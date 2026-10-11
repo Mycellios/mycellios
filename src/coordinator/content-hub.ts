@@ -327,16 +327,39 @@ export async function registerContentHubRoutes(
     }
   });
 
+  let lastSitemap: { xml: string; at: number } | undefined;
+  let sitemapRefresh: Promise<string> | undefined;
   app.get("/sitemap.xml", async (request, reply) => {
     reply.type("application/xml; charset=utf-8");
     reply.header("Cache-Control", "public, max-age=60, stale-if-error=86400");
     if (!options.client) return reply.send(fallbackSitemap);
+    const available = () => lastSitemap && Date.now() - lastSitemap.at < 86_400_000
+      ? lastSitemap.xml : fallbackSitemap;
+    if (!sitemapRefresh) {
+      sitemapRefresh = options.client.getAllPostsForSitemap()
+        .then((posts) => {
+          const xml = renderSitemap(posts);
+          lastSitemap = { xml, at: Date.now() };
+          return xml;
+        })
+        .catch((error: unknown) => {
+          request.log.warn({ err: error }, "Content Hub sitemap refresh failed");
+          return available();
+        })
+        .finally(() => { sitemapRefresh = undefined; });
+    }
+    // A slow editorial service must not hold up crawler requests. Share the
+    // bounded refresh and retain a valid sitemap while it completes.
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const posts = await options.client.getAllPostsForSitemap();
-      return reply.send(renderSitemap(posts));
-    } catch (error) {
-      request.log.warn({ err: error }, "Content Hub sitemap refresh failed");
-      return reply.send(fallbackSitemap);
+      return reply.send(await Promise.race([
+        sitemapRefresh,
+        new Promise<string>((resolve) => {
+          timer = setTimeout(() => resolve(available()), 500);
+        }),
+      ]));
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   });
 
