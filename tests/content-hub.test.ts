@@ -294,6 +294,35 @@ describe("Content Hub blog integration", () => {
     expect(fallback.body).toBe(readFileSync(fallbackPath, "utf8"));
   });
 
+  it("serves XML during a stalled shared refresh and retains articles after failure", async () => {
+    let complete!: (response: Response) => void;
+    const request = vi.fn<typeof fetch>().mockImplementationOnce(() =>
+      new Promise<Response>((resolve) => { complete = resolve; }),
+    ).mockRejectedValue(new Error("offline"));
+    const client = new ContentHubClient({
+      baseUrl: "https://content.example.com", fetch: request, cacheTtlMs: 0,
+    });
+    const app = Fastify();
+    apps.push(app);
+    await registerContentHubRoutes(app, { client });
+    const responses = await Promise.all([
+      app.inject({ method: "GET", url: "/sitemap.xml" }),
+      app.inject({ method: "GET", url: "/sitemap.xml" }),
+    ]);
+    expect(request).toHaveBeenCalledTimes(1);
+    for (const response of responses) {
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("application/xml");
+      expect(response.body).toContain("https://www.mycellios.com/blog</loc>");
+    }
+    complete(Response.json(postsPage({ items: [postFixture()] })));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    client.invalidate();
+    const stale = await app.inject({ method: "GET", url: "/sitemap.xml" });
+    expect(stale.body).toContain("https://www.mycellios.com/blog/research-note</loc>");
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it("returns HTML fallbacks for missing content or an unconfigured hub", async () => {
     const app = Fastify();
     apps.push(app);
