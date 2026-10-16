@@ -760,6 +760,12 @@ function orderedDpPlacement(
         const last = stageIndex === nodes.length - 1;
         if (last && end !== model.layers.length) continue;
         const stage: StagePlacement = { nodeId: node.id, layerStart: start, layerEnd: end };
+        // El techo de capas por etapa es un límite duro del motor, igual que la
+        // memoria: ambos crecen con `end`, así que la primera violación permite
+        // cortar el barrido. Sin esta comprobación el DP elegía por coste un
+        // reparto que el coste real rechazaba después, y el planificador devolvía
+        // `null` aunque existiera un reparto válido con el mismo número de nodos.
+        if (exceedsStageLayerLimit(node, start, end)) break;
         if (
           stageMemoryBytes(model, stage, workload, stageIndex === 0, last) >
           usableMemory(node)
