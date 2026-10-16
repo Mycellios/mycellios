@@ -55,12 +55,14 @@ const MAX_DECODE_SCALE = 20;
 export function deriveDecodeScales(
   observations: readonly ThroughputObservation[],
 ): DecodeScaleResult {
-  const measured = observations.filter(
-    (observation): observation is ThroughputObservation & { measuredTokensPerSecond: number } =>
-      observation.measuredTokensPerSecond !== null
-      && Number.isFinite(observation.measuredTokensPerSecond)
-      && observation.measuredTokensPerSecond > 0,
-  );
+  const isMeasured = (
+    observation: ThroughputObservation,
+  ): observation is ThroughputObservation & { measuredTokensPerSecond: number } =>
+    observation.measuredTokensPerSecond !== null
+    && Number.isFinite(observation.measuredTokensPerSecond)
+    && observation.measuredTokensPerSecond > 0;
+
+  const measured = observations.filter(isMeasured);
 
   if (measured.length === 0) {
     return {
@@ -75,12 +77,15 @@ export function deriveDecodeScales(
   }
 
   const reference = Math.max(...measured.map((observation) => observation.measuredTokensPerSecond));
-  const byId = new Map(measured.map((observation) => [observation.nodeId, observation]));
 
+  // Cada salida usa SU propia observación: dos observaciones del mismo nodeId
+  // son dos entradas distintas, no una. Un Map por nodeId colapsaba las
+  // duplicadas y una observación sin medir heredaba la medida de su gemela.
   const scales = observations.map((observation) => {
-    const hit = byId.get(observation.nodeId);
-    if (!hit) return { nodeId: observation.nodeId, decodeScale: 1, measured: false };
-    const raw = reference / hit.measuredTokensPerSecond;
+    if (!isMeasured(observation)) {
+      return { nodeId: observation.nodeId, decodeScale: 1, measured: false };
+    }
+    const raw = reference / observation.measuredTokensPerSecond;
     const clamped = Math.min(MAX_DECODE_SCALE, Math.max(MIN_DECODE_SCALE, raw));
     return {
       nodeId: observation.nodeId,
