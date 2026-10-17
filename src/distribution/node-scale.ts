@@ -76,7 +76,17 @@ export function deriveDecodeScales(
     };
   }
 
-  const reference = Math.max(...measured.map((observation) => observation.measuredTokensPerSecond));
+  // Un recorrido lineal, no `Math.max(...measured)`: pasar la lista entera como
+  // argumentos agota la pila de V8 a partir de ~125.000 observaciones
+  // (`RangeError: Maximum call stack size exceeded`) y la normalización caía con
+  // la flota, no con un número. El recorrido mantiene la MISMA referencia
+  // global (el máximo medido) en cualquier tamaño de flota.
+  let reference = 0;
+  for (const observation of measured) {
+    if (observation.measuredTokensPerSecond > reference) {
+      reference = observation.measuredTokensPerSecond;
+    }
+  }
 
   // Cada salida usa SU propia observación: dos observaciones del mismo nodeId
   // son dos entradas distintas, no una. Un Map por nodeId colapsaba las
