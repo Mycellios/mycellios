@@ -45,6 +45,34 @@ export function evaluateDistributionPlan(
       infeasibleReason: "concurrent_sequences_must_be_a_positive_integer",
     };
   }
+  // `promptTokens`, `outputTokens`, `contextTokens` and `maxStages` share the
+  // same contract as `concurrentSequences` (`assertPositiveInteger` in
+  // runtime-manifest, `z.number().int().positive()` in the auto-distribute
+  // schema), and so do the plan's `microBatchSize` and `prefillChunkTokens`
+  // (`runtime_microbatch_is_invalid` / `runtime_prefill_chunk_is_invalid`). An
+  // unvalidated caller can still pass a boundary value, and it must fail closed
+  // instead of fabricating metrics: with `promptTokens = 0` the prefill chunk
+  // is clamped to 1, `prefillChunks = ceil(0 / 1) = 0`, yet the sum of prefill
+  // services is still charged, so a positive TTFT is reported for no prompt;
+  // with `contextTokens = 0` the KV term vanishes and a route that does not fit
+  // is reported `feasible:true`; non-finite values would poison every metric
+  // while keeping the plan feasible.
+  const invalidPositiveInteger = (
+    [
+      ["prompt_tokens", workload.promptTokens],
+      ["output_tokens", workload.outputTokens],
+      ["context_tokens", workload.contextTokens],
+      ["max_stages", workload.maxStages],
+      ["micro_batch_size", plan.microBatchSize],
+      ["prefill_chunk_tokens", plan.prefillChunkTokens],
+    ] as const
+  ).find(([, value]) => !Number.isSafeInteger(value) || value < 1);
+  if (invalidPositiveInteger) {
+    return {
+      ...empty,
+      infeasibleReason: `${invalidPositiveInteger[0]}_must_be_a_positive_integer`,
+    };
+  }
   if (codec.estimatedQualityLoss > workload.maxQualityLoss) {
     return { ...empty, infeasibleReason: "activation_quality_budget_exceeded" };
   }
