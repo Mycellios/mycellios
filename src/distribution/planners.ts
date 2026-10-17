@@ -842,6 +842,14 @@ function furthestLayerThatFits(
   let best = start;
   for (let end = start + 1; end <= model.layers.length; end += 1) {
     if (exceedsStageLayerLimit(node, start, end)) break;
+    // El rol certificado es un límite duro igual que la memoria: la primera
+    // etapa es la cabeza y el tramo que cierra el modelo es la cola. Un nodo
+    // que no certifica ese rol no puede recibir ese tramo, porque
+    // `evaluateDistributionPlan` rechaza el plan entero
+    // (`engine_stage_role_unsupported`) y el barrido devolvía `null` aunque
+    // existiera un reparto válido. No se corta el barrido: un nodo sin rol de
+    // cola todavía puede quedarse con un tramo intermedio.
+    if (!nodeSupportsStagePosition(node, first, end === model.layers.length)) continue;
     const stage = { nodeId: node.id, layerStart: start, layerEnd: end };
     const memory = stageMemoryBytes(model, stage, workload, first, end === model.layers.length);
     if (memory > usableMemory(node)) break;
