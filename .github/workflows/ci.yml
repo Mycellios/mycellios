@@ -3,6 +3,11 @@ name: Deployment CI contract
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deployment-ci-${{ github.sha }}
+  cancel-in-progress: false
 
 permissions:
   checks: read
