@@ -797,31 +797,61 @@ function proportionalPlacement(
   nodes: ComputeNodeProfile[],
 ): StagePlacement[] | null {
   if (nodes.length > model.layers.length) return null;
-  const capacities = nodes.map((node, index) =>
-    maximumLayerCount(model, workload, node, index === 0, index === nodes.length - 1),
-  );
-  if (capacities.some((capacity) => capacity < 1)) return null;
-  if (sum(capacities) < model.layers.length) return null;
+  // La capacidad de un nodo depende de la capa donde empieza, porque las capas
+  // no pesan igual. Medirla desde la capa 0 daba por buenos tramos que después
+  // no cabían en memoria y el planificador devolvía `null` aunque existiera un
+  // reparto válido con esos mismos nodos en ese mismo orden.
+  const capacityOf = (counts: number[], index: number, shift = 0): number =>
+    maximumLayerCount(
+      model,
+      workload,
+      nodes[index]!,
+      sum(counts.slice(0, index)) + shift,
+      index === 0,
+      index === nodes.length - 1,
+    );
+  const counts = nodes.map(() => 1);
+  // Al repartir una capa más a un nodo, los posteriores empiezan una capa más
+  // tarde: la jugada sólo es segura si todos siguen cabiendo desde su nuevo
+  // inicio.
+  const laterNodesStayUsable = (counts: number[], index: number): boolean => {
+    for (let later = index + 1; later < nodes.length; later += 1) {
+      if (counts[later]! > capacityOf(counts, later, 1)) return false;
+    }
+    return true;
+  };
   const speeds = nodes.map((node) => 1 / Math.max(0.01, node.decodeScale));
   const speedTotal = sum(speeds);
-  const counts = nodes.map(() => 1);
   let remaining = model.layers.length - nodes.length;
   while (remaining > 0) {
     let chosen = -1;
+    let bestKeepsLaterNodesUsable = false;
     let bestDeficit = Number.NEGATIVE_INFINITY;
     for (let index = 0; index < nodes.length; index += 1) {
-      if (counts[index]! >= capacities[index]!) continue;
+      if (counts[index]! >= capacityOf(counts, index)) continue;
+      // Sumar una capa aquí retrasa el inicio de los nodos posteriores. Se
+      // prefiere la jugada que los deja dentro de su capacidad real; si no hay
+      // ninguna, se admite la mejor por reparto y decide la validación final.
+      const keepsLaterNodesUsable = laterNodesStayUsable(counts, index);
       const target = (model.layers.length * speeds[index]!) / speedTotal;
       const deficit = target - counts[index]!;
-      if (deficit > bestDeficit) {
-        bestDeficit = deficit;
+      if (
+        chosen < 0
+        || (keepsLaterNodesUsable && !bestKeepsLaterNodesUsable)
+        || (keepsLaterNodesUsable === bestKeepsLaterNodesUsable && deficit > bestDeficit)
+      ) {
         chosen = index;
+        bestKeepsLaterNodesUsable = keepsLaterNodesUsable;
+        bestDeficit = deficit;
       }
     }
     if (chosen < 0) return null;
     counts[chosen]! += 1;
     remaining -= 1;
   }
+  // Un reparto sólo vale si cada nodo puede cubrir de verdad sus capas desde la
+  // capa donde empieza.
+  if (nodes.some((_, index) => capacityOf(counts, index) < counts[index]!)) return null;
   const stages: StagePlacement[] = [];
   let start = 0;
   for (let index = 0; index < nodes.length; index += 1) {
@@ -862,15 +892,16 @@ function maximumLayerCount(
   model: DistributedModelProfile,
   workload: DistributionWorkload,
   node: ComputeNodeProfile,
+  layerStart: number,
   first: boolean,
   last: boolean,
 ): number {
   let count = 0;
-  for (let end = 1; end <= model.layers.length; end += 1) {
-    if (exceedsStageLayerLimit(node, 0, end)) break;
-    const stage = { nodeId: node.id, layerStart: 0, layerEnd: end };
+  for (let end = layerStart + 1; end <= model.layers.length; end += 1) {
+    if (exceedsStageLayerLimit(node, layerStart, end)) break;
+    const stage = { nodeId: node.id, layerStart, layerEnd: end };
     if (stageMemoryBytes(model, stage, workload, first, last) > usableMemory(node)) break;
-    count = end;
+    count = end - layerStart;
   }
   return count;
 }
