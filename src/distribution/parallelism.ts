@@ -243,6 +243,16 @@ export function tensorParallelCellGateReason(
   },
   now = Date.now(),
 ): string | null {
+  // A collective cell binds exactly one rank per physical member. A repeated
+  // id would count the same host twice: `directedLink` synthesizes a free
+  // self-link, so the collective would collapse to zero cost while the shard
+  // memory is divided by an inflated world size. That reports a feasible
+  // tensor-parallel cell no physical topology can execute. The pipeline cost
+  // model already rejects this as `node_reused_in_route`; the gate must fail
+  // closed too.
+  if (new Set(nodeIds).size !== nodeIds.length) {
+    return "tp_cell_member_reused";
+  }
   const byId = new Map(topology.nodes.map((node) => [node.id, node]));
   const regions = new Set(nodeIds.map((nodeId) => byId.get(nodeId)?.region));
   if (regions.has(undefined) || regions.size !== 1) {
