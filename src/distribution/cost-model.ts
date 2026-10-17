@@ -23,6 +23,28 @@ export function evaluateDistributionPlan(
 ): DistributionMetrics {
   const codec = activationCodec(plan.codec);
   const empty = emptyMetrics(codec.estimatedQualityLoss);
+  // `concurrentSequences` is a positive integer by contract: runtime-manifest
+  // `validatePlanRequest` and the auto-distribute schema both reject zero,
+  // negative, fractional and non-finite values before a plan is evaluated.
+  // Fail closed here too so an unvalidated caller cannot turn an invalid
+  // workload into a `feasible:true` plan. Without this guard, zero concurrency
+  // would set `batchSize = max(1, min(microBatchSize, 0)) = 1` and
+  // `batchesPerRound = ceil(0 / 1) = 0`, so
+  // `energyWhPerOutputToken = (energyPerBatchWh * 0) / 0 = NaN` while
+  // `aggregateTokensPerSecond = 0`; the plan would still be reported
+  // `feasible:true`, and `distributionObjective` (which only short-circuits on
+  // `!metrics.feasible`) would then return `NaN` instead of discarding the
+  // invalid input. Fractional or negative values likewise yield a misleading
+  // finite positive energy rather than being rejected.
+  if (
+    !Number.isSafeInteger(workload.concurrentSequences) ||
+    workload.concurrentSequences < 1
+  ) {
+    return {
+      ...empty,
+      infeasibleReason: "concurrent_sequences_must_be_a_positive_integer",
+    };
+  }
   if (codec.estimatedQualityLoss > workload.maxQualityLoss) {
     return { ...empty, infeasibleReason: "activation_quality_budget_exceeded" };
   }
@@ -194,6 +216,8 @@ export function evaluateDistributionPlan(
     const activeMs = decodeComputes[index]! + decodeOutgoing[index]! * 0.15;
     return total + (node.powerWatts * activeMs) / MILLISECONDS_PER_HOUR;
   }, 0);
+  // `concurrentSequences` is a validated positive integer here, so this
+  // division is always finite and well defined.
   const energyWhPerOutputToken =
     (energyPerBatchWh * batchesPerRound) / workload.concurrentSequences;
 
