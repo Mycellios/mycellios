@@ -332,7 +332,14 @@ function starAllReduceMs(
 ): number {
   let bestRoot = Number.POSITIVE_INFINITY;
   for (const root of nodeIds) {
-    let worstRoundTrip = 0;
+    // A star all-reduce reduces every peer into the root and only then
+    // broadcasts the result, so the root waits for the slowest inbound link and
+    // afterwards for the slowest outbound link. Those can belong to different
+    // peers: summing each peer's round trip and taking the maximum
+    // (`max(a_i + b_i)`) assumes one peer supplies both legs, which understates
+    // the collective on an asymmetric topology. Keep the legs separate.
+    let slowestInbound = 0;
+    let slowestOutbound = 0;
     let valid = true;
     for (const peer of nodeIds) {
       if (peer === root) continue;
@@ -342,13 +349,16 @@ function starAllReduceMs(
         valid = false;
         break;
       }
-      worstRoundTrip = Math.max(
-        worstRoundTrip,
-        rawTransferMs(messageBytes, inbound, p95) +
-          rawTransferMs(messageBytes, outbound, p95),
+      slowestInbound = Math.max(
+        slowestInbound,
+        rawTransferMs(messageBytes, inbound, p95),
+      );
+      slowestOutbound = Math.max(
+        slowestOutbound,
+        rawTransferMs(messageBytes, outbound, p95),
       );
     }
-    if (valid) bestRoot = Math.min(bestRoot, worstRoundTrip);
+    if (valid) bestRoot = Math.min(bestRoot, slowestInbound + slowestOutbound);
   }
   return bestRoot;
 }
