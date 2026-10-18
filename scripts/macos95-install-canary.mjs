@@ -121,7 +121,11 @@ try {
   await scheduler.arm(receipt.requestId, receipt.requestDigest);
   await waitFor('uninstall product removal', async () => await access(product).then(() => false, () => true));
   await assert.rejects(command('/bin/launchctl', ['print', service]));
-  report.gates.uninstall = { productRemoved: true, serviceRemoved: true };
+  const pairingAppRemoved = await access('/Applications/Mycellios Pairing.app').then(() => false, () => true);
+  const packageReceiptRemoved = await command('/usr/sbin/pkgutil', ['--pkg-info', 'io.mycellios.node']).then(() => false, () => true);
+  report.gates.uninstall = { productRemoved: true, serviceRemoved: true, pairingAppRemoved, packageReceiptRemoved };
+  assert.equal(pairingAppRemoved, true, 'uninstall left the installed Pairing app');
+  assert.equal(packageReceiptRemoved, true, 'uninstall left the installed PKG receipt');
   report.complete = true;
 } catch (error) {
   report.error = error.stack ?? String(error);

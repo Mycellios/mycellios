@@ -9,6 +9,7 @@ on:
       - scripts/verify-macos95-source.py
       - scripts/macos95-install-canary.mjs
       - scripts/macos95-ci-contract.mjs
+      - scripts/macos95-vitest.config.mjs
       - tests/test_macos95_source.py
       - config/macos95-source-allowlist.json
 
@@ -56,7 +57,7 @@ jobs:
           npm ci --include=dev --ignore-scripts --no-audit --no-fund
           node --input-type=module -e 'import fs from "node:fs";import{assertNativeSourceProvenanceMatches}from"./scripts/native-build-provenance.mjs";assertNativeSourceProvenanceMatches(".",JSON.parse(fs.readFileSync("mycellios-native-build-provenance.json")));'
           npm run typecheck
-          npx vitest run tests/node-pkg-package.test.ts tests/node-enrollment-bootstrap.test.ts tests/node-enrollment-api.test.ts tests/node-os-isolation.test.ts tests/node-uninstall-helper.test.ts
+          npx vitest run --config ../../scripts/macos95-vitest.config.mjs tests/node-pkg-package.test.ts tests/node-enrollment-bootstrap.test.ts tests/node-enrollment-api.test.ts tests/node-os-isolation.test.ts tests/node-uninstall-helper.test.ts
           npm run clean --silent
           npx tsc -p tsconfig.build.json
           npm run node:runtime
