@@ -1,3 +1,4 @@
+import { KOKORO_MODEL, resolveSpeechOptions } from "../contracts/speech.js";
 import type { ChatCompletionRequest } from "../contracts/types.js";
 import { canonicalJson, sha256Text } from "./json.js";
 
@@ -9,6 +10,7 @@ export function inputHashForRequest(request: ChatCompletionRequest): string {
     temperature: request.temperature,
     top_p: request.top_p,
     seed: request.seed,
+    ...(request.model === KOKORO_MODEL ? { speech: resolveSpeechOptions(request) } : {}),
   });
   return sha256Text(canonical);
 }

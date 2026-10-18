@@ -14,7 +14,11 @@
           "mycellios-kokoro-es": {
             "upstreamModel": "mycellios-kokoro-es",
             "categories": [
-              "tts"
+              "tts",
+              "speech",
+              "english",
+              "spanish",
+              "free"
             ],
             "capabilities": {
               "inputs": [
@@ -25,8 +29,46 @@
                 "audio"
               ],
               "supportedParameters": [
-                "stream"
+                "stream",
+                "language",
+                "voice",
+                "speed"
               ]
+            },
+            "pricing": {
+              "inputUsdPerMillion": 0,
+              "cachedInputUsdPerMillion": 0,
+              "outputUsdPerMillion": 0
+            }
+          },
+          "mycellios-kokoro": {
+            "upstreamModel": "mycellios-kokoro-es",
+            "categories": [
+              "tts",
+              "speech",
+              "english",
+              "spanish",
+              "free"
+            ],
+            "capabilities": {
+              "inputs": [
+                "text"
+              ],
+              "outputs": [
+                "text",
+                "audio"
+              ],
+              "supportedParameters": [
+                "stream",
+                "language",
+                "voice",
+                "speed"
+              ]
+            },
+            "pricing": {
+              "inputUsdPerMillion": 0,
+              "cachedInputUsdPerMillion": 0,
+              "outputUsdPerMillion": 0
             }
           }
         }

@@ -1,4 +1,4 @@
-import { isKokoroDeployment, MAX_SPEECH_RESPONSE_BYTES, verifiedSpeechEnvelope } from "../contracts/speech.js";
+import { isKokoroDeployment, MAX_SPEECH_RESPONSE_BYTES, verifiedSpeechEnvelope, resolveSpeechOptions } from "../contracts/speech.js";
 import type { ChatCompletionRequest, CompletionResult, ModelDeployment } from "../contracts/types.js";
 
 export function replicaOutputByteLimit(deployment: ModelDeployment | undefined, maxTokens = 256): number {
@@ -9,7 +9,7 @@ export function validateSpeechCompletion(request: ChatCompletionRequest, result:
   const users = request.messages.filter((m) => m.role === "user");
   if (users.length !== 1 || result.text !== output || result.metrics.outputTokens !== 0 || result.finishReason !== "stop"
     || Buffer.byteLength(output) > MAX_SPEECH_RESPONSE_BYTES) return { ok: false, reason: "Invalid speech completion" };
-  try { verifiedSpeechEnvelope(output, users[0]!.content); }
+  try { verifiedSpeechEnvelope(output, users[0]!.content, resolveSpeechOptions(request)); }
   catch { return { ok: false, reason: "Speech integrity validation failed" }; }
   return { ok: true };
 }

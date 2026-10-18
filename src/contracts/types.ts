@@ -94,6 +94,10 @@ export interface ChatMessage {
 
 export interface ChatCompletionRequest {
   model: string;
+  /** Kokoro controls: English by default, Spanish opt-in; speed 0.5..2. */
+  language?: "en" | "es";
+  voice?: "af_heart" | "am_michael" | "ef_dora" | "em_alex" | "em_santa";
+  speed?: number;
   messages: ChatMessage[];
   stream?: boolean;
   max_tokens?: number;

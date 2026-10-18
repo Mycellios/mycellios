@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   KOKORO_MODEL, KOKORO_WEIGHT_DIGEST, MAX_SPEECH_BYTES,
-  MAX_SPEECH_RESPONSE_BYTES, kokoroWorkerAdapterSchema, verifiedSpeechEnvelope,
+  MAX_SPEECH_RESPONSE_BYTES, kokoroWorkerAdapterSchema, verifiedSpeechEnvelope, resolveSpeechOptions,
 } from "../contracts/speech.js";
 import { AdapterError, type AdapterChunk, type AdapterRequest, type InferenceAdapter } from "./base.js";
 
@@ -29,7 +29,7 @@ export class KokoroAdapter implements InferenceAdapter {
     const health = z.object({
       status: z.literal("ready"), model: z.literal(KOKORO_MODEL),
       artifact_identity: z.literal(KOKORO_WEIGHT_DIGEST),
-      runtime: z.literal("mycellios-kokoro/1"), tokenizer: z.literal("cl100k_base"),
+      runtime: z.literal("mycellios-kokoro/2"), tokenizer: z.literal("cl100k_base"),
     }).parse(JSON.parse(await boundedBody(response, 4096)));
     this.ready = health.status === "ready";
     return { kind: this.kind, models: [KOKORO_MODEL], streaming: true, embeddings: false, reranking: false };
@@ -45,17 +45,18 @@ export class KokoroAdapter implements InferenceAdapter {
       throw new AdapterError("Speech requires one user text, without conversation history", "invalid_speech_request", false);
     }
     const text = users[0]!.content;
+    const options = resolveSpeechOptions(input.request);
     if (!text.trim() || [...text].length > 400) throw new Error("kokoro_text_limit_exceeded");
     const controller = new AbortController();
     this.jobs.set(input.jobId, controller);
     try {
       const response = await fetch(new URL("synthesize", this.baseUrl), {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text }), redirect: "error",
+        body: JSON.stringify({ text, ...options }), redirect: "error",
         signal: AbortSignal.any([signal, controller.signal, AbortSignal.timeout(120_000)]),
       });
       const result = replySchema.parse(JSON.parse(await boundedBody(response, MAX_SPEECH_RESPONSE_BYTES)));
-      verifiedSpeechEnvelope(result.content, text);
+      verifiedSpeechEnvelope(result.content, text, options);
       for (let offset = 0, index = 0; offset < result.content.length; offset += 16_384, index++) {
         if (signal.aborted) throw signal.reason;
         yield { index, text: result.content.slice(offset, offset + 16_384),

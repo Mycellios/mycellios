@@ -4,6 +4,7 @@ $root=$PSScriptRoot
 $env:HF_HOME=Join-Path $root 'Cache\huggingface'
 $env:TIKTOKEN_CACHE_DIR=Join-Path $root 'Cache\tiktoken'
 $env:MYCELLIOS_SPEECH_THREADS='2'
+$env:HF_HUB_OFFLINE='1'
 $env:PYTHONPATH=Join-Path $root 'venv\Lib\site-packages'
 $env:PYTHONNOUSERSITE='1'
 $env:GPU_MESH_WORKER_CONFIG=Join-Path $root 'worker.json'
