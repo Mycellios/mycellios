@@ -11,7 +11,7 @@ const recipe = path.join(root, 'scripts/macos-supplement-ci');
 const out = path.join(root, 'runtime/macos-supplement-ci');
 const sha = value => createHash('sha256').update(value).digest('hex');
 const inputBytes = fs.readFileSync(path.join(recipe, 'inputs.json'));
-assert.equal(sha(inputBytes), '967b422024d798678c0eb409670ca2884cf5c7d03cf7a8d46df808c140276944');
+assert.equal(sha(inputBytes), '45ff8f64c25699f1059b14c8b4af3dde1a3c6249a98a797e2b5a6d2e3289e6e6');
 const input = JSON.parse(inputBytes);
 assert.equal(input.schema, 'mycellios-macos-supplement-ci-inputs/1');
 assert.equal(input.completeProductionSourceReconstructed, false);

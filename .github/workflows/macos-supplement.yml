@@ -27,6 +27,8 @@ jobs:
         run: node scripts/macos-supplement-ci/run.mjs
       - name: Recipe tree structure and architecture (separate from119 closure)
         run: npm run verify:structure && npm run verify:architecture
+      - name: Operator publish rollback and full default store on real read-only mount
+        run: sudo unshare --mount --propagation private "$(command -v node)" scripts/macos-supplement-ci/operator-fixtures.mjs "$GITHUB_WORKSPACE/runtime/macos-supplement-ci/overlay-output/coordinator/macos-release-supplement.js"
       - name: Real read-only mount authority in a private mount namespace
         shell: bash
         run: |
