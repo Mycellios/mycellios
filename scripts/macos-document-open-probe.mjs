@@ -25,7 +25,7 @@ try {
   await writeFile(document, 'Harmless synthetic document; not an enrollment bundle.\n', {flag:'wx'});
   for (const kind of ['original-shell', 'prototype-applet']) {
     const app=join(base,kind+'.app'), capture=join(base,kind+'-capture.sh'), output=join(base,kind+'-argv.bin');
-    const bridge=join(app,'Contents/MacOS/pair-mycellios');
+    const bridge=join(app,'Contents/Resources/pair-mycellios');
     // Capture only the exact arguments delivered by LaunchServices/the proposed handler.
     await writeFile(capture, '#!/bin/sh\nprintf \'%s\\0\' "$@" > '+"'"+output.replaceAll("'","'\\''")+"'"+'\n', {flag:'wx'});
     await chmod(capture,0o700);
