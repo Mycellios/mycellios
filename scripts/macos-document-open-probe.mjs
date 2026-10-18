@@ -40,12 +40,14 @@ try {
       await chmod(launcher,0o700);
     }
     const plist=join(app,'Contents','Info.plist');
-    // Same minimal bundle metadata shape emitted by the proposed product builder.
-    await writeFile(plist,'<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Mycellios Pairing</string><key>CFBundleExecutable</key><string>'+(kind==='original-shell'?'launcher.sh':'applet')+'</string><key>CFBundlePackageType</key><string>APPL</string><key>LSBackgroundOnly</key><true/></dict></plist>');
-    for(const key of ['CFBundleIdentifier','CFBundleDocumentTypes']) {
+    if(kind==='original-shell') await writeFile(plist,'<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Mycellios Pairing</string><key>CFBundleExecutable</key><string>launcher.sh</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>');
+    const executableName=run('/usr/bin/plutil',['-extract','CFBundleExecutable','raw','-o','-',plist]).trim();
+    if(kind==='prototype-applet' && executableName!=='droplet')throw Error('unexpected_compiled_executable');
+    for(const key of ['CFBundleIdentifier','CFBundleDocumentTypes','LSBackgroundOnly']) {
       try { run('/usr/bin/plutil',['-remove',key,plist]); } catch {}
     }
     run('/usr/bin/plutil',['-insert','CFBundleIdentifier','-string','com.mycellios.probe.'+nonce+'.'+kind,plist]);
+    run('/usr/bin/plutil',['-insert','LSBackgroundOnly','-bool','true',plist]);
     run('/usr/bin/plutil',['-insert','CFBundleDocumentTypes','-json',JSON.stringify([{CFBundleTypeName:'Mycellios Enrollment',CFBundleTypeExtensions:['mycellios-enrollment'],CFBundleTypeRole:'Viewer',LSHandlerRank:'Owner',CFBundleTypeMIMETypes:['application/vnd.mycellios.enrollment+json']}]),plist]);
     let signatureVerified=false, decompiledHandlerVerified=false;
     if(kind==='prototype-applet') {
@@ -69,7 +71,7 @@ try {
       sameFile=expected.dev===actual.dev && expected.ino===actual.ino && actual.ino>0;
       sameContent=(await readFile(document)).equals(await readFile(argv[0]));
     }
-    report.results.push({kind,openError,argv,signatureVerified,decompiledHandlerVerified,exactPathString:argv?.length===1 && argv[0]===document,
+    report.results.push({kind,openError,argv,executableName,signatureVerified,decompiledHandlerVerified,exactPathString:argv?.length===1 && argv[0]===document,
       normalizedPathString:argv?.length===1 && argv[0].normalize('NFC')===document.normalize('NFC'),
       sameFileIdentity:sameFile,sameFileContent:sameContent,documentDeliveredToArgv:sameFile && sameContent,
       usedOpenArgs:false,scope:kind==='original-shell'?'Original95 shell launch shape; dummy executor only.':'Unpublished AppleScript on-open prototype; dummy executor only.'});
