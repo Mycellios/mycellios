@@ -291,3 +291,11 @@ runtime identity before starting the worker. Keep HF_HUB_DISABLE_XET=1 in the
 service environment for the standard verified HTTPS model download path. The
 supervisor uses two Torch threads and a process memory watchdog; this is not an
 OS-enforced memory quota. Stopping the service must remove its owned child processes.
+
+Operator-funded service quota is opt-in through
+`MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON`, a JSON object mapping dedicated API
+key IDs to model ID arrays. Use only for explicitly operator-funded routes.
+It preserves real usage counters and request/concurrency limits, while removing
+starter-token debits for that exact key/model pair. A persisted reservation marker
+keeps completion accounting stable across restarts and policy changes. Default is
+empty. Never put API key secrets in this setting or expose administrative tokens.

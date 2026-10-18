@@ -48,7 +48,9 @@ These rules apply to the complete repository.
 - Kokoro uses an explicit native replica adapter, not the Transformers layer planner.
 - Its loopback runtime owns model loading; the existing worker owns admission and leases.
 - Speech bytes are bounded independently from max_tokens and never counted as output text tokens.
-- Input usage is the cl100k_base count of the synthesized text. AntSeed examples start free.
+- Input usage is the cl100k_base count of the synthesized text. Set AntSeed speech pricing explicitly; never bill audio bytes as output tokens.
 - Test with tests/kokoro.test.ts and tests/kokoro-network.test.ts; real model tests are opt-in.
 - Standalone replicas redeem account-confirmed bundles through MYCELLIOS_WORKER_ENROLLMENT_PATH.
 - The worker owns the shared enrollment bootstrap; the native node keeps a compatibility re-export.
+
+- Operator-funded quota is opt-in per API key ID and model; preserve limits and persisted usage accounting.
