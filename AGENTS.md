@@ -42,3 +42,14 @@ These rules apply to the complete repository.
 - Physical tests that cannot run must be reported as skipped or unavailable,
   never as passing.
 - Do not commit or push unless the user explicitly requests it.
+
+## Archived Apple Silicon client release
+
+- `.github/workflows/macos-client95.yml` builds the existing authenticated public
+  client95 archive in a separate subdirectory. The orchestration Git revision and
+  archived payload source identity are distinct; never relabel the checkout's
+  package version or publish a replacement source ZIP through this workflow.
+- Archive verification uses `scripts/verify-macos95-source.py` and the exact
+  `config/macos95-source-allowlist.json`; installer lifecycle evidence is produced
+  by `scripts/macos95-install-canary.mjs` on a hosted arm64 Mac, without production
+  enrollment. Hosted service restart does not prove a physical reboot or GUI pairing.

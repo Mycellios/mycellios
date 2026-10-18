@@ -1,0 +1,101 @@
+name: Archived client95 Apple Silicon
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/macos95-release-20261018]
+    paths:
+      - .github/workflows/macos-client95.yml
+      - scripts/verify-macos95-source.py
+      - scripts/macos95-install-canary.mjs
+      - scripts/macos95-ci-contract.mjs
+      - tests/test_macos95_source.py
+      - config/macos95-source-allowlist.json
+
+permissions:
+  contents: read
+
+jobs:
+  macos95:
+    name: client95 · macos-arm64 · unsigned
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Verify standard hosted Apple Silicon runner
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          test "$(node -p 'process.arch')" = arm64
+          mkdir -p build/macos95-evidence
+      - name: Fetch and authenticate the existing public client95 source
+        run: |
+          set -euo pipefail
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 2 \
+            --output build/client95-source.zip \
+            https://www.mycellios.com/downloads/mycellios-node-0.2.95-source.zip
+          export MACOS95_SOURCE_ARCHIVE="$PWD/build/client95-source.zip"
+          python -m unittest discover -s tests -p test_macos95_source.py -v
+          python scripts/verify-macos95-source.py \
+            --archive build/client95-source.zip \
+            --allowlist config/macos95-source-allowlist.json \
+            --destination build/client95 \
+            --receipt build/macos95-evidence/archived-source.json
+      - name: Build the authenticated95 payload, not this branch's77 payload
+        working-directory: build/client95
+        env:
+          NODE_ENV: production
+        run: |
+          set -euo pipefail
+          npm ci --include=dev --ignore-scripts --no-audit --no-fund
+          node --input-type=module -e 'import fs from "node:fs";import{assertNativeSourceProvenanceMatches}from"./scripts/native-build-provenance.mjs";assertNativeSourceProvenanceMatches(".",JSON.parse(fs.readFileSync("mycellios-native-build-provenance.json")));'
+          npm run typecheck
+          npx vitest run tests/node-pkg-package.test.ts tests/node-enrollment-bootstrap.test.ts tests/node-enrollment-api.test.ts tests/node-os-isolation.test.ts tests/node-uninstall-helper.test.ts
+          npm run clean --silent
+          npx tsc -p tsconfig.build.json
+          npm run node:runtime
+          epoch="$(date -u +%s)"
+          node scripts/stage-node-installer.mjs \
+            --dist=dist --runtime=build/distribution-runtime \
+            --node-executable="$(node -p 'process.execPath')" --node-modules=node_modules \
+            --source-root=. --target=macos-arm64 \
+            --source-revision=7e8ce6eaf9b0501c0424773ec94c8e4af94bd3c5 \
+            --output=build/node-package/macos-arm64
+          node scripts/verify-node-installer.mjs --root=build/node-package/macos-arm64
+          node scripts/build-node-pkg.mjs --staged-root=build/node-package/macos-arm64 \
+            --output=build/mycellios-node-0.2.95-macos-arm64.pkg --version=0.2.95 --source-date-epoch="$epoch"
+          node scripts/verify-node-pkg.mjs --staged-root=build/node-package/macos-arm64 \
+            --pkg=build/mycellios-node-0.2.95-macos-arm64.pkg --version=0.2.95
+          node scripts/node-release-evidence.mjs \
+            --artifact=build/mycellios-node-0.2.95-macos-arm64.pkg \
+            --staged-root=build/node-package/macos-arm64 --output-directory=../macos95-evidence \
+            --source-date-epoch="$epoch" --builder-os=macOS --builder-arch=ARM64 \
+            --workflow="$GITHUB_WORKFLOW" --run-id="$GITHUB_RUN_ID" --run-attempt="$GITHUB_RUN_ATTEMPT"
+          node scripts/verify-node-release-evidence.mjs \
+            --artifact=build/mycellios-node-0.2.95-macos-arm64.pkg \
+            --staged-root=build/node-package/macos-arm64 \
+            --evidence=../macos95-evidence/mycellios-node-0.2.95-macos-arm64.pkg.provenance.json \
+            --sbom=../macos95-evidence/mycellios-node-0.2.95-macos-arm64.pkg.cdx.json \
+            --checksum=../macos95-evidence/mycellios-node-0.2.95-macos-arm64.pkg.sha256
+      - name: Install, enroll locally, exercise launchd and uninstall
+        run: |
+          set -euo pipefail
+          node scripts/macos95-ci-contract.mjs "$PWD/build/client95"
+          sudo "$(node -p 'process.execPath')" scripts/macos95-install-canary.mjs \
+            "$PWD/build/client95" "$PWD/build/macos95-evidence" "$GITHUB_SHA"
+      - name: Upload only candidate PKG and evidence, never a new source ZIP
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: mycellios-client95-macos-arm64-unsigned
+          path: |
+            build/client95/build/mycellios-node-0.2.95-macos-arm64.pkg
+            build/macos95-evidence
+          if-no-files-found: error
+          retention-days: 14
