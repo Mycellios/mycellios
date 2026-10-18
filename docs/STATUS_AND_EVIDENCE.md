@@ -229,3 +229,7 @@ The commission belongs to the combined channel, not an isolated voice payout.
 This was a controlled test between operator-owned buyer/seller accounts, not
 external customer revenue. ANTS rewards for this route remain unverified and
 must not be inferred from USDC settlement or self-test traffic.
+
+### Kokoro voice controls: source and isolated physical pilot (2026-10-18)
+
+English is the default; Spanish is explicit via language=es. The request accepts the five documented voices and speed 0.5 through 2. Contract, coordinator dispatch, request identity and response checks have focused automated coverage. An isolated MSI CPU pilot generated English default, English male, slow, fast and Spanish audio: the same 14-token English text produced 6.5 seconds at 0.8 and 4.45 seconds at 1.2. No public-path deployment or OmniRoute/AntSeed control verification is claimed by this entry. Existing Kokoro pricing remains zero.

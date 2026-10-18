@@ -900,6 +900,9 @@ function generationOnlyRequest(request: ChatCompletionRequest): ChatCompletionRe
     ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
     ...(request.top_p === undefined ? {} : { top_p: request.top_p }),
     ...(request.seed === undefined ? {} : { seed: request.seed }),
+    ...(request.language === undefined ? {} : { language: request.language }),
+    ...(request.voice === undefined ? {} : { voice: request.voice }),
+    ...(request.speed === undefined ? {} : { speed: request.speed }),
     ...(request.privacy === undefined ? {} : { privacy: {
       ...request.privacy,
       ...(request.privacy.pinned_identity_ids

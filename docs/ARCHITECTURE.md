@@ -61,3 +61,15 @@ tensor- and expert-parallel cells, speculative execution and recovery
 machinery. Those capabilities remain conditional on their documented hardware
 and evidence gates; they do not change the first milestone: prove the ordinary
 pipeline across two physical machines.
+
+## Optional speech controls
+
+The chat contract carries Kokoro language (`en` by default, `es` optional),
+allowlisted matching voices and speed 0.5..2. English defaults to `af_heart`;
+Spanish defaults to `ef_dora`. The coordinator includes normalized controls in
+request identity and forwards them through its generation checkpoint. The worker
+passes them to a loopback runtime sharing one CPU model across both language
+pipelines. The coordinator verifies returned language, voice and speed together
+with the bounded WAV hash before accepting a completion. Audio is never output
+text usage. AntSeed metadata declares `language`, `voice`, `speed`; end-to-end
+support additionally requires the gateway to preserve those request fields.

@@ -19,7 +19,7 @@ async function runtimeUrl() {
       const input = JSON.parse(Buffer.concat(chunks).toString());
       // A large response exercises the real worker byte and token boundaries.
       await new Promise((r) => setTimeout(r, 60));
-      res.end(JSON.stringify(speechReply(input.text, 180_000)));
+      res.end(JSON.stringify(speechReply(input.text, 180_000, { language: input.language, voice: input.voice, speed: input.speed })));
     })();
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
@@ -56,10 +56,10 @@ async function network(baseUrls: string[]) {
   }
   return { runtime, address };
 }
-async function speak(address: string, text: string, stream = false) {
+async function speak(address: string, text: string, stream = false, options: { language?: "en" | "es"; voice?: string; speed?: number } = {}) {
   return fetch(address + "/v1/chat/completions", { method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model: KOKORO_MODEL, messages: [{ role: "user", content: text }], stream }),
+    body: JSON.stringify({ model: KOKORO_MODEL, messages: [{ role: "user", content: text }], stream, ...options }),
   });
 }
 describe("Kokoro over the real Mycellios worker protocol", () => {
@@ -80,6 +80,18 @@ describe("Kokoro over the real Mycellios worker protocol", () => {
     const sse = await streamed.text();
     expect(sse).toContain("data: [DONE]");
     expect(sse).toContain('"completion_tokens":0');
+  });
+  it("preserves voice, language and speed through authenticated worker dispatch", async () => {
+    const { address } = await network([await runtimeUrl()]);
+    for (const options of [{}, { language: "es" as const, voice: "em_alex", speed: 0.8 }, { language: "en" as const, voice: "am_michael", speed: 1.2 }]) {
+      const response = await speak(address, "Control test", false, options);
+      const body = await response.json() as { choices: Array<{ message: { content: string } }> };
+      expect(response.status, JSON.stringify(body)).toBe(200);
+      const speech = JSON.parse(body.choices[0]!.message.content);
+      expect(speech).toMatchObject(Object.keys(options).length ? options : { language: "en", voice: "af_heart", speed: 1 });
+    }
+    const bad = await speak(address, "Control test", false, { language: "es", voice: "af_heart" });
+    expect(bad.status).toBe(400);
   });
   it.skipIf(!process.env.MYCELLIOS_KOKORO_REAL_URL)("delivers actual Kokoro WAV through an authenticated worker session", async () => {
     const { address } = await network([process.env.MYCELLIOS_KOKORO_REAL_URL!]);

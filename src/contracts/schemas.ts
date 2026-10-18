@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { kokoroWorkerAdapterSchema, KOKORO_WEIGHT_DIGEST } from "./speech.js";
+import { kokoroWorkerAdapterSchema, KOKORO_WEIGHT_DIGEST, KOKORO_MODEL, speechOptionsSchema, resolveSpeechOptions } from "./speech.js";
 import {
   coordinatorRuntimePerformanceEvidenceSchema,
 } from "../performance/runtime-profile.js";
@@ -88,6 +88,7 @@ export const chatMessageSchema = z.object({
 });
 
 export const chatCompletionRequestSchema = z.object({
+  ...speechOptionsSchema.shape,
   model: z.string().min(1),
   messages: z.array(chatMessageSchema).min(1),
   stream: z.boolean().default(false),
@@ -111,7 +112,14 @@ export const chatCompletionRequestSchema = z.object({
       context.addIssue({ code: "custom", path: ["pinned_identity_ids"], message: "Pinned identities require pinned-edges" });
     }
   }).optional(),
-}).strict();
+}).strict().superRefine((request, context) => {
+  if (request.model === KOKORO_MODEL) {
+    try { resolveSpeechOptions(request); }
+    catch { context.addIssue({ code: "custom", message: "Invalid speech voice/language combination", path: ["voice"] }); }
+  } else if (request.language !== undefined || request.voice !== undefined || request.speed !== undefined) {
+    context.addIssue({ code: "custom", message: "Speech controls require a Kokoro deployment", path: ["model"] });
+  }
+});
 
 export const deploymentSchema = z
   .object({
