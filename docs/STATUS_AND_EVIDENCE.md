@@ -202,6 +202,30 @@ SHA256 b35eb4ecd78629579fcae23bcff254d52368be1f069903674808b87adff58aee.
 The seller identity and unrelated research/GPU service configuration were retained.
 Receipts and audio are retained as operator artifacts rather than committed binaries.
 
-The public speech offer is free. This proves publication, discovery and speech
-delivery through physical PCs; paid USDC settlement and ANTS rewards for this
-route remain unverified.
+The offer subsequently changed to USD 6 per million input tokens (cached input
+also 6), with zero output price. An explicit operator-funded key/model quota
+policy now prevents the dedicated Kokoro seller key from consuming the owner
+account starter quota; authentication, revocation, rate/concurrency limits and
+actual usage counters remain active. This is an operator-funded route, not an
+automatic exemption for unrelated keys, models or third-party compute.
+
+Coordinator 0.2.122 is deployed from main
+67a72c97d283ec0c388e4e564c586cd6a1b93504, immutable image
+18db4ed982f9a0ad36ca2b12c2a76f2494face114f463063d81c03c6b40208df,
+source ID c6f74871605a7324e56e56ed1aa731ec358a02bf855745f7aa2c5f943f3752da.
+The overlay retained 328 unrelated JavaScript modules. Its exact compiled code
+passed a real admitted speech request with zero account quota before promotion.
+
+Paid gateway request job_56eb18fe03784ad18d5db91fb9c40c40 completed on the
+physical MRPUCCHI replica: 14 input tokens, zero output tokens, 4.125 seconds of
+verified audio. The account balance remained 24876 before and after the request.
+Its gross voice charge was 84 micro-USDC. The shared buyer channel also included
+458 micro-USDC of research, so the combined 542 micro-USDC settled as 521 to the
+seller and 21 protocol fee. Base transaction
+0x5cd390fa90006ceb557619591bfe265b3e2a7a8f4e29a3bf1260464b03647eaa
+succeeded at block 52772381; its USDC Transfer logs were independently checked.
+The commission belongs to the combined channel, not an isolated voice payout.
+
+This was a controlled test between operator-owned buyer/seller accounts, not
+external customer revenue. ANTS rewards for this route remain unverified and
+must not be inferred from USDC settlement or self-test traffic.
