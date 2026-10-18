@@ -29,7 +29,7 @@ class DerivationTests(unittest.TestCase):
                 ROOT / 'config/macos95-source-allowlist.json', patch_file, destination)
             return result, json.loads((destination / 'mycellios-native-build-provenance.json').read_bytes())
 
-    def test_two_mac_sources_have_new_identity_and651_authenticated_records(self):
+    def test_three_mac_sources_have_new_identity_and651_authenticated_records(self):
         receipt, provenance = self.attempt()
         self.assertEqual(receipt['sourceId'], provenance['sourceId'])
         self.assertNotEqual(receipt['sourceId'], module.original.SOURCE_ID)

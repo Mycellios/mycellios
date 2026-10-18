@@ -123,3 +123,19 @@ test('default Mac package refuses mismatching data paths before any external act
   await assert.rejects(mismatch.result, /data_paths_mismatch/);
   assert.deepEqual(mismatch.events, []);
 });
+test('Darwin registration uses the system chown executable without a Linux or Windows command', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mac95-registration-'));
+  try {
+    const { registerNativeNodeService } = await import(pathToFileURL(join(payload, 'dist/node/service-registration.js')));
+    const commands = [];
+    await registerNativeNodeService({
+      manifest: { ...macManifest, serviceDefinitionPath: join(root, 'service.plist'),
+        helperEntrypoint: join(root, 'app/node/uninstall-main.js'), nodeExecutable: '/fixture/node' },
+      config: { isolation: { mode: 'macos-launchd-limits' }, limits: { maxRamMiB: 512 } },
+      run: async (file, args) => { commands.push([file, args]); return { code: 0, stdout: '' }; },
+    });
+    assert.equal(commands[0][0], '/usr/sbin/chown');
+    assert.ok(commands.slice(1).every(([file]) => file === '/bin/launchctl'));
+    assert.ok(!commands.some(([file]) => ['/bin/chown', '/usr/bin/chown', 'sc.exe', '/usr/sbin/useradd'].includes(file)));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

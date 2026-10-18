@@ -11,6 +11,7 @@ on:
       - scripts/macos95-ci-contract.mjs
       - scripts/macos95-vitest.config.mjs
       - scripts/macos95-keychain-canary.mjs
+      - scripts/macos95-executable-audit.mjs
       - scripts/derive-macos95-source.py
       - config/macos95-mac-patch.json
       - tests/test_macos95_derivation.py
@@ -63,6 +64,7 @@ jobs:
           NODE_ENV: production
         run: |
           set -euo pipefail
+          node ../../scripts/macos95-executable-audit.mjs "$PWD" "$PWD/../macos95-evidence"
           npm ci --include=dev --ignore-scripts --no-audit --no-fund
           node --input-type=module -e 'import fs from "node:fs";import{assertNativeSourceProvenanceMatches}from"./scripts/native-build-provenance.mjs";assertNativeSourceProvenanceMatches(".",JSON.parse(fs.readFileSync("mycellios-native-build-provenance.json")));'
           npm run typecheck
@@ -109,5 +111,6 @@ jobs:
           path: |
             build/client95/build/mycellios-node-0.2.95-macos-arm64.pkg
             build/macos95-evidence
+            !build/macos95-evidence/ephemeral-enrollment.json
           if-no-files-found: error
           retention-days: 14

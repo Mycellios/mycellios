@@ -57,3 +57,6 @@ These rules apply to the complete repository.
   `scripts/derive-macos95-source.py` with their own source identity. Preserve the
   original archive and Windows95 identity; installer evidence must name the
   derived payload and distinguish the ephemeral client95 API from production.
+- Mac CI checks absolute system command paths and PATH commands on the actual
+  hosted runner before runtime packaging; filesystem inspection does not replace
+  enrollment and launchd lifecycle tests.
