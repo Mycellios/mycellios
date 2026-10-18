@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -9,8 +9,11 @@ import { pathToFileURL } from 'node:url';
 // Execute the original95 store unchanged. Only its fixed keychain location is
 // redirected by the supported command-runner seam to an exclusive temporary file.
 const [payload, evidence] = process.argv.slice(2).map((value) => resolve(value));
+const payloadIdentity = JSON.parse(await readFile(join(payload, 'mycellios-native-build-provenance.json'), 'utf8'));
 const report = { schema: 'mycellios-macos95-keychain-probe/1',
-  temporaryKeychainOnly: true, originalProductSourceUnmodified: true, complete: false, operations: [] };
+  temporaryKeychainOnly: true, payloadSourceId: payloadIdentity.sourceId,
+  originalProductSourceUnmodified: payloadIdentity.sourceId === 'sha256:df3c212976012758420b0085c8050ba417d818fc9424b4ec0a7edc1b42719032',
+  complete: false, operations: [] };
 let root, keychain;
 async function run(file, args, stdin) {
   return await new Promise((resolveRun, reject) => {

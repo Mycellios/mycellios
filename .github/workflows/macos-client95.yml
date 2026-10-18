@@ -11,6 +11,10 @@ on:
       - scripts/macos95-ci-contract.mjs
       - scripts/macos95-vitest.config.mjs
       - scripts/macos95-keychain-canary.mjs
+      - scripts/derive-macos95-source.py
+      - config/macos95-mac-patch.json
+      - tests/test_macos95_derivation.py
+      - tests/macos95-derived-contract.test.mjs
       - tests/test_macos95_source.py
       - config/macos95-source-allowlist.json
 
@@ -43,13 +47,17 @@ jobs:
             --output build/client95-source.zip \
             https://www.mycellios.com/downloads/mycellios-node-0.2.95-source.zip
           export MACOS95_SOURCE_ARCHIVE="$PWD/build/client95-source.zip"
-          python -m unittest discover -s tests -p test_macos95_source.py -v
+          python -m unittest discover -s tests -p 'test_macos95_*.py' -v
           python scripts/verify-macos95-source.py \
             --archive build/client95-source.zip \
             --allowlist config/macos95-source-allowlist.json \
-            --destination build/client95 \
+            --destination build/client95-original \
             --receipt build/macos95-evidence/archived-source.json
-      - name: Build the authenticated95 payload, not this branch's77 payload
+          python scripts/derive-macos95-source.py \
+            --archive build/client95-source.zip --allowlist config/macos95-source-allowlist.json \
+            --patch config/macos95-mac-patch.json --destination build/client95 \
+            --receipt build/macos95-evidence/derived-source.json
+      - name: Build the authenticated Mac-only95 derivative, not this branch's77 payload
         working-directory: build/client95
         env:
           NODE_ENV: production
@@ -61,6 +69,7 @@ jobs:
           npx vitest run --config ../../scripts/macos95-vitest.config.mjs tests/node-pkg-package.test.ts tests/node-enrollment-bootstrap.test.ts tests/node-enrollment-api.test.ts tests/node-os-isolation.test.ts tests/node-uninstall-helper.test.ts
           npm run clean --silent
           npx tsc -p tsconfig.build.json
+          MACOS95_DERIVED_PAYLOAD="$PWD" node --test ../../tests/macos95-derived-contract.test.mjs
           node ../../scripts/macos95-keychain-canary.mjs "$PWD" "$PWD/../macos95-evidence"
           npm run node:runtime
           epoch="$(date -u +%s)"

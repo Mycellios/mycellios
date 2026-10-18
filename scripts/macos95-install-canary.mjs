@@ -23,10 +23,12 @@ const command = async (file, args, options = {}) => await run(file, args, {
 const load = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const imported = async (file) => await import(pathToFileURL(join(payload, 'dist', file)));
 const report = { schema: 'mycellios-macos95-hosted-installation/1', recipeRevision,
-  payloadSourceId: 'sha256:df3c212976012758420b0085c8050ba417d818fc9424b4ec0a7edc1b42719032',
-  payloadRevision: '7e8ce6eaf9b0501c0424773ec94c8e4af94bd3c5', version: '0.2.95',
+  payloadSourceId: 'sha256:7a7690663d37ac3fed9db26950d10279ea6b13e93db0f34d5afbb7ca46c3aaf1',
+  payloadBaseSourceId: 'sha256:df3c212976012758420b0085c8050ba417d818fc9424b4ec0a7edc1b42719032',
+  payloadBaseRevision: '7e8ce6eaf9b0501c0424773ec94c8e4af94bd3c5', version: '0.2.95',
   unsigned: true, notarized: false, physicalMac: false, realRebootTested: false,
   guiPairingTested: false, gpuInferenceTested: false, distributedInferenceTested: false,
+  production119CompatibilityTested: false, coordinatorScope: 'Ephemeral loopback coordinator from authenticated client95 base plus Mac-only derivation.',
   gates: {}, complete: false };
 let coordinator, installed = false;
 async function save() { await writeFile(join(evidence, 'installation.json'), JSON.stringify(report, null, 2) + '\n'); }
@@ -45,6 +47,9 @@ try {
   assert.equal(process.platform, 'darwin'); assert.equal(process.arch, 'arm64'); assert.equal(process.getuid(), 0);
   assert.match(recipeRevision, /^[a-f0-9]{40}$/);
   report.gates.ciContracts = await verifyCiContracts(payload);
+  report.sourceDerivation = await load(join(evidence, 'derived-source.json'));
+  assert.equal(report.sourceDerivation.sourceId, report.payloadSourceId);
+  assert.equal(report.sourceDerivation.baseSourceId, report.payloadBaseSourceId);
   await assert.rejects(access(product), 'host must start without a previous Mycellios product');
   const pkg = join(payload, 'build/mycellios-node-0.2.95-macos-arm64.pkg');
   await command('/usr/sbin/installer', ['-pkg', pkg, '-target', '/']); installed = true;
@@ -120,6 +125,9 @@ try {
   assert.ok(marker, 'real installed tiny CPU canary evidence missing');
   report.gates.installedCpuCanary = JSON.parse(marker.slice(marker.indexOf('=') + 1));
   const { NodeUninstallScheduler } = await imported('node/uninstall-helper.js');
+  const identityMetadata = await load(config.coordinator.identityPath);
+  assert.equal(identityMetadata.identityId, config.nodeId);
+  assert.equal(identityMetadata.provider, 'macos-keychain');
   const scheduler = new NodeUninstallScheduler(config.uninstall.manifestPath, join(data, 'State/uninstall-requests'));
   const receipt = await scheduler.schedule({ nodeId: config.nodeId, generation: ownership.generation,
     commandId: randomUUID(), retain: { cache: false, logs: false, configuration: false, identity: false } });
@@ -128,9 +136,21 @@ try {
   await assert.rejects(command('/bin/launchctl', ['print', service]));
   const pairingAppRemoved = await access('/Applications/Mycellios Pairing.app').then(() => false, () => true);
   const packageReceiptRemoved = await command('/usr/sbin/pkgutil', ['--pkg-info', 'io.mycellios.node']).then(() => false, () => true);
-  report.gates.uninstall = { productRemoved: true, serviceRemoved: true, pairingAppRemoved, packageReceiptRemoved };
+  const configurationRemoved = await access(configFile).then(() => false, () => true);
+  const identityMetadataRemoved = await access(config.coordinator.identityPath).then(() => false, () => true);
+  const configurationDirectoryRemoved = await access(join(data, 'Configuration')).then(() => false, () => true);
+  const identityDirectoryRemoved = await access(join(data, 'Identity')).then(() => false, () => true);
+  const { MacOsKeychainSecretStore } = await imported('node/identity-store.js');
+  const identitySecretRemoved = await new MacOsKeychainSecretStore().get(identityMetadata.secretReference) === null;
+  report.gates.uninstall = { productRemoved: true, serviceRemoved: true, pairingAppRemoved, packageReceiptRemoved,
+    configurationRemoved, identityMetadataRemoved, identitySecretRemoved, configurationDirectoryRemoved, identityDirectoryRemoved };
   assert.equal(pairingAppRemoved, true, 'uninstall left the installed Pairing app');
   assert.equal(packageReceiptRemoved, true, 'uninstall left the installed PKG receipt');
+  assert.equal(configurationRemoved, true, 'uninstall left configuration');
+  assert.equal(identityMetadataRemoved, true, 'uninstall left identity metadata');
+  assert.equal(identitySecretRemoved, true, 'uninstall left the protected identity secret');
+  assert.equal(configurationDirectoryRemoved, true, 'uninstall left the configuration directory');
+  assert.equal(identityDirectoryRemoved, true, 'uninstall left the identity directory');
   report.complete = true;
 } catch (error) {
   report.error = error.stack ?? String(error);

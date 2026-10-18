@@ -53,3 +53,7 @@ These rules apply to the complete repository.
   `config/macos95-source-allowlist.json`; installer lifecycle evidence is produced
   by `scripts/macos95-install-canary.mjs` on a hosted arm64 Mac, without production
   enrollment. Hosted service restart does not prove a physical reboot or GUI pairing.
+- Mac-only client95 repairs are sealed by `config/macos95-mac-patch.json` and
+  `scripts/derive-macos95-source.py` with their own source identity. Preserve the
+  original archive and Windows95 identity; installer evidence must name the
+  derived payload and distinguish the ephemeral client95 API from production.
