@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, lstat, mkdtemp, rm } from 'node:fs/promises';
 import { posix, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
@@ -130,9 +130,17 @@ test('Darwin registration uses the system chown executable without a Linux or Wi
     const commands = [];
     await registerNativeNodeService({
       manifest: { ...macManifest, serviceDefinitionPath: join(root, 'service.plist'),
-        helperEntrypoint: join(root, 'app/node/uninstall-main.js'), nodeExecutable: '/fixture/node' },
+        helperEntrypoint: join(root, 'app/node/uninstall-main.js'), nodeExecutable: '/fixture/node',
+        configPath: join(root, 'Configuration/node.json'), identityPath: join(root, 'Identity/node.json'),
+        cachePath: join(root, 'Cache'), logsPath: join(root, 'Logs'), statePath: join(root, 'State') },
       config: { isolation: { mode: 'macos-launchd-limits' }, limits: { maxRamMiB: 512 } },
-      run: async (file, args) => { commands.push([file, args]); return { code: 0, stdout: '' }; },
+      run: async (file, args) => {
+        if (file === '/usr/sbin/chown') for (const path of args.slice(2)) {
+          assert.ok(path.startsWith(root));
+          const entry = await lstat(path); assert.ok(entry.isDirectory() && !entry.isSymbolicLink());
+        }
+        commands.push([file, args]); return { code: 0, stdout: '' };
+      },
     });
     assert.equal(commands[0][0], '/usr/sbin/chown');
     assert.ok(commands.slice(1).every(([file]) => file === '/bin/launchctl'));

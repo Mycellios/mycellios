@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { access, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, lstat, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
@@ -23,7 +23,7 @@ const command = async (file, args, options = {}) => await run(file, args, {
 const load = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const imported = async (file) => await import(pathToFileURL(join(payload, 'dist', file)));
 const report = { schema: 'mycellios-macos95-hosted-installation/1', recipeRevision,
-  payloadSourceId: 'sha256:25139c66deb61cdd7f3ee658c94dfe058eb87d44692a7783996e18d907267629',
+  payloadSourceId: 'sha256:a203c352249a1f53156bab62ee36ee2726ac2e5d66bc6dd5df0be78c486b3182',
   payloadBaseSourceId: 'sha256:df3c212976012758420b0085c8050ba417d818fc9424b4ec0a7edc1b42719032',
   payloadBaseRevision: '7e8ce6eaf9b0501c0424773ec94c8e4af94bd3c5', version: '0.2.95',
   unsigned: true, notarized: false, physicalMac: false, realRebootTested: false,
@@ -89,9 +89,25 @@ try {
   await command(join(product, 'bin/node'), [join(product, 'app/node/install-main.js'), '--enrollment', bundleFile], { timeout: 300_000 });
   await assert.rejects(access(bundleFile), 'one-use enrollment must be consumed');
   const config = await load(configFile);
+  assert.equal(config.coordinator.identityPath, join(data, 'Identity/node.json'));
+  assert.equal(config.worker.configPath, join(data, 'Configuration/worker.json'));
+  assert.equal(config.runtime.pythonExecutable, join(product, 'runtime/bin/python3'));
+  assert.equal(config.runtime.pythonPath, join(product, 'python'));
+  assert.equal(config.uninstall.manifestPath, join(data, 'State/installation.json'));
+  for (const path of [join(data, 'Configuration'), join(data, 'Identity'), config.runtime.cachePath,
+    '/Library/Logs/Mycellios', join(data, 'State')]) {
+    const entry = await lstat(path);
+    assert.ok(entry.isDirectory() && !entry.isSymbolicLink());
+    assert.equal(entry.uid, 0); assert.equal(entry.mode & 0o077, 0);
+  }
+  for (const path of [configFile, config.worker.configPath, config.uninstall.manifestPath]) {
+    const entry = await lstat(path); assert.ok(entry.isFile() && !entry.isSymbolicLink()); assert.equal(entry.uid, 0);
+  }
   const firstHealth = await waitFor('service ready', async () => { const value = await load(healthFile); return value.state === 'ready' && value; });
   const parent = await command('/bin/ps', ['-o', 'ppid=', '-p', String(firstHealth.pid)]);
   assert.equal(Number(parent.stdout.trim()), 1);
+  const user = await command('/bin/ps', ['-o', 'uid=', '-p', String(firstHealth.pid)]);
+  assert.equal(Number(user.stdout.trim()), 0);
   assert.equal(config.isolation.mode, 'macos-launchd-limits');
   await command('/bin/launchctl', ['print', service]);
   const ownership = coordinator.database.getNodeOwnership('device', config.nodeId);
@@ -99,6 +115,8 @@ try {
   report.gates.launchd = { parentPid: 1, servicePid: firstHealth.pid, isolation: config.isolation.mode,
     scope: 'Genuine launchd parent and configured limits; not a hard-memory-enforcement claim.' };
   report.gates.localEnrollment = { consumed: true, ownerVerified: true, productionUsed: false };
+  report.gates.protectedDirectories = { count: 5, ownerUid: 0, serviceUid: 0, privateDirectoryModes: true,
+    configurationAndWorkerFilesReadableByService: true };
   const nodeSnapshot = await waitFor('runtime ABI handshake snapshot', async () => {
     const result = await inject('GET', '/v1/nodes', null, 200);
     const node = result.data.find((item) => item.nodeId === config.nodeId);
