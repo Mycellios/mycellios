@@ -10,6 +10,7 @@ on:
       - scripts/macos95-install-canary.mjs
       - scripts/macos95-ci-contract.mjs
       - scripts/macos95-vitest.config.mjs
+      - scripts/macos95-keychain-canary.mjs
       - tests/test_macos95_source.py
       - config/macos95-source-allowlist.json
 
@@ -60,6 +61,7 @@ jobs:
           npx vitest run --config ../../scripts/macos95-vitest.config.mjs tests/node-pkg-package.test.ts tests/node-enrollment-bootstrap.test.ts tests/node-enrollment-api.test.ts tests/node-os-isolation.test.ts tests/node-uninstall-helper.test.ts
           npm run clean --silent
           npx tsc -p tsconfig.build.json
+          node ../../scripts/macos95-keychain-canary.mjs "$PWD" "$PWD/../macos95-evidence"
           npm run node:runtime
           epoch="$(date -u +%s)"
           node scripts/stage-node-installer.mjs \

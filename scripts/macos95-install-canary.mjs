@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { ABI, contributionCommand, verifyCiContracts } from './macos95-ci-contract.mjs';
+import { ABI, contributionCommand, verifyCiContracts, verifyCiInstalledLayout } from './macos95-ci-contract.mjs';
 
 const [payloadValue, evidenceValue, recipeRevision] = process.argv.slice(2);
 const payload = resolve(payloadValue), evidence = resolve(evidenceValue);
@@ -50,8 +50,13 @@ try {
   await command('/usr/sbin/installer', ['-pkg', pkg, '-target', '/']); installed = true;
   const packageInfo = await command('/usr/sbin/pkgutil', ['--pkg-info', 'io.mycellios.node']);
   assert.match(packageInfo.stdout, /version: 0\.2\.95/);
-  const provenance = await load(join(product, 'mycellios-native-build-provenance.json'));
+  const provenanceBytes = await readFile(join(product, 'app/mycellios-native-build-provenance.json'));
+  const provenance = JSON.parse(provenanceBytes);
+  const installedLayout = await load(join(product, 'layout-manifest.json'));
   assert.equal(provenance.sourceId, report.payloadSourceId);
+  assert.equal(installedLayout.source.sourceId, report.payloadSourceId);
+  assert.equal(createHash('sha256').update(provenanceBytes).digest('hex'), installedLayout.source.provenanceSha256);
+  report.gates.installedLayout = await verifyCiInstalledLayout(product, report.payloadSourceId);
   report.gates.installer = { version: '0.2.95', payloadSourceId: provenance.sourceId };
   const { MYCELLIOS_RUNTIME_ABI } = await imported('update/runtime-compatibility.js');
   assert.equal(MYCELLIOS_RUNTIME_ABI, ABI);
