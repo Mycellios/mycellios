@@ -1,3 +1,4 @@
+import { KokoroAdapter } from "./kokoro.js";
 import type { WorkerConfig } from "../contracts/schemas.js";
 import type { InferenceAdapter } from "./base.js";
 import { MycelliosNativeControlAdapter } from "./mycellios-native-control.js";
@@ -6,6 +7,8 @@ import { MockAdapter } from "./mock.js";
 
 export function createAdapter(config: WorkerConfig): InferenceAdapter {
   switch (config.adapter.kind) {
+    case "kokoro":
+      return new KokoroAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest! });
     case "mycellios-native":
       return new MycelliosNativeControlAdapter();
     case "mycellios-pipeline":

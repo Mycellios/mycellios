@@ -1,0 +1,5 @@
+# Optional CPU speech runtime; install torch from the CPU-only index first.
+kokoro==0.9.4
+tiktoken==0.14.0
+transformers==4.57.1
+huggingface-hub==0.36.0

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { kokoroWorkerAdapterSchema, KOKORO_WEIGHT_DIGEST } from "./speech.js";
 import {
   coordinatorRuntimePerformanceEvidenceSchema,
 } from "../performance/runtime-profile.js";
@@ -15,10 +16,11 @@ import {
 
 const adapterKind = z.enum([
   "mycellios-native",
+  "kokoro",
   "mycellios-pipeline",
   "mock",
 ]);
-const deploymentAdapterKind = z.enum(["mycellios-pipeline", "mock"]);
+const deploymentAdapterKind = z.enum(["mycellios-pipeline", "kokoro", "mock"]);
 const executionBackend = z.enum(["cpu", "cuda", "rocm", "directml", "mps", "xpu", "vulkan", "webgpu"]);
 const sha256Digest = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 
@@ -456,6 +458,7 @@ export const workerConfigSchema = z.object({
     pauseWhenForeground: z.boolean().default(true),
   }),
   adapter: z.discriminatedUnion("kind", [
+    kokoroWorkerAdapterSchema,
     z.object({
       kind: z.literal("mycellios-native"),
       model: z.literal("mycellios-native-control"),
@@ -517,6 +520,9 @@ export const workerConfigSchema = z.object({
     })
     .default({ contextLimit: 8_192 }),
 }).strict().superRefine((config, context) => {
+  if (config.adapter.kind === "kokoro" && (
+    config.deployment.modelDigest !== KOKORO_WEIGHT_DIGEST || config.limits.maxConcurrency !== 1
+  )) context.addIssue({ code: "custom", message: "Kokoro requires the pinned weight digest and one inference slot" });
   if (
     config.adapter.kind === "mycellios-pipeline"
     && !config.deployment.modelDigest

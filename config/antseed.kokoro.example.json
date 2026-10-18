@@ -1,0 +1,36 @@
+{
+  "seller": {
+    "maxConcurrentBuyers": 1,
+    "providers": {
+      "mycellios": {
+        "plugin": "openai",
+        "baseUrl": "https://YOUR-MYCELLIOS-COORDINATOR",
+        "apiKeyEnv": "MYCELLIOS_ANTSEED_API_KEY",
+        "defaults": {
+          "inputUsdPerMillion": 0,
+          "outputUsdPerMillion": 0
+        },
+        "services": {
+          "mycellios-kokoro-es": {
+            "upstreamModel": "mycellios-kokoro-es",
+            "categories": [
+              "tts"
+            ],
+            "capabilities": {
+              "inputs": [
+                "text"
+              ],
+              "outputs": [
+                "text",
+                "audio"
+              ],
+              "supportedParameters": [
+                "stream"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

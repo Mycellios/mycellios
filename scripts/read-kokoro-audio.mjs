@@ -1,0 +1,11 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+const [input, output] = process.argv.slice(2);
+if (!input || !output) throw new Error("Usage: node scripts/read-kokoro-audio.mjs RESPONSE.json OUTPUT.wav");
+const response = JSON.parse(await readFile(input, "utf8"));
+const speech = JSON.parse(response.choices?.[0]?.message?.content ?? "");
+if (speech.schema !== "mycellios-speech/1" || speech.audio?.format !== "wav") throw new Error("Invalid speech envelope");
+const audio = Buffer.from(speech.audio.data, "base64");
+if (audio.length > 1_048_576 || createHash("sha256").update(audio).digest("hex") !== speech.audio.sha256) throw new Error("Audio integrity failed");
+await writeFile(output, audio, { flag: "wx" });
+console.log(JSON.stringify({ output, bytes: audio.length, durationSeconds: speech.audio.duration_seconds, usage: response.usage }));

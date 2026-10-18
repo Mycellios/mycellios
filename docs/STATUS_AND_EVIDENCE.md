@@ -157,3 +157,20 @@ performance claim.
 Run the native contiguous pipeline on two computers using
 [`TWO_HOST_QUICKSTART.md`](TWO_HOST_QUICKSTART.md). Do not add a new engine or a
 new product surface before that run identifies a concrete missing capability.
+
+## Optional speech replica candidate
+
+The candidate adds a native Kokoro replica adapter to the existing Mycellios
+worker/scheduler/chat route. Its artifact-pinned loopback runtime returns bounded
+PCM16 WAV in a versioned JSON chat-content envelope. Input usage is a real
+cl100k_base text count; audio bytes are not billed as output text tokens.
+
+An isolated Linux CPU run produced real speech through an authenticated
+Mycellios worker and the unmodified AntSeed openai provider and secure P2P SDK
+(@antseed/node 0.2.147, provider-openai 0.2.52). One sample delivered 3.85 seconds
+of audio in 2312 ms, with 17 input tokens and zero output tokens. The receipt and
+audio are local runtime artifacts, not committed physical-network evidence.
+
+This is single-host integration evidence. Fleet installation, two physical
+speech nodes, public discovery/gateway behavior, paid USDC settlement and ANTS
+rewards remain unverified. The existing production release is unchanged.

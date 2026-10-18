@@ -2361,10 +2361,8 @@ export class WorkerAgent {
     let output = "";
     let outputBytes = 0;
     let backendMetrics: AdapterChunk["metrics"] | undefined;
-    const outputByteLimit = Math.min(
-      MAX_OUTPUT_BYTES,
-      (payload.request.max_tokens ?? 256) * 32,
-    );
+    const outputByteLimit = this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
+      : Math.min(MAX_OUTPUT_BYTES, (payload.request.max_tokens ?? 256) * 32);
     try {
       for await (const chunk of this.adapter.generate(
         { jobId: payload.jobId, request: payload.request },
@@ -2442,7 +2440,7 @@ export class WorkerAgent {
         leaseId: payload.leaseId,
         text: output,
         finishReason:
-          outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
+          this.adapter.kind !== "kokoro" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
             ? "length"
             : "stop",
         metrics,
@@ -2726,7 +2724,7 @@ function scaleMatches(observed: number, rawExpected: number): boolean {
 
 function deploymentAdapterKind(
   adapter: InferenceAdapter["kind"],
-): "mycellios-pipeline" | "mock" {
+): "mycellios-pipeline" | "kokoro" | "mock" {
   if (adapter === "mycellios-native") {
     throw new Error("mycellios_native_control_cannot_be_a_model_deployment");
   }
