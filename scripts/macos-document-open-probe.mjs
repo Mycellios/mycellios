@@ -1,6 +1,6 @@
 // Harmless LaunchServices experiment. No product installation or administrator access.
 import {execFileSync} from 'node:child_process';
-import {mkdtemp, mkdir, writeFile, readFile, chmod, rm} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, readFile, chmod, rm, stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
@@ -45,7 +45,15 @@ try {
       catch(error) { if(error.code!=='ENOENT')throw error; }
       await new Promise(resolve=>setTimeout(resolve,100));
     }
-    report.results.push({kind,openError,argv,documentDeliveredToArgv:argv?.length===1 && argv[0]===document,
+    let sameFile=false, sameContent=false;
+    if(argv?.length===1 && argv[0]) {
+      const [expected,actual]=await Promise.all([stat(document),stat(argv[0])]);
+      sameFile=expected.dev===actual.dev && expected.ino===actual.ino && actual.ino>0;
+      sameContent=(await readFile(document)).equals(await readFile(argv[0]));
+    }
+    report.results.push({kind,openError,argv,exactPathString:argv?.length===1 && argv[0]===document,
+      normalizedPathString:argv?.length===1 && argv[0].normalize('NFC')===document.normalize('NFC'),
+      sameFileIdentity:sameFile,sameFileContent:sameContent,documentDeliveredToArgv:sameFile && sameContent,
       usedOpenArgs:false,scope:kind==='original-shell'?'Original95 shell launch shape; dummy executor only.':'Unpublished AppleScript on-open prototype; dummy executor only.'});
     // Remove only this temporary registered bundle. No product or personal application.
     try { run('/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister',['-u',app]); } catch {}
