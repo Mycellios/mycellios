@@ -40,7 +40,8 @@ try {
       await chmod(launcher,0o700);
     }
     const plist=join(app,'Contents','Info.plist');
-    if (kind==='original-shell') await writeFile(plist,'<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleExecutable</key><string>launcher.sh</string><key>CFBundlePackageType</key><string>APPL</string><key>LSBackgroundOnly</key><true/></dict></plist>',{flag:'wx'});
+    // Same minimal bundle metadata shape emitted by the proposed product builder.
+    await writeFile(plist,'<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleName</key><string>Mycellios Pairing</string><key>CFBundleExecutable</key><string>'+(kind==='original-shell'?'launcher.sh':'applet')+'</string><key>CFBundlePackageType</key><string>APPL</string><key>LSBackgroundOnly</key><true/></dict></plist>');
     for(const key of ['CFBundleIdentifier','CFBundleDocumentTypes']) {
       try { run('/usr/bin/plutil',['-remove',key,plist]); } catch {}
     }
