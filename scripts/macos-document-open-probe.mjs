@@ -25,13 +25,16 @@ try {
   await writeFile(document, 'Harmless synthetic document; not an enrollment bundle.\n', {flag:'wx'});
   for (const kind of ['original-shell', 'prototype-applet']) {
     const app=join(base,kind+'.app'), capture=join(base,kind+'-capture.sh'), output=join(base,kind+'-argv.bin');
+    const bridge=join(app,'Contents/MacOS/pair-mycellios');
     // Capture only the exact arguments delivered by LaunchServices/the proposed handler.
     await writeFile(capture, '#!/bin/sh\nprintf \'%s\\0\' "$@" > '+"'"+output.replaceAll("'","'\\''")+"'"+'\n', {flag:'wx'});
     await chmod(capture,0o700);
     if (kind==='prototype-applet') {
       const source=join(base,'handler.applescript');
-      await writeFile(source, renderMacPairingOpenScript(capture), {flag:'wx'});
+      await writeFile(source, renderMacPairingOpenScript(bridge), {flag:'wx'});
       run('/usr/bin/osacompile',['-o',app,source]);
+      await writeFile(bridge, '#!/bin/sh\nset -eu\nexec '+"'"+capture.replaceAll("'","'\\''")+"'"+' "$1"\n',{flag:'wx'});
+      await chmod(bridge,0o700);
     } else {
       await mkdir(join(app,'Contents','MacOS'),{recursive:true});
       const launcher=join(app,'Contents','MacOS','launcher.sh');
@@ -54,7 +57,7 @@ try {
       run('/usr/bin/codesign',['--force','--sign','-','--timestamp=none',app]);
       run('/usr/bin/codesign',['--verify','--strict','--deep',app]);signatureVerified=true;
       const actual=run('/usr/bin/osadecompile',[join(app,'Contents/Resources/Scripts/main.scpt')]);
-      decompiledHandlerVerified=normalizeScript(actual)===normalizeScript(renderMacPairingOpenScript(capture));
+      decompiledHandlerVerified=normalizeScript(actual)===normalizeScript(renderMacPairingOpenScript(bridge));
       if(!decompiledHandlerVerified)throw Error('decompiled_handler_mismatch');
     }
     let openError=null;
