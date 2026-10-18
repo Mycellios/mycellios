@@ -1,0 +1,25 @@
+name: Mac document open probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/macos95-release-20261018]
+    paths:
+      - .github/workflows/macos-document-open-probe.yml
+      - scripts/macos-document-open-probe.mjs
+permissions:
+  contents: read
+jobs:
+  document-open:
+    runs-on: macos-14
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - run: node scripts/macos-document-open-probe.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mac-document-open-probe
+          path: build/document-open-probe.json
