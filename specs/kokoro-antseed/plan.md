@@ -10,6 +10,9 @@ Acceptance: fail-closed identity/size validation, cancellation/deadlines, real s
 worker-to-coordinator delivery, scheduling among replicas, unchanged LLM regressions.
 A fixture is not physical-network or paid-settlement evidence. Public promotion follows repository gates.
 
-Implementation ready for review. Real single-host secure AntSeed P2P delivery succeeded.
-Commit, push, PR and deployment are authorized; release gates and production provenance remain required.
-Existing physical nodes and production coordinator have not been updated.
+PR 55 is integrated at 54506128fc3bac6137ed17a8add164f8ba56f359.
+The verified coordinator overlay is deployed as 0.2.120, preserving the production repairs.
+Three owned Windows speech services produced real WAV audio. Account-confirmed
+enrollment and the AntSeed seller route to those PC replicas remain outstanding.
+The standalone CLI now reuses the protected native enrollment bootstrap; its
+account binding and completion path have an executable local regression.

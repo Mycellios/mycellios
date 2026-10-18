@@ -50,3 +50,5 @@ These rules apply to the complete repository.
 - Speech bytes are bounded independently from max_tokens and never counted as output text tokens.
 - Input usage is the cl100k_base count of the synthesized text. AntSeed examples start free.
 - Test with tests/kokoro.test.ts and tests/kokoro-network.test.ts; real model tests are opt-in.
+- Standalone replicas redeem account-confirmed bundles through MYCELLIOS_WORKER_ENROLLMENT_PATH.
+- The worker owns the shared enrollment bootstrap; the native node keeps a compatibility re-export.
