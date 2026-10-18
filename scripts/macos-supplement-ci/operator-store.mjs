@@ -145,8 +145,10 @@ export async function operate(planBytes, expectedPlanSha256, api, apply = false)
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const args = Object.fromEntries(process.argv.slice(2).filter(a => a.startsWith('--') && a.includes('=')).map(a => { const at = a.indexOf('='); return [a.slice(2, at), a.slice(at + 1)]; }));
   assert(args.plan && pin.test(args['plan-sha256']) && args.module && pin.test(args['module-sha256']));
-  const moduleBytes = await bounded(path.resolve(args.module), 262144, args['module-sha256']); void moduleBytes;
-  const api = await import(pathToFileURL(path.resolve(args.module)).href);
+  const moduleBytes = await bounded(path.resolve(args.module), 262144, args['module-sha256']);
+  // This closure imports only node: builtins. Execute the exact authenticated
+  // bytes, avoiding a hash-close-import pathname replacement race.
+  const api = await import('data:text/javascript;base64,' + moduleBytes.toString('base64'));
   const result = await operate(await bounded(path.resolve(args.plan), 32768), args['plan-sha256'], api, process.argv.includes('--apply'));
   console.log(JSON.stringify(result));
 }

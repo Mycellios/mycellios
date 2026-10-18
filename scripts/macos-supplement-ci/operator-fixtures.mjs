@@ -38,6 +38,11 @@ try {
   const run = (bytes, apply = false) => operate(bytes, sha(bytes), api, apply);
   const initial = makePlan(first, 'absent');
   assert.equal((await run(initial)).dryRun, true); assert.deepEqual(await fs.readdir(root), []); check();
+  const cliPlan = path.join(sandbox, 'cli-plan.json'); await fs.writeFile(cliPlan, initial, { flag: 'wx' });
+  const cli = path.resolve('scripts/macos-supplement-ci/operator-store.mjs'), moduleFile = path.resolve(process.argv[2]);
+  const cliArgs = [cli, '--plan=' + cliPlan, '--plan-sha256=' + sha(initial), '--module=' + moduleFile, '--module-sha256=' + sha(await fs.readFile(moduleFile))];
+  assert.equal(JSON.parse(execFileSync(process.execPath, cliArgs, { encoding: 'utf8' })).dryRun, true); assert.deepEqual(await fs.readdir(root), []); check();
+  assert.throws(() => execFileSync(process.execPath, [...cliArgs.slice(0, -1), '--module-sha256=' + '0'.repeat(64)], { stdio: 'pipe' })); assert.deepEqual(await fs.readdir(root), []); check();
   await assert.rejects(operate(initial, '0'.repeat(64), api, true)); check();
   const bad = await candidate('tampered'); await fs.chmod(path.join(bad.dir, 'artifact.pkg'), 0o644); await fs.writeFile(path.join(bad.dir, 'artifact.pkg'), Buffer.alloc(bad.artifact.length, 65));
   await assert.rejects(run(makePlan(bad, 'absent'), true)); assert.deepEqual(await fs.readdir(root), []); check();
