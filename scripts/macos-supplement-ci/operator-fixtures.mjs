@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { operate } from './operator-store.mjs';
+import { operate, renameObjectExclusive } from './operator-store.mjs';
 
 // CI runs this disposable fixture as root inside one private Linux mount namespace.
 // No production directory, key, network API, package upload or global release mutation.
@@ -45,6 +45,17 @@ try {
   let pointerBytes = await fs.readFile(path.join(root, 'pointer.json'));
   await assert.rejects(run(makePlan(second, '0'.repeat(64)), true)); assert((await fs.readFile(path.join(root, 'pointer.json'))).equals(pointerBytes)); check();
   await assert.rejects(run(makePlan(first, sha(pointerBytes)), true)); assert((await fs.readFile(path.join(root, 'pointer.json'))).equals(pointerBytes)); check();
+  const crashed = await candidate('crashed'); let verificationCalls = 0;
+  const crashApi = { ...api, verifyMacSupplementEvidence(...args) { verificationCalls++; if (verificationCalls === 2) throw new Error('Simulated interruption before final rename'); return api.verifyMacSupplementEvidence(...args); } };
+  const crashPlan = makePlan(crashed, sha(pointerBytes));
+  await assert.rejects(operate(crashPlan, sha(crashPlan), crashApi, true), /Simulated interruption/);
+  await assert.rejects(fs.lstat(path.join(root, 'objects', crashed.manifestSha)), e => e.code === 'ENOENT');
+  assert((await fs.readdir(path.join(root, 'objects'))).some(name => name.startsWith('.staging-')));
+  assert((await fs.readFile(path.join(root, 'pointer.json'))).equals(pointerBytes)); check();
+  const renameFrom = path.join(sandbox, 'rename-from'), renameTo = path.join(sandbox, 'empty-existing-target');
+  await fs.mkdir(renameFrom); await fs.writeFile(path.join(renameFrom, 'marker'), 'preserve'); await fs.mkdir(renameTo);
+  assert.throws(() => renameObjectExclusive(renameFrom, renameTo));
+  assert.equal(await fs.readFile(path.join(renameFrom, 'marker'), 'utf8'), 'preserve'); assert.deepEqual(await fs.readdir(renameTo), []); check();
   assert((await run(makePlan(second, sha(pointerBytes)), true)).objectCreated); check();
   pointerBytes = await fs.readFile(path.join(root, 'pointer.json'));
   assert((await run(makePlan(first, sha(pointerBytes), 'rollback'), true)).pointerChanged); check();
@@ -56,7 +67,7 @@ try {
   assert.equal(await real.assetPath(parent, 'downloads', first.manifest.artifact.fileName), path.join(root, 'objects', first.manifestSha, 'artifact.pkg')); check();
   await assert.rejects(fs.writeFile(path.join(root, 'cannot-write'), 'x'), error => error.code === 'EROFS'); check();
   assert.equal(await real.assetPath(parent, 'downloads', parent.assets[0].fileName), null); check();
-  const receipt = { schema: 'mycellios-macos-operator-fixtures/1', checks, publishAndRollback: true, defaultDryRun: true, externallyPinnedPlan: true, noObjectOverwrite: true, pointerCompareAndSwap: true, parentBytesUnchanged: true, fullDefaultStoreOnRealReadOnlyMount: true, ownerUid: 0, dependencyOverrides: false, packageFixture: true, installerValidated: false, productionChanged: false };
+  const receipt = { schema: 'mycellios-macos-operator-fixtures/1', checks, publishAndRollback: true, defaultDryRun: true, externallyPinnedPlan: true, noObjectOverwrite: true, atomicRenameNoReplace: true, existingEmptyTargetPreserved: true, crashLeavesOnlyPrivateTmp: true, pointerCompareAndSwap: true, parentBytesUnchanged: true, fullDefaultStoreOnRealReadOnlyMount: true, ownerUid: 0, dependencyOverrides: false, packageFixture: true, installerValidated: false, productionChanged: false };
   await fs.writeFile(path.join(base, 'operator-fixtures-proof.json'), json(receipt), { flag: 'wx' });
   console.log(JSON.stringify(receipt));
 } finally {

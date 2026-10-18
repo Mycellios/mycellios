@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, readFile, rename, rmdir, chmod } from 'node:fs/promises';
 import path from 'node:path';
@@ -31,6 +32,12 @@ async function bounded(file, maximum, expected) {
   } finally { await handle.close(); }
 }
 async function syncDirectory(dir) { const h = await open(dir, constants.O_RDONLY); try { await h.sync(); } finally { await h.close(); } }
+export function renameObjectExclusive(from, to) {
+  // Linux libc wrapper, not an architecture-specific syscall number. Missing
+  // Python/libc/renameat2 support fails closed; there is no unsafe rename fallback.
+  execFileSync('python3', ['-I', '-S', '-B', '-c',
+    'import ctypes,os,sys\nlib=ctypes.CDLL(None,use_errno=True)\nrename=lib.renameat2\nrename.argtypes=[ctypes.c_int,ctypes.c_char_p,ctypes.c_int,ctypes.c_char_p,ctypes.c_uint]\nrename.restype=ctypes.c_int\nresult=rename(-100,os.fsencode(sys.argv[1]),-100,os.fsencode(sys.argv[2]),1)\nif result:\n error=ctypes.get_errno()\n raise OSError(error,os.strerror(error))\n', from, to], { stdio: 'pipe' });
+}
 async function writeExclusive(file, bytes) { const h = await open(file, 'wx', 0o600); try { await h.writeFile(bytes); await h.sync(); await h.chmod(0o444); } finally { await h.close(); } }
 async function rootDirectory(root) {
   assert.equal(process.platform, 'linux'); assert.equal(process.getuid(), 0, 'Apply requires root; root ownership alone does not prove read-only serving');
@@ -97,12 +104,23 @@ export async function operate(planBytes, expectedPlanSha256, api, apply = false)
       const objects = path.join(plan.root, 'objects');
       try { await mkdir(objects, { mode: 0o755 }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
       const objectsStat = await lstat(objects); assert(objectsStat.isDirectory() && !objectsStat.isSymbolicLink() && objectsStat.uid === 0 && (objectsStat.mode & 0o022) === 0);
-      await mkdir(object, { mode: 0o700 }); // Exclusive, never replace even an incomplete previous object.
-      await writeExclusive(path.join(object, 'manifest.json'), manifestBytes);
-      for (const entry of entries) await writeExclusive(path.join(object, entry.name), entry.bytes);
-      await verifyPayload(path.join(sourceRoot, 'artifact.pkg'), manifest, path.join(object, 'artifact.pkg'));
-      await chmod(object, 0o555); await syncDirectory(object); await syncDirectory(objects);
+      try { await lstat(object); assert.fail('Never overwrite an existing object, including an empty directory'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      const staging = path.join(objects, '.staging-' + randomUUID());
+      await mkdir(staging, { mode: 0o700 });
+      // A failure/crash leaves only this unreferenced private staging directory.
+      // Never auto-remove a stale directory or lock: the operator must review it.
+      await writeExclusive(path.join(staging, 'manifest.json'), manifestBytes);
+      for (const entry of entries) await writeExclusive(path.join(staging, entry.name), entry.bytes);
+      await verifyPayload(path.join(sourceRoot, 'artifact.pkg'), manifest, path.join(staging, 'artifact.pkg'));
+      await bounded(path.join(staging, 'manifest.json'), 32768, plan.manifestSha256);
+      const stagedEvidence = await Promise.all(entries.map(async (entry, i) => api.parseStrictJson((await bounded(path.join(staging, entry.name), i === 0 ? 262144 : 65536, [manifest.build.sourceEvidenceSha256, manifest.build.releaseEvidenceSha256, manifest.build.validationReceiptSha256][i])).toString('utf8'))));
+      api.verifyMacSupplementEvidence(manifest, ...stagedEvidence);
+      await verifyPayload(path.join(staging, 'artifact.pkg'), manifest);
+      await chmod(staging, 0o555); await syncDirectory(staging);
+      assert.equal((await pointer(plan.root)).sha256, plan.expectedPointerSha256, 'Pointer changed before object rename');
+      renameObjectExclusive(staging, object); await syncDirectory(objects);
       receipt.objectCreated = true;
+      receipt.atomicNoReplaceObject = true;
     }
     const objectStat = await lstat(object), objectsStat = await lstat(path.dirname(object));
     for (const stat of [objectStat, objectsStat]) assert(stat.isDirectory() && !stat.isSymbolicLink() && stat.uid === 0 && (stat.mode & 0o022) === 0);
