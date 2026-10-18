@@ -1,3 +1,4 @@
+import { parseOperatorQuotaModels } from "../core/operator-quota-config.js";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import type { ChatCompletionRequest } from "../contracts/types.js";
 import { newId } from "../core/ids.js";
@@ -125,7 +126,14 @@ export class ApiAccessManager {
   constructor(
     private readonly database: MeshDatabase,
     readonly limits: ApiAccessLimits,
-  ) {}
+    private readonly operatorQuotaModels: Readonly<Record<string, readonly string[]>> = parseOperatorQuotaModels(process.env.MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON),
+  ) {
+    // Persist the decision with the reservation so restart/config changes cannot
+    // retroactively charge an operator-funded request or refund unreserved tokens.
+    database.raw.exec(`CREATE TABLE IF NOT EXISTS api_operator_funded_usage (
+      usage_id TEXT PRIMARY KEY REFERENCES api_usage(id) ON DELETE CASCADE
+    )`);
+  }
 
   getOrCreateAccount(userId: string): ApiAccount {
     return this.database.transaction(() => {
@@ -251,7 +259,10 @@ export class ApiAccessManager {
           1,
         );
       }
-      const reservedTokens = estimateInputTokens(request) + (request.max_tokens ?? 256);
+      const operatorFunded = apiKeyId !== null
+        && Object.hasOwn(this.operatorQuotaModels, apiKeyId)
+        && this.operatorQuotaModels[apiKeyId]!.includes(request.model);
+      const reservedTokens = operatorFunded ? 0 : estimateInputTokens(request) + (request.max_tokens ?? 256);
       if (account.tokenBalance < reservedTokens) {
         throw new ApiAccessError(
           "insufficient_token_balance",
@@ -274,6 +285,9 @@ export class ApiAccessManager {
         reservedTokens,
         now,
       );
+      if (operatorFunded) {
+        this.database.raw.prepare("INSERT INTO api_operator_funded_usage(usage_id) VALUES (?)").run(id);
+      }
       this.database.raw.prepare(
         "UPDATE api_accounts SET token_balance = token_balance - ?, updated_at = ? WHERE user_id = ?",
       ).run(reservedTokens, now, userId);
@@ -309,7 +323,10 @@ export class ApiAccessManager {
       const usage = this.usageRow(usageId);
       if (!usage || usage.status !== "pending") return null;
       const now = Date.now();
-      const actualTokens = Math.max(0, inputTokens) + Math.max(0, outputTokens);
+      const operatorFunded = this.database.raw.prepare(
+        "SELECT 1 FROM api_operator_funded_usage WHERE usage_id = ?",
+      ).get(usageId) !== undefined;
+      const actualTokens = operatorFunded ? 0 : Math.max(0, inputTokens) + Math.max(0, outputTokens);
       const refund = Math.max(0, usage.reserved_tokens - actualTokens);
       const additionalCharge = Math.max(0, actualTokens - usage.reserved_tokens);
       this.database.raw.prepare(
