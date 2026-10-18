@@ -19,13 +19,15 @@ def derive(archive, allowlist, patch_path, destination):
     if (patch['schema'] != 'mycellios-macos95-source-derivation/1'
             or patch['baseArchiveSha256'] != original.ARCHIVE_SHA
             or patch['baseSourceId'] != original.SOURCE_ID
-            or len(patch['files']) != 6 or {item['path'] for item in patch['files']} != ALLOWED):
+            or len(patch['files']) != 6 or {item['path'] for item in patch['files']} != ALLOWED
+            or len(patch.get('fixtures', [])) != 1
+            or patch['fixtures'][0]['path'] != 'tests/node-pkg-package.test.ts'):
         raise ValueError('mac95_derivation_base_or_scope_mismatch')
     replacements = {}
     by_path = {row['path']: row for row in rows}
     with zipfile.ZipFile(archive) as source:
         provenance = json.loads(source.read('mycellios-native-build-provenance.json'))
-        for item in patch['files']:
+        for item in patch['files'] + patch['fixtures']:
             before = by_path[item['path']]
             after = item['content'].encode('utf-8')
             if (before['sha256'] != item['beforeSha256'] or before['bytes'] != item['beforeBytes']
@@ -33,7 +35,11 @@ def derive(archive, allowlist, patch_path, destination):
                     or hashlib.sha256(after).hexdigest() != item['afterSha256']):
                 raise ValueError('mac95_derivation_replacement_mismatch')
             replacements[item['path']] = after
-            record = next(record for record in provenance['files'] if record['path'] == item['path'])
+            record = next((record for record in provenance['files'] if record['path'] == item['path']), None)
+            if item['path'] == 'tests/node-pkg-package.test.ts':
+                if record is not None:
+                    raise ValueError('mac95_fixture_unexpectedly_in_source_identity')
+                continue
             if record != before:
                 raise ValueError('mac95_derivation_source_binding_mismatch')
             record.update(bytes=len(after), sha256=item['afterSha256'])
@@ -56,6 +62,7 @@ def derive(archive, allowlist, patch_path, destination):
             'sourceId': source_id, 'sourceRevision': original.SOURCE_REVISION,
             'patchSha256': hashlib.sha256(patch_bytes).hexdigest(), 'sourceRecords': len(provenance['files']),
             'files': [{key: value for key, value in item.items() if key != 'content'} for item in patch['files']],
+            'fixtures': [{key: value for key, value in item.items() if key != 'content'} for item in patch['fixtures']],
             'scope': 'Mac-only derived payload; original Windows95 and public source ZIP are unchanged.'}
 
 

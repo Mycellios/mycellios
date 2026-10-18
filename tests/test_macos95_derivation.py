@@ -35,6 +35,11 @@ class DerivationTests(unittest.TestCase):
         self.assertNotEqual(receipt['sourceId'], module.original.SOURCE_ID)
         self.assertEqual(len(provenance['files']), 651)
         self.assertEqual({item['path'] for item in receipt['files']}, module.ALLOWED)
+        self.assertEqual([item['path'] for item in receipt['fixtures']], ['tests/node-pkg-package.test.ts'])
+
+    def test_fixture_bytes_are_authenticated_separately_from_source651(self):
+        with self.assertRaisesRegex(ValueError, 'replacement_mismatch'):
+            self.attempt(lambda value: value['fixtures'][0].update(content='forged'))
 
     def test_changed_replacement_bytes_rejected(self):
         with self.assertRaisesRegex(ValueError, 'replacement_mismatch'):

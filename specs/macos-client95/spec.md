@@ -13,3 +13,5 @@ Uninstall must remove Product, service, its recognized Pairing application, PKG 
 This phase allows branch commit/push/CI only. No merge/main update or production change. A later narrow additive catalogue supplement must preserve active Windows95manifest and distinguish Mac payload provenance from coordinator119.
 
 The Mac-only builder compiles an on-open AppleScript droplet, preserves its generated executable metadata, and seals the completed application ad hoc. The PKG remains unsigned and unnotarized. A harmless hosted LaunchServices fixture verifies document routing; administrator consent through the graphical pairing dialog and physical reboot remain untested.
+
+The package-layout test is patched separately under `fixtures` to check the new resource bridge and droplet. Its original bytes are authenticated by the exact archive entry allowlist, and its replacement by the recipe patch hash; it is not represented as a new member of the original 651 source identity records.
