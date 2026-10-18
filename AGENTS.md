@@ -60,3 +60,7 @@ These rules apply to the complete repository.
 - Mac CI checks absolute system command paths and PATH commands on the actual
   hosted runner before runtime packaging; filesystem inspection does not replace
   enrollment and launchd lifecycle tests.
+- The Mac pairing bundle uses an AppleScript open-document handler compiled by
+  `osacompile`; preserve its generated executable metadata and seal the final app
+  ad hoc after metadata/bridge edits. This does not sign or notarize the PKG.
+  LaunchServices routing fixtures do not prove graphical administrator consent.

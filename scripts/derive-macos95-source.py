@@ -9,7 +9,7 @@ import zipfile
 spec = importlib.util.spec_from_file_location('original95', Path(__file__).with_name('verify-macos95-source.py'))
 original = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(original)
-ALLOWED = {'src/node/identity-store.ts', 'src/node/uninstall-executor.ts', 'src/node/service-registration.ts', 'src/node/main.ts'}
+ALLOWED = {'src/node/identity-store.ts', 'src/node/uninstall-executor.ts', 'src/node/service-registration.ts', 'src/node/main.ts', 'scripts/build-node-pkg.mjs', 'scripts/verify-node-pkg.mjs'}
 
 
 def derive(archive, allowlist, patch_path, destination):
@@ -19,7 +19,7 @@ def derive(archive, allowlist, patch_path, destination):
     if (patch['schema'] != 'mycellios-macos95-source-derivation/1'
             or patch['baseArchiveSha256'] != original.ARCHIVE_SHA
             or patch['baseSourceId'] != original.SOURCE_ID
-            or len(patch['files']) != 4 or {item['path'] for item in patch['files']} != ALLOWED):
+            or len(patch['files']) != 6 or {item['path'] for item in patch['files']} != ALLOWED):
         raise ValueError('mac95_derivation_base_or_scope_mismatch')
     replacements = {}
     by_path = {row['path']: row for row in rows}

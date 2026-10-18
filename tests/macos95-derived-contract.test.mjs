@@ -10,8 +10,18 @@ const identity = await import(pathToFileURL(join(payload, 'dist/node/identity-st
 const executor = await readFile(join(payload, 'dist/node/uninstall-executor.js'), 'utf8');
 const helpers = executor.slice(executor.indexOf('async function validateMacPairingApplication('), executor.indexOf('async function disableService('));
 const helperJs = helpers;
+const expectedAppleScript = JSON.parse(helperJs.match(/const expected = ("[^\n]+");/)[1]);
 const constants = { O_RDONLY: 0, O_NOFOLLOW: 0x100 }; // Darwin fixture; never open a host path.
 const dirname = posix.dirname;
+test('actual product renderer matches the LaunchServices-tested handler without runtime overrides', async () => {
+  const builder = await import(pathToFileURL(join(payload, 'scripts/build-node-pkg.mjs')));
+  assert.equal(builder.renderMacPairingOpenScript('/Applications/Mycellios Pairing.app/Contents/Resources/pair-mycellios'), expectedAppleScript);
+  const probe = await readFile(new URL('../scripts/macos-document-open-probe.mjs', import.meta.url), 'utf8');
+  const renderer = probe.slice(probe.indexOf('function renderMacPairingOpenScript('), probe.indexOf('const normalizeScript'));
+  const context = vm.createContext({}); vm.runInContext(renderer, context);
+  const fixture = "/temporary/space üni'code/executor.sh";
+  assert.equal(builder.renderMacPairingOpenScript(fixture), context.renderMacPairingOpenScript(fixture));
+});
 function filesystem(options = {}) {
   const calls = [];
   const directory = { isDirectory: () => true, isSymbolicLink: () => false };
@@ -23,12 +33,16 @@ function filesystem(options = {}) {
     },
     open: async (path, flags) => {
       calls.push(['open', path]); assert.equal(flags & constants.O_NOFOLLOW, constants.O_NOFOLLOW);
-      const value = path.endsWith('Info.plist') ? '<string>io.mycellios.pairing</string>'
-        : '/Library/Application Support/Mycellios/Product/app/node/macos-pairing-main.js';
+      const value = path.endsWith('Info.plist') ? '<string>io.mycellios.pairing</string><string>'+(options.applet?'droplet':'pair-mycellios')+'</string>'
+        : '#!/bin/sh\nset -eu\nexec "/Library/Application Support/Mycellios/Product/bin/node" "/Library/Application Support/Mycellios/Product/app/node/macos-pairing-main.js" "$1"\n';
       return { stat: async () => ({ isFile: () => true, size: options.oversize ? 8193 : value.length }),
         read: async (buffer) => ({ bytesRead: buffer.write(options.mismatch ? 'foreign' : value) }), close: async () => {} };
     },
-    execFile: (_file, _args, _options, callback) => callback(options.receiptError ?? null, options.receiptOutput ?? '', ''),
+    execFile: (file, _args, _options, callback) => {
+      if(file==='/usr/bin/osadecompile') callback(null, options.badHandler?'foreign':expectedAppleScript, '');
+      else if(file==='/usr/bin/codesign') callback(options.badSignature?Error('bad_signature'):null, '', '');
+      else callback(options.receiptError ?? null, options.receiptOutput ?? '', '');
+    },
   });
   vm.runInContext(helperJs, context);
   return { context, calls };
@@ -80,6 +94,12 @@ test('interior symlink, oversize and foreign content reject before removals', as
   assert.ok(!linked.calls.some(([kind]) => kind === 'open'));
   await assert.rejects(filesystem({ oversize: true }).context.validateMacPairingApplication('unused'), /file_unsafe/);
   await assert.rejects(filesystem({ mismatch: true }).context.validateMacPairingApplication('unused'), /pairing_mismatch/);
+});
+test('applet ownership verifies bounded resources, sealed signature and exact decompiled handler', async () => {
+  assert.equal(await filesystem({applet:true}).context.validateMacPairingApplication('/Library/Application Support/Mycellios/Product'),true);
+  await assert.rejects(filesystem({applet:true,badHandler:true}).context.validateMacPairingApplication('/Library/Application Support/Mycellios/Product'), /pairing_mismatch/);
+  await assert.rejects(filesystem({applet:true,badSignature:true}).context.validateMacPairingApplication('/Library/Application Support/Mycellios/Product'), /pairing_invalid/);
+  await assert.rejects(filesystem({applet:true,symlink:'/Applications/Mycellios Pairing.app/Contents/Resources/Scripts'}).context.validateMacPairingApplication('/Library/Application Support/Mycellios/Product'), /pairing_unsafe/);
 });
 test('receipt absence is narrow; permission and other pkgutil failures remain errors', async () => {
   assert.equal(await filesystem().context.macPackageReceiptPresent(), true);
