@@ -270,3 +270,24 @@ This uses fresh test identities, private bootstrap only, secure P2P, zero
 prices and disabled payments. It writes a WAV and verification receipt under
 runtime/kokoro-proof-*. It does not announce a public seller or demonstrate
 USDC settlement, ANTS eligibility, public gateway access or the physical fleet.
+
+Standalone speech replicas need their own stable instanceId and device key. On a
+public coordinator, signed registration alone does not establish account ownership.
+Create and confirm a fresh enrollment from the owning account, then deliver its
+one-shot bundle to the replica over the authorized management connection. Set
+MYCELLIOS_WORKER_ENROLLMENT_PATH to that protected JSON file before starting the
+worker. The existing bootstrap redeems it with the replica's actual public key
+before admission and deletes it after successful redemption. Never reuse a consumed
+bundle, copy another node's protected key, weaken WebSocket ownership checks, or
+give a replica the coordinator's network administrator token.
+
+The optional Windows supervisor is deploy/kokoro-start.ps1. Install it next to
+worker.json, the verified app/ worker payload and the optional venv/ dependencies
+under C:/ProgramData/Mycellios/Kokoro. Run it as LocalService using the existing
+service wrapper; grant read/execute on code and modify only on Cache/, Logs/ and
+State/. It uses the installed Mycellios CPU interpreter, adds the isolated optional
+dependencies through PYTHONPATH, binds speech to loopback and waits for the pinned
+runtime identity before starting the worker. Keep HF_HUB_DISABLE_XET=1 in the
+service environment for the standard verified HTTPS model download path. The
+supervisor uses two Torch threads and a process memory watchdog; this is not an
+OS-enforced memory quota. Stopping the service must remove its owned child processes.

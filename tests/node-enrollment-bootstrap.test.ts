@@ -49,17 +49,30 @@ describe("native node enrollment bootstrap", () => {
     await expect(readFile(retryPath, "utf8")).resolves.toContain("enrollmentToken");
   });
 
-  it("rejects foreign coordinators, expired bundles and unsafe POSIX permissions before network access", async () => {
+  it("recovers a consumed expired grant while retaining a newly expired grant rejected by the coordinator", async () => {
+    const root = await temporaryDirectory();
+    const expired = { ...enrollmentBundle(), expiresAt: "2020-01-01T00:00:00.000Z" };
+    const consumedPath = join(root, "expired-consumed.json");
+    await writeFile(consumedPath, JSON.stringify(expired), { mode: 0o600 });
+    const consumedRequest = vi.fn(async () => Response.json({ error: { code: "node_enrollment_already-consumed" } }, { status: 409 }));
+    await new NodeEnrollmentBootstrap(consumedPath, "https://coordinator.example", consumedRequest as typeof fetch).redeem(input());
+    expect(consumedRequest).toHaveBeenCalledOnce();
+    await expect(access(consumedPath)).rejects.toMatchObject({ code: "ENOENT" });
+    const newPath = join(root, "expired-new.json");
+    await writeFile(newPath, JSON.stringify(expired), { mode: 0o600 });
+    const rejectedRequest = vi.fn(async () => Response.json({ error: { code: "node_enrollment_expired" } }, { status: 410 }));
+    await expect(new NodeEnrollmentBootstrap(newPath, "https://coordinator.example", rejectedRequest as typeof fetch).redeem(input()))
+      .rejects.toThrow("node_enrollment_expired");
+    await expect(access(newPath)).resolves.toBeUndefined();
+  });
+
+  it("rejects foreign coordinators and unsafe POSIX permissions before network access", async () => {
     const root = await temporaryDirectory();
     const request = vi.fn(async () => Response.json({}));
     const foreignPath = join(root, "foreign.json");
     await writeFile(foreignPath, JSON.stringify({ ...enrollmentBundle(), coordinatorUrl: "https://foreign.example" }), { mode: 0o600 });
     await expect(new NodeEnrollmentBootstrap(foreignPath, "https://coordinator.example", request as typeof fetch).redeem(input()))
       .rejects.toThrow("node_enrollment_bundle_coordinator_mismatch");
-    const expiredPath = join(root, "expired.json");
-    await writeFile(expiredPath, JSON.stringify({ ...enrollmentBundle(), expiresAt: "2020-01-01T00:00:00.000Z" }), { mode: 0o600 });
-    await expect(new NodeEnrollmentBootstrap(expiredPath, "https://coordinator.example", request as typeof fetch).redeem(input()))
-      .rejects.toThrow("node_enrollment_bundle_expired");
     if (process.platform !== "win32") {
       const unsafePath = join(root, "unsafe.json");
       await writeFile(unsafePath, JSON.stringify(enrollmentBundle()), { mode: 0o600 }); await chmod(unsafePath, 0o644);

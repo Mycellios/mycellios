@@ -171,6 +171,20 @@ Mycellios worker and the unmodified AntSeed openai provider and secure P2P SDK
 of audio in 2312 ms, with 17 input tokens and zero output tokens. The receipt and
 audio are local runtime artifacts, not committed physical-network evidence.
 
-This is single-host integration evidence. Fleet installation, two physical
-speech nodes, public discovery/gateway behavior, paid USDC settlement and ANTS
-rewards remain unverified. The existing production release is unchanged.
+The coordinator was subsequently promoted from the exact verified immutable
+image eb595a4bf825427e1acc0c0edc06317a4f65c7f0f21e5c4c58ca9c4547b15506,
+serving revision 54506128fc3bac6137ed17a8add164f8ba56f359 as version 0.2.120.
+Its operator overlay retained 321 unrelated production JavaScript modules byte
+for byte; the existing physical node connections and persistence were checked.
+The exact image also passed isolated real Kokoro delivery through AntSeed.
+
+Three owned Windows PCs now have a separate LocalService speech service using
+the existing CPU interpreter plus isolated optional dependencies. Each produced
+a verified 2.6-second WAV from its loopback service. This is physical synthesis
+evidence, not evidence of account-bound fleet routing: their new replica keys
+still require the owner's authenticated enrollment. The standalone CLI regression
+exercises an account-confirmed one-shot grant, real HTTP redemption, persistent
+ownership, WebSocket connection and bounded speech completion in a local fixture.
+
+A public AntSeed seller routing through those physical Mycellios replicas, paid
+USDC settlement and ANTS rewards remain unverified in this change.
