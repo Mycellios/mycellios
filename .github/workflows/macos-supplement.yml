@@ -1,0 +1,55 @@
+name: Mac download supplement closure
+
+on:
+  push:
+    branches: [codex/macos-supplement-ci-20261018]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-supplement-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  narrow-overlay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Authenticated119 baseline and narrow Mac delta
+        run: node scripts/macos-supplement-ci/run.mjs
+      - name: Recipe tree structure and architecture (separate from119 closure)
+        run: npm run verify:structure && npm run verify:architecture
+      - name: Real read-only mount authority in a private mount namespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="$(mktemp -d "$GITHUB_WORKSPACE/runtime/macos-supplement-ci/ro-probe.XXXXXX")"
+          node_exe="$(command -v node)"
+          module="$GITHUB_WORKSPACE/runtime/macos-supplement-ci/overlay-output/coordinator/macos-release-supplement.js"
+          sudo chown root:root "$probe"
+          sudo chmod 0755 "$probe"
+          sudo unshare --mount --propagation private bash -euo pipefail -c '
+            trap '\''umount "$1"'\'' EXIT
+            mount --bind "$1" "$1"
+            mount -o remount,bind,ro "$1"
+            "$2" --input-type=module -e '\''const {requireReadOnlyMacSupplementMount}=await import(process.argv[1]);await requireReadOnlyMacSupplementMount(process.argv[2]);console.log(JSON.stringify({realReadOnlyMountAuthority:true,installerValidated:false}));'\'' "file://$3" "$1"
+          ' bash "$probe" "$node_exe" "$module" | tee runtime/macos-supplement-ci/readonly-mount-proof.json
+          sudo rmdir -- "$probe"
+      - name: Evidence (no package or production publication)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-supplement-closure-${{ github.sha }}
+          path: |
+            runtime/macos-supplement-ci/*.json
+            runtime/macos-supplement-ci/overlay-output/
+          if-no-files-found: error
+          retention-days: 14

@@ -42,3 +42,7 @@ These rules apply to the complete repository.
 - Physical tests that cannot run must be reported as skipped or unavailable,
   never as passing.
 - Do not commit or push unless the user explicitly requests it.
+- `scripts/macos-supplement-ci/run.mjs` verifies a pinned, isolated production119
+  module closure without replacing the product sources in this checkout. Its
+  baseline reproduction and overlay evidence are not a full production rebuild
+  or proof of Mac installation, inference, signing or deployment.
