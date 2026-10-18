@@ -29,7 +29,7 @@ class DerivationTests(unittest.TestCase):
                 ROOT / 'config/macos95-source-allowlist.json', patch_file, destination)
             return result, json.loads((destination / 'mycellios-native-build-provenance.json').read_bytes())
 
-    def test_three_mac_sources_have_new_identity_and651_authenticated_records(self):
+    def test_four_mac_sources_have_new_identity_and651_authenticated_records(self):
         receipt, provenance = self.attempt()
         self.assertEqual(receipt['sourceId'], provenance['sourceId'])
         self.assertNotEqual(receipt['sourceId'], module.original.SOURCE_ID)
@@ -46,7 +46,7 @@ class DerivationTests(unittest.TestCase):
 
     def test_scope_cannot_include_another_source(self):
         with self.assertRaisesRegex(ValueError, 'scope_mismatch'):
-            self.attempt(lambda value: value['files'][0].update(path='src/node/main.ts'))
+            self.attempt(lambda value: value['files'][0].update(path='src/node/install-main.ts'))
 
     def test_existing_destination_is_preserved(self):
         with self.assertRaises(FileExistsError):

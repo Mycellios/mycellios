@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { access, lstat, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
@@ -23,7 +23,7 @@ const command = async (file, args, options = {}) => await run(file, args, {
 const load = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const imported = async (file) => await import(pathToFileURL(join(payload, 'dist', file)));
 const report = { schema: 'mycellios-macos95-hosted-installation/1', recipeRevision,
-  payloadSourceId: 'sha256:a203c352249a1f53156bab62ee36ee2726ac2e5d66bc6dd5df0be78c486b3182',
+  payloadSourceId: 'sha256:523a6e79147bd7f9bcc1a5e1740286957e6a5731777fe252bf58ad0c9a2f6b16',
   payloadBaseSourceId: 'sha256:df3c212976012758420b0085c8050ba417d818fc9424b4ec0a7edc1b42719032',
   payloadBaseRevision: '7e8ce6eaf9b0501c0424773ec94c8e4af94bd3c5', version: '0.2.95',
   unsigned: true, notarized: false, physicalMac: false, realRebootTested: false,
@@ -62,6 +62,18 @@ try {
   assert.equal(installedLayout.source.sourceId, report.payloadSourceId);
   assert.equal(createHash('sha256').update(provenanceBytes).digest('hex'), installedLayout.source.provenanceSha256);
   report.gates.installedLayout = await verifyCiInstalledLayout(product, report.payloadSourceId);
+  const { verifyPortableRuntimeInstallation, readPortableRuntimeManifest } = await import(
+    pathToFileURL(join(product, 'app/node/accelerator-runtime.js')));
+  const correctRuntimeRoot = join(product, 'runtime');
+  const certifiedRuntime = await verifyPortableRuntimeInstallation(correctRuntimeRoot, { platform: 'darwin', arch: 'arm64' });
+  const legacyWrongRoot = join(dirname(dirname(join(product, 'runtime/bin/python3'))), 'runtime');
+  let legacyRejection;
+  try { await readPortableRuntimeManifest(legacyWrongRoot); } catch (error) { legacyRejection = error.message; }
+  assert.match(legacyRejection ?? '', /portable runtime v4 manifest is missing or invalid/);
+  report.gates.installedPortableRuntime = { actualCertifiedRoot: correctRuntimeRoot,
+    pythonVersion: certifiedRuntime.pythonVersion, abi: certifiedRuntime.schema,
+    originalCertificateAndProbePreserved: true, legacyWrongRoot, legacyRejection,
+    scope: 'Read-only installed Python and original certificate verifier; source-derived legacy path is separately rejected.' };
   report.gates.installer = { version: '0.2.95', payloadSourceId: provenance.sourceId };
   const { MYCELLIOS_RUNTIME_ABI } = await imported('update/runtime-compatibility.js');
   assert.equal(MYCELLIOS_RUNTIME_ABI, ABI);

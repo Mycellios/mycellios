@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile, lstat, mkdtemp, rm } from 'node:fs/promises';
-import { posix, join, resolve } from 'node:path';
+import { posix, win32, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import vm from 'node:vm';
@@ -146,4 +146,15 @@ test('Darwin registration uses the system chown executable without a Linux or Wi
     assert.ok(commands.slice(1).every(([file]) => file === '/bin/launchctl'));
     assert.ok(!commands.some(([file]) => ['/bin/chown', '/usr/bin/chown', 'sc.exe', '/usr/sbin/useradd'].includes(file)));
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+test('actual main root expression handles the installed Darwin bin layout and preserves other platforms', async () => {
+  const source = await readFile(join(payload, 'src/node/main.ts'), 'utf8');
+  const expression = source.match(/installRoot: ([^\r\n]+),/)[1];
+  const evaluate = (platform, pythonExecutable, pythonPath, dirname) => vm.runInNewContext(expression,
+    { process: { platform }, config: { runtime: { pythonExecutable, pythonPath } }, dirname });
+  assert.equal(evaluate('darwin', '/Product/runtime/bin/python3', '/Product/python', posix.dirname), '/Product');
+  assert.equal(evaluate('win32', 'C:\\Product\\runtime\\python.exe', 'C:\\Product\\python', win32.dirname), 'C:\\Product');
+  assert.equal(evaluate('linux', '/Product/runtime/bin/python3', '/Product/python', posix.dirname), '/Product/runtime');
+  const installer = await readFile(join(payload, 'src/node/installation-bootstrap.ts'), 'utf8');
+  assert.ok(installer.includes('const pythonPath = join(manifest.installRoot, "python");'));
 });
