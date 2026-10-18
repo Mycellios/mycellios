@@ -1,3 +1,5 @@
+import { isKokoroDeployment } from "../contracts/speech.js";
+import { replicaOutputByteLimit, validateSpeechCompletion } from "./speech-completion.js";
 import { EventEmitter } from "node:events";
 import type {
   ChatCompletionRequest,
@@ -392,10 +394,8 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return;
     }
     const chunkBytes = Buffer.byteLength(payload.text, "utf8");
-    const maxOutputBytes = Math.min(
-      2 * 1024 * 1024,
-      Math.max(4_096, (runtime.request.max_tokens ?? 256) * 32),
-    );
+    const deployment = this.store.getWorker(envelope.workerId)?.capabilities.deployments.find((d) => d.deploymentId === job.deploymentId);
+    const maxOutputBytes = replicaOutputByteLimit(deployment, runtime.request.max_tokens);
     if (
       payload.index !== runtime.nextTokenIndex ||
       typeof payload.text !== "string" ||
@@ -794,6 +794,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     if (result.metrics.inputTokens < 1 || result.metrics.inputTokens > plausibleInputMaximum) {
       return { ok: false, reason: "Implausible input token count" };
     }
+    if (isKokoroDeployment(deployment)) return validateSpeechCompletion(runtime.request, result, runtime.output);
     const maximumOutputTokens = runtime.request.max_tokens ?? 256;
     const outputBytes = Buffer.byteLength(runtime.output, "utf8");
     // Output text length is not a tokenizer. Byte-level tokens, Unicode and

@@ -42,3 +42,11 @@ These rules apply to the complete repository.
 - Physical tests that cannot run must be reported as skipped or unavailable,
   never as passing.
 - Do not commit or push unless the user explicitly requests it.
+
+## Optional speech replicas
+
+- Kokoro uses an explicit native replica adapter, not the Transformers layer planner.
+- Its loopback runtime owns model loading; the existing worker owns admission and leases.
+- Speech bytes are bounded independently from max_tokens and never counted as output text tokens.
+- Input usage is the cl100k_base count of the synthesized text. AntSeed examples start free.
+- Test with tests/kokoro.test.ts and tests/kokoro-network.test.ts; real model tests are opt-in.

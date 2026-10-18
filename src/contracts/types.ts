@@ -8,6 +8,7 @@ import type { EngineRuntimeProfile } from "./engine-runtime-profile.js";
 export type WorkloadClass = "interactive" | "batch" | "benchmark";
 export type AdapterKind =
   | "mycellios-native"
+  | "kokoro"
   | "mycellios-pipeline"
   | "mock";
 export type DeploymentAdapterKind = Exclude<AdapterKind, "mycellios-native">;

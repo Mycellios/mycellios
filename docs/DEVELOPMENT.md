@@ -149,3 +149,124 @@ Check the live issue labels before referring contributors to `good first issue`.
 
 The HTTP contract is in [`openapi.yaml`](openapi.yaml). Architecture changes
 must also update [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+## Optional Kokoro speech replicas and AntSeed
+
+Kokoro is a native full-model replica workload, not a Transformers pipeline.
+The initial model ID is 'mycellios-kokoro-es', with the Spanish voice 'ef_dora'.
+Each designated node runs the local runtime and its configured Mycellios worker.
+The normal coordinator authenticates the worker, schedules replica leases and
+returns its result through '/v1/chat/completions'. Existing workers require an
+updated release before they can advertise the new adapter; do not claim the
+feature is installed on the fleet merely because a coordinator test passes.
+
+### CPU runtime on a Linux node
+
+Build the optional image from the repository root:
+
+~~~bash
+docker build -f deploy/kokoro.Dockerfile -t mycellios-kokoro:local .
+mkdir -p runtime/kokoro-cache
+# The image runs as UID 10001; grant that UID write access to this cache only.
+docker run --name mycellios-kokoro --network host \
+  --cpus 2 --memory 3g --memory-swap 3g --pids-limit 128 \
+  --cap-drop ALL --security-opt no-new-privileges --read-only \
+  --tmpfs /tmp:rw,exec,nosuid,size=128m \
+  -v "$PWD/runtime/kokoro-cache:/cache" mycellios-kokoro:local
+~~~
+
+The HTTP listener is hard-coded to IPv4 loopback; host networking does not
+publish it to the LAN. The temporary mount needs executable mappings because
+phonemizer loads a temporary copy of the eSpeak shared library. Keep the
+non-root user, read-only image and dropped capabilities. The first launch
+downloads the pinned Kokoro revision, the selected Spanish voice and the
+cl100k_base tokenizer. Inference makes no cloud inference calls. For offline
+operation prepare that cache first, then disable the runtime's network egress.
+
+The worker uses 'config/worker.kokoro.example.json'. Set
+GPU_MESH_WORKER_CONFIG to a private copy and GPU_MESH_COORDINATOR to the
+authorized coordinator. Preserve the existing worker's credential; use a
+separate MYCELLIOS_WORKER_CREDENTIAL_PATH if starting another speech worker.
+Enroll it through the existing signed admission/ownership flow. Do not bypass
+that flow or overwrite an existing node configuration. Start with
+'npm run dev:worker' in development or the verified packaged worker in a release.
+CPU RAM is capacity, not GPU VRAM. Do not independently promise the same memory
+to multiple workers on one PC.
+
+Kokoro's fixed model revision and weight SHA256 are checked before the replica
+is advertised. Runtime model loading and CPU configuration are explicit; this
+version does not automatically install Kokoro on every connected PC.
+
+### Chat request and audio response
+
+Send one user message with the exact text to synthesize:
+
+~~~json
+{
+  "model": "mycellios-kokoro-es",
+  "messages": [{"role": "user", "content": "Hola. Esta voz se genera en Mycellios."}],
+  "max_tokens": 1,
+  "stream": false
+}
+~~~
+
+The result remains a normal chat completion. Parse choices[0].message.content
+as JSON. It is a mycellios-speech/1 envelope with text, voice, and audio:
+format=wav, sample_rate=24000, duration_seconds, sha256, and base64 data.
+Verify the hash before playback. scripts/read-kokoro-audio.mjs validates and
+extracts a saved response into a new WAV file.
+
+Input is limited to 400 Unicode characters and output to 1 MiB of mono PCM16
+WAV, approximately 21.8 seconds. Oversized audio fails rather than truncating.
+The voice can be set at runtime startup with MYCELLIOS_SPEECH_VOICE to
+ef_dora, em_alex, or em_santa; per-request voice changes are not supported.
+stream=true streams the completed envelope in bounded JSON fragments, not
+real-time audio synthesis. Assemble all fragments before decoding or playing.
+Cancellation aborts the HTTP delivery; an already-running local synthesis
+finishes under the same single-slot runtime lock before accepting another job.
+
+Usage counts only the synthesized text with the real cl100k_base tokenizer.
+completion_tokens is zero: base64 and WAV bytes are not generated text tokens.
+System/developer instructions are ignored and not billed; conversation history
+and multiple user messages are rejected. max_tokens does not truncate audio.
+The independent speech byte/duration checks remain enforced at both boundaries.
+
+### AntSeed provider
+
+Merge config/antseed.kokoro.example.json into the seller's configuration,
+point baseUrl at the authorized Mycellios coordinator, and provide a dedicated
+Mycellios API key via MYCELLIOS_ANTSEED_API_KEY. Do not put credentials in JSON.
+Use the built-in openai plugin. Keep the same openai-chat-completions protocol
+on both sides; conversion to another protocol may discard the audio envelope.
+Capabilities announce text input and text/audio output.
+
+The example is deliberately priced at zero for functional validation. Set an
+explicit input-token price only when commercial operation and a paid test are
+authorized. Never report characters, audio bytes or seconds as invented tokens.
+This configuration does not enable /v1/audio/speech on AntSeed. Buyers call
+/v1/chat/completions and decode the speech envelope themselves.
+
+### Verification
+
+~~~bash
+npm test -- --maxWorkers=1 tests/kokoro.test.ts tests/kokoro-network.test.ts
+MYCELLIOS_KOKORO_REAL_URL=http://127.0.0.1:8890/ npm test -- --maxWorkers=1 tests/kokoro-network.test.ts
+PYTHONPATH=python python -m unittest python.tests.test_kokoro_engine
+~~~
+
+The ordinary network fixture has two logical replicas on one host and is not
+physical two-host evidence. The real runtime case is opt-in and skipped unless
+configured. Tests cover checkpoint identity, corrupted audio, cancellation,
+bounded delivery, replica routing, SSE completion and token accounting.
+
+For an isolated AntSeed P2P smoke, install @antseed/node@0.2.147 and
+@antseed/provider-openai@0.2.52 in runtime/antseed-proof, then run:
+
+~~~bash
+node --import tsx scripts/smoke-kokoro-antseed.ts
+~~~
+
+This uses fresh test identities, private bootstrap only, secure P2P, zero
+prices and disabled payments. It writes a WAV and verification receipt under
+runtime/kokoro-proof-*. It does not announce a public seller or demonstrate
+USDC settlement, ANTS eligibility, public gateway access or the physical fleet.
