@@ -45,7 +45,9 @@ test('Mac generic password arguments are positional and set verifies actual read
   await store.set('fixture-ref', 'fixture-secret');
   assert.equal(calls.at(-1).args.at(-1), '/Library/Keychains/System.keychain');
   assert.ok(!calls.flatMap((call) => call.args).join(' ').includes('fixture-secret'));
-  assert.ok(calls.find((call) => call.stdin)?.stdin.endsWith("'/Library/Keychains/System.keychain'\nquit\n"));
+  const stdin = calls.find((call) => call.stdin)?.stdin;
+  assert.ok(stdin.endsWith("'/Library/Keychains/System.keychain'\n"));
+  assert.ok(!stdin.includes('\nquit\n'));
   await store.delete('fixture-ref');
   assert.equal(await store.get('fixture-ref'), null);
 });

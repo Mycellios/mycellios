@@ -23,7 +23,7 @@ const command = async (file, args, options = {}) => await run(file, args, {
 const load = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const imported = async (file) => await import(pathToFileURL(join(payload, 'dist', file)));
 const report = { schema: 'mycellios-macos95-hosted-installation/1', recipeRevision,
-  payloadSourceId: 'sha256:7a7690663d37ac3fed9db26950d10279ea6b13e93db0f34d5afbb7ca46c3aaf1',
+  payloadSourceId: 'sha256:c6c84d012a8c4659575e3c2f5c9d8265bc46a3ff1d52535f42d79426feff8c92',
   payloadBaseSourceId: 'sha256:df3c212976012758420b0085c8050ba417d818fc9424b4ec0a7edc1b42719032',
   payloadBaseRevision: '7e8ce6eaf9b0501c0424773ec94c8e4af94bd3c5', version: '0.2.95',
   unsigned: true, notarized: false, physicalMac: false, realRebootTested: false,
