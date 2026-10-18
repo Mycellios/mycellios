@@ -158,9 +158,9 @@ Run the native contiguous pipeline on two computers using
 [`TWO_HOST_QUICKSTART.md`](TWO_HOST_QUICKSTART.md). Do not add a new engine or a
 new product surface before that run identifies a concrete missing capability.
 
-## Optional speech replica candidate
+## Optional speech replicas
 
-The candidate adds a native Kokoro replica adapter to the existing Mycellios
+The implementation adds a native Kokoro replica adapter to the existing Mycellios
 worker/scheduler/chat route. Its artifact-pinned loopback runtime returns bounded
 PCM16 WAV in a versioned JSON chat-content envelope. Input usage is a real
 cl100k_base text count; audio bytes are not billed as output text tokens.
@@ -178,13 +178,30 @@ Its operator overlay retained 321 unrelated production JavaScript modules byte
 for byte; the existing physical node connections and persistence were checked.
 The exact image also passed isolated real Kokoro delivery through AntSeed.
 
-Three owned Windows PCs now have a separate LocalService speech service using
-the existing CPU interpreter plus isolated optional dependencies. Each produced
-a verified 2.6-second WAV from its loopback service. This is physical synthesis
-evidence, not evidence of account-bound fleet routing: their new replica keys
-still require the owner's authenticated enrollment. The standalone CLI regression
-exercises an account-confirmed one-shot grant, real HTTP redemption, persistent
-ownership, WebSocket connection and bounded speech completion in a local fixture.
+On 2026-10-18, three owned Windows PCs redeemed separate account-confirmed
+one-shot grants and connected their speech replicas. Their LocalService services
+use the existing CPU interpreter plus isolated optional dependencies, two CPU
+threads and one concurrent request per replica. Each produced real loopback WAV;
+the production coordinator then completed three concurrent speech API requests.
+All three replicas had completed production jobs and remained connected.
 
-A public AntSeed seller routing through those physical Mycellios replicas, paid
-USDC settlement and ANTS rewards remain unverified in this change.
+The standalone CLI release is based on integrated main
+e010d317cd462057791c10e2cae9b7ada8fe4677, with worker version 0.2.121 and
+source ID e5069c8f5e4acbbc8e7a2949e51b0a8b09707a067cd5123178182b220ced0a8c.
+Its operator artifact retained 327 unrelated JavaScript modules; the exact
+compiled CLI passed account enrollment and completion against the preserved
+production admission boundary before promotion.
+
+The existing public AntSeed seller subsequently advertised mycellios-kokoro-es
+through its unmodified openai provider, pointing to the authenticated public
+Mycellios API. An actual AntSeed gateway request returned job
+job_9be630d1ea5b4789844c705824279996, also recorded as completed by the production
+coordinator on the physical HP replica. The verified WAV contained 4.125 seconds
+of audio, delivered in 3706 ms, with 17 input tokens and zero output tokens;
+SHA256 b35eb4ecd78629579fcae23bcff254d52368be1f069903674808b87adff58aee.
+The seller identity and unrelated research/GPU service configuration were retained.
+Receipts and audio are retained as operator artifacts rather than committed binaries.
+
+The public speech offer is free. This proves publication, discovery and speech
+delivery through physical PCs; paid USDC settlement and ANTS rewards for this
+route remain unverified.
