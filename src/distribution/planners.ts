@@ -1102,13 +1102,26 @@ function canStillCoverRemainingLayers(
   const capacities = nodes
     .filter((node) => !usedNodes.has(node.id))
     .map((node) => {
-      let count = 0;
-      for (let end = nextLayer + 1; end <= model.layers.length; end += 1) {
-        const stage = { nodeId: node.id, layerStart: nextLayer, layerEnd: end };
-        if (stageMemoryBytes(model, stage, workload, false, false) > usableMemory(node)) break;
-        count = end - nextLayer;
+      // Cada etapa restante empieza donde acaba la anterior, no todas en
+      // `nextLayer`: las capas no pesan igual, y medir la capacidad de todas
+      // desde el mismo inicio subestimaba los tramos posteriores y podaba
+      // rutas válidas (el beam devolvía `null` aunque `exhaustive-optimal`
+      // encontrara una ruta). Como esto es un filtro optimista —jamás debe
+      // descartar una ruta real— se toma la mayor capacidad que el nodo
+      // alcanza desde cualquier inicio dentro del tramo restante: es un
+      // límite superior seguro, porque una etapa real cubre un único tramo
+      // contiguo que nunca supera esa cota.
+      let best = 0;
+      for (let start = nextLayer; start < model.layers.length; start += 1) {
+        let count = 0;
+        for (let end = start + 1; end <= model.layers.length; end += 1) {
+          const stage = { nodeId: node.id, layerStart: start, layerEnd: end };
+          if (stageMemoryBytes(model, stage, workload, false, false) > usableMemory(node)) break;
+          count = end - start;
+        }
+        if (count > best) best = count;
       }
-      return count;
+      return best;
     })
     .sort((left, right) => right - left)
     .slice(0, stagesLeft);
