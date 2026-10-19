@@ -151,6 +151,19 @@ function tensorParallelEstimate(
   const byId = new Map(topology.nodes.map((node) => [node.id, node]));
   const nodes = nodeIds.map((id) => byId.get(id)).filter(Boolean) as ComputeNodeProfile[];
   if (nodes.length !== nodeIds.length) return infeasible(architecture, nodes.length, "unknown_node");
+  // `concurrentSequences` is a positive integer by contract, and
+  // `evaluateDistributionPlan` already fails closed on it
+  // (`concurrent_sequences_must_be_a_positive_integer`). The tensor cell
+  // computes its own throughput (`tpotMs = decodeMs * concurrentSequences`,
+  // `aggregateTokensPerSecond = concurrentSequences * 1_000 / tpotMs`) without
+  // going through that guard; an invalid value (0 or fractional) would fabricate
+  // a `feasible:true` cell with `tpotMs = 0`, `tokensPerSecondPerSequence =
+  // Infinity` and `aggregateTokensPerSecond = NaN`. Fail closed with the same
+  // reason so an unvalidated caller cannot turn an invalid workload into a
+  // tensor-parallel estimate no physical topology can execute.
+  if (!Number.isSafeInteger(workload.concurrentSequences) || workload.concurrentSequences < 1) {
+    return infeasible(architecture, nodes.length, "concurrent_sequences_must_be_a_positive_integer");
+  }
   const linkGateReason = tensorParallelCellGateReason(nodeIds, topology);
   if (linkGateReason !== null) {
     return infeasible(architecture, nodes.length, linkGateReason);
