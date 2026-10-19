@@ -368,9 +368,18 @@ function collectiveWireBytes(
   messageBytes: number,
   nodes: number,
 ): number {
-  if (architecture === "tensor-ring") {
-    return (2 * (nodes - 1) * messageBytes) / nodes;
-  }
+  // An all-reduce moves the same total bytes on the wire regardless of the
+  // collective topology: a ring splits the message into `nodes` chunks sent
+  // over 2*(nodes-1) steps, and a star gathers and then broadcasts the full
+  // message, so both total `2*(nodes-1)*messageBytes`. Only the per-step
+  // chunking differs. Previously the ring branch divided by `nodes`, reporting
+  // per-node bytes while the star reported total bytes, so the same physical
+  // collective was undercounted by a factor of `nodes` in
+  // `networkBytesPerOutputToken`. Report the total for both.
+  //
+  // The `architecture` parameter only selects the branch, so it is accepted but
+  // intentionally unused; both topologies carry the same total.
+  void architecture;
   return 2 * (nodes - 1) * messageBytes;
 }
 
