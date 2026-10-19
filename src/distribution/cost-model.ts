@@ -430,7 +430,15 @@ function validContiguousCoverage(
 ): boolean {
   let nextLayer = 0;
   for (const stage of stages) {
+    // Stage bounds index into `model.layers`, so they must be safe integers.
+    // runtime-manifest `validatePlanRequest` already rejects fractional bounds
+    // via `asInteger` (`runtime_layers_are_not_contiguous`); fail closed here
+    // too so an unvalidated caller cannot pass e.g. a `[0, 0.5)` stage past
+    // coverage and later index `model.layers[-0.5]` into an undefined layer and
+    // throw a TypeError instead of being rejected.
     if (
+      !Number.isSafeInteger(stage.layerStart) ||
+      !Number.isSafeInteger(stage.layerEnd) ||
       stage.layerStart !== nextLayer ||
       stage.layerEnd <= stage.layerStart ||
       stage.layerEnd > model.layers.length
