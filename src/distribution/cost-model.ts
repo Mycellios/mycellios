@@ -73,6 +73,24 @@ export function evaluateDistributionPlan(
       infeasibleReason: `${invalidPositiveInteger[0]}_must_be_a_positive_integer`,
     };
   }
+  // `batchWindowMs` is a time budget in milliseconds, whose external contract is
+  // non-negative and finite: `runtime-manifest.validatePlanRequest` applies
+  // `assertNonNegativeFinite` (`runtime_workload_batch_window_is_invalid`) and
+  // the python launcher / macro-wave CLI validate it as `nonNegativeFinite`.
+  // Unlike the integer workload fields it is not a count, so it must not be an
+  // arbitrary positive integer; but an unvalidated caller who passes a negative
+  // value shifts `batchingDelay` down and reports a *negative* tpot/ttft time and
+  // a negative throughput while still marking the plan `feasible:true`; `NaN` or
+  // `Infinity` likewise fabricate non-finite times. It must fail closed here too.
+  if (
+    !Number.isFinite(workload.batchWindowMs) ||
+    workload.batchWindowMs < 0
+  ) {
+    return {
+      ...empty,
+      infeasibleReason: "batch_window_ms_must_be_non_negative_and_finite",
+    };
+  }
   if (codec.estimatedQualityLoss > workload.maxQualityLoss) {
     return { ...empty, infeasibleReason: "activation_quality_budget_exceeded" };
   }
