@@ -5,6 +5,11 @@ These rules apply to the complete repository.
 ## Product direction
 
 - Mycellios is an independent distributed inference runtime.
+- The network vision includes phones, laptops, desktop PCs and servers as
+  contributing compute nodes. Illustrations must reflect that role; distinguish
+  the intended network from verified hardware and runtime support.
+- Network overview illustrations use a distributed peer mesh, with mixed device
+  types and multiple connections per node, rather than a fixed device sequence.
 - The immediate product gate is a reproducible native route across two physical
   computers. Prefer fixes that unblock or measure that route over new surfaces.
 - Do not present simulation, loopback or single-host execution as multi-host
@@ -25,6 +30,8 @@ These rules apply to the complete repository.
 ## Documentation
 
 - `README.md` is the entry point and `docs/README.md` is the documentation map.
+- README artwork belongs under `assets/readme/`. Keep brand illustrations and
+  conceptual diagrams distinct from screenshots or measured runtime evidence.
 - Capability claims live only in `docs/STATUS_AND_EVIDENCE.md`.
 - Keep active documentation within the canonical set enforced by
   `npm run verify:structure`; update that gate intentionally when adding a

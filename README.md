@@ -1,125 +1,134 @@
-# Mycellios
-
 <p align="center">
-  <img src="assets/mycellios-logo.png" alt="Mycellios logo" width="128" />
+  <img src="assets/readme/hero.png" alt="Mycellios — Connect devices. Run AI together. A conceptual network where phones, laptops, desktop PCs and servers all contribute compute as nodes." width="1200" />
 </p>
 
-<p align="center"><strong>Connect GPUs. Split the model. Run AI together.</strong></p>
-
 <p align="center">
-  <a href="https://github.com/tych0s/mycellios/actions/workflows/public-quality.yml"><img alt="Public quality gates" src="https://github.com/tych0s/mycellios/actions/workflows/public-quality.yml/badge.svg?branch=main" /></a>
-  <img alt="Node.js 24 or newer" src="https://img.shields.io/badge/Node.js-24%2B-339933?logo=node.js&logoColor=white" />
-  <img alt="GPL-3.0-only license" src="https://img.shields.io/badge/license-GPL--3.0--only-blue.svg" />
+  <strong>Open-source AI inference, built around connected devices.</strong><br />
+  Phones, laptops, PCs and servers — a network of contributing compute nodes.
 </p>
 
-Mycellios connects GPUs from different computers through a distributed network,
-similar to P2P, so they can run one AI model together. Instead of requiring one
-large GPU, it splits the model into smaller parts and assigns each part to a
-different worker. Mycellios coordinates the complete route and returns one
-streamed response through a familiar API.
+<p align="center">
+  <a href="#try-it-locally"><strong>Get started</strong></a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/STATUS_AND_EVIDENCE.md">Project status</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-## What it does
+<p align="center">
+  <a href="https://github.com/Mycellios/mycellios/actions/workflows/public-quality.yml"><img src="https://github.com/Mycellios/mycellios/actions/workflows/public-quality.yml/badge.svg?branch=main" alt="Public quality gates" /></a>
+  <a href="docs/DEVELOPMENT.md"><img src="https://img.shields.io/badge/Node.js-24%2B-3b4d35?style=flat" alt="Node.js 24 or newer" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--only-ad7a48?style=flat" alt="GPL-3.0-only license" /></a>
+</p>
 
-- **Combines distributed compute:** partitions supported models into
-  non-overlapping layer ranges that can run on different workers and GPUs.
-- **Runs a supervised route:** coordinates remote launch, readiness, canaries,
-  registration, recovery and cleanup across the participating computers.
-- **Streams inference:** connects the stages over persistent runtime channels
-  and exposes a streaming HTTP API.
-- **Captures evidence:** records execution details for debugging, recovery and
-  performance evaluation.
+## One model. Shared compute.
 
-## How the network works
+Mycellios is designed around a network of contributing devices: phones,
+laptops, desktop PCs and servers all have a place as compute nodes. Each node
+contributes according to its resources and compatible runtime.
 
-```mermaid
-flowchart LR
-  Client[Client] -->|streaming API| Coordinator
-  Coordinator -->|plans and supervises| Stage1[Stage 1]
-  Stage1 -->|activations| Stage2[Stage 2]
-  Stage2 -->|activations| StageN[Stage N]
-  StageN -->|generated tokens| Client
-```
+Large models can need more memory than one device can provide. The approach
+is to divide a supported model into smaller parts and assign each part to a
+participating node.
 
-Each stage loads its assigned model range. The coordinator manages admission,
-planning and route lifecycle; workers execute only authorized launches.
+Within the network, a coordinator selects compatible nodes and assigns model
+work. Participating nodes execute that work and exchange intermediate results.
+Together, they produce one streamed response.
 
-## Evidence status
+The name comes from **mycelium**: many connected parts working as a network.
 
-The distributed execution path includes model partitioning, authenticated
-remote launch agents, persistent stage transport, streaming inference, recovery
-contracts and evidence capture. Its software behavior has been exercised on one
-computer, including CPU pipeline parity, local transport, recovery and cleanup.
+> **In development.** Start with the local demo to explore the coordinator and
+> API flow. The next validation milestone is a reproducible route across two
+> physical computers. See [project status](docs/STATUS_AND_EVIDENCE.md) for the
+> current capabilities, measurements and limitations.
 
-A versioned route spanning two physical computers is the next evidence gate.
-Multi-host throughput, WAN latency, GPU parallelism across machines and remote
-recovery have not yet been measured and published by the project.
+## How it fits together
 
-Simulation, loopback and multiple processes on one computer are useful for
-software checks; they do not count as multi-host evidence. See
-[Status and evidence](docs/STATUS_AND_EVIDENCE.md) for the full boundary.
+<p>
+  <img src="assets/readme/how-it-works.png" alt="Illustrative model allocation: a model is divided into parts A, B, C and D, assigned to a phone, laptop, PC and server node within a distributed mesh. Other peer nodes remain available. Each participating node runs its assigned part rather than loading the whole model." width="1200" />
+</p>
 
-## Compute economy, blockchain and token
+The illustration focuses on model placement: participating nodes hold their
+assigned parts, while other peers remain available. Device support depends on
+the hardware and runtime; verified capabilities are listed in
+[Status and evidence](docs/STATUS_AND_EVIDENCE.md).
 
-Mycellios connects distributed inference with verifiable economic records. Each
-job can produce signed settlement receipts that bind usage, pricing and
-contributor allocations to execution evidence. This provides the accounting
-foundation for a decentralized compute network.
+| Part | Its job |
+| --- | --- |
+| **Compute nodes** | Contribute resources, run assigned model stages and exchange intermediate results. Phones, laptops, PCs and servers share this role in the network vision. |
+| **Coordinator** | Plan the model split, prepare the route and supervise its lifecycle. |
+| **Execution records** | Capture the details needed to inspect, debug and evaluate a run. |
 
-The architecture can extend these signed records to blockchain settlement and
-token-based rewards for computers that contribute compute. Today, credits remain
-internal, non-monetary and non-transferable: a public token, blockchain network
-and token supply have not yet been selected or launched. See the [economic and
-token status](docs/STATUS_AND_EVIDENCE.md#economic-and-token-status) for the
-current readiness gates.
+For the technical design and trust boundaries, read the
+[architecture](docs/ARCHITECTURE.md) and [security guide](docs/SECURITY.md).
 
 ## Try it locally
 
-Requirements: Node.js 24+, npm and Python 3 with the runtime dependencies when
-using Python stages.
+**You need:** Node.js 24+ and npm 10.9.8. Python 3.12 and the selected runtime
+dependencies are needed for Python model stages; see the
+[development guide](docs/DEVELOPMENT.md) for setup details.
 
 ```bash
+git clone https://github.com/Mycellios/mycellios.git
+cd mycellios
 npm ci
 npm run doctor
 npm run demo
 ```
 
-The demo uses a mock worker on loopback to show the coordinator and API flow. It
-does not run inference across computers or provide performance results.
+The demo uses a **mock worker on your computer**. It demonstrates the coordinator
+and API flow; it does not run a model across GPUs or measure network performance.
 
-To check a two-host configuration without launching workers:
+**Ready to work with two computers?** Follow the
+[two-host quickstart](docs/TWO_HOST_QUICKSTART.md). It covers prerequisites,
+private connectivity, configuration, preflight checks and the native route.
+
+<details>
+<summary><strong>Check the example configuration without launching workers</strong></summary>
 
 ```bash
 npm run preflight:two-host -- --config config/auto-distribute.two-host.example.json --json
 ```
 
-The example contains placeholder addresses and should report `dryRun: true`.
-To configure real machines and attempt the native route, follow the
-[Two-host quickstart](docs/TWO_HOST_QUICKSTART.md).
+The checked-in example uses placeholder addresses and should report
+`dryRun: true`. A valid configuration is not evidence of a successful physical run.
 
-## Contributing
+</details>
 
-Use Node.js 24 or newer, then run the repository checks:
+## Where the project stands
 
-```bash
-npm ci
-npm run check
-```
+Mycellios separates implementation from measured results. Automated checks and
+single-host runs do not establish performance across physical machines.
 
-See [Development](docs/DEVELOPMENT.md) and [Contributing](CONTRIBUTING.md).
+The full capability inventory and evidence boundaries live in
+[Status and evidence](docs/STATUS_AND_EVIDENCE.md). The
+[roadmap](docs/ROADMAP.md) explains the next gates and their acceptance criteria.
 
-## Documentation
+### Compute economy & blockchain
 
-| Topic | Guide |
+The design connects compute usage with contributor accounting and verifiable
+execution records. **There is no launched public Mycellios token or active
+on-chain contributor settlement.** Current compute credits are internal,
+non-monetary, non-transferable and non-withdrawable. Read the
+[economic and token status](docs/STATUS_AND_EVIDENCE.md#economic-and-token-status)
+for the current scope and future readiness gates.
+
+## Find your next step
+
+| I want to… | Start here |
 | --- | --- |
-| System design and boundaries | [Architecture](docs/ARCHITECTURE.md) |
-| Verified capabilities and evidence | [Status and evidence](docs/STATUS_AND_EVIDENCE.md) |
-| First attempt on two physical computers | [Two-host quickstart](docs/TWO_HOST_QUICKSTART.md) |
-| Evidence-gated work order | [Roadmap](docs/ROADMAP.md) |
-| HTTP API | [OpenAPI contract](docs/openapi.yaml) |
-| Security and trust boundaries | [Security](docs/SECURITY.md) |
-| Full documentation index | [Documentation map](docs/README.md) |
+| Understand the design | [Architecture](docs/ARCHITECTURE.md) |
+| Check what has been verified | [Status and evidence](docs/STATUS_AND_EVIDENCE.md) |
+| Prepare two computers | [Two-host quickstart](docs/TWO_HOST_QUICKSTART.md) |
+| Use the HTTP API | [OpenAPI contract](docs/openapi.yaml) |
+| Work on the code | [Development](docs/DEVELOPMENT.md) · [Contributing](CONTRIBUTING.md) |
+| Report a security issue | [Security policy](SECURITY.md) |
+| Browse all documentation | [Documentation map](docs/README.md) |
 
-## License
+## Build with us
 
-Mycellios is licensed under [GPL-3.0-only](LICENSE). Third-party notices are in
-[THIRD_PARTY.md](THIRD_PARTY.md).
+Contributions to the runtime, documentation and reproducible experiments are
+welcome. Read [Contributing](CONTRIBUTING.md) before starting, or
+[open an issue](https://github.com/Mycellios/mycellios/issues) to discuss a bug or idea.
+
+Mycellios is licensed under [GPL-3.0-only](LICENSE).
+See [third-party notices](THIRD_PARTY.md) for source attribution.
