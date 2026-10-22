@@ -147,6 +147,7 @@ try {
       physicalProbe: runtime.physicalProbe,
     }),
   );
+  snapshotResourceObserver.resetCpuBaseline();
   governor.start();
   if (pendingComponentActivation && componentLifecycle) {
     await componentLifecycle.markActivationHealthy();

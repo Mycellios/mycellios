@@ -1,5 +1,6 @@
 import { opendir, stat } from "node:fs/promises";
 import { resolve } from "node:path";
+import { setTimeout as wait } from "node:timers/promises";
 import type { NodeConfiguration } from "../contracts/node-configuration.js";
 import { probeHardware, type HardwareProbe } from "../worker/hardware.js";
 
@@ -8,6 +9,21 @@ export interface NodeResourceObservation {
   ramMiB: number;
   diskMiB: number;
   temperatureC: number | null;
+}
+
+export interface NodeResourceObserver {
+  (): Promise<NodeResourceObservation>;
+  resetCpuBaseline?(): void;
+}
+
+export interface NodeCpuObservationClock {
+  readCpuUsage(): { user: number; system: number };
+  nowNanoseconds(): bigint;
+}
+
+export interface NodeResourceObserverOptions {
+  cpuClock?: NodeCpuObservationClock;
+  waitMilliseconds?: (milliseconds: number) => Promise<void>;
 }
 
 export type NodeResourceLimitCode =
@@ -24,7 +40,7 @@ export class NodeResourceGovernor {
 
   constructor(
     private readonly limits: NodeConfiguration["limits"],
-    private readonly observe: () => Promise<NodeResourceObservation>,
+    private readonly observe: NodeResourceObserver,
     private readonly onBreach: (
       code: NodeResourceLimitCode,
       observation: NodeResourceObservation | null,
@@ -38,6 +54,7 @@ export class NodeResourceGovernor {
 
   start(): void {
     if (this.timer || this.stopped) return;
+    this.observe.resetCpuBaseline?.();
     this.timer = setInterval(() => void this.tick(), this.intervalMs);
     this.timer.unref();
   }
@@ -86,17 +103,35 @@ export function breachedLimit(
 export function createNodeResourceObserver(
   cachePath: string,
   hardwareProbe: () => Promise<HardwareProbe> = probeHardware,
-): () => Promise<NodeResourceObservation> {
+  options: NodeResourceObserverOptions = {},
+): NodeResourceObserver & { resetCpuBaseline(): void } {
+  const cpuClock = options.cpuClock ?? {
+    readCpuUsage: () => process.cpuUsage(),
+    nowNanoseconds: () => process.hrtime.bigint(),
+  };
+  const waitMilliseconds = options.waitMilliseconds ?? ((milliseconds: number) => wait(milliseconds));
   const root = resolve(cachePath);
-  let previousCpu = process.cpuUsage();
-  let previousTime = process.hrtime.bigint();
-  return async () => {
+  let inFlight: Promise<NodeResourceObservation> | null = null;
+  let previousCpu = cpuClock.readCpuUsage();
+  let previousTime = cpuClock.nowNanoseconds();
+  const resetCpuBaseline = () => {
+    if (inFlight) return;
+    previousCpu = cpuClock.readCpuUsage();
+    previousTime = cpuClock.nowNanoseconds();
+  };
+  const collect = async () => {
+    // Include a complete CPU window before charging the probe's own work.
+    let remainingMs = 5_000 - Number(cpuClock.nowNanoseconds() - previousTime) / 1_000_000;
+    while (remainingMs > 0) {
+      await waitMilliseconds(Math.ceil(remainingMs));
+      remainingMs = 5_000 - Number(cpuClock.nowNanoseconds() - previousTime) / 1_000_000;
+    }
     const [diskBytes, hardware] = await Promise.all([
       directoryBytes(root),
       hardwareProbe(),
     ]);
-    const cpu = process.cpuUsage();
-    const now = process.hrtime.bigint();
+    const cpu = cpuClock.readCpuUsage();
+    const now = cpuClock.nowNanoseconds();
     const elapsedMicros = Math.max(1, Number(now - previousTime) / 1_000);
     const usedMicros = Math.max(
       0,
@@ -114,6 +149,11 @@ export function createNodeResourceObserver(
       temperatureC: temperatures.length > 0 ? Math.max(...temperatures) : null,
     };
   };
+  const observe = () => {
+    if (!inFlight) inFlight = collect().finally(() => { inFlight = null; });
+    return inFlight;
+  };
+  return Object.assign(observe, { resetCpuBaseline });
 }
 
 async function directoryBytes(path: string): Promise<number> {
