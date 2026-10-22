@@ -235,7 +235,9 @@ must not be inferred from USDC settlement or self-test traffic.
 English is the default; Spanish is explicit via language=es. The request accepts the five documented voices and speed 0.5 through 2. Contract, coordinator dispatch, request identity and response checks have focused automated coverage. An isolated MSI CPU pilot generated English default, English male, slow, fast and Spanish audio: the same 14-token English text produced 6.5 seconds at 0.8 and 4.45 seconds at 1.2. No public-path deployment or OmniRoute/AntSeed control verification is claimed by this entry. Existing Kokoro pricing remains zero.
 ## Experimental Kev decision graphs
 
-Private physical qualification, 22 October 2026. **Not published in AntSeed.**
+Physical qualification and serving rollout, 22 October 2026. **Not yet a
+validated public service.** The zero-price AntSeed offer was announced, but the
+decision worker is held offline after the full-context buyer probe failed.
 The requested `jev` alias identifies independent [Kev-4B](https://huggingface.co/jaredpalmer/kev-4b),
 not TypeSafe Jev weights. It scores supplied choices and returns a choice, p(true)
 (`noul`), or probability-weighted level (`score`); it generates no prose or output tokens.
@@ -368,8 +370,30 @@ not an additional physical run or AntSeed delivery.
 
 Private receipts live under `outputs/kev-distributed-20261021`; secrets, identities,
 model weights and caches are excluded from source/public delivery. Remaining
-publication gates are source promotion under the repository's Git/QA rules,
-account-confirmed independent native cell admission, and a complete real buyer
-request through AntSeed with verified usage and `served_free=1`. Until then `jev`
-remains unavailable publicly. Larger contexts, GPU execution and general task
+publication gates already closed include source promotion through PRs #70–72
+and account-confirmed independent cell admission. A real 55-token SDK call and
+a real 55-token OmniRoute/AntSeed buyer call returned the correct decision;
+the buyer call did not meet the free gate because its implicit provider selector
+attributed another provider's pricing. An explicit
+`X-Antseed-Provider: mycellios-decisions` schema-rejection probe subsequently
+recorded `served_free=1`, but executed no model and is not buyer qualification.
+
+The 256-token buyer attempt failed: OmniRoute retried after an executor
+availability error, then a physical contributor's heartbeat expired. No complete
+256-token buyer result is claimed. The native process remained alive; memory and
+owner preflight later passed on all three hosts. The HP's existing nonblocking
+hardware sampler and other installed native overlays were preserved. Proposed
+TLS connection reuse has passed 78 model-free tests and the public structure,
+architecture and typecheck gates; it is not yet physically qualified or deployed.
+
+A stale, zero-token API reservation for an already failed job was reconciled
+with the normal failure-settlement method, without changing balances or limits.
+The seller replacement also produced a recorded embedding connection-refused
+request; this was not a zero-downtime rollout. A later interactive embedding
+query returned a valid vector and `served_free=1`. These observations do not
+establish global interactive latency or long-term stability.
+
+The remaining gate is a complete real buyer request at the pilot context limit,
+with verified usage and `served_free=1`, after source-bound physical qualification
+of any changed native transport. Larger contexts, GPU execution and general task
 quality require separate qualification.

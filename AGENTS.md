@@ -103,6 +103,15 @@ These rules apply to the complete repository.
   and retries only explicit account-concurrency rejection for at most 30 seconds.
   Verify with `node scripts/check-antseed-jev-bridge.mjs`. Never retry failed
   model execution or broaden an account's concurrency to make a canary pass.
+- Pinned AntSeed gateway calls for `jev` must select
+  `X-Antseed-Provider: mycellios-decisions`. On a seller with several providers,
+  omitting this selector can attribute another provider's price to the response.
+  Verify a real successful buyer receipt with `served_free=1`; never rewrite an
+  earlier receipt to make that gate pass.
+- Decision actor control traffic may reuse authenticated TLS channels. Keep poll/
+  result and active permit channels separate; authenticate each request and close
+  invalid framing/authentication paths. Preserve all existing permit, deadline,
+  owner, freshness and frame bounds; do not replay uncertain model execution.
 - Native CPU observations preserve the existing units and owner limits. Use at least
   five seconds per CPU sample, coalesce overlapping observations and reset the
   startup baseline only when monitoring begins. Keep thermal/RAM/disk checks and

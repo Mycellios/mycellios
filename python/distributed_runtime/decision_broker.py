@@ -94,6 +94,14 @@ class NativeDecisionBroker:
     def expired(self):
         return self.config['mode'] == 'qualification' and time.time()*1000 >= self.config['expiresAtMs']
 
+    def observations(self):
+        with self.lock:
+            now = time.time()
+            return [{'stageIndex': row['stageIndex'],
+                     'ownerAvailable': self.available.get(node) is True,
+                     'secondsSinceMessage': max(0, now-self.seen[node]) if node in self.seen else None}
+                    for node, row in self.config['nodes'].items()]
+
     def executor_message(self, node, action, body):
         expected = self.config['nodes'][node]
         with self.lock:
@@ -165,17 +173,21 @@ class NativeDecisionBroker:
     def listener(self):
         broker = self
         class Handler(BaseHTTPRequestHandler):
+            protocol_version = 'HTTP/1.1'
             def reply(self, code, body):
                 raw = json.dumps(body, allow_nan=False, separators=(',', ':')).encode()
                 self.send_response(code); self.send_header('Content-Type', 'application/json')
+                if self.close_connection: self.send_header('Connection', 'close')
                 self.send_header('Content-Length', str(len(raw))); self.end_headers(); self.wfile.write(raw)
 
             def do_POST(self):
                 parts = self.path.strip('/').split('/')
                 if len(parts) != 2 or parts[0] not in ('poll', 'permit', 'result') or parts[1] not in broker.config['nodes']:
+                    self.close_connection = True
                     return self.reply(404, {'error': 'not_found'})
                 action, node = parts; expected = broker.config['nodes'][node]
                 if not hmac.compare_digest(self.headers.get('Authorization', ''), 'Bearer '+expected['token']):
+                    self.close_connection = True
                     return self.reply(401, {'error': 'unauthorized'})
                 try:
                     self.connection.settimeout(30)
@@ -189,6 +201,7 @@ class NativeDecisionBroker:
                     code, result = broker.executor_message(node, action, body)
                     return self.reply(code, result)
                 except (ValueError, TypeError, KeyError, OSError):
+                    self.close_connection = True
                     return self.reply(400, {'error': 'invalid_native_decision_envelope'})
             def log_message(self, *args): pass
         host = wire.QualificationServer((self.config['address'], self.config['port']), Handler)

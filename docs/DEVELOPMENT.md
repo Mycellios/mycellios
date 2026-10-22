@@ -299,3 +299,40 @@ It preserves real usage counters and request/concurrency limits, while removing
 starter-token debits for that exact key/model pair. A persisted reservation marker
 keeps completion accounting stable across restarts and policy changes. Default is
 empty. Never put API key secrets in this setting or expose administrative tokens.
+
+## Optional decision service through AntSeed
+
+`jev` accepts the typed decision envelope described in
+[status and evidence](STATUS_AND_EVIDENCE.md#experimental-kev-decision-graphs).
+It is not a prose-completion model. Keep one user message containing the JSON
+envelope as a string, and use `max_tokens: 1`; actual output token usage is zero.
+
+For a pinned seller behind the AntSeed gateway, set both the model and provider:
+
+```http
+POST /v1/chat/completions
+Authorization: Bearer <gateway-api-key>
+Content-Type: application/json
+X-Antseed-Provider: mycellios-decisions
+
+{
+  "model": "<seller-peer-id>@jev",
+  "messages": [{
+    "role": "user",
+    "content": "{\"schema\":\"mycellios-decisions/1\",\"state\":\"My card was charged twice.\",\"questions\":{\"department\":{\"type\":\"choice\",\"instructions\":\"Choose the responsible team.\",\"criteria\":{\"billing\":\"Charges and refunds\",\"technical\":\"Software errors\"}}}}"
+  }],
+  "max_tokens": 1,
+  "stream": false
+}
+```
+
+Through OmniRoute, prefix the model with `antseed/`, retaining that provider
+header and the same envelope. Use the corresponding OmniRoute API key. Do not
+add diagnostic fields to the strict Mycellios request body; use headers for
+correlation instead.
+
+The provider selector matters on a seller advertising several providers: the
+gateway's implicit selection may use the first provider's pricing telemetry.
+Confirm the signed `jev` offer has zero prices and a successful gateway receipt
+records `served_free=1`, actual input usage and zero output usage. A configured
+zero price or a schema-rejected request alone does not close the buyer gate.

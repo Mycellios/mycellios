@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
+import http.client
+import io
 import importlib.util
 import ipaddress
 import json
@@ -12,6 +14,7 @@ import os
 from pathlib import Path
 import ssl
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -37,6 +40,55 @@ def file_pin(path, digest):
     if not hmac.compare_digest(h.hexdigest(), digest): raise ValueError('decision_actor_artifact_changed')
     stat = file.stat()
     return stat.st_size, stat.st_mtime_ns
+
+
+class JsonChannel:
+    """One sequential authenticated channel; never replay an uncertain request."""
+    def __init__(self, origin, context, token, *, connection_factory=None):
+        self.origin, self.context, self.token = urllib.parse.urlsplit(origin), context, token
+        self.factory = connection_factory or http.client.HTTPSConnection
+        self.connection = None
+        self.lock = threading.RLock()
+
+    def close(self):
+        with self.lock:
+            if self.connection is not None:
+                self.connection.close()
+                self.connection = None
+
+    def post(self, path, body, timeout):
+        raw = json.dumps(body, allow_nan=False, separators=(',', ':')).encode()
+        if not 0 < len(raw) <= wire.MAX_BODY:
+            raise ValueError('decision_actor_request_boundary')
+        with self.lock:
+            try:
+                if self.connection is None:
+                    self.connection = self.factory(self.origin.hostname, self.origin.port,
+                                                   context=self.context, timeout=timeout)
+                connection = self.connection
+                connection.timeout = timeout
+                if connection.sock is not None: connection.sock.settimeout(timeout)
+                connection.request('POST', path, body=raw, headers={
+                    'Authorization': 'Bearer '+self.token, 'Content-Type': 'application/json',
+                    'Content-Length': str(len(raw))})
+                response = connection.getresponse()
+                length = response.getheader('Content-Length')
+                if response.getheader('Transfer-Encoding') or length is None \
+                        or not length.isdecimal() or not 0 < int(length) <= wire.MAX_BODY:
+                    raise ValueError('decision_actor_response_boundary')
+                data = response.read(wire.MAX_BODY+1)
+                if len(data) != int(length): raise ValueError('decision_actor_response_boundary')
+                status, headers = response.status, response.headers
+                if response.will_close: self.close()
+                if status != 200:
+                    raise urllib.error.HTTPError(self.origin.geturl()+path, status,
+                                                 'native_decision_request_rejected', headers, io.BytesIO(data))
+                return wire._json(data)
+            except urllib.error.HTTPError:
+                raise
+            except (ValueError, OSError, http.client.HTTPException):
+                self.close()
+                raise
 
 
 class PermitGuard:
@@ -97,16 +149,12 @@ def run(config):
 
     def proof(): return {**owner.check(), 'ownerSourceSha256': pins['decision_owner.py']}
 
-    def post(action, body):
+    channel = JsonChannel(config['serverUrl'], context, config['token'])
+
+    def post(action, body, selected_channel=channel):
         body = {**body, 'shardSha256': config['shardSha256'], 'executableSha256': config['executableSha256']}
         if isinstance(body.get('ownerProof'), dict): body['ownerProof']['ownerSourceSha256'] = pins['decision_owner.py']
-        request = urllib.request.Request(config['serverUrl']+'/'+action+'/'+config['nodeId'],
-            data=json.dumps(body, allow_nan=False, separators=(',', ':')).encode(),
-            headers={'Authorization': 'Bearer '+config['token'], 'Content-Type': 'application/json'})
-        with urllib.request.urlopen(request, context=context, timeout=3 if action == 'permit' else 30) as response:
-            raw = response.read(wire.MAX_BODY+1)
-        if len(raw) > wire.MAX_BODY: raise ValueError('decision_actor_response_boundary')
-        return wire._json(raw)
+        return selected_channel.post('/'+action+'/'+config['nodeId'], body, 3 if action == 'permit' else 30)
 
     completed = None
     while config['mode'] == 'serving' or time.time()*1000 < config['expiresAtMs']:
@@ -138,10 +186,12 @@ def run(config):
                 raise ValueError('decision_actor_geometry')
             started = time.monotonic()
             result = {'ticket': item['ticket'], 'nodeId': config['nodeId'], 'shardSha256': config['shardSha256']}
+            permit_channel = JsonChannel(config['serverUrl'], context, config['token'])
             try:
                 native = owner_module.run_guarded([config['executable'], config['shard'], 'cpu', '2', 'mmap',
                     str(os.getpid()), str(max(1, int(remaining*1000)))],
-                    frame, remaining, PermitGuard(owner, post, item))
+                    frame, remaining, PermitGuard(owner,
+                        lambda action, body: post(action, body, permit_channel), item))
                 result['exitCode'] = native.returncode
                 if native.returncode == 0:
                     out, values = wire.read_frame(native.stdout)
@@ -152,6 +202,8 @@ def run(config):
             except (ValueError, TypeError, KeyError, OSError) as error:
                 code = str(error) if isinstance(error, ValueError) and str(error).startswith('decision_') else type(error).__name__
                 result.update(exitCode=125, error='native_owner_or_lease_closed', ownerFailureCode=code)
+            finally:
+                permit_channel.close()
             result['elapsedMs'] = (time.monotonic()-started)*1000
             completed = result
             post('result', completed)
