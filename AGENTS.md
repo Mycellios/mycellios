@@ -103,3 +103,7 @@ These rules apply to the complete repository.
   and retries only explicit account-concurrency rejection for at most 30 seconds.
   Verify with `node scripts/check-antseed-jev-bridge.mjs`. Never retry failed
   model execution or broaden an account's concurrency to make a canary pass.
+- Native CPU observations preserve the existing units and owner limits. Use at least
+  five seconds per CPU sample, coalesce overlapping observations and reset the
+  startup baseline only when monitoring begins. Keep thermal/RAM/disk checks and
+  snapshot reconciliation ordering intact.
