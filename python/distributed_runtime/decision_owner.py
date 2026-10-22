@@ -111,8 +111,11 @@ def run_guarded(arguments, frame, timeout, guard):
             while not finished.wait(0.5):
                 try:
                     guard.check()
-                except (ValueError, OSError, KeyError, TypeError):
-                    rejected.append(True)
+                except (ValueError, OSError, KeyError, TypeError) as error:
+                    code = str(error)
+                    if not isinstance(error, ValueError) or not re.fullmatch(r'decision_[a-z0-9_]{1,90}', code):
+                        code = 'decision_owner_guard_closed'
+                    rejected.append(code)
                     if process.poll() is None:
                         process.kill()
                     return
@@ -129,5 +132,7 @@ def run_guarded(arguments, frame, timeout, guard):
             finished.set()
             watcher.join(timeout=1)
         if rejected:
-            return subprocess.CompletedProcess(arguments, 125, b'', b'owner_policy_closed')
+            result = subprocess.CompletedProcess(arguments, 125, b'', b'owner_policy_closed')
+            result.owner_failure_code = rejected[0]
+            return result
         return subprocess.CompletedProcess(arguments, process.returncode, out, err)

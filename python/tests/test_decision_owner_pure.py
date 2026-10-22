@@ -78,6 +78,22 @@ class DecisionOwnerTests(unittest.TestCase):
         result = m.run_guarded([sys.executable, '-I', '-S', '-B', '-c', 'import time;time.sleep(5)'], b'', 4, Guard())
         self.assertEqual(result.returncode, 125)
         self.assertEqual(result.stdout, b'')
+        self.assertEqual(result.owner_failure_code, 'decision_owner_guard_closed')
+
+    def test_cancelled_child_preserves_a_bounded_owner_failure_without_payloads(self):
+        for reason, expected in (
+            ('decision_native_permit_expired', 'decision_native_permit_expired'),
+            ('private value / not a fixed decision code', 'decision_owner_guard_closed'),
+        ):
+            class Guard:
+                checks = 0
+                def check(self, **kwargs):
+                    self.checks += 1
+                    if self.checks > 1: raise ValueError(reason)
+            result = m.run_guarded([sys.executable, '-I', '-S', '-B', '-c', 'import time;time.sleep(5)'], b'', 4, Guard())
+            self.assertEqual(result.returncode, 125)
+            self.assertEqual(result.owner_failure_code, expected)
+            self.assertEqual(result.stderr, b'owner_policy_closed')
 
     def test_absolute_native_timeout_leaves_no_child_running(self):
         with self.assertRaises(subprocess.TimeoutExpired):

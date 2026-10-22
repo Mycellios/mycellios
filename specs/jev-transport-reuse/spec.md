@@ -22,6 +22,8 @@ receipts. Neither a transport probe nor a schema-rejected free response counts
 as successful model inference.
 Optional actor diagnostics rotate at 1 MiB with one backup, contain only fixed
 event/phase codes and HTTP status, and never log payloads or credentials.
+Preserve the bounded owner/permit cancellation code when the policy watcher
+kills a child; a generic exit 125 must not obscure which guard revoked it.
 
 Verify real keep-alive reuse and failure/boundary behavior with stdlib tests,
 existing decision/owner tests and public repository gates. Preserve exact source

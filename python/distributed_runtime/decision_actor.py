@@ -216,7 +216,11 @@ def run(config):
                     out, values = wire.read_frame(native.stdout)
                     if set(values) != set(config['outputIds']): raise ValueError('decision_actor_output_binding')
                     result.update(frame=wire.pack(native.stdout), nativeMetrics={k: out.get(k) for k in ('computeMs', 'device')})
-                else: result['error'] = 'native_stage_failed'
+                else:
+                    result['error'] = 'native_stage_failed'
+                    owner_code = getattr(native, 'owner_failure_code', None)
+                    if owner_code is not None:
+                        result.update(error='native_owner_or_lease_closed', ownerFailureCode=owner_code)
             except subprocess.TimeoutExpired: result.update(exitCode=124, error='native_stage_deadline')
             except (ValueError, TypeError, KeyError, OSError) as error:
                 code = str(error) if isinstance(error, ValueError) and str(error).startswith('decision_') else type(error).__name__

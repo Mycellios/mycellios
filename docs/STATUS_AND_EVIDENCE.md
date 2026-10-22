@@ -383,8 +383,20 @@ availability error, then a physical contributor's heartbeat expired. No complete
 256-token buyer result is claimed. The native process remained alive; memory and
 owner preflight later passed on all three hosts. The HP's existing nonblocking
 hardware sampler and other installed native overlays were preserved. Proposed
-TLS connection reuse has passed 79 model-free tests and the public structure,
-architecture and typecheck gates; it is not yet physically qualified or deployed.
+The first TLS-reuse candidate passed 79 model-free tests and the public structure,
+architecture and typecheck gates. Its source-bound, 55-token physical canary
+completed in 102.80 s with all 16 reference logits bit-identical. A 256-token
+private attempt failed after 9.47 s on an unavailable remote permit. These are
+private qualification observations, not successful free buyer delivery.
+
+Bounded idle transport probes isolated multi-second responses and timeouts on
+one contributor while local owner checks were fast. Changing only that host's
+NetBird home relay improved its next 12 idle probes without restarting voice or
+embedding engines. A subsequent full-context private attempt still cancelled
+after 22.50 s with generic native exit 125; the relay improvement alone did not
+close the model gate. The current candidate preserves a bounded owner-cancellation
+reason so that a policy-watcher kill is distinguishable from another native
+failure. That changed source requires new physical qualification before serving.
 
 A stale, zero-token API reservation for an already failed job was reconciled
 with the normal failure-settlement method, without changing balances or limits.
