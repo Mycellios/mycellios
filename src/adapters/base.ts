@@ -29,6 +29,7 @@ export interface AdapterChunk {
 export interface AdapterRequest {
   jobId: string;
   request: ChatCompletionRequest;
+  lease?: { id: string; deadline: number };
 }
 
 export interface InferenceAdapter {

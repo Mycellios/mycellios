@@ -9,6 +9,7 @@ export type WorkloadClass = "interactive" | "batch" | "benchmark";
 export type AdapterKind =
   | "mycellios-native"
   | "kokoro"
+  | "decision"
   | "mycellios-pipeline"
   | "mock";
 export type DeploymentAdapterKind = Exclude<AdapterKind, "mycellios-native">;

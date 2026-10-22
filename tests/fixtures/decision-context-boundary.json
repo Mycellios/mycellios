@@ -1,0 +1,53 @@
+{
+  "scope": "recorded-original-tokenizer-Q8-fixture-for-synthetic-protocol-tests-not-new-model-execution",
+  "input": {
+    "schema": "mycellios-decisions/1",
+    "state": "My card was charged twice. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge. Please refund the duplicate charge.  a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a a",
+    "questions": {
+      "department": {
+        "type": "choice",
+        "instructions": "Which team should handle this request?",
+        "criteria": {
+          "billing": "Payments, charges and refunds",
+          "technical": "Software errors and broken integrations",
+          "sales": "Questions about buying a new product"
+        }
+      }
+    }
+  },
+  "envelope": {
+    "schema": "mycellios-decisions/1",
+    "model": "jev",
+    "underlying_model": "mys/kev-4b-GGUF",
+    "revision": "9e37a4eb7def2f73a1bd1301218b063a48ad12c9",
+    "artifact_identity": "sha256:51c9353a5ff0b8e2f7cd7262359c0b26ea54b327214fe26a5da52b505b2978e8",
+    "request_digest": "sha256:c1d4b0a0839de75dd9b029de44500c4c2a11aaeacdaf301cc4f3620558935cc2",
+    "tokenizer_sha256": "06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523",
+    "result": {
+      "question_id": "department",
+      "type": "choice",
+      "value": "billing",
+      "probabilities": [
+        {
+          "option": "billing",
+          "probability": 0.9770802546967313
+        },
+        {
+          "option": "sales",
+          "probability": 0.0081358556352452
+        },
+        {
+          "option": "technical",
+          "probability": 0.014783889668023508
+        }
+      ]
+    },
+    "usage": {
+      "prompt_tokens": 256,
+      "completion_tokens": 0,
+      "total_tokens": 256
+    }
+  },
+  "actualInputTokens": 256,
+  "nativeRuntimeSourceId": "735596577208dcbc16e78e1a1fe17dd9e15f85519188f2b0efbfafa32bbf9220"
+}

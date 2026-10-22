@@ -1,4 +1,5 @@
 import { isKokoroDeployment } from "../contracts/speech.js";
+import { DECISION_DEADLINE_MS, DECISION_MODEL, isDecisionDeployment, parseDecisionRequest, verifiedDecisionEnvelope } from "../contracts/decision.js";
 import { replicaOutputByteLimit, validateSpeechCompletion } from "./speech-completion.js";
 import { EventEmitter } from "node:events";
 import type {
@@ -149,7 +150,8 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       }
     }
     const queue = new AsyncQueue<JobStreamEvent>();
-    const deadlineMs = Math.min(request.deadline_ms ?? this.requestTimeoutMs, this.requestTimeoutMs);
+    const deadlineCeiling = request.model === DECISION_MODEL ? DECISION_DEADLINE_MS : this.requestTimeoutMs;
+    const deadlineMs = Math.min(request.deadline_ms ?? deadlineCeiling, deadlineCeiling);
     this.store.database.transaction(() => {
       this.store.createJob({
         id: jobId,
@@ -757,6 +759,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const adaptiveTimeoutMs = Math.max(15_000, expectedTtftMs * 6 + 2_000);
     const job = this.store.getJob(jobId);
     const remainingMs = job ? Math.max(1_000, job.deadlineAt - Date.now() - 1_000) : 30_000;
+    if (isDecisionDeployment(deployment)) return Math.max(1_000, Math.min(DECISION_DEADLINE_MS, remainingMs));
     return Math.max(1_000, Math.min(30_000, adaptiveTimeoutMs, remainingMs));
   }
 
@@ -795,6 +798,14 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       return { ok: false, reason: "Implausible input token count" };
     }
     if (isKokoroDeployment(deployment)) return validateSpeechCompletion(runtime.request, result, runtime.output);
+    if (isDecisionDeployment(deployment)) {
+      try {
+        const envelope = verifiedDecisionEnvelope(runtime.output, parseDecisionRequest(runtime.request));
+        if (result.text !== runtime.output || result.finishReason !== "stop" || result.metrics.outputTokens !== 0
+          || result.metrics.inputTokens !== envelope.usage.prompt_tokens) throw new Error("decision_billing_mismatch");
+        return { ok: true };
+      } catch { return { ok: false, reason: "Decision integrity validation failed" }; }
+    }
     const maximumOutputTokens = runtime.request.max_tokens ?? 256;
     const outputBytes = Buffer.byteLength(runtime.output, "utf8");
     // Output text length is not a tokenizer. Byte-level tokens, Unicode and

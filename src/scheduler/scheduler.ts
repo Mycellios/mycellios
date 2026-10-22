@@ -7,6 +7,7 @@ import type {
   ScheduledRoutePlan,
 } from "../contracts/types.js";
 import { estimateInputTokens } from "../core/request.js";
+import { isDecisionDeployment } from "../contracts/decision.js";
 import { safeVramBudget } from "../core/tiers.js";
 import type { MeshStore, StoredWorker } from "../storage/store.js";
 import {
@@ -268,7 +269,7 @@ export class Scheduler {
       Math.min(worker.capabilities.limits.maxConcurrency, deployment.maxConcurrency),
     );
     const queueRatio = Math.min(1, active / capacity);
-    const generationMs = ((request.max_tokens ?? 256) / deployment.tokensPerSecond) * 1_000;
+    const generationMs = isDecisionDeployment(deployment) ? 0 : ((request.max_tokens ?? 256) / deployment.tokensPerSecond) * 1_000;
     const estimatedMs = deployment.ttftMs + generationMs;
     const deadline = request.deadline_ms ?? 120_000;
     const slaRisk = Math.min(1, estimatedMs / deadline);
@@ -437,7 +438,10 @@ export class Scheduler {
     if (!this.deploymentEvidenceIsEligible(worker, deployment)) {
       reasons.push("candidate_evidence_missing");
     }
-    if (estimateInputTokens(request) + (request.max_tokens ?? 256) > deployment.contextLimit) {
+    // Decisions enforce exact input length with the pinned native tokenizer
+    // before dispatch. JSON framing and max_tokens are not generated-model input.
+    if (!isDecisionDeployment(deployment)
+      && estimateInputTokens(request) + (request.max_tokens ?? 256) > deployment.contextLimit) {
       reasons.push("candidate_context_exceeded");
     }
     const active = this.store.countActiveJobs(worker.id);
@@ -747,7 +751,7 @@ function estimatedRouteServiceMs(
   const outputTokens = request.max_tokens ?? 256;
   const ttftMs = deployments.reduce((total, deployment) => total + deployment.ttftMs, 0);
   const generationMs = Math.max(
-    ...deployments.map((deployment) => outputTokens / deployment.tokensPerSecond * 1_000),
+    ...deployments.map((deployment) => isDecisionDeployment(deployment) ? 0 : outputTokens / deployment.tokensPerSecond * 1_000),
   );
   return ttftMs + generationMs;
 }
