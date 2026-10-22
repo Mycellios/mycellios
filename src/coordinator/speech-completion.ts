@@ -1,7 +1,9 @@
 import { isKokoroDeployment, MAX_SPEECH_RESPONSE_BYTES, verifiedSpeechEnvelope, resolveSpeechOptions } from "../contracts/speech.js";
+import { isDecisionDeployment, MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
 import type { ChatCompletionRequest, CompletionResult, ModelDeployment } from "../contracts/types.js";
 
 export function replicaOutputByteLimit(deployment: ModelDeployment | undefined, maxTokens = 256): number {
+  if (isDecisionDeployment(deployment)) return MAX_DECISION_RESPONSE_BYTES;
   return isKokoroDeployment(deployment) ? MAX_SPEECH_RESPONSE_BYTES
     : Math.min(2 * 1024 * 1024, Math.max(4096, maxTokens * 32));
 }

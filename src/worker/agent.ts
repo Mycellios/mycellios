@@ -1,4 +1,5 @@
 import WebSocket from "ws";
+import { MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import {
@@ -1014,11 +1015,11 @@ export class WorkerAgent {
           contextLimit: this.config.deployment.contextLimit,
           maxConcurrency: this.config.limits.maxConcurrency,
           freeSlots: this.config.limits.maxConcurrency,
-          tokensPerSecond: this.config.adapter.kind === "mycellios-pipeline"
+          tokensPerSecond: this.config.adapter.kind === "decision" ? 0 : this.config.adapter.kind === "mycellios-pipeline"
             ? 1
             : this.config.deployment.tokensPerSecond ?? defaultTokensPerSecond,
           throughputSource,
-          ttftMs: this.config.adapter.kind === "mycellios-pipeline"
+          ttftMs: this.config.adapter.kind === "decision" ? this.config.deployment.ttftMs ?? 300_000 : this.config.adapter.kind === "mycellios-pipeline"
             ? 60_000
             : this.config.deployment.ttftMs ?? defaultTtft,
           ...(this.config.adapter.kind === "mycellios-pipeline"
@@ -2361,11 +2362,11 @@ export class WorkerAgent {
     let output = "";
     let outputBytes = 0;
     let backendMetrics: AdapterChunk["metrics"] | undefined;
-    const outputByteLimit = this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
+    const outputByteLimit = this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
       : Math.min(MAX_OUTPUT_BYTES, (payload.request.max_tokens ?? 256) * 32);
     try {
       for await (const chunk of this.adapter.generate(
-        { jobId: payload.jobId, request: payload.request },
+        { jobId: payload.jobId, request: payload.request, lease: { id: payload.leaseId, deadline: payload.deadlineAt } },
         controller.signal,
       )) {
         if (chunk.metrics) backendMetrics = { ...backendMetrics, ...chunk.metrics };
@@ -2440,7 +2441,7 @@ export class WorkerAgent {
         leaseId: payload.leaseId,
         text: output,
         finishReason:
-          this.adapter.kind !== "kokoro" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
+          this.adapter.kind !== "kokoro" && this.adapter.kind !== "decision" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
             ? "length"
             : "stop",
         metrics,
@@ -2521,7 +2522,7 @@ export class WorkerAgent {
       };
     }
     const heartbeat: WorkerHeartbeat = {
-      draining: !this.acceptsNewWork(),
+      draining: !this.acceptsNewWork() || (this.adapter.kind === "decision" && !metrics.ready),
       pausedReason: !this.contributionEnabled
         ? "Contribution paused"
         : this.updateDraining
@@ -2724,7 +2725,7 @@ function scaleMatches(observed: number, rawExpected: number): boolean {
 
 function deploymentAdapterKind(
   adapter: InferenceAdapter["kind"],
-): "mycellios-pipeline" | "kokoro" | "mock" {
+): "mycellios-pipeline" | "kokoro" | "decision" | "mock" {
   if (adapter === "mycellios-native") {
     throw new Error("mycellios_native_control_cannot_be_a_model_deployment");
   }

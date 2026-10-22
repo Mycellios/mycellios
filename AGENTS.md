@@ -62,3 +62,39 @@ These rules apply to the complete repository.
 - The worker owns the shared enrollment bootstrap; the native node keeps a compatibility re-export.
 
 - Operator-funded quota is opt-in per API key ID and model; preserve limits and persisted usage accounting.
+
+## Experimental native decision graphs
+
+- `python/distributed_runtime/decision_graph.py` partitions serialized ggmlc graphs
+  without executing or dequantizing weights. Preserve every live dependency and
+  require source and shard hashes. Verify with `python -I -S -B -m unittest
+  discover -s python/tests -p 'test_decision_*pure.py'`.
+- `decision_stage.cpp` is a bounded Windows stdio QA primitive linked against the
+  pinned external ggmlc runtime. It grants no network or public job admission.
+  The parent owns authenticated transport, artifact verification and owner limits.
+- Its native invocation requires the actual actor PID and a 1..240000 ms wall
+  budget after `shard cpu threads mmap`. A child-owned Job handle alone does not
+  stop work when Python dies. Preserve the independent parent-process handle and
+  deadline watcher. Validate new binaries on Windows with
+  `python/tests/check_decision_owner_windows.py`; this probe loads no model.
+- Never describe independent decisions or single-host partition tests as execution
+  of one distributed model. Keep AntSeed offers gated on physical and buyer proof.
+- `decision_reverse.py` is CPU-only private qualification transport. Its tickets
+  grant no public admission or GPU reservation. Retain pinned TLS, distinct node
+  credentials, distinct physical identities, bounded frames/deadlines, an explicit
+  qualification expiry and idempotent result redelivery, including native failures.
+- Native qualification deadlines must also end at the fixed qualification expiry;
+  stop the private listeners at expiry instead of silently extending their scope.
+
+- Correct Kev preprocessing requires the pinned original HF tokenizer and tokenizers
+  0.22.2. Reject the mislabeled Gemma GGUF preprocessing; approximate GPT-2 regex
+  tokenization is not a replacement. Preserve the embedded, already-baked temperature.
+- Native decision serving uses `decision_gateway.py`, `decision_broker.py` and
+  `decision_actor.py`: a source-bound physical activation receipt, authenticated
+  loopback worker token file, parent native leases, short monotonic remote permits,
+  and local owner/resource guards are required. Qualification mode cannot accept
+  public leases. The pilot admits one question, 256 tokens, batch/concurrency 1.
+- `scripts/antseed-jev-provider.mjs` is optional and requires the official AntSeed
+  SDK at `ANTSEED_PROOF_MODULES` (as for speech proofs). Importing it must not
+  announce a seller. Its isolated probe is `node scripts/check-antseed-jev-provider.mjs`;
+  this verifies SDK transport/free configuration only, never real buyer delivery.

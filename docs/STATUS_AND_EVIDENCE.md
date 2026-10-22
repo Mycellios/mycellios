@@ -233,3 +233,143 @@ must not be inferred from USDC settlement or self-test traffic.
 ### Kokoro voice controls: source and isolated physical pilot (2026-10-18)
 
 English is the default; Spanish is explicit via language=es. The request accepts the five documented voices and speed 0.5 through 2. Contract, coordinator dispatch, request identity and response checks have focused automated coverage. An isolated MSI CPU pilot generated English default, English male, slow, fast and Spanish audio: the same 14-token English text produced 6.5 seconds at 0.8 and 4.45 seconds at 1.2. No public-path deployment or OmniRoute/AntSeed control verification is claimed by this entry. Existing Kokoro pricing remains zero.
+## Experimental Kev decision graphs
+
+Private physical qualification, 22 October 2026. **Not published in AntSeed.**
+The requested `jev` alias identifies independent [Kev-4B](https://huggingface.co/jaredpalmer/kev-4b),
+not TypeSafe Jev weights. It scores supplied choices and returns a choice, p(true)
+(`noul`), or probability-weighted level (`score`); it generates no prose or output tokens.
+
+### Pinned artifacts and preprocessing
+
+The Apache-2.0 [Q8 graph](https://huggingface.co/mys/kev-4b-GGUF) revision is
+`9e37a4eb7def2f73a1bd1301218b063a48ad12c9`, 4,498,493,152 bytes, SHA-256
+`51c9353a5ff0b8e2f7cd7262359c0b26ea54b327214fe26a5da52b505b2978e8`.
+It is a serialized ggmlc graph, not a llama.cpp file. The compiled artifact supports
+2048 tokens and 16 options; this experimental serving contract admits **at most
+256 input tokens, one question, batch 1 and one simultaneous whole-cell job**.
+The embedded temperature is already baked into the head; applying another one is incorrect.
+
+The community converter incorrectly labels this Qwen vocabulary as Gemma/Metaspace.
+All 248,077 vocabulary IDs and 247,587 merges match the original Kev checkpoint
+at `6cfce5c2fa4b4bd64026336ab649c5ca78857d52` exactly. Correct preprocessing uses
+its NFC/Unicode Split/ByteLevel tokenizer, SHA-256
+`06b9509352d2af50381ab2247e083b80d32d5c0aba91c272ca9ff729b6a0e523`,
+and official tokenizers 0.22.2. Merely relabeling the approximate C++ tokenizer
+as GPT-2 is insufficient: a hyphenated English fixture still tokenizes differently.
+Actual input tokens are billed; padding to at least 64 positions is not billed.
+
+### Physical execution and numerical checks
+
+Each laptop holds only its required weights. The three stages cover blocks 0..7,
+8..19 and 20..31 plus the decision head. Their shard SHA-256 values are respectively
+`1ea5b923a3359eb3d6ecd683792b6723795c8d2fdf3d2a31d50219bf109dc325`,
+`02df8d07f3d7c7e47829cbb55d73c4a18d39096a5ed030f97333be9c7a64a6a5`,
+and `23fd6d438241135c4a23dab917dc81691d361ffca786aa84b7c1bc6dc23d6e35`.
+Original source bytes reconstruct to the exact full-model hash. Live dependencies
+crossing multiple stage boundaries are retained, rather than independently scoring
+questions on separate computers.
+
+With the correct original tokenizer, six complete decisions executed on three
+distinct owned Windows laptops over NetBird Internet relay:
+
+| Fixture | Actual tokens | Whole request |
+| --- | ---: | ---: |
+| Billing, English | 55 | 105.74 s |
+| Billing, Spanish | 72 | 104.68 s |
+| Explicit fact, English | 32 | 93.98 s |
+| Explicit fact, Spanish | 37 | 88.28 s |
+| Severity, English | 38 | 91.09 s |
+| Severity, Spanish | 47 | 99.64 s |
+
+These are six functional examples, not an accuracy benchmark or a latency SLA.
+An unpartitioned run of the exact original Q8 artifact in an isolated, networkless
+existing server container reproduced the English billing fixture's 16 logits
+exactly: maximum difference zero. It selected billing with probability
+0.9715933970626583. The reference had a different I/O/CPU budget, so its latency is
+not comparable with the laptops.
+
+The subsequent native sublease gateway also completed that fixture across all
+three laptops in **90.63 s**, 55 actual input tokens, zero output tokens. Its
+source identity is `a021aee22d58d74d3cc1bbfdfd21ec71e9ba1873a1e400c1a0313d8bad99d6b6`.
+An activation receipt binds this route, exact source closure, tokenizer, physical
+identities, input frame and full-model reference; its maximum logit difference is
+zero. This is still private qualification, not account enrollment or public buyer proof.
+
+### Resource and failure controls
+
+The earlier mapped CPU executable SHA-256 was
+`3b3c4e101b4aecc4dfa3e958e6c61522cb931f94fa6317359f438516f1a01b26`.
+Each native child has a Windows Job limit of 2 GiB private commit, 20% CPU and a
+1536 MiB working-set setting. Mapped weight pages and OS cache are not equivalent
+to private commit; do not describe this as a hard total-machine 2 GiB RAM cap.
+One measured 98-token run used roughly 120..145 MiB private process memory per
+stage, with substantially larger mapped working sets. Its logits were bit-identical
+to the unmapped route; wall time was 140.77 versus 149.19 s in that single comparison.
+
+Local guards bind the existing native node and MachineGuid hash and honor pause,
+drain, schedule, model allowlist, CPU/RAM limits and live memory headroom. Short
+remote permits use monotonic elapsed time with the complete network round trip
+subtracted, avoiding dependence on synchronized Windows clocks. Cancellation and
+expired permits kill only the request's native child; failures are not reassigned
+to a different physical stage. A missing-stage attempt failed and a new request
+after recovery completed in 148.29 s on the older private transport. This does not
+prove resumption of an interrupted request.
+
+A later scheduler lifetime probe reproduced an orphan: after its controller
+exited, the child remained alive despite its own nested Windows Job. That earlier
+core is therefore not eligible for public serving. The corrected native core is
+`6fbea65343c24216c5208230c8447187d1a7f25c6271efdda20ded5e19b0b429`.
+It independently holds a handle to the actual actor and enforces a wall deadline,
+even if Python crashes. No-model native probes passed on all three laptops:
+parent death returned exit 125; a 1000 ms independent deadline returned 124 in
+1.016..1.063 seconds; the old unguarded invocation was rejected. Old passing
+graph results remain historical evidence, not evidence for this new lifetime guard.
+
+The corrected core completed a new 55-token, three-laptop decision in 86.20 s,
+again matching all 16 full-model reference logits exactly. Its runtime source
+identity is `735596577208dcbc16e78e1a1fe17dd9e15f85519188f2b0efbfafa32bbf9220`.
+Its subsequent 256-token boundary request passed on all three stages in 345.02 s
+including HTTP overhead (344.996 s recorded inside the gateway), with zero output
+tokens. These are single observed runs under the same resource caps, not a speed SLA.
+The private broker now also clamps native deadlines to the fixed qualification
+expiry, and its private listeners shut down at that expiry. No public admission
+or AntSeed buyer delivery is implied by these qualification receipts.
+
+No GPU inference is claimed. A Vulkan build enumerated adapters only. Existing
+Kokoro/embedding reservations leave insufficient unreserved NVIDIA memory for
+these current shard sizes; those services and reservations were not changed.
+PC-DANI performed orchestration and artifact I/O only, never model inference.
+
+### Legacy diagnostics and publication gates
+
+Earlier six-fixture receipts used the incorrect community tokenizer. They remain
+useful graph/transport diagnostics, not correct preprocessing evidence. In that
+legacy comparison the raw-logit difference 0.01352954 failed an exploratory 0.001
+gate; the failed receipt is retained. A same-host partition control was bitwise
+identical, and the later original-tokenizer whole-model comparison above passed.
+Do not silently overwrite failed comparisons or claim their exact cause is proven.
+
+The latest preserved-production coordinator build and 125 focused tests pass
+(one opt-in real Kokoro test skipped). The full production snapshot typecheck
+reports the same 22 pre-existing errors as its unchanged baseline; it is not
+reported as passing. The separate AntSeed provider SDK probe passed with zero
+configured prices, one slot and a model-specific 555-second relay timeout. That
+probe used synthetic responses, no wallet, real model or seller announcement.
+
+The full-context API regression also exposed a coordinator admission error:
+it estimated tokens from the serialized decision JSON and reserved text output,
+rejecting a valid 256-token native request as if it were a generative prompt.
+Decision admission now defers the exact input bound to the pinned native
+tokenizer before physical dispatch; other model admission remains unchanged.
+The retained failing protocol test and the passing stream/non-stream regressions
+use the same synthetic 256-token fixture. They test API admission and accounting,
+not an additional physical run or AntSeed delivery.
+
+Private receipts live under `outputs/kev-distributed-20261021`; secrets, identities,
+model weights and caches are excluded from source/public delivery. Remaining
+publication gates are source promotion under the repository's Git/QA rules,
+account-confirmed independent native cell admission, and a complete real buyer
+request through AntSeed with verified usage and `served_free=1`. Until then `jev`
+remains unavailable publicly. Larger contexts, GPU execution and general task
+quality require separate qualification.
