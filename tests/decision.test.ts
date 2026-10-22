@@ -101,6 +101,34 @@ describe("typed Kev decision contract", () => {
 });
 
 describe("native decision adapter admission", () => {
+  it("retains verified readiness during one shared probe and invalidates a failed probe", async () => {
+    let calls = 0, fail = false;
+    let unblock!: () => void, observed!: () => void;
+    const pending = new Promise<void>((resolve) => { unblock = resolve; });
+    const received = new Promise<void>((resolve) => { observed = resolve; });
+    const baseUrl = await listen((req, res) => {
+      void (async () => {
+        if (req.url !== "/health") { res.end(JSON.stringify(envelope())); return; }
+        calls++;
+        if (calls === 2) { observed(); await pending; }
+        if (fail) { res.statusCode = 503; res.end('{"error":"unavailable"}'); }
+        else res.end(JSON.stringify(health));
+      })();
+    });
+    const adapter = new DecisionAdapter({ ...options, baseUrl }); await adapter.probe();
+    const first = adapter.probe(), probes = [first];
+    try {
+      await received;
+      expect((await adapter.metrics()).ready).toBe(true);
+      const second = adapter.probe(); probes.push(second); expect(first).toBe(second);
+      const chunks = []; for await (const chunk of adapter.generate(request, new AbortController().signal)) chunks.push(chunk);
+      expect(chunks).toHaveLength(1); expect(calls).toBe(2);
+    } finally { unblock(); await Promise.allSettled(probes); }
+    fail = true; await expect(adapter.probe()).rejects.toThrow();
+    expect((await adapter.metrics()).ready).toBe(false);
+    await expect(adapter.generate(request, new AbortController().signal)[Symbol.asyncIterator]().next()).rejects.toThrow("not_ready");
+    fail = false; await adapter.probe(); expect((await adapter.metrics()).ready).toBe(true);
+  });
   it("requires one whole-cell slot, pinned artifact and an activation", () => {
     installTestToken();
     const config = { region: "test", capacityScope: "cell", offeredVramMb: 2048, limits: { maxConcurrency: 1 },

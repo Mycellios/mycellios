@@ -98,3 +98,8 @@ These rules apply to the complete repository.
   SDK at `ANTSEED_PROOF_MODULES` (as for speech proofs). Importing it must not
   announce a seller. Its isolated probe is `node scripts/check-antseed-jev-provider.mjs`;
   this verifies SDK transport/free configuration only, never real buyer delivery.
+- Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
+  same authenticated API/key limits. It binds loopback only, accepts only `jev`,
+  and retries only explicit account-concurrency rejection for at most 30 seconds.
+  Verify with `node scripts/check-antseed-jev-bridge.mjs`. Never retry failed
+  model execution or broaden an account's concurrency to make a canary pass.

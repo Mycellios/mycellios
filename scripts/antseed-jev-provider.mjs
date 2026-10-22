@@ -2,6 +2,7 @@
 // speech proof; importing this module never starts a seller or announces it.
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { createJevPrivateBridge } from './antseed-jev-bridge.mjs';
 
 const sdkRoot = resolve(process.env.ANTSEED_PROOF_MODULES ?? 'runtime/antseed-proof/node_modules');
 const { BaseProvider, StaticTokenProvider } = await import(pathToFileURL(resolve(sdkRoot, '@antseed/provider-core/dist/index.js')).href);
@@ -17,6 +18,7 @@ const plugin = {
   configSchema: [
     { key: 'MYCELLIOS_API_KEY', label: 'Mycellios API key', type: 'secret', required: true },
     { key: 'MYCELLIOS_BASE_URL', label: 'Mycellios API URL', type: 'string', required: false, default: 'https://www.mycellios.com' },
+    { key: 'MYCELLIOS_PRIVATE_BASE_URL', label: 'Optional private Mycellios ingress', type: 'string', required: false },
   ],
   createProvider(config) {
     const apiKey = config.MYCELLIOS_API_KEY?.trim();
@@ -25,16 +27,20 @@ const plugin = {
     if (url.username || url.password || url.search || url.hash || url.pathname !== '/'
       || !(url.protocol === 'https:' && url.hostname === 'www.mycellios.com'
         || url.protocol === 'http:' && url.hostname === '127.0.0.1')) throw new Error('jev_upstream_url_rejected');
-    return new BaseProvider({
+    const create = (baseUrl) => new BaseProvider({
       name: 'mycellios-decisions', services: ['jev'],
       pricing: { defaults: { inputUsdPerMillion: 0, outputUsdPerMillion: 0, cachedInputUsdPerMillion: 0 } },
       serviceApiProtocols: { jev: ['openai-chat-completions'] },
       serviceCapabilities: { jev: { contextWindow: 256, inputs: ['text'], outputs: ['text'],
         reasoning: false, toolUse: false, structuredOutput: true } },
-      relay: { baseUrl: url.origin, authHeaderName: 'authorization', authHeaderValue: `Bearer ${apiKey}`,
+      relay: { baseUrl, authHeaderName: 'authorization', authHeaderValue: `Bearer ${apiKey}`,
         tokenProvider: new StaticTokenProvider(apiKey), allowedServices: ['jev'], maxConcurrency: 1,
         timeoutMs: JEV_HTTP_TIMEOUT_MS, redirect: 'error' },
     });
+    if (config.MYCELLIOS_PRIVATE_BASE_URL) return createJevPrivateBridge({
+      upstreamOrigin: config.MYCELLIOS_PRIVATE_BASE_URL, apiKey,
+    }).then(bridge => create(bridge.url));
+    return create(url.origin);
   },
 };
 

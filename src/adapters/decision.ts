@@ -34,6 +34,7 @@ export class DecisionAdapter implements InferenceAdapter {
   private readonly baseUrl: URL;
   private ready = false;
   private checkedAt = 0;
+  private probeInFlight: ReturnType<InferenceAdapter["probe"]> | null = null;
   private readonly jobs = new Map<string, { controller: AbortController; leaseId: string }>();
   constructor(private readonly options: { baseUrl: string; model: string; modelDigest: string; activationId: string; runtimeToken: string }) {
     const config = decisionWorkerAdapterSchema.parse({ kind: this.kind, model: options.model, baseUrl: options.baseUrl });
@@ -41,8 +42,12 @@ export class DecisionAdapter implements InferenceAdapter {
     if (!/^[A-Za-z0-9_-]{64,128}$/.test(options.runtimeToken)) throw new Error("decision_runtime_token_invalid");
     this.baseUrl = new URL(config.baseUrl);
   }
-  async probe() {
-    this.ready = false; this.checkedAt = Date.now();
+  probe(): ReturnType<InferenceAdapter["probe"]> {
+    this.probeInFlight ??= this.probeOnce().finally(() => { this.probeInFlight = null; });
+    return this.probeInFlight;
+  }
+  private async probeOnce() {
+    try {
     const response = await fetch(new URL("health", this.baseUrl), { headers: { authorization: "Bearer " + this.options.runtimeToken },
       signal: AbortSignal.timeout(5000), redirect: "error" });
     const health = healthSchema.parse(JSON.parse(await boundedBody(response, 8192)));
@@ -53,6 +58,12 @@ export class DecisionAdapter implements InferenceAdapter {
         || stage.shard_sha256 !== shards[i])) throw new Error("decision_route_identity_mismatch");
     this.ready = true;
     return { kind: this.kind, models: [DECISION_MODEL], streaming: true, embeddings: false, reranking: false };
+    } catch (error) {
+      this.ready = false;
+      throw error;
+    } finally {
+      this.checkedAt = Date.now();
+    }
   }
   async warm(model: string) { if (model !== DECISION_MODEL) throw new Error("decision_model_mismatch"); await this.probe(); }
   async *generate(input: AdapterRequest, signal: AbortSignal): AsyncIterable<AdapterChunk> {
