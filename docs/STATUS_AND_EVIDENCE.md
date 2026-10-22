@@ -383,7 +383,7 @@ availability error, then a physical contributor's heartbeat expired. No complete
 256-token buyer result is claimed. The native process remained alive; memory and
 owner preflight later passed on all three hosts. The HP's existing nonblocking
 hardware sampler and other installed native overlays were preserved. Proposed
-TLS connection reuse has passed 78 model-free tests and the public structure,
+TLS connection reuse has passed 79 model-free tests and the public structure,
 architecture and typecheck gates; it is not yet physically qualified or deployed.
 
 A stale, zero-token API reservation for an already failed job was reconciled

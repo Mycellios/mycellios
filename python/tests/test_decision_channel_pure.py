@@ -22,6 +22,8 @@ class DecisionChannelTests(unittest.TestCase):
                 body = self.rfile.read(int(self.headers['Content-Length']))
                 owner.requests.append((self.path, self.headers['Authorization'], json.loads(body)))
                 owner.ports.add(self.client_address[1])
+                if self.path == '/bad-status':
+                    self.connection.sendall(b'NOT-HTTP\r\n\r\n'); self.close_connection = True; return
                 raw = b'not-json' if self.path == '/bad-json' else b'{"ok":true}'
                 self.send_response(409 if self.path == '/reject' else 200)
                 self.send_header('Content-Length', '99' if self.path == '/oversize' else str(len(raw)))
@@ -71,6 +73,11 @@ class DecisionChannelTests(unittest.TestCase):
     def test_bad_json_closes_the_channel(self):
         with self.assertRaises(ValueError): self.client.post('/bad-json', {}, 3)
         self.assertIsNone(self.client.connection)
+
+    def test_malformed_http_remains_a_recoverable_transport_failure(self):
+        with self.assertRaises(urllib.error.URLError): self.client.post('/bad-status', {}, 3)
+        self.assertIsNone(self.client.connection)
+        self.assertEqual(self.client.post('/poll', {}, 3), {'ok': True})
 
     def test_oversized_declared_response_is_rejected_before_read(self):
         with patch.object(a.wire, 'MAX_BODY', 32):

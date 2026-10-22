@@ -9,6 +9,8 @@ import io
 import importlib.util
 import ipaddress
 import json
+import logging
+from logging.handlers import RotatingFileHandler
 import math
 import os
 from pathlib import Path
@@ -86,9 +88,12 @@ class JsonChannel:
                 return wire._json(data)
             except urllib.error.HTTPError:
                 raise
-            except (ValueError, OSError, http.client.HTTPException):
+            except (ValueError, OSError):
                 self.close()
                 raise
+            except http.client.HTTPException as error:
+                self.close()
+                raise urllib.error.URLError(error) from error
 
 
 class PermitGuard:
@@ -136,6 +141,14 @@ def run(config):
             or config.get('executableSha256') != contract.CORE_SHA256:
         raise ValueError('decision_actor_endpoint_or_core_binding')
     root = Path(__file__).parent
+    diagnostic = logging.getLogger('mycellios.decision.actor')
+    diagnostic.propagate = False
+    if config.get('diagnostics') is True:
+        log_path = root/'actor-events.jsonl'
+        if log_path.is_symlink(): raise ValueError('decision_actor_diagnostic_symlink')
+        handler = RotatingFileHandler(log_path, maxBytes=1024*1024, backupCount=1)
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        diagnostic.addHandler(handler)
     pins = config['sourceFiles']
     if set(pins) != {'decision_actor.py', 'decision_owner.py', 'decision_reverse.py', 'decision_contract.py'}:
         raise ValueError('decision_actor_source_closure')
@@ -156,14 +169,18 @@ def run(config):
         if isinstance(body.get('ownerProof'), dict): body['ownerProof']['ownerSourceSha256'] = pins['decision_owner.py']
         return selected_channel.post('/'+action+'/'+config['nodeId'], body, 3 if action == 'permit' else 30)
 
-    completed = None
+    completed, last_diagnostic, unavailable = None, float('-inf'), False
     while config['mode'] == 'serving' or time.time()*1000 < config['expiresAtMs']:
+        phase = 'poll'
         try:
             for path, expected in snapshots.items():
                 stat = Path(path).stat()
                 if (stat.st_size, stat.st_mtime_ns) != expected: raise ValueError('decision_actor_artifact_changed')
             polled_at = time.monotonic()
             item = post('poll', {'ownerProof': proof()})
+            if unavailable:
+                diagnostic.warning(json.dumps({'event': 'decision_actor_recovered', 'stageIndex': config['stageIndex']}))
+                unavailable = False
             if item.get('idle') is True: time.sleep(1); continue
             if item.get('schema') != 'mycellios-native-decision-stage/1' or item.get('scope') != config['mode'] \
                     or item.get('nodeId') != config['nodeId'] or item.get('stageIndex') != config['stageIndex'] \
@@ -180,6 +197,7 @@ def run(config):
             for path, expected in snapshots.items():
                 stat = Path(path).stat()
                 if (stat.st_size, stat.st_mtime_ns) != expected: raise ValueError('decision_actor_artifact_changed')
+            phase = 'frame'
             frame = wire.unpack(item['frame']); h, tensors = wire.read_frame(frame)
             if set(tensors) != set(config['inputIds']) or h.get('symbols', {}).get('s20') != 1 \
                     or type(h.get('symbols', {}).get('s53')) is not int or not 1 <= h['symbols']['s53'] <= 256:
@@ -187,6 +205,7 @@ def run(config):
             started = time.monotonic()
             result = {'ticket': item['ticket'], 'nodeId': config['nodeId'], 'shardSha256': config['shardSha256']}
             permit_channel = JsonChannel(config['serverUrl'], context, config['token'])
+            phase = 'execution'
             try:
                 native = owner_module.run_guarded([config['executable'], config['shard'], 'cpu', '2', 'mmap',
                     str(os.getpid()), str(max(1, int(remaining*1000)))],
@@ -206,8 +225,20 @@ def run(config):
                 permit_channel.close()
             result['elapsedMs'] = (time.monotonic()-started)*1000
             completed = result
+            phase = 'result'
             post('result', completed)
-        except (ValueError, TypeError, KeyError, OSError): time.sleep(2)
+        except (ValueError, TypeError, KeyError, OSError) as error:
+            unavailable = True
+            if time.monotonic()-last_diagnostic >= 10:
+                code = str(error)
+                if not (code.startswith('decision_') and len(code) <= 100
+                        and all(c.isascii() and (c.isalnum() or c == '_') for c in code)):
+                    code = type(error).__name__
+                diagnostic.warning(json.dumps({'event': 'decision_actor_unavailable',
+                    'stageIndex': config['stageIndex'], 'phase': phase, 'code': code,
+                    'httpStatus': error.code if isinstance(error, urllib.error.HTTPError) else None}))
+                last_diagnostic = time.monotonic()
+            time.sleep(2)
 
 
 if __name__ == '__main__':

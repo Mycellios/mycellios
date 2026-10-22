@@ -20,6 +20,8 @@ paths, so unread bodies cannot be interpreted as another request. Add bounded
 executor freshness diagnostics to authenticated loopback health and failure
 receipts. Neither a transport probe nor a schema-rejected free response counts
 as successful model inference.
+Optional actor diagnostics rotate at 1 MiB with one backup, contain only fixed
+event/phase codes and HTTP status, and never log payloads or credentials.
 
 Verify real keep-alive reuse and failure/boundary behavior with stdlib tests,
 existing decision/owner tests and public repository gates. Preserve exact source
