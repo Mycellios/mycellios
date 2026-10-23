@@ -62,6 +62,9 @@ These rules apply to the complete repository.
 - The worker owns the shared enrollment bootstrap; the native node keeps a compatibility re-export.
 
 - Operator-funded quota is opt-in per API key ID and model; preserve limits and persisted usage accounting.
+- Startup settles zero-token restart reservations only after interrupted jobs are
+  marked failed and before public admission. Preserve account state and live,
+  completed, unlinked or refund-bearing reservations.
 
 ## Experimental native decision graphs
 

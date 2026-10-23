@@ -409,3 +409,12 @@ The remaining gate is a complete real buyer request at the pilot context limit,
 with verified usage and `served_free=1`, after source-bound physical qualification
 of any changed native transport. Larger contexts, GPU execution and general task
 quality require separate qualification.
+
+On 23 October, two more zero-token embedding reservations survived coordinator
+restart after their jobs had already failed. They were settled with the existing
+failure-accounting method under transaction locks, preserving balances, counters,
+limits and jobs. A subsequent provider receipt returned HTTP 200 and
+`served_free=1`; the caller had already exhausted its deadline while waiting for
+admission, so this is provider recovery only. Startup recovery now has a narrowly
+scoped candidate that settles such terminal zero-token usage before admission;
+its deployment and full caller recovery require separate verification.
