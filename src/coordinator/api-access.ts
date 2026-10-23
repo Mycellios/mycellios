@@ -367,6 +367,18 @@ export class ApiAccessManager {
     });
   }
 
+  /** Startup-only settlement after job recovery; never refunds or changes limits. */
+  async reconcileRestartedZeroTokenUsage(): Promise<number> {
+    const result = await this.database.raw.prepare(
+      `UPDATE api_usage SET status = 'failed', error_code = 'coordinator_restarted', completed_at = ?
+       WHERE status = 'pending' AND reserved_tokens = 0 AND job_id IN (
+         SELECT id FROM jobs WHERE status = 'failed' AND failure_code = 'coordinator_restarted'
+         AND input_tokens = 0 AND output_tokens = 0
+       )`,
+    ).run(Date.now());
+    return Number(result.changes);
+  }
+
   listUsage(userId: string, limit = 25): ApiUsageRecord[] {
     const rows = this.database.raw.prepare(
       `SELECT id, user_id, api_key_id, job_id, session_id, model, reserved_tokens,

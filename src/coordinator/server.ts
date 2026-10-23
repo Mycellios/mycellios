@@ -1545,6 +1545,7 @@ export async function createCoordinator(
     queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath);
   }
   const service = new MeshService(store, scheduler, hub, config.requestTimeoutMs);
+  await apiAccess.reconcileRestartedZeroTokenUsage();
   const attachExecutionReceipt = (
     event: Extract<JobStreamEvent, { type: "completed" }>,
     modelId: string,

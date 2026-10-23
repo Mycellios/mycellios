@@ -62,6 +62,9 @@ These rules apply to the complete repository.
 - The worker owns the shared enrollment bootstrap; the native node keeps a compatibility re-export.
 
 - Operator-funded quota is opt-in per API key ID and model; preserve limits and persisted usage accounting.
+- Startup settles zero-token restart reservations only after interrupted jobs are
+  marked failed and before public admission. Preserve account state and live,
+  completed, unlinked or refund-bearing reservations.
 
 ## Experimental native decision graphs
 
@@ -103,6 +106,21 @@ These rules apply to the complete repository.
   and retries only explicit account-concurrency rejection for at most 30 seconds.
   Verify with `node scripts/check-antseed-jev-bridge.mjs`. Never retry failed
   model execution or broaden an account's concurrency to make a canary pass.
+- Pinned AntSeed gateway calls for `jev` must select
+  `X-Antseed-Provider: mycellios-decisions`. On a seller with several providers,
+  omitting this selector can attribute another provider's price to the response.
+  Verify a real successful buyer receipt with `served_free=1`; never rewrite an
+  earlier receipt to make that gate pass.
+- Decision actor control traffic may reuse authenticated TLS channels. Keep poll/
+  result and active permit channels separate; authenticate each request and close
+  invalid framing/authentication paths. Preserve all existing permit, deadline,
+  owner, freshness and frame bounds; do not replay uncertain model execution.
+  Preserve bounded owner-cancellation codes without logging request data.
+  Authenticated health may include bounded executor observations; accept the
+  optional field and reject stale, unavailable or duplicate stage observations.
+  Full-context AntSeed qualification uses SSE and must reach the successful final
+  result/usage and terminal event. Preserve absolute native leases and bounded
+  local HTTP responses; do not increase shared provider/buyer timeouts.
 - Native CPU observations preserve the existing units and owner limits. Use at least
   five seconds per CPU sample, coalesce overlapping observations and reset the
   startup baseline only when monitoring begins. Keep thermal/RAM/disk checks and

@@ -1,0 +1,132 @@
+{
+  "schema": "mycellios-operator-recorded-decision-buyer-evidence/1",
+  "date": "2026-10-23",
+  "modelAlias": "jev",
+  "underlyingModel": "mys/kev-4b-GGUF",
+  "revision": "9e37a4eb7def2f73a1bd1301218b063a48ad12c9",
+  "artifactIdentity": "sha256:51c9353a5ff0b8e2f7cd7262359c0b26ea54b327214fe26a5da52b505b2978e8",
+  "nativeSourceId": "ed0c9874176ef1dacf18b17d773e8ac71b91306c9bffc97e89491397b253ba3f",
+  "physicalHosts": 3,
+  "transport": "authenticated pinned TLS over Internet VPN relay",
+  "stageLayers": [
+    [
+      0,
+      8
+    ],
+    [
+      8,
+      20
+    ],
+    [
+      20,
+      32
+    ]
+  ],
+  "backend": "cpu",
+  "pcDaniInference": false,
+  "limits": {
+    "inputTokens": 256,
+    "questions": 1,
+    "batch": 1,
+    "concurrency": 1
+  },
+  "sourceComponents": {
+    "syncedMain": "29e555b1520e2c9fe7d66fbfc148f561ad1c8d21",
+    "nativeArtifactCommit": "1f30878ccc1477488b4e167ceff3ca3ccba84d2b",
+    "workerAdapterCommit": "e028e093b55eb2039614cc5a5016c9a53d4aea0e",
+    "workerArtifactSha256": "5f23a2b5696873556a1da277e98ba2694bfa88d16138f7bbc0716ee3301877cb",
+    "coordinatorImage": "sha256:e66fdea9647fd48262f8fcdf06b0eada6c15166952cec048e89f5df24f41e387",
+    "coordinatorComponentBase": "ba1cf9676785d32fa4580ae07aa67e9bc6cf0287",
+    "coordinatorUnrelatedCapacityHeartbeatOverlaysPreserved": true,
+    "sellerImage": "sha256:fd9ae835e2d11f736de8f39ccec36bf6d083fe7c4dd42e65af8f755763fe54e0"
+  },
+  "privatePhysicalQualification": {
+    "status": 200,
+    "inputTokens": 256,
+    "seconds": 329.26582384109497,
+    "all16LogitsBitExactAgainstPriorWholeModelQualifiedReference": true,
+    "receiptSha256": "c12a3f8a7bd5d28d7d8ac00d5c09621e1c5ad1f232eaaf9f16b48e78a01462ee"
+  },
+  "actualBuyer": {
+    "transport": "sse",
+    "successfulTerminalEventVerified": true,
+    "route": [
+      "existing buyer HTTP client",
+      "AntSeed gateway",
+      "AntSeed seller",
+      "Mycellios API",
+      "independently enrolled three-host decision cell"
+    ],
+    "status": 200,
+    "providerSelector": "mycellios-decisions",
+    "inputTokens": 256,
+    "outputTokens": 0,
+    "servedFree": 1,
+    "seconds": 378.02592039108276,
+    "nativeWallMs": 376506.0630129883,
+    "modelRetries": 0,
+    "envelopeEqualsPinnedReference": true,
+    "all16LogitsEqualQualifiedReference": true,
+    "result": {
+      "question_id": "department",
+      "type": "choice",
+      "value": "billing",
+      "probabilities": [
+        {
+          "option": "billing",
+          "probability": 0.9770802546967313
+        },
+        {
+          "option": "sales",
+          "probability": 0.0081358556352452
+        },
+        {
+          "option": "technical",
+          "probability": 0.014783889668023508
+        }
+      ]
+    },
+    "buyerReceiptSha256": "957c31c7e730845fb9349bb5b9e0e0499e967ac705d49cc7084c0a7e121cf32d",
+    "nativeReceiptSha256": "99e26c904a7ef707ee06a429cfa1a092e3e4b1cf6c020641361a63185f324e79"
+  },
+  "stages": [
+    {
+      "stageIndex": 0,
+      "computeMs": 63667.3,
+      "elapsedMs": 64968.99999999732
+    },
+    {
+      "stageIndex": 1,
+      "computeMs": 187479,
+      "elapsedMs": 188686.99999991804
+    },
+    {
+      "stageIndex": 2,
+      "computeMs": 67835.4,
+      "elapsedMs": 68547.00000002049
+    }
+  ],
+  "preservation": {
+    "independentCellIdentity": true,
+    "permanentCredentials": true,
+    "existingProvidersAndPrices": true,
+    "wallet": true,
+    "ownerAndMemoryLimits": true,
+    "kokoroAndEmbeddingServicesNotRestartedForThisRollout": true,
+    "otherWorkerModulesByteIdentical": true,
+    "noQaCredentialsPromoted": true
+  },
+  "retainedFailures": [
+    "Earlier successful 55-token buyer omitted the explicit provider selector and recorded served_free=0; not the free gate.",
+    "Earlier full-context OmniRoute attempt failed across executor/admission errors; not qualification.",
+    "Initial new-gateway startup rejected the additive executor-observations field; the adapter was corrected and tested.",
+    "Initial direct buyer used an encrypted stored key as plaintext and was rejected with 401 before model execution; credentials were not rotated."
+  ],
+  "nonStreamingFullContextQualified": false,
+  "retainedFullContextNonStreamingFailure": "AntSeed initial response deadline at 300 seconds; request cancelled. No complete model result claimed for that attempt.",
+  "singleRunNotLatencySla": true,
+  "generalTaskQualityQualified": false,
+  "gpuQualified": false,
+  "largerContextsQualified": false,
+  "zeroDowntimeClaimed": false
+}

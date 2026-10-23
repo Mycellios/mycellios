@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { lstatSync, readFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { DECISION_CONTEXT_LIMIT, DECISION_DEADLINE_MS, DECISION_DIGEST, DECISION_MODEL, DECISION_REVISION, DECISION_TOKENIZER_SHA256,
   MAX_DECISION_RESPONSE_BYTES, decisionWorkerAdapterSchema, parseDecisionRequest, verifiedDecisionEnvelope } from "../contracts/decision.js";
 import { AdapterError, type AdapterChunk, type AdapterRequest, type InferenceAdapter } from "./base.js";
@@ -12,6 +13,9 @@ const healthSchema = z.object({ status: z.literal("ready"), runtime: z.literal("
   // Identity here must be bound by native admission, not by a client hostname.
   stages: z.array(z.object({ node_id: z.string().min(1), physical_identity: sha, layer_start: z.number().int(),
     layer_end: z.number().int(), backend: z.literal("cpu"), shard_sha256: sha }).strict()).length(3),
+  executor_observations: z.array(z.object({ stageIndex: z.number().int().min(0).max(2),
+    ownerAvailable: z.boolean(), secondsSinceMessage: z.number().finite().nonnegative().nullable(),
+  }).strict()).length(3).optional(),
 }).strict();
 const shards = ["1ea5b923a3359eb3d6ecd683792b6723795c8d2fdf3d2a31d50219bf109dc325",
   "02df8d07f3d7c7e47829cbb55d73c4a18d39096a5ed030f97333be9c7a64a6a5",
@@ -56,6 +60,10 @@ export class DecisionAdapter implements InferenceAdapter {
       || new Set(health.stages.map((s) => s.physical_identity)).size !== 3
       || health.stages.some((stage, i) => stage.layer_start !== boundaries[i] || stage.layer_end !== boundaries[i + 1]
         || stage.shard_sha256 !== shards[i])) throw new Error("decision_route_identity_mismatch");
+    if (health.executor_observations?.some((stage, i) => stage.stageIndex !== i
+      || !stage.ownerAvailable || stage.secondsSinceMessage === null || stage.secondsSinceMessage >= 15)) {
+      throw new Error("decision_executor_unavailable");
+    }
     this.ready = true;
     return { kind: this.kind, models: [DECISION_MODEL], streaming: true, embeddings: false, reranking: false };
     } catch (error) {
@@ -74,12 +82,11 @@ export class DecisionAdapter implements InferenceAdapter {
     this.jobs.set(input.jobId, { controller, leaseId: input.lease.id });
     let verified = false;
     try {
-      const response = await fetch(new URL("decide", this.baseUrl), { method: "POST", headers: { "content-type": "application/json",
-        authorization: "Bearer " + this.options.runtimeToken },
-        body: JSON.stringify({ ...request, lease: { jobId: input.jobId, id: input.lease.id,
-          deadline: input.lease.deadline, activationId: this.options.activationId } }), redirect: "error",
-        signal: AbortSignal.any([signal, controller.signal, AbortSignal.timeout(Math.max(1, Math.min(DECISION_DEADLINE_MS, input.lease.deadline - Date.now())))]) });
-      const result = verifiedDecisionEnvelope(await boundedBody(response, MAX_DECISION_RESPONSE_BYTES), request);
+      const text = await boundedDecisionPost(new URL("decide", this.baseUrl), this.options.runtimeToken,
+        JSON.stringify({ ...request, lease: { jobId: input.jobId, id: input.lease.id,
+          deadline: input.lease.deadline, activationId: this.options.activationId } }),
+        AbortSignal.any([signal, controller.signal, AbortSignal.timeout(Math.max(1, Math.min(DECISION_DEADLINE_MS, input.lease.deadline - Date.now())))]));
+      const result = verifiedDecisionEnvelope(text, request);
       if (signal.aborted) throw signal.reason;
       if (controller.signal.aborted) throw controller.signal.reason;
       verified = true;
@@ -105,6 +112,34 @@ export class DecisionAdapter implements InferenceAdapter {
     if (Date.now() - this.checkedAt >= 5000) { try { await this.probe(); } catch { this.ready = false; } }
     return { ready: this.ready, activeJobs: this.jobs.size, loadedModels: this.ready ? [DECISION_MODEL] : [] };
   }
+}
+
+// The native lease bounds the entire request. node:http avoids fetch's separate
+// five-minute header deadline while retaining cancellation and bounded bytes.
+function boundedDecisionPost(url: URL, token: string, body: string, signal: AbortSignal): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(url, { method: "POST", signal, headers: {
+      "content-type": "application/json", authorization: "Bearer " + token,
+      "content-length": Buffer.byteLength(body),
+    } }, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new AdapterError("Decision runtime HTTP " + res.statusCode, "decision_runtime_failed",
+          (res.statusCode ?? 0) >= 500 || res.statusCode === 429));
+        res.destroy(); return;
+      }
+      const chunks: Buffer[] = []; let size = 0;
+      res.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > MAX_DECISION_RESPONSE_BYTES) {
+          reject(new Error("decision_response_limit")); res.destroy(); req.destroy(); return;
+        }
+        chunks.push(chunk);
+      });
+      res.on("error", reject);
+      res.once("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    });
+    req.on("error", reject); req.end(body);
+  });
 }
 
 async function boundedBody(response: Response, maximum: number) {

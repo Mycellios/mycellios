@@ -97,6 +97,7 @@ class NativeDecisionGateway:
             'revision': contract.REVISION, 'artifact_identity': contract.DIGEST,
             'tokenizer_sha256': contract.TOKENIZER_SHA256, 'activation_id': self.config['activationId'],
             'max_input_tokens': contract.CONTEXT_LIMIT,
+            'executor_observations': self.broker.observations(),
             'stages': [{'node_id': row['nativeNodeId'], 'physical_identity': row['physicalIdentity'],
                         'layer_start': BOUNDARIES[i], 'layer_end': BOUNDARIES[i+1], 'backend': 'cpu',
                         'shard_sha256': row['shardSha256']} for i, row in enumerate(self.config['nodes'].values())]}
@@ -198,6 +199,7 @@ class NativeDecisionGateway:
                     (folder/(lease['jobId']+'.failure.json')).write_text(json.dumps({
                         'schema': 'mycellios-native-decision-failure/1', 'jobId': lease['jobId'],
                         'sourceId': gateway.source_id, 'errorCode': code, 'nativeFailure': getattr(error, 'details', None),
+                        'executorObservations': gateway.broker.observations(),
                         'publicAdmissionValidated': False}))
                     return self.reply(503, {'error': 'decision_native_route_failed'})
                 finally:
