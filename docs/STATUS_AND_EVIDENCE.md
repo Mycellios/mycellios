@@ -235,9 +235,10 @@ must not be inferred from USDC settlement or self-test traffic.
 English is the default; Spanish is explicit via language=es. The request accepts the five documented voices and speed 0.5 through 2. Contract, coordinator dispatch, request identity and response checks have focused automated coverage. An isolated MSI CPU pilot generated English default, English male, slow, fast and Spanish audio: the same 14-token English text produced 6.5 seconds at 0.8 and 4.45 seconds at 1.2. No public-path deployment or OmniRoute/AntSeed control verification is claimed by this entry. Existing Kokoro pricing remains zero.
 ## Experimental Kev decision graphs
 
-Physical qualification and serving rollout, 22 October 2026. **Not yet a
-validated public service.** The zero-price AntSeed offer was announced, but the
-decision worker is held offline after the full-context buyer probe failed.
+Physical qualification and experimental serving rollout, 23 October 2026.
+**A complete 256-token AntSeed streaming buyer request is verified at zero model
+price.** The independently enrolled decision cell is online after repairing
+executor availability, health compatibility and local HTTP deadline handling.
 The requested `jev` alias identifies independent [Kev-4B](https://huggingface.co/jaredpalmer/kev-4b),
 not TypeSafe Jev weights. It scores supplied choices and returns a choice, p(true)
 (`noul`), or probability-weighted level (`score`); it generates no prose or output tokens.
@@ -378,11 +379,11 @@ attributed another provider's pricing. An explicit
 `X-Antseed-Provider: mycellios-decisions` schema-rejection probe subsequently
 recorded `served_free=1`, but executed no model and is not buyer qualification.
 
-The 256-token buyer attempt failed: OmniRoute retried after an executor
+The 22 October 256-token buyer attempt failed: OmniRoute retried after an executor
 availability error, then a physical contributor's heartbeat expired. No complete
-256-token buyer result is claimed. The native process remained alive; memory and
+256-token buyer result was claimed for that attempt. The native process remained alive; memory and
 owner preflight later passed on all three hosts. The HP's existing nonblocking
-hardware sampler and other installed native overlays were preserved. Proposed
+hardware sampler and other installed native overlays were preserved.
 The first TLS-reuse candidate passed 79 model-free tests and the public structure,
 architecture and typecheck gates. Its source-bound, 55-token physical canary
 completed in 102.80 s with all 16 reference logits bit-identical. A 256-token
@@ -396,7 +397,7 @@ embedding engines. A subsequent full-context private attempt still cancelled
 after 22.50 s with generic native exit 125; the relay improvement alone did not
 close the model gate. The current candidate preserves a bounded owner-cancellation
 reason so that a policy-watcher kill is distinguishable from another native
-failure. That changed source requires new physical qualification before serving.
+failure. That changed source was physically qualified before serving on 23 October.
 
 A stale, zero-token API reservation for an already failed job was reconciled
 with the normal failure-settlement method, without changing balances or limits.
@@ -405,10 +406,8 @@ request; this was not a zero-downtime rollout. A later interactive embedding
 query returned a valid vector and `served_free=1`. These observations do not
 establish global interactive latency or long-term stability.
 
-The remaining gate is a complete real buyer request at the pilot context limit,
-with verified usage and `served_free=1`, after source-bound physical qualification
-of any changed native transport. Larger contexts, GPU execution and general task
-quality require separate qualification.
+The full-context streaming buyer gate is closed by the 23 October evidence below.
+Larger contexts, GPU execution and general task quality require separate qualification.
 
 On 23 October, two more zero-token embedding reservations survived coordinator
 restart after their jobs had already failed. They were settled with the existing
@@ -418,3 +417,45 @@ limits and jobs. A subsequent provider receipt returned HTTP 200 and
 admission, so this is provider recovery only. Startup recovery now has a narrowly
 scoped candidate that settles such terminal zero-token usage before admission;
 its deployment and full caller recovery require separate verification.
+
+### Verified free AntSeed streaming buyer, 23 October 2026
+
+The repaired native source
+`ed0c9874176ef1dacf18b17d773e8ac71b91306c9bffc97e89491397b253ba3f`
+passed a fresh 256-token private physical run in **329.27 s**, with all 16 logits
+bit-identical to the prior whole-model-qualified reference. Its three distinct
+physical contributors execute layers 0..7, 8..19 and 20..31/head over pinned TLS
+through the Internet VPN route. PC-DANI executes no model inference.
+
+A subsequent real buyer request through the AntSeed gateway, seller and
+authenticated Mycellios API completed in **378.03 s** (**376.51 s native wall
+time**). The successful final SSE decision and usage arrived with `[DONE]`;
+the coordinator recorded completion and the gateway recorded HTTP 200,
+**256 input tokens, zero output tokens and `served_free=1`**. The complete
+envelope matches the pinned fixture, and all 16 native logits match the qualified
+reference. Public, sanitized evidence is in
+[`jev-public-buyer-evidence.json`](../tests/fixtures/jev-public-buyer-evidence.json).
+This buyer used the existing gateway credential and explicit provider selector,
+without OmniRoute's retry engine or automatic model retries.
+
+The preceding non-streaming full-context attempt timed out at AntSeed's 300-second
+initial-response deadline and cancelled the job. Long decisions therefore use the
+existing SSE admission/heartbeat route; HTTP 200 or an early event alone is not
+success. The bounded local HTTP adapter retains the nine-minute absolute native
+lease, cancellation, no redirects and response-byte limits. Shared buyer/provider
+timeouts, owner/resource limits and concurrency were not increased.
+
+The native artifact is source-bound to commit `1f30878ccc1477488b4e167ceff3ca3ccba84d2b`;
+the active worker adapter component is `e028e093b55eb2039614cc5a5016c9a53d4aea0e`
+(artifact SHA-256 `5f23a2b5696873556a1da277e98ba2694bfa88d16138f7bbc0716ee3301877cb`).
+Only the decision adapter and its map changed in the existing worker package;
+the independent cell identity, permanent credentials, embedding repair and all
+other worker modules were preserved. The coordinator's existing PostgreSQL,
+capacity and heartbeat overlays and the seller's other providers/prices were
+preserved. Kokoro and the GPU embedding engine were not restarted for this rollout.
+
+These are individual experimental CPU observations, not a latency SLA, a measured
+speedup, GPU qualification or a general decision-quality benchmark. Non-streaming
+delivery at the 256-token boundary is not qualified. The pilot remains one
+question, 256 input tokens, batch/concurrency one, and produces decisions rather
+than generated prose.
