@@ -288,6 +288,19 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
       this.failRuntime(jobId, "empty_route", "Scheduler produced an empty route");
       return;
     }
+    // Planning is not an admission grant. Recheck the immutable request and
+    // exact route against current owner/capacity/evidence before offering work.
+    const queued = this.store.getJob(jobId);
+    if (!queued || queued.deadlineAt <= Date.now()) {
+      this.failRuntime(jobId, "deadline_exceeded", "The request expired before dispatch");
+      return;
+    }
+    if (!this.scheduler.isRouteCurrentlyEligible(runtime.request, queued.sessionId, runtime.route, {
+      ...routeOptionsForRequest(runtime.request, this.hub.connectedWorkerIds()), allowPipeline: false,
+    })) {
+      this.retryOrFail(jobId, "route_no_longer_eligible", "The planned route is no longer eligible");
+      return;
+    }
     const leaseId = newId("lea");
     if (promote) this.store.promoteJobRoute(jobId, runtime.route, leaseId);
     else this.store.setJobRoute(jobId, runtime.route, leaseId);
