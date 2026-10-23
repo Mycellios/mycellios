@@ -116,14 +116,16 @@ export class Scheduler {
       .filter((worker) => !options.connectedWorkerIds || options.connectedWorkerIds.has(worker.id))
       .filter((worker) => !options.excludeWorkerIds?.has(worker.id));
 
-    const affinity = this.store.getSessionRoute(sessionId, request.model);
+    const savedAffinity = this.store.getSessionRoute(sessionId, request.model);
+    const affinity = savedAffinity
+      ? this.refreshSessionRoute(savedAffinity, request, workers, now, options.allowPipeline === true)
+      : null;
     const affinityEligible = Boolean(
       affinity
-      && this.routeStillValid(affinity, request, workers)
       && !this.routeIsSaturated(affinity, workers)
     );
 
-    const replicas = this.replicaCandidatesWithReasons(request, workers);
+    const replicas = this.replicaCandidatesWithReasons(request, workers, now);
     const routes: ScheduledRoute[] = replicas.map((candidate) => ({
         routeClass: "replica",
         model: request.model,
@@ -320,7 +322,7 @@ export class Scheduler {
     const candidates = workers.flatMap((worker) =>
       worker.capabilities.deployments
         .filter((deployment) => deployment.model === request.model && deployment.mode === "pipeline")
-        .filter((deployment) => this.isEligible(worker, deployment, request))
+        .filter((deployment) => this.isEligible(worker, deployment, request, now))
         .map((deployment) => ({
           worker,
           deployment,
@@ -370,23 +372,26 @@ export class Scheduler {
         if (paths.length === 0) break;
       }
 
-      const path = paths.sort((left, right) => left.cost - right.cost)[0];
-      if (!path || path.stages.length !== total) continue;
-      const returnPenalty = this.linkPenalty(
-        path.stages.at(-1)!.worker,
-        path.stages[0]!.worker,
-        now,
-      );
-      if (!Number.isFinite(returnPenalty)) continue;
-      const route: ScheduledRoute = {
-        routeClass: "pipeline",
-        model: request.model,
-        region: path.region,
-        stages: path.stages.map((candidate, index) => this.toRouteStage(candidate, index)),
-        score: path.cost + returnPenalty,
-        affinityHit: false,
-      };
-      completeRoutes.push(route);
+      // Evaluate complete bounded alternatives BEFORE policy selection. The
+      // cheapest forward path may have an unavailable or expensive return.
+      for (const path of paths) {
+        if (path.stages.length !== total) continue;
+        const returnPenalty = this.linkPenalty(
+          path.stages.at(-1)!.worker,
+          path.stages[0]!.worker,
+          now,
+        );
+        if (!Number.isFinite(returnPenalty)) continue;
+        const route: ScheduledRoute = {
+          routeClass: "pipeline",
+          model: request.model,
+          region: path.region,
+          stages: path.stages.map((candidate, index) => this.toRouteStage(candidate, index)),
+          score: path.cost + returnPenalty,
+          affinityHit: false,
+        };
+        completeRoutes.push(route);
+      }
     }
     return completeRoutes.sort(
       (left, right) => left.score - right.score
@@ -398,13 +403,14 @@ export class Scheduler {
   private replicaCandidatesWithReasons(
     request: ChatCompletionRequest,
     workers: StoredWorker[],
+    now: number,
   ): EvaluatedCandidate[] {
     return workers
       .flatMap((worker) =>
         worker.capabilities.deployments
           .filter((deployment) => deployment.model === request.model && deployment.mode === "replica")
           .map((deployment) => {
-            const rejectionReasons = this.eligibilityRejections(worker, deployment, request);
+            const rejectionReasons = this.eligibilityRejections(worker, deployment, request, now);
             if (!this.internalPipelineDependenciesConnected(deployment, workers)) {
               rejectionReasons.push("candidate_not_ready");
             }
@@ -423,19 +429,21 @@ export class Scheduler {
     worker: StoredWorker,
     deployment: ModelDeployment,
     request: ChatCompletionRequest,
+    now = Date.now(),
   ): boolean {
-    return this.eligibilityRejections(worker, deployment, request).length === 0;
+    return this.eligibilityRejections(worker, deployment, request, now).length === 0;
   }
 
   private eligibilityRejections(
     worker: StoredWorker,
     deployment: ModelDeployment,
     request: ChatCompletionRequest,
+    now = Date.now(),
   ): ExecutionRouteReasonCode[] {
     const reasons: ExecutionRouteReasonCode[] = [];
     if (worker.status !== "online") reasons.push("candidate_not_ready");
     if (deployment.freeSlots < 1) reasons.push("candidate_capacity_exhausted");
-    if (!this.deploymentEvidenceIsEligible(worker, deployment)) {
+    if (!this.deploymentEvidenceIsEligible(worker, deployment, now)) {
       reasons.push("candidate_evidence_missing");
     }
     // Decisions enforce exact input length with the pinned native tokenizer
@@ -459,25 +467,44 @@ export class Scheduler {
     return [...new Set(reasons)];
   }
 
-  private routeStillValid(
+  private refreshSessionRoute(
     route: ScheduledRoute,
     request: ChatCompletionRequest,
     workers: StoredWorker[],
-  ): boolean {
+    now: number,
+    allowPipeline: boolean,
+  ): ScheduledRoute | null {
+    if (route.model !== request.model || route.stages.length === 0
+      || (route.routeClass === "pipeline" && !allowPipeline)
+      || (route.routeClass === "replica" && route.stages.length !== 1)
+      || new Set(route.stages.map((stage) => stage.workerId)).size !== route.stages.length) return null;
     const byId = new Map(workers.map((worker) => [worker.id, worker]));
-    return route.stages.every((stage) => {
+    const candidates: Candidate[] = [];
+    for (const [index, stage] of route.stages.entries()) {
       const worker = byId.get(stage.workerId);
       const deployment = worker?.capabilities.deployments.find(
         (candidate) => candidate.deploymentId === stage.deploymentId,
       );
-      return Boolean(
-        worker &&
-          deployment &&
-          deployment.modelDigest === stage.modelDigest &&
-          this.isEligible(worker, deployment, request) &&
-          this.internalPipelineDependenciesConnected(deployment, workers),
-      );
-    });
+      if (!worker || !deployment || deployment.model !== request.model
+        || deployment.mode !== route.routeClass || stage.stageIndex !== index
+        || deployment.modelDigest !== stage.modelDigest
+        || !this.isEligible(worker, deployment, request, now)
+        || !this.internalPipelineDependenciesConnected(deployment, workers)) return null;
+      if (route.routeClass === "pipeline" && (deployment.stage?.index !== index
+        || deployment.stage.total !== route.stages.length)) return null;
+      candidates.push({ worker, deployment, score: this.scoreWorker(worker, deployment, request) });
+    }
+    const region = candidates.every((candidate) => candidate.worker.capabilities.region === candidates[0]!.worker.capabilities.region)
+      ? candidates[0]!.worker.capabilities.region : "multi-region";
+    if (route.routeClass === "pipeline" && request.workload_class === "interactive" && region === "multi-region") return null;
+    let score = candidates.reduce((total, candidate) => total + candidate.score, 0);
+    if (route.routeClass === "pipeline" && candidates.length > 1) {
+      for (let i = 0; i < candidates.length; i++) {
+        score += this.linkPenalty(candidates[i]!.worker, candidates[(i + 1) % candidates.length]!.worker, now);
+      }
+    }
+    if (!Number.isFinite(score)) return null;
+    return { ...route, region, score, stages: candidates.map((candidate, index) => this.toRouteStage(candidate, index)) };
   }
 
   private internalPipelineDependenciesConnected(

@@ -50,6 +50,17 @@ These rules apply to the complete repository.
   never as passing.
 - Do not commit or push unless the user explicitly requests it.
 
+## Execution route admission
+
+- Session affinity must be revalidated and rescored from current worker capacity,
+  exact deployments and measured forward/return links. Cached scores are not
+  current capacity evidence. Respect disabled pipeline dispatch on cached routes.
+- Evaluate bounded complete pipeline alternatives including the return path before
+  applying route policy. Recheck the exact immutable request immediately before
+  offering a lease; use only compatible preplanned standbys if eligibility changed.
+- Verify with `npx vitest run tests/capacity-dispatch-hardening.test.ts
+  tests/scheduler.test.ts tests/mesh-failover.test.ts tests/kokoro-network.test.ts`.
+
 ## Optional speech replicas
 
 - Kokoro uses an explicit native replica adapter, not the Transformers layer planner.
