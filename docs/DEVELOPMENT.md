@@ -206,7 +206,7 @@ Send one user message with the exact text to synthesize:
   "model": "mycellios-kokoro-es",
   "messages": [{"role": "user", "content": "Hola. Esta voz se genera en Mycellios."}],
   "max_tokens": 1,
-  "stream": true
+  "stream": false
 }
 ~~~
 
@@ -322,7 +322,7 @@ X-Antseed-Provider: mycellios-decisions
     "content": "{\"schema\":\"mycellios-decisions/1\",\"state\":\"My card was charged twice.\",\"questions\":{\"department\":{\"type\":\"choice\",\"instructions\":\"Choose the responsible team.\",\"criteria\":{\"billing\":\"Charges and refunds\",\"technical\":\"Software errors\"}}}}"
   }],
   "max_tokens": 1,
-  "stream": false
+  "stream": true
 }
 ```
 
