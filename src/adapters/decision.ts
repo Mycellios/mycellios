@@ -130,13 +130,15 @@ function boundedDecisionPost(url: URL, token: string, body: string, signal: Abor
       const chunks: Buffer[] = []; let size = 0;
       res.on("data", (chunk: Buffer) => {
         size += chunk.length;
-        if (size > MAX_DECISION_RESPONSE_BYTES) { req.destroy(new Error("decision_response_limit")); return; }
+        if (size > MAX_DECISION_RESPONSE_BYTES) {
+          reject(new Error("decision_response_limit")); res.destroy(); req.destroy(); return;
+        }
         chunks.push(chunk);
       });
-      res.once("error", reject);
+      res.on("error", reject);
       res.once("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     });
-    req.once("error", reject); req.end(body);
+    req.on("error", reject); req.end(body);
   });
 }
 
