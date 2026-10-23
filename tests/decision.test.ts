@@ -101,6 +101,23 @@ describe("typed Kev decision contract", () => {
 });
 
 describe("native decision adapter admission", () => {
+  it("accepts authenticated executor observations and rejects stale, missing or duplicate stages", async () => {
+    const observations = [0, 1, 2].map((stageIndex) => ({ stageIndex, ownerAvailable: true, secondsSinceMessage: 1 }));
+    let value: unknown = { ...health, executor_observations: observations };
+    const baseUrl = await listen((_req, res) => res.end(JSON.stringify(value)));
+    const adapter = new DecisionAdapter({ ...options, baseUrl }); await adapter.probe();
+    expect((await adapter.metrics()).ready).toBe(true);
+    for (const invalid of [observations.slice(1), [observations[0], observations[0], observations[2]],
+      observations.map((row) => ({ ...row, ownerAvailable: false })),
+      observations.map((row) => ({ ...row, secondsSinceMessage: 15 })),
+      observations.map((row) => ({ ...row, secondsSinceMessage: null }))]) {
+      value = { ...health, executor_observations: invalid };
+      await expect(adapter.probe()).rejects.toThrow();
+      expect((await adapter.metrics()).ready).toBe(false);
+    }
+    value = health; await adapter.probe(); // Older qualified gateways remain compatible.
+    expect((await adapter.metrics()).ready).toBe(true);
+  });
   it("retains verified readiness during one shared probe and invalidates a failed probe", async () => {
     let calls = 0, fail = false;
     let unblock!: () => void, observed!: () => void;

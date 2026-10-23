@@ -20,6 +20,10 @@ paths, so unread bodies cannot be interpreted as another request. Add bounded
 executor freshness diagnostics to authenticated loopback health and failure
 receipts. Neither a transport probe nor a schema-rejected free response counts
 as successful model inference.
+The worker adapter must accept the bounded optional observations field while
+retaining strict health validation. When present, require all three stage indices
+in route order, available owners and observations younger than 15 seconds.
+Continue accepting earlier qualified gateways without the optional field.
 Optional actor diagnostics rotate at 1 MiB with one backup, contain only fixed
 event/phase codes and HTTP status, and never log payloads or credentials.
 Preserve the bounded owner/permit cancellation code when the policy watcher

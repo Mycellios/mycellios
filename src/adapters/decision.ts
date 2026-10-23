@@ -12,6 +12,9 @@ const healthSchema = z.object({ status: z.literal("ready"), runtime: z.literal("
   // Identity here must be bound by native admission, not by a client hostname.
   stages: z.array(z.object({ node_id: z.string().min(1), physical_identity: sha, layer_start: z.number().int(),
     layer_end: z.number().int(), backend: z.literal("cpu"), shard_sha256: sha }).strict()).length(3),
+  executor_observations: z.array(z.object({ stageIndex: z.number().int().min(0).max(2),
+    ownerAvailable: z.boolean(), secondsSinceMessage: z.number().finite().nonnegative().nullable(),
+  }).strict()).length(3).optional(),
 }).strict();
 const shards = ["1ea5b923a3359eb3d6ecd683792b6723795c8d2fdf3d2a31d50219bf109dc325",
   "02df8d07f3d7c7e47829cbb55d73c4a18d39096a5ed030f97333be9c7a64a6a5",
@@ -56,6 +59,10 @@ export class DecisionAdapter implements InferenceAdapter {
       || new Set(health.stages.map((s) => s.physical_identity)).size !== 3
       || health.stages.some((stage, i) => stage.layer_start !== boundaries[i] || stage.layer_end !== boundaries[i + 1]
         || stage.shard_sha256 !== shards[i])) throw new Error("decision_route_identity_mismatch");
+    if (health.executor_observations?.some((stage, i) => stage.stageIndex !== i
+      || !stage.ownerAvailable || stage.secondsSinceMessage === null || stage.secondsSinceMessage >= 15)) {
+      throw new Error("decision_executor_unavailable");
+    }
     this.ready = true;
     return { kind: this.kind, models: [DECISION_MODEL], streaming: true, embeddings: false, reranking: false };
     } catch (error) {

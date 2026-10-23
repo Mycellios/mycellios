@@ -116,6 +116,8 @@ These rules apply to the complete repository.
   invalid framing/authentication paths. Preserve all existing permit, deadline,
   owner, freshness and frame bounds; do not replay uncertain model execution.
   Preserve bounded owner-cancellation codes without logging request data.
+  Authenticated health may include bounded executor observations; accept the
+  optional field and reject stale, unavailable or duplicate stage observations.
 - Native CPU observations preserve the existing units and owner limits. Use at least
   five seconds per CPU sample, coalesce overlapping observations and reset the
   startup baseline only when monitoring begins. Keep thermal/RAM/disk checks and
