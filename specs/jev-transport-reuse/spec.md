@@ -35,3 +35,10 @@ and model lineage; qualify changed native sources physically before serving.
 Require a complete real buyer result with the explicit provider selector,
 actual input/zero output usage and served_free=1. Keep all failed attempts;
 leave GPU/voice/embedding services, reservations and account limits unchanged.
+
+Full-context decisions can exceed the default HTTP/P2P initial-response timeout.
+Use the existing SSE buyer route with admission/heartbeat events; require the
+complete decision, successful finish, usage and terminal event. The local native
+adapter uses bounded node:http with the existing absolute lease, cancellation,
+no redirects and strict response-byte limit, avoiding fetch's separate header
+deadline. Do not increase other providers' or the buyer's global timeouts.

@@ -118,6 +118,9 @@ These rules apply to the complete repository.
   Preserve bounded owner-cancellation codes without logging request data.
   Authenticated health may include bounded executor observations; accept the
   optional field and reject stale, unavailable or duplicate stage observations.
+  Full-context AntSeed qualification uses SSE and must reach the successful final
+  result/usage and terminal event. Preserve absolute native leases and bounded
+  local HTTP responses; do not increase shared provider/buyer timeouts.
 - Native CPU observations preserve the existing units and owner limits. Use at least
   five seconds per CPU sample, coalesce overlapping observations and reset the
   startup baseline only when monitoring begins. Keep thermal/RAM/disk checks and

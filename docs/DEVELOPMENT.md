@@ -206,7 +206,7 @@ Send one user message with the exact text to synthesize:
   "model": "mycellios-kokoro-es",
   "messages": [{"role": "user", "content": "Hola. Esta voz se genera en Mycellios."}],
   "max_tokens": 1,
-  "stream": false
+  "stream": true
 }
 ~~~
 
@@ -330,6 +330,12 @@ Through OmniRoute, prefix the model with `antseed/`, retaining that provider
 header and the same envelope. Use the corresponding OmniRoute API key. Do not
 add diagnostic fields to the strict Mycellios request body; use headers for
 correlation instead.
+
+Use SSE (`stream: true`) for long decisions. The distributed pilot can exceed
+AntSeed's five-minute initial-response timeout; the existing streaming route sends
+admission/heartbeat events while the atomic decision is computed. Require the
+final decision, usage, successful finish and `[DONE]`, not just HTTP 200 or an
+early stream event. Native execution retains its absolute nine-minute lease.
 
 The provider selector matters on a seller advertising several providers: the
 gateway's implicit selection may use the first provider's pricing telemetry.

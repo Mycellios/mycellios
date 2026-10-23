@@ -101,6 +101,34 @@ describe("typed Kev decision contract", () => {
 });
 
 describe("native decision adapter admission", () => {
+  it("allows delayed native headers within the lease and aborts at its absolute deadline", async () => {
+    const baseUrl = await listen((req, res) => {
+      if (req.url === "/health") { res.end(JSON.stringify(health)); return; }
+      if (req.url === "/cancel") { res.end('{"accepted":true}'); return; }
+      setTimeout(() => { if (!res.destroyed) res.end(JSON.stringify(envelope())); }, 120);
+    });
+    const adapter = new DecisionAdapter({ ...options, baseUrl }); await adapter.probe();
+    const chunks = [];
+    for await (const chunk of adapter.generate({ ...request, lease: { id: "delayed", deadline: Date.now() + 2000 } }, new AbortController().signal)) chunks.push(chunk);
+    expect(chunks).toHaveLength(1);
+    const expired = adapter.generate({ ...request, lease: { id: "short", deadline: Date.now() + 30 } }, new AbortController().signal)[Symbol.asyncIterator]().next();
+    await expect(expired).rejects.toThrow();
+    expect((await adapter.metrics()).activeJobs).toBe(0);
+  });
+  it("rejects redirects, oversized and truncated native responses", async () => {
+    for (const failure of ["redirect", "oversized", "truncated"]) {
+      const baseUrl = await listen((req, res) => {
+        if (req.url === "/health") { res.end(JSON.stringify(health)); return; }
+        if (req.url === "/cancel") { res.end('{"accepted":true}'); return; }
+        if (failure === "redirect") { res.writeHead(302, { location: "/other" }); res.end(); }
+        else if (failure === "oversized") res.end("x".repeat(20000));
+        else { res.writeHead(200, { "content-length": "1000" }); res.write("{"); res.destroy(); }
+      });
+      const adapter = new DecisionAdapter({ ...options, baseUrl }); await adapter.probe();
+      await expect(adapter.generate(request, new AbortController().signal)[Symbol.asyncIterator]().next()).rejects.toThrow();
+      expect((await adapter.metrics()).activeJobs).toBe(0);
+    }
+  });
   it("accepts authenticated executor observations and rejects stale, missing or duplicate stages", async () => {
     const observations = [0, 1, 2].map((stageIndex) => ({ stageIndex, ownerAvailable: true, secondsSinceMessage: 1 }));
     let value: unknown = { ...health, executor_observations: observations };

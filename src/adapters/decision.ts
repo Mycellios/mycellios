@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { lstatSync, readFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { DECISION_CONTEXT_LIMIT, DECISION_DEADLINE_MS, DECISION_DIGEST, DECISION_MODEL, DECISION_REVISION, DECISION_TOKENIZER_SHA256,
   MAX_DECISION_RESPONSE_BYTES, decisionWorkerAdapterSchema, parseDecisionRequest, verifiedDecisionEnvelope } from "../contracts/decision.js";
 import { AdapterError, type AdapterChunk, type AdapterRequest, type InferenceAdapter } from "./base.js";
@@ -81,12 +82,11 @@ export class DecisionAdapter implements InferenceAdapter {
     this.jobs.set(input.jobId, { controller, leaseId: input.lease.id });
     let verified = false;
     try {
-      const response = await fetch(new URL("decide", this.baseUrl), { method: "POST", headers: { "content-type": "application/json",
-        authorization: "Bearer " + this.options.runtimeToken },
-        body: JSON.stringify({ ...request, lease: { jobId: input.jobId, id: input.lease.id,
-          deadline: input.lease.deadline, activationId: this.options.activationId } }), redirect: "error",
-        signal: AbortSignal.any([signal, controller.signal, AbortSignal.timeout(Math.max(1, Math.min(DECISION_DEADLINE_MS, input.lease.deadline - Date.now())))]) });
-      const result = verifiedDecisionEnvelope(await boundedBody(response, MAX_DECISION_RESPONSE_BYTES), request);
+      const text = await boundedDecisionPost(new URL("decide", this.baseUrl), this.options.runtimeToken,
+        JSON.stringify({ ...request, lease: { jobId: input.jobId, id: input.lease.id,
+          deadline: input.lease.deadline, activationId: this.options.activationId } }),
+        AbortSignal.any([signal, controller.signal, AbortSignal.timeout(Math.max(1, Math.min(DECISION_DEADLINE_MS, input.lease.deadline - Date.now())))]));
+      const result = verifiedDecisionEnvelope(text, request);
       if (signal.aborted) throw signal.reason;
       if (controller.signal.aborted) throw controller.signal.reason;
       verified = true;
@@ -112,6 +112,32 @@ export class DecisionAdapter implements InferenceAdapter {
     if (Date.now() - this.checkedAt >= 5000) { try { await this.probe(); } catch { this.ready = false; } }
     return { ready: this.ready, activeJobs: this.jobs.size, loadedModels: this.ready ? [DECISION_MODEL] : [] };
   }
+}
+
+// The native lease bounds the entire request. node:http avoids fetch's separate
+// five-minute header deadline while retaining cancellation and bounded bytes.
+function boundedDecisionPost(url: URL, token: string, body: string, signal: AbortSignal): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(url, { method: "POST", signal, headers: {
+      "content-type": "application/json", authorization: "Bearer " + token,
+      "content-length": Buffer.byteLength(body),
+    } }, (res) => {
+      if (res.statusCode !== 200) {
+        reject(new AdapterError("Decision runtime HTTP " + res.statusCode, "decision_runtime_failed",
+          (res.statusCode ?? 0) >= 500 || res.statusCode === 429));
+        res.destroy(); return;
+      }
+      const chunks: Buffer[] = []; let size = 0;
+      res.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > MAX_DECISION_RESPONSE_BYTES) { req.destroy(new Error("decision_response_limit")); return; }
+        chunks.push(chunk);
+      });
+      res.once("error", reject);
+      res.once("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    });
+    req.once("error", reject); req.end(body);
+  });
 }
 
 async function boundedBody(response: Response, maximum: number) {
