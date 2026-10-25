@@ -88,18 +88,6 @@
         "contribution-route": {
           "match": "Contribute-",
           "maximumBytes": 65000
-        },
-        "document-library": {
-          "match": "lib-",
-          "maximumBytes": 525000
-        },
-        "pdf-reader": {
-          "match": "pdf-",
-          "maximumBytes": 450000
-        },
-        "pdf-worker": {
-          "match": "pdf.worker.min-",
-          "maximumBytes": 1300000
         }
       },
       "criticalPaths": {
