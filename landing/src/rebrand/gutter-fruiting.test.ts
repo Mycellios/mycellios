@@ -188,12 +188,11 @@ describe("it is a mushroom rather than a parasol", () => {
     expect(groupAlpha).toBeLessThanOrEqual(0.55);
   });
 
-  it("keeps material depth in the mobile SVG instead of reverting to a flat cut-out", async () => {
+  it("keeps mobile material depth while using flat fills", async () => {
     const component = await read("./GutterFruiting.tsx");
     const css = await read("./rebrand.css");
 
-    expect(component).toContain('<radialGradient id="rbGutterCap"');
-    expect(component).toContain('<linearGradient id="rbGutterStipe"');
+    expect(component).not.toMatch(/<(?:radial|linear)Gradient\b/);
     expect(component).toContain('filter="url(#rbGutterDepth)"');
     const phone = css.slice(css.indexOf("@media(max-width:700px){ .rb-gutter-fruiting"));
     expect(phone).toMatch(/\.rb-gutter-body \{ opacity:\.9;/);
