@@ -100,6 +100,7 @@ function preloadHeroRenderer() {
       const script =
         `<script>(function(){` +
         `if(location.pathname!=="/"&&location.pathname!=="/rebrand"&&location.pathname!=="/rebrand/")return;` +
+        `if(new URLSearchParams(location.search).get("landing")!=="previous")return;` +
         `if(window.matchMedia&&window.matchMedia("(max-width: 700px)").matches)return;` +
         `var l=document.createElement("link");` +
         `l.rel="modulepreload";l.crossOrigin="";l.fetchPriority="high";l.href="/${file}";` +
@@ -135,6 +136,7 @@ export default defineConfig({
       // Documentation paths redirect from the coordinator to their canonical
       // sources; the SPA fallback would silently render the homepage instead.
       "/docs": productionProxy(),
+      "^/downloads/": productionProxy(),
       "/public": productionProxy(),
       "/v1": productionProxy(),
     },
@@ -151,6 +153,7 @@ export default defineConfig({
       "/local": productionProxy(),
       "^/blog(?:/|\\?|$)": productionProxy(),
       "/docs": productionProxy(),
+      "^/downloads/": productionProxy(),
       "/public": productionProxy(),
       "/v1": productionProxy(),
     },

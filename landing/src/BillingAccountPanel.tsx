@@ -1,3 +1,4 @@
+import { Button as UiButton, Heading as UiHeading, Text as UiText } from "./ui/primitives";
 import { CheckCircle2, CircleAlert, CreditCard, LoaderCircle, RefreshCw, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiAccount } from "./api-access";
@@ -12,10 +13,11 @@ import {
   type BillingAccountOverview,
 } from "./billing";
 
-export function BillingAccountPanel({ session, titleId, account, navigate = (url) => window.location.assign(url) }: {
+export function BillingAccountPanel({ session, titleId, account, loadOverview = loadBillingAccount, navigate = (url) => window.location.assign(url) }: {
   session: AuthSession;
   titleId: string;
   account?: Pick<ApiAccount, "token_balance"> | null;
+  loadOverview?: typeof loadBillingAccount;
   navigate?: (url: string) => void;
 }) {
   const [overview, setOverview] = useState<BillingAccountOverview | null>(null);
@@ -32,14 +34,14 @@ export function BillingAccountPanel({ session, titleId, account, navigate = (url
     setBusy("load");
     setError(null);
     try {
-      const next = await loadBillingAccount(session.accessToken);
+      const next = await loadOverview(session.accessToken);
       if (refreshRequestSeq.current === requestSeq) setOverview(next);
     } catch (caught) {
       if (refreshRequestSeq.current === requestSeq) setError(errorText(caught));
     } finally {
       if (refreshRequestSeq.current === requestSeq) setBusy(null);
     }
-  }, [session.accessToken]);
+  }, [session.accessToken, loadOverview]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -81,7 +83,7 @@ export function BillingAccountPanel({ session, titleId, account, navigate = (url
   }
 
   if (busy === "load" && !overview) return <div className="billing-panel-state" role="status"><LoaderCircle className="spin" /><span>Loading verified billing state…</span></div>;
-  if (!overview) return <div className="billing-panel-state error" role="alert"><CircleAlert /><span>{error ?? "Billing state is unavailable."}</span><button onClick={() => void refresh()}><RefreshCw />Retry</button></div>;
+  if (!overview) return <div className="billing-panel-state error" role="alert"><CircleAlert /><span>{error ?? "Billing state is unavailable."}</span><UiButton onClick={() => void refresh()}><RefreshCw />Retry</UiButton></div>;
 
   const subscription = overview.subscription;
   const plan = overview.plan;
@@ -97,19 +99,18 @@ export function BillingAccountPanel({ session, titleId, account, navigate = (url
         : { label: "NOT SUBSCRIBED", detail: returnState === "success" ? "Checkout is being verified. Access remains unchanged until payment is confirmed." : checkoutReady ? "Subscribe securely through Stripe. Access activates after payment is confirmed." : "Subscription checkout is unavailable right now.", tone: "muted" };
 
   return <>
-    <h2 id={titleId}>Plan &amp; billing</h2>
-    <p>Your plan updates after Stripe confirms your payment.</p>
+    <UiHeading as="h2" id={titleId}>Plan &amp; billing</UiHeading>
     {returnState === "success" && state === "active" && <div className="billing-return-notice" role="status"><CheckCircle2 /><span><strong>Mycellios Go is active</strong><small>Your payment is confirmed and your monthly tokens are ready.</small></span></div>}
     {returnState === "success" && state !== "active" && <div className={`billing-return-notice${checkoutChecking ? "" : " neutral"}`} role="status">{checkoutChecking ? <LoaderCircle className="spin" /> : <CircleAlert />}<span><strong>{checkoutChecking ? "Checking checkout status" : "Checkout is still unverified"}</strong><small>{checkoutChecking ? "Access activates after the payment provider confirms this checkout." : "Automatic checks have finished. Refresh the billing state later before starting another checkout."}</small></span></div>}
     {returnState === "cancelled" && state !== "active" && <div className="billing-return-notice neutral" role="status"><CircleAlert /><span><strong>Checkout closed</strong><small>Current billing status is shown below.</small></span></div>}
     <section className="billing-plan-card" aria-label="Mycellios Go subscription">
       <header><div><span>MYCELLIOS GO</span><strong className={plan?.status === "active" ? undefined : "price-unavailable"}>{billingPriceLabel(plan)}{plan?.status === "active" && <small>/month</small>}</strong></div><b className={`billing-status ${statusCopy.tone}`}>{state === "active" ? <CheckCircle2 /> : <ShieldCheck />}{statusCopy.label}</b></header>
-      <p>{statusCopy.detail}</p>
+      <UiText>{statusCopy.detail}</UiText>
       <div className="billing-plan-proof"><span><small>INCLUDED EACH MONTH</small><strong>{plan?.status === "active" ? `${formatTokens(plan.includedTokens)} tokens` : "No active plan"}</strong></span><span><small>ACCOUNT BALANCE</small><strong>{account ? `${formatCompactTokens(account.token_balance)} tokens` : "Unavailable"}</strong></span></div>
       <footer>
-        {state === "not_subscribed" || state === "cancelled" ? <button className="billing-primary" disabled={!checkoutReady || busy !== null} onClick={() => void subscribe()}>{busy === "subscription" ? <LoaderCircle className="spin" /> : <CreditCard />}{busy === "subscription" ? "Opening Stripe…" : checkoutReady ? "Subscribe with Stripe" : plan?.status !== "active" ? "Plan unavailable" : "Checkout unavailable"}</button> : null}
-        {overview.portalAvailable && state !== "cancelled" ? <button className="billing-secondary" disabled={busy !== null} onClick={() => void portal()}>{busy === "portal" ? <LoaderCircle className="spin" /> : <CreditCard />}{busy === "portal" ? "Opening portal…" : "Manage billing"}</button> : null}
-        <button className="billing-refresh" disabled={busy !== null} onClick={() => void refresh()} aria-label="Refresh billing state"><RefreshCw /></button>
+        {state === "not_subscribed" || state === "cancelled" ? <UiButton className="billing-primary" disabled={!checkoutReady || busy !== null} onClick={() => void subscribe()}>{busy === "subscription" ? <LoaderCircle className="spin" /> : <CreditCard />}{busy === "subscription" ? "Opening Stripe…" : checkoutReady ? "Subscribe with Stripe" : plan?.status !== "active" ? "Plan unavailable" : "Checkout unavailable"}</UiButton> : null}
+        {overview.portalAvailable && state !== "cancelled" ? <UiButton className="billing-secondary" disabled={busy !== null} onClick={() => void portal()}>{busy === "portal" ? <LoaderCircle className="spin" /> : <CreditCard />}{busy === "portal" ? "Opening portal…" : "Manage billing"}</UiButton> : null}
+        <UiButton className="billing-refresh" disabled={busy !== null} onClick={() => void refresh()} aria-label="Refresh billing state"><RefreshCw /></UiButton>
       </footer>
     </section>
     {!checkoutReady && <div className="billing-safety-note"><ShieldCheck /><span><strong>Checkout unavailable</strong><small>{plan?.status !== "active" ? "No active subscription plan is available right now." : "Payment checkout is not available for this account right now."}</small></span></div>}

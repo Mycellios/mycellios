@@ -16,6 +16,7 @@ contracts and one release identity.
 | `src/worker`, `src/node` | Enrolled execution nodes and installed native service |
 | `python/distributed_runtime` | Native model execution data plane |
 | `landing` | Public web and operator interface |
+| `landing/src/ui`, `landing/.storybook` | Shared React controls, production patterns and their Storybook catalog |
 | `src/mobile` | Installable mobile contribution surface |
 | `scripts` | Build, release and verification entry points—not reusable product code |
 | `tests`, `python/tests` | Automated and opt-in physical verification |

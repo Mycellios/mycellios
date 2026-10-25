@@ -40,6 +40,58 @@ These rules apply to the complete repository.
 
 ## Changes and verification
 
+- Reusable web controls live in `landing/src/ui`. Use the production kit in every
+  surface and import the same components in Storybook; do not add parallel demo
+  implementations or native controls outside the kit. Run `npm run verify:ui-kit`.
+- Primary action buttons use flat colors without decorative borders or shadows.
+  Segmented controls may use the subtle selection shadow from the Agent reference.
+  Control variants, heights, radii and keyboard focus belong to
+  `landing/src/ui/ui.css`. Preserve
+  native form behavior, refs, disabled states and accessible names.
+- The default Agent profile uses Geist Variable and the Agent paper/stone palette
+  through `landing/src/ui/agent-style.css`: warm off-white canvas, pale stone cards,
+  subtle warm edges and deep moss actions, with a neutral gray dark mode. The previous
+  Graphite/amber design remains available as the classic profile. Keep both
+  profiles scoped separately and selectable in Storybook.
+- Agent component colors and interaction states belong to
+  `landing/src/ui/agent-components.css`, using the semantic tokens in
+  `agent-style.css`. Keep legacy page colors out of this profile; ordinary
+  icons are neutral and status indicators retain semantic success/warning/error.
+- Agent spacing, surface radii and motion belong to `agent-style.css`. Native
+  disclosures animate their real height; preserve reduced-motion preferences and
+  the sidebar's geometry transitions when adding control transitions.
+- Overview shows one network summary and active models. Keep setup, device tables,
+  topology, runtime telemetry and activity in closed detail groups; use
+  `landing/src/overview.css` and the production Overview stories for this layout.
+- The panel has no built-in chat. Mycellios Agent owns the conversation UI; keep
+  legacy `view=chat` and `view=inference` links mapped to Overview, without removing
+  the coordinator API used by Agent and other clients.
+- `ReferenceLanding` is the default network-first marketing page: a centered
+  introduction, a large computing-fabric illustration and API/device entry points
+  in the network chapter. `NetworkPrint` applies a bounded WebGL print treatment
+  with a plain image fallback and reduced-motion support. It follows the supplied
+  Compute/Antseed/Rakazo references with Geist and the shared UI kit. Keep the
+  artwork centered in normal document flow, without scroll-driven panning or
+  scaling; connection content follows below it. Its artwork and Agent workspace
+  are concepts and local examples, never telemetry or real tool execution.
+  Storybook imports those same production components.
+  Keep the original artwork as the default. The optional mushroom comparison uses
+  `?compare=mushrooms&art=fruiting`; `art=fabric` restores the exact original asset.
+  Both variants use the same renderer, layout and production controls.
+  Preserve the rejected `AssemblageLanding`
+  with `?landing=assemblage` and the
+  previous `RootedLanding` with `?landing=rooted`, `ModernLanding` with
+  `?landing=saved` and the earlier complete page with `?landing=previous` (and
+  optional `&hero=dark`). Only the earlier page preloads the WebGL mushroom
+  renderer. Keep reference-specific styles within `mycellios-reference`.
+- Other panel screens use `landing/src/panel-minimal.css`, the shared SummaryStrip
+  and single-title PanelDisclosure. Keep secondary tables/filters behind disclosures
+  and preserve visible actionable errors, authorization and payment safeguards.
+- Use flat fills across themes, including decorative CSS, SVG and canvas artwork.
+  Do not introduce gradients; `verify:ui-kit` enforces this rule in web sources.
+- Run `npm run storybook` for the local catalog and `npm run storybook:build`
+  when changing shared components. Config lives in `landing/.storybook`.
+
 - Preserve unrelated worktree changes.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
   canonical docs when complete.

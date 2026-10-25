@@ -95,13 +95,13 @@ describe("network observatory", () => {
     expect(historyForRange(wallHistory, "7d")).toBeNull();
     expect(historyForRange(null, "7d")).toBeNull();
     const html = renderToStaticMarkup(<NetworkPage initialSnapshot={snapshot} initialHistory={{ ...wallHistory, range: "7d" }} animate={false} />);
-    expect(html).toContain('aria-pressed="true">7 days</button>');
+    expect(html).toMatch(/<button\b[^>]*aria-pressed="true"[^>]*>7 days<\/button>/);
     expect(html).toContain("4 persisted observations");
   });
 
   it("keeps intraday times on chart axes when the selected history covers about a day", () => {
     const html = renderToStaticMarkup(<NetworkPage initialSnapshot={snapshot} initialHistory={{ ...wallHistory, range: "24h" }} animate={false} />);
-    expect(html).toContain('aria-pressed="true">24 hours</button>');
+    expect(html).toMatch(/<button\b[^>]*aria-pressed="true"[^>]*>24 hours<\/button>/);
     expect(html).toMatch(/class="axis"[^>]*>\d{1,2} \d{2}:\d{2}<\/text>/);
   });
 
@@ -361,7 +361,7 @@ describe("network observatory", () => {
     expect(html).toContain("$ SPORE");
     expect(html).toContain("mycellios on GitHub");
     expect(html).toContain("aria-current=\"page\"");
-    expect(html).toContain("class=\"rb-brand\" href=\"/\"");
+    expect(html).toMatch(/<a\b(?=[^>]*href="\/")(?=[^>]*class="[^"]*\brb-brand\b)[^>]*>/);
   });
 
   it("does not animate canvas geometry between overview and globe", () => {

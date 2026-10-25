@@ -75,18 +75,19 @@ function webPage(name: string, description: string, path: string): JsonValue {
 
 export const SEO_PAGES = {
   "/": {
-    title: "mycellios — The open compute layer for distributed AI",
+    title: "Mycellios — open compute for distributed AI",
     description:
-      "Mycellios develops open-source distributed AI inference. Explore model-stage coordination, public network data, browser workers, and current evidence.",
+      "Explore the Mycellios compute network, build with an OpenAI-compatible API, use Mycellios Agent, or contribute a compatible device.",
     canonicalPath: "/",
     robots: "index, follow, max-image-preview:large",
     staticContent: {
-      heading: "Distributed AI inference with mycellios",
+      heading: "AI beyond one machine, connected by Mycellios",
       paragraphs: [
-        "mycellios is an open-source project building a distributed AI inference runtime. Its coordinator plans model stages across worker computers and streams responses through a familiar API.",
+        "Mycellios Agent is a workspace for conversations, models and tools. The Mycellios network connects compute workers and models through an OpenAI-compatible API.",
         "The project is under active development. Multi-host GPU performance, models that need combined host memory, and recovery after a worker fails have not been demonstrated as general production capabilities.",
       ],
       links: [
+        { href: "https://www.mycellios.com/agent", label: "Open Mycellios Agent" },
         { href: "/network", label: "Inspect the public network snapshot" },
         { href: "/earn", label: "Learn about contributing to the test network" },
         { href: "https://github.com/tych0s/mycellios", label: "View the open-source project" },

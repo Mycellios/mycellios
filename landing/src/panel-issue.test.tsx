@@ -8,7 +8,8 @@ describe("Panel deep links", () => {
     expect(panelViewFromLocation("/dashboard", "?view=network")).toBe("history");
     expect(panelViewFromLocation("/network", "?view=history")).toBe("history");
     expect(panelViewFromLocation("/dashboard", "?view=tasks")).toBe("jobs");
-    expect(panelViewFromLocation("/dashboard", "?view=chat")).toBe("inference");
+    expect(panelViewFromLocation("/dashboard", "?view=chat")).toBe("overview");
+    expect(panelViewFromLocation("/dashboard", "?view=inference")).toBe("overview");
   });
 });
 
@@ -45,7 +46,7 @@ describe("Benchmark controls", () => {
   it("keeps remote results readable without offering a local-only action", () => {
     const remote = renderToStaticMarkup(<Tests canRunLocally={false} />);
     const local = renderToStaticMarkup(<Tests canRunLocally={true} />);
-    expect(remote).toContain("Manual tests can be started on the coordinator host.");
+    expect(remote).toContain("Performance");
     expect(remote).not.toContain("Run test again");
     expect(local).toContain("Run test again");
   });
@@ -96,7 +97,7 @@ describe("AccountDetails", () => {
     expect(markup).toContain("Network role unverified");
     expect(markup).toContain("Admin tools remain locked.");
     expect(markup).toContain("Retry");
-    expect(markup).toContain("REQUESTS MADE</small><strong>—</strong>");
+    expect(markup).not.toContain("account-usage-summary");
   });
 
   it("shows usage errors instead of reporting missing data as zero activity", () => {

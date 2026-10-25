@@ -21,7 +21,7 @@ describe("Landing", () => {
     expect(css).not.toContain("family=Manrope");
   });
 
-  it("opens the hero on the headline and ends it at the prompt", () => {
+  it("opens the hero on the headline", () => {
     const html = renderToStaticMarkup(<RebrandLanding />);
 
     // The headline names the open-compute category and the distributed-AI job
@@ -59,14 +59,11 @@ describe("Landing", () => {
     expect(hero).toContain('aria-hidden="true"');
   });
 
-  it("links the blog from the header navigation, not only the footer", () => {
+  it("keeps the retired blog out of header navigation", () => {
     const html = renderToStaticMarkup(<RebrandLanding />);
 
-    // The blog is served by the coordinator at /blog, so it must be a real
-    // navigation, not an in-page anchor.
-    const header = html.slice(0, html.indexOf("</header>"));
-    expect(header).toContain('href="/blog"');
-    expect(header).toContain(">Blog</a>");
+    expect(html).not.toContain('href="/blog"');
+    expect(html).not.toContain(">Blog</a>");
   });
 
   it("sends documentation links to the coordinator in dev and preview", async () => {
@@ -83,20 +80,20 @@ describe("Landing", () => {
     expect(header).toContain('aria-label="mycellios on GitHub"');
     expect(header).toContain('href="https://x.com/mycellios"');
     expect(header).toContain('href="https://t.me/mycellios"');
-    expect(header).toContain('href="/dashboard">Login</a>');
+    expect(header).toMatch(/<a\b[^>]*href="\/dashboard"[^>]*>Login<\/a>/);
     expect(header).toContain(">Login</a>");
     // The old "Find your worker" pill is gone from every header surface, mobile
     // burger menu included.
     expect(header).not.toContain("Find your worker");
   });
 
-  it("renders the hero prompt input as the primary entry point", () => {
+  it("keeps the retired panel chat and prompt out of the landing", () => {
     const html = renderToStaticMarkup(<RebrandLanding />);
 
-    expect(html).toContain('id="rb-hero-prompt-input"');
-    expect(html).toContain('placeholder="Ask the impossible…"');
-    expect(html).toContain("Send this prompt to the network");
-    expect(html).toContain("Ask the network");
+    expect(html).not.toContain('id="rb-hero-prompt-input"');
+    expect(html).not.toContain('href="/network?view=inference"');
+    expect(html).not.toContain("Send this prompt to the network");
+    expect(html).not.toContain(">Chat</a>");
     // The globe canvas replaces the old mushroom photo and static SVG mesh.
     expect(html).toContain('class="rb-globe"');
     expect(html).not.toContain("rb-hero-image");
@@ -275,7 +272,7 @@ describe("Landing", () => {
     expect(closing).toContain("rb-fruit-cap");
     expect(closing).toContain("rb-fruit-stipe");
     expect(closing).toContain("rb-fruit-under");
-    expect(closing).toContain("rb-fruit-cap-paint");
+    expect(closing).not.toMatch(/<(?:linear|radial)Gradient/);
     expect(closing).toContain('d="M');
     // Decorative only — the panel already says "Many machines. One model.",
     // and announcing the same thing twice is noise on a screen reader.

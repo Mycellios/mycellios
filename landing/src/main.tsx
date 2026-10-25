@@ -3,10 +3,20 @@ import { createRoot, type Root } from "react-dom/client";
 import { loadMushroomStage, wantsMushroom } from "./rebrand/HeroMushroom";
 import { applySeoMetadata } from "./seo";
 import { resolveLandingSurface } from "./routing";
+import "./button-style.css";
+import "./logo-style.css";
+import "./ui/dark-theme.css";
+import { initializeDesignProfile } from "./ui/design-profile";
+
+initializeDesignProfile();
 
 const Panel = lazy(() => import("./Panel").then((module) => ({ default: module.Panel })));
 const NetworkPage = lazy(() => import("./NetworkPage").then((module) => ({ default: module.NetworkPage })));
 const RebrandLanding = lazy(() => import("./rebrand/RebrandLanding").then((module) => ({ default: module.RebrandLanding })));
+const ModernLanding = lazy(() => import("./rebrand/ModernLanding").then((module) => ({ default: module.ModernLanding })));
+const RootedLanding = lazy(() => import("./rebrand/RootedLanding").then((module) => ({ default: module.RootedLanding })));
+const AssemblageLanding = lazy(() => import("./rebrand/AssemblageLanding").then((module) => ({ default: module.AssemblageLanding })));
+const ReferenceLanding = lazy(() => import("./rebrand/ReferenceLanding").then((module) => ({ default: module.ReferenceLanding })));
 const CreateStudio = lazy(() => import("./rebrand/CreateStudio").then((module) => ({ default: module.CreateStudio })));
 const EarnStudio = lazy(() => import("./rebrand/EarnStudio").then((module) => ({ default: module.EarnStudio })));
 const SporeStudio = lazy(() => import("./rebrand/SporeStudio").then((module) => ({ default: module.SporeStudio })));
@@ -42,6 +52,14 @@ if (isRebrandRoute) window.history.replaceState({}, "", "/");
 if (window.location.pathname === "/join" || window.location.pathname === "/join/") {
   window.history.replaceState({}, "", "/earn");
 }
+// Retired chat bookmarks open the network overview instead of a dead screen.
+const retiredChatUrl = new URL(window.location.href);
+if (["inference", "chat"].includes(retiredChatUrl.searchParams.get("view") ?? "")
+  && ["/dashboard", "/network", "/downloads", "/account", "/browser", "/mobile"].includes(retiredChatUrl.pathname.replace(/\/+$/, ""))) {
+  retiredChatUrl.searchParams.delete("view");
+  if (retiredChatUrl.pathname.replace(/\/+$/, "") === "/network") retiredChatUrl.searchParams.set("view", "overview");
+  window.history.replaceState({}, "", `${retiredChatUrl.pathname}${retiredChatUrl.search}${retiredChatUrl.hash}`);
+}
 applySeoMetadata();
 
 const path = window.location.pathname.length > 1
@@ -55,13 +73,17 @@ const isSpore = path.startsWith("/spore");
 const isNetwork = surface === "network";
 const isPanel = surface === "panel";
 const isLanding = !isCreate && !isEarn && !isSpore && !isNetwork && !isPanel;
+const previousLanding = new URLSearchParams(window.location.search).get("landing") === "previous";
+const savedLanding = new URLSearchParams(window.location.search).get("landing") === "saved";
+const rootedLanding = new URLSearchParams(window.location.search).get("landing") === "rooted";
+const assemblageLanding = new URLSearchParams(window.location.search).get("landing") === "assemblage";
 
 const page = isCreate ? <CreateStudio />
   : isEarn ? <EarnStudio />
   : isSpore ? <SporeStudio />
   : isNetwork ? <NetworkPage />
   : isPanel ? <Panel accountEntry={path === "/account"} mobileEntry={path === "/browser" || path === "/mobile"} />
-  : <RebrandLanding />;
+  : previousLanding ? <RebrandLanding /> : savedLanding ? <ModernLanding /> : rootedLanding ? <RootedLanding /> : assemblageLanding ? <AssemblageLanding /> : <ReferenceLanding />;
 
 /*
  * Start the hero renderer's download here rather than letting the component ask
@@ -79,7 +101,7 @@ const page = isCreate ? <CreateStudio />
  * phone or studio route download 190KB it never draws. `wantsMushroom()` then
  * applies the same reduced-motion and width tests the component uses.
  */
-if (isLanding && wantsMushroom()) {
+if (isLanding && previousLanding && wantsMushroom()) {
   void loadMushroomStage().catch(() => {
     /* The component awaits the same shared promise and reports there. */
   });

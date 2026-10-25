@@ -1,3 +1,4 @@
+import { Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import { ArrowUpRight } from "lucide-react";
 import { QuestionsColony } from "./QuestionsColony";
 import "./questions.css";
@@ -20,7 +21,7 @@ import "./questions.css";
  *    no token" cost conversions, and both stay in, because the section is only
  *    worth having if the uncomfortable question is the one it takes.
  *
- * Markup is native <details>: it opens with no JavaScript, is keyboard- and
+ * Markup is native <UiDisclosure>: it opens with no JavaScript, is keyboard- and
  * screen-reader-correct for free, and every answer is in the server-rendered
  * HTML, so a crawler reads the same page a visitor does.
  */
@@ -65,9 +66,9 @@ export function QuestionsSection() {
         {/* The heading stays with the reader while the answers scroll past it,
             so the column never loses what it is answering. */}
         <div className="rb-quest-head rb-reveal">
-          <p className="rb-kicker"><i /><span>Straight answers</span></p>
-          <h2 id="rb-quest-title">The awkward<br /><em>questions.</em></h2>
-          <p>The ones worth asking before installing anything. If the honest answer is “not yet”, that is the answer printed here.</p>
+          <UiText className="rb-kicker"><i /><span>Straight answers</span></UiText>
+          <UiHeading as="h2" id="rb-quest-title">The awkward<br /><em>questions.</em></UiHeading>
+          <UiText>The ones worth asking before installing anything. If the honest answer is “not yet”, that is the answer printed here.</UiText>
         </div>
 
         {/* Its horizontal origin is measured from the heading column, while
@@ -77,22 +78,22 @@ export function QuestionsSection() {
 
         <div className="rb-quest-list rb-reveal">
           {QUESTIONS.map((item) => (
-            <details className="rb-quest-item" key={item.id}>
-              <summary>
+            <UiDisclosure className="rb-quest-item" key={item.id}>
+              <UiDisclosureSummary>
                 <span className="rb-quest-no">{item.id}</span>
                 <span className="rb-quest-q">{item.q}</span>
                 {/* Two bars: the upright one rotates flat on open, so the plus
                     becomes a minus in a single transform. */}
                 <i className="rb-quest-sign" aria-hidden="true"><b /><b /></i>
-              </summary>
-              <div className="rb-quest-body"><p>{item.a}</p></div>
-            </details>
+              </UiDisclosureSummary>
+              <div className="rb-quest-body"><UiText>{item.a}</UiText></div>
+            </UiDisclosure>
           ))}
 
-          <p className="rb-quest-foot">
+          <UiText className="rb-quest-foot">
             Still unsure? The assistant in the corner answers from the same documentation.
-            <a href="/docs">Read the docs <ArrowUpRight /></a>
-          </p>
+            <UiLink href="/docs">Read the docs <ArrowUpRight /></UiLink>
+          </UiText>
         </div>
       </div>
     </section>

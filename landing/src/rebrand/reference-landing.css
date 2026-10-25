@@ -1,0 +1,148 @@
+.mycellios-reference { --assembly-paper: #faf9f7; --assembly-ink: #16221b; --assembly-muted: #59635d; --assembly-stone: #f0f1ed; --ui-radius-card: 12px; }
+html:has(.mycellios-reference) { background: #faf9f7; }
+.reference-shell { width: min(1150px,calc(100% - 80px)); margin-inline: auto; }
+.reference-header { display: flex; align-items: center; min-height: 86px; gap: 28px; position: relative; }
+.reference-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 500; letter-spacing: -.035em; }
+.reference-brand img { object-fit: contain; }
+.reference-header > nav:not(.reference-mobile-navigation) { margin-left: auto; display: flex; gap: 26px; align-items: center; }
+.reference-header nav a { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; }
+.reference-menu { display: none; }
+.reference-mobile-navigation { position: absolute; top: 76px; inset-inline: 0; z-index: 20; display: grid; padding: 16px; background: var(--assembly-stone); border-radius: 12px; }
+.reference-hero { text-align: center; padding-top: 52px; position: relative; z-index: 2; }
+.reference-hero h1 { font-size: clamp(40px,4.5vw,65px); font-weight: 500; line-height: 1.04; letter-spacing: -.04em; }
+.reference-hero h1 br { display: none; }
+.reference-hero > p { margin: 26px auto 0; font-size: 19px; line-height: 1.6; max-width: 690px; }
+.reference-hero-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.reference-connect { width: min(590px,100%); margin: 30px auto 0; padding: 10px; background: #ffffff; border: 1px solid var(--assembly-line); border-radius: 16px; text-align: left; }
+.reference-connect-tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; background: var(--assembly-stone); border-radius: 10px; }
+.reference-connect-tabs .ui-button { border: 0; background: transparent; min-height: 38px; font-size: 14px; border-radius: 8px; color: var(--assembly-muted); }
+.reference-connect-tabs .ui-button[aria-pressed="true"] { background: #ffffff; color: var(--assembly-ink); }
+.reference-connect-content { min-height: 102px; padding: 16px 10px 7px; }
+.reference-endpoint { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; border-radius: 9px; color: #f6faf4; background: #17291d; }
+.reference-endpoint code { font-size: 13px; overflow-wrap: anywhere; }
+.reference-endpoint button { display: inline-flex; color: inherit; background: transparent; border: 0; padding: 5px; }
+.reference-connect-bottom { display: flex; justify-content: space-between; gap: 15px; font-size: 12px; padding: 13px 1px 0; color: var(--assembly-muted); }
+.reference-connect-bottom a { display: inline-flex; align-items: center; gap: 6px; color: var(--assembly-ink); }
+.reference-device-action { display: flex; align-items: center; gap: 13px; padding: 8px 3px; min-height: 51px; }
+.reference-device-action > span { display: grid; flex: 1; font-size: 14px; }
+.reference-device-action small { font-size: 11px; color: var(--assembly-muted); }
+.reference-network-story { position: relative; margin-top: 25px; }
+.reference-art-comparison { display: flex; width: fit-content; gap: 5px; padding: 5px; margin: 0 auto 22px; border-radius: 12px; background: var(--assembly-stone); }
+.mycellios-reference .reference-art-comparison .ui-button { min-width: 110px; }
+.mycellios-reference .reference-art-comparison .ui-button[aria-pressed="true"] { background: var(--assembly-ink) !important; color: var(--assembly-paper) !important; }
+.reference-world-visual { position: relative; width: min(100%,1600px); aspect-ratio: 1774 / 877; margin-inline: auto; }
+.reference-network-print { position: relative; width: 100%; height: 100%; }
+.reference-network-print img, .reference-network-print canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.reference-network-print canvas { opacity: 0; }
+.reference-network-print[data-renderer="webgl"] canvas { opacity: 1; }
+.reference-network-print[data-renderer="webgl"] img { opacity: 0; }
+.reference-world-visual canvas { display: block; width: 100%; height: 100%; }
+.reference-network-chapter { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: center; gap: clamp(24px,6vw,80px); padding-block: 55px 45px; }
+.reference-network-copy { max-width: 480px; }
+.mycellios-reference h2 { font-size: clamp(34px,4vw,54px); line-height: 1.08; }
+.reference-network-chapter p { max-width: 430px; margin-top: 20px; font-size: 17px; }
+.reference-network-chapter .reference-connect { width: 100%; margin: 0; }
+.reference-text-link { display: flex; align-items: center; gap: 10px; width: fit-content; min-height: 44px; font-size: 16px; font-weight: 500; margin-top: 25px; }
+.reference-status-link { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; margin-top: 16px; font-size: 13px; }
+.reference-world-caption { display: flex; justify-content: space-between; align-items: center; gap: 15px; position: relative; padding-bottom: 24px; font-size: 11px; color: var(--assembly-muted); }
+.reference-world-caption a { display: inline-flex; align-items: center; gap: 5px; }
+.reference-agent { text-align: center; padding-top: 105px; }
+.reference-agent > p { font-size: 19px; margin-block: 25px; }
+.reference-agent > .assembly-agent-showcase { margin-top: 54px; text-align: left; }
+.reference-agent .assembly-workspace { min-height: 510px; grid-template-columns: 230px minmax(0,1fr) 235px; }
+.reference-agent .assembly-conversation { padding: 24px; }
+.reference-agent .assembly-messages { gap: 26px; padding-block: 30px; }
+.assembly-mobile-assistant { display: none; }
+.assembly-mobile-assistant:focus-visible { outline: 2px solid #f1f3ee !important; outline-offset: 3px !important; }
+.reference-agent .assembly-attached-note { display: flex; align-items: center; gap: 12px; margin-left: 38px; padding: 12px 14px; border: 1px solid #353b35; border-radius: 9px; font-size: 12px; }
+.assembly-attached-note > div { display: grid; flex: 1; gap: 3px; }
+.assembly-attached-note strong { font-size: 12px; font-weight: 500; }.assembly-attached-note span { color: #b2b9ae; font-size: 11px; }
+.assembly-attached-note button { padding: 6px; border: 0; background: transparent; color: #f1f3ee; font-size: 11px; }
+.reference-agent .assembly-context-files { display: grid; gap: 5px; margin-top: 22px; }
+.assembly-context-files button { display: flex; align-items: center; gap: 9px; padding: 9px; border: 0; color: inherit; background: transparent; border-radius: 7px; font-size: 12px; text-align: left; }
+.assembly-context-files button[aria-pressed="true"] { background: #303b2f; }
+.reference-agent .assembly-file-preview { display: block; margin-top: 20px; background: #232824; border-radius: 9px; padding: 13px; font-weight: 400; }
+.assembly-file-preview > span { font-size: 11px; color: #b2b9ae; }
+.assembly-file-preview pre { margin: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.7; color: #f1f3ee; }
+.reference-agent .assembly-inline-context { display: none; }
+.assembly-inline-context summary { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; list-style: none; font-size: 12px; }
+.assembly-inline-context summary::-webkit-details-marker { display: none; }
+.assembly-inline-context summary:focus-visible { outline: 2px solid var(--demo-fg); outline-offset: 3px; }
+.reference-agent .assembly-agent-feature { background: transparent; padding: 20px 0; }
+.reference-agent .assembly-agent-feature:first-child { padding-right: 20px; }
+.reference-agent .assembly-agent-feature:last-child { padding-left: 20px; }
+.reference-agent .assembly-agent-feature > div:first-child > svg { display: none; }
+.reference-agent .assembly-agent-feature h3 { font-size: 20px; }
+.reference-agent .assembly-agent-details { gap: 45px; margin-top: 26px; }
+.reference-contribute { display: grid; grid-template-columns: 1fr 1fr; gap: 10%; align-items: center; padding-block: 140px 120px; }
+.reference-contribute p { margin-top: 27px; font-size: 17px; }
+.reference-contribute-links { display: grid; gap: 12px; }
+.reference-contribute-links > a { display: flex; align-items: center; gap: 18px; min-height: 100px; padding: 22px; background: #ffffff; border-radius: 14px; }
+.reference-contribute-links > a > span { display: grid; flex: 1; font-size: 17px; }
+.reference-contribute-links small { font-size: 13px; margin-top: 6px; color: var(--assembly-muted); }
+.reference-questions { max-width: 760px; padding-bottom: 110px; }
+.reference-questions h2 { text-align: center; margin-bottom: 42px; font-size: 42px; }
+.reference-questions details { border-bottom: 1px solid var(--assembly-line); }
+.reference-questions summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-block: 24px; list-style: none; cursor: pointer; font-size: 16px; }
+.reference-questions summary::-webkit-details-marker { display: none; }
+.reference-questions details p { font-size: 15px; padding-bottom: 24px; }
+.reference-questions details a { text-decoration: underline; }
+.reference-questions summary:focus-visible { outline: 2px solid var(--assembly-moss); outline-offset: 4px; }
+.reference-footer { display: flex; align-items: center; gap: 30px; padding-block: 35px 45px; border-top: 1px solid var(--assembly-line); }
+.reference-footer nav { display: flex; flex-wrap: wrap; gap: 12px 22px; margin-left: auto; }
+.reference-footer nav a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 13px; }
+.reference-footer > span { color: var(--assembly-muted); font-size: 11px; }
+@media (max-width: 1100px) {
+  .reference-agent .assembly-workspace { grid-template-columns: 200px minmax(0,1fr); }
+  .reference-agent .assembly-inline-context { display: block; margin-left: 38px; border: 1px solid var(--demo-edge); border-radius: 9px; }
+  .reference-agent .assembly-inline-context .assembly-file-preview { margin: 0 12px 12px; }
+}
+@media (max-width: 760px) {
+  .reference-shell { width: calc(100% - 40px); }
+  .reference-header { min-height: 78px; }
+  .reference-header > nav:not(.reference-mobile-navigation), .mycellios-reference .reference-header .reference-header-action { display: none !important; }
+  .reference-menu { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; padding: 10px; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: inherit; }
+  .reference-mobile-navigation { display: grid; }
+  .reference-mobile-navigation a { padding-inline: 12px; }
+  .reference-hero { padding-top: 40px; }
+  .reference-hero h1 { font-size: clamp(29px,8.5vw,48px); line-height: 1.08; }
+  .reference-hero h1 br { display: initial; }
+  .reference-hero > p { font-size: 16px; margin-top: 23px; }
+  .reference-hero > p br { display: none; }
+  .reference-hero-actions { gap: 10px; margin-top: 24px; }
+  .mycellios-reference { --ui-control-xl-inline: 13px; --ui-control-xl-gap: 8px; --ui-control-xl-text: 13px; }
+  .mycellios-reference .reference-hero-actions .ui-button[data-size="xl"] { padding-inline: 13px !important; font-size: 13px !important; gap: 8px !important; }
+  .reference-connect { margin-top: 25px; border-radius: 13px; padding: 8px; }
+  .reference-connect-tabs .ui-button { font-size: 12px; }
+  .reference-connect-content { padding: 12px 4px 7px; }
+  .reference-endpoint code { font-size: 11px; }
+  .reference-connect-bottom { font-size: 11px; }
+  .reference-network-story { margin-top: 20px; }
+  .reference-network-chapter { grid-template-columns: 1fr; gap: 24px; padding-block: 30px 35px; }
+  .reference-network-copy { max-width: none; }
+  .reference-network-chapter p { margin-top: 20px; }
+  .reference-network-chapter h2 br { display: none; }
+  .reference-world-caption { font-size: 10px; padding-bottom: 12px; }
+  .reference-agent { padding-top: 70px; }
+  .reference-agent > p { font-size: 16px; margin-block: 22px; }
+  .reference-agent > .assembly-agent-showcase { margin-top: 34px; }
+  .reference-agent .assembly-workspace { grid-template-columns: 1fr; min-height: 440px; }
+  .reference-agent .assembly-conversation { padding: 16px; }
+  .reference-agent .assembly-conversation-top { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .reference-agent .assembly-model-select { width: 100%; max-width: none; min-height: 40px; }
+  .reference-agent .assembly-inline-context { margin-left: 0; }
+  .reference-agent .assembly-messages { padding-block: 20px; gap: 20px; }
+  .reference-agent .assembly-assistants { display: none; }
+  .reference-agent .assembly-mobile-assistant { display: block; width: 100%; min-height: 44px; padding: 8px 10px; background: #232824; color: #f1f3ee; border: 1px solid #353b35; }
+  .reference-agent .assembly-attached-note { margin-left: 0; }
+  .reference-agent .assembly-agent-details { gap: 20px; }
+  .reference-agent .assembly-agent-feature:first-child, .reference-agent .assembly-agent-feature:last-child { padding: 10px 0; }
+  .reference-contribute { grid-template-columns: 1fr; gap: 30px; padding-block: 75px; }
+  .reference-contribute p { margin-top: 23px; font-size: 16px; }
+  .reference-contribute-links > a { padding: 20px; }
+  .reference-questions { padding-bottom: 70px; }
+  .reference-questions h2 { font-size: 32px; margin-bottom: 25px; }
+  .reference-questions summary { font-size: 15px; }
+  .reference-footer { flex-wrap: wrap; gap: 20px; padding-block: 25px; }
+  .reference-footer nav { width: 100%; margin-left: 0; gap: 22px; }
+}

@@ -1,3 +1,5 @@
+import { DialogPanel as UiDialogPanel } from "./ui/primitives";
+import { Button as UiButton, Card as UiCard, Form as UiForm, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
 import {
   ArrowUpRight,
   Bot,
@@ -247,7 +249,7 @@ export function SupportAssistant({
   return (
     <div className={`support-assistant support-assistant-${surface}`}>
       {open && (
-        <section className="support-assistant-window" role="dialog" aria-label="mycellios assistant">
+        <UiDialogPanel className="support-assistant-window" role="dialog" aria-label="mycellios assistant">
           <header>
             <div className="support-assistant-avatar"><Bot size={20} /></div>
             <div className="support-assistant-title">
@@ -259,39 +261,39 @@ export function SupportAssistant({
                 title={online ? "Connected" : "Disconnected"}
               />
             </div>
-            <button type="button" title="Close" aria-label="Close assistant" onClick={() => setOpen(false)}><X size={18} /></button>
+            <UiButton type="button" title="Close" aria-label="Close assistant" onClick={() => setOpen(false)}><X size={18} /></UiButton>
           </header>
 
           <div className="support-assistant-conversation" ref={conversationRef}>
             <div className="support-assistant-message assistant">
               <div className="support-assistant-mini-avatar"><Sparkles size={14} /></div>
-              <p>{welcome}</p>
+              <UiText>{welcome}</UiText>
             </div>
 
             {messages.map((message) => (
               <div className={`support-assistant-message ${message.role}`} key={message.id}>
                 {message.role === "assistant" && <div className="support-assistant-mini-avatar"><Sparkles size={14} /></div>}
-                <p>{message.content || (message.streaming ? "Connecting to the network model…" : "")}{message.streaming && message.content && <i className="support-assistant-caret" />}</p>
+                <UiText>{message.content || (message.streaming ? "Connecting to the network model…" : "")}{message.streaming && message.content && <i className="support-assistant-caret" />}</UiText>
               </div>
             ))}
 
             {messages.length === 0 && config?.suggestions && (
               <div className="support-assistant-suggestions">
                 {config.suggestions.map((suggestion) => (
-                  <button type="button" key={suggestion} disabled={!online} onClick={() => void submitPrompt(undefined, suggestion)}>
+                  <UiButton type="button" key={suggestion} disabled={!online} onClick={() => void submitPrompt(undefined, suggestion)}>
                     {suggestion}<ArrowUpRight size={13} />
-                  </button>
+                  </UiButton>
                 ))}
               </div>
             )}
 
             {pendingAction && actionDone !== pendingAction.key && !busy && (
-              <article className="support-assistant-action">
+              <UiCard className="support-assistant-action">
                 <div><Zap size={17} /><span><strong>{pendingAction.title}</strong><small>{pendingAction.detail}</small></span></div>
-                <button type="button" disabled={actionBusy} onClick={() => void executeAction(pendingAction)}>
+                <UiButton type="button" disabled={actionBusy} onClick={() => void executeAction(pendingAction)}>
                   {actionBusy ? <LoaderCircle className="spin" size={15} /> : <Check size={15} />}{pendingAction.label}
-                </button>
-              </article>
+                </UiButton>
+              </UiCard>
             )}
 
             {pendingAction && actionDone === pendingAction.key && (
@@ -299,7 +301,7 @@ export function SupportAssistant({
             )}
 
             {(error || configError) && (
-              <div className="support-assistant-error"><CircleAlert size={15} /><span>{error ?? configError}</span>{configError && <button type="button" onClick={() => setConfigRefresh((current) => current + 1)}>Retry</button>}</div>
+              <div className="support-assistant-error"><CircleAlert size={15} /><span>{error ?? configError}</span>{configError && <UiButton type="button" onClick={() => setConfigRefresh((current) => current + 1)}>Retry</UiButton>}</div>
             )}
 
             {config && !config.enabled && (
@@ -310,8 +312,8 @@ export function SupportAssistant({
             )}
           </div>
 
-          <form className="support-assistant-composer" onSubmit={(event) => void submitPrompt(event)}>
-            <textarea
+          <UiForm className="support-assistant-composer" onSubmit={(event) => void submitPrompt(event)}>
+            <UiTextarea
               rows={2}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -325,14 +327,14 @@ export function SupportAssistant({
               disabled={!online || busy}
               aria-label="Message for the assistant"
             />
-            <button type="submit" disabled={!online || busy || !draft.trim()} aria-label="Send message">
+            <UiButton type="submit" disabled={!online || busy || !draft.trim()} aria-label="Send message">
               {busy ? <LoaderCircle className="spin" size={18} /> : <Send size={18} />}
-            </button>
-          </form>
-        </section>
+            </UiButton>
+          </UiForm>
+        </UiDialogPanel>
       )}
 
-      <button
+      <UiButton
         className={`support-assistant-launcher ${open ? "open" : online ? "online" : "offline"}`}
         type="button"
         aria-label={open ? "Close assistant" : "Open mycellios assistant"}
@@ -348,7 +350,7 @@ export function SupportAssistant({
           aria-label={online ? "Assistant connected" : "Assistant disconnected"}
           title={online ? "Connected" : "Disconnected"}
         />}
-      </button>
+      </UiButton>
     </div>
   );
 }

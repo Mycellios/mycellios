@@ -43,6 +43,22 @@ describe("network telemetry history", () => {
     database.close();
   });
 
+  it("returns the newest bounded samples in chronological order", () => {
+    const database = new MeshDatabase(":memory:");
+    try {
+      const store = new MeshStore(database);
+      for (const capturedAt of [1_800_000, 600_000, 1_200_000]) {
+        store.recordNetworkTelemetrySample(telemetrySample({ capturedAt }));
+      }
+      expect(store.listNetworkTelemetrySamples(0, 2).map((sample) => sample.capturedAt))
+        .toEqual([1_200_000, 1_800_000]);
+      expect(store.listNetworkTelemetrySamples(1_500_000).map((sample) => sample.capturedAt))
+        .toEqual([1_800_000]);
+    } finally {
+      database.close();
+    }
+  });
+
   it("serves bounded public history and records a current sample", async () => {
     const runtime = await createCoordinator({
       host: "127.0.0.1",

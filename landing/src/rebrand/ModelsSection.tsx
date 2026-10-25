@@ -1,3 +1,4 @@
+import { Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import { ArrowUpRight, Boxes } from "lucide-react";
 import { useRef, type CSSProperties } from "react";
 import { useInView } from "./use-motion";
@@ -36,14 +37,14 @@ export function ModelsSection() {
     <section className="rb-models" id="models" aria-labelledby="rb-models-title">
       <div className="rb-shell">
         <div className="rb-models-head rb-reveal">
-          <p className="rb-kicker"><i /><span>The models</span></p>
+          <UiText className="rb-kicker"><i /><span>The models</span></UiText>
           {/* Two short lines: at this type size anything past ~26 characters
               wraps, and a ragged three-line headline is not a headline. */}
-          <h2 id="rb-models-title">Any open model.<br /><em>Even the biggest ones.</em></h2>
-          <p>
+          <UiHeading as="h2" id="rb-models-title">Any open model.<br /><em>Even the biggest ones.</em></UiHeading>
+          <UiText>
             A current shortlist from local-scale reasoning to frontier MoE systems. Mycellios evaluates each architecture
             independently: appearing here means it is worth integrating, not that the native adapter already ships.
-          </p>
+          </UiText>
         </div>
 
         <div className={`rb-models-panel ${live ? "is-live" : ""}`} ref={panelRef}>
@@ -60,7 +61,7 @@ export function ModelsSection() {
             {MODELS.map((model, index) => (
               <li key={model.ref} style={{ "--i": index, "--w": model.bar } as CSSProperties}>
                 <div className="rb-model-id">
-                  <strong><a href={model.href} target="_blank" rel="noreferrer">{model.name}<ArrowUpRight /></a></strong>
+                  <strong><UiLink href={model.href} target="_blank" rel="noreferrer">{model.name}<ArrowUpRight /></UiLink></strong>
                   <small>{model.ref}</small>
                 </div>
                 <span className="rb-model-license">{model.license}</span>
@@ -79,18 +80,18 @@ export function ModelsSection() {
           <div className="rb-models-foot">
             <Boxes />
             <span>Native adapters today: {FAMILIES.join(" · ")}</span>
-            <a href="https://huggingface.co/models?pipeline_tag=text-generation&sort=downloads" target="_blank" rel="noreferrer">
+            <UiLink href="https://huggingface.co/models?pipeline_tag=text-generation&sort=downloads" target="_blank" rel="noreferrer">
               Browse open models <ArrowUpRight />
-            </a>
+            </UiLink>
           </div>
         </div>
 
-        <p className="rb-models-note rb-reveal">
+        <UiText className="rb-models-note rb-reveal">
           Scale is the published parameter count, not a memory or speed promise. Hardware fit still depends on
           precision, context, runtime support and the measured route selected by Mycellios.
-        </p>
+        </UiText>
 
-        <p className="rb-econ-caveat rb-reveal">Shortlist ≠ installed support · new families land only after an adapter and physical evidence ship</p>
+        <UiText className="rb-econ-caveat rb-reveal">Shortlist ≠ installed support · new families land only after an adapter and physical evidence ship</UiText>
       </div>
     </section>
   );

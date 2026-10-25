@@ -47,16 +47,11 @@ describe("worker protocol deterministic abuse fuzzing", () => {
     expect(parseWorkerEnvelope(candidate)).toBeNull();
   });
 
-  it("normalizes prototype-shaped JSON without polluting shared objects", () => {
+  it("rejects prototype-shaped JSON without polluting shared objects", () => {
     const candidate = JSON.parse(
       '{"v":1,"workerId":"worker","type":"worker.hello","payload":{},"__proto__":{"polluted":true}}',
     ) as unknown;
-    expect(parseWorkerEnvelope(candidate)).toEqual({
-      v: 1,
-      workerId: "worker",
-      type: "worker.hello",
-      payload: {},
-    });
+    expect(parseWorkerEnvelope(candidate)).toBeNull();
     expect(Object.prototype).not.toHaveProperty("polluted");
   });
 });

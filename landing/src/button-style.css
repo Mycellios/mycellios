@@ -1,0 +1,10 @@
+/* Shared flat button treatment across the landing, dashboard and browser worker.
+ * Keep outlines available for keyboard focus; transparent borders preserve sizing.
+ */
+:is(button, input[type="button"], input[type="submit"], [role="button"],
+  a[class*="button"], a[class*="btn"], a[class*="cta"],
+  a.download-card-action, a.connect-primary-action) {
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}

@@ -213,22 +213,6 @@ function GutterFruitingSvg() {
         focusable="false"
       >
         <defs>
-          {/* Mobile keeps the cheap SVG, but it should still describe the same
-              waxy organism as WebGL. An off-centre radial light gives the cap
-              a crown and a shaded far side; the horizontal stipe ramp keeps
-              the stem from reading as a strip of paper. */}
-          <radialGradient id="rbGutterCap" cx="30%" cy="19%" r="86%">
-            <stop offset="0" stopColor="#f0d7b8" />
-            <stop offset="0.38" stopColor="#d4aa7b" />
-            <stop offset="0.76" stopColor="#ad7543" />
-            <stop offset="1" stopColor="#774823" />
-          </radialGradient>
-          <linearGradient id="rbGutterStipe" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#a96f40" />
-            <stop offset="0.38" stopColor="#ead0ae" />
-            <stop offset="0.7" stopColor="#c49261" />
-            <stop offset="1" stopColor="#8a552d" />
-          </linearGradient>
           <filter id="rbGutterDepth" x="-35%" y="-25%" width="170%" height="165%">
             <feDropShadow dx="1.5" dy="2.5" stdDeviation="2.1" floodColor="#5b351b" floodOpacity="0.24" />
           </filter>

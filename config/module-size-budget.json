@@ -2,7 +2,7 @@
   "schema": "mycellios-module-size-budget/2",
   "defaultMaximumLines": 2000,
   "trackedDebt": {
-    "landing/src/Panel.tsx": { "ceiling": 5555, "target": 5400, "owner": "web-control" },
+    "landing/src/Panel.tsx": { "ceiling": 4953, "target": 5400, "owner": "web-control" },
     "python/distributed_runtime/engine.py": { "ceiling": 7387, "target": 7200, "owner": "python-runtime" },
     "python/distributed_runtime/external_cell.py": { "ceiling": 2323, "target": 2200, "owner": "python-runtime" },
     "python/distributed_runtime/model.py": { "ceiling": 2501, "target": 2400, "owner": "python-runtime" },

@@ -199,12 +199,10 @@ export function defineMyceliumField() {
       const c = document.createElement('canvas');
       c.width = c.height = 64;
       const x = c.getContext('2d');
-      const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-      g.addColorStop(0, 'rgba(255,244,230,0.95)');
-      g.addColorStop(0.25, this.rgba(0.5));
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      x.fillStyle = g;
-      x.fillRect(0, 0, 64, 64);
+      x.fillStyle = this.rgba(0.8);
+      x.beginPath();
+      x.arc(32, 32, 10, 0, Math.PI * 2);
+      x.fill();
       return c;
     }
 
@@ -212,13 +210,10 @@ export function defineMyceliumField() {
       const c = document.createElement('canvas');
       c.width = c.height = 64;
       const x = c.getContext('2d');
-      const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-      g.addColorStop(0, this.rgba(0.94));
-      g.addColorStop(0.12, this.rgba(0.58));
-      g.addColorStop(0.46, this.rgba(0.16));
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      x.fillStyle = g;
-      x.fillRect(0, 0, 64, 64);
+      x.fillStyle = this.rgba(0.8);
+      x.beginPath();
+      x.arc(32, 32, 4, 0, Math.PI * 2);
+      x.fill();
       return c;
     }
 

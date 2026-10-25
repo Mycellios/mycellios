@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <filter id="remove-white" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%">
+    <!-- Keep the original RGB; turn white pixels into transparent pixels. -->
+    <feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -1 -1 -1 0 3" result="cutout"/>
+    <feComposite in="cutout" in2="SourceGraphic" operator="in"/>
+  </filter>
+</svg>

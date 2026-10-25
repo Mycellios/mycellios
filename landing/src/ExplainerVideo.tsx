@@ -1,3 +1,4 @@
+import { Heading as UiHeading, Text as UiText } from "./ui/primitives";
 import {
   Boxes,
   Cpu,
@@ -142,7 +143,7 @@ function SceneHeading({
   return (
     <div style={{ maxWidth: 1120, textAlign: "center" }}>
       <Label>{label}</Label>
-      <h2
+      <UiHeading as="h2"
         style={{
           margin: "24px 0 16px",
           color: colors.ivory,
@@ -154,8 +155,8 @@ function SceneHeading({
         }}
       >
         {title}
-      </h2>
-      <p
+      </UiHeading>
+      <UiText
         style={{
           maxWidth: 900,
           margin: "0 auto",
@@ -165,7 +166,7 @@ function SceneHeading({
         }}
       >
         {copy}
-      </p>
+      </UiText>
     </div>
   );
 }
@@ -325,7 +326,7 @@ function NetworkLine({
         overflow: "visible",
         transformOrigin: "0 50%",
         transform: `rotate(${angle}rad) scaleX(${progress})`,
-        background: `linear-gradient(90deg, ${colors.bronze}b0, ${colors.sageLight}59)`,
+        background: colors.bronze,
         boxShadow: `0 0 16px ${colors.bronze}40`,
       }}
     >
@@ -384,7 +385,7 @@ function ConnectScene({ frame }: { frame: number }) {
           placeItems: "center",
           border: `1.5px solid ${colors.bronze}90`,
           borderRadius: "50%",
-          background: `radial-gradient(circle, ${colors.bronze}33, ${colors.forestDeep} 70%)`,
+          background: colors.forestDeep,
           boxShadow: `0 0 0 34px ${colors.bronze}12, 0 0 90px ${colors.bronze}38`,
           opacity: hub,
           transform: `scale(${interpolate(hub, [0, 1], [0.65, 1]) * hubPulse})`,
@@ -719,7 +720,7 @@ function AnswerScene({ frame }: { frame: number }) {
               <Sparkles size={16} />
               STREAMING
             </span>
-            <p
+            <UiText
               style={{
                 minHeight: 60,
                 margin: "12px 0 0",
@@ -732,7 +733,7 @@ function AnswerScene({ frame }: { frame: number }) {
               {visibleCharacters < answer.length && (
                 <span style={{ color: colors.bronzeLight, opacity: caretVisible ? 1 : 0 }}>|</span>
               )}
-            </p>
+            </UiText>
           </div>
         </div>
       </div>
@@ -754,12 +755,12 @@ function MycelliosExplainerComposition() {
         fontFamily: fonts.ui,
       }}
     >
-      {/* Warm organic washes that drift slowly, like light through a canopy. */}
+      {/* Flat stage surface shared by every frame. */}
       <div
         style={{
           position: "absolute",
           inset: -80,
-          background: `radial-gradient(circle at ${18 + breathe(frame) * 2}% 15%, ${colors.bronze}2e, transparent 34%), radial-gradient(circle at ${82 + breathe(frame, 2.1) * 2}% 80%, ${colors.sage}33, transparent 36%), radial-gradient(circle at 50% 45%, ${colors.forestDeep}, transparent 75%)`,
+          background: colors.forestDeep,
         }}
       />
       <div
@@ -767,9 +768,9 @@ function MycelliosExplainerComposition() {
           position: "absolute",
           inset: 0,
           opacity: 0.5,
-          backgroundImage: `linear-gradient(rgba(238, 233, 226, .045) 1px, transparent 1px), linear-gradient(90deg, rgba(238, 233, 226, .045) 1px, transparent 1px)`,
+          backgroundImage: "none",
           backgroundSize: "70px 70px",
-          maskImage: "radial-gradient(circle at center, black, transparent 78%)",
+          maskImage: "none",
         }}
       />
 

@@ -1,0 +1,8 @@
+/* Shared brand rendering for login, navigation, studios and inference avatars. */
+img:is([src$="/assets/brand/favicon.png"], [src$="/assets/brand/app-icon.png"],
+  [src$="/assets/logos/logo.png"], [src$="/mycellios-logo.png"],
+  [src$="/mycellios-favicon-v2.png"], [src$="/mycellios-app-icon-v2.png"]) {
+  filter: url("/assets/brand/logo-filter.svg#remove-white") !important;
+  mix-blend-mode: normal !important;
+  background: transparent !important;
+}

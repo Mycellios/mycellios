@@ -1,5 +1,91 @@
 # Development
 
+## Shared interface kit and Storybook
+
+The default landing lives in `landing/src/rebrand/ReferenceLanding.tsx` and
+`reference-landing.css`. It uses the shared Agent controls and an authored
+computing-fabric WebP. `NetworkPrint` applies an event-driven WebGL print effect;
+the image stays available when WebGL is unavailable and for reduced motion.
+The artwork remains centered in normal document flow as the page scrolls; the
+network chapter follows underneath without sticky overlap, panning or scaling.
+The original illustration remains the default. `/?compare=mushrooms&art=fruiting`
+opens an optional mushroom variant with Actual / Con setas controls;
+`art=fabric` selects the exact original asset and `/` has no comparison controls.
+The renderer and layout are shared, with the same variants in Storybook.
+Its scene is conceptual. The expanded Agent example includes local attachment
+fixtures, not real user files or completed actions. Production and the
+`Screens/Landing` Storybook story import the same components. Real conversations
+open the published Agent app. Reference-specific layout uses `mycellios-reference`
+over the existing marketing base and does not repaint the panel or studios.
+
+Previous versions remain available: `/?landing=assemblage` shows the discarded
+composition, `/?landing=rooted` restores RootedLanding,
+`/?landing=saved` shows ModernLanding, and `/?landing=previous` shows the earlier
+complete landing, with optional `&hero=dark`. Their TSX and CSS are preserved.
+Only the last variant preloads the large WebGL mushroom chunk.
+
+Reusable web UI lives in `landing/src/ui`. Production pages and Storybook import
+the same modules. The dashboard, landing, account, studios and browser worker
+use its Button, Link, Input, Select, Textarea, labels, forms, headings, cards,
+dialogs and table elements. Repeated page titles, metrics, disclosure panels,
+selectors, sidebar and pagination also live there.
+Spacious marketing actions use the kit's `xl` size (52px, or a scoped
+`--ui-control-xl-height`); the existing compact app sizes are unchanged.
+
+```bash
+npm run storybook
+npm run verify:ui-kit
+npm run storybook:build
+```
+
+The catalog opens at `http://127.0.0.1:6006`. Configuration is under
+`landing/.storybook`; build output is ignored under `storybook-static`.
+The theme toolbar selects the production light or dark theme. Stories cover
+button variants and sizes, native form semantics, loading, disabled and error
+states, tables, disclosures, dialogs and sidebar alignment in both widths.
+The default Agent design uses `landing/src/ui/agent-style.css`, matching the
+Mycellios Agent fork's Geist Variable and compact controls. The light palette uses
+Agent's paper `#f8f5f0`, pale stone cards `#f1eee8`, a warmer sidebar `#eee9e2`,
+and low-saturation deep moss actions. Dark mode keeps its neutral gray palette.
+Ordinary icons have no decorative plates. Text fields use a warm muted fill at
+36px, search wrappers a single 40px frame, and selectors a pale paper fill at 32px.
+Segmented controls use a stone track with a raised paper selection; hover and
+selected states have separate tokens. Shared token changes also apply in Storybook.
+`agent-components.css` maps production surfaces, tables, fields, menus, icons
+and interaction states to those semantic tokens. Its scoped compatibility reset
+removes legacy per-page paint; add component roles there instead of adding color
+overrides to individual pages. Status text uses the card surface to retain
+readable contrast in both themes.
+Agent uses 12px card corners, 1px edges, 16px insets and 20px between panel
+sections (14px/16px on mobile). Motion follows the reference: 100ms popup entry,
+150ms controls/disclosures and 220ms page entry. Native disclosures interpolate
+their content height where supported; other browsers keep native toggling.
+Reduced motion disables these effects. Pointer focus has no extra frame;
+keyboard focus keeps a rounded, thin indicator. Inputs keep their border focus
+without an exterior ring.
+The font is served locally under `assets/fonts` with its SIL Open Font License.
+The previous design remains intact: `?design=classic` selects it and
+`?design=agent` returns to Agent. An explicit selection persists across navigation.
+Storybook exposes the same profiles through its Design toolbar. The classic dark
+palette remains in `landing/src/ui/dark-theme.css` with its separate light scope.
+All themes and decorative artwork use flat fills. `verify:ui-kit` rejects CSS,
+SVG and canvas gradient definitions in production web sources.
+Stories use the production viewport wrapper. Full shells such as Sidebar set
+`parameters.ownsThemeRoot` and consume the toolbar theme themselves, avoiding
+nested light/dark roots that override each other's backgrounds and text.
+Operation stories render the real node, model, task, log, benchmark, API and
+billing panels with local fixtures. Benchmarks and billing accept optional read
+loaders so their stories do not query private services or require credentials.
+The history story renders the production report with local samples so chart
+lines, legends and tables can be checked without waiting for live telemetry.
+
+Add new reusable controls to the kit and add stories importing those exports.
+Do not implement controls inside stories or add native controls directly to
+pages. `verify:ui-kit` rejects native control, typography and table bypasses;
+CI also builds Storybook. Keep page-specific layout classes while centralizing
+control geometry in `landing/src/ui/ui.css`. Keyboard focus and native browser
+validation remain part of the component contract.
+
 ## Prerequisites
 
 - Node.js 24 or newer

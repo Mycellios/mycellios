@@ -1,3 +1,5 @@
+import { Badge as UiBadge } from "./ui/primitives";
+import { Button as UiButton, Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "./ui/primitives";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Database, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { LandingHeader } from "./rebrand/RebrandLanding";
@@ -12,6 +14,7 @@ import {
   type Vec3,
 } from "./network-globe";
 import "./network-page.css";
+import "./ui/dark-theme.css";
 
 export interface NetworkGpu {
   id: string;
@@ -387,6 +390,13 @@ export function NetworkPage({
     const context = canvas?.getContext("2d");
     if (!canvas || !context) return;
 
+    const tokens = getComputedStyle(canvas);
+    const channels = (token: string, fallback: string) => {
+      const hex = tokens.getPropertyValue(token).trim().match(/^#([\da-f]{6})$/i)?.[1];
+      return hex ? hex.match(/../g)!.map(value => parseInt(value, 16)).join(",") : fallback;
+    };
+    const ink = { serving: channels("--agent-success", INK.serving), standby: channels("--agent-fg", INK.standby) };
+
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const visitor = visitorLocation();
     const targetYaw = -visitor.lon * (Math.PI / 180);
@@ -431,7 +441,7 @@ export function NetworkPage({
       context.clearRect(0, 0, width, height);
 
       // Sphere edge.
-      context.strokeStyle = "rgba(255,255,255,0.09)";
+      context.strokeStyle = `rgba(${ink.standby},0.09)`;
       context.lineWidth = 1;
       context.beginPath();
       context.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -443,12 +453,12 @@ export function NetworkPage({
         const point = project(LAND_POINTS, index * 3);
         if (point[2] <= 0.02) continue;
         const alpha = 0.06 + 0.34 * point[2];
-        context.fillStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+        context.fillStyle = `rgba(${ink.standby},${alpha.toFixed(3)})`;
         context.fillRect((centerX + point[0] * radius) | 0, (centerY - point[1] * radius) | 0, 2, 2);
       }
 
       // Country borders, cut wherever they cross the horizon.
-      context.strokeStyle = "rgba(255,255,255,0.2)";
+      context.strokeStyle = `rgba(${ink.standby},0.2)`;
       context.lineWidth = 0.6;
       context.beginPath();
       for (const line of BORDER_LINES) {
@@ -471,7 +481,7 @@ export function NetworkPage({
       // Route arcs between serving nodes, with a travelling pulse.
       for (const arc of arcsRef.current) {
         const count = arc.length / 3;
-        context.strokeStyle = "rgba(34,197,94,0.5)";
+        context.strokeStyle = `rgba(${ink.serving},0.5)`;
         context.lineWidth = 1;
         context.beginPath();
         let pen = false;
@@ -491,7 +501,7 @@ export function NetworkPage({
         const head = Math.floor((pulse % 1) * (count - 1));
         const point = project(arc, head * 3);
         if (point[2] > 0) {
-          context.fillStyle = "#fff";
+          context.fillStyle = `rgb(${ink.standby})`;
           context.fillRect(
             ((centerX + point[0] * radius) | 0) - 1,
             ((centerY - point[1] * radius) | 0) - 1,
@@ -523,24 +533,24 @@ export function NetworkPage({
         const hovered = node.worker.id === hoveredRef.current;
 
         if (node.state === "serving") {
-          context.fillStyle = `rgba(${INK.serving},${(0.2 * edge).toFixed(2)})`;
+          context.fillStyle = `rgba(${ink.serving},${(0.2 * edge).toFixed(2)})`;
           context.fillRect(ix - 4, iy - 4, 8, 8);
-          context.fillStyle = `rgba(${INK.serving},${edge.toFixed(2)})`;
+          context.fillStyle = `rgba(${ink.serving},${edge.toFixed(2)})`;
           context.fillRect(ix - 2, iy - 2, 4, 4);
         } else {
           const alpha = (node.state === "standby" ? 0.8 : 0.34) * edge;
-          context.fillStyle = `rgba(${INK.standby},${alpha.toFixed(2)})`;
+          context.fillStyle = `rgba(${ink.standby},${alpha.toFixed(2)})`;
           context.fillRect(ix - 2, iy - 2, 4, 4);
         }
 
         if (selected || hovered) {
-          context.strokeStyle = selected ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.7)";
+          context.strokeStyle = selected ? `rgba(${ink.serving},0.95)` : `rgba(${ink.standby},0.7)`;
           context.lineWidth = 1;
           context.strokeRect(ix - 6.5, iy - 6.5, 13, 13);
           const label = (node.located ? node.worker.region : shortId(node.worker.id)).toLowerCase();
           const textWidth = context.measureText(label).width;
           const textX = ix + 11 + textWidth > width - 4 ? ix - 11 - textWidth : ix + 11;
-          context.fillStyle = selected ? "rgba(34,197,94,0.95)" : "rgba(255,255,255,0.85)";
+          context.fillStyle = selected ? `rgba(${ink.serving},0.95)` : `rgba(${ink.standby},0.85)`;
           context.fillText(label, textX, iy);
         }
       }
@@ -747,13 +757,13 @@ export function NetworkPage({
         role="img"
       />}
 
-      <h1 className="net-visually-hidden">Mycellios network</h1>
+      <UiHeading as="h1" className="net-visually-hidden">Mycellios network</UiHeading>
 
       <LandingHeader active="network" />
 
       <div className="net-hud net-view-switcher" role="group" aria-label="Network view">
-        <button type="button" className={viewMode === "overview" ? "active" : ""} aria-pressed={viewMode === "overview"} onClick={() => selectViewMode("overview")}>Overview</button>
-        <button type="button" className={viewMode === "globe" ? "active" : ""} aria-pressed={viewMode === "globe"} onClick={() => selectViewMode("globe")}>Globe</button>
+        <UiButton type="button" className={viewMode === "overview" ? "active" : ""} aria-pressed={viewMode === "overview"} onClick={() => selectViewMode("overview")}>Overview</UiButton>
+        <UiButton type="button" className={viewMode === "globe" ? "active" : ""} aria-pressed={viewMode === "globe"} onClick={() => selectViewMode("globe")}>Globe</UiButton>
       </div>
 
       {viewMode === "overview" && <section className="net-dashboard" aria-label="Live network overview">
@@ -770,7 +780,7 @@ export function NetworkPage({
           <span><strong>{observed(formatMemory(metrics.memoryGb))}</strong>registered memory</span>
         </div>
         <div className="net-dashboard-visuals">
-          <article className="net-globe-card">
+          <UiCard className="net-globe-card">
             <canvas
               ref={canvasRef}
               className="net-globe"
@@ -778,8 +788,8 @@ export function NetworkPage({
               role="img"
             />
             <header><span>LIVE TOPOLOGY</span><strong>{hasData ? `${snapshot.summary.online} online · ${metrics.regions} regions` : "Awaiting snapshot"}</strong></header>
-            <button type="button" onClick={() => selectViewMode("globe")} aria-label="Open full-screen globe"><ArrowRight /></button>
-          </article>
+            <UiButton type="button" onClick={() => selectViewMode("globe")} aria-label="Open full-screen globe"><ArrowRight /></UiButton>
+          </UiCard>
           <DashboardChart title="Online capacity" unit="GB" samples={visibleHistory?.samples ?? []} series={[{ key: "offeredVramMb", label: "Online", tone: "bronze", divisor: 1024 }, { key: "freeVramMb", label: "Free", tone: "sage", divisor: 1024 }]} />
           <DashboardChart title="Node availability" unit="nodes" samples={visibleHistory?.samples ?? []} series={[{ key: "connectedNodes", label: "Connected", tone: "ink" }, { key: "onlineNodes", label: "Online", tone: "sage" }]} />
           <DashboardChart title="Model fabric" unit="models" samples={visibleHistory?.samples ?? []} series={[{ key: "activeModels", label: "Models", tone: "ink" }, { key: "modelReplicas", label: "Replicas", tone: "bronze" }]} />
@@ -788,7 +798,7 @@ export function NetworkPage({
         </div>
       </section>}
 
-      {viewMode === "overview" && <a className="net-hud net-scroll-cue" href="#network-evidence"><span>SCROLL</span>Historical telemetry · node ledger · methodology <b aria-hidden="true">↓</b></a>}
+      {viewMode === "overview" && <UiLink className="net-hud net-scroll-cue" href="#network-evidence"><span>SCROLL</span>Historical telemetry · node ledger · methodology <b aria-hidden="true">↓</b></UiLink>}
 
       <div className="net-hud net-legend" role="list" aria-label="Node state legend">
         <span role="listitem"><i style={{ background: "#22c55e" }} />serving</span>
@@ -834,7 +844,7 @@ export function NetworkPage({
 
       <div className="net-hud net-cmd">
         <code><span>{SNAPSHOT_COMMAND}</span></code>
-        <button type="button" onClick={copyCommand}>{copied ? "copied" : "copy"}</button>
+        <UiButton type="button" onClick={copyCommand}>{copied ? "copied" : "copy"}</UiButton>
       </div>
 
       <div className="net-hud net-status">
@@ -843,7 +853,7 @@ export function NetworkPage({
           {error ? "REFRESH FAILED" : loading ? "CONNECTING" : stale ? "STALE" : "LIVE"}
         </span>
         <span>{hasData ? `${relativeTime(snapshot.capturedAt)} · v${snapshot.version}` : "—"}</span>
-        <a href="/earn">connect a device →</a>
+        <UiLink href="/earn">connect a device →</UiLink>
       </div>
 
       {selectedNode && <NodePanel
@@ -855,12 +865,12 @@ export function NetworkPage({
       {!loading && !error && nodes.length === 0 && <div className="net-empty">
         <strong>No nodes announced</strong>
         <span>The coordinator is reachable, but no worker is currently visible.</span>
-        <a href="/earn">Connect a device →</a>
+        <UiLink href="/earn">Connect a device →</UiLink>
       </div>}
 
       {error && <div className="net-error" role="alert">
         <span>{hasData ? "Live refresh failed. Showing the last successful snapshot." : error}</span>
-        <button onClick={() => void refresh()}>Retry</button>
+        <UiButton onClick={() => void refresh()}>Retry</UiButton>
       </div>}
     </div>
 
@@ -869,9 +879,9 @@ export function NetworkPage({
         <header className="net-data-intro">
           <div>
             <span className="net-kicker">PUBLIC NETWORK EVIDENCE</span>
-            <h2 id="net-data-title">A network you can inspect.</h2>
+            <UiHeading as="h2" id="net-data-title">A network you can inspect.</UiHeading>
           </div>
-          <p>Capacity, availability and work are published from the coordinator’s observed state. No simulated nodes, projected earnings or configured throughput appear here.</p>
+          <UiText>Capacity, availability and work are published from the coordinator’s observed state. No simulated nodes, projected earnings or configured throughput appear here.</UiText>
         </header>
 
         <div className="net-proof-strip" aria-label="Evidence provenance">
@@ -882,11 +892,11 @@ export function NetworkPage({
 
         <section className="net-signal-index" aria-labelledby="net-signals-title">
           <header className="net-section-head">
-            <div><span className="net-kicker">SIGNAL INDEX</span><h2 id="net-signals-title">The network, in signals.</h2></div>
-            <p>Compact surfaces for the questions visitors ask first. Every value is observed, derived, or deliberately withheld.</p>
+            <div><span className="net-kicker">SIGNAL INDEX</span><UiHeading as="h2" id="net-signals-title">The network, in signals.</UiHeading></div>
+            <UiText>Compact surfaces for the questions visitors ask first. Every value is observed, derived, or deliberately withheld.</UiText>
           </header>
           <div className="net-signal-groups">
-            <article className="net-signal-group">
+            <UiCard className="net-signal-group">
               <header><strong>LIVE</strong><span>coordinator snapshot</span></header>
               <div className="net-signal-cards">
                 <SignalCard label="Workers online" value={observed(metrics.activeWorkers.length)} tone="healthy" />
@@ -896,8 +906,8 @@ export function NetworkPage({
                 <SignalCard label="Tasks in flight" value={observed(metrics.activeJobs.length)} />
                 <SignalCard label="Registered memory" value={observed(formatMemory(metrics.memoryGb))} />
               </div>
-            </article>
-            <article className="net-signal-group">
+            </UiCard>
+            <UiCard className="net-signal-group">
               <header><strong>NETWORK</strong><span>persisted telemetry</span></header>
               <div className="net-signal-cards">
                 <SignalCard label="Completed jobs" value={observed(snapshot.summary.completedJobs.toLocaleString("en-US"))} />
@@ -905,8 +915,8 @@ export function NetworkPage({
                 <SignalCard label="Retention" value={visibleHistory ? `${visibleHistory.retentionDays}d` : "—"} />
                 <SignalCard label="Sampling" value={visibleHistory ? `${visibleHistory.intervalMinutes}m` : "—"} />
               </div>
-            </article>
-            <article className="net-signal-group net-signal-group-muted">
+            </UiCard>
+            <UiCard className="net-signal-group net-signal-group-muted">
               <header><strong>TRANSPARENCY</strong><span>no unsupported claims</span></header>
               <div className="net-signal-cards">
                 <SignalCard label="Revenue" value="Not published" />
@@ -914,19 +924,19 @@ export function NetworkPage({
                 <SignalCard label="$SPORE" value="Not active" />
                 <SignalCard label="Throughput" value="Not measured" />
               </div>
-            </article>
+            </UiCard>
           </div>
         </section>
 
         <section className="net-wall" aria-labelledby="net-wall-network-title">
           <header className="net-wall-head">
-            <h2 id="net-wall-network-title">network</h2>
+            <UiHeading as="h2" id="net-wall-network-title">network</UiHeading>
             <div className="net-range" role="group" aria-label="History range">
-              {HISTORY_RANGES.map(({ value, label }) => <button type="button" key={value} className={historyRange === value ? "active" : ""} aria-pressed={historyRange === value} onClick={() => selectHistoryRange(value)}>{label}</button>)}
+              {HISTORY_RANGES.map(({ value, label }) => <UiButton type="button" key={value} className={historyRange === value ? "active" : ""} aria-pressed={historyRange === value} onClick={() => selectHistoryRange(value)}>{label}</UiButton>)}
             </div>
           </header>
 
-          {historyError && <div className="net-history-alert" role="alert"><Database /><span><strong>History unavailable</strong>{historyError}</span><button type="button" onClick={() => void refreshHistory()}><RefreshCw />Retry</button></div>}
+          {historyError && <div className="net-history-alert" role="alert"><Database /><span><strong>History unavailable</strong>{historyError}</span><UiButton type="button" onClick={() => void refreshHistory()}><RefreshCw />Retry</UiButton></div>}
           {historyLoading && !visibleHistory && <div className="net-history-loading" role="status"><span />Reading persisted samples…</div>}
           {visibleHistory && visibleHistory.samples.length > 0 ? <div className="net-wall-grid">
             <StripedBarChart
@@ -967,7 +977,7 @@ export function NetworkPage({
 
         <section className="net-wall" aria-labelledby="net-wall-snapshot-title">
           <header className="net-wall-head">
-            <h2 id="net-wall-snapshot-title">snapshot</h2>
+            <UiHeading as="h2" id="net-wall-snapshot-title">snapshot</UiHeading>
             <span className="net-wall-note">{hasData ? `observed ${relativeTime(snapshot.capturedAt)}` : "awaiting first snapshot"}</span>
           </header>
           <div className="net-wall-stats">
@@ -982,7 +992,7 @@ export function NetworkPage({
 
         <section className="net-wall" aria-labelledby="net-wall-spore-title">
           <header className="net-wall-head">
-            <h2 id="net-wall-spore-title">$SPORE</h2>
+            <UiHeading as="h2" id="net-wall-spore-title">$SPORE</UiHeading>
             <span className="net-wall-note">no public economic feed — states, not projections</span>
           </header>
           <div className="net-wall-stats">
@@ -999,7 +1009,7 @@ export function NetworkPage({
 
         <section className="net-wall" aria-labelledby="net-wall-activity-title">
           <header className="net-wall-head">
-            <h2 id="net-wall-activity-title">recorded activity</h2>
+            <UiHeading as="h2" id="net-wall-activity-title">recorded activity</UiHeading>
             <span className="net-wall-note">latest stored jobs · age shown</span>
           </header>
           <div className="net-wall-panel net-wall-activity">
@@ -1008,7 +1018,7 @@ export function NetworkPage({
               {recentJobs.map((job) => <div className="net-wall-activity-row" role="row" key={job.id}>
                 <span className="id">{shortId(job.id)}</span>
                 <span>{job.model}</span>
-                <span className={`status s-${job.status}`}>{job.status}</span>
+                <UiBadge className={`status s-${job.status}`}>{job.status}</UiBadge>
                 <span>{(job.inputTokens + job.outputTokens).toLocaleString("en-US")}</span>
                 <span>{relativeTime(job.updatedAt)}</span>
               </div>)}
@@ -1018,8 +1028,8 @@ export function NetworkPage({
 
         <section className="net-ledger" aria-labelledby="net-ledger-title">
           <header className="net-section-head">
-            <div><span className="net-kicker">CURRENT SUPPLY</span><h2 id="net-ledger-title">Nodes behind the snapshot.</h2></div>
-            <a href="/join">Connect a device <ArrowRight /></a>
+            <div><span className="net-kicker">CURRENT SUPPLY</span><UiHeading as="h2" id="net-ledger-title">Nodes behind the snapshot.</UiHeading></div>
+            <UiLink href="/join">Connect a device <ArrowRight /></UiLink>
           </header>
           <div className="net-ledger-table" role="table" aria-label="Public node ledger">
             <div className="net-ledger-row head" role="row"><span>Node</span><span>State</span><span>Hardware</span><span>Work</span><span>Last seen</span></div>
@@ -1035,13 +1045,13 @@ export function NetworkPage({
         </section>
 
         <section className="net-method" aria-labelledby="net-method-title">
-          <div><span className="net-kicker">MEASUREMENT CONTRACT</span><h2 id="net-method-title">What these numbers mean.</h2></div>
+          <div><span className="net-kicker">MEASUREMENT CONTRACT</span><UiHeading as="h2" id="net-method-title">What these numbers mean.</UiHeading></div>
           <div className="net-method-copy">
-            <p><ShieldCheck /> <span><strong>Observed</strong>Workers, models, memory and jobs come from the coordinator’s live public snapshot.</span></p>
-            <p><Database /> <span><strong>Derived</strong>Regions and totals are calculated only from that snapshot; the formula stays visible in the open source client.</span></p>
-            <p><CheckCircle2 /> <span><strong>Deliberately absent</strong>Revenue, rewards and throughput stay unpublished until they have an auditable public source.</span></p>
+            <UiText><ShieldCheck /> <span><strong>Observed</strong>Workers, models, memory and jobs come from the coordinator’s live public snapshot.</span></UiText>
+            <UiText><Database /> <span><strong>Derived</strong>Regions and totals are calculated only from that snapshot; the formula stays visible in the open source client.</span></UiText>
+            <UiText><CheckCircle2 /> <span><strong>Deliberately absent</strong>Revenue, rewards and throughput stay unpublished until they have an auditable public source.</span></UiText>
           </div>
-          <div className="net-method-links"><a href="/docs/protocol">Read the architecture <ExternalLink /></a><a href="https://github.com/tych0s/mycellios" target="_blank" rel="noreferrer">Inspect the source <ExternalLink /></a></div>
+          <div className="net-method-links"><UiLink href="/docs/protocol">Read the architecture <ExternalLink /></UiLink><UiLink href="https://github.com/tych0s/mycellios" target="_blank" rel="noreferrer">Inspect the source <ExternalLink /></UiLink></div>
         </section>
       </div>
     </section>
@@ -1053,7 +1063,7 @@ function SignalCard({ label, value, tone }: { label: string; value: string | num
 }
 
 function WallStat({ value, label, muted = false }: { value: string; label: string; muted?: boolean }) {
-  return <article className={`net-wall-stat${muted ? " muted" : ""}`}><strong>{value}</strong><span>{label}</span></article>;
+  return <UiCard className={`net-wall-stat${muted ? " muted" : ""}`}><strong>{value}</strong><span>{label}</span></UiCard>;
 }
 
 type WallTone = "ivory" | "bronze" | "sage";
@@ -1209,10 +1219,10 @@ function sampleXLabels(points: NetworkTelemetrySample[], compact = false): [stri
 }
 
 function WallPanel({ title, note, full = false, children }: { title: string; note?: string | undefined; full?: boolean; children: ReactNode }) {
-  return <article className={`net-wall-panel${full ? " full" : ""}`}>
+  return <UiCard className={`net-wall-panel${full ? " full" : ""}`}>
     <header className="net-wall-panel-head"><strong>{title}</strong>{note ? <span>{note}</span> : null}</header>
     {children}
-  </article>;
+  </UiCard>;
 }
 
 /** Daily buckets rendered as stacks of thin horizontal stripes, like the reference wall. */
@@ -1337,14 +1347,14 @@ function DashboardChart({ title, unit, samples, series }: { title: string; unit:
   const x = (index: number) => 16 + (index / Math.max(points.length - 1, 1)) * 328;
   const y = (amount: number) => 12 + (1 - amount / ceiling) * 154;
   const latest = points.at(-1);
-  return <article className="net-dashboard-chart">
-    <header><div><span>30-DAY HISTORY</span><h2>{title}</h2></div><strong>{latest ? formatChartValue(value(latest, series[0]!.key, series[0]!.divisor)) : "—"} <small>{unit}</small></strong></header>
+  return <UiCard className="net-dashboard-chart">
+    <header><div><span>30-DAY HISTORY</span><UiHeading as="h2">{title}</UiHeading></div><strong>{latest ? formatChartValue(value(latest, series[0]!.key, series[0]!.divisor)) : "—"} <small>{unit}</small></strong></header>
     {points.length > 0 ? <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${title}: ${samples.length} persisted observations`}>
       {[0, .5, 1].map((ratio) => <line key={ratio} x1="16" x2="344" y1={12 + ratio * 154} y2={12 + ratio * 154} />)}
       {series.map((item) => <polyline className={item.tone} key={item.key} points={points.map((sample, index) => `${x(index)},${y(value(sample, item.key, item.divisor))}`).join(" ")} />)}
     </svg> : <div className="net-dashboard-chart-empty">Waiting for persisted samples</div>}
     <footer>{series.map((item) => <span className={item.tone} key={item.key}><i />{item.label}</span>)}</footer>
-  </article>;
+  </UiCard>;
 }
 
 function downsample<T>(items: T[], limit: number): T[] {
@@ -1406,7 +1416,7 @@ function NodePanel({ node, jobs, onClose }: {
     <div className="net-panel-top">
       <span className="net-panel-city">{located ? worker.region : "Unlocated node"}</span>
       <span className="net-panel-cc">{country ?? worker.kind}</span>
-      <button className="net-panel-close" type="button" onClick={onClose} aria-label="Close node detail">×</button>
+      <UiButton className="net-panel-close" type="button" onClick={onClose} aria-label="Close node detail">×</UiButton>
     </div>
     <div className={`net-panel-state ${state}`}>{stateLabel}</div>
     <div className="net-panel-id">{worker.id}</div>
@@ -1426,9 +1436,9 @@ function NodePanel({ node, jobs, onClose }: {
       <Row label="jobs in snapshot" value={String(jobs.length)} />
       <Row label="last seen" value={relativeTime(worker.lastSeenAt)} />
     </div>
-    {!located && <p className="net-panel-note">
+    {!located && <UiText className="net-panel-note">
       This node did not announce a region, so its globe position is schematic.
-    </p>}
+    </UiText>}
   </div>;
 }
 

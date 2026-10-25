@@ -238,20 +238,8 @@ export function HeroGlobe() {
         }
       }
       context.closePath();
-      /*
-       * Lit from up-screen, which is where the hero's own light comes from.
-       * A flat fill at this size is a bronze sticker; two stops along the
-       * body's own "up" axis are enough to round the dome, and because the
-       * gradient is built on the billboard frame it stays consistent as the
-       * globe turns.
-       */
-      const crown = place({ x: 0, y: body.apex.y + 0.55 });
-      const rimLevel = place({ x: 0, y: body.apex.y - 0.25 });
-      const shade = context.createLinearGradient(crown.sx, crown.sy, rimLevel.sx, rimLevel.sy);
-      shade.addColorStop(0, "#e0a86a");
-      shade.addColorStop(0.55, "#c98f52");
-      shade.addColorStop(1, "#96633a");
-      context.fillStyle = shade;
+      // Flat bronze fill keeps the globe illustration consistent with the UI.
+      context.fillStyle = "#c98f52";
       context.fill();
       // A darker rim keeps the dome from flattening into a blob against the
       // land dots behind it.
@@ -283,6 +271,14 @@ export function HeroGlobe() {
     };
 
     const render = () => {
+      const styles = getComputedStyle(canvas);
+      const color = (name: string, fallback: string) => styles.getPropertyValue(`--hero-globe-${name}`).trim() || fallback;
+      const palette = {
+        rim: color("rim", "rgba(238,233,226,0.09)"), land: color("land", "#e8e2d8"),
+        hub: color("hub", "rgba(198,146,90,0.95)"), filament: color("filament", "rgba(178,196,174,0.72)"),
+        hubTip: color("hub-tip", "#d59a5c"), tip: color("tip", "#bacab6"),
+        hubCore: color("hub-core", "#f0cfa4"), tipCore: color("tip-core", "#e2e8dc"),
+      };
       const radius = (Math.min(width, height) / 2) * 0.94;
       const centerX = width / 2;
       const centerY = height / 2;
@@ -302,7 +298,7 @@ export function HeroGlobe() {
 
       context.beginPath();
       context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      context.strokeStyle = "rgba(238,233,226,0.09)";
+      context.strokeStyle = palette.rim;
       context.lineWidth = 1;
       context.stroke();
 
@@ -313,7 +309,7 @@ export function HeroGlobe() {
         context.globalAlpha = 0.13 + depth * 0.5;
         context.beginPath();
         context.arc(sx, sy, dotRadius, 0, Math.PI * 2);
-        context.fillStyle = "#e8e2d8";
+        context.fillStyle = palette.land;
         context.fill();
       }
 
@@ -345,7 +341,7 @@ export function HeroGlobe() {
         if (visibleDepth <= 0) continue;
 
         const alpha = (0.18 + visibleDepth * 0.62) * filament.vitality;
-        context.strokeStyle = filament.hub ? "rgba(198,146,90,0.95)" : "rgba(178,196,174,0.72)";
+        context.strokeStyle = filament.hub ? palette.hub : palette.filament;
 
         /*
          * Stroked in bands rather than as one path, because a hypha is thickest
@@ -412,36 +408,17 @@ export function HeroGlobe() {
           if (anyHair) context.stroke();
         }
 
-        /*
-         * The advancing tip.
-         *
-         * A flat filled circle was the other half of the complaint, and it was
-         * right: a hard-edged disc is a UI dot, and it is the one thing on this
-         * globe with no organic edge at all. A hypha's tip is a swelling that
-         * fades into its own halo, so this is a soft radial gradient with a
-         * small bright core — the same treatment the page's own mycelium field
-         * uses for its forks, so the two networks read as one organism.
-         */
+        // Advancing tips use a flat disc and a small contrasting core.
         const tip = path[path.length - 1] ?? null;
         if (tip && tip.depth > 0.02) {
           const growing = filament.progress < 1;
           const presence = (growing ? 0.9 : 0.55) * (0.35 + tip.depth * 0.65) * filament.vitality;
           // Growing tips swell, settled ones sit back down into the network.
           const size = (filament.hub ? dotRadius * 3.4 : dotRadius * 2.2) * (growing ? 1.15 : 1);
-          const glow = context.createRadialGradient(tip.sx, tip.sy, 0, tip.sx, tip.sy, size);
-          if (filament.hub) {
-            glow.addColorStop(0, "rgba(247,226,196,0.95)");
-            glow.addColorStop(0.32, "rgba(213,154,92,0.6)");
-            glow.addColorStop(1, "rgba(213,154,92,0)");
-          } else {
-            glow.addColorStop(0, "rgba(233,238,228,0.85)");
-            glow.addColorStop(0.34, "rgba(186,202,182,0.42)");
-            glow.addColorStop(1, "rgba(186,202,182,0)");
-          }
           context.globalAlpha = presence;
           context.beginPath();
           context.arc(tip.sx, tip.sy, size, 0, Math.PI * 2);
-          context.fillStyle = glow;
+          context.fillStyle = filament.hub ? palette.hubTip : palette.tip;
           context.fill();
 
           // A small dense core inside the halo. Without it the tip is a smudge;
@@ -449,7 +426,7 @@ export function HeroGlobe() {
           context.globalAlpha = presence * 0.9;
           context.beginPath();
           context.arc(tip.sx, tip.sy, Math.max(0.5, size * 0.26), 0, Math.PI * 2);
-          context.fillStyle = filament.hub ? "#f0cfa4" : "#e2e8dc";
+          context.fillStyle = filament.hub ? palette.hubCore : palette.tipCore;
           context.fill();
         }
       }

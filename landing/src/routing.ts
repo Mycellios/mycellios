@@ -6,7 +6,6 @@ export type PanelView =
   | "network"
   | "models"
   | "jobs"
-  | "inference"
   | "tests"
   | "downloads"
   | "contribute"
@@ -31,12 +30,11 @@ const OPERATIONS_ROLES: readonly PanelRole[] = ["operator", "admin", "owner"];
 const ADMIN_ROLES: readonly PanelRole[] = ["admin", "owner"];
 
 export const PANEL_ROUTES: readonly PanelRoute[] = [
-  { id: "overview", label: "Overview", width: "standard", modes: ["simple", "developer"], roles: EVERY_ROLE, primaryAction: "Run inference" },
+  { id: "overview", label: "Overview", width: "standard", modes: ["simple", "developer"], roles: EVERY_ROLE, primaryAction: "Connect device" },
   { id: "nodes", label: "Nodes", width: "wide", modes: ["developer"], roles: EVERY_ROLE, primaryAction: "Connect node" },
   { id: "network", label: "Network", width: "wide", modes: ["simple", "developer"], roles: EVERY_ROLE, primaryAction: "Change range" },
   { id: "models", label: "Models", width: "wide", modes: ["developer"], roles: EVERY_ROLE, primaryAction: "Request model" },
   { id: "jobs", label: "Jobs", width: "wide", modes: ["developer"], roles: EVERY_ROLE, primaryAction: "Inspect job" },
-  { id: "inference", label: "Inference", width: "standard", modes: ["simple", "developer"], roles: EVERY_ROLE, primaryAction: "Send prompt" },
   { id: "tests", label: "Tests", width: "wide", modes: ["developer"], roles: EVERY_ROLE, primaryAction: "Run benchmark" },
   { id: "downloads", label: "Downloads", width: "standard", modes: ["simple", "developer"], roles: EVERY_ROLE, primaryAction: "Download node" },
   { id: "contribute", label: "Run", width: "standard", modes: ["simple", "developer"], roles: EVERY_ROLE, primaryAction: "Connect device" },
@@ -45,7 +43,7 @@ export const PANEL_ROUTES: readonly PanelRoute[] = [
 ];
 
 const PANEL_ROUTE_BY_ID = new Map(PANEL_ROUTES.map((route) => [route.id, route]));
-const LEGACY_PANEL_VIEWS: Readonly<Record<string, PanelView>> = { history: "network", tasks: "jobs", chat: "inference", join: "contribute" };
+const LEGACY_PANEL_VIEWS: Readonly<Record<string, PanelView>> = { history: "network", tasks: "jobs", chat: "overview", inference: "overview", join: "contribute" };
 
 export function normalizePanelView(value: string | null): PanelView | null {
   if (!value) return null;

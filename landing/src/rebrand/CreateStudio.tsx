@@ -1,3 +1,4 @@
+import { Button as UiButton, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Text as UiText, Textarea as UiTextarea } from "../ui/primitives";
 import {
   ArrowRight,
   BookOpen,
@@ -270,21 +271,21 @@ export function CreateStudio() {
   return (
     <main className="studio-page">
       <header className="studio-topbar">
-        <a className="studio-brand" href="/" aria-label="Mycellios home">
+        <UiLink className="studio-brand" href="/" aria-label="Mycellios home">
           <img src="/assets/brand/favicon.png" alt="" width={34} height={34} />
           <span>mycellios</span><i>studio</i>
-        </a>
+        </UiLink>
         <div className="studio-draft-status" aria-live="polite">
           <CircleDot />
           <span>{storageFailed ? "Browser storage unavailable · keep this tab open" : saved ? "Draft saved locally" : "Saving draft…"}</span>
         </div>
         <div className="studio-top-actions">
-          <button type="button" className="studio-reset" disabled={remoteBusy} onClick={resetDraft}><RefreshCw />Reset</button>
-          <a className="studio-login" href="/dashboard">Workspace <ArrowRight /></a>
+          <UiButton type="button" className="studio-reset" disabled={remoteBusy} onClick={resetDraft}><RefreshCw />Reset</UiButton>
+          <UiLink className="studio-login" href="/dashboard">Workspace <ArrowRight /></UiLink>
         </div>
-        <button className="studio-mobile-menu" type="button" aria-label={mobileNavOpen ? "Close studio navigation" : "Open studio navigation"} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}>
+        <UiButton className="studio-mobile-menu" type="button" aria-label={mobileNavOpen ? "Close studio navigation" : "Open studio navigation"} aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen((open) => !open)}>
           {mobileNavOpen ? <X /> : <Menu />}
-        </button>
+        </UiButton>
       </header>
 
       <div className="studio-shell">
@@ -296,14 +297,14 @@ export function CreateStudio() {
           <div className="studio-progress" aria-label={`${completion}% of draft checklist filled`}><i style={{ width: `${completion}%` }} /></div>
           <nav>
             {steps.map(({ id, label, icon: Icon }, index) => (
-              <button className={activeStep === id ? "active" : ""} type="button" onClick={() => { setActiveStep(id); setMobileNavOpen(false); }} key={id}>
+              <UiButton className={activeStep === id ? "active" : ""} type="button" onClick={() => { setActiveStep(id); setMobileNavOpen(false); }} key={id}>
                 <span>{index + 1}</span><Icon /><b>{label}</b>{activeStep === id && <ChevronRight />}
-              </button>
+              </UiButton>
             ))}
           </nav>
           <div className="studio-rail-note">
             <Sparkles />
-            <p><strong>Local draft</strong>Your draft stays in this browser. Publishing sends supported settings to your account.</p>
+            <UiText><strong>Local draft</strong>Your draft stays in this browser. Publishing sends supported settings to your account.</UiText>
           </div>
         </aside>
 
@@ -311,10 +312,10 @@ export function CreateStudio() {
           <div className="studio-editor-heading">
             <div>
               <span className="studio-kicker">Mycellios Studio · {steps.find((step) => step.id === activeStep)?.label}</span>
-              <h1 id="studio-editor-title">{stepTitle(activeStep)}</h1>
-              <p>{stepDescription(activeStep)}</p>
+              <UiHeading as="h1" id="studio-editor-title">{stepTitle(activeStep)}</UiHeading>
+              <UiText>{stepDescription(activeStep)}</UiText>
             </div>
-            {activeStep === "identity" && <button type="button" className="studio-text-action" onClick={() => setTemplateOpen((open) => !open)}>{templateOpen ? "Hide templates" : "Change template"}</button>}
+            {activeStep === "identity" && <UiButton type="button" className="studio-text-action" onClick={() => setTemplateOpen((open) => !open)}>{templateOpen ? "Hide templates" : "Change template"}</UiButton>}
           </div>
 
           {activeStep === "identity" && (
@@ -322,16 +323,16 @@ export function CreateStudio() {
               {templateOpen && (
                 <div className="studio-templates" aria-label="Identity templates">
                   {STUDIO_TEMPLATES.map((template) => (
-                    <button type="button" className={draft.templateId === template.id ? "selected" : ""} onClick={() => chooseTemplate(template.id)} key={template.id}>
-                      <span>{template.eyebrow}</span><strong>{template.title}</strong><p>{template.description}</p><i>{draft.templateId === template.id ? <Check /> : <ArrowRight />}</i>
-                    </button>
+                    <UiButton type="button" className={draft.templateId === template.id ? "selected" : ""} onClick={() => chooseTemplate(template.id)} key={template.id}>
+                      <span>{template.eyebrow}</span><strong>{template.title}</strong><UiText>{template.description}</UiText><i>{draft.templateId === template.id ? <Check /> : <ArrowRight />}</i>
+                    </UiButton>
                   ))}
                 </div>
               )}
               <div className="studio-fields">
-                <label><span>Name</span><input ref={nameField} value={draft.name} maxLength={48} onChange={(event) => update({ name: event.target.value })} /></label>
-                <label><span>Role</span><input ref={roleField} value={draft.role} maxLength={100} onChange={(event) => update({ role: event.target.value })} /></label>
-                <label className="studio-field-wide"><span>Personality and boundaries</span><textarea ref={instructionsField} value={draft.instructions} maxLength={600} onChange={(event) => update({ instructions: event.target.value })} /><small>{draft.instructions.length}/600 · Tell it how to behave, and what it must never invent.</small></label>
+                <UiFieldLabel><span>Name</span><UiInput ref={nameField} value={draft.name} maxLength={48} onChange={(event) => update({ name: event.target.value })} /></UiFieldLabel>
+                <UiFieldLabel><span>Role</span><UiInput ref={roleField} value={draft.role} maxLength={100} onChange={(event) => update({ role: event.target.value })} /></UiFieldLabel>
+                <UiFieldLabel className="studio-field-wide"><span>Personality and boundaries</span><UiTextarea ref={instructionsField} value={draft.instructions} maxLength={600} onChange={(event) => update({ instructions: event.target.value })} /><small>{draft.instructions.length}/600 · Tell it how to behave, and what it must never invent.</small></UiFieldLabel>
               </div>
             </div>
           )}
@@ -339,26 +340,26 @@ export function CreateStudio() {
           {activeStep === "memory" && (
             <div className="studio-step-panel studio-choice-list">
               {memoryOptions.map((option) => (
-                <button type="button" className={draft.memoryMode === option.id ? "selected" : ""} onClick={() => update({ memoryMode: option.id })} key={option.id}>
-                  <span className="studio-radio"><i /></span><p><strong>{option.label}</strong><small>{option.detail}</small></p>{draft.memoryMode === option.id && <Check />}
-                </button>
+                <UiButton type="button" className={draft.memoryMode === option.id ? "selected" : ""} onClick={() => update({ memoryMode: option.id })} key={option.id}>
+                  <span className="studio-radio"><i /></span><UiText><strong>{option.label}</strong><small>{option.detail}</small></UiText>{draft.memoryMode === option.id && <Check />}
+                </UiButton>
               ))}
-              <div className="studio-safety-note"><Database /><p><strong>Memory is policy, not a transcript dump.</strong>Approved mode is the safest default for a public identity: useful facts can persist without saving every conversation.</p></div>
+              <div className="studio-safety-note"><Database /><UiText><strong>Memory is policy, not a transcript dump.</strong>Approved mode is the safest default for a public identity: useful facts can persist without saving every conversation.</UiText></div>
             </div>
           )}
 
           {activeStep === "knowledge" && (
             <div className="studio-step-panel">
-              <form className="studio-source-form" onSubmit={addKnowledge}>
-                <label htmlFor="studio-source">Source label</label>
-                <div><input id="studio-source" value={knowledgeInput} maxLength={64} placeholder="e.g. Product handbook" onChange={(event) => setKnowledgeInput(event.target.value)} /><button type="submit" disabled={!knowledgeInput.trim() || draft.knowledge.length >= 6}><Plus />Add source</button></div>
+              <UiForm className="studio-source-form" onSubmit={addKnowledge}>
+                <UiFieldLabel htmlFor="studio-source">Source label</UiFieldLabel>
+                <div><UiInput id="studio-source" value={knowledgeInput} maxLength={64} placeholder="e.g. Product handbook" onChange={(event) => setKnowledgeInput(event.target.value)} /><UiButton type="submit" disabled={!knowledgeInput.trim() || draft.knowledge.length >= 6}><Plus />Add source</UiButton></div>
                 <small>Labels stay in this browser. No source content is uploaded or included when you publish.</small>
-              </form>
+              </UiForm>
               <div className="studio-source-list">
                 {draft.knowledge.map((source, index) => (
-                  <div key={`${source}-${index}`}><span><BookOpen /><i>{String(index + 1).padStart(2, "0")}</i></span><p><strong>{source}</strong><small>Local label · no content connected</small></p><button type="button" aria-label={`Remove ${source}`} onClick={() => update({ knowledge: draft.knowledge.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 /></button></div>
+                  <div key={`${source}-${index}`}><span><BookOpen /><i>{String(index + 1).padStart(2, "0")}</i></span><UiText><strong>{source}</strong><small>Local label · no content connected</small></UiText><UiButton type="button" aria-label={`Remove ${source}`} onClick={() => update({ knowledge: draft.knowledge.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 /></UiButton></div>
                 ))}
-                {draft.knowledge.length === 0 && <div className="studio-empty"><BookOpen /><p><strong>No source labels yet</strong><small>Add a name here to plan a source. No content is connected in this draft.</small></p></div>}
+                {draft.knowledge.length === 0 && <div className="studio-empty"><BookOpen /><UiText><strong>No source labels yet</strong><small>Add a name here to plan a source. No content is connected in this draft.</small></UiText></div>}
               </div>
             </div>
           )}
@@ -367,9 +368,9 @@ export function CreateStudio() {
             <div className="studio-step-panel studio-tools-grid">
               {toolOptions.map(({ id, label, detail, icon: Icon }) => {
                 const selected = draft.tools.includes(id);
-                return <button type="button" className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => toggleTool(id)} key={id}><Icon /><span><strong>{label}</strong><small>{detail}</small></span><i>{selected ? "On" : "Off"}</i></button>;
+                return <UiButton type="button" className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => toggleTool(id)} key={id}><Icon /><span><strong>{label}</strong><small>{detail}</small></span><i>{selected ? "On" : "Off"}</i></UiButton>;
               })}
-              <div className="studio-safety-note studio-tools-note"><Wrench /><p><strong>Tools are deny-by-default.</strong>Real actions require authentication, an allowlist, and explicit credentials. This draft never asks for secrets.</p></div>
+              <div className="studio-safety-note studio-tools-note"><Wrench /><UiText><strong>Tools are deny-by-default.</strong>Real actions require authentication, an allowlist, and explicit credentials. This draft never asks for secrets.</UiText></div>
             </div>
           )}
 
@@ -377,29 +378,29 @@ export function CreateStudio() {
             <div className="studio-step-panel studio-launch-panel">
               <div className="studio-channel-list">
                 {channels.map(({ id, label, detail, icon: Icon }) => (
-                  <button type="button" className={draft.channel === id ? "selected" : ""} onClick={() => update({ channel: id })} key={id}><Icon /><span><strong>{label}</strong><small>{detail}</small></span>{draft.channel === id ? <Check /> : <ChevronRight />}</button>
+                  <UiButton type="button" className={draft.channel === id ? "selected" : ""} onClick={() => update({ channel: id })} key={id}><Icon /><span><strong>{label}</strong><small>{detail}</small></span>{draft.channel === id ? <Check /> : <ChevronRight />}</UiButton>
                 ))}
               </div>
               <div className="studio-launch-summary">
                 <span>Review before publishing</span>
-                <h2>{draft.name || "Untitled identity"} for {channels.find((channel) => channel.id === draft.channel)?.label}</h2>
+                <UiHeading as="h2">{draft.name || "Untitled identity"} for {channels.find((channel) => channel.id === draft.channel)?.label}</UiHeading>
                 <ul><li className={identityReady ? "" : "waiting"}><Check />{identityReady ? "Identity and behavior configured" : "Add a name, role, and behavior"}</li><li className="waiting"><BookOpen />{draft.knowledge.length || "No"} local source label{draft.knowledge.length === 1 ? "" : "s"} · not published</li><li className={draft.tools.length ? "" : "waiting"}><Check />{draft.tools.length || "No"} tool{draft.tools.length === 1 ? "" : "s"} selected</li></ul>
                 {remoteMissing && session
-                  ? <button type="button" onClick={forgetMissingAgent}>Start a new agent from this draft <ArrowRight /></button>
+                  ? <UiButton type="button" onClick={forgetMissingAgent}>Start a new agent from this draft <ArrowRight /></UiButton>
                   : !identityReady && !continuity?.publish
-                    ? <button type="button" onClick={completeIdentity}>Complete identity first <ArrowRight /></button>
+                    ? <UiButton type="button" onClick={completeIdentity}>Complete identity first <ArrowRight /></UiButton>
                     : session
-                  ? <button type="button" onClick={() => void saveAndPublish()} disabled={remoteBusy}>{remoteBusy ? "Checking and publishing…" : continuity?.publish ? "Confirm previous publication" : continuity?.create ? "Retry import and publish" : continuity?.agentId ? "Publish this revision" : "Import draft and publish"} <ExternalLink /></button>
-                  : <a href="/dashboard">Sign in, then return to publish <ExternalLink /></a>}
+                  ? <UiButton type="button" onClick={() => void saveAndPublish()} disabled={remoteBusy}>{remoteBusy ? "Checking and publishing…" : continuity?.publish ? "Confirm previous publication" : continuity?.create ? "Retry import and publish" : continuity?.agentId ? "Publish this revision" : "Import draft and publish"} <ExternalLink /></UiButton>
+                  : <UiLink href="/dashboard">Sign in, then return to publish <ExternalLink /></UiLink>}
                 <small className={remoteError ? "error" : undefined} role={remoteError ? "alert" : undefined} aria-live="polite">{remoteStatus ?? (session ? "Import is explicit; your local draft remains unchanged." : "No agent has been deployed yet.")}</small>
               </div>
             </div>
           )}
 
           <div className="studio-step-nav">
-            <button type="button" disabled={firstStep.id === activeStep} onClick={() => setActiveStep(previousStep(activeStep))}><ChevronLeft />Previous</button>
+            <UiButton type="button" disabled={firstStep.id === activeStep} onClick={() => setActiveStep(previousStep(activeStep))}><ChevronLeft />Previous</UiButton>
             <span>{steps.findIndex((step) => step.id === activeStep) + 1} of {steps.length}</span>
-            <button className="primary" type="button" disabled={lastStep.id === activeStep} onClick={() => setActiveStep(nextStep(activeStep))}>Next <ChevronRight /></button>
+            <UiButton className="primary" type="button" disabled={lastStep.id === activeStep} onClick={() => setActiveStep(nextStep(activeStep))}>Next <ChevronRight /></UiButton>
           </div>
         </section>
 
@@ -416,14 +417,14 @@ export function CreateStudio() {
           </div>
           <div className="studio-conversation" aria-live="polite">
             {conversation.slice(-5).map((message, index) => (
-              <div className={message.role} key={`${message.role}-${index}`}><span>{message.role === "agent" ? initials(draft.name) : "You"}</span><p>{message.text}</p></div>
+              <div className={message.role} key={`${message.role}-${index}`}><span>{message.role === "agent" ? initials(draft.name) : "You"}</span><UiText>{message.text}</UiText></div>
             ))}
           </div>
-          <form className="studio-test-form" onSubmit={testDraft}>
-            <label htmlFor="studio-test">Test this identity</label>
-            <div><textarea id="studio-test" rows={3} value={prompt} placeholder={`Ask ${draft.name || "this identity"} something…`} onChange={(event) => setPrompt(event.target.value)} /><button type="submit" disabled={!prompt.trim()} aria-label="Send test message"><ArrowRight /></button></div>
+          <UiForm className="studio-test-form" onSubmit={testDraft}>
+            <UiFieldLabel htmlFor="studio-test">Test this identity</UiFieldLabel>
+            <div><UiTextarea id="studio-test" rows={3} value={prompt} placeholder={`Ask ${draft.name || "this identity"} something…`} onChange={(event) => setPrompt(event.target.value)} /><UiButton type="submit" disabled={!prompt.trim()} aria-label="Send test message"><ArrowRight /></UiButton></div>
             <small><MessageCircle />Preview only · no model or external tool is called</small>
-          </form>
+          </UiForm>
         </aside>
       </div>
     </main>

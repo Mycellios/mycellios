@@ -19,7 +19,7 @@ describe("panel information architecture", () => {
     expect(canInspectOperationalEvidence("owner", "token")).toBe(true);
   });
   it("defines every required product view with one primary action and a stable width", () => {
-    const required = ["overview", "nodes", "network", "models", "jobs", "inference", "tests", "downloads"];
+    const required = ["overview", "nodes", "network", "models", "jobs", "tests", "downloads"];
     expect(PANEL_ROUTES.filter((route) => required.includes(route.id)).map((route) => route.id)).toEqual(required);
     for (const id of required) {
       expect(panelRoute(id as Parameters<typeof panelRoute>[0]).primaryAction).not.toBe("");
@@ -48,7 +48,9 @@ describe("panel information architecture", () => {
     expect(normalizePanelView("unknown")).toBeNull();
     expect(panelLocation("overview")).toBe("/network?view=overview");
     expect(panelLocation("overview", false, true)).toBe("/dashboard");
-    expect(panelLocation("inference", false, true)).toBe("/dashboard?view=inference");
+    expect(normalizePanelView("inference")).toBe("overview");
+    expect(normalizePanelView("chat")).toBe("overview");
+    expect(visiblePanelRoutes("simple", "public").some((route) => /chat|inference/i.test(route.label))).toBe(false);
     expect(normalizePanelView("settings")).toBeNull();
     expect(resolveLandingSurface("/network", "?view=globe")).toBe("network");
     expect(resolveLandingSurface("/network", "?view=overview")).toBe("panel");

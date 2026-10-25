@@ -1,0 +1,55 @@
+/* Shared minimal hierarchy for the panel's working screens. */
+.public-panel .minimal-screen { width: 100%; max-width: 1000px; margin-inline: auto; padding-bottom: 32px; min-width: 0; }
+.public-panel .minimal-screen > .panel-page-title { margin-bottom: 28px; }
+.public-panel .minimal-screen > :is(.panel-disclosure, .model-request-form, .model-active-table, .inference-console) { margin-bottom: 24px; }
+.public-panel .panel-disclosure.minimal-disclosure { border-width: 0 0 1px; border-radius: 0; box-shadow: none; background: transparent; }
+.public-panel .panel-disclosure.minimal-disclosure > summary { grid-template-columns: 20px minmax(0, 1fr) 18px; gap: 12px; min-height: 56px; padding: 12px 8px; border-radius: var(--ui-radius-control); }
+.public-panel .minimal-disclosure .panel-disclosure-icon { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.public-panel .minimal-disclosure > summary strong { font-size: 13px; font-weight: 500; }
+.public-panel .minimal-disclosure > .panel-disclosure-body { padding: 18px 0 26px; border-top: 0; gap: 24px; }
+.public-panel .minimal-disclosure > .panel-disclosure-body > :first-child { margin-top: 0; }
+.public-panel .minimal-screen .network-history-meta { margin: 0 0 18px; padding: 0; font-size: 12px; }
+.public-panel .minimal-screen .network-history-chart > header { padding: 20px 20px 12px; }
+.public-panel .minimal-screen .network-history-chart h2 { font-size: 16px; }
+.public-panel .minimal-screen .network-history-chart > footer { justify-content: flex-start; gap: 18px; padding: 12px 20px 18px; }
+.public-panel .minimal-screen .network-history-toolbar { margin-bottom: 22px; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.public-panel .minimal-screen.inference-page { gap: 24px; }
+.public-panel .minimal-screen .inference-output .inference-unavailable { max-width: 620px; margin: auto; padding: 24px; border: 0; box-shadow: none; }
+.public-panel .minimal-screen .inference-output .inference-unavailable-copy h2 { font-size: 20px; line-height: 1.35; }
+.public-panel .minimal-screen .inference-output .inference-unavailable-copy .ui-text { max-width: 48ch; line-height: 1.7; }
+.public-panel .minimal-screen .inference-console { margin-bottom: 24px; }
+.public-panel .minimal-screen .api-access-panel { margin-top: 24px; }
+.public-panel .minimal-screen .hub-model-table { min-width: 560px; }
+.public-panel .minimal-screen .hub-catalog-toolbar { gap: 14px; }
+.public-panel .minimal-screen .model-form-heading { margin-bottom: 20px; }
+.public-panel .minimal-screen .model-request-list { margin: 0; }
+.public-panel .minimal-screen .model-request-list-heading { margin-bottom: 14px; }
+.public-panel .minimal-screen .connect-studio-workspace { margin-top: 0; }
+.public-panel .minimal-screen .connect-route-picker > button { min-height: 64px; }
+.public-panel .minimal-screen .contribute-browser-card > .panel-disclosure { margin: 0 20px; }
+.public-panel .minimal-screen .contribute-browser-facts { flex-wrap: wrap; gap: 28px; padding: 6px 8px; }
+.public-panel .minimal-screen .contribute-detail-grid { display: grid; grid-template-columns: 1fr; }
+.public-panel .minimal-screen .benchmark-chart-grid { margin-bottom: 24px; }
+.public-panel .minimal-screen .benchmark-toolbar { margin-block: 20px; }
+@media (max-width: 600px) {
+  .public-panel .minimal-screen > .panel-page-title { margin-bottom: 24px; }
+  .public-panel .minimal-screen .inference-output .inference-unavailable { padding: 18px 12px; }
+  .public-panel .minimal-screen .network-history-chart > header { padding: 16px; }
+}
+.public-panel .minimal-screen .hub-catalog-toolbar { grid-template-columns: minmax(0, 1fr); }
+.public-panel .minimal-screen .hub-filter-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.public-panel .account-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) { .public-panel .minimal-screen .hub-filter-options { grid-template-columns: minmax(0, 1fr); } }
+
+.public-panel .api-access-summary { grid-template-columns: minmax(0, 1fr) auto; }
+.public-panel .minimal-screen .network-history-meta { border: 0; border-radius: 0; min-height: 0; box-shadow: none; }
+.public-panel .minimal-screen .contribute-browser-card > header { grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 14px; }
+@media (max-width: 600px) {
+  .public-panel .minimal-screen .contribute-browser-card > header { grid-template-columns: 40px minmax(0, 1fr) auto; }
+  .public-panel .minimal-screen .contribute-browser-card > header > .ui-button { grid-column: 1 / -1; justify-self: stretch; }
+}
+.public-panel .minimal-screen .network-history-chart svg text { font-size: 16px; }
+@media (max-width: 600px) {
+  .public-panel .minimal-screen .network-history-chart svg text { font-size: 24px; }
+  .public-panel .minimal-screen .network-history-chart .history-x-label:not(.history-edge-label) { display: none; }
+}

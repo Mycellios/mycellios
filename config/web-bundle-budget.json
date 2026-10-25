@@ -6,20 +6,74 @@
       "sourceMapsAllowed": false,
       "defaultMaximumBytes": 25000,
       "budgets": {
-        "application-shell": { "match": "index-", "maximumBytes": 225000 },
-        "panel-route": { "match": "Panel-", "maximumBytes": 350000 },
-        "network-route": { "match": "NetworkPage-", "maximumBytes": 85000 },
-        "contribution-route": { "match": "Contribute-", "maximumBytes": 65000 },
-        "landing-route": { "match": "RebrandLanding-", "maximumBytes": 125000 },
-        "mushroom-renderer": { "match": "mushroom-stage-", "maximumBytes": 575000 },
-        "document-library": { "match": "lib-", "maximumBytes": 525000 },
-        "pdf-reader": { "match": "pdf-", "maximumBytes": 450000 },
-        "pdf-worker": { "match": "pdf.worker.min-", "maximumBytes": 1300000 }
+        "application-shell": {
+          "match": "index-",
+          "maximumBytes": 225000
+        },
+        "panel-route": {
+          "match": "Panel-",
+          "maximumBytes": 350000
+        },
+        "network-route": {
+          "match": "NetworkPage-",
+          "maximumBytes": 85000
+        },
+        "contribution-route": {
+          "match": "Contribute-",
+          "maximumBytes": 65000
+        },
+        "landing-route": {
+          "match": "RebrandLanding-",
+          "maximumBytes": 125000
+        },
+        "mushroom-renderer": {
+          "match": "mushroom-stage-",
+          "maximumBytes": 575000
+        },
+        "modern-landing-route": {
+          "match": "ModernLanding-",
+          "maximumBytes": 25000
+        },
+        "rooted-landing-route": {
+          "match": "RootedLanding-",
+          "maximumBytes": 35000
+        },
+        "assemblage-landing-route": {
+          "match": "AssemblageLanding-",
+          "maximumBytes": 35000
+        },
+        "reference-landing-route": {
+          "match": "ReferenceLanding-",
+          "maximumBytes": 35000
+        },
+        "globe-renderer": {
+          "match": "HeroGlobe-",
+          "maximumBytes": 50000
+        }
       },
       "criticalPaths": {
-        "home": { "entry": "index.html", "highPriorityMatches": ["mushroom-stage-"], "maximumBytes": 800000 },
-        "panel": { "entry": "src/Panel.tsx", "highPriorityMatches": [], "maximumBytes": 550000 },
-        "network": { "entry": "src/NetworkPage.tsx", "highPriorityMatches": [], "maximumBytes": 425000 }
+        "home": {
+          "entry": "src/rebrand/ReferenceLanding.tsx",
+          "highPriorityMatches": [],
+          "maximumBytes": 350000
+        },
+        "panel": {
+          "entry": "src/Panel.tsx",
+          "highPriorityMatches": [],
+          "maximumBytes": 550000
+        },
+        "network": {
+          "entry": "src/NetworkPage.tsx",
+          "highPriorityMatches": [],
+          "maximumBytes": 425000
+        },
+        "previous-home": {
+          "entry": "index.html",
+          "highPriorityMatches": [
+            "mushroom-stage-"
+          ],
+          "maximumBytes": 800000
+        }
       }
     },
     "mobile": {
@@ -27,14 +81,21 @@
       "sourceMapsAllowed": false,
       "defaultMaximumBytes": 25000,
       "budgets": {
-        "application-shell": { "match": "index-", "maximumBytes": 550000 },
-        "contribution-route": { "match": "Contribute-", "maximumBytes": 65000 },
-        "document-library": { "match": "lib-", "maximumBytes": 525000 },
-        "pdf-reader": { "match": "pdf-", "maximumBytes": 450000 },
-        "pdf-worker": { "match": "pdf.worker.min-", "maximumBytes": 1300000 }
+        "application-shell": {
+          "match": "index-",
+          "maximumBytes": 550000
+        },
+        "contribution-route": {
+          "match": "Contribute-",
+          "maximumBytes": 65000
+        }
       },
       "criticalPaths": {
-        "application": { "entry": "index.html", "highPriorityMatches": [], "maximumBytes": 550000 }
+        "application": {
+          "entry": "index.html",
+          "highPriorityMatches": [],
+          "maximumBytes": 550000
+        }
       }
     }
   }

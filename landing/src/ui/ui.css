@@ -1,0 +1,89 @@
+:root {
+  --ui-control-height: 42px;
+  --ui-radius-control: 10px;
+  --ui-radius-card: 18px;
+  --ui-space: 8px;
+  --ui-accent: #a77b49;
+  --ui-on-accent: #fff;
+  --ui-accent-hover: #946a3c;
+  --ui-foreground: #26392f;
+  --ui-muted: #777269;
+  --ui-surface: #f7f5f1;
+  --ui-line: #e6e0d7;
+  --ui-focus: #ad7a48;
+}
+.ui-button { font: inherit; cursor: pointer; }
+.ui-button[data-variant="primary"],
+.ui-button[data-variant="secondary"],
+.ui-button[data-variant="danger"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--ui-space) !important;
+  min-height: var(--ui-control-height) !important;
+  padding: 10px 16px !important;
+  border: 0 !important;
+  border-radius: var(--ui-radius-control) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  font: 600 13px/1.35 var(--panel-font, system-ui, sans-serif) !important;
+  text-decoration: none !important;
+}
+.ui-button[data-variant="primary"] { color: var(--ui-on-accent) !important; background-color: var(--ui-accent) !important; }
+.ui-button[data-variant="primary"]:hover:not(:disabled) { background-color: var(--ui-accent-hover) !important; }
+.ui-button[data-variant="secondary"] { color: var(--ui-foreground) !important; background-color: var(--ui-surface) !important; }
+.ui-button[data-variant="danger"] { color: #fff !important; background-color: #a83f3f !important; }
+.ui-button[data-variant="ghost"] { border-color: transparent !important; background-image: none !important; box-shadow: none !important; }
+.ui-button[data-size="sm"]:not([data-variant="ghost"]):not([data-variant="navigation"]) { min-height: 34px !important; padding: 7px 12px !important; font-size: 12px !important; }
+.ui-button[data-size="lg"]:not([data-variant="ghost"]):not([data-variant="navigation"]) { min-height: 48px !important; padding-inline: 20px !important; }
+.ui-button[data-icon-only="true"] { width: var(--ui-control-height); padding: 0 !important; }
+/* Spacious actions for marketing surfaces, without changing compact app controls. */
+:root[data-mycellios-design] .ui-button[data-size="xl"]:is([data-variant="primary"], [data-variant="secondary"], [data-variant="danger"]) {
+  min-height: var(--ui-control-xl-height, 52px) !important;
+  padding: 12px var(--ui-control-xl-inline, 22px) !important;
+  gap: var(--ui-control-xl-gap, 14px) !important;
+  font-size: var(--ui-control-xl-text, 15px) !important;
+  font-weight: 500 !important;
+}
+.ui-button:disabled, .ui-button[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.ui-button:focus-visible, .ui-link:focus-visible,
+.ui-input:is([data-control="checkbox"], [data-control="radio"], [data-control="range"], [data-control="file"]):focus-visible { outline: 2px solid var(--ui-focus) !important; outline-offset: 3px !important; }
+.ui-input:not([data-control="checkbox"]):not([data-control="radio"]):not([data-control="range"]):not([data-control="file"]):focus,
+.ui-select:focus, .ui-textarea:focus { outline: none !important; box-shadow: none !important; }
+.ui-input:not([data-control="checkbox"]):not([data-control="radio"]):not([data-control="range"]):not([data-control="file"]):not([data-control="hidden"]), .ui-textarea, .ui-select {
+  border-radius: var(--ui-radius-control) !important;
+  font: 400 13px/1.5 var(--panel-font, system-ui, sans-serif);
+}
+.ui-input:not([data-control="checkbox"]):not([data-control="radio"]):not([data-control="range"]):not([data-control="file"]):not([data-control="hidden"]), .ui-select { min-height: var(--ui-control-height); }
+.ui-field { display: grid; gap: var(--ui-space); }
+.ui-card { border-radius: var(--ui-radius-card); }
+.ui-dialog { border-radius: 22px; }
+.ui-heading { font-family: var(--panel-font-display, Georgia, serif); }
+[data-ui="table"] { width: 100%; border-collapse: collapse; }
+[data-ui="table-header"], [data-ui="table-cell"] { text-align: left; vertical-align: middle; }
+.ui-field > .ui-label { font-size: 12px; font-weight: 600; }
+.ui-field > .ui-input, .ui-field > .ui-textarea, .ui-field > .ui-select { width: 100%; padding: 10px 12px; border: 1px solid var(--ui-line); background: var(--ui-surface); color: var(--ui-foreground); }
+.ui-field .ui-text { color: var(--ui-muted); font-size: 11px; }
+.ui-field [role="alert"] { color: #a83f3f; }
+.ui-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px; font: 500 11px/1.4 system-ui; color: var(--ui-muted); background: var(--ui-surface); }
+.ui-badge[data-tone="success"] { color: #1e7150; background: #eaf5ee; }
+.ui-badge[data-tone="warning"] { color: #89601c; background: #faf2df; }
+.ui-badge[data-tone="danger"] { color: #a83f3f; background: #faeaea; }
+.ui-alert { padding: 14px 16px; border-radius: var(--ui-radius-control); color: var(--ui-foreground); background: var(--ui-surface); font-size: 13px; }
+.ui-alert[data-tone="danger"] { color: #a83f3f; background: #faeaea; }
+.ui-alert[data-tone="warning"] { color: #89601c; background: #faf2df; }
+.ui-empty-state { display: grid; justify-items: center; gap: 12px; padding: 32px; text-align: center; }
+.ui-empty-state > * { margin: 0; }
+.ui-spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ui-spin .7s linear infinite; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ui-spinner { animation: none; border-style: dotted; } }
+/* Shared flat summary, also used by the production screen stories. */
+.ui-summary-strip { display: grid; grid-template-columns: repeat(var(--summary-columns, 3), minmax(0, 1fr)); margin: 0 0 28px; padding: 0 0 24px; border-bottom: 1px solid var(--ui-line); }
+.ui-summary-strip > div { min-width: 0; padding-inline: 22px; border-left: 1px solid var(--ui-line); }
+.ui-summary-strip > div:first-child { border-left: 0; padding-left: 0; }
+.ui-summary-strip dt { margin-bottom: 10px; color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
+.ui-summary-strip dd { margin: 0; color: var(--ui-foreground); font-size: clamp(22px, 2.4vw, 30px); font-weight: 500; letter-spacing: -.035em; line-height: 1.3; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .ui-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 0; }
+  .ui-summary-strip > div:nth-child(odd) { border-left: 0; padding-left: 0; }
+}

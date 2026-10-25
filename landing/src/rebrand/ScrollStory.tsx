@@ -1,3 +1,4 @@
+import { Heading as UiHeading, Text as UiText } from "../ui/primitives";
 import { Check, Cpu, Laptop, MemoryStick, Sparkles } from "lucide-react";
 import { useRef, type CSSProperties } from "react";
 import { useStoryProgress } from "./use-motion";
@@ -52,8 +53,8 @@ export function ScrollStory() {
       <div className={`rb-story-sticky beat-${beat}`}>
         <div className="rb-shell rb-story-inner">
           <header className="rb-story-head">
-            <p className="rb-kicker"><i /><span>How it works</span></p>
-            <h2 id="rb-story-title">One model.<br /><em>Many machines.</em></h2>
+            <UiText className="rb-kicker"><i /><span>How it works</span></UiText>
+            <UiHeading as="h2" id="rb-story-title">One model.<br /><em>Many machines.</em></UiHeading>
           </header>
 
           <div className="rb-stage" aria-hidden="true">
@@ -103,7 +104,7 @@ export function ScrollStory() {
             <div className="rb-story-copy" key={active.id}>
               <span>{active.id}</span>
               <strong>{active.title}</strong>
-              <p>{active.copy}</p>
+              <UiText>{active.copy}</UiText>
             </div>
             {/* Not aria-hidden: unlike the four dashes it replaces, this rail
                 carries the names of the four steps, and the sticky section only
@@ -124,7 +125,7 @@ export function ScrollStory() {
           four beats, with no scroll dependency. */}
       <ol className="rb-story-fallback rb-shell">
         {BEATS.map((item) => (
-          <li key={item.id}><span>{item.id}</span><div><strong>{item.title}</strong><p>{item.copy}</p></div></li>
+          <li key={item.id}><span>{item.id}</span><div><strong>{item.title}</strong><UiText>{item.copy}</UiText></div></li>
         ))}
       </ol>
     </section>

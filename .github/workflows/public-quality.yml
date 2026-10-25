@@ -27,6 +27,7 @@ jobs:
       - run: npm install --global npm@10.9.8
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run verify:structure
+      - run: npm run verify:ui-kit
       - run: npm run verify:docs
       - run: npm run verify:format
       - run: npm run verify:architecture
@@ -53,6 +54,7 @@ jobs:
       - run: npm run mobile:typecheck
       - run: npm test
       - run: npm run build
+      - run: npm run storybook:build
 
   python:
     name: Python 3.12 runtime

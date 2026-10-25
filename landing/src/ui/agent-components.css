@@ -1,0 +1,228 @@
+/* Semantic component colors for the Agent profile. Legacy declarations never
+   choose component colors in this profile; classic keeps its original cascade. */
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) {
+  color: var(--agent-fg) !important;
+  background: var(--agent-bg) !important;
+  --success: var(--agent-success);
+  --warning: var(--agent-warning);
+  --danger: var(--agent-danger);
+  --text-muted: var(--agent-muted);
+  --accent: var(--agent-primary);
+  --bg-overlay: var(--agent-overlay);
+  accent-color: var(--agent-primary);
+  scrollbar-color: var(--agent-scrollbar) transparent;
+}
+
+/* Clear old per-element paint, including inline decorative accents. Component
+   roles below supply the only fills and text tones. Borders retain their widths. */
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :where(*, *::before, *::after) {
+  color: inherit !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: var(--agent-line) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+/* Page, card, inset, and floating surfaces use distinct, stable slots. */
+:root[data-mycellios-design="agent"] .public-panel :is(.panel-main, .panel-content-scale, .panel-topbar) { background: var(--agent-bg) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-sidebar { background: var(--agent-sidebar) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-card, .panel-card, .dashboard-connect, .live-network-telemetry, .global-capacity-card, .inference-chat, .inference-unavailable, .api-access-panel, .panel-disclosure, .connect-studio-workspace, .contribute-browser-card, .contribute-native-disclosure, .benchmark-history, .net-wall-panel, .net-wall-stat, .net-globe-card, .net-dashboard-chart, .studio-source-form, .earn-option, .spore-metrics > article, .spore-chart-grid > article, .rb-sponsors) {
+  background: var(--agent-card) !important;
+  border-color: var(--agent-card-line) !important;
+}
+:root[data-mycellios-design="agent"] .public-panel :is(.overview-announcement, .global-capacity-device-row, .global-capacity-metric, .inference-toolbar, .inference-route-strip, .chat-input-area, .inference-chat-header, .card-heading, .panel-disclosure > summary, .mesh-scene, .interactive-mesh-stage, .mesh-stats) { background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-dialog, .app-select-menu, .inference-model-menu, .inference-instructions-popover, .inference-settings, .mesh-node-popover, .panel-detail-drawer, .spore-menu-popover, .rb-mobile-nav) {
+  background: var(--agent-popover) !important;
+  border-color: var(--agent-line) !important;
+  color: var(--agent-fg) !important;
+  box-shadow: 0 8px 24px var(--agent-overlay) !important;
+}
+:root[data-mycellios-design="agent"] .public-panel .modal-backdrop { background: var(--agent-overlay) !important; }
+
+/* Typography and ordinary icons inherit a neutral foreground, never bronze. */
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-heading, .panel-brand, .rb-brand, strong, b) { color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-text, .ui-label, small, em, .panel-disclosure > summary small, .connected-peers-controls, .connected-peers-controls label, .peer-share > span, .model-request-hint, .mesh-stage-legend, .panel-sidebar-meta) { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(code, pre) { color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.overview-announcement > div > span, .global-capacity-heading > span, .global-capacity-legend > span, .canvas-head > div > span, .inference-unavailable-copy > span, .api-target-state) { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel .api-target-state.ready { color: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-link, .ui-button[data-variant="ghost"], .ui-button[data-variant="navigation"]) { color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.panel-stat > div, .global-capacity-metric > i, .panel-disclosure-icon, .overview-announcement-icon, .model-icon, .mesh-core > span, .mesh-node > span) {
+  color: var(--agent-muted) !important;
+  background: var(--agent-muted-surface) !important;
+  border-color: var(--agent-line) !important;
+}
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) svg.lucide { color: inherit !important; stroke: currentColor; }
+:root[data-mycellios-design="agent"] .public-panel svg text { fill: var(--agent-muted) !important; }
+
+/* Tables share card surfaces, neutral headings and the same row hover. */
+:root[data-mycellios-design="agent"] .public-panel :is(table, thead, tbody, tr, th, td) { background: transparent !important; border-color: var(--agent-line) !important; }
+:root[data-mycellios-design="agent"] .public-panel thead { background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] .public-panel th { color: var(--agent-muted) !important; font-weight: 500; }
+:root[data-mycellios-design="agent"] .public-panel :is(td, td > code, td > strong) { color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(td > small, .connected-peers-controls > label > span) { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel tbody tr:is(:hover, [aria-selected="true"]) { background: var(--agent-hover) !important; }
+:root[data-mycellios-design="agent"] .public-panel tbody tr[aria-selected="true"] { background: var(--agent-selected) !important; }
+:root[data-mycellios-design="agent"] .public-panel th .ui-button[data-variant="ghost"] { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel th .ui-button:hover { background: transparent !important; color: var(--agent-fg) !important; }
+
+/* Inputs and read-only command fields use the same muted fill and input edge. */
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-input, .ui-select, .ui-textarea, .app-select-trigger):where(:not([data-control="checkbox"]):not([data-control="radio"]):not([data-control="range"]):not([data-control="hidden"])) {
+  background: var(--agent-input-surface) !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--agent-input-line) !important;
+  color: var(--agent-fg) !important;
+}
+:root[data-mycellios-design="agent"] .public-panel :is(.dashboard-connect-command, .dashboard-connect-field) { background: var(--agent-card) !important; border-color: var(--agent-line) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-select, .app-select-trigger) { background: var(--agent-select-surface) !important; }
+:root[data-mycellios-design="agent"] .public-panel .inference-model-picker > button { background: var(--agent-select-surface) !important; border-color: var(--agent-input-line) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-input, .ui-textarea)::placeholder { color: var(--agent-muted) !important; opacity: 1; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-input, .ui-select, .ui-textarea, .app-select-trigger):focus { border-color: var(--agent-ring) !important; }
+:root[data-mycellios-design="agent"] .public-panel option { background: var(--agent-popover) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary:focus:not(:focus-visible) { outline: none; }
+:root[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary:focus-visible { outline: 1px solid var(--agent-ring); outline-offset: -3px; }
+:root[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary:hover { background: var(--agent-hover) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-disclosure-body > .api-access-panel { background: transparent !important; }
+:root[data-mycellios-design="agent"] .public-panel .inference-unavailable-icon { background: var(--agent-muted-surface) !important; color: var(--agent-muted) !important; border-color: var(--agent-card-line) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.inference-unavailable, .inference-console) { border-color: var(--agent-card-line) !important; }
+
+/* Buttons, menus, navigation and every selected/hover state share these slots. */
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button:where(:not(.app-select-trigger)) { border-color: transparent !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-button[data-variant="primary"], .rb-pill, .rb-mobile-cta) {
+  background: var(--agent-primary) !important;
+  color: var(--agent-on-primary) !important;
+}
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button[data-variant="primary"] :is(span, strong, small) { color: inherit !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-button[data-variant="primary"], .rb-pill):hover:not(:disabled) { background: color-mix(in srgb, var(--agent-primary) 80%, var(--agent-bg)) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button[data-variant="secondary"] { background: var(--agent-secondary) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button[data-variant="secondary"]:hover:not(:disabled) { background: var(--agent-hover) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button[data-variant="danger"] { background: color-mix(in srgb, var(--agent-danger) 10%, transparent) !important; color: var(--agent-danger) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-button[data-variant="ghost"], .ui-button[data-variant="navigation"], .panel-join-options .ui-link, .app-select-menu button, .connect-route-picker > button):is(:hover, [aria-expanded="true"], [aria-selected="true"], .selected):not(:disabled):where(:not(.panel-menu-backdrop)) {
+  background: var(--agent-hover) !important;
+  color: var(--agent-fg) !important;
+}
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button:is([data-variant="ghost"], [data-variant="navigation"]):is(.active, [aria-pressed="true"], [data-state="active"]) { background: var(--agent-hover) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-button[data-variant="ghost"], .ui-button[data-variant="navigation"], .app-select-menu button, .connect-route-picker > button):is([aria-selected="true"], [aria-pressed="true"], .selected, .active):not(:disabled) { background: var(--agent-selected) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button:is(.selected, .active, [aria-selected="true"], [aria-pressed="true"]) small { color: var(--agent-selected-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-sidebar nav button.ui-button.active { background: var(--agent-sidebar-accent) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.network-history-ranges, .power-mode-selector, .account-mode-tabs, .inference-tabs) .ui-button.active { background: var(--agent-hover) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel .account-mode-tabs .ui-button.active::after { background: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.connect-platforms .ui-button.active, .account-mode-tabs .ui-button.active) { border-bottom-color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-sidebar nav button:not(.active):not(:hover) { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-input, .ui-select, .ui-textarea):disabled { color: var(--agent-muted) !important; opacity: .65; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-button:is(:disabled, [aria-disabled="true"]) { background: var(--agent-secondary) !important; color: var(--agent-muted) !important; opacity: .65; }
+
+/* Match the supplied neutral settings screens: grouped controls, quiet icon
+   treatment, and one field edge rather than nested browser/legacy borders. */
+:root[data-mycellios-design="agent"] .public-panel :is(.account-mode-tabs, .contribute-levels, .network-history-ranges, .connect-platforms) { background: var(--agent-muted-surface) !important; border: 0; }
+:root[data-mycellios-design="agent"] .public-panel :is(.account-mode-tabs, .contribute-levels, .network-history-ranges, .connect-platforms) .ui-button[data-variant="ghost"]:is(.active, .selected, [aria-pressed="true"]):not(:disabled) { background: var(--agent-card) !important; color: var(--agent-fg) !important; box-shadow: 0 1px 3px var(--agent-overlay) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.account-mode-tabs, .connect-platforms) .ui-button::after { display: none; }
+:root[data-mycellios-design="agent"] .public-panel :is(.account-mode-tabs, .connect-platforms) .ui-button { border-bottom-color: transparent !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.panel-stat > div, .global-capacity-metric > i, .panel-disclosure-icon, .overview-announcement-icon, .announcement-icon, .model-icon, .inference-unavailable-icon) { border: 0 !important; background: transparent !important; color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) { background: var(--agent-input-surface) !important; border: 1px solid var(--agent-input-line) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search):focus-within { border-color: var(--agent-ring) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) .ui-input { border: 0 !important; background: transparent !important; }
+:root[data-mycellios-design="agent"] #mycellios-loader { background: var(--dark-canvas) !important; }
+
+/* Badges and measured status are the only components with semantic colors. */
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-badge, .ui-alert) { background: var(--agent-card) !important; color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-badge, .ui-alert)[data-tone="success"] { color: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-badge, .ui-alert)[data-tone="warning"] { color: var(--agent-warning) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-badge, .ui-alert)[data-tone="danger"] { color: var(--agent-danger) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.ui-badge, .ui-alert, .peer-role, .peer-state, .inference-toolbar-stat) { background: var(--agent-muted-surface) !important; color: var(--agent-muted) !important; border-color: var(--agent-line) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-badge:is(.online, .serving, .connected, .active, .ready, .certified) { color: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-badge:is(.profiling, .activating, .warning, .suspect, .degraded, .paused, .gated, .draining) { color: var(--agent-warning) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) .ui-badge:is(.error, .failed, .danger) { color: var(--agent-danger) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.ui-badge[data-tone="success"], .peer-state.serving, .peer-state.connected, .state-badge.online, .model-state.active, .configured-target) { color: var(--agent-success) !important; background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.ui-badge[data-tone="warning"], .ui-alert[data-tone="warning"], .state-badge.paused, .model-state.profiling) { color: var(--agent-warning) !important; background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.ui-badge[data-tone="danger"], .ui-alert[data-tone="danger"], .state-badge.error, .model-state.failed, .ui-field [role="alert"]) { color: var(--agent-danger) !important; background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.peer-state, .state-badge, .ui-badge) > :is(span, strong, small) { color: inherit !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.peer-state.serving, .peer-state.connected, .state-badge.online) > i,
+:root[data-mycellios-design="agent"] .public-panel :is(.mesh-core > i, .mesh-node > span i, .panel-sidebar-status.healthy i) { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-sidebar-status.degraded i { background: var(--agent-warning) !important; }
+
+/* Tracks and toggles use primary/accent fills, not decorative amber. */
+:root[data-mycellios-design="agent"] .public-panel :is(.global-capacity-track, .global-capacity-bar, .peer-share > i, .node-overview-progress, .toggle-row > i, .capacity-line) { background: var(--agent-secondary) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.global-capacity-track > i, .global-capacity-bar > i, .global-capacity-bar > b, .peer-share > i > b, .node-overview-progress > i, .capacity-line > span) { background: var(--agent-primary) !important; }
+:root[data-mycellios-design="agent"] .public-panel .toggle-row[aria-checked="true"] > i { background: var(--agent-primary) !important; }
+:root[data-mycellios-design="agent"] .public-panel .toggle-row > i::after { background: var(--agent-bg) !important; }
+
+/* Live data uses the same semantic tones as the kit, including legacy class names. */
+:root[data-mycellios-design="agent"] .public-panel :is(.ui-alert[data-tone="success"], .network-model-state.active, .model-request-status:is(.ready,.active), .node-status.idle, .node-status.busy, .hub-status-pill.certified, .account-auth-success, .owned-node-feedback.ok, .owned-node-command.applied, .owned-node-control-head > b.converged) { color: var(--agent-success) !important; background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.network-model-state:is(.profiling,.activating), .model-request-status:is(.profiling,.activating), .node-status.degraded, .hub-status-pill.gated, .owned-node-control-head > b.pending, .node-incident, .product-state-banner.tone-warning) { color: var(--agent-warning) !important; background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.network-model-state.failed, .model-request-status.failed, .node-status.error, .inference-error, .account-auth-error, .owned-node-feedback.error, .owned-node-command.expired, .product-state-banner.tone-danger) { color: var(--agent-danger) !important; background: var(--agent-card) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.peer-state, .network-model-state, .node-status, .model-detail-badges > span) > i { background: currentColor !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.model-capacity-bar, .remote-accelerator-progress) { background: var(--agent-secondary) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.model-capacity-bar, .remote-accelerator-progress) > i { background: var(--agent-primary) !important; }
+:root[data-mycellios-design="agent"] .public-panel .ui-spinner { border-color: currentColor !important; border-right-color: transparent !important; }
+:root[data-mycellios-design="agent"] .public-panel .network-history-legend > span > i { background: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel .network-history-legend .green i { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .public-panel .network-history-legend .purple i { background: var(--agent-working) !important; }
+:root[data-mycellios-design="agent"] .public-panel .network-history-legend .orange i { background: var(--agent-warning) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.history-grid-line, .benchmark-grid-line) { stroke: var(--agent-line) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-menu-backdrop { background: var(--agent-overlay) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.ui-input, .ui-textarea)[aria-invalid="true"] { border-color: var(--agent-danger) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.mesh-head-status, .mesh-stage-legend) > b > i { background: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel .live-network-telemetry .inflight > i { background: var(--agent-secondary) !important; }
+:root[data-mycellios-design="agent"] .public-panel .live-network-telemetry .inflight > i.active::after { background: var(--agent-working) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.live-telemetry-meter, .accelerator-compact-progress, .accelerator-progress-track) { background: var(--agent-secondary) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.live-telemetry-meter > b, .accelerator-compact-progress > i, .accelerator-progress-track > i) { background: var(--agent-primary) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.node-topology-legend i, .topology-node > div > i, .contribute-connection i, .contribute-activity-dot) { background: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.node-topology-legend i.active, .topology-node.active > div > i, .contribute-connection.online i, .contribute-activity-dot.active, .node-network-hub > i) { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .public-panel :is(.node-topology-legend i.warning, .topology-node.warning > div > i) { background: var(--agent-warning) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-legend i { background: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-legend i.series-1 { background: var(--agent-working) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-legend i.series-2 { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-legend i.series-3 { background: var(--agent-warning) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-series:is(.series-1, .tone-purple) { color: var(--agent-working) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-series:is(.series-2, .tone-green) { color: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-series:is(.series-3, .tone-orange) { color: var(--agent-warning) !important; }
+:root[data-mycellios-design="agent"] .public-panel .benchmark-confidence-band { fill: color-mix(in srgb, var(--agent-working) 13%, transparent); stroke: color-mix(in srgb, var(--agent-working) 28%, transparent); }
+:root[data-mycellios-design="agent"] .public-panel .node-topology-links line { stroke: var(--agent-line); }
+:root[data-mycellios-design="agent"] .public-panel .node-topology-links line.active { stroke: var(--agent-success); }
+:root[data-mycellios-design="agent"] .public-panel .node-topology-links line.warning { stroke: var(--agent-warning); }
+:root[data-mycellios-design="agent"] .net :is(.net-ledger-row, .net-wall-activity-row):not(.head):hover { background: var(--agent-hover) !important; }
+:root[data-mycellios-design="agent"] .net .net-state-dot { background: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .net .net-state-dot.serving { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .net .net-panel-bar { background: var(--agent-secondary) !important; }
+:root[data-mycellios-design="agent"] .net .net-panel-bar .fill { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .net .net-legend span > i { background: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .net .net-legend span:first-child > i { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .net .net-legend span:nth-child(3) > i { background: color-mix(in srgb, var(--agent-fg) 32%, transparent) !important; }
+:root[data-mycellios-design="agent"] .net .net-legend span:nth-child(4) > i { background: color-mix(in srgb, var(--agent-fg) 16%, transparent) !important; }
+:root[data-mycellios-design="agent"] .net svg text { fill: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .net :is(.net-chart-line, .net-wall-line) { stroke: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .net :is(.net-chart-line, .net-wall-line).bronze { stroke: var(--agent-working) !important; }
+:root[data-mycellios-design="agent"] .net :is(.net-chart-line, .net-wall-line).sage { stroke: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page) :is(.inference-user-message, .support-assistant-message.user) { background: var(--agent-chat-user) !important; color: var(--agent-on-chat-user) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page) :is(.inference-user-message, .support-assistant-message.user) :is(.ui-text, span, small, strong, b, code) { color: inherit !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page) .support-assistant-message.assistant { background: var(--agent-muted-surface) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page) .support-assistant-success { color: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page) .support-assistant-error { color: var(--agent-danger) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page) .support-assistant-launcher > i.online { background: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page) .support-assistant-launcher > i.offline { background: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .studio-page .studio-progress { background: var(--agent-secondary) !important; }
+:root[data-mycellios-design="agent"] .studio-page .studio-progress i { background: var(--agent-primary) !important; }
+:root[data-mycellios-design="agent"] .spore-page .spore-bars i { background: var(--agent-primary) !important; }
+:root[data-mycellios-design="agent"] .spore-page .spore-signal-grid i { background: var(--agent-success) !important; }
+
+/* The marketing page keeps its light/dark sections and illustrations. */
+:root[data-mycellios-design="agent"] .rb-page :is(.rb-hero, .rb-header, .rb-closing, .rb-get) { background: var(--agent-bg) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .rb-page .rb-models-panel { background: var(--agent-card) !important; color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .rb-page :is(.rb-kicker, .rb-quest-no, .rb-footer-bottom, .rb-rule-top, .rb-models-note, .rb-pay-note) { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .rb-page .rb-hero-prompt input { background: var(--agent-muted-surface) !important; color: var(--agent-fg) !important; border-color: var(--agent-input-line) !important; }
+:root[data-mycellios-design="agent"] .rb-page .rb-hero-prompt button { background: var(--agent-primary) !important; color: var(--agent-on-primary) !important; }
+
+/* Minimal overview labels and evidence use the shared semantic palette. */
+:root[data-mycellios-design="agent"] .public-panel :is(.overview-status, .overview-summary dt, .overview-model-nodes, .overview-model-row > svg, .overview-details > h2, .overview-detail > summary > svg, .overview-runtime dt, .overview-activity-heading) { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel .overview-status > i { background: currentColor !important; }
+:root[data-mycellios-design="agent"] .public-panel .overview-status.fresh > i { color: var(--agent-success) !important; }
+:root[data-mycellios-design="agent"] .public-panel .overview-status:is(.stale, .degraded) { color: var(--agent-warning) !important; }
+:root[data-mycellios-design="agent"] .public-panel .overview-detail > summary:hover { background: var(--agent-hover) !important; }
+
+/* Minimal screen hierarchy keeps the same Agent color roles. */
+:root[data-mycellios-design="agent"] .public-panel .ui-summary-strip dt { color: var(--agent-muted) !important; }
+:root[data-mycellios-design="agent"] .public-panel .ui-summary-strip dd { color: var(--agent-fg) !important; }
+:root[data-mycellios-design="agent"] .public-panel .panel-disclosure.minimal-disclosure { background: transparent !important; border-radius: 0 !important; }
+:root[data-mycellios-design="agent"] .public-panel .minimal-screen .network-history-toolbar { background: transparent !important; }

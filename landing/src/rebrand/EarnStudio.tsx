@@ -1,3 +1,4 @@
+import { Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import { AppWindow, ChevronRight, Download, MonitorUp } from "lucide-react";
 import { LandingHeader } from "./RebrandLanding";
 import "./earn-studio.css";
@@ -32,18 +33,18 @@ export function EarnStudio() {
 
       <section className="earn-intro">
         <span>CONTRIBUTE CAPACITY</span>
-        <h1>Put your machine to work.</h1>
-        <p>Choose how this device joins the Mycellios test network. You stay in control of what it shares and when it stops.</p>
+        <UiHeading as="h1">Put your machine to work.</UiHeading>
+        <UiText>Choose how this device joins the Mycellios test network. You stay in control of what it shares and when it stops.</UiText>
       </section>
 
       <section className="earn-options" aria-label="Contribution options">
         {contributionOptions.map((option) => {
           const Icon = option.icon;
-          return <article className={`earn-option ${option.id}`} key={option.id}>
+          return <UiCard className={`earn-option ${option.id}`} key={option.id}>
             <div className="earn-option-icon"><Icon /></div>
-            <div className="earn-option-copy"><span>{option.eyebrow}</span><h2>{option.title}</h2><p>{option.copy}</p><small>{option.detail}</small></div>
-            <a href={option.href}>{option.id === "native" && <Download />}<span>{option.action}</span><ChevronRight /></a>
-          </article>;
+            <div className="earn-option-copy"><span>{option.eyebrow}</span><UiHeading as="h2">{option.title}</UiHeading><UiText>{option.copy}</UiText><small>{option.detail}</small></div>
+            <UiLink href={option.href}>{option.id === "native" && <Download />}<span>{option.action}</span><ChevronRight /></UiLink>
+          </UiCard>;
         })}
       </section>
 

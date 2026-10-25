@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
-  FLARE_TAPER,
+  flareInk,
+  meanCoverage,
   makeSporeField,
   refitSporeField,
   riseSpore,
@@ -136,24 +137,7 @@ function tintedRGB(tint: number): string {
   ].join(",");
 }
 
-/**
- * One species' sprite, drawn once into an offscreen canvas and then blitted.
- *
- * The stops come from `SPECIES_PROFILE` rather than being written here, because
- * the coverage ceiling the layer is held to is a statement about those numbers
- * and a `CanvasGradient` cannot be measured. Every species is a radial falloff
- * that reaches zero at its rim and has no hard stop anywhere in it — a mote with
- * an edge is a dot, and a field of dots is a halftone screen, which is the exact
- * printed texture this brand was taken off.
- *
- * The sprite is drawn at full opacity and the per-mote alpha is applied by the
- * caller through `globalAlpha`, so one sprite per species serves the whole
- * field at every ink and every size.
- *
- * The canvas is `extent` times the disc so a species whose flare runs past its
- * own rim has somewhere to put it; the disc stays centred and keeps its own
- * radius, so nothing about a mote's size or ink changes because the box grew.
- */
+/** Flat sprites retain the profile's integrated ink, shared by every mote. */
 function makeSprite(species: Species): HTMLCanvasElement {
   const sprite = document.createElement("canvas");
   sprite.width = sprite.height = SPRITE;
@@ -164,26 +148,12 @@ function makeSprite(species: Species): HTMLCanvasElement {
   /* The disc occupies 1/extent of the sprite; the rest is room for the arms. */
   const radius = mid / sporeExtent(species);
 
-  const gradient = context.createRadialGradient(mid, mid, 0, mid, mid, radius);
-  for (const stop of profile.stops) {
-    gradient.addColorStop(stop.offset, `rgba(${tintedRGB(stop.tint)},${stop.alpha})`);
-  }
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, SPRITE, SPRITE);
+  context.fillStyle = `rgba(${tintedRGB(0.15)},${meanCoverage(profile.stops)})`;
+  context.beginPath();
+  context.arc(mid, mid, radius, 0, Math.PI * 2);
+  context.fill();
 
-  /*
-   * The flare, painted after the disc and only where a species declares one.
-   *
-   * Each arm is a triangle from the centre out to `reach`, filled with a
-   * gradient that reaches zero alpha at the tip — so the arm tapers in width and
-   * in ink at the same time and has no visible end. `lighter` composites it
-   * additively, which is what makes the crossing point at the centre read as the
-   * brightest part of the spark rather than as four overlapping strokes.
-   *
-   * The arms are drawn at half-offsets of π so a four-armed flare is an upright
-   * cross rather than a saltire: a diagonal star is a decorative asset, an
-   * upright one is a highlight.
-   */
+  // Uniform arm opacity preserves the integrated ink of the reference profile.
   const flare = profile.flare;
   if (flare) {
     context.globalCompositeOperation = "lighter";
@@ -194,19 +164,8 @@ function makeSprite(species: Species): HTMLCanvasElement {
       context.save();
       context.translate(mid, mid);
       context.rotate(angle);
-      /* Straight from `FLARE_TAPER`, which is the curve `flareInk` integrates —
-         a gradient written by hand here would drift away from the measured cost
-         of the arms with nothing to catch it. Its tints are near-bronze
-         throughout, because an arm is a thin streak and a thin streak of
-         near-white over ivory paper is nothing at all: the same
-         annulus-around-a-hole failure the radial stops are kept low for, in the
-         one place it would have been easiest to miss, since a flare is
-         *supposed* to be the bright part. */
-      const taper = context.createLinearGradient(0, 0, reach, 0);
-      for (const stop of FLARE_TAPER) {
-        taper.addColorStop(stop.offset, `rgba(${tintedRGB(stop.tint)},${flare.alpha * stop.alpha})`);
-      }
-      context.fillStyle = taper;
+      const armAlpha = flareInk(flare) * Math.PI / (flare.arms * flare.reach * flare.width);
+      context.fillStyle = `rgba(${tintedRGB(0.15)},${armAlpha})`;
       context.beginPath();
       context.moveTo(0, -half);
       context.lineTo(reach, 0);

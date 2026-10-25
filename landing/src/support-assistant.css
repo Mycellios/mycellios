@@ -29,7 +29,7 @@
   border: 1px solid rgba(217, 185, 140, .38);
   border-radius: 18px;
   color: #fff;
-  background: linear-gradient(135deg, rgba(173, 122, 72, .98), rgba(138, 95, 54, .98));
+  background: rgba(173, 122, 72, .98);
   box-shadow: 0 18px 55px rgba(74, 52, 29, .5), inset 0 1px rgba(255,255,255,.17);
   cursor: pointer;
 }
@@ -83,8 +83,7 @@
   border: 1px solid rgba(214, 178, 139, .27);
   border-radius: 24px;
   background:
-    radial-gradient(circle at 85% 0, rgba(196, 154, 110, .22), transparent 37%),
-    linear-gradient(160deg, rgba(29, 53, 41, .99), rgba(15, 28, 22, .995));
+    color-mix(in srgb, var(--bg-card, var(--dark-surface)) 99%, transparent);
   box-shadow: 0 30px 100px rgba(0, 0, 0, .6), inset 0 1px rgba(255,255,255,.05);
   transition: color .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
   animation: assistant-in .22s ease-out both;
@@ -126,7 +125,7 @@
   border: 1px solid rgba(204, 173, 140, .16);
   border-radius: 10px;
   color: #cdb8a2;
-  background: rgba(18, 33, 25, .48);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 48%, transparent);
   cursor: pointer;
 }
 .support-assistant-window > header button:hover { color: #fff; border-color: rgba(204, 173, 140, .35); }
@@ -138,7 +137,7 @@
   border: 1px solid rgba(218, 174, 127, .4);
   border-radius: 13px;
   color: #e3c3a0;
-  background: linear-gradient(145deg, rgba(191, 143, 92, .35), rgba(138, 107, 74, .25));
+  background: rgba(191, 143, 92, .35);
 }
 
 .support-assistant-conversation {
@@ -162,7 +161,7 @@
   border: 1px solid rgba(200, 170, 138, .17);
   border-radius: 7px 16px 16px 16px;
   color: #ede6de;
-  background: rgba(33, 61, 47, .78);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 78%, transparent);
   font-size: 12px;
   line-height: 1.58;
   white-space: pre-wrap;
@@ -171,7 +170,7 @@
   border-color: rgba(209, 168, 124, .38);
   border-radius: 16px 7px 16px 16px;
   color: #fff;
-  background: linear-gradient(145deg, rgba(172, 130, 85, .75), rgba(121, 94, 65, .75));
+  background: rgba(172, 130, 85, .75);
 }
 .support-assistant-mini-avatar {
   display: grid;
@@ -205,7 +204,7 @@
   border: 1px solid rgba(202, 168, 132, .18);
   border-radius: 11px;
   color: #cebaa5;
-  background: rgba(20, 38, 29, .58);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 58%, transparent);
   font-size: 11px;
   text-align: left;
   cursor: pointer;
@@ -218,7 +217,7 @@
   padding: 12px;
   border: 1px solid rgba(133, 203, 127, .25);
   border-radius: 14px;
-  background: linear-gradient(145deg, rgba(22,91,80,.23), rgba(37, 66, 52, .55));
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 23%, transparent);
 }
 .support-assistant-action > div { display: flex; gap: 9px; }
 .support-assistant-action > div > svg { flex: 0 0 auto; color: #87ca81; }
@@ -250,7 +249,7 @@
   padding: 9px 10px;
   border-radius: 10px;
   color: #86c980;
-  background: rgba(25,96,78,.18);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 18%, transparent);
   font-size: 10px;
 }
 .support-assistant-error { color: #ff9daf; background: rgba(125,31,60,.16); }
@@ -286,7 +285,7 @@
   gap: 8px;
   padding: 12px 13px;
   border-top: 1px solid var(--assistant-line);
-  background: rgba(14, 26, 20, .68);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 68%, transparent);
 }
 .support-assistant-composer textarea {
   width: 100%;
@@ -300,7 +299,7 @@
   border-radius: 12px;
   outline: none;
   color: #fff;
-  background: rgba(26, 48, 37, .75);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 75%, transparent);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -314,7 +313,7 @@
   border: 0;
   border-radius: 12px;
   color: #fff;
-  background: linear-gradient(145deg, #ad7a48, #8a5f36);
+  background-color: #ad7a48;
   cursor: pointer;
 }
 .support-assistant-composer button:disabled { opacity: .42; cursor: not-allowed; }
@@ -333,8 +332,7 @@
 .public-panel-viewport:has(.public-panel.theme-light) .support-assistant-window {
   border-color: rgba(30, 42, 34, .15);
   background:
-    radial-gradient(circle at 85% 0, rgba(173, 122, 72, .11), transparent 38%),
-    linear-gradient(160deg, #fff, #f7f3ed);
+    #fff;
   box-shadow: 0 28px 80px rgba(46, 55, 48, .18), inset 0 1px rgba(255,255,255,.9);
 }
 .public-panel-viewport:has(.public-panel.theme-light) .support-assistant-window > header button {
@@ -351,7 +349,7 @@
 .public-panel-viewport:has(.public-panel.theme-light) .support-assistant-avatar {
   border-color: rgba(173, 122, 72, .3);
   color: #8a5f36;
-  background: linear-gradient(145deg, #f5eadf, #eee4d8);
+  background: #f5eadf;
 }
 .public-panel-viewport:has(.public-panel.theme-light) .support-assistant-conversation {
   scrollbar-color: rgba(138, 95, 54, .28) transparent;
@@ -364,7 +362,7 @@
 .public-panel-viewport:has(.public-panel.theme-light) .support-assistant-message.user p {
   border-color: rgba(138, 95, 54, .34);
   color: #fff;
-  background: linear-gradient(145deg, #ad7a48, #8a5f36);
+  background: #ad7a48;
 }
 .public-panel-viewport:has(.public-panel.theme-light) .support-assistant-mini-avatar {
   border-color: rgba(173, 122, 72, .25);

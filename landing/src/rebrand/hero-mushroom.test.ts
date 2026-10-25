@@ -27,7 +27,7 @@ describe("the hero mushroom is not left downloading behind the bundle", () => {
     // The same mutually exclusive route flags choose the lazy page and derive
     // `isLanding`; a panel or studio route must never pay for this chunk.
     expect(main).toContain("const isLanding = !isCreate && !isEarn && !isSpore && !isNetwork && !isPanel");
-    expect(main).toMatch(/if \(isLanding && wantsMushroom\(\)\)/);
+    expect(main).toMatch(/if \(isLanding && previousLanding && wantsMushroom\(\)\)/);
   });
 
   it("keeps the renderer in its own chunk instead of inlining it into the entry", async () => {

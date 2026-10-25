@@ -53,9 +53,9 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
 /* The hero fills exactly one screen — no cap — so the next section never peeks
    in under the fold. svh keeps mobile browser chrome from cropping the prompt. */
 .rb-hero { position:relative; min-height:100vh; min-height:100svh; display:flex; align-items:center; overflow:hidden; border-bottom:1px solid rgba(238,233,226,.1); background:#0b0f0c; color:#eee9e2; }
-.rb-hero::after { content:""; position:absolute; inset:0; z-index:3; background:radial-gradient(105% 85% at 10% 50%,rgba(11,15,12,.95) 0%,rgba(11,15,12,.74) 34%,rgba(11,15,12,.2) 58%,transparent 78%); pointer-events:none; }
+.rb-hero::after { content:""; position:absolute; inset:0; z-index:3; background:transparent; pointer-events:none; }
 .rb-globe { position:absolute; z-index:2; top:50%; right:-3%; width:min(1120px,66vw,94vh); aspect-ratio:1; transform:translateY(-50%); }
-.rb-globe canvas { width:100%; height:100%; display:block; background:radial-gradient(circle at 50% 50%,rgba(11,15,12,.96) 0 67%,rgba(11,15,12,.78) 69%,transparent 71%); }
+.rb-globe canvas { width:100%; height:100%; display:block; background:rgba(11,15,12,.96); }
 /* The standing fruiting body is planted at the viewport edge beside SCROLL.
    Its base is the page-wide mycelium's real origin, while the smaller scale
    keeps the cue readable and returns the headline to an unobstructed plane. */
@@ -135,7 +135,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
    (top:50%, not 38%), sized so the visible disc still clears the edges at the
    top of the breathe, and faded to a true transparent well before its own
    radius. */
-.rb-closing::before { content:""; position:absolute; inset:0; background:radial-gradient(circle closest-side,rgba(173,122,72,.28),rgba(173,122,72,.09) 42%,transparent 70%); animation:rbHalo 11s ease-in-out infinite; pointer-events:none; }
+.rb-closing::before { content:""; position:absolute; inset:0; background:transparent; animation:rbHalo 11s ease-in-out infinite; pointer-events:none; }
 @keyframes rbHalo { 0%,100% { transform:scale(.88); opacity:.6; } 50% { transform:scale(1.12); opacity:1; } }
 .rb-closing-inner { position:relative; z-index:1; display:grid; justify-items:center; padding-block:130px; }
 /* The fruiting body that closes the page. Same generator as the hero globe and
@@ -163,10 +163,10 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
    and it has to be here too. Butt-capped so its top edge sits flat under the
    fill instead of bulging a round end through the cap. */
 .rb-fruit-stipe-shadow { --len:80; stroke:rgba(173,122,72,.28); stroke-width:18; stroke-linecap:round; filter:url(#rb-fruit-soft-glow); }
-.rb-fruit-stipe { --len:80; stroke:url(#rb-fruit-stipe-paint); stroke-width:13; stroke-linecap:round; }
+.rb-fruit-stipe { --len:80; stroke:#eadfce; stroke-width:13; stroke-linecap:round; }
 .rb-fruit-stipe-light { --len:80; stroke:rgba(255,250,240,.44); stroke-width:2.4; stroke-linecap:round; transform:translateX(2px); }
-.rb-fruit-cap { --len:152; stroke:#e5d1b7; stroke-width:2.5; fill:url(#rb-fruit-cap-paint); fill-opacity:0; }
-.rb-fruit-under { --len:96; stroke:#a87349; stroke-width:1.7; fill:url(#rb-fruit-under-paint); fill-opacity:0; }
+.rb-fruit-cap { --len:152; stroke:#e5d1b7; stroke-width:2.5; fill:#d9bd99; fill-opacity:0; }
+.rb-fruit-under { --len:96; stroke:#a87349; stroke-width:1.7; fill:#b98455; fill-opacity:0; }
 .rb-fruit-cap-light { --len:112; stroke:rgba(255,250,241,.72); stroke-width:1.9; fill:none; }
 /* The cap fills once its outline has closed. Stroking alone leaves an arc, and
    an arc over a stalk is an umbrella — the solid is what makes it a cap, and
@@ -296,7 +296,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
    three blocks butt together with square inner edges and look like one bar; as
    the gap opens those corners round to match the outer ones. Order is
    top-left / top-right / bottom-right / bottom-left. */
-.rb-stage-model i { flex:1; height:100%; margin-inline:calc(var(--p1) * 5px); background:linear-gradient(180deg,#b9834e,#a06f3f); border-radius:calc(var(--p1) * 2px); opacity:calc(1 - var(--p1) * var(--i) * .14); }
+.rb-stage-model i { flex:1; height:100%; margin-inline:calc(var(--p1) * 5px); background:#b9834e; border-radius:calc(var(--p1) * 2px); opacity:calc(1 - var(--p1) * var(--i) * .14); }
 .rb-stage-model i.shard-0 { border-radius:2px calc(var(--p1) * 2px) calc(var(--p1) * 2px) 2px; }
 .rb-stage-model i.shard-2 { border-radius:calc(var(--p1) * 2px) 2px 2px calc(var(--p1) * 2px); }
 
@@ -401,7 +401,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
 /* The scale bar is logarithmically compressed: `--w` keeps 12B and 2.8T visible
    in the same table without pretending that screen width is a memory estimate. */
 .rb-model-track { display:block; height:3px; margin-top:8px; border-radius:999px; background:rgba(238,233,226,.1); overflow:hidden; }
-.rb-model-track i { display:block; width:calc(var(--w,0)*1%); height:100%; border-radius:999px; background:linear-gradient(90deg,#70806d,#dfb98c); transform:scaleX(0); transform-origin:0 50%; transition:transform .75s cubic-bezier(.22,.8,.2,1); transition-delay:calc(.34s + var(--i,0)*.09s); }
+.rb-model-track i { display:block; width:calc(var(--w,0)*1%); height:100%; border-radius:999px; background:#70806d; transform:scaleX(0); transform-origin:0 50%; transition:transform .75s cubic-bezier(.22,.8,.2,1); transition-delay:calc(.34s + var(--i,0)*.09s); }
 .rb-models-panel.is-live .rb-model-track i { transform:none; }
 .rb-model-fit { display:flex; align-items:center; gap:8px; }
 .rb-model-fit>i { width:7px; height:7px; border-radius:50%; background:#829184; box-shadow:0 0 0 3px rgba(130,145,132,.12); flex:none; }
@@ -543,11 +543,11 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
 /* Wide at the ground, narrower under the cap: a constant-width stalk is a
    dowel. Filled rather than stroked so it is part of the same solid — a
    stroked path here would composite against the cap's fill. */
-.rb-gutter-fruiting .rb-gutter-stipe { fill:url(#rbGutterStipe); }
+.rb-gutter-fruiting .rb-gutter-stipe { fill:#c49261; }
 /* One hue, crown to rim. Just enough ramp to give the cap a near side and read
    as a body rather than a filled outline — this is still texture beside a
    pricing table, so it stops well short of modelling. */
-.rb-gutter-fruiting .rb-gutter-cap { fill:url(#rbGutterCap); }
+.rb-gutter-fruiting .rb-gutter-cap { fill:#d4aa7b; }
 /* The overhanging rim, redrawn over the fill: the one edge that has to survive
    at 60px. Darker than the fill so it sinks into the cup as shade rather than
    sitting on the cap as a highlight. */
@@ -623,7 +623,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
 
 /* Three coins travel the wire on a loop, so money is visibly moving in both
    halves of the rail rather than implied by an arrow. Transform only. */
-.rb-pay-wire { position:relative; height:2px; background:linear-gradient(90deg,rgba(30,42,34,.14),rgba(173,122,72,.4)); }
+.rb-pay-wire { position:relative; height:2px; background:rgba(30,42,34,.14); }
 .rb-pay-wire i { position:absolute; top:50%; left:0; width:7px; height:7px; margin-top:-3.5px; border-radius:50%; background:var(--rb-bronze); box-shadow:0 0 0 3px rgba(173,122,72,.16); opacity:0; }
 .rb-pay-rail.is-live .rb-pay-wire i { animation:rbCoin 2.4s cubic-bezier(.5,0,.5,1) infinite; animation-delay:calc(var(--i)*.8s); }
 @keyframes rbCoin { 0% { transform:translateX(0); opacity:0; } 15%,80% { opacity:1; } 100% { transform:translateX(78px); opacity:0; } }
@@ -649,7 +649,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
 /* The bar is the share as width: the same memory split the diagram above shows,
    now framed as route attribution rather than a fabricated retail price. */
 .rb-pay-bar { grid-column:1/-1; height:4px; border-radius:999px; background:rgba(30,42,34,.08); overflow:hidden; }
-.rb-pay-bar i { display:block; width:calc(var(--share,0)*1%); height:100%; border-radius:999px; background:linear-gradient(90deg,#70806d,var(--rb-bronze)); transform:scaleX(0); transform-origin:0 50%; transition:transform .8s cubic-bezier(.22,.8,.2,1); transition-delay:calc(.4s + var(--i,0)*.11s); }
+.rb-pay-bar i { display:block; width:calc(var(--share,0)*1%); height:100%; border-radius:999px; background:#70806d; transform:scaleX(0); transform-origin:0 50%; transition:transform .8s cubic-bezier(.22,.8,.2,1); transition-delay:calc(.4s + var(--i,0)*.11s); }
 .rb-pay-rail.is-live .rb-pay-bar i { transform:none; }
 /* The receipt stamps in after its own bar has finished filling — the payment is
    the consequence of the proof, and the order on screen says so. */
@@ -694,7 +694,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
    style this brand is separating from. Horizontal rules at 30px say "a page in
    a notebook" instead, which is the register the whole band now sits in, and
    they still keep this from reading as the top of the ivory doors below. */
-.rb-local { padding-block:clamp(52px,7vh,80px); background:var(--rb-ivory) repeating-linear-gradient(180deg,rgba(30,42,34,.05) 0 1px,transparent 1px 30px); border-bottom:1px solid var(--rb-line); }
+.rb-local { padding-block:clamp(52px,7vh,80px); background:var(--rb-ivory); border-bottom:1px solid var(--rb-line); }
 /* The right half is the wider one: the endpoint has to hold a 44-character URL
    on one line, and the copy beside it is three short lines that do not need
    room. */
@@ -726,7 +726,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
 .rb-local-cards.is-live .rb-local-switch:hover { border-color:var(--rb-bronze); background:rgba(173,122,72,.05); }
 .rb-local-switch:active { transform:translateY(0); }
 .rb-local-switch:focus-visible { outline:3px solid rgba(173,122,72,.28); outline-offset:3px; }
-.rb-local-switch.is-on { border-color:rgba(173,122,72,.62); background:linear-gradient(135deg,var(--rb-paper),rgba(223,185,140,.16)); }
+.rb-local-switch.is-on { border-color:rgba(173,122,72,.62); background:var(--rb-paper); }
 .rb-local-knob { width:42px; height:23px; padding:3px; border-radius:999px; background:rgba(30,42,34,.13); transition:background-color .18s ease; }
 .rb-local-knob i { display:block; width:17px; height:17px; border-radius:50%; background:var(--rb-paper); box-shadow:0 2px 5px rgba(30,42,34,.22); transition:transform .18s ease; }
 .rb-local-switch.is-on .rb-local-knob { background:var(--rb-bronze); }
@@ -880,7 +880,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
 /* A slow bronze wash travels across the strip, so the one part of the page that
    describes unbuilt work is visibly labelled as in motion. */
 .rb-next-strip { position:relative; overflow:hidden; }
-.rb-next-strip::before { content:""; position:absolute; inset:0; background:linear-gradient(100deg,transparent 34%,rgba(173,122,72,.16) 50%,transparent 66%); transform:translateX(-100%); animation:rbSheen 6.5s ease-in-out 1.4s infinite; pointer-events:none; }
+.rb-next-strip::before { content:""; position:absolute; inset:0; background:transparent; transform:translateX(-100%); animation:rbSheen 6.5s ease-in-out 1.4s infinite; pointer-events:none; }
 @keyframes rbSheen { 0% { transform:translateX(-100%); } 55%,100% { transform:translateX(100%); } }
 .rb-next-strip svg { width:16px; height:16px; color:var(--rb-bronze); }
 .rb-next-strip b { margin-left:auto; color:#8a8272; font:500 10px var(--rb-font-mono); letter-spacing:.1em; text-transform:uppercase; }
@@ -932,7 +932,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
      hairline separators, a mono kicker for the $SPORE cluster, the login as
      a bronze CTA, and a backdrop that dims the page behind it. */
   .rb-mobile-backdrop { position:fixed; z-index:39; inset:0; display:block; background:rgba(8,11,9,.55); backdrop-filter:blur(3px); animation:rbFade .18s ease-out both; }
-  .rb-header-inner > .rb-mobile-nav { position:absolute; z-index:40; top:78px; left:var(--rb-gutter); right:var(--rb-gutter); display:flex; flex-direction:column; padding:12px 14px 16px; border:1px solid rgba(238,233,226,.14); border-radius:20px; background:radial-gradient(120% 90% at 85% 0%,rgba(173,122,72,.18),transparent 55%),#0e1511; color:#eee9e2; box-shadow:0 30px 70px rgba(0,0,0,.45); animation:rbMobileNavIn .24s cubic-bezier(.22,.8,.2,1) both; }
+  .rb-header-inner > .rb-mobile-nav { position:absolute; z-index:40; top:78px; left:var(--rb-gutter); right:var(--rb-gutter); display:flex; flex-direction:column; padding:12px 14px 16px; border:1px solid rgba(238,233,226,.14); border-radius:20px; background:#0e1511; color:#eee9e2; box-shadow:0 30px 70px rgba(0,0,0,.45); animation:rbMobileNavIn .24s cubic-bezier(.22,.8,.2,1) both; }
   .rb-mobile-group { display:flex; flex-direction:column; padding-block:7px; }
   .rb-mobile-group + .rb-mobile-group { border-top:1px solid rgba(238,233,226,.08); }
   .rb-mobile-nav a { display:flex; align-items:center; justify-content:space-between; min-height:48px; padding:0 10px; border-radius:12px; font-size:16.5px; font-weight:550; letter-spacing:-.01em; color:#e9e3d7; }
@@ -977,7 +977,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
      rather than a rotated container (a rotation would tilt the cards too). */
   .rb-pay-rail { grid-template-columns:1fr; }
   .rb-pay-card { text-align:center; justify-items:center; }
-  .rb-pay-wire { justify-self:center; width:2px; height:56px; background:linear-gradient(180deg,rgba(30,42,34,.14),rgba(173,122,72,.4)); }
+  .rb-pay-wire { justify-self:center; width:2px; height:56px; background:rgba(30,42,34,.14); }
   .rb-pay-wire i { left:50%; top:0; margin:0 0 0 -3.5px; }
   .rb-pay-rail.is-live .rb-pay-wire i { animation-name:rbCoinDown; }
   .rb-pay-machines { padding:0; }
@@ -1042,7 +1042,7 @@ body:has(.rb-page) { margin:0; background:var(--rb-paper); color:var(--rb-ink); 
   .rb-ground-mushroom-e { left:66%; --rb-mini-size:23px; --rb-mini-opacity:.62; }
   .rb-hero h1 { font-size:clamp(40px,12.5vw,54px); }
   .rb-hero-prompt { max-width:none; }
-  .rb-hero::after { background:radial-gradient(90% 46% at 50% 16%,transparent 0%,rgba(11,15,12,.55) 55%,rgba(11,15,12,.95) 78%); }
+  .rb-hero::after { background:transparent; }
   /* Clipped to an arc rather than a full circle: a 1:1 globe at this width
      would push the prompt input below the fold on a phone.
 
