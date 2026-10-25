@@ -1,3 +1,4 @@
+import { Button as UiButton, Form as UiForm, Heading as UiHeading, Input as UiInput, Text as UiText } from "./ui/primitives";
 import {
   Check,
   CircleAlert,
@@ -183,55 +184,45 @@ export function ApiAccessPanel({
   const targetLabel = live ? "MODEL AVAILABLE" : "NO MODEL ONLINE";
   const errorPresentation = error ? apiAccessErrorPresentation(error, errorSource) : null;
   return <section className={`api-access-panel${open ? " open" : ""}`}>
-    <button className="api-access-summary" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
-      <span className={`api-target-state${live ? " ready" : ""}`}><i />{targetLabel}</span>
-      <strong>{origin}</strong>
+    <UiButton className="api-access-summary" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
       <span className="api-access-summary-copy"><Code2 size={15} />API Access</span>
       <span className="api-access-chevron">{open ? "−" : "+"}</span>
-    </button>
+    </UiButton>
     {open && <div className="api-access-body">
-      <header>
-        <div className="api-access-icon"><PlugZap /></div>
-        <div><span>OPENAI-COMPATIBLE</span><h2>Connect mycellios to your applications</h2><p>Use an OpenAI-compatible client. Requests run through the network when a model is connected.</p></div>
-      </header>
-
       {!enabled && <div className="api-access-notice"><CircleAlert /><span><strong>Account access is not configured</strong>The local coordinator keeps the API available, but public keys require the account service.</span></div>}
-      {enabled && !accessToken && <div className="api-access-notice signin"><LockKeyhole /><span><strong>Sign in to get a key</strong>The endpoint is visible, but access and balance belong to your account.</span><button onClick={onSignIn}>Sign in</button></div>}
+      {enabled && !accessToken && <div className="api-access-notice signin"><LockKeyhole /><span><strong>Sign in to get a key</strong>The endpoint is visible, but access and balance belong to your account.</span><UiButton onClick={onSignIn}>Sign in</UiButton></div>}
 
       <div className="api-command-grid">
         {commands.map((command) => <div className="api-command" key={command.label}>
           <div><span>{command.label}</span><CopyButton value={command.value} /></div>
           <code>{command.value}</code>
-          <p>{command.help}</p>
+          <UiText>{command.help}</UiText>
         </div>)}
       </div>
 
       <div className="api-access-status-row">
         <div>
-          <span>LIVE STATUS</span>
+          <span>Model availability</span>
           <strong className={live ? "ready" : ""}>{live ? `${availableModels} model${availableModels === 1 ? "" : "s"} available` : "No models connected"}</strong>
-          <small>The API is not marked operational until `/models` returns real capacity.</small>
         </div>
-        <button className="secondary-button" disabled={connection === "testing"} onClick={() => void testConnection()}>
+        <UiButton className="secondary-button" disabled={connection === "testing"} onClick={() => void testConnection()}>
           {connection === "testing" ? <LoaderCircle className="spin" /> : connection === "ready" ? <Check /> : <Wifi />}
           {connection === "idle" ? "Test connection" : connection === "testing" ? "Testing…" : connection === "ready" ? "Connection ready" : connection === "empty" ? "API active, no model" : "Try again"}
-        </button>
+        </UiButton>
       </div>
 
       {accessToken && account && <div className="api-account-strip">
         <div><span>BALANCE</span><strong>{formatTokens(account.token_balance)} TOK</strong></div>
-        <div><span>USED</span><strong>{formatTokens(account.lifetime_input_tokens + account.lifetime_output_tokens)}</strong></div>
-        <div><span>REQUESTS</span><strong>{account.request_count}</strong></div>
         <div><span>LIMITS</span><strong>{account.limits.requests_per_minute}/min · {account.limits.max_concurrent} concurrent</strong></div>
       </div>}
 
       {accessToken && <section className="api-keys-section">
-        <div className="api-keys-heading"><div><span>API KEYS</span><h3>Revocable keys</h3></div><small>The full key is shown only once.</small></div>
+        <div className="api-keys-heading"><div><span>API KEYS</span><UiHeading as="h3">Revocable keys</UiHeading></div><small>The full key is shown only once.</small></div>
         {created && <div className="api-created-key"><div><KeyRound /><span><strong>Save it now</strong><code>{created.secret}</code></span></div><CopyButton value={created.secret} label="Copy key" /></div>}
-        <form onSubmit={(event) => void addKey(event)} className="api-key-form">
-          <input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label="API key name" placeholder="Application name" />
-          <button className="primary-button" disabled={busy || !name.trim()}><Plus />Create key</button>
-        </form>
+        <UiForm onSubmit={(event) => void addKey(event)} className="api-key-form">
+          <UiInput value={name} onChange={(event) => setName(event.target.value)} maxLength={80} aria-label="API key name" placeholder="Application name" />
+          <UiButton className="primary-button" disabled={busy || !name.trim()}><Plus />Create key</UiButton>
+        </UiForm>
         <div className="api-key-list">
           {busy && keys.length === 0 && <div className="api-key-empty"><LoaderCircle className="spin" />Loading keys…</div>}
           {!busy && keys.length === 0 && <div className="api-key-empty"><KeyRound />{keysLoaded ? "You do not have any keys yet." : "API keys could not be loaded."}</div>}
@@ -239,7 +230,7 @@ export function ApiAccessPanel({
             <KeyRound />
             <span><strong>{key.name}</strong><code>{key.prefix}••••••••</code></span>
             <small>{key.revoked_at ? "Revoked" : key.last_used_at ? `Used ${relativeDate(key.last_used_at)}` : "Never used"}</small>
-            {!key.revoked_at && <button aria-label={`Revoke ${key.name}`} disabled={busy} onClick={() => void removeKey(key.id)}><Trash2 /></button>}
+            {!key.revoked_at && <UiButton aria-label={`Revoke ${key.name}`} disabled={busy} onClick={() => void removeKey(key.id)}><Trash2 /></UiButton>}
           </div>)}
         </div>
         {keys.length > keysPageSize && <TablePagination label="API keys" page={visibleKeysPage} pageCount={keysPageCount} total={keys.length} onPageChange={setKeysPage} />}
@@ -247,9 +238,9 @@ export function ApiAccessPanel({
       {errorPresentation && <div className="api-access-error" role="alert">
         <CircleAlert />
         <span><strong>{errorPresentation.title}</strong><small>{errorPresentation.detail}</small></span>
-        <button type="button" onClick={() => { setError(null); if (errorPresentation.requiresAuth) onSignIn(); else if (errorSource === "keys") void reloadKeys(); else if (errorSource === "connection") void testConnection(); }}>
+        <UiButton type="button" onClick={() => { setError(null); if (errorPresentation.requiresAuth) onSignIn(); else if (errorSource === "keys") void reloadKeys(); else if (errorSource === "connection") void testConnection(); }}>
           {errorPresentation.action}
-        </button>
+        </UiButton>
       </div>}
     </div>}
   </section>;
@@ -264,7 +255,7 @@ function CopyButton({ value, label = "Copy" }: { value: string; label?: string }
     setStatus(await copyApiValue(value));
     resetTimer.current = window.setTimeout(() => setStatus("idle"), 2_500);
   }
-  return <button type="button" className={`api-copy-button${status === "failed" ? " failed" : ""}`} aria-live="polite" title={status === "failed" ? "Select the text and copy it manually." : undefined} onClick={() => void copy()}>{status === "copied" ? <Check /> : status === "failed" ? <CircleAlert /> : <Clipboard />}{status === "copied" ? "Copied" : status === "failed" ? "Copy failed" : label}</button>;
+  return <UiButton type="button" className={`api-copy-button${status === "failed" ? " failed" : ""}`} aria-live="polite" title={status === "failed" ? "Select the text and copy it manually." : undefined} onClick={() => void copy()}>{status === "copied" ? <Check /> : status === "failed" ? <CircleAlert /> : <Clipboard />}{status === "copied" ? "Copied" : status === "failed" ? "Copy failed" : label}</UiButton>;
 }
 
 export async function copyApiValue(value: string, writeText = (text: string) => navigator.clipboard.writeText(text)): Promise<"copied" | "failed"> {

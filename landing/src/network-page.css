@@ -46,8 +46,6 @@ body:has(.net) { margin: 0; }
 .net-stage { position: relative; min-height: 100svh; overflow: hidden; background: var(--net-bg); }
 .net-view-overview .net-stage {
   background:
-    radial-gradient(circle at 72% 18%, rgba(173,122,72,.09), transparent 27%),
-    radial-gradient(circle at 14% 82%, rgba(112,128,109,.1), transparent 25%),
     var(--net-bg);
 }
 .net-view-overview .net-stage::before {
@@ -57,9 +55,9 @@ body:has(.net) { margin: 0; }
   inset: 0;
   pointer-events: none;
   opacity: .22;
-  background-image: radial-gradient(rgba(238,233,226,.22) .65px, transparent .65px);
+  background-image: none;
   background-size: 18px 18px;
-  mask-image: linear-gradient(120deg, transparent 4%, #000 34%, transparent 72%);
+  mask-image: none;
 }
 .net-view-overview .net-stage::after {
   content: "";
@@ -105,7 +103,7 @@ body:has(.net) { margin: 0; }
   gap: 36px;
   padding: 0 var(--net-inset);
   border-bottom: 1px solid rgba(255,255,255,.06);
-  background: linear-gradient(to bottom, rgba(11,19,14,.92), rgba(11,19,14,0));
+  background: color-mix(in srgb, var(--dark-surface) 92%, transparent);
 }
 .net-topbar nav { display: flex; gap: clamp(22px, 2.5vw, 36px); font-size: 12px; }
 .net-topbar nav a { position: relative; min-height: 44px; display: inline-flex; align-items: center; color: var(--net-dim); transition: color 160ms var(--net-ease); }
@@ -123,7 +121,7 @@ body:has(.net) { margin: 0; }
   padding: 3px;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 999px;
-  background: rgba(11,19,14,.82);
+  background: color-mix(in srgb, var(--dark-surface) 82%, transparent);
   backdrop-filter: blur(12px);
   transform: translateX(-50%);
 }
@@ -453,18 +451,18 @@ body:has(.net) { margin: 0; }
 .net-dashboard .net-hero-metrics strong { font-size: clamp(25px, 2.3vw, 36px); line-height: 1; }
 
 .net-dashboard-visuals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(220px, 1fr)); gap: 12px; min-height: 0; }
-.net-globe-card, .net-dashboard-chart { position: relative; min-width: 0; overflow: hidden; border: 1px solid rgba(238,233,226,.12); background: linear-gradient(145deg, rgba(238,233,226,.035), rgba(20,32,25,.42)); box-shadow: inset 0 1px 0 rgba(238,233,226,.025); }
+.net-globe-card, .net-dashboard-chart { position: relative; min-width: 0; overflow: hidden; border: 1px solid rgba(238,233,226,.12); background: rgba(238,233,226,.035); box-shadow: inset 0 1px 0 rgba(238,233,226,.025); }
 .net-globe-card { grid-row: auto; }
 .net-globe-card { border-radius: 28px 28px 96px 28px; }
 .net-dashboard-chart { border-radius: 22px 22px 9px 22px; }
 .net-dashboard-chart:nth-child(3), .net-dashboard-chart:nth-child(5) { border-radius: 22px 9px 22px 22px; }
 .net-dashboard-chart::before { content: ""; position: absolute; top: 0; left: 24px; width: 52px; height: 1px; background: var(--rb-bronze, #ad7a48); opacity: .72; }
 .net-globe-card .net-globe { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; opacity: .88; }
-.net-globe-card::after { content: ""; position: absolute; z-index: 1; inset: 42% 0 0; pointer-events: none; background: linear-gradient(to bottom, transparent, rgba(11,19,14,.96)); }
+.net-globe-card::after { content: ""; position: absolute; z-index: 1; inset: 42% 0 0; pointer-events: none; background: transparent; }
 .net-globe-card header { position: absolute; z-index: 2; right: 18px; bottom: 17px; left: 18px; display: grid; gap: 2px; pointer-events: none; }
 .net-globe-card header span, .net-dashboard-chart header span { color: var(--net-amber); font-family: var(--net-mono); font-size: 10px; letter-spacing: .08em; }
 .net-globe-card header strong { font-family: var(--rb-font-display, Fraunces, serif); font-size: 22px; font-weight: 400; }
-.net-globe-card > button { position: absolute; z-index: 3; right: 16px; top: 16px; display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(173,122,72,.48); border-radius: 50%; background: rgba(11,19,14,.68); color: var(--rb-ivory, #eee9e2); cursor: pointer; transition: background 160ms var(--net-ease), color 160ms var(--net-ease), transform 160ms var(--net-ease); }
+.net-globe-card > button { position: absolute; z-index: 3; right: 16px; top: 16px; display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(173,122,72,.48); border-radius: 50%; background: color-mix(in srgb, var(--dark-surface) 68%, transparent); color: var(--rb-ivory, #eee9e2); cursor: pointer; transition: background 160ms var(--net-ease), color 160ms var(--net-ease), transform 160ms var(--net-ease); }
 .net-globe-card > button svg { width: 14px; }
 .net-globe-card > button:hover, .net-globe-card > button:focus-visible { background: var(--rb-ivory, #eee9e2); color: var(--rb-forest, #142019); transform: translateX(2px); }
 
@@ -525,13 +523,13 @@ body:has(.net) { margin: 0; }
 .net-data {
   position: relative;
   z-index: 5;
-  background: #0d1510;
+  background: var(--dark-surface);
   color: rgba(238, 233, 226, .92);
   --rb-ink: #eee9e2;
   --rb-sage: #93a18e;
   --rb-line: rgba(238, 233, 226, .16);
 }
-.net-data::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .14; background-image: radial-gradient(rgba(238,233,226,.24) .55px, transparent .55px); background-size: 12px 12px; mask-image: linear-gradient(to bottom, #000, transparent 34%); }
+.net-data::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .14; background-image: none; background-size: 12px 12px; mask-image: none; }
 .net-data-shell { position: relative; width: min(1200px, calc(100% - 2 * var(--rb-gutter, 48px))); margin: 0 auto; padding: clamp(48px, 7vw, 96px) 0 112px; }
 .net-data-intro { display: grid; grid-template-columns: 1.15fr .85fr; gap: clamp(40px, 8vw, 110px); align-items: end; }
 .net-kicker { display: block; margin-bottom: 18px; color: var(--rb-bronze, #ad7a48); font-family: var(--rb-font-mono, "IBM Plex Mono", monospace); font-size: 10px; font-weight: 500; letter-spacing: .12em; }
@@ -675,7 +673,7 @@ body:has(.net) { margin: 0; }
 
 .net-ledger-table { border-top: 1px solid var(--rb-line); }
 .net-ledger-row { display: grid; grid-template-columns: 1.35fr .7fr 1.3fr .8fr .75fr; align-items: center; gap: 18px; min-height: 78px; padding: 12px 18px; border-bottom: 1px solid var(--rb-line); font-size: 12px; transition: background 150ms var(--net-ease); }
-.net-ledger-row:not(.head):hover { background: rgba(30,42,34,.035); }
+.net-ledger-row:not(.head):hover { background: color-mix(in srgb, var(--dark-surface) 3.5%, transparent); }
 .net-ledger-row.head { min-height: 42px; color: var(--rb-sage); font-family: var(--rb-font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .net-ledger-row > span { min-width: 0; display: flex; align-items: center; gap: 8px; }
 .net-ledger-row > span:first-child, .net-ledger-row > span:nth-child(3), .net-ledger-row > span:nth-child(4) { display: grid; gap: 1px; }

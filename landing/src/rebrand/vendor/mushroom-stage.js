@@ -1,6 +1,7 @@
 /* <mushroom-stage> — procedural translucent mushroom, three.js + custom bloom.
    Attributes: accent (#hex) | spores ("on"/"off") | motion ("full"|"calm"|"off") | scale (number)
-               | variant ("hero"|"gutter"|"colony", boot-time only) */
+               | variant ("hero"|"gutter"|"colony", boot-time only)
+               | surface ("light"|"dark", boot-time only) */
 /*
  * Vendored from the design reference. It is kept as a custom element rather
  * than rewritten as a React component on purpose: the value here is the *look*,
@@ -361,12 +362,10 @@ export function defineMushroomStage() {
     const c = document.createElement('canvas');
     c.width = c.height = 256;
     const g = c.getContext('2d');
-    const grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
-    grd.addColorStop(0, inner);
-    grd.addColorStop(0.28, mid);
-    grd.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = grd;
-    g.fillRect(0, 0, 256, 256);
+    g.fillStyle = inner;
+    g.beginPath();
+    g.arc(128, 128, 80, 0, Math.PI * 2);
+    g.fill();
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
@@ -664,7 +663,7 @@ export function defineMushroomStage() {
          omitting them: the tick loop drives `this.halos[0]` every frame, and a
          variant that changes the *shape* of the object graph is a variant that
          will eventually crash the loop for one caller and not the other. */
-      haloBig.visible = haloCore.visible = V.tune.halo > 0;
+      haloBig.visible = haloCore.visible = V.tune.halo > 0 && this.getAttribute('surface') !== 'light';
       this.halos = [haloBig, haloCore];
 
       // ── spores
@@ -721,7 +720,8 @@ export function defineMushroomStage() {
       const mk = (fs, uniforms) => new THREE.ShaderMaterial({ uniforms, vertexShader: QUAD_VS, fragmentShader: fs, depthTest: false, depthWrite: false });
       this.pBright = mk(BRIGHT_FS, { tDiffuse: { value: null }, uThreshold: { value: V.tune.threshold }, uKnee: { value: 0.35 } });
       this.pBlur = mk(BLUR_FS, { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2() } });
-      this.pComp = mk(COMP_FS, { tScene: { value: null }, tBloom: { value: null }, uStrength: { value: V.tune.bloom } });
+      // The boot-time light surface keeps bloom from leaving a gray plate on white.
+      this.pComp = mk(COMP_FS, { tScene: { value: null }, tBloom: { value: null }, uStrength: { value: this.getAttribute('surface') === 'light' ? 0 : V.tune.bloom } });
       this.pComp.transparent = true;
       this.quadScene = new THREE.Scene();
       this.quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);

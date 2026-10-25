@@ -1,3 +1,4 @@
+import { Button as UiButton, Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import {
   ArrowDown,
   ArrowDownRight,
@@ -18,7 +19,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { applySeoMetadata } from "../seo";
 import { FruitingMark } from "./FruitingMark";
 import { HeroGlobe } from "./HeroGlobe";
@@ -37,6 +38,8 @@ import { useCountUp, useInView, useRevealOnScroll } from "./use-motion";
 import { fetchPublicDownloadAvailability, PUBLIC_DOWNLOAD_OPTIONS } from "../public-downloads";
 import "./rebrand.css";
 
+const AGENT_URL = "https://www.mycellios.com/agent";
+
 /*
  * The landing is a scroll pitch, not a product manual.
  *
@@ -45,7 +48,7 @@ import "./rebrand.css";
  * whom, which models can I run, do I have to join anything, where do I fit, is
  * any of this actually built, what about the parts I am sceptical of, how do I
  * start, and who is behind it. Detail that belongs to the docs, the panel or
- * the blog is linked, not restated — the earlier fourteen-section version made
+ * technical documentation is linked, not restated — the earlier fourteen-section version made
  * the reader work for a story that fits in this.
  *
  * Every visual here is generated in the browser (SVG, canvas, CSS) and driven
@@ -110,23 +113,23 @@ export function LandingHeader({ active }: { active?: "network" | "earn" }) {
     <div className="rb-header-inner rb-shell">
       <Brand />
       <nav aria-label="Main navigation">
-        <a href="/network?view=inference">Chat</a><a href="/create">Create</a><a className={active === "earn" ? "active" : undefined} href="/earn" aria-current={active === "earn" ? "page" : undefined}>Earn</a><SporeMenu /><a className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</a><a href="/blog">Blog</a>
+        <UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/create">Create</UiLink><UiLink className={active === "earn" ? "active" : undefined} href="/earn" aria-current={active === "earn" ? "page" : undefined}>Earn</UiLink><SporeMenu /><UiLink className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</UiLink>
       </nav>
       <div className="rb-header-actions rb-desktop-cta">
-        <a className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><GithubMark /></a>
-        <a className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><XMark /></a>
-        <a className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><TelegramMark /></a>
-        <a className="rb-pill rb-pill-ghost" href="/dashboard">Login</a>
+        <UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><GithubMark /></UiLink>
+        <UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><XMark /></UiLink>
+        <UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><TelegramMark /></UiLink>
+        <UiLink className="rb-pill rb-pill-ghost" href="/dashboard">Login</UiLink>
       </div>
-      <button className="rb-menu" type="button" aria-label={mobileOpen ? "Close menu" : "Open menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</button>
+      <UiButton className="rb-menu" type="button" aria-label={mobileOpen ? "Close menu" : "Open menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</UiButton>
       {mobileOpen && <>
         <div className="rb-mobile-backdrop" aria-hidden="true" onClick={() => setMobileOpen(false)} />
         <nav className="rb-mobile-nav" aria-label="Mobile navigation" onClick={() => setMobileOpen(false)}>
-          <div className="rb-mobile-group"><a href="/network?view=inference">Chat</a><a href="/create">Create</a><a className={active === "earn" ? "active" : undefined} href="/earn" aria-current={active === "earn" ? "page" : undefined}>Earn</a></div>
-          <div className="rb-mobile-group"><span className="rb-mobile-kicker">$ SPORE</span><div className="rb-mobile-sub"><a href="/spore">Staking</a><a href="/spore/treasury">Treasury</a><a href="/spore/data">Data</a></div></div>
-          <div className="rb-mobile-group"><a className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</a><a href="/blog">Blog</a></div>
-          <a className="rb-mobile-cta" href="/dashboard">Login</a>
-          <div className="rb-mobile-social"><a className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><GithubMark /></a><a className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><XMark /></a><a className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><TelegramMark /></a></div>
+          <div className="rb-mobile-group"><UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/create">Create</UiLink><UiLink className={active === "earn" ? "active" : undefined} href="/earn" aria-current={active === "earn" ? "page" : undefined}>Earn</UiLink></div>
+          <div className="rb-mobile-group"><span className="rb-mobile-kicker">$ SPORE</span><div className="rb-mobile-sub"><UiLink href="/spore">Staking</UiLink><UiLink href="/spore/treasury">Treasury</UiLink><UiLink href="/spore/data">Data</UiLink></div></div>
+          <div className="rb-mobile-group"><UiLink className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</UiLink></div>
+          <UiLink className="rb-mobile-cta" href="/dashboard">Login</UiLink>
+          <div className="rb-mobile-social"><UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><GithubMark /></UiLink><UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><XMark /></UiLink><UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><TelegramMark /></UiLink></div>
         </nav>
       </>}
     </div>
@@ -138,7 +141,7 @@ const doors = [
     label: "Developers",
     title: "One API. Served by a network.",
     copy: "An OpenAI-compatible endpoint that runs on pooled machines instead of a data center.",
-    action: { href: "/network?view=inference", text: "Try it live" },
+    action: { href: "/network", text: "Explore the network" },
     icon: Sparkles,
   },
   {
@@ -167,7 +170,7 @@ const evidenceRows = [
 type DownloadKey = typeof PUBLIC_DOWNLOAD_OPTIONS[number]["id"];
 
 function Brand() {
-  return <a className="rb-brand" href="/" aria-label="mycellios, home"><img src={brandLogo} alt="" /><span>mycellios</span></a>;
+  return <UiLink className="rb-brand" href="/" aria-label="mycellios, home"><img src={brandLogo} alt="" /><span>mycellios</span></UiLink>;
 }
 
 /* Downloads. The visitor's platform is detected so the primary action is a
@@ -197,15 +200,15 @@ function GetStartedSection() {
     <section className="rb-get" id="install" aria-labelledby="rb-get-title">
       <div className="rb-shell rb-get-inner">
         <div className="rb-get-copy rb-reveal">
-          <p className="rb-kicker rb-kicker-light"><i /><span>Join</span></p>
-          <h2 id="rb-get-title">Your machine.<br /><em>Part of the network.</em></h2>
-          <p>Check which native packages are published, or try the browser worker without installing anything.</p>
-          <a className="rb-get-primary" href={selectedHref}>
+          <UiText className="rb-kicker rb-kicker-light"><i /><span>Join</span></UiText>
+          <UiHeading as="h2" id="rb-get-title">Your machine.<br /><em>Part of the network.</em></UiHeading>
+          <UiText>Check which native packages are published, or try the browser worker without installing anything.</UiText>
+          <UiLink className="rb-get-primary" href={selectedHref}>
             <span className="rb-get-icon"><Download /></span>
             <span><small>{selectedAvailable ? "Download for" : availability ? "Package status" : "Checking availability"}</small><strong>{selectedAvailable ? `${selected.label} ${selected.format}` : selected.label}</strong></span>
             <ArrowDownRight />
-          </a>
-          <p className="rb-get-meta"><ShieldCheck />You choose what to share · pause at any time</p>
+          </UiLink>
+          <UiText className="rb-get-meta"><ShieldCheck />You choose what to share · pause at any time</UiText>
         </div>
 
         <div className="rb-get-side rb-reveal">
@@ -213,17 +216,17 @@ function GetStartedSection() {
             {PUBLIC_DOWNLOAD_OPTIONS.map((option, index) => {
               const pkg = availability?.packages.find((item) => item.id === option.id);
               const available = pkg?.available === true;
-              return <a className={option.id === recommended ? "recommended" : ""} href={available && pkg ? pkg.path : `/downloads?platform=${option.id}&availability=${availability ? "unavailable" : "unknown"}`} key={option.id} style={{ "--i": index } as CSSProperties}>
+              return <UiLink className={option.id === recommended ? "recommended" : ""} href={available && pkg ? pkg.path : `/downloads?platform=${option.id}&availability=${availability ? "unavailable" : "unknown"}`} key={option.id} style={{ "--i": index } as CSSProperties}>
                 <HardDriveDownload />
                 <span><strong>{option.label}</strong><small>{option.detail}</small></span>
                 <b>{available ? option.format : availability ? "UNAVAILABLE" : "CHECKING"}</b>
-              </a>;
+              </UiLink>;
             })}
           </div>
-          <p className="rb-get-safety">Native package availability is checked against published release files. Try the browser worker on compatible devices.<a href="/browser/">Try it in your browser <ArrowUpRight /></a></p>
-          <p className="rb-get-safety">
-            <a href={RELEASES_URL} target="_blank" rel="noreferrer">View published releases <ArrowUpRight /></a>
-          </p>
+          <UiText className="rb-get-safety">Native package availability is checked against published release files. Try the browser worker on compatible devices.<UiLink href="/browser/">Try it in your browser <ArrowUpRight /></UiLink></UiText>
+          <UiText className="rb-get-safety">
+            <UiLink href={RELEASES_URL} target="_blank" rel="noreferrer">View published releases <ArrowUpRight /></UiLink>
+          </UiText>
         </div>
       </div>
     </section>
@@ -231,7 +234,7 @@ function GetStartedSection() {
 }
 
 export function RebrandLanding() {
-  const [heroPrompt, setHeroPrompt] = useState("");
+  const heroTheme = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("hero") === "dark" ? "dark" : "light";
   const pageRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -240,18 +243,8 @@ export function RebrandLanding() {
 
   useRevealOnScroll(pageRef);
 
-  // The hero input is an entry point, not an inference client: the prompt is
-  // handed to the panel chat, which owns models, auth, and streaming.
-  const submitHeroPrompt = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const text = heroPrompt.trim();
-    if (!text) return;
-    window.sessionStorage.setItem("mycellios.hero-prompt", text);
-    window.location.assign("/network?view=inference");
-  };
-
   return (
-    <main className="rb-page" id="rb-top" ref={pageRef}>
+    <main className="rb-page" id="rb-top" ref={pageRef} data-hero-theme={heroTheme}>
       {/* The brand is a fungal network, so the page grows one while you read.
           It is anchored to the base of the hero's mushroom and descends the
           whole document from there — roots of the organism above it, not a
@@ -276,23 +269,18 @@ export function RebrandLanding() {
                 Broken across three lines rather than two: the copy column is
                 50vw and the hero organism starts at 50% + 110px, so the
                 two-line setting ran the headline under the mushroom. */}
-            <h1 id="rb-hero-title" aria-label="The open compute layer for distributed AI.">The open compute<br />layer<br /><em>for distributed AI.</em></h1>
+            <UiHeading as="h1" id="rb-hero-title" aria-label="The open compute layer for distributed AI.">The open compute<br />layer<br /><em>for distributed AI.</em></UiHeading>
             {/* Kept under the lede's 470px measure so it sets as one line: the
                 longer version broke with "anyway." orphaned on its own. */}
-            <p className="rb-lede">Mycellios splits the model across many machines.</p>
-            <form className="rb-hero-prompt" onSubmit={submitHeroPrompt}>
-              <label className="rb-visually-hidden" htmlFor="rb-hero-prompt-input">Ask the network</label>
-              <input id="rb-hero-prompt-input" name="prompt" type="text" autoComplete="off" placeholder="Ask the impossible…" value={heroPrompt} onChange={(event) => setHeroPrompt(event.target.value)} />
-              <button type="submit" aria-label="Send this prompt to the network"><ArrowRight /></button>
-            </form>
+            <UiText className="rb-lede">Mycellios splits the model across many machines.</UiText>
           </div>
         </div>
         {/* The hero owns the whole viewport, so nothing below it peeks in to hint
             there is more. This cue is that hint, and it jumps to the story. */}
-        <a className="rb-scroll-cue" href="#how-it-works" aria-label="Scroll to the next section">
+        <UiLink className="rb-scroll-cue" href="#how-it-works" aria-label="Scroll to the next section">
           <span>Scroll</span>
           <ArrowDown />
-        </a>
+        </UiLink>
         {/* Mycelium origin on phones. There the organism stands behind the
             globe — its base is mid-hero, which would start the colony in the
             middle of the copy — so the network anchors to the hero's floor
@@ -334,22 +322,22 @@ export function RebrandLanding() {
         <section className="rb-doors" id="doors" aria-labelledby="rb-doors-title">
           <div className="rb-shell">
             <div className="rb-doors-head rb-reveal">
-              <p className="rb-kicker"><i /><span>Where you fit</span></p>
-              <h2 id="rb-doors-title">Three doors.<br /><em>One network.</em></h2>
+              <UiText className="rb-kicker"><i /><span>Where you fit</span></UiText>
+              <UiHeading as="h2" id="rb-doors-title">Three doors.<br /><em>One network.</em></UiHeading>
             </div>
             <div className="rb-doors-grid">
               {doors.map((door, index) => {
                 const Icon = door.icon;
                 const external = "external" in door.action && door.action.external;
                 return (
-                  <article className="rb-door rb-reveal" key={door.label} style={{ "--i": index } as CSSProperties}>
+                  <UiCard className="rb-door rb-reveal" key={door.label} style={{ "--i": index } as CSSProperties}>
                     <div className="rb-door-top"><Icon /><span>{door.label}</span></div>
-                    <h3>{door.title}</h3>
-                    <p>{door.copy}</p>
-                    <a href={door.action.href} {...(external ? { target: "_blank", rel: "noreferrer" } : {})}>
+                    <UiHeading as="h3">{door.title}</UiHeading>
+                    <UiText>{door.copy}</UiText>
+                    <UiLink href={door.action.href} {...(external ? { target: "_blank", rel: "noreferrer" } : {})}>
                       {door.action.text} <ArrowUpRight />
-                    </a>
-                  </article>
+                    </UiLink>
+                  </UiCard>
                 );
               })}
             </div>
@@ -368,9 +356,9 @@ export function RebrandLanding() {
       <section className="rb-proof" id="evidence" aria-labelledby="rb-proof-title">
         <div className="rb-shell rb-proof-inner">
           <div className="rb-proof-copy rb-reveal">
-            <p className="rb-kicker"><i /><span>Evidence</span></p>
-            <h2 id="rb-proof-title">We are building<br /><em>in public.</em></h2>
-            <p>No simulation is called a global network. Every claim passes a reproducible test before it becomes a promise.</p>
+            <UiText className="rb-kicker"><i /><span>Evidence</span></UiText>
+            <UiHeading as="h2" id="rb-proof-title">We are building<br /><em>in public.</em></UiHeading>
+            <UiText>No simulation is called a global network. Every claim passes a reproducible test before it becomes a promise.</UiText>
           </div>
           <div className="rb-board rb-reveal" aria-label="Build status">
             {evidenceRows.map((row, index) => (
@@ -409,8 +397,8 @@ export function RebrandLanding() {
               scroll, standing over the final ask. */}
           <FruitingMark />
           <Brand />
-          <h2 id="rb-closing-title">Many machines.<br /><em>One model.</em></h2>
-          <a className="rb-pill rb-pill-light" href="/earn">Connect this device <Zap /></a>
+          <UiHeading as="h2" id="rb-closing-title">Many machines.<br /><em>One model.</em></UiHeading>
+          <UiLink className="rb-pill rb-pill-light" href="/earn">Connect this device <Zap /></UiLink>
           <small>Public test network · no login required</small>
         </div>
       </section>
@@ -418,11 +406,11 @@ export function RebrandLanding() {
       <SponsorFooter />
       <footer className="rb-footer">
         <div className="rb-footer-inner rb-shell">
-          <div className="rb-footer-brand"><Brand /><p>Distributed intelligence built from the capacity already around us.</p></div>
-          <nav aria-label="Product"><span>Product</span><a href="/network?view=inference">Chat</a><a href="/create">Create</a><a href="/earn">Earn</a><a href="/spore">$ SPORE</a></nav>
-          <nav aria-label="Network"><span>Network</span><a href="#how-it-works">How it works</a><a href="/network">Network</a><a href="/downloads">Downloads</a><a href="/browser/">Browser worker</a></nav>
-          <nav aria-label="Resources"><span>Resources</span><a href="/docs">Documentation</a><a href="/blog">Blog</a><a href={GITHUB_URL}><GitBranch /> GitHub</a><a href={`mailto:${EMAIL}`}>Contact</a></nav>
-          <div className="rb-footer-bottom"><span>© 2026 mycellios</span><a href="#rb-top">Back to top <ArrowDown /></a></div>
+          <div className="rb-footer-brand"><Brand /><UiText>Distributed intelligence built from the capacity already around us.</UiText></div>
+          <nav aria-label="Product"><span>Product</span><UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/create">Create</UiLink><UiLink href="/earn">Earn</UiLink><UiLink href="/spore">$ SPORE</UiLink></nav>
+          <nav aria-label="Network"><span>Network</span><UiLink href="#how-it-works">How it works</UiLink><UiLink href="/network">Network</UiLink><UiLink href="/downloads">Downloads</UiLink><UiLink href="/browser/">Browser worker</UiLink></nav>
+          <nav aria-label="Resources"><span>Resources</span><UiLink href="/docs">Documentation</UiLink><UiLink href={GITHUB_URL}><GitBranch /> GitHub</UiLink><UiLink href={`mailto:${EMAIL}`}>Contact</UiLink></nav>
+          <div className="rb-footer-bottom"><span>© 2026 mycellios</span><UiLink href="#rb-top">Back to top <ArrowDown /></UiLink></div>
         </div>
       </footer>
     </main>

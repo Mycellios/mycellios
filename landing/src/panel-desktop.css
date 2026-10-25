@@ -51,7 +51,7 @@
   padding: 24px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, rgba(28, 36, 69, 0.98), rgba(20, 26, 52, 0.98));
+  background: rgba(28, 36, 69, 0.98);
   box-shadow: var(--shadow-card);
 }
 
@@ -103,7 +103,7 @@
   padding: 20px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  background: linear-gradient(145deg, rgba(18, 31, 61, 0.96), rgba(16, 23, 48, 0.98));
+  background: rgba(18, 31, 61, 0.96);
   box-shadow: var(--shadow-card);
 }
 
@@ -144,7 +144,7 @@
   border: 1px solid rgba(82, 217, 174, 0.2);
   border-radius: 999px;
   color: #62e6b9;
-  background: rgba(43, 191, 145, 0.08);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 8%, transparent);
   font-size: 8px;
   font-weight: 650;
   letter-spacing: 0.1em;
@@ -177,7 +177,7 @@
 
 .public-panel .compute-mode-grid > button.active {
   border-color: rgba(75, 142, 255, 0.58);
-  background: linear-gradient(145deg, rgba(44, 97, 195, 0.24), rgba(50, 46, 137, 0.18));
+  background-color: rgba(44, 97, 195, 0.24);
   box-shadow: inset 0 1px rgba(177, 205, 255, 0.08), 0 0 22px rgba(39, 101, 232, 0.1);
 }
 
@@ -238,7 +238,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--blue-600), var(--blue-300));
+  background: var(--blue-600);
   box-shadow: 0 0 14px var(--blue-glow);
 }
 
@@ -351,7 +351,7 @@
   gap: 11px;
   padding: 11px 13px;
   color: var(--green-300);
-  background: rgba(45, 211, 170, 0.065);
+  background: color-mix(in srgb, var(--bg-card, var(--dark-surface)) 6.5%, transparent);
   border: 1px solid rgba(45, 211, 170, 0.2);
   border-radius: 10px;
 }
@@ -734,7 +734,7 @@
   border: 0;
   border-radius: 12px;
   color: #fff;
-  background: linear-gradient(135deg, var(--blue-600), var(--blue-500));
+  background-color: var(--blue-600);
   box-shadow: 0 10px 28px rgba(126, 82, 42, 0.2);
   font-size: 13px;
   font-weight: 500;
@@ -760,7 +760,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(6, 12, 9, 0.78);
+  background: color-mix(in srgb, var(--bg-overlay, #0009) 78%, transparent);
   backdrop-filter: blur(18px);
 }
 
@@ -772,8 +772,7 @@
   border: 1px solid rgba(223, 185, 144, 0.2);
   border-radius: var(--radius-xl);
   background:
-    radial-gradient(circle at 90% 0%, rgba(196, 147, 94, 0.18), transparent 34%),
-    #122219;
+    var(--bg-card, var(--dark-surface));
   box-shadow: 0 34px 110px rgba(0, 5, 20, 0.62), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 

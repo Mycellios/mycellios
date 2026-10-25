@@ -34,8 +34,8 @@
    masks its fixed viewport canvas, which made the ambient spores disappear
    throughout the hero despite being drawn correctly. */
 .rb-myco-net mycelium-field > canvas:first-child {
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%);
-  mask-image: linear-gradient(180deg, transparent 0, #000 9%);
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 /* The page has to establish a containing block for a full-document absolute

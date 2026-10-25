@@ -51,6 +51,19 @@ describe("public package availability", () => {
     await expect(fetchPublicDownloadAvailability()).rejects.toThrow("download_availability_invalid");
   });
 
+  it("accepts the native installer formats and direct platform routes", async () => {
+    const installers: PublicDownloadAvailability = {
+      ...availability,
+      packages: availability.packages.map((pkg, index) => ({
+        ...pkg,
+        format: (["MSI", "PKG", "DEB"] as const)[index]!,
+        path: ["/downloads/windows", "/downloads/macos-arm64", "/downloads/linux"][index]!,
+      })),
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(installers)));
+    await expect(fetchPublicDownloadAvailability()).resolves.toEqual(installers);
+  });
+
   it("bounds the status request so Downloads can show its fallback", async () => {
     const request = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
       expect(init?.signal).toBeInstanceOf(AbortSignal);

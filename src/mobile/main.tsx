@@ -2,6 +2,8 @@ import { createRoot } from "react-dom/client";
 import { Panel } from "../../landing/src/Panel";
 import { applySeoMetadata } from "../../landing/src/seo";
 import "./styles.css";
+import "../../landing/src/button-style.css";
+import "../../landing/src/logo-style.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing mobile root element");

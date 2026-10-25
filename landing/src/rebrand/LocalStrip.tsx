@@ -1,3 +1,4 @@
+import { Button as UiButton, Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import { ArrowUpRight, Terminal } from "lucide-react";
 import { useRef, useState } from "react";
 import { useInView } from "./use-motion";
@@ -29,36 +30,36 @@ export function LocalStrip() {
     <section className="rb-local" aria-labelledby="rb-local-title">
       <div className="rb-shell rb-local-inner" ref={bandRef}>
         <div className={`rb-local-copy ${live ? "is-live" : ""}`}>
-          <p className="rb-kicker"><i /><span>On your machine</span></p>
-          <h2 id="rb-local-title">Nothing to sign up for.<br /><em>Just a local address.</em></h2>
-          <p>
+          <UiText className="rb-kicker"><i /><span>On your machine</span></UiText>
+          <UiHeading as="h2" id="rb-local-title">Nothing to sign up for.<br /><em>Just a local address.</em></UiHeading>
+          <UiText>
             Run the coordinator on your own computer and it answers on loopback. No login, no key, no account —
             the network is something you point at, not something you join.
-          </p>
+          </UiText>
         </div>
 
         <div className={`rb-local-cards ${live ? "is-live" : ""}`}>
           {/* The command types itself in: a bar slides off the text rather than
               the text being re-rendered, so the whole effect is one transform. */}
-          <article className="rb-local-term">
+          <UiCard className="rb-local-term">
             <span className="rb-local-term-top"><Terminal />Local endpoint</span>
-            <p className="rb-local-cmd">
+            <UiText className="rb-local-cmd">
               <code>POST http://127.0.0.1:8787/v1/chat/completions</code>
               {/* The mask is the effect: it retracts to the right and uncovers
                   the line, and its ::before is a caret riding that edge — it
                   moves with the mask and stops, it does not blink. No
                   character-by-character state, no re-render, no idle loop. */}
               <i className="rb-local-mask" aria-hidden="true" />
-            </p>
+            </UiText>
             <ul className="rb-local-chips">
               {CHIPS.map((chip) => <li key={chip}>{chip}</li>)}
             </ul>
-          </article>
+          </UiCard>
 
           {/* This is an interactive preview, not the real desktop setting. The
               explicit status copy prevents a landing-page click from implying
               that hardware was enlisted without installation or consent. */}
-          <button
+          <UiButton
             className={`rb-local-switch ${sharingPreview ? "is-on" : ""}`}
             type="button"
             role="switch"
@@ -73,14 +74,14 @@ export function LocalStrip() {
                 ? "Preview on — no hardware is actually shared from this page."
                 : "Off until you turn it on. Running locally never enlists your machine."}
             </small>
-          </button>
+          </UiButton>
         </div>
 
-        <p className="rb-local-foot">
+        <UiText className="rb-local-foot">
           Local runs keep the conversation in a database file on that same machine — nothing is uploaded unless you
           point the app at a hosted coordinator.
-          <a href="/downloads">Run it yourself <ArrowUpRight /></a>
-        </p>
+          <UiLink href="/downloads">Run it yourself <ArrowUpRight /></UiLink>
+        </UiText>
       </div>
     </section>
   );

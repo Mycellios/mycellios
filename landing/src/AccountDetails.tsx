@@ -1,3 +1,4 @@
+import { Button as UiButton, Heading as UiHeading, Text as UiText } from "./ui/primitives";
 import { CircleAlert, LoaderCircle, LogOut, UserRound } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { ApiAccount, ApiUsage } from "./api-access";
@@ -65,27 +66,25 @@ export function AccountDetails({ tab, titleId, session, identity, account, usage
   useEffect(() => setUsagePage(0), [usage.length]);
 
   if (tab === "account") return <>
-    <h2 id={titleId}>Your network identity</h2>
-    <p>History and permissions follow this account across devices.</p>
+    <UiHeading as="h2" id={titleId}>Account</UiHeading>
     <div className="account-identity-card"><UserRound /><span><strong>{identity?.email ?? session.user.email ?? identity?.id ?? session.user.id}</strong><small>{identity ? `${identity.role ?? "member"} · hosted network` : "Network role unverified"}</small></span></div>
-    {!identity && <div className="account-role-warning" role="status"><CircleAlert size={17} /><span>Your session is active, but network permissions could not be verified. Admin tools remain locked.</span><button type="button" disabled={roleBusy} onClick={onRetryRole}>{roleBusy ? "Checking…" : "Retry"}</button></div>}
+    {!identity && <div className="account-role-warning" role="status"><CircleAlert size={17} /><span>Your session is active, but network permissions could not be verified. Admin tools remain locked.</span><UiButton type="button" disabled={roleBusy} onClick={onRetryRole}>{roleBusy ? "Checking…" : "Retry"}</UiButton></div>}
     <section className="account-link-identities">
       <div><strong>Sign-in methods</strong><small>{canLinkGoogle || canLinkX ? "Link another available sign-in method to this account." : providers ? "No additional sign-in methods are available for this network." : "Other sign-in methods have not been verified."}</small></div>
       {(canLinkGoogle || canLinkX) && <span>
-        {canLinkGoogle && <button type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("google")}>{linkBusy === "google" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">G</b>}Google</button>}
-        {canLinkX && <button type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("twitter")}>{linkBusy === "twitter" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">𝕏</b>}X</button>}
+        {canLinkGoogle && <UiButton type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("google")}>{linkBusy === "google" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">G</b>}Google</UiButton>}
+        {canLinkX && <UiButton type="button" disabled={linkBusy !== null} onClick={() => onLinkProvider("twitter")}>{linkBusy === "twitter" ? <LoaderCircle className="spin" /> : <b aria-hidden="true">𝕏</b>}X</UiButton>}
       </span>}
       {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
     </section>
-    <div className="account-facts"><span><small>MEMBER SINCE</small><strong>{account ? new Date(account.created_at).toLocaleDateString() : "—"}</strong></span><span><small>REQUESTS MADE</small><strong>{account?.request_count ?? "—"}</strong></span><span><small>API TOKEN BALANCE</small><strong>{account ? `${formatCompactTokens(account.token_balance)} tokens` : "—"}</strong></span></div>
-    <button className="account-signout" onClick={onSignOut}><LogOut size={16} />Sign out</button>
+    <div className="account-facts"><span><small>MEMBER SINCE</small><strong>{account ? new Date(account.created_at).toLocaleDateString() : "—"}</strong></span><span><small>API TOKEN BALANCE</small><strong>{account ? `${formatCompactTokens(account.token_balance)} tokens` : "—"}</strong></span></div>
+    <UiButton className="account-signout" onClick={onSignOut}><LogOut size={16} />Sign out</UiButton>
   </>;
 
   if (tab === "billing") return <Suspense fallback={<div className="account-usage-empty" role="status">Loading plan…</div>}><BillingAccountPanel session={session} titleId={titleId} account={account} /></Suspense>;
 
   return <>
-    <h2 id={titleId}>Usage</h2>
-    <p>Real requests and tokens across chat and the API.</p>
+    <UiHeading as="h2" id={titleId}>Usage</UiHeading>
     <div className="account-usage-summary"><span><small>REQUESTS</small><strong>{account?.request_count ?? "—"}</strong></span><span><small>INPUT TOKENS</small><strong>{account ? formatCompactTokens(account.lifetime_input_tokens) : "—"}</strong></span><span><small>OUTPUT TOKENS</small><strong>{account ? formatCompactTokens(account.lifetime_output_tokens) : "—"}</strong></span></div>
     <div className="account-usage-models"><span>LAST 50 REQUESTS BY MODEL</span>{usageBusy ? <div className="account-usage-empty" role="status"><LoaderCircle className="spin" />Loading usage…</div> : error ? <div className="account-auth-error" role="alert"><CircleAlert size={16} />Usage could not be loaded: {error}</div> : usageByModel.length === 0 ? <div className="account-usage-empty">No usage recorded yet.</div> : visibleUsageByModel.map(([model, total]) => <div key={model}><strong>{model}</strong><span>{total.requests} request{total.requests === 1 ? "" : "s"}</span><b>{formatCompactTokens(total.tokens)} tokens</b></div>)}</div>
     {usageByModel.length > usagePageSize && <TablePagination label="usage models" page={visibleUsagePage} pageCount={usagePageCount} total={usageByModel.length} onPageChange={setUsagePage} />}

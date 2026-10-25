@@ -1,3 +1,4 @@
+import { Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import { ArrowUpRight, BadgeCheck, HandCoins, ShieldCheck, Wallet } from "lucide-react";
 import { useRef, type CSSProperties } from "react";
 import { GutterFruiting } from "./GutterFruiting";
@@ -39,17 +40,17 @@ export function PaymentsSection() {
       <GutterFruiting />
       <div className="rb-shell">
         <div className="rb-pay-head rb-reveal">
-          <p className="rb-kicker"><i /><span>The exchange</span></p>
-          <h2 id="rb-pay-title">Access for users.<br /><em>Proof for machine owners.</em></h2>
-          <p>Mycellios Go is the network’s regular-access plan. Check its availability in your account. Accepted stages and signed receipts record each machine’s contribution.</p>
+          <UiText className="rb-kicker"><i /><span>The exchange</span></UiText>
+          <UiHeading as="h2" id="rb-pay-title">Access for users.<br /><em>Proof for machine owners.</em></UiHeading>
+          <UiText>Mycellios Go is the network’s regular-access plan. Check its availability in your account. Accepted stages and signed receipts record each machine’s contribution.</UiText>
         </div>
 
         <div className={`rb-pay-rail ${live ? "is-live" : ""}`} ref={railRef}>
-          <article className="rb-pay-card buyer">
+          <UiCard className="rb-pay-card buyer">
             <span><Wallet />Your access</span>
             <strong>Mycellios Go</strong>
             <small>Current plans and usage in Account</small>
-          </article>
+          </UiCard>
 
           <div className="rb-pay-wire" aria-hidden="true">
             {[0, 1, 2].map((index) => <i key={index} style={{ "--i": index } as CSSProperties} />)}
@@ -78,38 +79,38 @@ export function PaymentsSection() {
             {[0, 1, 2].map((index) => <i key={index} style={{ "--i": index } as CSSProperties} />)}
           </div>
 
-          <article className="rb-pay-card seller">
+          <UiCard className="rb-pay-card seller">
             <span><HandCoins />Machine owners</span>
             <strong>Verified contribution</strong>
             <small>accepted stages · signed receipts</small>
-          </article>
+          </UiCard>
         </div>
 
-        <p className="rb-pay-note">
+        <UiText className="rb-pay-note">
           Illustrative attribution of one served route — the shares show the memory each machine lends to the model,
           not subscription pricing or a guaranteed payout.
-          <a href="/spore/treasury">How value routes <ArrowUpRight /></a>
-        </p>
+          <UiLink href="/spore/treasury">How value routes <ArrowUpRight /></UiLink>
+        </UiText>
 
         <div className="rb-pay-rules">
           {RULES.map((rule, index) => {
             const Icon = rule.icon;
             return (
-              <article className="rb-rule rb-reveal" key={rule.id} style={{ "--i": index } as CSSProperties}>
+              <UiCard className="rb-rule rb-reveal" key={rule.id} style={{ "--i": index } as CSSProperties}>
                 <div className="rb-rule-top"><Icon /><span>{rule.id}</span></div>
                 <strong>{rule.title}</strong>
-                <p>{rule.copy}</p>
-              </article>
+                <UiText>{rule.copy}</UiText>
+              </UiCard>
             );
           })}
         </div>
 
         <div className="rb-pay-actions rb-reveal">
-          <a className="rb-pill rb-pill-dark" href="/account">Explore Mycellios Go <ArrowUpRight /></a>
-          <a className="rb-pill rb-pill-ghost" href="/earn">Connect your machine <ArrowUpRight /></a>
+          <UiLink className="rb-pill rb-pill-dark" href="/account">Explore Mycellios Go <ArrowUpRight /></UiLink>
+          <UiLink className="rb-pill rb-pill-ghost" href="/earn">Connect your machine <ArrowUpRight /></UiLink>
         </div>
 
-        <p className="rb-econ-caveat rb-reveal">Usage tokens are access credits, not $SPORE · contributor payouts and $SPORE are not live yet</p>
+        <UiText className="rb-econ-caveat rb-reveal">Usage tokens are access credits, not $SPORE · contributor payouts and $SPORE are not live yet</UiText>
       </div>
     </section>
   );

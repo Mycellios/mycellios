@@ -1,20 +1,21 @@
+import { Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, Link as UiLink } from "../ui/primitives";
 import { ChevronDown } from "lucide-react";
 import "./spore-menu.css";
 
 export function SporeMenu({ active = false }: { active?: boolean }) {
-  return <details className={`spore-menu${active ? " active" : ""}`}>
-    <summary aria-label="Open SPORE menu"><span>$ SPORE</span><ChevronDown /></summary>
+  return <UiDisclosure className={`spore-menu${active ? " active" : ""}`}>
+    <UiDisclosureSummary aria-label="Open SPORE menu"><span>$ SPORE</span><ChevronDown /></UiDisclosureSummary>
     <div className="spore-menu-popover">
-      <a href="/spore">Staking</a>
-      <a href="/spore/treasury">Treasury</a>
-      <a href="/spore/data">Data</a>
+      <UiLink href="/spore">Staking</UiLink>
+      <UiLink href="/spore/treasury">Treasury</UiLink>
+      <UiLink href="/spore/data">Data</UiLink>
     </div>
-  </details>;
+  </UiDisclosure>;
 }
 
 export function SporeMobileLinks({ active = false }: { active?: boolean }) {
   return <div className={`spore-mobile-links${active ? " active" : ""}`}>
     <strong>$ SPORE</strong>
-    <a href="/spore">Staking</a><a href="/spore/treasury">Treasury</a><a href="/spore/data">Data</a>
+    <UiLink href="/spore">Staking</UiLink><UiLink href="/spore/treasury">Treasury</UiLink><UiLink href="/spore/data">Data</UiLink>
   </div>;
 }

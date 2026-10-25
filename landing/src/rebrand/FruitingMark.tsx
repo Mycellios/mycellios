@@ -58,23 +58,6 @@ export function FruitingMark() {
       focusable="false"
     >
       <defs>
-        <linearGradient id="rb-fruit-stipe-paint" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#8f6845" />
-          <stop offset="0.34" stopColor="#eadfce" />
-          <stop offset="0.68" stopColor="#f6eee2" />
-          <stop offset="1" stopColor="#a97b50" />
-        </linearGradient>
-        <linearGradient id="rb-fruit-cap-paint" x1="0.16" y1="0" x2="0.86" y2="1">
-          <stop offset="0" stopColor="#f3eadc" />
-          <stop offset="0.38" stopColor="#d9bd99" />
-          <stop offset="0.76" stopColor="#b9824d" />
-          <stop offset="1" stopColor="#7d5535" />
-        </linearGradient>
-        <linearGradient id="rb-fruit-under-paint" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#e7d3b7" />
-          <stop offset="0.58" stopColor="#b98455" />
-          <stop offset="1" stopColor="#6c452d" />
-        </linearGradient>
         <filter id="rb-fruit-soft-glow" x="-35%" y="-35%" width="170%" height="180%">
           <feGaussianBlur stdDeviation="2.4" />
         </filter>

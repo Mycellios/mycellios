@@ -22,18 +22,18 @@
 }
 
 /*
- * Dark variant for ops surfaces (panel reskin, etc.): forest base background,
- * ivory text, bronze accent. Apply the `.mycelium-dark` class to a scope root.
+ * Dark variant for ops surfaces: Graphite background, ivory text and amber.
+ * Shared dark values are owned by ui/dark-theme.css.
  */
 .mycelium-dark {
   color-scheme: dark;
-  --rb-ink: #eee9e2;
-  --rb-forest: #142019;
-  --rb-sage: #93a18e;
-  --rb-ivory: #eee9e2;
-  --rb-paper: #142019;
-  --rb-bronze: #ad7a48;
-  --rb-line: rgba(238, 233, 226, 0.16);
+  --rb-ink: var(--dark-text);
+  --rb-forest: var(--dark-canvas);
+  --rb-sage: var(--dark-muted);
+  --rb-ivory: var(--dark-text);
+  --rb-paper: var(--dark-canvas);
+  --rb-bronze: var(--dark-accent);
+  --rb-line: var(--dark-line);
 
   background: var(--rb-paper);
   color: var(--rb-ink);

@@ -29,14 +29,21 @@ describe("NetworkHistoryReport", () => {
       ],
     } satisfies Parameters<typeof NetworkHistoryReport>[0]["history"];
 
-    const html = renderToStaticMarkup(<NetworkHistoryReport history={history} />);
+    const html = renderToStaticMarkup(<NetworkHistoryReport history={history} compact={false} />);
 
     expect(html).toContain("Latest sample");
     expect(html).toContain("40 GB");
     expect(html).toContain("28 GB");
     expect(html).toContain("+16384 since start");
     expect(html).toContain("Latest saved readings");
-    expect(html).toContain("Coordinator data, no estimates");
+    expect(html).toContain("<polyline");
+
+    const compact = renderToStaticMarkup(<NetworkHistoryReport history={history} />);
+    const initialCharts = compact.split("<details")[0] ?? "";
+    expect(initialCharts.match(/class="ui-card network-history-chart"/g)).toHaveLength(2);
+    expect(compact).not.toContain('class="network-history-summary"');
+    expect(compact).not.toContain('open=""');
+    expect(compact).toContain("Latest saved readings");
   });
 });
 

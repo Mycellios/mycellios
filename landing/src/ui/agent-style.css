@@ -1,0 +1,324 @@
+/* Mycellios Agent reference: packages/ui-tokens and packages/ui-web in the
+   Rakazo fork. Scoped separately so the previous design remains available. */
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/fonts/geist-latin-ext-wght-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/assets/fonts/geist-latin-wght-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+html[data-mycellios-design="agent"] {
+  --agent-font: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Agent's paper (#f8f5f0) and stone palette, with lighter card fills. */
+  --agent-bg: #f8f5f0;
+  --agent-card: #f1eee8;
+  --agent-fg: #242b26;
+  --agent-muted: #62665d;
+  --agent-faint: #62665d;
+  --agent-selected-muted: #50584d;
+  --agent-primary: #26332a;
+  --agent-on-primary: #f8f5f0;
+  --agent-chat-user: #e6e5dc;
+  --agent-on-chat-user: #242b26;
+  --agent-secondary: #eae6de;
+  --agent-hover: #eae6de;
+  --agent-line: #ded9d1;
+  --agent-card-line: #ded9d1;
+  --agent-space-card: 20px;
+  --agent-space-inset: 16px;
+  --agent-motion-fast: 100ms;
+  --agent-motion-control: 150ms;
+  --agent-motion-page: 220ms;
+  --agent-ease-enter: cubic-bezier(.22, .61, .36, 1);
+  --agent-input-line: #b7b1a7;
+  --agent-sidebar: #eee9e2;
+  --agent-link: #6b573f;
+  --agent-muted-surface: #eeebe5;
+  --agent-popover: #faf8f4;
+  --agent-sidebar-accent: #e4e2d8;
+  --agent-success: #1e7150;
+  --agent-warning: #89601c;
+  --agent-danger: #c12429;
+  --agent-working: #0c64c1;
+  --agent-ring: #8c7962;
+  --agent-overlay: rgba(36, 43, 38, .14);
+  --agent-scrollbar: #c2bbae;
+  --panel-font: var(--agent-font);
+  --panel-font-display: var(--agent-font);
+  --rb-font-display: var(--agent-font);
+  --rb-font-ui: var(--agent-font);
+  --dark-canvas: #161618;
+  --dark-surface: #1c1c1f;
+  --dark-raised: #242427;
+  --dark-hover: #2e2e32;
+  --dark-input: #242427;
+  --dark-line: #333336;
+  --dark-line-strong: #505054;
+  --dark-text: #f5f5f5;
+  --dark-muted: #aaaab2;
+  --dark-subtle: #aaaab2;
+  --dark-accent: #fafafa;
+  --dark-accent-hover: #dedee2;
+  --dark-on-accent: #18181b;
+  --agent-selected: #e4e2d8;
+  --agent-input-surface: #eeebe5;
+  --agent-select-surface: #faf8f4;
+}
+
+html[data-mycellios-design="agent"] :is(.theme-dark, .mycelium-dark, .net, .studio-page, .earn-page, .spore-page, .rb-page:not([data-hero-theme="light"]) .rb-header, .rb-page:not([data-hero-theme="light"]) .rb-hero, .rb-closing, .rb-models-panel, .rb-get) {
+  --agent-bg: #161618;
+  --agent-card: #1c1c1f;
+  --agent-fg: #f5f5f5;
+  --agent-muted: #aaaab2;
+  --agent-faint: #aaaab2;
+  --agent-selected-muted: #c0c0c8;
+  --agent-primary: #fafafa;
+  --agent-on-primary: #18181b;
+  --agent-chat-user: #2e2e32;
+  --agent-on-chat-user: #f5f5f5;
+  --agent-secondary: #2a2a2d;
+  --agent-hover: #2e2e32;
+  --agent-line: #333336;
+  --agent-card-line: #333336;
+  --agent-input-line: #505054;
+  --agent-sidebar: #141416;
+  --agent-link: #e4e4e7;
+  --agent-muted-surface: #242427;
+  --agent-popover: #202023;
+  --agent-sidebar-accent: #2a2a2d;
+  --agent-success: #5fbf84;
+  --agent-warning: #e4b65e;
+  --agent-danger: #ff9592;
+  --agent-working: #459ffe;
+  --agent-overlay: rgba(0, 0, 0, .4);
+  --agent-scrollbar: #4a4a50;
+  --agent-selected: #38383d;
+  --agent-input-surface: #242427;
+  --agent-select-surface: #1c1c1f;
+  --agent-ring: #929298;
+}
+
+/* Landing-only light experiment. ?hero=dark restores the previous opening. */
+html[data-mycellios-design="agent"] .rb-page[data-hero-theme="light"] :is(.rb-header, .rb-hero) {
+  --agent-bg: #ffffff;
+  --agent-fg: #171917;
+  --agent-muted: #535851;
+  --agent-faint: #535851;
+  --agent-primary: #171917;
+  --agent-on-primary: #ffffff;
+  --agent-link: #171917;
+  --hero-mushroom-surface: light;
+  --hero-globe-land: #556255;
+  --hero-globe-rim: rgba(34, 49, 38, .12);
+  --hero-globe-filament: rgba(71, 99, 70, .72);
+  --hero-globe-hub: rgba(153, 112, 66, .95);
+  --hero-globe-tip: #58704f;
+  --hero-globe-tip-core: #385033;
+  --hero-globe-hub-tip: #ad7a48;
+  --hero-globe-hub-core: #80552e;
+}
+
+html[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) {
+  --panel-font: var(--agent-font);
+  --panel-font-display: var(--agent-font);
+  --rb-font-display: var(--agent-font);
+  --rb-font-body: var(--agent-font);
+  --rb-font-ui: var(--agent-font);
+  --ui-control-height: 32px;
+  --ui-radius-control: 8px;
+  --ui-radius-card: 12px;
+  --ui-space: 6px;
+  --ui-accent: var(--agent-primary);
+  --ui-accent-hover: color-mix(in srgb, var(--agent-primary) 80%, transparent);
+  --ui-on-accent: var(--agent-on-primary);
+  --ui-foreground: var(--agent-fg);
+  --ui-muted: var(--agent-muted);
+  --ui-surface: var(--agent-card);
+  --ui-line: var(--agent-line);
+  --ui-focus: var(--agent-ring);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  font-family: var(--agent-font);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+html[data-mycellios-design="agent"] .public-panel {
+  --bg-canvas: var(--agent-bg);
+  --bg-sidebar: var(--agent-sidebar);
+  --bg-card: var(--agent-card);
+  --bg-elevated: var(--agent-hover);
+  --bg-card-hover: var(--agent-hover);
+  --bg-input: var(--agent-input-surface);
+  --text-primary: var(--agent-fg);
+  --text-secondary: var(--agent-muted);
+  --text-tertiary: var(--agent-faint);
+  --text-disabled: var(--agent-faint);
+  --border-subtle: var(--agent-line);
+  --border-strong: var(--agent-input-line);
+  --blue-300: var(--agent-fg);
+  --blue-400: var(--agent-fg);
+  --blue-500: var(--agent-primary);
+  --blue-600: var(--agent-primary);
+  --purple-300: var(--agent-working);
+  --purple-400: var(--agent-working);
+  --purple-500: var(--agent-working);
+  --shadow-card: none;
+  --shadow-hover: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+html[data-mycellios-design="agent"] .public-panel-viewport { overflow-x: clip; }
+html[data-mycellios-design="agent"] .public-panel.theme-light { --text-tertiary: var(--agent-muted); --warning: var(--agent-warning); --success: var(--agent-success); --danger: var(--agent-danger); }
+
+html[data-mycellios-design="agent"] :is(.ui-heading, .rb-brand, .panel-brand strong) {
+  font-family: var(--agent-font) !important;
+  font-weight: 500;
+  letter-spacing: -.025em;
+}
+html[data-mycellios-design="agent"] :is(.public-panel, .net, .rb-page, .studio-page) strong { font-family: var(--agent-font); }
+html[data-mycellios-design="agent"] .panel-page-title h1 { font-size: clamp(24px, 2.5vw, 28px); line-height: 1.2; font-weight: 500; }
+html[data-mycellios-design="agent"] .panel-brand strong { font-size: 20px; }
+html[data-mycellios-design="agent"] .public-panel .panel-sidebar nav :is(button, a) { min-height: 36px; padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; }
+html[data-mycellios-design="agent"] :is(.ui-card, .panel-card, .connect-studio-workspace, .contribute-native-disclosure) { border-radius: var(--ui-radius-card) !important; }
+html[data-mycellios-design="agent"] .ui-dialog { border-radius: 16px; }
+
+html[data-mycellios-design="agent"] .ui-button { border-radius: 8px; font-family: var(--agent-font); }
+html[data-mycellios-design="agent"] .ui-button[data-variant="ghost"] { font-family: var(--agent-font); font-weight: 400 !important; }
+html[data-mycellios-design="agent"] .ui-link:where(:not(.ui-button)) { font-weight: 400 !important; }
+html[data-mycellios-design="agent"] .public-panel .panel-sidebar nav :is(button, a):not(.active) { font-weight: 400; }
+html[data-mycellios-design="agent"] .ui-button:is([data-variant="primary"], [data-variant="secondary"], [data-variant="danger"]) {
+  min-height: 32px !important;
+  padding: 6px 10px !important;
+  gap: 6px !important;
+  border-radius: 8px !important;
+  font: 500 14px/20px var(--agent-font) !important;
+  letter-spacing: normal;
+  transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+html[data-mycellios-design="agent"] .ui-button[data-size="sm"]:not([data-variant="ghost"]):not([data-variant="navigation"]) { min-height: 28px !important; padding: 4px 10px !important; font-size: 12.8px !important; }
+html[data-mycellios-design="agent"] .ui-button[data-size="lg"]:not([data-variant="ghost"]):not([data-variant="navigation"]) { min-height: 36px !important; padding: 8px 10px !important; }
+html[data-mycellios-design="agent"] .ui-button[data-icon-only="true"] { width: 32px; height: 32px; }
+html[data-mycellios-design="agent"] .ui-button:active:not(:disabled):not([aria-haspopup]) { transform: translateY(1px); }
+html[data-mycellios-design="agent"] .ui-button:is(:disabled, [aria-disabled="true"]) { opacity: .65; }
+html[data-mycellios-design="agent"] .ui-button svg { flex-shrink: 0; }
+html[data-mycellios-design="agent"] .ui-button:is([data-variant="primary"], [data-variant="secondary"], [data-variant="danger"]) :is(span, strong, b) { font: inherit !important; letter-spacing: inherit; }
+html[data-mycellios-design="agent"] .ui-label { font-size: 12px; font-weight: 500; letter-spacing: normal; }
+html[data-mycellios-design="agent"] :is(.ui-input, .ui-select, .ui-textarea, .app-select-trigger) { border-radius: 8px !important; font: 400 14px/20px var(--agent-font) !important; }
+html[data-mycellios-design="agent"] :is(.ui-input, .ui-select, .app-select-trigger):where(:not([data-control="checkbox"]):not([data-control="radio"]):not([data-control="range"]):not([data-control="file"]):not([data-control="hidden"])) { height: 36px !important; min-height: 36px; padding: 6px 12px !important; }
+html[data-mycellios-design="agent"] :is(.ui-select, .app-select-trigger) { height: 32px !important; min-height: 32px !important; padding: 4px 10px !important; }
+html[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) { height: 40px; border-radius: 12px; padding-inline: 12px; }
+html[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) .ui-input { height: 36px !important; min-height: 0; border-radius: 0 !important; padding-inline: 0 !important; }
+html[data-mycellios-design="agent"] .app-select-menu button { min-height: 32px; padding: 6px 10px; font: 500 14px/20px var(--agent-font); }
+html[data-mycellios-design="agent"] .public-panel :is(.ui-input, .ui-textarea)::placeholder { opacity: 1; }
+html[data-mycellios-design="agent"] .account-modal form label { font-family: var(--agent-font); text-transform: none; letter-spacing: normal; }
+html[data-mycellios-design="agent"] .ui-badge { border-radius: 6px; font-family: var(--agent-font); }
+
+html[data-mycellios-design="agent"] .rb-page { --rb-paper: var(--agent-bg); --rb-ink: var(--agent-fg); --rb-sage: var(--agent-muted); --rb-line: var(--agent-line); --rb-forest: #161618; --rb-ivory: #f5f5f5; --rb-bronze: var(--agent-link); }
+html[data-mycellios-design="agent"] .rb-page :is(.rb-header, .rb-hero, .rb-closing, .rb-models-panel, .rb-get) { --rb-bronze: var(--agent-link); --rb-sage: var(--agent-muted); --rb-ink: var(--agent-fg); --rb-line: var(--agent-line); }
+html[data-mycellios-design="agent"] .rb-page :is(h1, h2, h3) { font-family: var(--agent-font); font-weight: 500; }
+html[data-mycellios-design="agent"] .rb-page :is(h1, h2, h3) em { font-style: normal; font-weight: inherit; }
+html[data-mycellios-design="agent"] .rb-hero h1 { font-size: clamp(44px, 5.2vw, 76px); line-height: 1.08; }
+html[data-mycellios-design="agent"] .rb-page h2 { font-size: clamp(30px, 4vw, 52px); line-height: 1.12; }
+html[data-mycellios-design="agent"] .rb-page h3 { font-size: 24px; line-height: 1.25; }
+html[data-mycellios-design="agent"] .rb-brand { font-size: 25px; }
+html[data-mycellios-design="agent"] .rb-header nav { font-size: 14px; font-weight: 500; }
+html[data-mycellios-design="agent"] .rb-pill {
+  min-height: 36px; padding: 8px 14px; gap: 6px; border: 0; border-radius: 8px;
+  font: 500 14px/20px var(--agent-font); letter-spacing: normal; text-transform: none;
+}
+html[data-mycellios-design="agent"] .rb-pill:hover { transform: none; }
+html[data-mycellios-design="agent"] .rb-closing .rb-pill { min-height: 48px; border-radius: 12px; padding-inline: 20px; }
+html[data-mycellios-design="agent"] .rb-hero-prompt :is(input, button) { height: 48px; border-radius: 12px; font-family: var(--agent-font); }
+html[data-mycellios-design="agent"] .rb-hero-prompt button { width: 48px; border: 0; }
+html[data-mycellios-design="agent"] .rb-mobile-cta { border-radius: 8px; font-family: var(--agent-font); text-transform: none; letter-spacing: normal; }
+html[data-mycellios-design="agent"] :is(.net, .studio-page, .earn-page, .spore-page) { font-family: var(--agent-font); }
+
+/* Agent surface rhythm: separate peer cards, flatten redundant nested frames. */
+html[data-mycellios-design="agent"] .public-panel .inference-page {
+  display: grid;
+  gap: var(--agent-space-card);
+  align-content: start;
+}
+html[data-mycellios-design="agent"] .public-panel .inference-page > :is(.panel-page-title, .panel-disclosure, .api-access-panel, .inference-unavailable, .inference-console) { margin-block: 0; }
+html[data-mycellios-design="agent"] .public-panel :is(.panel-disclosure, .api-access-panel, .inference-unavailable, .inference-console, .inference-chat) { border-radius: var(--ui-radius-card); }
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary {
+  min-height: 72px;
+  grid-template-columns: 32px minmax(0, 1fr) 18px;
+  gap: 12px;
+  padding: var(--agent-space-inset);
+  border-radius: var(--ui-radius-card);
+}
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure-icon { width: 32px; height: 32px; border-radius: 8px; }
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary small { font-weight: 500; letter-spacing: .08em; }
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure-body { gap: var(--agent-space-inset); padding: var(--agent-space-inset); }
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure-body > :first-child { margin-top: 0; }
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure-body > .api-access-panel { border: 0; border-radius: 0; }
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure-body .api-access-summary { padding-inline: 4px; min-height: 40px; border-radius: 8px; }
+html[data-mycellios-design="agent"] .public-panel .api-target-state { border-radius: 6px; font-size: 10px; font-weight: 500; letter-spacing: .06em; }
+html[data-mycellios-design="agent"] .public-panel :is(.account-mode-tabs, .contribute-levels, .network-history-ranges, .connect-platforms) { border-radius: 12px !important; padding: 3px !important; gap: 2px !important; }
+html[data-mycellios-design="agent"] .public-panel :is(.account-mode-tabs, .contribute-levels, .network-history-ranges, .connect-platforms) .ui-button { min-height: 28px !important; padding: 4px 10px !important; border-radius: 9px !important; font-size: 13px !important; font-weight: 400 !important; }
+html[data-mycellios-design="agent"] .public-panel .connect-platforms { width: fit-content; max-width: 100%; }
+html[data-mycellios-design="agent"] .public-panel .dashboard-connect-field.install code { font: 400 13px/20px var(--agent-font); }
+html[data-mycellios-design="agent"] .public-panel .stat-accent { display: none; }
+html[data-mycellios-design="agent"] .public-panel .inference-unavailable { padding: 20px; grid-template-columns: 40px minmax(0, 1fr); gap: 16px; }
+html[data-mycellios-design="agent"] .public-panel .inference-unavailable-icon { width: 40px; height: 40px; border-radius: 10px; }
+html[data-mycellios-design="agent"] .public-panel :is(.card-heading strong, .dashboard-connect > header strong, .canvas-head strong, .panel-disclosure > summary strong, .api-access-summary strong) { font-weight: 500; }
+html[data-mycellios-design="agent"] :is(.ui-input, .ui-select, .ui-textarea, .app-select-trigger) { box-sizing: border-box; }
+html[data-mycellios-design="agent"] .ui-textarea { padding: 10px 12px; }
+html[data-mycellios-design="agent"] .public-panel .account-modal { width: min(440px, calc(100vw - 32px)); padding: 24px; }
+html[data-mycellios-design="agent"] .public-panel .account-modal-close { width: 32px; height: 32px; border-radius: 8px; }
+
+/* Match Agent's control, collapsible, popup and content-entry timing. Individual
+   scale/translate properties preserve the positioning transforms of popovers. */
+html[data-mycellios-design="agent"] :is(.ui-button, .ui-link, .ui-input, .ui-select, .ui-textarea, .app-select-trigger, .panel-disclosure > summary, tbody tr):where(:not(.panel-sidebar *)) {
+  transition: color var(--agent-motion-control) ease, background-color var(--agent-motion-control) ease, border-color var(--agent-motion-control) ease, transform var(--agent-motion-control) ease;
+}
+html[data-mycellios-design="agent"] .public-panel .panel-disclosure-chevron { transition: transform var(--agent-motion-control) ease-out; }
+html[data-mycellios-design="agent"] .public-panel .panel-content-scale > :is(section, article) { animation: agent-content-enter var(--agent-motion-page) var(--agent-ease-enter); }
+html[data-mycellios-design="agent"] .public-panel .panel-page-title { animation: agent-title-enter var(--agent-motion-page) var(--agent-ease-enter); }
+html[data-mycellios-design="agent"] :is(.ui-dialog, .app-select-menu, .inference-model-menu, .inference-instructions-popover, .mesh-node-popover, .spore-menu-popover) { animation: agent-popup-enter var(--agent-motion-fast) ease-out; }
+html[data-mycellios-design="agent"] .app-select-menu { transform-origin: top center; }
+html[data-mycellios-design="agent"] .public-panel .panel-detail-drawer { animation: agent-drawer-enter var(--agent-motion-control) ease-out; }
+html[data-mycellios-design="agent"] .public-panel .modal-backdrop { animation: agent-content-enter var(--agent-motion-fast) ease-out; }
+@keyframes agent-content-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes agent-title-enter { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+@keyframes agent-popup-enter { from { opacity: 0; scale: .95; } to { opacity: 1; scale: 1; } }
+@keyframes agent-drawer-enter { from { opacity: 0; translate: 12px 0; } to { opacity: 1; translate: 0 0; } }
+@supports (interpolate-size: allow-keywords) {
+  html[data-mycellios-design="agent"] .public-panel :is(.panel-disclosure, .overview-detail)::details-content {
+    interpolate-size: allow-keywords;
+    block-size: 0;
+    overflow: clip;
+    transition: block-size var(--agent-motion-control) ease-out, content-visibility var(--agent-motion-control) allow-discrete;
+  }
+  html[data-mycellios-design="agent"] .public-panel :is(.panel-disclosure, .overview-detail)[open]::details-content { block-size: auto; }
+}
+
+@media (pointer: coarse) {
+  html[data-mycellios-design="agent"] .ui-button:is([data-variant="primary"], [data-variant="secondary"], [data-variant="danger"]) { min-height: 44px !important; }
+}
+@media (max-width: 767px) {
+  html[data-mycellios-design="agent"] :is(.ui-input, .ui-select, .ui-textarea) { font-size: 16px !important; }
+  html[data-mycellios-design="agent"] .public-panel { --agent-space-card: 16px; --agent-space-inset: 14px; }
+  html[data-mycellios-design="agent"] .public-panel .inference-unavailable { padding: 16px; gap: 12px; }
+  html[data-mycellios-design="agent"] .public-panel .account-modal { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-mycellios-design="agent"] :is(.ui-button, .ui-link, .ui-input, .ui-select, .ui-textarea, .app-select-trigger, .panel-disclosure > summary, .panel-disclosure-chevron, tbody tr) { transition: none !important; }
+  html[data-mycellios-design="agent"] :is(.panel-content-scale > section, .panel-content-scale > article, .panel-page-title, .ui-dialog, .app-select-menu, .inference-model-menu, .inference-instructions-popover, .mesh-node-popover, .spore-menu-popover, .modal-backdrop) { animation: none !important; }
+  html[data-mycellios-design="agent"] .public-panel :is(.panel-disclosure, .overview-detail)::details-content { transition: none !important; }
+}

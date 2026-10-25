@@ -35,6 +35,12 @@ model computation and moves activations between assigned ranges.
 
 ## Runtime invariants
 
+The React web and browser-worker surfaces compose `landing/src/ui` primitives
+and patterns. Storybook under `landing/.storybook` consumes those same production
+exports; it does not own an independent implementation. The UI kit depends on
+React and presentation libraries, never on coordinator or inference internals.
+`verify:ui-kit` enforces native-control ownership and catalog coverage.
+
 - Unknown models and uncertified layouts fail closed before launch.
 - A node receives an explicit range; it is not treated as a generic remote
   command runner.

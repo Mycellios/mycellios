@@ -1,3 +1,4 @@
+import { Button as UiButton, Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import { Activity, Database, Leaf, LockKeyhole, Network, ShieldCheck, Sprout } from "lucide-react";
 import { LandingHeader } from "./RebrandLanding";
 import "./create-studio.css";
@@ -15,9 +16,9 @@ function PreviewNotice() {
 }
 
 function Staking() {
-  return <><section className="spore-hero"><div><span>NETWORK PARTICIPATION</span><h1>Grow with <em>$SPORE</em></h1><p>A proposed self-custody participation layer for useful, verified compute. Designed to reward real work—not speculative activity.</p></div><div className="spore-mark" aria-hidden="true"><i /><i /><i /><Leaf /></div></section><PreviewNotice />
-    <section className="spore-gate"><LockKeyhole /><h2>Staking is not active</h2><p>The interface will open only after the contract, custody model, reward source and legal gates are independently verified.</p><button type="button" disabled>Connect wallet — unavailable</button></section>
-    <section className="spore-how"><span>PROPOSED FLOW</span><div>{steps.map(([id,title,copy]) => <article key={id}><b>{id}</b><h3>{title}</h3><p>{copy}</p></article>)}</div></section></>;
+  return <><section className="spore-hero"><div><span>NETWORK PARTICIPATION</span><UiHeading as="h1">Grow with <em>$SPORE</em></UiHeading><UiText>A proposed self-custody participation layer for useful, verified compute. Designed to reward real work—not speculative activity.</UiText></div><div className="spore-mark" aria-hidden="true"><i /><i /><i /><Leaf /></div></section><PreviewNotice />
+    <section className="spore-gate"><LockKeyhole /><UiHeading as="h2">Staking is not active</UiHeading><UiText>The interface will open only after the contract, custody model, reward source and legal gates are independently verified.</UiText><UiButton type="button" disabled>Connect wallet — unavailable</UiButton></section>
+    <section className="spore-how"><span>PROPOSED FLOW</span><div>{steps.map(([id,title,copy]) => <UiCard key={id}><b>{id}</b><UiHeading as="h3">{title}</UiHeading><UiText>{copy}</UiText></UiCard>)}</div></section></>;
 }
 
 function FlowLine({ tone = "bronze" }: { tone?: "bronze" | "green" | "cream" }) {
@@ -29,18 +30,18 @@ function EmptyChart() {
 }
 
 function Treasury() {
-  return <><section className="spore-title"><span>VALUE ROUTING</span><h1>The <em>SPORE</em>{" "}treasury</h1><p>A transparent proposal for routing margin from completed compute. Nothing moves until real revenue, governance and audit trails exist.</p></section><PreviewNotice />
-    <section className="spore-split"><h2>A proposed ledger routes verified compute margin through explicit rules.</h2><div><article><Sprout /><strong>Network resilience</strong><p>Funds future worker incentives, reliability and operating reserves.</p></article><article><ShieldCheck /><strong>Participant distribution</strong><p>Only paid, attributable work can become a distribution event.</p></article></div></section>
-    <section className="spore-metrics"><article className="primary"><span>RESERVE STATUS</span><strong>Not funded</strong><small>No treasury contract deployed</small></article><article><span>DISTRIBUTIONS</span><strong>0</strong><small>No reward events recorded</small></article><article><span>BUYBACKS</span><strong>Disabled</strong><small>No market operation configured</small></article></section>
-    <section className="spore-chart-grid"><article><header><span>Illustrative reserve path</span><strong>Requires real revenue</strong></header><FlowLine tone="green" /></article><article><header><span>Illustrative distributions</span><strong>Requires verified work</strong></header><FlowLine tone="cream" /></article></section></>;
+  return <><section className="spore-title"><span>VALUE ROUTING</span><UiHeading as="h1">The <em>SPORE</em>{" "}treasury</UiHeading><UiText>A transparent proposal for routing margin from completed compute. Nothing moves until real revenue, governance and audit trails exist.</UiText></section><PreviewNotice />
+    <section className="spore-split"><UiHeading as="h2">A proposed ledger routes verified compute margin through explicit rules.</UiHeading><div><UiCard><Sprout /><strong>Network resilience</strong><UiText>Funds future worker incentives, reliability and operating reserves.</UiText></UiCard><UiCard><ShieldCheck /><strong>Participant distribution</strong><UiText>Only paid, attributable work can become a distribution event.</UiText></UiCard></div></section>
+    <section className="spore-metrics"><UiCard className="primary"><span>RESERVE STATUS</span><strong>Not funded</strong><small>No treasury contract deployed</small></UiCard><UiCard><span>DISTRIBUTIONS</span><strong>0</strong><small>No reward events recorded</small></UiCard><UiCard><span>BUYBACKS</span><strong>Disabled</strong><small>No market operation configured</small></UiCard></section>
+    <section className="spore-chart-grid"><UiCard><header><span>Illustrative reserve path</span><strong>Requires real revenue</strong></header><FlowLine tone="green" /></UiCard><UiCard><header><span>Illustrative distributions</span><strong>Requires verified work</strong></header><FlowLine tone="cream" /></UiCard></section></>;
 }
 
 function Data() {
   const signals = [["Credited workers", "No source"],["Credited GPU work", "No source"],["Credited browser work", "No source"],["Verified routes", "No source"],["Rewards today", "—"],["SPORE price", "Not listed"]];
-  return <><section className="spore-data-hero"><div><span>MYCELLIOS / DATA</span><h1>Network signals,<br/>{" "}<em>without invented numbers.</em></h1><p>This preview shows the planned telemetry layout. For current connected nodes, models and jobs, visit the <a href="/network">live network</a>.</p></div><div className="spore-pulse" aria-hidden="true">{Array.from({length:18},(_,i)=><i key={i}/>)}</div></section><PreviewNotice />
-    <section className="spore-live"><header><Activity /><h2>Planned feed</h2><span>source not connected</span></header><div className="spore-signal-grid">{signals.map(([label,value])=><article key={label}><strong>{value}</strong><span><i />{label}</span></article>)}</div></section>
-    <section className="spore-telemetry"><h2><Network /> Planned contribution feed</h2><div className="spore-chart-grid"><article><header><span>Verified work credited per day</span><strong>Awaiting source</strong></header><EmptyChart /></article><article><header><span>Useful compute recorded</span><strong>Awaiting source</strong></header><EmptyChart /></article></div></section>
-    <section className="spore-provenance"><Database /><div><strong>Source before spectacle</strong><p>Every published metric will include its origin, sample window and last update. Price and market-cap panels stay absent until a real market exists.</p></div></section></>;
+  return <><section className="spore-data-hero"><div><span>MYCELLIOS / DATA</span><UiHeading as="h1">Network signals,<br/>{" "}<em>without invented numbers.</em></UiHeading><UiText>This preview shows the planned telemetry layout. For current connected nodes, models and jobs, visit the <UiLink href="/network">live network</UiLink>.</UiText></div><div className="spore-pulse" aria-hidden="true">{Array.from({length:18},(_,i)=><i key={i}/>)}</div></section><PreviewNotice />
+    <section className="spore-live"><header><Activity /><UiHeading as="h2">Planned feed</UiHeading><span>source not connected</span></header><div className="spore-signal-grid">{signals.map(([label,value])=><UiCard key={label}><strong>{value}</strong><span><i />{label}</span></UiCard>)}</div></section>
+    <section className="spore-telemetry"><UiHeading as="h2"><Network /> Planned contribution feed</UiHeading><div className="spore-chart-grid"><UiCard><header><span>Verified work credited per day</span><strong>Awaiting source</strong></header><EmptyChart /></UiCard><UiCard><header><span>Useful compute recorded</span><strong>Awaiting source</strong></header><EmptyChart /></UiCard></div></section>
+    <section className="spore-provenance"><Database /><div><strong>Source before spectacle</strong><UiText>Every published metric will include its origin, sample window and last update. Price and market-cap panels stay absent until a real market exists.</UiText></div></section></>;
 }
 
 export function SporeStudio() {

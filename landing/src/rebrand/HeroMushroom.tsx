@@ -87,6 +87,7 @@ export function HeroMushroom() {
         defineMushroomStage();
         element = document.createElement("mushroom-stage");
         element.setAttribute("variant", "hero");
+        element.setAttribute("surface", getComputedStyle(host).getPropertyValue("--hero-mushroom-surface").trim() || "dark");
         element.setAttribute("accent", "#c9976a");
         element.setAttribute("spores", reduceMotion ? "off" : "on");
         element.setAttribute("motion", reduceMotion ? "off" : "full");

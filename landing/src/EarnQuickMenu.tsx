@@ -1,4 +1,5 @@
-import { Check, ChevronDown, ChevronRight, Copy, Download, ExternalLink, GitFork, Network, Share2, Smartphone } from "lucide-react";
+import { Button as UiButton, DialogPanel as UiDialogPanel, Link as UiLink } from "./ui/primitives";
+import { Check, ChevronDown, ChevronRight, Copy, Download, Globe2, Network, Share2 } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 export function EarnQuickMenu({
@@ -54,7 +55,7 @@ export function EarnQuickMenu({
 
   return (
     <div className={`panel-join-menu ${open ? "open" : ""}`} ref={rootRef}>
-      <button
+      <UiButton
         type="button"
         className="panel-join-trigger"
         aria-label="Earn"
@@ -66,46 +67,26 @@ export function EarnQuickMenu({
         <Share2 size={15} />
         <span>Earn</span>
         <ChevronDown className="panel-join-chevron" size={13} />
-      </button>
+      </UiButton>
       {open && (
-        <section className="panel-join-popover" id={menuId} role="dialog" aria-label="Earn by contributing">
-          <div className="panel-join-popover-intro">
-            <span>CONTRIBUTE CAPACITY</span>
-            <strong>Earn</strong>
-            <p>Choose how to contribute compute. Rewards remain unavailable until verified work and payouts are activated.</p>
+        <UiDialogPanel className="panel-join-popover" id={menuId} role="dialog" aria-label="Earn by contributing">
+          <strong className="panel-join-heading">Contribute</strong>
+          <div className="panel-join-options">
+            <UiLink href={browserUrl} {...externalProps} onClick={() => setOpen(false)}>
+              <Globe2 size={17} /><span>In your browser</span><ChevronRight size={14} />
+            </UiLink>
+            <UiLink href={downloadsUrl} {...externalProps} onClick={() => setOpen(false)}>
+              <Download size={17} /><span>On your computer</span><ChevronRight size={14} />
+            </UiLink>
+            <UiButton type="button" onClick={() => { setOpen(false); onOpenEarn(); }}>
+              <Network size={17} /><span>All options</span><ChevronRight size={14} />
+            </UiButton>
           </div>
-          <div className="panel-join-invite">
-            <div className="panel-join-invite-head">
-              <span>PUBLIC CONTRIBUTION LINK</span>
-              <button type="button" className={copyState} onClick={() => void copyEarnLink()} aria-live="polite">
-                {copyState === "copied" ? <Check size={14} /> : <Copy size={14} />}
-                {copyState === "copied" ? "Copied" : copyState === "error" ? "Try again" : "Copy"}
-              </button>
-            </div>
-            <code><span>$</span>{earnUrl}</code>
-            <small>Anyone with this link can contribute in a browser or check native package availability.</small>
-          </div>
-          <div className="panel-join-quick-actions">
-            <button type="button" onClick={() => { setOpen(false); onOpenEarn(); }}>
-              <Network size={16} />
-              <span><strong>Open Earn</strong><small>See every contribution option</small></span>
-              <ChevronRight size={15} />
-            </button>
-            <a href={browserUrl} {...externalProps}>
-              <Smartphone size={16} />
-              <span><strong>Browser node</strong><small>Connect without installing</small></span>
-              <ExternalLink size={14} />
-            </a>
-            <a href={downloadsUrl} {...externalProps}>
-              <Download size={16} />
-              <span><strong>Native packages</strong><small>Check current availability</small></span>
-              <ChevronRight size={15} />
-            </a>
-          </div>
-          <a className="panel-join-guide" href="https://github.com/tych0s/mycellios" target="_blank" rel="noreferrer">
-            <GitFork size={14} /> Setup &amp; contribute on GitHub <ExternalLink size={12} />
-          </a>
-        </section>
+          <UiButton type="button" className={`panel-join-copy ${copyState}`} onClick={() => void copyEarnLink()} aria-live="polite">
+            {copyState === "copied" ? <Check size={16} /> : <Copy size={16} />}
+            {copyState === "copied" ? "Link copied" : copyState === "error" ? "Try copying again" : "Copy invite link"}
+          </UiButton>
+        </UiDialogPanel>
       )}
     </div>
   );

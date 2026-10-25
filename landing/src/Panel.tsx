@@ -1,3 +1,8 @@
+import { Badge as UiBadge } from "./ui/primitives";
+import { AgentNavigationLink, Sidebar, SidebarFooter } from "./ui/Sidebar";
+import { DialogPanel as UiDialogPanel } from "./ui/primitives";
+import { Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Select as UiSelect, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
+import { AppSelect, Toggle, PageTitle, PanelDisclosure, SummaryStrip, Metric, Empty, PanelLoading } from "./ui/patterns";
 import {
   Activity,
   ArrowRight,
@@ -34,14 +39,14 @@ import {
   MessageSquareText,
   Minus,
   Network,
-  Paperclip,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Play,
   Plus,
   Radio,
   RefreshCw,
   Search,
-  Send,
   Server,
   Settings,
   ShieldCheck,
@@ -60,6 +65,8 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "@fontsource-variable/manrope";
+import "./overview.css";
+import "./panel-minimal.css";
 import type {
   DashboardDeployment,
   DashboardWorker,
@@ -75,30 +82,16 @@ import type {
   SystemLogSnapshot,
   WorkerCredentialSummary,
 } from "../../src/contracts/dashboard";
-import type { ChatResponse, ChatStreamUpdate } from "../../src/contracts/chat";
-import { consumeChatCompletionStreamWithRecovery } from "../../src/core/chat-stream";
-import { isAvailableInferenceWorker, selectInferenceModel } from "./inference-selection";
-import { friendlyInferenceError, inferenceWaitingStatus } from "./inference-status";
-import type { ChatMessage, NetworkExecutionTrace } from "../../src/contracts/types";
+import { isAvailableInferenceWorker } from "./inference-selection";
+import type { NetworkExecutionTrace } from "../../src/contracts/types";
 import { projectObservedTopology } from "./network-topology";
 import { type ProductStatePresentation } from "./product-state";
 import type { NativeBuildIdentity } from "../../src/contracts/build-identity";
 import type { BenchmarkMeasurement, BenchmarkRun } from "../../src/benchlab/types";
 import { DownloadsPage } from "./Downloads";
 import { EarnQuickMenu } from "./EarnQuickMenu";
-import { SupportAssistant } from "./SupportAssistant";
 import { AccountDetails, MetaMaskProviderIcon } from "./AccountDetails";
 import { TABLE_PAGE_SIZE, TablePagination } from "./TablePagination";
-import {
-  formatFileSize,
-  inferenceMessageWithAttachments,
-  INFERENCE_FILE_ACCEPT,
-  MAX_INFERENCE_FILES,
-  MAX_INFERENCE_TOTAL_CHARS,
-  readInferenceAttachment,
-  type InferenceAttachment,
-  type InferenceAttachmentSummary,
-} from "./inference-attachments";
 import { firstFocusable, trapDialogTab, formatCompactNumber, formatCompactTokens, formatPower, shortId, shortFingerprint, formatMemory, relativeTime } from "./panel-ui-utilities";
 const brandIcon = "/assets/brand/favicon.png";
 const Contribute = lazy(() => import("./Contribute").then((module) => ({ default: module.Contribute })));
@@ -154,10 +147,8 @@ import {
   type OAuthProvider,
   type PublicAuthConfig,
 } from "./auth";
-import { ApiAccessPanel } from "./ApiAccessPanel";
 import {
   loadApiAccount,
-  apiRequestUrl,
   loadApiUsage,
   loadOperatorEvidence,
   configuredApiUrl,
@@ -169,8 +160,9 @@ import "./panel.css";
 
 import "./panel-downloads.css";
 import "./panel-desktop.css";
+import "./ui/dark-theme.css";
 
-type PanelView = "overview" | "history" | "nodes" | "models" | "jobs" | "tests" | "logs" | "inference" | "contribute" | "join" | "downloads" | "admin";
+type PanelView = "overview" | "history" | "nodes" | "models" | "jobs" | "tests" | "logs" | "contribute" | "join" | "downloads" | "admin";
 type PanelMode = "simple" | "developer";
 
 interface PanelProps {
@@ -316,18 +308,18 @@ const sharedNavItems: Array<{ id: PanelView; label: string; icon: typeof Network
   { id: "tests", label: "Tests", icon: Gauge },
   { id: "logs", label: "Logs", icon: ScrollText },
   { id: "models", label: "Models", icon: Boxes },
-  { id: "inference", label: "Chat", icon: MessageSquareText },
   { id: "contribute", label: "Run", icon: Zap },
   { id: "downloads", label: "Downloads", icon: Download },
   { id: "admin", label: "Admin", icon: ShieldCheck },
 ];
 
-const simplePanelViews = new Set<PanelView>(["overview", "history", "inference", "contribute", "downloads"]);
+const simplePanelViews = new Set<PanelView>(["overview", "history", "contribute", "downloads"]);
 const developerPanelViews = new Set<PanelView>(["nodes", "jobs", "tests", "logs", "models"]);
 const legacyPanelViews: Readonly<Record<string, PanelView>> = {
   network: "history",
   tasks: "jobs",
-  chat: "inference",
+  chat: "overview",
+  inference: "overview",
   join: "contribute",
 };
 
@@ -396,6 +388,17 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   const coordinatorStatus = coordinatorError ? "Unavailable" : loading ? "Connecting" : "Connected";
   const error = issue?.message ?? null;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return window.localStorage.getItem("mycellios.sidebar-collapsed") === "true"; }
+    catch { return false; }
+  });
+  const toggleSidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try { window.localStorage.setItem("mycellios.sidebar-collapsed", String(next)); } catch { /* Keep the toggle usable when storage is unavailable. */ }
+      return next;
+    });
+  };
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const sidebarCloseButtonRef = useRef<HTMLButtonElement>(null);
   const mainContentRef = useRef<HTMLElement>(null);
@@ -511,7 +514,7 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
 
   useEffect(() => {
     let timer: number | undefined;
-    const liveViews = new Set<PanelView>(["overview", "nodes", "models", "jobs", "logs", "inference"]);
+    const liveViews = new Set<PanelView>(["overview", "nodes", "models", "jobs", "logs"]);
     const intervalMs = liveViews.has(view) ? 5_000 : 15_000;
     const schedule = () => {
       if (document.visibilityState === "visible") timer = window.setInterval(() => void refresh(), intervalMs);
@@ -822,36 +825,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
     await refresh();
   }
 
-  async function sendPrompt(model: string, messages: ChatMessage[], sessionId: string, onUpdate?: (update: ChatStreamUpdate) => void, signal?: AbortSignal): Promise<ChatResponse> {
-    const session = await getValidSession();
-    if (authConfig.apiAccessEnabled && !session) {
-      throw new Error(authSessionRef.current
-        ? "Your account session could not be refreshed. Try again shortly."
-        : "Sign in to use your account's inference balance.");
-    }
-    const result = await consumeChatCompletionStreamWithRecovery(
-      (_attempt, signal) => fetch(apiRequestUrl("/v1/chat/completions", authConfig.publicApiBaseUrl), {
-        method: "POST",
-        headers: {
-          accept: "text/event-stream",
-          "content-type": "application/json",
-          ...(session ? { authorization: `Bearer ${session.accessToken}` } : {}),
-        },
-        body: JSON.stringify({ model, messages, session_id: sessionId, stream: true, max_tokens: 128, temperature: 0, top_p: 1 }),
-        signal,
-      }),
-      model,
-      onUpdate ?? (() => undefined),
-      { sessionId, ...(signal ? { signal } : {}) },
-    );
-    if (session && authConfig.apiAccessEnabled) {
-      void loadApiAccount(session.accessToken, apiRequestBaseUrl).then((account) => {
-        if (authSessionRef.current?.accessToken === session.accessToken) setApiAccount(account);
-      }).catch(() => undefined);
-    }
-    return result;
-  }
-
   const publicLink = (path: string) => path;
   const configuredApiBase = authConfig.publicApiBaseUrl ?? "/v1";
   const apiBaseUrl = configuredApiBase.startsWith("http")
@@ -879,21 +852,19 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
   return (
     <div className="public-panel-viewport">
       <div
-        className={`public-panel theme-${theme} panel-mode-${panelMode}`}
+        className={`public-panel theme-${theme} panel-mode-${panelMode}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
       >
-      <a className="panel-skip-link" href="#panel-main-content" inert={authOpen}>Skip to main content</a>
-      <aside id="panel-navigation" className={menuOpen ? "panel-sidebar open" : "panel-sidebar"} aria-label="Primary navigation" inert={authOpen}>
-        <button ref={sidebarCloseButtonRef} className="panel-sidebar-close" aria-label="Close navigation" onClick={closeNavigation}><X size={18} /></button>
-        <a className="panel-brand" href={publicLink("/")}><img src={brandIcon} alt="" /><div><strong>mycellios</strong><span>Mycellios Network</span></div></a>
-        <nav>
+      <UiLink className="panel-skip-link" href="#panel-main-content" inert={authOpen}>Skip to main content</UiLink>
+      <Sidebar collapsed={sidebarCollapsed} open={menuOpen} inert={authOpen} onToggle={toggleSidebar} onClose={closeNavigation} closeButtonRef={sidebarCloseButtonRef} homeHref={publicLink("/")} logoSrc={brandIcon}>
+        <nav id="panel-sidebar-links">
           {panelMode === "developer" && <span className="panel-nav-label">DEVELOPER TOOLS</span>}
           {navItems.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={view === id ? "active" : ""} title={label} aria-label={label} aria-current={view === id ? "page" : undefined} onClick={() => navigate(id)}>
+            <UiButton key={id} className={view === id ? "active" : ""} title={label} aria-label={label} aria-current={view === id ? "page" : undefined} onClick={() => navigate(id)}>
               <Icon size={18} /><span>{label}</span>{id === "nodes" && <b>{snapshot.summary.connected}</b>}
-            </button>
-          ))}
+            </UiButton>
+          ))}<AgentNavigationLink />
         </nav>
-        {advancedAccess && <button
+        {advancedAccess && <UiButton
           type="button"
           className={`panel-mode-toggle ${panelMode === "developer" ? "active" : ""}`}
           aria-pressed={panelMode === "developer"}
@@ -903,59 +874,33 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
           <Code2 size={18} />
           <span><strong>Developer mode</strong><small>{panelMode === "developer" ? "Advanced tools visible" : "Simple panel active"}</small></span>
           <i aria-hidden="true" />
-        </button>}
-        <div className="panel-sidebar-footer">
-          <div className="panel-top-actions panel-sidebar-actions">
-            <button className="panel-theme-indicator" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}><SunMoon size={16} /></button>
-            <EarnQuickMenu
+        </UiButton>}
+        <SidebarFooter
+          accountLabel={(networkIdentity?.email ?? authSession?.user.email)?.split("@")[0] ?? (authSession ? "Account" : "Sign in")}
+          accountTitle={authSession ? `Open account for ${networkIdentity?.email ?? authSession.user.email ?? "Mycellios user"}` : "Sign in to Mycellios"}
+          onAccount={() => { setMenuOpen(false); setAuthOpen(true); }}
+          theme={theme} onTheme={toggleTheme} status={coordinatorStatus}
+          degraded={Boolean(coordinatorError) || loading} version={snapshot.version}
+          earnMenu={<EarnQuickMenu
               earnUrl={`${window.location.origin}/earn`}
               browserUrl={publicLink("/browser/?autostart=1")}
               downloadsUrl={publicLink("/downloads")}
               external={false}
               onOpenEarn={() => window.location.assign("/earn")}
-            />
-          </div>
-          <button
-            type="button"
-            className="panel-sidebar-account"
-            onClick={() => { setMenuOpen(false); setAuthOpen(true); }}
-            aria-label={authSession ? `Open account for ${networkIdentity?.email ?? authSession.user.email ?? "Mycellios user"}` : "Sign in to Mycellios"}
-            title={authSession ? networkIdentity?.email ?? authSession.user.email ?? "Mycellios account" : "Sign in to Mycellios"}
-          >
-            <UserRound size={16} />
-            <span>
-              <strong>{(networkIdentity?.email ?? authSession?.user.email)?.split("@")[0] ?? (authSession ? "Account" : "Sign in")}</strong>
-              <small>{authSession ? "Mycellios account" : "Access your account"}</small>
-            </span>
-            <ChevronRight size={14} aria-hidden="true" />
-          </button>
-          <div className="panel-sidebar-meta">
-            <div
-              className={`panel-sidebar-status ${coordinatorError || loading ? "degraded" : "healthy"}`}
-              role="status"
-              aria-label={`Coordinator connection: ${coordinatorStatus}`}
-              title={coordinatorError ? "Cannot refresh the coordinator snapshot" : loading ? "Loading the coordinator snapshot" : `Coordinator connected · ${snapshot.summary.connected} connected nodes`}
-            >
-              <i />
-              <strong>{coordinatorStatus}</strong>
-            </div>
-            <div className="panel-sidebar-version" aria-label={`Coordinator version ${snapshot.version}`}>
-              <span><strong>{snapshot.version === "—" ? "—" : `v${snapshot.version}`}</strong></span>
-            </div>
-          </div>
-        </div>
-      </aside>
-      {menuOpen && !authOpen && <button className="panel-menu-backdrop" aria-label="Close navigation overlay" onClick={closeNavigation} />}
+            />}
+        />
+      </Sidebar>
+      {menuOpen && !authOpen && <UiButton className="panel-menu-backdrop" aria-label="Close navigation overlay" onClick={closeNavigation} />}
 
       <div className="panel-main" inert={authOpen}>
-        <button
+        <UiButton
           ref={menuButtonRef}
           className="panel-menu-button"
           aria-label={menuOpen ? "Close navigation" : "Show navigation labels"}
           aria-controls="panel-navigation"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((current) => !current)}
-        ><Menu /></button>
+        ><Menu /></UiButton>
 
         {issue && <div className="panel-error" role="alert" aria-live="assertive" title={issue.message}><CircleAlert size={17} /> {issue.source === "coordinator" ? "Coordinator unavailable." : "This node could not join the network."} Retrying automatically.</div>}
         <main id="panel-main-content" ref={mainContentRef} className="panel-content" tabIndex={-1}>
@@ -975,7 +920,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
               />}
               {view === "tests" && advancedAccess && <Tests canRunLocally={localBrowser && !localProductionProxy} />}
               {view === "logs" && advancedAccess && <SystemLogs snapshot={snapshot} connectionError={coordinatorError} />}
-              {view === "inference" && <Inference key={authSession?.user.id ?? "guest"} accountUserId={authSession?.user.id ?? null} snapshot={snapshot} coordinatorConnected={!coordinatorError} onSend={sendPrompt} onNavigate={navigate} developerMode={panelMode === "developer"} accountAuthenticated={!authConfig.apiAccessEnabled || authSession !== null} onSignIn={() => setAuthOpen(true)} apiAccessEnabled={authConfig.apiAccessEnabled ?? false} apiBaseUrl={apiBaseUrl} accessToken={authSession?.accessToken ?? null} getValidSession={getValidSession} apiAccount={apiAccount} />}
               {view === "contribute" && <Suspense fallback={<div className="panel-loading" role="status" aria-live="polite"><LoaderCircle className="spin" /><strong>Loading contribution tools</strong><span>Preparing the browser and node options…</span></div>}>
                 <Contribute
                   accessToken={authSession?.accessToken ?? null}
@@ -1043,11 +987,6 @@ function Panel({ mobileEntry = false, accountEntry = false }: PanelProps = {}) {
         onClose={closeAccount}
       />}
       </div>
-      {!authOpen && <SupportAssistant
-        surface="panel"
-        apiOrigin=""
-        onNavigate={navigate}
-      />}
     </div>
   );
 }
@@ -1246,42 +1185,42 @@ export function AccountModal({
   }
 
   return <div className="modal-backdrop account-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-    <section ref={dialogRef} className="account-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
-      <button type="button" className="account-modal-close" aria-label="Close" onClick={onClose}><X size={18} /></button>
+    <UiDialogPanel ref={dialogRef} className="account-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+      <UiButton type="button" className="account-modal-close" aria-label="Close" onClick={onClose}><X size={18} /></UiButton>
       <div className="account-modal-brand"><img src={brandIcon} alt="" /></div>
       {!ready && !session ? <>
-        <h2 id={titleId}>Checking your account</h2>
-        <p>Restoring your session and sign-in options…</p>
+        <UiHeading as="h2" id={titleId}>Checking your account</UiHeading>
+        <UiText>Restoring your session and sign-in options…</UiText>
         <div className="account-usage-empty" role="status"><LoaderCircle className="spin" />Loading account…</div>
       </> : session ? <>
-        <div className="account-detail-tabs"><button className={accountTab === "account" ? "active" : ""} onClick={() => setAccountTab("account")}>Account</button><button className={accountTab === "billing" ? "active" : ""} onClick={() => setAccountTab("billing")}>Plan</button><button className={accountTab === "usage" ? "active" : ""} onClick={() => setAccountTab("usage")}>Usage</button></div>
+        <div className="account-detail-tabs"><UiButton className={accountTab === "account" ? "active" : ""} onClick={() => setAccountTab("account")}>Account</UiButton><UiButton className={accountTab === "billing" ? "active" : ""} onClick={() => setAccountTab("billing")}>Plan</UiButton><UiButton className={accountTab === "usage" ? "active" : ""} onClick={() => setAccountTab("usage")}>Usage</UiButton></div>
         <AccountDetails tab={accountTab} titleId={titleId} session={session} identity={identity} account={account} usage={usage} usageBusy={usageBusy} linkBusy={linkBusy} roleBusy={roleBusy} providers={config.providers} error={error} onLinkProvider={(provider) => void linkProvider(provider)} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />
       </> : <>
-        <h2 id={titleId}>{!emailAvailable ? "Continue to Mycellios" : mode === "signin" ? "Welcome back" : "Create your account"}</h2>
-        <p>{!emailAvailable ? "Email sign-in is unavailable on this network. Choose a provider below." : mode === "signin" ? "Sign in to see your account and activity." : "Create an account to manage your access and view your activity."}</p>
-        {emailAvailable && <div className="account-mode-tabs"><button className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setNotice(null); setError(null); }}>Sign in</button><button className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setNotice(null); setError(null); }}>Create account</button></div>}
-        {emailAvailable && <form onSubmit={(event) => void submit(event)}>
-          <label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
-          <label>Password<span className="account-password-field"><input type={passwordVisible ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-label={passwordVisible ? "Hide password" : "Show password"} aria-pressed={passwordVisible} title={passwordVisible ? "Hide password" : "Show password"} onClick={() => setPasswordVisible((visible) => !visible)}>{passwordVisible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</button></span></label>
+        <UiHeading as="h2" id={titleId}>{!emailAvailable ? "Continue to Mycellios" : mode === "signin" ? "Welcome back" : "Create your account"}</UiHeading>
+        {!emailAvailable && <UiText>Email sign-in is unavailable on this network. Choose a provider below.</UiText>}
+        {emailAvailable && <div className="account-mode-tabs"><UiButton className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setNotice(null); setError(null); }}>Sign in</UiButton><UiButton className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setNotice(null); setError(null); }}>Create account</UiButton></div>}
+        {emailAvailable && <UiForm onSubmit={(event) => void submit(event)}>
+          <UiFieldLabel>Email<UiInput type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></UiFieldLabel>
+          <UiFieldLabel>Password<span className="account-password-field"><UiInput type={passwordVisible ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /><UiButton type="button" aria-label={passwordVisible ? "Hide password" : "Show password"} aria-pressed={passwordVisible} title={passwordVisible ? "Hide password" : "Show password"} onClick={() => setPasswordVisible((visible) => !visible)}>{passwordVisible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}</UiButton></span></UiFieldLabel>
           {notice && <div className="account-auth-success" role="status"><CheckCircle2 size={16} />{notice}</div>}
           {error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
-          <button className="account-submit" disabled={busy}>{busy ? <LoaderCircle className="spin" /> : null}<span>{busy ? "Connecting…" : mode === "signin" ? "Sign in securely" : "Create account"}</span>{!busy && <ArrowRight aria-hidden="true" />}</button>
-        </form>}
+          <UiButton className="account-submit" disabled={busy}>{busy ? <LoaderCircle className="spin" /> : null}<span>{busy ? "Connecting…" : mode === "signin" ? "Sign in securely" : "Create account"}</span>{!busy && <ArrowRight aria-hidden="true" />}</UiButton>
+        </UiForm>}
         {!emailAvailable && error && <div className="account-auth-error" role="alert"><CircleAlert size={16} />{error}</div>}
         {otherSignInAvailable && <><div className="account-provider-divider"><i />{emailAvailable ? "or continue with" : "Continue with"}<i /></div>
         <div className="account-provider-orbs" aria-label="Other sign-in options">
-          {googleAvailable && <button type="button" className="account-provider-google" aria-label="Continue with Google" title="Continue with Google" disabled={providerBusy !== null || busy} onClick={continueWithGoogle}>
+          {googleAvailable && <UiButton type="button" className="account-provider-google" aria-label="Continue with Google" title="Continue with Google" disabled={providerBusy !== null || busy} onClick={continueWithGoogle}>
             {providerBusy === "google" ? <LoaderCircle className="spin" /> : <GoogleProviderIcon />}
-          </button>}
-          {xAvailable && <button type="button" className="account-provider-x" aria-label="Continue with X" title="Continue with X" disabled={providerBusy !== null || busy} onClick={continueWithX}>
+          </UiButton>}
+          {xAvailable && <UiButton type="button" className="account-provider-x" aria-label="Continue with X" title="Continue with X" disabled={providerBusy !== null || busy} onClick={continueWithX}>
             {providerBusy === "x" ? <LoaderCircle className="spin" /> : <XProviderIcon />}
-          </button>}
-          {walletAvailable && <button type="button" className="account-provider-wallet" aria-label="Continue with MetaMask" title="Continue with MetaMask" disabled={providerBusy !== null || busy} onClick={() => void continueWithMetaMask()}>
+          </UiButton>}
+          {walletAvailable && <UiButton type="button" className="account-provider-wallet" aria-label="Continue with MetaMask" title="Continue with MetaMask" disabled={providerBusy !== null || busy} onClick={() => void continueWithMetaMask()}>
             {providerBusy === "metamask" ? <LoaderCircle className="spin" /> : <MetaMaskProviderIcon />}
-          </button>}
+          </UiButton>}
         </div></>}
       </>}
-    </section>
+    </UiDialogPanel>
   </div>;
 }
 
@@ -1315,7 +1254,7 @@ interface AssistantAdminResponse {
   runtime: AssistantAdminRuntime;
 }
 
-function AssistantAdmin({
+export function AssistantAdmin({
   apiOrigin,
   adminToken,
   authSession,
@@ -1526,7 +1465,7 @@ function AssistantAdmin({
   const failedFleetResults = (fleetResult?.results.length ?? 0) - confirmedFleetResults;
 
   return (
-    <section className="assistant-admin-page">
+    <section className="assistant-admin-page minimal-screen">
       <PageTitle
         eyebrow="NETWORK ADMINISTRATION"
         title="Network administration"
@@ -1534,13 +1473,13 @@ function AssistantAdmin({
         actions={<span className="assistant-network-only"><ShieldCheck size={15} /> Restricted controls</span>}
       />
 
-      <article className="assistant-admin-auth">
+      <UiCard className="assistant-admin-auth">
         <div className="assistant-admin-auth-copy">
           <ShieldCheck size={21} />
           <span><strong>Administrator authorization</strong><small>{authSession ? "Your signed-in network role is used first. A token can also be supplied if needed." : "Enter the network administrator token to read or change private network controls."}</small></span>
         </div>
         <div className="assistant-admin-auth-control">
-          <input
+          <UiInput
             type="password"
             autoComplete="off"
             spellCheck={false}
@@ -1549,11 +1488,11 @@ function AssistantAdmin({
             placeholder="Administrator token"
             aria-label="Network administrator token"
           />
-          <button type="button" disabled={loading || (!draftToken.trim() && !authSession)} onClick={() => void load(draftToken, true)}>
+          <UiButton type="button" disabled={loading || (!draftToken.trim() && !authSession)} onClick={() => void load(draftToken, true)}>
             {loading ? <LoaderCircle className="spin" size={16} /> : <ShieldCheck size={16} />}Unlock
-          </button>
+          </UiButton>
         </div>
-      </article>
+      </UiCard>
 
       {error && <div className="assistant-admin-error" role="alert"><CircleAlert size={17} /><span>{error}</span></div>}
 
@@ -1561,7 +1500,7 @@ function AssistantAdmin({
         <div className="assistant-admin-loading"><LoaderCircle className="spin" /><strong>Loading private network controls…</strong></div>
       ) : settings && runtime && fleet ? (
         <div className="assistant-admin-content">
-          <article className="fleet-control-card" aria-live="polite">
+          <UiCard className="fleet-control-card" aria-live="polite">
             <div className="fleet-control-heading">
               <div className="assistant-admin-section-icon"><Server size={21} /></div>
               <div>
@@ -1569,7 +1508,7 @@ function AssistantAdmin({
                 <strong>Control every reachable node</strong>
                 <small>Only computers with Mycellios open and the compatible control channel can acknowledge these commands.</small>
               </div>
-              <button
+              <UiButton
                 type="button"
                 className="fleet-refresh"
                 disabled={fleetAction !== null}
@@ -1577,37 +1516,32 @@ function AssistantAdmin({
                 aria-label="Refresh contribution status"
               >
                 <RefreshCw size={16} />
-              </button>
+              </UiButton>
             </div>
 
-            <div className="fleet-control-summary">
-              <div><span>CONTRIBUTING</span><strong className="fleet-positive">{fleet.summary.contributing}</strong><small>Available to the scheduler</small></div>
-              <div><span>PAUSED</span><strong>{fleet.summary.paused}</strong><small>Connected, accepting no work</small></div>
-              <div><span>CONTROL READY</span><strong>{fleet.summary.controlReady}</strong><small>Can receive this command now</small></div>
-              <div><span>OUT OF REACH</span><strong>{fleet.summary.offline + fleet.summary.unsupported}</strong><small>Offline or requires an update</small></div>
-            </div>
+            <SummaryStrip label="Fleet status" items={[{ label: "Contributing", value: fleet.summary.contributing }, { label: "Paused", value: fleet.summary.paused }, { label: "Ready for commands", value: fleet.summary.controlReady }, { label: "Unavailable", value: fleet.summary.offline + fleet.summary.unsupported }]} />
 
             <div className="fleet-control-actions">
               <div>
                 <strong>{fleet.summary.connected} of {fleet.summary.desktopNodes} native nodes connected</strong>
                 <small>This controls Mycellios contribution, not the computer's physical power.</small>
               </div>
-              <button
+              <UiButton
                 type="button"
                 className="fleet-action fleet-action-pause"
                 disabled={fleetAction !== null || fleet.summary.controlReady === 0}
                 onClick={() => setFleetConfirmation("pause")}
               >
                 <Pause size={17} />Pause all
-              </button>
-              <button
+              </UiButton>
+              <UiButton
                 type="button"
                 className="fleet-action fleet-action-activate"
                 disabled={fleetAction !== null || fleet.summary.controlReady === 0}
                 onClick={() => setFleetConfirmation("activate")}
               >
                 <CirclePower size={17} />Activate all
-              </button>
+              </UiButton>
             </div>
 
             {fleetConfirmation && (
@@ -1617,8 +1551,8 @@ function AssistantAdmin({
                   <strong>{fleetConfirmation === "activate" ? "Activate" : "Pause"} {fleet.summary.controlReady} reachable nodes?</strong>
                   <small>{fleetConfirmation === "activate" ? "They will begin accepting compatible network work." : "Active work may be interrupted and no new work will be accepted."}</small>
                 </div>
-                <button type="button" className="secondary" onClick={() => setFleetConfirmation(null)}>Cancel</button>
-                <button
+                <UiButton type="button" className="secondary" onClick={() => setFleetConfirmation(null)}>Cancel</UiButton>
+                <UiButton
                   type="button"
                   className={fleetConfirmation === "activate" ? "confirm-activate" : "confirm-pause"}
                   disabled={fleetAction !== null}
@@ -1626,7 +1560,7 @@ function AssistantAdmin({
                 >
                   {fleetAction ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}
                   Confirm
-                </button>
+                </UiButton>
               </div>
             )}
 
@@ -1640,34 +1574,35 @@ function AssistantAdmin({
                 </span>
               </div>
             )}
-          </article>
+          </UiCard>
 
-          <form className="assistant-admin-form" onSubmit={(event) => void save(event)}>
+          <PanelDisclosure icon={Bot} title="Support assistant">
+          <UiForm className="assistant-admin-form" onSubmit={(event) => void save(event)}>
           <div className="assistant-admin-status-grid">
-            <article>
+            <UiCard>
               <span>PUBLIC STATUS</span>
               <strong className={runtime.available ? "healthy" : "offline"}><i />{!runtime.enabled ? "Disabled" : runtime.available ? "Online" : "Waiting for a model"}</strong>
               <small>The widget never falls back to an external AI.</small>
-            </article>
-            <article>
+            </UiCard>
+            <UiCard>
               <span>MODEL IN USE</span>
               <strong>{runtime.selectedModel ?? "None connected"}</strong>
               <small>{runtime.configuredModel ? "Fixed by the administrator" : "Selected automatically from live models"}</small>
-            </article>
-            <article>
+            </UiCard>
+            <UiCard>
               <span>LIVE OPTIONS</span>
               <strong>{runtime.availableModels.length}</strong>
               <small>Real non-test models announced by connected nodes.</small>
-            </article>
+            </UiCard>
           </div>
 
-          <article className="assistant-admin-section assistant-admin-primary">
+          <UiCard className="assistant-admin-section assistant-admin-primary">
             <div className="assistant-admin-section-heading">
               <div className="assistant-admin-section-icon"><Bot size={21} /></div>
               <span><strong>Assistant availability and model</strong><small>Choose Automatic to keep support online when network capacity changes.</small></span>
             </div>
             <div className="assistant-admin-field-grid">
-              <label>
+              <UiFieldLabel>
                 <span>NETWORK MODEL</span>
                 <AppSelect
                   ariaLabel="Support assistant network model"
@@ -1675,59 +1610,57 @@ function AssistantAdmin({
                   options={modelOptions}
                   onChange={(value) => update("modelId", value || null)}
                 />
-              </label>
+              </UiFieldLabel>
               <div className="assistant-admin-toggle-stack">
                 <Toggle label="Show assistant publicly" checked={settings.enabled} onChange={(value) => update("enabled", value)} />
                 <Toggle label="Offer confirmed device actions" checked={settings.allowDeviceControl} onChange={(value) => update("allowDeviceControl", value)} />
               </div>
             </div>
-          </article>
+          </UiCard>
 
-          <article className="assistant-admin-section">
+          <UiCard className="assistant-admin-section">
             <div className="assistant-admin-section-heading">
               <div className="assistant-admin-section-icon"><MessageSquareText size={21} /></div>
               <span><strong>Conversation</strong><small>These texts are visible to users. One suggested question per line, up to six.</small></span>
             </div>
-            <label className="assistant-admin-full-field">
+            <UiFieldLabel className="assistant-admin-full-field">
               <span>WELCOME MESSAGE</span>
-              <textarea rows={3} value={settings.welcomeMessage} onChange={(event) => update("welcomeMessage", event.target.value)} />
-            </label>
-            <label className="assistant-admin-full-field">
+              <UiTextarea rows={3} value={settings.welcomeMessage} onChange={(event) => update("welcomeMessage", event.target.value)} />
+            </UiFieldLabel>
+            <UiFieldLabel className="assistant-admin-full-field">
               <span>SUGGESTED QUESTIONS</span>
-              <textarea rows={4} value={suggestionsText} onChange={(event) => { setSuggestionsText(event.target.value); setSaved(false); }} />
-            </label>
-          </article>
+              <UiTextarea rows={4} value={suggestionsText} onChange={(event) => { setSuggestionsText(event.target.value); setSaved(false); }} />
+            </UiFieldLabel>
+          </UiCard>
 
-          <article className="assistant-admin-section">
+          <UiCard className="assistant-admin-section">
             <div className="assistant-admin-section-heading">
               <div className="assistant-admin-section-icon"><Sparkles size={21} /></div>
               <span><strong>Project knowledge and behaviour</strong><small>The coordinator adds verified live network data separately on every request.</small></span>
             </div>
-            <label className="assistant-admin-full-field">
+            <UiFieldLabel className="assistant-admin-full-field">
               <span>PRIVATE SYSTEM INSTRUCTIONS</span>
-              <textarea className="assistant-admin-system-prompt" rows={12} value={settings.systemPrompt} onChange={(event) => update("systemPrompt", event.target.value)} />
+              <UiTextarea className="assistant-admin-system-prompt" rows={12} value={settings.systemPrompt} onChange={(event) => update("systemPrompt", event.target.value)} />
               <small>Never place passwords or private tokens here. The instructions are sent only to the selected network model for each support request.</small>
-            </label>
+            </UiFieldLabel>
             <div className="assistant-admin-number-grid">
-              <label><span>MAXIMUM OUTPUT TOKENS</span><input type="number" min={64} max={4096} step={64} value={settings.maxOutputTokens} onChange={(event) => update("maxOutputTokens", Number(event.target.value))} /></label>
-              <label><span>TEMPERATURE</span><input type="number" min={0} max={1.5} step={0.1} value={settings.temperature} onChange={(event) => update("temperature", Number(event.target.value))} /></label>
+              <UiFieldLabel><span>MAXIMUM OUTPUT TOKENS</span><UiInput type="number" min={64} max={4096} step={64} value={settings.maxOutputTokens} onChange={(event) => update("maxOutputTokens", Number(event.target.value))} /></UiFieldLabel>
+              <UiFieldLabel><span>TEMPERATURE</span><UiInput type="number" min={0} max={1.5} step={0.1} value={settings.temperature} onChange={(event) => update("temperature", Number(event.target.value))} /></UiFieldLabel>
             </div>
-          </article>
+          </UiCard>
 
           <div className="assistant-admin-savebar">
             <span><ShieldCheck size={15} />Shared model activation remains protected by administrator authorization.</span>
             {saved && <b><Check size={15} />Saved</b>}
-            <button type="submit" disabled={saving || settings.systemPrompt.trim().length < 20 || settings.welcomeMessage.trim().length < 10 || suggestionsText.trim().length < 3}>
+            <UiButton type="submit" disabled={saving || settings.systemPrompt.trim().length < 20 || settings.welcomeMessage.trim().length < 10 || suggestionsText.trim().length < 3}>
               {saving ? <LoaderCircle className="spin" size={17} /> : <Check size={17} />}{saving ? "Saving…" : "Save assistant"}
-            </button>
+            </UiButton>
           </div>
-          </form>
+          </UiForm>
+          </PanelDisclosure>
         </div>
       ) : (
-        <article className="assistant-admin-locked">
-          <ShieldCheck size={26} />
-          <div><strong>Private configuration is locked</strong><p>Sign in with an owner, admin or operator account, or enter the administrator token above.</p></div>
-        </article>
+        <UiText className="assistant-admin-locked-copy">Unlock to manage devices and the support assistant.</UiText>
       )}
     </section>
   );
@@ -1773,7 +1706,7 @@ const historyRangeLabels: Record<NetworkHistoryRange, string> = {
   "90d": "90 days",
 };
 
-export function NetworkHistory({ endpoint, compact = false }: { endpoint: string; compact?: boolean }) {
+export function NetworkHistory({ endpoint, compact = true }: { endpoint: string; compact?: boolean }) {
   const [range, setRange] = useState<NetworkHistoryRange>("24h");
   const [history, setHistory] = useState<NetworkTelemetryHistory | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1802,35 +1735,35 @@ export function NetworkHistory({ endpoint, compact = false }: { endpoint: string
     return () => { requestSeq.current += 1; window.clearInterval(timer); };
   }, [load]);
 
-  return <section className="network-history-page">
+  return <section className="network-history-page minimal-screen">
     <PageTitle title="Network history" />
     <div className="network-history-toolbar">
       <div className="network-history-ranges" role="group" aria-label="History range">
         {(Object.keys(historyRangeLabels) as NetworkHistoryRange[]).map((value) => (
-          <button
+          <UiButton
             type="button"
             className={range === value ? "active" : ""}
             aria-pressed={range === value}
             onClick={() => setRange(value)}
             key={value}
-          >{historyRangeLabels[value]}</button>
+          >{historyRangeLabels[value]}</UiButton>
         ))}
       </div>
-      <span><History size={15} />Every {history?.intervalMinutes ?? 10} min · retained for {history?.retentionDays ?? 90} days</span>
+      <span>{history?.samples.length ? `${history.samples.length} samples` : ""}</span>
     </div>
-    {loadError && <div className="network-history-error" role="alert"><CircleAlert size={17} /><span><strong>Could not load history</strong>{loadError}</span><button type="button" onClick={() => void load()}>Retry</button></div>}
-    {loading && !history ? <div className="network-history-loading"><LoaderCircle className="spin" /><span>Loading saved samples…</span></div> : history && <NetworkHistoryReport history={history} />}
+    {loadError && <div className="network-history-error" role="alert"><CircleAlert size={17} /><span><strong>Could not load history</strong>{loadError}</span><UiButton type="button" onClick={() => void load()}>Retry</UiButton></div>}
+    {loading && !history ? <div className="network-history-loading"><LoaderCircle className="spin" /><span>Loading saved samples…</span></div> : history && <NetworkHistoryReport history={history} compact={compact} />}
   </section>;
 }
 
-export function NetworkHistoryReport({ history, compact = false }: { history: NetworkTelemetryHistory; compact?: boolean }) {
+export function NetworkHistoryReport({ history, compact = true }: { history: NetworkTelemetryHistory; compact?: boolean }) {
   const latest = history.samples.at(-1);
   const first = history.samples[0];
   if (!latest) {
     return <Empty icon={History} title="No samples yet" copy="The coordinator will save the first reading automatically and add another every ten minutes." />;
   }
   return <>
-    <div className="network-history-summary" aria-label="Latest sample">
+    {!compact && <div className="network-history-summary" aria-label="Latest sample">
       <HistorySummaryCard
         icon={MemoryStick}
         label="Active VRAM"
@@ -1863,12 +1796,8 @@ export function NetworkHistoryReport({ history, compact = false }: { history: Ne
         delta={historyDelta(latest.inflightJobs, first?.inflightJobs)}
         tone="orange"
       />}
-    </div>
-    <div className="network-history-meta">
-      <span><Radio />Latest sample <strong>{formatHistoryDate(latest.capturedAt)}</strong></span>
-      <span><ShieldCheck />Coordinator data, no estimates</span>
-      <span><History />{history.samples.length} samples across {historyRangeLabels[history.range]}</span>
-    </div>
+    </div>}
+    <div className="network-history-meta"><span>Updated {formatHistoryDate(latest.capturedAt)}</span></div>
     <div className="network-history-charts">
       <NetworkHistoryChart
         title="Network capacity"
@@ -1896,7 +1825,7 @@ export function NetworkHistoryReport({ history, compact = false }: { history: Ne
       {!compact && <DetailedHistoryCharts history={history} />}
     </div>
     {compact ? (
-      <PanelDisclosure icon={Activity} eyebrow="ON DEMAND" title="Detailed telemetry" summary="Model availability, inference load, and the raw sample table.">
+      <PanelDisclosure icon={Activity} eyebrow="ON DEMAND" title="More charts & saved readings">
         <div className="network-history-charts network-history-charts-detail"><DetailedHistoryCharts history={history} /></div>
         <NetworkHistoryTable samples={history.samples} />
       </PanelDisclosure>
@@ -1968,7 +1897,7 @@ function NetworkHistoryChart({
   const points = downsampleNetworkHistory(samples, 720);
   const width = 760;
   const height = 250;
-  const left = 52;
+  const left = 88;
   const right = 24;
   const top = 24;
   const bottom = 44;
@@ -1980,9 +1909,9 @@ function NetworkHistoryChart({
     ? (left + width - right) / 2
     : left + (index / Math.max(points.length - 1, 1)) * (width - left - right);
   const y = (value: number) => top + (1 - value / ceiling) * (height - top - bottom);
-  const labelEvery = Math.max(1, Math.ceil(points.length / 5));
-  return <article className="network-history-chart">
-    <header><div><span>{eyebrow}</span><h2>{title}</h2></div><div className="network-history-legend">{series.map((item) => <span className={item.tone} key={item.key}><i />{item.label}</span>)}</div></header>
+  const labelEvery = Math.max(1, Math.ceil(points.length / 3));
+  return <UiCard className="network-history-chart">
+    <header><div><UiHeading as="h2">{title}</UiHeading></div><div className="network-history-legend">{series.map((item) => <span className={item.tone} key={item.key}><i />{item.label}</span>)}</div></header>
     <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${title}. ${samples.length} real samples.`}>
       {[0, 0.5, 1].map((ratio) => <g key={ratio}>
         <line className="history-grid-line" x1={left} y1={top + ratio * (height - top - bottom)} x2={width - right} y2={top + ratio * (height - top - bottom)} />
@@ -1994,11 +1923,11 @@ function NetworkHistoryChart({
       </g>)}
       {points.map((sample, index) => {
         if (index % labelEvery !== 0 && index !== points.length - 1) return null;
-        return <text className="history-x-label" x={x(index)} y={height - 13} textAnchor="middle" key={sample.capturedAt}>{formatHistoryChartTime(sample.capturedAt)}</text>;
+        return <text className={`history-x-label${index === 0 || index === points.length - 1 ? " history-edge-label" : ""}`} x={x(index)} y={height - 13} textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"} key={sample.capturedAt}>{formatHistoryChartTime(sample.capturedAt)}</text>;
       })}
     </svg>
-    <footer><span>{samples.length} samples · every 10 min</span>{series.map((item) => <strong key={item.key}>{item.label} {valueFormatter(points.at(-1)?.[item.key] ?? 0)} {unit && <small>{unit}</small>}</strong>)}</footer>
-  </article>;
+    <footer>{series.map((item) => <strong key={item.key}>{item.label} {valueFormatter(points.at(-1)?.[item.key] ?? 0)} {unit && <small>{unit}</small>}</strong>)}</footer>
+  </UiCard>;
 }
 
 function HistorySummaryCard({
@@ -2016,11 +1945,11 @@ function HistorySummaryCard({
   delta: number;
   tone: "blue" | "green" | "purple" | "orange";
 }) {
-  return <article className={`network-history-summary-card ${tone}`}>
+  return <UiCard className={`network-history-summary-card ${tone}`}>
     <Icon />
     <span><small>{label}</small><strong>{value}</strong><em>{detail}</em></span>
     <b className={delta > 0 ? "positive" : delta < 0 ? "negative" : "neutral"}>{delta > 0 ? "+" : ""}{delta} since start</b>
-  </article>;
+  </UiCard>;
 }
 
 function NetworkHistoryTable({ samples }: { samples: NetworkTelemetrySample[] }) {
@@ -2031,26 +1960,26 @@ function NetworkHistoryTable({ samples }: { samples: NetworkTelemetrySample[] })
   const visiblePage = Math.min(page, pageCount - 1);
   const visible = allRows.slice(visiblePage * pageSize, visiblePage * pageSize + pageSize);
   useEffect(() => setPage(0), [samples]);
-  return <article className="network-history-table-card">
-    <header><div><span>EXACT SAMPLES</span><h2>Latest saved readings</h2></div><small>Showing {allRows.length} most recent</small></header>
-    <p className="panel-table-scroll-hint">Swipe sideways to see every reading →</p>
+  return <UiCard className="network-history-table-card">
+    <header><div><span>EXACT SAMPLES</span><UiHeading as="h2">Latest saved readings</UiHeading></div><small>Showing {allRows.length} most recent</small></header>
+    <UiText className="panel-table-scroll-hint">Swipe sideways to see every reading →</UiText>
     <div className="network-history-table-scroll" role="region" aria-label="Scrollable history readings" tabIndex={0}>
-      <table>
-        <thead><tr><th>Timestamp</th><th>Active VRAM</th><th>Free VRAM</th><th>Nodes</th><th>Online</th><th>Models</th><th>Inflight</th><th>Completed</th></tr></thead>
-        <tbody>{visible.map((sample) => <tr key={sample.capturedAt}>
-          <td><strong>{formatHistoryDate(sample.capturedAt)}</strong></td>
-          <td>{formatMemory(sample.offeredVramMb)}</td>
-          <td>{formatMemory(sample.freeVramMb)}</td>
-          <td>{sample.connectedNodes}</td>
-          <td>{sample.onlineNodes}</td>
-          <td>{sample.activeModels}</td>
-          <td>{sample.inflightJobs}</td>
-          <td>{sample.completedJobs}</td>
-        </tr>)}</tbody>
-      </table>
+      <UiTable>
+        <UiTableHead><UiTableRow><UiTableHeader>Timestamp</UiTableHeader><UiTableHeader>Active VRAM</UiTableHeader><UiTableHeader>Free VRAM</UiTableHeader><UiTableHeader>Nodes</UiTableHeader><UiTableHeader>Online</UiTableHeader><UiTableHeader>Models</UiTableHeader><UiTableHeader>Inflight</UiTableHeader><UiTableHeader>Completed</UiTableHeader></UiTableRow></UiTableHead>
+        <UiTableBody>{visible.map((sample) => <UiTableRow key={sample.capturedAt}>
+          <UiTableCell><strong>{formatHistoryDate(sample.capturedAt)}</strong></UiTableCell>
+          <UiTableCell>{formatMemory(sample.offeredVramMb)}</UiTableCell>
+          <UiTableCell>{formatMemory(sample.freeVramMb)}</UiTableCell>
+          <UiTableCell>{sample.connectedNodes}</UiTableCell>
+          <UiTableCell>{sample.onlineNodes}</UiTableCell>
+          <UiTableCell>{sample.activeModels}</UiTableCell>
+          <UiTableCell>{sample.inflightJobs}</UiTableCell>
+          <UiTableCell>{sample.completedJobs}</UiTableCell>
+        </UiTableRow>)}</UiTableBody>
+      </UiTable>
     </div>
     {allRows.length > pageSize && <TablePagination label="history samples" page={visiblePage} pageCount={pageCount} total={allRows.length} onPageChange={setPage} />}
-  </article>;
+  </UiCard>;
 }
 
 function downsampleNetworkHistory(
@@ -2132,48 +2061,48 @@ export function DashboardConnect({
   const copyLabel = (kind: "api" | "link") => copied === kind ? "Copied" : copyError === kind ? "Try again" : "Copy";
 
   return (
-    <article className="dashboard-connect" aria-labelledby={titleId}>
+    <UiCard className="dashboard-connect" aria-labelledby={titleId}>
       <header>
-        <div><strong id={titleId}>Connect</strong><span>· use the configured mycellios network</span></div>
-        <a href="https://github.com/tych0s/mycellios#readme" target="_blank" rel="noreferrer">Full docs <ArrowRight size={13} /></a>
+        <div><strong id={titleId}>Connect</strong></div>
+        <UiLink href="https://github.com/tych0s/mycellios#readme" target="_blank" rel="noreferrer">Full docs <ArrowRight size={13} /></UiLink>
       </header>
       <div className="dashboard-connect-grid">
         <section>
           <span>1 · NATIVE PACKAGES</span>
-          <a className="dashboard-connect-field install" href={downloadsUrl} {...externalProps}>
+          <UiLink className="dashboard-connect-field install" href={downloadsUrl} {...externalProps}>
             <Download size={15} />
             <code>Check native packages</code>
             <b>open</b>
-          </a>
+          </UiLink>
         </section>
         <section>
           <span>API ENDPOINT</span>
           <div className="dashboard-connect-field endpoint">
             <Globe2 size={15} />
             <code>{apiBaseUrl}</code>
-            <button type="button" onClick={() => void copyValue("api", apiBaseUrl)} aria-label={`${copyLabel("api")} API endpoint`}>
+            <UiButton type="button" onClick={() => void copyValue("api", apiBaseUrl)} aria-label={`${copyLabel("api")} API endpoint`}>
               {copied === "api" ? <Check size={13} /> : <Copy size={13} />}
               <span>{copied === "api" ? "copied" : "configured target"}</span>
-            </button>
+            </UiButton>
           </div>
         </section>
         <section className="dashboard-connect-join">
           <span>2 · CONNECT</span>
           <div className="dashboard-connect-command">
             <code>{earnUrl}</code>
-            <button type="button" className={copyError === "link" ? "error" : copied === "link" ? "copied" : ""} onClick={() => void copyValue("link", earnUrl)}>
+            <UiButton type="button" className={copyError === "link" ? "error" : copied === "link" ? "copied" : ""} onClick={() => void copyValue("link", earnUrl)}>
               {copied === "link" ? <Check size={14} /> : <Copy size={14} />}
               {copyLabel("link")}
-            </button>
+            </UiButton>
           </div>
-          <p>Open the Earn link to choose how this device connects. Native packages are listed when published. The configured API uses the OpenAI-compatible <code>/v1</code> interface.</p>
+          <UiText>Open the Earn link to choose how this device connects. Native packages are listed when published. The configured API uses the OpenAI-compatible <code>/v1</code> interface.</UiText>
         </section>
       </div>
       <footer>
-        <a href={browserUrl} {...externalProps}><Smartphone size={14} />Start a browser node <ExternalLink size={12} /></a>
-        <button type="button" onClick={onOpenEarn}>View every option <ChevronRight size={13} /></button>
+        <UiLink href={browserUrl} {...externalProps}><Smartphone size={14} />Start a browser node <ExternalLink size={12} /></UiLink>
+        <UiButton type="button" onClick={onOpenEarn}>View every option <ChevronRight size={13} /></UiButton>
       </footer>
-    </article>
+    </UiCard>
   );
 }
 
@@ -2209,7 +2138,7 @@ export function overviewSnapshotEvidence(
   return { state: "stale", label: "STALE SNAPSHOT", detail: `Captured ${relativeTime(capturedAt, now)}`, capturedAt, ageMs };
 }
 
-function Overview({ snapshot, connectionError, onNavigate, publicLink, external, apiBaseUrl, earnUrl, developerMode, theme }: { snapshot: PublicSnapshot; connectionError: string | null; onNavigate: (view: PanelView) => void; publicLink: (path: string) => string; external: boolean; apiBaseUrl: string; earnUrl: string; developerMode: boolean; theme: "dark" | "light" }) {
+export function Overview({ snapshot, connectionError, onNavigate, publicLink, external, apiBaseUrl, earnUrl, developerMode, theme }: { snapshot: PublicSnapshot; connectionError: string | null; onNavigate: (view: PanelView) => void; publicLink: (path: string) => string; external: boolean; apiBaseUrl: string; earnUrl: string; developerMode: boolean; theme: "dark" | "light" }) {
   const evidence = overviewSnapshotEvidence(snapshot.capturedAt, connectionError);
   const active = snapshot.workers.filter((worker) => worker.connected);
   const operational = active.filter((worker) => worker.status === "online");
@@ -2217,87 +2146,58 @@ function Overview({ snapshot, connectionError, onNavigate, publicLink, external,
   const activeDeployments = operational.flatMap((worker) => worker.deployments);
   const telemetryGpus = activeGpus.filter((gpu) => gpu.utilizationPct !== undefined);
   const poweredGpus = activeGpus.filter((gpu) => (gpu.powerW ?? 0) > 0);
-  const activeOfferedVramMb = activeGpus.reduce((total, gpu) => total + gpu.offeredVramMb, 0);
-  const freeVramMb = Math.min(activeOfferedVramMb, activeGpus.reduce((total, gpu) => total + gpu.freeOfferedVramMb, 0));
-  const usedVramMb = Math.max(0, activeOfferedVramMb - freeVramMb);
-  const freeRatio = activeOfferedVramMb > 0 ? freeVramMb / activeOfferedVramMb : 0;
-  const averageUtilization = telemetryGpus.length > 0
-    ? telemetryGpus.reduce((total, gpu) => total + (gpu.utilizationPct ?? 0), 0) / telemetryGpus.length
-    : null;
-  const observedPowerW = poweredGpus.reduce((total, gpu) => total + (gpu.powerW ?? 0), 0);
-  const measuredDeployments = activeDeployments.filter(isMeasuredDeployment);
-  const measuredThroughput = measuredDeployments.reduce((total, deployment) => total + deployment.tokensPerSecond, 0);
+  const sharedMemory = activeGpus.reduce((total, gpu) => total + gpu.offeredVramMb, 0);
+  const freeMemory = Math.min(sharedMemory, activeGpus.reduce((total, gpu) => total + gpu.freeOfferedVramMb, 0));
+  const measured = activeDeployments.filter(isMeasuredDeployment);
+  const throughput = measured.reduce((total, deployment) => total + deployment.tokensPerSecond, 0);
   const execution = summarizeDeploymentExecution(activeDeployments);
-  const nativeNodes = operational.filter((worker) => worker.kind === "desktop").length;
-  const browserNodes = operational.filter((worker) => worker.kind === "browser").length;
-  const cellNodes = operational.filter((worker) => worker.kind === "cell").length;
-  return (
-    <section className="overview-page">
-      <PageTitle title="Overview" />
-      <aside className="overview-announcement" aria-label="Contribute to the configured mycellios network">
-        <div className="announcement-icon"><Network size={21} /></div>
-        <div><strong>Put spare compute to work</strong><span>Contribute from this browser, choose how much power to share, and pause anytime. Native packages appear in Downloads when published.</span></div>
-        <div className="overview-announcement-actions">
-          <button onClick={() => onNavigate("contribute")}>Contribute now <ArrowRight size={15} /></button>
-          <a href="https://github.com/tych0s/mycellios" target="_blank" rel="noreferrer"><GitFork size={15} />GitHub</a>
-        </div>
-      </aside>
-      <div className={`overview-evidence ${evidence.state}`} role="status"><span><Radio />{evidence.label}</span><strong>Coordinator snapshot</strong><small>{evidence.detail}</small></div>
-      {evidence.state === "waiting" ? <article className="overview-no-evidence"><CircleAlert /><div><span>NO VERIFIED NETWORK DATA</span><h2>Overview is waiting for the coordinator</h2><p>Capacity, models, tasks and performance remain hidden until a real snapshot arrives. Retrying automatically.</p></div></article> : <>
-      <LiveNetworkTelemetry snapshot={snapshot} evidence={evidence} showSnapshot={false} />
-      <DashboardConnect
-        apiBaseUrl={apiBaseUrl}
-        earnUrl={earnUrl}
-        downloadsUrl={publicLink("/downloads")}
-        browserUrl={publicLink("/browser/?autostart=1")}
-        external={external}
-        onOpenEarn={() => window.location.assign("/earn")}
-      />
-      <article className="global-capacity-card">
-        <div className="global-capacity-main">
-          <div className="global-capacity-heading"><span>GLOBAL NODE CAPACITY</span></div>
-          <div className="execution-overview"><ExecutionBadge execution={execution} workers={snapshot.workers} large /><span><strong>Effective inference device</strong><small>Reported by the runtime after loading the model, never inferred from detected hardware.</small></span></div>
-          <div className="global-capacity-total"><strong>{formatMemory(activeOfferedVramMb)}</strong><div><b>Active usable memory</b><small>{`Offered by ${operational.length} operational node${operational.length === 1 ? "" : "s"}`}</small></div></div>
-          <div className="global-capacity-bar" aria-label={`${Math.round(freeRatio * 100)}% of offered memory is free`}><i style={{ width: `${freeRatio * 100}%` }} /></div>
-          <div className="global-capacity-legend"><span>{formatMemory(freeVramMb)} free now</span><span>{formatMemory(usedVramMb)} in use</span></div>
-        </div>
-        <div className={`global-capacity-metrics${developerMode ? "" : " compact"}`}>
-          <CapacityMetric icon={Cpu} label="Runtime stages" value={execution.verified ? String(execution.unitCount) : "Unverified"} detail={execution.verified ? executionDetail(execution) : `${nativeNodes} native · ${browserNodes} browser · ${cellNodes} cells connected`} />
-          {developerMode && <CapacityMetric icon={Gauge} label="Average GPU load" value={averageUtilization === null ? "No telemetry" : `${averageUtilization.toFixed(0)}%`} detail={`${telemetryGpus.length} reporting engine${telemetryGpus.length === 1 ? "" : "s"}`} />}
-          <CapacityMetric icon={Zap} label="Measured inference capacity" value={measuredThroughput > 0 ? `${formatCompactNumber(measuredThroughput)} tok/s` : "Not measured"} detail={measuredDeployments.length > 0 ? `${measuredDeployments.length} runtime${measuredDeployments.length === 1 ? "" : "s"} with completed inference` : activeDeployments.length > 0 ? "Measured after the first real inference" : "Requires an active model"} />
-          {developerMode && <CapacityMetric icon={Activity} label="Observed GPU draw" value={poweredGpus.length > 0 ? formatPower(observedPowerW) : "No telemetry"} detail={poweredGpus.length > 0 ? `${poweredGpus.length} physical reading${poweredGpus.length === 1 ? "" : "s"}` : telemetryGpus.length > 0 ? "GPU load is visible, but the driver does not expose watts" : "Never estimated"} />}
-        </div>
-      </article>
-      <div className="panel-stat-grid">
-        <Stat icon={Radio} label="Active nodes" value={String(snapshot.summary.connected)} detail={`${snapshot.summary.registered} registered · snapshot`} />
-        <Stat icon={HardDrive} label="Shared VRAM" value={formatMemory(activeOfferedVramMb)} detail={`${formatMemory(freeVramMb)} free · snapshot`} tone="purple" />
-        <Stat icon={Boxes} label="Available models" value={String(snapshot.models.length)} detail="Announced in this snapshot" />
-        <Stat icon={CheckCircle2} label="Tasks completed" value={String(snapshot.summary.completedJobs)} detail="Coordinator history at capture" />
-      </div>
-      <ConnectedPeersTable workers={snapshot.workers} />
-      <div className="overview-grid overview-grid-interactive">
-      <InteractiveMesh
-        workers={active}
-        traces={snapshot.recentNetworkTraces ?? []}
-          registeredWorkers={snapshot.summary.registered}
-          sharedVramMb={activeOfferedVramMb}
-          publicLink={publicLink}
-          external={external}
-          developerMode={developerMode}
-          onNavigate={onNavigate}
-        />
-        <NetworkModelCatalog snapshot={snapshot} developerMode={developerMode} theme={theme} onNavigate={onNavigate} />
-        <article className="activity-card">
-          <div className="card-heading"><div><span>RECENT ACTIVITY</span><h2>Network tasks</h2></div>{developerMode && <button onClick={() => onNavigate("jobs")}>View all</button>}</div>
-          <div className="activity-list">
-            {snapshot.jobs.slice(0, 5).map((job) => <div key={job.id}><i className={job.status} /><div><strong>{job.model}</strong><span>{shortId(job.id)} · {relativeTime(job.updatedAt)}</span></div><b>{job.status}</b></div>)}
-            {snapshot.jobs.length === 0 && <Empty icon={Activity} title="No tasks yet" copy="Tasks will appear here when you test a connected model." />}
+  const inflight = snapshot.jobs.filter((job) => ["queued", "leasing", "running", "streaming"].includes(job.status)).length;
+  return <section className="overview-page overview-minimal">
+    <header className="overview-heading">
+      <div><UiHeading as="h1">Overview</UiHeading><span className={`overview-status ${evidence.state}`} role="status" title={evidence.detail}><i />{evidence.state === "fresh" ? "Live network" : evidence.state === "waiting" ? "Waiting for data" : evidence.detail}</span></div>
+      <div className="overview-actions"><UiButton variant="primary" onClick={() => onNavigate("contribute")}>Add a device <ArrowRight size={15} /></UiButton></div>
+    </header>
+    {evidence.state === "waiting" ? <UiCard className="overview-no-evidence"><CircleAlert /><div><UiHeading as="h2">Waiting for the coordinator</UiHeading><UiText>Network data will appear when the connection is restored.</UiText></div></UiCard> : <>
+      <dl className="overview-summary" aria-label="Network summary">
+        <div><dt>Connected nodes</dt><dd>{snapshot.summary.connected}</dd></div>
+        <div><dt>Available models</dt><dd>{snapshot.models.length}</dd></div>
+        <div><dt>Shared memory</dt><dd>{formatMemory(sharedMemory)}</dd></div>
+        <div><dt>Tasks in progress</dt><dd>{inflight}</dd></div>
+      </dl>
+      <NetworkModelCatalog snapshot={snapshot} developerMode={developerMode} theme={theme} onNavigate={onNavigate} compact />
+      <section className="overview-details" aria-label="Network details">
+        <UiHeading as="h2">Details</UiHeading>
+        <OverviewDetail title="Devices & network" icon={Network}>
+          <ConnectedPeersTable workers={snapshot.workers} />
+          <InteractiveMesh workers={active} traces={snapshot.recentNetworkTraces ?? []} registeredWorkers={snapshot.summary.registered} sharedVramMb={sharedMemory} publicLink={publicLink} external={external} developerMode={developerMode} onNavigate={onNavigate} />
+        </OverviewDetail>
+        <OverviewDetail title="Models & performance" icon={Cpu}>
+          <div className="overview-runtime">
+            <ExecutionBadge execution={execution} workers={snapshot.workers} />
+            <dl><div><dt>Free memory</dt><dd>{formatMemory(freeMemory)}</dd></div><div><dt>Memory in use</dt><dd>{formatMemory(Math.max(0, sharedMemory - freeMemory))}</dd></div><div><dt>Runtime stages</dt><dd>{execution.verified ? execution.unitCount : "Unverified"}</dd></div><div><dt>Measured speed</dt><dd>{throughput > 0 ? `${formatCompactNumber(throughput)} tok/s` : "Not measured"}</dd></div>{developerMode && <><div><dt>Average GPU load</dt><dd>{telemetryGpus.length > 0 ? `${(telemetryGpus.reduce((sum, gpu) => sum + (gpu.utilizationPct ?? 0), 0) / telemetryGpus.length).toFixed(0)}%` : "No telemetry"}</dd></div><div><dt>Observed GPU draw</dt><dd>{poweredGpus.length > 0 ? formatPower(poweredGpus.reduce((sum, gpu) => sum + (gpu.powerW ?? 0), 0)) : "No telemetry"}</dd></div></>}</dl>
           </div>
-        </article>
-      </div>
-      </>}
-    </section>
-  );
+          <NetworkModelCatalog snapshot={snapshot} developerMode={developerMode} theme={theme} onNavigate={onNavigate} />
+        </OverviewDetail>
+        <OverviewDetail title="API & connection" icon={Code2}>
+          <DashboardConnect apiBaseUrl={apiBaseUrl} earnUrl={earnUrl} downloadsUrl={publicLink("/downloads")} browserUrl={publicLink("/browser/?autostart=1")} external={external} onOpenEarn={() => window.location.assign("/earn")} />
+        </OverviewDetail>
+        <OverviewDetail title="Recent activity" icon={History}>
+          <div className="overview-activity-heading"><span>{formatCompactNumber(snapshot.summary.completedJobs)} tasks completed</span>{developerMode && <UiButton onClick={() => onNavigate("jobs")}>View all <ArrowRight size={14} /></UiButton>}</div>
+          <div className="activity-list">
+            {snapshot.jobs.slice(0, 5).map((job) => <div key={job.id}><i className={job.status} /><div><strong>{job.model}</strong><span>{relativeTime(job.updatedAt)}</span></div><b>{job.status}</b></div>)}
+            {snapshot.jobs.length === 0 && <UiText>No recent tasks.</UiText>}
+          </div>
+        </OverviewDetail>
+      </section>
+    </>}
+  </section>;
+}
+
+function OverviewDetail({ title, icon: Icon, children }: { title: string; icon: typeof Network; children: ReactNode }) {
+  return <UiDisclosure className="overview-detail">
+    <UiDisclosureSummary><Icon size={17} aria-hidden="true" /><span>{title}</span><ChevronDown size={16} aria-hidden="true" /></UiDisclosureSummary>
+    <div className="overview-detail-content">{children}</div>
+  </UiDisclosure>;
 }
 
 type PeerSortKey = "id" | "hosted" | "version" | "vram" | "share" | "seen" | "role" | "status";
@@ -2381,52 +2281,52 @@ function ConnectedPeersTable({ workers }: { workers: PublicWorker[] }) {
   }
 
   const sortableHeader = (label: string, key: PeerSortKey) => (
-    <button type="button" className={sortKey === key ? `active ${sortDirection}` : ""} onClick={() => toggleSort(key)}>
+    <UiButton type="button" className={sortKey === key ? `active ${sortDirection}` : ""} onClick={() => toggleSort(key)}>
       {label}<ChevronDown size={11} />
-    </button>
+    </UiButton>
   );
 
   return (
-    <article className="connected-peers-card" aria-labelledby="connected-peers-title">
+    <UiCard className="connected-peers-card" aria-labelledby="connected-peers-title">
       <header>
         <strong id="connected-peers-title">Registered peers</strong>
         <div className="connected-peers-controls">
           <span>{filteredRows.length} total</span>
-          <label><SlidersHorizontal size={12} /><span>Filter</span><select aria-label="Filter peers" value={filter} onChange={(event) => { setFilter(event.target.value as PeerFilter); setPage(0); }}><option value="all">All peers</option><option value="serving">Serving</option><option value="connected">Connected</option><option value="offline">Needs attention</option></select></label>
+          <UiFieldLabel><SlidersHorizontal size={12} /><span>Filter</span><UiSelect aria-label="Filter peers" value={filter} onChange={(event) => { setFilter(event.target.value as PeerFilter); setPage(0); }}><option value="all">All peers</option><option value="serving">Serving</option><option value="connected">Connected</option><option value="offline">Needs attention</option></UiSelect></UiFieldLabel>
         </div>
       </header>
-      <p className="panel-table-scroll-hint">Swipe sideways to see all peer details →</p>
+      <UiText className="panel-table-scroll-hint">Swipe sideways to see all peer details →</UiText>
       <div className="connected-peers-scroll" role="region" aria-label="Scrollable peer details" tabIndex={0}>
-        <table>
-          <thead><tr>
-            <th aria-sort={sortKey === "id" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("ID", "id")}</th>
-            <th aria-sort={sortKey === "hosted" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Hosted", "hosted")}</th>
-            <th aria-sort={sortKey === "version" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Version", "version")}</th>
-            <th aria-sort={sortKey === "vram" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("VRAM", "vram")}</th>
-            <th aria-sort={sortKey === "share" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Share", "share")}</th>
-            <th aria-sort={sortKey === "seen" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Last seen", "seen")}</th>
-            <th aria-sort={sortKey === "role" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Role", "role")}</th>
-            <th aria-sort={sortKey === "status" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Status", "status")}</th>
-          </tr></thead>
-          <tbody>
+        <UiTable>
+          <UiTableHead><UiTableRow>
+            <UiTableHeader aria-sort={sortKey === "id" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("ID", "id")}</UiTableHeader>
+            <UiTableHeader aria-sort={sortKey === "hosted" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Hosted", "hosted")}</UiTableHeader>
+            <UiTableHeader aria-sort={sortKey === "version" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Version", "version")}</UiTableHeader>
+            <UiTableHeader aria-sort={sortKey === "vram" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("VRAM", "vram")}</UiTableHeader>
+            <UiTableHeader aria-sort={sortKey === "share" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Share", "share")}</UiTableHeader>
+            <UiTableHeader aria-sort={sortKey === "seen" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Last seen", "seen")}</UiTableHeader>
+            <UiTableHeader aria-sort={sortKey === "role" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Role", "role")}</UiTableHeader>
+            <UiTableHeader aria-sort={sortKey === "status" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}>{sortableHeader("Status", "status")}</UiTableHeader>
+          </UiTableRow></UiTableHead>
+          <UiTableBody>
             {visibleRows.map((row) => (
-              <tr key={row.worker.id}>
-                <td><strong>{shortId(row.worker.id)}</strong><small>{workerLabel(row.worker)}</small></td>
-                <td><code>{row.hosted}</code>{row.hostedCount > 1 && <small>+{row.hostedCount - 1} more</small>}</td>
-                <td><code>{row.version}</code></td>
-                <td><strong>{formatMemory(row.vramMb)}</strong></td>
-                <td><div className="peer-share"><i><b style={{ width: `${Math.min(100, row.sharePercent)}%` }} /></i><span>{Math.round(row.sharePercent)}%</span></div></td>
-                <td><code>{relativeTime(row.worker.lastSeenAt)}</code></td>
-                <td><span className={`peer-role ${row.role.toLowerCase()}`}>{row.role}</span></td>
-                <td><span className={`peer-state ${row.status}`}><i />{peerStatusLabel(row.status)}</span></td>
-              </tr>
+              <UiTableRow key={row.worker.id}>
+                <UiTableCell><strong>{shortId(row.worker.id)}</strong><small>{workerLabel(row.worker)}</small></UiTableCell>
+                <UiTableCell><code>{row.hosted}</code>{row.hostedCount > 1 && <small>+{row.hostedCount - 1} more</small>}</UiTableCell>
+                <UiTableCell><code>{row.version}</code></UiTableCell>
+                <UiTableCell><strong>{formatMemory(row.vramMb)}</strong></UiTableCell>
+                <UiTableCell><div className="peer-share"><i><b style={{ width: `${Math.min(100, row.sharePercent)}%` }} /></i><span>{Math.round(row.sharePercent)}%</span></div></UiTableCell>
+                <UiTableCell><code>{relativeTime(row.worker.lastSeenAt)}</code></UiTableCell>
+                <UiTableCell><span className={`peer-role ${row.role.toLowerCase()}`}>{row.role}</span></UiTableCell>
+                <UiTableCell><UiBadge className={`peer-state ${row.status}`}><i />{peerStatusLabel(row.status)}</UiBadge></UiTableCell>
+              </UiTableRow>
             ))}
-            {visibleRows.length === 0 && <tr><td className="connected-peers-empty" colSpan={8}><Server size={18} /><span><strong>No peers in this view</strong><small>Change the filter or connect a new device.</small></span></td></tr>}
-          </tbody>
-        </table>
+            {visibleRows.length === 0 && <UiTableRow><UiTableCell className="connected-peers-empty" colSpan={8}><Server size={18} /><span><strong>No peers in this view</strong><small>Change the filter or connect a new device.</small></span></UiTableCell></UiTableRow>}
+          </UiTableBody>
+        </UiTable>
       </div>
       {filteredRows.length > pageSize && <TablePagination label="peers" page={visiblePage} pageCount={pageCount} total={filteredRows.length} onPageChange={setPage} />}
-    </article>
+    </UiCard>
   );
 }
 
@@ -2458,7 +2358,8 @@ interface NetworkCatalogEntry {
   request: RequestedModelCapacity | null;
 }
 
-function NetworkModelCatalog({ snapshot, developerMode, theme, onNavigate }: {
+function NetworkModelCatalog({ snapshot, developerMode, theme, onNavigate, compact = false }: {
+  compact?: boolean;
   snapshot: PublicSnapshot;
   developerMode: boolean;
   theme: "light" | "dark";
@@ -2468,6 +2369,7 @@ function NetworkModelCatalog({ snapshot, developerMode, theme, onNavigate }: {
   const [page, setPage] = useState(0);
   const closeSelectedModel = useCallback(() => setSelectedModelId(""), []);
   const drawerTitleId = useId();
+  const [showAll, setShowAll] = useState(false);
   const entries = useMemo<NetworkCatalogEntry[]>(() => {
     const active = snapshot.models.map((model) => ({
       id: model.id,
@@ -2495,33 +2397,46 @@ function NetworkModelCatalog({ snapshot, developerMode, theme, onNavigate }: {
   const visibleEntries = entries.slice(visiblePage * pageSize, visiblePage * pageSize + pageSize);
   useEffect(() => setPage(0), [entries]);
 
+  const activeEntries = entries.filter((entry) => entry.state === "active").sort((left, right) => left.id.localeCompare(right.id));
+  const compactEntries = showAll ? activeEntries : activeEntries.slice(0, 5);
   return <>
-    <article className="network-model-catalog">
+    {compact ? <UiCard className="overview-models">
+      <header><UiHeading as="h2">Models</UiHeading>{developerMode && <UiButton onClick={() => onNavigate("models")}>Manage models</UiButton>}</header>
+      {compactEntries.length > 0 ? <ul className="overview-model-list">{compactEntries.map((entry) => {
+        const telemetry = networkModelTelemetry(snapshot, entry.id);
+        const runtime = networkModelRuntimeLabel(telemetry.deployments);
+        const capability = runtime === "kokoro" ? "Speech" : runtime === "embedding" ? "Embeddings" : runtime === "decision" ? "Decisions" : runtime;
+        return <li key={entry.id}><UiButton className="overview-model-row" onClick={() => setSelectedModelId(entry.id)} aria-label={`View details for ${entry.id}`}>
+          <Boxes size={19} aria-hidden="true" /><span><strong>{entry.id}</strong><small>{capability}</small></span><span className="overview-model-nodes">{telemetry.peers.length} {telemetry.peers.length === 1 ? "node" : "nodes"}</span><ChevronRight size={16} aria-hidden="true" />
+        </UiButton></li>;
+      })}</ul> : <div className="overview-models-empty"><Boxes size={24} /><strong>No models available yet</strong><UiText>Add a device to bring a model online.</UiText></div>}
+      {activeEntries.length > 5 && <footer><UiButton onClick={() => setShowAll((current) => !current)} aria-expanded={showAll}>{showAll ? "Show less" : `Show all ${activeEntries.length} models`}</UiButton></footer>}
+    </UiCard> : <UiCard className="network-model-catalog">
       <header className="network-model-catalog-head">
-        <div><span>MODEL & TOKEN CATALOG</span><h2>Available intelligence</h2><p>Inspect each model, its real token activity and the peers currently serving it.</p></div>
-        <div><b><i /> LIVE DATA</b>{developerMode && <button type="button" onClick={() => onNavigate("models")}>Manage models</button>}</div>
+        <div><span>MODEL & TOKEN CATALOG</span><UiHeading as="h2">Available intelligence</UiHeading><UiText>Inspect each model, its real token activity and the peers currently serving it.</UiText></div>
+        <div><b><i /> LIVE DATA</b>{developerMode && <UiButton type="button" onClick={() => onNavigate("models")}>Manage models</UiButton>}</div>
       </header>
-      <p className="panel-table-scroll-hint">Swipe sideways to see all model details →</p>
+      <UiText className="panel-table-scroll-hint">Swipe sideways to see all model details →</UiText>
       <div className="network-model-table-wrap" role="region" aria-label="Scrollable model details" tabIndex={0}>
-        <table className="network-model-table">
-          <thead><tr><th>Model</th><th>Status</th><th>Availability</th><th>Peer memory</th><th>Measured speed</th><th>Processed tokens</th><th><span className="sr-only">Details</span></th></tr></thead>
-          <tbody>{visibleEntries.map((entry) => {
+        <UiTable className="network-model-table">
+          <UiTableHead><UiTableRow><UiTableHeader>Model</UiTableHeader><UiTableHeader>Status</UiTableHeader><UiTableHeader>Availability</UiTableHeader><UiTableHeader>Peer memory</UiTableHeader><UiTableHeader>Measured speed</UiTableHeader><UiTableHeader>Processed tokens</UiTableHeader><UiTableHeader><span className="sr-only">Details</span></UiTableHeader></UiTableRow></UiTableHead>
+          <UiTableBody>{visibleEntries.map((entry) => {
             const telemetry = networkModelTelemetry(snapshot, entry.id);
-            return <tr key={entry.id} className={selectedModelId === entry.id ? "selected" : ""}>
-              <td><button type="button" className="network-model-name" onClick={() => setSelectedModelId(entry.id)}><i><Boxes /></i><span><strong>{entry.id}</strong><small>{networkModelRuntimeLabel(telemetry.deployments)}</small></span></button></td>
-              <td><span className={`network-model-state ${entry.state}`}>{entry.state === "active" ? "Active" : modelRequestStatusLabel(entry.request?.status)}</span></td>
-              <td><strong>{`${telemetry.peers.length} node${telemetry.peers.length === 1 ? "" : "s"}`}</strong><small>{entry.replicas} replicas · {entry.pipelines} pipelines</small></td>
-              <td>{telemetry.peerMemoryMb > 0 ? formatMemory(telemetry.peerMemoryMb) : "Not reported"}</td>
-              <td>{telemetry.measuredThroughput > 0 ? `${formatCompactNumber(telemetry.measuredThroughput)} tok/s` : "Not measured"}</td>
-              <td>{telemetry.processedTokens > 0 ? formatCompactTokens(telemetry.processedTokens) : "No activity"}</td>
-              <td><button type="button" className="network-model-open" onClick={() => setSelectedModelId(entry.id)} aria-label={`View details for ${entry.id}`}><ChevronRight /></button></td>
-            </tr>;
-          })}</tbody>
-        </table>
-        {entries.length === 0 && <div className="network-model-empty"><Boxes /><strong>No models are active yet</strong><span>Models and their token activity will appear here as soon as a node publishes one.</span>{developerMode && <button type="button" onClick={() => onNavigate("models")}>Open model catalog</button>}</div>}
+            return <UiTableRow key={entry.id} className={selectedModelId === entry.id ? "selected" : ""}>
+              <UiTableCell><UiButton type="button" className="network-model-name" onClick={() => setSelectedModelId(entry.id)}><i><Boxes /></i><span><strong>{entry.id}</strong><small>{networkModelRuntimeLabel(telemetry.deployments)}</small></span></UiButton></UiTableCell>
+              <UiTableCell><UiBadge className={`network-model-state ${entry.state}`}>{entry.state === "active" ? "Active" : modelRequestStatusLabel(entry.request?.status)}</UiBadge></UiTableCell>
+              <UiTableCell><strong>{`${telemetry.peers.length} node${telemetry.peers.length === 1 ? "" : "s"}`}</strong><small>{entry.replicas} replicas · {entry.pipelines} pipelines</small></UiTableCell>
+              <UiTableCell>{telemetry.peerMemoryMb > 0 ? formatMemory(telemetry.peerMemoryMb) : "Not reported"}</UiTableCell>
+              <UiTableCell>{telemetry.measuredThroughput > 0 ? `${formatCompactNumber(telemetry.measuredThroughput)} tok/s` : "Not measured"}</UiTableCell>
+              <UiTableCell>{telemetry.processedTokens > 0 ? formatCompactTokens(telemetry.processedTokens) : "No activity"}</UiTableCell>
+              <UiTableCell><UiButton type="button" className="network-model-open" onClick={() => setSelectedModelId(entry.id)} aria-label={`View details for ${entry.id}`}><ChevronRight /></UiButton></UiTableCell>
+            </UiTableRow>;
+          })}</UiTableBody>
+        </UiTable>
+        {entries.length === 0 && <div className="network-model-empty"><Boxes /><strong>No models are active yet</strong><span>Models and their token activity will appear here as soon as a node publishes one.</span>{developerMode && <UiButton type="button" onClick={() => onNavigate("models")}>Open model catalog</UiButton>}</div>}
       </div>
       {entries.length > pageSize && <TablePagination label="models" page={visiblePage} pageCount={pageCount} total={entries.length} onPageChange={setPage} />}
-    </article>
+    </UiCard>}
     {selectedEntry && createPortal(
       <NetworkModelDrawer entry={selectedEntry} snapshot={snapshot} theme={theme} titleId={drawerTitleId} onClose={closeSelectedModel} />,
       document.body,
@@ -2567,11 +2482,11 @@ function NetworkModelDrawer({ entry, snapshot, theme, titleId, onClose }: {
     };
   }, [onClose]);
   return <div className={`model-detail-backdrop ${theme === "light" ? "theme-light" : "theme-dark"}`} role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-    <aside ref={dialogRef} className="model-detail-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+    <UiDialogPanel as="aside" ref={dialogRef} className="model-detail-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
       <header className="model-detail-head">
         <div className="model-detail-icon"><Boxes /></div>
-        <div><span>NETWORK MODEL</span><h2 id={titleId}>{entry.id}</h2><small>{networkModelRuntimeLabel(telemetry.deployments)}</small></div>
-        <button type="button" onClick={onClose} aria-label="Close model details"><X /></button>
+        <div><span>NETWORK MODEL</span><UiHeading as="h2" id={titleId}>{entry.id}</UiHeading><small>{networkModelRuntimeLabel(telemetry.deployments)}</small></div>
+        <UiButton type="button" onClick={onClose} aria-label="Close model details"><X /></UiButton>
       </header>
       <div className="model-detail-badges"><span className={entry.state}><i />{entry.state === "active" ? "Active now" : modelRequestStatusLabel(entry.request?.status)}</span><span className={`execution ${execution.deviceType}`}><Cpu />{executionShortLabel(execution)}</span></div>
       <section className="model-detail-metrics" aria-label="Model telemetry">
@@ -2581,7 +2496,7 @@ function NetworkModelDrawer({ entry, snapshot, theme, titleId, onClose }: {
         <ModelDetailMetric icon={Gauge} label="Measured speed" value={telemetry.measuredThroughput > 0 ? `${formatCompactNumber(telemetry.measuredThroughput)} tok/s` : "Not measured"} />
       </section>
       <section className="model-detail-section">
-        <div className="model-detail-section-title"><Activity /><h3>Token activity</h3></div>
+        <div className="model-detail-section-title"><Activity /><UiHeading as="h3">Token activity</UiHeading></div>
         <div className="model-token-breakdown">
           <div><span>Input tokens</span><strong>{formatCompactTokens(inputTokens)}</strong></div>
           <div><span>Output tokens</span><strong>{formatCompactTokens(outputTokens)}</strong></div>
@@ -2589,24 +2504,24 @@ function NetworkModelDrawer({ entry, snapshot, theme, titleId, onClose }: {
         </div>
       </section>
       <section className="model-detail-section">
-        <div className="model-detail-section-title"><Code2 /><h3>Runtime identity</h3></div>
+        <div className="model-detail-section-title"><Code2 /><UiHeading as="h3">Runtime identity</UiHeading></div>
         <div className="model-runtime-identity"><span><small>MODEL ID</small><code>{entry.id}</code></span><span><small>RUNTIME MODES</small><code>{networkModelRuntimeLabel(telemetry.deployments)}</code></span></div>
       </section>
       <section className="model-detail-section model-peer-section">
-        <div className="model-detail-section-title"><Network /><h3>Active peers</h3><span>{telemetry.peers.length}</span></div>
+        <div className="model-detail-section-title"><Network /><UiHeading as="h3">Active peers</UiHeading><span>{telemetry.peers.length}</span></div>
         <div className="model-peer-table-wrap">
-          <table className="model-peer-table">
-            <thead><tr><th>Node</th><th>Region</th><th>Device</th><th>Memory</th><th>Speed</th></tr></thead>
-            <tbody>{visiblePeers.map(({ worker, deployments }) => {
+          <UiTable className="model-peer-table">
+            <UiTableHead><UiTableRow><UiTableHeader>Node</UiTableHeader><UiTableHeader>Region</UiTableHeader><UiTableHeader>Device</UiTableHeader><UiTableHeader>Memory</UiTableHeader><UiTableHeader>Speed</UiTableHeader></UiTableRow></UiTableHead>
+            <UiTableBody>{visiblePeers.map(({ worker, deployments }) => {
               const measured = deployments.filter(isMeasuredDeployment).reduce((total, deployment) => total + deployment.tokensPerSecond, 0);
-              return <tr key={worker.id}><td><strong><i />{shortId(worker.id)}</strong></td><td>{worker.region}</td><td>{worker.gpus[0]?.model ?? worker.kind}</td><td>{formatMemory(worker.offeredVramMb)}</td><td>{measured > 0 ? `${formatCompactNumber(measured)} tok/s` : "Not measured"}</td></tr>;
-            })}</tbody>
-          </table>
+              return <UiTableRow key={worker.id}><UiTableCell><strong><i />{shortId(worker.id)}</strong></UiTableCell><UiTableCell>{worker.region}</UiTableCell><UiTableCell>{worker.gpus[0]?.model ?? worker.kind}</UiTableCell><UiTableCell>{formatMemory(worker.offeredVramMb)}</UiTableCell><UiTableCell>{measured > 0 ? `${formatCompactNumber(measured)} tok/s` : "Not measured"}</UiTableCell></UiTableRow>;
+            })}</UiTableBody>
+          </UiTable>
           {telemetry.peers.length === 0 && <div className="model-peer-empty"><Server /><span>No active peer is advertising this model right now.</span></div>}
         </div>
         {telemetry.peers.length > peerPageSize && <TablePagination label="model peers" page={visiblePeerPage} pageCount={peerPageCount} total={telemetry.peers.length} onPageChange={setPeerPage} />}
       </section>
-    </aside>
+    </UiDialogPanel>
   </div>;
 }
 
@@ -2716,7 +2631,7 @@ function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, pub
   }
 
   return (
-    <article className={`network-canvas interactive-mesh${fullscreen ? " fullscreen" : ""}`} ref={cardRef}>
+    <UiCard className={`network-canvas interactive-mesh${fullscreen ? " fullscreen" : ""}`} ref={cardRef}>
       <div className="canvas-head mesh-canvas-head">
         <div><span>LIVE TOPOLOGY</span><strong>Explore the network</strong></div>
         <div className="mesh-head-status" aria-label={`${visibleWorkers.length} observed nodes and ${links.length} evidenced routes`}>
@@ -2725,8 +2640,8 @@ function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, pub
           <span>{links.length} ROUTES</span>
         </div>
         <div className="mesh-head-actions">
-          {developerMode && <button className="canvas-link" onClick={() => onNavigate("nodes")}>Node details</button>}
-          <button className="mesh-fullscreen-button" onClick={() => void toggleFullscreen()}><Maximize2 />{fullscreen ? "Exit fullscreen" : "Fullscreen"}</button>
+          {developerMode && <UiButton className="canvas-link" onClick={() => onNavigate("nodes")}>Node details</UiButton>}
+          <UiButton className="mesh-fullscreen-button" onClick={() => void toggleFullscreen()}><Maximize2 />{fullscreen ? "Exit fullscreen" : "Fullscreen"}</UiButton>
         </div>
       </div>
       <div
@@ -2746,11 +2661,6 @@ function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, pub
           </div>
           <svg className="mesh-links" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <defs>
-              <linearGradient id="mesh-link-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop className="mesh-link-start" offset="0%" stopColor="#a8794d" stopOpacity=".24" />
-                <stop className="mesh-link-mid" offset="48%" stopColor="#d2a16c" stopOpacity=".78" />
-                <stop className="mesh-link-end" offset="100%" stopColor="#8a5f36" stopOpacity=".28" />
-              </linearGradient>
               <filter id="mesh-packet-glow" x="-200%" y="-200%" width="500%" height="500%">
                 <feGaussianBlur stdDeviation=".8" result="blur" />
                 <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
@@ -2764,8 +2674,8 @@ function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, pub
             })}
           </svg>
           <div className="mesh-core" role="img" aria-label="mycellios coordinator">
-            <span><img src={brandIcon} alt="" /></span>
-            <strong>mycellios</strong>
+            <span><Network size={25} strokeWidth={1.6} aria-hidden="true" /></span>
+            <strong>Mycellios</strong>
             <small>coordinator</small>
             <i />
           </div>
@@ -2773,7 +2683,7 @@ function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, pub
             const position = MESH_OVERVIEW_POSITIONS[index] ?? { x: 50, y: 50 };
             const selected = selectedWorkerId === worker.id;
             return (
-              <button
+              <UiButton
                 className={`mesh-node ${worker.kind}${selected ? " selected" : ""}`}
                 style={{ "--node-x": `${position.x}%`, "--node-y": `${position.y}%`, "--node-delay": `${index * -0.41}s` } as CSSProperties}
                 key={worker.id}
@@ -2784,17 +2694,17 @@ function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, pub
                 <span><WorkerKindIcon worker={worker} /><i /></span>
                 <strong>{workerLabel(worker)}</strong>
                 <small>{worker.gpus[0]?.model ?? worker.kind}</small>
-              </button>
+              </UiButton>
             );
           })}
         </div>
-        {visibleWorkers.length === 0 && <div className="network-empty interactive-empty"><Wifi size={28} /><strong>No nodes are connected right now</strong><span>Connected devices appear in the live topology.</span><a href={publicLink("/browser/")} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>Connect this device <ArrowRight size={13} /></a></div>}
+        {visibleWorkers.length === 0 && <div className="network-empty interactive-empty"><Wifi size={28} /><strong>No nodes are connected right now</strong><span>Connected devices appear in the live topology.</span><UiLink href={publicLink("/browser/")} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined}>Connect this device <ArrowRight size={13} /></UiLink></div>}
         <div className="mesh-stage-legend"><b><i /> OBSERVED</b><span>{physicalLinks} physical</span><span>{links.length - physicalLinks} declared/simulated</span>{links.length === 0 && <span>No route observed yet</span>}</div>
         {selectedWorker && selectedWorkerPosition && <MeshNodePopover worker={selectedWorker} position={selectedWorkerPosition} sharePercent={selectedSharePercent} onClose={() => setSelectedWorkerId("")} />}
         {visibleWorkers.length > 0 && <div className="mesh-zoom-controls" aria-label="Network zoom controls">
-          <button onClick={() => setZoom((value) => Math.min(1.35, value + 0.12))} disabled={zoom >= 1.35} aria-label="Zoom in"><Plus /></button>
+          <UiButton onClick={() => setZoom((value) => Math.min(1.35, value + 0.12))} disabled={zoom >= 1.35} aria-label="Zoom in"><Plus /></UiButton>
           <output>{Math.round(zoom * 100)}%</output>
-          <button onClick={() => setZoom((value) => Math.max(0.76, value - 0.12))} disabled={zoom <= 0.76} aria-label="Zoom out"><Minus /></button>
+          <UiButton onClick={() => setZoom((value) => Math.max(0.76, value - 0.12))} disabled={zoom <= 0.76} aria-label="Zoom out"><Minus /></UiButton>
         </div>}
       </div>
       <div className="network-summary mesh-network-summary">
@@ -2802,7 +2712,7 @@ function InteractiveMesh({ workers, traces, registeredWorkers, sharedVramMb, pub
         <div><span>Evidenced routes</span><strong>{links.length}</strong></div>
         <div><span>Shared VRAM</span><strong>{formatMemory(sharedVramMb)}</strong></div>
       </div>
-    </article>
+    </UiCard>
   );
 }
 
@@ -2834,7 +2744,7 @@ export function MeshNodePopover({ worker, position, sharePercent, onClose }: {
       previous?.focus();
     };
   }, []);
-  return <aside
+  return <UiDialogPanel as="aside"
     ref={dialogRef}
     className={`mesh-node-popover ${position.y < 44 ? "below" : "above"}`}
     role="dialog"
@@ -2845,10 +2755,10 @@ export function MeshNodePopover({ worker, position, sharePercent, onClose }: {
       "--mesh-popover-y": `${position.y}%`,
     } as CSSProperties}
   >
-    <button className="mesh-node-popover-close" onClick={onClose} aria-label="Close node details"><X /></button>
+    <UiButton className="mesh-node-popover-close" onClick={onClose} aria-label="Close node details"><X /></UiButton>
     <header>
       <div><strong>{workerLabel(worker)}</strong><small>{shortId(worker.id)}</small></div>
-      <span className={`peer-state ${status}`}><i />{peerStatusLabel(status)}</span>
+      <UiBadge className={`peer-state ${status}`}><i />{peerStatusLabel(status)}</UiBadge>
     </header>
     <div className="mesh-node-popover-meta">
       <span className={`peer-role ${role.toLowerCase()}`}>{role}</span>
@@ -2867,10 +2777,10 @@ export function MeshNodePopover({ worker, position, sharePercent, onClose }: {
       <i />
       <span>{worker.region}</span>
     </footer>
-  </aside>;
+  </UiDialogPanel>;
 }
 
-function Nodes({
+export function Nodes({
   snapshot,
   onRemove,
   onClearOffline,
@@ -2971,16 +2881,11 @@ function Nodes({
     }
   }
   return (
-    <section className="nodes-page">
-      <PageTitle eyebrow="DISTRIBUTED NETWORK" title="Node network" copy="Physical devices, active browsers and compute cells connected to mycellios." actions={<button disabled={busy !== null} onClick={() => void clearOffline()}><Trash2 size={15} /> Clear offline</button>} />
+    <section className="nodes-page minimal-screen">
+      <PageTitle eyebrow="DISTRIBUTED NETWORK" title="Node network" copy="Physical devices, active browsers and compute cells connected to mycellios." actions={<UiButton disabled={busy !== null} onClick={() => void clearOffline()}><Trash2 size={15} /> Clear offline</UiButton>} />
       {actionError && <div className="inline-error" role="alert"><CircleAlert size={17} />{actionError}</div>}
 
-      <div className="node-overview-grid compact">
-        <NodeOverviewStat icon={Server} label="Active devices" value={`${activePhysicalWorkers.length} / ${physicalWorkers.length}`} detail={`${connectedPhysicalWorkers.length} connected now · ${cellWorkers.length} cells`} progress={physicalWorkers.length > 0 ? activePhysicalWorkers.length / physicalWorkers.length : 0} tone="green" />
-        <NodeOverviewStat icon={MemoryStick} label="Offered memory" value={formatMemory(activeOfferedVramMb)} detail={`${formatMemory(freeVramMb)} available for models`} progress={activeOfferedVramMb > 0 ? freeVramMb / activeOfferedVramMb : 0} tone="blue" />
-        <NodeOverviewStat icon={Zap} label="Measured inference capacity" value={measuredThroughput > 0 ? `${formatCompactNumber(measuredThroughput)} tok/s` : "Not measured"} detail={measuredDeployments.length > 0 ? `${measuredDeployments.length} runtime${measuredDeployments.length === 1 ? "" : "s"} with completed inference` : activeDeployments.length > 0 ? "Measured after the first real inference" : "Requires an active model"} tone="violet" />
-      </div>
-
+      <SummaryStrip label="Device summary" items={[{ label: "Connected devices", value: connectedPhysicalWorkers.length }, { label: "Shared memory", value: formatMemory(activeOfferedVramMb) }, { label: "Measured speed", value: measuredThroughput > 0 ? `${formatCompactNumber(measuredThroughput)} tok/s` : "Not measured" }]} />
       <PanelDisclosure icon={Gauge} eyebrow="ON DEMAND" title="Physical telemetry" summary="GPU load, reporting coverage, and observed power.">
         <div className="node-overview-grid compact">
           <NodeOverviewStat icon={Gauge} label="Average GPU load" value={averageUtilization === null ? "No data" : `${averageUtilization.toFixed(0)}%`} detail={`${telemetryGpus.length} GPU${telemetryGpus.length === 1 ? "" : "s"} reporting telemetry`} progress={averageUtilization === null ? 0 : averageUtilization / 100} tone="purple" />
@@ -2992,7 +2897,7 @@ function Nodes({
       <PanelDisclosure icon={Network} eyebrow="ON DEMAND" title="Live topology" summary={`${activeWorkers.length} active connections. Open the network map when you need routing context.`}>
       <section className="node-topology-card">
         <header className="node-topology-head">
-          <div><span>LIVE TOPOLOGY</span><h2>Coordinator connections</h2><p>Each line represents a real session with mycellios.</p></div>
+          <div><span>LIVE TOPOLOGY</span><UiHeading as="h2">Coordinator connections</UiHeading><UiText>Each line represents a real session with mycellios.</UiText></div>
           <div className="node-topology-legend"><span><i className="active" />Active</span><span><i className="warning" />Needs attention</span><span><i className="offline" />Offline</span></div>
         </header>
         <div className={`node-topology-map${snapshot.workers.length === 0 ? " empty" : ""}`}>
@@ -3007,7 +2912,7 @@ function Nodes({
           {sortedWorkers.map((worker, index) => {
             const position = topologyPosition(index, sortedWorkers.length);
             const label = workerLabel(worker);
-            return <button
+            return <UiButton
               type="button"
               key={worker.id}
               aria-label={`View node ${label}`}
@@ -3015,7 +2920,7 @@ function Nodes({
               className={`topology-node ${nodeVisualState(worker)}${selectedWorker?.id === worker.id ? " selected" : ""}`}
               style={{ "--node-x": `${position.x}%`, "--node-y": `${position.y}%` } as CSSProperties}
               onClick={() => setSelectedWorkerId(worker.id)}
-            ><div><WorkerKindIcon worker={worker} /><i /></div><span><strong>{label}</strong><small>{worker.region} · {nodeStatusLabel(worker)}</small></span></button>;
+            ><div><WorkerKindIcon worker={worker} /><i /></div><span><strong>{label}</strong><small>{worker.region} · {nodeStatusLabel(worker)}</small></span></UiButton>;
           })}
           {snapshot.workers.length === 0 && <div className="node-topology-empty"><Server /><strong>No nodes yet</strong><span>Connect a machine to see it appear on the network.</span></div>}
         </div>
@@ -3027,17 +2932,17 @@ function Nodes({
         <header>
           <div>
             <span>DEVICE TRUST</span>
-            <h2>Signed identities</h2>
-            <p>Administrative inventory of enrolled keys. Revoking cuts the active session and blocks new registrations.</p>
+            <UiHeading as="h2">Signed identities</UiHeading>
+            <UiText>Administrative inventory of enrolled keys. Revoking cuts the active session and blocks new registrations.</UiText>
           </div>
-          <button
+          <UiButton
             type="button"
             disabled={busy !== null}
             onClick={() => void loadCredentials()}
           >
             {busy === "credentials" ? <LoaderCircle className="spin" /> : <ShieldCheck />}
             {credentials === null ? "Load identities" : "Refresh"}
-          </button>
+          </UiButton>
         </header>
         {credentialError && <div className="inline-error" role="alert"><CircleAlert size={17} />{credentialError}</div>}
         {credentials !== null && credentials.length === 0 && (
@@ -3050,7 +2955,7 @@ function Nodes({
         {credentials !== null && credentials.length > 0 && (
           <div className="device-trust-list">
             {visibleCredentials.map((credential) => (
-              <article key={`${credential.identityKind}:${credential.identityId}`}>
+              <UiCard key={`${credential.identityKind}:${credential.identityId}`}>
                 <div className="device-trust-identity">
                   <div><LockKeyhole /></div>
                   <span>
@@ -3066,7 +2971,7 @@ function Nodes({
                 </div>
                 <div className="device-trust-action">
                   {credential.status === "active" ? (
-                    <button
+                    <UiButton
                       type="button"
                       disabled={busy !== null}
                       onClick={() => void revokeCredential(credential)}
@@ -3075,14 +2980,14 @@ function Nodes({
                         ? <LoaderCircle className="spin" />
                         : <CircleAlert />}
                       Revoke access
-                    </button>
+                    </UiButton>
                   ) : (
                     <span title={credential.revocationReason ?? undefined}>
                       {credential.revokedAt ? `Revoked ${relativeTime(credential.revokedAt)}` : "Revoked"}
                     </span>
                   )}
                 </div>
-              </article>
+              </UiCard>
             ))}
           </div>
         )}
@@ -3091,9 +2996,9 @@ function Nodes({
       </PanelDisclosure>
 
       <NodeInventorySection eyebrow="INSTALLED DEVICES" title="Physical devices" workers={installedWorkers} snapshot={snapshot} busy={busy} onRemove={remove} onSelect={setSelectedWorkerId} />
-      {browserWorkers.length > 0 && <NodeInventorySection eyebrow="TEMPORARY CAPACITY" title="Active browsers" workers={browserWorkers} snapshot={snapshot} busy={busy} onRemove={remove} onSelect={setSelectedWorkerId} />}
-      {cellWorkers.length > 0 && <NodeInventorySection eyebrow="DISTRIBUTED EXECUTORS" title="Compute cells" workers={cellWorkers} snapshot={snapshot} busy={busy} onRemove={remove} onSelect={setSelectedWorkerId} />}
-      {snapshot.workers.length === 0 && <div className="node-card-grid"><div className="wide-empty"><Empty icon={Server} title="No registered nodes" copy="Open the browser worker to add the first machine. Native packages appear on Downloads when published." /><a href="/browser/">Connect a device <ArrowRight size={15} /></a></div></div>}
+      {browserWorkers.length > 0 && <PanelDisclosure icon={Globe2} title="Browser devices"><NodeInventorySection eyebrow="TEMPORARY CAPACITY" title="Active browsers" workers={browserWorkers} snapshot={snapshot} busy={busy} onRemove={remove} onSelect={setSelectedWorkerId} /></PanelDisclosure>}
+      {cellWorkers.length > 0 && <PanelDisclosure icon={Cpu} title="Compute cells"><NodeInventorySection eyebrow="DISTRIBUTED EXECUTORS" title="Compute cells" workers={cellWorkers} snapshot={snapshot} busy={busy} onRemove={remove} onSelect={setSelectedWorkerId} /></PanelDisclosure>}
+      {snapshot.workers.length === 0 && <div className="node-card-grid"><div className="wide-empty"><Empty icon={Server} title="No registered nodes" copy="Open the browser worker to add the first machine. Native packages appear on Downloads when published." /><UiLink href="/browser/">Connect a device <ArrowRight size={15} /></UiLink></div></div>}
       {selectedWorker && <NodeDetailsDrawer worker={selectedWorker} snapshot={snapshot} onClose={() => setSelectedWorkerId("")} />}
     </section>
   );
@@ -3110,19 +3015,19 @@ function NodeInventorySection({ eyebrow, title, workers, snapshot, busy, onRemov
 }) {
   if (workers.length === 0) return null;
   return <>
-    <div className="node-list-heading"><div><span>{eyebrow}</span><h2>{title}</h2></div><strong>{workers.length} registered</strong></div>
+    <div className="node-list-heading"><div><span>{eyebrow}</span><UiHeading as="h2">{title}</UiHeading></div><strong>{workers.length} registered</strong></div>
     <div className="node-card-grid compact">
       {workers.map((worker) => {
         const execution = workerExecutionSummary(snapshot, worker);
         const remoteRepair = worker.acceleration;
         const autoRepair = executionAutoRepairActive(execution, snapshot.workers)
           || Boolean(remoteRepair?.retryable && remoteRepair.state !== "gpu-ready");
-        return <article className="node-card" key={worker.id}>
-        <div className="node-card-head"><div className={`node-device ${worker.kind}`}><WorkerKindIcon worker={worker} /></div><div><span>{workerKindLabel(worker)}</span><h2>{workerLabel(worker)}</h2><small>{shortId(worker.id)}</small></div><span className={`node-status ${worker.status}`}><i />{nodeStatusLabel(worker)}</span></div>
+        return <UiCard className="node-card" key={worker.id}>
+        <div className="node-card-head"><div className={`node-device ${worker.kind}`}><WorkerKindIcon worker={worker} /></div><div><span>{workerKindLabel(worker)}</span><UiHeading as="h2">{workerLabel(worker)}</UiHeading><small>{shortId(worker.id)}</small></div><UiBadge className={`node-status ${worker.status}`}><i />{nodeStatusLabel(worker)}</UiBadge></div>
         <div className={`node-runtime-state${autoRepair ? " repairing" : ""}`}><ExecutionBadge execution={execution} workers={snapshot.workers} /><span><strong>{remoteRepair?.retryable && remoteRepair.state !== "gpu-ready" ? `GPU auto-repair · ${remoteRepair.phase} · ${remoteRepair.progressPct ?? 0}%` : autoRepair ? "Service maintained on CPU · auto-repair active" : execution.verified ? executionDetail(execution) : "No active model is reporting execution on this node"}</strong><small>{remoteRepair?.retryable && remoteRepair.state !== "gpu-ready" ? remoteRepair.issueSummary ?? "mycellios is rebuilding and revalidating the local GPU runtime." : autoRepair ? "mycellios will revalidate the GPU and migrate this stage automatically." : execution.verified ? executionDeviceNames(execution) : "Detected GPU hardware is not counted as active compute."}</small></span></div>
         <div className="node-card-quick"><span><MemoryStick size={14} />{formatMemory(worker.offeredVramMb)} offered</span><span><Globe2 size={14} />{worker.region}</span></div>
-        <div className="node-card-foot"><span>Seen {relativeTime(worker.lastSeenAt)}</span><div><button type="button" onClick={() => onSelect(worker.id)}>View details</button><button disabled={busy !== null} onClick={() => void onRemove(worker.id)}>{busy === worker.id ? <LoaderCircle className="spin" /> : <Trash2 />} Remove</button></div></div>
-      </article>;})}
+        <div className="node-card-foot"><span>Seen {relativeTime(worker.lastSeenAt)}</span><div><UiButton type="button" onClick={() => onSelect(worker.id)}>View details</UiButton><UiButton disabled={busy !== null} onClick={() => void onRemove(worker.id)}>{busy === worker.id ? <LoaderCircle className="spin" /> : <Trash2 />} Remove</UiButton></div></div>
+      </UiCard>;})}
     </div>
   </>;
 }
@@ -3162,15 +3067,15 @@ function NodeDetailsDrawer({ worker, snapshot, onClose }: { worker: PublicWorker
     };
   }, [onClose]);
   return createPortal(<div className="panel-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <aside ref={drawerRef} className="panel-detail-drawer" role="dialog" aria-modal="true" aria-label={`Node details for ${workerLabel(worker)}`}>
-      <header><span><small>NODE DETAILS</small><strong>{workerLabel(worker)}</strong></span><button ref={closeButtonRef} type="button" onClick={onClose} aria-label="Close node details"><X /></button></header>
+    <UiDialogPanel as="aside" ref={drawerRef} className="panel-detail-drawer" role="dialog" aria-modal="true" aria-label={`Node details for ${workerLabel(worker)}`}>
+      <header><span><small>NODE DETAILS</small><strong>{workerLabel(worker)}</strong></span><UiButton ref={closeButtonRef} type="button" onClick={onClose} aria-label="Close node details"><X /></UiButton></header>
       <NodeTopologyInspector worker={worker} snapshot={snapshot} />
-    </aside>
+    </UiDialogPanel>
   </div>, document.querySelector(".public-panel") ?? document.body);
 }
 
 function NodeOverviewStat({ icon: Icon, label, value, detail, progress, tone }: { icon: typeof Server; label: string; value: string; detail: string; progress?: number; tone: "green" | "blue" | "purple" | "violet" | "cyan" | "orange" }) {
-  return <article className={`node-overview-stat ${tone}`}><div className="node-overview-icon"><Icon /></div><span>{label}</span><strong>{value}</strong><small>{detail}</small>{progress !== undefined && <div className="node-overview-progress"><i style={{ width: `${Math.max(0, Math.min(1, progress)) * 100}%` }} /></div>}</article>;
+  return <UiCard className={`node-overview-stat ${tone}`}><div className="node-overview-icon"><Icon /></div><span>{label}</span><strong>{value}</strong><small>{detail}</small>{progress !== undefined && <div className="node-overview-progress"><i style={{ width: `${Math.max(0, Math.min(1, progress)) * 100}%` }} /></div>}</UiCard>;
 }
 
 function NodeTopologyInspector({ worker, snapshot }: { worker: PublicWorker; snapshot: PublicSnapshot }) {
@@ -3236,17 +3141,17 @@ function ExecutorIsolationDiagnostics({
   isolation: NonNullable<PublicWorker["isolation"]>;
 }) {
   const jobObject = isolation.killOnClose === "windows-job-object";
-  return <details className="executor-isolation-diagnostics">
-    <summary>
+  return <UiDisclosure className="executor-isolation-diagnostics">
+    <UiDisclosureSummary>
       <span><ShieldCheck />Executor isolation</span>
       <strong>{jobObject ? "PARTIAL · JOB OBJECT" : "PARTIAL · SEALED POLICY"}</strong>
       <ChevronDown />
-    </summary>
+    </UiDisclosureSummary>
     <div className="executor-isolation-body">
-      <p className="executor-isolation-summary">
+      <UiText className="executor-isolation-summary">
         <ShieldCheck />
         <span><strong>Active, verifiable controls.</strong> The process receives a filtered environment, a private temporary directory and a watchdog that stops the route when it exceeds its limits.{jobObject ? " Windows also places it in a Job Object before execution and closes the entire tree if the application exits." : ""}</span>
-      </p>
+      </UiText>
       <div className="executor-isolation-grid">
         <Metric label="Environment" value="Filtered variables" />
         <Metric label="Private temp space" value={`Max ${formatMemory(isolation.maxWorkspaceBytes / (1024 * 1024))}`} />
@@ -3261,7 +3166,7 @@ function ExecutorIsolationDiagnostics({
         <span><strong>Strong isolation still pending.</strong> This node does not yet announce an operating-system sandbox or hard CPU/RAM/GPU quotas{jobObject ? "." : " or a kill-on-close guarantee."}</span>
       </div>
     </div>
-  </details>;
+  </UiDisclosure>;
 }
 
 function RemoteAccelerationDiagnostics({
@@ -3270,12 +3175,12 @@ function RemoteAccelerationDiagnostics({
   diagnostics: NonNullable<PublicWorker["acceleration"]>;
 }) {
   const repairing = diagnostics.retryable && diagnostics.state !== "gpu-ready";
-  return <details className={`remote-accelerator-diagnostics${repairing ? " repairing" : diagnostics.state === "gpu-ready" ? " ready" : ""}`}>
-    <summary>
+  return <UiDisclosure className={`remote-accelerator-diagnostics${repairing ? " repairing" : diagnostics.state === "gpu-ready" ? " ready" : ""}`}>
+    <UiDisclosureSummary>
       <span><Activity />{repairing ? "GPU self-repair" : "GPU diagnostics"}</span>
       <strong>{remoteAccelerationLabel(diagnostics)}</strong>
       <ChevronDown />
-    </summary>
+    </UiDisclosureSummary>
     <div className="remote-accelerator-body">
       <div className="remote-accelerator-grid">
         <Metric label="App" value={`v${diagnostics.appVersion}`} />
@@ -3284,11 +3189,11 @@ function RemoteAccelerationDiagnostics({
         <Metric label="Attempt" value={String(diagnostics.retryAttempt)} />
       </div>
       {diagnostics.progressPct !== null && <div className="remote-accelerator-progress"><i style={{ width: `${diagnostics.progressPct}%` }} /></div>}
-      {diagnostics.issueSummary && <p><CircleAlert />{diagnostics.issueSummary}</p>}
+      {diagnostics.issueSummary && <UiText><CircleAlert />{diagnostics.issueSummary}</UiText>}
       {diagnostics.nextRetryAt && <small>Next automatic retry: {new Date(diagnostics.nextRetryAt).toLocaleString()}</small>}
       {diagnostics.recentEvents.length > 0 && <ol>{diagnostics.recentEvents.map((event, index) => <li className={event.level} key={`${event.at}-${index}`}><time>{new Date(event.at).toLocaleTimeString()}</time><span>{event.message}</span></li>)}</ol>}
     </div>
-  </details>;
+  </UiDisclosure>;
 }
 
 function remoteAccelerationLabel(diagnostics: NonNullable<PublicWorker["acceleration"]>): string {
@@ -3297,7 +3202,7 @@ function remoteAccelerationLabel(diagnostics: NonNullable<PublicWorker["accelera
   return diagnostics.issueCode ?? diagnostics.state;
 }
 
-function Models({ snapshot, onSearch, onRequest, onRemove, adminToken: initialAdminToken, requiresAdminToken, secureTokenStorage }: {
+export function Models({ snapshot, onSearch, onRequest, onRemove, adminToken: initialAdminToken, requiresAdminToken, secureTokenStorage }: {
   snapshot: PublicSnapshot;
   onSearch: (input: HubCatalogSearchInput) => Promise<HubCatalogPage>;
   onRequest: (input: RequestModelInput, adminToken: string) => Promise<void>;
@@ -3436,66 +3341,66 @@ function Models({ snapshot, onSearch, onRequest, onRemove, adminToken: initialAd
     }
   }
 
-  return <section className="models-page">
+  return <section className="models-page minimal-screen">
     <PageTitle eyebrow="MODEL FABRIC" title="Models" copy="Choose a compatible Hugging Face model. mycellios calculates the capacity it needs and prepares distribution when nodes are available." />
-    <form className="model-request-form" onSubmit={(event) => void submit(event)}>
-      <div className="model-form-heading"><div><span>HUGGING FACE CATALOG</span><h2>Choose a model for the network</h2><p>Only certified architectures can be selected. No terminal commands or pre-split files.</p></div><Boxes size={24} /></div>
+    <UiForm className="model-request-form" onSubmit={(event) => void submit(event)}>
+      <div className="model-form-heading"><div><UiHeading as="h2">Add a model</UiHeading></div><Boxes size={24} /></div>
 
-      <details className="model-advanced model-advanced-top">
-        <summary><SlidersHorizontal size={15} /> Advanced settings or manual model ID <ChevronDown size={15} /></summary>
+      <UiDisclosure className="model-advanced model-advanced-top">
+        <UiDisclosureSummary><SlidersHorizontal size={15} /> Advanced settings or manual model ID <ChevronDown size={15} /></UiDisclosureSummary>
         <div className="model-form-grid">
-          <label>HUGGING FACE MODEL<input value={source} onChange={(event) => { setSource(event.target.value); setModelId(networkNameForHubModel(event.target.value)); }} placeholder="Qwen/Qwen3-0.6B" required /></label>
-          <label>NETWORK NAME <small>automatic</small><input value={modelId} onChange={(event) => setModelId(event.target.value)} placeholder="qwen3-0.6b" required pattern="[A-Za-z0-9][A-Za-z0-9._-]*" /></label>
-          <label>REVISION <small>optional</small><input value={revision} onChange={(event) => setRevision(event.target.value)} placeholder="main or commit" /></label>
-          <label>CONTEXT TOKENS<input type="number" min={128} max={1048576} value={contextTokens} onChange={(event) => setContextTokens(Number(event.target.value))} /></label>
-          <label>MINIMUM NODES<AppSelect ariaLabel="Minimum nodes" value={String(minimumNodes)} onChange={(value) => setMinimumNodes(Number(value))} options={[2, 3, 4, 5, 6, 7, 8].map((count) => ({ value: String(count), label: String(count) }))} /></label>
+          <UiFieldLabel>HUGGING FACE MODEL<UiInput value={source} onChange={(event) => { setSource(event.target.value); setModelId(networkNameForHubModel(event.target.value)); }} placeholder="Qwen/Qwen3-0.6B" required /></UiFieldLabel>
+          <UiFieldLabel>NETWORK NAME <small>automatic</small><UiInput value={modelId} onChange={(event) => setModelId(event.target.value)} placeholder="qwen3-0.6b" required pattern="[A-Za-z0-9][A-Za-z0-9._-]*" /></UiFieldLabel>
+          <UiFieldLabel>REVISION <small>optional</small><UiInput value={revision} onChange={(event) => setRevision(event.target.value)} placeholder="main or commit" /></UiFieldLabel>
+          <UiFieldLabel>CONTEXT TOKENS<UiInput type="number" min={128} max={1048576} value={contextTokens} onChange={(event) => setContextTokens(Number(event.target.value))} /></UiFieldLabel>
+          <UiFieldLabel>MINIMUM NODES<AppSelect ariaLabel="Minimum nodes" value={String(minimumNodes)} onChange={(value) => setMinimumNodes(Number(value))} options={[2, 3, 4, 5, 6, 7, 8].map((count) => ({ value: String(count), label: String(count) }))} /></UiFieldLabel>
         </div>
-      </details>
+      </UiDisclosure>
 
       {(!source || catalogOpen) && <>
         <div className="hub-catalog-toolbar">
-          <div className="hub-model-search"><Search size={17} /><input value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search every Hugging Face text-generation model…" aria-label="Search Hugging Face models" />{catalogBusy && <LoaderCircle className="spin" />}</div>
-          <label><span>ADAPTER STATUS</span><AppSelect ariaLabel="Filter by adapter status" value={catalogStatus} onChange={(value) => setCatalogStatus(value as typeof catalogStatus)} options={[{ value: "compatible", label: "Runtime compatible" }, { value: "all", label: "All catalog results" }, { value: "unsupported", label: "Needs adapter" }, { value: "gated", label: "License required" }]} /></label>
-          <label><span>NETWORK FIT</span><AppSelect ariaLabel="Filter by network capacity" value={catalogFit} onChange={(value) => setCatalogFit(value as typeof catalogFit)} options={[{ value: "all", label: "Any size" }, { value: "fits", label: "Fits now" }, { value: "too-large", label: "Needs capacity" }]} /></label>
-          <label><span>SORT BY</span><AppSelect ariaLabel="Sort Hugging Face models" value={catalogSort} onChange={(value) => setCatalogSort(value as typeof catalogSort)} options={[{ value: "downloads", label: "Most downloaded" }, { value: "likes", label: "Most liked" }, { value: "lastModified", label: "Recently updated" }, { value: "name", label: "Name A–Z" }, { value: "memory", label: "Memory low–high" }]} /></label>
+          <div className="hub-model-search"><Search size={17} /><UiInput value={catalogQuery} onChange={(event) => setCatalogQuery(event.target.value)} placeholder="Search every Hugging Face text-generation model…" aria-label="Search Hugging Face models" />{catalogBusy && <LoaderCircle className="spin" />}</div>
+          <PanelDisclosure icon={SlidersHorizontal} title="Filters"><div className="hub-filter-options">
+          <UiFieldLabel><span>ADAPTER STATUS</span><AppSelect ariaLabel="Filter by adapter status" value={catalogStatus} onChange={(value) => setCatalogStatus(value as typeof catalogStatus)} options={[{ value: "compatible", label: "Runtime compatible" }, { value: "all", label: "All catalog results" }, { value: "unsupported", label: "Needs adapter" }, { value: "gated", label: "License required" }]} /></UiFieldLabel>
+          <UiFieldLabel><span>NETWORK FIT</span><AppSelect ariaLabel="Filter by network capacity" value={catalogFit} onChange={(value) => setCatalogFit(value as typeof catalogFit)} options={[{ value: "all", label: "Any size" }, { value: "fits", label: "Fits now" }, { value: "too-large", label: "Needs capacity" }]} /></UiFieldLabel>
+          <UiFieldLabel><span>SORT BY</span><AppSelect ariaLabel="Sort Hugging Face models" value={catalogSort} onChange={(value) => setCatalogSort(value as typeof catalogSort)} options={[{ value: "downloads", label: "Most downloaded" }, { value: "likes", label: "Most liked" }, { value: "lastModified", label: "Recently updated" }, { value: "name", label: "Name A–Z" }, { value: "memory", label: "Memory low–high" }]} /></UiFieldLabel>
+          </div></PanelDisclosure>
         </div>
-        <div className="hub-catalog-heading"><span>{visibleCatalogModels.length} SHOWN · {catalogModels.length} LOADED FROM HUGGING FACE</span><a href="https://huggingface.co/models?pipeline_tag=text-generation" target="_blank" rel="noreferrer">Explore Hugging Face <ExternalLink size={12} /></a></div>
+        <div className="hub-catalog-heading"><span>{visibleCatalogModels.length} models</span><UiLink href="https://huggingface.co/models?pipeline_tag=text-generation" target="_blank" rel="noreferrer">Explore Hugging Face <ExternalLink size={12} /></UiLink></div>
         {catalogError && <div className="hub-catalog-state error" role="alert"><CircleAlert size={15} />Catalog unavailable. Open Advanced settings above to enter a model ID.</div>}
         {!catalogError && !catalogBusy && catalogModels.length === 0 && <div className="hub-catalog-state">{catalogQuery.trim().length === 1 ? "Type at least two characters to search." : "No matching models found."}</div>}
         {!catalogError && !catalogBusy && catalogModels.length > 0 && visibleCatalogModels.length === 0 && <div className="hub-catalog-state">No loaded models match these filters. Change a filter or load more results.</div>}
-        {visibleCatalogModels.length > 0 && <div className="hub-model-table-wrap"><table className="hub-model-table">
-          <thead><tr><th>Model</th><th>Architecture</th><th>Memory</th><th>Downloads</th><th>Likes</th><th>Updated</th><th>Status</th><th><span className="sr-only">Select</span></th></tr></thead>
-          <tbody>{visibleCatalogModels.map((model) => {
+        {visibleCatalogModels.length > 0 && <div className="hub-model-table-wrap"><UiTable className="hub-model-table">
+          <UiTableHead><UiTableRow><UiTableHeader>Model</UiTableHeader><UiTableHeader>Memory</UiTableHeader><UiTableHeader>Status</UiTableHeader><UiTableHeader><span className="sr-only">Select</span></UiTableHeader></UiTableRow></UiTableHead>
+          <UiTableBody>{visibleCatalogModels.map((model) => {
           const estimatedMemoryMiB = estimatedHubMemoryMiB(model);
           const fits = estimatedMemoryMiB !== null && estimatedMemoryMiB <= availableCatalogMemoryMiB;
           const status = model.compatible ? "Certified" : model.gated ? "Gated" : "Not supported";
-          return <tr key={model.id} className={`${source === model.id ? "selected" : ""} ${model.compatible ? "compatible" : "unsupported"}`} title={model.compatibilityReason ?? undefined}>
-            <td><span className="hub-table-model"><i><Boxes /></i><span><strong>{model.id}</strong><small>{model.author}</small></span></span></td>
-            <td><span className="hub-table-architecture">{model.architecture ?? model.modelType ?? "Unknown"}</span></td>
-            <td><span className={`hub-table-memory ${fits ? "fits" : ""}`}><MemoryStick />{estimatedMemoryMiB === null ? "Unknown" : `≈ ${formatMemory(estimatedMemoryMiB)}`}</span></td>
-            <td>{formatHubCount(model.downloads)}</td><td>{formatHubCount(model.likes)}</td><td>{formatHubDate(model.lastModified)}</td>
-            <td><span className={`hub-status-pill ${model.compatible ? "certified" : model.gated ? "gated" : "unsupported"}`}>{status}</span></td>
-            <td><button type="button" className="hub-table-select" disabled={!model.compatible} onClick={() => selectCatalogModel(model)}>{source === model.id ? <><CheckCircle2 /> Selected</> : "Select"}</button></td>
-          </tr>;
-        })}</tbody></table></div>}
-        {catalogModels.length > 0 && <div className="hub-catalog-pagination"><span>Results are loaded directly from Hugging Face in pages of 20.</span>{catalogNextCursor ? <button type="button" onClick={() => void loadMoreCatalog()} disabled={catalogLoadingMore}>{catalogLoadingMore ? <LoaderCircle className="spin" /> : <Plus />}{catalogLoadingMore ? "Loading…" : "Load 20 more"}</button> : <em>End of results</em>}</div>}
+          return <UiTableRow key={model.id} className={`${source === model.id ? "selected" : ""} ${model.compatible ? "compatible" : "unsupported"}`} title={model.compatibilityReason ?? undefined}>
+            <UiTableCell><span className="hub-table-model"><i><Boxes /></i><span><strong>{model.id}</strong><small>{model.author}</small></span></span></UiTableCell>
+            <UiTableCell><span className={`hub-table-memory ${fits ? "fits" : ""}`}><MemoryStick />{estimatedMemoryMiB === null ? "Unknown" : `≈ ${formatMemory(estimatedMemoryMiB)}`}</span></UiTableCell>
+            <UiTableCell><UiBadge className={`hub-status-pill ${model.compatible ? "certified" : model.gated ? "gated" : "unsupported"}`}>{status}</UiBadge></UiTableCell>
+            <UiTableCell><UiButton type="button" className="hub-table-select" disabled={!model.compatible} onClick={() => selectCatalogModel(model)}>{source === model.id ? <><CheckCircle2 /> Selected</> : "Select"}</UiButton></UiTableCell>
+          </UiTableRow>;
+        })}</UiTableBody></UiTable></div>}
+        {catalogModels.length > 0 && <div className="hub-catalog-pagination">{catalogNextCursor ? <UiButton type="button" onClick={() => void loadMoreCatalog()} disabled={catalogLoadingMore}>{catalogLoadingMore ? <LoaderCircle className="spin" /> : <Plus />}{catalogLoadingMore ? "Loading…" : "Load 20 more"}</UiButton> : <em>End of results</em>}</div>}
       </>}
 
-      {source && <div className="hub-selected-model"><CheckCircle2 /><span><small>SELECTED MODEL</small><strong>{source}</strong><em>It will be published as {modelId}{selectedCatalogModel && estimatedHubMemoryMiB(selectedCatalogModel) !== null ? ` · ≈ ${formatMemory(estimatedHubMemoryMiB(selectedCatalogModel)!)} required` : ""}</em></span><button type="button" onClick={() => setCatalogOpen(true)}>Change model</button></div>}
+      {source && <div className="hub-selected-model"><CheckCircle2 /><span><small>SELECTED MODEL</small><strong>{source}</strong><em>It will be published as {modelId}{selectedCatalogModel && estimatedHubMemoryMiB(selectedCatalogModel) !== null ? ` · ≈ ${formatMemory(estimatedHubMemoryMiB(selectedCatalogModel)!)} required` : ""}</em></span><UiButton type="button" onClick={() => setCatalogOpen(true)}>Change model</UiButton></div>}
 
-      {requiresAdminToken && <label className="model-admin-auth"><ShieldCheck /><span><strong>Network administrator authorization</strong><small>Required because preparing a model changes the shared network. {secureTokenStorage ? "Saved with encrypted operating-system storage after successful authorization." : "Kept only for this browser session."}</small></span><input type="password" autoComplete="off" spellCheck={false} value={adminToken} onChange={(event) => { setAdminToken(event.target.value); setFormError(null); }} placeholder="Administrator token" aria-label="Network administrator token" /></label>}
+      {requiresAdminToken && <UiFieldLabel className="model-admin-auth"><ShieldCheck /><span><strong>Network administrator authorization</strong><small>Required because preparing a model changes the shared network. {secureTokenStorage ? "Saved with encrypted operating-system storage after successful authorization." : "Kept only for this browser session."}</small></span><UiInput type="password" autoComplete="off" spellCheck={false} value={adminToken} onChange={(event) => { setAdminToken(event.target.value); setFormError(null); }} placeholder="Administrator token" aria-label="Network administrator token" /></UiFieldLabel>}
 
       <div className="model-submit-row">
-        <label className="model-auto-toggle"><input type="checkbox" checked={autoActivate} onChange={(event) => setAutoActivate(event.target.checked)} /><span><strong>Activate automatically</strong><small>Start as soon as compatible capacity reaches the requirement.</small></span></label>
-        <button className="model-submit" disabled={busy || !source.trim() || !modelId.trim() || (requiresAdminToken && !adminToken.trim())}>{busy ? <LoaderCircle className="spin" /> : <Play size={16} />}{busy ? "Inspecting model…" : "Calculate and prepare"}</button>
+        <UiFieldLabel className="model-auto-toggle"><UiInput type="checkbox" checked={autoActivate} onChange={(event) => setAutoActivate(event.target.checked)} /><span><strong>Activate automatically</strong><small>Start as soon as compatible capacity reaches the requirement.</small></span></UiFieldLabel>
+        <UiButton className="model-submit" disabled={busy || !source.trim() || !modelId.trim() || (requiresAdminToken && !adminToken.trim())}>{busy ? <LoaderCircle className="spin" /> : <Play size={16} />}{busy ? "Inspecting model…" : "Calculate and prepare"}</UiButton>
       </div>
       {formError && <div className="model-form-error" role="alert"><CircleAlert size={16} />{formError}</div>}
-    </form>
+    </UiForm>
 
-    <div className="model-request-list">
-      <div className="model-request-list-heading"><div><span>NETWORK QUEUE</span><strong>Requested models</strong></div><small>{snapshot.requestedModels.length} {snapshot.requestedModels.length === 1 ? "model" : "models"}</small></div>
+    {snapshot.requestedModels.length > 0 && <PanelDisclosure icon={Boxes} title={snapshot.requestedModels.some((model) => model.status === "failed") ? "Requested models · needs attention" : "Requested models"}><div className="model-request-list">
+      <div className="model-request-list-heading"><div><strong>Requests</strong></div><small>{snapshot.requestedModels.length} {snapshot.requestedModels.length === 1 ? "model" : "models"}</small></div>
       {snapshot.requestedModels.map((model) => <RequestedModelCard key={model.id} model={model} onRemove={(modelId) => onRemove(modelId, adminToken)} />)}
-    </div>
+    </div></PanelDisclosure>}
 
     <div className="panel-table model-active-table"><div className="panel-table-head"><span>Active model</span><span>Replicas</span><span>Pipelines</span><span>Effective device</span></div>
       {visibleActiveModels.map((model) => {
@@ -3521,13 +3426,13 @@ function RequestedModelCard({ model, onRemove }: { model: RequestedModelCapacity
     setRemoveError(null);
     try { await onRemove(model.id); } catch (error) { setRemoveError(friendlyModelMutationError(error)); } finally { setRemoving(false); }
   }
-  return <article className={`model-request-card ${model.status}`}>
-    <div className="model-request-head"><div className="model-request-icon"><Boxes /></div><div><span>{model.source}</span><h2>{model.id}</h2><small>{model.adapterId ?? "Checking architecture"}</small></div><ModelStatus status={model.status} /></div>
-    <p className="model-request-message">{model.status === "failed" ? friendlyActivationFailure(model.message) : model.message}</p>
+  return <UiCard className={`model-request-card ${model.status}`}>
+    <div className="model-request-head"><div className="model-request-icon"><Boxes /></div><div><span>{model.source}</span><UiHeading as="h2">{model.id}</UiHeading><small>{model.adapterId ?? "Checking architecture"}</small></div><ModelStatus status={model.status} /></div>
+    <UiText className="model-request-message">{model.status === "failed" ? friendlyActivationFailure(model.message) : model.message}</UiText>
     <div className="model-capacity-bar"><i style={{ width: `${progress}%` }} /></div>
     <div className="model-request-quick"><span><MemoryStick size={14} />{formatMemory(model.availableVramMiB)} available</span><span><Server size={14} />{model.availableNodes} / {model.requiredNodes} nodes</span><span><Activity size={14} />{model.activationProgress?.length ?? 0} events</span></div>
-    <details className="model-request-details" onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
-      <summary><Activity size={15} />Capacity and diagnostics<ChevronDown size={15} /></summary>
+    <UiDisclosure className="model-request-details" onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
+      <UiDisclosureSummary><Activity size={15} />Capacity and diagnostics<ChevronDown size={15} /></UiDisclosureSummary>
       {detailsOpen && <div className="model-request-details-body">
       <div className="model-capacity-grid">
         <Metric label="Estimated need" value={model.requiredVramMiB === null ? "Calculating" : formatMemory(model.requiredVramMiB)} />
@@ -3538,10 +3443,10 @@ function RequestedModelCard({ model, onRemove }: { model: RequestedModelCapacity
       {model.activationIncident && <ActivationIncidentPanel incident={model.activationIncident} />}
       {(model.status === "activating" || model.status === "failed" || (model.activationProgress?.length ?? 0) > 0) && <ActivationProgressLog model={model} />}
       </div>}
-    </details>
+    </UiDisclosure>
     {removeError && <div className="model-form-error" role="alert"><CircleAlert size={16} />{removeError}</div>}
-    <div className="model-request-foot"><span>{model.autoActivate ? <><Zap size={14} /> Auto-activation armed</> : "Auto-activation off"}</span><button disabled={removing} onClick={() => void remove()}>{removing ? <LoaderCircle className="spin" /> : <Trash2 />} Remove</button></div>
-  </article>;
+    <div className="model-request-foot"><span>{model.autoActivate ? <><Zap size={14} /> Auto-activation armed</> : "Auto-activation off"}</span><UiButton disabled={removing} onClick={() => void remove()}>{removing ? <LoaderCircle className="spin" /> : <Trash2 />} Remove</UiButton></div>
+  </UiCard>;
 }
 
 function ModelStatus({ status }: { status: RequestedModelCapacity["status"] }) {
@@ -3576,7 +3481,7 @@ function ActivationIncidentPanel({
       <div><small>{automatic ? "AUTONOMOUS RECOVERY" : "FAIL-CLOSED DIAGNOSIS"}</small><strong>{incident.title}</strong></div>
       <b>{repairLabels[incident.repairState]}</b>
     </header>
-    <p>{incident.summary}</p>
+    <UiText>{incident.summary}</UiText>
     <div className="activation-incident-grid">
       <span><small>Scope</small><strong>{incident.scope}</strong></span>
       <span><small>Equipment</small><strong>{incident.nodeId ? shortId(incident.nodeId) : "Not isolated"}</strong></span>
@@ -3637,13 +3542,13 @@ export function Jobs({ snapshot, operatorAccess = false, accessToken = null, get
 
   useEffect(() => { void loadEvidence(); }, [loadEvidence]);
   const receiptJobs = new Set(evidence?.receipts.map((receipt) => receipt.jobId) ?? []);
-  return <section><PageTitle eyebrow="EXECUTION LOG" title="Network jobs" copy="Recent inference requests and their execution state." />
+  return <section className="jobs-page minimal-screen"><PageTitle eyebrow="EXECUTION LOG" title="Tasks" copy="Recent inference requests and their execution state." />
     <div className="panel-table jobs-table"><div className="panel-table-head"><span>Request</span><span>Model</span><span>Tokens</span><span>Status</span></div>
       {visibleJobs.map((job) => <div className="panel-table-row" key={job.id}><strong><Activity size={16} />{shortId(job.id)}<small>{relativeTime(job.createdAt)}{receiptJobs.has(job.id) ? " · receipt verified" : ""}</small></strong><span data-label="Model">{job.model}</span><span data-label="Tokens">{job.inputTokens + job.outputTokens}</span><b className={job.status} data-label="Status"><i />{job.status}</b></div>)}
-      {snapshot.jobs.length === 0 && <Empty icon={Activity} title="No jobs yet" copy="Use the inference console when a model becomes available." />}
+      {snapshot.jobs.length === 0 && <Empty icon={Activity} title="No jobs yet" copy="Requests from Mycellios Agent and the API will appear here." />}
     </div>
     {snapshot.jobs.length > pageSize && <TablePagination label="jobs" page={visiblePage} pageCount={pageCount} total={snapshot.jobs.length} onPageChange={setPage} />}
-    {operatorAccess && accessToken && <OperatorEvidence evidence={evidence} busy={evidenceBusy} error={evidenceError} onRefresh={loadEvidence} />}
+    {operatorAccess && accessToken && <PanelDisclosure icon={ShieldCheck} title="Execution evidence"><OperatorEvidence evidence={evidence} busy={evidenceBusy} error={evidenceError} onRefresh={loadEvidence} /></PanelDisclosure>}
   </section>;
 }
 
@@ -3654,38 +3559,38 @@ function OperatorEvidence({ evidence, busy, error, onRefresh }: {
   onRefresh: () => Promise<void>;
 }) {
   return <section className="operator-evidence-console" aria-labelledby="operator-evidence-title" aria-busy={busy}>
-    <header><div><small>READ-ONLY · ROLE RESTRICTED</small><h2 id="operator-evidence-title">Operator evidence</h2><span>Incidents, signed releases, certifications and receipts from canonical stores.</span></div>
-      <button type="button" disabled={busy} onClick={() => void onRefresh()}>{busy ? <LoaderCircle className="spin" /> : <RefreshCw />}Refresh</button></header>
+    <header><div><small>READ-ONLY · ROLE RESTRICTED</small><UiHeading as="h2" id="operator-evidence-title">Operator evidence</UiHeading><span>Incidents, signed releases, certifications and receipts from canonical stores.</span></div>
+      <UiButton type="button" disabled={busy} onClick={() => void onRefresh()}>{busy ? <LoaderCircle className="spin" /> : <RefreshCw />}Refresh</UiButton></header>
     {error && <div className="operator-evidence-error" role="alert"><CircleAlert /><span><strong>Evidence unavailable</strong><small>{error}</small></span></div>}
     {!evidence && busy && <div className="operator-evidence-loading" role="status" aria-live="polite"><LoaderCircle className="spin" />Verifying operational evidence…</div>}
     {evidence && <div className="operator-evidence-grid" aria-live="polite">
       <EvidenceLane title="Incidents" count={evidence.incidents.length} state={evidence.incidents.length ? "attention" : "clear"}>
-        {evidence.incidents.slice(0, 4).map(({ modelId, incident }) => <article key={`${modelId}-${incident.code}`}><b>{incident.title}</b><span>{modelId} · {incident.repairState}</span><small>{incident.summary}</small></article>)}
-        {evidence.incidents.length === 0 && <p>No active activation incidents.</p>}
+        {evidence.incidents.slice(0, 4).map(({ modelId, incident }) => <UiCard key={`${modelId}-${incident.code}`}><b>{incident.title}</b><span>{modelId} · {incident.repairState}</span><small>{incident.summary}</small></UiCard>)}
+        {evidence.incidents.length === 0 && <UiText>No active activation incidents.</UiText>}
       </EvidenceLane>
       <EvidenceLane title="Releases" count={evidence.releases.items.length} state={evidence.releases.configured ? "clear" : "blocked"}>
-        {evidence.releases.items.slice(0, 4).map((release) => <article key={`${release.channel}-${release.platform}-${release.arch}`}><b>{release.channel} · sequence {release.sequence}</b><span>{release.platform}/{release.arch}</span><small>{shortId(release.manifestId)}</small></article>)}
-        {evidence.releases.items.length === 0 && <p>{evidence.releases.configured ? "No signed manifest published." : "Component release store is not configured."}</p>}
+        {evidence.releases.items.slice(0, 4).map((release) => <UiCard key={`${release.channel}-${release.platform}-${release.arch}`}><b>{release.channel} · sequence {release.sequence}</b><span>{release.platform}/{release.arch}</span><small>{shortId(release.manifestId)}</small></UiCard>)}
+        {evidence.releases.items.length === 0 && <UiText>{evidence.releases.configured ? "No signed manifest published." : "Component release store is not configured."}</UiText>}
       </EvidenceLane>
       <EvidenceLane title="Certifications" count={evidence.certifications.items.length} state={evidence.certifications.configured ? "clear" : "blocked"}>
-        {evidence.certifications.items.slice(0, 4).map((certification) => <article key={certification.certificationId}><b>{certification.modelFamily} · {certification.decision}</b><span>{certification.topology} · {certification.platform}/{certification.backend}</span><small>{shortId(certification.certificationId)}</small></article>)}
-        {evidence.certifications.items.length === 0 && <p>{evidence.certifications.configured ? "No signed model certification published." : "Durable certification registry is not configured."}</p>}
+        {evidence.certifications.items.slice(0, 4).map((certification) => <UiCard key={certification.certificationId}><b>{certification.modelFamily} · {certification.decision}</b><span>{certification.topology} · {certification.platform}/{certification.backend}</span><small>{shortId(certification.certificationId)}</small></UiCard>)}
+        {evidence.certifications.items.length === 0 && <UiText>{evidence.certifications.configured ? "No signed model certification published." : "Durable certification registry is not configured."}</UiText>}
       </EvidenceLane>
       <EvidenceLane title="Receipts" count={evidence.receipts.length} state="clear">
-        {evidence.receipts.slice(0, 4).map((receipt) => <article key={receipt.receiptId}><b>{shortId(receipt.jobId)} · {receipt.routeClass}</b><span>{receipt.recoveryMode}</span><small>{shortId(receipt.receiptId)}</small></article>)}
-        {evidence.receipts.length === 0 && <p>No signed execution receipt yet.</p>}
+        {evidence.receipts.slice(0, 4).map((receipt) => <UiCard key={receipt.receiptId}><b>{shortId(receipt.jobId)} · {receipt.routeClass}</b><span>{receipt.recoveryMode}</span><small>{shortId(receipt.receiptId)}</small></UiCard>)}
+        {evidence.receipts.length === 0 && <UiText>No signed execution receipt yet.</UiText>}
       </EvidenceLane>
     </div>}
   </section>;
 }
 
 function EvidenceLane({ title, count, state, children }: { title: string; count: number; state: "clear" | "attention" | "blocked"; children: ReactNode }) {
-  return <section className={`operator-evidence-lane ${state}`}><header><h3>{title}</h3><b aria-label={`${count} ${title.toLowerCase()}`}>{count}</b></header><div>{children}</div></section>;
+  return <section className={`operator-evidence-lane ${state}`}><header><UiHeading as="h3">{title}</UiHeading><b aria-label={`${count} ${title.toLowerCase()}`}>{count}</b></header><div>{children}</div></section>;
 }
 
 type SystemLogFilter = "important" | "errors" | "all";
 
-function SystemLogs({ snapshot, connectionError }: { snapshot: PublicSnapshot; connectionError: string | null }) {
+export function SystemLogs({ snapshot, connectionError }: { snapshot: PublicSnapshot; connectionError: string | null }) {
   const [filter, setFilter] = useState<SystemLogFilter>("important");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
@@ -3711,24 +3616,20 @@ function SystemLogs({ snapshot, connectionError }: { snapshot: PublicSnapshot; c
 
   useEffect(() => setPage(0), [filter, query]);
 
-  return <section className="system-logs-page">
+  return <section className="system-logs-page minimal-screen">
     <PageTitle
       eyebrow="SYSTEM DIAGNOSTICS"
-      title="Important logs"
+      title="Logs"
       copy="Relevant activity observed from the coordinator, nodes, models, and tasks."
     />
-    <div className="system-log-summary">
-      <article><ScrollText /><span><small>LOADED ENTRIES</small><strong>{logSnapshot.entries.length}</strong><em>Current network state</em></span></article>
-      <article className="warning"><CircleAlert /><span><small>WARNINGS</small><strong>{warningCount}</strong><em>Retries and degraded states</em></span></article>
-      <article className="error"><X /><span><small>ERRORS</small><strong>{errorCount}</strong><em>Events needing attention</em></span></article>
-    </div>
+    <SummaryStrip label="Log summary" items={[{ label: "Entries", value: logSnapshot.entries.length }, { label: "Warnings", value: warningCount }, { label: "Errors", value: errorCount }]} />
     <div className="system-log-toolbar">
       <div className="system-log-filters" role="group" aria-label="Filter logs">
-        <button className={filter === "important" ? "active" : ""} onClick={() => setFilter("important")}>Important</button>
-        <button className={filter === "errors" ? "active" : ""} onClick={() => setFilter("errors")}>Errors only</button>
-        <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>All</button>
+        <UiButton className={filter === "important" ? "active" : ""} onClick={() => setFilter("important")}>Important</UiButton>
+        <UiButton className={filter === "errors" ? "active" : ""} onClick={() => setFilter("errors")}>Errors only</UiButton>
+        <UiButton className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>All</UiButton>
       </div>
-      <label className="system-log-search"><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search event, source, or message…" /></label>
+      <UiFieldLabel className="system-log-search"><Search /><UiInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search event, source, or message…" /></UiFieldLabel>
     </div>
     {logSnapshot.truncated && <div className="system-log-notice"><CircleAlert />Only the latest entries are shown to keep the panel responsive and safe.</div>}
     <div className="system-log-list" aria-live="polite">
@@ -3736,19 +3637,18 @@ function SystemLogs({ snapshot, connectionError }: { snapshot: PublicSnapshot; c
       {visibleEntries.length === 0 && <Empty icon={ScrollText} title="No logs match this filter" copy={normalizedQuery ? "Try another search or show all levels." : "No events were recorded at this level."} />}
     </div>
     {visibleEntries.length > pageSize && <TablePagination label="logs" page={visiblePage} pageCount={pageCount} total={visibleEntries.length} onPageChange={setPage} />}
-    <footer className="system-log-safety"><ShieldCheck /><span><strong>Safe, limited read</strong><small>Credentials, tokens, passwords and secrets are redacted before reaching this screen.</small></span></footer>
   </section>;
 }
 
 function SystemLogRow({ entry }: { entry: SystemLogEntry }) {
-  return <article className={`system-log-row ${entry.level}`}>
+  return <UiCard className={`system-log-row ${entry.level}`}>
     <div className="system-log-row-marker"><i /></div>
     <div className="system-log-row-content">
       <header><time dateTime={entry.at}>{formatSystemLogTime(entry.at)}</time><span className={`system-log-level ${entry.level}`}>{systemLogLevelLabel(entry.level)}</span><span className="system-log-source">{systemLogSourceLabel(entry.source)}</span></header>
-      <div><strong>{humanizeSystemLogEvent(entry.event)}</strong><p>{entry.message}</p></div>
-      {entry.details && <details><summary>Technical details <ChevronDown /></summary><code>{entry.details}</code></details>}
+      <div><strong>{humanizeSystemLogEvent(entry.event)}</strong><UiText>{entry.message}</UiText></div>
+      {entry.details && <UiDisclosure><UiDisclosureSummary>Technical details <ChevronDown /></UiDisclosureSummary><code>{entry.details}</code></UiDisclosure>}
     </div>
-  </article>;
+  </UiCard>;
 }
 
 function networkSnapshotLogs(snapshot: PublicSnapshot, connectionError: string | null): SystemLogSnapshot {
@@ -3854,7 +3754,7 @@ function humanizeSystemLogEvent(event: string): string {
   return event.replace(/[-_.]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function Tests({ canRunLocally }: { canRunLocally: boolean }) {
+function Tests({ canRunLocally, loadBenchmarkRuns = fetchBenchmarkRuns }: { canRunLocally: boolean; loadBenchmarkRuns?: typeof fetchBenchmarkRuns }) {
   const [runs, setRuns] = useState<BenchmarkRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState("");
   const [comparisonRunId, setComparisonRunId] = useState("");
@@ -3869,7 +3769,7 @@ function Tests({ canRunLocally }: { canRunLocally: boolean }) {
     loadInFlight.current = true;
     if (!silent) setLoading(true);
     try {
-      const next = await fetchBenchmarkRuns();
+      const next = await loadBenchmarkRuns();
       setRuns(next);
       setSelectedRunId((current) => next.some((run) => run.runId === current) ? current : next[0]?.runId ?? "");
       setError(null);
@@ -3879,7 +3779,7 @@ function Tests({ canRunLocally }: { canRunLocally: boolean }) {
       loadInFlight.current = false;
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [loadBenchmarkRuns]);
 
   useEffect(() => {
     void loadRuns();
@@ -3973,29 +3873,20 @@ function Tests({ canRunLocally }: { canRunLocally: boolean }) {
     }),
   ];
 
-  return <section className="tests-page">
-    <PageTitle eyebrow="AUTOMATED BENCHMARKS" title="Is Mycellios getting faster?" copy="Compare speed, latency and efficiency across matching models, workloads and hardware." actions={canRunLocally ? <button disabled={running} onClick={() => void runNow()}>{running ? <LoaderCircle className="spin" size={16} /> : <Play size={16} />}{running ? "Measuring…" : "Run test again"}</button> : undefined} />
-    <div className="benchmark-auto-notice"><Activity size={19} /><span><strong>Measured results</strong>The benchmark warms the model, repeats requests and records variation. Missing values appear as “No reading” and are never estimated.{!canRunLocally && " Manual tests can be started on the coordinator host."}</span></div>
+  return <section className="tests-page minimal-screen">
+    <PageTitle eyebrow="AUTOMATED BENCHMARKS" title="Performance" copy="Compare speed, latency and efficiency across matching models, workloads and hardware." actions={canRunLocally ? <UiButton disabled={running} onClick={() => void runNow()}>{running ? <LoaderCircle className="spin" size={16} /> : <Play size={16} />}{running ? "Measuring…" : "Run test again"}</UiButton> : undefined} />
     {error && <div className="benchmark-error" role="alert"><CircleAlert size={17} /><span><strong>Test failed</strong>{error}</span></div>}
-    <div className="benchmark-overview-row">
-      <div className="panel-stat-grid benchmark-stats">
-        <Stat icon={Activity} label="Visible tests" value={String(filteredRuns.length)} detail={`${runs.length} saved in total`} />
-        <Stat icon={Boxes} label="Selected model" value={selectedMeasurement?.model.label ?? "No reading"} detail={selected ? `v${selected.version} · ${formatBenchmarkDate(selected.finishedAt)}` : "No measurements"} />
-        <Stat icon={Server} label="Nodes used" value={selectedInventory ? String(selectedNodes) : "No reading"} detail={selectedInventory ? `${selectedInventory.connectedDevices}/${selectedInventory.totalDevices} connected` : "No inventory"} />
-        <Stat icon={Gauge} label="Best comparable P50" value={formatBenchmark(bestThroughput, " tok/s")} detail={selectedMeasurement ? `${trendRuns.length} test${trendRuns.length === 1 ? "" : "s"} with the same configuration` : "No scenario selected"} tone="purple" />
-      </div>
-      <div className="benchmark-overview-context"><span><i /> Benchmark status</span><strong>{loading ? "Loading history" : runs.length > 0 ? "History available" : "Waiting for the first measurement"}</strong><small>Only observed values are shown. Capacity and route changes are compared separately.</small></div>
-    </div>
-    {selectedMeasurement && <div className="benchmark-capacity-strip">
+    <SummaryStrip label="Test summary" items={[{ label: "Saved tests", value: filteredRuns.length }, { label: "Best speed P50", value: formatBenchmark(bestThroughput, " tok/s") }, { label: "First token P95", value: formatBenchmark(selectedMeasurement?.metrics.ttftMsP95 ?? null, " ms") }]} />
+    {selectedMeasurement && <PanelDisclosure icon={Gauge} title="Measurement details"><div className="benchmark-capacity-strip">
       <BenchmarkMetric icon={MemoryStick} label="Offered memory" value={formatBenchmark(selectedOfferedGb, " GB")} detail={formatBenchmark(selectedInventory?.physicalMemoryGb ?? null, " physical GB")} />
       <BenchmarkMetric icon={Zap} label="P50 power" value={selectedPower === null ? "No reading" : formatPower(selectedPower)} detail={`P95 ${formatPowerReading(selectedMeasurement.metrics.powerWattsP95 ?? null)} · peak ${formatPowerReading(selectedMeasurement.metrics.powerWattsPeak ?? null)}`} />
       <BenchmarkMetric icon={Gauge} label="Speed P50" value={formatBenchmark(selectedMeasurement.metrics.tokensPerSecondP50 ?? selectedMeasurement.metrics.tokensPerSecond, " tok/s")} detail={`P5 ${formatBenchmark(selectedMeasurement.metrics.tokensPerSecondP5 ?? null, " tok/s")} · P95 ${formatBenchmark(selectedMeasurement.metrics.tokensPerSecondP95, " tok/s")}`} />
       <BenchmarkMetric icon={Timer} label="First token P95" value={formatBenchmark(selectedMeasurement.metrics.ttftMsP95, " ms")} detail={`P50 ${formatBenchmark(selectedMeasurement.metrics.ttftMsP50, " ms")}`} />
       <BenchmarkMetric icon={ShieldCheck} label="Statistical confidence" value={benchmarkStabilityLabel(selectedMeasurement)} detail={`CV ${formatBenchmark(selectedMeasurement.metrics.coefficientOfVariationPct ?? null, "%")} · ±${formatBenchmark(selectedMeasurement.metrics.confidenceHalfWidthPct ?? null, "%")}`} />
       <BenchmarkMetric icon={Activity} label="Measured energy" value={formatBenchmark(selectedMeasurement.metrics.energyWh ?? null, " Wh")} detail={`Coverage ${formatBenchmark(selectedMeasurement.metrics.energyCoveragePct ?? null, "%")}`} />
-    </div>}
+    </div></PanelDisclosure>}
     {loading && runs.length === 0 ? <div className="benchmark-loading"><LoaderCircle className="spin" /><span>Loading real history…</span></div> : runs.length === 0 ? <Empty icon={Gauge} title="No real tests yet" copy="Start a model. The first measurement is saved automatically when a physical route is available." /> : <>
-      <BenchmarkFiltersPanel
+      <PanelDisclosure icon={SlidersHorizontal} title="Filter tests"><BenchmarkFiltersPanel
         filters={filters}
         values={filterValues}
         visibleCount={filteredRuns.length}
@@ -4005,24 +3896,26 @@ function Tests({ canRunLocally }: { canRunLocally: boolean }) {
           setSelectedRunId(runs[0]?.runId ?? "");
           setComparisonRunId("");
         }}
-      />
+      /></PanelDisclosure>
       {filteredRuns.length === 0 ? <Empty icon={Search} title="No tests match these filters" copy="Change one filter to see the saved real history again." /> : <>
       <div className="benchmark-toolbar">
         <div className="benchmark-toolbar-selects">
-          <label>CURRENT RESULT<AppSelect ariaLabel="Current result" value={selected?.runId ?? ""} onChange={selectRun} options={runOptions} /></label>
-          <label>COMPARE WITH<AppSelect ariaLabel="Reference result" value={comparisonRun?.runId ?? ""} onChange={setComparisonRunId} options={comparisonOptions} /></label>
+          <UiFieldLabel>CURRENT RESULT<AppSelect ariaLabel="Current result" value={selected?.runId ?? ""} onChange={selectRun} options={runOptions} /></UiFieldLabel>
+          <UiFieldLabel>COMPARE WITH<AppSelect ariaLabel="Reference result" value={comparisonRun?.runId ?? ""} onChange={setComparisonRunId} options={comparisonOptions} /></UiFieldLabel>
         </div>
         {selected && <div className={`benchmark-run-state ${selected.status}`}><i />{benchmarkStatusLabel(selected.status)}<span>{selected.trigger === "automatic-model-start" ? "automatic start" : selected.suite === "physical-import" ? "physical campaign" : "manual test"}</span></div>}
       </div>
-      <BenchmarkComparisonPanel comparison={comparison} />
+      {comparisonRun && <BenchmarkComparisonPanel comparison={comparison} />}
       <div className="benchmark-chart-grid">
         <BenchmarkTrend runs={trendRuns} metric="tokensPerSecond" label="Speed P50 and P5–P95 range" unit="tok/s" tone="blue" />
         <BenchmarkTrend runs={trendRuns} metric="ttftMsP95" label="First token P95" unit="ms" tone="purple" />
+      </div>
+      <PanelDisclosure icon={Activity} title="More charts"><div className="benchmark-chart-grid">
         <BenchmarkTrend runs={trendRuns} metric="nodes" label="Nodes used" unit=" nodes" tone="green" />
         <BenchmarkTrend runs={trendRuns} metric="tokensPerSecondPerNode" label="Speed per node" unit=" tok/s/node" tone="orange" />
-      </div>
-      <BenchmarkHistory runs={filteredRuns} selectedRunId={selected?.runId ?? ""} onSelect={selectRun} />
-      {selected && <BenchmarkRunDetails run={selected} />}
+      </div></PanelDisclosure>
+      <PanelDisclosure icon={History} title="Saved tests"><BenchmarkHistory runs={filteredRuns} selectedRunId={selected?.runId ?? ""} onSelect={selectRun} /></PanelDisclosure>
+      {selected && <PanelDisclosure icon={FileText} title="Result details"><BenchmarkRunDetails run={selected} /></PanelDisclosure>}
       </>}
     </>}
   </section>;
@@ -4045,14 +3938,14 @@ function BenchmarkFiltersPanel({
   return <section className="benchmark-filters" aria-label="Benchmark filters">
     <div className="benchmark-filters-heading">
       <div><SlidersHorizontal size={19} /><span><strong>Filter tests</strong><small>{visibleCount} visible result{visibleCount === 1 ? "" : "s"}</small></span></div>
-      <button type="button" className="benchmark-clear-filters" disabled={activeFilters === 0} onClick={onClear}>Clear filters{activeFilters > 0 ? ` (${activeFilters})` : ""}</button>
+      <UiButton type="button" className="benchmark-clear-filters" disabled={activeFilters === 0} onClick={onClear}>Clear filters{activeFilters > 0 ? ` (${activeFilters})` : ""}</UiButton>
     </div>
     <div className="benchmark-filter-grid">
-      <label>MODEL<AppSelect ariaLabel="Filter by model" value={filters.model} onChange={(value) => onChange("model", value)} options={[{ value: "", label: "All models" }, ...values.models]} /></label>
-      <label>VERSION<AppSelect ariaLabel="Filter by version" value={filters.version} onChange={(value) => onChange("version", value)} options={[{ value: "", label: "All versions" }, ...values.versions.map((version) => ({ value: version, label: `v${version}` }))]} /></label>
-      <label>STATUS<AppSelect ariaLabel="Filter by status" value={filters.status} onChange={(value) => onChange("status", value)} options={[{ value: "", label: "All statuses" }, ...values.statuses.map((status) => ({ value: status, label: benchmarkStatusLabel(status) }))]} /></label>
-      <label>BACKEND<AppSelect ariaLabel="Filter by backend" value={filters.backend} onChange={(value) => onChange("backend", value)} options={[{ value: "", label: "All backends" }, ...values.backends.map((backend) => ({ value: backend, label: backend === "__without_reading__" ? "No reading" : backend.toUpperCase() }))]} /></label>
-      <label>EVIDENCE<AppSelect ariaLabel="Filter by evidence" value={filters.evidence} onChange={(value) => onChange("evidence", value)} options={[{ value: "", label: "All evidence" }, ...values.evidence.map((evidence) => ({ value: evidence, label: evidence === "physical" ? "Real physical" : "Local loopback" }))]} /></label>
+      <UiFieldLabel>MODEL<AppSelect ariaLabel="Filter by model" value={filters.model} onChange={(value) => onChange("model", value)} options={[{ value: "", label: "All models" }, ...values.models]} /></UiFieldLabel>
+      <UiFieldLabel>VERSION<AppSelect ariaLabel="Filter by version" value={filters.version} onChange={(value) => onChange("version", value)} options={[{ value: "", label: "All versions" }, ...values.versions.map((version) => ({ value: version, label: `v${version}` }))]} /></UiFieldLabel>
+      <UiFieldLabel>STATUS<AppSelect ariaLabel="Filter by status" value={filters.status} onChange={(value) => onChange("status", value)} options={[{ value: "", label: "All statuses" }, ...values.statuses.map((status) => ({ value: status, label: benchmarkStatusLabel(status) }))]} /></UiFieldLabel>
+      <UiFieldLabel>BACKEND<AppSelect ariaLabel="Filter by backend" value={filters.backend} onChange={(value) => onChange("backend", value)} options={[{ value: "", label: "All backends" }, ...values.backends.map((backend) => ({ value: backend, label: backend === "__without_reading__" ? "No reading" : backend.toUpperCase() }))]} /></UiFieldLabel>
+      <UiFieldLabel>EVIDENCE<AppSelect ariaLabel="Filter by evidence" value={filters.evidence} onChange={(value) => onChange("evidence", value)} options={[{ value: "", label: "All evidence" }, ...values.evidence.map((evidence) => ({ value: evidence, label: evidence === "physical" ? "Real physical" : "Local loopback" }))]} /></UiFieldLabel>
     </div>
   </section>;
 }
@@ -4079,8 +3972,8 @@ function BenchmarkTrend({ runs, metric, label, unit, tone }: { runs: BenchmarkRu
   const ceiling = Math.max(...values, 1);
   const x = (index: number) => points.length === 1 ? (left + width - right) / 2 : left + (index / Math.max(points.length - 1, 1)) * (width - left - right);
   const y = (value: number) => top + (1 - value / ceiling) * (height - top - bottom);
-  return <article className="benchmark-chart">
-    <div><span>SAME FINGERPRINT · {points[0]?.snapshot.measurement.model.label ?? "NO DATA"}</span><h2>{label}</h2></div>
+  return <UiCard className="benchmark-chart">
+    <div><span>SAME FINGERPRINT · {points[0]?.snapshot.measurement.model.label ?? "NO DATA"}</span><UiHeading as="h2">{label}</UiHeading></div>
     <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label}. ${points.length} real test${points.length === 1 ? "" : "s"}.`}>
       <line className="benchmark-axis" x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
       {[0, 0.5, 1].map((ratio) => <g key={ratio}><line className="benchmark-grid-line" x1={left} y1={top + ratio * (height - top - bottom)} x2={width - right} y2={top + ratio * (height - top - bottom)} /><text x={left - 8} y={top + ratio * (height - top - bottom) + 4} textAnchor="end">{formatBenchmark(ceiling * (1 - ratio), "")}</text></g>)}
@@ -4115,14 +4008,14 @@ function BenchmarkTrend({ runs, metric, label, unit, tone }: { runs: BenchmarkRu
       })}
     </svg>
     <div className="benchmark-chart-summary"><span>{points.length} matching measurement{points.length === 1 ? "" : "s"}{metric === "tokensPerSecond" ? " · P5–P95 range" : ""}</span><strong>{formatBenchmark(points.at(-1)?.value ?? null, ` ${unit}`)}</strong></div>
-  </article>;
+  </UiCard>;
 }
 
 function BenchmarkComparisonPanel({ comparison }: { comparison: BenchmarkRunComparison }) {
   const copy = benchmarkComparisonNarrative(comparison);
-  return <article className={`benchmark-comparison ${comparison.mode} ${comparison.verdict}`}>
+  return <UiCard className={`benchmark-comparison ${comparison.mode} ${comparison.verdict}`}>
     <div className="benchmark-comparison-heading">
-      <div><span>{copy.eyebrow}</span><h2>{copy.title}</h2><p>{copy.description}</p></div>
+      <div><span>{copy.eyebrow}</span><UiHeading as="h2">{copy.title}</UiHeading><UiText>{copy.description}</UiText></div>
       {comparison.current && comparison.baseline && <div className="benchmark-comparison-versions">
         <span><small>REFERENCE</small><strong>v{comparison.baseline.run.version}</strong><em>rev {benchmarkBuildRevision(comparison.baseline.run)}</em></span>
         <ArrowRight size={17} />
@@ -4171,7 +4064,7 @@ function BenchmarkComparisonPanel({ comparison }: { comparison: BenchmarkRunComp
         delta={comparison.efficiencyPerWattChangePct}
       />
     </div>
-  </article>;
+  </UiCard>;
 }
 
 function BenchmarkComparisonMetric({ label, baseline, current, baselineDetail, currentDetail, delta = null, rawDelta, neutral = false, claim = false }: {
@@ -4209,14 +4102,14 @@ function BenchmarkHistory({ runs, selectedRunId, onSelect }: { runs: BenchmarkRu
   const visiblePage = Math.min(page, pageCount - 1);
   const visibleRuns = runs.slice(visiblePage * pageSize, visiblePage * pageSize + pageSize);
   useEffect(() => setPage(0), [runs]);
-  return <article className="benchmark-history">
-    <div className="card-heading"><div><span>EVOLUTION HISTORY</span><h2>All real tests</h2></div><small>{runs.length} test{runs.length === 1 ? "" : "s"} · select a row</small></div>
+  return <UiCard className="benchmark-history">
+    <div className="card-heading"><div><span>EVOLUTION HISTORY</span><UiHeading as="h2">All real tests</UiHeading></div><small>{runs.length} test{runs.length === 1 ? "" : "s"} · select a row</small></div>
     <div className="benchmark-history-table">
       <div className="benchmark-history-head"><span>Version / build</span><span>Model / evidence</span><span>Nodes / topology</span><span>Capacity</span><span>P50 speed</span><span>Confidence</span><span>Status</span></div>
       {visibleRuns.map((run) => {
         const snapshot = benchmarkRunSnapshot(run);
         if (!snapshot) return null;
-        return <button className={`benchmark-history-row ${run.runId === selectedRunId ? "selected" : ""}`} aria-pressed={run.runId === selectedRunId} key={run.runId} onClick={() => onSelect(run.runId)}>
+        return <UiButton className={`benchmark-history-row ${run.runId === selectedRunId ? "selected" : ""}`} aria-pressed={run.runId === selectedRunId} key={run.runId} onClick={() => onSelect(run.runId)}>
           <span data-label="Version / build"><strong>v{run.version}</strong><small>rev {benchmarkBuildRevision(run)} · src {shortSourceId(run.build.sourceId)} · {formatBenchmarkDate(run.finishedAt)}</small></span>
           <span data-label="Model / evidence"><strong>{snapshot.measurement.model.label}</strong><small>{snapshot.measurement.evidence === "physical" ? "Real physical" : "Loopback"} · {formatBenchmarkBackend(snapshot.measurement)}</small></span>
           <span data-label="Nodes / topology"><strong>{snapshot.nodes}</strong><small>{formatTopologyDigest(snapshot.measurement.topology.digest)}</small></span>
@@ -4224,16 +4117,16 @@ function BenchmarkHistory({ runs, selectedRunId, onSelect }: { runs: BenchmarkRu
           <span data-label="P50 speed"><strong>{formatBenchmark(snapshot.tokensPerSecondP50, " tok/s")}</strong><small>{formatBenchmarkRange(snapshot)}</small></span>
           <span data-label="Confidence"><strong>{benchmarkStabilityLabel(snapshot.measurement)}</strong><small>CV {formatBenchmark(snapshot.coefficientOfVariationPct, "%")} · TTFT {formatBenchmark(snapshot.ttftMsP95, " ms")}</small></span>
           <span data-label="Status"><b className={run.status}><i />{benchmarkStatusLabel(run.status)}</b><ChevronRight size={15} /></span>
-        </button>;
+        </UiButton>;
       })}
     </div>
     {runs.length > pageSize && <TablePagination label="benchmark tests" page={visiblePage} pageCount={pageCount} total={runs.length} onPageChange={setPage} />}
-  </article>;
+  </UiCard>;
 }
 
 function BenchmarkRunDetails({ run }: { run: BenchmarkRun }) {
   return <div className="benchmark-results">
-    <div className="card-heading"><div><span>SELECTED RESULT</span><h2>{run.triggerModelId ?? run.label}</h2></div><small>v{run.version} · review {benchmarkBuildRevision(run)} · local source {shortSourceId(run.build.sourceId)} · node-declared sources {run.build.participantSourceIds.map(shortSourceId).join(", ") || "undeclared"} · {benchmarkDirtyLabel(run.gitDirty)}</small></div>
+    <div className="card-heading"><div><span>SELECTED RESULT</span><UiHeading as="h2">{run.triggerModelId ?? run.label}</UiHeading></div><small>v{run.version} · review {benchmarkBuildRevision(run)} · local source {shortSourceId(run.build.sourceId)} · node-declared sources {run.build.participantSourceIds.map(shortSourceId).join(", ") || "undeclared"} · {benchmarkDirtyLabel(run.gitDirty)}</small></div>
     <div className="benchmark-result-list">
       {run.measurements.map((measurement) => <BenchmarkResultCard measurement={measurement} run={run} key={measurement.id} />)}
     </div>
@@ -4257,7 +4150,7 @@ function BenchmarkResultCard({ measurement, run }: { measurement: BenchmarkMeasu
     ?? nullableBenchmarkSum(measurement.inventory.profiles.map((profile) => profile.powerLimitWatts));
   const temperaturePeak = measurement.metrics.temperatureCPeak
     ?? nullableBenchmarkMax(measurement.inventory.profiles.map((profile) => profile.temperatureC));
-  return <article className="benchmark-result-card">
+  return <UiCard className="benchmark-result-card">
     <div className="benchmark-result-heading">
       <div><span className="benchmark-result-icon"><Gauge size={18} /></span><span><small>{measurement.evidence === "physical" ? "REAL PHYSICAL EVIDENCE" : "REAL LOCAL RUNTIME"}</small><strong>{measurement.model.label}</strong><em>{measurement.model.precision} · model rev {measurement.model.revision?.slice(0, 12) ?? "No reading"} · build rev {benchmarkBuildRevision(run)}</em></span></div>
       <b className={measurement.status}><i />{benchmarkStatusLabel(measurement.status)}</b>
@@ -4285,8 +4178,8 @@ function BenchmarkResultCard({ measurement, run }: { measurement: BenchmarkMeasu
       </dl>
     </div>
     <BenchmarkNetworkTrace traces={measurement.networkTraces ?? []} />
-    <details className="benchmark-technical-details">
-      <summary>View all metrics for this test</summary>
+    <UiDisclosure className="benchmark-technical-details">
+      <UiDisclosureSummary>View all metrics for this test</UiDisclosureSummary>
       <div>
         <BenchmarkValue label="Valid requests" value={`${formatCountReading(measurement.workload.successfulRequests)} / ${formatCountReading(measurement.workload.requests)}`} detail={`Success ${formatRate(measurement.metrics.requestSuccessRate ?? null)}`} />
         <BenchmarkValue label="Warmup" value={formatCountReading(measurement.workload.warmupRequests)} detail={`${formatCountReading(measurement.workload.recoveredFailures)} failures recovered`} />
@@ -4300,8 +4193,8 @@ function BenchmarkResultCard({ measurement, run }: { measurement: BenchmarkMeasu
         <BenchmarkValue label="Campaign end" value={benchmarkCampaignStopLabel(measurement.workload.campaignStopReason)} detail={measurement.scenarioFingerprint ? measurement.scenarioFingerprint.slice(0, 19) : "No reading"} />
       </div>
       <ul>{measurement.notes.map((note) => <li key={note}>{note}</li>)}</ul>
-    </details>
-  </article>;
+    </UiDisclosure>
+  </UiCard>;
 }
 
 function BenchmarkNetworkTrace({ traces }: { traces: NetworkExecutionTrace[] }) {
@@ -4309,7 +4202,7 @@ function BenchmarkNetworkTrace({ traces }: { traces: NetworkExecutionTrace[] }) 
   if (!trace) {
     return <div className="benchmark-network-trace empty">
       <div><Wifi size={18} /><span><small>NETWORK TRACE PER REQUEST</small><strong>No reading</strong></span></div>
-      <p>This run provided no physical evidence for stages, transport, RTT or bytes.</p>
+      <UiText>This run provided no physical evidence for stages, transport, RTT or bytes.</UiText>
     </div>;
   }
   return <div className="benchmark-network-trace">
@@ -4325,7 +4218,7 @@ function BenchmarkNetworkTrace({ traces }: { traces: NetworkExecutionTrace[] }) 
             <small>{stage.layerStart === null || stage.layerEnd === null ? "Layers: No reading" : `layers ${stage.layerStart}–${stage.layerEnd}`} · {stage.backend} · {stage.precision}</small>
             <em>{stage.workerId ? `worker ${shortId(stage.workerId)}` : "worker: No reading"} · deployment {shortId(stage.deploymentId)} · time: No reading</em>
           </span>)
-        : <p>Physical stages were not observed by this runtime.</p>}
+        : <UiText>Physical stages were not observed by this runtime.</UiText>}
     </div>
     <div className="benchmark-trace-boundaries">
       {trace.boundaries.length > 0
@@ -4334,7 +4227,7 @@ function BenchmarkNetworkTrace({ traces }: { traces: NetworkExecutionTrace[] }) 
             <small>{boundary.sourceNodeId ? shortId(boundary.sourceNodeId) : "No reading"} → {boundary.destinationNodeId ? shortId(boundary.destinationNodeId) : "No reading"}</small>
             <em>RTT {formatBenchmark(boundary.connectRttMs, " ms")} · sent {formatTraceBytes(boundary.bytesSourceToDestination)} · received {formatTraceBytes(boundary.bytesDestinationToSource)} · overlap {formatBenchmark(boundary.observedOverlapMs, " ms")}</em>
           </span>)
-        : <p>No transport boundaries between stages.</p>}
+        : <UiText>No transport boundaries between stages.</UiText>}
     </div>
   </div>;
 }
@@ -4359,325 +4252,6 @@ function BenchmarkMetric({ icon: Icon, label, value, detail }: { icon: typeof Ga
 
 function BenchmarkValue({ label, value, detail, accent = false, tone = "" }: { label: string; value: string; detail: string; accent?: boolean; tone?: string }) {
   return <div className={`benchmark-value ${accent ? "accent" : ""} ${tone}`}><small>{label}</small><strong>{value}</strong><em>{detail}</em></div>;
-}
-
-interface InferenceTurn {
-  id: string;
-  prompt: string;
-  messageContent: string;
-  attachments: InferenceAttachmentSummary[];
-  response: ChatResponse;
-}
-
-interface InferencePendingTurn extends ChatStreamUpdate {
-  prompt: string;
-  attachments: InferenceAttachmentSummary[];
-}
-
-function Inference({ accountUserId, snapshot, coordinatorConnected, onSend, onNavigate, developerMode, accountAuthenticated, onSignIn, apiAccessEnabled, apiBaseUrl, accessToken, getValidSession, apiAccount }: {
-  accountUserId: string | null;
-  snapshot: PublicSnapshot;
-  coordinatorConnected: boolean;
-  onSend: (model: string, messages: ChatMessage[], sessionId: string, onUpdate?: (update: ChatStreamUpdate) => void, signal?: AbortSignal) => Promise<ChatResponse>;
-  onNavigate: (view: PanelView) => void;
-  developerMode: boolean;
-  accountAuthenticated: boolean;
-  onSignIn: () => void;
-  apiAccessEnabled: boolean;
-  apiBaseUrl: string;
-  accessToken: string | null;
-  getValidSession: (forceRefresh?: boolean) => Promise<AuthSession | null>;
-  apiAccount: ApiAccount | null;
-}) {
-  const options = useMemo(() => snapshot.models.map((item) => inferenceModelOption(snapshot, item)), [snapshot]);
-  const realModels = options.filter((item) => item.nativeRuntime);
-  const [model, setModel] = useState("");
-  // The landing hero hands off its prompt through sessionStorage so the visitor
-  // lands in the chat with what they already typed, instead of an empty box.
-  const [prompt, setPrompt] = useState(() => {
-    const handoff = window.sessionStorage.getItem("mycellios.hero-prompt");
-    if (handoff) window.sessionStorage.removeItem("mycellios.hero-prompt");
-    return handoff ?? "";
-  });
-  useEffect(() => { if (accountUserId === null) { if (prompt.trim()) window.sessionStorage.setItem("mycellios.hero-prompt", prompt); else window.sessionStorage.removeItem("mycellios.hero-prompt"); } }, [accountUserId, prompt]);
-  const [attachments, setAttachments] = useState<InferenceAttachment[]>([]);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [filesBusy, setFilesBusy] = useState(false);
-  const [turns, setTurns] = useState<InferenceTurn[]>([]);
-  const [sessionId, setSessionId] = useState(() => newInferenceSessionId());
-  const [error, setError] = useState<{ message: string; stopped: boolean } | null>(null);
-  const [pendingTurn, setPendingTurn] = useState<InferencePendingTurn | null>(null);
-  const [interruptedTurn, setInterruptedTurn] = useState<InferencePendingTurn | null>(null);
-  const activeRequest = useRef<AbortController | null>(null);
-  const [instructionsOpen, setInstructionsOpen] = useState(false);
-  const instructionsKey = `mycellios.chat.instructions.${accountUserId ?? "guest"}`;
-  const [instructions, setInstructions] = useState(() => window.localStorage.getItem(instructionsKey) ?? "");
-  const outputRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const selectedOption = selectInferenceModel(realModels, model);
-  const modelAvailable = selectedOption !== null;
-  const inferenceAvailable = coordinatorConnected && modelAvailable && accountAuthenticated;
-  const selectedModel = selectedOption?.id ?? "";
-
-  useEffect(() => () => { activeRequest.current?.abort(); activeRequest.current = null; }, []);
-  useEffect(() => { window.localStorage.removeItem("mycellios.chat.instructions"); }, []);
-
-  function saveInstructions(next: string) {
-    setInstructions(next);
-    if (next.trim()) window.localStorage.setItem(instructionsKey, next);
-    else window.localStorage.removeItem(instructionsKey);
-  }
-
-  useEffect(() => {
-    if (!pendingTurn) return;
-    const output = outputRef.current;
-    if (output) output.scrollTop = output.scrollHeight;
-  }, [pendingTurn?.text, pendingTurn?.outputTokens]);
-
-  useEffect(() => {
-    if (!pendingTurn) return;
-    const timer = window.setInterval(() => {
-      setPendingTurn((current) => current
-        ? { ...current, elapsedMs: current.elapsedMs + 250 }
-        : current);
-    }, 250);
-    return () => window.clearInterval(timer);
-  }, [pendingTurn !== null]);
-
-  async function addFiles(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0 || filesBusy) return;
-    const availableSlots = Math.max(0, MAX_INFERENCE_FILES - attachments.length);
-    if (availableSlots === 0) {
-      setAttachmentError(`You can attach up to ${MAX_INFERENCE_FILES} files per message.`);
-      return;
-    }
-    setFilesBusy(true);
-    setAttachmentError(null);
-    try {
-      const next: InferenceAttachment[] = [];
-      let remainingChars = Math.max(0, MAX_INFERENCE_TOTAL_CHARS - attachments.reduce((total, attachment) => total + attachment.text.length, 0));
-      for (const file of Array.from(fileList).slice(0, availableSlots)) {
-        if (remainingChars === 0) throw new Error("Attached documents use all the context available for this message.");
-        const attachment = await readInferenceAttachment(file, remainingChars);
-        next.push(attachment);
-        remainingChars -= attachment.text.length;
-      }
-      setAttachments((current) => [...current, ...next]);
-      if (fileList.length > availableSlots) setAttachmentError(`Only ${availableSlots} files were added; the limit is ${MAX_INFERENCE_FILES}.`);
-    } catch (caught) {
-      setAttachmentError(errorText(caught));
-    } finally {
-      setFilesBusy(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
-
-  async function send() {
-    const cleanPrompt = prompt.trim();
-    const attachedFiles = attachments;
-    if (!inferenceAvailable || (!cleanPrompt && attachedFiles.length === 0) || activeRequest.current || filesBusy) return;
-    const request = new AbortController();
-    activeRequest.current = request;
-    let latestUpdate: ChatStreamUpdate | null = null;
-    const displayPrompt = cleanPrompt || "Analyze the attached files.";
-    const messageContent = inferenceMessageWithAttachments(displayPrompt, attachedFiles);
-    const attachmentSummaries = attachedFiles.map(({ id, name, size, kind, truncated }) => ({ id, name, size, kind, truncated }));
-    setPendingTurn({
-      prompt: displayPrompt,
-      attachments: attachmentSummaries,
-      requestId: "pending",
-      model: selectedModel,
-      delta: "",
-      text: "",
-      outputTokens: 0,
-      routeClass: "waiting",
-      affinityHit: false,
-      sessionId,
-      reusedKvTokens: 0,
-      ttftMs: 0,
-      elapsedMs: 0,
-    });
-    setPrompt("");
-    setAttachments([]);
-    setAttachmentError(null);
-    setError(null);
-    setInterruptedTurn(null);
-    try {
-      const messages: ChatMessage[] = [
-        ...(instructions.trim() ? [{ role: "developer" as const, content: instructions.trim() }] : []),
-        ...turns.flatMap((turn): ChatMessage[] => [
-          { role: "user", content: turn.messageContent },
-          { role: "assistant", content: turn.response.text },
-        ]),
-        { role: "user", content: messageContent },
-      ];
-      const response = await onSend(selectedModel, messages, sessionId, (update) => {
-        if (activeRequest.current !== request || request.signal.aborted) return;
-        latestUpdate = update;
-        setPendingTurn((current) => current ? { ...current, ...update } : current);
-      }, request.signal);
-      if (activeRequest.current !== request) return;
-      request.signal.throwIfAborted();
-      if (!response.text.trim()) throw new Error("The model finished without returning text.");
-      setTurns((current) => [...current, { id: response.requestId, prompt: displayPrompt, messageContent, attachments: attachmentSummaries, response }]);
-    } catch (caught) {
-      if (activeRequest.current !== request) return;
-      setPrompt(cleanPrompt);
-      setAttachments(attachedFiles);
-      const partial = latestUpdate as ChatStreamUpdate | null;
-      if (partial?.text) setInterruptedTurn({ ...partial, prompt: displayPrompt, attachments: attachmentSummaries });
-      setError({ message: errorText(caught), stopped: request.signal.aborted });
-    } finally {
-      if (activeRequest.current === request) { activeRequest.current = null; setPendingTurn(null); }
-    }
-  }
-
-  function resetConversation(nextModel?: string) {
-    activeRequest.current?.abort();
-    activeRequest.current = null;
-    if (nextModel !== undefined) setModel(nextModel);
-    setTurns([]);
-    if (nextModel === undefined) { setPrompt(""); setAttachments([]); }
-    setAttachmentError(null);
-    setError(null);
-    setPendingTurn(null);
-    setInterruptedTurn(null);
-    setSessionId(newInferenceSessionId());
-  }
-
-  const apiAccessPanel = <ApiAccessPanel enabled={apiAccessEnabled} apiBaseUrl={apiBaseUrl} accessToken={accessToken} getValidSession={getValidSession} account={apiAccount} availableModels={realModels.length} onSignIn={onSignIn} />;
-
-  const unavailableNotice = <div className="inference-unavailable focused-empty" role="status">
-      <div className="inference-unavailable-icon"><MessageSquareText /></div>
-      <div className="inference-unavailable-copy"><span>{!coordinatorConnected ? "CONNECTION INTERRUPTED" : model ? "SELECTED MODEL UNAVAILABLE" : "WAITING FOR A MODEL"}</span><h2>{!coordinatorConnected ? "Reconnecting to the network" : model ? "Your selected model is offline" : "Connect a model to start chatting"}</h2><p>{!coordinatorConnected ? "The last model snapshot may be out of date. Your conversation and draft stay here while Mycellios reconnects." : model ? `${model} has no available native route in the latest network snapshot. Choose another model or wait for it to reconnect.` : "No connected native inference route is available in the latest network snapshot. Connect a node and activate a model to begin."}</p>
-        {developerMode && snapshot.requestedModels[0] && <div className="inference-request-state"><LoaderCircle className={["profiling", "activating"].includes(snapshot.requestedModels[0].status) ? "spin" : ""} /><span><strong>{snapshot.requestedModels[0].id}</strong>{snapshot.requestedModels[0].status === "failed" ? friendlyActivationFailure(snapshot.requestedModels[0].message) : snapshot.requestedModels[0].message}</span></div>}
-        <div className="inference-unavailable-actions"><button className="primary-button" onClick={() => onNavigate("models")}><Boxes size={16} />View and activate models</button></div>
-      </div>
-    </div>
-  ;
-
-  return <section className="inference-page">
-    <PageTitle title="Test a model" />
-    {developerMode ? apiAccessPanel : <PanelDisclosure icon={Code2} eyebrow="OPTIONAL" title="API access" summary="Keys, usage, and the OpenAI-compatible endpoint.">{apiAccessPanel}</PanelDisclosure>}
-    {(!coordinatorConnected || !modelAvailable) && unavailableNotice}
-    {coordinatorConnected && modelAvailable && !accountAuthenticated && <div className="inference-unavailable account-required">
-      <div className="inference-unavailable-icon"><LockKeyhole /></div>
-      <div className="inference-unavailable-copy"><span>ACCOUNT REQUIRED</span><h2>The model is connected; sign in to use it</h2><p>Sending uses your account balance and limits. Chat remains visible so you can see how it works.</p><div className="inference-unavailable-actions"><button className="primary-button" onClick={onSignIn}><UserRound size={16} />Sign in</button></div></div>
-    </div>}
-    <div className={`inference-console${inferenceAvailable ? "" : " is-unavailable"}`} aria-busy={pendingTurn !== null}>
-      <div className="inference-toolbar">
-        <div className="inference-toolbar-title"><MessageSquareText /><span><strong>Chat</strong><small>{selectedModel || model || "Waiting for a native model"}</small></span></div>
-        <div className="inference-toolbar-controls">
-          <span className="inference-toolbar-stat"><Network /><b>{selectedOption?.nodeCount ?? 0}</b> node{selectedOption?.nodeCount === 1 ? "" : "s"}</span>
-          <span className="inference-toolbar-stat"><MemoryStick /><b>{selectedOption && selectedOption.peerMemoryMb > 0 ? formatMemory(selectedOption.peerMemoryMb) : "—"}</b> memory</span>
-        </div>
-      </div>
-      {developerMode && <div className="inference-route-strip">
-        {inferenceAvailable
-          ? <div className="inference-model-summary"><ExecutionBadge execution={selectedOption?.execution ?? unknownExecutionSummary()} workers={snapshot.workers} large /><span className="inference-live"><i />AVAILABLE</span><span>{selectedOption?.routeLabel}</span><span>{selectedOption?.freeSlots ?? 0} free slot{selectedOption?.freeSlots === 1 ? "" : "s"}</span></div>
-          : <div className="inference-model-summary inference-offline"><LockKeyhole size={14} /><span>{!coordinatorConnected ? "RECONNECTING" : modelAvailable ? "SIGN IN" : "NO REAL CONNECTION"}</span></div>}
-      </div>}
-      <div className="inference-output" aria-live="polite" ref={outputRef}>
-        {turns.length === 0 && !pendingTurn && !error && (inferenceAvailable
-          ? <div className="inference-welcome"><Sparkles /><h2>Ask a question</h2><p>Responses come from the selected native Mycellios deployment.</p><div className="inference-suggestions">{["Summarize how this network works", "Explain an idea in three sentences", "Give me a short example"].map((suggestion) => <button key={suggestion} onClick={() => setPrompt(suggestion)}>{suggestion}</button>)}</div></div>
-          : <div className="inference-welcome inference-welcome-locked"><LockKeyhole /><h2>{!coordinatorConnected ? "Restoring connection" : modelAvailable ? "Chat is waiting for your account" : "Chat is waiting for a model"}</h2><p>{coordinatorConnected && modelAvailable ? "You can prepare your message. Sign in to send it using your token balance." : "You can prepare your message now. Sending will be available when a native inference route is connected."}</p></div>)}
-        {turns.map((turn) => <InferenceCompletedTurn turn={turn} key={turn.id} />)}
-        {pendingTurn && <InferenceStreamingTurn turn={pendingTurn} />}
-        {interruptedTurn && <div className="inference-turn"><InferenceUserMessage prompt={interruptedTurn.prompt} attachments={interruptedTurn.attachments} /><div className="inference-message"><img src={brandIcon} alt="" /><div><div className="inference-stream-head"><span>{interruptedTurn.model}</span><b>INCOMPLETE RESPONSE</b></div><p>{interruptedTurn.text}</p></div></div></div>}
-        {error && <div className={`inference-error${error.stopped ? " is-stopped" : ""}`} role={error.stopped ? "status" : "alert"}>{error.stopped ? <Pause /> : <CircleAlert />}<div><strong>{error.stopped ? "Generation stopped" : "The response could not be completed"}</strong><span>{error.stopped ? "Your message is ready to edit or send again." : friendlyInferenceError(error.message)}</span></div></div>}
-      </div>
-      <div className="inference-input">
-        {attachments.length > 0 && <div className="inference-attachments" aria-label="Attachments">{attachments.map((attachment) => <div key={attachment.id}><FileText /><span><strong>{attachment.name}</strong><small>{formatFileSize(attachment.size)} · {attachment.kind.toUpperCase()}{attachment.truncated ? " · content truncated" : ""}</small></span><button type="button" onClick={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))} aria-label={`Remove ${attachment.name}`}><X /></button></div>)}</div>}
-        {attachmentError && <div className="inference-attachment-error" role="alert"><CircleAlert />{attachmentError}</div>}
-        <div className="inference-composer-row">
-          <input ref={fileInputRef} hidden type="file" multiple accept={INFERENCE_FILE_ACCEPT} onChange={(event) => void addFiles(event.target.files)} />
-          <button type="button" className="inference-attach" disabled={!inferenceAvailable || pendingTurn !== null || filesBusy || attachments.length >= MAX_INFERENCE_FILES} onClick={() => fileInputRef.current?.click()} aria-label="Attach documents" title="PDF, DOCX, text, code, CSV or JSON">{filesBusy ? <LoaderCircle className="spin" /> : <Paperclip />}</button>
-          <textarea aria-label="Message" value={prompt} disabled={pendingTurn !== null} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} placeholder={inferenceAvailable ? `Write to ${selectedModel}…` : "Draft a message while waiting…"} />
-        </div>
-        <div className="inference-input-foot"><div className="inference-composer-tools">
-          <InferenceModelPicker options={realModels} value={model} onChange={(nextModel) => { if (nextModel !== model) resetConversation(nextModel); }} disabled={pendingTurn !== null} />
-          <div className={`inference-instructions${instructionsOpen ? " open" : ""}`}>
-            <button type="button" aria-label="Conversation instructions" aria-expanded={instructionsOpen} onClick={() => setInstructionsOpen((current) => !current)}><SlidersHorizontal />{instructions.trim() && <i />}</button>
-            {instructionsOpen && <div className="inference-instructions-popover"><header><strong>Conversation instructions</strong><span>Sent before each message.</span></header><textarea value={instructions} onChange={(event) => saveInstructions(event.target.value)} placeholder="For example: answer clearly and say when you are unsure." maxLength={2_000} /><div className="inference-instruction-presets">{["Direct answers", "Step by step", "Code first", "Brief summary"].map((preset) => <button type="button" key={preset} onClick={() => saveInstructions(instructions.trim() ? `${instructions.trim()}\n${preset}.` : `${preset}.`)}>{preset}</button>)}</div><footer><button type="button" onClick={() => saveInstructions("")}>Clear</button><button type="button" onClick={() => setInstructionsOpen(false)}>Done</button></footer></div>}
-          </div>
-          <span>{inferenceAvailable ? <><Paperclip size={12} />Files · <kbd>Enter</kbd> to send</> : <><LockKeyhole size={12} />{!coordinatorConnected ? "Reconnecting" : modelAvailable ? "Sign in to send" : "Connect a model"}</>}</span>
-        </div><div>{(turns.length > 0 || interruptedTurn) && <button className="inference-clear" disabled={pendingTurn !== null} onClick={() => resetConversation()}><Trash2 size={14} />New conversation</button>}{pendingTurn ? <button className="inference-send" onClick={() => activeRequest.current?.abort()}><Pause /><span>Stop</span></button> : <button className="inference-send" disabled={!inferenceAvailable || (!prompt.trim() && attachments.length === 0) || filesBusy} onClick={() => void send()}><Send /><span>Send</span></button>}</div></div>
-      </div>
-    </div>
-  </section>;
-}
-
-function InferenceStreamingTurn({ turn, compact = false }: { turn: InferencePendingTurn; compact?: boolean }) {
-  const content = splitStreamingContent(turn.text);
-  const waitingStatus = inferenceWaitingStatus(turn);
-  return <div className="inference-turn pending">
-    <InferenceUserMessage prompt={turn.prompt} attachments={turn.attachments} />
-    {turn.text ? <div className="inference-message streaming"><img src={brandIcon} alt="" /><div>
-      <div className="inference-stream-head"><span>{turn.model}</span><b><i />GENERATING</b></div>
-      {turn.phase === "recovering" && <div className="inference-stream-recovery"><LoaderCircle className="spin" size={14} />{turn.statusMessage ?? "Retrying the full request before the first token…"} <small>attempt {turn.attempt ?? 1} of {turn.maximumAttempts ?? 8}</small></div>}
-      {content.reasoning !== null && <div className="inference-live-reasoning"><span>REASONING</span><p>{content.reasoning}{content.answer === "" && <i className="stream-cursor" />}</p></div>}
-      {content.answer && <p>{content.answer}<i className="stream-cursor" /></p>}
-      {!compact && <div className="inference-response-metrics live"><span><b>{formatDuration(turn.ttftMs)}</b>first token</span><span><b>{formatDuration(turn.elapsedMs)}</b>current time</span><span><b>{turn.outputTokens}</b>tokens received</span><span><b>{formatLiveThroughput(turn)}</b>tokens/s now</span><span><b>{turn.routeClass}</b>route</span>{turn.affinityHit && <span><b>AFFINITY</b>same route</span>}</div>}
-    </div></div> : <div className={`inference-thinking ${turn.phase === "recovering" ? "recovering" : ""}`}><LoaderCircle className="spin" /><span><strong>{waitingStatus}</strong><small>{formatDuration(turn.elapsedMs)}{(turn.attempt ?? 1) > 1 ? ` · attempt ${turn.attempt} of ${turn.maximumAttempts ?? 8}` : ""}</small></span></div>}
-  </div>;
-}
-
-function InferenceCompletedTurn({ turn }: { turn: InferenceTurn }) {
-  const content = splitThinkingContent(turn.response.text);
-  return <div className="inference-turn">
-    <InferenceUserMessage prompt={turn.prompt} attachments={turn.attachments} />
-    {turn.response.activity && <InferenceActivitySummary activity={turn.response.activity} />}
-    <div className="inference-message"><img src={brandIcon} alt="" /><div><span>{turn.response.model}</span>{content.reasoning && <details className="inference-reasoning"><summary>View model reasoning</summary><p>{content.reasoning}</p></details>}<p>{content.answer}</p>
-      <div className="inference-response-metrics">
-        <span><b>{formatDuration(turn.response.ttftMs)}</b>first token</span><span><b>{formatDuration(turn.response.activeMs)}</b>total time</span><span><b>{turn.response.outputTokens}</b>output tokens</span><span><b>{formatResponseThroughput(turn.response)}</b>tokens/s</span><span><b>{turn.response.routeClass}</b>route</span>
-        {turn.response.recoveryTrace && turn.response.recoveryTrace.finalMode !== "initial" && <span><b>{turn.response.recoveryTrace.finalMode === "full_retry" ? "FULL RETRY" : turn.response.recoveryTrace.finalMode.replaceAll("_", " ").toUpperCase()}</b>{turn.response.recoveryTrace.attempts.length} attempts · {turn.response.recoveryTrace.attempts.at(-1)?.restoredTokenCount ?? 0} tokens restored</span>}{turn.response.runtimeRecovery && <span title={`Checkpoint ${turn.response.runtimeRecovery.checkpointId}`}><b>ROUTE REBUILT</b>{turn.response.runtimeRecovery.attempts} attempts · {turn.response.runtimeRecovery.restoredTokenCount} prefix tokens · no KV transfer</span>}
-        {turn.response.reusedKvTokens > 0 ? <span><b>{turn.response.reusedKvTokens}</b>KV tokens reused</span> : turn.response.affinityHit ? <span><b>AFFINITY</b>same route</span> : null}
-      </div>
-    </div></div>
-  </div>;
-}
-
-function InferenceActivitySummary({ activity }: { activity: NonNullable<ChatResponse["activity"]> }) {
-  const status = activity.goal?.status ?? "in_progress";
-  const storageKey = `mycellios.remembered-activity.${activity.goal?.title ?? activity.model}`;
-  const [remembered, setRemembered] = useState(() => window.localStorage.getItem(storageKey) !== null);
-  function toggleRemembered() {
-    if (remembered) window.localStorage.removeItem(storageKey);
-    else window.localStorage.setItem(storageKey, JSON.stringify(activity));
-    setRemembered(!remembered);
-  }
-  return <aside className="inference-activity-summary">
-    <header><span><strong>Model {activity.model}</strong>{activity.effort && <><i />Effort {activity.effort}</>}</span>{activity.rememberable && <button type="button" aria-pressed={remembered} onClick={toggleRemembered}>{remembered ? <Check /> : <History />}{remembered ? "Remembered" : "Remember this"}</button>}</header>
-    {activity.goal && <section><span className={`inference-activity-status ${status}`}>{status.replaceAll("_", " ")}</span><h3>{activity.goal.title}</h3><small>{activity.goal.tokens !== null ? `${activity.goal.tokens.toLocaleString()} tokens` : ""}{activity.goal.tokens !== null && activity.goal.elapsedMs !== null ? " · " : ""}{activity.goal.elapsedMs !== null ? formatDuration(activity.goal.elapsedMs) : ""}</small></section>}
-    {activity.requestSummary && <section><span>Request summary</span><p>{activity.requestSummary}</p></section>}
-    {activity.decision && <section className="inference-activity-decision"><span>{activity.goal?.status === "needs_decision" ? "Needs decision" : "Outcome"}</span><h3>{activity.decision.headline}</h3>{activity.decision.pending.length > 0 && <ul>{activity.decision.pending.map((item) => <li key={item}>{item}</li>)}</ul>}{activity.decision.userAction && <p><strong>Your action:</strong> {activity.decision.userAction}</p>}</section>}
-  </aside>;
-}
-
-function InferenceUserMessage({ prompt, attachments }: { prompt: string; attachments: InferenceAttachmentSummary[] }) {
-  return <div className="inference-user-message"><span>YOU</span><p>{prompt}</p>{attachments.length > 0 && <div className="inference-message-files">{attachments.map((attachment) => <span key={attachment.id}><FileText /><b>{attachment.name}</b><small>{formatFileSize(attachment.size)}</small></span>)}</div>}</div>;
-}
-
-type InferenceModelOption = ReturnType<typeof inferenceModelOption>;
-
-function InferenceModelPicker({ options, value, onChange, disabled }: { options: InferenceModelOption[]; value: string; onChange: (value: string) => void; disabled: boolean }) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const selected = options.find((option) => option.id === value) ?? null;
-  const label = selected?.id ?? (value ? `${value} · offline` : options.length === 0 ? "No model connected" : "Mesh — automatic");
-  return <div className={`inference-model-picker${open ? " open" : ""}`} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
-    <button ref={triggerRef} type="button" aria-label="Select chat model" aria-haspopup="listbox" aria-expanded={open} disabled={disabled || options.length === 0} onClick={() => setOpen((current) => !current)} onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}>
-      <Cpu /><span><small>MODEL</small><strong>{label}</strong></span><ChevronDown />
-    </button>
-    {open && <div className="inference-model-menu" role="listbox" aria-label="Available models">
-      <button type="button" role="option" aria-selected={value === ""} className={value === "" ? "selected" : ""} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(""); setOpen(false); triggerRef.current?.focus(); }}>
-        <span><strong>Mesh — automatic</strong><small>The network chooses the best available route</small></span><b className="auto"><i />AUTO</b>{value === "" && <Check />}
-      </button>
-      {options.map((option) => <button type="button" role="option" aria-selected={option.id === value} className={option.id === value ? "selected" : ""} key={option.id} onMouseDown={(event) => event.preventDefault()} onClick={() => { onChange(option.id); setOpen(false); triggerRef.current?.focus(); }}>
-        <span><strong>{option.id}</strong><small>{option.nodeCount} connected node{option.nodeCount === 1 ? "" : "s"} · {option.peerMemoryMb > 0 ? formatMemory(option.peerMemoryMb) : "memory not reported"}</small></span><b className={option.freeSlots > 0 ? "warm" : "ready"}><i />{option.freeSlots > 0 ? "AVAILABLE" : "BUSY"}</b>{option.id === value && <Check />}
-      </button>)}
-    </div>}
-  </div>;
 }
 
 function ActivationProgressLog({ model }: { model: RequestedModelCapacity }) {
@@ -4722,7 +4296,7 @@ function ActivationProgressLog({ model }: { model: RequestedModelCapacity }) {
           </ul>}
         </span>
         <time dateTime={event.at}>{formatActivationTime(event.at)}</time>
-        {technicalDetails.length > 0 && <details className="model-activation-details"><summary>View raw runtime details</summary><div>{technicalDetails.map((detail, detailIndex) => <code key={`${detail}-${detailIndex}`}>{detail}</code>)}</div></details>}
+        {technicalDetails.length > 0 && <UiDisclosure className="model-activation-details"><UiDisclosureSummary>View raw runtime details</UiDisclosureSummary><div>{technicalDetails.map((detail, detailIndex) => <code key={`${detail}-${detailIndex}`}>{detail}</code>)}</div></UiDisclosure>}
       </li>;
     })}</ol>
   </div>;
@@ -4891,10 +4465,6 @@ export function formatActivationTime(value: string): string {
   return `${day}\n${time}`;
 }
 
-function newInferenceSessionId(): string {
-  return `chat-${globalThis.crypto.randomUUID()}`;
-}
-
 export function ProductStateBanner({ presentation, subject }: {
   presentation: ProductStatePresentation;
   subject: string;
@@ -4907,60 +4477,6 @@ export function ProductStateBanner({ presentation, subject }: {
 }
 
 
-interface AppSelectOption {
-  value: string;
-  label: string;
-}
-
-function AppSelect({ ariaLabel, value, options, onChange, placeholder = "Select an option" }: { ariaLabel: string; value: string; options: AppSelectOption[]; onChange: (value: string) => void; placeholder?: string }) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
-  const selected = options[selectedIndex];
-
-  function moveSelection(direction: -1 | 1) {
-    if (options.length === 0) return;
-    const nextIndex = (selectedIndex + direction + options.length) % options.length;
-    const next = options[nextIndex];
-    if (next) onChange(next.value);
-  }
-
-  return <div className={`app-select${open ? " open" : ""}`} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
-    <button
-      ref={triggerRef}
-      type="button"
-      className="app-select-trigger"
-      aria-label={ariaLabel}
-      aria-haspopup="listbox"
-      aria-expanded={open}
-      disabled={options.length === 0}
-      onClick={() => setOpen((current) => !current)}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") { event.preventDefault(); setOpen(false); }
-        if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true); moveSelection(1); }
-        if (event.key === "ArrowUp") { event.preventDefault(); setOpen(true); moveSelection(-1); }
-      }}
-    >
-      <span>{selected?.label ?? placeholder}</span><ChevronDown size={16} />
-    </button>
-    {open && <div className="app-select-menu" role="listbox" aria-label={ariaLabel}>
-      {options.map((option) => <button
-        key={option.value}
-        type="button"
-        role="option"
-        aria-selected={option.value === value}
-        className={option.value === value ? "selected" : ""}
-        tabIndex={-1}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => { onChange(option.value); setOpen(false); triggerRef.current?.focus(); }}
-      ><span>{option.label}</span>{option.value === value && <Check size={15} />}</button>)}
-    </div>}
-  </div>;
-}
-
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <button type="button" className="toggle-row" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}><span>{label}</span><i aria-hidden="true" /></button>;
-}
 function errorText(error: unknown) { return error instanceof Error ? error.name === "TimeoutError" ? "Request timed out. Check the current status before trying again." : error.message : String(error); }
 function networkNameForHubModel(source: string): string {
   return (source.split("/").at(-1) ?? source)
@@ -5002,28 +4518,6 @@ function friendlyModelMutationError(error: unknown): string {
   return message.replace(/^Error invoking remote method ['"]?models:[^:]+['"]?:\s*Error:\s*/i, "");
 }
 
-function PageTitle({ eyebrow, title, copy, actions }: { eyebrow?: string; title: string; copy?: string; actions?: React.ReactNode }) {
-  void eyebrow;
-  void copy;
-  return <div className="panel-page-title"><div><h1>{title}</h1></div>{actions && <div className="page-actions">{actions}</div>}</div>;
-}
-
-function PanelDisclosure({ icon: Icon, eyebrow, title, summary, children, defaultOpen = false }: { icon: typeof Activity; eyebrow: string; title: string; summary: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  return <details className="panel-disclosure" open={defaultOpen}>
-    <summary>
-      <i className="panel-disclosure-icon"><Icon size={18} /></i>
-      <span><small>{eyebrow}</small><strong>{title}</strong><em>{summary}</em></span>
-      <ChevronDown className="panel-disclosure-chevron" size={18} aria-hidden="true" />
-    </summary>
-    <div className="panel-disclosure-body">{children}</div>
-  </details>;
-}
-
-function Stat({ icon: Icon, label, value, detail, tone = "blue" }: { icon: typeof Radio; label: string; value: string; detail: string; tone?: "blue" | "purple" }) { return <article className={`panel-stat ${tone}`}><div><Icon /></div><span>{label}</span><strong>{value}</strong><small>{detail}</small><i className="stat-accent" /></article>; }
-function CapacityMetric({ icon: Icon, label, value, detail }: { icon: typeof Cpu; label: string; value: string; detail: string }) { return <div className="global-capacity-metric"><i><Icon /></i><span><small>{label}</small><strong>{value}</strong><em>{detail}</em></span></div>; }
-function Metric({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div>; }
-function Empty({ icon: Icon, title, copy }: { icon: typeof Activity; title: string; copy: string }) { return <div className="panel-empty"><Icon /><strong>{title}</strong><p>{copy}</p></div>; }
-function PanelLoading() { return <div className="panel-loading" role="status" aria-live="polite" aria-atomic="true"><LoaderCircle className="spin" /><strong>Connecting to mycellios</strong><span>Loading the configured network snapshot…</span></div>; }
 function WorkerKindIcon({ worker }: { worker: PublicWorker }) {
   if (worker.kind === "browser") return <Smartphone />;
   if (worker.kind === "cell") return <Boxes />;
@@ -5212,13 +4706,13 @@ function ExecutionBadge({ execution, workers = [], large = false, interactive = 
 
   if (!diagnosticsAvailable) return <span className={className} title={title}>{contents}</span>;
   return <>
-    <button type="button" className={className} title={title} aria-haspopup="dialog" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen(true)}>{contents}</button>
+    <UiButton type="button" className={className} title={title} aria-haspopup="dialog" aria-expanded={diagnosticsOpen} onClick={() => setDiagnosticsOpen(true)}>{contents}</UiButton>
     {diagnosticsOpen && createPortal(
       <div className="execution-diagnostic-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDiagnosticsOpen(false); }}>
-        <section ref={diagnosticsRef} className="execution-diagnostic-dialog" role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} tabIndex={-1}>
+        <UiDialogPanel ref={diagnosticsRef} className="execution-diagnostic-dialog" role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} tabIndex={-1}>
           <header className="execution-diagnostic-head">
-            <div><span>REAL TELEMETRY</span><h2 id={dialogTitleId}>Execution diagnostics</h2><p>Device and backend confirmed for each process after loading the model.</p></div>
-            <button type="button" aria-label="Close diagnostics" onClick={() => setDiagnosticsOpen(false)}><X /></button>
+            <div><span>REAL TELEMETRY</span><UiHeading as="h2" id={dialogTitleId}>Execution diagnostics</UiHeading><UiText>Device and backend confirmed for each process after loading the model.</UiText></div>
+            <UiButton type="button" aria-label="Close diagnostics" onClick={() => setDiagnosticsOpen(false)}><X /></UiButton>
           </header>
           <div className="execution-diagnostic-summary">
             <div><small>ESTADO</small><strong>{executionShortLabel(execution)}</strong></div>
@@ -5233,7 +4727,7 @@ function ExecutionBadge({ execution, workers = [], large = false, interactive = 
             {execution.stages.length > 0 ? execution.stages.map((stage) => {
               const host = executionWorkerForNode(workers, stage.nodeId);
               const stageSummary = summarizeExecutionStages([stage]);
-              return <article className={`execution-diagnostic-stage${stage.fallback ? " fallback" : ""}`} key={`${stage.nodeId}-${stage.stageIndex}`}>
+              return <UiCard className={`execution-diagnostic-stage${stage.fallback ? " fallback" : ""}`} key={`${stage.nodeId}-${stage.stageIndex}`}>
                 <div className="execution-diagnostic-stage-head"><span><b>{String(stage.stageIndex + 1).padStart(2, "0")}</b><span><small>ETAPA {stage.stageIndex + 1}</small><strong>Capas {stage.layerStart}–{stage.layerEnd}</strong></span></span><ExecutionBadge execution={stageSummary} interactive={false} /></div>
                 <div className="execution-diagnostic-stage-grid">
                   <div><small>PHYSICAL DEVICE</small><strong>{host ? workerLabel(host) : "Device not identified"}</strong></div>
@@ -5242,12 +4736,12 @@ function ExecutionBadge({ execution, workers = [], large = false, interactive = 
                   <div><small>NODO</small><code title={stage.nodeId}>{shortId(stage.nodeId)}</code></div>
                   {host?.computeMode && <div><small>MODO</small><strong>{computeModeLabel(host.computeMode)}</strong></div>}
                 </div>
-                {stage.fallbackReason && <p><CircleAlert />{stage.fallbackReason}</p>}
-              </article>;
-            }) : <article className="execution-diagnostic-runtime"><strong>{executionDeviceNames(execution)}</strong><span>{executionDetail(execution)}</span></article>}
+                {stage.fallbackReason && <UiText><CircleAlert />{stage.fallbackReason}</UiText>}
+              </UiCard>;
+            }) : <UiCard className="execution-diagnostic-runtime"><strong>{executionDeviceNames(execution)}</strong><span>{executionDetail(execution)}</span></UiCard>}
           </div>
           <footer className="execution-diagnostic-foot"><HardDrive /><span><strong>Complete log on the affected machine</strong><small>Windows: <code>%APPDATA%\mycellios\mycellios.log</code>. On macOS and Linux it is stored as <code>mycellios.log</code> inside the application data folder.</small></span></footer>
-        </section>
+        </UiDialogPanel>
       </div>,
       document.body,
     )}
@@ -5323,45 +4817,10 @@ function buildIdentityTitle(
     : "This runtime has not published a sealed source identity.";
 }
 
-function formatDuration(milliseconds: number): string {
-  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return "—";
-  return milliseconds < 1_000 ? `${Math.round(milliseconds)} ms` : `${(milliseconds / 1_000).toFixed(milliseconds < 10_000 ? 2 : 1)} s`;
-}
-
-function formatResponseThroughput(response: ChatResponse): string {
-  if (response.activeMs <= 0 || response.outputTokens <= 0) return "—";
-  return (response.outputTokens / (response.activeMs / 1_000)).toFixed(2);
-}
-
 export function formatRecoveryMode(mode: "none" | "prompt-replay" | "deterministic-prefix-replay"): string {
   if (mode === "deterministic-prefix-replay") return "Exact prefix replay";
   if (mode === "prompt-replay") return "Prompt replay";
   return "No recovery";
-}
-
-function formatLiveThroughput(update: ChatStreamUpdate): string {
-  if (update.elapsedMs <= 0 || update.outputTokens <= 0) return "—";
-  return (update.outputTokens / (update.elapsedMs / 1_000)).toFixed(2);
-}
-
-function splitStreamingContent(text: string): { reasoning: string | null; answer: string } {
-  const opening = /^\s*<think>/i.exec(text);
-  if (!opening) return { reasoning: null, answer: text };
-  const content = text.slice(opening[0].length);
-  const closingIndex = content.toLowerCase().indexOf("</think>");
-  if (closingIndex < 0) return { reasoning: content, answer: "" };
-  return {
-    reasoning: content.slice(0, closingIndex),
-    answer: content.slice(closingIndex + "</think>".length).replace(/^\s+/, ""),
-  };
-}
-
-function splitThinkingContent(text: string): { reasoning: string | null; answer: string } {
-  const match = /^\s*<think>([\s\S]*?)<\/think>\s*/i.exec(text);
-  if (!match) return { reasoning: null, answer: text.trim() };
-  const reasoning = match[1]?.trim() || null;
-  const answer = text.slice(match[0].length).trim();
-  return { reasoning, answer: answer || "The model returned no final content." };
 }
 
 async function fetchBenchmarkRuns(): Promise<BenchmarkRun[]> {

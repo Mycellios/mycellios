@@ -1,3 +1,6 @@
+import { PanelDisclosure } from "./ui/patterns";
+import { Badge as UiBadge } from "./ui/primitives";
+import { Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Heading as UiHeading, Input as UiInput, Link as UiLink, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
 import {
   Activity,
   AlertTriangle,
@@ -43,7 +46,7 @@ interface ContributeProps {
   onSessionElevated(session: AuthSession): void;
   onSignIn(): void;
   onOpenAccount(): void;
-  onNavigate(view: "overview" | "nodes" | "inference"): void;
+  onNavigate(view: "overview" | "nodes"): void;
   network: {
     connectedNodes: number;
     completedJobs: number;
@@ -133,11 +136,11 @@ export function Contribute(props: ContributeProps) {
 
   return (
     <section
-      className={`contribute-page ${worker.running ? "is-running" : ""}`}
+      className={`contribute-page minimal-screen ${worker.running ? "is-running" : ""}`}
     >
       <div className="panel-page-title">
         <div>
-          <h1>Your devices</h1>
+          <UiHeading as="h1">Your devices</UiHeading>
         </div>
       </div>
       {errorPresentation && (
@@ -147,7 +150,7 @@ export function Contribute(props: ContributeProps) {
             <strong>{errorPresentation.title}</strong>
             <small>{errorPresentation.detail}</small>
           </span>
-          <button
+          <UiButton
             type="button"
             onClick={() => {
               setError(null);
@@ -156,7 +159,7 @@ export function Contribute(props: ContributeProps) {
             }}
           >
             {errorPresentation.action}
-          </button>
+          </UiButton>
         </div>
       )}
       {notice && (
@@ -186,38 +189,33 @@ function BrowserContribution({
 }) {
   const connected = worker.running && worker.connection === "online";
   return (
-    <article className="contribute-browser-card">
+    <UiCard className="contribute-browser-card">
       <header>
         <div className="contribute-browser-icon"><MonitorSmartphone /></div>
         <div>
-          <h2>This browser</h2>
-          <p>{worker.statusText}</p>
+          <UiHeading as="h2">This browser</UiHeading>
+          <UiText>{worker.statusText}</UiText>
         </div>
-        <span className={`state-badge ${connected ? "online" : "paused"}`}>
-          {connected ? "Connected" : "Paused"}
-        </span>
-      </header>
-
-      <div className="contribute-browser-action">
-        <div className="contribute-browser-facts" aria-label="Browser worker details">
-          <span><Cpu /><small>Engine</small><strong>{worker.backend === "webgpu" ? "WebGPU" : "CPU"}</strong></span>
-          <span><Activity /><small>Work</small><strong>{worker.verifiedTasks > 0 ? `${worker.verifiedTasks} verified` : "No tasks yet"}</strong></span>
-        </div>
-        <button
+        <UiBadge className={`state-badge ${connected ? "online" : "paused"}`}>
+          {connected ? "Connected" : worker.starting || worker.running ? "Connecting" : "Paused"}
+        </UiBadge>
+        <UiButton
           ref={startButtonRef}
+          variant={worker.running ? "secondary" : "primary"}
           disabled={worker.starting}
           onClick={() => void toggleMobileWorker()}
         >
           {worker.starting ? <Radio className="spin" /> : <Power />}
           {worker.running ? "Pause contribution" : "Start contributing"}
-        </button>
-      </div>
+        </UiButton>
+      </header>
+
 
       <div className="contribute-power-row">
         <span>Power</span>
         <div className="contribute-levels" role="group" aria-label="Browser power level">
           {(["low", "balanced", "maximum"] as MobileWorkerLevel[]).map((level, index) => (
-            <button
+            <UiButton
               key={level}
               className={worker.level === level ? "active" : ""}
               disabled={worker.running || worker.starting}
@@ -228,11 +226,17 @@ function BrowserContribution({
                 {Array.from({ length: index + 1 }, (_, ray) => <Zap key={ray} />)}
               </span>
               <span>{level}</span>
-            </button>
+            </UiButton>
           ))}
         </div>
       </div>
-    </article>
+      <PanelDisclosure icon={Cpu} title="Device details">
+        <div className="contribute-browser-facts" aria-label="Browser worker details">
+          <span><Cpu /><small>Engine</small><strong>{worker.backend === "webgpu" ? "WebGPU" : "CPU"}</strong></span>
+          <span><Activity /><small>Work</small><strong>{worker.verifiedTasks > 0 ? `${worker.verifiedTasks} verified` : "No tasks yet"}</strong></span>
+        </div>
+      </PanelDisclosure>
+    </UiCard>
   );
 }
 
@@ -305,65 +309,62 @@ function NativeNodeSetup(
     }
   };
   return (
-    <details className="contribute-native-disclosure">
-      <summary>
+    <UiDisclosure className="contribute-native-disclosure">
+      <UiDisclosureSummary>
         <span className="contribute-native-summary-icon"><Server /></span>
-        <span><strong>Use a dedicated computer</strong><small>Check native package availability for persistent contribution.</small></span>
+        <span><strong>Desktop devices</strong></span>
         <b className={props.nodes.length > 0 ? "" : "empty"} aria-label={`${props.nodes.length} paired nodes`}>{props.nodes.length || ""}</b>
         <ChevronDown />
-      </summary>
+      </UiDisclosureSummary>
       <div className="contribute-detail-grid">
-      <article className="contribute-settings-card">
+      <UiCard className="contribute-settings-card">
         <div className="contribute-card-head">
           <div>
-            <span className="card-kicker">NATIVE NODE</span>
-            <h2>Persistent contribution</h2>
+            <UiHeading as="h2">Setup</UiHeading>
           </div>
           <Server />
         </div>
-        <p>
-          When a native package is available, install the signed service and
-          use a one-time pairing bundle. The browser never scans localhost.
-        </p>
+        <UiText>
+          Install the service, then use a one-time pairing bundle.
+        </UiText>
         <div className="page-actions">
-          <a href="/downloads">
+          <UiLink href="/downloads" variant="primary">
             <Download />
-            Check {installer.label} package
-          </a>
+            Download for {installer.label}
+          </UiLink>
           {props.accessToken ? <>
-            <button type="button" disabled={busy !== null} onClick={() => void createBundle()}>
+            <UiButton type="button" disabled={busy !== null} onClick={() => void createBundle()}>
               <ShieldCheck />
               {busy === "pair" ? "Creating…" : "Create pairing bundle"}
-            </button>
-            <button type="button" disabled={busy !== null} onClick={() => void acceptTransfer()}>
+            </UiButton>
+            <UiButton type="button" disabled={busy !== null} onClick={() => void acceptTransfer()}>
               <ShieldCheck />
               Accept ownership transfer
-            </button>
+            </UiButton>
           </> : (
-            <button type="button" onClick={props.onSignIn}><ShieldCheck />Sign in to pair a node</button>
+            <UiButton type="button" onClick={props.onSignIn}><ShieldCheck />Sign in to pair a node</UiButton>
           )}
         </div>
-      </article>
-      <article className="contribute-activity-card">
+      </UiCard>
+      <UiCard className="contribute-activity-card">
         <div className="contribute-card-head">
           <div>
-            <span className="card-kicker">OWNED NODES</span>
-            <h2>Durable control</h2>
+            <UiHeading as="h2">Paired devices</UiHeading>
           </div>
-          <button
+          <UiButton
             aria-label="Refresh nodes"
             disabled={props.loading}
             onClick={() => void props.onRefresh()}
           >
             <RefreshCw className={props.loading ? "spin" : ""} />
-          </button>
+          </UiButton>
         </div>
         {props.nodes.length === 0 ? (
-          <p>
+          <UiText>
             {props.accessToken
               ? "No native node is paired with this account yet."
               : "Sign in to see your native nodes."}
-          </p>
+          </UiText>
         ) : (
           props.nodes.map((node) => (
             <OwnedNodeCard
@@ -375,9 +376,9 @@ function NativeNodeSetup(
             />
           ))
         )}
-      </article>
+      </UiCard>
       </div>
-    </details>
+    </UiDisclosure>
   );
 }
 
@@ -563,38 +564,38 @@ function OwnedNodeCard({
             {node.connected ? "connected" : "offline"}
           </small>
         </div>
-        <span className={`state-badge ${presentation.tone}`}>
+        <UiBadge className={`state-badge ${presentation.tone}`}>
           {presentation.label}
-        </span>
+        </UiBadge>
       </header>
-      <p>{presentation.summary}</p>
+      <UiText>{presentation.summary}</UiText>
       <NodeDiagnostics node={node} />
       <div className="page-actions">
-        <button
+        <UiButton
           disabled={disabled}
           onClick={() => void run("pause", { version: 1 })}
         >
           Pause
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           disabled={disabled}
           onClick={() => void run("resume", { version: 1 })}
         >
           Resume
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           disabled={disabled}
           onClick={() => void run("drain", { version: 1, deadlineMs: 300_000 })}
         >
           Drain
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           disabled={disabled}
           onClick={() => void run("update", { version: 1, channel: "stable" })}
         >
           Update
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           disabled={disabled}
           onClick={() =>
             void run("rollback", {
@@ -604,24 +605,24 @@ function OwnedNodeCard({
           }
         >
           Rollback
-        </button>
-        <button disabled={disabled} onClick={() => void revoke()}>
+        </UiButton>
+        <UiButton disabled={disabled} onClick={() => void revoke()}>
           Revoke
-        </button>
-        <button disabled={disabled} onClick={() => void transferOwnership()}>
+        </UiButton>
+        <UiButton disabled={disabled} onClick={() => void transferOwnership()}>
           Transfer ownership
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           disabled={
             disabled || node.observed?.runtime.uninstallAvailable !== true
           }
           onClick={() => void uninstall()}
         >
           Uninstall all
-        </button>
+        </UiButton>
       </div>
-      <details>
-        <summary>
+      <UiDisclosure>
+        <UiDisclosureSummary>
           <span>
             Resource limits
             <small>
@@ -629,7 +630,7 @@ function OwnedNodeCard({
             </small>
           </span>
           <ChevronDown />
-        </summary>
+        </UiDisclosureSummary>
         <div className="node-limit-grid">
           {(
             [
@@ -641,9 +642,9 @@ function OwnedNodeCard({
               ["maxTemperatureC", "Temperature °C"],
             ] as const
           ).map(([key, label]) => (
-            <label key={key}>
+            <UiFieldLabel key={key}>
               <span>{label}</span>
-              <input
+              <UiInput
                 type="number"
                 min={key === "maxVramMiB" ? 0 : 1}
                 value={limits[key]}
@@ -654,18 +655,18 @@ function OwnedNodeCard({
                   }))
                 }
               />
-            </label>
+            </UiFieldLabel>
           ))}
         </div>
-        <button
+        <UiButton
           disabled={disabled}
           onClick={() => void run("set-limits", { version: 1, ...limits })}
         >
           Apply limits and restart safely
-        </button>
-      </details>
-      <details>
-        <summary>
+        </UiButton>
+      </UiDisclosure>
+      <UiDisclosure>
+        <UiDisclosureSummary>
           <span>
             Schedule and allowed models
             <small>
@@ -674,19 +675,19 @@ function OwnedNodeCard({
             </small>
           </span>
           <ChevronDown />
-        </summary>
-        <p>
+        </UiDisclosureSummary>
+        <UiText>
           Times are UTC. An empty model list permits any coordinator-certified
           model.
-        </p>
+        </UiText>
         <div
           className="node-schedule-days"
           role="group"
           aria-label="Contribution days UTC"
         >
           {DAY_LABELS.map((label, day) => (
-            <label key={label}>
-              <input
+            <UiFieldLabel key={label}>
+              <UiInput
                 type="checkbox"
                 checked={policyWindow.days.includes(day)}
                 onChange={(event) =>
@@ -704,13 +705,13 @@ function OwnedNodeCard({
                 }
               />
               {label}
-            </label>
+            </UiFieldLabel>
           ))}
         </div>
         <div className="node-limit-grid">
-          <label>
+          <UiFieldLabel>
             <span>Start UTC</span>
-            <input
+            <UiInput
               type="time"
               value={minuteToTime(policyWindow.startMinuteUtc)}
               onChange={(event) =>
@@ -725,10 +726,10 @@ function OwnedNodeCard({
                 }))
               }
             />
-          </label>
-          <label>
+          </UiFieldLabel>
+          <UiFieldLabel>
             <span>End UTC</span>
-            <input
+            <UiInput
               type="time"
               value={minuteToTime(
                 policyWindow.endMinuteUtc === 1_440
@@ -747,18 +748,18 @@ function OwnedNodeCard({
                 }))
               }
             />
-          </label>
+          </UiFieldLabel>
         </div>
-        <label>
+        <UiFieldLabel>
           <span>Exact model IDs, one per line</span>
-          <textarea
+          <UiTextarea
             rows={4}
             value={models}
             onChange={(event) => setModels(event.target.value)}
             placeholder="org/model-id"
           />
-        </label>
-        <button
+        </UiFieldLabel>
+        <UiButton
           disabled={disabled}
           onClick={() =>
             void run("set-policy", {
@@ -778,8 +779,8 @@ function OwnedNodeCard({
           }
         >
           Apply policy and restart safely
-        </button>
-      </details>
+        </UiButton>
+      </UiDisclosure>
       {node.commands[0] && (
         <small>
           Latest: {node.commands[0].type} · {node.commands[0].state}
@@ -805,11 +806,11 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
   const accelerator = diagnostics?.capacity.primaryAccelerator;
   const resources = diagnostics?.resources;
   return (
-    <details
+    <UiDisclosure
       className="node-diagnostics"
       open={observed.state === "degraded" || observed.state === "failed"}
     >
-      <summary>
+      <UiDisclosureSummary>
         <span>
           <Activity />
           <span>
@@ -822,7 +823,7 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
           </span>
         </span>
         <ChevronDown />
-      </summary>
+      </UiDisclosureSummary>
       <div className="node-diagnostics-grid">
         <span>
           <small>Build</small>
@@ -868,7 +869,7 @@ function NodeDiagnostics({ node }: { node: OwnedNode }) {
           </span>
         </div>
       )}
-    </details>
+    </UiDisclosure>
   );
 }
 

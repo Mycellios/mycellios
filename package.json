@@ -21,7 +21,7 @@
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean --silent && npm run verify:structure && tsc -p tsconfig.build.json && npm run mobile:build && npm run landing:build && node scripts/write-coordinator-output-receipt.mjs",
-    "check": "npm run verify:structure && npm run verify:docs && npm run verify:format && npm run verify:architecture && npm run verify:component-boundaries && npm run typecheck && npm run landing:typecheck && npm run mobile:typecheck && npm test",
+    "check": "npm run verify:structure && npm run verify:ui-kit && npm run verify:docs && npm run verify:format && npm run verify:architecture && npm run verify:component-boundaries && npm run typecheck && npm run landing:typecheck && npm run mobile:typecheck && npm test",
     "doctor": "node scripts/developer-doctor.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "npm run landing:dev",
@@ -123,7 +123,11 @@
     "mobile:dev": "vite --config vite.mobile.config.ts",
     "mobile:typecheck": "tsc -p tsconfig.mobile.json --noEmit",
     "mobile:build": "vite build --config vite.mobile.config.ts && npm run verify:bundle:mobile",
-    "mobile:serve": "npm run mobile:build && tsx src/coordinator/main.ts"
+    "mobile:serve": "npm run mobile:build && tsx src/coordinator/main.ts",
+    "storybook": "storybook dev -p 6006 --host 127.0.0.1 --no-open --disable-telemetry -c landing/.storybook",
+    "storybook:build": "storybook build --disable-telemetry -c landing/.storybook -o storybook-static",
+    "verify:ui-kit": "node scripts/verify-ui-kit.mjs",
+    "ui:check": "npm run verify:ui-kit && npm run landing:typecheck && npm run storybook:build"
   },
   "dependencies": {
     "@fastify/rate-limit": "11.2.0",
@@ -149,6 +153,8 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@storybook/addon-docs": "10.6.3",
+    "@storybook/react-vite": "10.6.3",
     "@types/node": "24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -158,6 +164,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "@webgpu/types": "^0.1.71",
     "pe-library": "1.0.1",
+    "storybook": "10.6.3",
     "tsx": "4.23.1",
     "typescript": "7.0.2",
     "vite": "^8.1.5",

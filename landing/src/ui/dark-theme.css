@@ -1,0 +1,152 @@
+/* Shared Graphite palette. Keep dark surfaces neutral; amber is an action accent. */
+:root {
+  --dark-canvas: #111112;
+  --dark-surface: #19191c;
+  --dark-raised: #222225;
+  --dark-hover: #29292d;
+  --dark-input: #151517;
+  --dark-line: #2d2d32;
+  --dark-line-strong: #48484f;
+  --dark-text: #eeede9;
+  --dark-muted: #aaa9ae;
+  --dark-subtle: #99989f;
+  --dark-accent: #e2b681;
+  --dark-accent-hover: #edc797;
+  --dark-on-accent: #231a0f;
+}
+
+:is(.theme-dark, .mycelium-dark, .net, .studio-page, .earn-page, .spore-page) {
+  --ui-accent: var(--dark-accent);
+  --ui-accent-hover: var(--dark-accent-hover);
+  --ui-on-accent: var(--dark-on-accent);
+  --ui-foreground: var(--dark-text);
+  --ui-muted: var(--dark-muted);
+  --ui-surface: var(--dark-raised);
+  --ui-line: var(--dark-line);
+  --ui-focus: var(--dark-accent);
+}
+
+.public-panel.theme-dark {
+  --bg-canvas: var(--dark-canvas);
+  --bg-sidebar: var(--dark-canvas);
+  --bg-elevated: var(--dark-raised);
+  --bg-card: var(--dark-surface);
+  --bg-card-hover: var(--dark-hover);
+  --bg-input: var(--dark-input);
+  --bg-overlay: #0009;
+  --text-primary: var(--dark-text);
+  --text-secondary: var(--dark-muted);
+  --text-tertiary: var(--dark-subtle);
+  --text-disabled: var(--dark-subtle);
+  --border-subtle: var(--dark-line);
+  --border-strong: var(--dark-line-strong);
+  --blue-300: var(--dark-accent);
+  --blue-400: var(--dark-accent);
+  --blue-500: var(--dark-accent);
+  --blue-600: var(--dark-accent-hover);
+  --blue-glow: #e2b68112;
+  --purple-300: #efd2ae;
+  --purple-400: var(--dark-accent);
+  --purple-500: var(--dark-accent);
+  --purple-glow: #e2b68112;
+  --success: #98c9ac;
+  --warning: #e2b681;
+  --danger: #f49b9f;
+  --shadow-card: none;
+  --shadow-hover: 0 8px 24px #0002;
+  --rb-ink: var(--dark-text);
+  --rb-ivory: var(--dark-text);
+  --rb-sage: var(--dark-muted);
+  --rb-paper: var(--dark-canvas);
+  --rb-forest: var(--dark-canvas);
+  --rb-bronze: var(--dark-accent);
+  --rb-line: var(--dark-line);
+  color-scheme: dark;
+}
+
+body:has(.public-panel.theme-dark),
+.public-panel-viewport:has(.public-panel.theme-dark) { background: var(--dark-canvas); }
+.public-panel.theme-dark :is(.panel-sidebar, .panel-main, .panel-content-scale, .panel-topbar) { background: var(--dark-canvas); }
+.public-panel.theme-dark .panel-sidebar { border-right-color: var(--dark-line); }
+.public-panel.theme-dark .panel-sidebar nav button.active { background: var(--dark-hover); color: var(--dark-text); }
+.public-panel.theme-dark :is(.panel-sidebar nav button:hover, .connect-route-picker > button.selected, .panel-theme-indicator, .account-modal-close) { background: var(--dark-raised); color: var(--dark-text); }
+.public-panel.theme-dark .panel-brand img,
+.public-panel.theme-dark .account-modal-brand img { filter: url('/assets/brand/logo-filter.svg#remove-white') grayscale(1) brightness(0) invert(.9) !important; }
+
+/* Retire legacy forest gradients on cards without changing content or geometry. */
+.public-panel.theme-dark :is(.ui-card, .panel-card, .global-capacity-card, .network-canvas, .connected-peers-card, .network-model-catalog, .dashboard-connect, .network-history-summary-card, .network-history-chart-card, .hardware-hero, .inference-unavailable, .inference-chat, .contribute-browser-card, .contribute-native-disclosure, .api-access-panel, .benchmark-history) {
+  background: var(--dark-surface);
+  border-color: var(--dark-line);
+  box-shadow: var(--shadow-card);
+}
+.public-panel.theme-dark :is(.overview-announcement, .live-network-telemetry, .execution-overview, .inference-console, .network-history-meta, .inference-model-menu, .inference-settings, .model-request-card) { background: var(--dark-surface); border-color: var(--dark-line); box-shadow: none; }
+.public-panel.theme-dark :is(.inference-toolbar, .inference-route-strip, .inference-input, .inference-toolbar-stat, .inference-model-picker > button) { background: var(--dark-raised); border-color: var(--dark-line); }
+.public-panel.theme-dark :is(.inference-output, .inference-input textarea) { background: var(--dark-input); color: var(--dark-text); }
+.public-panel.theme-dark :is(.global-capacity-device-row, .capacity-metric-card, .network-history-ranges, .network-history-chart-footer, .connect-route-picker, .interactive-mesh-stage, .mesh-scene, .mesh-stats, .inference-chat-header, .chat-input-area, .card-heading, .panel-table-head, .network-model-table thead) { background: var(--dark-surface); }
+.public-panel.theme-dark :is(.interactive-mesh-stage, .mesh-scene) { background-image: none; }
+.public-panel.theme-dark :is(.app-select-menu, .panel-join-popover, .ui-dialog, .panel-detail-drawer) { background: var(--dark-raised); border-color: var(--dark-line-strong); color: var(--dark-text); box-shadow: 0 20px 60px #0005; }
+.public-panel.theme-dark .account-modal::before { background: none; }
+.public-panel.theme-dark .modal-backdrop { background: var(--bg-overlay); }
+.public-panel.theme-dark :is(.account-modal form input, .ui-textarea, .ui-select, .app-select-trigger) { background: var(--dark-input); border-color: var(--dark-line-strong); color: var(--dark-text); }
+.public-panel.theme-dark .account-modal form input:focus { border-color: #72727b; }
+.public-panel.theme-dark :is(.account-modal form label, .account-provider-divider, .account-mode-tabs button, .account-modal-close, .account-password-field > button) { color: var(--dark-muted); }
+.public-panel.theme-dark .account-mode-tabs button.active { color: var(--dark-text); }
+.public-panel.theme-dark .account-mode-tabs button.active::after { background: var(--dark-text); }
+.public-panel.theme-dark .account-mode-tabs { border-color: var(--dark-line-strong); }
+.public-panel.theme-dark :is(.ui-button[data-variant='primary'], a.connect-primary-action, a.download-card-action, .primary-button, .account-submit, .contribute-start-button) { color: var(--dark-on-accent) !important; background-color: var(--dark-accent); }
+:is(.theme-dark, .mycelium-dark, .net, .studio-page, .earn-page, .spore-page) .ui-badge[data-tone='success'] { color: #98c9ac; background: var(--dark-raised); }
+:is(.theme-dark, .mycelium-dark, .net, .studio-page, .earn-page, .spore-page) :is(.ui-badge, .ui-alert)[data-tone='warning'] { color: #edc797; background: #352b20; }
+:is(.theme-dark, .mycelium-dark, .net, .studio-page, .earn-page, .spore-page) :is(.ui-badge, .ui-alert)[data-tone='danger'] { color: #f49b9f; background: #382327; }
+:is(.theme-dark, .mycelium-dark, .net, .studio-page, .earn-page, .spore-page) .ui-field [role='alert'] { color: #f49b9f; }
+.public-panel.theme-dark .mesh-zoom-controls output { color: var(--dark-subtle); }
+.public-panel.theme-dark .node-overview-icon { background: var(--dark-raised); }
+.public-panel.theme-dark .node-overview-stat::after { background: var(--dark-text); }
+.public-panel.theme-dark .nodes-page > .panel-disclosure > summary small { color: var(--dark-accent); }
+.public-panel.theme-dark .nodes-page > .panel-disclosure > summary em { color: var(--dark-muted); }
+.public-panel.theme-dark .app-select-menu button.selected { color: var(--dark-on-accent); background: var(--dark-accent); }
+.public-panel.theme-dark .app-select-menu button.selected svg { color: inherit; }
+:is(.theme-dark, .mycelium-dark, .net, .studio-page, .earn-page, .spore-page) .ui-button:is(:disabled, [aria-disabled='true']) { opacity: 1; color: var(--dark-muted) !important; background-color: var(--dark-raised) !important; }
+
+/* The public observatory uses the same surfaces, including the live canvas. */
+.net[class*='net-view-'] {
+  --net-bg: var(--dark-canvas);
+  --net-pop: var(--dark-raised);
+  --net-text: var(--dark-text);
+  --net-dim: var(--dark-muted);
+  --net-faint: var(--dark-subtle);
+  --net-line: var(--dark-line);
+  --net-green: #98c9ac;
+  --net-amber: var(--dark-accent);
+  --rb-ink: var(--dark-text);
+  --rb-ivory: var(--dark-text);
+  --rb-sage: var(--dark-muted);
+  --rb-forest: var(--dark-canvas);
+  --rb-bronze: var(--dark-accent);
+  --rb-line: var(--dark-line);
+  color-scheme: dark;
+}
+.net[class*='net-view-'] :is(.net-stage, .net-data) { background: var(--dark-canvas); }
+.net[class*='net-view-'] .net-stage::before,
+.net[class*='net-view-'] .net-stage::after { display: none; }
+.net[class*='net-view-'] :is(.net-globe-card, .net-dashboard-chart, .net-signal-group, .net-wall-panel, .net-wall-stat, .net-node-panel, .net-dashboard .net-hero-metrics span) { background: var(--dark-surface); border-color: var(--dark-line); box-shadow: none; }
+.net[class*='net-view-'] .net-dashboard-chart::before { display: none; }
+.net[class*='net-view-'] .net-globe-card::after { background: transparent; }
+.net[class*='net-view-'] :is(.net-view-switcher, .net-topbar, .net-globe-card > button) { background: var(--dark-canvas); }
+.net[class*='net-view-'] .net-workspace { border: 0; border-radius: 9px; background: var(--dark-raised); }
+.net[class*='net-view-'] .net-hero-actions .primary { background: var(--dark-accent); color: var(--dark-on-accent); }
+.net[class*='net-view-'] :is(.net-wall-stat.muted strong, .net-wall-feed-empty span, .net-wall-empty span) { color: var(--dark-subtle); }
+.net[class*='net-view-'] .net-topbar img { filter: url('/assets/brand/logo-filter.svg#remove-white') grayscale(1) brightness(0) invert(.9) !important; }
+:is(.net, .studio-page, .earn-page, .spore-page) .rb-brand img { filter: url('/assets/brand/logo-filter.svg#remove-white') grayscale(1) brightness(0) invert(.9) !important; }
+:is(.net, .studio-page, .earn-page, .spore-page) .spore-menu-popover { background: var(--dark-raised); border-color: var(--dark-line-strong); color: var(--dark-text); }
+
+/* Standalone contribution studios are dark surfaces, not the light landing. */
+:root .earn-page { background: var(--dark-canvas); color: var(--dark-text); }
+.earn-page .earn-option, .earn-page .earn-notice { background: var(--dark-surface); border-color: var(--dark-line); }
+.earn-page .earn-option:hover, .earn-page .earn-option-icon { background: var(--dark-raised); }
+.earn-page :is(.earn-intro p, .earn-option p, .earn-option small, .earn-notice) { color: var(--dark-muted); }
+:root .studio-page { --studio-bg: var(--dark-canvas); --studio-panel: var(--dark-surface); --studio-raised: var(--dark-raised); --studio-line: var(--dark-line); --studio-line-strong: var(--dark-line-strong); --studio-text: var(--dark-text); --studio-muted: var(--dark-muted); --studio-dim: var(--dark-subtle); --studio-accent: var(--dark-accent); }
+.studio-page :is(.studio-rail, .studio-topbar) { background: var(--dark-canvas); }
+.studio-page :is(.studio-rail-note, .studio-templates button) { background: var(--dark-surface); }
+:is(.studio-page, .earn-page, .spore-page) :is(input, textarea)::placeholder { color: var(--dark-subtle); opacity: 1; }
+:root .spore-page { --sp-bg: var(--dark-canvas); --sp-panel: var(--dark-surface); --sp-line: var(--dark-line); --sp-cream: var(--dark-text); --sp-muted: var(--dark-muted); --sp-bronze: var(--dark-accent); --sp-green: #98c9ac; background: var(--dark-canvas); }
+.spore-page .spore-header { background: var(--dark-canvas); }

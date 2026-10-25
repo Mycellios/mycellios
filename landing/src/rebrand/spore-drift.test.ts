@@ -931,16 +931,14 @@ describe("the layer is mounted where the empty band actually is", () => {
     expect(component).toContain('getContext("2d")');
   });
 
-  it("builds one sprite per species from the profile rather than inline gradients", async () => {
+  it("builds flat sprites from the integrated profile ink", async () => {
     const component = code(await read("./SporeDrift.tsx"));
-    /* The stops are the thing MEAN_INK_CEILING is a statement about, so they have
-       to come from the module the ceiling is asserted in. A gradient written by
-       hand here would drift away from the measured coverage silently — which is
-       exactly how the 0.62 core stop ended up compounding the layer into
-       invisibility. */
+    // Flat fills use the same integrated ink budget as the profile.
     expect(component).toContain("SPECIES_PROFILE[species]");
-    expect(component).toContain("of profile.stops");
-    expect(component).toContain("addColorStop(stop.offset");
+    expect(component).toContain("meanCoverage(profile.stops)");
+    expect(component).toContain("flareInk(flare)");
+    expect(component).not.toContain("createRadialGradient(");
+    expect(component).not.toContain("createLinearGradient(");
     /* The flare is drawn from the profile too, and its geometry is read rather
        than written here — `flareInk` has to be able to account for the ink those
        arms lay down, and it can only do that if the numbers it integrates are

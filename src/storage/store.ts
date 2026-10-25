@@ -1437,7 +1437,7 @@ export class MeshStore {
          WHERE captured_at >= ?
          ORDER BY captured_at DESC
          LIMIT ?
-       ) ORDER BY captured_at ASC`,
+       ) AS recent_samples ORDER BY captured_at ASC`,
     ).all(since, boundedLimit) as unknown as Array<{
       captured_at: number;
       registered_nodes: number;
