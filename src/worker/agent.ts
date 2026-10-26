@@ -17,7 +17,8 @@ import type {
   WorkerExecutorIsolationCapability,
   WorkerHeartbeat,
 } from "../contracts/types.js";
-import type { AdapterChunk, InferenceAdapter } from "../adapters/base.js";
+import type { AdapterChunk, AdapterMetrics, InferenceAdapter } from "../adapters/base.js";
+import { HeartbeatObservation } from "./heartbeat-observation.js";
 import { createAdapter } from "../adapters/factory.js";
 import { sha256Text } from "../core/json.js";
 import { estimateInputTokens } from "../core/request.js";
@@ -2483,22 +2484,23 @@ export class WorkerAgent {
     for (const [, controller] of jobs) controller.abort(new Error(reason));
     await Promise.allSettled(jobs.map(([jobId]) => this.adapter.cancel(jobId)));
   }
-
   private rejectServerMessage(socket: WebSocket, error: unknown): void {
     this.logger.warn(`Rejected invalid coordinator message: ${errorText(error)}`);
     if (socket.readyState === WebSocket.OPEN) {
       socket.close(1008, "invalid coordinator message");
     }
   }
-
+  private readonly heartbeatMetrics = new HeartbeatObservation<AdapterMetrics>();
+  private readonly heartbeatHardware = new HeartbeatObservation<HardwareProbe>();
   private async sendHeartbeat(): Promise<void> {
     if (!this.capabilities || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const [metrics, liveHardware] = await Promise.all([
-      this.adapter.metrics(),
+    const [observedMetrics, liveHardware] = await Promise.all([
+      this.heartbeatMetrics.read(() => this.adapter.metrics()),
       this.config.capacityScope === "host"
-        ? (this.options.hardwareProbe?.() ?? probeHardware()).catch(() => null)
+        ? this.heartbeatHardware.read(() => this.options.hardwareProbe?.() ?? probeHardware())
         : Promise.resolve(null),
     ]);
+    const metrics = observedMetrics ?? { ready: false, activeJobs: this.activeJobs.size, loadedModels: [] };
     if (liveHardware) {
       this.capabilities = {
         ...this.capabilities,
@@ -2522,7 +2524,7 @@ export class WorkerAgent {
       };
     }
     const heartbeat: WorkerHeartbeat = {
-      draining: !this.acceptsNewWork() || (this.adapter.kind === "decision" && !metrics.ready),
+      draining: !this.acceptsNewWork() || !metrics.ready,
       pausedReason: !this.contributionEnabled
         ? "Contribution paused"
         : this.updateDraining
@@ -2538,7 +2540,7 @@ export class WorkerAgent {
       })),
       deployments: this.capabilities.deployments.map((deployment) => ({
         deploymentId: deployment.deploymentId,
-        freeSlots: deployment.freeSlots,
+        freeSlots: metrics.ready ? deployment.freeSlots : 0,
       })),
       network: {
         coordinatorRttMs: this.capabilities.network.coordinatorRttMs,
@@ -2554,7 +2556,6 @@ export class WorkerAgent {
       },
     });
   }
-
   private updateFreeSlots(): void {
     if (!this.capabilities) return;
     const freeSlots = this.acceptsNewWork()

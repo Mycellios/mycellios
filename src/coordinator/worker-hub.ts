@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { WorkerMaintenance } from "./worker-maintenance.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -341,13 +342,11 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       this.runtimeLinkProbeTimer.unref();
     }
   }
-
+  private readonly maintenance = new WorkerMaintenance();
+  async setWorkerMaintenance(workerId: string, enabled: boolean): Promise<void> { await this.maintenance.set(workerId, enabled, this.store, this.isConnected(workerId)); }
+  currentWorkerSessionId(workerId: string): string | null { const state = this.connections.get(workerId); return state?.ready ? state.sessionId : null; }
   connectedWorkerIds(): ReadonlySet<string> {
-    return new Set(
-      [...this.connections.entries()]
-        .filter(([, state]) => state.ready)
-        .map(([workerId]) => workerId),
-    );
+    return new Set([...this.connections.entries()].filter(([, state]) => state.ready).map(([workerId]) => workerId));
   }
 
   isConnected(workerId: string): boolean {
@@ -701,6 +700,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
   }
 
   send(workerId: string, type: string, payload: unknown): boolean {
+    if (type === "lease.offer" && this.maintenance.blocked(workerId)) return false;
     const state = this.connections.get(workerId);
     if (!state?.ready || state.socket.readyState !== state.socket.OPEN) return false;
     return this.sendSocket(state.socket, type, payload);
@@ -1005,7 +1005,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
 
   private applyHeartbeat(state: ConnectionState, payload: WorkerHeartbeatPayload): void {
     const workerId = state.workerId!;
-    const status = payload.heartbeat.draining ? "draining" : "online";
+    const status = this.maintenance.status(workerId, payload.heartbeat.draining ? "draining" : "online");
     const current = this.store.getWorker(workerId)?.capabilities ?? null;
     this.store.updateWorkerHeartbeat(
       workerId,

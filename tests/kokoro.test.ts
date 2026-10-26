@@ -16,6 +16,38 @@ async function listen(handler: RequestListener) {
 import { speechReply, health } from "./kokoro-fixture.js";
 const request = { jobId: "speech-test", request: { model: KOKORO_MODEL, messages: [{ role: "user" as const, content: "Hola" }] } };
 describe("native Kokoro replica", () => {
+  it("shares an ongoing health check with new synthesis instead of failing transiently", async () => {
+    let calls = 0, release: (() => void) | undefined;
+    const url = await listen((req, res) => {
+      if (req.url !== "/health") { res.end(JSON.stringify(speechReply())); return; }
+      calls++;
+      if (calls === 2) release = () => res.end(JSON.stringify(health));
+      else res.end(JSON.stringify(health));
+    });
+    const adapter = new KokoroAdapter({ baseUrl: url, model: KOKORO_MODEL, modelDigest: KOKORO_WEIGHT_DIGEST });
+    await adapter.probe(); const checking = adapter.probe();
+    const deadline = Date.now() + 3000;
+    while (!release && Date.now() < deadline) await new Promise(r => setTimeout(r, 5));
+    expect(release).toBeDefined();
+    const generated = (async () => { let text = ""; for await (const c of adapter.generate(request, new AbortController().signal)) text += c.text; return text; })();
+    const observed = generated.then(value => ({ value }), error => ({ error }));
+    release!(); await checking;
+    expect(await observed).toEqual({ value: speechReply().content }); expect(calls).toBe(2);
+  });
+  it("revalidates runtime identity and lease expiry before synthesis", async () => {
+    let wrong = false, synthesized = 0;
+    const url = await listen((req, res) => {
+      if (req.url === "/health") res.end(JSON.stringify(wrong ? { ...health, artifact_identity: "sha256:" + "0".repeat(64) } : health));
+      else { synthesized++; res.end(JSON.stringify(speechReply())); }
+    });
+    const adapter = new KokoroAdapter({ baseUrl: url, model: KOKORO_MODEL, modelDigest: KOKORO_WEIGHT_DIGEST });
+    await adapter.probe(); wrong = true;
+    const collect = async (value = request) => { for await (const _ of adapter.generate(value, new AbortController().signal)) {} };
+    await expect(collect()).rejects.toThrow(); expect(synthesized).toBe(0);
+    wrong = false;
+    const expired = { ...request, lease: { id: "expired", deadline: Date.now() - 1 } };
+    await expect(collect(expired)).rejects.toThrow("lease_expired"); expect(synthesized).toBe(0);
+  });
   it("preserves audio across bounded chunks and never bills its base64 as output tokens", async () => {
     const expected = speechReply();
     const url = await listen((req, res) => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify(req.url === "/health" ? health : expected)); });

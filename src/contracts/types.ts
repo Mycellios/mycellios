@@ -2,6 +2,7 @@ import type {
   CoordinatorRuntimePerformanceEvidence,
 } from "../performance/runtime-profile.js";
 import type { DeploymentCanaryEvidence } from "./deployment-canary.js";
+import type { NativeReplicaEvidence } from "./native-replica-evidence.js";
 import type { NativeBuildIdentity } from "./build-identity.js";
 import type { EngineRuntimeProfile } from "./engine-runtime-profile.js";
 
@@ -145,6 +146,7 @@ export interface ModelDeployment {
    * active native pipeline from which measured throughput was derived.
    */
   canaryEvidence?: DeploymentCanaryEvidence | undefined;
+  nativeReplicaEvidence?: NativeReplicaEvidence | undefined;
   dataLocality: "local";
   stage?: {
     index: number;

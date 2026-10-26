@@ -1,0 +1,213 @@
+{
+  "schema": "mycellios-native-replica-production-evidence/1",
+  "observedAt": "2026-10-26T18:09:25.380555+00:00",
+  "scope": "Physical single-GPU replicas on the same RTX 2060; not two-host inference",
+  "mainSynchronized": "4f4d8e8745348b199da4e1e0dbd6a0fa09ab95d1",
+  "coordinatorImage": "sha256:ccfd384cbd145d7ca4c490690e9a234812a8c70c399e804d20f7b2bcb33ab86f",
+  "coordinatorSourceId": "sha256:bb4c6d7950156bd8e69eda1f3f33e2e3e446ae91d15dc933a23e53808217a2b9",
+  "targets": [
+    {
+      "workerId": "wrk_c0e9f50a653a4f3dadbaad2173e9ee73",
+      "buildSourceId": "sha256:1da82a8eac08fc13bca6d31f46be0ac89f6b7e80a2128ae9eddc683fe0545b0d",
+      "evidence": {
+        "schema": "mycellios-native-replica-qualification/1",
+        "workerId": "wrk_c0e9f50a653a4f3dadbaad2173e9ee73",
+        "sessionId": "session-638b1479-722c-4196-93b0-023963bd401b",
+        "deploymentId": "dep-61dc147054ac",
+        "activationId": "embedding-cuda-76166167-20261020",
+        "model": "mycellios-qwen3-embedding-4b",
+        "modelDigest": "sha256:a6e058f3339e6bbd2d41463c50ca9ff5ae35507cf62627233488cdef7e928297",
+        "buildSourceId": "sha256:1da82a8eac08fc13bca6d31f46be0ac89f6b7e80a2128ae9eddc683fe0545b0d",
+        "physicalNodeId": "node-4c3832ee0e884100ba0a6596a400192c",
+        "responseKind": "embedding",
+        "challengeId": "native-9fbdb8ac-485d-4c37-921d-f53739f3e144",
+        "promptDigest": "sha256:96c36d1fd048b81c161e51857bc4bd1e7862233cd2af6e2f78ec95bdc2578c8d",
+        "issuedAt": 1793037498134,
+        "observedAt": 1793037572362,
+        "samples": [
+          {
+            "jobId": "job_c7f1627a99b84c34a47f2cfa5cb78e61",
+            "receiptId": "sha256:dc6f273d1f5820073e71776f5729b3de7872d752dca3303d45bde30b93b8468b",
+            "traceDigest": "sha256:b2f29f45eb6f1dd6cbc71ce6e3fb633d043b863684991276b5ef817f6740ee37",
+            "resultDigest": "sha256:a14955e5bd5b693050f2969590dd3e0980d35bcce8c08fdf8702e19716054a35",
+            "inputTokens": 9,
+            "outputTokens": 0,
+            "completedAt": 1793037523222
+          },
+          {
+            "jobId": "job_2ee7fae462fe4e7889c25d07290372e8",
+            "receiptId": "sha256:20729485448a5964367d9845a4c1f89f22999dc245eac0c9e667ce56f57820a8",
+            "traceDigest": "sha256:41f4e5cd51288efacf38583b3e11db2bf71843d3a7dd10a9f0f8d7fba26cd966",
+            "resultDigest": "sha256:a14955e5bd5b693050f2969590dd3e0980d35bcce8c08fdf8702e19716054a35",
+            "inputTokens": 9,
+            "outputTokens": 0,
+            "completedAt": 1793037547948
+          },
+          {
+            "jobId": "job_ae831e271fc64179a43f8e165a5d07b4",
+            "receiptId": "sha256:26849f7d07db445a1cdf2043fd14b7ec7e8d04531529d409d203af5df10d79b8",
+            "traceDigest": "sha256:a2559136e6c1bf6aaebcf4c281b35d12b1a6c95bcd78ba3d777dba9d29078e00",
+            "resultDigest": "sha256:a14955e5bd5b693050f2969590dd3e0980d35bcce8c08fdf8702e19716054a35",
+            "inputTokens": 9,
+            "outputTokens": 0,
+            "completedAt": 1793037572360
+          }
+        ],
+        "evidenceId": "sha256:475b9b5452445e2b8fbe1e9dd286021233b97d4b871a8277ac23d68d19ba711e"
+      }
+    },
+    {
+      "workerId": "wrk_0ec8225466aa48d590501704321968f4",
+      "buildSourceId": "sha256:dad2f91bb08a4cddea140d6d38c242ecd1b6e2c9004ddbb3ee6019f7236ca533",
+      "evidence": {
+        "schema": "mycellios-native-replica-qualification/1",
+        "workerId": "wrk_0ec8225466aa48d590501704321968f4",
+        "sessionId": "session-13955a46-5bea-4f09-92d0-07fce13f812d",
+        "deploymentId": "dep-553ac915a452",
+        "activationId": "kokoro-gpu-de77dcce-26fd-4388-834a-d0c9d64d5185",
+        "model": "mycellios-kokoro-es",
+        "modelDigest": "sha256:496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4",
+        "buildSourceId": "sha256:dad2f91bb08a4cddea140d6d38c242ecd1b6e2c9004ddbb3ee6019f7236ca533",
+        "physicalNodeId": "node-4c3832ee0e884100ba0a6596a400192c",
+        "responseKind": "speech",
+        "challengeId": "native-e513e764-36e2-424d-aacb-b48ae5d975b9",
+        "promptDigest": "sha256:7b35f3cd884106ae5edf24eb7e3769cfb58178c6f348e9510c22183f24d198e2",
+        "issuedAt": 1793037411842,
+        "observedAt": 1793037415334,
+        "samples": [
+          {
+            "jobId": "job_b6cdb651189e47e78545d672832ff9ba",
+            "receiptId": "sha256:cf8a134e3fb2fd88acaab458f8f8eb08fe771d2d1d3e453c4cbd27305de55ffe",
+            "traceDigest": "sha256:843412dc9d1b81a0eccff877926c227e95f6447614327693d9e255da4797c14a",
+            "resultDigest": "sha256:1ec554e0e5e8d0d5bd88d3de2f5fdb00faf86068062389b3f70a0d0e7cfd320f",
+            "inputTokens": 10,
+            "outputTokens": 0,
+            "completedAt": 1793037412864
+          },
+          {
+            "jobId": "job_8f28137d1a2f4002b92f6722577d3c08",
+            "receiptId": "sha256:fe2c954e5b0579397a51a82b51f208aaf05fbe1665a9d5898e48bf30e24f9ecb",
+            "traceDigest": "sha256:1e403b0842a82f54482dc026fd2119c4e3beca9eb9931bfb60c4d7e69e801473",
+            "resultDigest": "sha256:2527d8a66813fd2db3242a1190be75cb844d6ffab021a66bfd6beed98ff83f3e",
+            "inputTokens": 10,
+            "outputTokens": 0,
+            "completedAt": 1793037413822
+          },
+          {
+            "jobId": "job_530d7240456c44419ee3cfed1af0aa03",
+            "receiptId": "sha256:9c1eaa20a79db196a7c92f3435563a67e019ede32a32a45381caeb1d49210e38",
+            "traceDigest": "sha256:0b0020ad2f962a37e415595c0d0b2369c94d73faf2f4b4cc507d514edb1bcf7b",
+            "resultDigest": "sha256:a59d7cdb12d5e4c500d3871d41d89750c1dff84808e5e1cf0794ca19271777ee",
+            "inputTokens": 10,
+            "outputTokens": 0,
+            "completedAt": 1793037415331
+          }
+        ],
+        "evidenceId": "sha256:90b4820f06aa7408845d1dd68cd42a41ec6525b19b642e432d435c61f5f6a2ee"
+      }
+    }
+  ],
+  "apiCanaries": [
+    {
+      "passed": true,
+      "kind": "embedding",
+      "jobId": "job_e253f2c2cd34471eb0e235cec5cdcfa0",
+      "usage": {
+        "prompt_tokens": 9,
+        "completion_tokens": 0,
+        "total_tokens": 9
+      },
+      "result": {
+        "dimensions": 2560,
+        "norm": 0.9999999897871797
+      },
+      "elapsedMs": 24971,
+      "scope": "Direct HTTP API with existing operator credentials; real pinned GPU lease; no customer debit or economic settlement"
+    },
+    {
+      "passed": true,
+      "kind": "embedding",
+      "jobId": "job_b666d46e2886446bb53a66dfb16447ca",
+      "usage": {
+        "prompt_tokens": 9,
+        "completion_tokens": 0,
+        "total_tokens": 9
+      },
+      "result": {
+        "dimensions": 2560,
+        "norm": 0.9999999897871797
+      },
+      "elapsedMs": 26020,
+      "scope": "Direct HTTP API with existing operator credentials; real pinned GPU lease; no customer debit or economic settlement"
+    },
+    {
+      "passed": true,
+      "kind": "speech",
+      "jobId": "job_f738140e4a09493687c61a96440d0677",
+      "usage": {
+        "prompt_tokens": 10,
+        "completion_tokens": 0,
+        "total_tokens": 10
+      },
+      "result": {
+        "audioBytes": 106844,
+        "durationSeconds": 2.225,
+        "sha256": "2ee097e0377e64a2a5fcc2465165b9decce1a6f4c1c79cdf81926794017ec92b"
+      },
+      "elapsedMs": 1479,
+      "scope": "Direct HTTP API with existing operator credentials; real pinned GPU lease; no customer debit or economic settlement"
+    }
+  ],
+  "reconnect": {
+    "passed": true,
+    "previousSession": "session-cb5dba66-9e9b-4aef-bd1a-66fbe132b1dc",
+    "newSession": "session-638b1479-722c-4196-93b0-023963bd401b",
+    "newEvidenceId": "sha256:475b9b5452445e2b8fbe1e9dd286021233b97d4b871a8277ac23d68d19ba711e",
+    "samples": 3
+  },
+  "economicEvidence": {
+    "passed": true,
+    "readOnlyPreview": true,
+    "databaseWrites": 0,
+    "settlementPerformed": false,
+    "validatedInsertPreviews": 2,
+    "previews": [
+      {
+        "jobId": "job_e253f2c2cd34471eb0e235cec5cdcfa0",
+        "evidenceId": "sha256:712686ce08ec65a389c1f0a62a8fd76053601f04b663b0974d83e70c0a64ecc6",
+        "executionReceiptId": "sha256:2b6ed9616261615ab42b6f25c636e4bda4fc76d49896ed63a00a56c5d239ac68",
+        "participants": [
+          {
+            "nodeId": "node-4c3832ee0e884100ba0a6596a400192c",
+            "workerId": "wrk_56c5b40e3cb9448ba1e048e5ce74b072",
+            "physicalIdentityDigest": "sha256:a8cafe2c7d8e4c8479cba00ba1cbb8a042b85c6788340f6a828d78166522a5fc",
+            "canaryEvidenceIds": [
+              "sha256:475b9b5452445e2b8fbe1e9dd286021233b97d4b871a8277ac23d68d19ba711e"
+            ],
+            "stageCount": 1
+          }
+        ],
+        "physicalBoundaryCount": 0
+      },
+      {
+        "jobId": "job_f738140e4a09493687c61a96440d0677",
+        "evidenceId": "sha256:9c0a76b6f68f0b7f530c7a83817f729adeb4778866a671e65e3e642fd71dc5a9",
+        "executionReceiptId": "sha256:251c097e2edd7ddcef1abba413c3a5f58bbfb725e3c880284132fb7d393054b0",
+        "participants": [
+          {
+            "nodeId": "node-4c3832ee0e884100ba0a6596a400192c",
+            "workerId": "wrk_56c5b40e3cb9448ba1e048e5ce74b072",
+            "physicalIdentityDigest": "sha256:a8cafe2c7d8e4c8479cba00ba1cbb8a042b85c6788340f6a828d78166522a5fc",
+            "canaryEvidenceIds": [
+              "sha256:90b4820f06aa7408845d1dd68cd42a41ec6525b19b642e432d435c61f5f6a2ee"
+            ],
+            "stageCount": 1
+          }
+        ],
+        "physicalBoundaryCount": 0
+      }
+    ]
+  },
+  "publicAntseedRouteQualified": false,
+  "customerSettlementPerformed": false
+}

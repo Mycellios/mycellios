@@ -1,0 +1,228 @@
+{
+  "schema": "mycellios-antseed-production-evidence/1",
+  "date": "2026-10-26",
+  "publicSpeech": {
+    "passed": true,
+    "kind": "speech",
+    "http": 200,
+    "jobId": "job_cccbeab7d18c4b859dedd7cbb20684ec",
+    "workerId": "wrk_0ec8225466aa48d590501704321968f4",
+    "backend": "single-gpu-replica",
+    "startedAt": 1793041939130,
+    "finishedAt": 1793041944666,
+    "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 0,
+      "total_tokens": 10
+    },
+    "result": {
+      "audioBytes": 106844,
+      "sha256": "1ee4c77ad97ca89fcd98345e811be3e5c94c8d69113651e32cfd53d2200d295b",
+      "durationSeconds": 2.225
+    },
+    "gateway": {
+      "tag": "gw_abb62908-c57f-4102-9a80-a0bcf1fecbff",
+      "status": 200,
+      "served_free": 1,
+      "latency_ms": 5120,
+      "usage_input_tokens": 10,
+      "usage_output_tokens": 0
+    },
+    "scope": "OmniRoute -> AntSeed -> Mycellios -> recorded native worker; backend explicitly observed; no two-host claim"
+  },
+  "publicEmbedding": {
+    "passed": true,
+    "kind": "embedding",
+    "http": 200,
+    "jobId": "job_8a79a65445d34f1b97262532f479f7c1",
+    "workerId": "wrk_577945c0b61f433e95c80f4cbef41027",
+    "backend": "native-cpu-pipeline",
+    "startedAt": 1793041945930,
+    "finishedAt": 1793041955897,
+    "usage": {
+      "prompt_tokens": 9,
+      "completion_tokens": 0,
+      "total_tokens": 9
+    },
+    "result": {
+      "dimensions": 2560,
+      "norm": 1.0000000363725483
+    },
+    "gateway": {
+      "tag": "gw_7326b1df-ed07-4727-8408-a4dc8317e752",
+      "status": 200,
+      "served_free": 1,
+      "latency_ms": 9885,
+      "usage_input_tokens": 9,
+      "usage_output_tokens": 0
+    },
+    "scope": "OmniRoute -> AntSeed -> Mycellios -> recorded native worker; backend explicitly observed; no two-host claim"
+  },
+  "publicReconciliation": [
+    {
+      "id": "job_8a79a65445d34f1b97262532f479f7c1",
+      "model": "mycellios-qwen3-embedding-4b",
+      "status": "completed",
+      "worker_id": "wrk_577945c0b61f433e95c80f4cbef41027",
+      "model_digest": "sha256:a6e058f3339e6bbd2d41463c50ca9ff5ae35507cf62627233488cdef7e928297",
+      "usage_status": "completed",
+      "input_tokens": "9",
+      "output_tokens": "0",
+      "execution_receipts": "1",
+      "internal_settlements": "0"
+    },
+    {
+      "id": "job_cccbeab7d18c4b859dedd7cbb20684ec",
+      "model": "mycellios-kokoro-es",
+      "status": "completed",
+      "worker_id": "wrk_0ec8225466aa48d590501704321968f4",
+      "model_digest": "sha256:496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4",
+      "usage_status": "completed",
+      "input_tokens": "10",
+      "output_tokens": "0",
+      "execution_receipts": "1",
+      "internal_settlements": "1"
+    }
+  ],
+  "customerSettlements": {
+    "passed": true,
+    "readOnly": true,
+    "scope": "Real persisted Mycellios execution and internal-credit settlement receipts; not AntSeed on-chain settlement",
+    "observations": [
+      {
+        "jobId": "job_79c63ed4d0ca4ec78c26ab78b301ffb5",
+        "settlementId": "sha256:774a9c12f0be72d398fd33501e975729f5ebc34940d3a83b6d04dafd29ae8ff0",
+        "executionReceiptId": "sha256:e18af4d8fea694b14e14c204adaf48e4effce518c2e56356ab78616da2b12114",
+        "economicReceiptId": "sha256:3e291f2a5f8f16a36ec612e52ffdb1996845d8f4cf3711d65e018a9f38d91f8b",
+        "contributionEvidenceId": "sha256:022ae3c6fa09d3e7f03b0a8e90daad6ad1082267c719010fdabecbab81478ab9",
+        "signaturesVerified": true,
+        "balanced": true
+      },
+      {
+        "jobId": "job_b892669e20cf4aea90096d33073aeca1",
+        "settlementId": "sha256:690103201b80eaac13793b74bafe77f4d80050cad1ffc4656d0454bf568055b7",
+        "executionReceiptId": "sha256:d1272b0aa4326336aea3eeec1b5868f944637be4f316fb15d114c650b3b06ed2",
+        "economicReceiptId": "sha256:12f12a00a65142b3bc9ff2e5e6dacdc30a967f17a25ce2714b1d2eed59e800e4",
+        "contributionEvidenceId": "sha256:c739d9f82a245fedc1345e9916a6b491ed6a193066f1a71e9cdd4d5b6fca1d75",
+        "signaturesVerified": true,
+        "balanced": true
+      }
+    ]
+  },
+  "customerReceiptHttp": {
+    "passed": true,
+    "readOnly": true,
+    "scope": "Customer-authorized economic receipt HTTP retrieval",
+    "receipts": [
+      {
+        "settlementId": "sha256:774a9c12f0be72d398fd33501e975729f5ebc34940d3a83b6d04dafd29ae8ff0",
+        "http": 200,
+        "receiptId": "sha256:3e291f2a5f8f16a36ec612e52ffdb1996845d8f4cf3711d65e018a9f38d91f8b",
+        "signatureBytes": 64
+      },
+      {
+        "settlementId": "sha256:690103201b80eaac13793b74bafe77f4d80050cad1ffc4656d0454bf568055b7",
+        "http": 200,
+        "receiptId": "sha256:12f12a00a65142b3bc9ff2e5e6dacdc30a967f17a25ce2714b1d2eed59e800e4",
+        "signatureBytes": 64
+      }
+    ]
+  },
+  "deployment": {
+    "deployed": true,
+    "imageUnchanged": "sha256:fd9ae835e2d11f736de8f39ccec36bf6d083fe7c4dd42e65af8f755763fe54e0",
+    "selectedProviders": [
+      "mycellios-speech",
+      "mycellios-research",
+      "mycellios-decisions"
+    ],
+    "excludedUnhealthyProvider": "mycellios",
+    "originalConfigurationAndIdentityPreserved": true,
+    "remainingPricingPreserved": true,
+    "protectedServicesUnchanged": true,
+    "pluginVersionsPinned": true,
+    "backupContainer": "nc-antseed-seller-before-selection-1793039641",
+    "at": 1793039672.9143775
+  },
+  "credentialRotation": {
+    "rotated": true,
+    "credentials": [
+      "MYCELLIOS_API_KEY",
+      "RESEARCH_SERVICE_TOKEN",
+      "GPU_BRIDGE_TOKEN"
+    ],
+    "apiKeyIdPreserved": "key_e0dd6763fb494dd18d7261685ea998f0",
+    "walletIdentityPreserved": true,
+    "imagesAndResourcesPreserved": true,
+    "protectedServicesUnchanged": true,
+    "checks": [
+      {
+        "consumer": "mycellios-speech",
+        "newStatus": 200,
+        "oldStatus": 401
+      },
+      {
+        "consumer": "mycellios-research",
+        "newStatus": 200,
+        "oldStatus": 401
+      },
+      {
+        "consumer": "mycellios",
+        "newStatus": 200,
+        "oldStatus": 401
+      }
+    ],
+    "at": 1793041877.433083
+  },
+  "finalHealth": {
+    "checkedAt": 1793042250,
+    "publicHealthStatus": "200",
+    "publicHealthCurlExit": 0,
+    "containers": [
+      {
+        "name": "nc-antseed-seller",
+        "running": true,
+        "health": null,
+        "image": "sha256:fd9ae835e2d11f736de8f39ccec36bf6d083fe7c4dd42e65af8f755763fe54e0",
+        "restartPolicy": "unless-stopped"
+      },
+      {
+        "name": "nc-antseed-gateway",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:b31ea68ca1b4d77b50c1b717c4fca6125506f3d3c99ccf1e739ee4d864413f09",
+        "restartPolicy": "unless-stopped"
+      },
+      {
+        "name": "nc-antseed-mycellios-gpu-bridge",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:793f842e990d6de598d655acc14340d0f6b9687068ab1757479aeb8f8baa0823",
+        "restartPolicy": "unless-stopped"
+      },
+      {
+        "name": "nc-antseed-research-upstream",
+        "running": true,
+        "health": "healthy",
+        "image": "sha256:5e9129141f04680d0e5fa2a2ee1b98d2d1ca784c9ef0e5e506170021fa0c3714",
+        "restartPolicy": "unless-stopped"
+      }
+    ],
+    "qualificationWatcher": "active"
+  },
+  "limitations": [
+    "The earlier gas pause was lifted after Daniel funded the wallet; Jarvis observed SDK advertising resumed at 18:43 UTC. This does not establish continuous availability.",
+    "No wallet transfer performed.",
+    "CPU public embedding has no internal settlement.",
+    "Internal credits are not money or on-chain AntSeed settlement.",
+    "Research and decisions preserved, not requalified.",
+    "No inference across two physical computers established by these probes."
+  ],
+  "advertisingRecovery": {
+    "source": "Jarvis qwen-status-20261026 recovery evidence",
+    "observedAt": "2026-10-26T18:43:00Z",
+    "sdkBalanceEth": "0.002168874558129165",
+    "advertisingResumed": true,
+    "additionalFundingRequested": false
+  }
+}
