@@ -1,3 +1,4 @@
+import { BrandIcon } from "../ui/BrandIcons";
 import { Button as UiButton, Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
 import {
   ArrowDown,
@@ -71,32 +72,6 @@ const GITHUB_URL = "https://github.com/tych0s/mycellios";
 const X_URL = "https://x.com/mycellios";
 const TELEGRAM_URL = "https://t.me/mycellios";
 
-/* Lucide dropped its brand marks, so the three social glyphs are inline paths.
-   They are decorative: each link carries its own accessible name. */
-function GithubMark() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-      <path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5Z" />
-    </svg>
-  );
-}
-
-function XMark() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-      <path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.65l-5.22-6.82-5.96 6.82H1.68l7.73-8.84L1.25 2.25h6.82l4.71 6.23 5.46-6.23Zm-1.16 17.52h1.83L7.01 4.13H5.05l12.03 15.64Z" />
-    </svg>
-  );
-}
-
-function TelegramMark() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
-      <path d="M21.94 3.4a1.2 1.2 0 0 0-1.24-.2L2.72 10.4c-.86.34-.83 1.57.05 1.86l4.4 1.47 1.7 5.24c.2.62 1 .8 1.45.33l2.47-2.56 4.5 3.3c.55.4 1.34.11 1.5-.56l3.36-14.6a1.2 1.2 0 0 0-.21-1.05ZM9.35 14.3l-.53 3.53-1.19-3.66 9.1-5.98-7.38 6.11Z" />
-    </svg>
-  );
-}
-
 export function LandingHeader({ active }: { active?: "network" | "earn" }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -116,9 +91,9 @@ export function LandingHeader({ active }: { active?: "network" | "earn" }) {
         <UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/create">Create</UiLink><UiLink className={active === "earn" ? "active" : undefined} href="/earn" aria-current={active === "earn" ? "page" : undefined}>Earn</UiLink><SporeMenu /><UiLink className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</UiLink>
       </nav>
       <div className="rb-header-actions rb-desktop-cta">
-        <UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><GithubMark /></UiLink>
-        <UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><XMark /></UiLink>
-        <UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><TelegramMark /></UiLink>
+        <UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><BrandIcon name="github" /></UiLink>
+        <UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><BrandIcon name="x" /></UiLink>
+        <UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><BrandIcon name="telegram" /></UiLink>
         <UiLink className="rb-pill rb-pill-ghost" href="/dashboard">Login</UiLink>
       </div>
       <UiButton className="rb-menu" type="button" aria-label={mobileOpen ? "Close menu" : "Open menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</UiButton>
@@ -129,7 +104,7 @@ export function LandingHeader({ active }: { active?: "network" | "earn" }) {
           <div className="rb-mobile-group"><span className="rb-mobile-kicker">$ SPORE</span><div className="rb-mobile-sub"><UiLink href="/spore">Staking</UiLink><UiLink href="/spore/treasury">Treasury</UiLink><UiLink href="/spore/data">Data</UiLink></div></div>
           <div className="rb-mobile-group"><UiLink className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</UiLink></div>
           <UiLink className="rb-mobile-cta" href="/dashboard">Login</UiLink>
-          <div className="rb-mobile-social"><UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><GithubMark /></UiLink><UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><XMark /></UiLink><UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><TelegramMark /></UiLink></div>
+          <div className="rb-mobile-social"><UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><BrandIcon name="github" /></UiLink><UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><BrandIcon name="x" /></UiLink><UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><BrandIcon name="telegram" /></UiLink></div>
         </nav>
       </>}
     </div>

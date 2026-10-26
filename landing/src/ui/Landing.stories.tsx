@@ -3,14 +3,14 @@ import { AgentPreview, ModernLanding } from "../rebrand/ModernLanding";
 import { RootedLanding, ApiSample } from "../rebrand/RootedLanding";
 import { NetworkWeave } from "../rebrand/NetworkWeave";
 import { AssemblageLanding } from "../rebrand/AssemblageLanding";
-import { ReferenceLanding } from "../rebrand/ReferenceLanding";
+import { ReferenceHeader, ReferenceLanding } from "../rebrand/ReferenceLanding";
 
 const meta = { title: "Screens/Landing", component: ReferenceLanding, parameters: { layout: "fullscreen", ownsThemeRoot: true } } satisfies Meta<typeof ReferenceLanding>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Refreshed: Story = {};
-export const WithMushrooms: Story = { args: { initialArtwork: "fruiting" } };
-export const MushroomComparison: Story = { args: { initialArtwork: "fruiting", compareArtwork: true } };
+export const Navigation: Story = { render: () => <div className="mycellios-assemblage mycellios-reference" style={{ minHeight: 320 }}><ReferenceHeader /></div> };
+export const OriginalArtwork: Story = { args: { initialArtwork: "fabric" } };
 export const DiscardedAssemblage: Story = { render: () => <AssemblageLanding /> };
 export const PreviousRooted: Story = { render: () => <RootedLanding /> };
 export const SavedVersion: Story = { render: () => <ModernLanding /> };

@@ -75,9 +75,11 @@ These rules apply to the complete repository.
   scaling; connection content follows below it. Its artwork and Agent workspace
   are concepts and local examples, never telemetry or real tool execution.
   Storybook imports those same production components.
-  Keep the original artwork as the default. The optional mushroom comparison uses
-  `?compare=mushrooms&art=fruiting`; `art=fabric` restores the exact original asset.
-  Both variants use the same renderer, layout and production controls.
+  Use the mushroom artwork by default, without an artwork selector. `?art=fabric`
+  restores the exact original asset; both variants share the renderer and layout.
+  Keep Agent, Create, Earn, Token (Staking, Treasure, Data), Live network,
+  GitHub/X/Telegram and Login accessible in desktop and mobile navigation, using
+  the production controls. Docs remains available in the page and footer.
   Preserve the rejected `AssemblageLanding`
   with `?landing=assemblage` and the
   previous `RootedLanding` with `?landing=rooted`, `ModernLanding` with
