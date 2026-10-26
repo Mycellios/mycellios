@@ -37,7 +37,7 @@ void main(){
 }`;
 
 /** The fallback stays visible until a local texture and a complete GPU frame exist. */
-export function NetworkPrint({ artwork = "fabric" }: { artwork?: NetworkArtwork } = {}) {
+export function NetworkPrint({ artwork = "fruiting" }: { artwork?: NetworkArtwork } = {}) {
   const art = artworkSources[artwork];
   const ref = useRef<HTMLCanvasElement>(null);
   const [renderedArt, setRenderedArt] = useState<string | null>(null);

@@ -2,12 +2,28 @@
 html:has(.mycellios-reference) { background: #faf9f7; }
 .reference-shell { width: min(1150px,calc(100% - 80px)); margin-inline: auto; }
 .reference-header { display: flex; align-items: center; min-height: 86px; gap: 28px; position: relative; }
-.reference-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 500; letter-spacing: -.035em; }
+.reference-brand { display: inline-flex; flex-shrink: 0; align-items: center; gap: 10px; font-size: 22px; font-weight: 500; letter-spacing: -.035em; white-space: nowrap; }
 .reference-brand img { object-fit: contain; }
-.reference-header > nav:not(.reference-mobile-navigation) { margin-left: auto; display: flex; gap: 26px; align-items: center; }
+.reference-header > nav:not(.reference-mobile-navigation) { margin-left: auto; display: flex; gap: 28px; align-items: center; white-space: nowrap; }
 .reference-header nav a { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; }
+.reference-header-actions { display: flex; align-items: center; gap: 16px; white-space: nowrap; }
+.reference-social-links { display: flex; align-items: center; gap: 2px; }
+.reference-social-links a { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-height: 44px; }
+.reference-social-links svg { width: 16px; height: 16px; }
+.mycellios-reference .reference-header .ui-button.reference-header-login { --ui-control-height: 36px; --ui-radius-control: 0px; min-width: 76px; min-height: var(--ui-control-height) !important; border-radius: var(--ui-radius-control) !important; }
+.reference-header .spore-menu summary { font-size: 14px; }
+.reference-header .spore-menu summary:hover, .reference-header .spore-menu summary:focus-visible { color: var(--assembly-moss); }
+.reference-header .spore-menu-popover { background: var(--assembly-paper); border-color: var(--assembly-line); box-shadow: none; }
+.reference-header .spore-menu-popover a { color: var(--assembly-ink) !important; }
+.reference-header .spore-menu-popover a:hover, .reference-header .spore-menu-popover a:focus-visible { background: var(--assembly-stone); color: var(--assembly-ink) !important; }
 .reference-menu { display: none; }
-.reference-mobile-navigation { position: absolute; top: 76px; inset-inline: 0; z-index: 20; display: grid; padding: 16px; background: var(--assembly-stone); border-radius: 12px; }
+.reference-mobile-navigation { position: absolute; top: calc(100% - 2px); inset-inline: 0; z-index: 20; display: grid; padding: 16px; max-height: calc(100dvh - 110px); overflow-y: auto; background: var(--assembly-stone); border-radius: 12px; }
+.reference-mobile-navigation a, .reference-mobile-navigation .spore-menu summary { padding-inline: 12px; }
+.reference-mobile-navigation .spore-menu { height: auto; }
+.reference-mobile-navigation .spore-menu-popover { position: static; width: auto; margin: 0 12px 8px; transform: none; animation: none; }
+.reference-mobile-navigation .reference-social-links { margin-block: 8px; }
+.reference-mobile-navigation .reference-social-links a { width: 44px; padding: 0; }
+.mycellios-reference .reference-mobile-navigation .ui-button.reference-header-login { --ui-control-height: 44px; }
 .reference-hero { text-align: center; padding-top: 52px; position: relative; z-index: 2; }
 .reference-hero h1 { font-size: clamp(40px,4.5vw,65px); font-weight: 500; line-height: 1.04; letter-spacing: -.04em; }
 .reference-hero h1 br { display: none; }
@@ -27,9 +43,6 @@ html:has(.mycellios-reference) { background: #faf9f7; }
 .reference-device-action > span { display: grid; flex: 1; font-size: 14px; }
 .reference-device-action small { font-size: 11px; color: var(--assembly-muted); }
 .reference-network-story { position: relative; margin-top: 25px; }
-.reference-art-comparison { display: flex; width: fit-content; gap: 5px; padding: 5px; margin: 0 auto 22px; border-radius: 12px; background: var(--assembly-stone); }
-.mycellios-reference .reference-art-comparison .ui-button { min-width: 110px; }
-.mycellios-reference .reference-art-comparison .ui-button[aria-pressed="true"] { background: var(--assembly-ink) !important; color: var(--assembly-paper) !important; }
 .reference-world-visual { position: relative; width: min(100%,1600px); aspect-ratio: 1774 / 877; margin-inline: auto; }
 .reference-network-print { position: relative; width: 100%; height: 100%; }
 .reference-network-print img, .reference-network-print canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
@@ -93,6 +106,8 @@ html:has(.mycellios-reference) { background: #faf9f7; }
 .reference-footer nav a { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 13px; }
 .reference-footer > span { color: var(--assembly-muted); font-size: 11px; }
 @media (max-width: 1100px) {
+  .reference-header > nav:not(.reference-mobile-navigation), .reference-header-actions { display: none; }
+  .reference-menu { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; padding: 10px; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: inherit; }
   .reference-agent .assembly-workspace { grid-template-columns: 200px minmax(0,1fr); }
   .reference-agent .assembly-inline-context { display: block; margin-left: 38px; border: 1px solid var(--demo-edge); border-radius: 9px; }
   .reference-agent .assembly-inline-context .assembly-file-preview { margin: 0 12px 12px; }
@@ -100,10 +115,6 @@ html:has(.mycellios-reference) { background: #faf9f7; }
 @media (max-width: 760px) {
   .reference-shell { width: calc(100% - 40px); }
   .reference-header { min-height: 78px; }
-  .reference-header > nav:not(.reference-mobile-navigation), .mycellios-reference .reference-header .reference-header-action { display: none !important; }
-  .reference-menu { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; padding: 10px; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: inherit; }
-  .reference-mobile-navigation { display: grid; }
-  .reference-mobile-navigation a { padding-inline: 12px; }
   .reference-hero { padding-top: 40px; }
   .reference-hero h1 { font-size: clamp(29px,8.5vw,48px); line-height: 1.08; }
   .reference-hero h1 br { display: initial; }

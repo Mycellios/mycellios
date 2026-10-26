@@ -8,10 +8,15 @@ computing-fabric WebP. `NetworkPrint` applies an event-driven WebGL print effect
 the image stays available when WebGL is unavailable and for reduced motion.
 The artwork remains centered in normal document flow as the page scrolls; the
 network chapter follows underneath without sticky overlap, panning or scaling.
-The original illustration remains the default. `/?compare=mushrooms&art=fruiting`
-opens an optional mushroom variant with Actual / Con setas controls;
-`art=fabric` selects the exact original asset and `/` has no comparison controls.
-The renderer and layout are shared, with the same variants in Storybook.
+The mushroom illustration is the default, without comparison controls, including
+on previously shared `/?compare=mushrooms&art=fruiting` links. `/?art=fabric`
+restores the exact original asset. The renderer and layout are shared; Storybook
+keeps the original illustration in `Screens/Landing/OriginalArtwork`.
+The header contains Agent, Create, Earn, Token (Staking, Treasure and Data),
+Live network, GitHub/X/Telegram and a compact Login action on desktop and in the
+responsive menu. Docs remains linked from the page and footer. The Token label
+uses the existing SPORE routes and disclosure component; other surfaces retain
+their original labels. `Screens/Landing/Navigation` renders the production header.
 Its scene is conceptual. The expanded Agent example includes local attachment
 fixtures, not real user files or completed actions. Production and the
 `Screens/Landing` Storybook story import the same components. Real conversations
