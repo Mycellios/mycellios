@@ -1,6 +1,6 @@
 # Status and evidence
 
-Updated: 2026-09-25 (economic and token status).
+Updated: 2026-10-26 (native replica and AntSeed production evidence).
 
 ## Implemented and connected
 
@@ -459,3 +459,73 @@ speedup, GPU qualification or a general decision-quality benchmark. Non-streamin
 delivery at the 256-token boundary is not qualified. The pilot remains one
 question, 256 input tokens, batch/concurrency one, and produces decisions rather
 than generated prose.
+
+### Native replica availability and evidence (2026-10-26)
+
+The deployed coordinator preserves its existing PostgreSQL, authentication and
+credit-wallet overlays. Bounded worker observations prevent stalled health or
+hardware probes from blocking heartbeats; missing readiness stops new admission.
+An operator-only native qualification uses three normal leased executions and
+binds their signed receipts to the current authenticated session, source build,
+model digest, activation and physical GPU node. It preserves zero generated text
+tokens for embeddings and speech. A pinned backend watcher refreshes only the two
+approved replicas, with a persistent three-attempt daily limit per worker.
+
+The RTX 2060 completed both three-request qualifications, a direct HTTP vector
+request with 2,560 normalized dimensions and a Spanish WAV request. Reconnecting
+the embedding worker invalidated its previous session proof; the watcher produced
+a new proof for the replacement session. Its managed Windows bootstrap also
+passed a real cold start with normal priority inside the unchanged 4 GiB / 90%
+Windows Job, preserving the pre-import barrier and kill-on-close protection.
+
+The actual economic evidence authority accepted both direct API receipts in a
+read-only preview. No customer debit, contributor credit or settlement was
+performed by that preview. The public AntSeed request returned 502 and the seller
+reported advertising paused below its gas floor; this rollout did not fund its
+wallet or qualify that external route. These are two replicas on one physical GPU,
+not evidence of inference distributed across two physical computers. Sanitized
+identities, receipts and observations are recorded in
+[`native-replica-production-evidence.json`](../tests/fixtures/native-replica-production-evidence.json).
+
+### AntSeed production follow-up (2026-10-26)
+
+This follow-up supersedes the preceding preview-only and failed public-route
+observations. Actual customer requests for Spanish speech and GPU embeddings
+completed, each with a persisted execution receipt and balanced internal-credit
+settlement. Both execution and economic signatures were verified, and the
+customer could retrieve both settlement receipts. These are non-monetary
+Mycellios credits, not AntSeed revenue or on-chain settlement.
+
+After deployment and credential rotation, fresh requests through OmniRoute,
+AntSeed gateway, seller and Mycellios completed with HTTP 200 and
+`served_free=1`. Speech used the RTX 2060 replica; embeddings used the native CPU
+pipeline selected by the scheduler, returning 2,560 normalized dimensions.
+Both recorded zero generated-text tokens and persisted execution receipts.
+The public speech job has an internal settlement; the public CPU embedding job
+has none. This does not qualify CPU financial contribution or establish inference
+across two physical computers. Sanitized observations are in
+[`antseed-native-e2e-production-evidence.json`](../tests/fixtures/antseed-native-e2e-production-evidence.json).
+
+The seller explicitly selects its existing speech, research and decisions
+providers. The stale text provider returned 503 and is excluded from selection;
+its original configuration remains recoverable. Identity, remaining prices,
+images and resource limits were preserved, and plugin versions are pinned.
+Research and decisions were preserved, not newly qualified by these probes.
+Three credentials exposed during diagnosis were rotated in the canonical vault
+and consumers; all replacement credentials returned 200 and all revoked values
+returned 401. Account identity, quotas and permissions were preserved.
+
+Production health returned 200, PostgreSQL was connected without an error, and
+the qualification watcher was active. The deployed coordinator source identity
+is `sha256:bb4c6d7950156bd8e69eda1f3f33e2e3e446ae91d15dc933a23e53808217a2b9`,
+based on fetched main `4f4d8e8745348b199da4e1e0dbd6a0fa09ab95d1` plus
+the recorded local reliability patches. This does not imply those patches were
+committed, pushed or merged.
+
+An earlier SDK observation paused advertising with a Base mainnet balance of
+0.000038496637378844 ETH, below its 0.00005 ETH floor. Daniel subsequently funded
+the wallet. Jarvis's recovery evidence at 18:43 UTC records the SDK reporting
+0.002168874558129165 ETH and advertising resumed. The previous funding request
+is obsolete; no additional transfer is requested. This intervention performed
+no transfer or gas-guard bypass. Successful requests and announcement recovery
+are bounded observations, not a continuous-availability guarantee.

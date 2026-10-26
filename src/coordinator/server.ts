@@ -20,6 +20,7 @@ import {
 } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { z, ZodError } from "zod";
+import { registerNativeReplicaQualifications } from "./native-replica-qualification.js";
 import {
   StableBenchmarkActivationTracker,
   type BenchmarkActivation,
@@ -1576,6 +1577,8 @@ export async function createCoordinator(
     });
     return { ...event, result: { ...event.result, executionReceiptId: receipt.receiptId } };
   };
+  registerNativeReplicaQualifications(app, { adminToken: config.modelAdminToken, networkToken: config.networkToken,
+    hub, store, service, attachReceipt: attachExecutionReceipt });
   const studioInference: StudioInference = options.studioInference ?? (async (request) => {
     const chat: ChatCompletionRequest = {
       model: request.model,
@@ -4514,6 +4517,7 @@ export async function createCoordinator(
       id: worker.id,
       status: worker.status,
       connected: hub.isConnected(worker.id),
+      authenticatedSessionId: hub.currentWorkerSessionId(worker.id),
       region: worker.capabilities.region,
       agentVersion: worker.capabilities.agentVersion,
       buildIdentity: worker.capabilities.buildIdentity,
@@ -4663,6 +4667,7 @@ export async function createCoordinator(
     const executionReceiptId = input.executionReceiptId;
     try {
       const contributionEvidence = physicalContributionEvidence.certify({
+        currentSessionIdForWorker: workerId => hub.currentWorkerSessionId(workerId),
         jobId: input.jobId,
         executionReceiptId,
         trace: input.networkTrace,

@@ -9,6 +9,7 @@ import {
   deploymentMetricsFromCanaryEvidence,
 } from "./deployment-canary.js";
 import { nativeBuildIdentitySchema } from "./build-identity.js";
+import { nativeReplicaEvidenceSchema } from "./native-replica-evidence.js";
 import { engineRuntimeProfileSchema } from "./engine-runtime-profile.js";
 import {
   workerAdmissionProofSchema,
@@ -146,6 +147,7 @@ export const deploymentSchema = z
     ttftMs: z.number().nonnegative(),
     verificationState: z.enum(["pending", "verified"]).optional(),
     canaryEvidence: deploymentCanaryEvidenceSchema.optional(),
+    nativeReplicaEvidence: nativeReplicaEvidenceSchema.optional(),
     dataLocality: z.literal("local"),
     stage: z
       .object({
@@ -259,6 +261,11 @@ export const deploymentSchema = z
         || deployment.contextLimit !== DECISION_CONTEXT_LIMIT || deployment.maxConcurrency !== 1
         || deployment.canaryEvidence || deployment.verificationState || deployment.throughputSource === "measured") {
         context.addIssue({ code: "custom", message: "Decision replicas require pinned identity, a bound activation and separate decision qualification" });
+      }
+    } else if (deployment.adapter === "kokoro" && deployment.activationId) {
+      if (deployment.model !== KOKORO_MODEL || deployment.modelDigest !== KOKORO_WEIGHT_DIGEST
+        || deployment.canaryEvidence || deployment.verificationState || deployment.throughputSource === "measured") {
+        context.addIssue({ code: "custom", message: "Speech activation requires the pinned model and separate native qualification", path: ["activationId"] });
       }
     } else if (
       deployment.canaryEvidence

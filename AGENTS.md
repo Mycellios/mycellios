@@ -117,6 +117,21 @@ These rules apply to the complete repository.
 
 ## Optional speech replicas
 
+- Keep worker heartbeats bounded independently of adapter and hardware probes.
+  Missing adapter observations close admission without cancelling active leases;
+  do not reuse late readiness or launch duplicate probes while one is pending.
+- Native embedding/speech qualification requires both operator credentials, three
+  normal completed leases, validated outputs and current session/build/activation
+  binding. Preserve zero generated-text tokens and strip worker-declared evidence.
+- Per-worker maintenance blocks new lease offers at dispatch while keeping active
+  work and heartbeats. Release it without overriding an owner's pause state.
+- Worker maintenance does not close HTTP job admission. An empty jobs query is
+  not a global drain; coordinator replacement requires a common admission
+  barrier and a handoff that preserves active calls and original deadlines.
+- Native requalification may refresh only explicitly approved worker/build/model/
+  activation/node tuples. Keep the three-attempt daily cap and uncertain-request
+  backoff; source drift requires operator approval, not a widened allowlist.
+
 - Kokoro uses an explicit native replica adapter, not the Transformers layer planner.
 - Its loopback runtime owns model loading; the existing worker owns admission and leases.
 - Speech bytes are bounded independently from max_tokens and never counted as output text tokens.
@@ -176,6 +191,14 @@ These rules apply to the complete repository.
   omitting this selector can attribute another provider's price to the response.
   Verify a real successful buyer receipt with `served_free=1`; never rewrite an
   earlier receipt to make that gate pass.
+- Select seller providers explicitly when an upstream is unavailable; preserve
+  original configuration, identity and remaining prices. Passing an existing
+  buyer request does not establish discovery while the official gas guard pauses
+  announcements. Never bypass that guard or infer permission to fund a wallet.
+- Runtime descriptors may contain credentials in argument arrays. Read only
+  allowlisted fields; never print complete descriptors, environment or vault
+  exports. Rotate exposed credentials in the canonical vault and all consumers,
+  then verify new acceptance and old rejection without logging secret values.
 - Decision actor control traffic may reuse authenticated TLS channels. Keep poll/
   result and active permit channels separate; authenticate each request and close
   invalid framing/authentication paths. Preserve all existing permit, deadline,
@@ -190,3 +213,7 @@ These rules apply to the complete repository.
   five seconds per CPU sample, coalesce overlapping observations and reset the
   startup baseline only when monitoring begins. Keep thermal/RAM/disk checks and
   snapshot reconciliation ordering intact.
+- The managed CUDA embedding launcher is `scripts/embedding-gpu-bootstrap.py`.
+  It uses normal process priority inside the existing Windows Job; preserve the
+  pre-import barrier, owner CPU/memory quotas and kill-on-job-close behavior.
+  Check the launcher with `python tests/embedding_gpu_bootstrap_test.py`.

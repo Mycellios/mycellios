@@ -9,6 +9,10 @@ export function stripWorkerDeclaredEvidence(
 ): WorkerCapabilities {
   const capabilities = structuredClone(input);
   capabilities.deployments = capabilities.deployments.map((deployment) => {
+    if (deployment.nativeReplicaEvidence || (["embedding", "kokoro"].includes(deployment.adapter) && deployment.verificationState)) {
+      const { nativeReplicaEvidence: _native, canaryEvidence: _canary, verificationState: _state, ...claim } = deployment;
+      deployment = claim;
+    }
     if (deployment.adapter !== "mycellios-pipeline") return deployment;
     const {
       canaryEvidence: _canaryEvidence,
@@ -53,6 +57,13 @@ export function mergeCurrentSessionEvidence(
     return sanitized;
   }
   sanitized.deployments = sanitized.deployments.map((claim) => {
+    if (["embedding", "kokoro"].includes(claim.adapter)) {
+      const verified = current.deployments.find(candidate => candidate.deploymentId === claim.deploymentId
+        && candidate.model === claim.model && candidate.modelDigest === claim.modelDigest
+        && candidate.activationId === claim.activationId && candidate.verificationState === "verified"
+        && candidate.nativeReplicaEvidence?.workerId === workerId && candidate.nativeReplicaEvidence.sessionId === sessionId);
+      return verified ? { ...claim, verificationState: "verified", nativeReplicaEvidence: structuredClone(verified.nativeReplicaEvidence!) } : claim;
+    }
     if (claim.adapter !== "mycellios-pipeline") return claim;
     const verified = current.deployments.find(
       (candidate) =>

@@ -9,6 +9,20 @@ import type { StoredWorker } from "../src/storage/store.js";
 const sha = (character: string) => `sha256:${character.repeat(64)}`;
 
 describe("physical contribution evidence", () => {
+  it("never credits a runtime that lacks a verified deployment canary", () => {
+    const database = new MeshDatabase(":memory:");
+    try {
+      const authority = new PhysicalContributionEvidenceAuthority(database);
+      const workers = [worker("worker-a", "node-a", "a", "dep-a"), worker("worker-b", "node-b", "b", "dep-b")];
+      delete workers[0]!.capabilities.deployments[0]!.canaryEvidence;
+      const trace = physicalTrace();
+      expect(() => authority.certify({ jobId: trace.jobId, executionReceiptId: sha("e"), trace, workers, createdAt: 2_100 }))
+        .toThrow("economic_contribution_verified_canary_is_missing");
+      expect(database.raw.prepare("SELECT COUNT(*) AS count FROM economic_contribution_evidence").get())
+        .toEqual({ count: 0 });
+    } finally { database.close(); }
+  });
+
   it("certifies an exact physical route idempotently", () => {
     const database = new MeshDatabase(":memory:");
     const authority = new PhysicalContributionEvidenceAuthority(database);

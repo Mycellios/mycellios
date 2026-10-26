@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  DEPLOYMENT_CANARY_MAXIMUM_AGE_MS,
-  validateDeploymentCanaryEvidence,
-} from "../contracts/deployment-canary.js";
+import { verifiedContributionCanary } from "./deployment-contribution-canary.js";
 import type { NetworkExecutionTrace, WorkerPhysicalIdentity } from "../contracts/types.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
 import { MeshDatabase } from "../storage/database.js";
@@ -49,6 +46,7 @@ export class PhysicalContributionEvidenceAuthority {
     trace: NetworkExecutionTrace;
     workers: readonly StoredWorker[];
     createdAt: number;
+    currentSessionIdForWorker?: ((workerId: string) => string | null) | undefined;
   }): PhysicalContributionEvidence {
     const trace = networkExecutionTraceSchema.parse(input.trace);
     const jobId = identifierSchema.parse(input.jobId);
@@ -83,18 +81,9 @@ export class PhysicalContributionEvidenceAuthority {
       const deployment = owner?.capabilities.deployments.find((candidate) =>
         candidate.deploymentId === stage.deploymentId && candidate.modelDigest === stage.modelDigest
       );
-      const canary = deployment?.canaryEvidence;
-      if (!owner || deployment?.verificationState !== "verified" || !canary) {
-        throw new Error("economic_contribution_verified_canary_is_missing");
-      }
-      validateDeploymentCanaryEvidence(canary);
-      if (canary.workerId !== owner.id || canary.modelDigest !== stage.modelDigest) {
-        throw new Error("economic_contribution_canary_binding_is_invalid");
-      }
-      const canaryAt = Date.parse(canary.observedAt);
-      if (canaryAt > trace.observedUntil || trace.observedUntil - canaryAt > DEPLOYMENT_CANARY_MAXIMUM_AGE_MS) {
-        throw new Error("economic_contribution_canary_is_stale");
-      }
+      const canaryId = verifiedContributionCanary({ owner, deployment, modelDigest: stage.modelDigest,
+        physicalNodeId: stage.nodeId, observedUntil: trace.observedUntil,
+        currentSessionId: owner ? input.currentSessionIdForWorker?.(owner.id) : null });
 
       const digest = sha256CanonicalEvidence(identity);
       const existing = participants.get(stage.nodeId);
@@ -108,7 +97,7 @@ export class PhysicalContributionEvidenceAuthority {
         canaryEvidenceIds: new Set<string>(),
         stageCount: 0,
       };
-      participant.canaryEvidenceIds.add(canary.evidenceId);
+      participant.canaryEvidenceIds.add(canaryId);
       participant.stageCount += 1;
       participants.set(stage.nodeId, participant);
     }

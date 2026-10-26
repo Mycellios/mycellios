@@ -3,7 +3,7 @@ import {
   KOKORO_MODEL, KOKORO_WEIGHT_DIGEST, MAX_SPEECH_BYTES,
   MAX_SPEECH_RESPONSE_BYTES, kokoroWorkerAdapterSchema, verifiedSpeechEnvelope, resolveSpeechOptions,
 } from "../contracts/speech.js";
-import { AdapterError, type AdapterChunk, type AdapterRequest, type InferenceAdapter } from "./base.js";
+import { AdapterError, type AdapterCapabilities, type AdapterChunk, type AdapterRequest, type InferenceAdapter } from "./base.js";
 
 const replySchema = z.object({
   model: z.literal(KOKORO_MODEL),
@@ -15,14 +15,21 @@ export class KokoroAdapter implements InferenceAdapter {
   readonly kind = "kokoro" as const;
   private readonly baseUrl: URL;
   private ready = false;
+  private checkedAt = 0;
+  private inFlightProbe: Promise<AdapterCapabilities> | null = null;
   private readonly jobs = new Map<string, AbortController>();
   constructor(options: { baseUrl: string; model: string; modelDigest: string }) {
     const config = kokoroWorkerAdapterSchema.parse({ kind: this.kind, model: options.model, baseUrl: options.baseUrl });
     if (options.modelDigest !== KOKORO_WEIGHT_DIGEST) throw new Error("kokoro_model_digest_mismatch");
     this.baseUrl = new URL(config.baseUrl);
   }
-  async probe() {
+  probe(): Promise<AdapterCapabilities> {
+    this.inFlightProbe ??= this.probeOnce().finally(() => { this.inFlightProbe = null; });
+    return this.inFlightProbe;
+  }
+  private async probeOnce() {
     this.ready = false;
+    this.checkedAt = Date.now();
     const response = await fetch(new URL("health", this.baseUrl), {
       signal: AbortSignal.timeout(5_000), redirect: "error",
     });
@@ -39,7 +46,11 @@ export class KokoroAdapter implements InferenceAdapter {
     await this.probe();
   }
   async *generate(input: AdapterRequest, signal: AbortSignal): AsyncIterable<AdapterChunk> {
-    if (!this.ready || input.request.model !== KOKORO_MODEL) throw new Error("kokoro_not_ready_or_model_mismatch");
+    if (input.request.model !== KOKORO_MODEL) throw new Error("kokoro_not_ready_or_model_mismatch");
+    signal.throwIfAborted();
+    try { await this.probe(); } catch { throw new Error("kokoro_not_ready_or_model_mismatch"); }
+    signal.throwIfAborted();
+    if (input.lease && input.lease.deadline <= Date.now()) throw new Error("kokoro_worker_lease_expired");
     const users = input.request.messages.filter((message) => message.role === "user");
     if (users.length !== 1 || input.request.messages.some((m) => !["user", "system", "developer"].includes(m.role))) {
       throw new AdapterError("Speech requires one user text, without conversation history", "invalid_speech_request", false);
@@ -67,7 +78,10 @@ export class KokoroAdapter implements InferenceAdapter {
     }
   }
   async cancel(jobId: string) { this.jobs.get(jobId)?.abort(new Error("Speech cancelled")); }
-  async metrics() { return { ready: this.ready, activeJobs: this.jobs.size, loadedModels: this.ready ? [KOKORO_MODEL] : [] }; }
+  async metrics() {
+    if (Date.now() - this.checkedAt >= 5000) { try { await this.probe(); } catch { this.ready = false; } }
+    return { ready: this.ready, activeJobs: this.jobs.size, loadedModels: this.ready ? [KOKORO_MODEL] : [] };
+  }
 }
 async function boundedBody(response: Response, maximum: number): Promise<string> {
   if (!response.ok || !response.body) {
