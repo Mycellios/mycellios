@@ -1,0 +1,32 @@
+{
+  "deployed": true,
+  "activationEpochMs": 1793048859953,
+  "sourceId": "sha256:da905e65d83e9c7bd66854df833bd13d479d47e7916643a15383ada9832e9fb6",
+  "baseImage": "sha256:ccfd384cbd145d7ca4c490690e9a234812a8c70c399e804d20f7b2bcb33ab86f",
+  "validatorId": "5f91420af5fdbb62a1607ce1ab27717ac6cec7056aae8fc244cfe8f8e5c7949f",
+  "nginxConfigBeforeSha256": "7a56af8a51b451b230e2bbad54d8986059264c41b2089b97467b2590e5d5e349",
+  "nginxConfigAfterSha256": "c158b262d05c8b00bd05ba7fa730c32993dc96de5d11eced994d5d884d71c954",
+  "protectedRuntimeIdentitiesUnchanged": true,
+  "coordinatorSellerOrEngineRestarted": false,
+  "hostPortPublished": false,
+  "negativeCheck": {
+    "http": 400,
+    "code": "invalid_embedding_request",
+    "stoppedAtValidator": true,
+    "antseedChannelOpened": false
+  },
+  "publicHealthHttp": "200",
+  "validatorCounters": {
+    "status": "ok",
+    "sourceId": "sha256:da905e65d83e9c7bd66854df833bd13d479d47e7916643a15383ada9832e9fb6",
+    "active": 0,
+    "accepted": 0,
+    "rejected": 1,
+    "authRejected": 0,
+    "upstreamFailed": 0
+  },
+  "scope": "Public Nginx chat-completions ingress only; direct 4174 and other routes preserved",
+  "mainSynchronized": "4f4d8e8745348b199da4e1e0dbd6a0fa09ab95d1",
+  "candidateCommit": "c7b44792aa28dcf4411dc9800fe2cfd651cbc43b",
+  "candidateHasAdditionalPinnedSource": true
+}

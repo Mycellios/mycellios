@@ -529,3 +529,51 @@ the wallet. Jarvis's recovery evidence at 18:43 UTC records the SDK reporting
 is obsolete; no additional transfer is requested. This intervention performed
 no transfer or gas-guard bypass. Successful requests and announcement recovery
 are bounded observations, not a continuous-availability guarantee.
+
+### Public embedding admission ingress (2026-10-26, 21:07:39 UTC)
+
+A separate ingress validator now rejects invalid embedding envelopes before
+upstream job creation or usage reservation. It reuses the exact deployed embedding
+contract and delegates authentication to the coordinator's protected, read-only
+execution-receipt-key endpoint. Valid requests retain their original body bytes,
+authentication and idempotency headers; other models keep their existing route.
+The HTTP handler's cancellation path was exercised with a fixture executor, not
+physical inference. The native coordinator process itself was not replaced.
+
+Nine local transport tests passed. The unmodified production coordinator image
+with isolated PostgreSQL passed 23 HTTP cases covering validation, real API and
+operator authentication, and native handler cancellation on deadline/disconnect.
+The exact Nginx image preserved an active SSE call through both promotion and
+rollback. TypeScript, architecture and structure checks passed before activation.
+The isolated builder reproduces identical executable/configuration bytes using
+its explicitly pinned TypeScript 6.0.3 compiler API; TypeScript 7 remains the
+project's normal typechecker. The extra ingress source identity is
+`sha256:da905e65d83e9c7bd66854df833bd13d479d47e7916643a15383ada9832e9fb6`.
+It is a pinned addition to the existing runtime image, not code contained by
+base source commit `c7b4479` or a replacement for its coordinator build identity.
+
+Activation used Nginx reload only. A non-generative CORS preflight verified the
+live route marker before one negative HTTP control returned 400 at the validator.
+The protected container IDs, images, start times and host PIDs remained unchanged,
+and public health returned 200. The validator publishes no host port, holds no
+stored API key or database credentials, and runs with a read-only filesystem.
+Its JSON bound is 2 MiB; non-JSON parser exceptions and other endpoints remain
+upstream. Existing ingress buffering, limits and logging were preserved.
+Explicit request deadlines also bound the proxy transport without rewriting the
+body or retrying execution. Existing seller channels and engines were preserved.
+
+This covers the public chat-completions ingress used by the selected speech and
+embedding provider. Direct/internal port 4174 callers remain outside this filter;
+there is no claim of global coordinator admission closure. A subsequent Jarvis
+readback reported three new vectors after its post-activation baseline, all three
+valid, and eight successful free gateway responses with one concurrency rejection
+in a short window. Further validator rejections occurred after the single control
+request. These observations show continued operation and pre-execution rejection,
+not a measured migration speedup or reduction of on-chain channel-open fees.
+The channel opens before its request payload is validated. Buyer addresses in
+metering do not establish the operator or originating process. No buyer was
+blocked and price, account limits, daily cap and channel TTL were not changed.
+
+Sanitized evidence: [native HTTP cases](../tests/fixtures/embedding-ingress-native-http-evidence.json),
+[active-stream reload](../tests/fixtures/embedding-ingress-reload-evidence.json) and
+[activation receipt](../tests/fixtures/embedding-ingress-deployment-evidence.json).

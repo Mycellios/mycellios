@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "activeSseSurvivedPromotion": true,
+  "activeSseSurvivedRollback": true,
+  "newRequestsUsedValidator": true,
+  "validBodyBytesPreserved": true,
+  "coordinatorOrSellerRestarted": false,
+  "scope": "Local exact Nginx image graceful reload with actual proxy and mock streaming upstream; no model execution"
+}

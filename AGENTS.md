@@ -128,6 +128,10 @@ These rules apply to the complete repository.
 - Worker maintenance does not close HTTP job admission. An empty jobs query is
   not a global drain; coordinator replacement requires a common admission
   barrier and a handoff that preserves active calls and original deadlines.
+- The optional embedding ingress proxy protects only its configured HTTP route,
+  not direct/internal callers. Build its pinned capsule with
+  `scripts/build-embedding-admission-proxy.mjs`; keep compiler, contract and image
+  identities explicit. Healthchecks must not open AntSeed channels or run models.
 - Native requalification may refresh only explicitly approved worker/build/model/
   activation/node tuples. Keep the three-attempt daily cap and uncertain-request
   backoff; source drift requires operator approval, not a widened allowlist.

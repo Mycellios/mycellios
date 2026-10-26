@@ -57,7 +57,43 @@ per micro and 2048 total. Do not convert one unit into the other by estimation.
 
 Promotion still requires a common admission barrier and deadline-preserving
 handoff. Per-worker maintenance and an empty jobs query cannot provide that
-barrier. An ingress validator without coordinator restart is an alternative to
-review, not an implemented release; direct/internal callers need explicit
-coverage. Do not restart the seller, open healthcheck buyer channels, widen
+barrier. The separate ingress proxy provides a release path without replacing the
+coordinator; direct/internal callers still need explicit coverage. Do not restart the seller, open healthcheck buyer channels, widen
 limits or promise a throughput improvement from pre-change vector counts.
+
+
+## Reproducible ingress release
+
+Build the independent transport with `scripts/build-embedding-admission-proxy.mjs`.
+Supply a new output directory, immutable base/Nginx image IDs, exact embedding
+contract SHA-256, fixed credential-free upstream origin, fetched main revision
+and `--compiler-api` pointing to the installed TypeScript 6.0.3 API. This emitter
+is explicitly pinned because the project's TypeScript 7 compiler does not expose
+that legacy transpilation API. It does not replace the project typechecker.
+
+The builder emits the module, startup entrypoint, configuration and hash manifest.
+The startup entrypoint verifies each mounted runtime file before listening. Mount
+only those files read-only into the pinned image; grant no database or persisted
+API credentials, no host port and no new wallet. Record whether source files
+actually belong to the named Git commit rather than attributing dirty additions
+to that commit. Preserve the existing coordinator's independent build identity.
+
+Route only the exact public chat-completions path through the proxy. Preserve
+all other Nginx routes, logging, request limits and parser exceptions. Confirm
+readiness privately; use a non-generative OPTIONS route marker to prove the new
+Nginx worker is serving traffic before a negative control. No model inference or
+AntSeed channel is required for healthchecks. Never infer activation from a
+configuration file read alone. Keep direct/internal bypasses explicit.
+
+Reload Nginx rather than restarting workers or seller. Before writing, lock the
+promotion, check current config and protected runtime identities, and save the
+old bytes. For file bind mounts retain the original inode. Validate with nginx -t
+before reload; revert the previous bytes if validation fails. A rollback must
+leave the proxy running until old Nginx workers and their buffered/active calls
+have drained. Never cut calls to remove an otherwise unused proxy.
+
+Verify real traffic with a post-activation baseline and readback, not extra
+competing GPU probes. Correlate rejected requests with seller event/session IDs
+without storing payloads or secret headers. Do not call a 400 response monetary
+savings: on-chain OPEN precedes payload delivery. Keep price, daily cap, ledger,
+audit, channel TTL, owner quotas and chat priority unchanged.
