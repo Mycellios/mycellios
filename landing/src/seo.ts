@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 const SITE_ORIGIN = "https://www.mycellios.com";
-const BRAND_IMAGE_URL = `${SITE_ORIGIN}/assets/brand/og-image.png`;
+const BRAND_IMAGE_URL = `${SITE_ORIGIN}/assets/brand/og-network-v2.png`;
 const BRAND_LOGO_URL = `${SITE_ORIGIN}/assets/brand/app-icon.png`;
 const ORGANIZATION_ID = `${SITE_ORIGIN}/#organization`;
 const WEBSITE_ID = `${SITE_ORIGIN}/#website`;
@@ -365,7 +365,11 @@ export function applySeoMetadata(pathname = window.location.pathname): void {
   upsertMeta("property", "og:title", page.title);
   upsertMeta("property", "og:description", page.description);
   upsertMeta("property", "og:image", BRAND_IMAGE_URL);
-  upsertMeta("property", "og:image:alt", "mycellios — distributed intelligence, rooted in nature");
+  upsertMeta("property", "og:image:alt", "Mycellios — many machines, one shared network");
+  upsertMeta("property", "og:image:width", "1200");
+  upsertMeta("property", "og:image:height", "630");
+  upsertMeta("property", "og:image:type", "image/png");
+  upsertMeta("name", "twitter:image:alt", "Mycellios — many machines, one shared network");
   upsertMeta("name", "twitter:card", "summary_large_image");
   upsertMeta("name", "twitter:title", page.title);
   upsertMeta("name", "twitter:description", page.description);

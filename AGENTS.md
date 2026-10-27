@@ -94,6 +94,9 @@ These rules apply to the complete repository.
 - Run `npm run storybook` for the local catalog and `npm run storybook:build`
   when changing shared components. Config lives in `landing/.storybook`.
 
+- Shared-link previews use the versioned 1200 × 630 PNG declared in
+  `landing/index.html` and `landing/src/seo.ts`. Keep static and runtime metadata
+  aligned; verify `tests/landing-seo.test.ts` when changing social cards.
 - Preserve unrelated worktree changes.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
   canonical docs when complete.
