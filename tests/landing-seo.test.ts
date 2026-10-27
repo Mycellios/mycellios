@@ -12,6 +12,24 @@ import {
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("landing SEO contract", () => {
+  it("shares the versioned, correctly sized brand card before JavaScript runs", () => {
+    const html = read("landing/index.html");
+    const source = read("landing/src/seo.ts");
+    const image = readFileSync(new URL("../landing/public/assets/brand/og-network-v2.png", import.meta.url));
+    expect([...image.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+    expect(image.readUInt32BE(16)).toBe(1200);
+    expect(image.readUInt32BE(20)).toBe(630);
+    expect(image.length).toBeLessThan(2_000_000);
+    for (const key of ["og:image", "twitter:image"]) {
+      expect(html).toContain(`${key}" content="https://www.mycellios.com/assets/brand/og-network-v2.png`);
+    }
+    expect(html).toContain('property="og:image:width" content="1200"');
+    expect(html).toContain('property="og:image:height" content="630"');
+    expect(html).toContain('name="twitter:image:alt"');
+    expect(source).toContain("/assets/brand/og-network-v2.png");
+    expect(html).not.toContain("/assets/brand/og-image.png");
+  });
+
   it("uses unique titles and canonical URLs for every route", () => {
     const paths = Object.keys(SEO_PAGES) as SeoPath[];
     const titles = paths.map((path) => SEO_PAGES[path].title);
