@@ -109,6 +109,7 @@
     "node:stage:verify": "node scripts/verify-node-installer.mjs",
     "node:package:deb": "node scripts/build-node-deb.mjs",
     "node:package:deb:verify": "node scripts/verify-node-deb.mjs",
+    "desktop:package:rpm": "node scripts/build-desktop-rpm.mjs",
     "node:package:pkg": "node scripts/build-node-pkg.mjs",
     "node:package:pkg:verify": "node scripts/verify-node-pkg.mjs",
     "node:package:msi": "node scripts/build-node-msi.mjs",
