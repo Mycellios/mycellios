@@ -31,7 +31,7 @@ export function DesktopDownloads() {
           const platform = id === "windows-x64" ? "Windows" : fedora ? "Fedora" : "Linux";
           return <div className="desktop-package" key={id}>
             <div><Heading as="h2">{platform}</Heading><Text>{id === "windows-x64" ? "Windows 10 / 11 · 64-bit" : fedora ? "Fedora · 64-bit · RPM" : "Ubuntu / Debian · 64-bit"}</Text></div>
-            {pkg && (fedora || !failed) ? <Link variant="primary" size="lg" aria-label={`Download for ${platform}`} href={pkg.path} download={pkg.fileName}><Download size={18} aria-hidden="true" />{fedora ? "Download RPM" : "Download"}</Link> : <Button variant="primary" size="lg" disabled aria-label={`Download for ${platform}`}>Download</Button>}
+            {pkg && (fedora || !failed) ? <Link variant="primary" size="lg" aria-label={`Download for ${platform}`} href={pkg.path} download={pkg.fileName}><Download size={18} aria-hidden="true" />Download</Link> : <Button variant="primary" size="lg" disabled aria-label={`Download for ${platform}`}>Download</Button>}
           </div>;
         })}
       </div>

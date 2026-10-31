@@ -19,7 +19,7 @@ describe("Desktop downloads", () => {
     const html = renderToStaticMarkup(<DesktopDownloads />);
     expect(html).toContain(`href="${FEDORA_DESKTOP_DOWNLOAD.path}"`);
     expect(html).toContain('aria-label="Download for Fedora"');
-    expect(html).toContain("Download RPM");
+    expect(html).not.toContain("Download RPM");
     expect(html).toContain(`sudo dnf install ./${FEDORA_DESKTOP_DOWNLOAD.fileName}`);
     expect(html).toContain(FEDORA_DESKTOP_DOWNLOAD.sha256);
     expect(FEDORA_DESKTOP_DOWNLOAD.path).toBe(`https://github.com/Mycellios/mycellios/releases/download/desktop-v${FEDORA_DESKTOP_DOWNLOAD.version}-fedora-preview/${FEDORA_DESKTOP_DOWNLOAD.fileName}`);
