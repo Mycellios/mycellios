@@ -29,6 +29,16 @@ namespaces with temporary `/etc` and `/opt`, synthetic payloads and no network.
 Missing platform tools or unavailable user namespaces produce explicit skips.
 Interactive sign-in and real network enrollment require separate user testing.
 
+The separate `/downloads/desktop` page is built from
+`landing/src/DesktopDownloads.tsx` with `node scripts/build-desktop-downloads.mjs`
+into `build/desktop-downloads/web`. Preserve the EXE/DEB catalog and existing
+immutable files when publishing this static surface. The Fedora row uses the
+qualified GitHub preview asset pinned in `landing/src/desktop-fedora-download.ts`;
+its version, size and SHA-256 must match the published release. Do not append
+RPMs to the legacy two-package catalog: older page versions reject unknown entries.
+Run `npx vitest run landing/src/desktop-downloads.test.tsx` and
+`npm run landing:typecheck` when changing this page.
+
 ## Shared interface kit and Storybook
 
 The default landing lives in `landing/src/rebrand/ReferenceLanding.tsx` and

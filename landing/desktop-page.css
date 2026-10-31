@@ -1,0 +1,5 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: #f8f5f0; color: #1e2a22; font-family: "Geist Variable", sans-serif; }
+body { min-width: 280px; }
+::selection { background: #dce7db; color: #1e2a22; }
+:focus-visible { outline: 2px solid #9c7047; outline-offset: 3px; }

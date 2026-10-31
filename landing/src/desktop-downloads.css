@@ -1,0 +1,31 @@
+.desktop-downloads { max-width: 736px; margin: 0 auto; padding: calc(32px + env(safe-area-inset-top)) calc(28px + env(safe-area-inset-right)) calc(56px + env(safe-area-inset-bottom)) calc(28px + env(safe-area-inset-left)); color: var(--agent-fg); }
+.desktop-downloads header, .desktop-downloads footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.desktop-wordmark { font-size: 22px; font-weight: 500; text-decoration: none; }
+.desktop-downloads header > a:last-child { font-size: 14px; }
+.desktop-downloads section { margin-top: 64px; }
+.desktop-downloads h1 { font-size: clamp(30px, 4vw, 40px); font-weight: 500; line-height: 1.15; letter-spacing: -.025em; margin: 0; }
+.desktop-intro { font-size: 18px; margin: 16px 0 32px; }
+.desktop-downloads p { line-height: 1.6; }
+.desktop-package { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 0; border-bottom: 1px solid var(--ui-line); }
+.desktop-package:first-child { border-top: 1px solid var(--ui-line); }
+.desktop-package h2 { font-size: 20px; font-weight: 500; margin: 0 0 4px; }
+.desktop-package p { font-size: 14px; margin: 0; color: var(--agent-muted); }
+.desktop-package > a, .desktop-package > button { flex-shrink: 0; }
+.desktop-version, .desktop-notice { font-size: 13px; color: var(--agent-muted); }
+.desktop-version { margin: 20px 0 6px; }
+.desktop-notice { margin: 0; }
+.desktop-details { margin-top: 28px; font-size: 14px; }
+.desktop-details summary { cursor: pointer; text-underline-offset: 3px; }
+.desktop-details summary:hover { text-decoration: underline; }
+.desktop-details p { margin: 16px 0; }
+.desktop-details code { overflow-wrap: anywhere; }
+.desktop-checksums { margin-top: 24px; }
+.desktop-checksums code { display: block; overflow-wrap: anywhere; font-size: 12px; margin-top: 8px; color: var(--agent-muted); }
+.desktop-downloads footer { margin-top: 24px; justify-content: flex-start; }
+@media (max-width: 440px) {
+ .desktop-downloads { padding: calc(24px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left)); }
+ .desktop-downloads header { gap: 16px; }
+ .desktop-downloads section { margin-top: 48px; }
+ .desktop-package { gap: 12px; padding: 20px 0; }
+ .desktop-package p { max-width: 19ch; }
+}
