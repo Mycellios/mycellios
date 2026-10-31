@@ -41,18 +41,26 @@ The mushroom illustration is the default, without comparison controls, including
 on previously shared `/?compare=mushrooms&art=fruiting` links. `/?art=fabric`
 restores the exact original asset. The renderer and layout are shared; Storybook
 keeps the original illustration in `Screens/Landing/OriginalArtwork`.
-The header contains Agent, Create, Earn, Token (Staking, Treasure and Data),
-Live network, GitHub/X/Telegram and Login on desktop and in the responsive menu.
+The header exposes Agent, Create and Earn, with Live network, Docs and the Token
+links (Staking, Treasure and Data) grouped in a single Explore disclosure.
+Login remains available on desktop and in the responsive menu; social links
+live in the footer.
 A primary Download action opens `/downloads/desktop` and remains visible beside
 the mobile menu toggle. The header respects display cutouts and the mobile menu
-uses the small viewport height. Docs remains linked from the page and footer. The Token label
-uses the existing SPORE routes and disclosure component; other surfaces retain
+uses the small viewport height. Docs remains linked from the page and footer. The Token group
+uses the existing SPORE routes and shared disclosure primitive; other surfaces retain
 their original labels. `Screens/Landing/Navigation` renders the production header.
 Its scene is conceptual. The expanded Agent example includes local attachment
 fixtures, not real user files or completed actions. Production and the
 `Screens/Landing` Storybook story import the same components. Real conversations
 open the published Agent app. Reference-specific layout uses `mycellios-reference`
 over the existing marketing base and does not repaint the panel or studios.
+
+The hero has one action, How it works, which scrolls to `#network`. That chapter
+contains the API endpoint; computer/browser contribution choices appear only
+under `#contribute`. Desktop download links share `/downloads/desktop`. The
+Agent illustration has one outbound handoff in its composer; its other controls
+stay within the example instead of opening the app under unrelated labels.
 
 Previous versions remain available: `/?landing=assemblage` shows the discarded
 composition, `/?landing=rooted` restores RootedLanding,

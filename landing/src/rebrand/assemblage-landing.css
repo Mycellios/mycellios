@@ -100,7 +100,7 @@ html:has(.mycellios-assemblage) { scroll-behavior: smooth; scroll-padding-top: 2
 .assembly-agent-brand { display: flex; gap: 10px; align-items: center; font-size: 14px; font-weight: 500; white-space: nowrap; }
 .assembly-agent-brand img, .assembly-message-answer > img { filter: grayscale(1) brightness(0) invert(.93); }
 .assembly-bots-label { display: flex; justify-content: space-between; align-items: center; margin-top: 33px; padding-left: 10px; font-size: 13px; }
-.assembly-bots-label a { padding: 8px; display: inline-flex; }
+.assembly-bots-mark { padding: 8px; display: inline-flex; }
 .assembly-assistants { display: grid; gap: 8px; margin-top: 13px; }
 .assembly-assistants button { display: flex; align-items: center; gap: 10px; min-height: 48px; width: 100%; text-align: left; color: inherit; background: transparent; border: 0; border-radius: 8px; padding: 10px; font-size: 13px; }
 .assembly-assistants button[aria-pressed="true"] { background: var(--demo-raised); }
