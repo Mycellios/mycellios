@@ -9,7 +9,15 @@ describe("native Windows MSI source", () => {
     ] });
     expect(source).toContain('InstallScope="perMachine"'); expect(source).toContain(".mycellios-enrollment");
     expect(source).toContain("[INSTALLFOLDER]install.ps1"); expect(source).toContain("%1"); expect(source).toContain("MYCELLIOSSOURCEREVISION");
-    expect(source.match(/<File /g)).toHaveLength(3); expect(source).not.toContain("enrollmentToken");
+    expect(source.match(/<File /g)).toHaveLength(4); expect(source).toContain("layout-manifest.json"); expect(source).not.toContain("enrollmentToken");
+  });
+
+  it("includes the product manifest exactly once when the inventory already contains it", () => {
+    const source = generateWixSource({ stagedRoot: "C:\\staged", version: "0.2.77", sourceRevision: "a".repeat(40), files: [
+      { path: "layout-manifest.json", bytes: 1, sha256: "d".repeat(64) },
+    ] });
+    expect(source.match(/<File /g)).toHaveLength(1);
+    expect(source).toContain("layout-manifest.json");
   });
 
   it("is deterministic for identical source identity", () => {

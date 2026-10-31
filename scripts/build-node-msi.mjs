@@ -20,7 +20,10 @@ export function generateWixSource(input) {
   if (!/^\d+\.\d+\.\d+$/.test(input.version)) throw new Error("node_msi_version_is_invalid");
   if (!/^[a-f0-9]{40}$/.test(input.sourceRevision)) throw new Error("node_msi_source_revision_is_invalid");
   const root = directoryNode("INSTALLFOLDER", "Mycellios"); const componentIds = [];
-  for (const file of input.files) {
+  // The manifest excludes itself from its hash inventory but must ship in the MSI.
+  const files = input.files.some((file) => file.path === "layout-manifest.json")
+    ? input.files : [...input.files, { path: "layout-manifest.json" }];
+  for (const file of files) {
     const parts = file.path.split("/"); const name = parts.pop(); if (!name || parts.some((part) => !part || part === "." || part === "..")) throw new Error("node_msi_file_path_is_invalid");
     let directory = root; for (const part of parts) directory = childDirectory(directory, part);
     const id = wixId("cmp", file.path); componentIds.push(id);
