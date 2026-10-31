@@ -1,7 +1,7 @@
-.mycellios-reference { --assembly-paper: #faf9f7; --assembly-ink: #16221b; --assembly-muted: #59635d; --assembly-stone: #f0f1ed; --ui-radius-card: 12px; }
+.mycellios-reference { --assembly-paper: #faf9f7; --assembly-ink: #16221b; --assembly-muted: #59635d; --assembly-stone: #f0f1ed; --ui-radius-card: 12px; padding-inline: env(safe-area-inset-left) env(safe-area-inset-right); padding-bottom: env(safe-area-inset-bottom); }
 html:has(.mycellios-reference) { background: #faf9f7; }
 .reference-shell { width: min(1150px,calc(100% - 80px)); margin-inline: auto; }
-.reference-header { display: flex; align-items: center; min-height: 86px; gap: 28px; position: relative; }
+.reference-header { display: flex; align-items: center; min-height: calc(86px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); gap: 20px; position: relative; }
 .reference-brand { display: inline-flex; flex-shrink: 0; align-items: center; gap: 10px; font-size: 22px; font-weight: 500; letter-spacing: -.035em; white-space: nowrap; }
 .reference-brand img { object-fit: contain; }
 .reference-header > nav:not(.reference-mobile-navigation) { margin-left: auto; display: flex; gap: 28px; align-items: center; white-space: nowrap; }
@@ -10,14 +10,15 @@ html:has(.mycellios-reference) { background: #faf9f7; }
 .reference-social-links { display: flex; align-items: center; gap: 2px; }
 .reference-social-links a { display: inline-flex; align-items: center; justify-content: center; width: 36px; min-height: 44px; }
 .reference-social-links svg { width: 16px; height: 16px; }
-.mycellios-reference .reference-header .ui-button.reference-header-login { --ui-control-height: 36px; --ui-radius-control: 0px; min-width: 76px; min-height: var(--ui-control-height) !important; border-radius: var(--ui-radius-control) !important; }
+.mycellios-reference .reference-header .ui-button:is(.reference-header-login, .reference-header-download) { --ui-control-height: 36px; --ui-radius-control: 0px; min-width: 76px; min-height: var(--ui-control-height) !important; border-radius: var(--ui-radius-control) !important; }
+.reference-header-download { flex-shrink: 0; }
 .reference-header .spore-menu summary { font-size: 14px; }
 .reference-header .spore-menu summary:hover, .reference-header .spore-menu summary:focus-visible { color: var(--assembly-moss); }
 .reference-header .spore-menu-popover { background: var(--assembly-paper); border-color: var(--assembly-line); box-shadow: none; }
 .reference-header .spore-menu-popover a { color: var(--assembly-ink) !important; }
 .reference-header .spore-menu-popover a:hover, .reference-header .spore-menu-popover a:focus-visible { background: var(--assembly-stone); color: var(--assembly-ink) !important; }
 .reference-menu { display: none; }
-.reference-mobile-navigation { position: absolute; top: calc(100% - 2px); inset-inline: 0; z-index: 20; display: grid; padding: 16px; max-height: calc(100dvh - 110px); overflow-y: auto; background: var(--assembly-stone); border-radius: 12px; }
+.reference-mobile-navigation { position: absolute; top: calc(100% - 2px); inset-inline: 0; z-index: 20; display: grid; padding: 16px; max-height: calc(100svh - 110px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; background: var(--assembly-stone); border-radius: 12px; }
 .reference-mobile-navigation a, .reference-mobile-navigation .spore-menu summary { padding-inline: 12px; }
 .reference-mobile-navigation .spore-menu { height: auto; }
 .reference-mobile-navigation .spore-menu-popover { position: static; width: auto; margin: 0 12px 8px; transform: none; animation: none; }
@@ -107,14 +108,16 @@ html:has(.mycellios-reference) { background: #faf9f7; }
 .reference-footer > span { color: var(--assembly-muted); font-size: 11px; }
 @media (max-width: 1100px) {
   .reference-header > nav:not(.reference-mobile-navigation), .reference-header-actions { display: none; }
-  .reference-menu { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; padding: 10px; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: inherit; }
+  .reference-header { gap: 12px; }
+  .mycellios-reference .reference-header .ui-button.reference-header-download { --ui-control-height: 44px; margin-left: auto; }
+  .reference-menu { display: inline-flex; align-items: center; justify-content: center; padding: 10px; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: inherit; }
   .reference-agent .assembly-workspace { grid-template-columns: 200px minmax(0,1fr); }
   .reference-agent .assembly-inline-context { display: block; margin-left: 38px; border: 1px solid var(--demo-edge); border-radius: 9px; }
   .reference-agent .assembly-inline-context .assembly-file-preview { margin: 0 12px 12px; }
 }
 @media (max-width: 760px) {
   .reference-shell { width: calc(100% - 40px); }
-  .reference-header { min-height: 78px; }
+  .reference-header { min-height: calc(78px + env(safe-area-inset-top)); }
   .reference-hero { padding-top: 40px; }
   .reference-hero h1 { font-size: clamp(29px,8.5vw,48px); line-height: 1.08; }
   .reference-hero h1 br { display: initial; }
@@ -156,4 +159,9 @@ html:has(.mycellios-reference) { background: #faf9f7; }
   .reference-questions summary { font-size: 15px; }
   .reference-footer { flex-wrap: wrap; gap: 20px; padding-block: 25px; }
   .reference-footer nav { width: 100%; margin-left: 0; gap: 22px; }
+}
+@media (max-width: 400px) {
+  .reference-header { gap: 8px; }
+  .mycellios-reference .reference-header .ui-button.reference-header-download { padding-inline: 10px; }
+  .reference-header-download svg { display: none; }
 }

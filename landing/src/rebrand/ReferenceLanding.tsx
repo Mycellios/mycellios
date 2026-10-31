@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, GitFork, Globe2, Laptop, Menu, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, ChevronDown, Copy, Download, GitFork, Globe2, Laptop, Menu, X } from "lucide-react";
 import { Button, Disclosure, DisclosureSummary, Heading, Link, Text } from "../ui/primitives";
 import { BrandIcon } from "../ui/BrandIcons";
 import { applySeoMetadata } from "../seo";
@@ -43,7 +43,7 @@ export function ReferenceHeader() {
     return () => { window.removeEventListener("keydown", escape); window.removeEventListener("pointerdown", outside); };
   }, [open]);
   const items = <><Link href={AGENT_URL}>Agent</Link><Link href="/create">Create</Link><Link href="/earn">Earn</Link><SporeMenu label="Token" treasuryLabel="Treasure" menuLabel="Open Token menu" /><Link href="/network">Live network</Link></>;
-  return <header ref={header} className="reference-header reference-shell"><Link className="reference-brand" href="/" aria-label="Mycellios home"><img src={logo} width="30" height="30" alt="" /><span>Mycellios</span></Link><nav aria-label="Main navigation">{items}</nav><div className="reference-header-actions"><ReferenceSocialLinks /><Link href="/dashboard" variant="primary" className="reference-header-login">Login</Link></div><Button ref={toggle} variant="ghost" className="reference-menu" aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open} aria-controls="reference-mobile-navigation" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</Button>{open && <nav id="reference-mobile-navigation" className="reference-mobile-navigation" aria-label="Mobile navigation">{items}<ReferenceSocialLinks /><Link href="/dashboard" variant="primary" className="reference-header-login">Login</Link></nav>}</header>;
+  return <header ref={header} className="reference-header reference-shell"><Link className="reference-brand" href="/" aria-label="Mycellios home"><img src={logo} width="30" height="30" alt="" /><span>Mycellios</span></Link><nav aria-label="Main navigation">{items}</nav><div className="reference-header-actions"><ReferenceSocialLinks /><Link href="/dashboard" variant="ghost" className="reference-header-login">Login</Link></div><Link href="/downloads/desktop" variant="primary" className="reference-header-download"><Download size={16} aria-hidden="true" /><span>Download</span></Link><Button ref={toggle} variant="ghost" className="reference-menu" aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open} aria-controls="reference-mobile-navigation" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</Button>{open && <nav id="reference-mobile-navigation" className="reference-mobile-navigation" aria-label="Mobile navigation">{items}<ReferenceSocialLinks /><Link href="/dashboard" variant="primary" className="reference-header-login">Login</Link></nav>}</header>;
 }
 
 function ConnectionPanel() {

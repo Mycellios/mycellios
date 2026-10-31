@@ -1,5 +1,34 @@
 # Development
 
+## Fedora Desktop RPM
+
+`npm run desktop:package:rpm` creates
+`build/desktop-rpm/Mycellios-Desktop-0.3.9-fedora-x86_64.rpm`, its SHA-256 and
+provenance JSON. Build on Linux x86_64 with `rpm-build`, `binutils`, `tar`,
+`gzip` and `zstd`. Install the result with `sudo dnf install ./<artifact>.rpm`.
+Build output and cached downloads are ignored by Git.
+
+`config/desktop-fedora-release.json` pins the published Desktop DEB and complete
+source archive. The Desktop source supplement identifies its baseline main
+revision separately from the bundled runtime version; do not rebuild the older
+runtime in main and substitute it for the published payload. The RPM retains
+the application ASAR, runtime archive, licenses and account behavior byte for
+byte. Only native package integration and the polkit enrollment helper change.
+
+`deploy/linux/install-desktop-runtime.sh` verifies the bundled payload's hash
+and package identity, then extracts its `/opt/mycellios` tree as data without
+dpkg. The native node installer still owns service registration and enrollment.
+Installing or removing Desktop never starts, enrolls, removes or replaces a
+contribution node. An existing identity or incomplete installation is preserved.
+Contribution setup requires the normal signed-in account action and polkit.
+Fedora uses Chromium's user-namespace sandbox; the package does not disable it.
+
+Run `npx vitest run tests/desktop-rpm.test.ts tests/desktop-runtime-fedora.test.ts`.
+RPM tests use the real RPM tools; enrollment-helper tests use Bubblewrap user
+namespaces with temporary `/etc` and `/opt`, synthetic payloads and no network.
+Missing platform tools or unavailable user namespaces produce explicit skips.
+Interactive sign-in and real network enrollment require separate user testing.
+
 ## Shared interface kit and Storybook
 
 The default landing lives in `landing/src/rebrand/ReferenceLanding.tsx` and
@@ -13,8 +42,10 @@ on previously shared `/?compare=mushrooms&art=fruiting` links. `/?art=fabric`
 restores the exact original asset. The renderer and layout are shared; Storybook
 keeps the original illustration in `Screens/Landing/OriginalArtwork`.
 The header contains Agent, Create, Earn, Token (Staking, Treasure and Data),
-Live network, GitHub/X/Telegram and a compact Login action on desktop and in the
-responsive menu. Docs remains linked from the page and footer. The Token label
+Live network, GitHub/X/Telegram and Login on desktop and in the responsive menu.
+A primary Download action opens `/downloads/desktop` and remains visible beside
+the mobile menu toggle. The header respects display cutouts and the mobile menu
+uses the small viewport height. Docs remains linked from the page and footer. The Token label
 uses the existing SPORE routes and disclosure component; other surfaces retain
 their original labels. `Screens/Landing/Navigation` renders the production header.
 Its scene is conceptual. The expanded Agent example includes local attachment
