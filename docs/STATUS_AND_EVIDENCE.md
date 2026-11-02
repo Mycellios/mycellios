@@ -1,6 +1,267 @@
 # Status and evidence
 
-Updated: 2026-09-25 (economic and token status).
+Updated: 2026-11-01 (local Desktop development window installed and checked; broader integration gates remain; public releases and economic records unchanged).
+
+<!-- Local Desktop evidence below does not promote any public installer or backend. -->
+
+## Local Desktop development window — 2026-11-01
+
+The installed Windows preview now offers General / Advanced / Open development.
+It opens a separate sandboxed window with a loopback Vite server, an explicit
+development/real-account label and the existing account session for API requests.
+No API, worker, database, new host grant or public release is started by this action.
+Only UI source updates live; native host changes still require rebuilding/restarting.
+
+Eleven focused cases passed locally (including the subsequently rechecked native
+boundary/lifecycle cases), as did scoped incremental types and the stable frontend
+build. Real installed checks opened both windows, recovered the account without
+another login, closed development and observed its child server stop while stable
+remained open. Reopening development worked without restarting stable. An actual
+CSS change was then applied/reverted in the installed window through Vite HMR;
+the renderer logged a CSS hot update without another document load. Temporary
+probe code was removed. The initial stylesheet requires explicit `?direct` delivery
+through the credential-free asset proxy. Evidence is under
+`src/agent/outputs/desktop-development-20261101`.
+
+This is a local installation only, with recoverable native/frontend predecessors.
+Global architecture checks still report cycles/oversized modules across the Agent
+integration; the root typecheck also reports an unrelated import-extension error
+in the desktop download test. This evidence does not qualify a public release.
+
+
+## Shared Agent visual qualification — 2026-10-31
+
+Local source corrections bound long select values and menus, prevent shared dialog
+headings from overlapping their close controls, fit the sign-in heading on narrow
+screens and retain technical computer setup under a closed disclosure. Artifact
+cards now respect containers narrower than their preferred minimum.
+
+Actual shared React components were rendered with offline account fixtures across
+ten settings/integration surfaces at 360/768/1280 pixels, with additional 320-pixel,
+keyboard, expanded-form, chat-card and locale/theme cases. The final browser run
+passed 65 checks; 175 affected component tests, incremental TypeScript, the frontend
+build and repository structure check passed locally. The source design detector
+reported no findings on the changed UI files. Evidence and isolated dependency
+mapping are in `src/agent/outputs/visual-audit-20261031`.
+
+These are local Chrome/emulated viewport checks, not physical phone tests or a
+live-account/backend qualification. No account mutations, inference, installer
+update or production deployment was performed for this visual change.
+
+## Simple Desktop startup and recovery candidate — 2026-10-31
+
+Normal startup opens the existing Mycellios account route directly. A damaged
+saved preference no longer opens server setup or starts a local stack. Explicit
+valid self-hosted configurations retain their validation and ownership checks.
+Connection failure shows a light recovery surface with Retry/Close; server
+configuration stays folded under Advanced. Retry is restricted to the native-owned
+failed target and does not save configuration, clear cookies or replay tasks.
+
+Sixty affected tests passed locally; three filesystem tests were skipped on
+Windows. Focused incremental native TypeScript checking passed after supplying
+the actual workspace/dependency paths. Real Windows Electron fixtures qualified
+offline recovery, duplicate retry coalescing, recovery after the service returned,
+close while offline, preserved test-profile storage across reopening and the
+normal first-party login in the same visible window. Local Geist loading was
+verified under the recovery page's real CSP. These anonymous fixtures did not
+sign into the user's account or perform inference.
+
+The prepared native patch is
+`4d9df5e23eb5ded8e2466bbc6fcec1ab1ae68360fd8a1d75853eee874003f23f`.
+It changes only the native entry point and four setup assets, adding the
+self-hosted font, while retaining the previous package and unrelated files.
+After Windows was unlocked, the application was closed normally and this native
+patch was applied locally. The real account and Micos returned directly, without
+server setup or sign-in, including a second normal close/reopen. The displayed
+balance remained 0.954188 Credits with Promo separately identified. Native caption
+controls stayed visible. The profile, runtime and public services were preserved;
+no inference was requested. This local native patch does not install the later
+visual frontend candidate. Receipts are `local-update.json` and
+`local-account-verified.json` in the qualification directory. Installer preparation
+and its separate qualification receipts are under
+`src/agent/outputs/desktop-startup-20261031`. No new installer is published by
+this source/local preparation; the earlier public 0.3.9 downloads remain active.
+
+The unsigned Windows 0.3.10 installer is prepared with SHA-256
+`55615f70ebcd10b5adbb9bb5185d50d97937f7ad2605a423d8041f10dca9f38b`.
+Its actual packaged executable passed the same startup/recovery/reopening cases;
+payload checks matched all changed native assets, the pinned 0.2.95 runtime and
+the already-qualified shared frontend. Its packaged ASAR is
+`091ab23a5b09ffccafafc16a454fe905b56c41523edd393eb058272b18783014`.
+This is packaging and packaged-executable proof, not a clean Windows installation,
+an upgrade of the user's installation or a new Linux/macOS qualification.
+Repository structure verification passed. No commit, push or publication occurred.
+
+## Unified Agent typography — 2026-10-31
+
+Agent body text, display headings, wordmarks, startup and first-party account
+forms now share self-hosted Geist Variable. The login's Georgia shorthand and
+the Agent's Fraunces/Georgia display override were removed. Registration and
+sign-in retain their existing authentication JavaScript byte for byte; the
+central login changes only its content-addressed stylesheet reference. Its CSP
+adds same-origin fonts, retaining all other restrictions.
+
+Frontend build `20261031130004`, immutable patch
+`8484f35664205f67588fd3c4c65aab44ad9d67748aad3cc622ce56274d3a9a4f`,
+was qualified against fetched main `1a45f32d6deb5149fb8f7490c918b8285a622d4b`
+and the prior qualified source. Source snapshot SHA-256 is
+`a2c18da382ce48fd011db1140480c1c59b5ebe0dbade93a5eb75b8cdc4574dd5`.
+Twenty-three affected identity tests, scoped incremental types and the complete
+frontend build passed locally. Isolated browser fixtures verified the actual
+custom font used by Chromium, registration/sign-in switching and no overflow at
+320, 390, 768 and 1440 pixels. Initial fixture failures involved its manifest,
+deployment base and asset policy; they were corrected before qualification.
+
+Private Nginx and public HTTPS checks verified immutable HTML/assets, font hashes,
+unchanged identity JavaScript, retained legacy assets and PWA scope. The public
+login was also visually inspected. API, workers, database, financial records and
+model services were not replaced, restarted or invoked.
+
+The local Windows native artifact remains
+`1e4f0559a2fdc822e2913c4877817b5ebfa2afb9eaa7510050bdca8f1ac709bf`.
+Its compact transparent caption overlay replaces the earlier full-width strip;
+the shared frontend reserves space beside the sidebar actions. The real profile
+initially failed startup with its local-renderer override enabled. Archiving
+only that preference and using the identical published frontend allowed Desktop
+to reopen its existing account, Micos and **0.954188 Credits** with separate Promo,
+without a credential prompt. The local override remains disabled; its successful
+anonymous loading probe is not proof of authenticated OAuth compatibility.
+Public native installers were not replaced. Receipts and screenshots are under
+`src/agent/outputs/typography-consistency-20261031`.
+
+## Persistent Desktop control strip — 2026-10-31
+
+The initially qualified local Windows Desktop 0.3.9 application used the requested red/yellow/green
+controls without the Windows title bar. A sandboxed local WebContentsView owns
+the strip independently of the navigable Agent/login page, with a separate
+32-pixel layout area. Its IPC accepts only its own local main frame and the
+three caption actions; no account, project, shell or runtime capabilities are
+exposed by that view. Existing macOS traffic lights are retained by source.
+
+Thirty-two focused tests and scoped incremental TypeScript passed. A real Windows
+fixture qualified navigation, page DOM replacement, resizing, minimize,
+maximize/restore and close. The installed executable then passed minimize,
+maximize/restore and close on the actual first-party HTTPS login in a separate
+anonymous profile. The initial test harness expected an intermediate login
+button; it was corrected to accept the existing direct same-window OAuth route.
+No product authentication behavior changed.
+
+The regular real-account profile reopened without another credential prompt and
+visibly retained its Micos and **0.954188 Credits** with separate Promo. No new
+account sign-in was performed in the anonymous test profile. The runtime, user
+profile and public services were not modified. That initial native artifact was
+`e028a6ec1b1af3f78842bb1ea17da8a21e95b674af0c26ab82cb985e79724be6`;
+5,616 existing package files are preserved, with one native entry-point change
+and four new local strip assets. The public Windows/Linux installers remain
+unchanged. Receipts and the native-window login screenshot are under
+`src/agent/outputs/persistent-chrome-20261031`.
+
+## Agent balance recovery and window controls — 2026-10-31
+
+Production frontend build `20261031122612`, immutable patch
+`8a495031a359a5eca67c4ecdcd1ad876b76766a725468887ef44dee40c3b8a5e`,
+supersedes the terminology build below. Fetched main remained
+`1a45f32d6deb5149fb8f7490c918b8285a622d4b`; the exact published source snapshot
+is `7cc014f0b33e3e9f4cc9c8609a08b6533f81fe46a97d907dd2d26628aa30dea7`.
+No commit, push, backend update or financial mutation occurred.
+
+Credit reads now retry transient failures serially, retain an explicitly stale
+last verified amount only for the same owner, and clear it on access/identity
+changes or authoritative null. Local focused checks, scoped incremental types,
+the full frontend build and responsive initial-failure-recovery fixtures passed.
+Full-Shell transitive type errors were independently reproduced in the previous
+published source and remain recorded, not claimed passing. Private Nginx and
+public HTTPS checks verified exact application bytes, translated catalogs,
+PWA scope, retained legacy assets, downloads and AntSeed authorization boundaries.
+The API, workers, database and model services were not replaced or restarted.
+
+The central login and Agent wordmark now display **Mycellios**. Login promotion
+changes exactly the compiled brand text and its content-addressed asset reference;
+authentication behavior and the existing assets are retained.
+
+The real signed-in account recovered and displayed **0.954188 Credits**, with
+separate Promo, in browser and installed Windows Desktop observations before this
+frontend promotion. Post-promotion public bytes were checked; a fresh interactive
+account check was not completed because computer control was stopped.
+
+The initial Windows/Linux fallback retained native window frames across login
+navigation and renderer failures; the custom strip above supersedes it. That
+narrow local Windows 0.3.9 update changed only native window
+options and its preload capability, retaining 5,615 other packaged files, profile
+and runtime. Native caption controls and the existing account were visibly observed.
+The final native close-click check was interrupted; it is not reported passing.
+The public 0.3.9 installers have **not** been replaced with this native fix.
+
+Receipts are under `src/agent/outputs/credit-balance-recovery-20261031` and
+`src/agent/outputs/native-chrome-20261031`.
+
+## Agent terminology publication — 2026-10-31
+
+Production Agent build `20261031115929` uses Credits (Créditos in Spanish) for
+the internal balance and Mico/Micos for user agents. Spore names the separate
+official token; this release does not activate the token or change balances.
+The paid-credit conversion remains 10 USD = 10 Credits, with integer micro-unit
+precision and promotional attribution retained. There were no financial writes,
+schema migrations, model calls or saved-history changes in this publication.
+
+The immutable frontend patch is
+`651ab5019b216f41ed2d0c832c4df68869c57467e19d8456141849bde3f38c7d`,
+qualified against fetched main `1a45f32d6deb5149fb8f7490c918b8285a622d4b`
+and the exact published frontend source. Sixty affected tests, scoped incremental
+types, a local build, English/Spanish responsive fixtures and eight route-safety
+tests passed. Private Nginx qualification and public HTTPS checks verified the
+new HTML/assets, translated catalogs, legacy asset delivery, PWA scope, Desktop
+downloads and unchanged AntSeed authorization requirements. The existing
+Cloudflare analytics injection is retained.
+
+Docker was unresponsive under host I/O pressure. The publication therefore uses
+immutable files in the existing read-only frontend mount and a gracefully reloaded
+Nginx configuration; the API, workers, database, old web service and model services
+were not replaced or restarted. The active Nginx configuration and release receipt,
+not the old web container label alone, identify the served frontend revision.
+
+A real signed-in browser verified Créditos, Nuevo Mico and the Desktop link.
+The account lookup currently returns unavailable, so the sidebar shows an em dash.
+The numeric production balance was **not** reverified; no zero or cached amount
+was substituted. Receipts and screenshots are under
+`src/agent/outputs/credits-micos-release-20261031`.
+
+## Desktop preview publication — 2026-10-31
+
+Mycellios Desktop 0.3.9 is published for Windows x64 (EXE) and Debian/Ubuntu
+x64 (DEB) at https://www.mycellios.com/downloads/desktop, with the bundled
+runtime 0.2.95. The separate headless runtime catalog and platform downloads
+remain unchanged. macOS Desktop is deferred. Preview upgrades are manual;
+unsigned automatic updates are disabled.
+
+The public files match the qualified installers. Windows clean installation
+and removal were exercised in Windows Sandbox; the 0.3.8-to-0.3.9 upgrade
+retained its profile and project fixture. Reinstalling the public 0.3.9 EXE
+also retained the existing real account, preferences and native identity;
+reloading and restarting Desktop required no new login. Linux install,
+reinstall, removal and profile retention passed in an isolated Debian
+container, with a later packaged GUI/session test using Xvfb and an isolated
+identity fixture. This is not physical Linux GPU or production-account
+sign-in evidence.
+
+Publication identity:
+`8cf6e5ab48eae736dace45d69e497038926c77c48e5430b3fc8fe17ba514a16d`.
+The source archive records the canonical repository, source inputs and native
+bundle reproduction against main `1a45f32d6deb5149fb8f7490c918b8285a622d4b`.
+Local campaign receipts are under `outputs/desktop-publication-20261031`;
+earlier installer and platform receipts are under
+`src/agent/outputs/desktop-linux-20261030` and
+`src/agent/outputs/desktop-platforms-20261031`.
+
+Publication adds a read-only download service and narrowly scoped ingress
+routes. Coordinator, Agent API/worker/frontend, AntSeed and GPU reservations
+kept their running images and start times. PC-DANI ran no inference.
+
+The subsequent download-page simplification uses publication
+`3c8264913b971d1b3fe0e5719084fab6cbb811bc68923c119b1214d5f44f2b0d`,
+with the same installer hashes and additive source/asset URLs. Local desktop,
+320/390-pixel mobile, keyboard disclosure and error-retry checks passed;
+receipts live under `outputs/desktop-downloads-simple-20261031`.
 
 ## Implemented and connected
 
@@ -459,3 +720,380 @@ speedup, GPU qualification or a general decision-quality benchmark. Non-streamin
 delivery at the 256-token boundary is not qualified. The pilot remains one
 question, 256 input tokens, batch/concurrency one, and produces decisions rather
 than generated prose.
+
+
+### Windows Desktop caption publication (2026-10-31)
+
+Preview 0.3.9 has a distinct `windows-x64-caption-fix.exe` installer in the
+public Desktop catalog. SHA-256: `b138908982d036a9cf5cb566805304f257e6ce2a20cca82889988ffedc8ed02e`.
+The extracted archive equals the visually qualified native package. Twenty-one
+affected tests and scoped incremental types passed; a same-profile reinstall
+retained three profile files and the bundled runtime, reopening the saved account
+in one window without another login. Full public download and HTTP range 206
+passed. This is not clean-OS or new inference evidence.
+
+The immutable downloads artifact is `9e5e54a6c316200b476e6227abc835dc6b7c1c316032cc041f45a906f62ebee6`;
+canonical main reviewed immediately before publication was
+`2e7e9205438ccf53e4bcc990afc7ae920b587c73`. The runtime/API/worker were not
+redeployed. The current download page, Linux/Fedora packages, headless catalog
+and prior release URLs were preserved. Corresponding source includes the editable
+Desktop sources and exact scoped compiled backport. Updates remain manual while
+unsigned. Source changes remain uncommitted; this is an artifact backport, not a
+merge of the integration checkout into main.
+
+### Managed Desktop development copy (2026-11-01)
+
+Development now prepares a private source copy and isolated npm tooling in the
+device's local application data, preserving edits across reopening and stable
+upgrades. The native bridge mounts that copy for individual development-chat
+file tools and command working directories; model instructions do not choose its
+root. The development window retains the owning stable account and Space while
+Vite assets stay credential-free. There is no manual folder linking or database
+project registration. Another PC starts its own copy.
+
+Focused component and relay tests, incremental types, native/web builds and
+Windows/Linux resource configuration passed locally. A real cold preparation
+and CSS HMR check passed against the independent copy and dependencies; the
+temporary edit was reverted. The final native bundle also passes node --check,
+which now runs during build after an installed launch exposed a declaration
+collision not detected by component tests.
+
+The native candidate was installed locally with the original stable frontend
+preserved, and the existing real-account chat reopened. Opening development
+reaches the native computer-consent dialog; two-window acceptance of this
+managed-copy revision remains pending the user's response. No agent work was
+submitted for verification. This is not physical second-PC or clean-OS evidence.
+Individual development chats are covered; group/scheduled execution and native
+or backend hot reload are not qualified. No public installer, repository remote,
+API/worker service or database was changed by this local activation.
+
+After the user confirmed consent, a later launch used a connected web UI without
+the settings launch button. A native File / Open development command and
+Ctrl+Shift+D now provide entry independently of web release, through the same
+permission/admission handlers. Eight affected tests, incremental types and the
+final native bundle build/syntax check passed. This revision was installed and
+the app reopened; Windows automation failed while selecting the new window, so
+installed two-window acceptance still requires manual observation of the shortcut.
+
+The missing settings button was subsequently traced to Windows package filesystem
+virtualization: an ordinary same-user process saw no local renderer preference,
+while the packaged tooling saw its virtualized copy. The native archive was
+identical in both contexts. The previously qualified web artifact was installed
+and activated in the ordinary Desktop profile, with no account/session files
+copied. A separate ordinary process confirmed the preference and bundled source/npm
+resources. The running window must restart to load it; visual installed acceptance
+remains pending that restart. This replaces the remote stable frontend locally;
+the earlier byte-preservation result applies to the native-only installation step.
+
+### General project browser beside chat (2026-11-01)
+
+The new local candidate supersedes the managed development launcher above. The
+existing review panel opens HTTP(S) project URLs beside any chat, with tabs,
+navigation and element selection. A comment, selector and cropped capture enter
+the editable composer; the user still sends the message. Attachment refusal keeps
+the selection and comment available for retry. The development settings action,
+File menu launcher and Ctrl+Shift+D are removed from the active native/UI flow;
+ordinary project selection and existing development copies are preserved.
+
+Desktop pages run in sandboxed native views with separate ephemeral sessions,
+without the application bridge or account cookies. Admission and capture are
+bound to the owning account/chat/Space and navigation generation. Native pages
+hide below application dialogs. Selection consumes its click; cross-origin frames
+are selected as containers. The browser does not start project servers or grant
+file access. Existing project servers retain their own hot reload. The web-only
+iframe fallback still requires frameable, cooperating pages.
+
+Eighty-three focused browser, inspector, session, preload, panel, attachment,
+composer and concurrent language-entry tests passed locally, alongside scoped
+incremental types, scoped Biome checks,
+native build/syntax verification and a production web build. A real Electron
+fixture verified isolated navigation, trusted selection and capture, no iframe
+click-through, cookie-refresh continuity, stale-capture rejection, chat isolation
+and Vite CSS hot reload without replacing the document. A separate fixture using
+the actual React components verified selection into an editable unsent draft and
+layouts at 1440 and 390 pixels. These fixtures use no real account or model calls.
+The finish review's four behavioral findings were corrected and requalified.
+
+The native candidate preserves the separately installed relay-recovery repair:
+its source hash matches the repair's qualification, and the compiled relay class
+differs only by audited bundler identifier renaming. Eighteen relay/host tests in
+four suites passed again. The structure gate passes; the broad architecture gate
+still reports pre-existing Agent integration dependency cycles and oversized
+modules. No public release or backend/worker deployment was performed. The browser
+candidate was subsequently installed locally; the saved real-account chat reopened
+and the Browser panel was opened beside it, with its close control below Windows
+caption controls. No agent message or real-account annotation was submitted.
+Selection/capture/HMR evidence remains the anonymous fixture evidence above.
+
+A concurrent setup-recovery repair then composed only dist/setup.css, setup.html
+and setup.js over the installed browser artifact. Independent comparison confirms
+the browser main/preload/inspector are preserved byte for byte and the legacy
+development shortcut remains absent. The resulting native archive digest is
+`20f02718df5d1f0aa420a85e6777b0392e027f8a94eb9140608c1f9c480df8b0`.
+That task's later restart initially returned to connection recovery; a subsequent
+ordinary launch recovered the real-account chat again with Open browser present.
+This local observation does not establish long-term connection reliability.
+
+### Native project entry visibility (2026-11-01)
+
+A local follow-up found a running native executor but no consent in the ordinary
+Desktop profile; the packaged tools' virtualized profile is separate evidence.
+The project availability probe also hid its entry after any remote identity
+failure. Availability now advertises the configured main frame and initialized
+native host, while access/connect keep their original identity and consent checks.
+The real Mycellios profile now shows Use this computer and Project and preview.
+The Mycellios agent was subsequently connected through the native access flow,
+with matching consent, and its native folder picker assigned the canonical
+mycellios-agent-canonical-20261029 checkout. On 2 November, the running native host
+confirmed that exact project environment and read project/package.json for this
+agent. The recorded check made no project-file modification or model request.
+
+The frontend preview at http://localhost:5191/app is running and open beside that
+chat. Anonymous browser verification rendered the page without JavaScript errors
+and received Vite's HMR connected frame. It forwards API requests to the existing
+https://www.mycellios.com/agent service; no local workers or database connection
+were started. Its isolated browser session shows language setup. Preview account
+authentication and a model-generated edit remain unverified; no concrete frontend
+change was supplied by the user yet.
+
+Nineteen affected tests, scoped incremental types, native build and syntax check
+passed locally. Only the availability handler in installed dist/main.js changed;
+browser, caption, recovery and relay repairs were preserved. Native digest:
+`73e26f2e78a8a5dcf59212e366f8b24396494771e6caa8b9d0dd53ac3fc64cba`.
+No production service, public package or agent message was changed or submitted.
+
+### Automatic native workspace acceptance (2026-11-02)
+
+After a subsequent Desktop restart and renewed user consent, the optional folder
+picker was cancelled. The connected Mycellios agent's native environment had no
+selected project. The existing native transport provisioned its persistent
+per-agent directory, executed a command there, then executed a read-only package
+check in the explicitly requested canonical checkout via cwd. Both commands
+returned exit code zero and the project package name was mycellios. This proves
+that manual folder selection is unnecessary for native command work. The check
+made no model request and changed no project file; it does not establish a
+model-generated edit. The local browser preview was reopened beside the chat.
+The final scheduled automatic-workspace and anonymous frontend/HMR checks both
+passed after the restart. Browser account authentication remains unverified.
+
+### Project service Play/Stop (2026-11-02)
+
+The local candidate adds Run/Stop, named service profiles and folded logs to the
+existing Browser panel. First Play submits an idempotent preparation request to
+the current owned agent after native consent/connection; subsequent Play reuses
+portable .mycellios/run.json. The absolute binding stays in native machine-local
+storage. The native manager owns foreground process trees, validates dependency
+order and loopback readiness, cancels pending auto-start and opens ready URLs in
+the adjacent browser. It does not own daemon/container/system-service lifecycles.
+
+Twenty-two focused tests, scoped incremental types, scoped lint, web/native build
+checks and the root structure/UI-kit gates passed locally. Real Windows processes
+verified three-service ordering, partial failure, cancellation and preservation
+of an unrelated listener. Anonymous real Electron acceptance verified scoped IPC,
+an isolated embedded page with no app bridge and revocation cleanup. Actual React
+controls passed desktop/390px checks with one fixture preparation reused across
+profiles. These are fixture results, not a real model-generated configuration.
+The broad architecture gate retains existing integration cycles and oversized
+modules; it was not waived. Local installation is recorded separately; no public
+release, API/worker deployment, commit or push was performed.
+
+The qualified candidate was subsequently installed locally, preserving every
+other native archive member and the previous recovery/browser/caption repairs.
+The app reopened with its authenticated session, and Run/Stop/log controls were
+visibly confirmed in the Mycellios chat's Browser panel. Installed native digest:
+`a860eb354a86617d7b0190630c953348abcda29e9daeb8e1fa5f7d82f802d15d`.
+The real-account Play action and model-generated preparation remain unexercised.
+
+
+### Quiet Browser preparation candidate (2026-11-02)
+
+The user's real Play screenshot exposed the legacy synthetic setup prompt in the
+main conversation. The new local candidate creates an idempotent auxiliary
+`project_prepare` task on the same agent/computer/thread without a user message or
+chat steering. Existing background classification suppresses narration, progress,
+normal transcript/history text and sidebar activity. The Browser keeps compact
+preparation state and folded bounded final details. Necessary user-input cards
+retain their existing explicit approval flow.
+
+The API resolves ownership before creation/status/cancel. Stop cancels the exact
+owned preparation and its fenced computer work, preserving unrelated runs and
+steering. Native service lifecycle and internal preview navigation are preserved.
+A failed cancellation remains retryable. The worker retains setup results for
+Browser details without giving ticket-board instructions. No new Mico, provider,
+folder picker, synthetic chat message or database migration is introduced.
+
+Local evidence under src/agent/outputs/project-preparation-quiet-20261102 includes
+146 distinct passing tests across focused reports, incremental API/executor/web
+types, scoped lint, canonical API/worker bundle syntax checks, a production web
+build with unchanged source manifest and actual React/Chromium desktop/390px
+screenshots. The main-chat DOM stays unchanged during success, failure and Stop;
+details stay folded, the preview stays embedded and no external popup opens.
+The model response and native bridge are fixtures, not real-account execution.
+Root structure/UI-kit gates pass; prior broad architecture failures are not waived.
+One invalid CP1252 dash in another local change's main.tsx comment was converted
+to UTF-8 without changing any other byte; the original and hashes are preserved.
+
+Activation remains pending under the user's local-only/no-deploy instruction.
+Worker trigger support must precede the API procedures and client update. No
+production service, installed app, historical message, Git commit, push or merge
+was changed by this candidate. The earlier installed Play/Stop build is unchanged.
+
+
+### Native agent project workflow (2026-11-02)
+
+- Qualified on the installed Windows Desktop with the actual Jarvis agent: local
+  discovery, existing SSH configuration, service/mount identification of a live
+  checkout, exclusive temporary-file creation/read/modification/removal observed
+  from host and serving container. Final command/SSH exits were 0. HEAD, Git status
+  and staged/unstaged diff hashes were unchanged; no functional code or services
+  were modified. This does not qualify a functional Jarvis feature release.
+- After Desktop relaunch, a second actual agent execution read private PROJECT.md
+  and reused its verified destination without repeating discovery; HEAD and marker
+  absence checks passed in host/container with exit 0. Project notes contain no
+  credentials. Native admission adds the standing workflow through conflict-checked
+  bot instruction updates, preserving existing owner instructions.
+- Local checks: 31 affected web tests (native-computer-execution,
+  native-computer-workspace, rpc); focused incremental typecheck against the current
+  local contracts. The installed frontend preserves the preceding renderer assets
+  and native package. Hosted web/backend promotion is separate from this PC update.
+
+
+### Compact native activity and initial project admission (2026-11-02)
+
+- Installed Windows status keeps health and elapsed time visible, with technical
+  activity inside a closed disclosure. Qualified at narrow/wide widths in both
+  themes with the actual installed component and explicit synthetic state.
+- Initial assignment preserves an automatic introduction awaiting its first answer
+  on an unused placeholder. User work, active introductions, provisioned computers
+  and control/execution leases retain the existing blocking rules. The real local
+  API fixture covers both admission and protected cases in the current Linux image.
+- 29 affected tests and focused incremental typing passed locally. The actual
+  previously blocked new agent received its dedicated workspace and completed the
+  user's pending message without cancelling its introduction or losing the draft.
+- API promotion preserved the current concurrent runtime modules, image, credentials
+  and mounts, retaining the prior container for rollback. No schema migration or
+  worker replacement. Hosted web frontend promotion is separate from the installed
+  Desktop renderer update.
+
+
+### Remembered native account permission (2026-11-02)
+
+- Installed Windows Desktop persists account/server consent independently of
+  sessions, Spaces and transport tokens. Restoration revalidates identity;
+  revocation clears local and account grants and blocks stale permission records.
+- Physical restart qualification called the real native computer.requestAccess
+  bridge: allowed=true without a dialog. No conversation or command was replayed.
+- 16 local tests and five installed-handler scenarios passed, with focused
+  incremental typing. Three unrelated opt-in checks remained skipped. The native
+  archive preserves 5627 other file contents and unpack flags, with a rollback
+  archive retained. No hosted server or public installer was changed.
+
+### Quiet Browser preparation activated and checked (2026-11-02)
+
+- Following explicit authorization, deployed worker support before API creation,
+  then installed the Desktop renderer. Synced origin/main was
+  `2e7e9205438ccf53e4bcc990afc7ae920b587c73`; immutable server release
+  `177faff1a17839f81d788fe1393043874bda704be16fd21dcf2e17485e7cf33a`
+  preserves the verified live engine/task/skill changes. No schema migration,
+  push, merge or public installer release. Hosted frontend assets are unchanged.
+- Exact release passed 134 focused backend tests plus one selected actual
+  executor fixture, incremental typing and local Linux smoke with the production
+  images. Client qualification includes actual Chromium desktop/390px controls,
+  a guarded production build and the initial native-connect polling regression.
+- Installed acceptance exposed a concurrent native repair that removed the host
+  wrapper workspace accessor. Repaired only that forwarding entry over the exact
+  current archive; all other files and the active renderer were preserved.
+  Ten real host tests and the exact packaged wrapper reproduction/repair passed.
+  Current native digest is
+  `501d8396b9e6fda02d12e074608282a88e7508315cef701b75ac55effd7a4858`;
+  renderer build `20261102083521` retains concurrent activity/timer improvements.
+- Actual Play created and completed `cmvz0o3e9000f01pihs3ujord` as
+  `project_prepare`, with no source message. User messages remained 10. Its
+  retained result is visible only in Browser details; the main chat received no
+  new technical prompt, narration or final response. The prior historical prompt
+  remains. Sidebar preview text stayed conversational; its timestamp advanced.
+- This checkout still cannot start: incompatible linked dependencies fail Vite's
+  `@rakazo/core/screen-reconnect` resolution. The agent correctly left configuration
+  unprepared and reported the reason in folded Browser logs. This is a verified
+  quiet preparation flow, not a claim of service readiness. Stable app remains
+  open; no unrelated listeners were stopped and no external browser was opened.
+- Evidence: `src/agent/outputs/project-preparation-quiet-20261102/QUALIFICATION.md`,
+  `deployment.json`, `native-workspace-proof.json`, `native-workspace-installed.json`,
+  `play-after-native-fix.json` and `play-completed-quiet.json`.
+
+### Local Browser service startup and stop qualified (2026-11-02)
+
+- Replaced this Agent checkout's dependency junctions to a sibling with its own
+  npm installation and the verified package lock, preserving the former links
+  for recovery. Vite resolves first-party sources in this canonical checkout.
+- Real acceptance exposed lost Play intent on transient status timeouts and a
+  process-global Koffi type collision across native bundles. Pending intent now
+  survives transient observation failures; Stop/revocation still cancel it.
+  Anonymous Job structures preserve independent Windows process ownership.
+  Startup cleanup now preserves the original refusal before killing children.
+  Identity reads retry one timeout only; commands and access refusals never retry.
+- Twelve affected React tests, nine actual desktop-relay tests, the startup
+  error regression and the independent Windows process-tree regression pass
+  locally. Incremental typing and the guarded client production build pass.
+  Exact packaged class/Job checks and archive file comparisons qualify the
+  installed repair. This does not claim the broad integration suites passed.
+- Final local native archive SHA256 is
+  `588ab77101b576f1797e7bc7d4653c663383edd998afed31b053e9206d49a772`;
+  renderer build `20261102093850`. Normal app restart activated both. In that
+  exact installed app, actual Play -> Stop -> Play opened
+  `http://127.0.0.1:5192/app` in the native lateral Browser. App and HMR client
+  returned HTTP 200; Stop closed their port and preserved a separate existing
+  preview. Main-chat user count stayed 10 and raw sequence stayed 33, with no
+  new preparation run when reusing configuration. Old chat history was retained.
+- Automatic preparation produced a frontend-only profile; local API :3100 is
+  still absent. The language screen renders, while data/auth/bootstrap requests
+  cannot complete. This verifies the service controls and frontend preview,
+  not a complete local backend. Stable app and preview remain open. No public
+  deployment, push, merge or installer publication in this follow-up.
+- Evidence: `src/agent/outputs/project-dependencies-play-20261102/QUALIFICATION.md`
+  and `installed-acceptance.json`, with the recorded native hashes and real
+  start/stop HTTP observations.
+
+### Local API, accounts and persistent data in Browser preview (2026-11-02)
+
+- The canonical source now exposes `npm run dev:local:backend` and
+  `npm run dev:local:web`. The Browser profile starts the existing embedded
+  PostgreSQL/API plus a local Graphile worker, waits for database-backed API
+  readiness and a fresh worker heartbeat, then starts Vite. No Docker service
+  or detached process is required. Two owned service trees contain all four
+  components; source backend changes reload with Stop/Play and frontend changes
+  retain Vite hot reload.
+- State, random keys and accounts persist in ignored `data/project-preview`.
+  Minimal environment construction and explicit dotenv isolation prevent
+  inherited production database, SSO, telemetry and model credentials. Auth uses
+  the normal local password endpoints, runtime database roles, row security,
+  encryption and PostgreSQL realtime. No login bypass or stable-session copy.
+- Nine affected local tests, Prisma generation and scoped incremental typing
+  passed through the shared scheduler. Real HTTP testing through Vite verified
+  local registration/login, authenticated bootstrap, Space creation/rename/read,
+  sign-out and anonymous 401. The first request sequence timed out under PC load
+  after creating its account/data; subsequent before/after-restart sequences
+  passed. No broad integration-suite or live-model qualification is claimed.
+- Actual installed Stop closed API/readiness/Vite/PostgreSQL ports and terminated
+  all 22 recorded owned PostgreSQL process IDs, preserving the separate prior
+  preview and saved state. Play restarted the final heartbeat-based source
+  backend; the same account logged in and read the same saved Space afterward.
+  Native Browser showed 2/2 services and the normal local sign-in/registration
+  screen at `http://127.0.0.1:5192/sign-in`. Passwords were not entered through
+  Computer Use. The user can register their own local account there.
+- Stable main-chat count stayed 10 user messages and sequence stayed 33, with
+  no new preparation or chat message. Stable app and local preview remain open.
+  Installed native archive remains
+  `588ab77101b576f1797e7bc7d4653c663383edd998afed31b053e9206d49a772`.
+  No push, merge, hosted deployment or installer update in this follow-up.
+- Evidence: `src/agent/outputs/project-fullstack-20261102/QUALIFICATION.md`,
+  `acceptance.json`, `actual-stop.json`, `auth-data-after-restart.json`,
+  `unit-tests.json` and `source-hashes.json`.
+
+### Desktop update continuity prepared (2026-11-02)
+
+- Canonical local Desktop source is prepared as 0.3.10, including remembered account/server permission, generic PC/project admission, compact activity and the earlier native-engine/task/skill capabilities. Existing retry, model/contribution behavior and the newer Browser/runner are retained.
+- Packaged official /agent UI is selected after an older profile override expires, with root assets kept separately for managed local mode. Authentication/API traffic retains its existing origin/session. Ordinary and unified packaging reject missing or stale native/web/local-backend receipts.
+- 328 focused cases and 5 packaging cases pass, with scoped incremental typing and native/backend/both web builds. The actual compiled backend boots against temporary PostgreSQL, returns health/session HTTP 200 and shuts down cleanly. Upgrade fixtures retain permission and private project notes.
+- Structure verification passes. The general imported-Agent architecture gate remains failing (10 cycle groups, 25 module-size findings); no public installer, main integration, commit or deployment is claimed. Physical OS upgrade and authenticated native-provider inference are not covered by this task's fixtures.
+- Evidence: src/agent/outputs/update-continuity-20261102/QUALIFICATION.md and verification.json. Qualified source digest: 64f9111bb8a537e0bdecc744b1a83f43e47532f7f3708c027e55bbfc3e9f7688.

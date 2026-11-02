@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ArrowRight, Download, Laptop, Globe2 } from "lucide-react";
 import type { PublicDownloadAvailability } from "../../src/contracts/public-downloads.js";
 import { fetchPublicDownloadAvailability, PUBLIC_DOWNLOAD_OPTIONS } from "./public-downloads";
+import { DesktopDownloads } from "./DesktopDownloads";
 
 export function downloadAvailabilityNotice(
   availability: PublicDownloadAvailability | null,
@@ -64,6 +65,9 @@ export function DownloadsPage({
     ?? (/Mac/i.test(navigator.platform) ? "macos-arm64" : /Linux/i.test(navigator.platform) ? "linux-x64" : "windows-x64"),
   );
   const [route, setRoute] = useState<"native" | "browser">("native");
+
+  // Desktop is a distinct product: never serve a headless runtime as its installer.
+  if (params.get("product") === "desktop" || !params.toString()) return <DesktopDownloads />;
 
   return <section className="connect-studio minimal-screen">
     {title}

@@ -1,0 +1,7 @@
+@import "@fontsource-variable/geist";
+
+/* Shared by the Agent, its startup screen and first-party account forms. */
+:root {
+  --mycellios-font-family: "Geist Variable", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+}

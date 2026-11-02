@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NodeCommand } from "../../src/contracts/node-control";
+import { desktopRuntimeBridge } from "./desktop-runtime";
 import {
   getMobileWorkerSnapshot,
   initializeMobileWorker,
@@ -251,6 +252,7 @@ function NativeNodeSetup(
 ) {
   const [busy, setBusy] = useState<string | null>(null);
   const installer = detectInstaller();
+  const nativeRuntime = desktopRuntimeBridge();
   const createBundle = async () => {
     if (!props.accessToken || !props.authSession) {
       props.onSignIn();
@@ -259,11 +261,22 @@ function NativeNodeSetup(
     setBusy("pair");
     props.onError(null);
     try {
+      if (nativeRuntime && (await nativeRuntime.status()).enrolled) {
+        props.onNotice("A runtime identity already exists on this computer. Manage the existing node below.");
+        await props.onRefresh();
+        return;
+      }
       const bundle = await createNodeEnrollmentBundle(
         props.accessToken,
         props.authSession.user.id,
         window.location.origin,
       );
+      if (nativeRuntime) {
+        await nativeRuntime.enroll(bundle);
+        props.onNotice("Runtime paired. Connecting this computer to your account…");
+        await props.onRefresh();
+        return;
+      }
       const blob = new Blob([`${JSON.stringify(bundle, null, 2)}\n`], {
         type: "application/json",
       });
@@ -309,7 +322,7 @@ function NativeNodeSetup(
     }
   };
   return (
-    <UiDisclosure className="contribute-native-disclosure">
+    <UiDisclosure className="contribute-native-disclosure" open={nativeRuntime ? true : undefined}>
       <UiDisclosureSummary>
         <span className="contribute-native-summary-icon"><Server /></span>
         <span><strong>Desktop devices</strong></span>
@@ -325,17 +338,17 @@ function NativeNodeSetup(
           <Server />
         </div>
         <UiText>
-          Install the service, then use a one-time pairing bundle.
+          {nativeRuntime ? "Enable contribution from this computer using your Mycellios account." : "Install the service, then use a one-time pairing bundle."}
         </UiText>
         <div className="page-actions">
-          <UiLink href="/downloads" variant="primary">
+          {!nativeRuntime && <UiLink href="/downloads" variant="primary">
             <Download />
             Download for {installer.label}
-          </UiLink>
+          </UiLink>}
           {props.accessToken ? <>
             <UiButton type="button" disabled={busy !== null} onClick={() => void createBundle()}>
               <ShieldCheck />
-              {busy === "pair" ? "Creating…" : "Create pairing bundle"}
+              {busy === "pair" ? (nativeRuntime ? "Setting up…" : "Creating…") : (nativeRuntime ? "Enable contribution" : "Create pairing bundle")}
             </UiButton>
             <UiButton type="button" disabled={busy !== null} onClick={() => void acceptTransfer()}>
               <ShieldCheck />

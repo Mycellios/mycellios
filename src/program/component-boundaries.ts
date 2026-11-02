@@ -4,6 +4,7 @@ export type Component = "control" | "engine" | "shared" | "legacy" | "tooling" |
 
 const roots: ReadonlyArray<readonly [string, Component]> = [
   ["landing/", "control"], ["src/mobile/", "control"], ["src/coordinator/", "control"],
+  ["src/agent/", "control"],
   ["src/support/", "shared"],
   ["src/node/", "engine"], ["src/worker/", "engine"], ["src/distribution/", "engine"], ["src/transport/", "engine"],
   ["src/adapters/", "engine"],

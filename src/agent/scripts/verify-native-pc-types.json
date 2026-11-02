@@ -1,0 +1,27 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@rakazo/contracts": [
+        "../packages/contracts/src/index.ts"
+      ]
+    }
+  },
+  "files": [
+    "../apps/web/src/lib/native-computer-execution.ts",
+    "../apps/web/src/lib/native-pc-bootstrap.ts",
+    "../apps/web/src/lib/native-computer-execution.test.ts",
+    "../apps/web/src/lib/native-computer-workspace.test.ts"
+  ],
+  "include": []
+}

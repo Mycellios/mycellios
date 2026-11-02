@@ -4,6 +4,11 @@ These rules apply to the complete repository.
 
 ## Product direction
 
+- Product terminology: Spore is the official token; Credits (Créditos in Spanish)
+  are the internal currency with 1 USD = 1 Credit for paid top-ups. Mico/Micos names
+  user agents. Preserve historical ledger identifiers, balance precision and separate
+  funding sources; this naming change does not launch the token or set its price.
+
 - Mycellios is an independent distributed inference runtime.
 - The network vision includes phones, laptops, desktop PCs and servers as
   contributing compute nodes. Illustrations must reflect that role; distinguish
@@ -16,6 +21,13 @@ These rules apply to the complete repository.
   evidence.
 
 ## Repository structure
+
+- Mycellios Agent source is being integrated under `src/agent`; its nested npm
+  workspace is isolated from the native runtime's TypeScript build. Follow
+  `specs/agent-integration/spec.md` until that migration is qualified. Do not
+  treat the former standalone clone or its upstream remote as the release source.
+  Agent is a Control surface in the component boundary checker; the inference
+  runtime consumes shared contracts and must not depend on Agent UI or Desktop.
 
 - npm is the only supported JavaScript package manager. Commit
   `package-lock.json`; do not add pnpm or Yarn workspace/lock files.
@@ -97,6 +109,12 @@ These rules apply to the complete repository.
 - Shared-link previews use the versioned 1200 × 630 PNG declared in
   `landing/index.html` and `landing/src/seo.ts`. Keep static and runtime metadata
   aligned; verify `tests/landing-seo.test.ts` when changing social cards.
+- Desktop installer availability has a separate catalog at
+  `/public/v1/desktop-downloads` and page `/downloads/desktop`; preserve the
+  headless runtime catalog and platform routes. Preview upgrades are manual
+  while Windows packages are unsigned; never enable unsigned automatic installs.
+  The isolated page build uses `node scripts/build-desktop-downloads.mjs` and the
+  same `DesktopDownloads` component as the main downloads screen.
 - Preserve unrelated worktree changes.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
   canonical docs when complete.
@@ -135,6 +153,13 @@ These rules apply to the complete repository.
   completed, unlinked or refund-bearing reservations.
 
 ## Experimental native decision graphs
+
+- Native loopback generation must propagate SSE errors and require final usage,
+  a successful finish reason and the terminal event before reporting success.
+  Local single-stage prefill honors the configured chunk bound without emitting
+  prefix tokens; cancellation releases the same request's KV state.
+  CUDA KV arenas grow in bounded pages rather than doubling long-context memory;
+  preserve exact cached values, CPU growth and exact physical-batch allocations.
 
 - `python/distributed_runtime/decision_graph.py` partitions serialized ggmlc graphs
   without executing or dequantizing weights. Preserve every live dependency and

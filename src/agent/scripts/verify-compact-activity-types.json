@@ -1,0 +1,35 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@rakazo/contracts": [
+        "../packages/contracts/src/index.ts"
+      ],
+      "@rakazo/core/run-health": [
+        "../packages/core/src/run-health.ts"
+      ]
+    },
+    "types": [
+      "node",
+      "vite/client"
+    ]
+  },
+  "files": [
+    "../apps/web/src/components/RunActivityStatus.tsx",
+    "../apps/web/src/components/RunActivityStatus.test.tsx",
+    "../apps/api/src/initial-computer-assignment.ts",
+    "../apps/api/src/initial-computer-assignment.test.ts"
+  ],
+  "include": []
+}

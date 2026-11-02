@@ -1,0 +1,21 @@
+<!DOCTYPE html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-src about:; child-src 'none'; form-action 'none'; base-uri 'none'"><meta name="referrer" content="no-referrer"><style>html,body{height:100%;margin:0}iframe{width:100%;height:100%;border:0;background:#fff}</style><iframe id="preview" title="Preview" sandbox="allow-scripts" referrerpolicy="no-referrer" csp="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'; base-uri 'none'"></iframe><script>
+// Loaded from the network (not srcdoc) so the app's CSP is not inherited. frame-src about: allows
+// the nested srcdoc and rejects navigations the sandbox and inner CSP do not block.
+let inspection = null;
+const preview = document.getElementById("preview");
+preview.addEventListener("load", () => {
+  if (inspection) preview.contentWindow.postMessage(inspection, "*");
+});
+addEventListener("message", (event) => {
+  if (parent === window) return;
+  if (event.source === parent) {
+    if (typeof event.data === "string") preview.srcdoc = event.data;
+    else if (event.data?.type === "mycellios:inspect" && typeof event.data.session === "string") {
+      inspection = event.data;
+      preview.contentWindow.postMessage(inspection, "*");
+    }
+  } else if (event.source === preview.contentWindow && inspection && event.data?.session === inspection.session && event.data.type === "mycellios:selection") {
+    parent.postMessage(event.data, "*");
+  }
+});
+</script>

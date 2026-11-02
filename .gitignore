@@ -1,4 +1,6 @@
 node_modules/
+/outputs/
+*.tsbuildinfo
 dist/
 out/
 build/distribution-runtime/

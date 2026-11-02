@@ -5,6 +5,15 @@
     "outDir": "dist",
     "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "tests", "vitest.config.ts", "src/mobile"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "vitest.config.ts",
+    "src/mobile",
+    "src/agent"
+  ]
 }

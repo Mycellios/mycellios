@@ -11,6 +11,8 @@ describe("Control and Engine component boundaries", () => {
     expect(componentFor("src/economy/economic-ledger.ts")).toBe("engine");
     expect(componentFor("src/simulator/model.ts")).toBe("tooling");
     expect(componentFor("src/support/assistant.ts")).toBe("shared");
+    expect(componentFor("src/agent/apps/desktop/src/main.ts")).toBe("control");
+    expect(componentFor("src/agent/apps/web/src/components/LocalProject.tsx")).toBe("control");
   });
 
   it("prevents browser code from importing Engine internals", () => {
@@ -22,6 +24,10 @@ describe("Control and Engine component boundaries", () => {
     expect(boundaryViolation("src/worker/agent.ts", "../coordinator/server.js"))
       .toBe("engine_must_not_depend_on_control");
     expect(boundaryViolation("src/contracts/types.ts", "../coordinator/server.js"))
+      .toBe("shared_must_not_depend_on_control");
+    expect(boundaryViolation("src/worker/agent.ts", "../agent/apps/desktop/src/main.js"))
+      .toBe("engine_must_not_depend_on_control");
+    expect(boundaryViolation("src/contracts/types.ts", "../agent/apps/desktop/src/main.js"))
       .toBe("shared_must_not_depend_on_control");
   });
 });

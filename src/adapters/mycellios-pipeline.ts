@@ -128,10 +128,21 @@ export class MycelliosPipelineAdapter implements InferenceAdapter {
         );
       }
       let index = 0;
+      let terminal = false;
+      let reportedUsage = false;
+      let done = false;
       for await (const payload of readSseData(response.body)) {
-        if (payload === "[DONE]") break;
-        const parsed = JSON.parse(payload) as {
-          choices?: Array<{ delta?: { content?: string }; text?: string }>;
+        if (payload === "[DONE]") { done = true; break; }
+        let value: unknown;
+        try { value = JSON.parse(payload); } catch {
+          throw new AdapterError("Native pipeline returned invalid JSON", "mycellios_pipeline_invalid_stream", false);
+        }
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          throw new AdapterError("Native pipeline returned an invalid event", "mycellios_pipeline_invalid_stream", false);
+        }
+        const parsed = value as {
+          error?: unknown;
+          choices?: Array<{ delta?: { content?: string }; text?: string; finish_reason?: string | null }>;
           usage?: {
             prompt_tokens?: number;
             completion_tokens?: number;
@@ -142,8 +153,37 @@ export class MycelliosPipelineAdapter implements InferenceAdapter {
             reused_kv_tokens?: number;
           };
         };
+        if (parsed.error !== undefined) {
+          const detail = parsed.error && typeof parsed.error === "object"
+            ? parsed.error as Record<string, unknown> : {};
+          const memoryPressure = typeof detail.message === "string"
+            && /(?:CUDA|GPU).*out of memory/i.test(detail.message);
+          throw new AdapterError(
+            memoryPressure ? "Native GPU memory is exhausted" : "Native pipeline execution failed",
+            memoryPressure ? "mycellios_pipeline_memory_exhausted" : "mycellios_pipeline_generation_failed",
+            index === 0,
+          );
+        }
         const text = parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.text ?? "";
+        if (terminal && (text || parsed.choices?.[0]?.finish_reason)) {
+          throw new AdapterError("Native pipeline returned data after its terminal result", "mycellios_pipeline_invalid_stream", false);
+        }
         if (text) yield { index: index++, text };
+        const finish = parsed.choices?.[0]?.finish_reason;
+        if (finish !== undefined && finish !== null) {
+          if (finish !== "stop" && finish !== "length") {
+            throw new AdapterError("Native pipeline returned an invalid finish reason", "mycellios_pipeline_invalid_stream", false);
+          }
+          terminal = true;
+        }
+        if (parsed.usage) {
+          const input = parsed.usage.prompt_tokens, output = parsed.usage.completion_tokens;
+          if (!Number.isSafeInteger(input) || input! < 0 || !Number.isSafeInteger(output) || output! < 0) {
+            throw new AdapterError("Native pipeline returned invalid usage", "mycellios_pipeline_invalid_stream", false);
+          }
+          if (reportedUsage) throw new AdapterError("Native pipeline repeated its usage", "mycellios_pipeline_invalid_stream", false);
+          reportedUsage = terminal;
+        }
         const metrics = parsed.distribution_metrics;
         if (metrics || parsed.usage) {
           yield {
@@ -158,6 +198,9 @@ export class MycelliosPipelineAdapter implements InferenceAdapter {
             },
           };
         }
+      }
+      if (!done || !terminal || !reportedUsage) {
+        throw new AdapterError("Native pipeline stream ended before a validated result", "mycellios_pipeline_truncated_stream", false);
       }
     } finally {
       this.activeJobs -= 1;
@@ -220,10 +263,11 @@ async function* readSseData(stream: ReadableStream<Uint8Array>): AsyncIterable<s
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let exhausted = false;
   try {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) { exhausted = true; break; }
       buffer += decoder.decode(value, { stream: true }).replaceAll("\r\n", "\n");
       let boundary = buffer.indexOf("\n\n");
       while (boundary >= 0) {
@@ -241,6 +285,7 @@ async function* readSseData(stream: ReadableStream<Uint8Array>): AsyncIterable<s
       assertStreamBufferSize(buffer);
     }
   } finally {
+    if (!exhausted) await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }

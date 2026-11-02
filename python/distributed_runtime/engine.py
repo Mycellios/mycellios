@@ -23,6 +23,7 @@ from transformers import AutoConfig
 
 from .device import normalize_torch_device_request
 from .dense_tiering import DenseTieringConfig
+from .prefill import GenerationCancelledError, consume_prefill
 from .failure_evidence import StageFailureEvidence
 from .macro_wave import KVVersion, MacroWaveState
 from .macro_wave_adapter import (
@@ -904,10 +905,6 @@ class PipelineRecoveryIdentity:
     speculative_inflight_bytes: int
     speculation_minimum_speedup: float
     speculation_probe: bool
-
-
-class GenerationCancelledError(RuntimeError):
-    pass
 
 
 class PipelineShutdownError(RuntimeError):
@@ -7301,7 +7298,7 @@ class LocalPipelineEngine:
         try:
             self._runner.begin(request.client_id)
             began = True
-            current = request.input_ids
+            current = consume_prefill(self._runner, self.config, request, cancelled)
             finish_reason = "length"
             for step in range(request.max_new_tokens):
                 if cancelled.is_set():

@@ -1,0 +1,141 @@
+{
+  "name": "@rakazo/desktop",
+  "productName": "Mycellios Desktop",
+  "version": "0.3.10",
+  "author": {
+    "name": "Mycellios"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "pack:windows:unified": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && node scripts/package-windows.mjs",
+    "dev": "npm run build && electron .",
+    "build": "npm run check && node scripts/build.mjs",
+    "pack": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --mac --win --linux",
+    "pack:dir": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --dir",
+    "check": "tsc --noEmit --incremental --tsBuildInfoFile dist/desktop.tsbuildinfo -p tsconfig.json",
+    "test": "vitest run --root ../.. apps/desktop/src",
+    "test:e2e": "npm run build && playwright test --config e2e/playwright.config.ts",
+    "release": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --publish never",
+    "pack:linux:unified": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && node scripts/package-linux.mjs"
+  },
+  "dependencies": {
+    "@rakazo/contracts": "*",
+    "@rakazo/logging": "*",
+    "@sentry/electron": "8.3.0",
+    "electron-updater": "6.8.11",
+    "koffi": "3.3.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@rakazo/adapters": "*",
+    "@rakazo/ui-tokens": "*",
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  },
+  "build": {
+    "beforePack": "./scripts/verify-release.cjs",
+    "appId": "com.mycellios.agent.desktop",
+    "directories": {
+      "output": "out",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web"
+      },
+      {
+        "from": "../../infra/compose/docker-compose.images.yml",
+        "to": "stack/docker-compose.images.yml"
+      },
+      {
+        "from": "../../infra/compose/stack-env.example",
+        "to": "stack/stack-env.example"
+      },
+      {
+        "from": "local-server",
+        "to": "local-server",
+        "filter": [
+          "**/*",
+          "!node_modules{,/**/*}"
+        ]
+      },
+      {
+        "from": "local-server/node_modules",
+        "to": "local-server/node_modules",
+        "filter": [
+          "**/*",
+          "!**/.bin{,/**/*}"
+        ]
+      }
+    ],
+    "extraMetadata": {
+      "name": "mycellios-desktop",
+      "main": "dist/main.js"
+    },
+    "mac": {
+      "icon": "assets/icon-macos.png",
+      "category": "public.app-category.productivity",
+      "x64ArchFiles": "{**/node_modules/@koromix/koffi-darwin-*/darwin_*/koffi.node,**/node_modules/@oxc-parser/binding-darwin-*/parser.darwin-*.node}",
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Mycellios Agent uses the microphone for dictation and voice calls with your bots."
+      },
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "notarize": true
+    },
+    "dmg": {
+      "title": "${productName}",
+      "iconSize": 100,
+      "window": {
+        "width": 660,
+        "height": 400
+      },
+      "contents": [
+        {
+          "x": 170,
+          "y": 175,
+          "type": "file"
+        },
+        {
+          "x": 490,
+          "y": 175,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "verifyUpdateCodeSignature": true
+    },
+    "nsis": {
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "executableName": "mycellios-agent",
+      "icon": "assets/icon.png",
+      "target": [
+        "AppImage"
+      ]
+    },
+    "publish": [],
+    "artifactName": "Mycellios-Desktop-${version}-${os}-${arch}.${ext}"
+  }
+}
