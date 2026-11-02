@@ -8,6 +8,7 @@
 // rewritten to the relative path of the file it resolves to from its importer.
 import { builtinModules } from "node:module";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
 const builtins = new Set(builtinModules);
@@ -23,6 +24,8 @@ for (const entry of entries) {
     format: "esm",
     target: "node22",
     sourcemap: true,
+    // Typecheck-only aliases can resolve declarations instead of executable modules.
+    tsconfig: fileURLToPath(new URL("./tsconfig.server-build.json", import.meta.url)),
     // No "module" condition: resolve externals the way Node will.
     conditions: ["node"],
     logLevel: "warning",

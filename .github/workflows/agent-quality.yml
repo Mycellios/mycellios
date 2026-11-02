@@ -45,10 +45,11 @@ jobs:
         working-directory: src/agent
         run: |
           npm test -- --maxWorkers 2 --no-file-parallelism
-          node --test scripts/project-local-env.test.mjs apps/desktop/scripts/release-continuity.test.mjs
+          node --test scripts/project-local-env.test.mjs scripts/build-server.test.mjs apps/desktop/scripts/release-continuity.test.mjs
       - name: Compile API, worker, bundled web and Desktop host
         working-directory: src/agent
         run: |
           npm run build --workspace @rakazo/api --workspace @rakazo/worker
+          node scripts/verify-server-startup.mjs
           npm run build --workspace @rakazo/web -- --desktop
           npm run build --workspace @rakazo/desktop
