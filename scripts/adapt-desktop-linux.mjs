@@ -22,7 +22,7 @@ export function patchDesktopMain(source) {
 
 /** Preserve every other file, executable bit and native-module unpack flag. */
 export async function adaptDesktopLinux(archive, output) {
-  const names = listPackage(archive).map(name => name.replace(/^\//, ""));
+  const names = listPackage(archive).map(name => name.replaceAll("\\", "/").replace(/^\/+/, ""));
   const originalMain = extractFile(archive, "dist/main.js");
   const patchedMain = Buffer.from(patchDesktopMain(originalMain.toString("utf8")));
   const streams = names.map(name => {
@@ -37,7 +37,7 @@ export async function adaptDesktopLinux(archive, output) {
       streamGenerator: () => Readable.from(name === "dist/main.js" ? patchedMain : extractFile(archive, name)) };
   });
   await createPackageFromStreams(output, streams);
-  const outputNames = listPackage(output).map(name => name.replace(/^\//, ""));
+  const outputNames = listPackage(output).map(name => name.replaceAll("\\", "/").replace(/^\/+/, ""));
   if (JSON.stringify(names) !== JSON.stringify(outputNames)) throw new Error("desktop_linux_asar_inventory_changed");
   let retainedFiles = 0;
   for (const name of names) {
