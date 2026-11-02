@@ -37,6 +37,54 @@
 .ui-button[data-size="sm"]:not([data-variant="ghost"]):not([data-variant="navigation"]) { min-height: 34px !important; padding: 7px 12px !important; font-size: 12px !important; }
 .ui-button[data-size="lg"]:not([data-variant="ghost"]):not([data-variant="navigation"]) { min-height: 48px !important; padding-inline: 20px !important; }
 .ui-button[data-icon-only="true"] { width: var(--ui-control-height); padding: 0 !important; }
+/* Compact product hero actions use the same kit as the app controls. */
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button:is([data-variant="primary"], [data-variant="secondary"]) {
+  min-height:48px !important; padding:12px 22px !important; border-radius:10px !important;
+  font:400 16px/1.5 var(--agent-font,system-ui,sans-serif) !important; gap:8px !important;
+}
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .agent-product-actions .ui-button[data-variant="secondary"] { border:1px solid var(--ui-line) !important; background:transparent !important; }
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .reference-header .ui-button[data-variant="primary"] {
+  min-height:40px !important; padding:8px 18px !important; font-size:13px !important;
+}
+:root[data-mycellios-design] [data-ui="agent-product-demo"] .ui-button[data-variant="ghost"] {
+  border:0 !important; border-radius:12px; color:inherit; background-color:transparent !important;
+}
+:root[data-mycellios-design] [data-ui="agent-product-demo"] .ui-button[data-variant="ghost"][aria-pressed="true"] { background-color:#faf8f4 !important; }
+:root[data-mycellios-design] [data-ui="agent-product-demo"] .ui-button.agent-demo-artifact { background-color:#eeebe5 !important; }
+:root[data-mycellios-design] [data-ui="agent-product-demo"] .agent-demo-mobile-mico { border:0; border-radius:999px !important; padding:4px 12px; background:#eeebe5; color:#242b26; min-height:32px; }
+:root[data-mycellios-design] [data-ui="agent-product-demo"] .ui-button[data-icon-only="true"],
+:root[data-mycellios-design] .agent-demo-figure figcaption .ui-button[data-icon-only="true"] {
+  display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; min-height:28px;
+  padding:4px !important; color:inherit; background:transparent;
+}
+:root[data-mycellios-design] [data-ui="agent-product-demo"] .ui-button[data-size="sm"]:is([data-variant="primary"], [data-variant="secondary"]) {
+  min-height:28px !important; padding:5px 10px !important; border-radius:8px !important; font-size:10px !important;
+}
+@media (max-width:760px) {
+  :root[data-mycellios-design] [data-ui-surface="agent-marketing"] .reference-header .ui-button[data-variant="primary"] { min-height:44px !important; }
+  :root[data-mycellios-design] [data-ui-surface="agent-marketing"] .agent-product-actions .ui-button {
+    min-height:40px !important; padding:9px 14px !important; font-size:13px !important;
+  }
+}
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button.agent-mico-greeting {
+  display:inline-flex; align-items:center; justify-content:center; width:76px; height:76px; min-height:76px;
+  padding:0 !important; border:0 !important; border-radius:14px !important; background:transparent !important;
+}
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button.agent-mico-greeting:disabled { opacity:1; cursor:default; }
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button.agent-case-choice {
+  display:flex; align-items:center; gap:14px; width:100%; min-height:76px; padding:14px 16px !important;
+  text-align:left; color:#172a20; border:0 !important; border-radius:12px !important; background:transparent !important;
+}
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button.agent-case-choice[aria-pressed="true"] { background:#eeece5 !important; }
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button.agent-case-choice:hover { background:#f1efe9 !important; }
+@media (max-width:760px) {
+  :root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button.agent-mico-greeting { width:36px; height:36px; min-height:36px; border-radius:7px !important; }
+  :root[data-mycellios-design] [data-ui-surface="agent-marketing"] .ui-button.agent-case-choice { min-height:68px; padding:12px 14px !important; }
+}
+:root[data-mycellios-design] .agent-closing .ui-button.agent-closing-motion {
+  display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; min-height:44px;
+  padding:10px !important; border:0 !important; border-radius:50% !important; background:transparent !important; color:#62665d;
+}
 /* Spacious actions for marketing surfaces, without changing compact app controls. */
 :root[data-mycellios-design] .ui-button[data-size="xl"]:is([data-variant="primary"], [data-variant="secondary"], [data-variant="danger"]) {
   min-height: var(--ui-control-xl-height, 52px) !important;
@@ -87,3 +135,15 @@
   .ui-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 0; }
   .ui-summary-strip > div:nth-child(odd) { border-left: 0; padding-left: 0; }
 }
+/* Shared marketing selectors retain the kit's focus and disabled behavior. */
+.ui-button.marketing-toggle { --ui-control-height:36px; --ui-radius-control:7px; min-height:36px; padding-inline:14px; border:0; background:transparent; color:inherit; font-size:12px; }
+.ui-button.marketing-toggle[aria-pressed="true"] { background:#dde4d8; color:#173b25; }
+.ui-button.marketing-option { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:92px; height:auto; white-space:normal; padding:20px; border:0; border-radius:12px; text-align:left; background:#f0eee8; }
+.ui-button.marketing-option[aria-pressed="true"] { background:#e0e8da; color:#172a20; }
+.ui-button.marketing-option:disabled { opacity:.55; }
+.marketing-page :is(.ui-input,.ui-select), .compute-calculator :is(.ui-input,.ui-select) { width:100%; min-height:42px; box-sizing:border-box; padding:10px 12px; border:1px solid #c5cbbc; border-radius:8px; background:#faf9f7; color:#172a20; font:inherit; font-size:14px; }
+.marketing-page :is(.ui-input,.ui-select):focus-visible, .compute-calculator :is(.ui-input,.ui-select):focus-visible { outline:2px solid #427d6e !important; outline-offset:2px; }
+.marketing-page .ui-input[aria-invalid="true"], .compute-calculator .ui-input[aria-invalid="true"] { border-color:#a34436; }
+.marketing-header .ui-button.marketing-menu { border:0; background:transparent; box-shadow:none; padding:8px; color:inherit; }
+.ui-button.api-copy { display:inline-flex; align-items:center; justify-content:center; padding:8px; border:0; background:transparent; color:inherit; }
+:root[data-mycellios-design] [data-ui-surface="agent-marketing"] .marketing-header .ui-button.marketing-stats { min-height:34px !important; padding:7px 12px !important; font-size:12px !important; }

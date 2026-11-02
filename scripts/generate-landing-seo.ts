@@ -11,19 +11,7 @@ import {
 
 const outputRoot = join(process.cwd(), "landing-dist");
 const templatePath = join(outputRoot, "index.html");
-const routeOutputPaths: Record<(typeof LANDING_SEO_PATHS)[number], string> = {
-  "/": "index.html",
-  "/network": "network/index.html",
-  "/create": "create/index.html",
-  "/earn": "earn/index.html",
-  "/spore": "spore/index.html",
-  "/spore/treasury": "spore/treasury/index.html",
-  "/spore/data": "spore/data/index.html",
-  "/downloads": "downloads/index.html",
-  "/admin": "admin/index.html",
-  "/dashboard": "dashboard/index.html",
-  "/account": "account/index.html",
-};
+const routeOutputPaths = Object.fromEntries(LANDING_SEO_PATHS.map(path => [path, path === "/" ? "index.html" : `${path.slice(1)}/index.html`])) as Record<(typeof LANDING_SEO_PATHS)[number], string>;
 
 function escapeAttribute(value: string): string {
   return value

@@ -34,7 +34,7 @@ import { QuestionsSection } from "./QuestionsSection";
 import { ScrollStory } from "./ScrollStory";
 import { SponsorFooter } from "./SponsorFooter";
 import { SporeDrift } from "./SporeDrift";
-import { SporeMenu } from "./SporeMenu";
+import { MarketingHeader as LandingHeader } from "./MarketingHeader";
 import { useCountUp, useInView, useRevealOnScroll } from "./use-motion";
 import { fetchPublicDownloadAvailability, PUBLIC_DOWNLOAD_OPTIONS } from "../public-downloads";
 import "./rebrand.css";
@@ -72,44 +72,7 @@ const GITHUB_URL = "https://github.com/tych0s/mycellios";
 const X_URL = "https://x.com/mycellios";
 const TELEGRAM_URL = "https://t.me/mycellios";
 
-export function LandingHeader({ active }: { active?: "network" | "earn" }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileOpen(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [mobileOpen]);
-
-  return <header className="rb-header">
-    <div className="rb-header-inner rb-shell">
-      <Brand />
-      <nav aria-label="Main navigation">
-        <UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/create">Create</UiLink><UiLink className={active === "earn" ? "active" : undefined} href="/earn" aria-current={active === "earn" ? "page" : undefined}>Earn</UiLink><SporeMenu /><UiLink className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</UiLink>
-      </nav>
-      <div className="rb-header-actions rb-desktop-cta">
-        <UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><BrandIcon name="github" /></UiLink>
-        <UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><BrandIcon name="x" /></UiLink>
-        <UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><BrandIcon name="telegram" /></UiLink>
-        <UiLink className="rb-pill rb-pill-ghost" href="/dashboard">Login</UiLink>
-      </div>
-      <UiButton className="rb-menu" type="button" aria-label={mobileOpen ? "Close menu" : "Open menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)}>{mobileOpen ? <X /> : <Menu />}</UiButton>
-      {mobileOpen && <>
-        <div className="rb-mobile-backdrop" aria-hidden="true" onClick={() => setMobileOpen(false)} />
-        <nav className="rb-mobile-nav" aria-label="Mobile navigation" onClick={() => setMobileOpen(false)}>
-          <div className="rb-mobile-group"><UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/create">Create</UiLink><UiLink className={active === "earn" ? "active" : undefined} href="/earn" aria-current={active === "earn" ? "page" : undefined}>Earn</UiLink></div>
-          <div className="rb-mobile-group"><span className="rb-mobile-kicker">$ SPORE</span><div className="rb-mobile-sub"><UiLink href="/spore">Staking</UiLink><UiLink href="/spore/treasury">Treasury</UiLink><UiLink href="/spore/data">Data</UiLink></div></div>
-          <div className="rb-mobile-group"><UiLink className={active === "network" ? "active" : undefined} href="/network" aria-current={active === "network" ? "page" : undefined}>Live network</UiLink></div>
-          <UiLink className="rb-mobile-cta" href="/dashboard">Login</UiLink>
-          <div className="rb-mobile-social"><UiLink className="rb-social" href={GITHUB_URL} target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><BrandIcon name="github" /></UiLink><UiLink className="rb-social" href={X_URL} target="_blank" rel="noreferrer" aria-label="mycellios on X"><BrandIcon name="x" /></UiLink><UiLink className="rb-social" href={TELEGRAM_URL} target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><BrandIcon name="telegram" /></UiLink></div>
-        </nav>
-      </>}
-    </div>
-  </header>;
-}
+export { LandingHeader };
 
 const doors = [
   {
@@ -382,7 +345,7 @@ export function RebrandLanding() {
       <footer className="rb-footer">
         <div className="rb-footer-inner rb-shell">
           <div className="rb-footer-brand"><Brand /><UiText>Distributed intelligence built from the capacity already around us.</UiText></div>
-          <nav aria-label="Product"><span>Product</span><UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/create">Create</UiLink><UiLink href="/earn">Earn</UiLink><UiLink href="/spore">$ SPORE</UiLink></nav>
+          <nav aria-label="Product"><span>Product</span><UiLink href={AGENT_URL}>Mycellios Agent</UiLink><UiLink href="/earn">Earn</UiLink><UiLink href="/spore">$ SPORE</UiLink></nav>
           <nav aria-label="Network"><span>Network</span><UiLink href="#how-it-works">How it works</UiLink><UiLink href="/network">Network</UiLink><UiLink href="/downloads">Downloads</UiLink><UiLink href="/browser/">Browser worker</UiLink></nav>
           <nav aria-label="Resources"><span>Resources</span><UiLink href="/docs">Documentation</UiLink><UiLink href={GITHUB_URL}><GitBranch /> GitHub</UiLink><UiLink href={`mailto:${EMAIL}`}>Contact</UiLink></nav>
           <div className="rb-footer-bottom"><span>© 2026 mycellios</span><UiLink href="#rb-top">Back to top <ArrowDown /></UiLink></div>

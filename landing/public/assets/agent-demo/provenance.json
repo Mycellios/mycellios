@@ -1,0 +1,6 @@
+{
+  "source": "https://www.mycellios.com/agent",
+  "purpose": "Recreate Mycellios Agent product UI with synthetic example content",
+  "assets": "Mycellios avatar geometry observed in our published interface; static flat fills, no animation or account content exported",
+  "reference_structure": "https://x.ai/bot"
+}

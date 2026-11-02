@@ -2,7 +2,7 @@ import { lazy, StrictMode, Suspense, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { loadMushroomStage, wantsMushroom } from "./rebrand/HeroMushroom";
 import { applySeoMetadata } from "./seo";
-import { resolveLandingSurface } from "./routing";
+import { resolveLandingSurface, retiredMarketingDestination } from "./routing";
 import "./button-style.css";
 import "./logo-style.css";
 import "./ui/dark-theme.css";
@@ -17,7 +17,9 @@ const ModernLanding = lazy(() => import("./rebrand/ModernLanding").then((module)
 const RootedLanding = lazy(() => import("./rebrand/RootedLanding").then((module) => ({ default: module.RootedLanding })));
 const AssemblageLanding = lazy(() => import("./rebrand/AssemblageLanding").then((module) => ({ default: module.AssemblageLanding })));
 const ReferenceLanding = lazy(() => import("./rebrand/ReferenceLanding").then((module) => ({ default: module.ReferenceLanding })));
-const CreateStudio = lazy(() => import("./rebrand/CreateStudio").then((module) => ({ default: module.CreateStudio })));
+const StatsDashboard = lazy(() => import("./StatsDashboard").then((module) => ({ default: module.StatsDashboard })));
+const PricingPage = lazy(() => import("./rebrand/PricingPage").then((module) => ({ default: module.PricingPage })));
+const ComparePage = lazy(() => import("./rebrand/ComparePage").then((module) => ({ default: module.ComparePage })));
 const EarnStudio = lazy(() => import("./rebrand/EarnStudio").then((module) => ({ default: module.EarnStudio })));
 const SporeStudio = lazy(() => import("./rebrand/SporeStudio").then((module) => ({ default: module.SporeStudio })));
 
@@ -28,6 +30,10 @@ function LoadedRoute({ children }: { children: ReactNode }) {
     let timer: number | undefined;
     const removeLoader = () => loader.remove();
     let frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => {
+      if (loader.dataset.mode === "forest") {
+        loader.dispatchEvent(new Event("mycellios:route-ready"));
+        return;
+      }
       loader.dataset.state = "leaving";
       loader.addEventListener("transitionend", removeLoader, { once: true });
       timer = window.setTimeout(removeLoader, 400);
@@ -44,11 +50,23 @@ function LoadedRoute({ children }: { children: ReactNode }) {
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing landing root element");
 
+const forestLoader = document.getElementById("mycellios-loader");
+if (forestLoader?.dataset.mode === "forest") {
+  let dispose: (() => void) | undefined;
+  let disposed = false;
+  void import("./rebrand/forest-loader").then(({ startForestLoader }) => {
+    if (!disposed && forestLoader.isConnected) dispose = startForestLoader(forestLoader);
+  }).catch(() => forestLoader.dispatchEvent(new Event("mycellios:forest-disable")));
+  import.meta.hot?.dispose(() => { disposed = true; dispose?.(); });
+}
+
 // Phase 2 (merged landing): `/rebrand` no longer serves a separate concept — the
 // rebrand design is the landing. Redirect to `/` before applying SEO metadata so
 // the canonical tags describe the merged page.
 const isRebrandRoute = window.location.pathname === "/rebrand" || window.location.pathname === "/rebrand/";
 if (isRebrandRoute) window.history.replaceState({}, "", "/");
+const retiredDestination = retiredMarketingDestination(window.location.pathname);
+if (retiredDestination) window.history.replaceState({}, "", `${retiredDestination}${window.location.search}`);
 if (window.location.pathname === "/join" || window.location.pathname === "/join/") {
   window.history.replaceState({}, "", "/earn");
 }
@@ -56,8 +74,7 @@ if (window.location.pathname === "/join" || window.location.pathname === "/join/
 const retiredChatUrl = new URL(window.location.href);
 if (["inference", "chat"].includes(retiredChatUrl.searchParams.get("view") ?? "")
   && ["/dashboard", "/network", "/downloads", "/account", "/browser", "/mobile"].includes(retiredChatUrl.pathname.replace(/\/+$/, ""))) {
-  retiredChatUrl.searchParams.delete("view");
-  if (retiredChatUrl.pathname.replace(/\/+$/, "") === "/network") retiredChatUrl.searchParams.set("view", "overview");
+  retiredChatUrl.searchParams.set("view", "overview");
   window.history.replaceState({}, "", `${retiredChatUrl.pathname}${retiredChatUrl.search}${retiredChatUrl.hash}`);
 }
 applySeoMetadata();
@@ -65,20 +82,21 @@ applySeoMetadata();
 const path = window.location.pathname.length > 1
   ? window.location.pathname.replace(/\/+$/, "")
   : window.location.pathname;
-const surface = resolveLandingSurface(path, window.location.search);
+const surface = resolveLandingSurface(path, window.location.search, window.location.hostname);
 
-const isCreate = path === "/create";
 const isEarn = path === "/earn";
 const isSpore = path.startsWith("/spore");
 const isNetwork = surface === "network";
 const isPanel = surface === "panel";
-const isLanding = !isCreate && !isEarn && !isSpore && !isNetwork && !isPanel;
+const isLanding = surface === "landing" && !isEarn && !isSpore;
 const previousLanding = new URLSearchParams(window.location.search).get("landing") === "previous";
 const savedLanding = new URLSearchParams(window.location.search).get("landing") === "saved";
 const rootedLanding = new URLSearchParams(window.location.search).get("landing") === "rooted";
 const assemblageLanding = new URLSearchParams(window.location.search).get("landing") === "assemblage";
 
-const page = isCreate ? <CreateStudio />
+const page = surface === "stats" ? <StatsDashboard />
+  : surface === "pricing" ? <PricingPage />
+  : surface === "compare" ? <ComparePage />
   : isEarn ? <EarnStudio />
   : isSpore ? <SporeStudio />
   : isNetwork ? <NetworkPage />

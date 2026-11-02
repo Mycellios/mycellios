@@ -1,0 +1,66 @@
+.agent-journey-body { position:relative; isolation:isolate; }
+.agent-journey-thread { position:absolute; z-index:-1; pointer-events:none; top:-100px; left:max(0px,calc((100% - 1150px)/2 - 90px)); width:64px; height:calc(100% + 100px); overflow:visible; }
+.agent-thread-root, .agent-thread-branches, .agent-thread-progress { fill:none; stroke-linecap:round; }
+.agent-thread-root { stroke:#a6af93; stroke-width:1.2; opacity:.4; }
+.agent-thread-branches { stroke:#b9bba6; stroke-width:.7; opacity:.4; }
+.agent-thread-progress { stroke:#558264; stroke-width:1.8; opacity:.8; }
+.agent-thread-light { fill:#c6b16e; }
+.agent-thread-halo { fill:#88ae85; opacity:.2; }
+.agent-use-cases { display:grid; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); align-items:center; gap:clamp(48px,7vw,100px); min-height:810px; padding-block:130px 110px; color:#172a20; }
+.mycellios-reference .agent-use-cases h2 { font-size:clamp(40px,4vw,56px); line-height:1.05; letter-spacing:-.04em; }
+.agent-case-copy > p, .agent-case-fallback p { margin-top:22px; color:#62665d; font-size:19px; line-height:1.6; }
+.agent-case-choices { display:grid; gap:9px; margin-top:30px; }
+.agent-case-choice > .mico-avatar { width:40px; height:40px; flex:none; }
+.agent-case-choice > span { display:grid; gap:3px; flex:1; }
+.agent-case-choice strong { font-size:17px; font-weight:500; }
+.agent-case-choice > span > span { color:#62665d; font-size:13px; line-height:1.5; }
+.agent-case-choice > svg { opacity:0; transform:translateX(-4px); transition:opacity 180ms ease,transform 180ms ease; }
+.agent-case-choice[aria-pressed="true"] > svg, .agent-case-choice:hover > svg { opacity:1; transform:none; }
+.agent-case-open { display:inline-flex; align-items:center; gap:10px; min-height:44px; margin-top:22px; font-size:14px; }
+.agent-case-preview { min-width:0; }
+.agent-case-request { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+.agent-case-request .mico-avatar { width:33px; height:33px; flex:none; }
+.agent-case-request p { padding:13px 16px; background:#efede7; border-radius:14px; font-size:14px; line-height:1.5; }
+.agent-case-context { display:flex; align-items:flex-start; gap:12px; padding:18px 20px; background:#f1efe9; border-radius:14px; }
+.agent-case-context > svg { flex:none; margin-top:2px; }
+.agent-case-context strong { font-size:13px; font-weight:500; }
+.agent-case-context p { margin-top:6px; color:#62665d; font-size:12px; line-height:1.6; }
+.agent-case-permission { display:flex; align-items:center; gap:7px; padding:13px 5px 17px; color:#62665d; font-size:11px; }
+.agent-case-permission > span:last-child { display:flex; align-items:center; gap:4px; margin-left:auto; color:#42624b; }
+.agent-case-document { padding:24px 28px 28px; background:#fff; border-radius:14px; box-shadow:0 10px 35px #1927190a; } /* taste-skill-ignore: Floating document preview within the product illustration. */
+.agent-case-document-header { display:flex; align-items:center; gap:8px; font-size:12px; color:#62665d; margin-bottom:25px; }
+.agent-case-document-header > span:last-child { margin-left:auto; }
+.mycellios-reference .agent-case-document h3 { max-width:390px; font-size:27px; line-height:1.2; font-weight:500; letter-spacing:-.025em; }
+.agent-case-document > p { margin-top:12px; color:#62665d; font-size:13px; line-height:1.7; }
+.agent-case-document dl { display:grid; gap:18px; margin:25px 0 0; }
+.agent-case-document dt { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; }
+.agent-case-document dt svg { flex:none; color:#4e8065; }
+.agent-case-document dd { margin:5px 0 0 22px; color:#62665d; font-size:12px; line-height:1.65; }
+.mycellios-reference .agent-case-caption { margin:14px 0 0; color:#75796f; font-size:11px; line-height:1.5; }
+.agent-case-fallback { align-items:center; }
+.agent-case-fallback a { display:inline-flex; align-items:center; min-height:44px; margin-top:24px; font-size:14px; }
+@media (max-width:1250px) { .agent-journey-thread { left:0; width:22px; } }
+@media (max-width:1000px) {
+  .agent-use-cases { gap:32px; padding-block:100px 80px; }
+  .agent-case-document { padding:22px; }
+  .agent-case-context { padding:16px; }
+}
+@media (max-width:760px) {
+  .agent-journey-thread { top:-50px; height:calc(100% + 50px); width:14px; }
+  .agent-use-cases { grid-template-columns:1fr; gap:36px; min-height:1120px; padding-block:80px 65px; padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right); }
+  .mycellios-reference .agent-use-cases h2 { font-size:38px; }
+  .agent-case-copy > p { font-size:17px; margin-top:18px; }
+  .agent-case-copy > p br { display:none; }
+  .agent-case-choices { margin-top:24px; gap:6px; }
+  .agent-case-open { margin-top:14px; }
+  .agent-case-request { gap:10px; margin-bottom:16px; }
+  .agent-case-request p { padding:12px; font-size:13px; }
+  .agent-case-document { padding:22px 20px; }
+  .mycellios-reference .agent-case-document h3 { font-size:25px; }
+  .agent-case-permission { font-size:10px; gap:5px; }
+  .agent-case-fallback { display:flex; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .agent-thread-progress, .agent-thread-light { display:none; }
+  .agent-case-choice > svg { transition:none; }
+}
