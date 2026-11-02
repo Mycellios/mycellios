@@ -102,6 +102,8 @@ These rules apply to the complete repository.
   pinned published native baseline, source provenance, explicit runtime pairing
   and unsigned-preview update policy. Qualify packaging and launch on macOS;
   runner checks do not substitute for physical Mac inference evidence.
+  The download page opts into `?include=macos-arm64`; retain the byte-identical
+  legacy two-platform catalog for older clients without that query.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
   canonical docs when complete.
 - Run `npm run verify:structure`, relevant focused tests and `npm run typecheck`.

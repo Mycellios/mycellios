@@ -13,7 +13,7 @@ export function DesktopDownloads() {
     let active = true;
     const controller = new AbortController();
     setFailed(false);
-    void fetch("/public/v1/desktop-downloads", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
+    void fetch("/public/v1/desktop-downloads?include=macos-arm64", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
       .then(async r => { if (!r.ok) throw Error("Release unavailable"); const value: unknown = await r.json(); if (!isDesktopDownloadCatalog(value)) throw Error("Invalid release"); if (active) setCatalog(value); })
       .catch(() => { if (active) setFailed(true); });
     return () => { active = false; controller.abort(); };
@@ -44,7 +44,7 @@ export function DesktopDownloads() {
       <Text>On Fedora, open the RPM with your software installer or run <code>sudo dnf install ./{FEDORA_DESKTOP_DOWNLOAD.fileName}</code>.</Text>
       <Text>To update, close Desktop and run the new installer. Your account, chats and project settings are kept. Updates are manual for now.</Text>
       <Text>The contribution runtime is included. Joining the network requires your account and permission.</Text>
-      {catalog ? <div className="desktop-checksums">{catalog.packages.map(p => <Text key={p.id}><strong>{p.id === "windows-x64" ? "Windows" : p.id === "macos-arm64" ? "macOS" : "Linux"}</strong> · {p.format} · {Math.ceil(p.bytes / 1_000_000)} MB<code>{p.sha256}</code></Text>)}<Link href={catalog.source.path}>Source code and build information</Link><Link href="https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.9-macos-preview">Apple Silicon source and build information</Link></div> : null}
+      {catalog ? <div className="desktop-checksums">{catalog.packages.map(p => <Text key={p.id}><strong>{p.id === "windows-x64" ? "Windows" : p.id === "macos-arm64" ? "macOS" : "Linux"}</strong> · {p.format} · {Math.ceil(p.bytes / 1_000_000)} MB<code>{p.sha256}</code></Text>)}<Link href={catalog.source.path}>Source code and build information</Link><Link href="https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.9-apple-silicon-preview">Apple Silicon source and build information</Link></div> : null}
       <div className="desktop-checksums"><Text><strong>Fedora</strong> · RPM · Version {FEDORA_DESKTOP_DOWNLOAD.version} · {Math.ceil(FEDORA_DESKTOP_DOWNLOAD.bytes / 1_000_000)} MB<code>{FEDORA_DESKTOP_DOWNLOAD.sha256}</code></Text><Link href="https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.9-fedora-preview">Fedora source code and build information</Link></div>
       <footer><Link href="/downloads?product=runtime">Standalone runtime</Link><Link href="https://github.com/Mycellios/mycellios">GitHub</Link></footer>
     </Disclosure>
