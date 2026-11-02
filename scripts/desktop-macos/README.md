@@ -1,6 +1,6 @@
-# Apple Silicon Desktop preview
+# Intel and Apple Silicon Desktop previews
 
-The dedicated workflow builds ARM64 DMG/ZIP files from the hash-pinned published
+The dedicated workflow builds native x64 and ARM64 DMG/ZIP files from the hash-pinned published
 Desktop 0.3.9 native baseline and its matching source archive. `assemble.mjs`
 replaces only the contribution-runtime constructor with the Mac implementation;
 all other native behavior and the hosted shared UI are retained. The immutable
@@ -13,7 +13,13 @@ On macOS, package with `package-macos.mjs --runtime <PKG> --sha256 <pinned hash>
 from the assembled Desktop directory. Build tools require Node 24; Electron is
 pinned independently. Use the local job scheduler for Windows verification.
 
-The runtime is the existing Apple Silicon 0.2.95 package. Enrollment is explicit,
+Both downloads require macOS 13 or newer. Run assembly with a final `arm64` or
+`x64` argument and package on that native architecture with `--arch`.
+Only ARM64 accepts `--runtime` and its checksum. Intel Desktop omits the
+incompatible PKG and reports contribution unsupported before any pairing grant
+or administrator prompt; its agent and project tools remain available.
+
+The bundled ARM runtime is the existing Apple Silicon 0.2.95 package. Enrollment is explicit,
 requires a fresh account grant and the native administrator prompt, and reuses
 the protected runtime identity. Installation does not create a Windows user,
 modify automatic login, enroll a tester, or manufacture contribution Credits.

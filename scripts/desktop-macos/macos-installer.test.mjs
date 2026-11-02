@@ -14,3 +14,14 @@ test('Apple Silicon packaging pins the PKG, preserves identity and keeps unsigne
   await assert.rejects(prepareMacInstaller({...options,version:'../wrong'}),/version/);
  }finally{await rm(root,{recursive:true,force:true});}
 });
+test('Intel Desktop targets x64 and cannot accidentally bundle the ARM runtime',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'mycellios-intel-test-'));
+ try{
+  const options={desktopRoot:root,output:path.join(root,'out'),version:'0.3.9',arch:'x64'};
+  const config=await prepareMacInstaller(options);
+  assert.deepEqual(config.mac.target,[{target:'dmg',arch:['x64']},{target:'zip',arch:['x64']}]);assert.equal(config.mac.minimumSystemVersion,'13.0');
+  assert.equal(config.extraResources.some(r=>r.to.startsWith('contribution/')),false);assert(config.artifactName.includes('macos-x64'));
+  await assert.rejects(prepareMacInstaller({...options,runtimePkg:'incompatible-arm.pkg',runtimeSha256:'a'.repeat(64)}),/must not bundle/);
+  await assert.rejects(prepareMacInstaller({...options,arch:'ia32'}),/Unsupported/);
+ }finally{await rm(root,{recursive:true,force:true});}
+});

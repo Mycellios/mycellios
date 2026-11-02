@@ -1,5 +1,5 @@
 import fs from'node:fs/promises';import path from'node:path';import os from'node:os';import{createHash}from'node:crypto';import{createReadStream}from'node:fs';import{execFileSync}from'node:child_process';import{checkPreviewSignature}from'./signature-check.mjs';
-if(process.platform!=='darwin'||process.arch!=='arm64')throw Error('DMG qualification requires Apple Silicon macOS');
+if(process.platform!=='darwin'||!['arm64','x64'].includes(process.arch))throw Error('DMG qualification requires native Intel or Apple Silicon macOS');
 const[app,dmg,output]=process.argv.slice(2).map(p=>path.resolve(p));
 if(!app||!dmg||!output)throw Error('Provide the packaged app, final DMG and evidence output');
 const digest=async file=>{const h=createHash('sha256');for await(const b of createReadStream(file))h.update(b);return h.digest('hex');};

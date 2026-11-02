@@ -98,7 +98,7 @@ These rules apply to the complete repository.
   `landing/index.html` and `landing/src/seo.ts`. Keep static and runtime metadata
   aligned; verify `tests/landing-seo.test.ts` when changing social cards.
 - Preserve unrelated worktree changes.
-- Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
+- Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   pinned published native baseline, source provenance, explicit runtime pairing
   and unsigned-preview update policy. Qualify packaging and launch on macOS;
   runner checks do not substitute for physical Mac inference evidence.
@@ -107,6 +107,10 @@ These rules apply to the complete repository.
   Gatekeeper assessment separately: ad-hoc integrity is not notarization or an
   automatically trusted browser download. Keep manual updates and never remove
   quarantine or disable Gatekeeper as part of qualification.
+  Intel Desktop must omit the ARM-only contribution PKG and report that capability
+  unsupported before creating pairing grants or prompting for administrator access.
+  Qualify each architecture natively; require macOS 13 or newer. Keep the default
+  and earlier arm64 catalogs compatible; both Mac builds use the all-Mac opt-in.
   The download page opts into `?include=macos-arm64`; retain the byte-identical
   legacy two-platform catalog for older clients without that query.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
