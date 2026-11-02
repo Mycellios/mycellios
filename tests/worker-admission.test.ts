@@ -60,7 +60,7 @@ describe("signed worker admission", () => {
     };
 
     expect((await authority.verify({ identity, registrationDigest, proof })).enrollment).toBe("enrolled");
-    expect(async () => (await authority.verify({ identity, registrationDigest, proof }))).toThrowError(
+    await expect((async () => (await authority.verify({ identity, registrationDigest, proof })))()).rejects.toThrowError(
       expect.objectContaining({ code: "worker_admission_challenge_unknown" }),
     );
   });
@@ -91,7 +91,7 @@ describe("signed worker admission", () => {
       protocol,
     });
 
-    expect(async () => (await authority.verify({
+    await expect((async () => (await authority.verify({
       identity,
       registrationDigest: changedDigest,
       proof: {
@@ -101,7 +101,7 @@ describe("signed worker admission", () => {
         registrationDigest,
         signature: signer.sign(challenge.signingPayload),
       },
-    }))).toThrowError(
+    })))()).rejects.toThrowError(
       expect.objectContaining({ code: "worker_admission_registration_changed" }),
     );
   });
@@ -113,11 +113,11 @@ describe("signed worker admission", () => {
       workerAdmissionSigner(generateWorkerAdmissionCredential()),
       "desktop-bound",
     ));
-    expect(async () => (await admit(
+    await expect((async () => (await admit(
       authority,
       workerAdmissionSigner(generateWorkerAdmissionCredential()),
       "desktop-bound",
-    ))).toThrowError(
+    )))()).rejects.toThrowError(
       expect.objectContaining({ code: "worker_identity_key_mismatch" }),
     );
   });
@@ -128,7 +128,7 @@ describe("signed worker admission", () => {
     const database = databases.at(-1)!;
     (await bindOwnership(database, "desktop-owned", `sha256:${"f".repeat(64)}`));
 
-    expect(async () => (await admit(authority, signer, "desktop-owned"))).toThrowError(
+    await expect((async () => (await admit(authority, signer, "desktop-owned")))()).rejects.toThrowError(
       expect.objectContaining({ code: "worker_ownership_fingerprint_mismatch" }),
     );
     expect((await database.getWorkerAdmissionCredential("device", "desktop-owned"))).toBeNull();
@@ -217,7 +217,7 @@ describe("signed worker admission", () => {
       generation: 2,
     });
     expect((await admit(authority, next, "desktop-rotate")).enrollment).toBe("accepted");
-    expect(async () => (await admit(authority, current, "desktop-rotate"))).toThrowError(
+    await expect((async () => (await admit(authority, current, "desktop-rotate")))()).rejects.toThrowError(
       expect.objectContaining({ code: "worker_ownership_fingerprint_mismatch" }),
     );
   });
@@ -248,15 +248,15 @@ describe("signed worker admission", () => {
       status: "revoked",
       generation: 2,
     });
-    expect(async () => (await admit(authority, current, "desktop-revoked"))).toThrowError(
+    await expect((async () => (await admit(authority, current, "desktop-revoked")))()).rejects.toThrowError(
       expect.objectContaining({ code: "worker_ownership_revoked" }),
     );
-    expect(async () => (await authority.issueRotation({
+    await expect((async () => (await authority.issueRotation({
       identity: { kind: "device", id: "desktop-revoked" },
       currentPublicKey: current.publicKey,
       nextPublicKey: workerAdmissionSigner(generateWorkerAdmissionCredential()).publicKey,
       protocol: { min: 1, max: 1 },
-    }))).toThrowError(
+    })))()).rejects.toThrowError(
       expect.objectContaining({ code: "worker_credential_revoked" }),
     );
   });
@@ -269,11 +269,11 @@ describe("signed worker admission", () => {
     const database = databases.at(-1)!;
     (await bindOwnership(database, "desktop-recover", enrolled.credentialFingerprint));
     const identity = { kind: "device" as const, id: "desktop-recover" };
-    expect(async () => (await authority.issueRecovery({ identity, nextPublicKey: next.publicKey, protocol: { min: 1, max: 1 } }, "account-2")))
+    await expect((async () => (await authority.issueRecovery({ identity, nextPublicKey: next.publicKey, protocol: { min: 1, max: 1 } }, "account-2")))()).rejects
       .toThrowError(expect.objectContaining({ code: "worker_recovery_owner_mismatch" }));
 
     const challenge = (await authority.issueRecovery({ identity, nextPublicKey: next.publicKey, protocol: { min: 1, max: 1 } }, "account-1"));
-    expect(async () => (await authority.verifyRecovery(identity, { challengeId: challenge.challengeId, nextSignature: current.sign(challenge.signingPayload) }, "account-1")))
+    await expect((async () => (await authority.verifyRecovery(identity, { challengeId: challenge.challengeId, nextSignature: current.sign(challenge.signingPayload) }, "account-1")))()).rejects
       .toThrowError(expect.objectContaining({ code: "worker_recovery_signature_invalid" }));
     const retry = (await authority.issueRecovery({ identity, nextPublicKey: next.publicKey, protocol: { min: 1, max: 1 } }, "account-1"));
     const recovered = (await authority.verifyRecovery(identity, { challengeId: retry.challengeId, nextSignature: next.sign(retry.signingPayload) }, "account-1"));
@@ -282,7 +282,7 @@ describe("signed worker admission", () => {
       accountId: "account-1", status: "active", generation: 2,
       credentialFingerprint: recovered.credentialFingerprint,
     });
-    expect(async () => (await admit(authority, current, identity.id))).toThrowError(expect.objectContaining({ code: "worker_ownership_fingerprint_mismatch" }));
+    await expect((async () => (await admit(authority, current, identity.id)))()).rejects.toThrowError(expect.objectContaining({ code: "worker_ownership_fingerprint_mismatch" }));
     expect((await admit(authority, next, identity.id)).enrollment).toBe("accepted");
     expect(((await database.raw.prepare("SELECT event_type, generation, actor_kind FROM node_identity_events WHERE identity_id = ? ORDER BY sequence").all(identity.id)) as Array<Record<string, unknown>>))
       .toMatchObject([{ event_type: "credential.recovered", generation: 2, actor_kind: "account" }]);

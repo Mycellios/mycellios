@@ -82,7 +82,7 @@ describe("authenticated activation checkpoint transfer", () => {
     expect((await store.get(checkpoint.checkpointId, expected, 2_003))?.payload.equals(payload)).toBe(true);
   });
 
-  it("rejects cross-session, reordered, incomplete and corrupt transfers", () => {
+  it("rejects cross-session, reordered, incomplete and corrupt transfers", async () => {
     const payload = Buffer.alloc(ACTIVATION_CHECKPOINT_CHUNK_BYTES + 3, 11);
     const checkpoint = fixture(payload);
     const { transfer } = authority();
@@ -99,14 +99,14 @@ describe("authenticated activation checkpoint transfer", () => {
     }, 2_000);
     expect(() => transfer.chunk("worker-a", "session-a", chunks[1], 2_001)).toThrow(/order/);
     transfer.chunk("worker-a", "session-a", chunks[0], 2_001);
-    expect(async () => (await transfer.commit("worker-a", "session-a", {
+    await expect((async () => (await transfer.commit("worker-a", "session-a", {
       transferId, checkpointId: checkpoint.checkpointId,
-    }, 2_002))).toThrow(/incomplete/);
+    }, 2_002)))()).rejects.toThrow(/incomplete/);
     const corrupt = { ...chunks[1]!, data: Buffer.alloc(3, 12).toString("base64") };
     transfer.chunk("worker-a", "session-a", corrupt, 2_003);
-    expect(async () => (await transfer.commit("worker-a", "session-a", {
+    await expect((async () => (await transfer.commit("worker-a", "session-a", {
       transferId, checkpointId: checkpoint.checkpointId,
-    }, 2_004))).toThrow(/payload_is_corrupt/);
+    }, 2_004)))()).rejects.toThrow(/payload_is_corrupt/);
   });
 
   it("expires expectations and zero-aborts every transfer from a dead session", () => {

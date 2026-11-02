@@ -65,7 +65,7 @@ describe("bounded activation checkpoints", () => {
     });
     expect((await store.put(checkpoint, bytes, expected(), 2_000)).checkpointId)
       .toBe(checkpoint.checkpointId);
-    expect(async () => (await store.put(checkpoint, bytes, { ...expected(), keyId: "unknown" }, 2_000)))
+    await expect((async () => (await store.put(checkpoint, bytes, { ...expected(), keyId: "unknown" }, 2_000)))()).rejects
       .toThrow(/keyId_is_incompatible|signature_is_invalid/);
   });
 

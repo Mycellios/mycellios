@@ -12,6 +12,7 @@ await build({
   outfile: "dist/main.js",
   bundle: true,
   alias: await workspaceAliases(path.resolve("../..")),
+  nodePaths: [path.join(agentRoot, "node_modules")],
   platform: "node",
   format: "esm",
   target: "node22",

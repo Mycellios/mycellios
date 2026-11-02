@@ -124,7 +124,7 @@ describe("stablecoin buyer checkout", () => {
         keys.privateKey,
       ).toString("base64url"),
     });
-    expect(async () => (await applyBillingCommand(billing, secondCommand))).toThrowError(
+    await expect((async () => (await applyBillingCommand(billing, secondCommand)))()).rejects.toThrowError(
       expect.objectContaining({ code: "stablecoin_intent_consumed" }),
     );
   });

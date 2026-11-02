@@ -42,7 +42,7 @@ describe("NodeEnrollmentStore", () => {
       eventType: "identity.enrolled", generation: 1, previousEventDigest: null,
     }]);
     (await database.raw.prepare("UPDATE node_identity_events SET details_json = '{}' WHERE identity_id = 'node-1'").run());
-    expect(async () => (await database.nodeIdentityEvents("device", "node-1"))).toThrow("node_identity_event_digest_mismatch");
+    await expect((async () => (await database.nodeIdentityEvents("device", "node-1")))()).rejects.toThrow("node_identity_event_digest_mismatch");
     (await database.close());
   });
 
@@ -79,7 +79,7 @@ describe("NodeEnrollmentStore", () => {
     const database = (await MeshDatabase.open(":memory:"));
     const store = new NodeEnrollmentStore(database, () => clock);
     const first = (await store.issue({ accountId: "account-1", actor, expiresInSeconds: 60 }));
-    expect(async () => (await store.confirm({ enrollmentId: first.enrollmentId, accountId: "account-2", actorId: "account-2" }))).toThrow("node_enrollment_account_mismatch");
+    await expect((async () => (await store.confirm({ enrollmentId: first.enrollmentId, accountId: "account-2", actorId: "account-2" })))()).rejects.toThrow("node_enrollment_account_mismatch");
     (await store.confirm({ enrollmentId: first.enrollmentId, accountId: "account-1", actorId: "account-1" }));
     expect((await store.consume({ enrollmentToken: first.enrollmentToken, nonce: "wrong", identityKind: "device", identityId: "node-1", publicKeyFingerprint: `sha256:${"a".repeat(64)}` })).state).toBe("nonce-mismatch");
     const second = (await store.issue({ accountId: "account-1", actor, expiresInSeconds: 60 }));

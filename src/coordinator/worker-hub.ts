@@ -1,7 +1,9 @@
-import { connectionIsReady, connectedWorkerIdentifiers, authenticatedConnectionAuthority, type AuthorizedWorkerSession, type ConnectionState, type WorkerDisconnectDetails } from "./worker-connection-state.js";
+import { runtimeChallengeIdentity } from "./worker-runtime-challenge.js";
+import { connectionIsReady, connectedWorkerIdentifiers, authenticatedConnectionAuthority, workerHeartbeatArrival, workerConnectionIsHeartbeatStale, type AuthorizedWorkerSession, type ConnectionState, type WorkerDisconnectDetails } from "./worker-connection-state.js";
 import { WorkerEventDelivery, WorkerInboundQueue, type WorkerEventConsumer, type WorkerDisconnectObserver } from "./worker-event-delivery.js";
 import { AsyncTaskScope } from "../core/async-task-scope.js";
 export type { AuthorizedWorkerSession, WorkerDisconnectDetails } from "./worker-connection-state.js";
+export { workerConnectionIsHeartbeatStale } from "./worker-connection-state.js";
 import { logRuntimeStreamTermination, logDuplicateWorkerHello, runtimeStreamReportEquals,
   type RuntimeStreamRecoveryReport, type RuntimeStreamTerminalDiagnostic } from "./runtime-stream-lifecycle.js";
 import { EventEmitter } from "node:events";
@@ -204,22 +206,6 @@ const DIRECT_GRANT_TTL_MS = 10_000;
 const DIRECT_ROUTE_MAX_LIFETIME_MS = 4 * 60 * 60 * 1_000;
 const EVIDENCE_RETRY_AFTER_MS = 60_000;
 const MAX_PENDING_EVIDENCE_CHALLENGES = 1_024;
-const WORKER_HEARTBEAT_GRACE_MS = 10_000;
-
-/**
- * Registration and the first heartbeat are separate messages. A freshly
- * authenticated socket may therefore still have the persisted offline status
- * for a few milliseconds and must not be reaped by the stale-worker sweep.
- */
-export function workerConnectionIsHeartbeatStale(
-  worker: Pick<StoredWorker, "status" | "lastSeenAt"> | null,
-  now = Date.now(),
-): boolean {
-  if (!worker) return true;
-  if (worker.status !== "suspect" && worker.status !== "offline") return false;
-  return worker.lastSeenAt < now - WORKER_HEARTBEAT_GRACE_MS;
-}
-
 export function workerSessionSupersedes(previous: AuthorizedWorkerSession, incoming: AuthorizedWorkerSession): boolean {
   return previous.identityKind === incoming.identityKind
     && previous.identityId === incoming.identityId
@@ -236,6 +222,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
   private readonly workerEvents = new WorkerEventDelivery(this, () => this.logger);
   private readonly inboundFrames = new WorkerInboundQueue(this.background, (state, raw) => this.handleRawMessage(state, raw));
   private readonly connections = new Map<string, ConnectionState>();
+  private readonly validatedHeartbeatTimes = new WeakMap<ConnectionState, number>();
   private readonly allConnections = new Set<ConnectionState>();
   private logger: FastifyInstance["log"] | null = null;
   private pendingConnections = 0;
@@ -303,7 +290,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       };
       this.pendingConnections += 1;
       this.allConnections.add(state);
-      socket.on("message", raw => this.inboundFrames.enqueue(state, raw.toString()));
+      socket.on("message", raw => this.receiveRawMessage(state, raw.toString()));
       socket.on("close", (code, reason) => this.background.run("worker-hub:301", async () => {
         app.log.warn({
           workerId: state.workerId,
@@ -777,10 +764,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
 
   async closeStaleConnections(): Promise<number> {
     let closed = 0;
-    const now = Date.now();
     for (const [workerId, state] of this.connections) {
       const worker = (await this.store.getWorker(workerId));
-      if (!workerConnectionIsHeartbeatStale(worker, now)) continue;
+      if (this.connections.get(workerId) !== state) continue;
+      if (!workerConnectionIsHeartbeatStale(worker, Date.now(), this.validatedHeartbeatTimes.get(state))) continue;
       closed += 1;
       try {
         state.socket.close(4410, "worker heartbeat stale");
@@ -791,8 +778,16 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     return closed;
   }
 
+  private receiveRawMessage(state: ConnectionState, raw: string): void {
+    const arrival = workerHeartbeatArrival(state, raw, state.workerId ? this.connections.get(state.workerId) : undefined);
+    if (arrival !== undefined) this.validatedHeartbeatTimes.set(state, arrival);
+    this.inboundFrames.enqueue(state, raw);
+  }
+
   private async handleRawMessage(state: ConnectionState, raw: string): Promise<void> {
-    if (state.closed || state.socket.readyState !== state.socket.OPEN) return;
+    // Frames were admitted while OPEN and share a serial key with handleClose.
+    // A peer can close its socket before its already accepted goodbye is processed.
+    if (state.closed || state.recoveryDenied) return;
     try {
       const now = Date.now();
       if (now - state.messageWindowStartedAt >= 1_000) {
@@ -832,7 +827,9 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         return;
       }
 
-      if (state.closed || state.socket.readyState !== state.socket.OPEN) return;
+      // Frames were admitted while OPEN and share a serial key with handleClose.
+    // A peer can close its socket before its already accepted goodbye is processed.
+    if (state.closed || state.recoveryDenied) return;
       if (!state.workerId) {
         if (
           envelope.type !== "worker.hello"
@@ -845,7 +842,9 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           (await this.closeInvalid(state, "invalid worker hello", 4404));
           return;
         }
-        if (state.closed || state.socket.readyState !== state.socket.OPEN) return;
+        // Frames were admitted while OPEN and share a serial key with handleClose.
+    // A peer can close its socket before its already accepted goodbye is processed.
+    if (state.closed || state.recoveryDenied) return;
         const previous = this.connections.get(envelope.workerId);
         const incomingSupersedes = previous?.authorizedSession && state.authorizedSession
           ? workerSessionSupersedes(previous.authorizedSession, state.authorizedSession)
@@ -2681,46 +2680,6 @@ function evidenceChallengeKey(
   return `${workerId}\u0000${kind}\u0000${target}`;
 }
 
-function runtimeChallengeIdentity(
-  capabilities: WorkerCapabilities,
-): {
-  nodeId: string;
-  backend: RuntimePerformanceChallenge["backend"];
-  deviceName: string;
-  precision: RuntimePerformanceChallenge["precision"];
-} | null {
-  const executor = capabilities.distributedExecutor;
-  if (!executor) return null;
-  const acceleration = executor.acceleration;
-  if (
-    acceleration?.state === "gpu-ready"
-    && acceleration.backend
-    && acceleration.backend !== "cpu" && acceleration.backend !== "directml"
-    && acceleration.deviceName
-    && executor.computeMode !== "cpu-only"
-  ) {
-    return {
-      nodeId: executor.nodeId,
-      backend: acceleration.backend,
-      deviceName: acceleration.deviceName,
-      precision: "float16",
-    };
-  }
-  if (
-    executor.cpuEligible === true
-    && executor.computeMode !== "gpu-only"
-    && acceleration?.backend === "cpu"
-    && acceleration.deviceName
-  ) {
-    return {
-      nodeId: executor.nodeId,
-      backend: "cpu",
-      deviceName: acceleration.deviceName,
-      precision: "float32",
-    };
-  }
-  return null;
-}
 
 function normalizeDeviceName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");

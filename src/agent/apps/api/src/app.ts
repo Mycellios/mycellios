@@ -812,6 +812,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   };
   const sessionActor = async (request: Request) => (await requestSession(request))?.actor ?? null;
   const stopDesktopRelay = mountDesktopRelay(app, {
+    spaces: actor => runAsSystem("native account computer memberships",async()=>
+      (await prisma.spaceMember.findMany({where:{userId:actor.userId},select:{spaceId:true},take:128})).map(m=>m.spaceId)),
     enabled: process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true",
     secret: env.screenProxySecret,
     authenticate: requestSession,

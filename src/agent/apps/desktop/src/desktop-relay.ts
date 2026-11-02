@@ -3,6 +3,7 @@ import type {
   DesktopExecutorOperation,
   DesktopExecutorPoll,
 } from "../../../../contracts/desktop-executor.js";
+import {parseDesktopBinding} from "../../../../contracts/desktop-executor.js";
 import {
   HOST_COMPUTER_MAX_BYTES,
   hostComputerRequest,
@@ -11,7 +12,7 @@ import {
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 /** Native-only outbound transport. The renderer never receives the host bearer. */
 export class DesktopRelayClient {
-  private deviceId = randomUUID();
+  private deviceId: string = randomUUID();
   private grants = new Map<string, { generation: string }>();
   private active = new Map<string, AbortController>();
   private stopped = true;
@@ -19,6 +20,9 @@ export class DesktopRelayClient {
   private lastContact = 0;
   private lastBindingCheck = 0;
   private owner?: string;
+  private accountGeneration?: string;
+  private accountIdentity?: {userId:string;spaceId:string;connectionId:string};
+  private intent=0;
   constructor(
     private readonly options: {
       base: string;
@@ -27,8 +31,9 @@ export class DesktopRelayClient {
       localToken: string;
       revoked(): void;
       now?: () => number;
+      deviceId?:string;
     },
-  ) {}
+  ) { if(options.deviceId)this.deviceId=options.deviceId; }
   private async post(action: string, input: unknown, signal?: AbortSignal) {
     const response = await this.options.fetch(`${this.options.base}/api/desktop-relay/${action}`, {
       method: "POST",
@@ -73,16 +78,19 @@ export class DesktopRelayClient {
     return identity;
   }
   async bind(botId: string, renew = false) {
+    const intent=this.intent;
     await this.identity();
+    if(intent!==this.intent)throw Error("The local session changed");
     const existing = this.grants.get(botId);
     // Reassert the same grant after an API restart; never replay an operation.
     const generation =
-      existing && !renew ? existing.generation : randomUUID();
+      existing && !renew ? existing.generation : this.accountGeneration ?? randomUUID();
     await this.post("bind", {
       deviceId: this.deviceId,
       botId,
       generation,
     });
+    if(intent!==this.intent)throw Error("The local session changed");
     this.grants.set(botId, { generation });
     if (!this.lastBindingCheck) this.lastBindingCheck = (this.options.now ?? Date.now)();
     if (this.stopped) {
@@ -90,6 +98,21 @@ export class DesktopRelayClient {
       this.lastContact = (this.options.now ?? Date.now)();
       void this.poll();
     }
+  }
+  async spaces(): Promise<string[]> {
+    const data=await(await this.post("spaces",{})).json() as {spaces?:unknown};
+    if(!Array.isArray(data.spaces)||data.spaces.length>128||data.spaces.some(x=>typeof x!=="string"||!x||x.length>256))throw Error("Invalid account spaces");
+    return data.spaces;
+  }
+  async registerAccount(expected: {userId:string;spaceId:string;connectionId:string}) {
+    const intent=this.intent;
+    const identity=await this.identity();
+    if(intent!==this.intent)throw Error("The local session changed");
+    if(identity.userId!==expected.userId||identity.spaceId!==expected.spaceId||identity.connectionId!==expected.connectionId)throw Error("The account session changed");
+    this.accountIdentity=identity;
+    this.accountGeneration ??= randomUUID();
+    // The first poll registers and checks the account before it can receive work.
+    if(this.stopped){this.stopped=false;this.lastContact=0;await this.poll();}
   }
   async revoke() {
     this.stop();
@@ -103,22 +126,27 @@ export class DesktopRelayClient {
     return !this.stopped && this.grants.has(botId) &&
       (this.options.now ?? Date.now)() - this.lastContact < 40_000;
   }
+  online() { return !this.stopped && this.lastContact>0 && (this.options.now??Date.now)()-this.lastContact<40_000; }
   busy() {
     return this.active.size > 0;
   }
   stop() {
+    ++this.intent;
     this.stopped = true;
     clearTimeout(this.timer);
     for (const controller of this.active.values()) controller.abort();
     this.active.clear();
     this.grants.clear();
+    this.accountGeneration=undefined;
+    this.accountIdentity=undefined;
   }
   private async poll() {
     if (this.stopped) return;
     try {
       const state = (await (
-        await this.post("poll", { deviceId: this.deviceId })
+        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity} : {}) })
       ).json()) as DesktopExecutorPoll & { identity?: unknown };
+      if(this.stopped)return;
       if (!this.owner || JSON.stringify(state.identity) !== this.owner) {
         this.stop();
         this.options.revoked();
@@ -133,12 +161,18 @@ export class DesktopRelayClient {
       // Bindings are volatile on the API. Reassert only the same owner-approved
       // generation after a restart; commands/results are never resubmitted here.
       const now = (this.options.now ?? Date.now)();
-      if (now - this.lastBindingCheck >= 15_000) {
+      if (!this.accountGeneration && now - this.lastBindingCheck >= 15_000) {
         for (const [botId, grant] of this.grants) {
           await this.post("bind", { deviceId: this.deviceId, botId, generation: grant.generation });
           if (this.stopped) return;
         }
         this.lastBindingCheck = now;
+      }
+      if(this.accountGeneration){
+        if(!Array.isArray(state.bindings)||state.bindings.length>128)throw Error("Invalid account bindings");
+        const grants=new Map<string,{generation:string}>();
+        for(const raw of state.bindings){const b=parseDesktopBinding(raw);if(b.deviceId!==this.deviceId)throw Error("Another device binding");grants.set(b.botId,{generation:b.generation});}
+        this.grants=grants;
       }
       this.lastContact = (this.options.now ?? Date.now)();
       for (const [id, controller] of this.active)

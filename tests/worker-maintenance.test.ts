@@ -7,7 +7,7 @@ import type { WorkerStatus } from "../src/contracts/types.js";
 function setup() {
   const worker = { id: "worker", status: "online" as WorkerStatus } as StoredWorker;
   const store: Pick<MeshStore, "getWorker" | "setWorkerStatus"> = {
-    getWorker: () => worker, setWorkerStatus: (_id, status) => { worker.status = status; },
+    getWorker: async () => worker, setWorkerStatus: async (_id, status) => { worker.status = status; },
   };
   return { worker, store, maintenance: new WorkerMaintenance() };
 }

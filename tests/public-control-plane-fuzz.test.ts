@@ -78,14 +78,14 @@ describe("public control-plane deterministic stateful fuzzing", () => {
       const command = commandFixture(index);
       expect((await commands.enqueue(command, 3)).state).toBe("queued");
       expect((await commands.enqueue(command, 3)).state).toBe("queued");
-      expect(async () => (await commands.enqueue({ ...commandFixture(index + 10_000), nonce: command.nonce }, 3)))
+      await expect((async () => (await commands.enqueue({ ...commandFixture(index + 10_000), nonce: command.nonce }, 3)))()).rejects
         .toThrow("node_command_replay");
     }
 
     const events = (await commands.eventsAfter("node-fuzz", null));
     for (const event of events.slice(0, 32)) {
       const forged = `${event.cursor.slice(0, -1)}${event.cursor.endsWith("0") ? "1" : "0"}`;
-      expect(async () => (await commands.eventsAfter("node-fuzz", forged))).toThrow(/node_event_cursor/);
+      await expect((async () => (await commands.eventsAfter("node-fuzz", forged)))()).rejects.toThrow(/node_event_cursor/);
     }
     (await database.close());
   });

@@ -254,7 +254,7 @@ describe("mobile compute hub", () => {
     );
     const verified = await nextMessage(socket);
     expect(verified.type).toBe("compute.verified");
-    expect(verified.payload).toMatchObject({ inferenceReady: true, verifiedTasks: 1 });
+    expect(verified.payload).toMatchObject({ inferenceReady: false, verifiedTasks: 1 });
 
     socket.send(JSON.stringify({ v: 1, type: "work.request", payload: {} }));
     await expectNoMessage(socket);
@@ -541,7 +541,7 @@ async function validateMobileWorker(socket: WebSocket): Promise<void> {
     payload: {
       taskId: task.taskId,
       leaseId: task.leaseId,
-      backend: "cpu",
+      backend: "webgpu",
       durationMs: 12,
       estimatedGflops: 0.5,
       samples: independentSamples(task.size, task.seed),

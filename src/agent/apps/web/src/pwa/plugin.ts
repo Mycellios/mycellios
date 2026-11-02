@@ -12,7 +12,7 @@ const CACHE_PLACEHOLDER = "__RAKAZO_SW_CACHE__";
 
 export function webManifest(base = "/") {
   const icons = [192, 512].map((size) => ({
-    src: `${base}mycellios/app-icon-v2-${size}.png`,
+    src: `${base}mycellios/app-icon-v2-${size}.png?brand=3`,
     sizes: `${size}x${size}`,
     type: "image/png",
     purpose: "any",
@@ -22,7 +22,7 @@ export function webManifest(base = "/") {
     name: productBrand.name,
     short_name: productBrand.shortName,
     description: "Think, create, and get things done with Mycellios Agent.",
-    start_url: base,
+    start_url: `${base}app`,
     scope: base,
     display: "standalone",
     background_color: webDarkTokens.background,
@@ -30,7 +30,7 @@ export function webManifest(base = "/") {
     icons: [
       ...icons,
       {
-        src: `${base}mycellios/app-icon-v2-maskable.png`,
+        src: `${base}mycellios/app-icon-v2-maskable.png?brand=3`,
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

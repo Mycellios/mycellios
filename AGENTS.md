@@ -31,6 +31,8 @@ These rules apply to the complete repository.
   The native architecture gate follows that compiler boundary; Agent uses its
   own workspace typechecks, tests and builds. The component-boundary gate still
   inspects both workspaces and rejects native runtime imports of Agent code.
+  Native source provenance follows the same boundary; Agent seals its own
+  package inputs and outputs through Desktop release-continuity receipts.
 
 - npm is the only supported JavaScript package manager. Commit
   `package-lock.json`; do not add pnpm or Yarn workspace/lock files.

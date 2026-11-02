@@ -10,6 +10,7 @@ describe("WorkerHub runtime link probes", () => {
       runtimeWorker("worker-b", "node-b"),
     ];
     const hub = (await WorkerHub.create({
+      listRuntimeLinkSamples: async () => [],
       listWorkers: () => workers,
     } as unknown as MeshStore));
     const sent: Array<{
@@ -73,6 +74,7 @@ describe("WorkerHub runtime link probes", () => {
       runtimeWorker("worker-b", "node-b"),
     ];
     const hub = (await WorkerHub.create({
+      listRuntimeLinkSamples: async () => [],
       listWorkers: () => workers,
     } as unknown as MeshStore));
     const sent: Array<{ workerId: string; type: string; payload: Record<string, unknown> }> = [];

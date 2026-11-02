@@ -1,5 +1,12 @@
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+import path from "node:path";
 import { defineConfig } from "vitest/config";
+
+const chatRequire = createRequire(new URL("./packages/chat-ui/package.json", import.meta.url));
+const markdownSource = path.join(path.dirname(chatRequire.resolve(
+  "@ronradtke/react-native-markdown-display/package.json",
+)), "src/index.tsx");
 
 export default defineConfig({
   // Offline tests receive explicit fixtures; never read a maintainer's .env.
@@ -10,12 +17,7 @@ export default defineConfig({
         // The published dist keeps JSX inside .js files, which vite cannot parse;
         // tests load the package's shipped TypeScript source instead.
         find: /^@ronradtke\/react-native-markdown-display$/,
-        replacement: fileURLToPath(
-          new URL(
-            "./packages/chat-ui/node_modules/@ronradtke/react-native-markdown-display/src/index.tsx",
-            import.meta.url,
-          ),
-        ),
+        replacement: markdownSource,
       },
       {
         find: /^@lingui\/core\/macro$/,

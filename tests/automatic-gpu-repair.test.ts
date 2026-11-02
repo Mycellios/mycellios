@@ -97,7 +97,7 @@ function worker(
     identityId: nodeId,
     capabilities: {
       region: "test",
-      agentVersion: "test",
+      agentVersion: "0.2.99",
       gpus: [{
         id: `${id}-gpu`,
         vendor,

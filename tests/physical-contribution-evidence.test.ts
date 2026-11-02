@@ -52,25 +52,25 @@ describe("physical contribution evidence", () => {
     const trace = physicalTrace();
     const workers = [worker("worker-a", "node-a", "a", "dep-a"), worker("worker-b", "node-b", "b", "dep-b")];
     (await authority.certify({ jobId: trace.jobId, executionReceiptId: sha("e"), trace, workers, createdAt: 2_100 }));
-    expect(async () => (await authority.certify({
+    await expect(authority.certify({
       jobId: trace.jobId, executionReceiptId: sha("e"),
       trace: { ...trace, observedUntil: 2_001, durationMs: 1_001 }, workers, createdAt: 2_100,
-    }))).toThrow("economic_contribution_evidence_replay_conflict");
+    })).rejects.toThrow("economic_contribution_evidence_replay_conflict");
 
     const duplicate = worker("worker-b", "node-b", "b", "dep-b");
     duplicate.capabilities.distributedExecutor!.physicalIdentity = structuredClone(
       workers[0]!.capabilities.distributedExecutor!.physicalIdentity,
     );
-    expect(async () => (await new PhysicalContributionEvidenceAuthority((await MeshDatabase.open(":memory:"))).certify({
+    await expect(authority.certify({
       jobId: trace.jobId, executionReceiptId: sha("f"), trace,
       workers: [workers[0]!, duplicate], createdAt: 2_100,
-    }))).toThrow("economic_contribution_collocated_identity_detected");
+    })).rejects.toThrow("economic_contribution_collocated_identity_detected");
 
-    expect(async () => (await new PhysicalContributionEvidenceAuthority((await MeshDatabase.open(":memory:"))).certify({
+    await expect(authority.certify({
       jobId: trace.jobId, executionReceiptId: sha("f"),
       trace: { ...trace, boundaries: [{ ...trace.boundaries[0]!, transport: "unobserved", streamId: null, countersExclusive: null, bytesSourceToDestination: null, bytesDestinationToSource: null, connectRttMs: null, streamCreatedAt: null, streamConnectedAt: null, streamEndedAt: null, observedOverlapMs: null }] },
       workers, createdAt: 2_100,
-    }))).toThrow("economic_contribution_physical_boundary_is_unverified");
+    })).rejects.toThrow("economic_contribution_physical_boundary_is_unverified");
     (await database.close());
   });
 });

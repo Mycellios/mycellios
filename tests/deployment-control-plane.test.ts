@@ -75,6 +75,8 @@ describe("durable deployment control plane", () => {
       capacityMiB: 1_000,
     }], 60_000, 2_100));
     expect(reservation.status).toBe("prepared");
+    expect(await controller.reservedMemoryByNode(2_200)).toEqual({ "node-a": 700 });
+    expect(await controller.reservedMemoryByNode(62_101)).toEqual({});
     expect((await controller.getState("model-a"))?.observedState).toBe("preparing");
 
     await expect(async () => (await controller.prepareRoute(second.id, [{
@@ -92,6 +94,7 @@ describe("durable deployment control plane", () => {
       tokensPerSecond: 8.5,
     }, 2_300));
     expect(committed.status).toBe("committed");
+    expect(await controller.reservedMemoryByNode(2_300)).toEqual({ "node-a": 700 });
     expect((await controller.getState("model-a"))).toMatchObject({
       observedState: "active",
       observedGeneration: 1,
@@ -100,6 +103,7 @@ describe("durable deployment control plane", () => {
     expect((await controller.getOperation(first.id))?.status).toBe("succeeded");
 
     expect((await controller.releaseRoutesForModel("model-a", 2_400))).toBe(1);
+    expect(await controller.reservedMemoryByNode(2_400)).toEqual({});
     const replacement = (await controller.prepareRoute(second.id, [{
       nodeId: "node-a",
       stageIndex: 0,

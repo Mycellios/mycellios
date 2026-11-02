@@ -32,7 +32,7 @@ function fixture(mode: "normal" | "session-change" | "wrong-route" | "failed" | 
       modelDigest: KOKORO_WEIGHT_DIGEST, adapter: "kokoro", mode: "replica", maxConcurrency: 1, freeSlots: 1,
       execution: { deviceType: "gpu", backend: "cuda", fallback: false, stages: [{ nodeId: "node-1", deviceType: "gpu" }] } }],
   } } as unknown as StoredWorker;
-  const submit = vi.fn((request: unknown, sessionId?: string) => {
+  const submit = vi.fn(async (request: unknown, sessionId?: string) => {
     const index = ++next;
     const events = (async function* (): AsyncIterable<JobStreamEvent> {
       if (mode === "failed") { yield { type: "failed", code: "runtime_failed", message: "failed" }; return; }
@@ -46,11 +46,11 @@ function fixture(mode: "normal" | "session-change" | "wrong-route" | "failed" | 
     })();
     return { jobId: `job-${index}`, sessionId: sessionId ?? "", events };
   });
-  const cancel = vi.fn(() => true);
+  const cancel = vi.fn(async () => true);
   registerNativeReplicaQualifications(app, {
     adminToken: "operator-admin", networkToken: "operator-network",
     hub: { currentWorkerSessionId: () => session, setWorkerMaintenance: async () => {} },
-    store: { getWorker: () => worker, updateWorkerHeartbeat: (_id, capabilities) => { writes++; worker.capabilities = capabilities; } },
+    store: { getWorker: async () => worker, updateWorkerHeartbeat: async (_id, capabilities) => { writes++; worker.capabilities = capabilities; } },
     service: { submit: submit as MeshService["submit"], cancel },
     attachReceipt: event => ({ ...event, result: { ...event.result, executionReceiptId: sha(String(next)) } }),
   });

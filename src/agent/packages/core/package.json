@@ -63,7 +63,8 @@
       "types": "./src/run-health.ts",
       "development": "./src/run-health.ts",
       "default": "./src/run-health.ts"
-    }
+    },
+    "./native-project-instructions": "./src/native-project-instructions.ts"
   },
   "scripts": {
     "check": "tsc --noEmit -p tsconfig.json",

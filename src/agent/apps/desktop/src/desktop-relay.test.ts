@@ -150,3 +150,23 @@ it("recovers after a long network outage but does not claim a live connection wh
     expect(client.connected("bot")).toBe(true); expect(binds).toBeGreaterThan(before);
   } finally { client.stop(); }
 });
+
+it("does not publish account presence after being stopped during identity admission",async()=>{
+ let resolve!:(r:Response)=>void;const actions:string[]=[];
+ const identity={userId:"owner",spaceId:"space",connectionId:"session"};
+ const client=new DesktopRelayClient({base:"https://example.test",localUrl:"http://127.0.0.1:1234",localToken:"unused",revoked:vi.fn(),fetch:async(url)=>{actions.push(url);return new Promise<Response>(r=>{resolve=r;});}});
+ const registration=client.registerAccount(identity);client.stop();resolve(Response.json(identity));
+ await expect(registration).rejects.toThrow("session changed");expect(client.online()).toBe(false);expect(actions).toHaveLength(1);
+});
+it("re-registers account presence after an API restart without binding arbitrary agents or replaying work",async()=>{
+ vi.useFakeTimers();vi.setSystemTime(50000);
+ const identity={userId:"owner",spaceId:"space",connectionId:"session"};let registrations:unknown[]=[];
+ const client=new DesktopRelayClient({base:"https://example.test",localUrl:"http://127.0.0.1:1234",localToken:"unused",revoked:vi.fn(),fetch:async(url,init)=>{
+  const action=url.split("/").at(-1);if(action==="account")registrations.push(JSON.parse(String(init?.body)));
+  return Response.json(action==="identity"?identity:{identity,bindings:[],active:[],operations:[]});
+ }});
+ try{await client.registerAccount(identity);expect(client.online()).toBe(true);expect(client.connected("unowned")).toBe(false);
+  await vi.advanceTimersByTimeAsync(6000);expect(registrations.length).toBeGreaterThan(1);expect(registrations.every(x=>JSON.stringify(x)===JSON.stringify(registrations[0]))).toBe(true);
+  client.stop();const count=registrations.length;await vi.advanceTimersByTimeAsync(6000);expect(registrations).toHaveLength(count);
+ }finally{client.stop();}
+});

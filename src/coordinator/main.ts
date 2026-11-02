@@ -124,6 +124,7 @@ const runtime = await createCoordinator(config, {
             hub.connectedWorkerIds(),
             hub.runtimeLinkObservations(),
             engineActivationAuthority,
+            await deploymentController.reservedMemoryByNode(),
           ),
           resolveManagedAgent: async (nodeId, launch) => resolveConnectedExecutorAgent(
             (await store.listWorkers()),

@@ -1,4 +1,6 @@
 import type WebSocket from "ws";
+import type { StoredWorker } from "../storage/store.js";
+import { parseWorkerEnvelope } from "../contracts/worker-protocol.js";
 
 export interface AuthorizedWorkerSession {
   workerId: string;
@@ -40,4 +42,32 @@ export async function authenticatedConnectionAuthority(connections: ReadonlyMap<
     if (check && !(await check(session))) return null;
     return connections.get(workerId) === state && connectionIsReady(state) && state.authorizedSession === session ? { ...session } : null;
   } catch { return null; }
+}
+
+const WORKER_HEARTBEAT_GRACE_MS = 10_000;
+
+export function workerConnectionIsHeartbeatStale(
+  worker: Pick<StoredWorker, "status" | "lastSeenAt"> | null,
+  now = Date.now(),
+  lastValidatedHeartbeatAt?: number,
+): boolean {
+  if (!worker) return true;
+  if (lastValidatedHeartbeatAt !== undefined && Number.isFinite(lastValidatedHeartbeatAt)
+    && lastValidatedHeartbeatAt <= now && now - lastValidatedHeartbeatAt <= WORKER_HEARTBEAT_GRACE_MS) return false;
+  if (worker.status !== "suspect" && worker.status !== "offline") return false;
+  return worker.lastSeenAt < now - WORKER_HEARTBEAT_GRACE_MS;
+}
+
+export function workerHeartbeatArrival(
+  state: ConnectionState,
+  raw: string,
+  current: ConnectionState | undefined,
+  now = Date.now(),
+): number | undefined {
+  if (!connectionIsReady(state) || !state.workerId || current !== state
+    || Buffer.byteLength(raw, "utf8") > 2_200_000 || !raw.includes('"worker.heartbeat"')) return;
+  try {
+    const envelope = parseWorkerEnvelope(JSON.parse(raw));
+    if (envelope?.type === "worker.heartbeat" && envelope.workerId === state.workerId) return now;
+  } catch { /* Invalid frames never extend an authenticated worker's liveness. */ }
 }

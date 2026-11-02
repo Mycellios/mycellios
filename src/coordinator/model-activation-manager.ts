@@ -48,6 +48,7 @@ export interface DynamicActivationSnapshot {
   capacityNodes: readonly ModelExecutionCapacityNode[];
   config: AutoDistributionConfig | null;
   readinessDetails?: readonly string[];
+  reservationCapacityMiBByNode?: Readonly<Record<string, number>>;
 }
 
 export interface DynamicActivationRouteStage {
@@ -411,7 +412,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
       const measured = await this.options.measuredRouteEvidence?.(model.id, compilation);
       if (controller.signal.aborted) return;
       if (measured) compilation = await selectMeasuredModelActivation(compilation, measured, cwd, environment);
-      const reservationStages = routeStagesForReservation(config, compilation);
+      const reservationStages = routeStagesForReservation(config, compilation, this.current.reservationCapacityMiBByNode);
       const preparedRoute = this.options.onPlanPrepared
         ? await this.options.onPlanPrepared(
             model.id,
@@ -613,6 +614,7 @@ export async function runWithReservationHeartbeat<T>(
 function routeStagesForReservation(
   config: AutoDistributionConfig,
   compilation: ReturnType<typeof compileAutoDistribution>,
+  capacityByNode?: Readonly<Record<string, number>>,
 ): DynamicActivationRouteStage[] {
   const nodes = new Map(config.nodes.map((node) => [node.id, node]));
   const model = compilation.profile.model;
@@ -640,7 +642,7 @@ function routeStagesForReservation(
         layerStart: stage.layerStart,
         layerEnd: stage.layerEnd,
         memoryMiB: Math.ceil(member.assignedMemoryBytes / (1024 * 1024)),
-        capacityMiB: Math.max(0, node.memoryMiB - node.reserveMiB),
+        capacityMiB: capacityByNode?.[node.id] ?? Math.max(0, node.memoryMiB - node.reserveMiB),
         artifactBytes: assignedTotal === 0
           ? memberIndex === 0 ? stageArtifactBytes : 0
           : Math.floor(stageArtifactBytes * assignedThrough / assignedTotal)

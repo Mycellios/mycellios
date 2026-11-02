@@ -96,11 +96,13 @@ export function buildConnectedExecutorActivationSnapshot(
   connectedWorkerIds: ReadonlySet<string>,
   runtimeLinkObservations: readonly RuntimeLinkObservation[] = [],
   engineAuthority?: EngineActivationAuthority,
+  reservedMemoryByNode: Readonly<Record<string, number>> = {},
 ): DynamicActivationSnapshot {
   const activationNow = Date.now();
   const minimumStages = baseConfig.distribution.minimumStages;
   const eligibleNodeIds = baseConfig.distribution.eligibleNodeIds;
   const executors = connectedExecutors(workers, connectedWorkerIds).filter(({ executor }) => eligibleNodeIds === undefined || eligibleNodeIds.includes(executor.nodeId));
+  const reservationCapacityMiBByNode: Record<string, number> = {};
   const capacityNodes = executors.map((entry) => {
     const { worker, executor } = entry;
     const memory = hostMemoryObservationSchema.safeParse(worker.capabilities.hostMemory);
@@ -108,7 +110,7 @@ export function buildConnectedExecutorActivationSnapshot(
       && eligiblePlannerPerformance(entry) !== null;
     return {
       id: executor.nodeId,
-      availableVramMiB: worker.capabilities.gpus.reduce((sum, gpu) => sum + gpu.freeOfferedVramMb, 0),
+      availableVramMiB: Math.max(0, worker.capabilities.gpus.reduce((sum, gpu) => sum + gpu.freeOfferedVramMb, 0) - (reservedMemoryByNode[executor.nodeId] ?? 0)),
       ...(fresh ? { availableHostMemoryMiB: Math.floor(Math.min(memory.data.availableBytes, memory.data.offeredBytes ?? 0) / (1024 * 1024)) } : {}),
     };
   });
@@ -177,6 +179,7 @@ export function buildConnectedExecutorActivationSnapshot(
     const host = hostMemoryObservationSchema.safeParse(worker.capabilities.hostMemory);
     const hostFresh = host.success && isFreshHostMemory(host.data, activationNow / 1000);
     const engineProfile = engineProfilesByNode.get(executor.nodeId) ?? null;
+    const ownerRoles = baseConfig.nodes.find(node => node.id === executor.nodeId)?.stageRoles;
     const memoryMiB = worker.capabilities.gpus.reduce(
       (sum, gpu) => sum + gpu.offeredVramMb,
       0,
@@ -185,6 +188,7 @@ export function buildConnectedExecutorActivationSnapshot(
       (sum, gpu) => sum + (gpu.powerW ?? 0),
       0,
     );
+    reservationCapacityMiBByNode[executor.nodeId] = Math.max(0, memoryMiB - Math.min(256, Math.max(0, memoryMiB - 1)));
     return {
       id: executor.nodeId,
       region: worker.capabilities.region,
@@ -192,7 +196,7 @@ export function buildConnectedExecutorActivationSnapshot(
       memoryMiB,
       ...(hostFresh && Math.min(host.data.availableBytes, host.data.offeredBytes ?? 0) >= 1024 * 1024
         ? { hostMemoryMiB: Math.floor(Math.min(host.data.availableBytes, host.data.offeredBytes ?? 0) / (1024 * 1024)) } : {}),
-      reserveMiB: Math.min(256, Math.max(0, memoryMiB - 1)),
+      reserveMiB: Math.min(memoryMiB, Math.min(256, Math.max(0, memoryMiB - 1)) + (reservedMemoryByNode[executor.nodeId] ?? 0)),
       decodeScale: decodeScaleById.get(executor.nodeId)?.measured
         ? decodeScaleById.get(executor.nodeId)!.decodeScale
         : performance.decodeScale,
@@ -208,6 +212,7 @@ export function buildConnectedExecutorActivationSnapshot(
             ),
           }
         : {}),
+      ...(ownerRoles ? { stageRoles: ownerRoles.filter(role => !engineProfile || engineProfile.features.roles.includes(role)) } : {}),
       powerWatts: measuredPower > 0 ? measuredPower : 1,
       availability: Math.max(0.01, Math.min(1, worker.reliability)),
       agent: { kind: "managed" as const },
@@ -315,7 +320,7 @@ export function buildConnectedExecutorActivationSnapshot(
       returnEndpoint: { ...baseConfig.runtime.returnEndpoint, host: rootHost },
     },
   });
-  return { capacityNodes, config };
+  return { capacityNodes, config, reservationCapacityMiBByNode };
 }
 
 export function eligiblePlanningEngineProfile(

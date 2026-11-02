@@ -1314,7 +1314,7 @@ export class WorkerAgent {
    * so every consumer scored placement on a constant: the scheduler's latency
    * term (`scheduler.ts`) was always 0, and the desktop planner concluded that
    * every worker-to-worker link cost 0.1 ms. Measured reality on the fleet is
-   * 54-437 ms per hop, and picking the right node is worth ~1.8x â€” a decision
+   * 54-437 ms per hop, and picking the right node is worth ~1.8x — a decision
    * the planner could not make because it never saw the number.
    *
    * WebSocket ping/pong is the honest probe: it rides the same connection as
@@ -1365,7 +1365,7 @@ export class WorkerAgent {
     this.lastRttSampleMs = sampleMs;
   }
 
-  /** Ãšltima muestra cruda de RTT, sin suavizar. DiagnÃ³stico y pruebas. */
+  /** Última muestra cruda de RTT, sin suavizar. Diagnóstico y pruebas. */
   get measuredRttMs(): number | null {
     return this.lastRttSampleMs;
   }

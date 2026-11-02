@@ -57,6 +57,7 @@ describe("WorkerHub activation checkpoint channel", () => {
       capabilities: { distributedExecutor: { protocol: "gdlp-worker-tunnel/2" } },
     };
     const hub = (await WorkerHub.create({
+      listRuntimeLinkSamples: async () => [],
       getWorker: vi.fn(() => worker),
       listWorkers: vi.fn(() => [worker]),
     } as unknown as MeshStore, { activationCheckpointTransfers: transfers }));
@@ -136,6 +137,7 @@ describe("WorkerHub activation checkpoint channel", () => {
       payload.byteLength, now + 10_000, now + 200,
     );
     await vi.waitFor(() => expect(sent.at(-1)?.type).toBe("runtime.checkpoint.restore.commit"));
+    await vi.waitFor(() => expect(sent.at(-1)?.payload.transferId).not.toBe(restoreTransferId));
     const failedTransferId = sent.at(-1)?.payload.transferId as string;
     await internal.handleRawMessage(state, JSON.stringify({
       v: 1,

@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 
 function catalog(locale: string) {
   const source = readFileSync(new URL(`./${locale}/messages.po`, import.meta.url), "utf8");
-  return new Map([...source.matchAll(/^msgid ("[^\r\n]*")\r?\nmsgstr ("[^\r\n]*")/gm)].map(match => [JSON.parse(match[1]), JSON.parse(match[2])]));
+  return new Map([...source.matchAll(/^msgid ("[^\r\n]*")\r?\nmsgstr ("[^\r\n]*")/gm)].map(match => [JSON.parse(match[1]!), JSON.parse(match[2]!) ]));
 }
 
 it.each([

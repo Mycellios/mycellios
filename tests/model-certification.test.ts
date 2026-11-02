@@ -62,8 +62,8 @@ describe("model certification", () => {
     expect((await registry.publish(data.certification, new Date("2026-08-11T00:00:00.000Z"))).alreadyPublished).toBe(false);
     expect((await registry.publish(data.certification, new Date("2026-08-11T00:00:00.000Z"))).alreadyPublished).toBe(true);
     expect((await registry.list())).toEqual([data.certification]);
-    expect(async () => (await new ModelCertificationRegistry(database, [{ ...data.pinnedKey, keyId: "other" }])
-      .publish(data.certification, new Date("2026-08-11T00:00:00.000Z")))).toThrow("model_certification_key_is_not_pinned");
+    await expect((async () => (await new ModelCertificationRegistry(database, [{ ...data.pinnedKey, keyId: "other" }])
+      .publish(data.certification, new Date("2026-08-11T00:00:00.000Z"))))()).rejects.toThrow("model_certification_key_is_not_pinned");
     (await database.close());
   });
   it("verifies a physically evidenced, reviewed certification against a pinned key", () => {

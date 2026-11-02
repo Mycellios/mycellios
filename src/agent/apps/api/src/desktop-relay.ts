@@ -3,6 +3,7 @@ import type { Actor } from "@rakazo/contracts";
 import type { Hono } from "hono";
 import {
   parseDesktopBinding,
+  parseDesktopAccount,
   parseDesktopDispatch,
   parseDesktopPoll,
   parseDesktopResult,
@@ -23,7 +24,8 @@ export function mountDesktopRelay(
     enabled: boolean;
     secret: string;
     authenticate(request: Request): Promise<{ actor: Actor; sessionId: string } | null>;
-    ownsBot(actor: Actor, botId: string): Promise<boolean>;
+    ownsBot(actor: Pick<Actor,"userId"|"spaceId">, botId: string): Promise<boolean>;
+    spaces?(actor: Actor): Promise<string[]>;
   },
 ) {
   const broker = new DesktopRelayBroker();
@@ -48,6 +50,11 @@ export function mountDesktopRelay(
         return c.json({ error: "Duplicate request" }, 409);
       replay.set(input.nonce, Date.now() + 60_000);
       if (!deps.enabled) return c.json({ error: "Unavailable" }, 404);
+      const botId=input.probe ?? (input.request ? hostComputerRequest.parse(input.request).botId : undefined);
+      if (botId) {
+        if (!await deps.ownsBot(input.scope,botId)) return c.json({available:false,error:"Unavailable agent"},404);
+        broker.connectAccountBot(input.scope,botId);
+      }
       if (input.probe && !input.request)
         return c.json({ available: broker.available(input.scope, input.probe) });
       if (!input.request || input.probe) return c.json({ error: "Invalid request" }, 400);
@@ -61,7 +68,7 @@ export function mountDesktopRelay(
       return c.json(
         {
           error:
-            "Desktop unavailable. Reconnect this agent in Desktop; check results before retrying.",
+            "PC disconnected. Start Mycellios Desktop on the paired computer; check results before retrying.",
         },
         409,
       );
@@ -92,6 +99,17 @@ export function mountDesktopRelay(
       switch (c.req.param("action")) {
         case "identity":
           return c.json(identity);
+        case "spaces":
+          return c.json({spaces:deps.spaces ? await deps.spaces(session.actor) : [owner.spaceId]});
+        case "account": {
+          const value=parseDesktopAccount(input);
+          if(value.identity.userId!==identity.userId||value.identity.spaceId!==identity.spaceId||value.identity.connectionId!==identity.connectionId)
+            return c.json({error:"The account session changed"},403);
+          broker.register(owner,value);
+          for(const botId of broker.ownedBindings(owner,value.deviceId))
+            if(!await deps.ownsBot(session.actor,botId))broker.revokeBot(owner,botId);
+          return c.json({...broker.poll(owner,value.deviceId),identity});
+        }
         case "bind": {
           const value = parseDesktopBinding(input);
           if (!(await deps.ownsBot(session.actor, value.botId)))
@@ -118,7 +136,7 @@ export function mountDesktopRelay(
           return c.json({ error: "Unavailable" }, 404);
       }
     } catch {
-      return c.json({ error: "Desktop connection changed. Reconnect the project." }, 409);
+      return c.json({ error: "PC connection changed. Reconnect the paired computer." }, 409);
     }
   });
   return () => broker.close();

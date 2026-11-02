@@ -110,13 +110,13 @@ describe("durable payout dispatch and reconciliation", () => {
 
   it("rejects an operation whose initial state contradicts its batch", async () => {
     const batch = (await prepare());
-    expect(async () => (await database.raw.prepare(`
+    await expect((async () => (await database.raw.prepare(`
       INSERT INTO payout_dispatch_operations(
         id, batch_id, payout_method, dispatch_key, state, external_reference,
         created_at, updated_at
       ) VALUES ('dispatch-impossible', ?, 'stable', ?, 'submitted',
         'transfer-impossible', 1, 1)
-    `).run(batch.id, `payout:${batch.id}`)))
+    `).run(batch.id, `payout:${batch.id}`)))()).rejects
       .toThrow(/invalid_payout_dispatch_batch_projection/);
   });
 
@@ -130,12 +130,12 @@ describe("durable payout dispatch and reconciliation", () => {
         'batch-empty-composition-key', 'digest', 250000, 0, 250000,
         'prepared', 1, 1)
     `).run());
-    expect(async () => (await database.raw.prepare(`
+    await expect((async () => (await database.raw.prepare(`
       INSERT INTO payout_dispatch_operations(
         id, batch_id, payout_method, dispatch_key, state, created_at, updated_at
       ) VALUES ('dispatch-empty-composition', 'batch-empty-composition', 'stable',
         'payout:batch-empty-composition', 'dispatching', 1, 1)
-    `).run())).toThrow(/invalid_payout_dispatch_economic_composition/);
+    `).run()))()).rejects.toThrow(/invalid_payout_dispatch_economic_composition/);
   });
 
   it("rejects a lateral operation transition that leaves its batch behind", async () => {
@@ -145,11 +145,11 @@ describe("durable payout dispatch and reconciliation", () => {
         id, batch_id, payout_method, dispatch_key, state, created_at, updated_at
       ) VALUES ('dispatch-transition', ?, 'stable', ?, 'dispatching', 1, 1)
     `).run(batch.id, `payout:${batch.id}`));
-    expect(async () => (await database.raw.prepare(`
+    await expect((async () => (await database.raw.prepare(`
       UPDATE payout_dispatch_operations
       SET state = 'submitted', external_reference = 'transfer-lateral'
       WHERE id = 'dispatch-transition'
-    `).run())).toThrow(/invalid_payout_dispatch_batch_projection/);
+    `).run()))()).rejects.toThrow(/invalid_payout_dispatch_batch_projection/);
   });
 
   it("preserves the monotonic dispatch audit timeline", async () => {
@@ -159,15 +159,15 @@ describe("durable payout dispatch and reconciliation", () => {
         id, batch_id, payout_method, dispatch_key, state, created_at, updated_at
       ) VALUES ('dispatch-timeline', ?, 'stable', ?, 'dispatching', 100, 100)
     `).run(batch.id, `payout:${batch.id}`));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET created_at = 99 WHERE id = 'dispatch-timeline'",
-    ).run())).toThrow(/invalid_payout_dispatch_time/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/invalid_payout_dispatch_time/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET updated_at = 99 WHERE id = 'dispatch-timeline'",
-    ).run())).toThrow(/invalid_payout_dispatch_time/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/invalid_payout_dispatch_time/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET reconciled_at = 101 WHERE id = 'dispatch-timeline'",
-    ).run())).toThrow(/invalid_payout_dispatch_time/);
+    ).run()))()).rejects.toThrow(/invalid_payout_dispatch_time/);
   });
 
   it("turns a timeout into uncertain state and reconciles without resending", async () => {
@@ -188,12 +188,12 @@ describe("durable payout dispatch and reconciliation", () => {
     expect(uncertain.batch.status).toBe("prepared");
     expect((await service.dispatch(batch.id)).duplicate).toBe(true);
     expect(stable.createTransfer).toHaveBeenCalledTimes(1);
-    expect(async () => (await payouts.cancelPrepared(batch.id))).toThrowError(expect.objectContaining({
+    await expect((async () => (await payouts.cancelPrepared(batch.id)))()).rejects.toThrowError(expect.objectContaining({
       code: "payout_cancellation_unsafe",
     }));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET status = 'cancelled', cancelled_at = ? WHERE id = ?",
-    ).run(Date.now(), batch.id))).toThrow(/payout_cancellation_unsafe|invalid_payout_batch_time/);
+    ).run(Date.now(), batch.id)))()).rejects.toThrow(/payout_cancellation_unsafe|invalid_payout_batch_time/);
     expect((await database.raw.prepare(
       "SELECT status FROM seller_earnings WHERE id = 'earning-stable'",
     ).get())).toEqual({ status: "batched" });
@@ -256,11 +256,11 @@ describe("durable payout dispatch and reconciliation", () => {
     };
     const service = new PayoutDispatchService(database, payouts, { stable });
     await service.dispatch(batch.id);
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `UPDATE payout_dispatch_operations
        SET state = 'submitted', external_reference = 'transfer-lateral'
        WHERE batch_id = ?`,
-    ).run(batch.id))).toThrow(/invalid_payout_dispatch_batch_projection/);
+    ).run(batch.id)))()).rejects.toThrow(/invalid_payout_dispatch_batch_projection/);
     expect(stable.inspectTransfer).not.toHaveBeenCalled();
     expect(stable.createTransfer).toHaveBeenCalledTimes(1);
   });
@@ -273,20 +273,20 @@ describe("durable payout dispatch and reconciliation", () => {
     };
     const service = new PayoutDispatchService(database, payouts, { stable });
     await service.dispatch(batch.id);
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earnings SET status = 'available' WHERE id = 'earning-stable'",
-    ).run())).toThrow(/invalid_seller_earning_status_transition/);
+    ).run()))()).rejects.toThrow(/invalid_seller_earning_status_transition/);
     (await database.raw.exec("DROP TRIGGER seller_earning_status_transition_guard"));
     (await database.raw.prepare(
       "UPDATE seller_earnings SET status = 'available' WHERE id = 'earning-stable'",
     ).run());
 
-    expect(async () => (await payouts.prepare({
+    await expect((async () => (await payouts.prepare({
       sellerId: "seller-1",
       payoutMethod: "stable",
       earningIds: ["earning-stable"],
       idempotencyKey: "lateral-double-allocation",
-    }))).toThrowError(expect.objectContaining({ code: "earning_already_allocated" }));
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "earning_already_allocated" }));
     expect((await database.raw.prepare(
       "SELECT COUNT(*) AS count FROM payout_batches WHERE idempotency_key = 'lateral-double-allocation'",
     ).get())).toEqual({ count: 0 });
@@ -298,10 +298,10 @@ describe("durable payout dispatch and reconciliation", () => {
        ) VALUES ('payout-lateral', 'seller-1', 'stable', 'sql-lateral-allocation',
                  'fixture-digest', 250000, 250000, 'prepared', ?, ?)`,
     ).run(now, now));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO payout_batch_items(batch_id, earning_id, amount_usd_micros)
        VALUES ('payout-lateral', 'earning-stable', 250000)`,
-    ).run())).toThrow(/invalid_payout_batch_item/);
+    ).run()))()).rejects.toThrow(/invalid_payout_batch_item/);
 
     await expect(service.reconcile(batch.id)).rejects.toMatchObject({
       code: "payout_dispatch_projection_conflict",
@@ -328,7 +328,7 @@ describe("durable payout dispatch and reconciliation", () => {
       operation: { state: "rejected", externalReference: "transfer-before-rejection" },
       batch: { status: "submitted" },
     });
-    expect(async () => (await payouts.cancelPrepared(batch.id))).toThrowError(expect.objectContaining({
+    await expect((async () => (await payouts.cancelPrepared(batch.id)))()).rejects.toThrowError(expect.objectContaining({
       code: "payout_cancellation_unsafe",
     }));
     expect((await database.raw.prepare(
@@ -355,13 +355,13 @@ describe("durable payout dispatch and reconciliation", () => {
       `INSERT INTO payout_batch_items(batch_id, earning_id, amount_usd_micros)
        VALUES (?, 'earning-extra', 250000)`,
     ).run(batch.id));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `UPDATE payout_batch_items SET amount_usd_micros = 1
        WHERE batch_id = ? AND earning_id = 'earning-extra'`,
-    ).run(batch.id))).toThrow(/immutable_payout_batch_item/);
-    expect(async () => (await database.raw.prepare(
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_batch_item/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM payout_batch_items WHERE batch_id = ? AND earning_id = 'earning-extra'",
-    ).run(batch.id))).toThrow(/immutable_payout_batch_item/);
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_batch_item/);
 
     const stable = gateway({ state: "submitted", externalReference: "transfer-polluted" });
     const service = new PayoutDispatchService(database, payouts, { stable });
@@ -376,16 +376,16 @@ describe("durable payout dispatch and reconciliation", () => {
       duplicate: false,
       batch: { status: "cancelled", cancelledAt: expect.any(Number) },
     });
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET status = 'prepared', cancelled_at = NULL WHERE id = ?",
-    ).run(batch.id))).toThrow(/invalid_payout_batch_/);
-    expect(async () => (await database.raw.prepare(
+    ).run(batch.id)))()).rejects.toThrow(/invalid_payout_batch_/);
+    await expect((async () => (await database.raw.prepare(
       `UPDATE payout_batches
        SET status = 'paid', dispatch_key = 'payout:forged',
            external_reference = 'transfer-forged', settlement_reference = 'settlement-forged',
            submitted_at = 1, paid_at = 1, cancelled_at = NULL
        WHERE id = ?`,
-    ).run(batch.id))).toThrow(/invalid_payout_batch_state_transition|invalid_payout_batch_time/);
+    ).run(batch.id)))()).rejects.toThrow(/invalid_payout_batch_state_transition|invalid_payout_batch_time/);
     expect((await payouts.getBatch(batch.id))).toMatchObject({ status: "cancelled" });
   });
 
@@ -415,62 +415,62 @@ describe("durable payout dispatch and reconciliation", () => {
       verifier_key_id: "settlement-verifier",
       signature: "signed-settlement-evidence",
     });
-    expect(async () => (await service.recordSettlement({ ...evidence, externalReference: "transfer-other" })))
+    await expect((async () => (await service.recordSettlement({ ...evidence, externalReference: "transfer-other" })))()).rejects
       .toThrowError(expect.objectContaining({ code: "payout_settlement_identity_conflict" }));
-    expect(async () => (await service.recordSettlement({ ...evidence, settlementReference: "bank-payout-other" })))
+    await expect((async () => (await service.recordSettlement({ ...evidence, settlementReference: "bank-payout-other" })))()).rejects
       .toThrowError(expect.objectContaining({ code: "payout_settlement_evidence_conflict" }));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET settlement_reference = 'bank-payout-other' WHERE batch_id = ?",
-    ).run(batch.id))).toThrow(/immutable_payout_dispatch_provider_identity|invalid_payout_settlement_evidence_binding|invalid_payout_dispatch_batch_projection/);
-    expect(async () => (await database.raw.prepare(
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_dispatch_provider_identity|invalid_payout_settlement_evidence_binding|invalid_payout_dispatch_batch_projection/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_settlement_evidence SET signature = 'replacement-signature' WHERE batch_id = ?",
-    ).run(batch.id))).toThrow(/immutable_payout_settlement_evidence/);
-    expect(async () => (await database.raw.prepare(
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_settlement_evidence/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET state = 'uncertain' WHERE batch_id = ?",
-    ).run(batch.id))).toThrow(/invalid_payout_dispatch_/);
-    expect(async () => (await database.raw.prepare(
+    ).run(batch.id)))()).rejects.toThrow(/invalid_payout_dispatch_/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM payout_settlement_evidence WHERE batch_id = ?",
-    ).run(batch.id))).toThrow(/immutable_payout_settlement_evidence/);
-    expect(async () => (await database.raw.prepare(
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_settlement_evidence/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM payout_dispatch_operations WHERE batch_id = ?",
-    ).run(batch.id))).toThrow(/immutable_payout_dispatch_operation/);
-    expect(async () => (await database.raw.prepare(
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_dispatch_operation/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM payout_batches WHERE id = ?",
-    ).run(batch.id))).toThrow(/immutable_payout_/);
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_/);
     expect((await service.getByBatchId(batch.id))).not.toBeNull();
     expect((await service.getSettlementEvidence(batch.id))).not.toBeNull();
   });
 
   it("rejects settlement evidence that is not bound to the durable dispatch", async () => {
     const batch = (await prepare());
-    expect(async () => (await database.raw.prepare(`
+    await expect((async () => (await database.raw.prepare(`
       INSERT INTO payout_settlement_evidence(
         batch_id, schema_name, external_reference, settlement_reference,
         paid_at, issued_at, verifier_key_id, signature, recorded_at
       ) VALUES (?, 'mycellios.payout-settlement.v1', 'transfer-forged',
         'settlement-forged', 1786000000000, 1786000001000,
         'settlement-verifier', 'signature', 1786000002000)
-    `).run(batch.id))).toThrow(/invalid_payout_settlement_evidence_binding/);
+    `).run(batch.id)))()).rejects.toThrow(/invalid_payout_settlement_evidence_binding/);
 
     const stable = gateway({ state: "submitted", externalReference: "transfer-real" });
     const service = new PayoutDispatchService(database, payouts, { stable });
     await service.dispatch(batch.id);
-    expect(async () => (await database.raw.prepare(`
+    await expect((async () => (await database.raw.prepare(`
       INSERT INTO payout_settlement_evidence(
         batch_id, schema_name, external_reference, settlement_reference,
         paid_at, issued_at, verifier_key_id, signature, recorded_at
       ) VALUES (?, 'mycellios.payout-settlement.v1', 'transfer-other',
         'settlement-other', 1786000000000, 1786000001000,
         'settlement-verifier', 'signature', 1786000002000)
-    `).run(batch.id))).toThrow(/invalid_payout_settlement_evidence_binding/);
-    expect(async () => (await database.raw.prepare(`
+    `).run(batch.id)))()).rejects.toThrow(/invalid_payout_settlement_evidence_binding/);
+    await expect((async () => (await database.raw.prepare(`
       INSERT INTO payout_settlement_evidence(
         batch_id, schema_name, external_reference, settlement_reference,
         paid_at, issued_at, verifier_key_id, signature, recorded_at
       ) VALUES (?, 'mycellios.payout-settlement.v1', 'transfer-real',
         'settlement-impossible-time', 1786000060001, 1786000000000,
         'settlement-verifier', 'signature', 1786000001000)
-    `).run(batch.id))).toThrow(/invalid_payout_settlement_evidence_binding/);
+    `).run(batch.id)))()).rejects.toThrow(/invalid_payout_settlement_evidence_binding/);
   });
 
   it("keeps an absent provider lookup uncertain", async () => {
@@ -504,16 +504,16 @@ describe("durable payout dispatch and reconciliation", () => {
     expect((await database.raw.prepare(
       "SELECT status FROM seller_earnings WHERE id = 'earning-stable'",
     ).get())).toEqual({ status: "available" });
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `UPDATE payout_dispatch_operations
        SET external_reference = 'transfer-late' WHERE batch_id = ?`,
-    ).run(batch.id))).toThrow(/immutable_payout_dispatch_provider_identity|invalid_payout_dispatch_batch_projection/);
+    ).run(batch.id)))()).rejects.toThrow(/immutable_payout_dispatch_provider_identity|invalid_payout_dispatch_batch_projection/);
     expect(await service.reconcile(batch.id)).toMatchObject({
       duplicate: true,
       operation: { state: "rejected" },
       batch: { status: "cancelled" },
     });
-    expect(async () => (await service.recordSettlement({
+    await expect((async () => (await service.recordSettlement({
       schema: "mycellios.payout-settlement.v1",
       batchId: batch.id,
       externalReference: "rejected-transfer",
@@ -522,7 +522,7 @@ describe("durable payout dispatch and reconciliation", () => {
       issuedAt: Date.now(),
       verifierKeyId: "settlement-verifier",
       signature: "signed-rejected-settlement",
-    }))).toThrowError(expect.objectContaining({ code: "payout_dispatch_terminal" }));
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "payout_dispatch_terminal" }));
     expect((await service.getSettlementEvidence(batch.id))).toBeNull();
   });
 
@@ -613,15 +613,15 @@ describe("durable payout dispatch and reconciliation", () => {
     (await database.raw.prepare(
       "UPDATE spore_conversion_quotes SET status = 'superseded', replaced_at = ? WHERE quote_id = ?",
     ).run(quote.expiresAt + 2, quote.quoteId));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE spore_conversion_quotes SET status = 'active', replaced_at = NULL WHERE quote_id = ?",
-    ).run(quote.quoteId))).toThrow(/invalid_spore_conversion_quote_lifecycle/);
-    expect(async () => (await database.raw.prepare(
+    ).run(quote.quoteId)))()).rejects.toThrow(/invalid_spore_conversion_quote_lifecycle/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM spore_conversion_quotes WHERE quote_id = ?",
-    ).run(quote.quoteId))).toThrow(/immutable_spore_conversion_quote/);
-    expect(async () => (await database.raw.prepare(
+    ).run(quote.quoteId)))()).rejects.toThrow(/immutable_spore_conversion_quote/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE spore_conversion_quotes SET token_atomic_amount = ? WHERE quote_id = ?",
-    ).run("999", quote.quoteId))).toThrow(/immutable_spore_conversion_quote_content/);
+    ).run("999", quote.quoteId)))()).rejects.toThrow(/immutable_spore_conversion_quote_content/);
     (await database.raw.exec("DROP TRIGGER spore_conversion_quote_content_immutable_guard"));
     (await database.raw.prepare("UPDATE spore_conversion_quotes SET token_atomic_amount = ? WHERE quote_id = ?")
       .run("999", quote.quoteId));
@@ -629,7 +629,7 @@ describe("durable payout dispatch and reconciliation", () => {
       code: "spore_dispatch_quote_audit_conflict",
     });
     expect(spore.inspectTransfer).toHaveBeenCalledTimes(1);
-    expect(async () => (await service.recordSettlement({
+    await expect((async () => (await service.recordSettlement({
       schema: "mycellios.payout-settlement.v1",
       batchId: batch.id,
       externalReference: "spore-transfer-1",
@@ -638,7 +638,7 @@ describe("durable payout dispatch and reconciliation", () => {
       issuedAt: quote.expiresAt + 3,
       verifierKeyId: "settlement-verifier",
       signature: "signed-spore-settlement",
-    }))).toThrowError(expect.objectContaining({ code: "spore_dispatch_quote_audit_conflict" }));
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "spore_dispatch_quote_audit_conflict" }));
     expect((await database.raw.prepare(
       "SELECT COUNT(*) AS count FROM payout_settlement_evidence WHERE batch_id = ?",
     ).get(batch.id))).toEqual({ count: 0 });
@@ -656,18 +656,18 @@ describe("durable payout dispatch and reconciliation", () => {
       reference: "wallet-spore-audit",
       fingerprint: "d".repeat(64),
     }));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO payout_dispatch_operations(
          id, batch_id, payout_method, dispatch_key, state, created_at, updated_at
        ) VALUES ('invalid-spore', ?, 'spore', ?, 'dispatching', 1, 1)`,
-    ).run(sporeBatch.id, `payout:${sporeBatch.id}`))).toThrow(/invalid_payout_dispatch_spore_quote_audit/);
-    expect(async () => (await database.raw.prepare(
+    ).run(sporeBatch.id, `payout:${sporeBatch.id}`)))()).rejects.toThrow(/invalid_payout_dispatch_spore_quote_audit/);
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO payout_dispatch_operations(
          id, batch_id, payout_method, dispatch_key, state, spore_quote_id,
          spore_quote_attestation_digest, created_at, updated_at
        ) VALUES ('invalid-quote-binding', ?, 'spore', ?, 'dispatching',
          'quote-missing', ?, 1, 1)`,
-    ).run(sporeBatch.id, `payout:${sporeBatch.id}`, "b".repeat(64))))
+    ).run(sporeBatch.id, `payout:${sporeBatch.id}`, "b".repeat(64))))()).rejects
       .toThrow(/invalid_payout_dispatch_spore_quote_binding/);
 
     (await database.raw.prepare(`
@@ -680,33 +680,33 @@ describe("durable payout dispatch and reconciliation", () => {
     `).run(sporeBatch.id, "d".repeat(64)));
 
     const stableBatch = (await prepare("stable", openManager));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO payout_dispatch_operations(
          id, batch_id, payout_method, dispatch_key, state, created_at, updated_at
        ) VALUES ('invalid-binding', ?, 'stable', 'payout:other', 'dispatching', 1, 1)`,
-    ).run(stableBatch.id))).toThrow(/invalid_payout_dispatch_batch_binding/);
-    expect(async () => (await database.raw.prepare(
+    ).run(stableBatch.id)))()).rejects.toThrow(/invalid_payout_dispatch_batch_binding/);
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO payout_dispatch_operations(
          id, batch_id, payout_method, dispatch_key, state, created_at, updated_at
        ) VALUES ('invalid-rail', ?, 'stable', ?, 'dispatching', 1, 1)`,
-    ).run(sporeBatch.id, `payout:${sporeBatch.id}`))).toThrow(/invalid_payout_dispatch_batch_binding/);
-    expect(async () => (await database.raw.prepare(
+    ).run(sporeBatch.id, `payout:${sporeBatch.id}`)))()).rejects.toThrow(/invalid_payout_dispatch_batch_binding/);
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO payout_dispatch_operations(
          id, batch_id, payout_method, dispatch_key, state, spore_quote_id,
          spore_quote_attestation_digest, created_at, updated_at
        ) VALUES ('invalid-stable', ?, 'stable', ?, 'dispatching', 'quote', ?, 1, 1)`,
-    ).run(stableBatch.id, `payout:${stableBatch.id}`, "a".repeat(64))))
+    ).run(stableBatch.id, `payout:${stableBatch.id}`, "a".repeat(64))))()).rejects
       .toThrow(/invalid_payout_dispatch_spore_quote_audit/);
     (await database.raw.prepare(
       `INSERT INTO payout_dispatch_operations(
          id, batch_id, payout_method, dispatch_key, state, created_at, updated_at
        ) VALUES ('valid-stable', ?, 'stable', ?, 'dispatching', 1, 1)`,
     ).run(stableBatch.id, `payout:${stableBatch.id}`));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `UPDATE payout_dispatch_operations
        SET spore_quote_id = 'quote', spore_quote_attestation_digest = ?
        WHERE id = 'valid-stable'`,
-    ).run("a".repeat(64)))).toThrow(/payout_dispatch_spore_quote_audit/);
+    ).run("a".repeat(64))))()).rejects.toThrow(/payout_dispatch_spore_quote_audit/);
 
     (await database.raw.prepare(
       `INSERT INTO payout_dispatch_operations(
@@ -714,17 +714,17 @@ describe("durable payout dispatch and reconciliation", () => {
          spore_quote_attestation_digest, created_at, updated_at
        ) VALUES ('valid-spore', ?, 'spore', ?, 'dispatching', 'quote-1', ?, 1, 1)`,
     ).run(sporeBatch.id, `payout:${sporeBatch.id}`, "b".repeat(64)));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `UPDATE payout_dispatch_operations
        SET spore_quote_id = 'quote-2', spore_quote_attestation_digest = ?
        WHERE id = 'valid-spore'`,
-    ).run("c".repeat(64)))).toThrow(/immutable_payout_dispatch_spore_quote_audit/);
-    expect(async () => (await database.raw.prepare(
+    ).run("c".repeat(64))))()).rejects.toThrow(/immutable_payout_dispatch_spore_quote_audit/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET payout_method = 'stable' WHERE id = 'valid-spore'",
-    ).run())).toThrow(/immutable_payout_dispatch_spore_quote_audit/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/immutable_payout_dispatch_spore_quote_audit/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET state = 'submitted' WHERE id = 'valid-spore'",
-    ).run())).toThrow(/invalid_payout_dispatch_state_evidence/);
+    ).run()))()).rejects.toThrow(/invalid_payout_dispatch_state_evidence/);
 
     (await payouts.markSubmitted({
       batchId: stableBatch.id,
@@ -736,30 +736,30 @@ describe("durable payout dispatch and reconciliation", () => {
        SET state = 'submitted', external_reference = 'transfer-1'
        WHERE id = 'valid-stable'`,
     ).run());
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET external_reference = 'transfer-2' WHERE id = 'valid-stable'",
-    ).run())).toThrow(/immutable_payout_dispatch_provider_identity|invalid_payout_dispatch_batch_projection/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/immutable_payout_dispatch_provider_identity|invalid_payout_dispatch_batch_projection/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET dispatch_key = 'payout:other' WHERE id = 'valid-stable'",
-    ).run())).toThrow(/immutable_payout_dispatch_provider_identity/);
+    ).run()))()).rejects.toThrow(/immutable_payout_dispatch_provider_identity/);
     (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET state = 'uncertain' WHERE id = 'valid-stable'",
     ).run());
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET state = 'paid' WHERE id = 'valid-stable'",
-    ).run())).toThrow(/invalid_payout_dispatch_state_evidence/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/invalid_payout_dispatch_state_evidence/);
+    await expect((async () => (await database.raw.prepare(
       `UPDATE payout_dispatch_operations
        SET settlement_reference = 'premature-settlement' WHERE id = 'valid-stable'`,
-    ).run())).toThrow(/invalid_payout_dispatch_state_evidence/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/invalid_payout_dispatch_state_evidence/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_dispatch_operations SET state = 'dispatching' WHERE id = 'valid-stable'",
-    ).run())).toThrow(/invalid_payout_dispatch_state_transition|invalid_payout_dispatch_batch_projection/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/invalid_payout_dispatch_state_transition|invalid_payout_dispatch_batch_projection/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET amount_usd_micros = 999 WHERE id = ?",
-    ).run(stableBatch.id))).toThrow(/immutable_payout_batch_economic_snapshot/);
-    expect(async () => (await database.raw.prepare(
+    ).run(stableBatch.id)))()).rejects.toThrow(/immutable_payout_batch_economic_snapshot/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET destination_reference = 'other-destination' WHERE id = ?",
-    ).run(stableBatch.id))).toThrow(/immutable_payout_batch_economic_snapshot/);
+    ).run(stableBatch.id)))()).rejects.toThrow(/immutable_payout_batch_economic_snapshot/);
   });
 });

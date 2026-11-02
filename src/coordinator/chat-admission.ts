@@ -4,6 +4,12 @@ import { setTimeout as delay } from "node:timers/promises";
 import type { ChatCompletionRequest } from "../contracts/types.js";
 import { inputHashForRequest } from "../core/request.js";
 import { MeshServiceError, type MeshService } from "./mesh-service.js";
+import { chatCompletionRequestSchema } from "../contracts/schemas.js";
+import { withModelRequestDeadline } from "../core/model-request-deadline.js";
+
+export function parseChatRequest(body: unknown, budgets?: Readonly<Record<string, number>>): ChatCompletionRequest {
+  return chatCompletionRequestSchema.parse(withModelRequestDeadline(body, budgets)) as ChatCompletionRequest;
+}
 
 export async function waitForChatCapacity(
   service: MeshService,

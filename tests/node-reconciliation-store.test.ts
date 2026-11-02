@@ -88,11 +88,11 @@ describe("NodeReconciliationStore", () => {
     const latest = (await commands.latestCursor("node-1"));
     const forged = `${latest.slice(0, -1)}${latest.endsWith("0") ? "1" : "0"}`;
     (await reconciliation.reconcile(snapshot({ cursor: latest, observedAt: new Date(clock).toISOString(), activeCommandIds: [input.id] })));
-    expect(async () => (await reconciliation.reconcile(snapshot({ observedAt: new Date(clock).toISOString(), activeCommandIds: [input.id] })))).toThrow("node_snapshot_cursor_regression");
-    expect(async () => (await reconciliation.reconcile(snapshot({ cursor: forged, observedAt: new Date(clock).toISOString() })))).toThrow(/node_event_cursor/);
-    expect(async () => (await reconciliation.reconcile(snapshot({ generation: 2, cursor: latest, observedAt: new Date(clock).toISOString() })))).toThrow("node_snapshot_generation_downgrade");
-    expect(async () => (await reconciliation.reconcile(snapshot({ cursor: latest, observedAt, activeCommandIds: [input.id] })))).toThrow("node_snapshot_time_regression");
-    expect(async () => (await reconciliation.reconcile(snapshot({ cursor: latest, observedAt: new Date(clock).toISOString(), activeCommandIds: [randomUUID()] })))).toThrow("node_snapshot_active_commands_invalid");
+    await expect((async () => (await reconciliation.reconcile(snapshot({ observedAt: new Date(clock).toISOString(), activeCommandIds: [input.id] }))))()).rejects.toThrow("node_snapshot_cursor_regression");
+    await expect((async () => (await reconciliation.reconcile(snapshot({ cursor: forged, observedAt: new Date(clock).toISOString() }))))()).rejects.toThrow(/node_event_cursor/);
+    await expect((async () => (await reconciliation.reconcile(snapshot({ generation: 2, cursor: latest, observedAt: new Date(clock).toISOString() }))))()).rejects.toThrow("node_snapshot_generation_downgrade");
+    await expect((async () => (await reconciliation.reconcile(snapshot({ cursor: latest, observedAt, activeCommandIds: [input.id] }))))()).rejects.toThrow("node_snapshot_time_regression");
+    await expect((async () => (await reconciliation.reconcile(snapshot({ cursor: latest, observedAt: new Date(clock).toISOString(), activeCommandIds: [randomUUID()] }))))()).rejects.toThrow("node_snapshot_active_commands_invalid");
     (await database.close());
   });
 

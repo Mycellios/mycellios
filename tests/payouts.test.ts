@@ -107,7 +107,7 @@ describe("provider-neutral seller payout batches", () => {
       idempotencyKey: "cancel-2",
     }));
     (await payouts.markSubmitted({ batchId: next.batch.id, dispatchKey: "dispatch-2", externalReference: "transfer-2" }));
-    expect(async () => (await payouts.cancelPrepared(next.batch.id))).toThrowError(
+    await expect((async () => (await payouts.cancelPrepared(next.batch.id)))()).rejects.toThrowError(
       expect.objectContaining({ code: "payout_cancellation_unsafe" } satisfies Partial<PayoutError>),
     );
   });
@@ -124,39 +124,39 @@ describe("provider-neutral seller payout batches", () => {
     const initial = (await database.raw.prepare(
       "SELECT created_at, updated_at FROM payout_batches WHERE id = ?",
     ).get(prepared.batch.id)) as { created_at: number; updated_at: number };
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET updated_at = ? WHERE id = ?",
-    ).run(initial.created_at - 1, prepared.batch.id))).toThrow(/invalid_payout_batch_time/);
+    ).run(initial.created_at - 1, prepared.batch.id)))()).rejects.toThrow(/invalid_payout_batch_time/);
 
     const submitted = (await payouts.markSubmitted({
       batchId: prepared.batch.id,
       dispatchKey: "dispatch-batch-time",
       externalReference: "transfer-batch-time",
     }));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET submitted_at = submitted_at + 1 WHERE id = ?",
-    ).run(prepared.batch.id))).toThrow(/invalid_payout_batch_time/);
+    ).run(prepared.batch.id)))()).rejects.toThrow(/invalid_payout_batch_time/);
 
     (await payouts.markPaid({
       batchId: prepared.batch.id,
       settlementReference: "settlement-batch-time",
       paidAt: 1,
     }));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET paid_at = paid_at + 1 WHERE id = ?",
-    ).run(prepared.batch.id))).toThrow(/invalid_payout_batch_time/);
+    ).run(prepared.batch.id)))()).rejects.toThrow(/invalid_payout_batch_time/);
     expect(submitted.batch.submittedAt).toBeGreaterThanOrEqual(initial.created_at);
   });
 
   it("fails closed for SPORE until every gate is approved", async () => {
     (await earning("earning-spore", "seller-1", "spore"));
     const closed = new PayoutManager(database, closedPolicy);
-    expect(async () => (await closed.prepare({
+    await expect((async () => (await closed.prepare({
       sellerId: "seller-1",
       payoutMethod: "spore",
       earningIds: ["earning-spore"],
       idempotencyKey: "spore-closed",
-    }))).toThrowError(expect.objectContaining({ code: "spore_payout_gates_closed" }));
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "spore_payout_gates_closed" }));
 
     const open = new PayoutManager(database, {
       ...closedPolicy,
@@ -179,39 +179,39 @@ describe("provider-neutral seller payout batches", () => {
     (await earning("earning-owned"));
     (await earning("earning-other", "seller-2"));
     const payouts = new PayoutManager(database, closedPolicy);
-    expect(async () => (await payouts.prepare({
+    await expect((async () => (await payouts.prepare({
       sellerId: "seller-1", payoutMethod: "stable",
       earningIds: ["earning-other"], idempotencyKey: "wrong-owner",
-    }))).toThrowError(expect.objectContaining({ code: "earning_owner_conflict" }));
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "earning_owner_conflict" }));
     const first = (await payouts.prepare({
       sellerId: "seller-1", payoutMethod: "stable",
       earningIds: ["earning-owned"], idempotencyKey: "first",
     }));
-    expect(async () => (await payouts.prepare({
+    await expect((async () => (await payouts.prepare({
       sellerId: "seller-1", payoutMethod: "stable",
       earningIds: ["earning-owned"], idempotencyKey: "second",
-    }))).toThrowError(expect.objectContaining({ code: "earning_not_available" }));
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "earning_not_available" }));
     (await payouts.markSubmitted({ batchId: first.batch.id, dispatchKey: "dispatch-unique", externalReference: "transfer-unique" }));
-    expect(async () => (await payouts.markSubmitted({
+    await expect((async () => (await payouts.markSubmitted({
       batchId: first.batch.id,
       dispatchKey: "dispatch-changed",
       externalReference: "transfer-changed",
-    }))).toThrowError(expect.objectContaining({ code: "payout_submission_conflict" }));
-    expect(async () => (await database.raw.prepare(
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "payout_submission_conflict" }));
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET dispatch_key = 'dispatch-lateral' WHERE id = ?",
-    ).run(first.batch.id))).toThrow(/immutable_payout_batch_provider_identity/);
-    expect(async () => (await database.raw.prepare(
+    ).run(first.batch.id)))()).rejects.toThrow(/immutable_payout_batch_provider_identity/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET external_reference = 'transfer-lateral' WHERE id = ?",
-    ).run(first.batch.id))).toThrow(/immutable_payout_batch_provider_identity/);
+    ).run(first.batch.id)))()).rejects.toThrow(/immutable_payout_batch_provider_identity/);
 
     (await payouts.markPaid({
       batchId: first.batch.id,
       settlementReference: "settlement-unique",
       paidAt: 1,
     }));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE payout_batches SET settlement_reference = 'settlement-lateral' WHERE id = ?",
-    ).run(first.batch.id))).toThrow(/immutable_payout_batch_provider_identity/);
+    ).run(first.batch.id)))()).rejects.toThrow(/immutable_payout_batch_provider_identity/);
   });
 
   it("nets seller debt from a payout and restores it on safe cancellation", async () => {
@@ -240,26 +240,26 @@ describe("provider-neutral seller payout batches", () => {
     expect((await database.raw.prepare(
       "SELECT amount_usd_micros FROM seller_debts WHERE seller_id = 'seller-1'",
     ).get())).toEqual({ amount_usd_micros: 125_000 });
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_debts SET seller_id = 'seller-other' WHERE seller_id = 'seller-1'",
-    ).run())).toThrow(/invalid_seller_debt_identity_time/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/invalid_seller_debt_identity_time/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_debts SET updated_at = 0 WHERE seller_id = 'seller-1'",
-    ).run())).toThrow(/invalid_seller_debt_identity_time/);
-    expect(async () => (await database.raw.prepare(
+    ).run()))()).rejects.toThrow(/invalid_seller_debt_identity_time/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM seller_debts WHERE seller_id = 'seller-1'",
-    ).run())).toThrow(/immutable_seller_debt/);
+    ).run()))()).rejects.toThrow(/immutable_seller_debt/);
   });
 
-  it("rejects a payout batch whose net amount does not balance", () => {
-    expect(async () => (await database.raw.prepare(`
+  it("rejects a payout batch whose net amount does not balance", async () => {
+    await expect((async () => (await database.raw.prepare(`
       INSERT INTO payout_batches(
         id, seller_id, payout_method, idempotency_key, request_digest,
         gross_usd_micros, debt_offset_usd_micros, amount_usd_micros,
         status, created_at, updated_at
       ) VALUES ('batch-unbalanced', 'seller-1', 'stable', 'batch-unbalanced-key',
         'digest-unbalanced', 200000, 50000, 175000, 'prepared', 1, 1)
-    `).run())).toThrow(/invalid_payout_batch_amount_equation/);
+    `).run()))()).rejects.toThrow(/invalid_payout_batch_amount_equation/);
   });
 
   it("keeps the seller debt offset consumed after external settlement", async () => {
@@ -293,10 +293,10 @@ describe("provider-neutral seller payout batches", () => {
   it("requires and snapshots a verified destination when policy enables self-service", async () => {
     (await earning("earning-destination-one", "seller-1", "stable", 200_000));
     const strict = new PayoutManager(database, { ...closedPolicy, requireVerifiedDestination: true });
-    expect(async () => (await strict.prepare({
+    await expect((async () => (await strict.prepare({
       sellerId: "seller-1", payoutMethod: "stable",
       earningIds: ["earning-destination-one"], idempotencyKey: "destination-missing",
-    }))).toThrowError(expect.objectContaining({ code: "verified_payout_destination_required" }));
+    })))()).rejects.toThrowError(expect.objectContaining({ code: "verified_payout_destination_required" }));
 
     const now = Date.now();
     (await database.raw.prepare(

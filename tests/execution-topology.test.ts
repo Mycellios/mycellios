@@ -47,11 +47,11 @@ describe("durable redacted execution topology", () => {
     const keys = generateKeyPairSync("ed25519");
     const receipts = new ExecutionReceiptStore(database, { keyId: "key", privateKey: keys.privateKey });
     const trace = fixtureTrace();
-    expect(async () => (await receipts.record({ schema: "mycellios-execution-receipt/1", jobId: trace.jobId,
+    await expect((async () => (await receipts.record({ schema: "mycellios-execution-receipt/1", jobId: trace.jobId,
       modelIdHash: sha("a"), routeClass: "pipeline", metrics: { inputTokens: 1, outputTokens: 1, ttftMs: 1, activeMs: 1 },
       networkTraceDigest: sha("f"), recovery: { mode: "none", attempts: 1, replayedTokenEvents: 0 },
       privacy: { trust: "default", boundary: "trusted-edges", pinnedIdentityHashes: [] }, completedAt: 1 },
-    { trace, regionForWorker: () => null }))).toThrow("execution_topology_trace_digest_mismatch");
+    { trace, regionForWorker: () => null })))()).rejects.toThrow("execution_topology_trace_digest_mismatch");
     expect((await receipts.forJob(trace.jobId))).toBeNull();
     (await database.close());
   });

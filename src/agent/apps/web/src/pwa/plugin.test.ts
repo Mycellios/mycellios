@@ -48,19 +48,19 @@ describe("PWA build", () => {
     expect(manifest).toMatchObject({
       id: "/",
       scope: "/",
-      start_url: "/",
+      start_url: "/app",
       display: "standalone",
       background_color: webDarkTokens.background,
       theme_color: webDarkTokens.background,
     });
     expect(manifest.icons.filter((icon) => icon.purpose === "maskable")).toHaveLength(1);
     expect(manifest.name).toBe("Mycellios Agent");
-    expect(manifest.icons[0]?.src).toBe("/mycellios/app-icon-v2-192.png");
+    expect(manifest.icons[0]?.src).toBe("/mycellios/app-icon-v2-192.png?brand=3");
     expect(
       manifest.icons.filter((icon) => icon.purpose === "any").map((icon) => icon.sizes),
     ).toEqual(["192x192", "512x512"]);
     expect(manifest.icons.find((icon) => icon.purpose === "maskable")?.src).toBe(
-      "/mycellios/app-icon-v2-maskable.png",
+      "/mycellios/app-icon-v2-maskable.png?brand=3",
     );
   });
 });
@@ -68,6 +68,7 @@ describe("PWA build", () => {
 it("limits an embedded product manifest to its deployment namespace", () => {
   const manifest = webManifest("/agent/");
   expect(manifest.scope).toBe("/agent/");
-  expect(manifest.start_url).toBe("/agent/");
-  expect(manifest.icons[0]?.src).toBe("/agent/mycellios/app-icon-v2-192.png");
+  expect(manifest.id).toBe("/agent/");
+  expect(manifest.start_url).toBe("/agent/app");
+  expect(manifest.icons[0]?.src).toBe("/agent/mycellios/app-icon-v2-192.png?brand=3");
 });

@@ -1,3 +1,4 @@
+import { installAccountComputerBackground } from "./account-computer-background.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
@@ -137,6 +138,8 @@ let hostComputer: Awaited<ReturnType<typeof prepareHostComputer>> | undefined;
 let cloudComputer: DesktopRelayClient | undefined;
 let cloudComputerBase: string | undefined;
 let cloudComputerOwner: string | undefined;
+let accountComputer: ReturnType<typeof installAccountComputerBackground> | undefined;
+let accountComputerSession: {base:string;session:Session}|undefined;
 let projectRunner: ReturnType<typeof installProjectRunner> | undefined;
 let contributionRuntime: ContributionRuntime;
 let requestingComputerAccess = false;
@@ -683,7 +686,7 @@ async function runMenuUpdateCheck() {
 
 async function installUpdate() {
   if (desktopUpdater.state().phase !== "ready") return desktopUpdater.state();
-  if (hostComputer?.hasActiveWork() || cloudComputer?.busy()) return {
+  if (hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()) return {
     ...desktopUpdater.state(), message: "A local task is still running. Install the update when it finishes.",
   };
   quitting = true;
@@ -704,11 +707,10 @@ function installApplicationMenu() {
     label: "Revoke Local Computer Access",
     visible: hostComputer?.isEnabled() === true,
     click: () => {
+      const revoked = hostComputer?.revoke();
+      void accountComputer?.revoke();
       void cloudComputer?.revoke(); cloudComputerOwner = undefined;
-      void hostComputer
-        ?.revoke()
-        .finally(() => installApplicationMenu())
-        .catch(() => undefined);
+      void revoked?.finally(() => installApplicationMenu()).catch(() => undefined);
     },
   };
   const checkForUpdates: Electron.MenuItemConstructorOptions = {
@@ -940,7 +942,9 @@ async function openAppOnce(targetUrl: string, switching: boolean) {
   projectRunner?.reset();
   targetUrl = desktopEntryUrl(targetUrl);
   cloudComputer?.stop(); cloudComputer = undefined; cloudComputerOwner = undefined;
-  hostComputer?.activate(currentSetup?.mode === "new" && targetUrl === localStack.webUrl());
+  if (!accountComputer?.online() || switching) {
+    hostComputer?.activate(currentSetup?.mode === "new" && targetUrl === localStack.webUrl());
+  }
   const target = await resolveSessionForTarget(targetUrl);
   target.value.webRequest.onHeadersReceived((details, callback) => {
     const headers = { ...details.responseHeaders };
@@ -1324,10 +1328,24 @@ app.whenReady().then(async () => {
         return nativeSession.fetch(url, { ...init, headers, bypassCustomProtocolHandlers: true });
       },
       localUrl: hostComputer.connection.url.replace("host.docker.internal", "127.0.0.1"), localToken: hostComputer.connection.token,
-      revoked: () => { cloudComputerOwner = undefined; hostComputer?.activate(false); },
+      revoked: () => { cloudComputerOwner = undefined; if(!accountComputer?.online())hostComputer?.activate(false); },
     });
     return cloudComputer;
   };
+  if(hostComputer) accountComputer = installAccountComputerBackground({
+    profile:userDataDir,host:hostComputer,
+    localUrl:hostComputer.connection.url.replace("host.docker.internal","127.0.0.1"),localToken:hostComputer.connection.token,
+    consentScope:computerConsentScope,window:()=>mainWindow,changed:installApplicationMenu,
+    context:async()=>{
+      if(currentSetup?.mode === "new")return null;
+      const base=projectServer() ?? normalizeServerUrl(currentSetup?.serverUrl ?? currentTargetUrl ?? (target.kind === "app" ? target.url : ""));
+      if(!base)return null;
+      if(mainWindow && projectServer()===base)accountComputerSession={base,session:mainWindow.webContents.session};
+      const nativeSession=accountComputerSession?.base===base?accountComputerSession.session:undefined;
+      if(!nativeSession)return null;
+      return {base,fetch:(url,init)=>nativeSession.fetch(url,{...init,bypassCustomProtocolHandlers:true})};
+    },
+  });
   const projectBrowser = installProjectBrowser({
     getWindow: () => mainWindow,
     authorize: event => isCloudComputerRequest(event) || isManagedComputerRequest(event),
@@ -1353,7 +1371,7 @@ app.whenReady().then(async () => {
       if (isCloudComputerRequest(event)) {
         const client = getCloudComputer();
         owner = JSON.stringify(await client.identity());
-        if (owner !== cloudComputerOwner || !client.connected(botId)) throw new Error("Reconnect this agent to the local computer.");
+        if (owner !== cloudComputerOwner || !(accountComputer?.connected(botId,await nativeProjectSpace(captured)) ?? client.connected(botId))) throw new Error("Reconnect this agent to the local computer.");
       } else {
         if (!await localStack.matchesDesiredStack()) throw new Error("The local session changed.");
         owner = JSON.stringify(await nativePreviewContext(captured));
@@ -1370,7 +1388,8 @@ app.whenReady().then(async () => {
     if (currentSetup?.mode === "new" && await localStack.matchesDesiredStack()) return;
     const client = getCloudComputer(), owner = cloudComputerOwner;
     if (!owner || JSON.stringify(await client.identity()) !== owner) throw new Error("Allow local computer access first.");
-    await client.bind(botId);
+    if(accountComputer)await accountComputer.connect(botId,mainWindow?await nativeProjectSpace(mainWindow):null);
+    else await client.bind(botId);
     if (cloudComputerOwner !== owner || !hostComputer.isEnabled()) {
       await client.revoke(); throw new Error("The local session changed.");
     }
@@ -1395,7 +1414,10 @@ app.whenReady().then(async () => {
         const client = getCloudComputer();
         const identity = await client.identity();
         const owner = JSON.stringify(identity);
-        if (cloudComputerOwner === owner && hostComputer.isEnabled()) return true;
+        if (cloudComputerOwner === owner && hostComputer.isEnabled()) {
+          await accountComputer?.refresh();
+          return hostComputer.isEnabled();
+        }
         const consentScope = computerConsentScope(projectServer()!, identity);
         if (hostComputer.hasRememberedAccess(consentScope)) {
           if (!isCloudComputerRequest(event) || JSON.stringify(await client.identity()) !== owner) return false;
@@ -1407,8 +1429,9 @@ app.whenReady().then(async () => {
           }
           hostComputer.activate(true);
           cloudComputerOwner = owner;
+          await accountComputer?.refresh();
           installApplicationMenu();
-          return true;
+          return hostComputer.isEnabled();
         }
         const result = await dialog.showMessageBox(mainWindow!, {
           type: "warning", title: "Use this computer?", message: "Allow your Mycellios agents to work on this computer?",
@@ -1417,7 +1440,8 @@ app.whenReady().then(async () => {
         });
         if (result.response !== 1 || !isCloudComputerRequest(event) || JSON.stringify(await client.identity()) !== owner) return false;
         await hostComputer.grant(consentScope); hostComputer.activate(true); cloudComputerOwner = owner;
-        installApplicationMenu(); return true;
+        await accountComputer?.refresh();
+        installApplicationMenu(); return hostComputer.isEnabled();
       } finally { requestingComputerAccess = false; }
     }
     if (!isManagedComputerRequest(event) || !hostComputer)
@@ -1475,7 +1499,7 @@ app.whenReady().then(async () => {
     if (!isCloudComputerRequest(event) || !cloudComputerOwner) return false;
     const client = getCloudComputer();
     if (JSON.stringify(await client.identity()) !== cloudComputerOwner) return false;
-    return client.connected(botId);
+    return accountComputer?.connected(botId,await nativeProjectSpace(mainWindow!)) ?? client.connected(botId);
   });
   ipcMain.handle("desktop.computer.connect", async (event, botId: unknown) => {
     if (!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) throw new Error("Open the configured application first.");
@@ -1489,14 +1513,14 @@ app.whenReady().then(async () => {
     if(isCloudComputerRequest(event)) {
       const client=getCloudComputer();if(JSON.stringify(await client.identity())!==cloudComputerOwner)throw new Error("The account changed.");
       assertProjectGrant(hostComputer.project(botId),await realpath(selected.filePaths[0]));
-      const project=await hostComputer.selectProject(botId,selected.filePaths[0]);await client.bind(botId);return project;
+      const project=await hostComputer.selectProject(botId,selected.filePaths[0]);await connectLocalComputer(botId);return project;
     }
     if(!isManagedComputerRequest(event) || !await localStack.matchesDesiredStack())throw new Error("The local session changed.");
     return hostComputer.selectProject(botId,selected.filePaths[0]);
   });
   ipcMain.handle("desktop.computer.revokeAccess", async (event) => {
     if (isCloudComputerRequest(event)) {
-      cloudComputerOwner = undefined; await cloudComputer?.revoke(); await hostComputer?.revoke(); installApplicationMenu(); return;
+      cloudComputerOwner = undefined; const revoked=hostComputer?.revoke(); await accountComputer?.revoke(); await cloudComputer?.revoke(); await revoked; installApplicationMenu(); return;
     }
     if (isManagedComputerRequest(event)) {
       try {
@@ -1737,12 +1761,14 @@ app.whenReady().then(async () => {
       destroySetupWindow();
     }
   }
+  void accountComputer?.refresh();
+  if(process.argv.includes("--background")){mainWindow?.hide();setupWindow?.hide();}
 });
 
 app.on("window-all-closed", () => {
   // A hidden session probe (defaultSessionHasOriginData) can be the only window
   // during startup; its teardown must not quit the app.
-  if (liveProbeWindows > 0) return;
+  if (liveProbeWindows > 0 || accountComputer?.hasConsent()) return;
   if (process.platform !== "darwin") app.quit();
 });
 
@@ -1756,6 +1782,7 @@ app.on("before-quit", (event) => {
     });
     return;
   }
+  accountComputer?.stop();
   cloudComputer?.stop();
   quitting = true;
   clearTimeout(warmWindowTimer);

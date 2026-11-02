@@ -155,7 +155,7 @@ describe("worker tunnel execution telemetry", () => {
     await agent.close();
   });
 
-  it("does not block route cleanup when a connected worker never acknowledges stop", async () => {
+  it("rejects bounded route cleanup when a connected worker never acknowledges stop", async () => {
     const hub = new FakeWorkerHub();
     const description = {
       launchId: "launch-stop-timeout",
@@ -180,7 +180,7 @@ describe("worker tunnel execution telemetry", () => {
     await handle.ready;
     const exited = handle.exited.catch((error: unknown) => error);
 
-    await expect(handle.stop("route_repair")).resolves.toBeUndefined();
+    await expect(handle.stop("route_repair")).rejects.toThrow("worker_tunnel_stop_timeout:worker-stop-timeout");
     await expect(exited).resolves.toMatchObject({
       message: "worker_tunnel_stop_timeout:worker-stop-timeout",
     });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { workerConfigSchema } from "../src/contracts/schemas.js";
@@ -248,7 +248,8 @@ describe("inference-only coordinator and worker", () => {
 
   it("reports published downloads and serves archive files when available", async () => {
     const downloadsRoot = mkdtempSync(join(tmpdir(), "mycellios-downloads-"));
-    const archiveName = "mycellios-node-windows-x64.zip";
+    const version = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
+    const archiveName = `mycellios-node-${version}-windows-x64.msi`;
     writeFileSync(join(downloadsRoot, archiveName), "fixture archive");
     const { runtime, address, agent, run } = await startNetwork({ releaseDownloadsPath: downloadsRoot });
     cleanup.push(async () => {
@@ -264,9 +265,9 @@ describe("inference-only coordinator and worker", () => {
     expect(availability).toMatchObject({
       schema: "mycellios-public-downloads/1",
       packages: [
-        { id: "windows-x64", format: "ZIP", path: "/downloads/windows", available: true, fileName: archiveName },
-        { id: "macos-arm64", format: "TAR.GZ", path: "/downloads/macos-arm64" },
-        { id: "linux-x64", format: "TAR.GZ", path: "/downloads/linux" },
+        { id: "windows-x64", format: "MSI", path: "/downloads/windows", available: true, fileName: archiveName },
+        { id: "macos-arm64", format: "PKG", path: "/downloads/macos-arm64" },
+        { id: "linux-x64", format: "DEB", path: "/downloads/linux" },
       ],
     });
 

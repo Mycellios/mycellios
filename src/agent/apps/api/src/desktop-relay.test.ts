@@ -196,3 +196,15 @@ it.each([false, true])(
   30_000,
 );
 
+
+it("fences account registration to the exact native identity and rejects browser admission",async()=>{
+ const app=fixture();const headers={"x-mycellios-desktop":"1","x-test-auth":"yes"};
+ const call=(action:string,input:unknown,extra:Record<string,string>={})=>app.request("/api/desktop-relay/"+action,{method:"POST",headers:{...headers,...extra},body:JSON.stringify(input)});
+ const identity=await(await call("identity",{})).json();
+ const input={deviceId:randomUUID(),generation:randomUUID(),identity};
+ expect((await call("account",input,{origin:"https://example.test"})).status).toBe(403);
+ expect((await call("account",{...input,identity:{...identity,userId:"other"}})).status).toBe(403);
+ expect((await call("account",{...input,identity:{...identity,connectionId:"stale"}})).status).toBe(403);
+ expect((await call("account",input)).status).toBe(200);
+ expect(await(await call("spaces",{})).json()).toEqual({spaces:[owner.spaceId]});
+});

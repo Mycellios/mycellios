@@ -88,21 +88,21 @@ describe("receipt-driven seller earnings", () => {
   it("seals the verified receipt and derived earning economic snapshot", async () => {
     const earning = (await manager.recordAcceptedReceipt(receipt()));
 
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE verified_work_receipts SET amount_usd_micros = 999999 WHERE receipt_id = ?",
-    ).run(earning.receiptId))).toThrow(/immutable_verified_work_receipt/);
-    expect(async () => (await database.raw.prepare(
+    ).run(earning.receiptId)))()).rejects.toThrow(/immutable_verified_work_receipt/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earnings SET payout_method = 'spore' WHERE id = ?",
-    ).run(earning.id))).toThrow(/immutable_seller_earning_economic_snapshot/);
-    expect(async () => (await database.raw.prepare(
+    ).run(earning.id)))()).rejects.toThrow(/immutable_seller_earning_economic_snapshot/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earnings SET amount_usd_micros = 999999 WHERE id = ?",
-    ).run(earning.id))).toThrow(/immutable_seller_earning_economic_snapshot/);
-    expect(async () => (await database.raw.prepare(
+    ).run(earning.id)))()).rejects.toThrow(/immutable_seller_earning_economic_snapshot/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM seller_earnings WHERE id = ?",
-    ).run(earning.id))).toThrow(/immutable_seller_earning/);
-    expect(async () => (await database.raw.prepare(
+    ).run(earning.id)))()).rejects.toThrow(/immutable_seller_earning/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM verified_work_receipts WHERE receipt_id = ?",
-    ).run(earning.receiptId))).toThrow(/immutable_verified_work_receipt/);
+    ).run(earning.receiptId)))()).rejects.toThrow(/immutable_verified_work_receipt/);
 
     const now = Date.now();
     (await database.raw.prepare(
@@ -112,11 +112,11 @@ describe("receipt-driven seller earnings", () => {
        ) VALUES ('receipt-binding', 'seller-1', 'worker-binding', 'job-binding',
                  'stage-binding', 'pricing-1', 125000, ?, ?, 'verifier-1', 'signed-fixture', ?)`,
     ).run("c".repeat(64), now, now));
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO seller_earnings(
          id, seller_id, receipt_id, amount_usd_micros, payout_method, status, created_at
        ) VALUES ('earning-binding', 'seller-1', 'receipt-binding', 999999, 'stable', 'available', ?)`,
-    ).run(now))).toThrow(/invalid_seller_earning_receipt_binding/);
+    ).run(now)))()).rejects.toThrow(/invalid_seller_earning_receipt_binding/);
   });
 
   it("snapshots an explicit SPORE payout preference without changing stable value", async () => {
@@ -127,13 +127,13 @@ describe("receipt-driven seller earnings", () => {
 
   it("fails closed for tampering, rejected work and untrusted verifiers", async () => {
     const signed = receipt();
-    expect(async () => (await manager.recordAcceptedReceipt({ ...signed, amountUsdMicros: 999_000 }))).toThrowError(
+    await expect((async () => (await manager.recordAcceptedReceipt({ ...signed, amountUsdMicros: 999_000 })))()).rejects.toThrowError(
       expect.objectContaining({ code: "invalid_receipt_signature" } satisfies Partial<SellerEarningsError>),
     );
-    expect(async () => (await manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-rejected", accepted: false })))).toThrowError(
+    await expect((async () => (await manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-rejected", accepted: false }))))()).rejects.toThrowError(
       expect.objectContaining({ code: "work_not_accepted" } satisfies Partial<SellerEarningsError>),
     );
-    expect(async () => (await manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-untrusted", verifierKeyId: "unknown-key" })))).toThrowError(
+    await expect((async () => (await manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-untrusted", verifierKeyId: "unknown-key" }))))()).rejects.toThrowError(
       expect.objectContaining({ code: "untrusted_receipt_verifier" } satisfies Partial<SellerEarningsError>),
     );
     expect((await database.raw.prepare("SELECT COUNT(*) AS count FROM seller_earnings").get())).toEqual({ count: 0 });
@@ -213,15 +213,15 @@ describe("receipt-driven seller earnings", () => {
     const pending = (await manager.recordEarningReversal(reversal(earning.id)));
     expect(pending.state).toBe("pending_payout");
     expect((await manager.getSellerDebt("seller-1"))).toBe(0);
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earning_reversals SET amount_usd_micros = 999999 WHERE id = ?",
-    ).run(pending.id))).toThrow(/immutable_seller_earning_reversal_content/);
-    expect(async () => (await database.raw.prepare(
+    ).run(pending.id)))()).rejects.toThrow(/immutable_seller_earning_reversal_content/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earning_reversals SET state = 'applied', resolved_at = ? WHERE id = ?",
-    ).run(Date.now(), pending.id))).toThrow(/invalid_seller_earning_reversal_lifecycle/);
-    expect(async () => (await database.raw.prepare(
+    ).run(Date.now(), pending.id)))()).rejects.toThrow(/invalid_seller_earning_reversal_lifecycle/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM seller_earning_reversals WHERE id = ?",
-    ).run(pending.id))).toThrow(/immutable_seller_earning_reversal/);
+    ).run(pending.id)))()).rejects.toThrow(/immutable_seller_earning_reversal/);
 
     (await payouts.markPaid({
       batchId: batch.id,
@@ -232,15 +232,15 @@ describe("receipt-driven seller earnings", () => {
     expect((await database.raw.prepare(
       "SELECT state, resolved_at FROM seller_earning_reversals WHERE reversal_id = ?",
     ).get(`reversal-${earning.id}`))).toEqual({ state: "seller_debt", resolved_at: expect.any(Number) });
-    expect(async () => (await database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earning_reversals SET state = 'pending_payout', resolved_at = NULL WHERE id = ?",
-    ).run(pending.id))).toThrow(/invalid_seller_earning_reversal_lifecycle/);
+    ).run(pending.id)))()).rejects.toThrow(/invalid_seller_earning_reversal_lifecycle/);
   });
 
   it("rejects tampered reversals and requires prepared payouts to be cancelled first", async () => {
     const earning = (await manager.recordAcceptedReceipt(receipt()));
     const signed = reversal(earning.id);
-    expect(async () => (await manager.recordEarningReversal({ ...signed, reason: "fraud" }))).toThrowError(
+    await expect((async () => (await manager.recordEarningReversal({ ...signed, reason: "fraud" })))()).rejects.toThrowError(
       expect.objectContaining({ code: "invalid_reversal_signature" }),
     );
 
@@ -259,7 +259,7 @@ describe("receipt-driven seller earnings", () => {
       earningIds: [earning.id],
       idempotencyKey: "prepared-reversal-batch",
     }));
-    expect(async () => (await manager.recordEarningReversal(signed))).toThrowError(
+    await expect((async () => (await manager.recordEarningReversal(signed)))()).rejects.toThrowError(
       expect.objectContaining({ code: "earning_in_prepared_payout" }),
     );
   });

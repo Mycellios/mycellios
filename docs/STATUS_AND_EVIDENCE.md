@@ -1,12 +1,37 @@
 # Status and evidence
 
-Updated: 2026-11-01 (local Desktop development window installed and checked; broader integration gates remain; public releases and economic records unchanged).
+Updated: 2026-11-02 (local project Play/Stop and full-stack preview qualified; integrated production candidate under verification).
 
-<!-- Local Desktop evidence below does not promote any public installer or backend. -->
+<!-- Local evidence does not by itself promote a public installer or backend. -->
 
-## Local Desktop development window â€” 2026-11-01
+## Local project preview and integrated release candidate — 2026-11-02
 
-The installed Windows preview now offers General / Advanced / Open development.
+The generic Browser beside a chat now owns project Play/Stop, service profiles,
+element selection and editable annotation drafts. First-time configuration uses
+an auxiliary project preparation run; its instructions, narration and result do
+not become main-chat messages. No Mycellios-specific development shortcut is used.
+
+Installed Windows acceptance exercised Stop → Play twice with the local API,
+PostgreSQL and Vite preview at `http://127.0.0.1:5192/app`. Registration, login,
+space read/update, sign-out, anonymous rejection and persistence after restart
+passed with a fixture account. Stop closed the owned API/readiness/Vite/database
+ports and process tree while retaining an unrelated preview. The main chat's ten
+user messages and raw sequence 33 were unchanged; the three auxiliary preparation
+runs remained separate. Local data and credentials stay outside source control.
+This demonstrates local application behavior, not live model/provider inference.
+
+The production candidate integrates current canonical main, the published Apple
+Silicon route, and recovered sources verified against the serving coordinator and
+Agent bundles. Native PostgreSQL repairs, contribution funding, OAuth fences,
+request deadlines, capacity reservations and heartbeat arrival handling are kept.
+Native and Agent have separate npm graphs and compiler/release evidence. Focused
+local types, native packaging and affected integration cases pass; full-suite,
+artifact and deployment evidence must be recorded before calling this release live.
+
+
+## Historical local Desktop development window — 2026-11-01
+
+An earlier local Windows preview offered General / Advanced / Open development.
 It opens a separate sandboxed window with a loopback Vite server, an explicit
 development/real-account label and the existing account session for API requests.
 No API, worker, database, new host grant or public release is started by this action.
@@ -24,12 +49,11 @@ through the credential-free asset proxy. Evidence is under
 `src/agent/outputs/desktop-development-20261101`.
 
 This is a local installation only, with recoverable native/frontend predecessors.
-Global architecture checks still report cycles/oversized modules across the Agent
-integration; the root typecheck also reports an unrelated import-extension error
-in the desktop download test. This evidence does not qualify a public release.
+The blockers recorded with that earlier checkout are superseded by the integrated
+candidate checks above. This historical evidence does not qualify a public release.
 
 
-## Shared Agent visual qualification â€” 2026-10-31
+## Shared Agent visual qualification — 2026-10-31
 
 Local source corrections bound long select values and menus, prevent shared dialog
 headings from overlapping their close controls, fit the sign-in heading on narrow
@@ -48,7 +72,7 @@ These are local Chrome/emulated viewport checks, not physical phone tests or a
 live-account/backend qualification. No account mutations, inference, installer
 update or production deployment was performed for this visual change.
 
-## Simple Desktop startup and recovery candidate â€” 2026-10-31
+## Simple Desktop startup and recovery candidate — 2026-10-31
 
 Normal startup opens the existing Mycellios account route directly. A damaged
 saved preference no longer opens server setup or starts a local stack. Explicit
@@ -92,7 +116,7 @@ This is packaging and packaged-executable proof, not a clean Windows installatio
 an upgrade of the user's installation or a new Linux/macOS qualification.
 Repository structure verification passed. No commit, push or publication occurred.
 
-## Unified Agent typography â€” 2026-10-31
+## Unified Agent typography — 2026-10-31
 
 Agent body text, display headings, wordmarks, startup and first-party account
 forms now share self-hosted Geist Variable. The login's Georgia shorthand and
@@ -129,7 +153,7 @@ anonymous loading probe is not proof of authenticated OAuth compatibility.
 Public native installers were not replaced. Receipts and screenshots are under
 `src/agent/outputs/typography-consistency-20261031`.
 
-## Persistent Desktop control strip â€” 2026-10-31
+## Persistent Desktop control strip — 2026-10-31
 
 The initially qualified local Windows Desktop 0.3.9 application used the requested red/yellow/green
 controls without the Windows title bar. A sandboxed local WebContentsView owns
@@ -156,7 +180,7 @@ and four new local strip assets. The public Windows/Linux installers remain
 unchanged. Receipts and the native-window login screenshot are under
 `src/agent/outputs/persistent-chrome-20261031`.
 
-## Agent balance recovery and window controls â€” 2026-10-31
+## Agent balance recovery and window controls — 2026-10-31
 
 Production frontend build `20261031122612`, immutable patch
 `8a495031a359a5eca67c4ecdcd1ad876b76766a725468887ef44dee40c3b8a5e`,
@@ -195,9 +219,9 @@ The public 0.3.9 installers have **not** been replaced with this native fix.
 Receipts are under `src/agent/outputs/credit-balance-recovery-20261031` and
 `src/agent/outputs/native-chrome-20261031`.
 
-## Agent terminology publication â€” 2026-10-31
+## Agent terminology publication — 2026-10-31
 
-Production Agent build `20261031115929` uses Credits (CrÃ©ditos in Spanish) for
+Production Agent build `20261031115929` uses Credits (Créditos in Spanish) for
 the internal balance and Mico/Micos for user agents. Spore names the separate
 official token; this release does not activate the token or change balances.
 The paid-credit conversion remains 10 USD = 10 Credits, with integer micro-unit
@@ -220,13 +244,13 @@ Nginx configuration; the API, workers, database, old web service and model servi
 were not replaced or restarted. The active Nginx configuration and release receipt,
 not the old web container label alone, identify the served frontend revision.
 
-A real signed-in browser verified CrÃ©ditos, Nuevo Mico and the Desktop link.
+A real signed-in browser verified Créditos, Nuevo Mico and the Desktop link.
 The account lookup currently returns unavailable, so the sidebar shows an em dash.
 The numeric production balance was **not** reverified; no zero or cached amount
 was substituted. Receipts and screenshots are under
 `src/agent/outputs/credits-micos-release-20261031`.
 
-## Desktop preview publication â€” 2026-10-31
+## Desktop preview publication — 2026-10-31
 
 Mycellios Desktop 0.3.9 is published for Windows x64 (EXE) and Debian/Ubuntu
 x64 (DEB) at https://www.mycellios.com/downloads/desktop, with the bundled
@@ -647,7 +671,7 @@ not an additional physical run or AntSeed delivery.
 
 Private receipts live under `outputs/kev-distributed-20261021`; secrets, identities,
 model weights and caches are excluded from source/public delivery. Remaining
-publication gates already closed include source promotion through PRs #70â€“72
+publication gates already closed include source promotion through PRs #70–72
 and account-confirmed independent cell admission. A real 55-token SDK call and
 a real 55-token OmniRoute/AntSeed buyer call returned the correct decision;
 the buyer call did not meet the free gate because its implicit provider selector

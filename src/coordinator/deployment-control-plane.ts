@@ -722,6 +722,16 @@ export class DeploymentControlPlane {
     return row ? mapRouteReservation(row) : null;
   }
 
+  async reservedMemoryByNode(now = Date.now()): Promise<Record<string, number>> {
+    const rows = await this.store.database.raw.prepare(
+      `SELECT node_id, SUM(memory_mib) AS leased
+       FROM deployment_stage_leases
+       WHERE status IN ('prepared', 'committed') AND expires_at > ?
+       GROUP BY node_id`,
+    ).all(now) as Array<{ node_id: string; leased: number | string }>;
+    return Object.fromEntries(rows.map(row => [row.node_id, Math.max(0, Number(row.leased))]));
+  }
+
   async listReservations(modelId: string, limit = 100): Promise<RouteReservation[]> {
     const rows = (await this.store.database.raw.prepare(
       `SELECT * FROM route_reservations

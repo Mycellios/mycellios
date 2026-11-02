@@ -460,7 +460,9 @@ describe("MCP transport seam", () => {
       access_token: "fresh-access",
       refresh_token: "rotated-refresh",
     });
-    expect(persisted).toHaveLength(1);
+    expect(persisted.at(-1)).toMatchObject({ oauth: { tokens: {
+      access_token: "fresh-access", refresh_token: "rotated-refresh",
+    } } });
     await session.close();
   });
 

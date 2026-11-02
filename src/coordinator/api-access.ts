@@ -127,6 +127,7 @@ export class ApiAccessManager {
     private readonly database: MeshDatabase,
     readonly limits: ApiAccessLimits,
     private readonly operatorQuotaModels: Readonly<Record<string, readonly string[]>> = parseOperatorQuotaModels(process.env.MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON),
+    private readonly contributionFundingEnabled = false,
   ) {}
 
   async getOrCreateAccount(userId: string): Promise<ApiAccount> {
@@ -222,7 +223,10 @@ export class ApiAccessManager {
     userId: string,
     apiKeyId: string | null,
     request: ChatCompletionRequest,
+    contributionFunded = false,
   ): Promise<ApiUsageReservation> {
+    if (contributionFunded && !this.contributionFundingEnabled)
+      throw new ApiAccessError("unsupported_funding_mode", "Contribution funding is unavailable.", 503);
     return (await this.database.transaction(async () => {
       const account = (await this.getOrCreateAccount(userId));
       const now = Date.now();
@@ -256,7 +260,7 @@ export class ApiAccessManager {
       const operatorFunded = apiKeyId !== null
         && Object.hasOwn(this.operatorQuotaModels, apiKeyId)
         && this.operatorQuotaModels[apiKeyId]!.includes(request.model);
-      const reservedTokens = operatorFunded ? 0 : estimateInputTokens(request) + (request.max_tokens ?? 256);
+      const reservedTokens = operatorFunded || contributionFunded ? 0 : estimateInputTokens(request) + (request.max_tokens ?? 256);
       if (account.tokenBalance < reservedTokens) {
         throw new ApiAccessError(
           "insufficient_token_balance",
@@ -279,6 +283,7 @@ export class ApiAccessManager {
         reservedTokens,
         now,
       ));
+      if (contributionFunded) await this.database.raw.prepare("INSERT INTO api_contribution_funded_usage(usage_id) VALUES (?)").run(id);
       if (operatorFunded) {
         (await this.database.raw.prepare("INSERT INTO api_operator_funded_usage(usage_id) VALUES (?)").run(id));
       }
@@ -320,7 +325,8 @@ export class ApiAccessManager {
       const operatorFunded = (await this.database.raw.prepare(
         "SELECT 1 FROM api_operator_funded_usage WHERE usage_id = ?",
       ).get(usageId)) !== undefined;
-      const actualTokens = operatorFunded ? 0 : Math.max(0, inputTokens) + Math.max(0, outputTokens);
+      const contributionFunded = this.contributionFundingEnabled && (await this.database.raw.prepare("SELECT 1 FROM api_contribution_funded_usage WHERE usage_id=?").get(usageId)) !== undefined;
+      const actualTokens = operatorFunded || contributionFunded ? 0 : Math.max(0, inputTokens) + Math.max(0, outputTokens);
       const refund = Math.max(0, usage.reserved_tokens - actualTokens);
       const additionalCharge = Math.max(0, actualTokens - usage.reserved_tokens);
       (await this.database.raw.prepare(

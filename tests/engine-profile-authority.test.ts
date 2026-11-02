@@ -27,26 +27,26 @@ describe("coordinator engine profile authority", () => {
     expect(persisted!.distributedExecutor!.engineProfiles).toEqual([profile]);
   });
 
-  it("rejects profiles detached from the current session or artifact", () => {
+  it("rejects profiles detached from the current session or artifact", async () => {
     const worker = workerFixture();
     const store = {
       getWorker: () => worker,
       listEngineRuntimeActivationPlans: () => [activationPlan()],
       updateWorkerHeartbeat: () => undefined,
     } as unknown as MeshStore;
-    expect(async () => (await publishCoordinatorEngineRuntimeProfile(store, worker.id, {
+    await expect((async () => (await publishCoordinatorEngineRuntimeProfile(store, worker.id, {
       ...profileFixture(),
       sessionId: "session-attacker",
-    }))).toThrow("engine_runtime_profile_seal_is_invalid");
+    })))()).rejects.toThrow("engine_runtime_profile_seal_is_invalid");
     const wrongArtifact = sealEngineRuntimeProfile({
       ...profileInput(),
       artifactManifestDigest: digest("9"),
     });
-    expect(async () => (await publishCoordinatorEngineRuntimeProfile(
+    await expect((async () => (await publishCoordinatorEngineRuntimeProfile(
       store,
       worker.id,
       wrongArtifact,
-    ))).toThrow("engine_runtime_profile_evidence_binding_is_invalid");
+    )))()).rejects.toThrow("engine_runtime_profile_evidence_binding_is_invalid");
   });
 });
 

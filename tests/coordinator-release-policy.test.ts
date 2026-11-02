@@ -213,6 +213,7 @@ function createFixture(): string {
     cpSync(resolve(portable), join(root, ...portable.split("/")), {
       recursive: true,
       dereference: true,
+      filter: (source) => source !== resolve("src/agent"),
     });
   }
   for (const portable of [

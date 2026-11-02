@@ -1,3 +1,6 @@
+import { createInferenceSettlement } from "./settle-completed-inference.js";
+import { beginContributionUsage } from "./contribution-funding.js";
+import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
 import { AsyncTaskScope, coalesceAsync } from "../core/async-task-scope.js";
 import { flatMapAsync, mapAsync } from "../core/async-collections.js";
 import { InferenceRouteRecovery } from "./inference-route-recovery.js";
@@ -5,7 +8,7 @@ import { networkInventory } from "../contracts/network-inventory.js";
 import websocket from "@fastify/websocket";
 import staticFiles from "@fastify/static";
 import rateLimit from "@fastify/rate-limit";
-import { resolveChatIdempotencyKey, parseIdempotencyKey, waitForChatCapacity } from "./chat-admission.js";
+import { resolveChatIdempotencyKey, parseIdempotencyKey, waitForChatCapacity, parseChatRequest } from "./chat-admission.js";
 import { AutomaticBenchmarkPriority, waitForBenchmarkCancellation } from "./automatic-benchmark-priority.js";
 import {
   claimSupportAssistantRequest,
@@ -563,7 +566,7 @@ export async function createCoordinator(
     });
   }
   const supabaseAuth = options.supabaseAuthService ?? (config.supabaseUrl && config.supabaseServiceRoleKey
-    ? new SupabaseAuthService(config.supabaseUrl, config.supabaseServiceRoleKey)
+    ? new SupabaseAuthService(config.supabaseUrl, config.supabaseServiceRoleKey, fetch, config.supabaseTrustedOAuthClientIds, config.supabaseTrustedOAuthIssuer)
     : null);
   const authorizedAdministrativeRequests = new WeakSet<FastifyRequest>();
   const markAdministrativeRequestAuthorized = (
@@ -674,6 +677,8 @@ export async function createCoordinator(
     privateKey: config.economicReceiptSigningPrivateKey ?? developmentEconomicKey!,
   };
   const economicLedger = new EconomicLedger(database, { receiptSigning });
+  const creditWallet = config.contributionCreditFunding ? new ContributionCreditWallet(database, economicLedger) : null;
+  if (creditWallet) await creditWallet.initialize();
   const executionReceipts = new ExecutionReceiptStore(database, receiptSigning);
   const modelCertifications = config.modelCertificationPinnedKeys?.length
     ? new ModelCertificationRegistry(database, config.modelCertificationPinnedKeys) : null;
@@ -732,7 +737,7 @@ export async function createCoordinator(
     requestsPerMinute: config.apiRequestsPerMinute ?? 30,
     maxConcurrent: config.apiMaxConcurrent ?? 2,
     maxActiveKeys: config.apiMaxActiveKeys ?? 10,
-  });
+  }, undefined, Boolean(creditWallet));
   const studioAgents = new StudioAgentStore(database);
   const studioContext = new StudioContextStore(database);
   const billing = new BillingManager(database, apiAccess);
@@ -1557,7 +1562,7 @@ export async function createCoordinator(
   if (persistence && config.mobileExpertArtifactsPath) {
     (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }
-  const service = (await MeshService.create(store, scheduler, hub, config.requestTimeoutMs));
+  const service = (await MeshService.create(store, scheduler, hub, config.requestTimeoutMs, { modelRequestTimeoutsMs: config.modelRequestTimeoutsMs }));
   await apiAccess.reconcileRestartedZeroTokenUsage();
   const attachExecutionReceipt = async (
     event: Extract<JobStreamEvent, { type: "completed" }>,
@@ -2038,39 +2043,43 @@ export async function createCoordinator(
       ));
     }
   };
+  let claimingRequestedActivation = false;
   const launchRequestedModel = async (model: StoredRequestedModel): Promise<boolean> => {
-    if (!activationManager || activationManager.isManaging(model.id) || activationManager.isBusy()) {
+    if (!activationManager || claimingRequestedActivation || activationManager.isManaging(model.id) || activationManager.isBusy()) {
       return false;
     }
-    (await deploymentController.ensureModel(model));
-    (await deploymentController.setDesiredState(
-      model.id,
-      model.autoActivate ? "active" : "inactive",
-    ));
-    const state = (await deploymentController.getState(model.id));
-    const operation = (await deploymentController.claimOperation(
-      model.id,
-      state?.observedState === "active" || state?.observedState === "degraded"
-        ? "repair"
-        : "activate",
-      { leaseMs: 90_000 },
-    ));
-    if (!operation) return false;
+    claimingRequestedActivation = true;
     try {
-      void activationManager.activate(model)
-        .then(async () => {
-          if ((await deploymentController.getState(model.id))?.observedState === "active") {
-            automaticActivationRetryState.delete(model.id);
-          }
-        })
-        .catch(async (error: unknown) => {
-          (await handleRequestedModelActivationFailure(model.id, error, operation));
-        });
-      return true;
-    } catch (error) {
-      (await handleRequestedModelActivationFailure(model.id, error, operation));
-      return true;
-    }
+      (await deploymentController.ensureModel(model));
+      (await deploymentController.setDesiredState(
+        model.id,
+        model.autoActivate ? "active" : "inactive",
+      ));
+      const state = (await deploymentController.getState(model.id));
+      const operation = (await deploymentController.claimOperation(
+        model.id,
+        state?.observedState === "active" || state?.observedState === "degraded"
+          ? "repair"
+          : "activate",
+        { leaseMs: 90_000 },
+      ));
+      if (!operation) return false;
+      try {
+        void activationManager.activate(model)
+          .then(async () => {
+            if ((await deploymentController.getState(model.id))?.observedState === "active") {
+              automaticActivationRetryState.delete(model.id);
+            }
+          })
+          .catch(async (error: unknown) => {
+            (await handleRequestedModelActivationFailure(model.id, error, operation));
+          });
+        return true;
+      } catch (error) {
+        (await handleRequestedModelActivationFailure(model.id, error, operation));
+        return true;
+      }
+    } finally { claimingRequestedActivation = false; }
   };
   const reconcileAutomaticGpuRepair = (
     model: StoredRequestedModel,
@@ -3394,7 +3403,7 @@ export async function createCoordinator(
   app.get("/v1/account/economy", async (request, reply) => {
     const principal = principalFor(request);
     if (principal.kind === "system") return reply.code(403).send({ error: { code: "account_session_required" } });
-    return { object: "economic_account", ...(await economicLedger.summary("account", principal.userId)) };
+    return { object: "economic_account", ...(creditWallet ? await creditWallet.summary("account", principal.userId) : await economicLedger.summary("account", principal.userId)), contributionFundingSupported: Boolean(creditWallet) };
   });
 
   app.get("/v1/economy/receipt-key", async () => ({
@@ -4253,7 +4262,7 @@ export async function createCoordinator(
         error: {
           code: "benchmark_version_mismatch",
           message:
-            `La versiÃ³n solicitada ${body.version} no coincide con el runtime real ${runtimeVersion}.`,
+            `La versión solicitada ${body.version} no coincide con el runtime real ${runtimeVersion}.`,
         },
       });
     }
@@ -4264,8 +4273,8 @@ export async function createCoordinator(
         error: {
           code: "benchmark_model_unavailable",
           message: body.model
-            ? `El modelo ${body.model} no estÃ¡ activo; no se ha generado ningÃºn dato.`
-            : "No hay ningÃºn modelo activo para medir; no se ha generado ningÃºn dato.",
+            ? `El modelo ${body.model} no está activo; no se ha generado ningún dato.`
+            : "No hay ningún modelo activo para medir; no se ha generado ningún dato.",
         },
       });
     }
@@ -4277,7 +4286,7 @@ export async function createCoordinator(
         error: {
           code: "benchmark_activation_unsealed",
           message:
-            "El modelo estÃ¡ activo, pero su cohorte de build declarada no coincide de forma estable con el coordinador.",
+            "El modelo está activo, pero su cohorte de build declarada no coincide de forma estable con el coordinador.",
         },
       });
     }
@@ -4668,64 +4677,12 @@ export async function createCoordinator(
     };
   });
 
-  const settleCompletedInference = async (input: {
-    userId: string;
-    jobId: string;
-    modelId: string;
-    routeClass: "replica" | "pipeline";
-    inputTokens: number;
-    outputTokens: number;
-    networkTrace: NonNullable<Extract<JobStreamEvent, { type: "completed" }>["result"]["networkTrace"]>;
-    recovery: NonNullable<Extract<JobStreamEvent, { type: "completed" }>["result"]["recovery"]>;
-    executionReceiptId: string;
-  }): Promise<void> => {
-    const pricingRoute = input.routeClass === "pipeline"
-      ? "distributed-pipeline" as const
-      : "remote-replica" as const;
-    const createdAt = Date.now();
-    const policy = (await economicLedger.resolvePricingPolicy(input.modelId, pricingRoute, createdAt));
-    if (!policy) return;
-    const weights = new Map<string, number>();
-    for (const stage of input.networkTrace.stages) {
-      const nodeId = stage.nodeId ?? stage.workerId;
-      if (nodeId) weights.set(nodeId, (weights.get(nodeId) ?? 0) + 1);
-    }
-    if (weights.size === 0) {
-      app.log.error({ jobId: input.jobId }, "Economic settlement lacks an attributable execution node");
-      return;
-    }
-    const executionReceiptId = input.executionReceiptId;
-    try {
-      const contributionEvidence = (await physicalContributionEvidence.certify({
-        currentSessionIdForWorker: workerId => hub.currentWorkerSessionId(workerId),
-        jobId: input.jobId,
-        executionReceiptId,
-        trace: input.networkTrace,
-        workers: (await store.listWorkers()),
-        createdAt,
-      }));
-      (await economicLedger.settle({
-        jobId: input.jobId,
-        executionReceiptId,
-        contributionEvidenceId: contributionEvidence.id,
-        pricingPolicyId: policy.id,
-        executionRecovery: input.recovery,
-        payerAccountId: input.userId,
-        inputTokens: input.inputTokens,
-        outputTokens: input.outputTokens,
-        contributors: [...weights].map(([nodeId, weight]) => ({ nodeId, weight })),
-        createdAt,
-      }));
-    } catch (error) {
-      app.log.error({
-        jobId: input.jobId,
-        error: error instanceof Error ? error.message : String(error),
-      }, "Economic settlement rejected because physical contribution was not verified");
-    }
-  };
+  const settleCompletedInference = createInferenceSettlement({
+    economicLedger, creditWallet, physicalContributionEvidence, store, hub, logger: app.log,
+  });
 
   app.post("/v1/chat/completions", async (request, reply) => {
-    const parsed = chatCompletionRequestSchema.parse(request.body) as ChatCompletionRequest;
+    const parsed = parseChatRequest(request.body, config.modelRequestTimeoutsMs);
     const principal: ApiRequestPrincipal = apiAccessEnabled
       ? principalFor(request)
       : { kind: "system" };
@@ -4748,13 +4705,11 @@ export async function createCoordinator(
     }
     if (reply.raw.destroyed) return;
     if (principal.kind !== "system") (await apiAccess.assertSessionAccess(principal.userId, parsed.session_id));
-    const usage = principal.kind === "system"
-      ? null
-      : (await apiAccess.beginUsage(
-          principal.userId,
-          principal.kind === "api_key" ? principal.apiKeyId : null,
-          parsed,
-        ));
+    const { funded, usage } = await beginContributionUsage({
+      mode: request.headers["x-mycellios-funding"], principal, api: apiAccess,
+      wallet: creditWallet, request: parsed, idempotencyKey,
+      onClose: (release) => { reply.raw.once("close", release); },
+    });
     if (usage) {
       reply.header("x-ratelimit-limit", usage.rateLimit.limit);
       reply.header("x-ratelimit-remaining", usage.rateLimit.remaining);
@@ -4786,6 +4741,15 @@ export async function createCoordinator(
     }
     if (!parsed.stream) reply.raw.once("close", () => background.run("server:4781", async () => (await service.cancel(handle.jobId)), "reply.raw.once"));
     if (usage) (await apiAccess.attachJob(usage.id, handle.jobId, handle.sessionId));
+    if (funded && usage && creditWallet) {
+      try { await creditWallet.attach(usage.id, handle.jobId); }
+      catch {
+        await creditWallet.release(usage.id);
+        await apiAccess.failUsage(usage.id, "contribution_credit_binding_failed");
+        await service.cancel(handle.jobId);
+        throw new MeshServiceError("contribution_credit_binding_failed", "The credit reservation could not be bound.", 409);
+      }
+    }
     const conversationId = (await store.startInferenceConversation(
       handle.sessionId,
       parsed.model,
@@ -4839,12 +4803,6 @@ export async function createCoordinator(
       finished = true;
       if (usage) {
         if (streamedResult) {
-          const account = (await apiAccess.completeUsage(
-            usage.id,
-            streamedResult.result.metrics.inputTokens,
-            streamedResult.result.metrics.outputTokens,
-          ));
-          void account;
           if (streamedResult.result.networkTrace) (await settleCompletedInference({
             userId: usage.userId,
             jobId: handle.jobId,
@@ -4856,12 +4814,23 @@ export async function createCoordinator(
             recovery: streamedResult.result.recovery ?? { mode: "none", attempts: 1, replayedTokenEvents: 0 },
             executionReceiptId: streamedResult.result.executionReceiptId!,
           }));
+          try {
+            if (funded && creditWallet) await creditWallet.assertSettled(usage.id);
+            await apiAccess.completeUsage(usage.id, streamedResult.result.metrics.inputTokens, streamedResult.result.metrics.outputTokens);
+          } catch {
+            streamError = new Error("Contribution credit settlement could not be verified.");
+            await apiAccess.failUsage(usage.id, "contribution_credit_settlement_failed");
+          }
         } else {
           (await apiAccess.failUsage(
             usage.id,
             streamedFailure?.code ?? (streamError ? "stream_failed" : "missing_result"),
           ));
         }
+      }
+      if (funded && usage && creditWallet) {
+        try { await creditWallet.assertSettled(usage.id); }
+        catch { streamError = new Error("Contribution credit settlement could not be verified."); }
       }
       (await store.appendInferenceMessage({
         conversationId,
@@ -4928,12 +4897,6 @@ export async function createCoordinator(
       throw error;
     }
     if (usage) {
-      const account = (await apiAccess.completeUsage(
-        usage.id,
-        result.result.metrics.inputTokens,
-        result.result.metrics.outputTokens,
-      ));
-      if (account) reply.header("x-token-balance", account.tokenBalance);
       if (result.result.networkTrace) (await settleCompletedInference({
         userId: usage.userId,
         jobId: handle.jobId,
@@ -4945,6 +4908,14 @@ export async function createCoordinator(
         recovery: result.result.recovery ?? { mode: "none", attempts: 1, replayedTokenEvents: 0 },
         executionReceiptId: result.result.executionReceiptId!,
       }));
+      try {
+        if (funded && creditWallet) await creditWallet.assertSettled(usage.id);
+        const account = await apiAccess.completeUsage(usage.id, result.result.metrics.inputTokens, result.result.metrics.outputTokens);
+        if (account) reply.header("x-token-balance", account.tokenBalance);
+      } catch {
+        await apiAccess.failUsage(usage.id, "contribution_credit_settlement_failed");
+        throw new MeshServiceError("contribution_credit_settlement_failed", "The credit settlement could not be verified.", 502);
+      }
     }
     reply.header("x-route-class", routeClass);
     (await store.appendInferenceMessage({
@@ -5855,7 +5826,7 @@ function mobileDashboardWorker(worker: MobileWorkerSnapshot) {
       {
         id: `mobile-${worker.id}`,
         vendor: worker.backend === "webgpu" ? "WebGPU" : "Browser CPU",
-        model: `${worker.name} Â· ${worker.backend.toUpperCase()}`,
+        model: `${worker.name} · ${worker.backend.toUpperCase()}`,
         physicalVramMb: 0,
         sharedMemoryMb: worker.capabilities.deviceMemoryGb
           ? Math.round(worker.capabilities.deviceMemoryGb * 1_024)

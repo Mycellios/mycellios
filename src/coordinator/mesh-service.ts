@@ -15,6 +15,7 @@ import type {
 } from "../contracts/types.js";
 import { AsyncQueue } from "../core/async-queue.js";
 import { newId } from "../core/ids.js";
+import { modelRequestTimeout } from "../core/model-request-deadline.js";
 import { estimateInputTokens, inputHashForRequest } from "../core/request.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
 import { Scheduler } from "../scheduler/scheduler.js";
@@ -95,6 +96,7 @@ const PRETOKEN_DEGRADATION_CODES = new Set([
 
 export interface MeshServiceOptions {
   firstTokenTimeoutMs?: number;
+  modelRequestTimeoutsMs?: Readonly<Record<string, number>> | undefined;
 }
 
 interface MeshServiceEvents {
@@ -187,7 +189,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const queue = new AsyncQueue<JobStreamEvent>();
     // Atomic long-context embeddings have their own bounded execution budget.
     // Preserve the caller's shorter deadline and all other models' timeouts.
-    const deadlineCeiling = stableRequest.model === DECISION_MODEL ? DECISION_DEADLINE_MS : stableRequest.model === EMBEDDING_MODEL ? 300_000 : this.requestTimeoutMs;
+    const deadlineCeiling = stableRequest.model === DECISION_MODEL ? DECISION_DEADLINE_MS : stableRequest.model === EMBEDDING_MODEL ? 300_000 : modelRequestTimeout(stableRequest.model, this.options.modelRequestTimeoutsMs, this.requestTimeoutMs);
     const deadlineMs = Math.min(request.deadline_ms ?? deadlineCeiling, deadlineCeiling);
     (await this.store.database.transaction(async () => {
       (await this.store.createJob({
@@ -818,6 +820,9 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     // apply the text decoder's 15-second first-token estimate to its full job.
     if (isDecisionDeployment(deployment)) return Math.max(1_000, Math.min(DECISION_DEADLINE_MS, remainingMs));
     if (isEmbeddingDeployment(deployment)) return Math.max(1_000, Math.min(300_000, remainingMs));
+    if (this.options.modelRequestTimeoutsMs && Object.hasOwn(this.options.modelRequestTimeoutsMs, runtime.request.model)) {
+      return Math.max(1_000, Math.min(120_000, remainingMs));
+    }
     return Math.max(1_000, Math.min(30_000, adaptiveTimeoutMs, remainingMs));
   }
 

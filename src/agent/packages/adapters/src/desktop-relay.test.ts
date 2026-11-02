@@ -23,7 +23,7 @@ describe("outbound Desktop relay", () => {
     broker = new DesktopRelayBroker(); broker.bind(owner, binding);
     const response = broker.dispatch({ method: "execute", botId: "bot", command: { argv: ["test"] } }, context());
     const id = broker.poll(owner, "device").operations[0]!.id;
-    expect(broker.poll(owner, "device")).toEqual({ operations: [], active: [id] });
+    expect(broker.poll(owner, "device")).toMatchObject({ operations: [], active: [id] });
     const data = Buffer.from('{"done":true}\n').toString("base64");
     broker.result(owner, "device", id, 0, data, true); broker.result(owner, "device", id, 0, data, true);
     expect(await response.text()).toBe('{"done":true}\n');
@@ -69,4 +69,28 @@ describe("outbound Desktop relay", () => {
     expect(verifyDesktopRelay("operator-secret", timestamp, "body", signature)).toBe(false);
     expect(verifyDesktopRelay(key, timestamp, "body", signature, Date.now() + 60_000)).toBe(false);
   });
+});
+
+it("lazily admits all owned bots on one paired PC and expires offline presence",()=>{
+ let now=1000;broker=new DesktopRelayBroker(()=>now);
+ broker.register(owner,binding);broker.connectAccountBot(owner,"unopened");
+ expect(broker.available(owner,"unopened")).toBe(true);
+ broker.connectAccountBot({...owner,userId:"other"},"unopened");
+ expect(broker.available({...owner,userId:"other"},"unopened")).toBe(false);
+ expect(()=>broker.register(owner,{...binding,deviceId:"different-pc"})).toThrow();
+ now+=46000;expect(broker.available(owner,"unopened")).toBe(false);
+ broker.connectAccountBot(owner,"new");expect(broker.available(owner,"new")).toBe(false);
+ broker.register(owner,binding);broker.connectAccountBot(owner,"new");
+ expect(broker.available(owner,"new")).toBe(true);
+});
+it("rotates a restarted native account without replaying an interrupted run",async()=>{
+ broker=new DesktopRelayBroker();broker.register(owner,binding);broker.connectAccountBot(owner,"bot");
+ const response=broker.dispatch({method:"environment",botId:"bot",runId:"old-run"},context());
+ expect(broker.poll(owner,"device").operations).toHaveLength(1);
+ const next={...owner,sessionId:"new-session"};
+ broker.register(next,{...binding,generation:"next-generation"});
+ expect(await response.text()).toContain("revoked");broker.connectAccountBot(next,"bot");
+ expect(broker.poll(next,"device").operations).toEqual([]);
+ expect(()=>broker.dispatch({method:"environment",botId:"bot",runId:"old-run"},context())).toThrow("previous project");
+ expect(broker.poll(owner,"device").bindings).toEqual([]);
 });

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -23,6 +23,10 @@ describe("native service registration", () => {
     for (const platform of ["darwin", "win32"] as const) {
       const root = await temporaryDirectory(); const calls: string[][] = [];
       const manifest = installation(root, platform);
+      if (platform === "win32") {
+        await mkdir(join(root, "install", "bin"), { recursive: true });
+        await writeFile(join(root, "install", "bin", "MycelliosNode.exe"), "fixture service wrapper; runner is mocked");
+      }
       const isolation = platform === "darwin" ? { mode: "macos-launchd-limits" as const }
         : { mode: "windows-job-object" as const, brokerExecutable: join(root, "install", "bin", "broker.exe") };
       await registerNativeNodeService({ manifest, config: configuration(manifest, isolation), run: runner(calls) });
@@ -48,7 +52,7 @@ function runner(calls: string[][]): ServiceCommandRunner { return async (executa
 function installation(root: string, platform: "linux" | "darwin" | "win32"): NodeInstallationManifest {
   return { schema: "mycellios-node-installation/1", platform, serviceName: platform === "darwin" ? "io.mycellios.node" : "mycellios-node",
     installRoot: join(root, "install"), nodeExecutable: join(root, "install", "bin", platform === "win32" ? "node.exe" : "node"),
-    helperEntrypoint: join(root, "install", "app", "node", "uninstall-main.js"), serviceDefinitionPath: join(root, "service", platform === "darwin" ? "io.mycellios.node.plist" : "mycellios-node.service"),
+    helperEntrypoint: join(root, "install", "app", "node", "uninstall-main.js"), serviceDefinitionPath: join(root, "service", platform === "darwin" ? "io.mycellios.node.plist" : platform === "win32" ? "MycelliosNode.xml" : "mycellios-node.service"),
     configPath: join(root, "config", "node.json"), identityPath: join(root, "identity", "node.json"), cachePath: join(root, "cache"), logsPath: join(root, "logs"), statePath: join(root, "state"), receiptPath: join(root, "receipt", "uninstall.json") };
 }
 function configuration(manifest: NodeInstallationManifest, isolation: NodeConfiguration["isolation"]): NodeConfiguration {

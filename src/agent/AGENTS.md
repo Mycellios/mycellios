@@ -173,6 +173,11 @@
   An unadmitted no_capacity response may retry once with a smaller per-call
   ceiling. Never replay accepted work, idempotent requests or billing failures.
 
+- PWA manifests launch the app route inside their deployment base. Keep the
+  existing manifest ID and scope stable when changing start URLs or branding;
+  the first-party landing links to the same Agent manifest and icon assets.
+  Version the icon URLs when refreshing branding so installed browsers detect it.
+
 - Web and installed PWA updates share the server-verified client update tracker.
   Render that single prompt in the sidebar slot when expanded, with a floating
   fallback where no slot is mounted. Keep the same guarded update action and
@@ -232,7 +237,7 @@
   paths live in `packages/contracts/src/product-brand.ts`; semantic forest/paper
   colors remain in `packages/ui-tokens/src/index.ts`. Web overrides must not
   replace the shared forest/paper surfaces with upstream monochrome colors. Generate its CSS with
-  `pnpm --filter @rakazo/ui-tokens generate`. Preserve upstream license notices
+  `npm run generate --workspace @rakazo/ui-tokens`. Preserve upstream license notices
   and internal storage/protocol identifiers when changing visible branding.
   Declare the startup Geist font in `apps/web/package.json`; ship its OFL notice
   under `apps/web/public/licenses/` rather than relying on a sibling clone cache.
@@ -240,7 +245,7 @@
   `apps/web/src/typography.css`; keep serif display overrides out of these surfaces.
   Hosted identity builds self-host font assets and require same-origin font CSP.
   App icons derive from `packages/ui-tokens/assets/mycellios-mark.svg` via
-  `pnpm --filter @rakazo/ui-tokens export:brand`. Keep separate opaque maskable/iOS
+  `npm run export:brand --workspace @rakazo/ui-tokens`. Keep separate opaque maskable/iOS
   and transparent adaptive/notification outputs; Windows ICO includes small native frames.
 - Preserve the separate contribution and paid-model ledgers; product naming does not merge or revalue them. Paid top-ups use the shared integer conversion in `credit-units.ts` (10 USD = 10 Credits). Mico/Micos names the user agents; Spore is the official token name, with existing launch gates unchanged.
 - Credit refreshes are account-scoped, cancellable and serialized. A transient failure
@@ -471,6 +476,10 @@
   must resolve to this checkout. Run frontend commands in apps/web (or with
   --workspace @rakazo/web) so Lingui finds its configuration. Do not validate or
   launch while another install is replacing this checkout's dependencies.
+  Compose application, supervisor and updater images use the canonical repository
+  as their build context so shared native contracts remain available. They install
+  with npm; only the updater image receives the Docker CLI. Agent quality is checked
+  separately by the root .github/workflows/agent-quality.yml workflow.
 
 
 - Execution health distinguishes worker lease renewal from actual output. Never cancel
@@ -535,3 +544,24 @@
   computer-error recovery, model defaults, contribution RPCs and project-browser
   behavior. Keep existing tests alongside new ones; composer and repository tests
   must still pass with the new native capabilities and project_prepare filtering.
+  Windows packaging may retry only transient EBUSY file-copy failures, with a
+  bounded delay and attempt count. Keep every other filesystem error fatal and
+  preserve the normal copy functions outside packaging. Verify
+  scripts/windows-copy-retry.test.mjs when changing this handling.
+
+- A remembered native account/server grant connects the PC independently of the
+  visible chat and requesting client. Keep account presence in native main,
+  authenticate each current member Space separately and lazily admit only owned
+  bots on the server. Browser, PWA, mobile and scheduled jobs use this same relay;
+  never require their renderer to bind a bot or receive the host bearer. Preserve
+  physical-device, session/generation and offline-expiry fences and never replay
+  uncertain commands. Saved Team/dedicated workspace policies remain unchanged.
+  With remembered consent, closing Desktop hides its window and retains drafts;
+  packaged Windows login startup restores the connection. Explicit tray Quit
+  disconnects; revocation disables host access and background login startup.
+  Verify account-computer.test.ts, account-computer-background.test.ts and the
+  native/API/broker desktop-relay tests, plus upgrade-continuity.test.ts.
+  Native ES module bundles retain the existing createRequire banner for CommonJS
+  runtime dependencies; qualify compiled module evaluation as well as syntax.
+  Resolve shared root protocol dependencies through the Agent build's own pinned
+  node_modules as well, so native bundling does not require a parent install.

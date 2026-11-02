@@ -23,7 +23,7 @@ it("does not change stable-window execution or read-only requests", async () => 
     connect = vi.fn();
   window.rakazoDesktop = { development: { isDevelopment: false, connect } } as any;
   await beforeDevelopmentExecution(["threads", "send"], { botId: "bot" }, dedicated);
-  window.rakazoDesktop.development!.isDevelopment = true;
+  window.rakazoDesktop!.development!.isDevelopment = true;
   await beforeDevelopmentExecution(["bots", "list"], {}, dedicated);
   expect(dedicated).not.toHaveBeenCalled();
   expect(connect).not.toHaveBeenCalled();

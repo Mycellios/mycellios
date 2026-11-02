@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ChatCompletionRequest,
   JobPayload,
@@ -54,6 +54,37 @@ describe("active-route recovery policy", () => {
   });
 
   afterEach(async () => { await service?.drainEvents(); await database.close(); });
+
+  it("admits a slower model under its explicit budget without raising other model deadlines", async () => {
+    const worker = await addWorker(store, { id: "slow-chat", tokensPerSecond: 1.6 });
+    hub.connected.add(worker.id);
+    const request: ChatCompletionRequest = { model: "distributed-small", messages: [{ role: "user", content: "hello" }], max_tokens: 1024, deadline_ms: 900_000 };
+    service = await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 120_000, { modelRequestTimeoutsMs: { "distributed-small": 900_000 } });
+    const handle = await service.submit(request);
+    const job = (await store.getJob(handle.jobId))!;
+    expect(job.deadlineAt - job.createdAt).toBeGreaterThan(890_000);
+    expect(await service.cancel(handle.jobId)).toBe(true);
+    const short = await service.submit({ ...request, deadline_ms: 700_000 });
+    expect((await store.getJob(short.jobId))!.deadlineAt - (await store.getJob(short.jobId))!.createdAt).toBeLessThanOrEqual(700_000);
+    expect(await service.cancel(short.jobId)).toBe(true);
+  });
+
+  it("keeps long-prompt first-token waiting bounded for a configured model", async () => {
+    vi.useFakeTimers();
+    try {
+      const worker = await addWorker(store, { id: "slow-prefill", tokensPerSecond: 1.6 });
+      hub.connected.add(worker.id);
+      service = await MeshService.create(store, new Scheduler(store), hub as unknown as WorkerHub, 120_000, { modelRequestTimeoutsMs: { "distributed-small": 900_000 } });
+      const handle = await service.submit({ model: "distributed-small", messages: [{ role: "user", content: "hello" }], max_tokens: 1024, deadline_ms: 900_000 });
+      const lease = leaseOffers(hub)[0]!;
+      hub.workerMessage({ v: 1, type: "lease.accept", workerId: worker.id, payload: { jobId: handle.jobId, leaseId: lease.payload.leaseId } });
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect((await store.getJob(handle.jobId))!.status).toBe("running");
+      await vi.advanceTimersByTimeAsync(100_001);
+      expect((await store.getJob(handle.jobId))!.status).toBe("failed");
+      expect((await store.getJob(handle.jobId))!.failureCode).toBe("first_token_timeout");
+    } finally { vi.useRealTimers(); }
+  });
 
   it("fails closed when only an anonymous worker can receive a sensitive boundary", async () => {
     const anonymous = (await addWorker(store, { id: "anonymous", trusted: false }));

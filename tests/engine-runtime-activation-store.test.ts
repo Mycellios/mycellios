@@ -59,15 +59,15 @@ describe("durable engine runtime activation plans", () => {
 
   it("rejects cross-model, cross-generation, duplicate, and unknown-field plans", async () => {
     const store = (await openStore());
-    expect(async () => (await store.replaceEngineRuntimeActivationPlans("other", "activation-1", [plan()])))
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("other", "activation-1", [plan()])))()).rejects
       .toThrow("engine_runtime_activation_plan_set_is_invalid");
-    expect(async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "other", [plan()])))
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "other", [plan()])))()).rejects
       .toThrow("engine_runtime_activation_plan_set_is_invalid");
-    expect(async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [plan(), plan()])))
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [plan(), plan()])))()).rejects
       .toThrow("engine_runtime_activation_plan_set_is_invalid");
-    expect(async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [
       { ...plan(), workerClaim: true },
-    ]))).toThrow();
+    ])))()).rejects.toThrow();
   });
 
   it("removes retired activation authority", async () => {

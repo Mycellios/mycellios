@@ -84,10 +84,15 @@ developer mode is a display preference and never grants extra server permission.
 
 ## Current evidence boundary
 
-The source has been imported and package manifests have been adapted to npm
-workspace references. Lock generation, launch migration, canonical build and
-runtime switching remain pending. No commit, push or production deployment is
-implied by this source import.
+The source is integrated in the canonical layout with an owned npm lock. Active
+launchers and application/updater/supervisor Dockerfiles use npm and the canonical
+repository build context. API, worker, web and Desktop have passed local scoped
+types; API/worker and both web variants have built locally. Native architecture
+and release provenance follow the separate compiler boundary, while the component
+gate still checks both workspaces. The integrated release candidate preserves
+source recovered from actual production overlays and concurrent account-computer
+changes. Final full-suite, immutable artifact and production promotion evidence
+remain separate release gates; source integration alone is not deployment.
 
 ## Production API preview qualification
 

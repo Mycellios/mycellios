@@ -87,7 +87,7 @@ it("backs off repeated failures and resumes normal polling after success", async
   vi.useFakeTimers();
   readAccount.mockRejectedValue(new Error("offline"));
   await rendered(async host => {
-    for (const [delay, count] of [[2_000,2],[5_000,3],[15_000,4],[60_000,5]]) {
+    for (const [delay, count] of [[2_000,2],[5_000,3],[15_000,4],[60_000,5]] as const) {
       await act(async () => vi.advanceTimersByTimeAsync(delay));
       expect(readAccount).toHaveBeenCalledTimes(count);
     }
@@ -137,7 +137,7 @@ it("aborts old identity reads and never applies their late balance to another us
   const host=document.createElement("div");document.body.append(host);const root=createRoot(host);
   try {
     await act(async () => root.render(<MycelliosCredits ownerId="owner-a" />));
-    const signal=readAccount.mock.calls[0][1].signal as AbortSignal;
+    const signal=readAccount.mock.calls[0]![1].signal as AbortSignal;
     await act(async () => root.render(<MycelliosCredits ownerId="owner-b" />));
     expect(signal.aborted).toBe(true);
     await act(async () => finish({ balanceMicrounits: 999999999 }));

@@ -75,9 +75,9 @@ describe("SPORE conversion quote boundary", () => {
     expect(first.duplicate).toBe(false);
     expect(replay.duplicate).toBe(true);
     expect((await store.getByBatchId("payout-batch-1"))).toMatchObject({ quoteId: "spore-quote-1" });
-    expect(async () => (await store.record(quote({ usdMicros: 9_000_000 }))))
+    await expect((async () => (await store.record(quote({ usdMicros: 9_000_000 }))))()).rejects
       .toThrowError(expect.objectContaining({ code: "spore_quote_batch_mismatch" }));
-    expect(async () => (await database.raw.prepare(`
+    await expect((async () => (await database.raw.prepare(`
       INSERT INTO spore_conversion_quotes(
         quote_id, batch_id, seller_id, usd_micros, chain_id, asset_id,
         token_decimals, token_atomic_amount, destination_fingerprint,
@@ -85,7 +85,7 @@ describe("SPORE conversion quote boundary", () => {
       ) VALUES ('quote-lateral', 'payout-batch-1', 'seller-other', 10000000,
         'base', 'spore-contract-1', 18, '1', ?, ?, ?, 'oracle-1',
         'signature', 'superseded', ?)
-    `).run("a".repeat(64), now - 1_000, now + 60_000, now)))
+    `).run("a".repeat(64), now - 1_000, now + 60_000, now)))()).rejects
       .toThrow(/invalid_spore_conversion_quote_batch_binding/);
     (await database.close());
   });
@@ -109,7 +109,7 @@ describe("SPORE conversion quote boundary", () => {
     const store = new SporeConversionQuoteStore(database, timedVerifier, () => clock);
     const first = quote({ expiresAt: clock + 100 });
     (await store.record(first));
-    expect(async () => (await store.record(quote({ quoteId: "spore-quote-live", expiresAt: clock + 200 }))))
+    await expect((async () => (await store.record(quote({ quoteId: "spore-quote-live", expiresAt: clock + 200 }))))()).rejects
       .toThrowError(expect.objectContaining({ code: "spore_quote_replay_conflict" }));
     clock += 101;
     const replacement = quote({ quoteId: "spore-quote-2", issuedAt: clock, expiresAt: clock + 60_000 });

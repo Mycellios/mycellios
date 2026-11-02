@@ -46,7 +46,7 @@ describe("execution receipt", () => {
       privacy: { trust: "default" as const, boundary: "trusted-edges" as const, pinnedIdentityHashes: [] }, completedAt: 1_000 };
     expect((await store.record(body))).toEqual((await store.record(body)));
     expect((await store.forJob("job-durable"))).toEqual((await store.record(body)));
-    expect(async () => (await store.record({ ...body, metrics: { ...body.metrics, outputTokens: 2 } }))).toThrow("execution_receipt_job_conflict");
+    await expect((async () => (await store.record({ ...body, metrics: { ...body.metrics, outputTokens: 2 } })))()).rejects.toThrow("execution_receipt_job_conflict");
     (await database.close());
   });
 });

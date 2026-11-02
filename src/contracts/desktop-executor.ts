@@ -7,8 +7,16 @@ export interface DesktopExecutorOperation {
   request: unknown;
 }
 export interface DesktopExecutorPoll {
+  bindings?: DesktopExecutorBinding[];
   operations: DesktopExecutorOperation[];
   active: string[];
+}
+export function parseDesktopAccount(value: unknown): {deviceId: string; generation: string; identity:{userId:string;spaceId:string;connectionId:string}} {
+  const input = object(value, ["deviceId", "generation", "identity"]);
+  if (!uuid(input.deviceId) || !uuid(input.generation)) throw new Error("Invalid Desktop account grant");
+  const owner=object(input.identity,["userId","spaceId","connectionId"]);
+  if(!id(owner.userId)||!id(owner.spaceId)||!id(owner.connectionId))throw Error("Invalid account identity");
+  return {deviceId:input.deviceId,generation:input.generation,identity:{userId:owner.userId,spaceId:owner.spaceId,connectionId:owner.connectionId}};
 }
 export interface DesktopExecutorResult { deviceId: string; id: string; seq: number; data: string; done: boolean }
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);

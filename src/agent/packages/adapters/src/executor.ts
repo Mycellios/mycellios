@@ -1,3 +1,4 @@
+import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { randomUUID } from "node:crypto";
 import type {
   AdapterContext,
@@ -4636,7 +4637,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   },
                   {
                     ...context,
-                    signal: AbortSignal.any([context.signal, AbortSignal.timeout(2000)]),
+                    signal: AbortSignal.any([context.signal, AbortSignal.timeout(5_000)]),
                   },
                 )
                 .catch(() => undefined)
@@ -4655,6 +4656,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : dockerToolInstruction
                   ? `${baseComputerInstruction} ${dockerToolInstruction}`
                   : baseComputerInstruction,
+              ...(computerKind === "desktop"
+                ? [
+                    "This run has been admitted to the user's connected PC independently of the chat client. For requested PC work, use the provided tools to verify access before claiming it is unavailable. Earlier chat messages are not a current connectivity check.",
+                    ...(bot.instructions?.includes(NATIVE_PROJECT_INSTRUCTIONS) ? [] : [NATIVE_PROJECT_INSTRUCTIONS]),
+                  ]
+                : []),
             ].join(" ")
           : baseComputerInstruction;
         const workspaceInstruction = !computerAvailable

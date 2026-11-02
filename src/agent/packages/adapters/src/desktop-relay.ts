@@ -28,6 +28,7 @@ export function verifyDesktopRelay(secret: string, timestamp: string, body: stri
 
 /** A single API instance owns the volatile relay. A restart fails work; it never replays it. */
 export class DesktopRelayBroker {
+  private accounts = new Map<string, DesktopExecutorOwner & {deviceId:string; generation:string; seen:number}>();
   private bindings = new Map<string, Binding>();
   private operations = new Map<string, Operation>();
   private runs = new Map<string, { generation: string; until: number }>();
@@ -37,11 +38,29 @@ export class DesktopRelayBroker {
     this.sweep.unref();
   }
   private expire() {
+    for (const [id, account] of this.accounts) if (this.now() - account.seen > LEASE_MS) this.accounts.delete(id);
     for (const [id, run] of this.runs) if (run.until < this.now()) this.runs.delete(id);
     for (const [id, binding] of this.bindings) if (this.now() - binding.seen > LEASE_MS) {
       this.bindings.delete(id);
       for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Desktop disconnected. Check results before retrying.");
     }
+  }
+  register(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string}) {
+    this.expire();
+    const id = JSON.stringify([owner.userId,owner.spaceId]);
+    const prior = this.accounts.get(id);
+    if (prior && prior.deviceId !== input.deviceId)
+      throw new Error("Another computer is already connected to this account");
+    if(prior&&(!sameOwner(owner,prior)||prior.generation!==input.generation))this.revoke(prior,prior.deviceId);
+    if (!prior && this.accounts.size >= 128) throw new Error("Desktop relay is busy");
+    this.accounts.set(id,{...owner,...input,seen:this.now()});
+  }
+  /** Called only after the API rechecks ownership of this particular bot. */
+  connectAccountBot(scope: {userId:string;spaceId:string}, botId: string) {
+    this.expire();
+    if (this.bindings.has(key(scope,botId))) return;
+    const account = this.accounts.get(JSON.stringify([scope.userId,scope.spaceId]));
+    if (account) this.bind(account,{deviceId:account.deviceId,generation:account.generation,botId});
   }
   bind(owner: DesktopExecutorOwner, input: DesktopExecutorBinding) {
     this.expire();
@@ -58,6 +77,9 @@ export class DesktopRelayBroker {
     return !!binding;
   }
   revoke(owner: DesktopExecutorOwner, deviceId: string) {
+    const accountKey=JSON.stringify([owner.userId,owner.spaceId]);
+    const account=this.accounts.get(accountKey);
+    if(account && sameOwner(account,owner) && account.deviceId===deviceId)this.accounts.delete(accountKey);
     for (const [id, binding] of this.bindings) if (sameOwner(owner, binding) && binding.deviceId === deviceId) {
       this.bindings.delete(id);
       for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Local computer access was revoked.");
@@ -78,12 +100,12 @@ export class DesktopRelayBroker {
     const current = [...this.operations.values()].filter(op => sameOwner(owner, op.binding) && op.binding.deviceId === deviceId && !op.closed);
     const pending = current.filter(op => !op.claimed);
     for (const op of pending) op.claimed = true; // Claim once. Lost polls must never execute twice.
-    return { operations: pending.map(op => ({ id: op.id, binding: { deviceId, botId: op.binding.botId, generation: op.binding.generation }, request: op.request })), active: current.map(op => op.id) };
+    return { bindings:[...this.bindings.values()].filter(b=>sameOwner(owner,b)&&b.deviceId===deviceId).map(b=>({deviceId,botId:b.botId,generation:b.generation})), operations: pending.map(op => ({ id: op.id, binding: { deviceId, botId: op.binding.botId, generation: op.binding.generation }, request: op.request })), active: current.map(op => op.id) };
   }
   dispatch(input: HostComputerRequest, context: AdapterContext): Response {
     this.expire();
     const binding = this.bindings.get(key(context, input.botId));
-    if (!binding) throw new Error("Open Desktop and connect this agent to a project.");
+    if (!binding) throw new Error("The paired PC is disconnected. Start Mycellios Desktop on that computer.");
     if ([...this.operations.values()].filter(op => !op.closed).length >= MAX_OPERATIONS || [...this.operations.values()].filter(op => op.binding === binding && !op.closed).length >= 2)
       throw new Error("Desktop relay is busy");
     if (input.runId) {
@@ -136,7 +158,7 @@ export class DesktopRelayBroker {
   close() {
     clearInterval(this.sweep);
     for (const op of this.operations.values()) this.fail(op, "Desktop relay restarted. Check results before retrying.");
-    this.operations.clear(); this.bindings.clear(); this.runs.clear();
+    this.operations.clear(); this.bindings.clear(); this.runs.clear(); this.accounts.clear();
   }
 }
 
