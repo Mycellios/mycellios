@@ -251,6 +251,7 @@ export class DesktopSandboxProvider implements SandboxProvider {
       platform: process.platform,
       home: homedir(),
       shell: process.platform === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/sh",
+      runtimeExecutable: process.execPath,
     };
   }
 

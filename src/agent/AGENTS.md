@@ -571,3 +571,9 @@
 - Repository-root `.github/workflows` owns Mycellios CI and publication. Nested
   `.github` files here preserve the imported upstream CI reference for offline
   security-boundary tests; they do not execute as workflows in this repository.
+
+- Native image generation uses only the run owner's already admitted Desktop
+  computer and that host's ChatGPT-backed Codex session. Preserve explicit
+  provider choices, bounded PNG transfer, nonce/thread/turn validation and
+  cancellation; never transfer account credentials or retry uncertain generations.
+  Verify native-image-generation.test.ts and codex-image-worker.test.ts.

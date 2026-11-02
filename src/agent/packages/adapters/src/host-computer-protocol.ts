@@ -63,6 +63,7 @@ export interface HostComputerEnvironment {
   platform: string;
   home: string;
   shell: string;
+  runtimeExecutable?: string;
   projectPath?: string;
   projectRoot?:boolean;
 }

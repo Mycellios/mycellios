@@ -335,6 +335,7 @@ import {
 } from "./mcp-server-tool.js";
 import { createMediaGenerationProvider } from "./media-generation-factory.js";
 import { generateMediaFromTool } from "./media-generation-tools.js";
+import { selectRunMediaGeneration } from "./native-image-generation.js";
 import { loadAgentMemoryContext } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { appendMemoryFact, selectMemoryTools } from "./memory-tools.js";
@@ -3144,7 +3145,7 @@ export function isTerminalModelSetupError(error: unknown): boolean {
 export function createRunExecutor(deps: ExecutorDeps) {
   const contextStrategy = deps.contextStrategy ?? DEFAULT_CONTEXT_STRATEGY;
   const web = deps.web ?? createWebProvider();
-  const mediaGeneration = deps.mediaGeneration ?? createMediaGenerationProvider();
+  const configuredMediaGeneration = deps.mediaGeneration ?? createMediaGenerationProvider();
   const browser = deps.browser ?? createBrowserProvider(undefined, { sandbox: deps.sandbox });
   const cloudAgent = deps.cloudAgent;
   const resolveConnectedModel = async (
@@ -4359,6 +4360,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             },
           );
         };
+        const mediaGeneration = selectRunMediaGeneration({
+          configured: configuredMediaGeneration,
+          computerAvailable,
+          computerKind,
+          sandbox: deps.sandbox,
+          computer: () => getRunComputer("tool", "generate_image"),
+        });
         let currentTurnFiles: Awaited<ReturnType<typeof listCurrentTurnFiles>> = [];
         let recentThreadFiles: Awaited<ReturnType<typeof listRecentThreadFiles>> = [];
         try {

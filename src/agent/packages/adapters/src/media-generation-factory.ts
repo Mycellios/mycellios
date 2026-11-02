@@ -8,7 +8,7 @@ export function createMediaGenerationProvider(
   env: NodeJS.ProcessEnv = process.env,
 ): MediaGenerationProvider | undefined {
   const kind = env.MEDIA_GENERATION_PROVIDER?.trim().toLowerCase();
-  if (!kind || kind === "disabled") return undefined;
+  if (!kind || kind === "disabled" || kind === "auto" || kind === "native") return undefined;
   if (kind === "fake") return new FakeMediaGenerationProvider();
   if (kind !== "fal") throw new Error("Unknown media generation provider");
   const apiKey = env.MEDIA_GENERATION_API_KEY?.trim();
