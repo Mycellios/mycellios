@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { adaptDesktopLinux } from "./adapt-desktop-linux.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const FEDORA_REQUIRES = Object.freeze([
@@ -45,6 +46,7 @@ function extractArMember(archive, member, output) {
 export function validateRelease(release) {
   if (!/^\d+\.\d+\.\d+$/.test(release.version) || !/^\d+\.\d+\.\d+$/.test(release.runtimeVersion)
     || !/^[a-f0-9]{40}$/.test(release.baseline)) throw new Error("desktop_rpm_invalid_release");
+  if (release.rpmRelease !== undefined && ![1, 2].includes(release.rpmRelease)) throw new Error("desktop_rpm_invalid_revision");
   for (const artifact of [release.desktop, release.source]) {
     const url = new URL(artifact.url);
     if (url.origin !== "https://www.mycellios.com" || url.search || url.hash
@@ -94,12 +96,13 @@ async function rpmFileList(root) {
   return `${lines.join("\n")}\n`;
 }
 
-export function renderRpmSpec({ version, root, fileList }) {
+export function renderRpmSpec({ version, root, fileList, rpmRelease = 1 }) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("desktop_rpm_invalid_version");
+  if (![1, 2].includes(rpmRelease)) throw new Error("desktop_rpm_invalid_revision");
   const stage = quoteSpecPath(root);
   return [
     "%global debug_package %{nil}", "%global __os_install_post %{nil}", "%global _build_id_links none",
-    "Name: mycellios-desktop", `Version: ${version}`, "Release: 1", "Summary: Mycellios Desktop with the contribution runtime",
+    "Name: mycellios-desktop", `Version: ${version}`, `Release: ${rpmRelease}`, "Summary: Mycellios Desktop with the contribution runtime",
     "License: GPL-3.0-only AND Apache-2.0 AND MIT AND BSD-3-Clause", "URL: https://www.mycellios.com",
     "BuildArch: x86_64", "AutoReqProv: no", `Requires: ${FEDORA_REQUIRES.join(", ")}`,
     "", "%description", "Mycellios agents and projects with an optional account-enrolled contribution runtime.",
@@ -138,6 +141,23 @@ export async function buildDesktopRpm({ release, deb, source, outputDirectory, i
   }
   await verifyPinnedFile(join(resources, "contribution", runtime.file), runtime.sha256);
   const applicationSha256 = await sha256(join(resources, "app.asar"));
+  const rpmRelease = release.rpmRelease ?? 1;
+  let applicationAdaptation;
+  if (rpmRelease === 2) {
+    const patched = join(work, "fedora-app.asar");
+    applicationAdaptation = await adaptDesktopLinux(join(resources, "app.asar"), patched);
+    await copyFile(patched, join(resources, "app.asar"));
+    // Use existing, correctly sized brand assets; hicolor does not index 1024px icons.
+    for (const size of [192, 512]) {
+      const icon = join(resources, `web/mycellios/app-icon-v2-${size}.png`);
+      const bytes = await readFile(icon);
+      if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+        || bytes.readUInt32BE(16) !== size || bytes.readUInt32BE(20) !== size) throw new Error("desktop_rpm_invalid_icon");
+      const directory = join(root, `usr/share/icons/hicolor/${size}x${size}/apps`);
+      await mkdir(directory, { recursive: true });
+      await copyFile(icon, join(directory, "mycellios-desktop.png"));
+    }
+  }
   await copyFile(installer, join(resources, "contribution/install-runtime.sh"));
   await chmod(join(resources, "contribution/install-runtime.sh"), 0o755);
   // Fedora supports Chromium's user-namespace sandbox; keep the upstream helper unprivileged.
@@ -145,26 +165,31 @@ export async function buildDesktopRpm({ release, deb, source, outputDirectory, i
   await mkdir(join(root, "usr/bin"), { recursive: true });
   await symlink(`/${productPath}/mycellios-desktop`, join(root, "usr/bin/mycellios-desktop"));
   const provenance = {
-    schema: "mycellios-desktop-fedora/1", version: release.version, runtimeVersion: release.runtimeVersion,
+    schema: "mycellios-desktop-fedora/1", version: release.version, rpmRelease, runtimeVersion: release.runtimeVersion,
     baseline: release.baseline, desktop: release.desktop, source: release.source,
-    applicationSha256, runtimeSha256: runtime.sha256, installerSha256: await sha256(installer),
-    adaptation: "Fedora RPM integration and hash-verified runtime extraction without dpkg; application and runtime bytes retained",
+    applicationSha256: await sha256(join(resources, "app.asar")), originalApplicationSha256: applicationSha256,
+    ...(applicationAdaptation ? { applicationAdaptation, adapterSha256: await sha256(join(repository, "scripts/adapt-desktop-linux.mjs")) } : {}),
+    runtimeSha256: runtime.sha256, installerSha256: await sha256(installer),
+    adaptation: rpmRelease === 2
+      ? "Fedora native window controls and indexed icons; all other application files and runtime bytes retained"
+      : "Fedora RPM integration and hash-verified runtime extraction without dpkg; application and runtime bytes retained",
   };
   const doc = join(root, "usr/share/doc/mycellios-desktop");
   await mkdir(doc, { recursive: true });
+  if (applicationAdaptation) await copyFile(join(repository, "scripts/adapt-desktop-linux.mjs"), join(doc, "adapt-desktop-linux.mjs"));
   await writeFile(join(doc, "fedora-build.json"), `${JSON.stringify(provenance, null, 2)}\n`);
   const fileList = join(work, "files.list");
   await writeFile(fileList, await rpmFileList(root));
   const spec = join(work, "mycellios-desktop.spec");
-  await writeFile(spec, renderRpmSpec({ version: release.version, root, fileList }));
+  await writeFile(spec, renderRpmSpec({ version: release.version, rpmRelease, root, fileList }));
   for (const directory of ["BUILD", "BUILDROOT", "RPMS", "SOURCES", "SPECS", "SRPMS"]) await mkdir(join(work, directory), { recursive: true });
   console.log("Building Fedora x86_64 RPM from verified Desktop and runtime payloads…");
   run("rpmbuild", ["-bb", spec, "--define", `_topdir ${work}`, "--define", "_binary_payload w3.zstdio",
     "--define", "_rpmformat 4", "--define", "_buildhost mycellios-fedora-builder"]);
-  const rpm = join(output, `Mycellios-Desktop-${release.version}-fedora-x86_64.rpm`);
-  await copyFile(join(work, "RPMS/x86_64", `mycellios-desktop-${release.version}-1.x86_64.rpm`), rpm);
-  const metadata = run("rpm", ["-qp", "--qf", "%{NAME}|%{VERSION}|%{ARCH}", rpm]);
-  if (metadata !== `mycellios-desktop|${release.version}|x86_64`) throw new Error("desktop_rpm_output_metadata_mismatch");
+  const rpm = join(output, `Mycellios-Desktop-${release.version}${rpmRelease === 1 ? "" : `-${rpmRelease}`}-fedora-x86_64.rpm`);
+  await copyFile(join(work, "RPMS/x86_64", `mycellios-desktop-${release.version}-${rpmRelease}.x86_64.rpm`), rpm);
+  const metadata = run("rpm", ["-qp", "--qf", "%{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}", rpm]);
+  if (metadata !== `mycellios-desktop|${release.version}|${rpmRelease}|x86_64`) throw new Error("desktop_rpm_output_metadata_mismatch");
   await writeFile(`${rpm}.sha256`, `${await sha256(rpm)}  ${basename(rpm)}\n`);
   await writeFile(`${rpm}.provenance.json`, `${JSON.stringify(provenance, null, 2)}\n`);
   console.log(`RPM: ${rpm}`);

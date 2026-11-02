@@ -1,9 +1,74 @@
 # Development
 
+## Marketing and public Stats
+
+The public `/dashboard` and `/stats` entries render `StatsDashboard` from the
+coordinator's public snapshot and persisted history. Explicit console links retain
+`/dashboard?view=overview`, `?view=nodes`, and the other existing operational views.
+`MarketingHeader` is shared by the landing, Earn, Pricing, Compare and Rewards.
+Create and token Data are retired; their old URLs redirect to the landing and Stats.
+Treasury/Treasure bookmarks redirect to `/spore/rewards`.
+
+The shared navbar lifts its links and reveals an underline on hover or keyboard
+focus. FAQ disclosures share one native name group, so opening a question closes
+the previous one. The shared UI kit animates the real answer height, opacity and
+chevron, with motion disabled for reduced-motion preferences. The same production
+disclosures appear in Storybook's ExclusiveAccordion story.
+
+Stats uses `https://www.mycellios.com/stats` as its canonical URL and sitemap entry.
+This route ships with the landing, so publishing does not depend on activating a
+new DNS record. The navbar's `/dashboard` link opens the same public Stats UI.
+Preview the future subdomain at `http://stats.localhost:4174/`. The exact
+`stats.mycellios.com` host selects its own document in the coordinator and client
+router; it retains the `/stats` canonical until a verified domain migration.
+
+Production ingress is Cloudflare Tunnel, not Caddy. On 2026-11-02, the existing
+`mycellios.com` and `www.mycellios.com` published applications used tunnel
+`575f0de0-6771-4ce2-b2f4-11f09da85b2e` on `nc-hz-control-01` with service
+`http://10.48.0.6:18080` and default origin settings. The unapplied
+`deploy/stats-tunnel-route.example.json` describes an additional published
+application for that same service, preserving Host. Recheck these observations
+before changing ingress; never replace the tunnel's existing applications.
+
+Activate the alias only after the integrated release serves `stats/index.html`:
+verify the origin using `Host: stats.mycellios.com`, then add the published
+application and its proxied DNS record in Cloudflare. Verify public DNS, TLS,
+the Stats document, its hashed assets and same-origin public snapshot/history
+endpoints. Compare `/health` with the intended release and recheck the main site.
+Do not point DNS at the old release: its root would display the previous landing.
+Moving the canonical to the subdomain requires a subsequent verified migration
+of metadata, sitemap and redirects. No DNS or tunnel change is part of a local build.
+
+The GPU calculator has two primary choices: GPU model and daily hours. It shows
+daily hours × 30 days × an hourly rate, assuming every selected hour is rented.
+The dated default prices are Salad's published Lowest rental tier, with a linked
+source and an optional USD rate override in the details. The GPU selector only
+lists models with a published reference. These are rental-value references, not Mycellios contributor
+remuneration, demand forecasts or net profit. They exclude electricity and fees.
+GPU choices do not establish runtime compatibility. Calculators create no charge,
+subscription, token conversion or payout. Pricing leads with Coming soon states
+for unannounced Mycellios plans, network usage prices and contributor rewards.
+The optional provider-cost estimator is inside a closed disclosure and remains
+separate from commercial offers. Token, staking and payout marketing uses the
+same availability wording; operational account/billing gates are unchanged.
+Pricing can load dated
+OpenAI and Anthropic standard, uncached text-token rates from
+`provider-rate-presets.ts`; the UI links to each official source. These are
+editable reference snapshots, not a live quote. Changing currency clears model
+rates instead of inventing an exchange rate. Comparisons contain
+original copy and primary product sources with a review date.
+
+Globe pins require an announced, mappable city. Unknown regions remain in the
+ledger without a fabricated geographic position. No peer arcs are inferred from
+the order of workers. The lower landing's decoration uses one shared graph across
+contribution, questions and the closing scene; topology tests cover resizing and
+expanded answers. Its complete content and animation load before that chapter
+enters the viewport, preserving the existing home bundle limit.
+
 ## Fedora Desktop RPM
 
 `npm run desktop:package:rpm` creates
-`build/desktop-rpm/Mycellios-Desktop-0.3.9-fedora-x86_64.rpm`, its SHA-256 and
+`build/desktop-rpm/Mycellios-Desktop-0.3.9-2-fedora-x86_64.rpm`, its SHA-256 and
 provenance JSON. Build on Linux x86_64 with `rpm-build`, `binutils`, `tar`,
 `gzip` and `zstd`. Install the result with `sudo dnf install ./<artifact>.rpm`.
 Build output and cached downloads are ignored by Git.
@@ -11,9 +76,16 @@ Build output and cached downloads are ignored by Git.
 `config/desktop-fedora-release.json` pins the published Desktop DEB and complete
 source archive. The Desktop source supplement identifies its baseline main
 revision separately from the bundled runtime version; do not rebuild the older
-runtime in main and substitute it for the published payload. The RPM retains
-the application ASAR, runtime archive, licenses and account behavior byte for
-byte. Only native package integration and the polkit enrollment helper change.
+runtime in main and substitute it for the published payload. RPM revision 1
+retains the original application ASAR. Revision 2 backports Linux native window
+frames and an explicit packaged window icon through `scripts/adapt-desktop-linux.mjs`.
+The adapter rejects unexpected bundle anchors and verifies every other ASAR file,
+native-module unpack flag and executable mode. Existing 192px and 512px brand
+assets are installed in indexed hicolor directories; the original 1024px directory
+is not indexed by Fedora's theme. The runtime archive, licenses and account logic
+remain byte-identical. Provenance records both ASAR hashes and the changed entry;
+the adapter source is included under `/usr/share/doc/mycellios-desktop`.
+Revision 2 uses a separate RPM filename and never overwrites the preview asset.
 
 `deploy/linux/install-desktop-runtime.sh` verifies the bundled payload's hash
 and package identity, then extracts its `/opt/mycellios` tree as data without
@@ -23,7 +95,7 @@ contribution node. An existing identity or incomplete installation is preserved.
 Contribution setup requires the normal signed-in account action and polkit.
 Fedora uses Chromium's user-namespace sandbox; the package does not disable it.
 
-Run `npx vitest run tests/desktop-rpm.test.ts tests/desktop-runtime-fedora.test.ts`.
+Run `npx vitest run tests/desktop-rpm.test.ts tests/desktop-runtime-fedora.test.ts tests/desktop-linux-window.test.ts`.
 RPM tests use the real RPM tools; enrollment-helper tests use Bubblewrap user
 namespaces with temporary `/etc` and `/opt`, synthetic payloads and no network.
 Missing platform tools or unavailable user namespaces produce explicit skips.
@@ -41,9 +113,81 @@ Run `npx vitest run landing/src/desktop-downloads.test.tsx` and
 
 ## Shared interface kit and Storybook
 
-The default landing lives in `landing/src/rebrand/ReferenceLanding.tsx` and
-`reference-landing.css`. It uses the shared Agent controls and an authored
-computing-fabric WebP. `NetworkPrint` applies an event-driven WebGL print effect;
+The default homepage leads with an Agent product hero. Its latest art direction
+follows the supplied light paper composition: a large title, compact app window,
+computing islands linked by mycelium and a three-item benefit strip. The earlier
+`https://x.ai/bot` reference informed the product-demo structure. `AgentProductHero` owns the opening;
+`AgentHeroDemo` recreates the published Agent's paper/stone workspace, Mico
+avatars, conversation, permissions, composer and previews. Its examples are
+synthetic: no account, model, file or tool API is called. The actual app remains
+at `/agent`, and the download actions use `/downloads/desktop`.
+
+A separate GSAP module animates the entrance, message typing, permission example
+and result. Visitors can switch Micos, search the example roster, open a local
+preview, pause and replay. Offscreen playback pauses; reduced motion shows the
+completed example immediately. Lifecycle cleanup removes owned timelines and
+observers. The production UI kit owns the scoped marketing and demo controls. The decorative
+living network uses a transparent, reference-guided image_gen asset with native
+CSS breathing and spores. GSAP drives light impulses along six paths registered
+to the artwork; path geometry is sampled once, then interpolated per frame. The
+image and signals share a breathing layer so they stay aligned. Background layers
+do not react to mouse movement or clicks; artwork and spores have no pointer
+parallax. The scene runs
+independently after the app sequence, shares the Pause animations control and
+removes its ticker subscription while paused, offscreen or hidden. Reduced motion
+keeps a static illustration. Cleanup removes owned observers, listeners and
+transforms. Asset, prompt and provenance live in
+`landing/public/assets/agent-demo/living-network-v1.json`.
+
+The product story continues with three selectable synthetic workflows: planning,
+research and writing. Each shows a request, attached context, a permission and a
+draft. `AgentUseCasesEntry` defers that chunk near the viewport and retains a
+usable Agent link if loading fails. The shared controls support keyboard selection;
+the draft updates without moving focus. A sampled SVG filament carries a
+GSAP-smoothed scroll impulse from the hero environment through these examples to
+the network chapter. It does not pin or move the original network illustration.
+The hero Mico greets pointer, keyboard and click input. These effects share global Pause/Play, respect
+reduced motion and clean up their timelines, listeners and observers. The example
+drafts and decorative traffic are authored illustrations, never live execution.
+
+The homepage closes after the FAQ with "Grow your first Mico": the existing Mico,
+converging mycelium and one Agent entry action on the same continuous paper canvas.
+Upper filaments reach into the space below the FAQ. Its text, avatar and link are
+available independently of the decorative chunk. The SVG/GSAP scene loads near the
+viewport; when the emblem is visible, paths light progressively and the Mico wakes.
+The network remains lit with traveling signals while the section is visible and
+re-arms after a complete exit. A local Pause/Play control complements global pause.
+Its owned ticker stops offscreen, hidden or paused. Reduced motion keeps a complete
+static scene; cleanup reverts styles and removes observers/listeners. The legacy
+forest opening keeps its original ending.
+
+The lower contribution, FAQ, closing and footer share one rooted backdrop. Its
+decorative chunk starts loading near the contribution section. Layout-aware roots
+stay in the outer gutters, widen beside the FAQ and cross only the whitespace
+between sections; their ends join the closing's filaments. A ResizeObserver
+updates geometry when the viewport or open answers change. Traveling signals share
+the page-wide and local mycelium pause controls, stop offscreen/hidden, and become
+static for reduced motion. The closing artwork and its control are portalled into
+the closing section while the background covers the whole lower group.
+
+The unchanged 350 KB homepage JS budget counts both the motion entry and its
+shared GSAP dependency. Avatar provenance lives in
+`landing/public/assets/agent-demo/provenance.json`.
+
+The previous forest concept is preserved at `/?intro=forest` and the paused
+`/forest-loader-preview.html` (`npm run landing:dev`), with its original network
+opening. It is no longer a gate before the new homepage. Only the current
+orientation's versioned pair is requested (841,196 bytes for landscape or
+673,570 for portrait). Its image_gen prompts and derivatives remain recorded in
+`landing/public/assets/loading/provenance.json`. Route readiness, Skip intro,
+Escape, reduced motion and chunk/image failure fallbacks remain supported.
+
+Verify with the focused forest lifecycle, living-network model/clock and landing SEO tests,
+`npm run landing:typecheck`, `npm run verify:ui-kit`, `npm run storybook:build`
+and `npm run landing:build`.
+
+The landing lives in `landing/src/rebrand/ReferenceLanding.tsx`. Its network
+chapter retains the shared Agent controls and authored computing-fabric WebP. `NetworkPrint` applies an event-driven WebGL print effect;
 the image stays available when WebGL is unavailable and for reduced motion.
 The artwork remains centered in normal document flow as the page scrolls; the
 network chapter follows underneath without sticky overlap, panning or scaling.

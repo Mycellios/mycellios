@@ -1,4 +1,6 @@
-export type LandingSurface = "landing" | "network" | "panel";
+import { marketingPageRedirect } from "../../src/contracts/marketing-pages";
+
+export type LandingSurface = "landing" | "network" | "panel" | "stats" | "pricing" | "compare";
 
 export type PanelView =
   | "overview"
@@ -77,7 +79,7 @@ export function panelViewFromLocation(pathname: string, search: string, mobile =
 
 export function panelLocation(view: PanelView, mobile = false, dashboard = false): string {
   if (mobile) return view === "contribute" ? "/browser/" : `/browser/?view=${view}`;
-  if (dashboard) return view === "overview" ? "/dashboard" : `/dashboard?view=${view}`;
+  if (dashboard) return `/dashboard?view=${view}`;
   if (view === "downloads") return "/downloads";
   if (view === "admin") return "/admin";
   return view === "overview" ? "/network?view=overview" : `/network?view=${view}`;
@@ -85,8 +87,15 @@ export function panelLocation(view: PanelView, mobile = false, dashboard = false
 
 const PANEL_PATHS = new Set(["/network", "/dashboard", "/admin", "/downloads", "/account", "/browser", "/mobile"]);
 
-export function resolveLandingSurface(pathname: string, search: string): LandingSurface {
+export function retiredMarketingDestination(pathname: string): string | null {
+  return marketingPageRedirect(pathname);
+}
+
+export function resolveLandingSurface(pathname: string, search: string, hostname = ""): LandingSurface {
   const view = new URLSearchParams(search).get("view");
+  if ((["stats.mycellios.com", "stats.localhost"].includes(hostname) && pathname === "/") || pathname === "/stats" || (pathname === "/dashboard" && view === null)) return "stats";
+  if (pathname === "/pricing") return "pricing";
+  if (pathname === "/compare" || pathname.startsWith("/compare/")) return "compare";
   if (pathname === "/network" && (view === null || view === "globe")) return "network";
   if (PANEL_PATHS.has(pathname)) return "panel";
   return "landing";

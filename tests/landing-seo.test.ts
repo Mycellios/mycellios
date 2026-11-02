@@ -12,6 +12,18 @@ import {
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("landing SEO contract", () => {
+  it("distinguishes public Stats from explicit operational console views", () => {
+    expect(seoPageForPath("/dashboard").title).toBe("Mycellios Stats dashboard");
+    expect(seoPageForPath("/dashboard", "?view=overview").title).toBe("Mycellios network console");
+    expect(seoPageForPath("/dashboard", "?view=nodes").robots).toContain("noindex");
+  });
+  it("keeps Stats discoverable without depending on an unactivated subdomain", () => {
+    const stats = SEO_PAGES["/stats"];
+    expect(canonicalUrl(stats)).toBe("https://www.mycellios.com/stats");
+    expect(stats.structuredData).toMatchObject({ url: canonicalUrl(stats) });
+    expect(read("landing/public/sitemap.xml")).not.toContain("https://stats.mycellios.com/");
+    expect(read("landing/public/llms.txt")).toContain("https://www.mycellios.com/stats");
+  });
   it("shares the versioned, correctly sized brand card before JavaScript runs", () => {
     const html = read("landing/index.html");
     const source = read("landing/src/seo.ts");
@@ -42,7 +54,7 @@ describe("landing SEO contract", () => {
     expect(SEO_PAGES["/dashboard"].robots).toContain("noindex");
     expect(LANDING_SEO_PATHS).toContain("/account");
     expect(LANDING_SEO_PATHS).toContain("/dashboard");
-    for (const path of ["/spore", "/spore/treasury", "/spore/data"] as const) {
+    for (const path of ["/spore", "/spore/rewards"] as const) {
       expect(seoPageForPath(path)).toBe(SEO_PAGES[path]);
       expect(SEO_PAGES[path].robots).toContain("noindex");
       expect("structuredData" in SEO_PAGES[path]).toBe(false);
@@ -85,7 +97,7 @@ describe("landing SEO contract", () => {
 
     expect(guide).toMatch(/^# mycellios/m);
     expect(guide).toContain("https://www.mycellios.com/network");
-    expect(guide).toContain("https://github.com/tych0s/mycellios/blob/main/docs/STATUS_AND_EVIDENCE.md");
+    expect(guide).toContain("https://github.com/Mycellios/mycellios/blob/main/docs/STATUS_AND_EVIDENCE.md");
     expect(guide).not.toMatch(/\/internal\/|\/public\/v1\/|\/v1\/|\/admin/);
     expect(guide).toContain("not established as general production capabilities");
   });

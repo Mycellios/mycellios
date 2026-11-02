@@ -1,0 +1,18 @@
+{
+  "purpose": "Transparent computing and fungal network framing the light Agent hero",
+  "generation": "Built-in image_gen; reference-guided illustration",
+  "references": [
+    "User supplied light hero composition",
+    "/assets/landing/network-fruiting.webp"
+  ],
+  "source": "exec-c4a1b294-9b83-4aa5-984a-4af6216589a4.png",
+  "encoding": "WebP quality 82; original dimensions and alpha preserved",
+  "prompt": "Use case: stylized-concept. Asset type: TRANSPARENT background illustration for the Mycellios website, to sit BEHIND a real app window rendered separately in HTML.\nInput image 1 is the AUTHORITATIVE COMPOSITION reference: a light paper website with a central app and an organic network of machines and mushrooms around its sides. Input image 2 is the AUTHORITATIVE ILLUSTRATION STYLE reference: Mycellios's finely engraved industrial computer modules, porous ivory mycelium and realistic mushrooms.\nGenerate ONLY THE BACKGROUND ART on a truly transparent wide landscape canvas, approximately 2:1. Absolutely NO app window, user interface, buttons, typography, wordmark, logo, letters, or page background. Do not reproduce any of the screenshot's UI.\nComposition: a loose living network framing a large EMPTY CENTRAL AREA. Keep the middle 56% of the canvas (x=22% through 78%) almost entirely transparent so a large software window can cover it. All major subjects must live in the outer left and right 22%, with fine organic bridges passing behind the central window and beneath its lower edge. Upper left: an industrial GPU/compute module with visible fans and vents, colonised by white mycelium, and a few small oyster/bonnet mushrooms emerging above. Upper right: a smaller upright server cluster with mushrooms. Lower right: a separate low horizontal compute module, connected back into the root network. Lower left: a smaller mushroom-and-root island, with moss and organic fibers. Different scale and placement on the two sides: this is a distributed peer mesh with multiple connections, not a symmetric border or a row of objects. Machines should be medium-sized islands, secondary to the app window that will be overlaid later, not giant mushrooms filling the frame.\nInterweave the islands using richly textured branching, porous ivory mycelium, thin dark green fibers and roots, open lace holes and arcs. Tiny sparse olive/gold spores and a little moss. Lots of intricate engraved botanical and metal detail. Ivory, muted moss green, charcoal/forest ink and touches of warm ochre; restrained natural colors for a warm off-white webpage. Fine stippled and etched drawing with depth, like the supplied reference; no flat icon look and no glossy 3D plastic.\nThe central upper region must stay genuinely empty and transparent for the real hero copy. Keep all elements within the canvas, with organic irregular edges and transparent gaps between stems/fibers. No trees, fog, solid backdrop, rectangular floor, neon lighting, badges, extra objects, watermark or text. One usable transparent botanical computing-network illustration, not a website mockup.",
+  "bytes": 749958,
+  "dimensions": [
+    1774,
+    887
+  ],
+  "sha256": "4146b04dbb8cfd216753763565d7c0d953934491ad17c964f2091c9539ae12da",
+  "asset": "living-network-v1.webp"
+}

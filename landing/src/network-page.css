@@ -378,6 +378,7 @@ body:has(.net) { margin: 0; }
 /* ---------- empty / error ---------- */
 
 .net-empty {
+  position: absolute;
   top: 50%; left: 50%;
   z-index: 3;
   display: grid;
@@ -396,6 +397,7 @@ body:has(.net) { margin: 0; }
 .net-empty a { margin-top: 6px; color: var(--net-green); font-size: 12px; }
 
 .net-error {
+  position: absolute;
   top: 24px; left: 50%;
   z-index: 4;
   display: flex;
@@ -712,10 +714,11 @@ body:has(.net) { margin: 0; }
   .net-brand-name { font-size: 23px; }
   .net-workspace { min-height: 38px; padding-inline: 13px; font-size: 11px; }
   .net-ticker, .net-legend { display: none; }
-  .net-cmd { left: 20px; right: 20px; bottom: 20px; max-width: none; }
+  .net-cmd { left: calc(20px + env(safe-area-inset-left)); right: calc(20px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); max-width: none; }
   .net-panel { top: auto; bottom: 84px; left: 20px; right: 20px; width: auto; max-height: 64vh; overflow-y: auto; }
-  .net-status { top: 82px; left: 20px; }
-  .net-view-switcher { top: 84px; left: auto; right: 20px; transform: none; }
+  .net-status { top: calc(132px + env(safe-area-inset-top)); left: calc(20px + env(safe-area-inset-left)); }
+  .net-view-switcher { top: calc(84px + env(safe-area-inset-top)); left: auto; right: calc(20px + env(safe-area-inset-right)); transform: none; }
+  .net-view-globe .net-empty { top: calc(174px + env(safe-area-inset-top)); width: min(300px, calc(100% - 40px)); transform: translateX(-50%); }
   .net-view-switcher button { min-height: 30px; padding-inline: 12px; }
   .net-view-overview .net-stage { min-height: 2020px; }
   .net-dashboard { top: 132px; bottom: 54px; gap: 14px; grid-template-rows: auto auto 1fr; }
@@ -780,3 +783,5 @@ body:has(.net) { margin: 0; }
   .net-history-loading span { animation: none; }
   .net-globe { transition: none; }
 }
+.net .marketing-header { --marketing-ink:#f1efe8; --ui-accent:#e9ede4; --ui-on-accent:#172a20; --ui-accent-hover:#d7e0d1; }
+.net .marketing-mobile-nav { color:#16221b; }

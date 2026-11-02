@@ -26,7 +26,7 @@ describe("the hero mushroom is not left downloading behind the bundle", () => {
     const main = await read("../main.tsx");
     // The same mutually exclusive route flags choose the lazy page and derive
     // `isLanding`; a panel or studio route must never pay for this chunk.
-    expect(main).toContain("const isLanding = !isCreate && !isEarn && !isSpore && !isNetwork && !isPanel");
+    expect(main).toContain('const isLanding = surface === "landing" && !isEarn && !isSpore');
     expect(main).toMatch(/if \(isLanding && previousLanding && wantsMushroom\(\)\)/);
   });
 

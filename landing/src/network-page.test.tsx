@@ -124,20 +124,22 @@ describe("network observatory", () => {
   it("ignores the placeholder 'auto' region when counting regions", () => {
     const autoOnly = { ...snapshot, workers: [{ ...snapshot.workers[0]!, region: "auto" }] };
     expect(deriveNetworkMetrics(autoOnly).regions).toBe(0);
+    const privateRegions = { ...snapshot, workers: snapshot.workers.map(worker => ({ ...worker, region: "eu-private-wan" })) };
+    expect(deriveNetworkMetrics(privateRegions).regions).toBe(0);
   });
 
   it("places known regions at their real coordinates and flags unknown ones", () => {
     const madrid = placeWorker("Madrid", "worker-madrid-1");
-    expect(madrid.located).toBe(true);
-    expect(madrid.country).toBe("Spain");
-    expect(madrid.lat).toBeCloseTo(40.4, 1);
-    expect(madrid.lon).toBeCloseTo(-3.7, 1);
+    expect(madrid!.located).toBe(true);
+    expect(madrid!.country).toBe("Spain");
+    expect(madrid!.lat).toBeCloseTo(40.4, 1);
+    expect(madrid!.lon).toBeCloseTo(-3.7, 1);
 
     const unknown = placeWorker("auto", "worker-offline-3");
-    expect(unknown.located).toBe(false);
-    expect(unknown.country).toBeNull();
-    // Unlocated nodes must still be deterministic across renders.
-    expect(placeWorker("auto", "worker-offline-3")).toEqual(unknown);
+    expect(unknown).toBeNull();
+    expect(placeWorker("eu-private-wan")).toBeNull();
+    expect(placeWorker("owner-native")).toBeNull();
+    expect(placeWorker("comparison")).toBeNull();
   });
 
   it("projects only the near hemisphere toward the viewer", () => {
@@ -216,7 +218,8 @@ describe("network observatory", () => {
     expect(html).toContain("GPUS ONLINE");
     expect(html).toContain("serving");
     expect(html).toContain("56.0");
-    expect(html).toContain("Interactive globe showing 3 announced Mycellios nodes");
+    expect(html).toContain("Interactive globe showing 2 Mycellios worker records with reported regional locations");
+    expect(html).toContain("1 without a reported city");
     // The reference page's simulated figures must never appear here.
     expect(html).not.toContain("1,248");
     expect(html).not.toContain("4,230,781");
@@ -347,7 +350,7 @@ describe("network observatory", () => {
     expect(overview).toContain("Model fabric");
     expect(overview).toContain("Inference load");
     expect(overview).toContain("Completed work");
-    expect(overview).toContain("LIVE TOPOLOGY");
+    expect(overview).toContain("REPORTED REGIONS");
     expect(overview).toContain("The network, in signals.");
     expect(overview).toContain("Not published");
     expect(overview).toContain("$SPORE");
@@ -357,11 +360,12 @@ describe("network observatory", () => {
 
   it("uses the canonical landing header on the public observatory", () => {
     const html = renderToStaticMarkup(<NetworkPage initialSnapshot={snapshot} animate={false} />);
-    expect(html).toContain("Live network");
-    expect(html).toContain("$ SPORE");
-    expect(html).toContain("mycellios on GitHub");
-    expect(html).toContain("aria-current=\"page\"");
-    expect(html).toMatch(/<a\b(?=[^>]*href="\/")(?=[^>]*class="[^"]*\brb-brand\b)[^>]*>/);
+    expect(html).toContain(">Stats</a>");
+    expect(html).toContain("$SPORE");
+    expect(html).toContain("Mycellios on GitHub");
+    expect(html).not.toContain('href="/create"');
+    expect(html).not.toContain(">Login</a>");
+    expect(html).toMatch(/<a\b(?=[^>]*href="\/")(?=[^>]*class="[^"]*\bmarketing-brand\b)[^>]*>/);
   });
 
   it("does not animate canvas geometry between overview and globe", () => {

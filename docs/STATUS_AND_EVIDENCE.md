@@ -317,6 +317,10 @@ receipts live under `outputs/desktop-downloads-simple-20261031`.
   hash rejection and preservation of existing installations. These tests use
   synthetic enrollment payloads; they do not establish real account enrollment
   or multi-host inference. See the Fedora build route in `DEVELOPMENT.md`.
+- Fedora RPM revision 2 has isolated ASAR retention tests and window-option
+  tests covering Linux native frames, packaged window icons and preservation
+  of Windows/macOS options. These tests do not replace visual validation in
+  a real desktop session after restarting the application.
 - selective Llama and Qwen-family pipelines;
 - real subprocesses and sockets on one host;
 - CPU pipeline parity and greedy kill-and-resume recovery;

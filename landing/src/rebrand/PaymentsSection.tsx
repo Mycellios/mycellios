@@ -23,8 +23,8 @@ const SHARES = [
 ] as const;
 
 const RULES = [
-  { id: "01", icon: Wallet, title: "Choose your access", copy: "Check current plan availability and usage allowance in your account." },
-  { id: "02", icon: BadgeCheck, title: "Meter real work", copy: "Each machine signs the stages it runs. Active plans show usage in your account." },
+  { id: "01", icon: Wallet, title: "Choose your access", copy: "Plans and usage prices are coming soon. Your account shows the access available today." },
+  { id: "02", icon: BadgeCheck, title: "Meter real work", copy: "Each machine signs the stages it runs. Plan usage will appear in your account when available." },
   { id: "03", icon: ShieldCheck, title: "Verify the work", copy: "Receipts are checked before contribution credit is recorded." },
 ] as const;
 
@@ -42,14 +42,14 @@ export function PaymentsSection() {
         <div className="rb-pay-head rb-reveal">
           <UiText className="rb-kicker"><i /><span>The exchange</span></UiText>
           <UiHeading as="h2" id="rb-pay-title">Access for users.<br /><em>Proof for machine owners.</em></UiHeading>
-          <UiText>Mycellios Go is the network’s regular-access plan. Check its availability in your account. Accepted stages and signed receipts record each machine’s contribution.</UiText>
+          <UiText>Mycellios plans and pricing are coming soon. Accepted stages and signed receipts record each machine’s contribution.</UiText>
         </div>
 
         <div className={`rb-pay-rail ${live ? "is-live" : ""}`} ref={railRef}>
           <UiCard className="rb-pay-card buyer">
             <span><Wallet />Your access</span>
-            <strong>Mycellios Go</strong>
-            <small>Current plans and usage in Account</small>
+            <strong>Coming soon</strong>
+            <small>Plans and pricing</small>
           </UiCard>
 
           <div className="rb-pay-wire" aria-hidden="true">
@@ -89,7 +89,7 @@ export function PaymentsSection() {
         <UiText className="rb-pay-note">
           Illustrative attribution of one served route — the shares show the memory each machine lends to the model,
           not subscription pricing or a guaranteed payout.
-          <UiLink href="/spore/treasury">How value routes <ArrowUpRight /></UiLink>
+          <UiLink href="/spore/rewards">How rewards work <ArrowUpRight /></UiLink>
         </UiText>
 
         <div className="rb-pay-rules">
@@ -106,11 +106,11 @@ export function PaymentsSection() {
         </div>
 
         <div className="rb-pay-actions rb-reveal">
-          <UiLink className="rb-pill rb-pill-dark" href="/account">Explore Mycellios Go <ArrowUpRight /></UiLink>
+          <UiLink className="rb-pill rb-pill-dark" href="/account">Check your account access <ArrowUpRight /></UiLink>
           <UiLink className="rb-pill rb-pill-ghost" href="/earn">Connect your machine <ArrowUpRight /></UiLink>
         </div>
 
-        <UiText className="rb-econ-caveat rb-reveal">Usage tokens are access credits, not $SPORE · contributor payouts and $SPORE are not live yet</UiText>
+        <UiText className="rb-econ-caveat rb-reveal">Usage tokens are access credits, not $SPORE · contributor payouts and $SPORE are coming soon</UiText>
       </div>
     </section>
   );

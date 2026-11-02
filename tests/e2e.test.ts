@@ -227,21 +227,24 @@ describe("inference-only coordinator and worker", () => {
       ["dashboard/", "/dashboard"],
       ["account/", "/account"],
       ["spore/", "/spore"],
-      ["spore/treasury/", "/spore/treasury"],
-      ["spore/data/", "/spore/data"],
       ["join", "/earn"],
       ["join/", "/earn"],
       ["downloads/linux-deb", "/downloads/linux"],
-      ["docs", "https://github.com/tych0s/mycellios/blob/main/docs/README.md"],
-      ["docs/", "https://github.com/tych0s/mycellios/blob/main/docs/README.md"],
-      ["docs/protocol", "https://github.com/tych0s/mycellios/blob/main/docs/ARCHITECTURE.md"],
-      ["docs/protocol/", "https://github.com/tych0s/mycellios/blob/main/docs/ARCHITECTURE.md"],
+      ["docs", "https://github.com/Mycellios/mycellios/blob/main/docs/README.md"],
+      ["docs/", "https://github.com/Mycellios/mycellios/blob/main/docs/README.md"],
+      ["docs/protocol", "https://github.com/Mycellios/mycellios/blob/main/docs/ARCHITECTURE.md"],
+      ["docs/protocol/", "https://github.com/Mycellios/mycellios/blob/main/docs/ARCHITECTURE.md"],
       ["docs/downloads", "/downloads"],
       ["docs/network", "/network"],
       ["docs/blog", "/blog"],
     ] as const) {
       const response = await fetch(new URL(path, `${address}/`), { redirect: "manual" });
       expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe(destination);
+    }
+    for (const [path, destination] of [["create", "/"], ["spore/treasury/", "/spore/rewards"], ["spore/data/", "/stats"]] as const) {
+      const response = await fetch(new URL(path, `${address}/`), { redirect: "manual" });
+      expect(response.status).toBe(308);
       expect(response.headers.get("location")).toBe(destination);
     }
   });

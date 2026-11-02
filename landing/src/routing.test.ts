@@ -7,6 +7,7 @@ import {
   panelRoute,
   panelViewFromLocation,
   resolveLandingSurface,
+  retiredMarketingDestination,
   visiblePanelRoutes,
 } from "./routing";
 
@@ -47,7 +48,7 @@ describe("panel information architecture", () => {
     expect(normalizePanelView("join")).toBe("contribute");
     expect(normalizePanelView("unknown")).toBeNull();
     expect(panelLocation("overview")).toBe("/network?view=overview");
-    expect(panelLocation("overview", false, true)).toBe("/dashboard");
+    expect(panelLocation("overview", false, true)).toBe("/dashboard?view=overview");
     expect(normalizePanelView("inference")).toBe("overview");
     expect(normalizePanelView("chat")).toBe("overview");
     expect(visiblePanelRoutes("simple", "public").some((route) => /chat|inference/i.test(route.label))).toBe(false);
@@ -61,9 +62,24 @@ describe("panel information architecture", () => {
     expect(panelViewFromLocation("/account", "?checkout=success")).toBe("overview");
   });
 
-  it("routes the dashboard login destination to the Panel overview", () => {
-    expect(resolveLandingSurface("/dashboard", "")).toBe("panel");
+  it("opens public Stats by default and preserves explicit technical console views", () => {
+    expect(resolveLandingSurface("/dashboard", "")).toBe("stats");
+    expect(resolveLandingSurface("/dashboard", "?view=overview")).toBe("panel");
+    expect(resolveLandingSurface("/dashboard", "?view=nodes")).toBe("panel");
+    expect(resolveLandingSurface("/stats", "")).toBe("stats");
+    expect(resolveLandingSurface("/", "", "stats.mycellios.com")).toBe("stats");
+    expect(resolveLandingSurface("/", "", "stats.mycellios.com.example.com")).toBe("landing");
     expect(panelViewFromLocation("/dashboard", "")).toBe("overview");
+  });
+
+  it("retires marketing screens without leaving broken bookmarks", () => {
+    expect(retiredMarketingDestination("/create/")).toBe("/");
+    expect(retiredMarketingDestination("/spore/treasury")).toBe("/spore/rewards");
+    expect(retiredMarketingDestination("/spore/treasure/")).toBe("/spore/rewards");
+    expect(retiredMarketingDestination("/spore/data")).toBe("/stats");
+    expect(retiredMarketingDestination("/spore")).toBeNull();
+    expect(resolveLandingSurface("/pricing", "")).toBe("pricing");
+    expect(resolveLandingSurface("/compare/chatgpt-dots", "")).toBe("compare");
   });
 
   it("routes browser worker entries to the contribution panel", () => {
