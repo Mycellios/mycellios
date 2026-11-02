@@ -17,14 +17,9 @@
 .agent-signal-halo { fill:var(--signal-ink); opacity:.16; }
 .agent-signal-core { fill:var(--signal-light); stroke:var(--signal-ink); }
 .agent-signal-center { fill:#fff; }
-.agent-node-ring { fill:none; stroke:#658b69; stroke-width:1.2; }
-.agent-node-center { fill:#d2c17d; }
 .agent-product-hero, .agent-product-benefits { position:relative; z-index:1; }
 @keyframes agent-backdrop-drift { 0% { opacity:0; transform:translate(6px,18px); } 40%,60% { opacity:.65; } 100% { opacity:0; transform:translate(-6px,-22px); } }
 @keyframes agent-network-breathe { from { transform:translateY(2px) scale(1); } to { transform:translateY(-3px) scale(1.008); } }
-@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference) {
-  .agent-product-opening[data-ambient-running="true"] :is(.agent-network-depth,.agent-spore-depth) { will-change:transform; }
-}
 .agent-product-opening .reference-header { position:sticky; top:0; z-index:30; background:#faf9f7; width:min(1150px,calc(100% - 64px)); min-height:calc(76px + env(safe-area-inset-top)); gap:28px; }
 .agent-product-opening .reference-brand { font-size:22px; letter-spacing:-.035em; }
 .agent-product-opening .reference-brand img { width:30px; height:30px; }

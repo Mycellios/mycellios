@@ -145,5 +145,26 @@
 .marketing-page :is(.ui-input,.ui-select):focus-visible, .compute-calculator :is(.ui-input,.ui-select):focus-visible { outline:2px solid #427d6e !important; outline-offset:2px; }
 .marketing-page .ui-input[aria-invalid="true"], .compute-calculator .ui-input[aria-invalid="true"] { border-color:#a34436; }
 .marketing-header .ui-button.marketing-menu { border:0; background:transparent; box-shadow:none; padding:8px; color:inherit; }
+
+/* The shared navbar and native FAQ use the same quiet motion on every surface. */
+.marketing-header :is(nav > .ui-link,.marketing-explore > summary) { position:relative; transition:transform 200ms ease-out,color 200ms ease-out; }
+.marketing-header :is(nav > .ui-link,.marketing-explore > summary)::after { content:""; position:absolute; inset:auto 0 7px; height:2px; background:currentColor; opacity:0; transform:scaleX(.25); transform-origin:center; transition:transform 220ms ease-out,opacity 160ms ease-out; }
+.marketing-header :is(nav > .ui-link,.marketing-explore > summary):is(:hover,:focus-visible) { text-decoration:none; transform:translateY(-2px); }
+.marketing-header :is(nav > .ui-link,.marketing-explore > summary):is(:hover,:focus-visible)::after { opacity:.65; transform:scaleX(1); }
+.marketing-header :is(.marketing-stats,.marketing-social .ui-link,.marketing-menu) { transition:transform 200ms ease-out,background-color 200ms ease-out; }
+.marketing-header :is(.marketing-stats,.marketing-social .ui-link,.marketing-menu):is(:hover,:focus-visible) { transform:translateY(-2px); }
+.marketing-header .marketing-brand > img { transition:transform 280ms ease-out; }
+.marketing-header .marketing-brand:is(:hover,:focus-visible) > img { transform:rotate(12deg); }
+.ui-animated-disclosure > summary > svg { flex-shrink:0; transition:transform 300ms ease-out; }
+.ui-animated-disclosure[open] > summary > svg { transform:rotate(180deg); }
+@supports selector(::details-content) {
+  .ui-animated-disclosure::details-content { display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows 340ms cubic-bezier(.22,1,.36,1),opacity 220ms ease-out,content-visibility 340ms allow-discrete; }
+  .ui-animated-disclosure[open]::details-content { grid-template-rows:1fr; opacity:1; }
+  .ui-animated-disclosure > .ui-disclosure-body { min-height:0; overflow:hidden; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .marketing-header :is(nav > .ui-link,.marketing-explore > summary,.marketing-stats,.marketing-social .ui-link,.marketing-menu), .marketing-header :is(nav > .ui-link,.marketing-explore > summary)::after, .marketing-header .marketing-brand > img, .ui-animated-disclosure > summary > svg, .ui-animated-disclosure::details-content { transition:none !important; }
+  .marketing-header :is(nav > .ui-link,.marketing-explore > summary,.marketing-stats,.marketing-social .ui-link,.marketing-menu):is(:hover,:focus-visible), .marketing-header .marketing-brand:is(:hover,:focus-visible) > img { transform:none; }
+}
 .ui-button.api-copy { display:inline-flex; align-items:center; justify-content:center; padding:8px; border:0; background:transparent; color:inherit; }
 :root[data-mycellios-design] [data-ui-surface="agent-marketing"] .marketing-header .ui-button.marketing-stats { min-height:34px !important; padding:7px 12px !important; font-size:12px !important; }

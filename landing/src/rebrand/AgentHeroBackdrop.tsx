@@ -18,7 +18,7 @@ function FloatingSpores({ spores, compact = false }: { spores: number[][]; compa
   </svg>;
 }
 
-/** The artwork and its signals breathe together; parallax affects background layers only. */
+/** The artwork and signals breathe together without reacting to pointer movement. */
 export function AgentHeroBackdrop() {
   return <div className="agent-product-backdrop" aria-hidden="true">
     <div className="agent-living-network"><div className="agent-network-depth"><div className="agent-network-breath">
@@ -32,7 +32,6 @@ export function AgentHeroBackdrop() {
             <circle className="agent-signal-center" r="1.25" />
           </g>)}
         </g>)}
-        {[[246,406],[1542,439],[231,742],[1552,615]].map(([x,y]) => <g key={x} transform={`translate(${x} ${y})`} data-node-x={x} data-node-y={y}><g className="agent-network-node-response" opacity="0"><circle r="17" className="agent-node-ring" vectorEffect="non-scaling-stroke" /><circle r="5" className="agent-node-center" /></g></g>)}
       </svg>
     </div></div></div>
     <div className="agent-spore-depth"><FloatingSpores spores={wideSpores} /><FloatingSpores spores={compactSpores} compact /></div>

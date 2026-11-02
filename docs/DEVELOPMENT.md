@@ -9,6 +9,12 @@ coordinator's public snapshot and persisted history. Explicit console links reta
 Create and token Data are retired; their old URLs redirect to the landing and Stats.
 Treasury/Treasure bookmarks redirect to `/spore/rewards`.
 
+The shared navbar lifts its links and reveals an underline on hover or keyboard
+focus. FAQ disclosures share one native name group, so opening a question closes
+the previous one. The shared UI kit animates the real answer height, opacity and
+chevron, with motion disabled for reduced-motion preferences. The same production
+disclosures appear in Storybook's ExclusiveAccordion story.
+
 Stats uses `https://www.mycellios.com/stats` as its canonical URL and sitemap entry.
 This route ships with the landing, so publishing does not depend on activating a
 new DNS record. The navbar's `/dashboard` link opens the same public Stats UI.
@@ -117,9 +123,9 @@ observers. The production UI kit owns the scoped marketing and demo controls. Th
 living network uses a transparent, reference-guided image_gen asset with native
 CSS breathing and spores. GSAP drives light impulses along six paths registered
 to the artwork; path geometry is sampled once, then interpolated per frame. The
-image and signals share a breathing layer so they stay aligned. Fine mouse input
-adds damped parallax, capped at 8 × 5 px for the artwork and 14 × 8 px for spores;
-the product UI and copy remain fixed. Touch input has no parallax. The scene runs
+image and signals share a breathing layer so they stay aligned. Background layers
+do not react to mouse movement or clicks; artwork and spores have no pointer
+parallax. The scene runs
 independently after the app sequence, shares the Pause animations control and
 removes its ticker subscription while paused, offscreen or hidden. Reduced motion
 keeps a static illustration. Cleanup removes owned observers, listeners and
@@ -133,8 +139,7 @@ usable Agent link if loading fails. The shared controls support keyboard selecti
 the draft updates without moving focus. A sampled SVG filament carries a
 GSAP-smoothed scroll impulse from the hero environment through these examples to
 the network chapter. It does not pin or move the original network illustration.
-The hero Mico greets pointer, keyboard and click input; four background nodes
-respond to nearby fine pointers. These effects share global Pause/Play, respect
+The hero Mico greets pointer, keyboard and click input. These effects share global Pause/Play, respect
 reduced motion and clean up their timelines, listeners and observers. The example
 drafts and decorative traffic are authored illustrations, never live execution.
 
