@@ -512,3 +512,17 @@ it.each([1, 5 * 60_000, 15 * 60_000, 60 * 60_000])(
     ).toBe(timeoutMs + 30_000);
   },
 );
+
+it.each([
+  [429, undefined, "queue is full"],
+  [413, undefined, "too large"],
+  [401, undefined, "session or computer permission"],
+  [409, "desktop_disconnected", "paired PC is disconnected"],
+  [409, "desktop_connection_changed", "connection changed"],
+  [409, undefined, "bridge could not accept"],
+] as const)("reports PC transport failures accurately without replaying (%s/%s)",async(status,code,message)=>{
+  const transport=vi.fn(async()=>new Response("private backend diagnostics",{status,headers:code?{"x-mycellios-desktop-error":code}:{}}));
+  const client=new HostComputerSandbox("","",transport);
+  await expect(client.environment({id:"host",botId:"test-bot",kind:"desktop",homePath:"/home"},context)).rejects.toThrow(message);
+  expect(transport).toHaveBeenCalledTimes(1);
+});

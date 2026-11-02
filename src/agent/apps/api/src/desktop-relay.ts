@@ -10,6 +10,7 @@ import {
 } from "../../../../contracts/desktop-executor.js";
 import {
   DesktopRelayBroker,
+  DesktopRelayError,
   desktopRelayKey,
   hostComputerRequest,
   verifyDesktopRelay,
@@ -64,11 +65,15 @@ export function mountDesktopRelay(
         traceId: input.nonce,
         signal: c.req.raw.signal,
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof DesktopRelayError) {
+        c.header("x-mycellios-desktop-error", error.code);
+        return c.json({ error: error.message, code: error.code }, error.status);
+      }
       return c.json(
         {
           error:
-            "PC disconnected. Start Mycellios Desktop on the paired computer; check results before retrying.",
+            "The PC bridge could not accept this request. Check results before retrying.",
         },
         409,
       );

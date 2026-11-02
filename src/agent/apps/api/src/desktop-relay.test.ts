@@ -85,7 +85,7 @@ it.each([false, true])(
     );
     const native = new DesktopRelayClient({
       base: "http://unit",
-      fetch: (url, init) => {
+      fetch: async (url, init) => {
         const headers = new Headers(init?.headers);
         headers.set("x-test-auth", "yes");
         return app.request(new URL(url).pathname, { ...init, headers });
@@ -207,4 +207,21 @@ it("fences account registration to the exact native identity and rejects browser
  expect((await call("account",{...input,identity:{...identity,connectionId:"stale"}})).status).toBe(403);
  expect((await call("account",input)).status).toBe(200);
  expect(await(await call("spaces",{})).json()).toEqual({spaces:[owner.spaceId]});
+});
+
+it("keeps a connected PC available while parallel calls wait, and reports queue pressure separately",async()=>{
+ const app=fixture();const native={"x-mycellios-desktop":"1","x-test-auth":"yes"};const binding={deviceId:randomUUID(),generation:randomUUID(),botId:"test-bot"};
+ expect((await app.request("/api/desktop-relay/bind",{method:"POST",headers:native,body:JSON.stringify(binding)})).status).toBe(200);
+ const dispatch=(request:unknown)=>{const body=JSON.stringify({scope:{userId:owner.userId,spaceId:owner.spaceId},request,nonce:randomUUID()}),time=String(Date.now());return app.request("/api/desktop-relay/internal",{method:"POST",headers:{"x-desktop-time":time,"x-desktop-signature":signDesktopRelay(desktopRelayKey("test-purpose-secret"),time,body)},body});};
+ const responses=await Promise.all(Array.from({length:8},()=>dispatch({method:"environment",botId:"test-bot"})));
+ expect(responses.every(r=>r.status===200)).toBe(true);
+ const excess=await dispatch({method:"environment",botId:"test-bot"});expect(excess.status).toBe(429);expect(excess.headers.get("x-mycellios-desktop-error")).toBe("desktop_busy");expect(await excess.json()).toMatchObject({code:"desktop_busy"});
+ for(const response of responses)await response.body?.cancel();
+ const missing=await dispatch({method:"environment",botId:"unowned"});expect(missing.status).toBe(404);
+});
+
+it("reports actual disconnection distinctly from queue pressure without accepting work",async()=>{
+ const app=fixture();const body=JSON.stringify({scope:{userId:owner.userId,spaceId:owner.spaceId},request:{method:"environment",botId:"test-bot"},nonce:randomUUID()}),time=String(Date.now());
+ const r=await app.request("/api/desktop-relay/internal",{method:"POST",headers:{"x-desktop-time":time,"x-desktop-signature":signDesktopRelay(desktopRelayKey("test-purpose-secret"),time,body)},body});
+ expect(r.status).toBe(409);expect(r.headers.get("x-mycellios-desktop-error")).toBe("desktop_disconnected");expect(await r.json()).toMatchObject({code:"desktop_disconnected"});
 });

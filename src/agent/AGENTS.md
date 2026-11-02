@@ -577,3 +577,8 @@
   provider choices, bounded PNG transfer, nonce/thread/turn validation and
   cancellation; never transfer account credentials or retry uncertain generations.
   Verify native-image-generation.test.ts and codex-image-worker.test.ts.
+
+- Desktop relay queues bound both waiting requests and buffered bytes separately
+  from execution slots. Claim each operation once; report only delivered IDs as
+  active. Preserve owner/generation fencing, queued cancellation and distinct
+  queue-pressure/disconnection errors without automatic command replay.
