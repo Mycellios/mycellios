@@ -17,16 +17,26 @@ Updated: 2026-09-25 (economic and token status).
 
 ## Verified in automated or single-host runs
 
-- Apple Silicon Desktop 0.3.9 preview is published at
-  [Desktop downloads](https://www.mycellios.com/downloads/desktop), bundling the
-  existing 0.2.95 ARM64 runtime. The macOS 26 ARM64
-  [qualification run](https://github.com/Mycellios/mycellios/actions/runs/41405775911)
-  built DMG/ZIP packages, opened and reopened one application window, reached the
-  central Mycellios sign-in form, checked renderer isolation and installed the
-  bundled runtime. Native candidate: `503635effc335ee52df7dbee0f3e0cb291efbf75`;
-  download UI: `17d37096874f6fb3d6a0eb2c8bfc26abffae4d80`. This unsigned,
-  non-notarized preview has no automatic updates. Real-account authentication
-  and inference on the owner's physical Mac remain unverified.
+- Intel x64 and Apple Silicon arm64 Desktop 0.3.9 previews for macOS 13 or newer
+  are published at [Desktop downloads](https://www.mycellios.com/downloads/desktop).
+  The [native qualification](https://github.com/Mycellios/mycellios/actions/runs/41481786116)
+  passes on both architectures: two launches, central sign-in UI, renderer
+  isolation and strict deep signature verification inside the final read-only DMG.
+  Native/source candidate: `553948e3bb169d041fb0e1ddd08b499e2a78b390`;
+  download revision: `desktop-macs-3b26d8ddb81345db`, based on main
+  `2e7e9205438ccf53e4bcc990afc7ae920b587c73`. Previous platform artifacts and
+  Windows 0.3.10 remain available; no account service or database was replaced.
+  Ad-hoc signatures establish integrity only: no Developer ID or notarization,
+  manual first-open approval and updates. Browser-download acceptance and real
+  account use on the owner's physical Mac remain unverified. Only Apple Silicon
+  includes the existing 0.2.95 contribution runtime, installed in CI without
+  enrolling an account. Intel contribution and physical Mac inference are not
+  qualified. The default two-package catalog remains byte-identical; the legacy
+  ARM opt-in and new all-Mac opt-in contain three and four packages respectively.
+  Complete public HTTPS downloads of both DMGs and their corresponding source
+  match the published SHA-256 values. The actual public page passes browser checks
+  at 1280, 390 and 320 pixels, with folded installation details and all five
+  platform links available.
 - Fedora Desktop packaging has focused RPM integrity/dependency tests and
   isolated user-namespace tests of runtime extraction, enrollment invocation,
   hash rejection and preservation of existing installations. These tests use
