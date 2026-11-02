@@ -278,6 +278,11 @@ receipts live under `outputs/desktop-downloads-simple-20261031`.
 
 ## Verified in automated or single-host runs
 
+- Fedora Desktop packaging has focused RPM integrity/dependency tests and
+  isolated user-namespace tests of runtime extraction, enrollment invocation,
+  hash rejection and preservation of existing installations. These tests use
+  synthetic enrollment payloads; they do not establish real account enrollment
+  or multi-host inference. See the Fedora build route in `DEVELOPMENT.md`.
 - selective Llama and Qwen-family pipelines;
 - real subprocesses and sockets on one host;
 - CPU pipeline parity and greedy kill-and-resume recovery;

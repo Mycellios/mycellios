@@ -1,0 +1,13 @@
+{
+  "version": "0.3.9",
+  "runtimeVersion": "0.2.95",
+  "baseline": "1a45f32d6deb5149fb8f7490c918b8285a622d4b",
+  "desktop": {
+    "url": "https://www.mycellios.com/downloads/desktop/releases/0.3.9/Mycellios-Desktop-0.3.9-linux-x64-pilot.deb",
+    "sha256": "ef4fb775c471c851f23fa0da0347ae8247537bf2c8a098722a2b4fe1a2593806"
+  },
+  "source": {
+    "url": "https://www.mycellios.com/downloads/desktop/releases/0.3.9/Mycellios-Desktop-0.3.9-source-ui2.tar.gz",
+    "sha256": "a15f4fc20b56ea3427dc1a75162bd7b1ae903641ccbc99f41121a73886c7ed2b"
+  }
+}

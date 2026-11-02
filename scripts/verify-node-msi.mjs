@@ -6,9 +6,15 @@ import { pathToFileURL } from "node:url";
 import { assertInstallerPackageTreeMatches } from "./verify-installer-package-tree.mjs";
 
 export async function verifyNodeMsi(input) {
-  const root = await mkdtemp(join(tmpdir(), "mycellios-node-msi-verify-")), extracted = join(root, "administrative"), decompiled = join(root, "decompiled.wxs");
+  // Leave room for the pinned Python runtime's deeply nested Windows paths.
+  const root = await mkdtemp(join(tmpdir(), "mcv-")), extracted = join(root, "a"), decompiled = join(root, "decompiled.wxs"), log = join(root, "extract.log");
   try {
-    run("msiexec.exe", ["/a", resolve(input.msi), "/qn", `TARGETDIR=${extracted}`], "node_msi_administrative_extract_failed");
+    try {
+      run("msiexec.exe", ["/a", resolve(input.msi), "/qn", "/L*V", log, `TARGETDIR=${extracted}`], "node_msi_administrative_extract_failed");
+    } catch (error) {
+      const detail = await readFile(log, "utf8").catch(() => "Installer log unavailable");
+      throw new Error(`${error.message}\n${detail.slice(-6000)}`, { cause: error });
+    }
     run("dark.exe", ["-nologo", "-x", join(root, "dark"), "-o", decompiled, resolve(input.msi)], "node_msi_decompile_failed");
     const manifests = await find(extracted, "layout-manifest.json");
     if (manifests.length !== 1) throw new Error("node_msi_product_root_is_ambiguous");
@@ -22,7 +28,7 @@ export async function verifyNodeMsi(input) {
 }
 
 async function find(root, name) { const matches = []; async function visit(directory) { for (const entry of await readdir(directory, { withFileTypes: true })) { const path = join(directory, entry.name); if (entry.isDirectory()) await visit(path); else if (entry.isFile() && entry.name === name) matches.push(path); } } await visit(root); return matches; }
-function run(executable, arguments_, error) { const result = spawnSync(executable, arguments_, { encoding: "utf8", shell: false }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${error}:${result.stderr.trim()}`); }
+function run(executable, arguments_, error) { const result = spawnSync(executable, arguments_, { encoding: "utf8", shell: false }); if (result.error) throw result.error; if (result.status !== 0) throw new Error(`${error}:exit=${result.status}:${result.stderr.trim()}`); }
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) { const values = Object.fromEntries(process.argv.slice(2).map((argument) => { const match = /^--([^=]+)=(.+)$/.exec(argument); if (!match) throw new Error(`node_msi_verify_argument_is_invalid:${argument}`); return [match[1], match[2]]; }));
   for (const key of ["msi", "staged-root", "version", "source-revision"]) if (!values[key]) throw new Error(`node_msi_verify_argument_is_missing:${key}`);
   await verifyNodeMsi({ msi: values.msi, stagedRoot: values["staged-root"], version: values.version, sourceRevision: values["source-revision"] }); process.stdout.write(`Native node MSI verified: ${values.msi}\n`); }
