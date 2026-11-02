@@ -5,12 +5,22 @@ import { HOST_COMPUTER_MAX_BYTES, hostComputerDeadlineMs, hostComputerRequest, t
 
 const LEASE_MS = 45_000;
 const MAX_OPERATIONS = 8;
+const MAX_WAITING_OPERATIONS = 32;
+const MAX_BOT_OPERATIONS = 8;
+const MAX_REQUEST_BUFFER = MAX_OPERATIONS * HOST_COMPUTER_MAX_BYTES;
 const MAX_STREAM_BUFFER = 2 * 1024 * 1024;
+
+export class DesktopRelayError extends Error {
+  constructor(readonly code: "desktop_disconnected" | "desktop_busy" | "desktop_connection_changed" | "desktop_request_too_large", message: string, readonly status: 409 | 429 | 413 = 409) {
+    super(message);
+    this.name = "DesktopRelayError";
+  }
+}
 type Binding = DesktopExecutorBinding & DesktopExecutorOwner & { seen: number };
 type Operation = {
   id: string; binding: Binding; request: HostComputerRequest; claimed: boolean;
   controller: ReadableStreamDefaultController<Uint8Array>; timer: ReturnType<typeof setTimeout>;
-  seq: number; digest: string; closed: boolean; dispose(): void;
+  seq: number; digest: string; closed: boolean; requestBytes: number; dispose(): void;
 };
 const sameOwner = (a: DesktopExecutorOwner, b: DesktopExecutorOwner) =>
   a.userId === b.userId && a.spaceId === b.spaceId && a.sessionId === b.sessionId;
@@ -98,32 +108,44 @@ export class DesktopRelayBroker {
     this.expire();
     for (const binding of this.bindings.values()) if (sameOwner(owner, binding) && binding.deviceId === deviceId) binding.seen = this.now();
     const current = [...this.operations.values()].filter(op => sameOwner(owner, op.binding) && op.binding.deviceId === deviceId && !op.closed);
-    const pending = current.filter(op => !op.claimed);
-    for (const op of pending) op.claimed = true; // Claim once. Lost polls must never execute twice.
-    return { bindings:[...this.bindings.values()].filter(b=>sameOwner(owner,b)&&b.deviceId===deviceId).map(b=>({deviceId,botId:b.botId,generation:b.generation})), operations: pending.map(op => ({ id: op.id, binding: { deviceId, botId: op.binding.botId, generation: op.binding.generation }, request: op.request })), active: current.map(op => op.id) };
+    let claimed = [...this.operations.values()].filter(op => op.claimed && !op.closed).length;
+    const pending: Operation[] = [];
+    for (const op of current) {
+      if (op.claimed || claimed >= MAX_OPERATIONS) continue;
+      if (current.filter(other => other.claimed && other.binding === op.binding).length >= 2) continue;
+      // Queue before admission; claim exactly once only when an execution slot exists.
+      op.claimed = true;
+      claimed++;
+      pending.push(op);
+    }
+    // Never advertise queued work as delivered: native recovery treats missing delivered
+    // operation IDs as uncertain work and must not execute them again.
+    return { bindings:[...this.bindings.values()].filter(b=>sameOwner(owner,b)&&b.deviceId===deviceId).map(b=>({deviceId,botId:b.botId,generation:b.generation})), operations: pending.map(op => ({ id: op.id, binding: { deviceId, botId: op.binding.botId, generation: op.binding.generation }, request: op.request })), active: current.filter(op => op.claimed).map(op => op.id) };
   }
   dispatch(input: HostComputerRequest, context: AdapterContext): Response {
     this.expire();
     const binding = this.bindings.get(key(context, input.botId));
-    if (!binding) throw new Error("The paired PC is disconnected. Start Mycellios Desktop on that computer.");
-    if ([...this.operations.values()].filter(op => !op.closed).length >= MAX_OPERATIONS || [...this.operations.values()].filter(op => op.binding === binding && !op.closed).length >= 2)
-      throw new Error("Desktop relay is busy");
+    if (!binding) throw new DesktopRelayError("desktop_disconnected", "The paired PC is disconnected. Start Mycellios Desktop on that computer.");
+    const requestBytes = Buffer.byteLength(JSON.stringify(input));
+    if (requestBytes > HOST_COMPUTER_MAX_BYTES) throw new DesktopRelayError("desktop_request_too_large", "The PC request is too large.", 413);
+    const open = [...this.operations.values()].filter(op => !op.closed);
+    if (open.length >= MAX_WAITING_OPERATIONS || open.filter(op => op.binding === binding).length >= MAX_BOT_OPERATIONS || open.reduce((bytes, op) => bytes + op.requestBytes, requestBytes) > MAX_REQUEST_BUFFER)
+      throw new DesktopRelayError("desktop_busy", "The PC request queue is full. Wait for current work to finish; this operation was not dispatched.", 429);
     if (input.runId) {
       const runKey = key(context, `${input.botId}:${input.runId}`);
       const previous = this.runs.get(runKey);
-      if (previous && previous.generation !== binding.generation) throw new Error("This run belongs to a previous project connection. Start a new request.");
-      if (!previous && this.runs.size >= 4096) throw new Error("Desktop relay is busy");
+      if (previous && previous.generation !== binding.generation) throw new DesktopRelayError("desktop_connection_changed", "This run belongs to a previous project connection. Start a new request.");
+      if (!previous && this.runs.size >= 4096) throw new DesktopRelayError("desktop_busy", "The PC request queue is full. Wait for current work to finish; this operation was not dispatched.", 429);
       this.runs.set(runKey, { generation: binding.generation, until: this.now() + 24 * 60 * 60_000 });
     }
-    if (Buffer.byteLength(JSON.stringify(input)) > HOST_COMPUTER_MAX_BYTES) throw new Error("Request too large");
     const id = randomUUID();
     let op: Operation;
     const abort = () => this.fail(op, "Desktop command cancelled. Check results before retrying.");
     const body = new ReadableStream<Uint8Array>({
       start: controller => {
-        const timer = setTimeout(() => this.fail(op, "Desktop command timed out. Check results before retrying."), hostComputerDeadlineMs(input));
+        const timer = setTimeout(() => this.fail(op, op.claimed ? "Desktop command timed out. Check results before retrying." : "The PC request timed out before dispatch. No command was started."), hostComputerDeadlineMs(input));
         timer.unref();
-        op = { id, binding, request: input, claimed: false, controller, timer, seq: -1, digest: "", closed: false,
+        op = { id, binding, request: input, requestBytes, claimed: false, controller, timer, seq: -1, digest: "", closed: false,
           dispose: () => { clearTimeout(timer); context.signal.removeEventListener("abort", abort); } };
         this.operations.set(id, op);
       },

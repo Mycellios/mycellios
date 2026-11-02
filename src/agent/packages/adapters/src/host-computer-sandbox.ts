@@ -53,7 +53,17 @@ export class HostComputerSandbox implements SandboxProvider {
     if (!response.ok || !response.body) {
       await response.body?.cancel();
       throw new Error(
-        "Local computer unavailable. Open the desktop app and enable local computer access.",
+        response.headers.get("x-mycellios-desktop-error") === "desktop_disconnected"
+          ? "The paired PC is disconnected. Start Mycellios Desktop on that computer."
+          : response.headers.get("x-mycellios-desktop-error") === "desktop_connection_changed"
+            ? "The PC connection changed during this run. Check existing results before starting a new request."
+            : response.status === 429
+              ? "The PC request queue is full. Wait for current work to finish; this operation was not dispatched."
+              : response.status === 413
+                ? "The PC request is too large. This operation was not dispatched."
+                : response.status === 401 || response.status === 403
+                  ? "Local computer access is unavailable: the Desktop session or computer permission was refused. Check Mycellios Desktop."
+                  : "The PC bridge could not accept this operation. Check the PC connection and existing results before retrying.",
       );
     }
     const reader = response.body.getReader();

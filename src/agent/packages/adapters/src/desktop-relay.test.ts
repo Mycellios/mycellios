@@ -94,3 +94,45 @@ it("rotates a restarted native account without replaying an interrupted run",asy
  expect(()=>broker.dispatch({method:"environment",botId:"bot",runId:"old-run"},context())).toThrow("previous project");
  expect(broker.poll(owner,"device").bindings).toEqual([]);
 });
+
+it("queues eight parallel calls, admits only two per agent and never reclaims delivered work", async () => {
+  broker = new DesktopRelayBroker(); broker.bind(owner, binding);
+  const responses = Array.from({length:8}, (_,i) => broker.dispatch({method:"execute",botId:"bot",command:{argv:["read-only",String(i)]}},context()));
+  expect(() => broker.dispatch({method:"environment",botId:"bot"},context())).toThrow("queue is full");
+  expect(broker.available(owner,"bot")).toBe(true);
+  const seen = new Set<string>();
+  for (let wave=0;wave<4;wave++) {
+    const state=broker.poll(owner,"device");
+    expect(state.operations).toHaveLength(2);expect(state.active).toHaveLength(2);
+    expect(broker.poll(owner,"device").operations).toEqual([]);
+    for(const op of state.operations){expect(seen.has(op.id)).toBe(false);seen.add(op.id);broker.result(owner,"device",op.id,0,Buffer.from('{"done":true}\n').toString("base64"),true);}
+  }
+  expect(seen.size).toBe(8);expect(broker.poll(owner,"device").active).toEqual([]);
+  expect(await Promise.all(responses.map(r=>r.text()))).toEqual(Array(8).fill('{"done":true}\n'));
+});
+
+it("removes a cancelled queued call without ever delivering it to the PC",async()=>{
+  broker=new DesktopRelayBroker();broker.bind(owner,binding);
+  const first=broker.dispatch({method:"environment",botId:"bot"},context());
+  const second=broker.dispatch({method:"environment",botId:"bot"},context());
+  const controller=new AbortController();const cancelled=broker.dispatch({method:"execute",botId:"bot",command:{argv:["must-not-run"]}},{...context(),signal:controller.signal});
+  const state=broker.poll(owner,"device");expect(state.operations).toHaveLength(2);
+  controller.abort();expect(await cancelled.text()).toContain("cancelled");
+  for(const op of state.operations)broker.result(owner,"device",op.id,0,"",true);
+  await Promise.all([first.text(),second.text()]);expect(broker.poll(owner,"device").operations).toEqual([]);
+});
+
+it("retains the global eight-operation execution limit across queued agents",async()=>{
+  broker=new DesktopRelayBroker();const responses:Response[]=[];
+  for(let bot=0;bot<5;bot++){
+    broker.bind(owner,{...binding,botId:"bot-"+bot});
+    for(let i=0;i<3;i++)responses.push(broker.dispatch({method:"environment",botId:"bot-"+bot},context()));
+  }
+  let completed=0;
+  while(completed<15){
+    const state=broker.poll(owner,"device");expect(state.active.length).toBeLessThanOrEqual(8);expect(state.operations.length).toBeGreaterThan(0);
+    const counts=new Map<string,number>();for(const op of state.operations){counts.set(op.binding.botId,(counts.get(op.binding.botId)??0)+1);broker.result(owner,"device",op.id,0,"",true);completed++;}
+    expect([...counts.values()].every(n=>n<=2)).toBe(true);
+  }
+  await Promise.all(responses.map(r=>r.text()));
+});
