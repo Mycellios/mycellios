@@ -1,0 +1,13 @@
+.api-quick-start { min-width:0; padding:24px; background:#efede7; border-radius:16px; }
+.api-quick-start > header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.api-quick-start h3 { font-size:19px; font-weight:500; }
+.api-languages { display:flex; flex-wrap:wrap; gap:4px; margin:14px 0; }
+.api-quick-start pre { min-width:0; margin:0; white-space:pre-wrap; overflow-wrap:anywhere; padding:22px; background:#18271e; color:#f6f5ef; border-radius:10px; font-size:12px; line-height:1.7; tab-size:2; }
+.api-quick-start pre:focus-visible { outline:2px solid #62876c; outline-offset:4px; }
+.api-example-hint { margin-top:15px; font-size:12px; line-height:1.6; color:#59635d; }
+.api-example-footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; align-items:center; margin-top:18px; font-size:12px; }
+.api-example-footer small { color:#59635d; }
+.api-example-footer a { display:inline-flex; align-items:center; gap:5px; }
+.reference-api-steps { display:grid; gap:14px; padding-left:20px; margin:27px 0; font-size:14px; line-height:1.65; }
+.reference-api-steps a { text-decoration:underline; }
+@media (max-width:760px) { .api-quick-start { padding:20px 16px; } .api-quick-start pre { padding:18px 14px; font-size:11px; } }

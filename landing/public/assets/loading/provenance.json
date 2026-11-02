@@ -1,0 +1,98 @@
+{
+  "purpose": "Approved forest loading intro and isolated animation review",
+  "generation": "Built-in image_gen; reference-guided generation and edit",
+  "encoding": "WebP quality 82; content and dimensions preserved",
+  "references": [
+    "Approved three-frame Mycellios storyboard",
+    "/assets/landing/network-fruiting.webp"
+  ],
+  "assets": [
+    {
+      "file": "forest-clean.webp",
+      "bytes": 669710,
+      "sha256": "197cfab7929e1320603537d29ed0a750ca3a86ad6418aa5dc5ee09e499685608",
+      "dimensions": [
+        1774,
+        887
+      ],
+      "prompt": "Make ONE full-bleed WIDE landscape image, approximately 2:1 aspect ratio, of the FIRST frame of the approved forest-to-mycelium loading concept in reference image 1. This is a real animation asset, NOT a storyboard, no panels, no gutters, no lettering, no typography or UI. Reference image 1 gives the approved forest atmosphere and engraved texture. Reference image 2 defines the exact five computer components and their arrangement, perspective and identities. Preserve that arrangement: fan-covered module on far left, tallest rectangular rack just left of centre, small upright motherboard/processor in centre foreground, horizontal server stack right foreground, cylindrical computer on far right. These are large central subjects, fully visible including their bases, filling 85% width and about 78% height. Keep all five recognizable.\nAll equipment is entirely CLEAN: remove ALL mushrooms and ALL white organic fungal webs; reconstruct metal panels, circuit boards, vents and normal black hardware cables where the webs were. There are NO mushrooms or visible fungal filaments ANYWHERE in this initial scene.\nThe computers stand firmly on a leafy woodland floor, tall woodland tree trunks behind them, ferns and low plants at the edges, roots and stones on the ground. Rich ink-drawn forest details across the full image, sufficient contrast around the equipment so it stays legible. EXACT aesthetic of approved first panel: delicate antique engraved and stippled print, forest green/charcoal ink and warm ivory paper, muted olive foliage, detailed metal etching. Organic and calm. No photorealism, no 3D plastic rendering, no neon, no glowing electronics. Camera fixed at the reference perspective. No clipped equipment, no extra machines, no people. Landscape single scene only."
+    },
+    {
+      "file": "forest-grown.webp",
+      "bytes": 698054,
+      "sha256": "94b4b05f907a3a3eca098652153c2986703be5501b50448d2613ff688ff7d8c4",
+      "dimensions": [
+        1774,
+        887
+      ],
+      "prompt": "Edit IMAGE 1 as a perfectly registered final-growth frame for a website animation. Preserve the entire exact canvas size, framing, perspective, EVERY machine's shape, placement and size, all trees, tree trunks, branches, rocks, leaves, ferns and woodland lighting. The before/after images will be overlaid in the animation, so do not move, repaint or recompose the existing scene. Only add the fungal growth.\nUse IMAGE 2 as the authoritative visual reference for the ivory, porous, branching mycelium wrapping the metal machinery and the oyster-style mushrooms growing from it. Coat and connect the five machines with this beautiful organic ivory network, making believable branching bridges through the existing cables. The ground, roots and several of the background tree trunks are also extensively colonised: thin pale webs branch across the woodland floor and climb bark into the forest. Mushroom clusters emerge at machine corners, between root systems and at tree bases. Keep the equipment and trees legible through the open holes of the network. This is widespread living colonisation of the whole forest and machines, not just a few mushrooms, but preserve all important existing outlines.\nKeep exactly IMAGE 1's detailed antique engraved/stippled print aesthetic: charcoal/forest-green ink, muted olive, warm ivory. No neon, no lights, no text or UI, no extra hardware, no insects or people, no camera shift or perspective change. ONE landscape scene with the same dimensions as IMAGE 1."
+    },
+    {
+      "file": "forest-portrait-clean.webp",
+      "bytes": 702238,
+      "sha256": "0921683a0cbca74a0ed3c1b6837768e7a313a2b8f7b9a0e8125505ae3f5ba3bc",
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "prompt": "Adapt this exact illustrated woodland and computer ensemble into a PORTRAIT 2:3 composition for a mobile website loading scene. One full-bleed image, no text, labels, borders or UI. Keep the same five identifiable industrial computer components, the same engraved/stippled ink rendering, charcoal and forest green with muted olive and warm ivory paper. Arrange the same machines as a compact tall ensemble among woodland trees: tallest rectangular server central behind, fan-covered module to its left, cylindrical computer to its right, upright processor board front centre, horizontal server stack front right. Preserve their shapes and relative identities but compose them in the vertical canvas so ALL FIVE fit fully within the image and are clearly identifiable. Devices occupy about the middle 75% of the height, with tree canopy above and leafy roots and forest floor below. Dense woodland tree trunks and ferns around the devices. The machinery is perfectly clean metal, circuit boards, vents and normal dark cables, with NO MUSHROOMS, NO MYCELIUM OR FUNGAL WEBS anywhere in the frame. No extra machines, no people, no glowing lights, no photorealism. This is the clean starting frame, consistent in quality and palette with the reference."
+    },
+    {
+      "file": "forest-portrait-grown.webp",
+      "bytes": 703756,
+      "sha256": "412ea9737145685d05e5c460ee6459870abe5bad0190254cad04dae54ca4bab8",
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "prompt": "Edit IMAGE 1 into the fully colonised final frame of a mobile loading animation. Keep its EXACT portrait canvas, camera, framing, all equipment shapes, scale and placement, tree trunks, canopy, foliage, roots, rocks and soil. These before/after images will be overlaid, so preserve the entire existing composition. Only ADD fungal growth; do not move anything.\nUse IMAGE 2 only as the reference for the approved fungal treatment: ivory, porous, branching mycelium climbing the machinery and trees, open organic web bridges between machines, and cream oyster-style mushrooms. Apply this extensively across IMAGE 1's forest floor and exposed roots, the machines and multiple tree trunks. Preserve readable metal surfaces inside the network's gaps. Place mushroom clusters emerging from machine corners, trunks and roots. The whole woodland and the machines now form a living connected network. Match IMAGE 1's intricate engraved/stippled forest-green and charcoal ink, muted olive and ivory aesthetic. No neon, no glowing circuits, no people, no extra devices, no text or UI. One portrait illustration, same dimensions and hardware geometry as IMAGE 1."
+    }
+  ],
+  "responsive": "Only the landscape or portrait pair for the current orientation is loaded.",
+  "production_derivatives": [
+    {
+      "file": "forest-clean-v1.webp",
+      "source": "forest-clean.webp",
+      "encoding": "WebP quality 68",
+      "bytes": 409034,
+      "dimensions": [
+        1536,
+        768
+      ],
+      "sha256": "290d6b61fee160673612a3fdb3e6c52f701dbc800dcc0a807f7212e827023fbe"
+    },
+    {
+      "file": "forest-grown-v1.webp",
+      "source": "forest-grown.webp",
+      "encoding": "WebP quality 68",
+      "bytes": 432162,
+      "dimensions": [
+        1536,
+        768
+      ],
+      "sha256": "47ad1227af8ff6895c6f119ad3328b27886b0205ec7a656693b135cd96ea8092"
+    },
+    {
+      "file": "forest-portrait-clean-v1.webp",
+      "source": "forest-portrait-clean.webp",
+      "encoding": "WebP quality 68",
+      "bytes": 331870,
+      "dimensions": [
+        768,
+        1152
+      ],
+      "sha256": "ff809823980ce12b8d67a3a4fee16ab2bfe6a25487de2bd1ffeb3a56a261de99"
+    },
+    {
+      "file": "forest-portrait-grown-v1.webp",
+      "source": "forest-portrait-grown.webp",
+      "encoding": "WebP quality 68",
+      "bytes": 341700,
+      "dimensions": [
+        768,
+        1152
+      ],
+      "sha256": "214d91271bc4dc7fc4342dcae2f56e72e75d92a1d69360ed142f88f607987161"
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+import { MARKETING_COMPARISONS } from "../../src/contracts/marketing-pages.js";
 
 const SITE_ORIGIN = "https://www.mycellios.com";
 const BRAND_IMAGE_URL = `${SITE_ORIGIN}/assets/brand/og-network-v2.png`;
@@ -67,13 +68,23 @@ function webPage(name: string, description: string, path: string): JsonValue {
     "@type": "WebPage",
     name,
     description,
-    url: `${SITE_ORIGIN}${path}`,
+    url: new URL(path, SITE_ORIGIN).href,
     isPartOf: { "@id": WEBSITE_ID },
     about: { "@id": SOFTWARE_ID },
   };
 }
 
+const extraPage = (title: string, description: string, path: string): SeoPage => ({ title, description, canonicalPath: path, robots: "index, follow, max-image-preview:large", structuredData: webPage(title, description, path), staticContent: { heading: title, paragraphs: [description, "Review the linked product sources and implementation status before choosing a workflow. Mycellios is in active development; compute rewards remain planned."], links: [{ href: "/", label: "Mycellios" }, { href: "https://www.mycellios.com/agent", label: "Open Agent" }] } });
+type ComparisonSeoPath = `/compare/${(typeof MARKETING_COMPARISONS)[number][0]}`;
+const comparisonPages = Object.fromEntries(MARKETING_COMPARISONS.map(([slug, name]) => [`/compare/${slug}`, extraPage(slug === "best-ai-agent-apps" ? "Choose your next AI agent | Mycellios" : `Mycellios vs ${name}`, `Compare agent workflows, deployment and costs. Original guidance with links to ${name}'s product sources.`, `/compare/${slug}`)])) as Record<ComparisonSeoPath, SeoPage>;
+const comparisonPaths = Object.keys(comparisonPages) as ComparisonSeoPath[];
+
 export const SEO_PAGES = {
+  ...comparisonPages,
+  "/pricing": extraPage("Plans & pricing | Mycellios", "Mycellios plans, network usage pricing and contributor rewards are coming soon. Use the workspace today and explore an optional provider-cost estimator.", "/pricing"),
+  "/compare": extraPage("Compare AI agent apps | Mycellios", "Compare Mycellios with other agent apps, with original guidance and current product sources.", "/compare"),
+  "/stats": extraPage("Mycellios Stats — network observations", "Inspect observed node capacity, models, jobs and persisted history from Mycellios's public coordinator.", "/stats"),
+  "/spore/rewards": { title: "Useful work. Shared rewards. | Mycellios", description: "SPORE rewards, staking and contributor payouts are coming soon. Explore the proposed reward flow and use Mycellios Agent today.", canonicalPath: "/spore/rewards", robots: "noindex, nofollow, noarchive", staticContent: { heading: "Useful work. Shared rewards.", paragraphs: ["SPORE rewards, staking and contributor payouts are coming soon. Confirmed rates and conditions will be published before activation."], links: [{ href: "https://www.mycellios.com/agent", label: "Open Mycellios Agent" }] } },
   "/": {
     title: "Mycellios — open compute for distributed AI",
     description:
@@ -90,7 +101,7 @@ export const SEO_PAGES = {
         { href: "https://www.mycellios.com/agent", label: "Open Mycellios Agent" },
         { href: "/network", label: "Inspect the public network snapshot" },
         { href: "/earn", label: "Learn about contributing to the test network" },
-        { href: "https://github.com/tych0s/mycellios", label: "View the open-source project" },
+        { href: "https://github.com/Mycellios/mycellios", label: "View the open-source project" },
       ],
     },
     structuredData: {
@@ -119,29 +130,6 @@ export const SEO_PAGES = {
       "Live distributed AI network | mycellios",
       "A public snapshot of Mycellios workers, models, and recorded inference activity when data is available.",
       "/network",
-    ),
-  },
-  "/create": {
-    title: "Design an AI identity | Mycellios Studio",
-    description:
-      "Design an AI identity with personality, memory, knowledge, tools, and launch channels. Preview a local draft and sign in to publish.",
-    canonicalPath: "/create",
-    robots: "index, follow, max-image-preview:large",
-    staticContent: {
-      heading: "Design an AI identity",
-      paragraphs: [
-        "Draft an AI identity by choosing its personality, memory policy, planned knowledge sources, tools, and launch channel.",
-        "Drafts stay in this browser. Source labels do not connect content, and tools remain controlled; publishing requires an account and an explicitly configured connection.",
-      ],
-      links: [
-        { href: "/", label: "Explore the Mycellios project" },
-        { href: "/network", label: "Inspect the public network snapshot" },
-      ],
-    },
-    structuredData: webPage(
-      "Design an AI identity | Mycellios Studio",
-      "A visual builder for drafting and previewing AI identities before publishing to web, Telegram, or API channels.",
-      "/create",
     ),
   },
   "/earn": {
@@ -179,30 +167,6 @@ export const SEO_PAGES = {
       links: [{ href: "/", label: "Return to Mycellios" }],
     },
   },
-  "/spore/treasury": {
-    title: "SPORE treasury preview | mycellios",
-    description:
-      "Preview the proposed SPORE treasury model. No treasury contract or reward distributions are live.",
-    canonicalPath: "/spore/treasury",
-    robots: "noindex, nofollow, noarchive",
-    staticContent: {
-      heading: "SPORE treasury preview",
-      paragraphs: ["This is a proposed model preview. No treasury contract or reward distributions are live."],
-      links: [{ href: "/", label: "Return to Mycellios" }],
-    },
-  },
-  "/spore/data": {
-    title: "Network data preview | mycellios",
-    description:
-      "Preview the planned mycellios network telemetry. No live feed or token price data is available.",
-    canonicalPath: "/spore/data",
-    robots: "noindex, nofollow, noarchive",
-    staticContent: {
-      heading: "Network data preview",
-      paragraphs: ["Planned Mycellios network telemetry is not a live feed, and token price data is not available."],
-      links: [{ href: "/network", label: "View the public network snapshot" }],
-    },
-  },
   "/downloads": {
     title: "Native package availability | mycellios",
     description:
@@ -217,7 +181,7 @@ export const SEO_PAGES = {
       ],
       links: [
         { href: "/browser/", label: "Try the browser worker" },
-        { href: "https://github.com/tych0s/mycellios/releases", label: "View published releases" },
+        { href: "https://github.com/Mycellios/mycellios/releases", label: "View published releases" },
       ],
     },
     structuredData: {
@@ -267,13 +231,13 @@ export const SEO_PAGES = {
     },
   },
   "/dashboard": {
-    title: "Dashboard | mycellios",
-    description: "Sign in to manage your Mycellios account and network workspace.",
+    title: "Mycellios Stats dashboard",
+    description: "Inspect Mycellios capacity, model availability and recorded network work.",
     canonicalPath: "/dashboard",
     robots: "noindex, nofollow, noarchive",
     staticContent: {
       heading: "Mycellios dashboard",
-      paragraphs: ["Sign in to manage your Mycellios account and network workspace."],
+      paragraphs: ["Inspect Mycellios capacity, model availability and recorded network work."],
       links: [{ href: "/", label: "Return to Mycellios" }],
     },
   },
@@ -292,15 +256,17 @@ export const SEO_PAGES = {
 
 export type SeoPath = keyof typeof SEO_PAGES;
 
-export const INDEXABLE_SEO_PATHS = ["/", "/network", "/create", "/earn", "/downloads", "/browser/"] as const;
+export const INDEXABLE_SEO_PATHS = ["/", "/network", "/earn", "/downloads", "/browser/", "/pricing", "/compare", "/stats", ...comparisonPaths] as const;
 export const LANDING_SEO_PATHS = [
   "/",
   "/network",
-  "/create",
   "/earn",
   "/spore",
-  "/spore/treasury",
-  "/spore/data",
+  "/spore/rewards",
+  "/stats",
+  "/pricing",
+  "/compare",
+  ...comparisonPaths,
   "/downloads",
   "/admin",
   "/dashboard",
@@ -308,10 +274,15 @@ export const LANDING_SEO_PATHS = [
 ] as const;
 
 export function canonicalUrl(page: SeoPage): string {
-  return `${SITE_ORIGIN}${page.canonicalPath}`;
+  return new URL(page.canonicalPath, SITE_ORIGIN).href;
 }
 
-export function seoPageForPath(pathname: string): SeoPage {
+export function seoPageForPath(pathname: string, search = ""): SeoPage {
+  if (pathname === "/dashboard" && new URLSearchParams(search).has("view")) return {
+    ...SEO_PAGES["/dashboard"],
+    title: "Mycellios network console",
+    description: "Inspect network capacity, models, devices and operational evidence in the Mycellios console.",
+  };
   if (pathname === "/browser" || pathname.startsWith("/browser/") || pathname === "/mobile" || pathname.startsWith("/mobile/")) return SEO_PAGES["/browser/"];
   if (pathname in SEO_PAGES) return SEO_PAGES[pathname as SeoPath];
   return SEO_PAGES["/"];
@@ -351,7 +322,7 @@ function upsertStructuredData(data: JsonValue | undefined): void {
 }
 
 export function applySeoMetadata(pathname = window.location.pathname): void {
-  const page = seoPageForPath(pathname);
+  const page = seoPageForPath(["stats.mycellios.com", "stats.localhost"].includes(window.location.hostname) && pathname === "/" ? "/stats" : pathname, window.location.search);
   const url = canonicalUrl(page);
 
   document.documentElement.lang = "en";

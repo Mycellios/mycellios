@@ -46,6 +46,14 @@
           "match": "ReferenceLanding-",
           "maximumBytes": 35000
         },
+        "forest-intro": {
+          "match": "forest-loader-",
+          "maximumBytes": 80000
+        },
+        "shared-animation": {
+          "match": "gsap-",
+          "maximumBytes": 72000
+        },
         "globe-renderer": {
           "match": "HeroGlobe-",
           "maximumBytes": 50000
@@ -54,7 +62,7 @@
       "criticalPaths": {
         "home": {
           "entry": "src/rebrand/ReferenceLanding.tsx",
-          "highPriorityMatches": [],
+          "highPriorityMatches": ["agent-hero-motion-", "gsap-"],
           "maximumBytes": 350000
         },
         "panel": {

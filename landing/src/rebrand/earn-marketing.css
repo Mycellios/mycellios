@@ -1,0 +1,17 @@
+.earn-marketing-intro { display:grid; grid-template-columns:1.1fr 1fr; align-items:center; gap:40px; }
+.earn-marketing-intro > img { display:block; width:100%; height:auto; }
+.earn-marketing-intro h1 { font-size:clamp(38px,4.3vw,60px); }
+.earn-marketing-intro .marketing-intro > a { display:inline-flex; gap:8px; align-items:center; margin-top:28px; font-size:14px; }
+.earn-marketing h2 { font-size:clamp(30px,3.5vw,44px); line-height:1.12; font-weight:500; letter-spacing:-.035em; }
+.earn-marketing-options { padding-block:20px 90px; }
+.earn-marketing-options > div { display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:40px; }
+.earn-marketing-options > div > a { display:flex; align-items:flex-start; gap:20px; }
+.earn-marketing-options svg { flex:none; margin-top:3px; }
+.earn-marketing-options strong { font-size:23px; font-weight:500; }
+.earn-marketing-options p { margin:16px 0; color:#59635d; font-size:15px; line-height:1.7; }
+.earn-marketing-options small { color:#59635d; font-size:12px; line-height:1.6; }
+.earn-marketing-economics > p { margin:24px 0 36px; font-size:17px; color:#59635d; line-height:1.6; }
+.earn-marketing-status { max-width:760px; padding-block:95px 80px; }
+.earn-marketing-status p { margin:24px 0; color:#59635d; font-size:17px; line-height:1.7; }
+.earn-marketing-status > a { display:inline-flex; align-items:center; gap:8px; min-height:44px; font-size:14px; }
+@media (max-width:760px) { .earn-marketing-intro { grid-template-columns:1fr; gap:0; } .earn-marketing-intro > img { max-height:240px; object-fit:contain; margin-bottom:40px; } .earn-marketing-options > div { grid-template-columns:1fr; gap:34px; } .earn-marketing-options { padding-bottom:65px; } .earn-marketing-status { padding-block:65px 55px; } }

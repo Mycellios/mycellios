@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
   analyzeArchitecture,
   type ArchitectureSource,
@@ -13,7 +13,7 @@ function trackedFiles(...patterns: string[]): string[] {
     ["ls-files", "--cached", "--others", "--exclude-standard", "--", ...patterns],
     { encoding: "utf8" },
   );
-  return output.trim().split("\n").filter(Boolean).sort();
+  return output.trim().split("\n").filter((file) => file && existsSync(file)).sort();
 }
 
 function readSources(files: readonly string[]): ArchitectureSource[] {

@@ -51,6 +51,14 @@
       .seo-static-fallback ul { padding-inline-start:1.25rem; }
       #mycellios-loader { position:fixed; z-index:1000; inset:0; display:grid; place-items:center; color:#eee9e2; background:#0b0f0c; transition:opacity 240ms ease-in,visibility 240ms ease-in; }
       #mycellios-loader[data-state="leaving"] { opacity:0; visibility:hidden; }
+      #mycellios-loader[data-theme="paper"] { background:#faf9f7; color:#203b2b; }
+      html[data-forest-loading] { overflow:hidden; scrollbar-gutter:stable; }
+      #mycellios-loader[data-mode="forest"] { display:block; background:#17221a; transition:none; }
+      #mycellios-loader[data-mode="forest"] > svg { display:none; }
+      #mycellios-loader[data-mode="forest"] picture, #mycellios-loader[data-mode="forest"] img, #mycellios-loader[data-mode="forest"] canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+      #mycellios-loader[data-animated] { background:transparent; }
+      #mycellios-loader[data-animated] picture { visibility:hidden; }
+      #forest-loader-actions { position:absolute; z-index:1; right:calc(1.25rem + env(safe-area-inset-right)); bottom:calc(1.25rem + env(safe-area-inset-bottom)); padding-top:env(safe-area-inset-top); padding-left:env(safe-area-inset-left); }
       .mycellios-loader__mark { width:68px; height:68px; overflow:visible; filter:drop-shadow(0 0 20px rgba(173,122,72,.22)); }
       .mycellios-loader__cap,.mycellios-loader__stem,.mycellios-loader__gills { fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; }
       .mycellios-loader__cap { stroke-width:1.7; stroke-dasharray:72; animation:mycellios-cap-grow 1.5s cubic-bezier(.2,.75,.2,1) infinite; }
@@ -119,6 +127,65 @@
       </svg>
     </div>
     <div id="root"></div>
+    <script id="forest-loader-bootstrap">
+      (() => {
+        const loader = document.getElementById("mycellios-loader");
+        const root = document.getElementById("root");
+        const url = new URL(location.href);
+        const legacy = ["previous", "saved", "rooted", "assemblage"].includes(url.searchParams.get("landing"));
+        if (url.pathname === "/" && !legacy && url.searchParams.get("intro") !== "forest") loader.dataset.theme = "paper";
+        let seen = false;
+        try { seen = sessionStorage.getItem("mycellios.forestIntro.v1") === "seen"; } catch { /* Private browsing can deny storage. */ }
+        if (url.searchParams.get("intro") !== "forest" || url.pathname !== "/" || url.hash || legacy || url.searchParams.get("art") === "fabric"
+          || matchMedia("(prefers-reduced-motion: reduce)").matches
+          || (seen && url.searchParams.get("intro") !== "forest")) return;
+        loader.dataset.mode = "forest";
+        document.documentElement.dataset.forestLoading = "";
+        root.inert = true;
+        root.setAttribute("aria-hidden", "true");
+        const picture = document.createElement("picture");
+        const source = document.createElement("source");
+        source.media = "(orientation: portrait)";
+        source.srcset = "/assets/loading/forest-portrait-clean-v1.webp";
+        const image = document.createElement("img");
+        image.alt = "";
+        image.fetchPriority = "high";
+        picture.append(source, image);
+        const actions = document.createElement("div");
+        actions.id = "forest-loader-actions";
+        loader.append(picture, actions);
+        image.src = "/assets/loading/forest-clean-v1.webp";
+        let disabled = false;
+        let claimTimer;
+        let released = false;
+        const release = () => {
+          if (released) return;
+          released = true;
+          clearTimeout(watchdog);
+          clearTimeout(claimTimer);
+          const restoreFocus = loader.contains(document.activeElement);
+          loader.dispatchEvent(new Event("mycellios:loader-released", { bubbles: true }));
+          root.inert = false;
+          root.removeAttribute("aria-hidden");
+          delete document.documentElement.dataset.forestLoading;
+          loader.remove();
+          if (restoreFocus) root.querySelector(".assembly-skip")?.focus({ preventScroll: true });
+        };
+        const disable = () => {
+          disabled = true;
+          if (loader.dataset.routeReady) release();
+        };
+        loader.addEventListener("mycellios:forest-disable", disable);
+        loader.addEventListener("mycellios:forest-finish", release);
+        loader.addEventListener("mycellios:route-ready", () => {
+          loader.dataset.routeReady = "true";
+          if (disabled) release();
+          else claimTimer = setTimeout(() => { if (!loader.dataset.claimed) disable(); }, 700);
+        });
+        // Even a failed animation chunk must reveal the page once its route mounts.
+        const watchdog = setTimeout(disable, 7000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

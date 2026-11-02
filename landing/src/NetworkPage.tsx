@@ -2,11 +2,10 @@ import { Badge as UiBadge } from "./ui/primitives";
 import { Button as UiButton, Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "./ui/primitives";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Database, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
-import { LandingHeader } from "./rebrand/RebrandLanding";
+import { MarketingHeader as LandingHeader } from "./rebrand/MarketingHeader";
 import {
   BORDER_LINES,
   LAND_POINTS,
-  buildArc,
   placeWorker,
   rotatePoint,
   sphere,
@@ -134,8 +133,10 @@ export function deriveNetworkMetrics(snapshot: NetworkSnapshot) {
     ["queued", "leasing", "running", "streaming"].includes(job.status));
   const regions = new Set(
     activeWorkers
-      .map((worker) => worker.region.trim().toLowerCase())
-      .filter((region) => region && region !== "auto"),
+      .flatMap((worker) => {
+        const location = placeWorker(worker.region);
+        return location ? [`${location.lon},${location.lat}`] : [];
+      }),
   );
   const gpuCount = activeWorkers.reduce(
     (total, worker) => total + (worker.gpus.length || (worker.kind === "browser" ? 1 : 0)),
@@ -347,9 +348,10 @@ export function NetworkPage({
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     .slice(0, 8), [snapshot.jobs]);
 
-  const nodes = useMemo<GlobeNode[]>(() => snapshot.workers.map((worker) => {
-    const placement = placeWorker(worker.region, worker.id);
-    return {
+  const nodes = useMemo<GlobeNode[]>(() => snapshot.workers.flatMap((worker) => {
+    const placement = placeWorker(worker.region);
+    if (!placement) return [];
+    return [{
       worker,
       vector: sphere(placement.lon, placement.lat),
       located: placement.located,
@@ -358,31 +360,18 @@ export function NetworkPage({
       x: 0,
       y: 0,
       front: false,
-    };
+    }];
   }), [snapshot.workers]);
 
-  // Serving nodes form the visible routes. A single closed ring keeps the arc
-  // count proportional to the network instead of drawing every pair.
-  const arcs = useMemo(() => {
-    const serving = nodes.filter((node) => node.state === "serving");
-    if (serving.length < 2) return [] as Float32Array[];
-    const pairs = serving.length === 2 ? 1 : serving.length;
-    const built: Float32Array[] = [];
-    for (let index = 0; index < pairs; index += 1) {
-      built.push(buildArc(serving[index]!.vector, serving[(index + 1) % serving.length]!.vector));
-    }
-    return built;
-  }, [nodes]);
+  const unlocatedWorkers = snapshot.workers.length - nodes.length;
 
   // Refs mirror the render inputs so the animation loop never re-subscribes and
   // never forces a React render per frame.
   const nodesRef = useRef(nodes);
-  const arcsRef = useRef(arcs);
   const drawRef = useRef<(() => void) | null>(null);
   const selectedRef = useRef<string | null>(selectedId);
   const hoveredRef = useRef<string | null>(null);
   nodesRef.current = nodes;
-  arcsRef.current = arcs;
   selectedRef.current = selectedId;
 
   useEffect(() => {
@@ -413,7 +402,6 @@ export function NetworkPage({
     let centerX = 0;
     let centerY = 0;
     let radius = 0;
-    let pulse = 0;
     const scratch: Vec3 = [0, 0, 0];
 
     const layout = () => {
@@ -478,39 +466,8 @@ export function NetworkPage({
       }
       context.stroke();
 
-      // Route arcs between serving nodes, with a travelling pulse.
-      for (const arc of arcsRef.current) {
-        const count = arc.length / 3;
-        context.strokeStyle = `rgba(${ink.serving},0.5)`;
-        context.lineWidth = 1;
-        context.beginPath();
-        let pen = false;
-        for (let index = 0; index < count; index += 1) {
-          const point = project(arc, index * 3);
-          if (point[2] > 0) {
-            const x = centerX + point[0] * radius;
-            const y = centerY - point[1] * radius;
-            if (pen) context.lineTo(x, y);
-            else context.moveTo(x, y);
-            pen = true;
-          } else {
-            pen = false;
-          }
-        }
-        context.stroke();
-        const head = Math.floor((pulse % 1) * (count - 1));
-        const point = project(arc, head * 3);
-        if (point[2] > 0) {
-          context.fillStyle = `rgb(${ink.standby})`;
-          context.fillRect(
-            ((centerX + point[0] * radius) | 0) - 1,
-            ((centerY - point[1] * radius) | 0) - 1,
-            3,
-            3,
-          );
-        }
-      }
-
+      // Only observed worker records with a declared city receive pins.
+      // The public snapshot supplies no peer-link evidence, so no routes are drawn.
       // Nodes. Screen positions are cached here for pointer hit-testing.
       context.font = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
       context.textBaseline = "middle";
@@ -584,7 +541,6 @@ export function NetworkPage({
           view.easing = false;
         }
       }
-      pulse += elapsed / 2_600;
       draw();
       frame = window.requestAnimationFrame(tick);
     };
@@ -714,7 +670,7 @@ export function NetworkPage({
     };
   }, [animate, viewMode]);
 
-  useEffect(() => { drawRef.current?.(); }, [nodes, arcs, selectedId]);
+  useEffect(() => { drawRef.current?.(); }, [nodes, selectedId]);
 
   const selectedNode = nodes.find((node) => node.worker.id === selectedId) ?? null;
   const hasData = snapshot.capturedAt !== EMPTY_SNAPSHOT.capturedAt;
@@ -753,7 +709,7 @@ export function NetworkPage({
       {viewMode === "globe" && <canvas
         ref={canvasRef}
         className="net-globe"
-        aria-label={`Interactive globe showing ${nodes.length} announced Mycellios nodes`}
+        aria-label={`Interactive globe showing ${nodes.length} Mycellios worker records with reported regional locations`}
         role="img"
       />}
 
@@ -784,10 +740,10 @@ export function NetworkPage({
             <canvas
               ref={canvasRef}
               className="net-globe"
-              aria-label={hasData ? `Interactive globe showing ${nodes.length} announced Mycellios nodes` : "Interactive globe awaiting network snapshot"}
+              aria-label={hasData ? `Interactive globe showing ${nodes.length} Mycellios worker records with reported regional locations` : "Interactive globe awaiting network snapshot"}
               role="img"
             />
-            <header><span>LIVE TOPOLOGY</span><strong>{hasData ? `${snapshot.summary.online} online · ${metrics.regions} regions` : "Awaiting snapshot"}</strong></header>
+            <header><span>REPORTED REGIONS</span><strong>{hasData ? `${snapshot.summary.online} online · ${metrics.regions} regions` : "Awaiting snapshot"}</strong></header>
             <UiButton type="button" onClick={() => selectViewMode("globe")} aria-label="Open full-screen globe"><ArrowRight /></UiButton>
           </UiCard>
           <DashboardChart title="Online capacity" unit="GB" samples={visibleHistory?.samples ?? []} series={[{ key: "offeredVramMb", label: "Online", tone: "bronze", divisor: 1024 }, { key: "freeVramMb", label: "Free", tone: "sage", divisor: 1024 }]} />
@@ -801,6 +757,7 @@ export function NetworkPage({
       {viewMode === "overview" && <UiLink className="net-hud net-scroll-cue" href="#network-evidence"><span>SCROLL</span>Historical telemetry · node ledger · methodology <b aria-hidden="true">↓</b></UiLink>}
 
       <div className="net-hud net-legend" role="list" aria-label="Node state legend">
+        {unlocatedWorkers > 0 && <span role="listitem">{unlocatedWorkers} without a reported city</span>}
         <span role="listitem"><i style={{ background: "#22c55e" }} />serving</span>
         <span role="listitem"><i style={{ background: "rgba(255,255,255,0.82)" }} />standby</span>
         <span role="listitem"><i style={{ background: "rgba(255,255,255,0.32)" }} />joining</span>
@@ -826,7 +783,7 @@ export function NetworkPage({
         <div className="net-ticker-label">{inactive.length > 0 ? "nodes not serving" : "node activity"}</div>
         {inactive.length === 0
           ? <div className="net-ticker-row empty">
-              {!hasData ? "Waiting for network snapshot." : nodes.length === 0 ? "Waiting for the first node." : "Every announced node is serving."}
+              {!hasData ? "Waiting for network snapshot." : nodes.length === 0 ? snapshot.workers.length ? "No worker has announced a mappable city yet." : "Waiting for the first node." : "Every mapped worker is serving."}
             </div>
           : inactive.map((node, index) => <div
               key={node.worker.id}
@@ -863,9 +820,9 @@ export function NetworkPage({
       />}
 
       {!loading && !error && nodes.length === 0 && <div className="net-empty">
-        <strong>No nodes announced</strong>
-        <span>The coordinator is reachable, but no worker is currently visible.</span>
-        <UiLink href="/earn">Connect a device →</UiLink>
+        <strong>{snapshot.workers.length ? "Waiting for reported locations" : "No nodes announced"}</strong>
+        <span>{snapshot.workers.length ? `${unlocatedWorkers} worker records have not reported a supported city. They are included in the network totals. Review their region settings to place them on the map.` : "The coordinator is reachable, but no worker is currently visible."}</span>
+        <UiLink href="/dashboard?view=nodes">Review worker regions →</UiLink>
       </div>}
 
       {error && <div className="net-error" role="alert">

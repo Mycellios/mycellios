@@ -35,7 +35,7 @@ export function DesktopDownloads() {
           </div>;
         })}
       </div>
-      <Text className="desktop-version">{catalog ? `Version ${catalog.version} · Preview` : "Checking downloads…"} · macOS not available yet.</Text>
+      <Text className="desktop-version">{catalog ? `Version ${catalog.version} · Preview` : "Checking downloads…"} · macOS — Coming soon.</Text>
       <Text className="desktop-notice">Windows may show a publisher warning: these installers are not signed yet.</Text>
     </section>
     <Disclosure className="desktop-details"><DisclosureSummary>Installation &amp; details</DisclosureSummary>

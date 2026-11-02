@@ -1,0 +1,20 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; min-width: 280px; background: #faf9f7; }
+.forest-preview { --panel-font: "Geist Variable", sans-serif; --panel-font-display: var(--panel-font); --ui-accent: #26392b; --ui-on-accent: #faf9f7; --ui-accent-hover: #3b5140; accent-color: var(--ui-accent); font: 400 14px/1.5 var(--panel-font); color: #17221a; }
+.forest-preview-landing { opacity: 0; visibility: hidden; }
+.forest-preview-scene { position: fixed; z-index: 80; inset: 0; height: 100svh; pointer-events: none; }
+.forest-preview-scene[data-complete="true"] { visibility: hidden; }
+.forest-preview-scene canvas { display: block; width: 100%; height: 100%; }
+.forest-preview-waiting { position: absolute; top: 45%; width: 100%; text-align: center; color: #faf9f7; }
+.forest-preview-controls { position: fixed; z-index: 90; left: calc(env(safe-area-inset-left) + 24px); right: calc(env(safe-area-inset-right) + 24px); bottom: calc(env(safe-area-inset-bottom) + 20px); max-width: 900px; margin: 0 auto; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 12px; background: #faf9f7; color: #17221a; }
+.forest-preview-status { display: grid; min-width: 172px; gap: 2px; }
+.forest-preview-status span { font-size: 11px; color: #626b60; }
+.forest-preview-status strong { font-size: 13px; font-weight: 500; }
+.forest-preview-controls > .ui-input { flex: 1; width: 100%; min-width: 70px; }
+.forest-preview-controls > .ui-select { max-width: 96px; }
+.forest-preview-controls small { color: #626b60; }
+@media (max-width: 700px) {
+  .forest-preview-controls { left: calc(env(safe-area-inset-left) + 12px); right: calc(env(safe-area-inset-right) + 12px); bottom: calc(env(safe-area-inset-bottom) + 12px); padding: 12px; gap: 8px; flex-wrap: wrap; }
+  .forest-preview-status { width: 100%; min-width: 0; display: flex; justify-content: space-between; }
+  .forest-preview-play-label { display: none; }
+}

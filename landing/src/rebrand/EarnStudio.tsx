@@ -1,54 +1,9 @@
-import { Card as UiCard, Heading as UiHeading, Link as UiLink, Text as UiText } from "../ui/primitives";
-import { AppWindow, ChevronRight, Download, MonitorUp } from "lucide-react";
-import { LandingHeader } from "./RebrandLanding";
-import "./earn-studio.css";
-
-const contributionOptions = [
-  {
-    id: "browser",
-    eyebrow: "IN THIS BROWSER",
-    title: "Start a browser worker",
-    copy: "Use WebGPU when available, with a CPU fallback. This tab stays open while your device contributes.",
-    detail: "No installation · Pause at any time",
-    action: "Open browser worker",
-    href: "/browser/?autostart=1",
-    icon: AppWindow,
-  },
-  {
-    id: "native",
-    eyebrow: "ON MY MACHINE",
-    title: "Native worker packages",
-    copy: "Run verified workloads with compatible GPU acceleration when a native package is published for your system.",
-    detail: "Windows · macOS · Linux",
-    action: "Check package availability",
-    href: "/downloads",
-    icon: MonitorUp,
-  },
-] as const;
+import { AppWindow, ArrowUpRight, MonitorUp } from "lucide-react";
+import { Heading, Link, Text } from "../ui/primitives";
+import { MarketingHeader, MarketingFooter } from "./MarketingHeader";
+import { ComputeCalculator } from "./ComputeCalculator";
+import "./earn-marketing.css";
 
 export function EarnStudio() {
-  return (
-    <main className="rb-page earn-page">
-      <LandingHeader active="earn" />
-
-      <section className="earn-intro">
-        <span>CONTRIBUTE CAPACITY</span>
-        <UiHeading as="h1">Put your machine to work.</UiHeading>
-        <UiText>Choose how this device joins the Mycellios test network. You stay in control of what it shares and when it stops.</UiText>
-      </section>
-
-      <section className="earn-options" aria-label="Contribution options">
-        {contributionOptions.map((option) => {
-          const Icon = option.icon;
-          return <UiCard className={`earn-option ${option.id}`} key={option.id}>
-            <div className="earn-option-icon"><Icon /></div>
-            <div className="earn-option-copy"><span>{option.eyebrow}</span><UiHeading as="h2">{option.title}</UiHeading><UiText>{option.copy}</UiText><small>{option.detail}</small></div>
-            <UiLink href={option.href}>{option.id === "native" && <Download />}<span>{option.action}</span><ChevronRight /></UiLink>
-          </UiCard>;
-        })}
-      </section>
-
-      <aside className="earn-notice"><i aria-hidden="true" /><div><strong>Test network · rewards are not live yet</strong><span>Contribution is measured for reliability and useful work. No USDC or token payment is currently promised.</span></div></aside>
-    </main>
-  );
+  return <main className="marketing-page earn-marketing"><MarketingHeader active="earn" /><div className="marketing-shell"><section className="earn-marketing-intro"><div className="marketing-intro"><Heading as="h1">Your GPU.<br />Shared power.</Heading><Text>Put spare capacity to useful work. Choose when you contribute, set your resource limits and explore the economics before you begin.</Text><Link href="#earn-options">Choose how to connect<ArrowUpRight size={15} /></Link></div><img src="/assets/agent-demo/living-network-v1.webp" width="1774" height="887" alt="Conceptual computing devices connected by mycelium" /></section><section className="earn-marketing-options" id="earn-options" aria-labelledby="earn-options-title"><Heading as="h2" id="earn-options-title">Two ways to take root.</Heading><div><Link href="/browser/?autostart=1"><AppWindow size={26} /><span><strong>In your browser</strong><Text>Open a compatible worker and keep the tab available while your device contributes.</Text><small>Check runtime support · Pause at any time</small></span><ArrowUpRight size={20} /></Link><Link href="/downloads"><MonitorUp size={26} /><span><strong>On your machine</strong><Text>Check native worker packages for your operating system, drivers and workload.</Text><small>Current platform availability and installation details</small></span><ArrowUpRight size={20} /></Link></div></section><section className="earn-marketing-economics" aria-labelledby="earn-economics-title"><Heading as="h2" id="earn-economics-title">Run the numbers first.</Heading><Text>Choose a GPU and your daily hours. See the rental reference and the full calculation in one place.</Text><ComputeCalculator /></section><section className="earn-marketing-status"><Heading as="h2">$SPORE rewards — Coming soon</Heading><Text>Mycellios is a test network. The proposed reward model follows useful, attributable work. Token issuance and contributor payments are coming soon. The calculator shows a rental reference while reward rates are being defined.</Text><Link href="/spore/rewards">Understand the reward model<ArrowUpRight size={15} /></Link></section></div><MarketingFooter /></main>;
 }

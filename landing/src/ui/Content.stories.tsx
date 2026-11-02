@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Cpu, Radio } from "lucide-react";
+import { ChevronDown, Cpu, Radio } from "lucide-react";
 import { useState } from "react";
 import { CapacityMetric, Empty as EmptyPanel, Metric, PageTitle, PanelDisclosure, PanelLoading, Stat, SummaryStrip } from "./patterns";
 import { TablePagination } from "./TablePagination";
@@ -20,6 +20,7 @@ export const PageHeader: Story = { render: () => <PageTitle title="Your devices"
 export const Metrics: Story = { render: () => <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 20 }}><Stat icon={Radio} label="Connected nodes" value="7" detail="Live snapshot" /><CapacityMetric icon={Cpu} label="Runtime stages" value="3" detail="CPU + CUDA" /></div> };
 export const Collapsible: Story = { render: () => <PanelDisclosure icon={Cpu} eyebrow="CAPACITY" title="Device details" summary="Runtime and memory"><Text>Loaded runtime information.</Text></PanelDisclosure> };
 export const NativeDisclosure: Story = { render: () => <Disclosure><DisclosureSummary>Advanced options</DisclosureSummary><Text>Optional configuration.</Text></Disclosure> };
+export const ExclusiveAccordion: Story = { render: () => <div style={{ maxWidth: 560 }}>{["Choose your model", "Add your context", "Review the result"].map(title => <Disclosure key={title} name="kit-exclusive-accordion" className="ui-animated-disclosure"><DisclosureSummary style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBlock: 20, cursor: "pointer" }}>{title}<ChevronDown size={18} aria-hidden="true" /></DisclosureSummary><div className="ui-disclosure-body"><Text style={{ paddingBottom: 20 }}>Expand another item to close this one. The native disclosure keeps keyboard and find-in-page behavior while its content animates.</Text></div></Disclosure>)}</div> };
 export const DataTable: Story = { render: function Demo() { const [page, setPage] = useState(0); return <><Table><TableHead><TableRow><TableHeader>Device</TableHeader><TableHeader>Status</TableHeader></TableRow></TableHead><TableBody><TableRow><TableCell>Device {page + 1}</TableCell><TableCell><Badge tone="success">Connected</Badge></TableCell></TableRow></TableBody></Table><TablePagination label="devices" page={page} pageCount={3} total={21} onPageChange={setPage} /></>; } };
 export const Dialog: Story = { render: () => <DialogPanel role="dialog" aria-labelledby="dialog-heading" className="account-modal" style={{ position: "relative", margin: "auto" }}><Heading id="dialog-heading">Welcome back</Heading><Text>Sign in to your account.</Text><Separator /><Button variant="primary">Sign in securely</Button></DialogPanel> };
 
