@@ -7,6 +7,11 @@ build/distribution-runtime/
 build/distribution-runtime.tar.gz
 build/python/
 build/coordinator-release/
+build/node-package/
+build/evidence/
+build/*.msi
+build/*.msi.wxs
+build/*.msi.wixobj
 build/mycellios-coordinator-output-receipt.json
 build/mycellios-*-lock-report.json
 build/validation-logs/
