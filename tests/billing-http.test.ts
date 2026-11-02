@@ -21,28 +21,28 @@ describe("billing HTTP ingress", () => {
   let database: MeshDatabase;
   let billing: BillingManager;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     app = Fastify();
-    database = new MeshDatabase(":memory:");
+    database = (await MeshDatabase.open(":memory:"));
     billing = new BillingManager(database, new ApiAccessManager(database, {
       starterTokens: 0,
       requestsPerMinute: 30,
       maxConcurrent: 2,
       maxActiveKeys: 10,
     }));
-    billing.registerPlan({
+    (await billing.registerPlan({
       planId: "mycellios-go",
       version: 1,
       priceCurrency: "EUR",
       priceMicros: 10_000_000,
       includedTokens: 50_000,
       status: "active",
-    });
+    }));
   });
 
   afterEach(async () => {
     await app.close();
-    database.close();
+    (await database.close());
   });
 
   it("preserves Stripe raw bytes, applies once and ignores unsupported signed events", async () => {
@@ -66,7 +66,7 @@ describe("billing HTTP ingress", () => {
     const replay = await app.inject({ method: "POST", url: "/webhooks/v1/stripe", headers, payload: raw });
     expect(replay.statusCode).toBe(200);
     expect(replay.json()).toEqual({ accepted: true, duplicate: true });
-    expect(database.raw.prepare("SELECT token_balance FROM api_accounts WHERE user_id = 'buyer-http'").get())
+    expect((await database.raw.prepare("SELECT token_balance FROM api_accounts WHERE user_id = 'buyer-http'").get()))
       .toEqual({ token_balance: 50_000 });
 
     const ignoredRaw = Buffer.from(JSON.stringify({ ...event, id: "evt_ignored", type: "customer.created" }));
@@ -115,11 +115,11 @@ describe("billing HTTP ingress", () => {
       chains: new Map([["base-mainnet", { asset: "USDC", minimumConfirmations: 12 }]]),
     });
     await registerBillingInboundRoutes(app, { manager: billing, stablecoin: inbound });
-    billing.createTopUpQuote({
+    (await billing.createTopUpQuote({
       quoteId: "quote-http", userId: "buyer-http-coin", amountMicros: 5_000_000,
       currency: "EUR", tokenAmount: 20_000, expiresAt: timestamp * 1_000 + 60_000,
-    });
-    database.raw.prepare(
+    }));
+    (await database.raw.prepare(
       `INSERT INTO billing_stablecoin_intents(
          id, user_id, idempotency_key, request_digest, kind, quote_id,
          amount_micros, currency, chain_id, asset, asset_atomic_amount,
@@ -129,7 +129,7 @@ describe("billing HTTP ingress", () => {
          5000000, 'EUR', 'base-mainnet', 'USDC', '5000000',
          '0xrecipienthttp001', 'deposit:coinpay-http', 'awaiting_payment', ?, ?, ?
        )`,
-    ).run(timestamp * 1_000 + 60_000, timestamp * 1_000, timestamp * 1_000);
+    ).run(timestamp * 1_000 + 60_000, timestamp * 1_000, timestamp * 1_000));
     const payload: StablecoinWatcherPayload = {
       schema: "mycellios.stablecoin-payment.v1",
       eventId: "base-mainnet:0xabc123:0",
@@ -201,14 +201,14 @@ describe("billing HTTP ingress", () => {
       MYCELLIOS_STRIPE_WEBHOOK_LIVEMODE: "false",
     });
     const runtime = await createCoordinator(config, { logger: false });
-    runtime.billing.registerPlan({
+    (await runtime.billing.registerPlan({
       planId: "mycellios-go",
       version: 1,
       priceCurrency: "EUR",
       priceMicros: 10_000_000,
       includedTokens: 50_000,
       status: "active",
-    });
+    }));
     const event = stripeInvoiceEvent(realTimestamp);
     const raw = Buffer.from(JSON.stringify(event));
     const accepted = await runtime.app.inject({
@@ -221,7 +221,7 @@ describe("billing HTTP ingress", () => {
       payload: raw,
     });
     expect(accepted.statusCode).toBe(202);
-    expect(runtime.apiAccess.getOrCreateAccount("buyer-http").tokenBalance).toBe(50_000);
+    expect((await runtime.apiAccess.getOrCreateAccount("buyer-http")).tokenBalance).toBe(50_000);
     await runtime.close();
   });
 

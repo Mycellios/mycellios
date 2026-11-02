@@ -28,6 +28,9 @@ These rules apply to the complete repository.
   treat the former standalone clone or its upstream remote as the release source.
   Agent is a Control surface in the component boundary checker; the inference
   runtime consumes shared contracts and must not depend on Agent UI or Desktop.
+  The native architecture gate follows that compiler boundary; Agent uses its
+  own workspace typechecks, tests and builds. The component-boundary gate still
+  inspects both workspaces and rejects native runtime imports of Agent code.
 
 - npm is the only supported JavaScript package manager. Commit
   `package-lock.json`; do not add pnpm or Yarn workspace/lock files.

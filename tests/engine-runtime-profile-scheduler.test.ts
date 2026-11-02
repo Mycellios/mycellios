@@ -148,7 +148,7 @@ describe("engine runtime profile renewal scheduler", () => {
       listWorkers: () => workers,
       getWorker: (workerId: string) => workers.find((worker) => worker.id === workerId),
     } as never;
-    const hub = new WorkerHub(store);
+    const hub = (await WorkerHub.create(store));
     let renewals = 0;
     await hub.waitForEngineRuntimeProfiles([plan], 100, 1, () => {
       renewals += 1;
@@ -163,7 +163,7 @@ describe("engine runtime profile renewal scheduler", () => {
     expect(renewals).toBe(1);
   });
 
-  it("renews only authority tied to the currently committed active route", () => {
+  it("renews only authority tied to the currently committed active route", async () => {
     const plan = {
       modelId: "qwen-test",
       routeReservationId: "reservation-1",
@@ -172,11 +172,11 @@ describe("engine runtime profile renewal scheduler", () => {
       getState: () => ({ desiredState: "active", observedState }),
       listReservations: () => [{ id: "reservation-1", status }],
     }) as never;
-    expect(activeEngineRuntimeActivationPlans([plan], controller("active", "committed")))
+    expect((await activeEngineRuntimeActivationPlans([plan], controller("active", "committed"))))
       .toEqual([plan]);
-    expect(activeEngineRuntimeActivationPlans([plan], controller("degraded", "committed")))
+    expect((await activeEngineRuntimeActivationPlans([plan], controller("degraded", "committed"))))
       .toEqual([]);
-    expect(activeEngineRuntimeActivationPlans([plan], controller("active", "released")))
+    expect((await activeEngineRuntimeActivationPlans([plan], controller("active", "released"))))
       .toEqual([]);
   });
 });

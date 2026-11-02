@@ -19,7 +19,7 @@ export interface HardwareGpu extends Omit<GpuCapability, "offeredVramMb" | "free
 
 export interface VerifiedGpuRuntimeEvidence {
   status: "gpu-ready";
-  backend: "cuda" | "rocm" | "mps" | "xpu";
+  backend: "cuda" | "rocm" | "mps" | "xpu" | "directml";
   deviceName: string;
 }
 
@@ -182,6 +182,11 @@ async function probeLinuxGpu(systemRamMb: number): Promise<HardwareProbe["gpus"]
   }
 }
 
+export function optionalGpuTelemetry(value: string | undefined): number | undefined {
+  const parsed = value?.trim() ? Number(value) : NaN;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
 async function probeNvidia(): Promise<HardwareProbe["gpus"]> {
   try {
     const { stdout } = await execFileAsync("nvidia-smi", [
@@ -202,9 +207,9 @@ async function probeNvidia(): Promise<HardwareProbe["gpus"]> {
           model: model ?? "NVIDIA GPU",
           runtimeDeviceIndex: Number(id ?? 0),
           physicalVramMb: Number(memory ?? 0),
-          utilizationPct: Number(utilization ?? 0),
-          temperatureC: Number(temperature ?? 0),
-          powerW: Number(power ?? 0),
+          ...(optionalGpuTelemetry(utilization) === undefined ? {} : { utilizationPct: optionalGpuTelemetry(utilization)! }),
+          ...(optionalGpuTelemetry(temperature) === undefined ? {} : { temperatureC: optionalGpuTelemetry(temperature)! }),
+          ...(optionalGpuTelemetry(power) === undefined ? {} : { powerW: optionalGpuTelemetry(power)! }),
         };
       });
   } catch {
@@ -371,6 +376,7 @@ function runtimeMatchesGpu(
 ): boolean {
   if (!runtime || runtime.status !== "gpu-ready") return false;
   const vendor = gpu.vendor.toLowerCase();
+  if (runtime.backend === "directml") return ["intel", "nvidia", "amd"].includes(vendor) && gpuModelsMatch(runtime.deviceName, gpu.model);
   if (runtime.backend === "mps") {
     return vendor === "apple";
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeArchitecture,
+  belongsToNativeArchitecture,
   countLines,
   type ModuleSizeBudget,
 } from "../src/program/architecture-health.js";
@@ -12,6 +13,14 @@ const budget: ModuleSizeBudget = {
 };
 
 describe("architecture health", () => {
+  it("scopes the native gate to its compiler workspace without hiding unknown native areas", () => {
+    expect(belongsToNativeArchitecture("src/worker/agent.ts")).toBe(true);
+    expect(belongsToNativeArchitecture("src/unowned/value.ts")).toBe(true);
+    expect(belongsToNativeArchitecture("landing/src/Panel.tsx")).toBe(true);
+    expect(belongsToNativeArchitecture("src/agent/apps/api/src/index.ts")).toBe(false);
+    expect(belongsToNativeArchitecture(".\\src\\agent\\apps\\desktop\\src\\main.ts")).toBe(false);
+    expect(belongsToNativeArchitecture("src/agent-runtime/value.ts")).toBe(true);
+  });
   it("counts files with and without trailing newlines consistently", () => {
     expect(countLines("one\ntwo\n")).toBe(2);
     expect(countLines("one\ntwo")).toBe(2);

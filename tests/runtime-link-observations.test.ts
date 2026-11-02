@@ -66,42 +66,42 @@ describe("runtime link observations", () => {
     )?.transportMode).toBe("direct");
   });
 
-  it("rehydrates bounded fresh probe evidence after coordinator restart", () => {
-    const database = new MeshDatabase(":memory:");
+  it("rehydrates bounded fresh probe evidence after coordinator restart", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     const durable = new MeshStore(database);
     const now = Date.now();
     for (let index = 0; index < 40; index += 1) {
-      durable.saveRuntimeLinkSample({
+      (await durable.saveRuntimeLinkSample({
         fromNodeId: "node-a",
         toNodeId: "node-b",
         measuredAt: now - 40 + index,
         rttMs: 20 + index,
         goodputMbps: 100 - index,
         transportMode: "relay",
-      }, 60_000, 32);
+      }, 60_000, 32));
     }
-    durable.saveRuntimeLinkSample({
+    (await durable.saveRuntimeLinkSample({
       fromNodeId: "node-b",
       toNodeId: "node-a",
       measuredAt: now,
       rttMs: null,
       goodputMbps: null,
       transportMode: "relay",
-    }, 60_000, 32);
-    durable.saveRuntimeLinkSample({
+    }, 60_000, 32));
+    (await durable.saveRuntimeLinkSample({
       fromNodeId: "node-a",
       toNodeId: "node-b",
       measuredAt: now,
       rttMs: 8,
       goodputMbps: 900,
       transportMode: "direct",
-    }, 60_000, 32);
+    }, 60_000, 32));
 
-    expect(durable.listRuntimeLinkSamples(now, 60_000)).toHaveLength(34);
+    expect((await durable.listRuntimeLinkSamples(now, 60_000))).toHaveLength(34);
     const rehydrated = new RuntimeLinkObservationStore(
       60_000,
       32,
-      durable.listRuntimeLinkSamples(now, 60_000),
+      (await durable.listRuntimeLinkSamples(now, 60_000)),
     );
     expect(rehydrated.observations(now)).toEqual([
       expect.objectContaining({
@@ -118,7 +118,7 @@ describe("runtime link observations", () => {
       }),
     ]);
 
-    const restartedHub = new WorkerHub(durable);
+    const restartedHub = (await WorkerHub.create(durable));
     expect(restartedHub.runtimeLinkObservations(now)).toEqual([
       expect.objectContaining({ transportMode: "direct", successfulSamples: 1 }),
       expect.objectContaining({
@@ -128,7 +128,7 @@ describe("runtime link observations", () => {
         successfulSamples: 32,
       }),
     ]);
-    restartedHub.close();
-    database.close();
+    (await restartedHub.close());
+    (await database.close());
   });
 });

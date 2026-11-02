@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// `pnpm dev`: start the API, worker, web app, and sandbox supervisor for this checkout.
+// `npm run dev`: start the API, worker, web app, and sandbox supervisor for this checkout.
 //
 // Several checkouts (git worktrees) can run at once. Each gets the first free block of ports,
 // and all of them share one Postgres database unless this branch adds migrations that main
@@ -355,8 +355,8 @@ function generateClientIfStale(env) {
   const schema = path.join(dbPackage, "prisma/schema.prisma");
   if (existsSync(client) && statSync(client).mtimeMs >= statSync(schema).mtimeMs) return;
   log("Generating the Prisma client");
-  execFileSync("pnpm", ["--filter", "@rakazo/db", "generate"], {
-    cwd: root,
+  execFileSync(process.execPath, [require.resolve("prisma/build/index.js"), "generate"], {
+    cwd: dbPackage,
     env,
     stdio: "inherit",
   });
@@ -397,15 +397,15 @@ const migrationLock = new Client({ connectionString: shared.migrationUrl });
 await migrationLock.connect();
 try {
   await migrationLock.query("SELECT pg_advisory_lock(hashtext('rakazo dev migrate'))");
-  execFileSync("pnpm", ["db:migrate"], { cwd: root, env, stdio: "inherit" });
+  execFileSync(process.execPath, [require.resolve("tsx/cli"), path.join(root, "apps/api/src/cli/migrate-database.ts")], { cwd: root, env, stdio: "inherit" });
 } finally {
   await migrationLock.end();
 }
 
 if (ports) log(`Open http://127.0.0.1:${ports.web}`);
 const turbo = spawn(
-  "pnpm",
-  ["exec", "turbo", "dev", "--env-mode=loose", ...SERVICES.map((name) => `--filter=${name}`)],
+  process.execPath,
+  [path.join(root, "node_modules/turbo/bin/turbo"), "dev", "--env-mode=loose", ...SERVICES.map((name) => `--filter=${name}`)],
   { cwd: root, env, stdio: "inherit" },
 );
 for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => turbo.kill(signal));

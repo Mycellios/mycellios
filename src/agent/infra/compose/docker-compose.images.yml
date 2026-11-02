@@ -285,7 +285,7 @@ services:
   supervisor:
     image: ${RAKAZO_IMAGE:-ghcr.io/elie222/rakazo/app}:${RAKAZO_IMAGE_TAG:-edge}
     restart: unless-stopped
-    command: ["pnpm", "--filter", "@rakazo/sandbox-supervisor", "start"]
+    command: ["npm", "run", "start", "--workspace", "@rakazo/sandbox-supervisor"]
     init: true
     user: root
     security_opt:
@@ -346,7 +346,7 @@ services:
     command:
       - bash
       - -lc
-      - pnpm db:deploy && exec env -u DATABASE_MIGRATION_URL node --enable-source-maps dist/index.js
+      - npm run db:deploy && exec env -u DATABASE_MIGRATION_URL node --enable-source-maps dist/index.js
     init: true
     security_opt:
       - no-new-privileges:true

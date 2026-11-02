@@ -9,6 +9,7 @@ import json
 import math
 import multiprocessing as mp
 from pathlib import Path
+import secrets
 import struct
 import sys
 import time
@@ -69,6 +70,7 @@ from .stage import (
     MAX_SPECULATIVE_KV_BYTES,
 )
 from .speculation import NgramTreeDraftProvider
+from .tokenizer_coordinates import stage_tokenizer_coordinates
 
 
 DEFAULT_MODEL = "HuggingFaceTB/SmolLM2-135M-Instruct"
@@ -100,17 +102,14 @@ def resolve_execution_tokenizer_snapshot(
         or len(stage_package_identity) != 71
     ):
         raise ValueError("stage package identity is not a SHA-256 identity")
-    from .stage_artifact import verify_stage_artifact
+    from .stage_artifact import read_stage_artifact_manifest
 
-    verified = verify_stage_artifact(
+    manifest = read_stage_artifact_manifest(
         execution_snapshot,
         expected_package_id=stage_package_identity.removeprefix("sha256:"),
     )
-    model = verified.manifest.to_document()["model"]
-    return resolve_model_metadata_snapshot(
-        str(model["source"]),
-        None if model["revision"] is None else str(model["revision"]),
-    )
+    model = manifest.to_document()["model"]
+    return resolve_model_metadata_snapshot(*stage_tokenizer_coordinates(model))
 
 
 def tree_draft_provider_from_args(
@@ -148,6 +147,10 @@ class PendingGeneration:
     events: asyncio.Queue[tuple[str, Any]] = field(default_factory=asyncio.Queue)
     abandoned: bool = False
     session_key: str | None = None
+    temperature: float = 0.0
+    top_p: float = 1.0
+    sampling_seed: bytes | None = None
+    finished: bool = False
 
 
 class ContinuousMicroBatcher:
@@ -188,7 +191,12 @@ class ContinuousMicroBatcher:
         self.queue.put_nowait(pending)
 
     def cancel(self, pending: PendingGeneration) -> None:
+        if pending.abandoned:
+            return
         pending.abandoned = True
+        # Wake the HTTP consumer too; its socket may already be closed and
+        # abandoned native work deliberately suppresses subsequent token events.
+        pending.events.put_nowait(("error", GenerationCancelledError("generation cancelled")))
         self.engine.cancel(pending.client_id)
 
     async def close(self) -> None:
@@ -227,6 +235,9 @@ class ContinuousMicroBatcher:
             task.add_done_callback(self.inflight.discard)
 
     async def _dispatch(self, batch: list[PendingGeneration]) -> None:
+        for pending in batch:
+            if pending.abandoned:
+                pending.finished = True
         batch = [pending for pending in batch if not pending.abandoned]
         if not batch:
             return
@@ -255,6 +266,9 @@ class ContinuousMicroBatcher:
                 max_new_tokens=pending.max_new_tokens,
                 eos_token_ids=self.eos_token_ids,
                 session_key=pending.session_key,
+                temperature=pending.temperature,
+                top_p=pending.top_p,
+                sampling_seed=pending.sampling_seed,
             )
             for pending in batch
         ]
@@ -265,6 +279,7 @@ class ContinuousMicroBatcher:
                 if not pending.abandoned:
                     pending.events.put_nowait(("error", error))
                 self.active.pop(pending.client_id, None)
+                pending.finished = True
             return
 
         self.batches += 1
@@ -287,6 +302,7 @@ class ContinuousMicroBatcher:
                     pending.events.put_nowait(("done", output))
             finally:
                 self.active.pop(pending.client_id, None)
+                pending.finished = True
 
         await asyncio.gather(
             *(bridge(pending, future) for pending, future in zip(batch, futures))
@@ -298,8 +314,10 @@ class ContinuousMicroBatcher:
                 pending = self.queue.get_nowait()
             except asyncio.QueueEmpty:
                 return
-            if pending is not None and not pending.abandoned:
-                pending.events.put_nowait(("error", error))
+            if pending is not None:
+                pending.finished = True
+                if not pending.abandoned:
+                    pending.events.put_nowait(("error", error))
 
 
 class IncrementalTokenDecoder:
@@ -390,6 +408,8 @@ class DistributedMycelliosServer:
             eos_token_ids=eos_ids,
         )
         self._client_counter = 0
+        self.native_requests: dict[str, PendingGeneration] = {}
+        self.cancelled_native_requests: dict[str, float] = {}
         self.started_at = time.time()
 
     def create_app(self) -> web.Application:
@@ -397,6 +417,7 @@ class DistributedMycelliosServer:
         app.router.add_get("/health", self.health)
         app.router.add_get("/v1/models", self.models)
         app.router.add_post("/v1/chat/completions", self.chat_completions)
+        app.router.add_post("/v1/native-requests/{request_id}/cancel", self.cancel_native_request)
         app.on_startup.append(self._on_startup)
         app.on_cleanup.append(self._on_cleanup)
         return app
@@ -521,7 +542,15 @@ class DistributedMycelliosServer:
         )
 
     async def chat_completions(self, request: web.Request) -> web.StreamResponse:
+        self._prune_native_requests()
         try:
+            request_id = self._native_request_id(request.headers.get("X-Mycellios-Job-Id"))
+            if request_id in self.cancelled_native_requests:
+                return error_response("Native request was already cancelled", "request_cancelled", 409)
+            if request_id in self.native_requests:
+                return error_response("Native request identity is active", "duplicate_request", 409)
+            if request_id and len(self.native_requests) >= 4096:
+                return error_response("Native request registry is full", "service_unavailable", 503)
             body = await request.json()
             pending, stream = self._prepare_request(
                 body,
@@ -529,9 +558,17 @@ class DistributedMycelliosServer:
             )
         except (json.JSONDecodeError, TypeError, ValueError, KeyError) as error:
             return error_response(str(error), "invalid_request", 400)
+        # Body parsing can yield to a cancellation arriving before admission.
+        if request_id and (request_id in self.cancelled_native_requests or request_id in self.native_requests):
+            return error_response("Native request identity is no longer admissible", "request_cancelled", 409)
+        if request_id and len(self.native_requests) >= 4096:
+            return error_response("Native request registry is full", "service_unavailable", 503)
+        if request_id:
+            self.native_requests[request_id] = pending
         try:
             await self.batcher.submit(pending)
         except QueueFullError as error:  # pragma: no cover - defensa, ver nota
+            pending.finished = True
             # Backpressure, not failure. A 503 tells a client (and any load
             # balancer in front) that this node is broken and should be taken
             # out; a 429 with Retry-After tells it to slow down and come back,
@@ -539,10 +576,47 @@ class DistributedMycelliosServer:
             # Refusing work we cannot serve protects the work already admitted.
             return overloaded_response(error)
         except RuntimeError as error:
+            pending.finished = True
             return error_response(str(error), "service_unavailable", 503)
         if stream:
             return await self._stream_response(request, pending)
         return await self._complete_response(pending)
+
+    @staticmethod
+    def _native_request_id(value: str | None) -> str | None:
+        if value is not None and (not 1 <= len(value) <= 256 or not value.isascii()
+                or any(not (c.isalnum() or c in "-_.:") for c in value)):
+            raise ValueError("Invalid native request identity")
+        return value
+
+    def _prune_native_requests(self) -> None:
+        self.native_requests = {key: value for key, value in self.native_requests.items() if not value.finished}
+        now = time.monotonic()
+        self.cancelled_native_requests = {key: expiry for key, expiry in self.cancelled_native_requests.items() if expiry > now}
+
+    async def cancel_native_request(self, request: web.Request) -> web.Response:
+        self._prune_native_requests()
+        try:
+            request_id = self._native_request_id(request.match_info["request_id"])
+        except ValueError as error:
+            return error_response(str(error), "invalid_request", 400)
+        if request_id not in self.cancelled_native_requests and len(self.cancelled_native_requests) >= 4096:
+            return error_response("Native cancellation registry is full", "service_unavailable", 503)
+        # A tombstone also protects cancellation before the original HTTP body
+        # arrives; a missing entry alone is never proof that it cannot start later.
+        self.cancelled_native_requests[request_id] = time.monotonic() + 900
+        pending = self.native_requests.get(request_id)
+        if pending is not None:
+            self.batcher.cancel(pending)
+        finished = pending is None or pending.finished
+        return web.json_response({
+            "schema": "mycellios-native-request-cancellation/1",
+            "status": "cancelled" if finished else "cancelling",
+            "request_id": request_id,
+            "model": self.public_model_name,
+            "artifact_identity": self.engine.model_artifact.identity,
+            "pipeline_snapshot_identity": str(self.engine.pipeline_id),
+        })
 
     def _prepare_request(
         self,
@@ -572,15 +646,21 @@ class DistributedMycelliosServer:
         if requested_model != self.public_model_name:
             raise ValueError(f"unknown model {requested_model!r}")
         temperature = exact_number(body.get("temperature", 0.0), "temperature")
-        if temperature != 0.0:
-            raise ValueError("this low-latency runtime currently supports greedy temperature=0 only")
+        if not 0.0 <= temperature <= 2.0:
+            raise ValueError("temperature must be between 0 and 2")
         top_p = exact_number(body.get("top_p", 1.0), "top_p")
         if not 0 < top_p <= 1:
             raise ValueError("top_p must be greater than 0 and at most 1")
         if exact_integer(body.get("n", 1), "n") != 1:
             raise ValueError("n must be 1")
-        if "seed" in body:
-            exact_integer(body["seed"], "seed")
+        seed = exact_integer(body["seed"], "seed") if "seed" in body else None
+        sampling_seed = (
+            hashlib.sha256(
+                b"mycellios-sampling-seed-v1\0" + str(seed).encode("ascii")
+            ).digest()
+            if seed is not None and temperature > 0
+            else secrets.token_bytes(32) if temperature > 0 else None
+        )
         if "stream" in body and type(body["stream"]) is not bool:
             raise ValueError("stream must be a boolean")
         messages = body.get("messages")
@@ -636,6 +716,9 @@ class DistributedMycelliosServer:
                 max_new_tokens=max_new_tokens,
                 prompt_tokens=prompt_tokens,
                 session_key=session_key,
+                temperature=temperature,
+                top_p=top_p,
+                sampling_seed=sampling_seed,
             ),
             body.get("stream", False),
         )
@@ -747,9 +830,13 @@ class DistributedMycelliosServer:
                     completed = True
                     break
                 elif kind == "error":
+                    unavailable = not self.engine.healthy
                     await write_sse(
                         response,
-                        {"error": {"message": str(payload), "type": "pipeline_error"}},
+                        {"error": {
+                            "message": str(payload),
+                            "type": "service_unavailable" if unavailable else "pipeline_error",
+                        }},
                     )
                     await response.write(b"data: [DONE]\n\n")
                     completed = True
@@ -780,6 +867,8 @@ class DistributedMycelliosServer:
                     # 500 genérico y no sabía que debía reintentar.
                     if isinstance(payload, QueueFullError):
                         return overloaded_response(payload)
+                    if not self.engine.healthy:
+                        return error_response(str(payload), "service_unavailable", 503)
                     return error_response(str(payload), "pipeline_error", 500)
                 elif kind == "done":
                     output: GenerationOutput = payload
@@ -1143,6 +1232,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--return-port", type=int, default=0)
     parser.add_argument("--startup-timeout-seconds", type=float, default=180.0)
     parser.add_argument("--socket-timeout-seconds", type=float, default=180.0)
+    from .tcp_writes import add_tcp_write_arguments
+    add_tcp_write_arguments(parser)
     parsed = parser.parse_args(arguments)
     if parsed.max_pending_requests is None:
         # Resolved here rather than at build time so every caller sees a complete
@@ -1513,6 +1604,7 @@ def build_server(args: argparse.Namespace) -> DistributedMycelliosServer:
             dense_tiering=dense_tiering_config_from_args(args),
             startup_timeout_seconds=args.startup_timeout_seconds,
             socket_timeout_seconds=args.socket_timeout_seconds,
+            tcp_write_chunk_bytes=getattr(args, "tcp_write_chunk_bytes", None),
             spawn_local_stages=not remote,
             first_stage_host=args.first_stage_host or "127.0.0.1",
             first_stage_port=args.first_stage_port,

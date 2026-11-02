@@ -1,7 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import type { SqlDriver } from "./sql-driver.js";
+import { SqliteDriver } from "./sqlite-driver.js";
+import { PostgresDriver } from "./postgres-driver.js";
 
 const SCHEMA_VERSION = 33;
 
@@ -74,53 +76,50 @@ export type WorkerCredentialRecoveryResult =
   | { state: "not_found" | "owner_mismatch" | "fingerprint_in_use"; credential?: WorkerAdmissionCredentialRow };
 
 export class MeshDatabase {
-  readonly raw: DatabaseSync;
-  private transactionDepth = 0;
+  private constructor(readonly raw: SqlDriver) {}
 
-  constructor(path: string) {
-    if (path !== ":memory:") {
-      mkdirSync(dirname(resolve(path)), { recursive: true });
-    }
-    this.raw = new DatabaseSync(path);
-    this.raw.exec("PRAGMA foreign_keys = ON");
-    this.raw.exec("PRAGMA busy_timeout = 5000");
-    if (path !== ":memory:") this.raw.exec("PRAGMA journal_mode = WAL");
-    this.migrate();
-  }
-
-  close(): void {
-    this.raw.close();
-  }
-
-  transaction<T>(operation: () => T): T {
-    if (this.transactionDepth > 0) return operation();
-    this.raw.exec("BEGIN IMMEDIATE");
-    this.transactionDepth += 1;
+  static async open(path: string): Promise<MeshDatabase> {
+    if (path !== ":memory:") mkdirSync(dirname(resolve(path)), { recursive: true });
+    const raw = await SqliteDriver.open(path);
+    const database = new MeshDatabase(raw);
     try {
-      const result = operation();
-      this.raw.exec("COMMIT");
-      return result;
-    } catch (error) {
-      this.raw.exec("ROLLBACK");
-      throw error;
-    } finally {
-      this.transactionDepth -= 1;
-    }
+      await raw.exec("PRAGMA foreign_keys = ON");
+      await raw.exec("PRAGMA busy_timeout = 5000");
+      if (path !== ":memory:") await raw.exec("PRAGMA journal_mode = WAL");
+      await database.migrate();
+      await raw.exec("CREATE TABLE IF NOT EXISTS api_operator_funded_usage (usage_id TEXT PRIMARY KEY REFERENCES api_usage(id) ON DELETE CASCADE)");
+      return database;
+    } catch (error) { await raw.close().catch(() => undefined); throw error; }
   }
 
-  private migrate(): void {
-    this.raw.exec(`
+  static async openPostgres(url: string, schema = "mycellios"): Promise<MeshDatabase> {
+    const raw = new PostgresDriver(url, schema);
+    const database = new MeshDatabase(raw);
+    try {
+      const row = await raw.prepare("SELECT version FROM schema_meta LIMIT 1").get();
+      if (!row || Number(row.version) !== SCHEMA_VERSION) throw new Error("Application database schema requires migration");
+      await raw.prepare("SELECT usage_id FROM api_operator_funded_usage LIMIT 1").all();
+      return database;
+    } catch (error) { await raw.close().catch(() => undefined); throw error; }
+  }
+
+  async close(): Promise<void> { await this.raw.close(); }
+
+  async transaction<T>(operation: () => T | Promise<T>): Promise<T> { return await this.raw.transaction(operation); }
+
+  private async migrate(): Promise<void> {
+    (await this.raw.exec(`
       CREATE TABLE IF NOT EXISTS schema_meta (version INTEGER NOT NULL);
       INSERT INTO schema_meta(version)
       SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM schema_meta);
-    `);
-    const row = this.raw.prepare("SELECT version FROM schema_meta LIMIT 1").get() as {
+    `));
+    const row = (await this.raw.prepare("SELECT version FROM schema_meta LIMIT 1").get()) as {
       version: number;
     };
     const currentVersion = Number(row.version);
-    if (currentVersion < 2) this.removeLegacyProductSchema();
+    if (currentVersion < 2) (await this.removeLegacyProductSchema());
 
-    this.raw.exec(`
+    (await this.raw.exec(`
       CREATE TABLE IF NOT EXISTS workers (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
@@ -1355,59 +1354,59 @@ export class MeshDatabase {
         updated_at INTEGER NOT NULL
       );
 
-    `);
+    `));
 
     if (currentVersion < 27) {
-      const payoutColumns = this.raw.prepare("PRAGMA table_info(payout_batches)").all() as Array<{ name: string }>;
+      const payoutColumns = (await this.raw.prepare("PRAGMA table_info(payout_batches)").all()) as Array<{ name: string }>;
       const names = new Set(payoutColumns.map((column) => column.name));
-      if (!names.has("destination_id")) this.raw.exec("ALTER TABLE payout_batches ADD COLUMN destination_id TEXT");
-      if (!names.has("destination_reference")) this.raw.exec("ALTER TABLE payout_batches ADD COLUMN destination_reference TEXT");
-      if (!names.has("destination_fingerprint")) this.raw.exec("ALTER TABLE payout_batches ADD COLUMN destination_fingerprint TEXT");
+      if (!names.has("destination_id")) (await this.raw.exec("ALTER TABLE payout_batches ADD COLUMN destination_id TEXT"));
+      if (!names.has("destination_reference")) (await this.raw.exec("ALTER TABLE payout_batches ADD COLUMN destination_reference TEXT"));
+      if (!names.has("destination_fingerprint")) (await this.raw.exec("ALTER TABLE payout_batches ADD COLUMN destination_fingerprint TEXT"));
     }
     if (currentVersion >= 2 && currentVersion < 3) {
-      const columns = this.raw.prepare("PRAGMA table_info(workers)").all() as Array<{
+      const columns = (await this.raw.prepare("PRAGMA table_info(workers)").all()) as Array<{
         name: string;
       }>;
       if (!columns.some((column) => column.name === "deregistered")) {
-        this.raw.exec("ALTER TABLE workers ADD COLUMN deregistered INTEGER NOT NULL DEFAULT 0");
+        (await this.raw.exec("ALTER TABLE workers ADD COLUMN deregistered INTEGER NOT NULL DEFAULT 0"));
       }
-      this.raw.exec("UPDATE workers SET deregistered = 1");
+      (await this.raw.exec("UPDATE workers SET deregistered = 1"));
     }
     if (currentVersion >= 4 && currentVersion < 5) {
-      const columns = this.raw.prepare("PRAGMA table_info(requested_models)").all() as Array<{
+      const columns = (await this.raw.prepare("PRAGMA table_info(requested_models)").all()) as Array<{
         name: string;
       }>;
       if (!columns.some((column) => column.name === "activation_error")) {
-        this.raw.exec("ALTER TABLE requested_models ADD COLUMN activation_error TEXT");
+        (await this.raw.exec("ALTER TABLE requested_models ADD COLUMN activation_error TEXT"));
       }
     }
-    if (currentVersion < 6) this.migrateWorkerIdentities();
+    if (currentVersion < 6) (await this.migrateWorkerIdentities());
     if (currentVersion < 17) {
-      const columns = this.raw.prepare("PRAGMA table_info(credit_grants)").all() as Array<{
+      const columns = (await this.raw.prepare("PRAGMA table_info(credit_grants)").all()) as Array<{
         name: string;
       }>;
       if (!columns.some((column) => column.name === "debt_repaid_tokens")) {
-        this.raw.exec(
+        (await this.raw.exec(
           "ALTER TABLE credit_grants ADD COLUMN debt_repaid_tokens INTEGER NOT NULL DEFAULT 0 CHECK(debt_repaid_tokens >= 0)",
-        );
+        ));
       }
     }
     if (currentVersion < 18) {
-      const columns = this.raw.prepare("PRAGMA table_info(billing_subscriptions)").all() as Array<{
+      const columns = (await this.raw.prepare("PRAGMA table_info(billing_subscriptions)").all()) as Array<{
         name: string;
       }>;
       if (!columns.some((column) => column.name === "status_changed_at")) {
-        this.raw.exec(
+        (await this.raw.exec(
           "ALTER TABLE billing_subscriptions ADD COLUMN status_changed_at INTEGER NOT NULL DEFAULT 0",
-        );
-        this.raw.exec(
+        ));
+        (await this.raw.exec(
           "UPDATE billing_subscriptions SET status_changed_at = updated_at WHERE status_changed_at = 0",
-        );
+        ));
       }
     }
     if (currentVersion === 19) {
-      this.raw.exec("PRAGMA foreign_keys = OFF");
-      this.raw.exec(`
+      (await this.raw.exec("PRAGMA foreign_keys = OFF"));
+      (await this.raw.exec(`
         ALTER TABLE payout_batch_items RENAME TO payout_batch_items_v19;
         CREATE TABLE payout_batch_items (
           batch_id TEXT NOT NULL REFERENCES payout_batches(id) ON DELETE CASCADE,
@@ -1418,28 +1417,28 @@ export class MeshDatabase {
         INSERT INTO payout_batch_items(batch_id, earning_id, amount_usd_micros)
         SELECT batch_id, earning_id, amount_usd_micros FROM payout_batch_items_v19;
         DROP TABLE payout_batch_items_v19;
-      `);
-      this.raw.exec("PRAGMA foreign_keys = ON");
+      `));
+      (await this.raw.exec("PRAGMA foreign_keys = ON"));
     }
     if (currentVersion < 22) {
-      const columns = this.raw.prepare("PRAGMA table_info(payout_batches)").all() as Array<{
+      const columns = (await this.raw.prepare("PRAGMA table_info(payout_batches)").all()) as Array<{
         name: string;
       }>;
       if (!columns.some((column) => column.name === "gross_usd_micros")) {
-        this.raw.exec(
+        (await this.raw.exec(
           "ALTER TABLE payout_batches ADD COLUMN gross_usd_micros INTEGER NOT NULL DEFAULT 0 CHECK(gross_usd_micros >= 0)",
-        );
-        this.raw.exec("UPDATE payout_batches SET gross_usd_micros = amount_usd_micros");
+        ));
+        (await this.raw.exec("UPDATE payout_batches SET gross_usd_micros = amount_usd_micros"));
       }
       if (!columns.some((column) => column.name === "debt_offset_usd_micros")) {
-        this.raw.exec(
+        (await this.raw.exec(
           "ALTER TABLE payout_batches ADD COLUMN debt_offset_usd_micros INTEGER NOT NULL DEFAULT 0 CHECK(debt_offset_usd_micros >= 0)",
-        );
+        ));
       }
     }
     if (currentVersion === 29) {
-      this.raw.exec("PRAGMA foreign_keys = OFF");
-      this.raw.exec(`
+      (await this.raw.exec("PRAGMA foreign_keys = OFF"));
+      (await this.raw.exec(`
         DROP INDEX IF EXISTS spore_conversion_quotes_active_batch;
         ALTER TABLE spore_conversion_quotes RENAME TO spore_conversion_quotes_v29;
         CREATE TABLE spore_conversion_quotes (
@@ -1471,25 +1470,25 @@ export class MeshDatabase {
         DROP TABLE spore_conversion_quotes_v29;
         CREATE UNIQUE INDEX spore_conversion_quotes_active_batch
         ON spore_conversion_quotes(batch_id) WHERE status = 'active';
-      `);
-      this.raw.exec("PRAGMA foreign_keys = ON");
+      `));
+      (await this.raw.exec("PRAGMA foreign_keys = ON"));
     }
     if (currentVersion === 30) {
-      this.raw.exec("ALTER TABLE payout_dispatch_operations ADD COLUMN spore_quote_id TEXT");
-      this.raw.exec("ALTER TABLE payout_dispatch_operations ADD COLUMN spore_quote_attestation_digest TEXT");
+      (await this.raw.exec("ALTER TABLE payout_dispatch_operations ADD COLUMN spore_quote_id TEXT"));
+      (await this.raw.exec("ALTER TABLE payout_dispatch_operations ADD COLUMN spore_quote_attestation_digest TEXT"));
     }
     if (currentVersion >= 18 && currentVersion < 19) {
-      const columns = this.raw.prepare("PRAGMA table_info(economic_settlements)").all() as Array<{ name: string }>;
+      const columns = (await this.raw.prepare("PRAGMA table_info(economic_settlements)").all()) as Array<{ name: string }>;
       if (!columns.some((column) => column.name === "contribution_evidence_id")) {
-        this.raw.exec("ALTER TABLE economic_settlements ADD COLUMN contribution_evidence_id TEXT REFERENCES economic_contribution_evidence(id)");
+        (await this.raw.exec("ALTER TABLE economic_settlements ADD COLUMN contribution_evidence_id TEXT REFERENCES economic_contribution_evidence(id)"));
       }
-      this.raw.exec(`
+      (await this.raw.exec(`
         CREATE UNIQUE INDEX IF NOT EXISTS economic_settlements_contribution_evidence_unique
         ON economic_settlements(contribution_evidence_id)
         WHERE contribution_evidence_id IS NOT NULL
-      `);
+      `));
     }
-    this.raw.exec(`
+    (await this.raw.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS workers_identity_unique
       ON workers(identity_kind, identity_id)
       WHERE identity_kind IS NOT NULL AND identity_id IS NOT NULL;
@@ -2162,27 +2161,27 @@ export class MeshDatabase {
       CREATE UNIQUE INDEX IF NOT EXISTS economic_settlements_contribution_evidence_unique
       ON economic_settlements(contribution_evidence_id)
       WHERE contribution_evidence_id IS NOT NULL;
-    `);
-    this.raw.prepare("UPDATE schema_meta SET version = ?").run(SCHEMA_VERSION);
+    `));
+    (await this.raw.prepare("UPDATE schema_meta SET version = ?").run(SCHEMA_VERSION));
   }
 
-  admitWorkerCredential(input: {
+  async admitWorkerCredential(input: {
     identityKind: WorkerAdmissionCredentialRow["identityKind"];
     identityId: string;
     algorithm: WorkerAdmissionCredentialRow["algorithm"];
     publicKey: string;
     fingerprint: string;
     protocolVersion: number;
-  }): WorkerAdmissionResult {
-    return this.transaction(() => {
+  }): Promise<WorkerAdmissionResult> {
+    return (await this.transaction(async () => {
       const existing = this.readWorkerAdmissionCredential(
-        this.raw.prepare(
+        (await this.raw.prepare(
           `SELECT identity_kind, identity_id, algorithm, public_key, fingerprint,
                   status, protocol_version, created_at, updated_at, last_seen_at,
                   revoked_at, revocation_reason
            FROM worker_admission_credentials
            WHERE identity_kind = ? AND identity_id = ?`,
-        ).get(input.identityKind, input.identityId),
+        ).get(input.identityKind, input.identityId)),
       );
       if (existing) {
         if (existing.status === "revoked") {
@@ -2196,7 +2195,7 @@ export class MeshDatabase {
           return { state: "key_mismatch", credential: existing };
         }
         const now = Date.now();
-        this.raw.prepare(
+        (await this.raw.prepare(
           `UPDATE worker_admission_credentials
            SET protocol_version = ?, updated_at = ?, last_seen_at = ?
            WHERE identity_kind = ? AND identity_id = ?`,
@@ -2206,7 +2205,7 @@ export class MeshDatabase {
           now,
           input.identityKind,
           input.identityId,
-        );
+        ));
         return {
           state: "accepted",
           credential: {
@@ -2219,20 +2218,20 @@ export class MeshDatabase {
       }
 
       const reused = this.readWorkerAdmissionCredential(
-        this.raw.prepare(
+        (await this.raw.prepare(
           `SELECT identity_kind, identity_id, algorithm, public_key, fingerprint,
                   status, protocol_version, created_at, updated_at, last_seen_at,
                   revoked_at, revocation_reason
            FROM worker_admission_credentials
            WHERE fingerprint = ?`,
-        ).get(input.fingerprint),
+        ).get(input.fingerprint)),
       );
       if (reused) {
         return { state: "fingerprint_in_use", credential: reused };
       }
 
       const now = Date.now();
-      this.raw.prepare(
+      (await this.raw.prepare(
         `INSERT INTO worker_admission_credentials(
            identity_kind, identity_id, algorithm, public_key, fingerprint,
            status, protocol_version, created_at, updated_at, last_seen_at
@@ -2247,7 +2246,7 @@ export class MeshDatabase {
         now,
         now,
         now,
-      );
+      ));
       return {
         state: "enrolled",
         credential: {
@@ -2260,48 +2259,48 @@ export class MeshDatabase {
           revocationReason: null,
         },
       };
-    });
+    }));
   }
 
-  listWorkerAdmissionCredentials(limit = 1_000): WorkerAdmissionCredentialRow[] {
-    return this.raw.prepare(
+  async listWorkerAdmissionCredentials(limit = 1_000): Promise<WorkerAdmissionCredentialRow[]> {
+    return (await this.raw.prepare(
       `SELECT identity_kind, identity_id, algorithm, public_key, fingerprint,
               status, protocol_version, created_at, updated_at, last_seen_at,
               revoked_at, revocation_reason
        FROM worker_admission_credentials
        ORDER BY last_seen_at DESC, identity_kind ASC, identity_id ASC
        LIMIT ?`,
-    ).all(Math.max(1, Math.min(10_000, Math.trunc(limit))))
+    ).all(Math.max(1, Math.min(10_000, Math.trunc(limit)))))
       .flatMap((row) => {
         const credential = this.readWorkerAdmissionCredential(row);
         return credential ? [credential] : [];
       });
   }
 
-  getWorkerAdmissionCredential(
+  async getWorkerAdmissionCredential(
     identityKind: WorkerAdmissionCredentialRow["identityKind"],
     identityId: string,
-  ): WorkerAdmissionCredentialRow | null {
+  ): Promise<WorkerAdmissionCredentialRow | null> {
     return this.readWorkerAdmissionCredential(
-      this.raw.prepare(
+      (await this.raw.prepare(
         `SELECT identity_kind, identity_id, algorithm, public_key, fingerprint,
                 status, protocol_version, created_at, updated_at, last_seen_at,
                 revoked_at, revocation_reason
          FROM worker_admission_credentials
          WHERE identity_kind = ? AND identity_id = ?`,
-      ).get(identityKind, identityId),
+      ).get(identityKind, identityId)),
     );
   }
 
-  getNodeOwnership(
+  async getNodeOwnership(
     identityKind: NodeOwnershipRow["identityKind"],
     identityId: string,
-  ): NodeOwnershipRow | null {
-    const row = this.raw.prepare(
+  ): Promise<NodeOwnershipRow | null> {
+    const row = (await this.raw.prepare(
       `SELECT identity_kind, identity_id, account_id, credential_fingerprint,
               status, generation, created_at, updated_at
        FROM node_ownership WHERE identity_kind = ? AND identity_id = ?`,
-    ).get(identityKind, identityId) as Record<string, unknown> | undefined;
+    ).get(identityKind, identityId)) as Record<string, unknown> | undefined;
     return row ? {
       identityKind: String(row.identity_kind) as NodeOwnershipRow["identityKind"],
       identityId: String(row.identity_id),
@@ -2314,12 +2313,12 @@ export class MeshDatabase {
     } : null;
   }
 
-  getNodeOwnershipByCredentialFingerprint(credentialFingerprint: string): NodeOwnershipRow | null {
-    const row = this.raw.prepare(
+  async getNodeOwnershipByCredentialFingerprint(credentialFingerprint: string): Promise<NodeOwnershipRow | null> {
+    const row = (await this.raw.prepare(
       `SELECT identity_kind, identity_id, account_id, credential_fingerprint,
               status, generation, created_at, updated_at
        FROM node_ownership WHERE credential_fingerprint = ?`,
-    ).get(credentialFingerprint) as Record<string, unknown> | undefined;
+    ).get(credentialFingerprint)) as Record<string, unknown> | undefined;
     return row ? {
       identityKind: String(row.identity_kind) as NodeOwnershipRow["identityKind"],
       identityId: String(row.identity_id),
@@ -2332,7 +2331,7 @@ export class MeshDatabase {
     } : null;
   }
 
-  appendNodeIdentityEvent(input: {
+  async appendNodeIdentityEvent(input: {
     identityKind: NodeOwnershipRow["identityKind"];
     identityId: string;
     generation: number;
@@ -2340,35 +2339,35 @@ export class MeshDatabase {
     actorId: string;
     eventType: string;
     details: Record<string, unknown>;
-  }): string {
-    const previous = this.raw.prepare(
+  }): Promise<string> {
+    const previous = (await this.raw.prepare(
       `SELECT event_digest FROM node_identity_events
        WHERE identity_kind = ? AND identity_id = ? ORDER BY sequence DESC LIMIT 1`,
-    ).get(input.identityKind, input.identityId) as { event_digest: string } | undefined;
+    ).get(input.identityKind, input.identityId)) as { event_digest: string } | undefined;
     const occurredAt = Date.now();
     const detailsJson = JSON.stringify(input.details);
     const eventDigest = nodeIdentityEventDigest({ identityKind: input.identityKind, identityId: input.identityId,
       generation: input.generation, actorKind: input.actorKind, actorId: input.actorId, eventType: input.eventType,
       detailsJson, previousEventDigest: previous?.event_digest ?? null, occurredAt });
-    this.raw.prepare(
+    (await this.raw.prepare(
       `INSERT INTO node_identity_events(
          identity_kind, identity_id, generation, actor_kind, actor_id,
          event_type, details_json, previous_event_digest, event_digest, occurred_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(input.identityKind, input.identityId, input.generation, input.actorKind, input.actorId,
-      input.eventType, detailsJson, previous?.event_digest ?? null, eventDigest, occurredAt);
+      input.eventType, detailsJson, previous?.event_digest ?? null, eventDigest, occurredAt));
     return eventDigest;
   }
 
-  nodeIdentityEvents(identityKind: NodeOwnershipRow["identityKind"], identityId: string): Array<{
+  async nodeIdentityEvents(identityKind: NodeOwnershipRow["identityKind"], identityId: string): Promise<Array<{
     sequence: number; generation: number; actorKind: string; actorId: string; eventType: string;
     details: Record<string, unknown>; previousEventDigest: string | null; eventDigest: string; occurredAt: string;
-  }> {
-    const rows = this.raw.prepare(
+  }>> {
+    const rows = (await this.raw.prepare(
       `SELECT sequence, identity_kind, identity_id, generation, actor_kind, actor_id,
               event_type, details_json, previous_event_digest, event_digest, occurred_at
        FROM node_identity_events WHERE identity_kind = ? AND identity_id = ? ORDER BY sequence`,
-    ).all(identityKind, identityId) as Array<Record<string, unknown>>;
+    ).all(identityKind, identityId)) as Array<Record<string, unknown>>;
     let previous: string | null = null;
     return rows.map((row) => {
       const previousEventDigest = row.previous_event_digest === null ? null : String(row.previous_event_digest);
@@ -2386,15 +2385,15 @@ export class MeshDatabase {
     });
   }
 
-  revokeWorkerAdmissionCredential(input: {
+  async revokeWorkerAdmissionCredential(input: {
     identityKind: WorkerAdmissionCredentialRow["identityKind"];
     identityId: string;
     expectedFingerprint: string;
     reason: string;
     actor?: { kind: "account" | "operator"; id: string };
-  }): WorkerCredentialRevocationResult {
-    return this.transaction(() => {
-      const existing = this.getWorkerAdmissionCredential(input.identityKind, input.identityId);
+  }): Promise<WorkerCredentialRevocationResult> {
+    return (await this.transaction(async () => {
+      const existing = (await this.getWorkerAdmissionCredential(input.identityKind, input.identityId));
       if (!existing) return { state: "not_found" };
       if (existing.fingerprint !== input.expectedFingerprint) {
         return { state: "fingerprint_mismatch", credential: existing };
@@ -2403,7 +2402,7 @@ export class MeshDatabase {
         return { state: "already_revoked", credential: existing };
       }
       const now = Date.now();
-      this.raw.prepare(
+      (await this.raw.prepare(
         `UPDATE worker_admission_credentials
          SET status = 'revoked', updated_at = ?, revoked_at = ?, revocation_reason = ?
          WHERE identity_kind = ? AND identity_id = ? AND fingerprint = ? AND status = 'active'`,
@@ -2414,8 +2413,8 @@ export class MeshDatabase {
         input.identityKind,
         input.identityId,
         input.expectedFingerprint,
-      );
-      this.raw.prepare(
+      ));
+      (await this.raw.prepare(
         `UPDATE node_ownership SET status = 'revoked', generation = generation + 1,
              updated_at = ?
          WHERE identity_kind = ? AND identity_id = ? AND credential_fingerprint = ?`,
@@ -2424,11 +2423,11 @@ export class MeshDatabase {
         input.identityKind === "browser" ? "cell" : input.identityKind,
         input.identityId,
         input.expectedFingerprint,
-      );
-      const ownership = this.getNodeOwnership(input.identityKind === "browser" ? "cell" : input.identityKind, input.identityId);
-      if (ownership) this.appendNodeIdentityEvent({ identityKind: ownership.identityKind, identityId: ownership.identityId,
+      ));
+      const ownership = (await this.getNodeOwnership(input.identityKind === "browser" ? "cell" : input.identityKind, input.identityId));
+      if (ownership) (await this.appendNodeIdentityEvent({ identityKind: ownership.identityKind, identityId: ownership.identityId,
         generation: ownership.generation, actorKind: input.actor?.kind ?? "operator", actorId: input.actor?.id ?? "coordinator", eventType: "credential.revoked",
-        details: { credentialFingerprint: existing.fingerprint, reason: input.reason } });
+        details: { credentialFingerprint: existing.fingerprint, reason: input.reason } }));
       return {
         state: "revoked",
         credential: {
@@ -2439,10 +2438,10 @@ export class MeshDatabase {
           revocationReason: input.reason,
         },
       };
-    });
+    }));
   }
 
-  rotateWorkerAdmissionCredential(input: {
+  async rotateWorkerAdmissionCredential(input: {
     identityKind: WorkerAdmissionCredentialRow["identityKind"];
     identityId: string;
     expectedFingerprint: string;
@@ -2450,22 +2449,22 @@ export class MeshDatabase {
     publicKey: string;
     fingerprint: string;
     protocolVersion: number;
-  }): WorkerCredentialRotationResult {
-    return this.transaction(() => {
-      const existing = this.getWorkerAdmissionCredential(input.identityKind, input.identityId);
+  }): Promise<WorkerCredentialRotationResult> {
+    return (await this.transaction(async () => {
+      const existing = (await this.getWorkerAdmissionCredential(input.identityKind, input.identityId));
       if (!existing) return { state: "not_found" };
       if (existing.status === "revoked") return { state: "revoked", credential: existing };
       if (existing.fingerprint !== input.expectedFingerprint) {
         return { state: "fingerprint_mismatch", credential: existing };
       }
       const reused = this.readWorkerAdmissionCredential(
-        this.raw.prepare(
+        (await this.raw.prepare(
           `SELECT identity_kind, identity_id, algorithm, public_key, fingerprint,
                   status, protocol_version, created_at, updated_at, last_seen_at,
                   revoked_at, revocation_reason
            FROM worker_admission_credentials
            WHERE fingerprint = ?`,
-        ).get(input.fingerprint),
+        ).get(input.fingerprint)),
       );
       if (reused && (
         reused.identityKind !== input.identityKind
@@ -2474,7 +2473,7 @@ export class MeshDatabase {
         return { state: "fingerprint_in_use", credential: reused };
       }
       const now = Date.now();
-      this.raw.prepare(
+      (await this.raw.prepare(
         `UPDATE worker_admission_credentials
          SET algorithm = ?, public_key = ?, fingerprint = ?, protocol_version = ?,
              updated_at = ?, last_seen_at = ?, revoked_at = NULL,
@@ -2490,8 +2489,8 @@ export class MeshDatabase {
         input.identityKind,
         input.identityId,
         input.expectedFingerprint,
-      );
-      this.raw.prepare(
+      ));
+      (await this.raw.prepare(
         `UPDATE node_ownership
          SET credential_fingerprint = ?, generation = generation + 1,
              status = 'active', updated_at = ?
@@ -2503,11 +2502,11 @@ export class MeshDatabase {
         input.identityKind === "browser" ? "cell" : input.identityKind,
         input.identityId,
         input.expectedFingerprint,
-      );
-      const ownership = input.identityKind === "browser" ? null : this.getNodeOwnership(input.identityKind, input.identityId);
-      if (ownership) this.appendNodeIdentityEvent({ identityKind: ownership.identityKind, identityId: ownership.identityId,
+      ));
+      const ownership = input.identityKind === "browser" ? null : (await this.getNodeOwnership(input.identityKind, input.identityId));
+      if (ownership) (await this.appendNodeIdentityEvent({ identityKind: ownership.identityKind, identityId: ownership.identityId,
         generation: ownership.generation, actorKind: "node", actorId: input.identityId, eventType: "credential.rotated",
-        details: { previousFingerprint: input.expectedFingerprint, credentialFingerprint: input.fingerprint } });
+        details: { previousFingerprint: input.expectedFingerprint, credentialFingerprint: input.fingerprint } }));
       return {
         state: "rotated",
         credential: {
@@ -2522,10 +2521,10 @@ export class MeshDatabase {
           revocationReason: null,
         },
       };
-    });
+    }));
   }
 
-  recoverWorkerAdmissionCredential(input: {
+  async recoverWorkerAdmissionCredential(input: {
     identityKind: "device";
     identityId: string;
     accountId: string;
@@ -2533,42 +2532,42 @@ export class MeshDatabase {
     publicKey: string;
     fingerprint: string;
     protocolVersion: number;
-  }): WorkerCredentialRecoveryResult {
-    return this.transaction(() => {
-      const ownership = this.getNodeOwnership(input.identityKind, input.identityId);
-      const existing = this.getWorkerAdmissionCredential(input.identityKind, input.identityId);
+  }): Promise<WorkerCredentialRecoveryResult> {
+    return (await this.transaction(async () => {
+      const ownership = (await this.getNodeOwnership(input.identityKind, input.identityId));
+      const existing = (await this.getWorkerAdmissionCredential(input.identityKind, input.identityId));
       if (!ownership || !existing) return { state: "not_found" };
       if (ownership.accountId !== input.accountId) return { state: "owner_mismatch", credential: existing };
-      const reused = this.readWorkerAdmissionCredential(this.raw.prepare(
+      const reused = this.readWorkerAdmissionCredential((await this.raw.prepare(
         `SELECT identity_kind, identity_id, algorithm, public_key, fingerprint,
                 status, protocol_version, created_at, updated_at, last_seen_at,
                 revoked_at, revocation_reason
          FROM worker_admission_credentials WHERE fingerprint = ?`,
-      ).get(input.fingerprint));
+      ).get(input.fingerprint)));
       if (reused && (reused.identityKind !== input.identityKind || reused.identityId !== input.identityId)) {
         return { state: "fingerprint_in_use", credential: reused };
       }
       const now = Date.now();
-      this.raw.prepare(
+      (await this.raw.prepare(
         `UPDATE worker_admission_credentials SET
            algorithm = ?, public_key = ?, fingerprint = ?, status = 'active',
            protocol_version = ?, updated_at = ?, last_seen_at = ?,
            revoked_at = NULL, revocation_reason = NULL
          WHERE identity_kind = ? AND identity_id = ?`,
-      ).run(input.algorithm, input.publicKey, input.fingerprint, input.protocolVersion, now, now, input.identityKind, input.identityId);
-      this.raw.prepare(
+      ).run(input.algorithm, input.publicKey, input.fingerprint, input.protocolVersion, now, now, input.identityKind, input.identityId));
+      (await this.raw.prepare(
         `UPDATE node_ownership SET credential_fingerprint = ?, status = 'active',
              generation = generation + 1, updated_at = ?
          WHERE identity_kind = ? AND identity_id = ? AND account_id = ?`,
-      ).run(input.fingerprint, now, input.identityKind, input.identityId, input.accountId);
-      const recovered = this.getWorkerAdmissionCredential(input.identityKind, input.identityId);
-      const updatedOwnership = this.getNodeOwnership(input.identityKind, input.identityId);
+      ).run(input.fingerprint, now, input.identityKind, input.identityId, input.accountId));
+      const recovered = (await this.getWorkerAdmissionCredential(input.identityKind, input.identityId));
+      const updatedOwnership = (await this.getNodeOwnership(input.identityKind, input.identityId));
       if (!recovered || !updatedOwnership) throw new Error("worker_recovery_persistence_failed");
-      this.appendNodeIdentityEvent({ identityKind: input.identityKind, identityId: input.identityId,
+      (await this.appendNodeIdentityEvent({ identityKind: input.identityKind, identityId: input.identityId,
         generation: updatedOwnership.generation, actorKind: "account", actorId: input.accountId,
-        eventType: "credential.recovered", details: { previousFingerprint: existing.fingerprint, credentialFingerprint: input.fingerprint } });
+        eventType: "credential.recovered", details: { previousFingerprint: existing.fingerprint, credentialFingerprint: input.fingerprint } }));
       return { state: "recovered", credential: recovered, generation: updatedOwnership.generation };
-    });
+    }));
   }
 
   private readWorkerAdmissionCredential(value: unknown): WorkerAdmissionCredentialRow | null {
@@ -2603,14 +2602,14 @@ export class MeshDatabase {
     };
   }
 
-  enqueueRemoteChange(
+  async enqueueRemoteChange(
     tableName: string,
     recordKey: string,
     operation: "upsert" | "delete",
     payload: Record<string, unknown> | null,
-  ): void {
+  ): Promise<void> {
     const now = Date.now();
-    this.raw.prepare(
+    (await this.raw.prepare(
       `INSERT INTO persistence_outbox(
          table_name, record_key, operation, payload_json, created_at, updated_at
        ) VALUES (?, ?, ?, ?, ?, ?)
@@ -2627,17 +2626,17 @@ export class MeshDatabase {
       payload ? JSON.stringify(payload) : null,
       now,
       now,
-    );
+    ));
   }
 
-  listPendingRemoteChanges(limit = 100): PersistenceOutboxRow[] {
-    const rows = this.raw.prepare(
+  async listPendingRemoteChanges(limit = 100): Promise<PersistenceOutboxRow[]> {
+    const rows = (await this.raw.prepare(
       `SELECT id, table_name, record_key, operation, payload_json, attempts,
               last_error, created_at, updated_at
        FROM persistence_outbox
        ORDER BY updated_at, id
        LIMIT ?`,
-    ).all(limit) as unknown as Array<{
+    ).all(limit)) as unknown as Array<{
       id: number;
       table_name: string;
       record_key: string;
@@ -2661,26 +2660,26 @@ export class MeshDatabase {
     }));
   }
 
-  markRemoteChangeSynced(id: number): void {
-    this.raw.prepare("DELETE FROM persistence_outbox WHERE id = ?").run(id);
+  async markRemoteChangeSynced(id: number): Promise<void> {
+    (await this.raw.prepare("DELETE FROM persistence_outbox WHERE id = ?").run(id));
   }
 
-  markRemoteChangeFailed(id: number, error: string): void {
-    this.raw.prepare(
+  async markRemoteChangeFailed(id: number, error: string): Promise<void> {
+    (await this.raw.prepare(
       `UPDATE persistence_outbox
        SET attempts = attempts + 1, last_error = ?, updated_at = ?
        WHERE id = ?`,
-    ).run(error.slice(0, 2_000), Date.now(), id);
+    ).run(error.slice(0, 2_000), Date.now(), id));
   }
 
-  pendingRemoteChangeCount(): number {
-    const row = this.raw.prepare(
+  async pendingRemoteChangeCount(): Promise<number> {
+    const row = (await this.raw.prepare(
       "SELECT COUNT(*) AS count FROM persistence_outbox",
-    ).get() as { count: number };
+    ).get()) as { count: number };
     return Number(row.count);
   }
 
-  enqueueArtifactBackup(input: {
+  async enqueueArtifactBackup(input: {
     id: string;
     localPath: string;
     storagePath: string;
@@ -2688,9 +2687,9 @@ export class MeshDatabase {
     sha256: string;
     sizeBytes: number;
     metadata: Record<string, unknown>;
-  }): void {
+  }): Promise<void> {
     const now = Date.now();
-    this.raw.prepare(
+    (await this.raw.prepare(
       `INSERT INTO artifact_backup_outbox(
          id, local_path, storage_path, content_type, sha256, size_bytes,
          metadata_json, created_at, updated_at
@@ -2710,17 +2709,17 @@ export class MeshDatabase {
       JSON.stringify(input.metadata),
       now,
       now,
-    );
+    ));
   }
 
-  listPendingArtifactBackups(limit = 10): ArtifactBackupOutboxRow[] {
-    const rows = this.raw.prepare(
+  async listPendingArtifactBackups(limit = 10): Promise<ArtifactBackupOutboxRow[]> {
+    const rows = (await this.raw.prepare(
       `SELECT id, local_path, storage_path, content_type, sha256, size_bytes,
               metadata_json, attempts, last_error
        FROM artifact_backup_outbox
        ORDER BY updated_at, id
        LIMIT ?`,
-    ).all(limit) as unknown as Array<{
+    ).all(limit)) as unknown as Array<{
       id: string;
       local_path: string;
       storage_path: string;
@@ -2744,41 +2743,41 @@ export class MeshDatabase {
     }));
   }
 
-  markArtifactBackupSynced(id: string): void {
-    this.raw.prepare("DELETE FROM artifact_backup_outbox WHERE id = ?").run(id);
+  async markArtifactBackupSynced(id: string): Promise<void> {
+    (await this.raw.prepare("DELETE FROM artifact_backup_outbox WHERE id = ?").run(id));
   }
 
-  markArtifactBackupFailed(id: string, error: string): void {
-    this.raw.prepare(
+  async markArtifactBackupFailed(id: string, error: string): Promise<void> {
+    (await this.raw.prepare(
       `UPDATE artifact_backup_outbox
        SET attempts=attempts+1, last_error=?, updated_at=?
        WHERE id=?`,
-    ).run(error.slice(0, 2_000), Date.now(), id);
+    ).run(error.slice(0, 2_000), Date.now(), id));
   }
 
-  pendingArtifactBackupCount(): number {
-    const row = this.raw.prepare(
+  async pendingArtifactBackupCount(): Promise<number> {
+    const row = (await this.raw.prepare(
       "SELECT COUNT(*) AS count FROM artifact_backup_outbox",
-    ).get() as { count: number };
+    ).get()) as { count: number };
     return Number(row.count);
   }
 
-  private migrateWorkerIdentities(): void {
-    const columns = this.raw.prepare("PRAGMA table_info(workers)").all() as Array<{
+  private async migrateWorkerIdentities(): Promise<void> {
+    const columns = (await this.raw.prepare("PRAGMA table_info(workers)").all()) as Array<{
       name: string;
     }>;
     if (!columns.some((column) => column.name === "identity_kind")) {
-      this.raw.exec("ALTER TABLE workers ADD COLUMN identity_kind TEXT");
+      (await this.raw.exec("ALTER TABLE workers ADD COLUMN identity_kind TEXT"));
     }
     if (!columns.some((column) => column.name === "identity_id")) {
-      this.raw.exec("ALTER TABLE workers ADD COLUMN identity_id TEXT");
+      (await this.raw.exec("ALTER TABLE workers ADD COLUMN identity_id TEXT"));
     }
 
-    const rows = this.raw.prepare(
+    const rows = (await this.raw.prepare(
       `SELECT id, status, capabilities_json, deregistered, last_seen_at,
               identity_kind, identity_id
        FROM workers`,
-    ).all() as Array<{
+    ).all()) as Array<{
       id: string;
       status: string;
       capabilities_json: string;
@@ -2823,26 +2822,26 @@ export class MeshDatabase {
       });
       const keeper = entries[0]!;
       for (const duplicate of entries.slice(1)) {
-        this.raw.prepare(
+        (await this.raw.prepare(
           `UPDATE workers
            SET deregistered = 1, status = 'offline', identity_kind = NULL, identity_id = NULL,
                updated_at = ?
            WHERE id = ?`,
-        ).run(Date.now(), duplicate.row.id);
+        ).run(Date.now(), duplicate.row.id));
       }
-      this.raw.prepare(
+      (await this.raw.prepare(
         `UPDATE workers
          SET identity_kind = ?, identity_id = ?
          WHERE id = ?`,
-      ).run(keeper.kind, keeper.identityId, keeper.row.id);
+      ).run(keeper.kind, keeper.identityId, keeper.row.id));
     }
   }
 
-  private removeLegacyProductSchema(): void {
+  private async removeLegacyProductSchema(): Promise<void> {
     // Product-level tables from the superseded prototype are intentionally not
     // carried into the inference-only runtime.
-    this.raw.exec("PRAGMA foreign_keys = OFF");
-    this.raw.exec(`
+    (await this.raw.exec("PRAGMA foreign_keys = OFF"));
+    (await this.raw.exec(`
       DROP TABLE IF EXISTS work_proofs;
       DROP TABLE IF EXISTS ledger_entries;
       DROP TABLE IF EXISTS ledger_transactions;
@@ -2854,8 +2853,8 @@ export class MeshDatabase {
       DROP TABLE IF EXISTS workers;
       DROP TABLE IF EXISTS users;
       DROP TABLE IF EXISTS owners;
-    `);
-    this.raw.exec("PRAGMA foreign_keys = ON");
+    `));
+    (await this.raw.exec("PRAGMA foreign_keys = ON"));
   }
 }
 

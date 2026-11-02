@@ -17,36 +17,36 @@ describe("coordinator crash recovery", () => {
     }
   });
 
-  it("fails orphaned inference jobs on restart", () => {
+  it("fails orphaned inference jobs on restart", async () => {
     const directory = mkdtempSync(join(tmpdir(), "gpu-mesh-recovery-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
-    let database = new MeshDatabase(path);
+    let database = (await MeshDatabase.open(path));
     let store = new MeshStore(database);
-    store.createJob({
+    (await store.createJob({
       id: "job-orphan",
       sessionId: "session",
       model: "model",
       workloadClass: "interactive",
       deadlineAt: Date.now() + 60_000,
-    });
-    database.close();
+    }));
+    (await database.close());
 
-    database = new MeshDatabase(path);
+    database = (await MeshDatabase.open(path));
     store = new MeshStore(database);
-    const hub = new WorkerHub(store);
-    new MeshService(store, new Scheduler(store), hub, 10_000);
+    const hub = (await WorkerHub.create(store));
+    (await MeshService.create(store, new Scheduler(store), hub, 10_000));
 
-    expect(store.getJob("job-orphan")?.status).toBe("failed");
-    expect(store.getJob("job-orphan")?.failureCode).toBe("coordinator_restarted");
-    expect((database.raw.prepare(
+    expect((await store.getJob("job-orphan"))?.status).toBe("failed");
+    expect((await store.getJob("job-orphan"))?.failureCode).toBe("coordinator_restarted");
+    expect(((await database.raw.prepare(
       "SELECT COUNT(*) AS count FROM execution_receipts WHERE job_id = 'job-orphan'",
-    ).get() as { count: number }).count).toBe(0);
-    hub.close();
-    database.close();
+    ).get()) as { count: number }).count).toBe(0);
+    (await hub.close());
+    (await database.close());
   });
 
-  it("migrates schema v30 dispatch operations with nullable SPORE quote audit fields", () => {
+  it("migrates schema v30 dispatch operations with nullable SPORE quote audit fields", async () => {
     const directory = mkdtempSync(join(tmpdir(), "gpu-mesh-v30-migration-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
@@ -74,17 +74,17 @@ describe("coordinator crash recovery", () => {
     `);
     legacy.close();
 
-    const migrated = new MeshDatabase(path);
-    expect((migrated.raw.prepare("SELECT version FROM schema_meta").get() as { version: number }).version)
+    const migrated = (await MeshDatabase.open(path));
+    expect(((await migrated.raw.prepare("SELECT version FROM schema_meta").get()) as { version: number }).version)
       .toBe(33);
-    expect(migrated.raw.prepare(
+    expect((await migrated.raw.prepare(
       `SELECT spore_quote_id, spore_quote_attestation_digest
        FROM payout_dispatch_operations WHERE id = 'dispatch-legacy'`,
-    ).get()).toEqual({ spore_quote_id: null, spore_quote_attestation_digest: null });
-    migrated.close();
+    ).get())).toEqual({ spore_quote_id: null, spore_quote_attestation_digest: null });
+    (await migrated.close());
   });
 
-  it("migrates a version 2 worker database without losing registered rows", () => {
+  it("migrates a version 2 worker database without losing registered rows", async () => {
     const directory = mkdtempSync(join(tmpdir(), "gpu-mesh-v2-migration-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
@@ -108,23 +108,23 @@ describe("coordinator crash recovery", () => {
     `);
     legacy.close();
 
-    const migrated = new MeshDatabase(path);
-    const version = migrated.raw.prepare("SELECT version FROM schema_meta").get() as {
+    const migrated = (await MeshDatabase.open(path));
+    const version = (await migrated.raw.prepare("SELECT version FROM schema_meta").get()) as {
       version: number;
     };
-    const row = migrated.raw
+    const row = (await migrated.raw
       .prepare("SELECT id, deregistered FROM workers WHERE id = 'wrk-existing'")
-      .get() as { id: string; deregistered: number };
+      .get()) as { id: string; deregistered: number };
     expect(version.version).toBe(33);
-    expect(migrated.raw.prepare(
+    expect((await migrated.raw.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'payout_settlement_evidence'",
-    ).get()).toEqual({ name: "payout_settlement_evidence" });
+    ).get())).toEqual({ name: "payout_settlement_evidence" });
     expect(version.version).toBe(33);
     expect(row).toEqual({ id: "wrk-existing", deregistered: 1 });
-    migrated.close();
+    (await migrated.close());
   });
 
-  it("finishes an interrupted version 2 migration when deregistered already exists", () => {
+  it("finishes an interrupted version 2 migration when deregistered already exists", async () => {
     const directory = mkdtempSync(join(tmpdir(), "gpu-mesh-v2-partial-migration-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
@@ -149,26 +149,26 @@ describe("coordinator crash recovery", () => {
     `);
     legacy.close();
 
-    const migrated = new MeshDatabase(path);
-    const version = migrated.raw.prepare("SELECT version FROM schema_meta").get() as {
+    const migrated = (await MeshDatabase.open(path));
+    const version = (await migrated.raw.prepare("SELECT version FROM schema_meta").get()) as {
       version: number;
     };
-    const row = migrated.raw
+    const row = (await migrated.raw
       .prepare("SELECT id, deregistered FROM workers WHERE id = 'wrk-partially-migrated'")
-      .get() as { id: string; deregistered: number };
+      .get()) as { id: string; deregistered: number };
     expect(version.version).toBe(33);
     expect(row).toEqual({ id: "wrk-partially-migrated", deregistered: 1 });
-    migrated.close();
+    (await migrated.close());
 
-    const reopened = new MeshDatabase(path);
+    const reopened = (await MeshDatabase.open(path));
     expect(
-      (reopened.raw.prepare("SELECT version FROM schema_meta").get() as { version: number })
+      ((await reopened.raw.prepare("SELECT version FROM schema_meta").get()) as { version: number })
         .version,
     ).toBe(33);
-    reopened.close();
+    (await reopened.close());
   });
 
-  it("adds durable activation failures when migrating a version 4 model catalog", () => {
+  it("adds durable activation failures when migrating a version 4 model catalog", async () => {
     const directory = mkdtempSync(join(tmpdir(), "gpu-mesh-v4-model-migration-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
@@ -195,16 +195,16 @@ describe("coordinator crash recovery", () => {
     `);
     legacy.close();
 
-    const migrated = new MeshDatabase(path);
-    const columns = migrated.raw.prepare("PRAGMA table_info(requested_models)").all() as Array<{ name: string }>;
+    const migrated = (await MeshDatabase.open(path));
+    const columns = (await migrated.raw.prepare("PRAGMA table_info(requested_models)").all()) as Array<{ name: string }>;
     expect(columns.some((column) => column.name === "activation_error")).toBe(true);
     expect(
-      (migrated.raw.prepare("SELECT version FROM schema_meta").get() as { version: number }).version,
+      ((await migrated.raw.prepare("SELECT version FROM schema_meta").get()) as { version: number }).version,
     ).toBe(33);
-    migrated.close();
+    (await migrated.close());
   });
 
-  it("adds physical contribution binding when migrating the version 18 economic ledger", () => {
+  it("adds physical contribution binding when migrating the version 18 economic ledger", async () => {
     const directory = mkdtempSync(join(tmpdir(), "mycellios-v18-economy-migration-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
@@ -222,14 +222,14 @@ describe("coordinator crash recovery", () => {
     `);
     legacy.close();
 
-    const migrated = new MeshDatabase(path);
-    const columns = migrated.raw.prepare("PRAGMA table_info(economic_settlements)").all() as Array<{ name: string }>;
+    const migrated = (await MeshDatabase.open(path));
+    const columns = (await migrated.raw.prepare("PRAGMA table_info(economic_settlements)").all()) as Array<{ name: string }>;
     expect(columns.some(({ name }) => name === "contribution_evidence_id")).toBe(true);
-    expect((migrated.raw.prepare("SELECT version FROM schema_meta").get() as { version: number }).version).toBe(33);
-    migrated.close();
+    expect(((await migrated.raw.prepare("SELECT version FROM schema_meta").get()) as { version: number }).version).toBe(33);
+    (await migrated.close());
   });
 
-  it("backfills desktop identities and retires duplicate legacy rows", () => {
+  it("backfills desktop identities and retires duplicate legacy rows", async () => {
     const directory = mkdtempSync(join(tmpdir(), "gpu-mesh-v5-identity-migration-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
@@ -257,15 +257,15 @@ describe("coordinator crash recovery", () => {
         id, status, capabilities_json, last_seen_at, created_at, updated_at, deregistered
       ) VALUES (?, ?, ?, ?, 1, ?, 0)
     `);
-    insert.run("wrk-old", "offline", capabilities, 10, 10);
-    insert.run("wrk-current", "online", capabilities, 20, 20);
+    (await insert.run("wrk-old", "offline", capabilities, 10, 10));
+    (await insert.run("wrk-current", "online", capabilities, 20, 20));
     legacy.close();
 
-    const migrated = new MeshDatabase(path);
-    const rows = migrated.raw.prepare(`
+    const migrated = (await MeshDatabase.open(path));
+    const rows = (await migrated.raw.prepare(`
       SELECT id, deregistered, identity_kind, identity_id
       FROM workers ORDER BY id
-    `).all() as Array<{
+    `).all()) as Array<{
       id: string;
       deregistered: number;
       identity_kind: string | null;
@@ -285,6 +285,6 @@ describe("coordinator crash recovery", () => {
         identity_id: null,
       },
     ]);
-    migrated.close();
+    (await migrated.close());
   });
 });

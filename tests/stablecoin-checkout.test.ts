@@ -21,20 +21,20 @@ describe("stablecoin buyer checkout", () => {
   let gateway: FakeStablecoinGateway;
   let checkout: StablecoinCheckoutService;
 
-  beforeEach(() => {
-    database = new MeshDatabase(":memory:");
+  beforeEach(async () => {
+    database = (await MeshDatabase.open(":memory:"));
     billing = new BillingManager(database, new ApiAccessManager(database, {
       starterTokens: 0, requestsPerMinute: 30, maxConcurrent: 2, maxActiveKeys: 10,
     }));
-    billing.registerPlan({
+    (await billing.registerPlan({
       planId: "mycellios-go", version: 1, priceCurrency: "EUR",
       priceMicros: 10_000_000, includedTokens: 50_000, status: "active",
-    });
+    }));
     gateway = new FakeStablecoinGateway();
     checkout = service(gateway);
   });
 
-  afterEach(() => database.close());
+  afterEach(async () => (await database.close()));
 
   it("creates a server-bound subscription payment intent and replays it", async () => {
     const first = await checkout.createSubscription({
@@ -49,11 +49,11 @@ describe("stablecoin buyer checkout", () => {
     });
     expect(replay).toEqual({ ...first, duplicate: true });
     expect(gateway.attempts).toHaveLength(1);
-    expect(database.raw.prepare(
+    expect((await database.raw.prepare(
       `SELECT user_id, plan_id, plan_version, amount_micros, currency,
               asset_atomic_amount, status
        FROM billing_stablecoin_intents WHERE id = ?`,
-    ).get(first.id)).toEqual({
+    ).get(first.id))).toEqual({
       user_id: "coin-buyer", plan_id: "mycellios-go", plan_version: 1,
       amount_micros: 10_000_000, currency: "EUR",
       asset_atomic_amount: "10000000", status: "awaiting_payment",
@@ -102,10 +102,10 @@ describe("stablecoin buyer checkout", () => {
         keys.privateKey,
       ).toString("base64url"),
     });
-    expect(applyBillingCommand(billing, command)).toMatchObject({ tokenBalance: 50_000 });
-    expect(database.raw.prepare(
+    expect((await applyBillingCommand(billing, command))).toMatchObject({ tokenBalance: 50_000 });
+    expect((await database.raw.prepare(
       "SELECT status, consumed_event_key FROM billing_stablecoin_intents WHERE id = ?",
-    ).get(first.id)).toEqual({
+    ).get(first.id))).toEqual({
       status: "consumed",
       consumed_event_key: "stablecoin:base-mainnet:0xsubscription:0",
     });
@@ -124,7 +124,7 @@ describe("stablecoin buyer checkout", () => {
         keys.privateKey,
       ).toString("base64url"),
     });
-    expect(() => applyBillingCommand(billing, secondCommand)).toThrowError(
+    expect(async () => (await applyBillingCommand(billing, secondCommand))).toThrowError(
       expect.objectContaining({ code: "stablecoin_intent_consumed" }),
     );
   });
@@ -135,10 +135,10 @@ describe("stablecoin buyer checkout", () => {
     });
     expect(result).toMatchObject({ kind: "topup", assetAtomicAmount: "5000000" });
     expect(result.quoteId).toBeDefined();
-    expect(database.raw.prepare(
+    expect((await database.raw.prepare(
       `SELECT amount_micros, currency, token_amount, status
        FROM billing_topup_quotes WHERE quote_id = ?`,
-    ).get(result.quoteId!)).toEqual({
+    ).get(result.quoteId!))).toEqual({
       amount_micros: 5_000_000, currency: "EUR", token_amount: 20_000, status: "open",
     });
     await expect(checkout.createTopUp({
@@ -175,10 +175,10 @@ describe("stablecoin buyer checkout", () => {
       stablecoinCheckout: { gateway: routeGateway, config: stablecoinConfig() },
     });
     try {
-      runtime.billing.registerPlan({
+      (await runtime.billing.registerPlan({
         planId: "mycellios-go", version: 1, priceCurrency: "EUR",
         priceMicros: 10_000_000, includedTokens: 50_000, status: "active",
-      });
+      }));
       const accepted = await runtime.app.inject({
         method: "POST",
         url: "/v1/billing/crypto/topup",
@@ -207,7 +207,7 @@ describe("stablecoin buyer checkout", () => {
       expect(replay.statusCode).toBe(200);
       expect(replay.json().duplicate).toBe(true);
 
-      const apiKey = runtime.apiAccess.createKey("coin-route", "crypto-forbidden");
+      const apiKey = (await runtime.apiAccess.createKey("coin-route", "crypto-forbidden"));
       const forbidden = await runtime.app.inject({
         method: "POST",
         url: "/v1/billing/crypto/subscription",

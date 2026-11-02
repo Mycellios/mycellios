@@ -125,6 +125,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--one-way-delay-ms", type=float, default=0.0)
     parser.add_argument("--bandwidth-mbps", type=float, default=0.0)
     parser.add_argument("--connect-timeout-seconds", type=float, default=180.0)
+    from .tcp_writes import add_tcp_write_arguments
+    add_tcp_write_arguments(parser)
     parser.add_argument("--sealed-wave-tokens", type=int)
     parser.add_argument("--max-prefill-chunk-tokens", type=int)
     parser.add_argument(
@@ -362,6 +364,7 @@ def build_config(args: argparse.Namespace) -> StageProcessConfig:
         device=args.device,
         dense_tiering=dense_tiering,
         connect_timeout_seconds=args.connect_timeout_seconds,
+        tcp_write_chunk_bytes=getattr(args, "tcp_write_chunk_bytes", None),
         sealed_wave_tokens=args.sealed_wave_tokens,
         max_prefill_chunk_tokens=args.max_prefill_chunk_tokens,
         cell_fixture=args.cell_fixture,

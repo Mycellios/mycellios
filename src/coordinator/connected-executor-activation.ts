@@ -18,6 +18,9 @@ import {
 import type { EngineActivationAuthority } from "./engine-activation-authority.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
 import { requireEligibleEngineRuntimeProfile } from "../contracts/engine-runtime-profile.js";
+import { supportsCurrentNativeLaunch } from "../contracts/native-launch-compatibility.js";
+import { denseHostAdmissionAllows } from "./dense-host-admission.js";
+import { hostMemoryObservationSchema, isFreshHostMemory } from "../contracts/host-memory.js";
 
 interface ConnectedExecutor {
   worker: StoredWorker;
@@ -95,14 +98,20 @@ export function buildConnectedExecutorActivationSnapshot(
   engineAuthority?: EngineActivationAuthority,
 ): DynamicActivationSnapshot {
   const activationNow = Date.now();
-  const executors = connectedExecutors(workers, connectedWorkerIds);
-  const capacityNodes = executors.map(({ worker, executor }) => ({
-    id: executor.nodeId,
-    availableVramMiB: worker.capabilities.gpus.reduce(
-      (sum, gpu) => sum + gpu.freeOfferedVramMb,
-      0,
-    ),
-  }));
+  const minimumStages = baseConfig.distribution.minimumStages;
+  const eligibleNodeIds = baseConfig.distribution.eligibleNodeIds;
+  const executors = connectedExecutors(workers, connectedWorkerIds).filter(({ executor }) => eligibleNodeIds === undefined || eligibleNodeIds.includes(executor.nodeId));
+  const capacityNodes = executors.map((entry) => {
+    const { worker, executor } = entry;
+    const memory = hostMemoryObservationSchema.safeParse(worker.capabilities.hostMemory);
+    const fresh = memory.success && isFreshHostMemory(memory.data, activationNow / 1000)
+      && eligiblePlannerPerformance(entry) !== null;
+    return {
+      id: executor.nodeId,
+      availableVramMiB: worker.capabilities.gpus.reduce((sum, gpu) => sum + gpu.freeOfferedVramMb, 0),
+      ...(fresh ? { availableHostMemoryMiB: Math.floor(Math.min(memory.data.availableBytes, memory.data.offeredBytes ?? 0) / (1024 * 1024)) } : {}),
+    };
+  });
   const profiledExecutors = executors.flatMap((entry) => {
     const performance = eligiblePlannerPerformance(entry);
     return performance ? [{ ...entry, performance }] : [];
@@ -110,7 +119,7 @@ export function buildConnectedExecutorActivationSnapshot(
   const profiledNodeIds = new Set(
     profiledExecutors.map(({ executor }) => executor.nodeId),
   );
-  if (profiledExecutors.length < 2) {
+  if (profiledExecutors.length < minimumStages) {
     return {
       capacityNodes,
       config: null,
@@ -144,7 +153,7 @@ export function buildConnectedExecutorActivationSnapshot(
   const planningExecutors = engineAuthority
     ? profiledExecutors.filter(({ executor }) => engineProfilesByNode.has(executor.nodeId))
     : profiledExecutors;
-  if (planningExecutors.length < 2) {
+  if (planningExecutors.length < minimumStages) {
     return {
       capacityNodes,
       config: null,
@@ -165,6 +174,8 @@ export function buildConnectedExecutorActivationSnapshot(
   );
 
   const nodes = planningExecutors.map(({ worker, executor, performance }) => {
+    const host = hostMemoryObservationSchema.safeParse(worker.capabilities.hostMemory);
+    const hostFresh = host.success && isFreshHostMemory(host.data, activationNow / 1000);
     const engineProfile = engineProfilesByNode.get(executor.nodeId) ?? null;
     const memoryMiB = worker.capabilities.gpus.reduce(
       (sum, gpu) => sum + gpu.offeredVramMb,
@@ -179,6 +190,8 @@ export function buildConnectedExecutorActivationSnapshot(
       region: worker.capabilities.region,
       endpoint: { host: executor.stageHost, port: executor.stagePort },
       memoryMiB,
+      ...(hostFresh && Math.min(host.data.availableBytes, host.data.offeredBytes ?? 0) >= 1024 * 1024
+        ? { hostMemoryMiB: Math.floor(Math.min(host.data.availableBytes, host.data.offeredBytes ?? 0) / (1024 * 1024)) } : {}),
       reserveMiB: Math.min(256, Math.max(0, memoryMiB - 1)),
       decodeScale: decodeScaleById.get(executor.nodeId)?.measured
         ? decodeScaleById.get(executor.nodeId)!.decodeScale
@@ -266,8 +279,10 @@ export function buildConnectedExecutorActivationSnapshot(
       ? [link.from, link.to]
       : []
   )));
-  const routableNodes = nodes.filter((node) => reciprocalNodeIds.has(node.id));
-  if (routableNodes.length < 2) {
+  // A complete single-host plan needs no inter-host link. Missing links still
+  // reject any multi-host placement in the distribution cost model.
+  const routableNodes = nodes.filter((node) => minimumStages === 1 || reciprocalNodeIds.has(node.id));
+  if (routableNodes.length < minimumStages) {
     return {
       capacityNodes,
       config: null,
@@ -288,7 +303,7 @@ export function buildConnectedExecutorActivationSnapshot(
     links,
     distribution: {
       ...baseConfig.distribution,
-      minimumStages: Math.min(baseConfig.distribution.minimumStages, routableNodes.length),
+      minimumStages,
       maximumStages: Math.min(baseConfig.distribution.maximumStages, routableNodes.length),
     },
     runtime: {
@@ -343,14 +358,38 @@ export function modelHasGpuFallback(
   workers: readonly StoredWorker[],
   connectedWorkerIds: ReadonlySet<string>,
 ): boolean {
+  const intentionalCpuNodes = new Set(
+    workers
+      .filter(
+        (worker) =>
+          connectedWorkerIds.has(worker.id) && worker.status === "online",
+      )
+      .filter(
+        (worker) =>
+          worker.capabilities.distributedExecutor?.computeMode === "cpu-only",
+      )
+      .map((worker) => worker.capabilities.distributedExecutor!.nodeId),
+  );
   return workers
-    .filter((worker) => connectedWorkerIds.has(worker.id) && worker.status === "online")
+    .filter(
+      (worker) =>
+        connectedWorkerIds.has(worker.id) && worker.status === "online",
+    )
     .flatMap((worker) => worker.capabilities.deployments)
     .filter((deployment) => deployment.model === modelId)
     .some((deployment) => {
       const execution = deployment.execution;
       if (!execution) return false;
-      return execution.fallback || execution.stages?.some((stage) => stage.fallback) === true;
+      const fallbackStages =
+        execution.stages?.filter((stage) => stage.fallback) ?? [];
+      if (fallbackStages.length > 0) {
+        return fallbackStages.some(
+          (stage) =>
+            stage.deviceType !== "cpu" ||
+            !intentionalCpuNodes.has(stage.nodeId),
+        );
+      }
+      return execution.fallback;
     });
 }
 
@@ -393,6 +432,7 @@ export function resolveConnectedExecutorAgent(
 ): LaunchAgent | undefined {
   const entry = connectedExecutors(workers, connectedWorkerIds)
     .find(({ executor }) => executor.nodeId === nodeId);
+  if (entry && !denseHostAdmissionAllows(launch, nodeId, entry.worker.capabilities.hostMemory)) return undefined;
   return entry
     ? new WorkerTunnelLaunchAgent(hub, entry.worker.id, nodeId, launch)
     : undefined;
@@ -404,6 +444,7 @@ function connectedExecutors(
 ): ConnectedExecutor[] {
   return workers
     .filter((worker) => connectedWorkerIds.has(worker.id) && worker.capabilities.distributedExecutor)
+    .filter((worker) => supportsCurrentNativeLaunch(worker.capabilities.agentVersion))
     .filter((worker) => executorCapacityIsEligible(worker))
     .map((worker) => ({ worker, executor: worker.capabilities.distributedExecutor! }))
     .filter(({ executor }) => executor.protocol === "gdlp-worker-tunnel/2")
@@ -463,6 +504,7 @@ function eligiblePlannerPerformance(
       rocm: "amd",
       mps: "apple",
       xpu: "intel",
+      directml: /intel/i.test(profile.deviceName) ? "intel" : /nvidia/i.test(profile.deviceName) ? "nvidia" : "amd",
     }[profile.backend];
     if (!entry.worker.capabilities.gpus.some(
       (gpu) => gpu.vendor.trim().toLowerCase() === expectedVendor,

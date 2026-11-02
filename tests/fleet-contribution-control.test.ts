@@ -49,7 +49,7 @@ function worker(
 }
 
 describe("fleet contribution controller", () => {
-  it("separates confirmed desktop states from legacy and offline nodes", () => {
+  it("separates confirmed desktop states from legacy and offline nodes", async () => {
     const workers = [
       worker("active", "online"),
       worker("paused", "draining"),
@@ -63,7 +63,7 @@ describe("fleet contribution controller", () => {
       { isConnected: (id) => connected.has(id), send: () => false },
     );
 
-    expect(controller.status().summary).toEqual({
+    expect((await controller.status()).summary).toEqual({
       desktopNodes: 4,
       connected: 3,
       controlReady: 2,
@@ -232,7 +232,7 @@ describe("fleet contribution administration API", () => {
     );
     agentRun = agent.start();
     await waitUntil(
-      () => runtime?.store.listWorkers()[0]?.status === "online",
+      async () => (await runtime?.store.listWorkers())?.[0]?.status === "online",
       3_000,
     );
 
@@ -265,9 +265,9 @@ describe("fleet contribution administration API", () => {
   });
 });
 
-async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+async function waitUntil(predicate: () => boolean | Promise<boolean>, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() > deadline) throw new Error("Timed out waiting for worker state");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }

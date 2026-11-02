@@ -19,6 +19,8 @@ export interface NativeRuntimeBuildMetadata {
  * Reads build metadata from one explicit application root. It never searches
  * process.cwd() or a parent directory, so a service cannot accidentally report
  * the identity of a sibling checkout.
+ * Release provenance may be at that root or its packaged app child. When both
+ * documents are present, both must be valid and identify the same source.
  *
  * Source checkouts legitimately have no generated provenance or REVISION.
  * When either file is present it is treated as release evidence and therefore
@@ -55,9 +57,16 @@ export function readNativeRuntimeBuildMetadata(
   }
 
   const provenancePath = resolve(root, NATIVE_BUILD_PROVENANCE_FILE);
-  const buildIdentity = existsSync(provenancePath)
-    ? readNativeBuildIdentity(provenancePath, version)
-    : null;
+  const packagedProvenancePath = resolve(root, "app", NATIVE_BUILD_PROVENANCE_FILE);
+  const canonicalIdentity = existsSync(provenancePath)
+    ? readNativeBuildIdentity(provenancePath, version) : null;
+  const packagedIdentity = existsSync(packagedProvenancePath)
+    ? readNativeBuildIdentity(packagedProvenancePath, version) : null;
+  if (canonicalIdentity && packagedIdentity
+      && canonicalIdentity.sourceId !== packagedIdentity.sourceId) {
+    throw new Error("Native build provenance locations disagree within runtime root.");
+  }
+  const buildIdentity = canonicalIdentity ?? packagedIdentity;
 
   const revisionPath = resolve(root, "REVISION");
   let revision: string | null = null;

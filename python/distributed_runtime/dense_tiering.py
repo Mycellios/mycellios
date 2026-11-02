@@ -26,6 +26,7 @@ import torch
 from torch import nn
 
 from .device import TorchExecutionDevice
+from .host_token_lookup import install_host_token_lookup
 
 
 _AUTO_ACCELERATOR_RESERVE_BYTES = 256 * 1024 * 1024
@@ -46,6 +47,11 @@ class DenseTieringConfig:
     activation_reserve_bytes: int | None = None
     admit_next_layer: bool = False
     allow_bounded_layer_cache: bool = True
+    host_token_lookup: bool = False
+    retain_layer_prefix: bool = False
+    compute_precision: str | None = None
+    pin_host_staging: bool = False
+    execution_target: str | None = None
 
     def __post_init__(self) -> None:
         for name, value in (
@@ -66,6 +72,42 @@ class DenseTieringConfig:
             raise TypeError("admit_next_layer must be boolean")
         if not isinstance(self.allow_bounded_layer_cache, bool):
             raise TypeError("allow_bounded_layer_cache must be boolean")
+        if not isinstance(self.host_token_lookup, bool):
+            raise TypeError("host_token_lookup must be boolean")
+        if not isinstance(self.retain_layer_prefix, bool):
+            raise TypeError("retain_layer_prefix must be boolean")
+        if not isinstance(self.pin_host_staging, bool):
+            raise TypeError("pin_host_staging must be boolean")
+        if self.compute_precision not in (None, "float16", "float32"):
+            raise ValueError("compute_precision must be float16, float32 or null")
+        if self.execution_target not in (None, "cpu"):
+            raise ValueError("execution_target must be cpu or null")
+        if self.execution_target == "cpu" and (
+            self.host_ram_budget_bytes <= 0 or self.vram_budget_bytes != 0 or self.host_token_lookup
+            or self.retain_layer_prefix or self.pin_host_staging
+            or self.allow_bounded_layer_cache
+        ):
+            raise ValueError("CPU dense execution requires resident host storage only")
+
+    def resolve_compute_dtype(self, execution_device: TorchExecutionDevice) -> torch.dtype:
+        if self.execution_target == "cpu" and (
+            execution_device.backend != "cpu" or execution_device.accelerated
+            or execution_device.device.type != "cpu"
+        ):
+            raise DenseTieringError("dense_cpu_target_requires_cpu_device")
+        if self.compute_precision == "float16":
+            if not execution_device.accelerated and self.execution_target != "cpu":
+                raise DenseTieringError("explicit_fp16_requires_accelerator")
+            return torch.float16
+        if self.compute_precision == "float32":
+            return torch.float32
+        return torch.float16 if execution_device.accelerated else torch.float32
+
+    def validate_stage_backends(self, *backend_groups) -> None:
+        if (self.compute_precision is not None or self.execution_target is not None) and any(
+            entry is not None for entries in backend_groups for entry in (entries or ())
+        ):
+            raise ValueError("explicit_dense_precision_requires_safetensors_stage")
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +134,10 @@ class DenseTieringError(RuntimeError):
 
 
 def add_dense_tiering_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--dense-execution-target", choices=("cpu",), default=None,
+                        help="Explicit resident CPU stage; never a GPU fallback.")
+    parser.add_argument("--dense-compute-precision", choices=("float16", "float32"),
+        help="Explicit qualified dense compute precision; omission preserves backend defaults.")
     parser.add_argument(
         "--dense-host-ram-budget-bytes",
         type=int,
@@ -137,6 +183,14 @@ def add_dense_tiering_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+    parser.add_argument("--dense-pin-host-staging", action="store_true",
+        help="Explicit bounded CUDA host-weight pinning; requires physical qualification.")
+    parser.add_argument("--dense-host-token-lookup", action="store_true",
+        help="Keep immutable embedding lookup on CPU in a qualified bounded GPU stage.")
+    parser.add_argument("--dense-retain-layer-prefix", action="store_true",
+        help="Retain a bounded layer prefix with a largest-layer streaming slot.")
+
+
 def dense_tiering_config_from_args(args: argparse.Namespace) -> DenseTieringConfig:
     return DenseTieringConfig(
         host_ram_budget_bytes=args.dense_host_ram_budget_bytes,
@@ -144,6 +198,11 @@ def dense_tiering_config_from_args(args: argparse.Namespace) -> DenseTieringConf
         activation_reserve_bytes=args.dense_activation_reserve_bytes,
         admit_next_layer=args.dense_enable_next_layer_admission,
         allow_bounded_layer_cache=not args.dense_require_full_residency,
+        host_token_lookup=getattr(args,"dense_host_token_lookup",False),
+        retain_layer_prefix=getattr(args,"dense_retain_layer_prefix",False),
+        compute_precision=getattr(args,"dense_compute_precision",None),
+        pin_host_staging=getattr(args,"dense_pin_host_staging",False),
+        execution_target=getattr(args,"dense_execution_target",None),
     )
 
 
@@ -162,6 +221,7 @@ class BoundedLayerResidency:
         capacity_bytes: int,
         move: Callable[[DenseMemoryUnit, bool], int | None],
         clock_ns: Callable[[], int] = time.perf_counter_ns,
+        retain_prefix: bool = False,
     ) -> None:
         ordered = tuple(units)
         if not ordered:
@@ -187,6 +247,16 @@ class BoundedLayerResidency:
         self._move = move
         self._clock_ns = clock_ns
         self._resident: OrderedDict[str, None] = OrderedDict()
+        self._retained: set[str] = set()
+        if not isinstance(retain_prefix, bool):
+            raise TypeError("retain_prefix must be boolean")
+        retained_bytes = 0
+        if retain_prefix:
+            for unit in ordered:
+                if retained_bytes + unit.bytes + largest > capacity_bytes:
+                    break
+                self._retained.add(unit.key)
+                retained_bytes += unit.bytes
         self._next_admitted: set[str] = set()
         self._resident_bytes = 0
         self._peak_resident_bytes = 0
@@ -250,6 +320,19 @@ class BoundedLayerResidency:
             for key in list(self._resident):
                 self._evict(key)
 
+    def set_retained_prefix(self, enabled: bool) -> None:
+        """Change only eviction policy; the owner must quiesce decoder requests."""
+        if not isinstance(enabled,bool):
+            raise TypeError("retained prefix policy must be boolean")
+        with self._lock:
+            retained, used = set(), 0
+            largest = max(unit.bytes for unit in self.units)
+            for unit in self.units if enabled else ():
+                if used + unit.bytes + largest > self.capacity_bytes:
+                    break
+                retained.add(unit.key);used += unit.bytes
+            self._retained = retained
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             return {
@@ -257,6 +340,7 @@ class BoundedLayerResidency:
                 "cacheResidentBytes": self._resident_bytes,
                 "cachePeakResidentBytes": self._peak_resident_bytes,
                 "cacheResidentUnits": list(self._resident),
+                "cacheRetainedPrefixUnits": sorted(self._retained),
                 "cacheHits": self._cache_hits,
                 "cacheMisses": self._cache_misses,
                 "nextLayerAdmissions": self._next_layer_admissions,
@@ -280,7 +364,10 @@ class BoundedLayerResidency:
         while self._resident_bytes + unit.bytes > self.capacity_bytes:
             if not self._resident:
                 raise DenseTieringError("dense_tiering_cache_accounting_underflow")
-            self._evict(next(iter(self._resident)))
+            victim = next((key for key in self._resident if key not in self._retained), None)
+            if victim is None:
+                raise DenseTieringError("dense_tiering_no_streaming_slot")
+            self._evict(victim)
         started = self._clock_ns()
         copied = self._move(unit, True)
         elapsed = max(0, self._clock_ns() - started)
@@ -345,6 +432,7 @@ class DenseTieringRuntime:
         startup_ram_to_vram_nanoseconds: int = 0,
         cache: BoundedLayerResidency | None = None,
         hooks: tuple[Any, ...] = (),
+        staging: Any = None,
     ) -> None:
         self.mode = mode
         self.execution_device = execution_device
@@ -360,6 +448,7 @@ class DenseTieringRuntime:
         self.startup_ram_to_vram_nanoseconds = startup_ram_to_vram_nanoseconds
         self.cache = cache
         self._hooks = hooks
+        self._staging = staging
         self.storage_evidence = dict(storage_evidence)
 
     def close(self) -> None:
@@ -368,6 +457,8 @@ class DenseTieringRuntime:
         self._hooks = ()
         if self.cache is not None:
             self.cache.close()
+        if self._staging is not None:
+            self._staging.close()
 
     def snapshot(self) -> dict[str, Any]:
         cache = {} if self.cache is None else self.cache.snapshot()
@@ -383,6 +474,8 @@ class DenseTieringRuntime:
                 0,
                 self.total_weight_bytes - self.static_vram_bytes,
             )
+        elif self.mode == "gpu-resident-host-vocabulary":
+            host_resident = int(self.storage_evidence["hostTokenLookupWeightBytes"])
         else:
             host_resident = 0
         return {
@@ -395,6 +488,7 @@ class DenseTieringRuntime:
             "activationReserveBytes": self.activation_reserve_bytes,
             "totalWeightBytes": self.total_weight_bytes,
             "hostResidentWeightBytes": host_resident,
+            "hostStagingBytes": 0 if self._staging is None else self._staging.metrics["residentBytes"],
             "staticVramWeightBytes": self.static_vram_bytes,
             "currentVramWeightBytes": self.static_vram_bytes + cache_resident,
             "peakVramWeightBytes": self.static_vram_bytes
@@ -425,6 +519,11 @@ def configure_dense_tiering(
 ) -> DenseTieringRuntime:
     """Place a dense stage without ever attempting an unbudgeted full GPU copy."""
 
+    if config.compute_precision is not None and compute_dtype != config.resolve_compute_dtype(execution_device):
+        raise DenseTieringError("explicit_dense_precision_mismatch")
+
+    if config.pin_host_staging and execution_device.backend != "cuda":
+        raise DenseTieringError("dense_host_pinning_requires_cuda")
     evidence = dict(storage_evidence or {})
     source_weight_bytes = unique_tensor_bytes(model)
     host_available = available_host_memory_bytes()
@@ -477,6 +576,19 @@ def configure_dense_tiering(
         raise DenseTieringError(
             "dense_tiering_cannot_measure_accelerator_free_memory"
         )
+    if execution_device.backend == "directml":
+        from .directml import video_memory_observation
+        sharing = video_memory_observation(execution_device.name).get("deviceMemorySharesHost")
+        if type(sharing) is not bool:
+            raise DenseTieringError("dense_tiering_cannot_measure_graphics_memory_sharing")
+        if sharing:
+            if host_budget is None:
+                raise DenseTieringError("dense_tiering_shared_graphics_requires_host_budget")
+            conversion = max((tensor.numel() * torch.empty((), dtype=compute_dtype).element_size()
+                for tensor in _module_tensors(model)
+                if tensor.is_floating_point() and tensor.dtype != compute_dtype), default=0)
+            vram_budget = min(vram_budget, max(0, host_budget - source_weight_bytes - conversion))
+            vram_source += "-shared-host-clamped"
     activation_reserve = (
         config.activation_reserve_bytes
         if config.activation_reserve_bytes is not None
@@ -492,13 +604,21 @@ def configure_dense_tiering(
             f"budget={vram_budget}:reserve={activation_reserve}"
         )
 
+    held_ids: set[int] = set()
+    if config.host_token_lookup:
+        if not permit_bounded_tiering or not config.allow_bounded_layer_cache:
+            raise DenseTieringError("host_token_lookup_requires_bounded_tiering")
+        held_ids, lookup_bytes = install_host_token_lookup(model, execution_device.device, compute_dtype)
+        evidence["hostTokenLookupWeightBytes"] = lookup_bytes
+        evidence["tokenLookupBackend"] = "cpu"
     target_weight_bytes = unique_tensor_bytes(model, dtype=compute_dtype)
-    if target_weight_bytes <= usable_weight_budget:
+    accelerator_weight_bytes = unique_tensor_bytes(model, dtype=compute_dtype, excluded_tensor_ids=held_ids)
+    if accelerator_weight_bytes <= usable_weight_budget:
         started = time.perf_counter_ns()
         model.to(device=execution_device.device, dtype=compute_dtype)
         elapsed = max(0, time.perf_counter_ns() - started)
         return DenseTieringRuntime(
-            mode="full-resident",
+            mode="gpu-resident-host-vocabulary" if held_ids else "full-resident",
             execution_device=execution_device,
             compute_dtype=compute_dtype,
             total_weight_bytes=target_weight_bytes,
@@ -507,9 +627,9 @@ def configure_dense_tiering(
             vram_budget_bytes=vram_budget,
             vram_budget_source=vram_source,
             activation_reserve_bytes=activation_reserve,
-            static_vram_bytes=target_weight_bytes,
+            static_vram_bytes=accelerator_weight_bytes,
             storage_evidence=evidence,
-            startup_ram_to_vram_bytes=target_weight_bytes,
+            startup_ram_to_vram_bytes=accelerator_weight_bytes,
             startup_ram_to_vram_nanoseconds=elapsed,
         )
     if not permit_bounded_tiering or not config.allow_bounded_layer_cache:
@@ -529,7 +649,7 @@ def configure_dense_tiering(
     static_bytes = unique_tensor_bytes(
         model,
         dtype=compute_dtype,
-        excluded_tensor_ids=layer_ids,
+        excluded_tensor_ids=layer_ids | held_ids,
     )
     layer_units = tuple(
         DenseMemoryUnit(
@@ -548,21 +668,25 @@ def configure_dense_tiering(
         )
 
     # Convert host weights once to their accelerator compute representation.
-    # Module._apply visits parameters sequentially, so the explicit upper bound
-    # is the loaded source stage plus the largest destination layer.
-    needs_host_dtype_conversion = any(
-        tensor.is_floating_point() and tensor.dtype != compute_dtype
+    # Module._apply converts tensors sequentially. Reserve the largest actual
+    # destination conversion, rather than a whole layer when only a small
+    # floating buffer needs conversion.
+    conversion_scratch = max((
+        tensor.numel() * torch.empty((), dtype=compute_dtype).element_size()
         for tensor in _module_tensors(model)
-    )
-    host_conversion_peak = source_weight_bytes + (
-        largest_layer_bytes if needs_host_dtype_conversion else 0
-    )
+        if tensor.is_floating_point() and tensor.dtype != compute_dtype
+    ), default=0)
+    host_conversion_peak = source_weight_bytes + conversion_scratch
     if host_budget is not None and host_conversion_peak > host_budget:
         raise DenseTieringError(
             "dense_tiering_host_conversion_peak_exceeds_budget:"
             f"required={host_conversion_peak}:budget={host_budget}"
         )
     model.to(device=torch.device("cpu"), dtype=compute_dtype)
+    staging = (_PinnedHostStaging(layers, source_weight_bytes, host_budget)
+               if config.pin_host_staging else None)
+    if staging is not None:
+        evidence["hostPinnedStaging"] = staging.metrics
     host_states = {
         unit.key: _capture_host_module_state(unit.module)
         for unit in layer_units
@@ -570,7 +694,7 @@ def configure_dense_tiering(
     static_started = time.perf_counter_ns()
     _move_static_tensors(
         model,
-        excluded_tensor_ids={
+        excluded_tensor_ids=held_ids | {
             id(tensor)
             for layer in layers
             for tensor in _module_tensors(layer)
@@ -580,6 +704,8 @@ def configure_dense_tiering(
     )
     _synchronize(execution_device)
     static_elapsed = max(0, time.perf_counter_ns() - static_started)
+    directml_fence = (_DeferredDirectmlFence()
+                      if execution_device.backend == "directml" else None)
 
     def move(unit: DenseMemoryUnit, to_accelerator: bool) -> int:
         host_state = host_states[unit.key]
@@ -588,7 +714,7 @@ def configure_dense_tiering(
                 _install_accelerator_copy(
                     host_state,
                     device=execution_device.device,
-                    dtype=compute_dtype,
+                    dtype=compute_dtype, staging=staging,
                 )
                 _synchronize(execution_device)
             except BaseException:
@@ -598,6 +724,8 @@ def configure_dense_tiering(
         # Inference weights are immutable. Synchronize the completed kernel,
         # restore the already-authoritative host objects and drop the GPU
         # references; a GPU->RAM copy would only duplicate PCIe traffic.
+        if directml_fence is not None:
+            directml_fence.before_release()
         _synchronize(execution_device)
         _restore_host_module_state(host_state)
         return 0
@@ -606,6 +734,7 @@ def configure_dense_tiering(
         layer_units,
         capacity_bytes=usable_weight_budget - static_bytes,
         move=move,
+        retain_prefix=config.retain_layer_prefix,
     )
     hooks: list[Any] = []
     for index, unit in enumerate(layer_units):
@@ -632,6 +761,11 @@ def configure_dense_tiering(
             *,
             predicted: str = next_key,
         ) -> Any:
+            # Keep the dependency for the latest queued layer. Cache hits do
+            # not release weights; a blocking readback is required only before
+            # eviction (including admission/close), while those weights live.
+            if directml_fence is not None:
+                directml_fence.remember(output)
             if config.admit_next_layer:
                 cache.admit_next(predicted)
             return output
@@ -660,7 +794,7 @@ def configure_dense_tiering(
         storage_evidence=evidence,
         startup_ram_to_vram_bytes=static_bytes,
         startup_ram_to_vram_nanoseconds=static_elapsed,
-        cache=cache,
+        cache=cache, staging=staging,
         hooks=tuple(hooks),
     )
 
@@ -735,6 +869,10 @@ def accelerator_free_memory_bytes(
     execution_device: TorchExecutionDevice,
 ) -> tuple[int | None, str]:
     device = execution_device.device
+    if execution_device.backend == "directml":
+        from .directml import video_memory_budget
+        budget, usage = video_memory_budget(execution_device.name)
+        return max(0, budget - usage), "dxgi-local-budget-minus-usage"
     if device.type == "cuda":
         try:
             free, _total = torch.cuda.mem_get_info(device)
@@ -808,16 +946,18 @@ def _install_accelerator_copy(
     *,
     device: torch.device,
     dtype: torch.dtype,
+    staging: Any = None,
 ) -> None:
+    def upload(tensor):
+        target_dtype = dtype if tensor.is_floating_point() else tensor.dtype
+        return (staging.upload(tensor, device, target_dtype) if staging is not None
+                else tensor.to(device=device, dtype=target_dtype))
     converted: dict[int, torch.Tensor] = {}
     for module, name, parameter in state.parameters:
         replacement = converted.get(id(parameter))
         if replacement is None:
             replacement = nn.Parameter(
-                parameter.to(
-                    device=device,
-                    dtype=dtype if parameter.is_floating_point() else parameter.dtype,
-                ),
+                upload(parameter),
                 requires_grad=parameter.requires_grad,
             )
             converted[id(parameter)] = replacement
@@ -825,10 +965,7 @@ def _install_accelerator_copy(
     for module, name, buffer in state.buffers:
         replacement = converted.get(id(buffer))
         if replacement is None:
-            replacement = buffer.to(
-                device=device,
-                dtype=dtype if buffer.is_floating_point() else buffer.dtype,
-            )
+            replacement = upload(buffer)
             converted[id(buffer)] = replacement
         module._buffers[name] = replacement
 
@@ -854,10 +991,7 @@ def _move_static_tensors(
                 continue
             replacement = converted.get(id(parameter))
             if replacement is None:
-                value = parameter.to(
-                    device=device,
-                    dtype=dtype if parameter.is_floating_point() else parameter.dtype,
-                )
+                value = parameter.to(device=device, dtype=dtype if parameter.is_floating_point() else parameter.dtype)
                 replacement = nn.Parameter(
                     value,
                     requires_grad=parameter.requires_grad,
@@ -889,6 +1023,37 @@ def _move_nested(value: Any, device: torch.device) -> Any:
     return value
 
 
+class _DeferredDirectmlFence:
+    """Fence queued layer work before its cached weight storage is released."""
+
+    def __init__(self) -> None:
+        self._pending: torch.Tensor | None = None
+
+    def remember(self, output: Any) -> None:
+        self._pending = _directml_fence_tensor(output)
+
+    def before_release(self) -> None:
+        if self._pending is not None:
+            # Clear only after completion; a failed readback must prevent the
+            # caller from restoring/freeing the accelerator parameters.
+            _fence_directml_output(self._pending)
+            self._pending = None
+
+
+def _directml_fence_tensor(output: Any) -> torch.Tensor:
+    if isinstance(output, torch.Tensor):
+        return output
+    if isinstance(output, (tuple, list)):
+        for item in output:
+            if isinstance(item, torch.Tensor):
+                return item
+    raise DenseTieringError("dense_directml_layer_output_cannot_be_fenced")
+
+
+def _fence_directml_output(output: Any) -> None:
+    _directml_fence_tensor(output).detach().to("cpu")
+
+
 def _synchronize(execution_device: TorchExecutionDevice) -> None:
     device = execution_device.device
     if device.type == "cuda":
@@ -912,3 +1077,45 @@ __all__ = [
     "dense_tiering_config_from_args",
     "unique_tensor_bytes",
 ]
+
+
+
+class _PinnedHostStaging:
+    """One retained pinned buffer; blocking uploads permit immediate reuse."""
+    def __init__(self, layers, source_bytes, host_budget, *, allocate=None):
+        tensors = [t for layer in layers for t in _module_tensors(layer)]
+        largest = max((t.numel()*t.element_size() for t in tensors), default=0)
+        if largest <= 0 or host_budget is None or source_bytes+largest > host_budget:
+            raise DenseTieringError('dense_host_staging_exceeds_budget')
+        available=available_host_memory_bytes()
+        if available is None or available < largest+256*1024**2:
+            raise DenseTieringError('dense_host_staging_unavailable')
+        if any(t.device.type!='cpu' for t in tensors):
+            raise DenseTieringError('dense_host_staging_requires_cpu_source')
+        started=time.perf_counter_ns()
+        self._buffer=(allocate(largest) if allocate else
+                      torch.empty(largest,dtype=torch.uint8,pin_memory=True))
+        self._lock=threading.RLock()
+        self.metrics=dict(residentBytes=largest,capacityBytes=largest,uploads=0,
+                          cpuCopyNanoseconds=0,preparationNanoseconds=time.perf_counter_ns()-started)
+
+    def upload(self, tensor, device, dtype):
+        with self._lock:
+            size=tensor.numel()*tensor.element_size()
+            if self._buffer is None or tensor.device.type!='cpu' or size>self.metrics['capacityBytes']:
+                raise DenseTieringError('dense_host_staging_invalid_upload')
+            view=self._buffer[:size].view(tensor.dtype).view(tensor.shape)
+            started=time.perf_counter_ns()
+            view.copy_(tensor.detach())
+            self.metrics['cpuCopyNanoseconds']+=time.perf_counter_ns()-started
+            # Explicit copy and blocking completion keep returned tensors independent
+            # of the pool and finish reading the buffer before the next upload.
+            result=view.to(device=device,dtype=dtype,non_blocking=False,copy=True)
+            self.metrics['uploads']+=1
+            return result
+
+    def close(self):
+        with self._lock:
+            self._buffer=None
+            self.metrics['residentBytes']=0
+

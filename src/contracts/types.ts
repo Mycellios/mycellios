@@ -1,585 +1,483 @@
-import type {
-  CoordinatorRuntimePerformanceEvidence,
-} from "../performance/runtime-profile.js";
+import type { CoordinatorRuntimePerformanceEvidence } from "../performance/runtime-profile.js";
 import type { DeploymentCanaryEvidence } from "./deployment-canary.js";
 import type { NativeBuildIdentity } from "./build-identity.js";
+import type { HostMemoryObservation } from "./host-memory.js";
 import type { EngineRuntimeProfile } from "./engine-runtime-profile.js";
-
 export type WorkloadClass = "interactive" | "batch" | "benchmark";
-export type AdapterKind =
-  | "mycellios-native"
-  | "kokoro"
-  | "decision"
-  | "mycellios-pipeline"
-  | "mock";
+export type AdapterKind = "mycellios-native" | "kokoro" | "mycellios-pipeline" | "mock" | "embedding" | "decision";
 export type DeploymentAdapterKind = Exclude<AdapterKind, "mycellios-native">;
 export type ExecutionMode = "replica" | "pipeline";
 export type ExecutionDeviceType = "cpu" | "gpu" | "mixed";
-export type ExecutionBackend =
-  | "cpu"
-  | "cuda"
-  | "rocm"
-  | "directml"
-  | "mps"
-  | "xpu"
-  | "vulkan"
-  | "webgpu";
+export type ExecutionBackend = "cpu" | "cuda" | "rocm" | "directml" | "mps" | "xpu" | "vulkan" | "webgpu";
 export type WorkerStatus = "online" | "suspect" | "offline" | "draining";
 export type WorkerIdentityKind = "device" | "cell";
-
 export interface WorkerExecutorIsolationCapability {
-  schema: "mycellios-executor-isolation-capability/1";
-  launchPolicySchema: "gdlp-executor-isolation/4";
-  environment: "filtered";
-  workspace: "private-temp-watchdog";
-  processTree: "best-effort" | "windows-job-object";
-  resourceLimits: "workspace-watchdog-only";
-  osSandbox: "not-enforced";
-  hardResourceQuotas: "not-enforced";
-  killOnClose: "not-enforced" | "windows-job-object";
-  maxWorkspaceBytes: number;
-  maxWorkspaceEntries: number;
-  workspaceCheckIntervalMs: number;
+    schema: "mycellios-executor-isolation-capability/1";
+    launchPolicySchema: "gdlp-executor-isolation/4";
+    environment: "filtered";
+    workspace: "private-temp-watchdog";
+    processTree: "best-effort" | "windows-job-object";
+    resourceLimits: "workspace-watchdog-only";
+    osSandbox: "not-enforced";
+    hardResourceQuotas: "not-enforced";
+    killOnClose: "not-enforced" | "windows-job-object";
+    maxWorkspaceBytes: number;
+    maxWorkspaceEntries: number;
+    workspaceCheckIntervalMs: number;
 }
 export type ComputeMode = "automatic" | "gpu-only" | "cpu-only";
-export type JobStatus =
-  | "queued"
-  | "leasing"
-  | "running"
-  | "streaming"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "expired";
-
+export type JobStatus = "queued" | "leasing" | "running" | "streaming" | "completed" | "failed" | "cancelled" | "expired";
 export interface HubCatalogModel {
-  id: string;
-  author: string;
-  downloads: number;
-  likes: number;
-  lastModified: string | null;
-  pipelineTag: string | null;
-  modelType: string | null;
-  architecture: string | null;
-  adapterId: string | null;
-  adapterContractId: string | null;
-  adapterRegistryId: string;
-  adapterEvidenceScope: "software-contract-only";
-  compatible: boolean;
-  gated: boolean;
-  compatibilityReason: string | null;
-  parameterCount?: number | null;
-  estimatedMemoryMiB?: number | null;
-  memoryEstimateSource?: "hub_metadata" | "model_name" | null;
+    id: string;
+    author: string;
+    downloads: number;
+    likes: number;
+    lastModified: string | null;
+    pipelineTag: string | null;
+    modelType: string | null;
+    architecture: string | null;
+    adapterId: string | null;
+    adapterContractId: string | null;
+    adapterRegistryId: string;
+    adapterEvidenceScope: "software-contract-only";
+    compatible: boolean;
+    gated: boolean;
+    compatibilityReason: string | null;
+    parameterCount?: number | null;
+    estimatedMemoryMiB?: number | null;
+    memoryEstimateSource?: "hub_metadata" | "model_name" | null;
 }
-
 export type HubCatalogSort = "downloads" | "likes" | "lastModified";
-
 export interface HubCatalogSearchInput {
-  query: string;
-  cursor?: string | null;
-  sort?: HubCatalogSort;
-  limit?: number;
+    query: string;
+    cursor?: string | null;
+    sort?: HubCatalogSort;
+    limit?: number;
 }
-
 export interface HubCatalogPage {
-  data: HubCatalogModel[];
-  nextCursor: string | null;
+    data: HubCatalogModel[];
+    nextCursor: string | null;
 }
-
 export interface ChatMessage {
-  role: "system" | "developer" | "user" | "assistant" | "tool";
-  content: string;
-  name?: string;
+    role: "system" | "developer" | "user" | "assistant" | "tool";
+    content: string;
+    name?: string;
 }
-
 export interface ChatCompletionRequest {
-  model: string;
-  /** Kokoro controls: English by default, Spanish opt-in; speed 0.5..2. */
-  language?: "en" | "es";
-  voice?: "af_heart" | "am_michael" | "ef_dora" | "em_alex" | "em_santa";
-  speed?: number;
-  messages: ChatMessage[];
-  stream?: boolean;
-  max_tokens?: number;
-  temperature?: number;
-  top_p?: number;
-  seed?: number;
-  session_id?: string;
-  workload_class?: WorkloadClass;
-  preferred_region?: string;
-  deadline_ms?: number;
-  privacy?: {
-    trust: "default" | "trusted-only";
-    boundary: "trusted-edges" | "pinned-edges";
-    pinned_identity_ids?: string[];
-  };
+    model: string;
+    /** Kokoro controls: English by default, Spanish opt-in; speed 0.5..2. */
+    language?: "en" | "es";
+    voice?: "af_heart" | "am_michael" | "ef_dora" | "em_alex" | "em_santa";
+    speed?: number;
+    messages: ChatMessage[];
+    stream?: boolean;
+    max_tokens?: number;
+    temperature?: number;
+    top_p?: number;
+    seed?: number;
+    session_id?: string;
+    workload_class?: WorkloadClass;
+    preferred_region?: string;
+    deadline_ms?: number;
+    privacy?: {
+        trust: "default" | "trusted-only";
+        boundary: "trusted-edges" | "pinned-edges";
+        pinned_identity_ids?: string[];
+    };
 }
-
 export interface ModelDeployment {
-  deploymentId: string;
-  model: string;
-  modelDigest: string;
-  /** Exact native pipeline snapshot verified independently through /health. */
-  activationId?: string | undefined;
-  mode: ExecutionMode;
-  adapter: DeploymentAdapterKind;
-  peakVramMb: number;
-  contextLimit: number;
-  maxConcurrency: number;
-  freeSlots: number;
-  tokensPerSecond: number;
-  /**
-   * Origin of the throughput figure. Only `measured` represents completed
-   * inference observed by this worker; the other values are planning inputs.
-   */
-  throughputSource?: "measured" | "estimated" | "configured" | "default" | undefined;
-  ttftMs: number;
-  /**
-   * Native pipeline deployments remain invisible to scheduling until the
-   * coordinator has completed a live activation challenge.
-   */
-  verificationState?: "pending" | "verified" | undefined;
-  /**
-   * Content-addressed physical canary bound to the exact model artifact and
-   * active native pipeline from which measured throughput was derived.
-   */
-  canaryEvidence?: DeploymentCanaryEvidence | undefined;
-  dataLocality: "local";
-  stage?: {
-    index: number;
-    total: number;
-    layerStart: number;
-    layerEnd: number;
-  } | undefined;
-  internalPipeline?: {
-    stageCount: number;
-    boundaries: number[];
-  } | undefined;
-  /**
-   * Device telemetry reported by the runtime after model weights have loaded.
-   * This is deliberately separate from advertised hardware: a detected GPU is
-   * not proof that inference is actually using it.
-   */
-  execution?: {
-    deviceType: ExecutionDeviceType;
-    backend: ExecutionBackend;
-    deviceName: string;
-    precision: string;
-    fallback: boolean;
-    fallbackReason?: string | undefined;
-    stages?: Array<{
-      nodeId: string;
-      stageIndex: number;
-      layerStart: number;
-      layerEnd: number;
-      deviceType: Exclude<ExecutionDeviceType, "mixed">;
-      backend: ExecutionBackend;
-      deviceName: string;
-      precision: string;
-      fallback: boolean;
-      fallbackReason?: string | undefined;
-    }> | undefined;
-  } | undefined;
+    deploymentId: string;
+    model: string;
+    modelDigest: string;
+    /** Exact native pipeline snapshot verified independently through /health. */
+    activationId?: string | undefined;
+    mode: ExecutionMode;
+    adapter: DeploymentAdapterKind;
+    peakVramMb: number;
+    contextLimit: number;
+    maxConcurrency: number;
+    freeSlots: number;
+    tokensPerSecond: number;
+    /**
+     * Origin of the throughput figure. Only `measured` represents completed
+     * inference observed by this worker; the other values are planning inputs.
+     */
+    throughputSource?: "measured" | "estimated" | "configured" | "default" | undefined;
+    ttftMs: number;
+    /**
+     * Native pipeline deployments remain invisible to scheduling until the
+     * coordinator has completed a live activation challenge.
+     */
+    verificationState?: "pending" | "verified" | undefined;
+    /**
+     * Content-addressed physical canary bound to the exact model artifact and
+     * active native pipeline from which measured throughput was derived.
+     */
+    canaryEvidence?: DeploymentCanaryEvidence | undefined;
+    dataLocality: "local";
+    stage?: {
+        index: number;
+        total: number;
+        layerStart: number;
+        layerEnd: number;
+    } | undefined;
+    internalPipeline?: {
+        stageCount: number;
+        boundaries: number[];
+    } | undefined;
+    /**
+     * Device telemetry reported by the runtime after model weights have loaded.
+     * This is deliberately separate from advertised hardware: a detected GPU is
+     * not proof that inference is actually using it.
+     */
+    execution?: {
+        deviceType: ExecutionDeviceType;
+        backend: ExecutionBackend;
+        deviceName: string;
+        precision: string;
+        fallback: boolean;
+        fallbackReason?: string | undefined;
+        stages?: Array<{
+            nodeId: string;
+            stageIndex: number;
+            layerStart: number;
+            layerEnd: number;
+            deviceType: Exclude<ExecutionDeviceType, "mixed">;
+            backend: ExecutionBackend;
+            deviceName: string;
+            precision: string;
+            fallback: boolean;
+            fallbackReason?: string | undefined;
+        }> | undefined;
+    } | undefined;
 }
-
 export interface GpuCapability {
-  id: string;
-  vendor: string;
-  model: string;
-  physicalVramMb: number;
-  sharedMemoryMb?: number | undefined;
-  unifiedMemory?: boolean | undefined;
-  offeredVramMb: number;
-  freeOfferedVramMb: number;
-  utilizationPct?: number | undefined;
-  temperatureC?: number | undefined;
-  powerW?: number | undefined;
+    id: string;
+    vendor: string;
+    model: string;
+    physicalVramMb: number;
+    sharedMemoryMb?: number | undefined;
+    unifiedMemory?: boolean | undefined;
+    offeredVramMb: number;
+    freeOfferedVramMb: number;
+    utilizationPct?: number | undefined;
+    temperatureC?: number | undefined;
+    powerW?: number | undefined;
 }
-
 export interface WorkerLimits {
-  maxConcurrency: number;
-  maxPowerW?: number | undefined;
-  maxTemperatureC?: number | undefined;
-  pauseWhenForeground: boolean;
+    maxConcurrency: number;
+    maxPowerW?: number | undefined;
+    maxTemperatureC?: number | undefined;
+    pauseWhenForeground: boolean;
 }
-
-export type WorkerAcceleratorDiagnosticState =
-  | "idle"
-  | "preparing"
-  | "cpu-ready"
-  | "gpu-ready"
-  | "gpu-fallback"
-  | "error";
-
-export type WorkerAcceleratorDiagnosticPhase =
-  | "idle"
-  | "detecting"
-  | "checking-cache"
-  | "checking-prerequisites"
-  | "copying-base"
-  | "downloading"
-  | "verifying-package"
-  | "installing"
-  | "physical-probe"
-  | "activating"
-  | "ready"
-  | "fallback"
-  | "blocked"
-  | "error";
-
+export type WorkerAcceleratorDiagnosticState = "idle" | "preparing" | "cpu-ready" | "gpu-ready" | "gpu-fallback" | "error";
+export type WorkerAcceleratorDiagnosticPhase = "idle" | "detecting" | "checking-cache" | "checking-prerequisites" | "copying-base" | "downloading" | "verifying-package" | "installing" | "physical-probe" | "activating" | "ready" | "fallback" | "blocked" | "error";
 /**
  * Bounded, path-free accelerator telemetry published by desktop workers.
  * It intentionally excludes command lines, environment variables and raw
  * stack traces so the public network can diagnose unattended nodes safely.
  */
 export interface WorkerAcceleratorDiagnostics {
-  schema: "mycellios-accelerator-diagnostics/1";
-  appVersion: string;
-  state: WorkerAcceleratorDiagnosticState;
-  backend: "cpu" | "cuda" | "rocm" | "mps" | "xpu" | null;
-  deviceName: string | null;
-  gpuVendor: string | null;
-  gpuModel: string | null;
-  phase: WorkerAcceleratorDiagnosticPhase;
-  progressPct: number | null;
-  issueCode: string | null;
-  issueSummary: string | null;
-  retryable: boolean;
-  retryAttempt: number;
-  nextRetryAt: string | null;
-  updatedAt: string;
-  recentEvents: Array<{
-    at: string;
-    level: "info" | "success" | "warning" | "error";
-    message: string;
-  }>;
+    schema: "mycellios-accelerator-diagnostics/1";
+    appVersion: string;
+    state: WorkerAcceleratorDiagnosticState;
+    backend: "cpu" | "cuda" | "rocm" | "mps" | "xpu" | "directml" | null;
+    deviceName: string | null;
+    gpuVendor: string | null;
+    gpuModel: string | null;
+    phase: WorkerAcceleratorDiagnosticPhase;
+    progressPct: number | null;
+    issueCode: string | null;
+    issueSummary: string | null;
+    retryable: boolean;
+    retryAttempt: number;
+    nextRetryAt: string | null;
+    updatedAt: string;
+    recentEvents: Array<{
+        at: string;
+        level: "info" | "success" | "warning" | "error";
+        message: string;
+    }>;
 }
-
 /**
  * Hashed physical identity emitted by unattended/headless executors.
  * Provider ids and GPU UUIDs must never be published in their raw form.
  */
 export interface WorkerPhysicalIdentity {
-  schema: "gdlp-worker-physical-identity/1";
-  provider: "gpu_cloud" | "generic";
-  providerMachineFingerprintSha256: string;
-  hostFingerprintSha256: string;
-  gpuFingerprintsSha256: string[];
-  attestedAt: string;
+    schema: "gdlp-worker-physical-identity/1";
+    provider: "gpu_cloud" | "generic";
+    providerMachineFingerprintSha256: string;
+    hostFingerprintSha256: string;
+    gpuFingerprintsSha256: string[];
+    attestedAt: string;
 }
-
 export interface WorkerCapabilities {
-  region: string;
-  agentVersion: string;
-  /** Exact sealed source identity. Missing only on legacy or development nodes. */
-  buildIdentity?: NativeBuildIdentity | undefined;
-  /** Explicit opt-in to administrator commands supported by this worker. */
-  administration?: {
-    contributionControl: "mycellios-contribution-control/1";
-  } | undefined;
-  gpus: GpuCapability[];
-  limits: WorkerLimits;
-  deployments: ModelDeployment[];
-  network: {
-    coordinatorRttMs: number;
-    uplinkMbps: number;
-    downlinkMbps: number;
-  };
-  /** A node-local shard executor controlled through the existing worker tunnel. */
-  distributedExecutor?: {
-    protocol: "gdlp-worker-tunnel/1" | "gdlp-worker-tunnel/2";
-    /**
-     * Optional, negotiated recovery extension for the authenticated relay.
-     * Legacy v2 workers omit it and remain fail-closed on any disconnect.
-     */
-    streamRecovery?: "offset-ack-v1" | undefined;
-    nodeId: string;
-    stageHost: string;
-    stagePort: number;
-    runtime: "python-safetensors";
-    /** User-selected runtime policy. Optional only for legacy registrations. */
-    computeMode?: ComputeMode | undefined;
-    /** True only when this registration explicitly permits CPU model stages. */
-    cpuEligible?: boolean | undefined;
-    /** Sanitized self-repair state; absent on legacy and non-desktop workers. */
-    acceleration?: WorkerAcceleratorDiagnostics | undefined;
-    /** Coordinator-observed physical calibration consumed by placement. */
-    performanceEvidence?: CoordinatorRuntimePerformanceEvidence | undefined;
-    /** Coordinator-owned, engine/artifact-specific physical capacity evidence. */
-    engineProfiles?: EngineRuntimeProfile[] | undefined;
-    /** Honest host-side process isolation controls; absent on legacy workers. */
-    isolation?: WorkerExecutorIsolationCapability | undefined;
-    /**
-     * Native peer listener candidates. These are reachability hints only:
-     * every session still requires a coordinator-issued, one-time grant.
-     */
-    directTransport?: {
-      protocol: "mycellios-direct/1";
-      /** Absent on legacy peers whose direct commit ordering is not race-free. */
-      commitAck?: "destination-v1" | undefined;
-      candidates: Array<{
-        host: string;
-        port: number;
-        scope: "lan" | "configured" | "public-mapped";
-      }>;
-      maxSessions: number;
-      maxSessionBytes: number;
+    hostMemory?: HostMemoryObservation | undefined;
+    region: string;
+    agentVersion: string;
+    /** Exact sealed source identity. Missing only on legacy or development nodes. */
+    buildIdentity?: NativeBuildIdentity | undefined;
+    /** Explicit opt-in to administrator commands supported by this worker. */
+    administration?: {
+        contributionControl: "mycellios-contribution-control/1";
     } | undefined;
-    /** Hashed physical evidence; raw provider ids and GPU UUIDs are forbidden. */
-    physicalIdentity?: WorkerPhysicalIdentity | undefined;
-  } | undefined;
+    gpus: GpuCapability[];
+    limits: WorkerLimits;
+    deployments: ModelDeployment[];
+    network: {
+        coordinatorRttMs: number;
+        uplinkMbps: number;
+        downlinkMbps: number;
+    };
+    /** A node-local shard executor controlled through the existing worker tunnel. */
+    distributedExecutor?: {
+        protocol: "gdlp-worker-tunnel/1" | "gdlp-worker-tunnel/2";
+        /**
+         * Optional, negotiated recovery extension for the authenticated relay.
+         * Legacy v2 workers omit it and remain fail-closed on any disconnect.
+         */
+        streamRecovery?: "offset-ack-v1" | undefined;
+        nodeId: string;
+        stageHost: string;
+        stagePort: number;
+        runtime: "python-safetensors";
+        /** User-selected runtime policy. Optional only for legacy registrations. */
+        computeMode?: ComputeMode | undefined;
+        /** True only when this registration explicitly permits CPU model stages. */
+        cpuEligible?: boolean | undefined;
+        /** Sanitized self-repair state; absent on legacy and non-desktop workers. */
+        acceleration?: WorkerAcceleratorDiagnostics | undefined;
+        /** Coordinator-observed physical calibration consumed by placement. */
+        performanceEvidence?: CoordinatorRuntimePerformanceEvidence | undefined;
+        /** Coordinator-owned, engine/artifact-specific physical capacity evidence. */
+        engineProfiles?: EngineRuntimeProfile[] | undefined;
+        /** Honest host-side process isolation controls; absent on legacy workers. */
+        isolation?: WorkerExecutorIsolationCapability | undefined;
+        /**
+         * Native peer listener candidates. These are reachability hints only:
+         * every session still requires a coordinator-issued, one-time grant.
+         */
+        directTransport?: {
+            protocol: "mycellios-direct/1";
+            /** Absent on legacy peers whose direct commit ordering is not race-free. */
+            commitAck?: "destination-v1" | undefined;
+            candidates: Array<{
+                host: string;
+                port: number;
+                scope: "lan" | "configured" | "public-mapped";
+            }>;
+            maxSessions: number;
+            maxSessionBytes: number;
+        } | undefined;
+        /** Hashed physical evidence; raw provider ids and GPU UUIDs are forbidden. */
+        physicalIdentity?: WorkerPhysicalIdentity | undefined;
+    } | undefined;
 }
-
 export interface WorkerRegistration {
-  identity?: {
-    kind: WorkerIdentityKind;
-    id: string;
-  } | undefined;
-  capabilities: WorkerCapabilities;
-  protocol?: {
-    min: number;
-    max: number;
-  } | undefined;
-  admission?: {
-    challengeId: string;
-    publicKey: {
-      algorithm: "ed25519" | "ecdsa-p256-sha256";
-      spki: string;
-    };
-    protocol: {
-      min: number;
-      max: number;
-    };
-    registrationDigest: string;
-    signature: string;
-  } | undefined;
+    identity?: {
+        kind: WorkerIdentityKind;
+        id: string;
+    } | undefined;
+    capabilities: WorkerCapabilities;
+    protocol?: {
+        min: number;
+        max: number;
+    } | undefined;
+    admission?: {
+        challengeId: string;
+        publicKey: {
+            algorithm: "ed25519" | "ecdsa-p256-sha256";
+            spki: string;
+        };
+        protocol: {
+            min: number;
+            max: number;
+        };
+        registrationDigest: string;
+        signature: string;
+    } | undefined;
 }
-
 export interface WorkerHeartbeat {
-  draining: boolean;
-  pausedReason?: string | null;
-  activeLeases: string[];
-  gpus: Array<
-    Pick<
-      GpuCapability,
-      "id" | "freeOfferedVramMb" | "utilizationPct" | "temperatureC" | "powerW"
-    >
-  >;
-  deployments: Array<Pick<ModelDeployment, "deploymentId" | "freeSlots">>;
-  network: Pick<WorkerCapabilities["network"], "coordinatorRttMs" | "uplinkMbps">;
+    draining: boolean;
+    pausedReason?: string | null;
+    activeLeases: string[];
+    gpus: Array<Pick<GpuCapability, "id" | "freeOfferedVramMb" | "utilizationPct" | "temperatureC" | "powerW">>;
+    deployments: Array<Pick<ModelDeployment, "deploymentId" | "freeSlots">>;
+    network: Pick<WorkerCapabilities["network"], "coordinatorRttMs" | "uplinkMbps">;
 }
-
 export interface CompletionMetrics {
-  inputTokens: number;
-  outputTokens: number;
-  ttftMs: number;
-  activeMs: number;
-  /** Exact prompt KV positions reused by the selected runtime, when reported. */
-  reusedKvTokens?: number | undefined;
-  energyWh?: number | undefined;
+    inputTokens: number;
+    outputTokens: number;
+    ttftMs: number;
+    activeMs: number;
+    /** Exact prompt KV positions reused by the selected runtime, when reported. */
+    reusedKvTokens?: number | undefined;
+    energyWh?: number | undefined;
 }
-
 export type NetworkTransportMode = "direct" | "relay" | "local" | "unobserved";
-
 /**
  * Coordinator-built evidence for one physical stage that actually backed the
  * selected deployment. Null timing fields mean that the runtime did not expose
  * a per-stage clock; they must never be inferred from whole-request latency.
  */
 export interface NetworkExecutionTraceStage {
-  routeStageIndex: number;
-  stageIndex: number;
-  nodeId: string | null;
-  workerId: string | null;
-  deploymentId: string;
-  deploymentOwnerWorkerId: string;
-  modelDigest: string;
-  layerStart: number | null;
-  layerEnd: number | null;
-  deviceType: Exclude<ExecutionDeviceType, "mixed">;
-  backend: ExecutionBackend;
-  precision: string;
-  deviceName: string;
-  startedAt: number | null;
-  endedAt: number | null;
-  durationMs: number | null;
+    routeStageIndex: number;
+    stageIndex: number;
+    nodeId: string | null;
+    workerId: string | null;
+    deploymentId: string;
+    deploymentOwnerWorkerId: string;
+    modelDigest: string;
+    layerStart: number | null;
+    layerEnd: number | null;
+    deviceType: Exclude<ExecutionDeviceType, "mixed">;
+    backend: ExecutionBackend;
+    precision: string;
+    deviceName: string;
+    startedAt: number | null;
+    endedAt: number | null;
+    durationMs: number | null;
 }
-
 /**
  * Effective transport observed on a directed physical boundary during a job.
  * Byte counts are null when another overlapping job could have used the same
  * persistent stream, because aggregate stream counters are not per-request.
  */
 export interface NetworkExecutionBoundaryTrace {
-  boundaryIndex: number;
-  fromStageIndex: number;
-  toStageIndex: number;
-  sourceNodeId: string | null;
-  destinationNodeId: string | null;
-  physicalBoundary: boolean | null;
-  transport: NetworkTransportMode;
-  streamId: string | null;
-  bytesSourceToDestination: number | null;
-  bytesDestinationToSource: number | null;
-  countersExclusive: boolean | null;
-  connectRttMs: number | null;
-  streamCreatedAt: number | null;
-  streamConnectedAt: number | null;
-  streamEndedAt: number | null;
-  observedOverlapMs: number | null;
+    boundaryIndex: number;
+    fromStageIndex: number;
+    toStageIndex: number;
+    sourceNodeId: string | null;
+    destinationNodeId: string | null;
+    physicalBoundary: boolean | null;
+    transport: NetworkTransportMode;
+    streamId: string | null;
+    bytesSourceToDestination: number | null;
+    bytesDestinationToSource: number | null;
+    countersExclusive: boolean | null;
+    connectRttMs: number | null;
+    streamCreatedAt: number | null;
+    streamConnectedAt: number | null;
+    streamEndedAt: number | null;
+    observedOverlapMs: number | null;
 }
-
 export interface NetworkExecutionTrace {
-  schema: "mycellios-network-execution-trace/1";
-  jobId: string;
-  attempt: number;
-  observedFrom: number;
-  observedUntil: number;
-  durationMs: number;
-  routeClass: ExecutionMode;
-  affinityHit: boolean;
-  routeDecision: ExecutionRouteDecisionRecord | null;
-  selectedRoute: Array<{
-    routeStageIndex: number;
+    schema: "mycellios-network-execution-trace/1";
+    jobId: string;
+    attempt: number;
+    observedFrom: number;
+    observedUntil: number;
+    durationMs: number;
+    routeClass: ExecutionMode;
+    affinityHit: boolean;
+    routeDecision: ExecutionRouteDecisionRecord | null;
+    selectedRoute: Array<{
+        routeStageIndex: number;
+        workerId: string;
+        deploymentId: string;
+        modelDigest: string;
+        stageIndex: number;
+    }>;
+    stages: NetworkExecutionTraceStage[];
+    physicalBoundaryCount: number | null;
+    boundaries: NetworkExecutionBoundaryTrace[];
+}
+export interface WorkerEnvelope<T = unknown> {
+    v: 1;
+    type: string;
+    workerId: string;
+    payload: T;
+}
+export interface ServerEnvelope<T = unknown> {
+    v: 1;
+    type: string;
+    payload: T;
+}
+export interface RouteStage {
     workerId: string;
     deploymentId: string;
     modelDigest: string;
     stageIndex: number;
-  }>;
-  stages: NetworkExecutionTraceStage[];
-  physicalBoundaryCount: number | null;
-  boundaries: NetworkExecutionBoundaryTrace[];
+    score: number;
 }
-
-export interface WorkerEnvelope<T = unknown> {
-  v: 1;
-  type: string;
-  workerId: string;
-  payload: T;
-}
-
-export interface ServerEnvelope<T = unknown> {
-  v: 1;
-  type: string;
-  payload: T;
-}
-
-export interface RouteStage {
-  workerId: string;
-  deploymentId: string;
-  modelDigest: string;
-  stageIndex: number;
-  score: number;
-}
-
 export interface ScheduledRoute {
-  routeClass: ExecutionMode;
-  model: string;
-  region: string;
-  stages: RouteStage[];
-  score: number;
-  affinityHit: boolean;
+    routeClass: ExecutionMode;
+    model: string;
+    region: string;
+    stages: RouteStage[];
+    score: number;
+    affinityHit: boolean;
 }
-
-export type ExecutionRouteKind =
-  | "local-complete"
-  | "remote-replica"
-  | "distributed-pipeline"
-  | "unavailable";
-
-export type ExecutionRouteReasonCode =
-  | "selected_best_service"
-  | "selected_kv_affinity"
-  | "selected_fallback_after_failure"
-  | "candidate_not_ready"
-  | "candidate_slo_exceeded"
-  | "candidate_evidence_missing"
-  | "candidate_capacity_exhausted"
-  | "candidate_context_exceeded"
-  | "candidate_trust_rejected"
-  | "candidate_boundary_trust_rejected"
-  | "candidate_boundary_pin_rejected"
-  | "candidate_residency_rejected"
-  | "candidate_failure_domain_rejected"
-  | "candidate_cost_exceeded"
-  | "no_candidate_routes";
-
+export type ExecutionRouteKind = "local-complete" | "remote-replica" | "distributed-pipeline" | "unavailable";
+export type ExecutionRouteReasonCode = "selected_best_service" | "selected_kv_affinity" | "selected_fallback_after_failure" | "candidate_not_ready" | "candidate_slo_exceeded" | "candidate_evidence_missing" | "candidate_capacity_exhausted" | "candidate_context_exceeded" | "candidate_trust_rejected" | "candidate_boundary_trust_rejected" | "candidate_boundary_pin_rejected" | "candidate_residency_rejected" | "candidate_failure_domain_rejected" | "candidate_cost_exceeded" | "no_candidate_routes";
 export interface ExecutionRouteDecisionSelection {
-  candidateId: string;
-  kind: Exclude<ExecutionRouteKind, "unavailable">;
-  score: number;
-  nodeCount: number;
-  reason: "selected_best_service" | "selected_kv_affinity" | "selected_fallback_after_failure";
-}
-
-export interface ExecutionRouteDecisionRecord {
-  recommendation: ExecutionRouteDecisionSelection | null;
-  selected: ExecutionRouteDecisionSelection | null;
-  selectedKind: ExecutionRouteKind;
-  fallbacks: ExecutionRouteDecisionSelection[];
-  standbys: Array<{
     candidateId: string;
     kind: Exclude<ExecutionRouteKind, "unavailable">;
-    compatibility: "exact-model-revision-and-stage-contract";
-    stageCount: number;
-    modelDigests: string[];
-  }>;
-  reasons: ExecutionRouteReasonCode[];
-  evaluations: Array<{
-    candidateId: string;
-    kind: Exclude<ExecutionRouteKind, "unavailable">;
-    eligible: boolean;
     score: number;
     nodeCount: number;
+    reason: "selected_best_service" | "selected_kv_affinity" | "selected_fallback_after_failure";
+}
+export interface ExecutionRouteDecisionRecord {
+    recommendation: ExecutionRouteDecisionSelection | null;
+    selected: ExecutionRouteDecisionSelection | null;
+    selectedKind: ExecutionRouteKind;
+    fallbacks: ExecutionRouteDecisionSelection[];
+    standbys: Array<{
+        candidateId: string;
+        kind: Exclude<ExecutionRouteKind, "unavailable">;
+        compatibility: "exact-model-revision-and-stage-contract";
+        stageCount: number;
+        modelDigests: string[];
+    }>;
     reasons: ExecutionRouteReasonCode[];
-  }>;
+    evaluations: Array<{
+        candidateId: string;
+        kind: Exclude<ExecutionRouteKind, "unavailable">;
+        eligible: boolean;
+        score: number;
+        nodeCount: number;
+        reasons: ExecutionRouteReasonCode[];
+    }>;
 }
-
 export interface ScheduledRoutePlan {
-  primary: ScheduledRoute;
-  standbys: ScheduledRoute[];
-  /** Immutable recommendation/selection evidence captured before dispatch. */
-  decision: ExecutionRouteDecisionRecord;
+    primary: ScheduledRoute;
+    standbys: ScheduledRoute[];
+    /** Immutable recommendation/selection evidence captured before dispatch. */
+    decision: ExecutionRouteDecisionRecord;
 }
-
 export interface JobPayload {
-  jobId: string;
-  leaseId: string;
-  modelDigest: string;
-  deadlineAt: number;
-  request: ChatCompletionRequest;
+    jobId: string;
+    leaseId: string;
+    modelDigest: string;
+    deadlineAt: number;
+    request: ChatCompletionRequest;
 }
-
 export interface TokenEvent {
-  index: number;
-  text: string;
+    index: number;
+    text: string;
 }
-
 export interface ExecutionRecoveryTrace {
-  mode: "none" | "prompt-replay" | "deterministic-prefix-replay";
-  attempts: number;
-  replayedTokenEvents: number;
+    mode: "none" | "prompt-replay" | "deterministic-prefix-replay";
+    attempts: number;
+    replayedTokenEvents: number;
 }
-
 export interface ExecutionPrivacyTrace {
-  trust: "default" | "trusted-only";
-  boundary: "trusted-edges" | "pinned-edges";
-  pinnedIdentityHashes: string[];
+    trust: "default" | "trusted-only";
+    boundary: "trusted-edges" | "pinned-edges";
+    pinnedIdentityHashes: string[];
 }
-
 export interface CompletionResult {
-  jobId: string;
-  leaseId: string;
-  text: string;
-  finishReason: "stop" | "length" | "cancelled" | "error";
-  metrics: CompletionMetrics;
-  /** Added by the coordinator after validating worker completion evidence. */
-  networkTrace?: NetworkExecutionTrace | undefined;
-  /** Redacted recovery outcome added by the coordinator; never contains prompt or token text. */
-  recovery?: ExecutionRecoveryTrace | undefined;
-  /** Effective privacy policy, redacted to hashes before it enters evidence. */
-  privacy?: ExecutionPrivacyTrace | undefined;
-  /** Content-addressed signed receipt generated by the coordinator after completion. */
-  executionReceiptId?: string | undefined;
+    jobId: string;
+    leaseId: string;
+    text: string;
+    finishReason: "stop" | "length" | "cancelled" | "error";
+    metrics: CompletionMetrics;
+    /** Added by the coordinator after validating worker completion evidence. */
+    networkTrace?: NetworkExecutionTrace | undefined;
+    /** Redacted recovery outcome added by the coordinator; never contains prompt or token text. */
+    recovery?: ExecutionRecoveryTrace | undefined;
+    /** Effective privacy policy, redacted to hashes before it enters evidence. */
+    privacy?: ExecutionPrivacyTrace | undefined;
+    /** Content-addressed signed receipt generated by the coordinator after completion. */
+    executionReceiptId?: string | undefined;
 }

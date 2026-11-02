@@ -43,7 +43,7 @@ import {
 } from "../worker/admission-credential.js";
 import { prepareNodeStageArtifacts } from "../worker/stage-artifact-preparer.js";
 
-const DEFAULT_MODEL = "hmellor/tiny-random-LlamaForCausalLM";
+const DEFAULT_MODEL = "HMellor/tiny-random-LlamaForCausalLM";
 const DEFAULT_TIMEOUT_SECONDS = 300;
 const CLEANUP_STEP_TIMEOUT_MS = 30_000;
 
@@ -113,7 +113,7 @@ export function createIdempotentDevelopmentCleanup(
       for (const step of steps) {
         try {
           await withTimeout(
-            Promise.resolve().then(() => step.run()),
+            Promise.resolve().then(async () => (await step.run())),
             stepTimeoutMs,
             `development_cleanup_timeout:${step.name}`,
           );
@@ -394,21 +394,21 @@ export async function executeDistributedDevelopmentGate(
             })),
             config,
           }),
-          resolveManagedAgent: (nodeId, launch) =>
+          resolveManagedAgent: async (nodeId, launch) =>
             resolveConnectedExecutorAgent(
-              store.listWorkers(),
+              (await store.listWorkers()),
               hub.connectedWorkerIds(),
               hub,
               nodeId,
               launch,
             ),
-          loadProgress: (modelId) => store.listActivationEvents(modelId),
-          onProgress: (modelId, event) => {
-            store.appendActivationEvent(modelId, event);
+          loadProgress: async (modelId) => (await store.listActivationEvents(modelId)),
+          onProgress: async (modelId, event) => {
+            (await store.appendActivationEvent(modelId, event));
             emitPhase(event.phase, event.message);
             if (event.phase === "running_canary") {
-              const operation = deploymentController.activeOperationForModel(modelId);
-              if (operation) deploymentController.markCanary(operation.id);
+              const operation = (await deploymentController.activeOperationForModel(modelId));
+              if (operation) (await deploymentController.markCanary(operation.id));
             }
             if (event.phase === "failed") {
               rejectActivated(new Error(
@@ -416,22 +416,22 @@ export async function executeDistributedDevelopmentGate(
               ));
             }
           },
-          onPlanPrepared: (modelId, stages) => {
-            const operation = deploymentController.activeOperationForModel(modelId);
+          onPlanPrepared: async (modelId, stages) => {
+            const operation = (await deploymentController.activeOperationForModel(modelId));
             if (!operation) throw new Error(`deployment_operation_missing:${modelId}`);
-            const reservation = deploymentController.prepareRoute(
+            const reservation = (await deploymentController.prepareRoute(
               operation.id,
               stages,
               Math.max(90_000, cli.timeoutMs + 60_000),
-            );
+            ));
             return { id: reservation.id, generation: reservation.generation };
           },
-          onPlanHeartbeat: (_modelId, reservationId) =>
-            deploymentController.renewRoute(
+          onPlanHeartbeat: async (_modelId, reservationId) =>
+            (await deploymentController.renewRoute(
               reservationId,
               Math.max(90_000, cli.timeoutMs + 60_000),
-            ),
-          onActivated: (modelId, reservationId, result) => {
+            )),
+          onActivated: async (modelId, reservationId, result) => {
             const canary = {
               passed: true,
               text: result.canaryText,
@@ -439,11 +439,11 @@ export async function executeDistributedDevelopmentGate(
               workerId: result.workerId,
             };
             if (reservationId) {
-              deploymentController.commitRoute(reservationId, canary);
+              (await deploymentController.commitRoute(reservationId, canary));
             } else {
-              const operation = deploymentController.activeOperationForModel(modelId);
+              const operation = (await deploymentController.activeOperationForModel(modelId));
               if (operation) {
-                deploymentController.completeOperation(operation.id, "active", { canary });
+                (await deploymentController.completeOperation(operation.id, "active", { canary }));
               }
             }
             activatedResult = result;
@@ -463,19 +463,19 @@ export async function executeDistributedDevelopmentGate(
       // real node. These enrollments exist only in its temporary database.
       const signer = workerAdmissionSigner(generateWorkerAdmissionCredential());
       const accountId = "development-gate";
-      const enrollment = enrollments.issue({
+      const enrollment = (await enrollments.issue({
         accountId,
         actor: { kind: "account", id: accountId, scopes: ["node:identity"] },
         expiresInSeconds: 60,
-      });
-      enrollments.confirm({ enrollmentId: enrollment.enrollmentId, accountId, actorId: accountId });
-      const consumed = enrollments.consume({
+      }));
+      (await enrollments.confirm({ enrollmentId: enrollment.enrollmentId, accountId, actorId: accountId }));
+      const consumed = (await enrollments.consume({
         enrollmentToken: enrollment.enrollmentToken,
         nonce: enrollment.nonce,
         identityKind: "device",
         identityId: nodeId,
         publicKeyFingerprint: workerAdmissionPublicKeyFingerprint(signer.publicKey) as `sha256:${string}`,
-      });
+      }));
       if (consumed.state !== "consumed") {
         throw new Error(`development_worker_enrollment_failed:${nodeId}:${consumed.state}`);
       }
@@ -554,15 +554,15 @@ export async function executeDistributedDevelopmentGate(
     }
 
     await waitUntil(
-      () => coordinator!.hub.connectedWorkerIds().size >= 2
-        && coordinator!.database.listWorkerAdmissionCredentials().length === 2,
+      async () => coordinator!.hub.connectedWorkerIds().size >= 2
+        && (await coordinator!.database.listWorkerAdmissionCredentials()).length === 2,
       30_000,
-      () => `development_workers_did_not_authenticate:connected=${
+      async () => `development_workers_did_not_authenticate:connected=${
         [...coordinator!.hub.connectedWorkerIds()].join(",") || "none"
-      }:credentials=${coordinator!.database.listWorkerAdmissionCredentials().length}`,
+      }:credentials=${(await coordinator!.database.listWorkerAdmissionCredentials()).length}`,
       controller.signal,
     );
-    const admitted = coordinator.database.listWorkerAdmissionCredentials();
+    const admitted = (await coordinator.database.listWorkerAdmissionCredentials());
     if (
       admitted.length !== 2
       || admitted.some((credential) => credential.status !== "active")
@@ -573,11 +573,11 @@ export async function executeDistributedDevelopmentGate(
     emitPhase("workers", "two signed source workers connected");
     if (environment.MYCELLIOS_DEV_E2E_DEBUG === "1") {
       let lastTick = Date.now();
-      diagnosticTimer = setInterval(() => {
+      diagnosticTimer = setInterval(async () => {
         const now = Date.now();
         const lagMs = Math.max(0, now - lastTick - 5_000);
         lastTick = now;
-        const states = coordinator!.store.listWorkers().map((worker) =>
+        const states = (await coordinator!.store.listWorkers()).map((worker) =>
           `${worker.identityId ?? worker.id}:${worker.status}, heartbeat age ${now - worker.lastSeenAt}ms`);
         emitPhase("control-health", `event-loop lag ${lagMs}ms; ${states.join("; ")}`);
       }, 5_000);
@@ -629,7 +629,7 @@ export async function executeDistributedDevelopmentGate(
       controller.signal,
     );
 
-    const publishingWorker = coordinator.store.listWorkers()
+    const publishingWorker = (await coordinator.store.listWorkers())
       .find((worker) => worker.id === activatedResult?.workerId);
     const deployment = publishingWorker?.capabilities.deployments
       .find((candidate) => candidate.model === config.model.publicName);
@@ -1123,7 +1123,7 @@ async function reservePort(): Promise<number> {
 async function waitUntil(
   predicate: () => boolean | Promise<boolean>,
   timeout: number,
-  message: string | (() => string),
+  message: string | (() => string | Promise<string>),
   signal?: AbortSignal,
 ): Promise<void> {
   const deadline = Date.now() + timeout;
@@ -1132,7 +1132,7 @@ async function waitUntil(
     if (await predicate()) return;
     await abortableDelay(100, signal);
   }
-  throw new Error(typeof message === "function" ? message() : message);
+  throw new Error(typeof message === "function" ? await message() : message);
 }
 
 function boundedAbortSignal(

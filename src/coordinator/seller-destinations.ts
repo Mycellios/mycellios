@@ -43,7 +43,7 @@ export class SellerDestinationManager {
     private readonly now: () => number = Date.now,
   ) {}
 
-  record(attestation: SellerDestinationAttestation): SellerPayoutDestination {
+  async record(attestation: SellerDestinationAttestation): Promise<SellerPayoutDestination> {
     validateAttestation(attestation, this.now());
     const publicKey = this.trustedVerifierKeys.get(attestation.verifierKeyId);
     if (!publicKey) throw new SellerDestinationError("untrusted_destination_verifier", "The destination verifier is not trusted.");
@@ -60,8 +60,8 @@ export class SellerDestinationManager {
     }
     if (!valid) throw new SellerDestinationError("invalid_destination_signature", "The destination attestation signature is invalid.");
 
-    return this.database.transaction(() => {
-      const existing = this.getById(attestation.destinationId);
+    return (await this.database.transaction(async () => {
+      const existing = (await this.getById(attestation.destinationId));
       if (existing) {
         if (!destinationMatches(existing, attestation)) {
           throw new SellerDestinationError("destination_replay_conflict", "The destination id was reused with different details.");
@@ -69,11 +69,11 @@ export class SellerDestinationManager {
         return existing;
       }
       const now = this.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `UPDATE seller_payout_destinations SET status = 'revoked', revoked_at = ?
          WHERE seller_id = ? AND payout_method = ? AND status = 'active'`,
-      ).run(now, attestation.sellerId, attestation.payoutMethod);
-      this.database.raw.prepare(
+      ).run(now, attestation.sellerId, attestation.payoutMethod));
+      (await this.database.raw.prepare(
         `INSERT INTO seller_payout_destinations(
            id, seller_id, payout_method, destination_kind, destination_reference,
            destination_fingerprint, verifier_key_id, attestation_signature, status,
@@ -84,35 +84,35 @@ export class SellerDestinationManager {
         attestation.destinationKind, attestation.destinationReference,
         attestation.destinationFingerprint, attestation.verifierKeyId,
         attestation.signature, attestation.verifiedAt, attestation.expiresAt, now,
-      );
-      return this.getById(attestation.destinationId)!;
-    });
+      ));
+      return (await this.getById(attestation.destinationId))!;
+    }));
   }
 
-  active(sellerId: string, method: PayoutMethod): SellerPayoutDestination | null {
-    const row = this.database.raw.prepare(
+  async active(sellerId: string, method: PayoutMethod): Promise<SellerPayoutDestination | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT id, seller_id, payout_method, destination_kind, destination_reference,
               destination_fingerprint, status, verified_at, expires_at, revoked_at
        FROM seller_payout_destinations
        WHERE seller_id = ? AND payout_method = ? AND status = 'active'`,
-    ).get(sellerId, method) as DestinationRow | undefined;
+    ).get(sellerId, method)) as DestinationRow | undefined;
     if (!row || Number(row.expires_at) <= this.now()) return null;
     return mapDestination(row);
   }
 
-  revoke(sellerId: string, method: PayoutMethod): boolean {
-    return this.database.raw.prepare(
+  async revoke(sellerId: string, method: PayoutMethod): Promise<boolean> {
+    return (await this.database.raw.prepare(
       `UPDATE seller_payout_destinations SET status = 'revoked', revoked_at = ?
        WHERE seller_id = ? AND payout_method = ? AND status = 'active'`,
-    ).run(this.now(), sellerId, method).changes === 1;
+    ).run(this.now(), sellerId, method)).changes === 1;
   }
 
-  private getById(id: string): SellerPayoutDestination | null {
-    const row = this.database.raw.prepare(
+  private async getById(id: string): Promise<SellerPayoutDestination | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT id, seller_id, payout_method, destination_kind, destination_reference,
               destination_fingerprint, status, verified_at, expires_at, revoked_at
        FROM seller_payout_destinations WHERE id = ?`,
-    ).get(id) as DestinationRow | undefined;
+    ).get(id)) as DestinationRow | undefined;
     return row ? mapDestination(row) : null;
   }
 }

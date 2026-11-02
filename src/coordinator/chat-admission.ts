@@ -21,7 +21,7 @@ export async function waitForChatCapacity(
   if (response?.destroyed) disconnected();
   try {
     controller.signal.throwIfAborted();
-    while (!service.hasCapacity(request, sessionId) && Date.now() < deadline) {
+    while (!(await service.hasCapacity(request, sessionId)) && Date.now() < deadline) {
       await delay(Math.min(250, Math.max(1, deadline - Date.now())), undefined, { signal: controller.signal });
     }
     controller.signal.throwIfAborted();
@@ -35,22 +35,22 @@ export async function waitForChatCapacity(
 
 type ChatPrincipal = { kind: "system" } | { kind: "user" | "api_key"; userId: string };
 
-export function resolveChatIdempotencyKey(
+export async function resolveChatIdempotencyKey(
   service: MeshService,
   request: ChatCompletionRequest,
   received: string | string[] | undefined,
   principal: ChatPrincipal,
-): string | undefined {
+): Promise<string | undefined> {
   const key = parseIdempotencyKey(received, principal);
-  let existing = key ? service.store.getIdempotentJob(key) : null;
+  let existing = key ? (await service.store.getIdempotentJob(key)) : null;
   if (!existing && key && principal.kind !== "system") {
-    const legacy = service.store.getIdempotentJob(parseIdempotencyKey(received)!);
+    const legacy = (await service.store.getIdempotentJob(parseIdempotencyKey(received)!));
     // Before account scoping, keys were stored verbatim. Preserve retry
     // protection only for accounts already associated with that legacy job.
     // Session ownership is checked before this compatibility lookup.
-    if (legacy && service.store.database.raw.prepare(
+    if (legacy && (await service.store.database.raw.prepare(
       "SELECT 1 FROM api_usage WHERE job_id = ? AND user_id = ? LIMIT 1",
-    ).get(legacy.jobId, principal.userId)) existing = legacy;
+    ).get(legacy.jobId, principal.userId))) existing = legacy;
   }
   if (!existing) return key;
   throw new MeshServiceError(

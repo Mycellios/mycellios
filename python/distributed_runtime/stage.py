@@ -15,11 +15,14 @@ from typing import TYPE_CHECKING, Any
 
 import torch
 
+from .transport_diagnostics import relay_route_probe
+
 from .checkpoint_control import (
     StageCheckpointControl,
     checkpoint_control_from_environment,
 )
 from .compute_timing import ComputeTimer
+from .tcp_writes import configure_write_chunk_bytes, validate_transport_limits
 from .device import normalize_torch_device_request
 from .dense_tiering import DenseTieringConfig
 from .failure_evidence import StageFailureEvidence
@@ -40,6 +43,7 @@ from .protocol import (
     TreePrepareRejection,
     TreePrepareStatus,
     bind_socket_deployment_generation,
+    accept_initial_frame,
     configure_socket,
     decode_branch_request_id,
     decode_tree_prepare,
@@ -236,6 +240,7 @@ class StageProcessConfig:
     ram_backed_moe: RamBackedMoeRuntimeConfig | None = None
     paged_kv: HFPagedStageRuntimeConfig | None = None
     native_gguf: NativeGgufRuntimeConfig | None = None
+    tcp_write_chunk_bytes: int | None = None
 
 
 _REQUEST_SCOPED_FRAMES = frozenset(
@@ -386,12 +391,11 @@ def run_stage_process(
         ready_event.set()
         emulator = LinkEmulator(config.one_way_delay_ms, config.bandwidth_mbps)
 
-        upstream, _ = listener.accept()
-        configure_socket(upstream)
+        upstream, hello = accept_initial_frame(listener, config.connect_timeout_seconds)
+        configure_write_chunk_bytes(upstream, config.tcp_write_chunk_bytes)
+        validate_hello(hello, config, runner.hidden_size)
         listener.close()
         listener = None
-        hello = recv_frame(upstream)
-        validate_hello(hello, config, runner.hidden_size)
         bind_socket_deployment_generation(
             upstream,
             config.deployment_generation,
@@ -407,6 +411,7 @@ def run_stage_process(
                 config.next_port,
                 config.connect_timeout_seconds,
             )
+            configure_write_chunk_bytes(downstream, config.tcp_write_chunk_bytes)
             bind_socket_deployment_generation(
                 downstream,
                 config.deployment_generation,
@@ -452,6 +457,7 @@ def run_stage_process(
                 config.return_port,
                 config.connect_timeout_seconds,
             )
+            configure_write_chunk_bytes(return_socket, config.tcp_write_chunk_bytes)
             bind_socket_deployment_generation(
                 return_socket,
                 config.deployment_generation,
@@ -623,26 +629,10 @@ def run_stage_process(
                 if request_admission is not None:
                     request_admission.release(frame.request_id)
             elif frame.frame_type == FrameType.PING:
-                if frame.request_id != config.pipeline_id:
-                    raise ValueError("route PING belongs to another pipeline session")
-                if downstream is not None:
-                    send_frame(
-                        downstream,
-                        FrameType.PING,
-                        frame.request_id,
-                        step=frame.step,
-                        emulator=emulator,
-                    )
-                else:
-                    if return_socket is None:
-                        raise RuntimeError("last stage has no route-probe return socket")
-                    send_frame(
-                        return_socket,
-                        FrameType.PONG,
-                        frame.request_id,
-                        step=frame.step,
-                        emulator=emulator,
-                    )
+                relay_route_probe(frame, pipeline_id=config.pipeline_id,
+                                  stage=config.spec.layer_start, upstream=upstream,
+                                  downstream=downstream, return_socket=return_socket,
+                                  emulator=emulator)
             elif frame.frame_type == FrameType.SHUTDOWN:
                 # Mark the lifecycle transition before forwarding SHUTDOWN. The
                 # downstream monitor may observe the peer's ensuing EOF first.
@@ -2189,7 +2179,7 @@ def build_stage_runner(config: StageProcessConfig) -> StageRunnerContract:
             pipeline_snapshot_identity=config.pipeline_id,
         )
     if config.cell_fixture is None:
-        if normalize_torch_device_request(config.device) == "auto":
+        if normalize_torch_device_request(config.device) == "auto" and config.dense_tiering == DenseTieringConfig():
             return StageRunner(config.spec)
         if config.dense_tiering == DenseTieringConfig():
             return StageRunner(config.spec, device=config.device)
@@ -2364,14 +2354,7 @@ def validate_stage_config(config: StageProcessConfig) -> None:
         TensorCodec(config.codec)
     except (TypeError, ValueError) as error:
         raise ValueError(f"unsupported activation codec {config.codec}") from error
-    for name, value in (
-        ("one_way_delay_ms", config.one_way_delay_ms),
-        ("bandwidth_mbps", config.bandwidth_mbps),
-    ):
-        if not math.isfinite(value) or value < 0:
-            raise ValueError(f"{name} must be finite and non-negative")
-    if not math.isfinite(config.connect_timeout_seconds) or config.connect_timeout_seconds <= 0:
-        raise ValueError("connect_timeout_seconds must be finite and positive")
+    validate_transport_limits(config, "connect_timeout_seconds", non_negative_first=True)
     if config.sealed_wave_tokens is not None and (
         not isinstance(config.sealed_wave_tokens, int)
         or isinstance(config.sealed_wave_tokens, bool)

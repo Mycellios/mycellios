@@ -133,9 +133,9 @@ export class WorkerAdmissionAuthority {
     };
   }
 
-  issueRotation(
+  async issueRotation(
     input: WorkerCredentialRotationChallengeRequest,
-  ): WorkerAdmissionChallengeResponse {
+  ): Promise<WorkerAdmissionChallengeResponse> {
     this.pruneExpired();
     if (
       this.challenges.size + this.rotationChallenges.size
@@ -157,10 +157,10 @@ export class WorkerAdmissionAuthority {
         400,
       );
     }
-    const existing = this.database.getWorkerAdmissionCredential(
+    const existing = (await this.database.getWorkerAdmissionCredential(
       input.identity.kind,
       input.identity.id,
-    );
+    ));
     if (!existing) {
       throw new WorkerAdmissionError(
         "worker_credential_unknown",
@@ -221,12 +221,12 @@ export class WorkerAdmissionAuthority {
     };
   }
 
-  issueRecovery(input: WorkerCredentialRecoveryChallengeRequest, accountId: string): WorkerAdmissionChallengeResponse {
+  async issueRecovery(input: WorkerCredentialRecoveryChallengeRequest, accountId: string): Promise<WorkerAdmissionChallengeResponse> {
     this.pruneExpired();
     if (this.challenges.size + this.rotationChallenges.size + this.recoveryChallenges.size >= MAX_PENDING_WORKER_ADMISSION_CHALLENGES) {
       throw new WorkerAdmissionError("worker_admission_busy", "The coordinator has too many pending worker admission challenges.", 429);
     }
-    const ownership = this.database.getNodeOwnership("device", input.identity.id);
+    const ownership = (await this.database.getNodeOwnership("device", input.identity.id));
     if (!ownership) throw new WorkerAdmissionError("worker_ownership_unknown", "This node identity has not been enrolled.", 404);
     if (ownership.accountId !== accountId) throw new WorkerAdmissionError("worker_recovery_owner_mismatch", "Only the current node owner can recover its credential.", 403);
     const next = normalizePublicKey(input.nextPublicKey);
@@ -244,7 +244,7 @@ export class WorkerAdmissionAuthority {
     return { challengeId, expiresAt: new Date(expiresAt).toISOString(), protocolVersion, signingPayload };
   }
 
-  verifyRecovery(identity: WorkerAdmissionIdentity, proof: WorkerCredentialRecoveryProof, accountId: string) {
+  async verifyRecovery(identity: WorkerAdmissionIdentity, proof: WorkerCredentialRecoveryProof, accountId: string) {
     const parsedProof = workerCredentialRecoveryProofSchema.parse(proof);
     const challenge = this.recoveryChallenges.get(parsedProof.challengeId);
     this.recoveryChallenges.delete(parsedProof.challengeId);
@@ -256,9 +256,9 @@ export class WorkerAdmissionAuthority {
     if (!verifyAdmissionSignature(challenge.nextKey, challenge.nextPublicKey.algorithm, challenge.signingPayload, parsedProof.nextSignature)) {
       throw new WorkerAdmissionError("worker_recovery_signature_invalid", "Recovery requires proof of possession of the replacement key.", 401);
     }
-    const result = this.database.recoverWorkerAdmissionCredential({ identityKind: "device", identityId: identity.id, accountId,
+    const result = (await this.database.recoverWorkerAdmissionCredential({ identityKind: "device", identityId: identity.id, accountId,
       algorithm: challenge.nextPublicKey.algorithm, publicKey: challenge.nextPublicKey.spki,
-      fingerprint: challenge.nextFingerprint, protocolVersion: challenge.protocolVersion });
+      fingerprint: challenge.nextFingerprint, protocolVersion: challenge.protocolVersion }));
     if (result.state === "not_found") throw new WorkerAdmissionError("worker_ownership_unknown", "This node identity has not been enrolled.", 404);
     if (result.state === "owner_mismatch") throw new WorkerAdmissionError("worker_recovery_owner_mismatch", "Only the current node owner can recover its credential.", 403);
     if (result.state === "fingerprint_in_use") throw new WorkerAdmissionError("worker_credential_reused", "This device key belongs to another identity.", 409);
@@ -266,14 +266,14 @@ export class WorkerAdmissionAuthority {
     return { credentialFingerprint: result.credential.fingerprint, generation: result.generation };
   }
 
-  verifyRotation(input: {
+  async verifyRotation(input: {
     identity: WorkerAdmissionIdentity;
     proof: WorkerCredentialRotationProof;
-  }): {
+  }): Promise<{
     protocolVersion: number;
     previousFingerprint: string;
     credentialFingerprint: string;
-  } {
+  }> {
     const proof = workerCredentialRotationProofSchema.parse(input.proof);
     const challenge = this.rotationChallenges.get(proof.challengeId);
     this.rotationChallenges.delete(proof.challengeId);
@@ -321,7 +321,7 @@ export class WorkerAdmissionAuthority {
         401,
       );
     }
-    const rotation = this.database.rotateWorkerAdmissionCredential({
+    const rotation = (await this.database.rotateWorkerAdmissionCredential({
       identityKind: input.identity.kind,
       identityId: input.identity.id,
       expectedFingerprint: challenge.currentFingerprint,
@@ -329,7 +329,7 @@ export class WorkerAdmissionAuthority {
       publicKey: challenge.nextPublicKey.spki,
       fingerprint: challenge.nextFingerprint,
       protocolVersion: challenge.protocolVersion,
-    });
+    }));
     if (rotation.state === "not_found") {
       throw new WorkerAdmissionError(
         "worker_credential_unknown",
@@ -366,15 +366,15 @@ export class WorkerAdmissionAuthority {
     };
   }
 
-  verify(input: {
+  async verify(input: {
     identity: WorkerAdmissionIdentity;
     registrationDigest: string;
     proof: WorkerAdmissionProof;
-  }): {
+  }): Promise<{
     protocolVersion: number;
     credentialFingerprint: string;
     enrollment: "enrolled" | "accepted";
-  } {
+  }> {
     const proof = workerAdmissionProofSchema.parse(input.proof);
     const challenge = this.challenges.get(proof.challengeId);
     // Challenges are one-shot even when the proof is malformed. This prevents
@@ -443,10 +443,10 @@ export class WorkerAdmissionAuthority {
       );
     }
     if (input.identity.kind !== "browser") {
-      const ownership = this.database.getNodeOwnership(
+      const ownership = (await this.database.getNodeOwnership(
         input.identity.kind,
         input.identity.id,
-      );
+      ));
       if (ownership && (
         ownership.status !== "active"
         || ownership.credentialFingerprint !== challenge.fingerprint
@@ -461,14 +461,14 @@ export class WorkerAdmissionAuthority {
       }
     }
 
-    const admission = this.database.admitWorkerCredential({
+    const admission = (await this.database.admitWorkerCredential({
       identityKind: input.identity.kind,
       identityId: input.identity.id,
       algorithm: proof.publicKey.algorithm,
       publicKey: proof.publicKey.spki,
       fingerprint: challenge.fingerprint,
       protocolVersion: challenge.protocolVersion,
-    });
+    }));
     if (admission.state === "revoked") {
       throw new WorkerAdmissionError(
         "worker_credential_revoked",

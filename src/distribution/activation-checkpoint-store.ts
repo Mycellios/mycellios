@@ -22,7 +22,7 @@ export class ActivationCheckpointStore {
   private totalBytes = 0;
 
   constructor(
-    private readonly pinnedKeys: ReadonlyMap<string, KeyLike> | ((keyId: string) => KeyLike | undefined),
+    private readonly pinnedKeys: ReadonlyMap<string, KeyLike> | ((keyId: string) => KeyLike | undefined | Promise<KeyLike | undefined>),
     private readonly limits: ActivationCheckpointStoreLimits,
   ) {
     if (
@@ -32,25 +32,25 @@ export class ActivationCheckpointStore {
     ) throw new Error("activation_checkpoint_store_limits_are_invalid");
   }
 
-  private keysFor(keyId: string): ReadonlyMap<string, KeyLike> {
+  private async keysFor(keyId: string): Promise<ReadonlyMap<string, KeyLike>> {
     if (typeof this.pinnedKeys !== "function") return this.pinnedKeys;
-    const key = this.pinnedKeys(keyId);
+    const key = await this.pinnedKeys(keyId);
     return key ? new Map([[keyId, key]]) : new Map();
   }
 
-  put(
+  async put(
     value: unknown,
     payload: Uint8Array,
     expected: ActivationCheckpointCompatibility,
     now = Date.now(),
-  ): ActivationCheckpoint {
+  ): Promise<ActivationCheckpoint> {
     if (payload.byteLength > this.limits.maxEntryBytes) {
       throw new Error("activation_checkpoint_store_entry_limit_exceeded");
     }
     const parsedKeyId = typeof value === "object" && value !== null
       && "keyId" in value && typeof value.keyId === "string" ? value.keyId : "";
     const checkpoint = verifyActivationCheckpoint(
-      value, payload, this.keysFor(parsedKeyId), expected, now,
+      value, payload, await this.keysFor(parsedKeyId), expected, now,
     );
     const existing = this.entries.get(checkpoint.checkpointId);
     if (existing) {
@@ -77,18 +77,18 @@ export class ActivationCheckpointStore {
     return structuredClone(checkpoint);
   }
 
-  get(
+  async get(
     checkpointId: string,
     expected: ActivationCheckpointCompatibility,
     now = Date.now(),
-  ): { checkpoint: ActivationCheckpoint; payload: Buffer } | null {
+  ): Promise<{ checkpoint: ActivationCheckpoint; payload: Buffer } | null> {
     const stored = this.entries.get(checkpointId);
     if (!stored) return null;
     try {
       const checkpoint = verifyActivationCheckpoint(
         stored.checkpoint,
         stored.payload,
-        this.keysFor(stored.checkpoint.keyId),
+        (await this.keysFor(stored.checkpoint.keyId)),
         expected,
         now,
       );

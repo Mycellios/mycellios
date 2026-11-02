@@ -1,7 +1,9 @@
-// `pnpm db:migrate`: schema migrations, the job queue schema, then the runtime
+// `npm run db:migrate`: schema migrations, the job queue schema, then the runtime
 // login. Everything here runs as the migration (owner) role; the API and worker
 // then connect with DATABASE_URL and only get the runtime grants.
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 import { migrateJobQueue } from "@rakazo/adapters";
 import { loadRootEnv } from "@rakazo/core/node/load-root-env";
 import {
@@ -13,7 +15,11 @@ import {
 
 loadRootEnv();
 const urls = databaseUrls(process.env);
-execFileSync("pnpm", ["--filter", "@rakazo/db", "exec", "prisma", "migrate", "deploy"], {
+const require = createRequire(import.meta.url);
+const prismaCli = path.join(path.dirname(require.resolve("prisma/package.json")), "build", "index.js");
+const dbPackage = path.resolve(import.meta.dirname, "../../../../packages/db");
+execFileSync(process.execPath, [prismaCli, "migrate", "deploy", "--config", path.join(dbPackage, "prisma.config.ts")], {
+  cwd: dbPackage,
   stdio: "inherit",
   env: { ...process.env, DATABASE_MIGRATION_URL: urls.migrationUrl },
 });

@@ -63,7 +63,7 @@ function authority() {
 }
 
 describe("authenticated activation checkpoint transfer", () => {
-  it("assembles ordered bounded chunks and admits only after full verification", () => {
+  it("assembles ordered bounded chunks and admits only after full verification", async () => {
     const payload = Buffer.alloc(ACTIVATION_CHECKPOINT_CHUNK_BYTES + 17, 7);
     const checkpoint = fixture(payload);
     const { store, transfer } = authority();
@@ -76,10 +76,10 @@ describe("authenticated activation checkpoint transfer", () => {
       transferId, checkpoint, chunkCount: chunks.length,
     }, 2_000);
     for (const chunk of chunks) transfer.chunk("worker-a", "session-a", chunk, 2_001);
-    expect(transfer.commit("worker-a", "session-a", {
+    expect((await transfer.commit("worker-a", "session-a", {
       transferId, checkpointId: checkpoint.checkpointId,
-    }, 2_002)).toEqual(checkpoint);
-    expect(store.get(checkpoint.checkpointId, expected, 2_003)?.payload.equals(payload)).toBe(true);
+    }, 2_002))).toEqual(checkpoint);
+    expect((await store.get(checkpoint.checkpointId, expected, 2_003))?.payload.equals(payload)).toBe(true);
   });
 
   it("rejects cross-session, reordered, incomplete and corrupt transfers", () => {
@@ -99,14 +99,14 @@ describe("authenticated activation checkpoint transfer", () => {
     }, 2_000);
     expect(() => transfer.chunk("worker-a", "session-a", chunks[1], 2_001)).toThrow(/order/);
     transfer.chunk("worker-a", "session-a", chunks[0], 2_001);
-    expect(() => transfer.commit("worker-a", "session-a", {
+    expect(async () => (await transfer.commit("worker-a", "session-a", {
       transferId, checkpointId: checkpoint.checkpointId,
-    }, 2_002)).toThrow(/incomplete/);
+    }, 2_002))).toThrow(/incomplete/);
     const corrupt = { ...chunks[1]!, data: Buffer.alloc(3, 12).toString("base64") };
     transfer.chunk("worker-a", "session-a", corrupt, 2_003);
-    expect(() => transfer.commit("worker-a", "session-a", {
+    expect(async () => (await transfer.commit("worker-a", "session-a", {
       transferId, checkpointId: checkpoint.checkpointId,
-    }, 2_004)).toThrow(/payload_is_corrupt/);
+    }, 2_004))).toThrow(/payload_is_corrupt/);
   });
 
   it("expires expectations and zero-aborts every transfer from a dead session", () => {
@@ -125,18 +125,18 @@ describe("authenticated activation checkpoint transfer", () => {
     expect(transfer.abortSession("worker-a", "session-a")).toBe(1);
   });
 
-  it("binds restore acknowledgement to the target worker session and checkpoint", () => {
+  it("binds restore acknowledgement to the target worker session and checkpoint", async () => {
     const payload = Buffer.from("admitted-restore");
     const checkpoint = fixture(payload);
     const { store, transfer } = authority();
-    store.put(checkpoint, payload, expected, 2_000);
-    const prepared = transfer.prepareRestore({
+    (await store.put(checkpoint, payload, expected, 2_000));
+    const prepared = (await transfer.prepareRestore({
       workerId: "worker-b",
       workerSessionId: "session-b",
       checkpointId: checkpoint.checkpointId,
       expected,
       expiresAt: 5_000,
-    }, 2_001);
+    }, 2_001));
     expect(prepared.payload.equals(payload)).toBe(true);
     expect(() => transfer.completeRestore(
       "worker-b", "stale-session", prepared.transferId, checkpoint.checkpointId, 2_002,
@@ -148,10 +148,10 @@ describe("authenticated activation checkpoint transfer", () => {
       "worker-b", "session-b", prepared.transferId, checkpoint.checkpointId, 2_002,
     )).toBe(checkpoint.checkpointId);
 
-    const abandoned = transfer.prepareRestore({
+    const abandoned = (await transfer.prepareRestore({
       workerId: "worker-b", workerSessionId: "session-b",
       checkpointId: checkpoint.checkpointId, expected, expiresAt: 5_000,
-    }, 2_003);
+    }, 2_003));
     expect(transfer.abortSession("worker-b", "session-b")).toBe(1);
     expect(() => transfer.completeRestore(
       "worker-b", "session-b", abandoned.transferId, checkpoint.checkpointId, 2_004,

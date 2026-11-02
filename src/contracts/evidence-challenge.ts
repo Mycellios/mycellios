@@ -39,7 +39,7 @@ export const runtimePerformanceChallengeSchema = z.object({
   ...challengeBase,
   kind: z.literal("runtime-performance"),
   nodeId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
-  backend: z.enum(["cuda", "rocm", "mps", "xpu", "cpu"]),
+  backend: z.enum(["cuda", "rocm", "mps", "xpu", "directml", "cpu"]),
   deviceName: z.string().trim().min(1).max(256),
   precision: z.enum(["float16", "float32"]),
   source: z.literal("physical-microbenchmark"),

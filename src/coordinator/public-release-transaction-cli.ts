@@ -17,6 +17,7 @@ import {
 } from "./release-upload.js";
 
 export interface PreparePublicReleaseTransactionInput {
+  windowsUnsignedBeta?: boolean;
   assetsRoot: string;
   outputPath: string;
   transactionId: string;
@@ -36,7 +37,8 @@ export async function preparePublicReleaseTransaction(
     throw new Error("public_release_assets_root_is_not_a_real_directory");
   }
 
-  const expected = expectedPublicReleaseAssets(input.version);
+  const schema = input.windowsUnsignedBeta ? "mycellios-native-windows-beta/1" : "mycellios-native-public-release/2";
+  const expected = expectedPublicReleaseAssets(input.version, schema);
   const allowedNames = new Set([
     ...expected.map(({ fileName }) => fileName),
     SHA256_SUMS,
@@ -73,7 +75,7 @@ export async function preparePublicReleaseTransaction(
     sourceId: input.sourceId as `sha256:${string}`,
     revision: input.revision,
     version: input.version,
-    assets,
+    assets, schema,
   });
   const outputPath = resolve(input.outputPath);
   await mkdir(dirname(outputPath), { recursive: true });
@@ -132,12 +134,14 @@ function parseArguments(argv: string[]): PreparePublicReleaseTransactionInput {
     "version",
   ];
   if (
-    JSON.stringify([...values.keys()].sort())
+    JSON.stringify([...values.keys()].filter((key) => key !== "windows-unsigned-beta").sort())
       !== JSON.stringify(expected)
   ) {
     throw new Error("public_release_arguments_incomplete_or_unknown");
   }
+  if (values.has("windows-unsigned-beta") && values.get("windows-unsigned-beta") !== "true") throw new Error("public_release_beta_flag_invalid");
   return {
+    windowsUnsignedBeta: values.get("windows-unsigned-beta") === "true",
     assetsRoot: values.get("assets")!,
     outputPath: values.get("output")!,
     revision: values.get("revision")!,

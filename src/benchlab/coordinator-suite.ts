@@ -132,15 +132,15 @@ export interface CoordinatorBenchmarkOptions {
   cwd: string;
   coordinatorUrl: string;
   model: CoordinatorBenchmarkModel;
-  inventory(routedWorkerIds: ReadonlySet<string>): BenchmarkInventory;
-  resolveWorkerId?(jobId: string): string | null;
+  inventory(routedWorkerIds: ReadonlySet<string>): BenchmarkInventory | Promise<BenchmarkInventory>;
+  resolveWorkerId?(jobId: string): string | null | Promise<string | null>;
   networkToken?: string;
   buildIdentity?: NativeBuildIdentity | null;
   activation?: BenchmarkActivation;
   validateActivation?(
     activation: BenchmarkActivation,
     routedWorkerIds: ReadonlySet<string>,
-  ): void;
+  ): void | Promise<void>;
   samples?: number;
   maximumSamples?: number;
   warmupSamples?: number;
@@ -154,7 +154,7 @@ export interface CoordinatorBenchmarkOptions {
   label?: string;
   historyDirectory?: string;
   trigger?: "automatic-model-start" | "manual";
-  telemetrySnapshot?(): BenchmarkTelemetrySnapshot;
+  telemetrySnapshot?(): BenchmarkTelemetrySnapshot | Promise<BenchmarkTelemetrySnapshot>;
   telemetryIntervalMs?: number;
   fetchImpl?: typeof fetch;
 }
@@ -233,15 +233,15 @@ export async function runCoordinatorModelSuite(
   const prompt = options.prompt ?? defaultPrompt(outputTokens);
   const telemetry = new PhysicalTelemetryWindow();
   const telemetryErrors: string[] = [];
-  const observeTelemetry = (): void => {
+  const observeTelemetry = async (): Promise<void> => {
     if (!options.telemetrySnapshot) return;
     try {
-      telemetry.observe(options.telemetrySnapshot());
+      telemetry.observe((await options.telemetrySnapshot()));
     } catch (error) {
       telemetryErrors.push(error instanceof Error ? error.message : String(error));
     }
   };
-  observeTelemetry();
+  (await observeTelemetry());
   const telemetryTimer = options.telemetrySnapshot
     ? setInterval(
         observeTelemetry,
@@ -281,7 +281,7 @@ export async function runCoordinatorModelSuite(
     });
   } finally {
     if (telemetryTimer) clearInterval(telemetryTimer);
-    observeTelemetry();
+    (await observeTelemetry());
   }
   for (const sample of campaign.samples) {
     if (sample.workerId) routedWorkerIds.add(sample.workerId);
@@ -297,10 +297,10 @@ export async function runCoordinatorModelSuite(
         );
       }
     }
-    options.validateActivation?.(options.activation, routedWorkerIds);
+    await options.validateActivation?.(options.activation, routedWorkerIds);
   }
 
-  const inventory = options.inventory(routedWorkerIds);
+  const inventory = (await options.inventory(routedWorkerIds));
   const selectedNodeIds = new Set(
     inventory.profiles
       .map((profile) => profile.nodeId)
@@ -541,7 +541,7 @@ async function requestCoordinatorSample(input: {
   sampleIndex: number;
   phase: "warmup" | "measurement";
   attempt: number;
-  resolveWorkerId?: (jobId: string) => string | null;
+  resolveWorkerId?: (jobId: string) => string | null | Promise<string | null>;
 }): Promise<CoordinatorSample> {
   const started = performance.now();
   const response = await input.fetchImpl(
@@ -595,7 +595,7 @@ async function requestCoordinatorSample(input: {
     activeMs: completion.x_network.active_ms,
     latencyMs,
     routeClass: completion.x_network.route_class,
-    workerId: input.resolveWorkerId?.(completion.id) ?? null,
+    workerId: (await input.resolveWorkerId?.(completion.id)) ?? null,
     executionTrace: completion.x_network.execution_trace ?? null,
   };
 }

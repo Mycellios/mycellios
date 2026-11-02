@@ -49,6 +49,22 @@
         "globe-renderer": {
           "match": "HeroGlobe-",
           "maximumBytes": 50000
+        },
+        "browser-layer-engine": {
+          "match": "browser-layer-",
+          "maximumBytes": 140000
+        },
+        "document-library": {
+          "match": "lib-",
+          "maximumBytes": 525000
+        },
+        "pdf-reader": {
+          "match": "pdf-",
+          "maximumBytes": 450000
+        },
+        "pdf-worker": {
+          "match": "pdf.worker.min-",
+          "maximumBytes": 1300000
         }
       },
       "criticalPaths": {
@@ -88,6 +104,22 @@
         "contribution-route": {
           "match": "Contribute-",
           "maximumBytes": 65000
+        },
+        "browser-layer-engine": {
+          "match": "browser-layer-",
+          "maximumBytes": 140000
+        },
+        "document-library": {
+          "match": "lib-",
+          "maximumBytes": 525000
+        },
+        "pdf-reader": {
+          "match": "pdf-",
+          "maximumBytes": 450000
+        },
+        "pdf-worker": {
+          "match": "pdf.worker.min-",
+          "maximumBytes": 1300000
         }
       },
       "criticalPaths": {

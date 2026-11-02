@@ -68,13 +68,13 @@ export class SporeConversionQuoteStore {
     private readonly now: () => number = Date.now,
   ) {}
 
-  record(input: SporeConversionQuote): { quote: SporeConversionQuote; duplicate: boolean } {
+  async record(input: SporeConversionQuote): Promise<{ quote: SporeConversionQuote; duplicate: boolean }> {
     const quote = this.verifier.verify(input);
-    return this.database.transaction(() => {
-      const batch = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      const batch = (await this.database.raw.prepare(
         `SELECT seller_id, payout_method, amount_usd_micros, destination_fingerprint, status
          FROM payout_batches WHERE id = ?`,
-      ).get(quote.batchId) as {
+      ).get(quote.batchId)) as {
         seller_id: string; payout_method: string; amount_usd_micros: number;
         destination_fingerprint: string | null; status: string;
       } | undefined;
@@ -85,21 +85,21 @@ export class SporeConversionQuoteStore {
         || batch.destination_fingerprint !== quote.destinationFingerprint) {
         throw new SporeConversionError("spore_quote_batch_mismatch", "The SPORE quote does not match the prepared payout.");
       }
-      const existing = this.getByBatchId(quote.batchId);
+      const existing = (await this.getByBatchId(quote.batchId));
       if (existing) {
         if (JSON.stringify(existing) !== JSON.stringify(quote)) {
           if (existing.expiresAt > this.now()) {
             throw new SporeConversionError("spore_quote_replay_conflict", "The payout already has a live SPORE quote.");
           }
-          this.database.raw.prepare(
+          (await this.database.raw.prepare(
             "UPDATE spore_conversion_quotes SET status = 'superseded', replaced_at = ? WHERE quote_id = ? AND status = 'active'",
-          ).run(this.now(), existing.quoteId);
+          ).run(this.now(), existing.quoteId));
         } else {
           return { quote: existing, duplicate: true };
         }
       }
       try {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `INSERT INTO spore_conversion_quotes(
              quote_id, batch_id, seller_id, usd_micros, chain_id, asset_id,
              token_decimals, token_atomic_amount, destination_fingerprint,
@@ -110,21 +110,21 @@ export class SporeConversionQuoteStore {
           quote.chainId, quote.assetId, quote.tokenDecimals, quote.tokenAtomicAmount,
           quote.destinationFingerprint, quote.issuedAt, quote.expiresAt,
           quote.oracleKeyId, quote.signature, this.now(),
-        );
+        ));
       } catch {
         throw new SporeConversionError("spore_quote_replay_conflict", "The SPORE quote identity is already used.");
       }
       return { quote, duplicate: false };
-    });
+    }));
   }
 
-  getByBatchId(batchId: string): SporeConversionQuote | null {
-    const row = this.database.raw.prepare(
+  async getByBatchId(batchId: string): Promise<SporeConversionQuote | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT quote_id, batch_id, seller_id, usd_micros, chain_id, asset_id,
               token_decimals, token_atomic_amount, destination_fingerprint,
               issued_at, expires_at, oracle_key_id, signature
        FROM spore_conversion_quotes WHERE batch_id = ? AND status = 'active'`,
-    ).get(batchId) as Record<string, unknown> | undefined;
+    ).get(batchId)) as Record<string, unknown> | undefined;
     return row ? {
       schema: "mycellios.spore-conversion-quote.v1",
       quoteId: String(row.quote_id), batchId: String(row.batch_id), sellerId: String(row.seller_id),
@@ -135,27 +135,27 @@ export class SporeConversionQuoteStore {
     } : null;
   }
 
-  getVerifiedByBatchId(batchId: string): SporeConversionQuote | null {
-    const quote = this.getByBatchId(batchId);
+  async getVerifiedByBatchId(batchId: string): Promise<SporeConversionQuote | null> {
+    const quote = (await this.getByBatchId(batchId));
     return quote ? this.verifier.verify(quote) : null;
   }
 
-  getStoredByQuoteId(quoteId: string): StoredSporeConversionQuote | null {
-    const row = this.database.raw.prepare(
+  async getStoredByQuoteId(quoteId: string): Promise<StoredSporeConversionQuote | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT quote_id, batch_id, seller_id, usd_micros, chain_id, asset_id,
               token_decimals, token_atomic_amount, destination_fingerprint,
               issued_at, expires_at, oracle_key_id, signature, status,
               recorded_at, replaced_at
        FROM spore_conversion_quotes WHERE quote_id = ?`,
-    ).get(quoteId) as Record<string, unknown> | undefined;
+    ).get(quoteId)) as Record<string, unknown> | undefined;
     return row ? mapStoredQuote(row) : null;
   }
 
-  listHistoryByBatchId(
+  async listHistoryByBatchId(
     batchId: string,
     limit = 50,
     after?: { recordedAt: number; quoteId: string },
-  ): StoredSporeConversionQuote[] {
+  ): Promise<StoredSporeConversionQuote[]> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 101) {
       throw new SporeConversionError("invalid_spore_quote_history_limit", "Invalid SPORE quote history limit.");
     }
@@ -163,14 +163,14 @@ export class SporeConversionQuoteStore {
       || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$/.test(after.quoteId))) {
       throw new SporeConversionError("invalid_spore_quote_history_cursor", "Invalid SPORE quote history cursor.");
     }
-    const rows = this.database.raw.prepare(
+    const rows = (await this.database.raw.prepare(
       `SELECT quote_id, batch_id, seller_id, usd_micros, chain_id, asset_id,
               token_decimals, token_atomic_amount, destination_fingerprint,
               issued_at, expires_at, oracle_key_id, signature, status,
               recorded_at, replaced_at
        FROM spore_conversion_quotes
        WHERE batch_id = ?
-         AND (? IS NULL OR recorded_at > ? OR (recorded_at = ? AND quote_id > ?))
+         AND (CAST(? AS BIGINT) IS NULL OR recorded_at > ? OR (recorded_at = ? AND quote_id > ?))
        ORDER BY recorded_at ASC, quote_id ASC
        LIMIT ?`,
     ).all(
@@ -180,7 +180,7 @@ export class SporeConversionQuoteStore {
       after?.recordedAt ?? null,
       after?.quoteId ?? "",
       limit,
-    ) as Record<string, unknown>[];
+    )) as Record<string, unknown>[];
     return rows.map(mapStoredQuote);
   }
 }

@@ -147,14 +147,14 @@ export class BillingManager {
     private readonly apiAccess: ApiAccessManager,
   ) {}
 
-  registerPlan(input: Omit<BillingPlan, "createdAt">): BillingPlan {
+  async registerPlan(input: Omit<BillingPlan, "createdAt">): Promise<BillingPlan> {
     validateIdentifier(input.planId, "plan_id");
     validatePositiveInteger(input.version, "plan version");
     validateCurrency(input.priceCurrency);
     validatePositiveInteger(input.priceMicros, "plan price");
     validatePositiveInteger(input.includedTokens, "included tokens");
-    return this.database.transaction(() => {
-      const existing = this.getPlan(input.planId, input.version);
+    return (await this.database.transaction(async () => {
+      const existing = (await this.getPlan(input.planId, input.version));
       if (existing) {
         const matches = existing.priceCurrency === input.priceCurrency.toUpperCase()
           && existing.priceMicros === input.priceMicros
@@ -166,7 +166,7 @@ export class BillingManager {
         return existing;
       }
       const createdAt = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO billing_plans(
            plan_id, version, price_currency, price_micros, included_tokens, status, created_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -178,12 +178,12 @@ export class BillingManager {
         input.includedTokens,
         input.status,
         createdAt,
-      );
+      ));
       return { ...input, priceCurrency: input.priceCurrency.toUpperCase(), createdAt };
-    });
+    }));
   }
 
-  createTopUpQuote(input: Omit<TopUpQuote, "createdAt">): TopUpQuote {
+  async createTopUpQuote(input: Omit<TopUpQuote, "createdAt">): Promise<TopUpQuote> {
     validateIdentifier(input.quoteId, "quote id");
     validateIdentifier(input.userId, "user id");
     validatePositiveInteger(input.amountMicros, "quote amount");
@@ -192,12 +192,12 @@ export class BillingManager {
     if (!Number.isSafeInteger(input.expiresAt) || input.expiresAt <= Date.now()) {
       throw new BillingError("invalid_quote_expiry", "A top-up quote must expire in the future.");
     }
-    return this.database.transaction(() => {
-      this.apiAccess.getOrCreateAccount(input.userId);
-      const existing = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      (await this.apiAccess.getOrCreateAccount(input.userId));
+      const existing = (await this.database.raw.prepare(
         `SELECT user_id, amount_micros, currency, token_amount, expires_at, created_at
          FROM billing_topup_quotes WHERE quote_id = ?`,
-      ).get(input.quoteId) as {
+      ).get(input.quoteId)) as {
         user_id: string; amount_micros: number; currency: string;
         token_amount: number; expires_at: number; created_at: number;
       } | undefined;
@@ -215,7 +215,7 @@ export class BillingManager {
         };
       }
       const createdAt = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO billing_topup_quotes(
            quote_id, user_id, amount_micros, currency, token_amount,
            status, expires_at, created_at
@@ -223,21 +223,21 @@ export class BillingManager {
       ).run(
         input.quoteId, input.userId, input.amountMicros, input.currency.toUpperCase(),
         input.tokenAmount, input.expiresAt, createdAt,
-      );
+      ));
       return { ...input, currency: input.currency.toUpperCase(), createdAt };
-    });
+    }));
   }
 
-  applyPaidSubscription(input: PaidSubscriptionEvent): BillingApplicationResult {
+  async applyPaidSubscription(input: PaidSubscriptionEvent): Promise<BillingApplicationResult> {
     validatePaidEvent(input);
-    this.validateStablecoinIntent(input, "subscription");
+    (await this.validateStablecoinIntent(input, "subscription"));
     validateIdentifier(input.providerSubscriptionId, "provider subscription id");
     validateIdentifier(input.planId, "plan id");
     validatePositiveInteger(input.planVersion, "plan version");
     if (!Number.isSafeInteger(input.periodStart) || input.periodEnd <= input.periodStart) {
       throw new BillingError("invalid_billing_period", "The billing period must have an ordered start and end.");
     }
-    const plan = this.getPlan(input.planId, input.planVersion);
+    const plan = (await this.getPlan(input.planId, input.planVersion));
     if (!plan || plan.status !== "active") {
       throw new BillingError("plan_not_active", "The paid event references a plan version that is not active.");
     }
@@ -245,7 +245,7 @@ export class BillingManager {
       throw new BillingError("plan_price_mismatch", "The paid amount does not match the immutable plan version.");
     }
     const digest = eventDigest("subscription_paid", input);
-    return this.applyGrant({
+    return (await this.applyGrant({
       provider: input.provider,
       providerEventId: input.providerEventId,
       eventType: "subscription_paid",
@@ -257,18 +257,18 @@ export class BillingManager {
       occurredAt: input.occurredAt,
       tokenAmount: plan.includedTokens,
       sourceType: "subscription",
-      onFirstApplication: (now) => {
-        const existing = this.database.raw.prepare(
+      onFirstApplication: async (now) => {
+        const existing = (await this.database.raw.prepare(
           `SELECT id, user_id, status_changed_at FROM billing_subscriptions
            WHERE provider = ? AND provider_subscription_id = ?`,
-        ).get(input.provider, input.providerSubscriptionId) as {
+        ).get(input.provider, input.providerSubscriptionId)) as {
           id: string; user_id: string; status_changed_at: number;
         } | undefined;
         if (existing && existing.user_id !== input.userId) {
           throw new BillingError("subscription_owner_conflict", "A provider subscription cannot move between accounts.");
         }
         if (existing && input.occurredAt >= Number(existing.status_changed_at)) {
-          this.database.raw.prepare(
+          (await this.database.raw.prepare(
             `UPDATE billing_subscriptions
              SET plan_id = ?, plan_version = ?, status = 'active', period_start = ?, period_end = ?,
                  status_changed_at = ?, updated_at = ?
@@ -276,10 +276,10 @@ export class BillingManager {
           ).run(
             input.planId, input.planVersion, input.periodStart, input.periodEnd,
             input.occurredAt, now, existing.id,
-          );
+          ));
         } else {
           if (!existing) {
-            this.database.raw.prepare(
+            (await this.database.raw.prepare(
               `INSERT INTO billing_subscriptions(
                  id, user_id, plan_id, plan_version, provider, provider_subscription_id,
                  status, period_start, period_end, status_changed_at, created_at, updated_at
@@ -288,25 +288,25 @@ export class BillingManager {
               newId("sub"), input.userId, input.planId, input.planVersion, input.provider,
               input.providerSubscriptionId, input.periodStart, input.periodEnd,
               input.occurredAt, now, now,
-            );
+            ));
           }
         }
-        this.consumeStablecoinIntent(input, now);
+        (await this.consumeStablecoinIntent(input, now));
       },
-    });
+    }));
   }
 
-  applyPaidTopUp(input: PaidTopUpEvent): BillingApplicationResult {
+  async applyPaidTopUp(input: PaidTopUpEvent): Promise<BillingApplicationResult> {
     validatePaidEvent(input);
-    this.validateStablecoinIntent(input, "topup");
+    (await this.validateStablecoinIntent(input, "topup"));
     validateIdentifier(input.paymentReference, "payment reference");
     validateIdentifier(input.quoteId, "quote id");
     validatePositiveInteger(input.tokenAmount, "top-up tokens");
-    const quote = this.database.raw.prepare(
+    const quote = (await this.database.raw.prepare(
       `SELECT user_id, amount_micros, currency, token_amount, status,
               consumed_event_key, expires_at
        FROM billing_topup_quotes WHERE quote_id = ?`,
-    ).get(input.quoteId) as {
+    ).get(input.quoteId)) as {
       user_id: string; amount_micros: number; currency: string; token_amount: number;
       status: "open" | "consumed"; consumed_event_key: string | null; expires_at: number;
     } | undefined;
@@ -329,7 +329,7 @@ export class BillingManager {
       throw new BillingError("topup_quote_already_consumed", "The quote was already consumed by another payment.");
     }
     const digest = eventDigest("topup_paid", input);
-    return this.applyGrant({
+    return (await this.applyGrant({
       provider: input.provider,
       providerEventId: input.providerEventId,
       eventType: "topup_paid",
@@ -341,21 +341,21 @@ export class BillingManager {
       occurredAt: input.occurredAt,
       tokenAmount: input.tokenAmount,
       sourceType: "topup",
-      onFirstApplication: (now) => {
-        const result = this.database.raw.prepare(
+      onFirstApplication: async (now) => {
+        const result = (await this.database.raw.prepare(
           `UPDATE billing_topup_quotes
            SET status = 'consumed', consumed_event_key = ?, consumed_at = ?
            WHERE quote_id = ? AND status = 'open'`,
-        ).run(eventKey, now, input.quoteId);
+        ).run(eventKey, now, input.quoteId));
         if (Number(result.changes) !== 1) {
           throw new BillingError("topup_quote_consume_conflict", "The quote could not be consumed atomically.");
         }
-        this.consumeStablecoinIntent(input, now);
+        (await this.consumeStablecoinIntent(input, now));
       },
-    });
+    }));
   }
 
-  applyPaymentReversal(input: PaymentReversalEvent): BillingReversalResult {
+  async applyPaymentReversal(input: PaymentReversalEvent): Promise<BillingReversalResult> {
     validateProvider(input.provider);
     validateIdentifier(input.providerEventId, "provider event id");
     validateIdentifier(input.originalProviderEventId, "original provider event id");
@@ -372,70 +372,70 @@ export class BillingManager {
     }
     const digest = eventDigest("payment_reversed", input);
 
-    return this.database.transaction(() => {
-      const paidCollision = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      const paidCollision = (await this.database.raw.prepare(
         "SELECT 1 AS found FROM billing_events WHERE provider = ? AND provider_event_id = ?",
-      ).get(input.provider, input.providerEventId) as { found: number } | undefined;
+      ).get(input.provider, input.providerEventId)) as { found: number } | undefined;
       if (paidCollision) {
         throw new BillingError("billing_event_conflict", "A provider event id is already used by a paid event.");
       }
-      const statusCollision = this.database.raw.prepare(
+      const statusCollision = (await this.database.raw.prepare(
         "SELECT 1 AS found FROM billing_subscription_events WHERE provider = ? AND provider_event_id = ?",
-      ).get(input.provider, input.providerEventId) as { found: number } | undefined;
+      ).get(input.provider, input.providerEventId)) as { found: number } | undefined;
       if (statusCollision) {
         throw new BillingError("billing_event_conflict", "A provider event id is already used by a subscription status event.");
       }
-      const existing = this.database.raw.prepare(
+      const existing = (await this.database.raw.prepare(
         `SELECT id, event_digest, recovered_tokens, debt_tokens
          FROM billing_reversals WHERE provider = ? AND provider_event_id = ?`,
-      ).get(input.provider, input.providerEventId) as {
+      ).get(input.provider, input.providerEventId)) as {
         id: string; event_digest: string; recovered_tokens: number; debt_tokens: number;
       } | undefined;
       if (existing) {
         if (existing.event_digest !== digest) {
           throw new BillingError("billing_event_conflict", "A reversal event id was reused with different economic content.");
         }
-        const account = this.apiAccess.getOrCreateAccount(input.userId);
+        const account = (await this.apiAccess.getOrCreateAccount(input.userId));
         return {
           reversalId: existing.id,
           recoveredTokens: Number(existing.recovered_tokens),
           debtTokens: Number(existing.debt_tokens),
           tokenBalance: account.tokenBalance,
-          totalTokenDebt: this.getTokenDebt(input.userId),
+          totalTokenDebt: (await this.getTokenDebt(input.userId)),
           duplicate: true,
         };
       }
 
-      const original = this.database.raw.prepare(
+      const original = (await this.database.raw.prepare(
         `SELECT id, user_id FROM billing_events
          WHERE provider = ? AND provider_event_id = ?`,
-      ).get(input.provider, input.originalProviderEventId) as { id: string; user_id: string } | undefined;
+      ).get(input.provider, input.originalProviderEventId)) as { id: string; user_id: string } | undefined;
       if (!original) {
         throw new BillingError("original_payment_not_found", "The reversed paid event does not exist.");
       }
       if (original.user_id !== input.userId) {
         throw new BillingError("reversal_owner_conflict", "A payment reversal cannot move between accounts.");
       }
-      const grant = this.database.raw.prepare(
+      const grant = (await this.database.raw.prepare(
         "SELECT id, token_amount FROM credit_grants WHERE source_event_id = ?",
-      ).get(original.id) as unknown as { id: string; token_amount: number } | undefined;
+      ).get(original.id)) as unknown as { id: string; token_amount: number } | undefined;
       if (!grant) {
         throw new BillingError("billing_ledger_incomplete", "The original paid event has no credit grant.");
       }
-      const reversed = this.database.raw.prepare(
+      const reversed = (await this.database.raw.prepare(
         "SELECT COALESCE(SUM(token_amount), 0) AS total FROM billing_reversals WHERE original_event_id = ?",
-      ).get(original.id) as { total: number };
+      ).get(original.id)) as { total: number };
       const remaining = Number(grant.token_amount) - Number(reversed.total);
       if (input.tokenAmount > remaining) {
         throw new BillingError("reversal_exceeds_grant", "The reversal exceeds the unreversed part of the original grant.");
       }
 
-      const account = this.apiAccess.getOrCreateAccount(input.userId);
+      const account = (await this.apiAccess.getOrCreateAccount(input.userId));
       const recoveredTokens = Math.min(account.tokenBalance, input.tokenAmount);
       const debtTokens = input.tokenAmount - recoveredTokens;
       const now = Date.now();
       const reversalId = newId("reverse");
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO billing_reversals(
            id, provider, provider_event_id, original_event_id, user_id, reason,
            event_digest, token_amount, recovered_tokens, debt_tokens, occurred_at, processed_at
@@ -444,30 +444,30 @@ export class BillingManager {
         reversalId, input.provider, input.providerEventId, original.id, input.userId,
         input.reason, digest, input.tokenAmount, recoveredTokens, debtTokens,
         input.occurredAt, now,
-      );
-      this.database.raw.prepare(
+      ));
+      (await this.database.raw.prepare(
         "UPDATE api_accounts SET token_balance = token_balance - ?, updated_at = ? WHERE user_id = ?",
-      ).run(recoveredTokens, now, input.userId);
+      ).run(recoveredTokens, now, input.userId));
       if (debtTokens > 0) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `INSERT INTO account_credit_debts(user_id, token_debt, updated_at)
            VALUES (?, ?, ?)
            ON CONFLICT(user_id) DO UPDATE
-           SET token_debt = token_debt + excluded.token_debt, updated_at = excluded.updated_at`,
-        ).run(input.userId, debtTokens, now);
+           SET token_debt = account_credit_debts.token_debt + excluded.token_debt, updated_at = excluded.updated_at`,
+        ).run(input.userId, debtTokens, now));
       }
       return {
         reversalId,
         recoveredTokens,
         debtTokens,
         tokenBalance: account.tokenBalance - recoveredTokens,
-        totalTokenDebt: this.getTokenDebt(input.userId),
+        totalTokenDebt: (await this.getTokenDebt(input.userId)),
         duplicate: false,
       };
-    });
+    }));
   }
 
-  applySubscriptionStatus(input: SubscriptionStatusEvent): SubscriptionStatusResult {
+  async applySubscriptionStatus(input: SubscriptionStatusEvent): Promise<SubscriptionStatusResult> {
     validateProvider(input.provider);
     validateIdentifier(input.providerEventId, "provider event id");
     validateIdentifier(input.providerSubscriptionId, "provider subscription id");
@@ -483,20 +483,20 @@ export class BillingManager {
     }
     const digest = eventDigest("subscription_status", input);
 
-    return this.database.transaction(() => {
-      const paidCollision = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      const paidCollision = (await this.database.raw.prepare(
         "SELECT 1 AS found FROM billing_events WHERE provider = ? AND provider_event_id = ?",
-      ).get(input.provider, input.providerEventId) as { found: number } | undefined;
-      const reversalCollision = this.database.raw.prepare(
+      ).get(input.provider, input.providerEventId)) as { found: number } | undefined;
+      const reversalCollision = (await this.database.raw.prepare(
         "SELECT 1 AS found FROM billing_reversals WHERE provider = ? AND provider_event_id = ?",
-      ).get(input.provider, input.providerEventId) as { found: number } | undefined;
+      ).get(input.provider, input.providerEventId)) as { found: number } | undefined;
       if (paidCollision || reversalCollision) {
         throw new BillingError("billing_event_conflict", "A provider event id is already used by another economic event.");
       }
-      const existingEvent = this.database.raw.prepare(
+      const existingEvent = (await this.database.raw.prepare(
         `SELECT id, event_digest, status, applied FROM billing_subscription_events
          WHERE provider = ? AND provider_event_id = ?`,
-      ).get(input.provider, input.providerEventId) as {
+      ).get(input.provider, input.providerEventId)) as {
         id: string; event_digest: string; status: SubscriptionStatusEvent["status"]; applied: number;
       } | undefined;
       if (existingEvent) {
@@ -511,10 +511,10 @@ export class BillingManager {
         };
       }
 
-      const subscription = this.database.raw.prepare(
+      const subscription = (await this.database.raw.prepare(
         `SELECT id, user_id, status_changed_at FROM billing_subscriptions
          WHERE provider = ? AND provider_subscription_id = ?`,
-      ).get(input.provider, input.providerSubscriptionId) as {
+      ).get(input.provider, input.providerSubscriptionId)) as {
         id: string; user_id: string; status_changed_at: number;
       } | undefined;
       if (!subscription) {
@@ -526,13 +526,13 @@ export class BillingManager {
       const applied = input.occurredAt >= Number(subscription.status_changed_at);
       const now = Date.now();
       if (applied) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `UPDATE billing_subscriptions
            SET status = ?, status_changed_at = ?, updated_at = ? WHERE id = ?`,
-        ).run(input.status, input.occurredAt, now, subscription.id);
+        ).run(input.status, input.occurredAt, now, subscription.id));
       }
       const eventId = newId("subevt");
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO billing_subscription_events(
            id, provider, provider_event_id, provider_subscription_id, user_id,
            status, event_digest, occurred_at, processed_at, applied
@@ -540,21 +540,21 @@ export class BillingManager {
       ).run(
         eventId, input.provider, input.providerEventId, input.providerSubscriptionId,
         input.userId, input.status, digest, input.occurredAt, now, applied ? 1 : 0,
-      );
+      ));
       return { eventId, status: input.status, applied, duplicate: false };
-    });
+    }));
   }
 
-  getTokenDebt(userId: string): number {
-    const row = this.database.raw.prepare(
+  async getTokenDebt(userId: string): Promise<number> {
+    const row = (await this.database.raw.prepare(
       "SELECT token_debt FROM account_credit_debts WHERE user_id = ?",
-    ).get(userId) as { token_debt: number } | undefined;
+    ).get(userId)) as { token_debt: number } | undefined;
     return Number(row?.token_debt ?? 0);
   }
 
-  getSubscription(userId: string): BillingSubscription | null {
+  async getSubscription(userId: string): Promise<BillingSubscription | null> {
     validateIdentifier(userId, "user id");
-    const row = this.database.raw.prepare(
+    const row = (await this.database.raw.prepare(
       `SELECT id, plan_id, plan_version, provider, status, period_start,
               period_end, status_changed_at, created_at, updated_at
        FROM billing_subscriptions
@@ -562,7 +562,7 @@ export class BillingManager {
        ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'past_due' THEN 1 ELSE 2 END,
                 status_changed_at DESC, id DESC
        LIMIT 1`,
-    ).get(userId) as {
+    ).get(userId)) as {
       id: string; plan_id: string; plan_version: number; provider: BillingProvider;
       status: BillingSubscription["status"]; period_start: number; period_end: number;
       status_changed_at: number; created_at: number; updated_at: number;
@@ -581,11 +581,11 @@ export class BillingManager {
     } : null;
   }
 
-  getPlan(planId: string, version: number): BillingPlan | null {
-    const row = this.database.raw.prepare(
+  async getPlan(planId: string, version: number): Promise<BillingPlan | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT plan_id, version, price_currency, price_micros, included_tokens, status, created_at
        FROM billing_plans WHERE plan_id = ? AND version = ?`,
-    ).get(planId, version) as {
+    ).get(planId, version)) as {
       plan_id: string; version: number; price_currency: string; price_micros: number;
       included_tokens: number; status: BillingPlan["status"]; created_at: number;
     } | undefined;
@@ -600,10 +600,10 @@ export class BillingManager {
     } : null;
   }
 
-  private validateStablecoinIntent(
+  private async validateStablecoinIntent(
     input: PaidSubscriptionEvent | PaidTopUpEvent,
     kind: "subscription" | "topup",
-  ): void {
+  ): Promise<void> {
     const binding = [
       input.stablecoinPaymentIntentId,
       input.stablecoinChainId,
@@ -620,12 +620,12 @@ export class BillingManager {
     if (binding.some((value) => typeof value !== "string" || value.length === 0)) {
       throw new BillingError("stablecoin_intent_required", "Stablecoin payments require a complete server-side intent binding.");
     }
-    const intent = this.database.raw.prepare(
+    const intent = (await this.database.raw.prepare(
       `SELECT user_id, kind, quote_id, plan_id, plan_version, subscription_id,
               period_duration_ms, amount_micros, currency, chain_id, asset,
               asset_atomic_amount, recipient, status, consumed_event_key, expires_at
        FROM billing_stablecoin_intents WHERE id = ?`,
-    ).get(input.stablecoinPaymentIntentId!) as {
+    ).get(input.stablecoinPaymentIntentId!)) as {
       user_id: string; kind: "subscription" | "topup"; quote_id: string | null;
       plan_id: string | null; plan_version: number | null; subscription_id: string | null;
       period_duration_ms: number | null; amount_micros: number; currency: string;
@@ -665,12 +665,12 @@ export class BillingManager {
     }
   }
 
-  private consumeStablecoinIntent(
+  private async consumeStablecoinIntent(
     input: PaidSubscriptionEvent | PaidTopUpEvent,
     now: number,
-  ): void {
+  ): Promise<void> {
     if (input.provider !== "stablecoin") return;
-    const result = this.database.raw.prepare(
+    const result = (await this.database.raw.prepare(
       `UPDATE billing_stablecoin_intents
        SET status = 'consumed', consumed_event_key = ?, consumed_at = ?, updated_at = ?
        WHERE id = ? AND status = 'awaiting_payment'`,
@@ -679,13 +679,13 @@ export class BillingManager {
       now,
       now,
       input.stablecoinPaymentIntentId!,
-    );
+    ));
     if (Number(result.changes) !== 1) {
       throw new BillingError("stablecoin_intent_consume_conflict", "The stablecoin payment intent could not be consumed atomically.");
     }
   }
 
-  private applyGrant(input: {
+  private async applyGrant(input: {
     provider: BillingProvider;
     providerEventId: string;
     eventType: BillingEventType;
@@ -697,22 +697,22 @@ export class BillingManager {
     occurredAt: number;
     tokenAmount: number;
     sourceType: "subscription" | "topup";
-    onFirstApplication: (now: number) => void;
-  }): BillingApplicationResult {
-    return this.database.transaction(() => {
-      const existingEvent = this.database.raw.prepare(
+    onFirstApplication: (now: number) => void | Promise<void>;
+  }): Promise<BillingApplicationResult> {
+    return (await this.database.transaction(async () => {
+      const existingEvent = (await this.database.raw.prepare(
         `SELECT id, event_digest FROM billing_events
          WHERE provider = ? AND provider_event_id = ?`,
-      ).get(input.provider, input.providerEventId) as BillingEventRow | undefined;
-      const reversalCollision = this.database.raw.prepare(
+      ).get(input.provider, input.providerEventId)) as BillingEventRow | undefined;
+      const reversalCollision = (await this.database.raw.prepare(
         "SELECT 1 AS found FROM billing_reversals WHERE provider = ? AND provider_event_id = ?",
-      ).get(input.provider, input.providerEventId) as { found: number } | undefined;
+      ).get(input.provider, input.providerEventId)) as { found: number } | undefined;
       if (reversalCollision) {
         throw new BillingError("billing_event_conflict", "A provider event id is already used by a reversal.");
       }
-      const statusCollision = this.database.raw.prepare(
+      const statusCollision = (await this.database.raw.prepare(
         "SELECT 1 AS found FROM billing_subscription_events WHERE provider = ? AND provider_event_id = ?",
-      ).get(input.provider, input.providerEventId) as { found: number } | undefined;
+      ).get(input.provider, input.providerEventId)) as { found: number } | undefined;
       if (statusCollision) {
         throw new BillingError("billing_event_conflict", "A provider event id is already used by a subscription status event.");
       }
@@ -720,16 +720,16 @@ export class BillingManager {
         if (existingEvent.event_digest !== input.digest) {
           throw new BillingError("billing_event_conflict", "A provider event id was reused with different economic content.");
         }
-        const grant = this.database.raw.prepare(
+        const grant = (await this.database.raw.prepare(
           "SELECT id, token_amount, debt_repaid_tokens FROM credit_grants WHERE source_event_id = ?",
-        ).get(existingEvent.id) as unknown as CreditGrantRow | undefined;
+        ).get(existingEvent.id)) as unknown as CreditGrantRow | undefined;
         if (!grant) {
           throw new BillingError(
             "billing_ledger_incomplete",
             "The billing event exists without its atomic credit grant.",
           );
         }
-        const account = this.apiAccess.getOrCreateAccount(input.userId);
+        const account = (await this.apiAccess.getOrCreateAccount(input.userId));
         return {
           eventId: existingEvent.id,
           grantId: grant.id,
@@ -741,9 +741,9 @@ export class BillingManager {
       }
 
       const now = Date.now();
-      this.apiAccess.getOrCreateAccount(input.userId);
+      (await this.apiAccess.getOrCreateAccount(input.userId));
       const eventId = newId("bill");
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO billing_events(
            id, provider, provider_event_id, event_type, user_id, event_digest,
            external_reference, amount_micros, currency, occurred_at, processed_at
@@ -752,13 +752,13 @@ export class BillingManager {
         eventId, input.provider, input.providerEventId, input.eventType, input.userId,
         input.digest, input.externalReference, input.amountMicros,
         input.currency.toUpperCase(), input.occurredAt, now,
-      );
-      input.onFirstApplication(now);
-      const debt = this.getTokenDebt(input.userId);
+      ));
+      await input.onFirstApplication(now);
+      const debt = (await this.getTokenDebt(input.userId));
       const debtRepaidTokens = Math.min(debt, input.tokenAmount);
       const availableTokens = input.tokenAmount - debtRepaidTokens;
       const grantId = newId("grant");
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO credit_grants(
            id, user_id, idempotency_key, source_type, source_event_id,
            token_amount, debt_repaid_tokens, created_at
@@ -766,16 +766,16 @@ export class BillingManager {
       ).run(
         grantId, input.userId, `${input.provider}:${input.providerEventId}`,
         input.sourceType, eventId, input.tokenAmount, debtRepaidTokens, now,
-      );
+      ));
       if (debtRepaidTokens > 0) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           "UPDATE account_credit_debts SET token_debt = token_debt - ?, updated_at = ? WHERE user_id = ?",
-        ).run(debtRepaidTokens, now, input.userId);
+        ).run(debtRepaidTokens, now, input.userId));
       }
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         "UPDATE api_accounts SET token_balance = token_balance + ?, updated_at = ? WHERE user_id = ?",
-      ).run(availableTokens, now, input.userId);
-      const account = this.apiAccess.getOrCreateAccount(input.userId);
+      ).run(availableTokens, now, input.userId));
+      const account = (await this.apiAccess.getOrCreateAccount(input.userId));
       return {
         eventId,
         grantId,
@@ -784,7 +784,7 @@ export class BillingManager {
         tokenBalance: account.tokenBalance,
         duplicate: false,
       };
-    });
+    }));
   }
 }
 

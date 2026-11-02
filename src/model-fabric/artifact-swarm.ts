@@ -154,6 +154,8 @@ export interface ArtifactSwarmDownloaderOptions {
   maximumSourcesPerChunk?: number | undefined;
   maximumParallelChunks?: number | undefined;
   now?: (() => number) | undefined;
+  /** Live resource-role policy; deny a peer without treating it as corrupt. */
+  peerAllowed?: ((peerId: string, blobSha256: string) => boolean) | undefined;
 }
 
 interface StoredPeer {
@@ -295,6 +297,7 @@ export class ArtifactSwarmRegistry {
     requesterChunkIds?: ReadonlySet<string>;
     maximumSourcesPerChunk?: number;
     now?: number;
+    peerAllowed?: ((peerId: string, blobSha256: string) => boolean) | undefined;
   }): ArtifactChunkRequest[] {
     const now = input.now ?? Date.now();
     this.expirePeers(now);
@@ -330,7 +333,8 @@ export class ArtifactSwarmRegistry {
       .filter((candidate) => !requesterChunks.has(candidate.chunkId))
       .map((candidate) => {
         const sources = availablePeers
-          .filter((peer) => peer.chunkIds.has(candidate.chunkId))
+          .filter((peer) => peer.chunkIds.has(candidate.chunkId)
+            && (!input.peerAllowed || input.peerAllowed(peer.announcement.peerId, candidate.blobSha256)))
           .map((peer) => ({
             peerId: peer.announcement.peerId,
             score: peerScore(peer, candidate.chunk.sizeBytes),
@@ -485,6 +489,7 @@ export function createArtifactSwarmDownloader(
       requesterChunkIds: present,
       maximumSourcesPerChunk: maximumSources,
       now: now(),
+      peerAllowed: options.peerAllowed,
     }).filter((request) => request.blobSha256 === selection.blob.sha256);
 
     let nextIndex = 0;
@@ -499,6 +504,7 @@ export function createArtifactSwarmDownloader(
 
         let stored = false;
         for (const source of request.sources) {
+          if (options.peerAllowed && !options.peerAllowed(source.peerId, request.blobSha256)) continue;
           const peerState = options.registry.peerState(source.peerId);
           if (
             peerState === null

@@ -15,14 +15,14 @@ describe("signed seller payout destinations", () => {
   let database: MeshDatabase;
   let manager: SellerDestinationManager;
 
-  beforeEach(() => {
-    database = new MeshDatabase(":memory:");
+  beforeEach(async () => {
+    database = (await MeshDatabase.open(":memory:"));
     manager = new SellerDestinationManager(database, new Map([[
       "destination-verifier",
       keys.publicKey.export({ type: "spki", format: "pem" }).toString(),
     ]]), () => now);
   });
-  afterEach(() => database.close());
+  afterEach(async () => (await database.close()));
 
   function attestation(id: string, reference = `provider-${id}`): SellerDestinationAttestation {
     const unsigned = {
@@ -43,68 +43,68 @@ describe("signed seller payout destinations", () => {
     };
   }
 
-  it("records a valid attestation and replays it without mutation", () => {
+  it("records a valid attestation and replays it without mutation", async () => {
     const input = attestation("destination-1");
-    expect(manager.record(input)).toMatchObject({
+    expect((await manager.record(input))).toMatchObject({
       id: "destination-1", sellerId: "seller-1", status: "active",
       destinationFingerprint: input.destinationFingerprint,
     });
-    expect(manager.record(input)).toEqual(manager.active("seller-1", "stable"));
+    expect((await manager.record(input))).toEqual((await manager.active("seller-1", "stable")));
   });
 
   it("rejects tampering, unknown verifiers and expired attestations", () => {
     const valid = attestation("destination-tamper");
-    expect(() => manager.record({ ...valid, destinationReference: "provider-tampered" })).toThrowError(
+    expect(async () => (await manager.record({ ...valid, destinationReference: "provider-tampered" }))).toThrowError(
       expect.objectContaining({ code: "destination_fingerprint_mismatch" } satisfies Partial<SellerDestinationError>),
     );
-    expect(() => manager.record({ ...valid, verifierKeyId: "unknown" })).toThrowError(
+    expect(async () => (await manager.record({ ...valid, verifierKeyId: "unknown" }))).toThrowError(
       expect.objectContaining({ code: "untrusted_destination_verifier" } satisfies Partial<SellerDestinationError>),
     );
     const expired = { ...attestation("destination-expired"), expiresAt: now - 1 };
-    expect(() => manager.record(expired)).toThrowError(
+    expect(async () => (await manager.record(expired))).toThrowError(
       expect.objectContaining({ code: "invalid_destination_validity" } satisfies Partial<SellerDestinationError>),
     );
   });
 
-  it("rotates atomically and supports explicit revocation", () => {
-    manager.record(attestation("destination-old"));
-    const replacement = manager.record(attestation("destination-new"));
-    expect(manager.active("seller-1", "stable")).toMatchObject({ id: replacement.id });
-    expect(database.raw.prepare(
+  it("rotates atomically and supports explicit revocation", async () => {
+    (await manager.record(attestation("destination-old")));
+    const replacement = (await manager.record(attestation("destination-new")));
+    expect((await manager.active("seller-1", "stable"))).toMatchObject({ id: replacement.id });
+    expect((await database.raw.prepare(
       "SELECT status FROM seller_payout_destinations WHERE id = 'destination-old'",
-    ).get()).toEqual({ status: "revoked" });
-    expect(manager.revoke("seller-1", "stable")).toBe(true);
-    expect(manager.active("seller-1", "stable")).toBeNull();
-    expect(() => database.raw.prepare(
+    ).get())).toEqual({ status: "revoked" });
+    expect((await manager.revoke("seller-1", "stable"))).toBe(true);
+    expect((await manager.active("seller-1", "stable"))).toBeNull();
+    expect(async () => (await database.raw.prepare(
       `UPDATE seller_payout_destinations
        SET status = 'active', revoked_at = NULL WHERE id = 'destination-old'`,
-    ).run()).toThrow(/invalid_seller_payout_destination_lifecycle/);
+    ).run())).toThrow(/invalid_seller_payout_destination_lifecycle/);
   });
 
-  it("seals signed destination content and retains revoked history", () => {
-    manager.record(attestation("destination-sealed"));
+  it("seals signed destination content and retains revoked history", async () => {
+    (await manager.record(attestation("destination-sealed")));
 
-    expect(() => database.raw.prepare(
+    expect(async () => (await database.raw.prepare(
       `UPDATE seller_payout_destinations
        SET destination_reference = 'provider-attacker' WHERE id = 'destination-sealed'`,
-    ).run()).toThrow(/immutable_seller_payout_destination_content/);
-    expect(() => database.raw.prepare(
+    ).run())).toThrow(/immutable_seller_payout_destination_content/);
+    expect(async () => (await database.raw.prepare(
       `UPDATE seller_payout_destinations
        SET destination_fingerprint = ? WHERE id = 'destination-sealed'`,
-    ).run("f".repeat(64))).toThrow(/immutable_seller_payout_destination_content/);
-    expect(() => database.raw.prepare(
+    ).run("f".repeat(64)))).toThrow(/immutable_seller_payout_destination_content/);
+    expect(async () => (await database.raw.prepare(
       "DELETE FROM seller_payout_destinations WHERE id = 'destination-sealed'",
-    ).run()).toThrow(/immutable_seller_payout_destination/);
+    ).run())).toThrow(/immutable_seller_payout_destination/);
 
-    expect(manager.revoke("seller-1", "stable")).toBe(true);
-    expect(() => database.raw.prepare(
+    expect((await manager.revoke("seller-1", "stable"))).toBe(true);
+    expect(async () => (await database.raw.prepare(
       "DELETE FROM seller_payout_destinations WHERE id = 'destination-sealed'",
-    ).run()).toThrow(/immutable_seller_payout_destination/);
+    ).run())).toThrow(/immutable_seller_payout_destination/);
   });
 
-  it("binds destination-backed batches to the exact active signed attestation", () => {
+  it("binds destination-backed batches to the exact active signed attestation", async () => {
     const destination = attestation("destination-batch");
-    manager.record(destination);
+    (await manager.record(destination));
     const insertBatch = database.raw.prepare(`
       INSERT INTO payout_batches (
         id, seller_id, payout_method, idempotency_key, request_digest,
@@ -115,15 +115,15 @@ describe("signed seller payout destinations", () => {
         'destination-batch', ?, ?, 'prepared', ?, ?)
     `);
 
-    expect(() => insertBatch.run(
+    expect(async () => (await insertBatch.run(
       "batch-tampered-destination", "destination-key-1", "digest-1",
       "provider-attacker", destination.destinationFingerprint, now, now,
-    )).toThrow(/invalid_payout_batch_destination_binding/);
+    ))).toThrow(/invalid_payout_batch_destination_binding/);
 
-    expect(manager.revoke("seller-1", "stable")).toBe(true);
-    expect(() => insertBatch.run(
+    expect((await manager.revoke("seller-1", "stable"))).toBe(true);
+    expect(async () => (await insertBatch.run(
       "batch-revoked-destination", "destination-key-2", "digest-2",
       destination.destinationReference, destination.destinationFingerprint, now, now,
-    )).toThrow(/invalid_payout_batch_destination_binding/);
+    ))).toThrow(/invalid_payout_batch_destination_binding/);
   });
 });

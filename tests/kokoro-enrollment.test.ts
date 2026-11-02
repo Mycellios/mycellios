@@ -33,9 +33,9 @@ it("binds the standalone speech CLI to its owning account before opening an auth
   const identityId = "standalone-enrolled-speech";
   const enrollments = new NodeEnrollmentStore(runtime.database);
   // The account grant is a fixture; the CLI still redeems through the real HTTP route.
-  const issued = enrollments.issue({ accountId: "speech-owner", expiresInSeconds: 600,
-    actor: { kind: "account", id: "speech-owner", scopes: ["node:identity"] } });
-  enrollments.confirm({ enrollmentId: issued.enrollmentId, accountId: "speech-owner", actorId: "speech-owner" });
+  const issued = (await enrollments.issue({ accountId: "speech-owner", expiresInSeconds: 600,
+    actor: { kind: "account", id: "speech-owner", scopes: ["node:identity"] } }));
+  (await enrollments.confirm({ enrollmentId: issued.enrollmentId, accountId: "speech-owner", actorId: "speech-owner" }));
   const enrollmentPath = join(root, "enrollment.json");
   await writeFile(enrollmentPath, JSON.stringify({ schema: "mycellios-node-enrollment-bundle/1", coordinatorUrl: address, ...issued }), { mode: 0o600 });
   const configPath = join(root, "worker.json");
@@ -65,7 +65,7 @@ it("binds the standalone speech CLI to its owning account before opening an auth
     if (Date.now() > deadline || child.exitCode !== null) throw new Error("enrolled_cli_failed: " + diagnostics);
     await new Promise((done) => setTimeout(done, 50));
   }
-  expect(runtime.database.getNodeOwnership("device", identityId)).toMatchObject({ accountId: "speech-owner", status: "active", generation: 1 });
+  expect((await runtime.database.getNodeOwnership("device", identityId))).toMatchObject({ accountId: "speech-owner", status: "active", generation: 1 });
   await expect(access(enrollmentPath)).rejects.toMatchObject({ code: "ENOENT" });
   const response = await fetch(address + "/v1/chat/completions", {
     method: "POST", headers: { "content-type": "application/json", authorization: "Bearer test-enrollment-network-token" },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDesktopDownloadCatalog } from "../src/contracts/desktop-downloads";
+import { isDesktopDownloadCatalog } from "../src/contracts/desktop-downloads.js";
 
 const catalog = () => ({ schema: "mycellios-desktop-downloads/1", version: "0.3.9", runtimeVersion: "0.2.95", channel: "preview", automaticUpdates: false,
   packages: [{ id: "windows-x64", format: "EXE", fileName: "desktop.exe", path: "/downloads/desktop/releases/0.3.9/desktop.exe", bytes: 442140381, sha256: "a".repeat(64) },

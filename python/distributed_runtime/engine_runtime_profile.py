@@ -228,6 +228,8 @@ def _probe_attention_kernel(
     head_dim: int,
     synchronize: Callable[[], None],
 ) -> bool:
+    if device.type == "privateuseone":
+        return False  # Production DirectML uses eager attention, not SDPA.
     functional = getattr(torch.nn.functional, "scaled_dot_product_attention", None)
     if not callable(functional):
         return False
@@ -251,6 +253,8 @@ def _probe_attention_kernel(
 
 
 def _synchronizer(device: torch.device) -> Callable[[], None]:
+    if device.type == "privateuseone":
+        return lambda: torch.empty(1, device=device).cpu()
     if device.type == "cuda":
         return lambda: torch.cuda.synchronize(device)
     if device.type == "xpu" and hasattr(torch, "xpu"):
@@ -261,6 +265,11 @@ def _synchronizer(device: torch.device) -> Callable[[], None]:
 
 
 def _usable_memory_bytes(device: torch.device) -> int:
+    if device.type == "privateuseone":
+        from .device import describe_torch_execution_device
+        from .directml import video_memory_budget
+        budget, usage = video_memory_budget(describe_torch_execution_device(device).name)
+        return max(0, budget - usage)
     if device.type == "cuda":
         free, _total = torch.cuda.mem_get_info(device)
         return int(free)

@@ -10,13 +10,13 @@ import type { MeshStore } from "../storage/store.js";
  * this coordinator's current authenticated worker session. Worker claims can
  * never call this path successfully by merely embedding a sealed document.
  */
-export function publishCoordinatorEngineRuntimeProfile(
+export async function publishCoordinatorEngineRuntimeProfile(
   store: MeshStore,
   workerId: string,
   value: unknown,
-): EngineRuntimeProfile {
+): Promise<EngineRuntimeProfile> {
   const profile = engineRuntimeProfileSchema.parse(value);
-  const worker = store.getWorker(workerId);
+  const worker = (await store.getWorker(workerId));
   const executor = worker?.capabilities.distributedExecutor;
   if (!worker || !executor || profile.workerId !== workerId || profile.nodeId !== executor.nodeId) {
     throw new Error("engine_runtime_profile_worker_binding_is_invalid");
@@ -24,7 +24,7 @@ export function publishCoordinatorEngineRuntimeProfile(
   const build = worker.capabilities.buildIdentity;
   const physical = executor.physicalIdentity;
   const performance = executor.performanceEvidence;
-  const activationPlan = store.listEngineRuntimeActivationPlans().find(
+  const activationPlan = (await store.listEngineRuntimeActivationPlans()).find(
     (candidate) => candidate.workerId === workerId
       && candidate.modelId === profile.modelId
       && candidate.evidence.canaryEvidenceId === profile.evidence.deploymentCanaryEvidenceId
@@ -52,7 +52,7 @@ export function publishCoordinatorEngineRuntimeProfile(
     ...current.filter((candidate) => !sameProfileSlot(candidate, profile)),
     profile,
   ].sort((left, right) => left.profileId.localeCompare(right.profileId)).slice(-128);
-  store.updateWorkerHeartbeat(worker.id, capabilities, worker.status);
+  (await store.updateWorkerHeartbeat(worker.id, capabilities, worker.status));
   return profile;
 }
 

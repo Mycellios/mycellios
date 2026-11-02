@@ -1,3 +1,4 @@
+import { waitForNativePipelineCancellation } from "./native-pipeline-drain.js";
 import {
   AdapterError,
   type AdapterCapabilities,
@@ -99,12 +100,15 @@ export class MycelliosPipelineAdapter implements InferenceAdapter {
       );
     }
     this.activeJobs += 1;
+    let nativeCompleted = false;
+    let generationFailure: unknown;
     try {
       const sessionId = request.request.session_id;
       const response = await fetch(new URL("v1/chat/completions", this.baseUrl), {
         method: "POST",
         headers: {
           "content-type": "application/json",
+          "x-mycellios-job-id": request.jobId,
           ...(sessionId ? { "x-session-id": sessionId } : {}),
         },
         body: JSON.stringify({
@@ -156,6 +160,7 @@ export class MycelliosPipelineAdapter implements InferenceAdapter {
         if (parsed.error !== undefined) {
           const detail = parsed.error && typeof parsed.error === "object"
             ? parsed.error as Record<string, unknown> : {};
+          if (detail.type === "service_unavailable") this.ready = false;
           const memoryPressure = typeof detail.message === "string"
             && /(?:CUDA|GPU).*out of memory/i.test(detail.message);
           throw new AdapterError(
@@ -202,8 +207,19 @@ export class MycelliosPipelineAdapter implements InferenceAdapter {
       if (!done || !terminal || !reportedUsage) {
         throw new AdapterError("Native pipeline stream ended before a validated result", "mycellios_pipeline_truncated_stream", false);
       }
+      nativeCompleted = true;
+    } catch (error) {
+      generationFailure = error;
+      throw error;
     } finally {
-      this.activeJobs -= 1;
+      try {
+        if (!nativeCompleted) await waitForNativePipelineCancellation(this.baseUrl, this.options, request.jobId);
+      } catch (error) {
+        this.ready = false;
+        if (generationFailure === undefined) throw error;
+      } finally {
+        this.activeJobs -= 1;
+      }
     }
   }
 

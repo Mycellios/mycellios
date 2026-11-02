@@ -267,8 +267,8 @@ services:
 
   supervisor:
     build:
-      context: ../..
-      dockerfile: infra/sandboxes/supervisor/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/sandboxes/supervisor/Dockerfile
     environment:
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
       DATA_DIR: /data
@@ -317,12 +317,12 @@ services:
 
   api:
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile
     # Node runs directly, not through pnpm: pnpm does not pass SIGTERM on, so a stop would kill the
     # process before its graceful shutdown finishes in-flight requests and jobs.
     working_dir: /app/apps/api
-    command: ["bash", "-lc", "pnpm db:deploy && exec env -u DATABASE_MIGRATION_URL node --enable-source-maps dist/index.js"]
+    command: ["bash", "-lc", "npm run db:deploy && exec env -u DATABASE_MIGRATION_URL node --enable-source-maps dist/index.js"]
     environment:
       <<: *app-environment
       # Owner login for migrations; the start command drops it before serving.
@@ -393,8 +393,8 @@ services:
 
   worker:
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile
     # Directly, not through pnpm, so a stop reaches it (see the api command).
     working_dir: /app/apps/worker
     command: ["node", "--enable-source-maps", "dist/index.js"]
@@ -420,8 +420,8 @@ services:
 
   web:
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile
     # Directly, not through pnpm, so a stop reaches it (see the api command).
     working_dir: /app/apps/web
     command: ["node_modules/.bin/vite", "preview", "--host", "0.0.0.0", "--port", "5173"]

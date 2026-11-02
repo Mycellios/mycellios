@@ -18,20 +18,20 @@ describe("buyer checkout service", () => {
   let gateway: FakeStripeGateway;
   let checkout: BillingCheckoutService;
 
-  beforeEach(() => {
-    database = new MeshDatabase(":memory:");
+  beforeEach(async () => {
+    database = (await MeshDatabase.open(":memory:"));
     billing = new BillingManager(database, new ApiAccessManager(database, {
       starterTokens: 0, requestsPerMinute: 30, maxConcurrent: 2, maxActiveKeys: 10,
     }));
-    billing.registerPlan({
+    (await billing.registerPlan({
       planId: "mycellios-go", version: 1, priceCurrency: "EUR",
       priceMicros: 10_000_000, includedTokens: 50_000, status: "active",
-    });
+    }));
     gateway = new FakeStripeGateway();
     checkout = service(gateway);
   });
 
-  afterEach(() => database.close());
+  afterEach(async () => (await database.close()));
 
   it("creates one owned customer and one subscription Checkout across replays", async () => {
     const first = await checkout.createSubscription({
@@ -47,9 +47,9 @@ describe("buyer checkout service", () => {
     expect(gateway.subscriptions[0]).toMatchObject({
       userId: "buyer-one", customerId: "cus_buyer_one", priceId: "price_go_1",
     });
-    expect(database.raw.prepare(
+    expect((await database.raw.prepare(
       "SELECT user_id, provider_customer_id FROM billing_customers",
-    ).all()).toEqual([{ user_id: "buyer-one", provider_customer_id: "cus_buyer_one" }]);
+    ).all())).toEqual([{ user_id: "buyer-one", provider_customer_id: "cus_buyer_one" }]);
   });
 
   it("resumes one recent subscription Checkout across different browser attempts", async () => {
@@ -64,14 +64,14 @@ describe("buyer checkout service", () => {
   });
 
   it("rejects another Checkout after verified activation", async () => {
-    billing.applyPaidSubscription({
+    (await billing.applyPaidSubscription({
       provider: "stripe", providerEventId: "evt_already_active",
       providerSubscriptionId: "sub_already_active", userId: "buyer-active",
       planId: "mycellios-go", planVersion: 1, amountMicros: 10_000_000,
       currency: "EUR", periodStart: 1_786_000_000_000,
       periodEnd: 1_788_678_400_000, occurredAt: 1_786_000_000_000,
       finalized: true,
-    });
+    }));
     await expect(checkout.createSubscription({
       userId: "buyer-active", email: null, idempotencyKey: "subscribe-again",
     })).rejects.toMatchObject({ code: "subscription_already_exists", statusCode: 409 });
@@ -92,9 +92,9 @@ describe("buyer checkout service", () => {
     await expect(checkout.createTopUp({
       userId: "buyer-three", email: null, packId: "boost-5", idempotencyKey: "topup-retry",
     })).rejects.toThrow("temporary Stripe failure");
-    const pending = database.raw.prepare(
+    const pending = (await database.raw.prepare(
       "SELECT quote_id, status FROM billing_checkout_operations WHERE user_id = 'buyer-three'",
-    ).get() as { quote_id: string; status: string };
+    ).get()) as { quote_id: string; status: string };
     expect(pending.status).toBe("pending");
 
     const completed = await checkout.createTopUp({
@@ -107,9 +107,9 @@ describe("buyer checkout service", () => {
       priceId: "price_boost_5",
     });
     expect(gateway.topupAttempts[0]?.idempotencyKey).toBe(gateway.topupAttempts[1]?.idempotencyKey);
-    expect(database.raw.prepare(
+    expect((await database.raw.prepare(
       "SELECT amount_micros, currency, token_amount, status FROM billing_topup_quotes WHERE quote_id = ?",
-    ).get(pending.quote_id)).toEqual({
+    ).get(pending.quote_id))).toEqual({
       amount_micros: 5_000_000, currency: "EUR", token_amount: 20_000, status: "open",
     });
     await expect(checkout.createTopUp({
@@ -182,10 +182,10 @@ describe("buyer checkout service", () => {
       billingCheckout: { gateway: routeGateway, config: checkoutConfig() },
     });
     try {
-      runtime.billing.registerPlan({
+      (await runtime.billing.registerPlan({
         planId: "mycellios-go", version: 1, priceCurrency: "EUR",
         priceMicros: 10_000_000, includedTokens: 50_000, status: "active",
-      });
+      }));
       const missingKey = await runtime.app.inject({
         method: "POST", url: "/v1/billing/checkout/subscription",
         headers: { authorization: "Bearer account-session" },
@@ -234,7 +234,7 @@ describe("buyer checkout service", () => {
         subscription: null,
       });
 
-      const apiKey = runtime.apiAccess.createKey("buyer-route", "billing-forbidden");
+      const apiKey = (await runtime.apiAccess.createKey("buyer-route", "billing-forbidden"));
       const forbidden = await runtime.app.inject({
         method: "POST", url: "/v1/billing/portal",
         headers: { authorization: `Bearer ${apiKey.secret}`, "idempotency-key": "portal-api-key" },
@@ -265,7 +265,7 @@ describe("buyer checkout service", () => {
     }), { logger: false });
     try {
       expect(runtime.billingCheckout).not.toBeNull();
-      expect(runtime.billing.getPlan("mycellios-go", 1)).toMatchObject({
+      expect((await runtime.billing.getPlan("mycellios-go", 1))).toMatchObject({
         priceCurrency: "EUR",
         priceMicros: 10_000_000,
         includedTokens: 50_000,

@@ -7,7 +7,7 @@ from typing import Any
 import torch
 
 
-SUPPORTED_TORCH_DEVICE_REQUESTS = ("auto", "cpu", "cuda", "mps", "xpu")
+SUPPORTED_TORCH_DEVICE_REQUESTS = ("auto", "cpu", "cuda", "mps", "xpu", "directml")
 
 
 @dataclass(frozen=True)
@@ -16,8 +16,7 @@ class TorchExecutionDevice:
 
     PyTorch exposes ROCm accelerators through the ``cuda`` device namespace.
     ``backend`` therefore records the effective implementation separately from
-    the Torch device string.  DirectML/Vulkan are deliberately absent: this
-    runtime does not currently execute Hugging Face stages through either API.
+    the Torch device string. DirectML uses PyTorch's PrivateUse1 namespace.
     """
 
     requested: str
@@ -99,6 +98,13 @@ def resolve_torch_execution_device(requested: str = "auto") -> TorchExecutionDev
             normalized = "mps"
         else:
             normalized = "cpu"
+            try:
+                import torch_directml
+                if torch_directml.device_count() > 0:
+                        from .directml import selected_device_index
+                        normalized = f"directml:{selected_device_index(torch_directml.device_count())}"
+            except ImportError:
+                pass
     if normalized == "cpu":
         return TorchExecutionDevice(
             requested=requested.strip().lower(),
@@ -107,6 +113,26 @@ def resolve_torch_execution_device(requested: str = "auto") -> TorchExecutionDev
             backend="cpu",
             name=platform.processor().strip() or platform.machine() or "CPU",
             accelerated=False,
+            total_memory_bytes=None,
+        )
+
+    if normalized == "directml" or normalized.startswith("directml:"):
+        try:
+            import torch_directml
+        except ImportError as error:
+            raise RuntimeError("DirectML requires a separate torch-directml runtime") from error
+        index = int(normalized.split(":", 1)[1]) if ":" in normalized else 0
+        if not 0 <= index < torch_directml.device_count():
+            raise RuntimeError(f"DirectML device {index} does not exist")
+        import warnings
+        warnings.filterwarnings("error", message=".*fall back.*", category=UserWarning)
+        return TorchExecutionDevice(
+            requested=requested.strip().lower(),
+            device=torch_directml.device(index),
+            kind="gpu",
+            backend="directml",
+            name=torch_directml.device_name(index).strip("\0"),
+            accelerated=True,
             total_memory_bytes=None,
         )
 
@@ -183,6 +209,8 @@ def describe_torch_execution_device(device: torch.device | str) -> TorchExecutio
     """Describe an execution device already selected by a specialised runner."""
 
     parsed = torch.device(device)
+    if parsed.type == "privateuseone":
+        return resolve_torch_execution_device(f"directml:{parsed.index or 0}")
     if parsed.type == "cpu":
         return resolve_torch_execution_device("cpu")
     if parsed.type not in {"cuda", "mps", "xpu"}:
@@ -207,7 +235,11 @@ def normalize_torch_device_request(requested: str) -> str:
         index_text = normalized.removeprefix("xpu:")
         if index_text.isdigit():
             return f"xpu:{int(index_text)}"
-    raise ValueError("device must be auto, cpu, cuda[:index], mps or xpu[:index]")
+    if normalized.startswith("directml:"):
+        index_text = normalized.removeprefix("directml:")
+        if index_text.isdigit():
+            return f"directml:{int(index_text)}"
+    raise ValueError("device must be auto, cpu, cuda[:index], mps, xpu[:index] or directml[:index]")
 
 
 def _cuda_is_usable() -> bool:

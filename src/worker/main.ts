@@ -1,4 +1,3 @@
-import { NodeEnrollmentBootstrap } from "./enrollment-bootstrap.js";
 import { resolve } from "node:path";
 import { loadWorkerConfig } from "../core/config.js";
 import { readNativeRuntimeBuildMetadata } from "../core/native-build-identity.js";
@@ -21,15 +20,7 @@ const admissionSigner = workerAdmissionSigner(
   loadOrCreateWorkerAdmissionCredential(admissionCredentialPath),
 );
 
-const enrollmentPath = process.env.MYCELLIOS_WORKER_ENROLLMENT_PATH?.trim();
-const enrollmentBootstrap = enrollmentPath
-  ? new NodeEnrollmentBootstrap(resolve(enrollmentPath), coordinatorUrl)
-  : null;
-
 const agent = new WorkerAgent(loadWorkerConfig(resolve(configPath)), {
-  ...(enrollmentBootstrap
-    ? { beforeSignedAdmission: (input) => enrollmentBootstrap.redeem(input) }
-    : {}),
   coordinatorUrl,
   admissionSigner,
   ...(process.env.MYCELLIOS_NETWORK_TOKEN?.trim()

@@ -41,12 +41,12 @@ services:
   supervisor:
     image: ${RAKAZO_IMAGE:-ghcr.io/elie222/rakazo/app}:${RAKAZO_IMAGE_TAG:-local}
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-}
     restart: unless-stopped
-    command: ["pnpm", "--filter", "@rakazo/sandbox-supervisor", "start"]
+    command: ["npm", "run", "start", "--workspace", "@rakazo/sandbox-supervisor"]
     init: true
     user: root
     security_opt:

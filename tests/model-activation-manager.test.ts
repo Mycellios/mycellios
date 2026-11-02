@@ -43,7 +43,7 @@ describe("automatic model activation manager", () => {
     const manager = new DynamicModelActivationManager({
       snapshot: () => ({ capacityNodes: [{ id: "node-a", availableVramMiB: 4096 }], config: null }),
       resolveManagedAgent: () => undefined,
-      onProgress: (_modelId, event) => phases.push(event.phase),
+      onProgress: (_modelId, event) => { phases.push(event.phase); },
     });
     await manager.initialize();
     await manager.close();
@@ -121,16 +121,16 @@ describe("automatic model activation manager", () => {
       }),
       resolveManagedAgent: () => undefined,
       loadProgress: () => persisted,
-      onProgress: (_modelId, event) => emitted.push(event),
+      onProgress: (_modelId, event) => { emitted.push(event); },
     });
     await manager.initialize();
-    expect(manager.activationProgressForModel("qwen-ui")).toEqual(persisted);
+    expect((await manager.activationProgressForModel("qwen-ui"))).toEqual(persisted);
 
     await expect(manager.activate(requestedModel())).rejects.toThrow(
       "distributed_activation_requires_two_connected_shard_executors",
     );
 
-    expect(manager.activationProgressForModel("qwen-ui")).toEqual([
+    expect((await manager.activationProgressForModel("qwen-ui"))).toEqual([
       expect.objectContaining({ phase: "queued", state: "completed" }),
       expect.objectContaining({
         phase: "failed",

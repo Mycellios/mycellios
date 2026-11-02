@@ -6,7 +6,7 @@ import type {
 } from "../src/contracts/types.js";
 import type { MeshStore, StoredWorker } from "../src/storage/store.js";
 
-export function addWorker(
+export async function addWorker(
   store: MeshStore,
   input: {
     id: string;
@@ -27,7 +27,7 @@ export function addWorker(
     identity?: WorkerRegistration["identity"];
     trusted?: boolean;
   },
-): StoredWorker {
+): Promise<StoredWorker> {
   const mode = input.mode ?? "replica";
   const registration: WorkerRegistration = {
     ...(input.identity ? { identity: input.identity }
@@ -73,7 +73,7 @@ export function addWorker(
       ...(input.distributedExecutor ? { distributedExecutor: input.distributedExecutor } : {}),
     },
   };
-  const worker = store.registerWorker(registration);
-  store.updateWorkerHeartbeat(worker.id, registration.capabilities, "online");
-  return store.getWorker(worker.id)!;
+  const worker = (await store.registerWorker(registration));
+  (await store.updateWorkerHeartbeat(worker.id, registration.capabilities, "online"));
+  return (await store.getWorker(worker.id))!;
 }

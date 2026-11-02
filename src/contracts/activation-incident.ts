@@ -177,215 +177,216 @@ export function activationFailureMessageAfterRuntimeChange(
 }
 
 function incidentDefinition(message: string): IncidentDefinition {
-  const normalized = message.toLowerCase();
-  if (
-    normalized.includes("route_availability_below_minimum")
-    || /^no_feasible_automatic_\d+_stage_pipeline$/i.test(message.trim())
-  ) {
+    const normalized = message.toLowerCase();
+    if (normalized.includes("route_capacity_conflict:")) {
+        return {
+            code: "executor_pool_not_ready",
+            scope: "node",
+            title: "Qualified executor capacity is temporarily reserved",
+            summary: "An existing stage lease still occupies the selected device capacity; the new route remains unpublished.",
+            remedy: "Mycellios preserves active leases and retries within its bounded recovery policy after capacity is released or its lease expires.",
+            steps: Object.freeze([
+                "Keep current stage leases intact until release or expiry.",
+                ...ROUTE_REBUILD_STEPS,
+            ]),
+            automaticAction: "rebuild_route",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("route_availability_below_minimum")
+        || /^no_feasible_automatic_\d+_stage_pipeline$/i.test(message.trim())) {
+        return {
+            code: "route_evidence_not_ready",
+            scope: "network",
+            title: "The verified route is temporarily below its reliability threshold",
+            summary: "The nodes have enough memory, but their recent connection evidence is not yet reliable enough to publish a distributed route.",
+            remedy: "Mycellios keeps the model unpublished while fresh reciprocal probes replace the degraded samples, then replans automatically.",
+            steps: Object.freeze([
+                "Keep both contributing desktop clients online.",
+                "Collect fresh successful reciprocal-link probes.",
+                ...ROUTE_REBUILD_STEPS,
+            ]),
+            automaticAction: "rebuild_route",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("distributed_activation_requires_two_connected_shard_executors")) {
+        return {
+            code: "executor_pool_not_ready",
+            scope: "network",
+            title: "The verified executor topology is not ready",
+            summary: "Connected capacity is visible, but fewer than two executors have completed the runtime and reciprocal-link evidence required to launch a distributed route.",
+            remedy: "Mycellios keeps the model unpublished while the connected desktops finish verification, then rebuilds the route automatically.",
+            steps: Object.freeze([
+                "Keep both contributing desktop clients online.",
+                "Wait for their runtime performance and reciprocal link probes to complete.",
+                ...ROUTE_REBUILD_STEPS,
+            ]),
+            automaticAction: "rebuild_route",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("distributed_worker_disconnected:")
+        || normalized.includes("distributed_worker_not_connected:")) {
+        return {
+            code: "node_disconnected",
+            scope: "node",
+            title: "A required node disconnected",
+            summary: "The partial topology was not published because one of its physical executors left during startup.",
+            remedy: "Mycellios waits for healthy capacity, discards the partial route and rebuilds it automatically.",
+            steps: ROUTE_REBUILD_STEPS,
+            automaticAction: "reconnect_node",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("managed_launch_agent_is_unavailable:")) {
+        return {
+            code: "launch_agent_unavailable",
+            scope: "node",
+            title: "The device launch agent is unavailable",
+            summary: "The coordinator could not start a model stage on the selected installed device.",
+            remedy: "Mycellios keeps the failed stage unpublished and retries after that device registers a healthy launch agent.",
+            steps: ROUTE_REBUILD_STEPS,
+            automaticAction: "reconnect_node",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("worker_tunnel_prepare_timeout")
+        || normalized.includes("coordinator_worker_registration_timeout")) {
+        return {
+            code: "network_prepare_timeout",
+            scope: "network",
+            title: "The stage connection timed out",
+            summary: "The encrypted worker route did not become ready inside the bounded startup window.",
+            remedy: "Mycellios closes the incomplete route and retries with the currently reachable nodes.",
+            steps: ROUTE_REBUILD_STEPS,
+            automaticAction: "rebuild_route",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("gpu_only_runtime_not_ready")
+        || normalized.includes("gpu_model_stage_unavailable_after_retries:")) {
+        return {
+            code: normalized.includes("out of memory")
+                ? "out_of_memory"
+                : "accelerator_not_ready",
+            scope: "accelerator",
+            title: normalized.includes("out of memory")
+                ? "The selected accelerator ran out of memory"
+                : "Verified GPU capacity is not ready",
+            summary: normalized.includes("out of memory")
+                ? "The real stage load exceeded the usable memory of its selected device, so the route was withheld."
+                : "Advertised hardware was present, but its certified runtime or physical probe was not ready for this stage.",
+            remedy: normalized.includes("out of memory")
+                ? "Mycellios releases the failed placement, refreshes real free memory and replans before another bounded attempt."
+                : "The device keeps its safe CPU contribution while GPU self-repair runs; model activation resumes only after verified GPU capacity returns.",
+            steps: Object.freeze([
+                "Keep unverified GPU capacity out of scheduling.",
+                ...ROUTE_REBUILD_STEPS,
+            ]),
+            automaticAction: normalized.includes("out of memory")
+                ? "reprofile_and_replan"
+                : "wait_for_verified_accelerator",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("launch_readiness_timeout:")) {
+        return {
+            code: "stage_readiness_timeout",
+            scope: "stage",
+            title: "A model stage did not become ready",
+            summary: "The stage process started but did not pass readiness before the activation deadline.",
+            remedy: "Mycellios terminates the incomplete topology and retries from a fresh placement and process.",
+            steps: ROUTE_REBUILD_STEPS,
+            automaticAction: "rebuild_route",
+            intrinsicallyRetryable: true,
+        };
+    }
+    if (normalized.includes("launch_process_exited:")
+        && extractExitCode(message) === 3_221_225_477) {
+        return {
+            code: "native_memory_access",
+            scope: "stage",
+            title: "The accelerator process hit a native memory fault",
+            summary: "Windows stopped the stage with 0xC0000005 while the model was loading.",
+            remedy: "The failed stage remains unpublished. GPU self-repair must rebuild and revalidate the local runtime before capacity is offered again.",
+            steps: Object.freeze([
+                "Keep the CPU worker available.",
+                "Rebuild and hash-check the certified accelerator runtime.",
+                "Run a physical GPU probe before re-advertising capacity.",
+                "Replan and canary the complete model route.",
+            ]),
+            automaticAction: "none",
+            intrinsicallyRetryable: false,
+        };
+    }
+    if (normalized.includes("launch_process_exited:")) {
+        return {
+            code: "stage_process_exited",
+            scope: "stage",
+            title: "A model stage process exited",
+            summary: "A stage stopped before the complete route passed its canary, so the model was not published.",
+            remedy: "The failure is isolated to the affected stage. Mycellios will not loop an unknown process failure without a verified runtime change.",
+            steps: Object.freeze([
+                "Keep the partial route unpublished.",
+                "Inspect the affected stage and device diagnostics.",
+                "Retry only after its runtime or capacity changes.",
+            ]),
+            automaticAction: "none",
+            intrinsicallyRetryable: false,
+        };
+    }
+    if (normalized.includes("unsupported_model")
+        || normalized.includes("adapter_contract")
+        || normalized.includes("model_architecture")) {
+        return {
+            code: "model_incompatible",
+            scope: "model",
+            title: "The model architecture is not certified",
+            summary: "The checkpoint does not match a native Mycellios adapter contract in this release.",
+            remedy: "Select a certified model or add and validate a native adapter before trying again.",
+            steps: Object.freeze([
+                "Keep the incompatible model out of activation.",
+                "Verify architecture, tokenizer and artifact format.",
+                "Certify a native adapter with exact-output tests.",
+            ]),
+            automaticAction: "none",
+            intrinsicallyRetryable: false,
+        };
+    }
+    if (normalized.includes("artifact")
+        || normalized.includes("safetensors")
+        || normalized.includes("model_download")
+        || normalized.includes("hash")) {
+        return {
+            code: "artifact_unavailable",
+            scope: "artifact",
+            title: "The model artifact could not be verified",
+            summary: "A required model file was unavailable or failed its integrity contract.",
+            remedy: "The model remains unpublished until a complete verified artifact is available.",
+            steps: Object.freeze([
+                "Discard unverified or incomplete bytes.",
+                "Resume from a verified peer or the certified origin.",
+                "Re-run manifest and content hash validation.",
+            ]),
+            automaticAction: "none",
+            intrinsicallyRetryable: false,
+        };
+    }
     return {
-      code: "route_evidence_not_ready",
-      scope: "network",
-      title: "The verified route is temporarily below its reliability threshold",
-      summary: "The nodes have enough memory, but their recent connection evidence is not yet reliable enough to publish a distributed route.",
-      remedy: "Mycellios keeps the model unpublished while fresh reciprocal probes replace the degraded samples, then replans automatically.",
-      steps: Object.freeze([
-        "Keep both contributing desktop clients online.",
-        "Collect fresh successful reciprocal-link probes.",
-        ...ROUTE_REBUILD_STEPS,
-      ]),
-      automaticAction: "rebuild_route",
-      intrinsicallyRetryable: true,
+        code: "unknown",
+        scope: "model",
+        title: "Activation stopped before publication",
+        summary: "The route did not complete its health and inference gates, so no incomplete model was exposed.",
+        remedy: "Mycellios keeps the failure isolated. A classified runtime or capacity change is required before another attempt.",
+        steps: Object.freeze([
+            "Keep the partial route unpublished.",
+            "Use the stage timeline to identify the affected equipment.",
+            "Retry only after the underlying condition changes.",
+        ]),
+        automaticAction: "none",
+        intrinsicallyRetryable: false,
     };
-  }
-  if (normalized.includes("distributed_activation_requires_two_connected_shard_executors")) {
-    return {
-      code: "executor_pool_not_ready",
-      scope: "network",
-      title: "The verified executor topology is not ready",
-      summary: "Connected capacity is visible, but fewer than two executors have completed the runtime and reciprocal-link evidence required to launch a distributed route.",
-      remedy: "Mycellios keeps the model unpublished while the connected desktops finish verification, then rebuilds the route automatically.",
-      steps: Object.freeze([
-        "Keep both contributing desktop clients online.",
-        "Wait for their runtime performance and reciprocal link probes to complete.",
-        ...ROUTE_REBUILD_STEPS,
-      ]),
-      automaticAction: "rebuild_route",
-      intrinsicallyRetryable: true,
-    };
-  }
-  if (
-    normalized.includes("distributed_worker_disconnected:")
-    || normalized.includes("distributed_worker_not_connected:")
-  ) {
-    return {
-      code: "node_disconnected",
-      scope: "node",
-      title: "A required node disconnected",
-      summary: "The partial topology was not published because one of its physical executors left during startup.",
-      remedy: "Mycellios waits for healthy capacity, discards the partial route and rebuilds it automatically.",
-      steps: ROUTE_REBUILD_STEPS,
-      automaticAction: "reconnect_node",
-      intrinsicallyRetryable: true,
-    };
-  }
-  if (normalized.includes("managed_launch_agent_is_unavailable:")) {
-    return {
-      code: "launch_agent_unavailable",
-      scope: "node",
-      title: "The device launch agent is unavailable",
-      summary: "The coordinator could not start a model stage on the selected installed device.",
-      remedy: "Mycellios keeps the failed stage unpublished and retries after that device registers a healthy launch agent.",
-      steps: ROUTE_REBUILD_STEPS,
-      automaticAction: "reconnect_node",
-      intrinsicallyRetryable: true,
-    };
-  }
-  if (
-    normalized.includes("worker_tunnel_prepare_timeout")
-    || normalized.includes("coordinator_worker_registration_timeout")
-  ) {
-    return {
-      code: "network_prepare_timeout",
-      scope: "network",
-      title: "The stage connection timed out",
-      summary: "The encrypted worker route did not become ready inside the bounded startup window.",
-      remedy: "Mycellios closes the incomplete route and retries with the currently reachable nodes.",
-      steps: ROUTE_REBUILD_STEPS,
-      automaticAction: "rebuild_route",
-      intrinsicallyRetryable: true,
-    };
-  }
-  if (
-    normalized.includes("gpu_only_runtime_not_ready")
-    || normalized.includes("gpu_model_stage_unavailable_after_retries:")
-  ) {
-    return {
-      code: normalized.includes("out of memory")
-        ? "out_of_memory"
-        : "accelerator_not_ready",
-      scope: "accelerator",
-      title: normalized.includes("out of memory")
-        ? "The selected accelerator ran out of memory"
-        : "Verified GPU capacity is not ready",
-      summary: normalized.includes("out of memory")
-        ? "The real stage load exceeded the usable memory of its selected device, so the route was withheld."
-        : "Advertised hardware was present, but its certified runtime or physical probe was not ready for this stage.",
-      remedy: normalized.includes("out of memory")
-        ? "Mycellios releases the failed placement, refreshes real free memory and replans before another bounded attempt."
-        : "The device keeps its safe CPU contribution while GPU self-repair runs; model activation resumes only after verified GPU capacity returns.",
-      steps: Object.freeze([
-        "Keep unverified GPU capacity out of scheduling.",
-        ...ROUTE_REBUILD_STEPS,
-      ]),
-      automaticAction: normalized.includes("out of memory")
-        ? "reprofile_and_replan"
-        : "wait_for_verified_accelerator",
-      intrinsicallyRetryable: true,
-    };
-  }
-  if (normalized.includes("launch_readiness_timeout:")) {
-    return {
-      code: "stage_readiness_timeout",
-      scope: "stage",
-      title: "A model stage did not become ready",
-      summary: "The stage process started but did not pass readiness before the activation deadline.",
-      remedy: "Mycellios terminates the incomplete topology and retries from a fresh placement and process.",
-      steps: ROUTE_REBUILD_STEPS,
-      automaticAction: "rebuild_route",
-      intrinsicallyRetryable: true,
-    };
-  }
-  if (
-    normalized.includes("launch_process_exited:")
-    && extractExitCode(message) === 3_221_225_477
-  ) {
-    return {
-      code: "native_memory_access",
-      scope: "stage",
-      title: "The accelerator process hit a native memory fault",
-      summary: "Windows stopped the stage with 0xC0000005 while the model was loading.",
-      remedy: "The failed stage remains unpublished. GPU self-repair must rebuild and revalidate the local runtime before capacity is offered again.",
-      steps: Object.freeze([
-        "Keep the CPU worker available.",
-        "Rebuild and hash-check the certified accelerator runtime.",
-        "Run a physical GPU probe before re-advertising capacity.",
-        "Replan and canary the complete model route.",
-      ]),
-      automaticAction: "none",
-      intrinsicallyRetryable: false,
-    };
-  }
-  if (normalized.includes("launch_process_exited:")) {
-    return {
-      code: "stage_process_exited",
-      scope: "stage",
-      title: "A model stage process exited",
-      summary: "A stage stopped before the complete route passed its canary, so the model was not published.",
-      remedy: "The failure is isolated to the affected stage. Mycellios will not loop an unknown process failure without a verified runtime change.",
-      steps: Object.freeze([
-        "Keep the partial route unpublished.",
-        "Inspect the affected stage and device diagnostics.",
-        "Retry only after its runtime or capacity changes.",
-      ]),
-      automaticAction: "none",
-      intrinsicallyRetryable: false,
-    };
-  }
-  if (
-    normalized.includes("unsupported_model")
-    || normalized.includes("adapter_contract")
-    || normalized.includes("model_architecture")
-  ) {
-    return {
-      code: "model_incompatible",
-      scope: "model",
-      title: "The model architecture is not certified",
-      summary: "The checkpoint does not match a native Mycellios adapter contract in this release.",
-      remedy: "Select a certified model or add and validate a native adapter before trying again.",
-      steps: Object.freeze([
-        "Keep the incompatible model out of activation.",
-        "Verify architecture, tokenizer and artifact format.",
-        "Certify a native adapter with exact-output tests.",
-      ]),
-      automaticAction: "none",
-      intrinsicallyRetryable: false,
-    };
-  }
-  if (
-    normalized.includes("artifact")
-    || normalized.includes("safetensors")
-    || normalized.includes("model_download")
-    || normalized.includes("hash")
-  ) {
-    return {
-      code: "artifact_unavailable",
-      scope: "artifact",
-      title: "The model artifact could not be verified",
-      summary: "A required model file was unavailable or failed its integrity contract.",
-      remedy: "The model remains unpublished until a complete verified artifact is available.",
-      steps: Object.freeze([
-        "Discard unverified or incomplete bytes.",
-        "Resume from a verified peer or the certified origin.",
-        "Re-run manifest and content hash validation.",
-      ]),
-      automaticAction: "none",
-      intrinsicallyRetryable: false,
-    };
-  }
-  return {
-    code: "unknown",
-    scope: "model",
-    title: "Activation stopped before publication",
-    summary: "The route did not complete its health and inference gates, so no incomplete model was exposed.",
-    remedy: "Mycellios keeps the failure isolated. A classified runtime or capacity change is required before another attempt.",
-    steps: Object.freeze([
-      "Keep the partial route unpublished.",
-      "Use the stage timeline to identify the affected equipment.",
-      "Retry only after the underlying condition changes.",
-    ]),
-    automaticAction: "none",
-    intrinsicallyRetryable: false,
-  };
 }
 
 function unwrapExhausted(message: string): {
@@ -406,10 +407,8 @@ function unwrapExhausted(message: string): {
 }
 
 function extractNodeId(message: string): string | null {
-  const match = /(?:distributed_worker_(?:disconnected|not_connected)|managed_launch_agent_is_unavailable):([^:\s]+)/i.exec(
-    message,
-  );
-  return safeIdentifier(match?.[1]);
+    const match = /(?:distributed_worker_(?:disconnected|not_connected)|managed_launch_agent_is_unavailable|route_capacity_conflict):([^:\s]+)/i.exec(message);
+    return safeIdentifier(match?.[1]);
 }
 
 function extractStageId(message: string): string | null {

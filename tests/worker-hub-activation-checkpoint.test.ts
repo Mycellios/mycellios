@@ -56,10 +56,10 @@ describe("WorkerHub activation checkpoint channel", () => {
       id: "worker-a",
       capabilities: { distributedExecutor: { protocol: "gdlp-worker-tunnel/2" } },
     };
-    const hub = new WorkerHub({
+    const hub = (await WorkerHub.create({
       getWorker: vi.fn(() => worker),
       listWorkers: vi.fn(() => [worker]),
-    } as unknown as MeshStore, { activationCheckpointTransfers: transfers });
+    } as unknown as MeshStore, { activationCheckpointTransfers: transfers }));
     const sent: Array<{ type: string; payload: Record<string, unknown> }> = [];
     vi.spyOn(hub, "send").mockImplementation((_workerId, type, value) => {
       sent.push({ type, payload: value as Record<string, unknown> });
@@ -105,7 +105,7 @@ describe("WorkerHub activation checkpoint channel", () => {
       type: "runtime.checkpoint.committed",
       payload: { transferId, checkpointId: checkpoint.checkpointId },
     });
-    expect(store.get(checkpoint.checkpointId, expected, now + 100)?.payload.equals(payload)).toBe(true);
+    expect((await store.get(checkpoint.checkpointId, expected, now + 100))?.payload.equals(payload)).toBe(true);
     const restored = vi.fn();
     hub.on("activationCheckpointRestored", restored);
     const restoration = hub.restoreActivationCheckpoint(
@@ -148,6 +148,6 @@ describe("WorkerHub activation checkpoint channel", () => {
       },
     }));
     await expect(failedRestoration).rejects.toThrow("checkpoint_restore_failed");
-    hub.close();
+    (await hub.close());
   });
 });

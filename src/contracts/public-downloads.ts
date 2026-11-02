@@ -17,3 +17,10 @@ export const publicDownloadAvailabilitySchema = z.object({
 
 export type PublicDownloadAvailability = z.infer<typeof publicDownloadAvailabilitySchema>;
 export type PublicDownloadPackage = PublicDownloadAvailability["packages"][number];
+
+export const publicWindowsInstallerIntegritySchema = z.object({
+  schema: z.literal("mycellios-windows-installer-integrity/1"),
+  version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  fileName: z.string().regex(/^mycellios-node-\d+\.\d+\.\d+-windows-x64\.msi$/),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();

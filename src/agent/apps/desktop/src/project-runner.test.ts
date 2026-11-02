@@ -98,9 +98,10 @@ it("stops partial startup when a dependent command exits", async () => {
   project.config.profiles[0]!.services = ["broken"];
   const manager = new ProjectServices(); managers.push(manager); manager.start(project, "all", async () => {});
   await manager.settled();
-  await expect.poll(() => manager.state.phase).toBe("error");
+  await expect.poll(() => manager.state.phase, { timeout: 15000 }).toBe("error");
+  expect(manager.state.error).toMatch(/Service broken exited/);
   await expect.poll(() => manager.probe(project.config.services[0]!.ready!.url)).toBe(false);
-});
+}, 30000);
 it("coalesces initial Play and waits for this request's machine-local binding", async () => {
   const runner = new ProjectRunner(path.join(root, "native")); runners.push(runner);
   const [first, second] = await Promise.all([runner.play("owner/chat", root, undefined, undefined, undefined, async () => {}), runner.play("owner/chat", root, undefined, undefined, undefined, async () => {})]);

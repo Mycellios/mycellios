@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import { MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
+import { MAX_EMBEDDING_RESPONSE_BYTES } from "../contracts/embedding.js";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import {
@@ -21,6 +22,8 @@ import type { AdapterChunk, InferenceAdapter } from "../adapters/base.js";
 import { createAdapter } from "../adapters/factory.js";
 import { sha256Text } from "../core/json.js";
 import { estimateInputTokens } from "../core/request.js";
+import { observeHostMemory, withoutHostMemory } from "./host-memory.js";
+import { defaultWorkerIdentity } from "./default-identity.js";
 import { safeVramBudget } from "../core/tiers.js";
 import {
   probeHardware,
@@ -94,6 +97,8 @@ import {
 
 export interface WorkerAgentOptions {
   coordinatorUrl: string;
+  /** Optional current host RAM offer, bounded by the persisted node policy. */
+  offeredHostMemoryBytes?: () => number;
   networkToken?: string;
   heartbeatIntervalMs?: number;
   /** How often to probe the coordinator RTT with a WebSocket ping. */
@@ -1108,8 +1113,11 @@ export class WorkerAgent {
 
   private async register(signal: AbortSignal): Promise<void> {
     this.assertStartupActive(signal);
-    const identity = this.options.identity ?? this.defaultIdentity();
+    const identity = this.options.identity ?? defaultWorkerIdentity(this.config, this.options.distributedExecutor);
     if (!this.capabilities) throw new Error("Worker capabilities are not initialized");
+    // Dynamic observations must not change the signed registration identity or
+    // prevent reconnection to a coordinator predating this optional field.
+    this.capabilities = withoutHostMemory(this.capabilities);
     const protocol = { min: WORKER_PROTOCOL_MIN, max: WORKER_PROTOCOL_MAX } as const;
     const registration = {
       ...(identity ? { identity } : {}),
@@ -1211,19 +1219,6 @@ export class WorkerAgent {
     this.registeredWorkerId = body.workerId;
     this.workerSessionToken = body.workerSessionToken;
     this.registeredNodeGeneration = body.nodeGeneration;
-  }
-
-  private defaultIdentity(): WorkerAgentOptions["identity"] {
-    if (this.options.distributedExecutor) {
-      return { kind: "device", id: this.options.distributedExecutor.nodeId };
-    }
-    if (this.config.instanceId) {
-      return {
-        kind: this.config.capacityScope === "cell" ? "cell" : "device",
-        id: this.config.instanceId,
-      };
-    }
-    return undefined;
   }
 
   private connectOnce(signal: AbortSignal): Promise<void> {
@@ -2362,7 +2357,7 @@ export class WorkerAgent {
     let output = "";
     let outputBytes = 0;
     let backendMetrics: AdapterChunk["metrics"] | undefined;
-    const outputByteLimit = this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
+    const outputByteLimit = this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "embedding" ? MAX_EMBEDDING_RESPONSE_BYTES : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
       : Math.min(MAX_OUTPUT_BYTES, (payload.request.max_tokens ?? 256) * 32);
     try {
       for await (const chunk of this.adapter.generate(
@@ -2441,7 +2436,7 @@ export class WorkerAgent {
         leaseId: payload.leaseId,
         text: output,
         finishReason:
-          this.adapter.kind !== "kokoro" && this.adapter.kind !== "decision" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
+          this.adapter.kind !== "kokoro" && this.adapter.kind !== "embedding" && this.adapter.kind !== "decision" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
             ? "length"
             : "stop",
         metrics,
@@ -2493,6 +2488,10 @@ export class WorkerAgent {
 
   private async sendHeartbeat(): Promise<void> {
     if (!this.capabilities || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    this.capabilities = {
+      ...this.capabilities,
+      hostMemory: observeHostMemory(this.options.offeredHostMemoryBytes?.()),
+    };
     const [metrics, liveHardware] = await Promise.all([
       this.adapter.metrics(),
       this.config.capacityScope === "host"
@@ -2522,7 +2521,7 @@ export class WorkerAgent {
       };
     }
     const heartbeat: WorkerHeartbeat = {
-      draining: !this.acceptsNewWork() || (this.adapter.kind === "decision" && !metrics.ready),
+      draining: !this.acceptsNewWork() || ((this.adapter.kind === "embedding" || this.adapter.kind === "decision") && !metrics.ready),
       pausedReason: !this.contributionEnabled
         ? "Contribution paused"
         : this.updateDraining
@@ -2725,7 +2724,7 @@ function scaleMatches(observed: number, rawExpected: number): boolean {
 
 function deploymentAdapterKind(
   adapter: InferenceAdapter["kind"],
-): "mycellios-pipeline" | "kokoro" | "decision" | "mock" {
+): "mycellios-pipeline" | "kokoro" | "embedding" | "decision" | "mock" {
   if (adapter === "mycellios-native") {
     throw new Error("mycellios_native_control_cannot_be_a_model_deployment");
   }

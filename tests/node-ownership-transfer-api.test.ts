@@ -20,7 +20,7 @@ describe("node ownership transfer API", () => {
     }) as typeof fetch);
     const runtime = await createCoordinator({ host: "127.0.0.1", port: 0, databasePath: ":memory:", requestTimeoutMs: 1_000, apiAccessEnabled: true }, { logger: false, supabaseAuthService: auth });
     runtimes.push(runtime);
-    runtime.database.raw.prepare(`INSERT INTO node_ownership(identity_kind, identity_id, account_id, credential_fingerprint, status, generation, created_at, updated_at) VALUES ('device', 'node-transfer-api', 'owner-a', ?, 'active', 1, 1, 1)`).run(`sha256:${"a".repeat(64)}`);
+    (await runtime.database.raw.prepare(`INSERT INTO node_ownership(identity_kind, identity_id, account_id, credential_fingerprint, status, generation, created_at, updated_at) VALUES ('device', 'node-transfer-api', 'owner-a', ?, 'active', 1, 1, 1)`).run(`sha256:${"a".repeat(64)}`));
 
     const payload = { targetAccountId: "owner-b", expectedGeneration: 1, confirmation: "node-transfer-api", expiresInSeconds: 900 };
     const stale = await runtime.app.inject({ method: "POST", url: "/v1/nodes/node-transfer-api/ownership-transfers", headers: { authorization: `Bearer ${staleOwnerToken}` }, payload });

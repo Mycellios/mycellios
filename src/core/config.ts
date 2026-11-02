@@ -31,6 +31,9 @@ export interface CoordinatorConfig {
   supabaseServiceRoleKey?: string | undefined;
   supabaseAnonKey?: string | undefined;
   supabasePersistenceRequired?: boolean | undefined;
+  storageBackend?: "sqlite" | "postgres" | undefined;
+  databaseUrl?: string | undefined;
+  databaseSchema?: string | undefined;
   /** Explicit test/development escape hatch; production defaults to native adapters only. */
   allowDevelopmentAdapters?: boolean | undefined;
   apiAccessEnabled?: boolean | undefined;
@@ -114,6 +117,8 @@ export function assertCoordinatorNetworkSecurity(
 export function loadCoordinatorConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): CoordinatorConfig {
+  const storageBackend = environment.MYCELLIOS_STORAGE_BACKEND?.trim();
+  if (storageBackend && storageBackend !== "sqlite" && storageBackend !== "postgres") throw new Error("mycellios_storage_backend_invalid");
   const networkToken = loadSecret(
     environment.MYCELLIOS_NETWORK_TOKEN,
     environment.MYCELLIOS_NETWORK_TOKEN_FILE,
@@ -304,6 +309,9 @@ export function loadCoordinatorConfig(
       environment.GPU_MESH_DB === ":memory:"
         ? ":memory:"
         : resolve(environment.GPU_MESH_DB ?? "./data/gpu-mesh.db"),
+    storageBackend: environment.MYCELLIOS_STORAGE_BACKEND?.trim() === "postgres" ? "postgres" : "sqlite",
+    databaseUrl: loadSecret(environment.MYCELLIOS_DATABASE_URL, environment.MYCELLIOS_DATABASE_URL_FILE),
+    databaseSchema: environment.MYCELLIOS_DATABASE_SCHEMA?.trim() || "mycellios",
     requestTimeoutMs: parseInteger(environment.GPU_MESH_REQUEST_TIMEOUT_MS, 120_000),
     supabasePersistenceRequired: environment.MYCELLIOS_SUPABASE_PERSISTENCE_REQUIRED?.trim() === "1",
     allowDevelopmentAdapters: environment.MYCELLIOS_ALLOW_DEV_ADAPTERS?.trim() === "1",

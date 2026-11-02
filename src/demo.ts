@@ -70,7 +70,7 @@ try {
   const body = (await response.json()) as Record<string, unknown>;
   if (!response.ok) throw new Error(`Demo request failed: ${JSON.stringify(body)}`);
 
-  const worker = runtime.store.listWorkers()[0]!;
+  const worker = (await runtime.store.listWorkers())[0]!;
   console.log(
     JSON.stringify(
       {
@@ -80,7 +80,7 @@ try {
           id: worker.id,
           region: worker.capabilities.region,
           offeredVramMb: worker.capabilities.gpus[0]?.offeredVramMb,
-          jobsCompleted: runtime.store.getWorker(worker.id)?.jobsCompleted,
+          jobsCompleted: (await runtime.store.getWorker(worker.id))?.jobsCompleted,
         },
         response: body,
       },

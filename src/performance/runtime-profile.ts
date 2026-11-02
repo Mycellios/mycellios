@@ -21,7 +21,7 @@ export interface PhysicalPerformanceSeries {
 
 export interface RuntimePerformanceProfileInput {
   measuredAt: string;
-  backend: "cuda" | "rocm" | "mps" | "xpu" | "cpu";
+  backend: "cuda" | "rocm" | "mps" | "xpu" | "directml" | "cpu";
   deviceName: string;
   precision: "float16" | "float32";
   source: "physical-microbenchmark" | "runtime-calibration";
@@ -218,7 +218,7 @@ function normalizeProfileInput(
   if (!Number.isFinite(measuredAtMs)) {
     throw new Error("runtime_performance_profile_measured_at_is_invalid");
   }
-  if (!["cuda", "rocm", "mps", "xpu", "cpu"].includes(input.backend)) {
+  if (!["cuda", "rocm", "mps", "xpu", "directml", "cpu"].includes(input.backend)) {
     throw new Error("runtime_performance_profile_backend_is_invalid");
   }
   if (!["float16", "float32"].includes(input.precision)) {
@@ -325,7 +325,7 @@ const performanceSeriesSchema = z.object({
  */
 export const runtimePerformanceProfileInputSchema = z.object({
   measuredAt: z.string().datetime({ offset: true }),
-  backend: z.enum(["cuda", "rocm", "mps", "xpu", "cpu"]),
+  backend: z.enum(["cuda", "rocm", "mps", "xpu", "directml", "cpu"]),
   deviceName: z.string().trim().min(1).max(256),
   precision: z.enum(["float16", "float32"]),
   source: z.enum(["physical-microbenchmark", "runtime-calibration"]),

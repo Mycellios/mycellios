@@ -1,3 +1,4 @@
+import { filterAsync } from "../core/async-collections.js";
 import {
   requireEligibleEngineRuntimeProfile,
   type EngineRuntimeProfile,
@@ -86,16 +87,16 @@ export function engineRuntimeActivationPlansReady(
   ));
 }
 
-export function activeEngineRuntimeActivationPlans(
+export async function activeEngineRuntimeActivationPlans(
   plans: readonly EngineRuntimeActivationPlan[],
   controller: Pick<DeploymentControlPlane, "getState" | "listReservations">,
-): EngineRuntimeActivationPlan[] {
-  return plans.filter((plan) => {
-    const state = controller.getState(plan.modelId);
-    const reservation = controller.listReservations(plan.modelId)
+): Promise<EngineRuntimeActivationPlan[]> {
+  return (await filterAsync(plans, async (plan) => {
+    const state = (await controller.getState(plan.modelId));
+    const reservation = (await controller.listReservations(plan.modelId))
       .find((candidate) => candidate.id === plan.routeReservationId);
     return state?.desiredState === "active"
       && state.observedState === "active"
       && reservation?.status === "committed";
-  });
+  }));
 }

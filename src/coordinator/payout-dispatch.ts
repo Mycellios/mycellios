@@ -87,21 +87,21 @@ export class PayoutDispatchService {
   ) {}
 
   async dispatch(batchId: string): Promise<PayoutDispatchResult> {
-    const current = this.requireBatch(batchId);
-    const existing = this.getByBatchId(current.id);
+    const current = (await this.requireBatch(batchId));
+    const existing = (await this.getByBatchId(current.id));
     if (existing) {
-      this.assertProjectionIntegrity(existing, current);
+      (await this.assertProjectionIntegrity(existing, current));
       return { operation: existing, batch: current, duplicate: true };
     }
-    const batch = this.requirePreparedBatch(batchId);
-    this.assertBatchEconomicIntegrity(batch);
+    const batch = (await this.requirePreparedBatch(batchId));
+    (await this.assertBatchEconomicIntegrity(batch));
     this.payouts.assertPayoutMethodEnabled(batch.payoutMethod);
     const gateway = this.requireGateway(batch.payoutMethod);
-    const sporeQuote = this.requireDispatchableSporeQuote(batch);
+    const sporeQuote = (await this.requireDispatchableSporeQuote(batch));
 
-    const allocation = this.createOperation(batch, sporeQuote);
+    const allocation = (await this.createOperation(batch, sporeQuote));
     if (!allocation.created) {
-      this.assertProjectionIntegrity(allocation.operation, batch);
+      (await this.assertProjectionIntegrity(allocation.operation, batch));
       return { operation: allocation.operation, batch, duplicate: true };
     }
     const operation = allocation.operation;
@@ -116,67 +116,67 @@ export class PayoutDispatchService {
         dispatchKey: operation.dispatchKey,
         sporeQuote,
       });
-      return this.applyObservation(operation, observation, false);
+      return (await this.applyObservation(operation, observation, false));
     } catch (error) {
-      const uncertain = this.updateOperation(operation.id, {
+      const uncertain = (await this.updateOperation(operation.id, {
         state: "uncertain",
         lastError: boundedError(error),
         reconciledAt: null,
-      });
-      return { operation: uncertain, batch: this.requireBatch(batch.id), duplicate: false };
+      }));
+      return { operation: uncertain, batch: (await this.requireBatch(batch.id)), duplicate: false };
     }
   }
 
   async reconcile(batchId: string): Promise<PayoutDispatchResult> {
-    const operation = this.getByBatchId(batchId);
+    const operation = (await this.getByBatchId(batchId));
     if (!operation) throw new PayoutError("payout_dispatch_not_found", "The payout has no dispatch operation.");
-    const batch = this.requireBatch(batchId);
-    this.assertProjectionIntegrity(operation, batch);
+    const batch = (await this.requireBatch(batchId));
+    (await this.assertProjectionIntegrity(operation, batch));
     if (operation.state === "paid" || operation.state === "rejected") {
       return { operation, batch, duplicate: true };
     }
-    this.assertSporeQuoteAuditIntegrity(operation);
+    (await this.assertSporeQuoteAuditIntegrity(operation));
     const gateway = this.requireGateway(operation.payoutMethod);
     const observation = await gateway.inspectTransfer({
       dispatchKey: operation.dispatchKey,
       externalReference: operation.externalReference,
     });
     if (observation.state === "absent") {
-      const uncertain = this.updateOperation(operation.id, {
+      const uncertain = (await this.updateOperation(operation.id, {
         state: "uncertain",
         lastError: "provider_transfer_absent",
         reconciledAt: Date.now(),
-      });
-      return { operation: uncertain, batch: this.requireBatch(batchId), duplicate: true };
+      }));
+      return { operation: uncertain, batch: (await this.requireBatch(batchId)), duplicate: true };
     }
-    return this.applyObservation(operation, observation, true);
+    return (await this.applyObservation(operation, observation, true));
   }
 
-  recordSettlement(
+  async recordSettlement(
     evidence: PayoutSettlementAttestation,
-  ): PayoutDispatchResult {
-    return this.database.transaction(() => {
-      const operation = this.getByBatchId(evidence.batchId);
+  ): Promise<PayoutDispatchResult> {
+    return (await this.database.transaction(async () => {
+      const operation = (await this.getByBatchId(evidence.batchId));
       if (!operation) throw new PayoutError("payout_dispatch_not_found", "The payout has no dispatch operation.");
-      this.assertProjectionIntegrity(operation, this.requireBatch(evidence.batchId));
+      (await this.assertProjectionIntegrity(operation, (await this.requireBatch(evidence.batchId))));
       if (operation.state === "rejected") {
         throw new PayoutError("payout_dispatch_terminal", "A rejected payout dispatch cannot be settled.");
       }
-      this.assertSporeQuoteAuditIntegrity(operation);
+      (await this.assertSporeQuoteAuditIntegrity(operation));
       if (operation.externalReference !== evidence.externalReference) {
         throw new PayoutError("payout_settlement_identity_conflict", "Settlement evidence does not match the dispatched transfer.");
       }
-      const existing = this.database.raw.prepare(
+      const existing = (await this.database.raw.prepare(
         `SELECT schema_name, external_reference, settlement_reference, paid_at,
                 issued_at, verifier_key_id, signature
          FROM payout_settlement_evidence WHERE batch_id = ?`,
-      ).get(evidence.batchId) as SettlementEvidenceRow | undefined;
+      ).get(evidence.batchId)) as SettlementEvidenceRow | undefined;
       if (existing && !settlementEvidenceMatches(existing, evidence)) {
         throw new PayoutError("payout_settlement_evidence_conflict", "The payout already has different signed settlement evidence.");
       }
       if (!existing) {
         try {
-          this.database.raw.prepare(
+          (await this.database.raw.prepare(
             `INSERT INTO payout_settlement_evidence(
                batch_id, schema_name, external_reference, settlement_reference,
                paid_at, issued_at, verifier_key_id, signature, recorded_at
@@ -185,37 +185,37 @@ export class PayoutDispatchService {
             evidence.batchId, evidence.schema, evidence.externalReference,
             evidence.settlementReference, evidence.paidAt, evidence.issuedAt,
             evidence.verifierKeyId, evidence.signature, Date.now(),
-          );
+          ));
         } catch (error) {
           throw new PayoutError("payout_settlement_evidence_conflict", boundedError(error));
         }
       }
-      const settled = this.applyObservation(operation, {
+      const settled = (await this.applyObservation(operation, {
         state: "paid",
         externalReference: evidence.externalReference,
         settlementReference: evidence.settlementReference,
         paidAt: evidence.paidAt,
-      }, true);
+      }, true));
       return { ...settled, duplicate: Boolean(existing) || operation.state === "paid" };
-    });
+    }));
   }
 
-  getByBatchId(batchId: string): PayoutDispatchOperation | null {
-    const row = this.database.raw.prepare(
+  async getByBatchId(batchId: string): Promise<PayoutDispatchOperation | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT id, batch_id, payout_method, dispatch_key, state, external_reference,
               settlement_reference, spore_quote_id, spore_quote_attestation_digest,
               last_error, created_at, updated_at, reconciled_at
        FROM payout_dispatch_operations WHERE batch_id = ?`,
-    ).get(batchId) as DispatchRow | undefined;
+    ).get(batchId)) as DispatchRow | undefined;
     return row ? mapOperation(row) : null;
   }
 
-  getSettlementEvidence(batchId: string): PayoutSettlementEvidenceRecord | null {
-    const row = this.database.raw.prepare(
+  async getSettlementEvidence(batchId: string): Promise<PayoutSettlementEvidenceRecord | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT batch_id, schema_name, external_reference, settlement_reference,
               paid_at, issued_at, verifier_key_id, signature, recorded_at
        FROM payout_settlement_evidence WHERE batch_id = ?`,
-    ).get(batchId) as (SettlementEvidenceRow & { batch_id: string; recorded_at: number }) | undefined;
+    ).get(batchId)) as (SettlementEvidenceRow & { batch_id: string; recorded_at: number }) | undefined;
     return row ? {
       batchId: row.batch_id,
       schema: row.schema_name as "mycellios.payout-settlement.v1",
@@ -229,12 +229,12 @@ export class PayoutDispatchService {
     } : null;
   }
 
-  private createOperation(batch: PayoutBatch, sporeQuote: SporeConversionQuote | null): {
+  private async createOperation(batch: PayoutBatch, sporeQuote: SporeConversionQuote | null): Promise<{
     operation: PayoutDispatchOperation;
     created: boolean;
-  } {
-    return this.database.transaction(() => {
-      const existing = this.getByBatchId(batch.id);
+  }> {
+    return (await this.database.transaction(async () => {
+      const existing = (await this.getByBatchId(batch.id));
       if (existing) return { operation: existing, created: false };
       const now = Date.now();
       const id = newId("payout-dispatch");
@@ -242,7 +242,7 @@ export class PayoutDispatchService {
       const sporeQuoteAttestationDigest = sporeQuote
         ? sporeConversionAttestationDigest(sporeQuote)
         : null;
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO payout_dispatch_operations(
            id, batch_id, payout_method, dispatch_key, state, spore_quote_id,
            spore_quote_attestation_digest, created_at, updated_at
@@ -250,63 +250,63 @@ export class PayoutDispatchService {
       ).run(
         id, batch.id, batch.payoutMethod, dispatchKey,
         sporeQuote?.quoteId ?? null, sporeQuoteAttestationDigest, now, now,
-      );
-      return { operation: this.getByBatchId(batch.id)!, created: true };
-    });
+      ));
+      return { operation: (await this.getByBatchId(batch.id))!, created: true };
+    }));
   }
 
-  private applyObservation(
+  private async applyObservation(
     operation: PayoutDispatchOperation,
     observation: Exclude<PayoutProviderObservation, { state: "absent" }>,
     reconciled: boolean,
-  ): PayoutDispatchResult {
+  ): Promise<PayoutDispatchResult> {
     if (observation.state === "rejected") {
-      return this.database.transaction(() => {
-        const rejected = this.updateOperation(operation.id, {
+      return (await this.database.transaction(async () => {
+        const rejected = (await this.updateOperation(operation.id, {
           state: "rejected",
           lastError: observation.reason.slice(0, 500),
           reconciledAt: reconciled ? Date.now() : null,
-        });
+        }));
         const batch = rejected.externalReference === null
-          ? this.payouts.cancelPrepared(operation.batchId).batch
-          : this.requireBatch(operation.batchId);
+          ? (await this.payouts.cancelPrepared(operation.batchId)).batch
+          : (await this.requireBatch(operation.batchId));
         return { operation: rejected, batch, duplicate: false };
-      });
+      }));
     }
 
-    return this.database.transaction(() => {
-      this.payouts.markSubmitted({
+    return (await this.database.transaction(async () => {
+      (await this.payouts.markSubmitted({
         batchId: operation.batchId,
         dispatchKey: operation.dispatchKey,
         externalReference: observation.externalReference,
-      });
+      }));
       if (observation.state === "paid") {
-        this.payouts.markPaid({
+        (await this.payouts.markPaid({
           batchId: operation.batchId,
           settlementReference: observation.settlementReference,
           paidAt: observation.paidAt,
-        });
+        }));
       }
-      const updated = this.updateOperation(operation.id, {
+      const updated = (await this.updateOperation(operation.id, {
         state: observation.state,
         externalReference: observation.externalReference,
         settlementReference: observation.state === "paid" ? observation.settlementReference : null,
         lastError: null,
         reconciledAt: reconciled ? Date.now() : null,
-      });
-      return { operation: updated, batch: this.requireBatch(operation.batchId), duplicate: false };
-    });
+      }));
+      return { operation: updated, batch: (await this.requireBatch(operation.batchId)), duplicate: false };
+    }));
   }
 
-  private updateOperation(id: string, input: {
+  private async updateOperation(id: string, input: {
     state: PayoutDispatchState;
     externalReference?: string | null;
     settlementReference?: string | null;
     lastError: string | null;
     reconciledAt: number | null;
-  }): PayoutDispatchOperation {
+  }): Promise<PayoutDispatchOperation> {
     const now = Date.now();
-    this.database.raw.prepare(
+    (await this.database.raw.prepare(
       `UPDATE payout_dispatch_operations
        SET state = ?, external_reference = COALESCE(?, external_reference),
            settlement_reference = COALESCE(?, settlement_reference), last_error = ?,
@@ -319,32 +319,32 @@ export class PayoutDispatchService {
       now,
       input.reconciledAt,
       id,
-    );
-    const row = this.database.raw.prepare(
+    ));
+    const row = (await this.database.raw.prepare(
       `SELECT id, batch_id, payout_method, dispatch_key, state, external_reference,
               settlement_reference, spore_quote_id, spore_quote_attestation_digest,
               last_error, created_at, updated_at, reconciled_at
        FROM payout_dispatch_operations WHERE id = ?`,
-    ).get(id) as DispatchRow | undefined;
+    ).get(id)) as DispatchRow | undefined;
     if (!row) throw new PayoutError("payout_dispatch_not_found", "The payout dispatch operation disappeared.");
     return mapOperation(row);
   }
 
-  private requirePreparedBatch(batchId: string): PayoutBatch {
-    const batch = this.requireBatch(batchId);
+  private async requirePreparedBatch(batchId: string): Promise<PayoutBatch> {
+    const batch = (await this.requireBatch(batchId));
     if (batch.status !== "prepared") {
       throw new PayoutError("payout_not_dispatchable", "Only a prepared payout can be dispatched.");
     }
     return batch;
   }
 
-  private assertProjectionIntegrity(operation: PayoutDispatchOperation, batch: PayoutBatch): void {
-    const earningRows = this.database.raw.prepare(
+  private async assertProjectionIntegrity(operation: PayoutDispatchOperation, batch: PayoutBatch): Promise<void> {
+    const earningRows = (await this.database.raw.prepare(
       `SELECT e.status
        FROM payout_batch_items i
        JOIN seller_earnings e ON e.id = i.earning_id
        WHERE i.batch_id = ?`,
-    ).all(batch.id) as unknown as Array<{ status: string }>;
+    ).all(batch.id)) as unknown as Array<{ status: string }>;
     const allowedEarningStatuses = batch.status === "cancelled"
       ? new Set(["available"])
       : batch.status === "paid"
@@ -381,13 +381,13 @@ export class PayoutDispatchService {
     }
   }
 
-  private requireDispatchableSporeQuote(batch: PayoutBatch): SporeConversionQuote | null {
+  private async requireDispatchableSporeQuote(batch: PayoutBatch): Promise<SporeConversionQuote | null> {
     if (batch.payoutMethod !== "spore") return null;
     if (!this.sporeQuotes) {
       throw new PayoutError("spore_quote_required", "SPORE payout dispatch requires a configured quote verifier.");
     }
     try {
-      const quote = this.sporeQuotes.getVerifiedByBatchId(batch.id);
+      const quote = (await this.sporeQuotes.getVerifiedByBatchId(batch.id));
       if (!quote) throw new PayoutError("spore_quote_required", "SPORE payout dispatch requires an active quote.");
       if (quote.sellerId !== batch.sellerId || quote.usdMicros !== batch.amountUsdMicros
         || quote.destinationFingerprint !== batch.destinationFingerprint) {
@@ -403,15 +403,15 @@ export class PayoutDispatchService {
     }
   }
 
-  private assertBatchEconomicIntegrity(batch: PayoutBatch): void {
-    const rows = this.database.raw.prepare(
+  private async assertBatchEconomicIntegrity(batch: PayoutBatch): Promise<void> {
+    const rows = (await this.database.raw.prepare(
       `SELECT i.amount_usd_micros AS item_amount_usd_micros,
               e.amount_usd_micros AS earning_amount_usd_micros,
               e.seller_id, e.payout_method, e.status
        FROM payout_batch_items i
        JOIN seller_earnings e ON e.id = i.earning_id
        WHERE i.batch_id = ?`,
-    ).all(batch.id) as unknown as Array<{
+    ).all(batch.id)) as unknown as Array<{
       item_amount_usd_micros: number;
       earning_amount_usd_micros: number;
       seller_id: string;
@@ -429,20 +429,20 @@ export class PayoutDispatchService {
     }
   }
 
-  private assertSporeQuoteAuditIntegrity(operation: PayoutDispatchOperation): void {
+  private async assertSporeQuoteAuditIntegrity(operation: PayoutDispatchOperation): Promise<void> {
     if (operation.payoutMethod !== "spore") return;
     if (!this.sporeQuotes || !operation.sporeQuoteId || !operation.sporeQuoteAttestationDigest) {
       throw new PayoutError("spore_dispatch_quote_audit_missing", "The SPORE dispatch has no durable quote audit link.");
     }
-    const quote = this.sporeQuotes.getStoredByQuoteId(operation.sporeQuoteId);
+    const quote = (await this.sporeQuotes.getStoredByQuoteId(operation.sporeQuoteId));
     const digest = quote ? sporeConversionAttestationDigest(quote) : null;
     if (!quote || quote.batchId !== operation.batchId || digest !== operation.sporeQuoteAttestationDigest) {
       throw new PayoutError("spore_dispatch_quote_audit_conflict", "The SPORE dispatch quote audit link is inconsistent.");
     }
   }
 
-  private requireBatch(batchId: string): PayoutBatch {
-    const batch = this.payouts.getBatch(batchId);
+  private async requireBatch(batchId: string): Promise<PayoutBatch> {
+    const batch = (await this.payouts.getBatch(batchId));
     if (!batch) throw new PayoutError("payout_not_found", "The payout batch does not exist.");
     return batch;
   }

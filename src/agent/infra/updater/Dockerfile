@@ -14,14 +14,10 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends git ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY patches patches
-COPY packages/contracts packages/contracts
-COPY packages/core packages/core
-COPY packages/logging packages/logging
-COPY infra/updater infra/updater
-RUN corepack enable && pnpm install --frozen-lockfile --prod --filter "@rakazo/updater..."
-WORKDIR /app/infra/updater
+COPY src/agent/ .
+COPY src/contracts/ /contracts/
+RUN --mount=type=cache,id=mycellios-agent-npm,target=/root/.npm npm ci --workspace @rakazo/updater --include-workspace-root=false --omit=dev --ignore-scripts --no-audit --no-fund \
+    && ln -s /app/node_modules /contracts/node_modules
 ARG GIT_SHA
 ENV GIT_SHA=$GIT_SHA
-CMD ["pnpm", "exec", "tsx", "src/index.ts"]
+CMD ["npm", "run", "start", "--workspace", "@rakazo/updater"]

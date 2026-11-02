@@ -13,6 +13,22 @@ _ERROR_TYPE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]{0,127}$")
 StageFailureRole = Literal["head", "middle", "tail"]
 
 
+def unattributed_failure_message(payload: bytes | bytearray) -> str | None:
+    """Bound legacy text diagnostics; never interpret them as executor evidence."""
+    if not isinstance(payload, (bytes, bytearray)) or not 0 < len(payload) <= 4096:
+        return None
+    try:
+        text = bytes(payload).decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return None
+    # A malformed structured proof must not become an accepted legacy message.
+    if not text or text.startswith(("{", "[")) or any(
+        (ord(char) < 32 and not char.isspace()) or ord(char) == 127 for char in text
+    ):
+        return None
+    return " ".join(text.split())[:1024]
+
+
 @dataclass(frozen=True, slots=True)
 class StageFailureEvidence:
     generation: int

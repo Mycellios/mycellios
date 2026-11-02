@@ -1,3 +1,4 @@
+import { denseStagePolicyIdentity, validateDenseStagePolicy, type DenseStagePolicy } from "../contracts/dense-stage.js";
 import { createHash } from "node:crypto";
 import { evaluateDistributionPlan } from "./cost-model.js";
 import {
@@ -70,12 +71,13 @@ export interface RuntimeMemberCapabilitiesInput {
   activationCodecs?: RuntimeActivationCodec[];
   features?: string[];
 }
-
 export interface RuntimeNodeProfile {
   id: string;
   region: string;
   memoryBytes: number;
   reserveBytes: number;
+  hostMemoryBytes?: number;
+  deviceMemorySharesHost?: boolean;
   decodeScale: number;
   prefillScale: number;
   codecScale: number;
@@ -89,7 +91,6 @@ export interface RuntimeNodeProfile {
   /** Required only when the opt-in MacroWave planner is selected. */
   ramVram?: ComputeNodeProfile["ramVram"];
 }
-
 export interface RuntimeTopology {
   nodes: RuntimeNodeProfile[];
   links: DirectedLinkProfile[];
@@ -206,6 +207,7 @@ export type RuntimeVirtualStageExecutionManifest =
   RuntimeTensorParallelCellExecutionManifest;
 
 export interface RuntimeVirtualStageManifest {
+  dense?: DenseStagePolicy;
   stageId: string;
   index: number;
   layerStart: number;
@@ -448,9 +450,9 @@ export function buildRuntimePipelineManifest(
   let prefillPlan: DistributionPlan;
   let decodePlan: DistributionPlan;
   if (sharedCellProfiles) {
-    const basePlan = planDefaultRoute(request, prefillTopology);
-    prefillPlan = request.phasePlans?.prefill ?? basePlan;
-    decodePlan = request.phasePlans?.decode ?? basePlan;
+    const basePlan = request.phasePlans?.prefill && request.phasePlans.decode ? undefined : planDefaultRoute(request, prefillTopology);
+    prefillPlan = request.phasePlans?.prefill ?? basePlan!;
+    decodePlan = request.phasePlans?.decode ?? basePlan!;
   } else {
     prefillPlan =
       request.phasePlans?.prefill ?? planDefaultRoute(request, prefillTopology);
@@ -1401,9 +1403,8 @@ function buildVirtualStages(
         endpoint: { ...member.endpoint },
       },
       members: [member],
-      ...(stage.macroWave
-        ? { macroWave: structuredClone(stage.macroWave) }
-        : {}),
+      ...(stage.dense !== undefined ? { dense: structuredClone(stage.dense) } : {}),
+      ...(stage.macroWave ? { macroWave: structuredClone(stage.macroWave) } : {}),
       memoryBytes: metrics.memoryBytes,
       memoryLimitBytes: metrics.memoryLimitBytes,
     };
@@ -1447,9 +1448,7 @@ function runtimePhasePlanId(
       activationCodec: plan.activationCodec,
       transport: plan.transport,
       microBatchSize: plan.microBatchSize,
-      macroWave: plan.macroWave
-        ? runtimeMacroWavePlanIdentity(plan.macroWave)
-        : null,
+      macroWave: plan.macroWave ? runtimeMacroWavePlanIdentity(plan.macroWave) : null,
       ...(plan.phase === "prefill"
         ? { chunkTokens: plan.chunkTokens }
         : {
@@ -1516,6 +1515,7 @@ function runtimeStageIdentity(stage: RuntimeVirtualStageManifest): object {
       endpoint: runtimeEndpointIdentity(stage.anchor.endpoint),
     },
     members: stage.members.map(runtimeMemberIdentity),
+    ...(stage.dense !== undefined ? { dense: denseStagePolicyIdentity(stage.dense) } : {}),
     ...(stage.execution
       ? { execution: runtimeCellExecutionIdentity(stage.execution) }
       : {}),
@@ -1732,6 +1732,7 @@ function sameExecutionRoute(
       stage.anchor.memberId === other.anchor.memberId &&
       endpointEquals(stage.anchor.endpoint, other.anchor.endpoint) &&
       stageExecutionEquals(stage.execution, other.execution) &&
+      denseStagePolicyIdentity(stage.dense) === denseStagePolicyIdentity(other.dense) &&
       macroWaveStageEquals(stage.macroWave, other.macroWave) &&
       stage.members.length === other.members.length &&
       stage.members.every((member, memberIndex) => {
@@ -1835,10 +1836,8 @@ function macroWaveStageEquals(
   right: MacroWaveStageExecutionContractV1 | undefined,
 ): boolean {
   if (left === undefined || right === undefined) return left === right;
-  return (
-    JSON.stringify(runtimeMacroWaveStageIdentity(left)) ===
-    JSON.stringify(runtimeMacroWaveStageIdentity(right))
-  );
+  return JSON.stringify(runtimeMacroWaveStageIdentity(left)) ===
+    JSON.stringify(runtimeMacroWaveStageIdentity(right));
 }
 
 function validateRuntimePipelineManifestV1(manifest: Record<string, unknown>): void {
@@ -2049,6 +2048,7 @@ function validatePhasePlan(
     if (stageMemory !== assignedMemory) throw new Error("runtime_stage_memory_sum_mismatch");
     if (stageLimit !== memoryLimit) throw new Error("runtime_stage_limit_sum_mismatch");
     if (stageMemory > stageLimit) throw new Error("runtime_stage_memory_exceeded");
+    validateDenseStagePolicy(stage as unknown as RuntimeVirtualStageManifest);
     const stageExecution = stage.macroWave as unknown;
     if (isRecord(stageExecution) && stageExecution.mode === "macro-wave-memory") {
       const macro = stageExecution as unknown as MacroWaveStageExecutionContractV1;

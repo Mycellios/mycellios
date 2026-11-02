@@ -6,6 +6,12 @@ export interface ArchitectureSource {
   content: string;
 }
 
+/** Agent owns a separate npm workspace and compiler; cross-workspace imports
+ * remain checked by the repository-wide component-boundary gate. */
+export function belongsToNativeArchitecture(portablePath: string): boolean {
+  return !portablePath.replaceAll("\\", "/").replace(/^\.\//u, "").startsWith("src/agent/");
+}
+
 export interface ModuleSizeBudget {
   schema: "mycellios-module-size-budget/2";
   defaultMaximumLines: number;

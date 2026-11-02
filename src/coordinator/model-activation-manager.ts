@@ -1,3 +1,6 @@
+import { AsyncTaskScope } from "../core/async-task-scope.js";
+import type { RootRecoveryProbe } from "../distribution/activation-recovery-probe.js";
+import type { WarmRouteRecoveryLease } from "./warm-route-recovery.js";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import type { NativeBuildIdentity } from "../contracts/build-identity.js";
@@ -21,6 +24,7 @@ import {
 } from "../distribution/python-launcher.js";
 import type { ResolvedDraftStrategy } from "../distribution/draft-strategy-registry.js";
 import type { ModelActivationProgressEvent, ModelExecutionCapacityNode } from "./model-catalog.js";
+import { compileMeasuredModelActivation, compilePinnedActivationCalibration, selectMeasuredModelActivation, type MeasuredModelActivationEvidence } from "./measured-model-activation.js";
 
 export type AutomaticModelRunner = (
   config: AutoDistributionConfig,
@@ -31,8 +35,9 @@ export interface ModelActivationManager {
   initialize(): Promise<void>;
   refresh(): Promise<void>;
   capacityNodesForModel(modelId: string): readonly ModelExecutionCapacityNode[];
-  activationProgressForModel?(modelId: string): readonly ModelActivationProgressEvent[];
+  activationProgressForModel?(modelId: string): readonly ModelActivationProgressEvent[] | Promise<readonly ModelActivationProgressEvent[]>;
   isManaging(modelId: string): boolean;
+  recoveryLeaseForModel?(modelId: string): WarmRouteRecoveryLease | null;
   isBusy(): boolean;
   activate(model: StoredRequestedModel): Promise<void>;
   deactivate(modelId: string): Promise<boolean>;
@@ -60,12 +65,34 @@ export interface DynamicActivationPreparedRoute {
   generation: number;
 }
 
+export interface DynamicActivationRecoveryContext {
+  readonly result: AutoDistributionRunResult;
+  readonly startedAt: number;
+  isCurrent(): boolean;
+  inspectRoot: RootRecoveryProbe;
+}
+
 export interface DynamicModelActivationManagerOptions {
-  snapshot(): DynamicActivationSnapshot;
+  createRecoveryLease?(modelId: string,
+    context: DynamicActivationRecoveryContext): WarmRouteRecoveryLease | null | Promise<WarmRouteRecoveryLease | null>;
+  /** Operator-only bootstrap for real measurements; never a qualified fastest route. */
+  calibrationCandidateId?: string;
+  /** Candidate provider runs before default planning, including oversized models. */
+  measuredCandidateEvidence?(
+    modelId: string,
+    config: AutoDistributionConfig,
+    profile: import("../distribution/auto-distribute.js").CompiledModelProfile,
+  ): Promise<MeasuredModelActivationEvidence | null>;
+  /** Internal verified evidence provider; never accept raw public client receipts. */
+  measuredRouteEvidence?(
+    modelId: string,
+    compilation: import("../distribution/auto-distribute.js").AutoDistributionCompilation,
+  ): Promise<MeasuredModelActivationEvidence | null>;
+  snapshot(): DynamicActivationSnapshot | Promise<DynamicActivationSnapshot>;
   resolveManagedAgent(
     nodeId: string,
     launch: import("../distribution/python-launcher.js").PythonPipelineLaunchDescription,
-  ): import("../distribution/launch-supervisor.js").LaunchAgent | undefined;
+  ): import("../distribution/launch-supervisor.js").LaunchAgent | undefined | Promise<import("../distribution/launch-supervisor.js").LaunchAgent | undefined>;
   /** Resolve only pinned, verified strategy grants; raw catalog data is forbidden. */
   resolveDraftStrategyAuthority?(
     launch: PythonPipelineLaunchDescription,
@@ -74,8 +101,8 @@ export interface DynamicModelActivationManagerOptions {
   environment?: NodeJS.ProcessEnv;
   workerBuildIdentity?: NativeBuildIdentity;
   workerAgentVersion?: string;
-  loadProgress?(modelId: string): readonly ModelActivationProgressEvent[];
-  onProgress?(modelId: string, event: ModelActivationProgressEvent): void;
+  loadProgress?(modelId: string): readonly ModelActivationProgressEvent[] | Promise<readonly ModelActivationProgressEvent[]>;
+  onProgress?(modelId: string, event: ModelActivationProgressEvent): void | Promise<void>;
   onPlanPrepared?(
     modelId: string,
     stages: readonly DynamicActivationRouteStage[],
@@ -242,10 +269,12 @@ export class AutomaticModelActivationManager implements ModelActivationManager {
 /** Activation manager backed by the shard executors currently connected to the coordinator. */
 export class DynamicModelActivationManager implements ModelActivationManager {
   private closed = false;
+  private recoveryLease: WarmRouteRecoveryLease | null = null;
   private current: DynamicActivationSnapshot = { capacityNodes: [], config: null };
   private activeModelId: string | null = null;
   private activeAbort: AbortController | null = null;
   private activePromise: Promise<void> | null = null;
+  private readonly progressWrites = new AsyncTaskScope((_task, error) => { console.error("activation_progress_persistence_failed", error); this.activeAbort?.abort(new Error("activation_progress_persistence_failed")); });
   private readonly progress = new Map<string, ModelActivationProgressEvent[]>();
 
   constructor(private readonly options: DynamicModelActivationManagerOptions) {}
@@ -253,7 +282,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
   async initialize(): Promise<void> { await this.refresh(); }
 
   async refresh(): Promise<void> {
-    this.current = this.options.snapshot();
+    this.current = await this.options.snapshot();
   }
 
   capacityNodesForModel(modelId: string): readonly ModelExecutionCapacityNode[] {
@@ -266,12 +295,17 @@ export class DynamicModelActivationManager implements ModelActivationManager {
     return this.activeModelId === modelId && this.activePromise !== null;
   }
 
+  recoveryLeaseForModel(modelId: string): WarmRouteRecoveryLease | null {
+    return this.isManaging(modelId) && this.recoveryLease?.isCurrent()
+      ? this.recoveryLease : null;
+  }
+
   isBusy(): boolean { return this.activePromise !== null; }
 
-  activationProgressForModel(modelId: string): readonly ModelActivationProgressEvent[] {
+  async activationProgressForModel(modelId: string): Promise<readonly ModelActivationProgressEvent[]> {
     const cached = this.progress.get(modelId);
     if (cached) return cached.map((event) => ({ ...event }));
-    const restored = this.options.loadProgress?.(modelId).map((event) => ({ ...event })) ?? [];
+    const restored = (await this.options.loadProgress?.(modelId))?.map((event) => ({ ...event })) ?? [];
     if (restored.length > 0) this.progress.set(modelId, restored.slice(-100));
     return restored;
   }
@@ -283,7 +317,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
     this.progress.set(model.id, []);
     this.appendProgress(model.id, "queued", "Activation accepted by the coordinator.");
     const base = this.current.config;
-    if (!base) {
+    if (!base || base.nodes.length < model.minimumNodes) {
       const error = new Error("distributed_activation_requires_two_connected_shard_executors");
       this.appendProgress(
         model.id,
@@ -310,6 +344,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
       artifactsDirectory: modelArtifactsDirectory(base, model.id),
     });
     const controller = new AbortController();
+    const recoveryStartedAt = Date.now();
     this.activeModelId = model.id;
     this.activeAbort = controller;
     const cwd = this.options.cwd ?? process.cwd();
@@ -332,7 +367,30 @@ export class DynamicModelActivationManager implements ModelActivationManager {
         },
       );
       if (controller.signal.aborted) return;
-      let compilation = compileAutoDistribution(config, profile);
+      // Profiling may outlive a resource release, heartbeat or owner disconnect.
+      // Rebuild from current coordinator observations while retaining this request.
+      await this.refresh();
+      const fresh = this.current.config;
+      if (!fresh || fresh.nodes.length < model.minimumNodes) {
+        throw new Error("distributed_activation_requires_two_connected_shard_executors");
+      }
+      config = parseAutoDistributionConfig({
+        ...structuredClone(fresh),
+        model: structuredClone(config.model),
+        distribution: {
+          ...structuredClone(config.distribution),
+          maximumStages: Math.max(model.minimumNodes,
+            Math.min(fresh.distribution.maximumStages, fresh.nodes.length)),
+        },
+        workload: structuredClone(config.workload),
+        artifactsDirectory: config.artifactsDirectory,
+      });
+      const calibrated = await this.options.measuredCandidateEvidence?.(model.id, structuredClone(config), structuredClone(profile));
+      let compilation = calibrated
+        ? this.options.calibrationCandidateId
+          ? compilePinnedActivationCalibration(config, profile, calibrated, this.options.calibrationCandidateId)
+          : await compileMeasuredModelActivation(config, profile, calibrated, cwd, environment)
+        : compileAutoDistribution(config, profile);
       const rootHost = compilation.manifest.plans.decode.stages[0]?.anchor.endpoint.host;
       if (
         rootHost
@@ -350,6 +408,9 @@ export class DynamicModelActivationManager implements ModelActivationManager {
         compilation = compileAutoDistribution(config, profile);
       }
       await writeAutoDistributionArtifacts(config, compilation, cwd);
+      const measured = await this.options.measuredRouteEvidence?.(model.id, compilation);
+      if (controller.signal.aborted) return;
+      if (measured) compilation = await selectMeasuredModelActivation(compilation, measured, cwd, environment);
       const reservationStages = routeStagesForReservation(config, compilation);
       const preparedRoute = this.options.onPlanPrepared
         ? await this.options.onPlanPrepared(
@@ -401,7 +462,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
       );
       if (controller.signal.aborted) return;
       const activation = runAutoDistribution(config, compilation, cwd, environment, controller.signal, {
-        resolveManagedAgent: (nodeId, launch) => this.options.resolveManagedAgent(nodeId, launch),
+        resolveManagedAgent: async (nodeId, launch) => (await this.options.resolveManagedAgent(nodeId, launch)),
         onProgress: (event) => this.appendRuntimeProgress(model.id, event),
         ...(this.options.workerBuildIdentity
           ? { workerBuildIdentity: this.options.workerBuildIdentity }
@@ -409,17 +470,22 @@ export class DynamicModelActivationManager implements ModelActivationManager {
         ...(this.options.workerAgentVersion
           ? { workerAgentVersion: this.options.workerAgentVersion }
           : {}),
-        ...(this.options.onActivated
-          ? {
-              onActivated: (result: AutoDistributionRunResult) =>
-                this.options.onActivated!(model.id, routeReservationId, result),
-            }
-          : {}),
+        onActivated: async (result: AutoDistributionRunResult, inspectRoot?: RootRecoveryProbe) => {
+          await this.progressWrites.drain();
+          await this.options.onActivated?.(model.id, routeReservationId, result);
+          if (this.closed || controller.signal.aborted || this.activeAbort !== controller) return;
+          this.recoveryLease = inspectRoot && this.options.createRecoveryLease
+            ? await this.options.createRecoveryLease(model.id, {
+                result, startedAt: recoveryStartedAt, inspectRoot,
+                isCurrent: () => !this.closed && !controller.signal.aborted
+                  && this.activeAbort === controller && this.isManaging(model.id),
+              }) : null;
+        },
       });
       await (routeReservationId && this.options.onPlanHeartbeat
         ? runWithReservationHeartbeat(
             activation,
-            () => this.options.onPlanHeartbeat!(model.id, routeReservationId),
+            async () => (await this.options.onPlanHeartbeat!(model.id, routeReservationId)),
             this.options.reservationHeartbeatMs ?? 30_000,
             (error) => controller.abort(error),
           )
@@ -429,10 +495,12 @@ export class DynamicModelActivationManager implements ModelActivationManager {
       throw error;
     });
     this.activePromise = running.finally(async () => {
-      await this.options.onStopped?.(model.id);
-      this.activePromise = null;
-      this.activeModelId = null;
-      this.activeAbort = null;
+      this.recoveryLease = null;
+      try { await this.progressWrites.drain(); }
+      finally {
+        try { await this.options.onStopped?.(model.id); }
+        finally { this.activePromise = null; this.activeModelId = null; this.activeAbort = null; }
+      }
     });
     return this.activePromise;
   }
@@ -466,7 +534,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
     const event = { phase, message, at: new Date().toISOString(), state, ...context };
     events.push(event);
     this.progress.set(modelId, events.slice(-100));
-    this.options.onProgress?.(modelId, { ...event });
+    this.progressWrites.run("activation-progress", () => this.options.onProgress?.(modelId, { ...event }), modelId);
   }
 
   private failProgress(modelId: string, message: string): void {
@@ -482,12 +550,13 @@ export class DynamicModelActivationManager implements ModelActivationManager {
     };
     events.push(event);
     this.progress.set(modelId, events.slice(-100));
-    this.options.onProgress?.(modelId, { ...event });
+    this.progressWrites.run("activation-progress", () => this.options.onProgress?.(modelId, { ...event }), modelId);
   }
 
   async deactivate(modelId: string): Promise<boolean> {
     if (!this.isManaging(modelId)) return false;
     const running = this.activePromise;
+    this.recoveryLease = null;
     this.activeAbort?.abort(new Error(`automatic_model_deactivated:${modelId}`));
     if (running) await running.catch(() => undefined);
     return true;
@@ -496,6 +565,7 @@ export class DynamicModelActivationManager implements ModelActivationManager {
   async close(): Promise<void> {
     this.closed = true;
     if (this.activeModelId) await this.deactivate(this.activeModelId);
+    await this.progressWrites.close();
   }
 }
 

@@ -12,13 +12,13 @@ import type { NetworkExecutionTrace } from "../src/contracts/types.js";
 const sha = (character: string) => `sha256:${character.repeat(64)}` as const;
 
 describe("durable redacted execution topology", () => {
-  it("persists a receipt-bound projection across restart without internal identities", () => {
+  it("persists a receipt-bound projection across restart without internal identities", async () => {
     const directory = mkdtempSync(join(tmpdir(), "mycellios-topology-"));
     const path = join(directory, "mesh.db");
     const keys = generateKeyPairSync("ed25519");
-    let database = new MeshDatabase(path);
+    let database = (await MeshDatabase.open(path));
     const jobs = new MeshStore(database);
-    jobs.createJob({ id: "job-topology", sessionId: "session", model: "qwen", workloadClass: "interactive", deadlineAt: 5_000 });
+    (await jobs.createJob({ id: "job-topology", sessionId: "session", model: "qwen", workloadClass: "interactive", deadlineAt: 5_000 }));
     const trace = fixtureTrace();
     const receipts = new ExecutionReceiptStore(database, { keyId: "key", privateKey: keys.privateKey });
     const body = { schema: "mycellios-execution-receipt/1" as const, jobId: trace.jobId,
@@ -26,34 +26,34 @@ describe("durable redacted execution topology", () => {
       metrics: { inputTokens: 2, outputTokens: 1, ttftMs: 10, activeMs: 20 },
       networkTraceDigest: sha256CanonicalEvidence(trace), recovery: { mode: "none" as const, attempts: 1, replayedTokenEvents: 0 },
       privacy: { trust: "default" as const, boundary: "trusted-edges" as const, pinnedIdentityHashes: [] }, completedAt: 1_000 };
-    const receipt = receipts.record(body, { trace, regionForWorker: (workerId) => workerId === "private-worker-a" ? "Madrid" : "10.0.0.7/private" });
-    expect(receipts.record(body, { trace, regionForWorker: (workerId) => workerId === "private-worker-a" ? "Madrid" : "10.0.0.7/private" })).toEqual(receipt);
-    const topology = receipts.topologyForJob(trace.jobId)!;
+    const receipt = (await receipts.record(body, { trace, regionForWorker: (workerId) => workerId === "private-worker-a" ? "Madrid" : "10.0.0.7/private" }));
+    expect((await receipts.record(body, { trace, regionForWorker: (workerId) => workerId === "private-worker-a" ? "Madrid" : "10.0.0.7/private" }))).toEqual(receipt);
+    const topology = (await receipts.topologyForJob(trace.jobId))!;
     expect(topology).toMatchObject({ receiptId: receipt.receiptId, traceDigest: receipt.networkTraceDigest,
       classification: "physical", stages: [{ alias: "stage-0", region: "Madrid" }, { alias: "stage-1", region: "undisclosed" }],
       boundaries: [{ transport: "direct", physicalBoundary: true }] });
     const serialized = JSON.stringify(topology);
     for (const secret of ["private-worker-a", "private-worker-b", "private-node", "private-deployment", "10.0.0.7"]) expect(serialized).not.toContain(secret);
-    database.close();
-    database = new MeshDatabase(path);
-    expect(new ExecutionReceiptStore(database, { keyId: "key", privateKey: keys.privateKey }).topologyForJob(trace.jobId)).toEqual(topology);
-    database.close();
+    (await database.close());
+    database = (await MeshDatabase.open(path));
+    expect((await new ExecutionReceiptStore(database, { keyId: "key", privateKey: keys.privateKey }).topologyForJob(trace.jobId))).toEqual(topology);
+    (await database.close());
     rmSync(directory, { recursive: true, force: true });
   });
 
-  it("rejects a trace that is not the one sealed by the receipt", () => {
-    const database = new MeshDatabase(":memory:");
-    new MeshStore(database).createJob({ id: "job-topology", sessionId: "session", model: "qwen", workloadClass: "interactive", deadlineAt: 5_000 });
+  it("rejects a trace that is not the one sealed by the receipt", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
+    (await new MeshStore(database).createJob({ id: "job-topology", sessionId: "session", model: "qwen", workloadClass: "interactive", deadlineAt: 5_000 }));
     const keys = generateKeyPairSync("ed25519");
     const receipts = new ExecutionReceiptStore(database, { keyId: "key", privateKey: keys.privateKey });
     const trace = fixtureTrace();
-    expect(() => receipts.record({ schema: "mycellios-execution-receipt/1", jobId: trace.jobId,
+    expect(async () => (await receipts.record({ schema: "mycellios-execution-receipt/1", jobId: trace.jobId,
       modelIdHash: sha("a"), routeClass: "pipeline", metrics: { inputTokens: 1, outputTokens: 1, ttftMs: 1, activeMs: 1 },
       networkTraceDigest: sha("f"), recovery: { mode: "none", attempts: 1, replayedTokenEvents: 0 },
       privacy: { trust: "default", boundary: "trusted-edges", pinnedIdentityHashes: [] }, completedAt: 1 },
-    { trace, regionForWorker: () => null })).toThrow("execution_topology_trace_digest_mismatch");
-    expect(receipts.forJob(trace.jobId)).toBeNull();
-    database.close();
+    { trace, regionForWorker: () => null }))).toThrow("execution_topology_trace_digest_mismatch");
+    expect((await receipts.forJob(trace.jobId))).toBeNull();
+    (await database.close());
   });
 });
 

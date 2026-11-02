@@ -132,14 +132,14 @@ describe("requested model capacity catalog", () => {
     expect(profile.incompatibilityReason).toContain("mistral");
   });
 
-  it("reports exact missing memory and node counts, then queues activation at zero deficit", () => {
+  it("reports exact missing memory and node counts, then queues activation at zero deficit", async () => {
     const request = requestedModel(profileFixture(6_000, 1_000));
-    const waiting = requestedModelCapacityViews({
+    const waiting = (await requestedModelCapacityViews({
       requests: [request],
       workers: [worker("a", 1_500, 1_000), worker("b", 2_048, 0)],
       connectedWorkerIds: new Set(["a", "b"]),
       activeModelIds: new Set(),
-    })[0]!;
+    }))[0]!;
 
     expect(waiting.status).toBe("waiting_capacity");
     expect(waiting.availableNodes).toBe(1);
@@ -149,31 +149,31 @@ describe("requested model capacity catalog", () => {
     expect(waiting.message).toContain("3952 MiB");
     expect(waiting.message).toContain("1 more compatible node");
 
-    const ready = requestedModelCapacityViews({
+    const ready = (await requestedModelCapacityViews({
       requests: [request],
       workers: [worker("a", 4_096, 0), worker("b", 4_096, 0)],
       connectedWorkerIds: new Set(["a", "b"]),
       activeModelIds: new Set(),
-    })[0]!;
+    }))[0]!;
     expect(ready.status).toBe("activating");
     expect(ready.missingNodes).toBe(0);
     expect(ready.missingVramMiB).toBe(0);
     expect(shouldQueueAutomaticActivation(ready)).toBe(true);
 
-    const oneRealExecutor = requestedModelCapacityViews({
+    const oneRealExecutor = (await requestedModelCapacityViews({
       requests: [request],
       workers: [],
       connectedWorkerIds: new Set(),
       activeModelIds: new Set(),
       executionNodesForModel: () => [{ id: "desktop-only", availableVramMiB: 16_384 }],
       activationAvailable: true,
-    })[0]!;
+    }))[0]!;
     expect(oneRealExecutor.status).toBe("waiting_capacity");
     expect(oneRealExecutor.availableNodes).toBe(1);
     expect(oneRealExecutor.missingNodes).toBe(1);
     expect(shouldQueueAutomaticActivation(oneRealExecutor)).toBe(false);
 
-    const active = requestedModelCapacityViews({
+    const active = (await requestedModelCapacityViews({
       requests: [{
         ...request,
         activationRequestedAt: Date.now(),
@@ -201,22 +201,22 @@ describe("requested model capacity catalog", () => {
         stageId: null,
         processExitCode: null,
       }),
-    })[0]!;
+    }))[0]!;
     expect(active.status).toBe("active");
     expect(active.activationIncident).toBeNull();
   });
 
-  it("fails closed instead of activating a profile from another adapter registry", () => {
+  it("fails closed instead of activating a profile from another adapter registry", async () => {
     const staleProfile = {
       ...profileFixture(2_000, 500),
       adapterRegistryId: `sha256:${"0".repeat(64)}`,
     };
-    const view = requestedModelCapacityViews({
+    const view = (await requestedModelCapacityViews({
       requests: [requestedModel(staleProfile)],
       workers: [worker("a", 4_096, 0), worker("b", 4_096, 0)],
       connectedWorkerIds: new Set(["a", "b"]),
       activeModelIds: new Set(),
-    })[0]!;
+    }))[0]!;
 
     expect(view.status).toBe("profiling");
     expect(view.compatible).toBeNull();

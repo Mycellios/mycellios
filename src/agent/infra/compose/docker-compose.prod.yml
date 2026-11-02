@@ -289,8 +289,8 @@ services:
     # yet. Once a release is published, pin RAKAZO_IMAGE_TAG to it and the pull path takes over.
     image: ${RAKAZO_IMAGE:-ghcr.io/elie222/rakazo/app}:${RAKAZO_IMAGE_TAG:-local}
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-}
     restart: unless-stopped
@@ -300,7 +300,7 @@ services:
     command:
       - bash
       - -lc
-      - pnpm db:deploy && exec env -u DATABASE_MIGRATION_URL node --enable-source-maps dist/index.js
+      - npm run db:deploy && exec env -u DATABASE_MIGRATION_URL node --enable-source-maps dist/index.js
     init: true
     logging: *logging
     security_opt:
@@ -384,8 +384,8 @@ services:
   worker:
     image: ${RAKAZO_IMAGE:-ghcr.io/elie222/rakazo/app}:${RAKAZO_IMAGE_TAG:-local}
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-}
     restart: unless-stopped
@@ -423,8 +423,8 @@ services:
   web:
     image: ${RAKAZO_IMAGE:-ghcr.io/elie222/rakazo/app}:${RAKAZO_IMAGE_TAG:-local}
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-}
     restart: unless-stopped
@@ -471,7 +471,7 @@ services:
 
   # The updater holds the Docker socket, which is root-equivalent on the host, so it is opt-in and
   # deliberately the narrowest service here: no `ports` (nothing on the host), only the dedicated
-  # `control` network shared with the API, and no `env_file` — secrets stay in the bind-mounted
+  # `control` network shared with the API, and no `env_file` â€” secrets stay in the bind-mounted
   # `.env` that Compose reads for interpolation, not in this process. Caddy has no route to it. The
   # API reaches it as http://updater:7092 with the shared token. It is also the one service the
   # update never recreates, because it is the process performing the update.
@@ -481,8 +481,8 @@ services:
     # its own version is an operator action, not something an update can do underneath itself.
     image: ${RAKAZO_UPDATER_IMAGE:-ghcr.io/elie222/rakazo/updater}:${RAKAZO_UPDATER_IMAGE_TAG:-local}
     build:
-      context: ../..
-      dockerfile: infra/updater/Dockerfile
+      context: ../../../..
+      dockerfile: src/agent/infra/updater/Dockerfile
       args:
         GIT_SHA: ${GIT_SHA:-}
     restart: unless-stopped

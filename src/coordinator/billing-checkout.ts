@@ -104,11 +104,11 @@ export class BillingCheckoutService {
   async createSubscription(input: {
     userId: string; email: string | null; idempotencyKey: string;
   }): Promise<BillingCheckoutResult> {
-    const plan = this.billing.getPlan(this.config.planId, this.config.planVersion);
+    const plan = (await this.billing.getPlan(this.config.planId, this.config.planVersion));
     if (!plan || plan.status !== "active") {
       throw new BillingCheckoutError("billing_plan_not_active", "The configured subscription plan is not active.", 503);
     }
-    const subscription = this.billing.getSubscription(input.userId);
+    const subscription = (await this.billing.getSubscription(input.userId));
     if (subscription && subscription.status !== "cancelled") {
       throw new BillingCheckoutError(
         "subscription_already_exists",
@@ -118,13 +118,13 @@ export class BillingCheckoutService {
         409,
       );
     }
-    const resumable = this.resumableSubscriptionCheckout(input.userId);
+    const resumable = (await this.resumableSubscriptionCheckout(input.userId));
     if (resumable) return { ...resumable, duplicate: true };
-    const operation = this.beginOperation(input.userId, input.idempotencyKey, "subscription", {
+    const operation = (await this.beginOperation(input.userId, input.idempotencyKey, "subscription", {
       planId: plan.planId,
       planVersion: plan.version,
       priceId: this.config.subscriptionPriceId,
-    });
+    }));
     const completed = completedResult(operation);
     if (completed) return completed;
     const customerId = await this.customerFor(input.userId, input.email);
@@ -137,26 +137,26 @@ export class BillingCheckoutService {
       cancelUrl: this.config.cancelUrl,
       idempotencyKey: providerOperationKey(operation.id),
     });
-    return this.completeOperation(operation, session);
+    return (await this.completeOperation(operation, session));
   }
 
-  hasCustomer(userId: string): boolean {
-    return Boolean(this.database.raw.prepare(
+  async hasCustomer(userId: string): Promise<boolean> {
+    return Boolean((await this.database.raw.prepare(
       "SELECT 1 AS found FROM billing_customers WHERE provider = 'stripe' AND user_id = ?",
-    ).get(userId));
+    ).get(userId)));
   }
 
   hasTopUpPacks(): boolean {
     return this.packs.size > 0;
   }
 
-  private resumableSubscriptionCheckout(userId: string): StripeCheckoutSessionResult | null {
-    const row = this.database.raw.prepare(
+  private async resumableSubscriptionCheckout(userId: string): Promise<StripeCheckoutSessionResult | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT provider_session_id, provider_url, created_at
        FROM billing_checkout_operations
        WHERE user_id = ? AND kind = 'subscription' AND status = 'completed'
        ORDER BY created_at DESC, id DESC LIMIT 1`,
-    ).get(userId) as {
+    ).get(userId)) as {
       provider_session_id: string | null; provider_url: string | null; created_at: number;
     } | undefined;
     if (!row?.provider_session_id || !row.provider_url) return null;
@@ -172,7 +172,7 @@ export class BillingCheckoutService {
   }): Promise<BillingCheckoutResult> {
     const pack = this.packs.get(input.packId);
     if (!pack) throw new BillingCheckoutError("topup_pack_not_found", "The selected top-up pack is unavailable.", 404);
-    const operation = this.beginOperation(input.userId, input.idempotencyKey, "topup", { packId: input.packId });
+    const operation = (await this.beginOperation(input.userId, input.idempotencyKey, "topup", { packId: input.packId }));
     const completed = completedResult(operation);
     if (completed) return completed;
     const quoteId = operation.quote_id ?? deterministicQuoteId(operation.id);
@@ -181,18 +181,18 @@ export class BillingCheckoutService {
     if (now >= expiresAt) {
       throw new BillingCheckoutError("checkout_operation_expired", "The pending top-up checkout has expired.", 409);
     }
-    this.billing.createTopUpQuote({
+    (await this.billing.createTopUpQuote({
       quoteId,
       userId: input.userId,
       amountMicros: pack.amountMicros,
       currency: pack.currency,
       tokenAmount: pack.tokenAmount,
       expiresAt,
-    });
+    }));
     if (!operation.quote_id) {
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         "UPDATE billing_checkout_operations SET quote_id = ?, updated_at = ? WHERE id = ? AND quote_id IS NULL",
-      ).run(quoteId, now, operation.id);
+      ).run(quoteId, now, operation.id));
       operation.quote_id = quoteId;
     }
     const customerId = await this.customerFor(input.userId, input.email);
@@ -206,15 +206,15 @@ export class BillingCheckoutService {
       cancelUrl: this.config.cancelUrl,
       idempotencyKey: providerOperationKey(operation.id),
     });
-    return this.completeOperation(operation, session, quoteId);
+    return (await this.completeOperation(operation, session, quoteId));
   }
 
   async createPortal(input: {
     userId: string; email: string | null; idempotencyKey: string;
   }): Promise<BillingCheckoutResult> {
-    const operation = this.beginOperation(input.userId, input.idempotencyKey, "portal", {
+    const operation = (await this.beginOperation(input.userId, input.idempotencyKey, "portal", {
       returnUrl: this.config.portalReturnUrl,
-    });
+    }));
     const completed = completedResult(operation);
     if (completed) return completed;
     const customerId = await this.customerFor(input.userId, input.email);
@@ -223,22 +223,22 @@ export class BillingCheckoutService {
       returnUrl: this.config.portalReturnUrl,
       idempotencyKey: providerOperationKey(operation.id),
     });
-    return this.completeOperation(operation, session);
+    return (await this.completeOperation(operation, session));
   }
 
-  private beginOperation(
+  private async beginOperation(
     userId: string,
     idempotencyKey: string,
     kind: "subscription" | "topup" | "portal",
     economicInput: object,
-  ): OperationRow {
+  ): Promise<OperationRow> {
     validateIdempotencyKey(idempotencyKey);
     const digest = createHash("sha256").update(JSON.stringify([kind, economicInput])).digest("hex");
-    return this.database.transaction(() => {
-      const existing = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      const existing = (await this.database.raw.prepare(
         `SELECT id, request_digest, quote_id, status, provider_session_id, provider_url, created_at
          FROM billing_checkout_operations WHERE user_id = ? AND idempotency_key = ?`,
-      ).get(userId, idempotencyKey) as OperationRow | undefined;
+      ).get(userId, idempotencyKey)) as OperationRow | undefined;
       if (existing) {
         if (existing.request_digest !== digest) {
           throw new BillingCheckoutError(
@@ -252,27 +252,27 @@ export class BillingCheckoutService {
       const now = this.config.now?.() ?? Date.now();
       const id = newId("checkout");
       // Ensure the FK account exists before reserving the operation key.
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT OR IGNORE INTO api_accounts(
            user_id, token_balance, usd_micros, created_at, updated_at
          ) VALUES (?, 0, 0, ?, ?)`,
-      ).run(userId, now, now);
-      this.database.raw.prepare(
+      ).run(userId, now, now));
+      (await this.database.raw.prepare(
         `INSERT INTO billing_checkout_operations(
            id, user_id, idempotency_key, kind, request_digest, status, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      ).run(id, userId, idempotencyKey, kind, digest, now, now);
+      ).run(id, userId, idempotencyKey, kind, digest, now, now));
       return {
         id, request_digest: digest, quote_id: null, status: "pending",
         provider_session_id: null, provider_url: null, created_at: now,
       };
-    });
+    }));
   }
 
   private async customerFor(userId: string, email: string | null): Promise<string> {
-    const existing = this.database.raw.prepare(
+    const existing = (await this.database.raw.prepare(
       "SELECT provider_customer_id FROM billing_customers WHERE provider = 'stripe' AND user_id = ?",
-    ).get(userId) as { provider_customer_id: string } | undefined;
+    ).get(userId)) as { provider_customer_id: string } | undefined;
     if (existing) return existing.provider_customer_id;
     const created = await this.stripe.createCustomer({
       userId,
@@ -282,33 +282,33 @@ export class BillingCheckoutService {
     validateStripeId(created.id, "customer");
     const now = this.config.now?.() ?? Date.now();
     try {
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO billing_customers(provider, user_id, provider_customer_id, created_at, updated_at)
          VALUES ('stripe', ?, ?, ?, ?)`,
-      ).run(userId, created.id, now, now);
+      ).run(userId, created.id, now, now));
     } catch {
-      const raced = this.database.raw.prepare(
+      const raced = (await this.database.raw.prepare(
         "SELECT provider_customer_id FROM billing_customers WHERE provider = 'stripe' AND user_id = ?",
-      ).get(userId) as { provider_customer_id: string } | undefined;
+      ).get(userId)) as { provider_customer_id: string } | undefined;
       if (raced?.provider_customer_id === created.id) return created.id;
       throw new BillingCheckoutError("stripe_customer_conflict", "The Stripe customer mapping conflicts with this account.", 409);
     }
     return created.id;
   }
 
-  private completeOperation(
+  private async completeOperation(
     operation: OperationRow,
     session: StripeCheckoutSessionResult,
     quoteId?: string,
-  ): BillingCheckoutResult {
+  ): Promise<BillingCheckoutResult> {
     validateStripeId(session.id, "session");
     validateHttpsUrl(session.url);
     const now = this.config.now?.() ?? Date.now();
-    this.database.raw.prepare(
+    (await this.database.raw.prepare(
       `UPDATE billing_checkout_operations
        SET status = 'completed', provider_session_id = ?, provider_url = ?, updated_at = ?
        WHERE id = ? AND status = 'pending'`,
-    ).run(session.id, session.url, now, operation.id);
+    ).run(session.id, session.url, now, operation.id));
     return { ...session, ...(quoteId ? { quoteId } : {}), duplicate: false };
   }
 }

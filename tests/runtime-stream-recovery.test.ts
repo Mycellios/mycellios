@@ -7,8 +7,8 @@ import { classifyRuntimeLinkFailure } from "../src/contracts/runtime-link-failur
 const RECOVERY_TOKEN = "recovery_token_0123456789";
 
 describe("WorkerHub recoverable runtime streams", () => {
-  it("resumes from the peer-confirmed offset and ignores an idempotent duplicate", () => {
-    const { hub, sent, store } = recoveryHub(true);
+  it("resumes from the peer-confirmed offset and ignores an idempotent duplicate", async () => {
+    const { hub, sent, store } = (await recoveryHub(true));
     openRecoverableStream(hub);
     deliver(hub, "worker-b", "runtime.stream.opened", recoveryIdentity());
     sent.splice(0);
@@ -97,11 +97,11 @@ describe("WorkerHub recoverable runtime streams", () => {
       && String(message.payload.message).includes("runtime_stream_offset_mismatch:4:9")
     )).toBe(true);
     expect(runtimeStreamCount(hub)).toBe(0);
-    hub.close();
+    (await hub.close());
   });
 
-  it("downgrades a mixed v2 route before its first byte without claiming recovery", () => {
-    const legacy = recoveryHub(false);
+  it("downgrades a mixed v2 route before its first byte without claiming recovery", async () => {
+    const legacy = (await recoveryHub(false));
     openRecoverableStream(legacy.hub);
     expect(legacy.sent).toContainEqual(expect.objectContaining({
       workerId: "worker-b",
@@ -121,15 +121,15 @@ describe("WorkerHub recoverable runtime streams", () => {
       payload: { streamId: "legacy-stream", targetPort: 9_850 },
     }));
     expect(runtimeStreamCount(legacy.hub)).toBe(2);
-    legacy.hub.close();
+    (await legacy.hub.close());
   });
 });
 
-function recoveryHub(destinationSupportsRecovery: boolean): {
+async function recoveryHub(destinationSupportsRecovery: boolean): Promise<{
   hub: WorkerHub;
   sent: Array<{ workerId: string; type: string; payload: Record<string, unknown> }>;
   store: { setWorkerStatus: ReturnType<typeof vi.fn> };
-} {
+}> {
   const workers = [
     worker("worker-a", "node-a", true),
     worker("worker-b", "node-b", destinationSupportsRecovery),
@@ -139,7 +139,7 @@ function recoveryHub(destinationSupportsRecovery: boolean): {
     listWorkers: vi.fn(() => workers),
     setWorkerStatus: vi.fn(),
   };
-  const hub = new WorkerHub(store as unknown as MeshStore);
+  const hub = (await WorkerHub.create(store as unknown as MeshStore));
   const sent: Array<{ workerId: string; type: string; payload: Record<string, unknown> }> = [];
   vi.spyOn(hub, "isConnected").mockReturnValue(true);
   vi.spyOn(hub, "send").mockImplementation((workerId, type, payload) => {

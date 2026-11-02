@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import {
   analyzeArchitecture,
+  belongsToNativeArchitecture,
   type ArchitectureSource,
   type ModuleSizeBudget,
 } from "../src/program/architecture-health.js";
@@ -13,7 +14,7 @@ function trackedFiles(...patterns: string[]): string[] {
     ["ls-files", "--cached", "--others", "--exclude-standard", "--", ...patterns],
     { encoding: "utf8" },
   );
-  return output.trim().split("\n").filter(Boolean).sort();
+  return output.trim().split("\n").filter(Boolean).filter(belongsToNativeArchitecture).sort();
 }
 
 function readSources(files: readonly string[]): ArchitectureSource[] {

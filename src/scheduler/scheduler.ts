@@ -1,3 +1,4 @@
+import { flatMapAsync, mapAsync, filterAsync, everyAsync, someAsync } from "../core/async-collections.js";
 import type {
   ChatCompletionRequest,
   ExecutionRouteDecisionRecord,
@@ -79,30 +80,30 @@ export class Scheduler {
     private readonly evidence: SchedulerEvidenceOptions = {},
   ) {}
 
-  selectRoute(
+  async selectRoute(
     request: ChatCompletionRequest,
     sessionId: string,
     options: SchedulerOptions = {},
-  ): ScheduledRoute | null {
-    return this.selectExecutionRouteDecision(request, sessionId, options).selected?.route ?? null;
+  ): Promise<ScheduledRoute | null> {
+    return (await this.selectExecutionRouteDecision(request, sessionId, options)).selected?.route ?? null;
   }
 
-  isRouteCurrentlyEligible(
+  async isRouteCurrentlyEligible(
     request: ChatCompletionRequest,
     sessionId: string,
     route: ScheduledRoute,
     options: SchedulerOptions = {},
-  ): boolean {
+  ): Promise<boolean> {
     const candidateId = routeCandidateId(route);
-    return this.selectExecutionRouteDecision(request, sessionId, options)
+    return (await this.selectExecutionRouteDecision(request, sessionId, options))
       .evaluations.some((candidate) => candidate.candidateId === candidateId && candidate.eligible);
   }
 
-  selectExecutionRouteDecision(
+  async selectExecutionRouteDecision(
     request: ChatCompletionRequest,
     sessionId: string,
     options: SchedulerOptions = {},
-  ): ExecutionRouteDecision<ScheduledRoute> {
+  ): Promise<ExecutionRouteDecision<ScheduledRoute>> {
     const maxNormalizedCost = options.routePolicy?.maxNormalizedCost;
     if (
       maxNormalizedCost !== undefined
@@ -111,21 +112,21 @@ export class Scheduler {
       throw new RangeError("maxNormalizedCost must be a finite non-negative number");
     }
     const now = options.now ?? Date.now();
-    const workers = this.store
-      .listSchedulableWorkers(now)
+    const workers = (await this.store
+      .listSchedulableWorkers(now))
       .filter((worker) => !options.connectedWorkerIds || options.connectedWorkerIds.has(worker.id))
       .filter((worker) => !options.excludeWorkerIds?.has(worker.id));
 
-    const savedAffinity = this.store.getSessionRoute(sessionId, request.model);
+    const savedAffinity = (await this.store.getSessionRoute(sessionId, request.model));
     const affinity = savedAffinity
-      ? this.refreshSessionRoute(savedAffinity, request, workers, now, options.allowPipeline === true)
+      ? await this.refreshSessionRoute(savedAffinity, request, workers, now, options.allowPipeline === true)
       : null;
     const affinityEligible = Boolean(
       affinity
-      && !this.routeIsSaturated(affinity, workers)
+      && !(await this.routeIsSaturated(affinity, workers))
     );
 
-    const replicas = this.replicaCandidatesWithReasons(request, workers, now);
+    const replicas = await this.replicaCandidatesWithReasons(request, workers, now);
     const routes: ScheduledRoute[] = replicas.map((candidate) => ({
         routeClass: "replica",
         model: request.model,
@@ -141,7 +142,7 @@ export class Scheduler {
       ]),
     );
     if (options.allowPipeline) {
-      routes.push(...this.buildPipelineRoutes(request, workers, now));
+      routes.push(...(await this.buildPipelineRoutes(request, workers, now)));
     }
     if (affinityEligible && affinity) {
       routes.push({ ...affinity, affinityHit: false });
@@ -186,11 +187,11 @@ export class Scheduler {
     return decision;
   }
 
-  selectRoutePlan(
+  async selectRoutePlan(
     request: ChatCompletionRequest,
     sessionId: string,
     options: RoutePlanOptions = {},
-  ): ScheduledRoutePlan | null {
+  ): Promise<ScheduledRoutePlan | null> {
     const maxStandbyRoutes = options.maxStandbyRoutes ?? 2;
     if (!Number.isInteger(maxStandbyRoutes) || maxStandbyRoutes < 0 || maxStandbyRoutes > 8) {
       throw new RangeError("maxStandbyRoutes must be an integer between 0 and 8");
@@ -205,19 +206,19 @@ export class Scheduler {
       ...(options.routePolicy === undefined ? {} : { routePolicy: options.routePolicy }),
       excludeWorkerIds: excludedWorkerIds,
     };
-    const initialDecision = this.selectExecutionRouteDecision(request, sessionId, routeOptions);
+    const initialDecision = (await this.selectExecutionRouteDecision(request, sessionId, routeOptions));
     const primary = initialDecision.selected?.route;
     if (!primary) return null;
 
     const standbys: ScheduledRoute[] = [];
     this.excludeRouteWorkers(primary, excludedWorkerIds);
-    const candidateBudget = this.store.listSchedulableWorkers(options.now ?? Date.now()).length;
+    const candidateBudget = (await this.store.listSchedulableWorkers(options.now ?? Date.now())).length;
     for (
       let candidatesInspected = 0;
       candidatesInspected < candidateBudget && standbys.length < maxStandbyRoutes;
       candidatesInspected += 1
     ) {
-      const candidate = this.selectRoute(request, sessionId, routeOptions);
+      const candidate = (await this.selectRoute(request, sessionId, routeOptions));
       if (!candidate) break;
       this.excludeRouteWorkers(candidate, excludedWorkerIds);
       if (this.hasExactRecoveryContract(primary, candidate)) standbys.push(candidate);
@@ -225,10 +226,10 @@ export class Scheduler {
     return { primary, standbys, decision: decisionRecord(initialDecision, standbys) };
   }
 
-  listAvailableModels(options: SchedulerOptions = {}): AvailableModel[] {
+  async listAvailableModels(options: SchedulerOptions = {}): Promise<AvailableModel[]> {
     const now = options.now ?? Date.now();
-    const workers = this.store
-      .listSchedulableWorkers(now)
+    const workers = (await this.store
+      .listSchedulableWorkers(now))
       .filter((worker) => !options.connectedWorkerIds || options.connectedWorkerIds.has(worker.id));
     const models = new Map<
       string,
@@ -260,12 +261,12 @@ export class Scheduler {
     }));
   }
 
-  scoreWorker(
+  async scoreWorker(
     worker: StoredWorker,
     deployment: ModelDeployment,
     request: ChatCompletionRequest,
-  ): number {
-    const active = this.store.countActiveJobs(worker.id);
+  ): Promise<number> {
+    const active = (await this.store.countActiveJobs(worker.id));
     const capacity = Math.max(
       1,
       Math.min(worker.capabilities.limits.maxConcurrency, deployment.maxConcurrency),
@@ -306,29 +307,27 @@ export class Scheduler {
     );
   }
 
-  buildPipelineRoute(
+  async buildPipelineRoute(
     request: ChatCompletionRequest,
     workers: StoredWorker[],
     now = Date.now(),
-  ): ScheduledRoute | null {
-    return this.buildPipelineRoutes(request, workers, now)[0] ?? null;
+  ): Promise<ScheduledRoute | null> {
+    return (await this.buildPipelineRoutes(request, workers, now))[0] ?? null;
   }
 
-  private buildPipelineRoutes(
+  private async buildPipelineRoutes(
     request: ChatCompletionRequest,
     workers: StoredWorker[],
     now: number,
-  ): ScheduledRoute[] {
-    const candidates = workers.flatMap((worker) =>
-      worker.capabilities.deployments
-        .filter((deployment) => deployment.model === request.model && deployment.mode === "pipeline")
-        .filter((deployment) => this.isEligible(worker, deployment, request, now))
-        .map((deployment) => ({
-          worker,
-          deployment,
-          score: this.scoreWorker(worker, deployment, request),
-        })),
-    );
+  ): Promise<ScheduledRoute[]> {
+    const candidates: Candidate[] = [];
+    for (const worker of workers) {
+      for (const deployment of worker.capabilities.deployments) {
+        if (deployment.model !== request.model || deployment.mode !== "pipeline") continue;
+        if (!(await this.isEligible(worker, deployment, request, now))) continue;
+        candidates.push({worker, deployment, score: await this.scoreWorker(worker, deployment, request)});
+      }
+    }
     const totals = [...new Set(candidates.map((candidate) => candidate.deployment.stage?.total))]
       .filter((value): value is number => value !== undefined)
       .sort((left, right) => left - right);
@@ -400,46 +399,44 @@ export class Scheduler {
     );
   }
 
-  private replicaCandidatesWithReasons(
+  private async replicaCandidatesWithReasons(
     request: ChatCompletionRequest,
     workers: StoredWorker[],
     now: number,
-  ): EvaluatedCandidate[] {
-    return workers
-      .flatMap((worker) =>
-        worker.capabilities.deployments
-          .filter((deployment) => deployment.model === request.model && deployment.mode === "replica")
-          .map((deployment) => {
-            const rejectionReasons = this.eligibilityRejections(worker, deployment, request, now);
+  ): Promise<EvaluatedCandidate[]> {
+    return (await flatMapAsync(workers, async (worker) =>
+        (await mapAsync(worker.capabilities.deployments
+          .filter((deployment) => deployment.model === request.model && deployment.mode === "replica"), async (deployment) => {
+            const rejectionReasons = (await this.eligibilityRejections(worker, deployment, request, now));
             if (!this.internalPipelineDependenciesConnected(deployment, workers)) {
               rejectionReasons.push("candidate_not_ready");
             }
             return {
               worker,
               deployment,
-              score: this.scoreWorker(worker, deployment, request),
+              score: (await this.scoreWorker(worker, deployment, request)),
               rejectionReasons: [...new Set(rejectionReasons)],
             };
-          }),
-      )
+          })),
+      ))
       .sort((left, right) => left.score - right.score);
   }
 
-  private isEligible(
+  private async isEligible(
     worker: StoredWorker,
     deployment: ModelDeployment,
     request: ChatCompletionRequest,
     now = Date.now(),
-  ): boolean {
-    return this.eligibilityRejections(worker, deployment, request, now).length === 0;
+  ): Promise<boolean> {
+    return (await this.eligibilityRejections(worker, deployment, request, now)).length === 0;
   }
 
-  private eligibilityRejections(
+  private async eligibilityRejections(
     worker: StoredWorker,
     deployment: ModelDeployment,
     request: ChatCompletionRequest,
     now = Date.now(),
-  ): ExecutionRouteReasonCode[] {
+  ): Promise<ExecutionRouteReasonCode[]> {
     const reasons: ExecutionRouteReasonCode[] = [];
     if (worker.status !== "online") reasons.push("candidate_not_ready");
     if (deployment.freeSlots < 1) reasons.push("candidate_capacity_exhausted");
@@ -452,7 +449,7 @@ export class Scheduler {
       && estimateInputTokens(request) + (request.max_tokens ?? 256) > deployment.contextLimit) {
       reasons.push("candidate_context_exceeded");
     }
-    const active = this.store.countActiveJobs(worker.id);
+    const active = (await this.store.countActiveJobs(worker.id));
     const concurrency = Math.min(
       worker.capabilities.limits.maxConcurrency,
       deployment.maxConcurrency,
@@ -467,13 +464,13 @@ export class Scheduler {
     return [...new Set(reasons)];
   }
 
-  private refreshSessionRoute(
+  private async refreshSessionRoute(
     route: ScheduledRoute,
     request: ChatCompletionRequest,
     workers: StoredWorker[],
     now: number,
     allowPipeline: boolean,
-  ): ScheduledRoute | null {
+  ): Promise<ScheduledRoute | null> {
     if (route.model !== request.model || route.stages.length === 0
       || (route.routeClass === "pipeline" && !allowPipeline)
       || (route.routeClass === "replica" && route.stages.length !== 1)
@@ -488,11 +485,11 @@ export class Scheduler {
       if (!worker || !deployment || deployment.model !== request.model
         || deployment.mode !== route.routeClass || stage.stageIndex !== index
         || deployment.modelDigest !== stage.modelDigest
-        || !this.isEligible(worker, deployment, request, now)
+        || !(await this.isEligible(worker, deployment, request, now))
         || !this.internalPipelineDependenciesConnected(deployment, workers)) return null;
       if (route.routeClass === "pipeline" && (deployment.stage?.index !== index
         || deployment.stage.total !== route.stages.length)) return null;
-      candidates.push({ worker, deployment, score: this.scoreWorker(worker, deployment, request) });
+      candidates.push({ worker, deployment, score: await this.scoreWorker(worker, deployment, request) });
     }
     const region = candidates.every((candidate) => candidate.worker.capabilities.region === candidates[0]!.worker.capabilities.region)
       ? candidates[0]!.worker.capabilities.region : "multi-region";
@@ -643,12 +640,12 @@ export class Scheduler {
     }
   }
 
-  private routeIsSaturated(
+  private async routeIsSaturated(
     route: ScheduledRoute,
     workers: readonly StoredWorker[],
-  ): boolean {
+  ): Promise<boolean> {
     const workerById = new Map(workers.map((worker) => [worker.id, worker]));
-    return route.stages.some((stage) => {
+    return (await someAsync(route.stages, async (stage) => {
       const worker = workerById.get(stage.workerId);
       const deployment = worker?.capabilities.deployments.find(
         (candidate) => candidate.deploymentId === stage.deploymentId,
@@ -658,8 +655,8 @@ export class Scheduler {
         1,
         Math.min(worker.capabilities.limits.maxConcurrency, deployment.maxConcurrency),
       );
-      return this.store.countActiveJobs(worker.id) / capacity >= 0.75;
-    });
+      return (await this.store.countActiveJobs(worker.id)) / capacity >= 0.75;
+    }));
   }
 
   private countCompletePipelines(stages: Set<string>): number {

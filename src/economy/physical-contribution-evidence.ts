@@ -43,13 +43,13 @@ export type PhysicalContributionEvidence = z.infer<typeof physicalContributionEv
 export class PhysicalContributionEvidenceAuthority {
   constructor(private readonly database: MeshDatabase) {}
 
-  certify(input: {
+  async certify(input: {
     jobId: string;
     executionReceiptId: string;
     trace: NetworkExecutionTrace;
     workers: readonly StoredWorker[];
     createdAt: number;
-  }): PhysicalContributionEvidence {
+  }): Promise<PhysicalContributionEvidence> {
     const trace = networkExecutionTraceSchema.parse(input.trace);
     const jobId = identifierSchema.parse(input.jobId);
     const executionReceiptId = sha256Schema.parse(input.executionReceiptId);
@@ -141,27 +141,27 @@ export class PhysicalContributionEvidenceAuthority {
       ...body,
       id: sha256CanonicalEvidence(body),
     });
-    return this.database.transaction(() => {
-      const existing = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      const existing = (await this.database.raw.prepare(
         "SELECT evidence_json FROM economic_contribution_evidence WHERE job_id = ? OR execution_receipt_id = ?",
-      ).get(jobId, executionReceiptId) as { evidence_json: string } | undefined;
+      ).get(jobId, executionReceiptId)) as { evidence_json: string } | undefined;
       if (existing) {
         const replay = physicalContributionEvidenceSchema.parse(JSON.parse(existing.evidence_json));
         if (replay.id !== evidence.id) throw new Error("economic_contribution_evidence_replay_conflict");
         return replay;
       }
-      this.database.raw.prepare(`
+      (await this.database.raw.prepare(`
         INSERT INTO economic_contribution_evidence(id, job_id, execution_receipt_id, trace_digest, evidence_json, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(evidence.id, jobId, executionReceiptId, evidence.traceDigest, JSON.stringify(evidence), createdAt);
+      `).run(evidence.id, jobId, executionReceiptId, evidence.traceDigest, JSON.stringify(evidence), createdAt));
       return evidence;
-    });
+    }));
   }
 
-  read(id: string): PhysicalContributionEvidence | null {
-    const row = this.database.raw.prepare(
+  async read(id: string): Promise<PhysicalContributionEvidence | null> {
+    const row = (await this.database.raw.prepare(
       "SELECT evidence_json FROM economic_contribution_evidence WHERE id = ?",
-    ).get(sha256Schema.parse(id)) as { evidence_json: string } | undefined;
+    ).get(sha256Schema.parse(id))) as { evidence_json: string } | undefined;
     return row ? physicalContributionEvidenceSchema.parse(JSON.parse(row.evidence_json)) : null;
   }
 }

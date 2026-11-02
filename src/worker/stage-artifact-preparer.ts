@@ -53,6 +53,8 @@ export interface StageArtifactPreparationOptions {
     executable: string,
     args: readonly string[],
   ) => Promise<string>;
+  /** Verification is independent of compilation and never materializes tensors. */
+  localPackageVerifierRunner?: (executable: string, args: readonly string[]) => Promise<string>;
   /**
    * Host-local verification seam for an already sealed native package. The
    * default implementation is entirely in-process and never invokes Python.
@@ -113,6 +115,7 @@ export async function prepareNodeStageArtifacts(
   const preparedByRange = new Map<string, StageArtifactCompilerResult>();
   let preparedModelIdentity: string | null = null;
   const result: PythonLaunchProcess[] = [];
+  const verifiedLocal = new Map<string, StageArtifactCompilerResult>();
   for (const process of local) {
     if (process.kind !== "cell-member" && process.nativeGguf !== null) {
       await (options.nativePackageVerifier ?? verifyNativeGgufStagePackage)(
@@ -129,6 +132,43 @@ export async function prepareNodeStageArtifacts(
       // A first-class GGUF process is already materialized and sealed. In
       // particular, --model and --stage-package-identity must stay byte-exact.
       result.push(process);
+      continue;
+    }
+
+    const pinIndex = process.command.args.indexOf("--stage-package-identity");
+    const pinnedCache = pinIndex < 0 ? null : resolve(options.cacheDirectory, "pinned-native-stages",
+      process.command.args[pinIndex + 1]!.slice(7));
+    const localSource = pinIndex < 0 ? null
+      : await pinnedLocalManifestPresent(description.runtimeModel.source, options.cwd) ? description.runtimeModel.source
+      : pinnedCache && await pinnedLocalManifestPresent(pinnedCache, options.cwd) ? pinnedCache : null;
+    if (localSource !== null) {
+      if (!SHA256_IDENTITY.test(description.runtimeModel.artifactIdentity ?? "")) {
+        throw new Error("stage_artifact_local_model_identity_required");
+      }
+      const key = `${process.layerStart}:${process.layerEnd}:${process.totalLayers}:${process.command.args[pinIndex + 1]}`;
+      if (!verifiedLocal.has(key)) {
+        const args = ["-u", "-m", "distributed_runtime.stage_artifact", localSource,
+          "--verify-only", "--expected-package-id", process.command.args[pinIndex + 1]!.slice(7),
+          "--expected-model-identity", description.runtimeModel.artifactIdentity!,
+          "--layer-start", String(process.layerStart), "--layer-end", String(process.layerEnd),
+          "--total-layers", String(process.totalLayers)];
+        const verified = parseCompilerResult(await (options.localPackageVerifierRunner
+          ? options.localPackageVerifierRunner(options.pythonExecutable, args)
+          : runCompiler(options.pythonExecutable, args, options)));
+        requirePinnedStageArtifactIdentity(process, verified);
+        if (verified.model_identity !== description.runtimeModel.artifactIdentity
+            || verified.layer_start !== process.layerStart || verified.layer_end !== process.layerEnd
+            || verified.total_layers !== process.totalLayers) {
+          throw new Error("stage_artifact_local_verification_identity_mismatch");
+        }
+        if (resolve(verified.destination) !== resolve(localSource)) throw new Error("stage_artifact_local_destination_mismatch");
+        verifiedLocal.set(key, verified);
+        options.onProgress?.({ stageIndex: process.stageIndex, layerStart: process.layerStart,
+          layerEnd: process.layerEnd, state: "ready", packageId: verified.package_id,
+          weightsSizeBytes: verified.weights_size_bytes, downloadedBytes: 0, resumedBytes: 0 });
+      }
+      result.push(localSource === description.runtimeModel.source ? structuredClone(process)
+        : rewriteProcessForStageArtifact(process, verifiedLocal.get(key)!));
       continue;
     }
 
@@ -193,6 +233,7 @@ export async function prepareNodeStageArtifacts(
       ) {
         throw new Error("stage_artifact_compiler_returned_wrong_model_identity");
       }
+      requirePinnedStageArtifactIdentity(process, prepared);
       const cacheResult = parseArtifactCacheResult(await (
         options.artifactCacheRunner
           ? options.artifactCacheRunner(
@@ -235,6 +276,7 @@ export async function prepareNodeStageArtifacts(
         materialized: cacheResult.materialized,
       });
     }
+    requirePinnedStageArtifactIdentity(process, prepared);
     result.push(rewriteProcessForStageArtifact(process, prepared));
   }
   return result;
@@ -515,6 +557,21 @@ function assertExactRecord(
     || keys.some((key) => !Object.prototype.hasOwnProperty.call(value, key))
   ) {
     throw new Error(error);
+  }
+}
+
+function requirePinnedStageArtifactIdentity(process: PythonLaunchProcess, artifact: StageArtifactCompilerResult): void {
+  const index = process.command.args.indexOf("--stage-package-identity");
+  if (index >= 0 && process.command.args[index + 1] !== artifact.artifact_identity) {
+    throw new Error("stage_artifact_preparation_pinned_identity_mismatch");
+  }
+}
+
+async function pinnedLocalManifestPresent(source: string, cwd = process.cwd()): Promise<boolean> {
+  try { await lstat(resolve(cwd, source, STAGE_ARTIFACT_MANIFEST)); return true; }
+  catch (error) {
+    if (["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) return false;
+    throw error;
   }
 }
 

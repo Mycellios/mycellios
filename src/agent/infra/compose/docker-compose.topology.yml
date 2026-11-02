@@ -23,14 +23,14 @@ services:
   app-image:
     image: ${TOPOLOGY_APP_IMAGE:-rakazo/app:topology}
     build:
-      context: ../..
-      dockerfile: infra/compose/Dockerfile.topology
+      context: ../../../..
+      dockerfile: src/agent/infra/compose/Dockerfile.topology
     command: ["true"]
     restart: "no"
 
   supervisor:
     image: ${TOPOLOGY_APP_IMAGE:-rakazo/app:topology}
-    command: ["pnpm", "--filter", "@rakazo/sandbox-supervisor", "start"]
+    command: ["npm", "run", "start", "--workspace", "@rakazo/sandbox-supervisor"]
     user: root
     environment:
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
@@ -76,7 +76,7 @@ services:
       - bash
       - -lc
       # The owner URL lives only in this command, so neither process environment holds it.
-      - DATABASE_MIGRATION_URL=postgres://rakazo:topology-only-password@postgres:5432/rakazo pnpm db:deploy && exec node --enable-source-maps dist/index.js
+      - DATABASE_MIGRATION_URL=postgres://rakazo:topology-only-password@postgres:5432/rakazo npm run db:deploy && exec node --enable-source-maps dist/index.js
     environment: &app-environment
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
       NODE_ENV: production

@@ -18,9 +18,9 @@ it("serves an operator-funded API key through real admission at zero account bal
   const root = await mkdtemp(join(tmpdir(), "mycellios-speech-enrollment-"));
   cleanup.push(() => rm(root, { recursive: true, force: true }));
   const databasePath = join(root, "coordinator.db");
-  const seed = new MeshDatabase(databasePath);
+  const seed = (await MeshDatabase.open(databasePath));
   const api = new ApiAccessManager(seed, { starterTokens: 0, requestsPerMinute: 30, maxConcurrent: 2, maxActiveKeys: 2 });
-  const key = api.createKey("speech-owner", "operator-speech"); seed.close();
+  const key = (await api.createKey("speech-owner", "operator-speech")); (await seed.close());
   vi.stubEnv("MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON", JSON.stringify({ [key.id]: [KOKORO_MODEL] }));
   const engine = createServer(async (request, response) => {
     if (request.url === "/health") { response.end(JSON.stringify(health)); return; }
@@ -40,9 +40,9 @@ it("serves an operator-funded API key through real admission at zero account bal
   const identityId = "standalone-enrolled-speech";
   const enrollments = new NodeEnrollmentStore(runtime.database);
   // The account grant is a fixture; the CLI still redeems through the real HTTP route.
-  const issued = enrollments.issue({ accountId: "speech-owner", expiresInSeconds: 600,
-    actor: { kind: "account", id: "speech-owner", scopes: ["node:identity"] } });
-  enrollments.confirm({ enrollmentId: issued.enrollmentId, accountId: "speech-owner", actorId: "speech-owner" });
+  const issued = (await enrollments.issue({ accountId: "speech-owner", expiresInSeconds: 600,
+    actor: { kind: "account", id: "speech-owner", scopes: ["node:identity"] } }));
+  (await enrollments.confirm({ enrollmentId: issued.enrollmentId, accountId: "speech-owner", actorId: "speech-owner" }));
   const enrollmentPath = join(root, "enrollment.json");
   await writeFile(enrollmentPath, JSON.stringify({ schema: "mycellios-node-enrollment-bundle/1", coordinatorUrl: address, ...issued }), { mode: 0o600 });
   const configPath = join(root, "worker.json");
@@ -72,7 +72,7 @@ it("serves an operator-funded API key through real admission at zero account bal
     if (Date.now() > deadline || child.exitCode !== null) throw new Error("enrolled_cli_failed: " + diagnostics);
     await new Promise((done) => setTimeout(done, 50));
   }
-  expect(runtime.database.getNodeOwnership("device", identityId)).toMatchObject({ accountId: "speech-owner", status: "active", generation: 1 });
+  expect((await runtime.database.getNodeOwnership("device", identityId))).toMatchObject({ accountId: "speech-owner", status: "active", generation: 1 });
   await expect(access(enrollmentPath)).rejects.toMatchObject({ code: "ENOENT" });
   const response = await fetch(address + "/v1/chat/completions", {
     method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${key.secret}` },
@@ -83,7 +83,7 @@ it("serves an operator-funded API key through real admission at zero account bal
   expect(verifiedSpeechEnvelope(completion.choices[0].message.content, "Hola").audio.format).toBe("wav");
   expect(completion.usage.completion_tokens).toBe(0);
   const quota = new ApiAccessManager(runtime.database, { starterTokens: 0, requestsPerMinute: 30, maxConcurrent: 2, maxActiveKeys: 2 });
-  expect(quota.getOrCreateAccount("speech-owner")).toMatchObject({ tokenBalance: 0, requestCount: 1 });
-  expect(quota.getOrCreateAccount("speech-owner").lifetimeInputTokens).toBeGreaterThan(0);
+  expect((await quota.getOrCreateAccount("speech-owner"))).toMatchObject({ tokenBalance: 0, requestCount: 1 });
+  expect((await quota.getOrCreateAccount("speech-owner")).lifetimeInputTokens).toBeGreaterThan(0);
 
 });

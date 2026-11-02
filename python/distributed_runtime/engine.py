@@ -21,10 +21,12 @@ from typing import Any, Callable
 import torch
 from transformers import AutoConfig
 
+from .transport_diagnostics import queue_receive_failure, trace_startup_probe
 from .device import normalize_torch_device_request
 from .dense_tiering import DenseTieringConfig
 from .prefill import GenerationCancelledError, consume_prefill
-from .failure_evidence import StageFailureEvidence
+from .tcp_writes import configure_write_chunk_bytes, validate_transport_limits
+from .failure_evidence import StageFailureEvidence, unattributed_failure_message
 from .macro_wave import KVVersion, MacroWaveState
 from .macro_wave_adapter import (
     MacroWaveProposal,
@@ -319,11 +321,13 @@ class PipelineEngineConfig:
     # Total idle KV tokens allowed across retained sessions; zero is unbounded.
     max_retained_session_tokens: int = 0
     retained_session_ttl_seconds: float = 600.0
+    tcp_write_chunk_bytes: int | None = None
 
     def __post_init__(self) -> None:
         normalize_torch_device_request(self.device)
         if not isinstance(self.dense_tiering, DenseTieringConfig):
             raise TypeError("dense_tiering must be DenseTieringConfig")
+        self.dense_tiering.validate_stage_backends(self.ram_backed_moe_stages, self.paged_kv_stages, self.native_gguf_stages)
         if not self.model_name.strip():
             raise ValueError("model_name cannot be empty")
         for name, value in (
@@ -746,18 +750,7 @@ class PipelineEngineConfig:
             or self.retained_session_ttl_seconds <= 0
         ):
             raise ValueError("retained_session_ttl_seconds must be finite and positive")
-        for name, value in (
-            ("startup_timeout_seconds", self.startup_timeout_seconds),
-            ("socket_timeout_seconds", self.socket_timeout_seconds),
-        ):
-            if not math.isfinite(value) or value <= 0:
-                raise ValueError(f"{name} must be finite and positive")
-        for name, value in (
-            ("one_way_delay_ms", self.one_way_delay_ms),
-            ("bandwidth_mbps", self.bandwidth_mbps),
-        ):
-            if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and non-negative")
+        validate_transport_limits(self, "startup_timeout_seconds", "socket_timeout_seconds")
         if not self.first_stage_host.strip():
             raise ValueError("first_stage_host cannot be empty")
         if not self.return_bind_host.strip() or not self.return_advertise_host.strip():
@@ -2460,6 +2453,7 @@ class DistributedPipelineEngine:
                         device=config.device,
                         dense_tiering=config.dense_tiering,
                         connect_timeout_seconds=config.startup_timeout_seconds,
+                        tcp_write_chunk_bytes=config.tcp_write_chunk_bytes,
                         sealed_wave_tokens=config.sealed_wave_tokens,
                         max_prefill_chunk_tokens=config.max_prefill_chunk_tokens,
                         max_speculative_branches=config.max_speculative_branches,
@@ -2548,6 +2542,7 @@ class DistributedPipelineEngine:
             config.startup_timeout_seconds,
         )
         downstream.settimeout(config.socket_timeout_seconds)
+        configure_write_chunk_bytes(downstream, config.tcp_write_chunk_bytes)
         self._downstream = downstream
         bind_socket_deployment_generation(
             downstream,
@@ -2575,6 +2570,7 @@ class DistributedPipelineEngine:
         downstream.settimeout(None)
         return_socket, _ = listener.accept()
         configure_socket(return_socket)
+        configure_write_chunk_bytes(return_socket, config.tcp_write_chunk_bytes)
         bind_socket_deployment_generation(
             return_socket,
             config.deployment_generation,
@@ -2595,6 +2591,7 @@ class DistributedPipelineEngine:
             )
             return_socket.settimeout(probe_timeout)
             downstream.settimeout(probe_timeout)
+            trace_startup_probe(downstream, "sending", 0, 0, self.pipeline_id)
             try:
                 send_frame(
                     downstream,
@@ -2622,6 +2619,7 @@ class DistributedPipelineEngine:
                         f"{control.frame_type.name}"
                     )
                 pong = recv_frame(return_socket)
+                trace_startup_probe(return_socket, "received", 0, pong.step, pong.request_id)
             except socket.timeout as error:
                 raise TimeoutError("pipeline route probe timed out during startup") from error
             finally:
@@ -2887,6 +2885,7 @@ class DistributedPipelineEngine:
                 if session is not None:
                     job.wire_id = session.wire_id
                     job.step = session.step
+                    job.next_step = session.step
                     job.started_at = time.perf_counter()
                     active[session.wire_id] = job
                     with self._callback_lock:
@@ -2901,6 +2900,8 @@ class DistributedPipelineEngine:
                     runner.begin(wire_id)
                     send_frame(downstream, FrameType.BEGIN, wire_id)
             except BaseException as error:
+                if job.wire_id not in active:
+                    self._retire_job(job, runner, exception=error, began=False)
                 for remaining in selected[index + 1 :]:
                     self._retire_job(remaining, runner, exception=error, began=False)
                 raise
@@ -2999,21 +3000,9 @@ class DistributedPipelineEngine:
             int(token) for token in job.request.input_ids.reshape(-1).tolist()
         )
         served = prompt_ids + tuple(job.token_ids)
-        # `kv_valid` se adelanta en el DESPACHO de la ola (ver los dos `+=` del
-        # bucle de despacho raíz). En la ruta secuencial es sólido: la ola de
-        # decode reenvía un token ya emitido. Con varias olas en vuelo deja de
-        # serlo — una ola despachada tras una divergencia adelanta posiciones
-        # que nunca se comprometen.
-        #
-        # Aquí es donde ese error se vuelve DURABLE: `kv_valid` se persiste en
-        # la sesión retenida y gobierna la reutilización de prefijo del turno
-        # siguiente. Un valor inflado haría reutilizar KV que no codifica la
-        # secuencia servida, y eso rompe la exactitud de tokens en silencio, en
-        # otro turno y sin traza.
-        #
-        # No se corrige el valor: se hace cumplir la invariante que el propio
-        # tipo declara. Un fallo ruidoso aquí es infinitamente preferible a una
-        # campaña de medición cuyos tokens divergen por una causa invisible.
+        # Only acknowledged positions may become durable session state. An
+        # inflated prefix would reuse KV that does not encode the served tokens.
+        # Reject it before retention rather than silently corrupting later turns.
         if job.kv_valid > len(served):
             raise RuntimeError(
                 "kv_valid invariant violated: "
@@ -3029,7 +3018,7 @@ class DistributedPipelineEngine:
             session = _RetainedSession(
                 key=key,
                 wire_id=job.wire_id,
-                step=job.step + 1,
+                step=job.next_step,
                 served_ids=served,
                 kv_tokens=kv_tokens,
                 kv_valid_tokens=job.kv_valid,
@@ -3038,7 +3027,7 @@ class DistributedPipelineEngine:
             self._session_retained_tokens += kv_tokens
         else:
             self._session_retained_tokens += kv_tokens - session.kv_tokens
-            session.step = job.step + 1
+            session.step = job.next_step
             session.served_ids = served
             session.kv_tokens = kv_tokens
             session.kv_valid_tokens = job.kv_valid
@@ -3540,6 +3529,12 @@ class DistributedPipelineEngine:
             raise RuntimeError(f"pipeline connection failed: {value}") from value
         frame, arrived = value
         if frame.frame_type == FrameType.ERROR:
+            if self.config.stage_executor_ids is None:
+                message = unattributed_failure_message(frame.payload)
+                if message is not None:
+                    with self._state_lock:
+                        self._recovery_failure_evidence = None
+                    raise RuntimeError(f"unattributed pipeline stage failure: {message}")
             try:
                 evidence = StageFailureEvidence.parse_payload(frame.payload)
                 self._validate_stage_failure_evidence(evidence, frame)
@@ -3947,7 +3942,8 @@ class DistributedPipelineEngine:
         # The returned TOKEN proves that the prior emitted input token has been
         # committed into every stage KV. This newly returned token itself is
         # still outside KV until a later wave succeeds.
-        job.kv_valid += 1
+        if not flight.is_prefill:
+            job.kv_valid += 1
         prior_output_tokens = len(job.token_ids)
         token = sampled_token if sampled_token is not None else decode_token(frame)
         job.token_ids.append(token)
@@ -6848,11 +6844,8 @@ class DistributedPipelineEngine:
                 # scheduler has advanced through preceding ACKs; invoking here
                 # would either drop or mis-order that first streamed token.
                 self._received_frames.put((frame, arrived))
-        except (EOFError, OSError) as error:
-            if not self._closed:
-                self._received_frames.put(error)
         except BaseException as error:
-            self._received_frames.put(error)
+            queue_receive_failure(self._received_frames, return_socket, "return", error, closed=self._closed)
 
     def _control_receive_loop(self) -> None:
         downstream = self._downstream
@@ -6866,11 +6859,9 @@ class DistributedPipelineEngine:
                     f"unexpected upstream control frame {frame.frame_type.name}"
                 )
             self._received_frames.put((frame, arrived))
-        except (EOFError, OSError) as error:
-            if not self._closed and self._fatal_error is None:
-                self._received_frames.put(error)
         except BaseException as error:
-            self._received_frames.put(error)
+            queue_receive_failure(self._received_frames, downstream, "upstream-control", error,
+                                  closed=self._closed, fatal_error=self._fatal_error)
 
     def _interrupt_transports(self) -> None:
         for sock in (self._return_socket, self._downstream, self._return_listener):
@@ -6911,20 +6902,24 @@ class DistributedPipelineEngine:
             # If lifecycle state cannot be certified, fail closed.
             return True
 
-    @classmethod
     def _join_components(
-        cls,
+        self,
         components: tuple[Any | None, ...],
         timeout_seconds: float,
     ) -> list[str]:
         errors: list[str] = []
         deadline = time.monotonic() + max(0.0, timeout_seconds)
         for component in components:
-            if component is None or not cls._component_is_alive(component):
+            if component is None or not self._component_is_alive(component):
                 continue
-            remaining = max(0.0, deadline - time.monotonic())
             try:
-                component.join(timeout=remaining)
+                while self._component_is_alive(component):
+                    if self._metrics_queue is not None:
+                        self.stage_metrics.extend(drain_metrics(self._metrics_queue))
+                    remaining = max(0.0, deadline - time.monotonic())
+                    component.join(timeout=min(0.05, remaining))
+                    if remaining == 0:
+                        break
             except BaseException as error:
                 # The final report calls is_alive/exitcode and converts an
                 # uncertifiable lifecycle into PipelineShutdownError.
@@ -7382,3 +7377,4 @@ def _wait_until_listening(process: Any, ready_event: Any, timeout_seconds: float
                 f"stage process {process.pid} exited during startup with code {process.exitcode}"
             )
     raise TimeoutError(f"stage process {process.pid} did not listen within {timeout_seconds}s")
+
