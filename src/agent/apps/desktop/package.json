@@ -12,6 +12,7 @@
     "pack:windows:unified": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && node scripts/package-windows.mjs",
     "dev": "npm run build && electron .",
     "build": "npm run check && node scripts/build.mjs",
+    "build:local-server": "node scripts/prepare-local-server.mjs",
     "pack": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --mac --win --linux",
     "pack:dir": "npm run build --workspace @rakazo/web -- --desktop && npm run build && node scripts/prepare-local-server.mjs && electron-builder --dir",
     "check": "tsc --noEmit --incremental --tsBuildInfoFile dist/desktop.tsbuildinfo -p tsconfig.json",
