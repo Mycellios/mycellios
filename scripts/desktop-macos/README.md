@@ -18,7 +18,12 @@ requires a fresh account grant and the native administrator prompt, and reuses
 the protected runtime identity. Installation does not create a Windows user,
 modify automatic login, enroll a tester, or manufacture contribution Credits.
 
-Unsigned preview: no Developer ID or notarization and no automatic unsigned
-updates. A runner launch/installation does not prove real-account sign-in or GPU
+Preview: explicit ad-hoc code signatures preserve bundle integrity, without
+Developer ID or notarization. Require strict deep signature verification on the
+app and again inside the final read-only DMG. Record Gatekeeper rejection as a
+manual-approval requirement, never as Apple approval. Qualification does not
+remove quarantine or change system security settings. Updates remain manual.
+A runner launch/installation does not prove browser-download acceptance,
+real-account sign-in or GPU
 inference on the owner's Mac. Physical validation must be recorded separately.
 Never offer the download before the workflow's package and launch gates pass.

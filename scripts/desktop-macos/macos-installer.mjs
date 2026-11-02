@@ -32,8 +32,9 @@ export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,
       {from:path.join(repository,'LICENSE'),to:'licenses/Mycellios-GPL-3.0.txt'},
       {from:path.join(repository,'THIRD_PARTY.md'),to:'licenses/THIRD_PARTY.md'},
     ],
-    // Preview only. Never enable the unsigned automatic-update channel.
-    mac:{target:[{target:'dmg',arch:['arm64']},{target:'zip',arch:['arm64']}],category:'public.app-category.productivity',icon:path.join(desktopRoot,'assets/icon-macos.png'),identity:null,notarize:false,hardenedRuntime:false,extendInfo:{NSMicrophoneUsageDescription:'Mycellios uses the microphone for dictation and voice calls.'}},
+    // Ad-hoc seals the final bundle without a paid certificate. It does not
+    // establish Developer ID trust or notarization; preview updates stay manual.
+    mac:{target:[{target:'dmg',arch:['arm64']},{target:'zip',arch:['arm64']}],category:'public.app-category.productivity',icon:path.join(desktopRoot,'assets/icon-macos.png'),identity:'-',notarize:false,hardenedRuntime:false,strictVerify:true,extendInfo:{NSMicrophoneUsageDescription:'Mycellios uses the microphone for dictation and voice calls.'}},
     publish:[],
   };
 }

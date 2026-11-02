@@ -4,6 +4,7 @@ import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {_electron as electron} from '@playwright/test';
 import {waitForMycelliosSignIn} from './signin-probe.mjs';
+import {checkPreviewSignature} from './signature-check.mjs';
 const app=path.resolve(process.argv[2]);
 const output=path.resolve(process.argv[3]);
 if(process.platform!=='darwin'||process.arch!=='arm64')throw Error('Qualification needs Apple Silicon macOS');
@@ -18,7 +19,7 @@ execFileSync('/bin/sh',['-n',path.join(resources,'contribution/describe-runtime-
 execFileSync('/usr/bin/shlock',['-p',String(process.pid),'-f',path.join(output,'lock-probe')]);
 await fs.unlink(path.join(output,'lock-probe'));
 const userData=await fs.mkdtemp(path.join(os.tmpdir(),'mycellios-mac-qa-'));
-const receipt={platform:process.platform,architecture:arch,profile:'isolated-empty',physicalMac:false,realAccountSignIn:false,modelInference:false,launches:[]};
+const receipt={platform:process.platform,architecture:arch,profile:'isolated-empty',physicalMac:false,realAccountSignIn:false,modelInference:false,signature:checkPreviewSignature(app),launches:[]};
 try{
  for(let i=0;i<2;i++){
   const client=await electron.launch({executablePath:binary,env:{...process.env,RAKAZO_PERFORMANCE_USER_DATA:userData},timeout:90000});

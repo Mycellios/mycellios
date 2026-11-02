@@ -7,7 +7,7 @@ test('Apple Silicon packaging pins the PKG, preserves identity and keeps unsigne
   const options={desktopRoot:root,runtimePkg,runtimeSha256,output:path.join(root,'out'),version:'0.3.9'};
   const config=await prepareMacInstaller(options);
   assert.equal(config.appId,'com.mycellios.agent.desktop');assert.deepEqual(config.mac.target,[{target:'dmg',arch:['arm64']},{target:'zip',arch:['arm64']}]);
-  assert.equal(config.mac.notarize,false);assert.equal(config.mac.identity,null);assert.deepEqual(config.publish,[]);
+  assert.equal(config.mac.notarize,false);assert.equal(config.mac.identity,'-');assert.equal(config.mac.strictVerify,true);assert.equal(config.mac.hardenedRuntime,false);assert.deepEqual(config.publish,[]);
   assert.equal(config.extraResources.some(r=>r.to==='contribution/mycellios-runtime.pkg'),true);assert.equal(config.extraResources.filter(r=>r.to.startsWith('licenses/')).length,3);
   assert.equal(JSON.parse(await readFile(path.join(root,'out/runtime.json'))).sha256,runtimeSha256);
   await assert.rejects(prepareMacInstaller({...options,runtimeSha256:'0'.repeat(64)}),/hash mismatch/);

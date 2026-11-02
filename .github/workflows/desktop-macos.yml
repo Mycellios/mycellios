@@ -34,7 +34,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --prefix scripts/desktop-macos --ignore-scripts --no-audit --no-fund
-          node --test scripts/desktop-macos/macos-installer.test.mjs
+          node --test scripts/desktop-macos/macos-installer.test.mjs scripts/desktop-macos/signature-check.test.mjs
           node scripts/desktop-macos/assemble.mjs build/input build/payload
           ln -s "$PWD/scripts/desktop-macos/node_modules" build/payload/node_modules
           npm ci --prefix build/payload/src/agent/apps/desktop --ignore-scripts --no-audit --no-fund
@@ -44,6 +44,8 @@ jobs:
           shasum -a 256 build/release/*.dmg build/release/*.zip > build/evidence/SHA256SUMS
       - name: Launch and reopen packaged Desktop on Apple Silicon
         run: node scripts/desktop-macos/qualify.mjs 'build/release/mac-arm64/Mycellios Desktop.app' build/evidence
+      - name: Verify signature inside the final read-only disk image
+        run: node scripts/desktop-macos/qualify-dmg.mjs 'build/release/mac-arm64/Mycellios Desktop.app' 'build/release/Mycellios-Desktop-0.3.9-macos-arm64-preview.dmg' build/evidence/dmg-signature.json
       - name: Install bundled runtime without enrolling any account
         run: |
           set -euo pipefail

@@ -102,6 +102,11 @@ These rules apply to the complete repository.
   pinned published native baseline, source provenance, explicit runtime pairing
   and unsigned-preview update policy. Qualify packaging and launch on macOS;
   runner checks do not substitute for physical Mac inference evidence.
+  Preview bundles use explicit ad-hoc signing, never identity:null. Require strict
+  deep codesign verification on both the app and its final read-only DMG. Record
+  Gatekeeper assessment separately: ad-hoc integrity is not notarization or an
+  automatically trusted browser download. Keep manual updates and never remove
+  quarantine or disable Gatekeeper as part of qualification.
   The download page opts into `?include=macos-arm64`; retain the byte-identical
   legacy two-platform catalog for older clients without that query.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
