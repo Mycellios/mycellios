@@ -3,7 +3,7 @@
 ## Fedora Desktop RPM
 
 `npm run desktop:package:rpm` creates
-`build/desktop-rpm/Mycellios-Desktop-0.3.9-fedora-x86_64.rpm`, its SHA-256 and
+`build/desktop-rpm/Mycellios-Desktop-0.3.9-2-fedora-x86_64.rpm`, its SHA-256 and
 provenance JSON. Build on Linux x86_64 with `rpm-build`, `binutils`, `tar`,
 `gzip` and `zstd`. Install the result with `sudo dnf install ./<artifact>.rpm`.
 Build output and cached downloads are ignored by Git.
@@ -11,9 +11,16 @@ Build output and cached downloads are ignored by Git.
 `config/desktop-fedora-release.json` pins the published Desktop DEB and complete
 source archive. The Desktop source supplement identifies its baseline main
 revision separately from the bundled runtime version; do not rebuild the older
-runtime in main and substitute it for the published payload. The RPM retains
-the application ASAR, runtime archive, licenses and account behavior byte for
-byte. Only native package integration and the polkit enrollment helper change.
+runtime in main and substitute it for the published payload. RPM revision 1
+retains the original application ASAR. Revision 2 backports Linux native window
+frames and an explicit packaged window icon through `scripts/adapt-desktop-linux.mjs`.
+The adapter rejects unexpected bundle anchors and verifies every other ASAR file,
+native-module unpack flag and executable mode. Existing 192px and 512px brand
+assets are installed in indexed hicolor directories; the original 1024px directory
+is not indexed by Fedora's theme. The runtime archive, licenses and account logic
+remain byte-identical. Provenance records both ASAR hashes and the changed entry;
+the adapter source is included under `/usr/share/doc/mycellios-desktop`.
+Revision 2 uses a separate RPM filename and never overwrites the preview asset.
 
 `deploy/linux/install-desktop-runtime.sh` verifies the bundled payload's hash
 and package identity, then extracts its `/opt/mycellios` tree as data without
@@ -23,7 +30,7 @@ contribution node. An existing identity or incomplete installation is preserved.
 Contribution setup requires the normal signed-in account action and polkit.
 Fedora uses Chromium's user-namespace sandbox; the package does not disable it.
 
-Run `npx vitest run tests/desktop-rpm.test.ts tests/desktop-runtime-fedora.test.ts`.
+Run `npx vitest run tests/desktop-rpm.test.ts tests/desktop-runtime-fedora.test.ts tests/desktop-linux-window.test.ts`.
 RPM tests use the real RPM tools; enrollment-helper tests use Bubblewrap user
 namespaces with temporary `/etc` and `/opt`, synthetic payloads and no network.
 Missing platform tools or unavailable user namespaces produce explicit skips.
