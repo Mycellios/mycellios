@@ -12,6 +12,7 @@ build/evidence/
 build/*.msi
 build/*.msi.wxs
 build/*.msi.wixobj
+build/*.wixpdb
 build/mycellios-coordinator-output-receipt.json
 build/mycellios-*-lock-report.json
 build/validation-logs/
