@@ -17,6 +17,16 @@ Updated: 2026-09-25 (economic and token status).
 
 ## Verified in automated or single-host runs
 
+- Apple Silicon Desktop 0.3.9 preview is published at
+  [Desktop downloads](https://www.mycellios.com/downloads/desktop), bundling the
+  existing 0.2.95 ARM64 runtime. The macOS 26 ARM64
+  [qualification run](https://github.com/Mycellios/mycellios/actions/runs/41405775911)
+  built DMG/ZIP packages, opened and reopened one application window, reached the
+  central Mycellios sign-in form, checked renderer isolation and installed the
+  bundled runtime. Native candidate: `503635effc335ee52df7dbee0f3e0cb291efbf75`;
+  download UI: `17d37096874f6fb3d6a0eb2c8bfc26abffae4d80`. This unsigned,
+  non-notarized preview has no automatic updates. Real-account authentication
+  and inference on the owner's physical Mac remain unverified.
 - Fedora Desktop packaging has focused RPM integrity/dependency tests and
   isolated user-namespace tests of runtime extraction, enrollment invocation,
   hash rejection and preservation of existing installations. These tests use
