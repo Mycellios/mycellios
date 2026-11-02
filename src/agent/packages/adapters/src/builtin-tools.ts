@@ -222,7 +222,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "generate_image",
     description:
-      "Generate one image from a prompt and attach it to chat. Uses the deployment media model and may incur charges. Do not retry failed submissions automatically.",
+      "Generate one image from a prompt and attach it to chat, using the configured media provider or Codex on the connected computer. Uses that account's limits and may incur charges. Do not retry failed submissions automatically.",
     inputSchema: {
       type: "object",
       properties: { prompt: { type: "string", minLength: 1, maxLength: 4000 } },
