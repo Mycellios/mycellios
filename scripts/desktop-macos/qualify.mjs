@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {_electron as electron} from '@playwright/test';
+import {waitForMycelliosSignIn} from './signin-probe.mjs';
 const app=path.resolve(process.argv[2]);
 const output=path.resolve(process.argv[3]);
 if(process.platform!=='darwin'||process.arch!=='arm64')throw Error('Qualification needs Apple Silicon macOS');
@@ -22,16 +23,25 @@ try{
  for(let i=0;i<2;i++){
   const client=await electron.launch({executablePath:binary,env:{...process.env,RAKAZO_PERFORMANCE_USER_DATA:userData},timeout:90000});
   try{
-   const window=await client.firstWindow({timeout:60000});
-   await window.waitForURL(u=>u.origin==='https://www.mycellios.com'&&(u.pathname.startsWith('/agent')||u.pathname.startsWith('/oauth')), {timeout:120000});
-   await window.locator('body').waitFor({state:'visible'});
-   await window.getByRole('button',{name:/continue with Mycellios|continuar con Mycellios/i}).waitFor({timeout:90000});
+   await client.firstWindow({timeout:60000});
+   let window;
+   const deadline=Date.now()+60000;
+   while(!window&&Date.now()<deadline){
+    for(const page of client.windows())if(await page.evaluate(()=>Boolean(window.rakazoDesktop)).catch(()=>false)){window=page;break;}
+    if(!window)await new Promise(resolve=>setTimeout(resolve,100));
+   }
+   if(!window)throw Error('No main window with the native Desktop bridge');
+   const signInSurface=await waitForMycelliosSignIn(window);
    const mainWindows=await client.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().filter(w=>w.isVisible()).length);
    if(mainWindows!==1)throw Error('Desktop did not open exactly one visible window');
    const isolation=await window.evaluate(()=>({node:typeof window.require,process:typeof window.process}));
    if(isolation.node!=='undefined'||isolation.process!=='undefined')throw Error('Renderer exposes Node privileges');
    await window.screenshot({path:path.join(output,`launch-${i+1}.png`)});
-   receipt.launches.push({visibleWindows:mainWindows,path:new URL(window.url()).pathname,rendererIsolated:true});
+   receipt.launches.push({visibleWindows:mainWindows,path:new URL(window.url()).pathname,signInSurface,rendererIsolated:true});
+  } catch(error){
+   receipt.failure=String(error.message).split('\n')[0];
+   for(const [j,page]of client.windows().entries())await page.screenshot({path:path.join(output,`failure-${i}-${j}.png`)}).catch(()=>{});
+   await fs.writeFile(path.join(output,'macos-qualification.json'),JSON.stringify(receipt,null,2));throw error;
   } finally{await client.close();}
  }
  await fs.writeFile(path.join(output,'macos-qualification.json'),JSON.stringify(receipt,null,2));
