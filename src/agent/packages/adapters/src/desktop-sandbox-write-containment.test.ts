@@ -232,12 +232,21 @@ describe("desktop sandbox write containment without O_NOFOLLOW", () => {
       await symlink(outside, parent, "junction");
     };
 
-    await expect(
-      desktop.writeFile(computer, {
+    let rejected = false;
+    try {
+      await desktop.writeFile(computer, {
         path: "notes/nested/result.txt",
         content: new TextEncoder().encode("after"),
-      }),
-    ).rejects.toThrow();
+      });
+    } catch (error) {
+      expect(error).toHaveProperty("message", "Path escapes the computer workspace");
+      rejected = true;
+    }
+    // Windows can finish through the held directory handle after its pathname
+    // moves. This is safe only when the write stays in that original directory.
+    if (!rejected) {
+      expect(await readFile(path.join(displaced, "nested/result.txt"), "utf8")).toBe("after");
+    }
     expect(swapped).toBe(true);
     await expect(readFile(path.join(outside, "nested/result.txt"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
