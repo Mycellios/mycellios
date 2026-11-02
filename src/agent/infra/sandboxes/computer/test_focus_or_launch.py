@@ -227,6 +227,32 @@ class ControlArgvTest(unittest.TestCase):
             with self.subTest(argv=argv):
                 self.assertFalse(control.allowed_control_argv(argv, ":1"))
 
+    def test_opener_arguments_cannot_override_browser_profile_or_launch_options(self):
+        for argv in (
+            ["env", "DISPLAY=:1", "xdg-open", "--help"],
+            ["env", "DISPLAY=:1", "rakazo-browser", "--user-data-dir=/tmp/other"],
+            ["env", "DISPLAY=:1", "rakazo-focus-or-launch", "rakazo-browser", "--user-data-dir=/tmp/other"],
+            ["env", "DISPLAY=:1", "xterm", "-e"],
+        ):
+            with self.subTest(argv=argv):
+                self.assertFalse(control.allowed_control_argv(argv, ":1"))
+
+    def test_launch_uses_image_owned_executable_and_separate_profile_environment(self):
+        argv = ["env", "DISPLAY=:1", f"RAKAZO_BROWSER_PROFILE={PROFILE}", "rakazo-browser", "https://example.test"]
+        with patch.dict(os.environ, {"PATH": "/tmp/untrusted"}), patch.object(control.subprocess, "Popen") as popen:
+            popen.return_value.wait.return_value = 0
+            control.run_control_argv(argv, ":1")
+        self.assertEqual(popen.call_args.args[0], ["/usr/local/bin/rakazo-browser", "https://example.test"])
+        self.assertEqual(popen.call_args.kwargs["env"]["RAKAZO_BROWSER_PROFILE"], PROFILE)
+        self.assertEqual(popen.call_args.kwargs["env"]["DISPLAY"], ":1")
+
+    def test_unknown_executable_never_reaches_subprocess(self):
+        with patch.object(control.subprocess, "run") as run, patch.object(control.subprocess, "Popen") as popen:
+            with self.assertRaisesRegex(RuntimeError, "unsupported computer action"):
+                control.run_control_argv(["env", "DISPLAY=:1", "/bin/sh", "-c", "id"], ":1")
+        run.assert_not_called()
+        popen.assert_not_called()
+
     def test_wrapped_browser_keeps_the_browser_spawn_poll(self):
         argv = ["env", "DISPLAY=:1", "rakazo-focus-or-launch", "rakazo-browser"]
         self.assertEqual(control.launch_spawn_poll_sec(argv), control.BROWSER_OPEN_POLL_SEC)
@@ -245,7 +271,8 @@ class ControlArgvTest(unittest.TestCase):
             control.subprocess, "run", return_value=subprocess.CompletedProcess(argv, 0)
         ) as run:
             control.run_control_argv(argv, ":1")
-        self.assertEqual(run.call_args.args[0], argv)
+        self.assertEqual(run.call_args.args[0], [control.CONTROL_EXECUTABLES["rakazo-focus-or-launch"], "rakazo-browser"])
+        self.assertEqual(run.call_args.kwargs["env"]["RAKAZO_BROWSER_PROFILE"], PROFILE)
         self.assertEqual(run.call_args.kwargs["timeout"], control.FOCUS_COMPLETION_SEC)
         self.assertGreater(control.FOCUS_COMPLETION_SEC, control.LAUNCH_SPAWN_POLL_SEC)
 
@@ -256,7 +283,7 @@ class ControlArgvTest(unittest.TestCase):
             script.write_text(f"#!/bin/sh\nsleep 0.5\ntouch {marker}\n")
             script.chmod(script.stat().st_mode | stat.S_IEXEC)
             argv = ["env", "DISPLAY=:1", "rakazo-focus-or-launch", "xterm"]
-            with patch.dict(os.environ, {"PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}):
+            with patch.dict(control.CONTROL_EXECUTABLES, {"rakazo-focus-or-launch": str(script)}):
                 started = time.monotonic()
                 control.run_control_argv(argv, ":1")
                 elapsed = time.monotonic() - started

@@ -24,6 +24,14 @@ KNOWN_LAUNCH = frozenset(
 )
 # Focus-or-launch wraps KNOWN_LAUNCH launchers: rakazo-focus-or-launch <launcher> [uri].
 FOCUS_OR_LAUNCH = "rakazo-focus-or-launch"
+# Select executables from image-owned paths, never from request argv or PATH.
+CONTROL_EXECUTABLES = {
+    "xdotool": "/usr/bin/xdotool",
+    "xdg-open": "/usr/bin/xdg-open",
+    "xterm": "/usr/bin/xterm",
+    "rakazo-browser": "/usr/local/bin/rakazo-browser",
+    FOCUS_OR_LAUNCH: "/usr/local/bin/rakazo-focus-or-launch",
+}
 CONTROL_TIMEOUT_SEC = 10
 LAUNCH_SPAWN_POLL_SEC = 0.2
 # A live browser opens a URL in this process, then exits. rakazo-browser caps the
@@ -182,16 +190,17 @@ def allowed_control_argv(argv, display):
     if command == "xdotool":
         return allowed_xdotool_argv(argv)
     if command == "xdg-open":
-        return len(argv) == index + 2
+        return len(argv) == index + 2 and not argv[-1].startswith("-")
     if command == FOCUS_OR_LAUNCH:
         return (
             len(argv) in (index + 2, index + 3)
             and argv[index + 1] in KNOWN_LAUNCH
+            and (len(argv) == index + 2 or not argv[-1].startswith("-"))
             and (index == 2 or argv[index + 1] == "rakazo-browser")
         )
     if "/" in command or command not in KNOWN_LAUNCH:
         return False
-    return len(argv) in (index + 1, index + 2)
+    return len(argv) in (index + 1, index + 2) and (len(argv) == index + 1 or not argv[-1].startswith("-"))
 
 
 # The wrapper bounds each wmctrl call at 5s and may also wait out a browser
@@ -225,17 +234,25 @@ def launch_spawn_poll_sec(argv):
 
 def run_control_argv(argv, display):
     """Run a fallback control command without holding the lock forever."""
+    index = control_command_index(argv)
+    command = argv[index]
+    executable = CONTROL_EXECUTABLES.get(command)
+    if executable is None:
+        raise RuntimeError("unsupported computer action")
+    exec_argv = [executable, *argv[index + 1:]]
     env = {**os.environ, "DISPLAY": display}
-    if argv[control_command_index(argv)] == FOCUS_OR_LAUNCH:
+    if index == 3:
+        env["RAKAZO_BROWSER_PROFILE"] = argv[2].removeprefix("RAKAZO_BROWSER_PROFILE=")
+    if command == FOCUS_OR_LAUNCH:
         try:
-            result = subprocess.run(argv, env=env, timeout=FOCUS_COMPLETION_SEC)
+            result = subprocess.run(exec_argv, env=env, timeout=FOCUS_COMPLETION_SEC)
         except subprocess.TimeoutExpired as error:
             raise RuntimeError("computer action timed out") from error
         if result.returncode:
             raise RuntimeError("computer action failed")
         return
     if is_long_lived_control(argv):
-        child = subprocess.Popen(argv, env=env, start_new_session=True)
+        child = subprocess.Popen(exec_argv, env=env, start_new_session=True)
         try:
             code = child.wait(timeout=launch_spawn_poll_sec(argv))
         except subprocess.TimeoutExpired:
@@ -245,7 +262,7 @@ def run_control_argv(argv, display):
             raise RuntimeError("computer action failed")
         return
     try:
-        result = subprocess.run(argv, env=env, timeout=CONTROL_TIMEOUT_SEC)
+        result = subprocess.run(exec_argv, env=env, timeout=CONTROL_TIMEOUT_SEC)
     except subprocess.TimeoutExpired as error:
         raise RuntimeError("computer action timed out") from error
     if result.returncode:
