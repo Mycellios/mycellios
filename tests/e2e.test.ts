@@ -242,7 +242,7 @@ describe("inference-only coordinator and worker", () => {
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toBe(destination);
     }
-    for (const [path, destination] of [["create", "/"], ["spore/treasury/", "/spore/rewards"], ["spore/data/", "/stats"]]) {
+    for (const [path, destination] of [["create", "/"], ["spore/treasury/", "/spore/rewards"], ["spore/data/", "/stats"]] as const) {
       const response = await fetch(new URL(path, `${address}/`), { redirect: "manual" });
       expect(response.status).toBe(308);
       expect(response.headers.get("location")).toBe(destination);
