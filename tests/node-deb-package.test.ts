@@ -1,5 +1,6 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { stageNodeInstaller } from "../scripts/stage-node-installer.mjs";
@@ -12,7 +13,7 @@ import { verifyNodeReleaseEvidence } from "../scripts/verify-node-release-eviden
 const cleanup: string[] = [];
 afterEach(async () => Promise.all(cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true }))));
 
-describe.runIf(process.platform === "linux" && process.arch === "x64")("native Debian package", () => {
+describe.runIf(process.platform === "linux" && process.arch === "x64" && spawnSync("dpkg-deb", ["--version"]).status === 0)("native Debian package (requires dpkg-deb)", () => {
   it("binds the exact staged product and opens pairing files without a terminal", async () => {
     const fixture = await stagedFixture(); const deb = join(fixture.root, "mycellios-node.deb");
     await buildNodeDeb({ stagedRoot: fixture.output, output: deb, version: "0.2.77", sourceRevision: "a".repeat(40), sourceDateEpoch: "0" });

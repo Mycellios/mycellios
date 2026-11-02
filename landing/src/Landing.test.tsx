@@ -73,15 +73,17 @@ describe("Landing", () => {
     expect(config.match(/"\/docs": productionProxy\(\)/g)).toHaveLength(2);
   });
 
-  it("closes the header with the social marks and Login instead of a worker CTA", () => {
+  it("keeps Stats and social links without retired navbar actions", () => {
     const html = renderToStaticMarkup(<RebrandLanding />);
     const header = html.slice(0, html.indexOf("</header>"));
 
-    expect(header).toContain('aria-label="mycellios on GitHub"');
+    expect(header).toContain('aria-label="Mycellios on GitHub"');
     expect(header).toContain('href="https://x.com/mycellios"');
     expect(header).toContain('href="https://t.me/mycellios"');
-    expect(header).toMatch(/<a\b[^>]*href="\/dashboard"[^>]*>Login<\/a>/);
-    expect(header).toContain(">Login</a>");
+    expect(header).toMatch(/<a\b[^>]*href="\/dashboard"[^>]*>Stats<\/a>/);
+    expect(header).not.toContain(">Login</a>");
+    expect(header).not.toContain(">Download</a>");
+    expect(header).not.toContain('href="/create"');
     // The old "Find your worker" pill is gone from every header surface, mobile
     // burger menu included.
     expect(header).not.toContain("Find your worker");
@@ -126,8 +128,9 @@ describe("Landing", () => {
     expect(html).toContain('id="payments"');
     expect(html).toContain("Access for users.");
     expect(html).toContain("Proof for machine owners.");
-    expect(html).toContain("Explore Mycellios Go");
-    expect(html).toContain('href="/account"');
+    expect(html).toContain("Coming soon");
+    expect(html).toContain('href="/pricing"');
+    expect(html).not.toContain("Explore Mycellios Go");
     expect(html).not.toContain("$0.0240");
     expect(html).toContain("Connect your machine");
     // The split is the same memory split the diagram above shows, so the three
@@ -142,7 +145,7 @@ describe("Landing", () => {
     // route attribution must not read as a guaranteed payout.
     expect(html).toContain("not subscription pricing or a guaranteed payout");
     expect(html).toContain("Usage tokens are access credits, not $SPORE");
-    expect(html).toContain("contributor payouts and $SPORE are not live yet");
+    expect(html).toContain("contributor payouts and $SPORE are coming soon");
   });
 
   it("renders the doors, evidence and install sections without crashing", () => {
@@ -291,26 +294,21 @@ describe("Landing", () => {
     expect(html).not.toContain("Need help?");
   });
 
-  it("ships the mobile menu as a dark grouped sheet, not the ivory link stack", async () => {
+  it("uses the shared accessible mobile navigation in retained landing variants", async () => {
     const read = (path: string) => import("node:fs/promises").then(({ readFile }) =>
       readFile(new URL(path, import.meta.url), "utf8"),
     );
     const page = await read("./rebrand/RebrandLanding.tsx");
-    const css = await read("./rebrand/rebrand.css");
+    const header = await read("./rebrand/MarketingHeader.tsx");
+    const css = await read("./rebrand/marketing-shell.css");
 
-    // Structure: groups with a mono kicker for the $SPORE cluster, the login
-    // as a CTA, and a backdrop that dims the page and closes on tap.
-    expect(page).toContain("rb-mobile-group");
-    expect(page).toContain("rb-mobile-kicker");
-    expect(page).toContain("rb-mobile-cta");
-    expect(page).toContain("rb-mobile-backdrop");
-    // Skin: dark forest panel on the hero's register, bronze accents, and a
-    // per-row arrow affordance. The ivory box must not come back.
-    expect(css).toContain("#0e1511");
-    expect(css).toContain("rbMobileNavIn");
-    expect(css).toContain(".rb-header-inner > nav:not(.rb-mobile-nav),.rb-desktop-cta { display:none; }");
-    expect(css).toContain(".rb-header-inner > .rb-mobile-nav { position:absolute;");
-    expect(css).toMatch(/\.rb-mobile-nav a::after \{ content:"→"/);
-    expect(css).not.toMatch(/\.rb-mobile-nav \{[^}]*background:#f8f5f0/);
+    expect(page).toContain('from "./MarketingHeader"');
+    expect(header).toContain('aria-controls="marketing-mobile-navigation"');
+    expect(header).toContain('aria-expanded={open}');
+    expect(header).toContain('aria-label="Mobile navigation"');
+    expect(header).toContain('event.key !== "Escape"');
+    expect(header).toContain("toggle.current?.focus()");
+    expect(css).toContain("100svh");
+    expect(css).toContain("env(safe-area-inset-bottom)");
   });
 });
