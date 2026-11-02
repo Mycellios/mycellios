@@ -44,6 +44,11 @@ function pendingTimerFixture(reuse = true) {
     updatedAt: scheduledAt,
   };
   const tx = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     computerExecutionLease: { findMany: vi.fn(async () => []) },
     computer: { findMany: vi.fn(async () => []) },
     routine: {
@@ -62,6 +67,10 @@ function pendingTimerFixture(reuse = true) {
     },
   };
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     routine: { findUnique: vi.fn(async () => routine) },
     bot: { findUnique: vi.fn(async () => ({ id: "bot-1", thread: { id: "thread-1" } })) },
     agentSkill: { findMany: vi.fn(async () => []) },

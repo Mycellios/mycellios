@@ -137,8 +137,12 @@ async function runWithModel(
     yield { type: "done" as const, text: "Done" };
   });
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
     user: { findUnique: vi.fn(async () => null) },
     run: {
+      findMany: vi.fn(async () => []),
+
       findUnique: vi.fn(async () => run),
       findUniqueOrThrow: vi.fn(async () => run),
       findFirst: vi.fn(async () => ({ bot: { notifyOnFinish: true }, thread: { groupId: null } })),
@@ -165,6 +169,8 @@ async function runWithModel(
       findMany: vi.fn(async () => []),
     },
     attempt: {
+      findMany: vi.fn(async () => []),
+
       create: vi.fn(async () => ({ id: "attempt-1" })),
       update: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),

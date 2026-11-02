@@ -57,6 +57,11 @@ describe("computer provisioning", () => {
       updatedAt: new Date("2024-01-01T00:00:00.000Z"),
     };
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({ ...computerRow })),
         updateMany: vi.fn(async (args) => {
@@ -161,11 +166,18 @@ describe("computer provisioning", () => {
       updatedAt: new Date("2024-01-01T00:00:00.000Z"),
     };
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({ ...row })),
         updateMany,
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn(async () => null),
       },
     } as unknown as PrismaClient;
@@ -273,11 +285,18 @@ describe("computer provisioning", () => {
       },
     );
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({ ...row })),
         updateMany,
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn(async () => null),
       },
     } as unknown as PrismaClient;
@@ -316,6 +335,11 @@ describe("computer provisioning", () => {
     const ttlMs = 5 * 60_000;
     const updateMany = vi.fn();
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({
           id: "computer-1",
@@ -330,6 +354,8 @@ describe("computer provisioning", () => {
         updateMany,
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn(async () => null),
       },
     } as unknown as PrismaClient;
@@ -368,6 +394,11 @@ describe("computer provisioning", () => {
     const nowMs = Date.parse("2024-06-01T12:00:00.000Z");
     const updateMany = vi.fn();
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({
           id: "computer-1",
@@ -382,6 +413,8 @@ describe("computer provisioning", () => {
         updateMany,
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn(async () => null),
       },
     } as unknown as PrismaClient;
@@ -430,6 +463,11 @@ describe("computer provisioning", () => {
     };
     let reads = 0;
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => {
           reads += 1;
@@ -489,6 +527,11 @@ describe("computer provisioning", () => {
     );
     const findUniqueOrThrow = vi.fn(async () => ({ ...row }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: { findUniqueOrThrow, updateMany },
     } as unknown as PrismaClient;
     const sandbox = new FakeSandboxProvider();
@@ -547,6 +590,11 @@ describe("computer provisioning", () => {
       },
     );
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({ ...row })),
         updateMany,
@@ -555,6 +603,8 @@ describe("computer provisioning", () => {
         findFirst: vi.fn(async () => null),
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn(async () => null),
       },
     } as unknown as PrismaClient;
@@ -616,6 +666,11 @@ describe("computer provisioning", () => {
     const updateMany = vi.fn();
     const findUniqueOrThrow = vi.fn(async () => ({ ...row }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow,
         updateMany,
@@ -624,6 +679,8 @@ describe("computer provisioning", () => {
         findFirst: vi.fn(async () => null),
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn(async () => null),
       },
     } as unknown as PrismaClient;
@@ -670,6 +727,11 @@ describe("computer provisioning", () => {
     };
     const updateMany = vi.fn();
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({ ...row })),
         updateMany,
@@ -678,6 +740,8 @@ describe("computer provisioning", () => {
         findFirst: vi.fn(async () => null),
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn(async () => ({ id: "other-run" })),
       },
     } as unknown as PrismaClient;
@@ -746,6 +810,11 @@ describe("computer provisioning", () => {
       },
     );
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn(async () => ({ ...row })),
         updateMany,
@@ -814,6 +883,11 @@ describe("computer provisioning", () => {
         fresh: true,
       };
       const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         computer: {
           findUniqueOrThrow: vi.fn().mockResolvedValue(original),
           updateMany:
@@ -899,6 +973,11 @@ describe("computer provisioning", () => {
       fresh: false,
     };
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue(original),
         update: vi.fn(),
@@ -959,6 +1038,11 @@ describe("computer provisioning", () => {
       const stop = vi.spyOn(sandbox, "stop");
       const saved = new TextEncoder().encode("saved work");
       const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         computer: {
           findUniqueOrThrow: vi.fn().mockResolvedValue({
             id: "computer-1",
@@ -1047,6 +1131,11 @@ describe("computer provisioning", () => {
       .spyOn(sandbox, "provision")
       .mockResolvedValue({ ...ref, kind: "boat", providerRef: "provider-1", fresh: false });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -1102,6 +1191,11 @@ describe("computer provisioning", () => {
     const releaseScreen = vi.fn().mockResolvedValue(undefined);
     const prepare = vi.fn().mockRejectedValue(new Error("provider preparation failed"));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -1165,6 +1259,11 @@ describe("computer provisioning", () => {
       .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 0 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -1225,6 +1324,11 @@ describe("computer provisioning", () => {
     };
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -1296,6 +1400,11 @@ describe("computer provisioning", () => {
         ? vi.fn().mockRejectedValue(new Error("provider preparation failed"))
         : vi.fn().mockResolvedValue(undefined);
       const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         computer: {
           findUniqueOrThrow: vi.fn().mockResolvedValue({
             id: "computer-1",
@@ -1362,6 +1471,11 @@ describe("computer provisioning", () => {
     const importWorkspace = vi.fn().mockResolvedValue(undefined);
     const exportHome = vi.fn().mockReturnValue((async function* () {})());
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -1442,6 +1556,11 @@ describe("Team Computer wake", () => {
       yield { type: "exit" as const, code: 0 };
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -1780,6 +1899,11 @@ describe("computer execution leases", () => {
       return { count: 1 };
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({ scope: "team", state: "running" }),
       },
@@ -1888,6 +2012,11 @@ describe("computer execution leases", () => {
     };
     const create = vi.fn().mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002" }));
     const client = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
       thread: {
         update: vi
@@ -1899,7 +2028,9 @@ describe("computer execution leases", () => {
         findMany: vi.fn().mockResolvedValue([{ id: "run-1", taskId: "task-1" }]),
         updateMany: vi.fn(),
       },
-      attempt: { updateMany: vi.fn() },
+      attempt: {
+      findMany: vi.fn(async () => []),
+ updateMany: vi.fn() },
       task: { updateMany: vi.fn() },
       computerExecutionLease: {
         updateMany: vi.fn().mockImplementation(async ({ data }) => {
@@ -2059,13 +2190,20 @@ describe("computer execution leases", () => {
       .mockResolvedValueOnce([{ fence: 4 }])
       .mockResolvedValueOnce([{ fence: 5 }]);
     const tx = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       $queryRaw: queryRaw,
       computerExecutionLease: {
         findUnique: vi.fn().mockResolvedValue(null),
         updateManyAndReturn,
         create: vi.fn(),
       },
-      run: { aggregate: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ aggregate: vi.fn(), findFirst: vi.fn().mockResolvedValue(null) },
     };
     const prisma = {
       $transaction: vi.fn(async (work: (client: typeof tx) => unknown) => work(tx)),
@@ -2095,6 +2233,11 @@ describe("computer execution leases", () => {
     async (live) => {
       const now = new Date();
       const tx = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         $queryRaw: vi
           .fn()
           .mockResolvedValueOnce([{ id: "bot-1" }])
@@ -2106,7 +2249,9 @@ describe("computer execution leases", () => {
             .fn()
             .mockRejectedValue(Object.assign(new Error("lease exists"), { code: "P2002" })),
         },
-        run: { aggregate: vi.fn().mockResolvedValue({ _max: { leaseFence: 2 } }) },
+        run: {
+      findMany: vi.fn(async () => []),
+ aggregate: vi.fn().mockResolvedValue({ _max: { leaseFence: 2 } }) },
       };
       const prisma = {
         $transaction: async (work: (client: typeof tx) => unknown) => work(tx),
@@ -2223,6 +2368,11 @@ function leasePrisma(options: {
   });
   return {
     client: {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow,
       },
@@ -2287,9 +2437,16 @@ describe("computer replacement", () => {
       .mockResolvedValue({ count: 1 });
     const update = vi.fn().mockResolvedValue({});
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: { findUniqueOrThrow, updateMany, update },
       computerExecutionLease: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
 
     const destroy = vi.spyOn(sandbox, "destroy");
@@ -2323,6 +2480,11 @@ describe("computer replacement", () => {
 
   it("rejects replacement while another team bot holds the computer", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2337,6 +2499,8 @@ describe("computer replacement", () => {
         updateMany: vi.fn().mockResolvedValueOnce({ count: 1 }),
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn().mockResolvedValue({ id: "other-run" }),
       },
     } as unknown as PrismaClient;
@@ -2359,6 +2523,11 @@ describe("computer replacement", () => {
   it("refuses Recover and Update on a stale suspending computer", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2373,7 +2542,9 @@ describe("computer replacement", () => {
         updateMany,
       },
       computerExecutionLease: { findFirst: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
 
     for (const mode of ["recover", "update"] as const) {
@@ -2401,6 +2572,11 @@ describe("computer replacement", () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
     const stale = new Date("2024-01-01T00:00:00.000Z");
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2415,7 +2591,9 @@ describe("computer replacement", () => {
         updateMany,
       },
       computerExecutionLease: { findFirst: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2443,6 +2621,11 @@ describe("computer replacement", () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const nowMs = Date.parse("2024-06-01T12:00:00.000Z");
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2457,7 +2640,9 @@ describe("computer replacement", () => {
         updateMany,
       },
       computerExecutionLease: { findFirst: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
     const now = vi.spyOn(Date, "now").mockReturnValue(nowMs);
 
@@ -2485,6 +2670,11 @@ describe("computer replacement", () => {
   it("refuses Reset on a stale suspending row while a run is still active", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2499,7 +2689,9 @@ describe("computer replacement", () => {
         updateMany,
       },
       computerExecutionLease: { findFirst: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue({ id: "live-run" }) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue({ id: "live-run" }) },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2524,6 +2716,11 @@ describe("computer replacement", () => {
     // reach the claim instead of answering "Computer is busy" for good.
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2538,7 +2735,9 @@ describe("computer replacement", () => {
         updateMany,
       },
       computerExecutionLease: { findFirst: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2563,6 +2762,11 @@ describe("computer replacement", () => {
   it("refuses a booting computer another bot is still holding", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2579,7 +2783,9 @@ describe("computer replacement", () => {
       computerExecutionLease: {
         findFirst: vi.fn().mockResolvedValue({ id: "lease-other-bot" }),
       },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2605,6 +2811,11 @@ describe("computer replacement", () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const nowMs = Date.parse("2024-06-01T12:00:00.000Z");
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2619,7 +2830,9 @@ describe("computer replacement", () => {
         updateMany,
       },
       computerExecutionLease: { findFirst: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
     const now = vi.spyOn(Date, "now").mockReturnValue(nowMs);
 
@@ -2649,6 +2862,11 @@ describe("computer replacement", () => {
     // Refuse before claiming suspending so we do not bump @updatedAt under the provisioner.
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2663,7 +2881,9 @@ describe("computer replacement", () => {
         updateMany,
       },
       computerExecutionLease: { findFirst: vi.fn().mockResolvedValue(null) },
-      run: { findFirst: vi.fn().mockResolvedValue({ id: "live-run" }) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue({ id: "live-run" }) },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2685,6 +2905,11 @@ describe("computer replacement", () => {
 
   it("rejects replacement while the target bot has an active run", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2699,6 +2924,8 @@ describe("computer replacement", () => {
         updateMany: vi.fn().mockResolvedValueOnce({ count: 1 }),
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn().mockResolvedValue({ id: "same-bot-run" }),
       },
     } as unknown as PrismaClient;
@@ -2720,6 +2947,11 @@ describe("computer replacement", () => {
 
   it("rejects replacement while any bot holds user control", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2753,6 +2985,11 @@ describe("computer replacement", () => {
 
   it("rejects replacement while the same bot holds user control", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -2818,11 +3055,18 @@ describe("computer replacement", () => {
         controlBotId: null,
       });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow,
         updateMany,
       },
-      run: { findFirst: vi.fn() },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn() },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2856,11 +3100,18 @@ describe("computer replacement", () => {
     const destroy = vi.fn();
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue(idleTakeoverComputer()),
         updateMany,
       },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2909,11 +3160,18 @@ describe("computer replacement", () => {
   it("does not revoke the screen when the reset claim loses", async () => {
     const setScreenControl = vi.fn();
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue(idleTakeoverComputer()),
         updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
-      run: { findFirst: vi.fn() },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn() },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2936,13 +3194,20 @@ describe("computer replacement", () => {
     const setScreenControl = vi.fn();
     const updateMany = vi.fn();
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi
           .fn()
           .mockResolvedValue(idleTakeoverComputer({ controlRunId: "run-waiting" })),
         updateMany,
       },
-      run: { findFirst: vi.fn() },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn() },
     } as unknown as PrismaClient;
 
     await expect(
@@ -2965,6 +3230,11 @@ describe("computer replacement", () => {
     const setScreenControl = vi.fn();
     const updateMany = vi.fn();
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue(
           idleTakeoverComputer({
@@ -2975,7 +3245,9 @@ describe("computer replacement", () => {
         ),
         updateMany,
       },
-      run: { findFirst: vi.fn() },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn() },
     } as unknown as PrismaClient;
 
     await expect(
@@ -3012,8 +3284,15 @@ describe("computer replacement", () => {
     const findUniqueOrThrow = vi.fn().mockResolvedValue(computer);
     const findUnique = vi.fn().mockResolvedValue(computer);
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: { findUniqueOrThrow, findUnique, updateMany: vi.fn() },
-      run: { findFirst: vi.fn() },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn() },
     } as unknown as PrismaClient;
     const sandbox = Object.assign(new FakeSandboxProvider(), {
       setScreenControl: async () => {
@@ -3040,6 +3319,11 @@ describe("computer replacement", () => {
 
   it("rejects replacement when control is claimed before the suspending lock", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -3056,7 +3340,9 @@ describe("computer replacement", () => {
         }),
         updateMany: vi.fn().mockResolvedValueOnce({ count: 0 }),
       },
-      run: { findFirst: vi.fn() },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn() },
     } as unknown as PrismaClient;
     await expect(
       replaceComputer(
@@ -3093,6 +3379,11 @@ describe("computer replacement", () => {
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -3107,6 +3398,8 @@ describe("computer replacement", () => {
         updateMany,
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn().mockResolvedValue({ id: "active-run" }),
       },
     } as unknown as PrismaClient;
@@ -3146,6 +3439,11 @@ describe("computer replacement", () => {
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -3160,6 +3458,8 @@ describe("computer replacement", () => {
         updateMany,
       },
       run: {
+      findMany: vi.fn(async () => []),
+
         findFirst: vi.fn().mockResolvedValue({ id: "active-run" }),
       },
     } as unknown as PrismaClient;
@@ -3224,8 +3524,15 @@ describe("computer replacement", () => {
         updatedAt: new Date("2024-01-01T00:00:00.000Z"),
       });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: { findUniqueOrThrow, updateMany, update },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
     const sandbox = new FakeSandboxProvider();
 
@@ -3257,6 +3564,11 @@ describe("computer replacement", () => {
 
   it("rejects a second claim on a stopped computer that is already suspending", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           id: "computer-1",
@@ -3270,7 +3582,9 @@ describe("computer replacement", () => {
         }),
         updateMany: vi.fn().mockResolvedValueOnce({ count: 0 }),
       },
-      run: { findFirst: vi.fn() },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn() },
     } as unknown as PrismaClient;
     await expect(
       replaceComputer(
@@ -3321,8 +3635,15 @@ describe("computer replacement", () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const update = vi.fn().mockResolvedValue({});
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: { findUniqueOrThrow, updateMany, update },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
     const destroy = vi.spyOn(sandbox, "destroy");
 
@@ -3371,12 +3692,19 @@ describe("computer replacement", () => {
     };
     const updateMany = vi.fn().mockResolvedValueOnce({ count: 1 }).mockResolvedValue({ count: 1 });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       computer: {
         findUniqueOrThrow: vi.fn().mockResolvedValue(computerRecord),
         updateMany,
         update: vi.fn(),
       },
-      run: { findFirst: vi.fn().mockResolvedValue(null) },
+      run: {
+      findMany: vi.fn(async () => []),
+ findFirst: vi.fn().mockResolvedValue(null) },
     } as unknown as PrismaClient;
     const destroy = vi.spyOn(sandbox, "destroy");
 

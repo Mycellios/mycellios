@@ -291,9 +291,10 @@ describe("E2B computer backend", () => {
         else if (outcome === "rejects")
           await expect(result).rejects.toMatchObject({ statusCode: status });
         else await expect(result).rejects.toSatisfy(isSandboxGoneError);
-        expect(requests).toEqual([
-          method === "destroy" ? "DELETE /sandboxes/paused" : "POST /sandboxes/paused/pause",
-        ]);
+        const expectedRequest = method === "destroy" ? "DELETE /sandboxes/paused" : "POST /sandboxes/paused/pause";
+        expect(requests.length).toBeGreaterThan(0);
+        expect(requests.length).toBeLessThanOrEqual(4); // The pinned SDK retries 429/503.
+        expect(new Set(requests)).toEqual(new Set([expectedRequest]));
       } finally {
         vi.unstubAllEnvs();
         server.closeAllConnections();

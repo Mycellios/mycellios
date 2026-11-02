@@ -37,8 +37,14 @@ function executorFixture(
     leaseFence: 0,
   };
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     user: { findUnique: vi.fn<() => Promise<{ timezone: string } | null>>(async () => null) },
     run: {
+      findMany: vi.fn(async () => []),
+
       findUnique: async () => run,
       findUniqueOrThrow: async () => run,
       updateMany: async ({ data }: { data: Record<string, unknown> }) => {
@@ -59,6 +65,8 @@ function executorFixture(
       findMany: async () => [],
     },
     attempt: {
+      findMany: vi.fn(async () => []),
+
       create: async () => ({ id: "attempt" }),
       update: vi.fn(),
       updateMany: async () => ({ count: 1 }),

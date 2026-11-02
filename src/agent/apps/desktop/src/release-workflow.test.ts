@@ -2,112 +2,53 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const workflow = readFileSync(
-  path.resolve(import.meta.dirname, "../../../.github/workflows/release-desktop.yml"),
-  "utf8",
-);
+// Publication belongs to the canonical repository; Desktop preview upgrades are manual.
+const repository = path.resolve(import.meta.dirname, "../../../../..");
+const agent = path.join(repository, "src/agent");
+const read = (name: string) => readFileSync(path.join(repository, name), "utf8");
+const quality = read(".github/workflows/agent-quality.yml");
+const desktop = JSON.parse(readFileSync(path.join(agent, "apps/desktop/package.json"), "utf8"));
+const windows = read("src/agent/apps/desktop/scripts/windows-installer.mjs");
 
-const expression = (inner: string) => `\${{ ${inner} }}`;
+describe("canonical Desktop preview release boundaries", () => {
+  it("checks both owned dependency graphs with read-only CI credentials", () => {
+    expect(quality).toContain("permissions:\n  contents: read");
+    expect(quality).toContain("npm ci --ignore-scripts --no-audit --no-fund");
+    expect(quality).toContain("npm ci --prefix src/agent");
+    expect(quality).not.toContain("secrets.");
+    expect(quality).not.toMatch(/--publish|gh release|npm publish/);
+  });
 
-describe("desktop release workflow", () => {
-  it("cannot execute contributor pull-request code with release credentials", () => {
+  it("pins every third-party quality action to an immutable commit", () => {
+    const actions = [...quality.matchAll(/uses:\s+([^\s#]+)/g)].map(match => match[1]);
+    expect(actions.length).toBeGreaterThan(0);
+    for (const action of actions) expect(action).toMatch(/@[0-9a-f]{40}$/);
+  });
+
+  it("gates ordinary and unified packaging on current source receipts", () => {
+    expect(desktop.build.beforePack).toBe("./scripts/verify-release.cjs");
+    expect(windows).toContain("scripts/verify-release.cjs");
+    const continuity = read("src/agent/apps/desktop/scripts/release-continuity.mjs");
+    expect(continuity).toContain("['desktop', 'web', 'local-server']");
+    expect(continuity).toContain("Stale ${surface} build");
+    expect(continuity).toContain("Modified ${surface} bundle");
+  });
+
+  it("keeps per-user upgrades and requires signature verification for an update", () => {
+    expect(desktop.build.appId).toBe("com.mycellios.agent.desktop");
+    expect(windows).toContain("perMachine: false");
+    expect(windows).toContain("deleteAppDataOnUninstall: false");
+    expect(windows).toContain("verifyUpdateCodeSignature: true");
+    expect(windows).toContain("publish: []");
+    expect(read("src/agent/apps/desktop/scripts/package-windows.mjs")).toContain("publish: 'never'");
+  });
+
+  it("retains the separately pinned Apple Silicon publication inputs", () => {
+    const workflow = read(".github/workflows/desktop-macos.yml");
+    expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).not.toMatch(/^\s*pull_request:/m);
+    expect(workflow).toContain("desktop-v0.3.9-macos-preview");
+    expect(workflow).toContain("shasum -a 256 -c");
     expect(workflow).toContain("permissions:\n  contents: read");
-    expect(workflow.match(/persist-credentials: false/g)).toHaveLength(3);
-  });
-
-  it("pins every third-party action to an immutable commit", () => {
-    const actionReferences = [...workflow.matchAll(/uses:\s+([^\s#]+)/g)].map((match) => match[1]);
-    expect(actionReferences.length).toBeGreaterThan(0);
-    for (const reference of actionReferences) {
-      expect(reference, reference).toMatch(/@[0-9a-f]{40}$/);
-    }
-  });
-
-  it("requires signed platform builds before a single publication job", () => {
-    expect(workflow).toContain("-c.forceCodeSigning=true");
-    expect(workflow).toContain("codesign --verify --deep --strict");
-    expect(workflow).toContain("Get-AuthenticodeSignature");
-    expect(workflow).toContain("needs: [validate, build]");
-    expect(workflow).toContain("attestations: write");
-    expect(workflow).toContain("actions/attest-build-provenance@");
-    expect(workflow).not.toContain("--publish always");
-    expect(workflow).toContain("DESKTOP_MAC_CSC_LINK");
-    expect(workflow).toContain("DESKTOP_WIN_CSC_LINK");
-    expect(workflow).not.toMatch(/secrets\.DESKTOP_CSC_(?:LINK|KEY_PASSWORD)/);
-    expect(workflow).not.toContain("cache: pnpm");
-    expect(workflow).toContain("apps/desktop/out/latest*.yml");
-    expect(workflow).not.toContain("apps/desktop/out/*.yml");
-  });
-
-  it("notarizes macOS with a short-lived App Store Connect API key file", () => {
-    for (const secret of ["APPLE_API_KEY_ID", "APPLE_API_ISSUER", "APPLE_API_KEY_P8"]) {
-      expect(workflow).toContain(`secrets.${secret}`);
-    }
-    expect(workflow).not.toMatch(/secrets\.(?:APPLE_ID|APPLE_APP_SPECIFIC_PASSWORD)\b/);
-    // The same temp path is declared by the setup, packaging, and cleanup steps.
-    const keyFile = `APPLE_API_KEY: ${expression("runner.temp")}/apple-api-key.p8`;
-    expect(workflow.split(keyFile)).toHaveLength(4);
-    expect(workflow).toContain(`printf '%s\\n' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY"`);
-    expect(workflow).toContain('chmod 600 "$APPLE_API_KEY"');
-    expect(workflow).toMatch(
-      /if: always\(\) && runner\.os == 'macOS'\n(?:.*\n){3}\s+run: rm -f "\$APPLE_API_KEY"/,
-    );
-  });
-
-  it("builds Windows only when an Authenticode certificate is configured", () => {
-    expect(workflow).toContain(
-      `WINDOWS_SIGNING: ${expression("secrets.DESKTOP_WIN_CSC_LINK != ''")}`,
-    );
-    expect(workflow).toContain(
-      `include: ${expression("fromJSON(needs.validate.outputs.platforms)")}`,
-    );
-    expect(workflow).toContain(
-      `include='[{"os":"macos-26","artifact":"macos"},{"os":"ubuntu-24.04","artifact":"linux"}]'`,
-    );
-    expect(workflow).toMatch(
-      /if \[\[ "\$WINDOWS_SIGNING" == "true" \]\]; then\n\s+include=.*\{"os":"windows-2022","artifact":"windows"\}/,
-    );
-    expect(workflow.split("windows-2022")).toHaveLength(2);
-    expect(workflow).toContain(`WINDOWS_BUILT: ${expression("needs.validate.outputs.windows")}`);
-    expect(workflow).toContain('if [[ "$WINDOWS_BUILT" == "true" ]]; then');
-    expect(workflow).toContain("feeds+=(release-artifacts/latest.yml)");
-  });
-
-  it("pins every platform update feed to the official GitHub owner and repo", () => {
-    expect(workflow).toContain('grep -Fqx "provider: github"');
-    expect(workflow).toContain('grep -Fqx "owner: elie222"');
-    expect(workflow).toContain('grep -Fqx "repo: rakazo"');
-    expect(workflow).toContain("Verify Linux update feed is pinned to the official GitHub channel");
-    expect(workflow).toContain("Windows update config missing");
-    expect(workflow).toContain("RELEASE_VERSION:");
-    expect(workflow).toContain('grep -Fqx "version: $RELEASE_VERSION"');
-  });
-
-  it("adds the system passkey association only when a provisioning profile is configured", () => {
-    expect(workflow).toContain(
-      `PROVISIONING_PROFILE: ${expression("secrets.DESKTOP_MAC_PROVISIONING_PROFILE")}`,
-    );
-    expect(workflow).toMatch(/if \[\[ -z "\$PROVISIONING_PROFILE" \]\]; then\n.*\n\s+exit 0/);
-    expect(workflow).toContain("pnpm exec tsx apps/desktop/scripts/passkey-entitlements.ts");
-    expect(workflow).toContain('if [[ "$app_id" != "$APPLE_TEAM_ID.$bundle_id" ]]; then');
-    // Helpers keep entitlementsInherit; only the main app is associated.
-    expect(workflow).toContain(
-      '"-c.mac.entitlements=$PASSKEY_ENTITLEMENTS" "-c.mac.provisioningProfile=$PASSKEY_PROFILE"',
-    );
-    expect(workflow).not.toContain("entitlementsInherit=");
-    expect(workflow).toContain('test -f "$app/Contents/embedded.provisionprofile"');
-    expect(workflow).not.toMatch(/secrets\.APPLE_TEAM_ID/);
-  });
-
-  it("publishes only a complete stable, upgrade-only feed", () => {
-    expect(workflow).toContain("^v([0-9]+)\\.([0-9]+)\\.([0-9]+)$");
-    expect(workflow).toContain("must be newer than published release");
-    expect(workflow).toContain("group: release-desktop-stable");
-    expect(workflow).toContain("latest.yml");
-    expect(workflow).toContain("latest-mac.yml");
-    expect(workflow).toContain("latest-linux.yml");
-    expect(workflow).toContain("--draft --generate-notes");
-    expect(workflow).toContain("--draft=false --latest");
   });
 });

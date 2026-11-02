@@ -10,6 +10,7 @@ describe("structured results through real Pi context selection", () => {
     let cursor = 0;
     let calls = 0;
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       steps: [
         {
           expect() {},
@@ -114,6 +115,7 @@ describe("structured results through real Pi context selection", () => {
       let calls = 0;
       const decisions: Array<{ droppedMessages: number; truncatedToolResults: number }> = [];
       const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
         steps: Array.from({ length: 13 }, (_, index) => ({
           expect(request) {
             const serialized = JSON.stringify(request.messages);
@@ -151,7 +153,7 @@ describe("structured results through real Pi context selection", () => {
           history: Array.from({ length: 100 }, (_, index) => ({
             id: `old-${index}`,
             role: "user" as const,
-            content: `obsolete-old-${index}: ${"irrelevant history ".repeat(50)}`,
+            content: `obsolete-old-${index}: ${"irrelevant history ".repeat(12)}`,
           })),
           contextStrategy,
           model: { ...server.model, contextWindow: 4096, maxTokens: 512 },

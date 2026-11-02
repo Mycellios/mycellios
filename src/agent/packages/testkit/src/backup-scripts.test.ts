@@ -86,7 +86,7 @@ if (args[0] === "inspect") {
   }
 } else if (args.includes("ps")) {
   console.log("example-api-container");
-} else if (!args.includes("up") && !args.includes("pg_isready")) {
+} else if (!args.includes("up") && !args.includes("stop") && !args.includes("pg_isready")) {
   process.exit(92);
 }
 `,

@@ -151,8 +151,14 @@ function fixture(runId = "run-1") {
     ),
   };
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     user: { findUnique: vi.fn(async () => null) },
     run: {
+      findMany: vi.fn(async () => []),
+
       findUnique: vi.fn(async () => run),
       findUniqueOrThrow: vi.fn(async () => run),
       updateMany: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
@@ -173,6 +179,8 @@ function fixture(runId = "run-1") {
       findMany: vi.fn(async () => []),
     },
     attempt: {
+      findMany: vi.fn(async () => []),
+
       create: vi.fn(async () => ({ id: "attempt-1" })),
       update: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),

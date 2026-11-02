@@ -93,6 +93,7 @@ vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
 vi.mock("./appearance", () => ({ mobileTokens: () => ({}) }));
 vi.mock("./native", () => ({
   native: new Proxy({}, { get: (_target, name) => String(name) }),
+  useMobileTokens: () => ({}),
   useResolvedAppearance: () => "light",
   useThemedStyles: (createStyles: () => unknown) => createStyles(),
 }));

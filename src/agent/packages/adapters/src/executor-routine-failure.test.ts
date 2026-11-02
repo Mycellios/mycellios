@@ -74,8 +74,12 @@ async function failRun(scenario: Scenario) {
     throw scenario.error;
   });
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
     user: { findUnique: vi.fn(async () => null) },
     run: {
+      findMany: vi.fn(async () => []),
+
       findUnique: vi.fn(async () => run),
       findUniqueOrThrow: vi.fn(async () => run),
       findFirst: vi.fn(async () => ({
@@ -115,6 +119,8 @@ async function failRun(scenario: Scenario) {
       findMany: vi.fn(async () => []),
     },
     attempt: {
+      findMany: vi.fn(async () => []),
+
       create: vi.fn(async () => ({ id: "attempt-1" })),
       update: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),
@@ -417,6 +423,11 @@ function retryHarness(scenario: RetryScenario = {}) {
     error: overloaded().message,
   };
   const tx = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     routine: {
       updateMany: vi.fn(async () => ({
         count: scenario.pausedBeforeCreate || scenario.archivedBeforeCreate ? 0 : 1,
@@ -430,6 +441,8 @@ function retryHarness(scenario: RetryScenario = {}) {
       deleteMany: vi.fn(async () => ({ count: 1 })),
     },
     run: {
+      findMany: vi.fn(async () => []),
+
       findFirst: vi.fn(async () => (scenario.laterRunBeforeCreate ? { id: "run-later" } : null)),
       deleteMany: vi.fn(async () => ({ count: scenario.retryStartedBeforeCleanup ? 0 : 1 })),
       create: vi.fn(async () => {
@@ -441,8 +454,15 @@ function retryHarness(scenario: RetryScenario = {}) {
     },
   };
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     user: { findUnique: vi.fn(async () => null) },
     run: {
+      findMany: vi.fn(async () => []),
+
       findUnique: vi.fn(async () => failed),
       findFirst: vi.fn(async ({ select }: { select: { id?: boolean } }) =>
         select.id

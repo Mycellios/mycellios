@@ -51,6 +51,11 @@ describe("reconcileStuckWork", () => {
   it("ignores a young queue and a row the scan cannot classify", async () => {
     const eventFindMany = vi.fn(async () => []);
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
         findMany: vi.fn(async () => [
           candidate("queued", 1),
@@ -422,6 +427,11 @@ describe("reconcileStuckWork", () => {
     const second = { ...candidate("waiting_input", 5), id: "run-next-page" };
     const seen: unknown[] = [];
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
         findMany: vi.fn(async (args: { where?: { AND?: unknown[] } }) => {
           seen.push(args.where);
@@ -478,6 +488,11 @@ describe("reconcileStuckWork", () => {
 
   it("continues the other scans when the stuck query fails", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
         findMany: vi.fn(async (args: { where?: { status?: { in?: string[] } } }) => {
           if (args.where?.status?.in?.includes("waiting_takeover")) throw new Error("stuck down");
@@ -529,6 +544,11 @@ function stampMatchesDelete(stamp: NoticeStamp, where: NoticeDeleteWhere | undef
 function noticePrisma(run: ReturnType<typeof candidate>, stamps: NoticeStamp[]) {
   let nextId = 0;
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     run: {
       findMany: vi.fn(async () => [run]),
       findUnique: vi.fn(async () => ({
@@ -574,6 +594,11 @@ function noticePrisma(run: ReturnType<typeof candidate>, stamps: NoticeStamp[]) 
 
 function expireClient(run: ReturnType<typeof candidate>, options?: { cancelled?: number }) {
   const client = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     externalEffect: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     run: {
       findMany: vi.fn(async () => [run]),
@@ -591,7 +616,9 @@ function expireClient(run: ReturnType<typeof candidate>, options?: { cancelled?:
       findFirst: vi.fn(async () => null),
       create: vi.fn(async () => ({ id: "run-next" })),
     },
-    attempt: { updateMany: vi.fn(async () => ({ count: 1 })) },
+    attempt: {
+      findMany: vi.fn(async () => []),
+ updateMany: vi.fn(async () => ({ count: 1 })) },
     task: {
       updateMany: vi.fn(async () => ({ count: 1 })),
       create: vi.fn(async () => ({ id: "task-next" })),

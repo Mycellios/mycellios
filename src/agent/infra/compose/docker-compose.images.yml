@@ -36,6 +36,8 @@ x-app-environment: &app-environment
   WAKEUP_DRIVER: graphile
   AGENT_RUNTIME: pi
   API_URL: ${API_URL:-http://127.0.0.1:5173}
+  MYCELLIOS_DESKTOP_RELAY_ENABLED:
+  DESKTOP_RELAY_API_URL:
   MAX_UPLOAD_SIZE_MB:
   RAKAZO_UPDATE_RESTART_SUPERVISOR:
   TICKET_BOARD_ENABLED:
@@ -453,6 +455,7 @@ services:
     environment:
       <<: *app-environment
       GRAPHILE_WORKER_CONCURRENCY:
+      RAKAZO_WORKER_HEALTH_FILE:
     volumes:
       - appdata:/data
     networks:

@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -38,6 +40,12 @@ const SOURCES = {
 
 /** Read by code but never passed to the api or worker containers, with the reason. */
 const NOT_PASSED: Record<string, string> = {
+  APPDATA: "host-native agent discovery; never pass a Windows host profile into containers",
+  USERPROFILE: "host-native agent discovery; containers keep their own image home",
+  HOME: "inherited from the container image, not the operator profile",
+  PATH: "inherited from the container image, not the operator executable search path",
+  RAKAZO_LOCAL_SERVER_CONFIG: "Desktop's private local-server entry, not the container API entry",
+  RAKAZO_PROJECT_LOCAL: "private project-preview isolation; Compose runs the deployed server",
   VITEST: "set by the test runner",
   OWNER_EMAIL: "bootstrap-owner CLI input, passed on its own command line",
   OWNER_PASSWORD: "bootstrap-owner CLI input, passed on its own command line",
@@ -136,10 +144,7 @@ function scanEnvReads(dirs: readonly string[]): Set<string> {
  * Read from the installed package, so a Pi upgrade that adds a provider fails here.
  */
 function piEnvKeys(): string[] {
-  const file = path.join(
-    repoRoot,
-    "packages/adapters/node_modules/@earendil-works/pi-ai/dist/env-api-keys.js",
-  );
+  const file = path.join(path.join(createRequire(path.join(repoRoot, "packages/adapters/package.json")).resolve.paths("@earendil-works/pi-ai")!.find((dir) => existsSync(path.join(dir, "@earendil-works/pi-ai/package.json")))!, "@earendil-works/pi-ai/dist"), "env-api-keys.js");
   const names = [...readFileSync(file, "utf8").matchAll(new RegExp(`"(${ENV_NAME})"`, "g"))];
   return names.map((match) => match[1] ?? "");
 }
@@ -206,7 +211,8 @@ describe("api and worker environment allowlists", () => {
       for (const service of ["api", "worker"] as const) {
         for (const file of files) expect(loadServices(file)[service]?.env_file).toBeUndefined();
         const keys = Object.keys(stackEnvironment(files, service)).sort();
-        expect({ service, keys }).toEqual({ service, keys: expectedKeys(service) });
+        const expected = expectedKeys(service);
+        expect({ missing: expected.filter(key => !keys.includes(key)), extra: keys.filter(key => !expected.includes(key)) }).toEqual({ missing: [], extra: [] });
       }
     },
   );

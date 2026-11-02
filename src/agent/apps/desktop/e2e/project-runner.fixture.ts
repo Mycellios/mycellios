@@ -56,12 +56,18 @@ void app.whenReady().then(async () => {
     const page = await until(async () => webContents.getAllWebContents().find(content => content !== win.webContents && content.getURL() === url), Boolean, "embedded native page");
     assert(page); assert.equal(await page.executeJavaScript("typeof window.rakazoDesktop"), "undefined");
     assert.equal(await page.executeJavaScript("location.href"), url);
+    await win.webContents.executeJavaScript('window.rakazoDesktop.projectRunner.stop("bot")');
+    await until(() => win.webContents.executeJavaScript('window.rakazoDesktop.projectRunner.state("bot")'), state => state.phase === "configured", "explicit Stop");
+    await until(async () => { try { await fetch(url, { signal: AbortSignal.timeout(500) }); return false; } catch { return true; } }, Boolean, "stopped service port");
+    await win.webContents.executeJavaScript('window.rakazoDesktop.projectRunner.play({botId:"bot"})');
+    await until(() => win.webContents.executeJavaScript('window.rakazoDesktop.projectRunner.state("bot")'), state => state.phase === "running", "Play after Stop");
+    assert.equal((await fetch(url)).status, 200);
     // Losing authorization closes only the process tree that this runner owns.
     allowed = false;
     await until(async () => { try { await fetch(url, { signal: AbortSignal.timeout(500) }); return false; } catch { return true; } }, Boolean, "revoked services stopped");
     allowed = true;
     assert.equal((await win.webContents.executeJavaScript('window.rakazoDesktop.projectRunner.state("bot")')).phase, "configured");
-    await writeFile(path.join(output, "native-proof.json"), JSON.stringify({ passed: true, realElectron: true, nativeProcessTree: true, scopedIpc: true, embeddedBrowser: true, noPageBridge: true, revokedServicesStopped: true, realModel: false, realAccount: false }, null, 2));
+    await writeFile(path.join(output, "native-proof.json"), JSON.stringify({ passed: true, realElectron: true, nativeProcessTree: true, scopedIpc: true, embeddedBrowser: true, noPageBridge: true, explicitStopPlay: true, revokedServicesStopped: true, realModel: false, realAccount: false }, null, 2));
     app.exit(0);
   } catch (error) {
     await writeFile(path.join(output, "native-proof.json"), JSON.stringify({ passed: false, error: String(error), stack: error instanceof Error ? error.stack : undefined }, null, 2)); app.exit(1);

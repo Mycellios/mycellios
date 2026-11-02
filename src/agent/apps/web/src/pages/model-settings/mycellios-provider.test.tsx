@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MycelliosProvider } from "./mycellios-provider";
 import { ProvidersSection } from "./providers-section";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 const mock = vi.hoisted(() => ({ connect: vi.fn(), caps: vi.fn() }));
 vi.mock("../../lib/auth-capabilities", () => ({ fetchAuthCapabilities: mock.caps }));
 vi.mock("../../lib/space-rpc", () => ({
@@ -124,6 +124,7 @@ describe("built-in Mycellios provider", () => {
     );
     expect(div.querySelectorAll("ul > li")[1]?.textContent).toContain("AntSeed");
     await vi.waitFor(() => expect(div.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false));
+    mkdirSync("outputs/mycellios-provider-20261101", { recursive: true });
     writeFileSync(
       "outputs/mycellios-provider-20261101/visual.html",
       `<!doctype html><html lang="en" data-theme="light"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Mycellios — local provider preview</title><link rel="stylesheet" href="/preview.css"><body class="bg-background text-foreground"><main style="max-width:640px;margin:48px auto;padding:24px"><p class="mb-6 text-sm text-muted-foreground">Local interface test · example connections · no live account</p><h1 class="mb-8 text-2xl font-medium">Models</h1>${div.innerHTML}</main></body></html>`,

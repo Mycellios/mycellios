@@ -23,7 +23,14 @@ case "$1" in
     echo "$ref" >>"$CREATED"
     echo fake-container
     ;;
-  export) [[ -z "${FAIL_EXPORT:-}" ]] && tar -c -C "$IMAGE_ROOT" app ;;  # no ./ prefix, like docker
+  inspect) echo sha256:fixture ;;
+  image)
+    [[ "$2" == save && -z "${FAIL_EXPORT:-}" ]] || exit 1
+    layer="$(mktemp -d)"
+    tar -cf "$layer/layer.tar" -C "$IMAGE_ROOT" app
+    tar -cf - --transform='s|^layer.tar$|fixture/layer.tar|' -C "$layer" layer.tar
+    rm -rf -- "$layer"
+    ;;
   rm | rmi) ;;
   *) exit 1 ;;
 esac

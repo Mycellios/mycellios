@@ -1,3 +1,4 @@
+import { createRefreshCoalescer } from "@rakazo/core";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
@@ -23,6 +24,8 @@ describe("thread foreground subscription", () => {
       let hookIndex = 0;
       const snapshot = { cursor: 10 };
       const scope = {
+        createRefreshCoalescer,
+        AppState: { currentState: "active" },
         useEffect: (effect: () => (() => void) | undefined, deps: unknown[]) => {
           const index = hookIndex++;
           const previous = hooks[index];
@@ -85,6 +88,7 @@ describe("thread foreground subscription", () => {
       scope.refresh.mockClear();
       // Another device paused a run; the event has no owner to expose Dismiss.
       deliver({ type: "run.waiting_input", seq: 12, runId: "run-other-device" });
+      await Promise.resolve();
       expect(applied).toEqual([11, 12]);
       expect(scope.refresh).toHaveBeenCalledTimes(mode === "latest" ? 1 : 0);
       expect(scope.refreshMentionBots).not.toHaveBeenCalled();

@@ -165,6 +165,7 @@ it.each([false, true])(
       expect(rows.map((row) => row.textContent)).toEqual([
         "Artifacts",
         "Models",
+        "Skills",
         "Voice",
         "Approvals",
         "Integrations",
@@ -179,10 +180,10 @@ it.each([false, true])(
       act(() => rows[1]!.click());
       expect(events).toEqual(["/models"]);
       events.length = 0;
-      act(() => rows[3]!.click());
+      act(() => rows[4]!.click());
       expect(events).toEqual(["/approvals"]);
       events.length = 0;
-      act(() => rows[5]!.click());
+      act(() => rows[6]!.click());
       expect(events).toEqual(["/messaging"]);
       act(() => root.render(render(true)));
       expect(container.querySelector("button")!.disabled).toBe(true);

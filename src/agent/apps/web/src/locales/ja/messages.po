@@ -6302,3 +6302,6 @@ msgstr "Version history"
 #: src/pages/SkillLibrarySettings.tsx
 msgid "Version saved for this agent"
 msgstr "Version saved for this agent"
+
+msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
+msgstr "リクエストがモデルのコンテキストに収まりませんでした。再試行するか、より大きなコンテキストのモデルを選択してください。"

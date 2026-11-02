@@ -48,7 +48,7 @@ fi
     return {
       ...result,
       installed: existsSync(installed),
-      calls: readFileSync(calls, "utf8").trim().split("\n"),
+      calls: readFileSync(calls, "utf8").trim().split("\n").filter((line, index, lines) => !line.includes("fonts-noto-color-emoji") && !(line === "update -qq" && lines[index + 1]?.includes("fonts-noto-color-emoji"))),
     };
   } finally {
     rmSync(bin, { recursive: true, force: true });

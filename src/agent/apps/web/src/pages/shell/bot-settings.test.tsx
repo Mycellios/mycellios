@@ -29,7 +29,8 @@ vi.mock("@lingui/react/macro", () => {
     parts.reduce((text, part, index) => `${text}${index > 0 ? values[index - 1] : ""}${part}`, "");
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
-vi.mock("@rakazo/ui-web", () => ({
+vi.mock("@rakazo/ui-web", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@rakazo/ui-web")>()),
   Button: ({
     variant: _variant,
     size: _size,
@@ -151,7 +152,7 @@ async function submitToolName(input: HTMLSelectElement, value: string) {
   await flush();
 }
 
-async function renderSettings(onSave: (patch: SavePatch) => Promise<void>, currentBot = bot) {
+async function renderSettings(onSave: (patch: SavePatch) => Promise<void>, currentBot = bot, expandAdvanced = true) {
   await act(async () => {
     root.render(
       <QueryClientProvider client={queryClient}>
@@ -167,6 +168,11 @@ async function renderSettings(onSave: (patch: SavePatch) => Promise<void>, curre
     );
   });
   await flush();
+  if (expandAdvanced) {
+    const advanced = container.querySelector<HTMLButtonElement>('[data-testid="bot-settings-advanced"] button[aria-expanded]')!;
+    if (advanced.getAttribute("aria-expanded") === "false") await act(async () => advanced.click());
+    await flush();
+  }
 }
 
 describe("BotSettings help", () => {
@@ -483,8 +489,8 @@ it("uses section headings without repeating notification or model row labels", a
   expect(model?.className).toBe("sr-only");
 });
 
-it("renders Advanced as a muted unfilled disclosure with an expanded state", async () => {
-  await renderSettings(vi.fn(async () => undefined));
+it("keeps Advanced initially folded and exposes its expanded state", async () => {
+  await renderSettings(vi.fn(async () => undefined), bot, false);
   const trigger = container.querySelector<HTMLButtonElement>(
     '[data-testid="bot-settings-advanced"] button[aria-expanded]',
   )!;
@@ -493,10 +499,11 @@ it("renders Advanced as a muted unfilled disclosure with an expanded state", asy
   expect(trigger.querySelector("svg")?.getAttribute("class")).toContain(
     "group-aria-expanded:rotate-0",
   );
-  await act(async () => trigger.click());
   expect(trigger.getAttribute("aria-expanded")).toBe("false");
   await act(async () => trigger.click());
   expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  await act(async () => trigger.click());
+  expect(trigger.getAttribute("aria-expanded")).toBe("false");
 });
 
 it("keeps cross-space communication off until explicitly enabled", async () => {

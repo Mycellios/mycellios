@@ -62,6 +62,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
         else retryMessages = request.messages;
       };
       const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
         steps: [
           {
             expect() {},
@@ -119,6 +120,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
         expect(JSON.stringify(request.messages)).toContain("Save hello to notes.txt.");
       };
       const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
         steps: [
           {
             expect: assertBounded,
@@ -145,7 +147,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
       });
       cleanups.push(() => server.close());
       const events = await collect(
-        new PiAgentRuntime({ onContextDecision: (decision) => decisions.push(decision) }).run(
+        new PiAgentRuntime({ onContextDecision: (decision) => { if (!decision.runId.startsWith("compact:")) decisions.push(decision); } }).run(
           runRequest(
             { ...server.model, contextWindow: 8192, maxTokens: 1024 },
             {
@@ -166,7 +168,8 @@ describe("real Pi against an offline model HTTP endpoint", () => {
       server.assertComplete();
       expect(events.some((event) => event.type === "done")).toBe(true);
       expect(decisions).toHaveLength(2);
-      expect(decisions[0]!.droppedMessages).toBeGreaterThan(0);
+      expect(server.compactionRequests.length).toBeGreaterThan(0);
+      expect(server.compactionRequests.length).toBeLessThanOrEqual(8);
       expect(decisions[1]!.truncatedToolResults).toBe(1);
     },
   );
@@ -175,6 +178,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
     let firstMessages: ModelEmulatorRequest["messages"] | undefined;
     let firstTools: ModelEmulatorRequest["tools"] | undefined;
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       steps: [
         {
           expect(request) {
@@ -235,6 +239,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
       ).toBe(false);
     };
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       steps: [
         {
           expect: assertOriginals,
@@ -285,7 +290,8 @@ describe("real Pi against an offline model HTTP endpoint", () => {
   ])(
     "rejects oversized $name before invoking the model or reserving spend",
     async ({ overrides, error }) => {
-      const server = await startModelEmulator({ steps: [] });
+      const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.", steps: [] });
       cleanups.push(() => server.close());
       let reservations = 0;
       const events: AgentRuntimeEvent[] = [];
@@ -321,6 +327,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
     const decisions: Array<{ agentId?: string; strategy?: string; truncatedToolResults: number }> =
       [];
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       steps: [
         {
           expect() {},
@@ -364,7 +371,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
     });
     cleanups.push(() => server.close());
     await collect(
-      new PiAgentRuntime({ onContextDecision: (decision) => decisions.push(decision) }).run(
+      new PiAgentRuntime({ onContextDecision: (decision) => { if (!decision.runId.startsWith("compact:")) decisions.push(decision); } }).run(
         runRequest(
           { ...server.model, contextWindow: 8192, maxTokens: 1024 },
           {
@@ -402,6 +409,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
     cleanups.push(() => rm(dir, { recursive: true, force: true }));
     const calls: Array<{ name: string; args: Record<string, unknown>; id?: string }> = [];
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       apiKey: "fixture-only-key",
       steps: [
         {
@@ -487,6 +495,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
   it("returns tool failure to the model and continues without claiming a successful write", async () => {
     let calls = 0;
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       steps: [
         {
           expect() {},
@@ -525,6 +534,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
   it("propagates a provider rejection without dispatching tools or emitting done", async () => {
     let calls = 0;
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       steps: [
         {
           expect() {},
@@ -554,6 +564,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
 
   it("rejects an interrupted SSE response without emitting successful completion", async () => {
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       // The cut reply is continued once; a continuation that is cut too fails the run.
       steps: [
         { expect() {}, response: { type: "disconnect", text: "Working" } },
@@ -573,6 +584,7 @@ describe("real Pi against an offline model HTTP endpoint", () => {
     const opened = deferred();
     const closed = deferred();
     const server = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       steps: [
         {
           expect() {},
@@ -606,11 +618,13 @@ describe("real Pi against an offline model HTTP endpoint", () => {
 
   it("keeps two model connections and their responses isolated", async () => {
     const first = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       modelId: "fixture-first",
       apiKey: "first-fixture-key",
       steps: [{ expect() {}, response: { type: "text", text: "First connection" } }],
     });
     const second = await startModelEmulator({
+        compactionSummary: "Synthetic summary: previous diagnostic history retained; continue the latest request.",
       modelId: "fixture-second",
       apiKey: "second-fixture-key",
       steps: [{ expect() {}, response: { type: "text", text: "Second connection" } }],

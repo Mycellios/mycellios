@@ -19,7 +19,7 @@ describe("associatedPasskeyRpIds", () => {
   });
 
   it("lists the hosted domain only for a packaged macOS app with an embedded profile", () => {
-    const exists = (file: string) => file === profile;
+    const exists = (file: string) => file.replaceAll("\\", "/") === profile;
     expect(
       associatedPasskeyRpIds({ platform: "darwin", packaged: true, resourcesPath, exists }),
     ).toEqual([PASSKEY_RP_ID]);
@@ -45,7 +45,7 @@ describe("passkeyEntitlements", () => {
     const plist = passkeyEntitlements(base, "ABCDE12345", pkg.build.appId);
     expect(plist.startsWith(base.slice(0, base.lastIndexOf("</dict>")).trimEnd())).toBe(true);
     expect(plist).toContain(
-      "<key>com.apple.application-identifier</key>\n    <string>ABCDE12345.dev.rakazo.desktop</string>",
+      `<key>com.apple.application-identifier</key>\n    <string>ABCDE12345.${pkg.build.appId}</string>`,
     );
     expect(plist).toContain(
       `<key>com.apple.developer.associated-domains</key>\n    <array>\n      <string>webcredentials:${PASSKEY_RP_ID}</string>\n    </array>\n  </dict>\n</plist>`,

@@ -227,8 +227,12 @@ function fixture({
   let outsideSteering = false;
   let offeredTools: string[] = [];
   const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
     user: { findUnique: vi.fn(async () => null) },
     run: {
+      findMany: vi.fn(async () => []),
+
       findFirst: vi.fn(async () =>
         pendingInstructionsRunId ? { id: pendingInstructionsRunId } : null,
       ),
@@ -272,6 +276,8 @@ function fixture({
       findUnique: vi.fn(async () => ({ ...liveBot })),
     },
     attempt: {
+      findMany: vi.fn(async () => []),
+
       create: vi.fn(async () => ({ id: "attempt-1" })),
       count: vi.fn(async () => 1),
       update: vi.fn(),
@@ -533,6 +539,11 @@ function fixture({
         blocks: [{ kind: "text", text: promptText }],
       };
       const tx = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         $queryRaw: vi.fn(async () => []),
         thread: { update: vi.fn(async () => ({ nextMessageSeq: 2, nextEventSeq: 2 })) },
         message: {

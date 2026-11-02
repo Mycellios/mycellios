@@ -3745,7 +3745,27 @@ export function createRunExecutor(deps: ExecutorDeps) {
           computer: { select: { scope: true } },
         },
       });
-      if (!leaseTarget.computerId) throw new Error("Bot has no computer");
+      if (!leaseTarget.computerId) {
+        // A deleted/unlinked computer needs user action, not an unbounded queue retry.
+        // Recheck ownership before recording an attempt; never settle a stolen lease.
+        const claimed = await deps.prisma.run.updateMany({
+          where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },
+          data: { error: "Bot has no computer" },
+        });
+        if (claimed.count !== 1) return;
+        const failedAttempt = await deps.prisma.attempt.create({
+          data: { runId, fence, status: "running" },
+        });
+        const bot = await deps.prisma.bot.findUnique({
+          where: { id: run.botId },
+          select: { name: true },
+        });
+        await failRunBeforeTurn(
+          deps, run, bot?.name ?? "", { attemptId: failedAttempt.id, workerId, fence },
+          "Bot has no computer",
+        );
+        return;
+      }
       if (leaseTarget.computerSwitching) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
@@ -4471,19 +4491,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
             "approval",
             {},
           ));
-        let autoReviewPreferencePromise:
-          | Promise<{ enabled: boolean; skipApprovals: boolean }>
-          | undefined;
-        const loadAutoReviewPreference = () => {
-          autoReviewPreferencePromise ??= findAutoReviewPreference(deps.prisma, {
+        // Approval changes made while a run is active apply to its next tool.
+        const loadAutoReviewPreference = () =>
+          findAutoReviewPreference(deps.prisma, {
             userId: run.userId,
             spaceId: run.spaceId,
           }).then((row) => ({
             enabled: row?.enabled ?? deploymentAutoReviewDefault(),
             skipApprovals: row?.skipApprovals ?? false,
           }));
-          return autoReviewPreferencePromise;
-        };
         // Outbound destinations this run may reach without asking. See outboundSiteGate and
         // connectorReadRequiresApproval; approvals from earlier attempts are read back from effects.
         const searchResultUrls = new Set<string>();

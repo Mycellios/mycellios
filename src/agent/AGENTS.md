@@ -565,3 +565,7 @@
   runtime dependencies; qualify compiled module evaluation as well as syntax.
   Resolve shared root protocol dependencies through the Agent build's own pinned
   node_modules as well, so native bundling does not require a parent install.
+
+- Repository-root `.github/workflows` owns Mycellios CI and publication. Nested
+  `.github` files here preserve the imported upstream CI reference for offline
+  security-boundary tests; they do not execute as workflows in this repository.

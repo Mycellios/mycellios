@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+import path from "node:path";
 import { expect, it, vi } from "vitest";
 import { observedPiStream } from "../../../adapters/src/pi-usage.js";
 import { SpendBudget } from "./measurement.js";
@@ -18,10 +22,7 @@ const model: Parameters<typeof observedPiStream>[1] = {
 it("blocks an explicitly requested Anthropic one-hour write before HTTP when its rate is missing", async () => {
   // Use the adapter's pinned SDK; testkit has no independent vendor dependency.
   const { anthropicMessagesApi } = await import(
-    new URL(
-      "../../../adapters/node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.lazy.js",
-      import.meta.url,
-    ).href
+    pathToFileURL(path.join(path.join(createRequire(new URL("../../../adapters/package.json", import.meta.url)).resolve.paths("@earendil-works/pi-ai")!.find((dir) => existsSync(path.join(dir, "@earendil-works/pi-ai/package.json")))!, "@earendil-works/pi-ai/dist"), "api/anthropic-messages.lazy.js")).href
   );
   const budget = new SpendBudget(5, {
     source: "fixture",
@@ -60,10 +61,7 @@ it("blocks an explicitly requested Anthropic one-hour write before HTTP when its
 
 async function anthropicUsage(cacheFields: Record<string, number> = {}, rawTotal?: number) {
   const { anthropicMessagesApi } = await import(
-    new URL(
-      "../../../adapters/node_modules/@earendil-works/pi-ai/dist/api/anthropic-messages.lazy.js",
-      import.meta.url,
-    ).href
+    pathToFileURL(path.join(path.join(createRequire(new URL("../../../adapters/package.json", import.meta.url)).resolve.paths("@earendil-works/pi-ai")!.find((dir) => existsSync(path.join(dir, "@earendil-works/pi-ai/package.json")))!, "@earendil-works/pi-ai/dist"), "api/anthropic-messages.lazy.js")).href
   );
   const budget = new SpendBudget(5, {
     source: "fixture",

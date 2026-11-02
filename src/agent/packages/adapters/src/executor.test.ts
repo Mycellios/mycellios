@@ -1140,7 +1140,13 @@ function pinnedRoutineRunPrisma(modelId: string) {
     computer: { id: "computer-1", scope: "private" },
   };
   return {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
     run: {
+      findMany: vi.fn(async () => []),
+
       findUnique: vi.fn(async () => run),
       findUniqueOrThrow: vi.fn(async () => ({ status: "leased", startedAt: null })),
       updateMany: vi.fn(async () => ({ count: 1 })),
@@ -1152,6 +1158,8 @@ function pinnedRoutineRunPrisma(modelId: string) {
     },
     computer: { findUniqueOrThrow: vi.fn(async () => ({ scope: "private", state: "running" })) },
     attempt: {
+      findMany: vi.fn(async () => []),
+
       create: vi.fn(async () => ({ id: "attempt-1" })),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
@@ -1255,7 +1263,14 @@ describe("run notification preference", () => {
       thread: { groupId: null },
     };
     const findFirst = vi.fn(async () => source);
-    const prisma = { run: { findFirst } } as unknown as PrismaClient;
+    const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+ run: {
+      findMany: vi.fn(async () => []),
+ findFirst } } as unknown as PrismaClient;
 
     await expect(
       runNotificationsEnabled(prisma, {
@@ -1914,6 +1929,10 @@ describe("createRunExecutor", () => {
     const taskCreate = vi.fn(async () => ({ id: "task-1" }));
     const runCreate = vi.fn(async () => ({ id: "run-1" }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -1941,6 +1960,11 @@ describe("createRunExecutor", () => {
       },
       $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
         callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
           routine: {
             updateMany,
             findUnique: vi.fn(async () => ({
@@ -1982,6 +2006,10 @@ describe("createRunExecutor", () => {
     const taskCreate = vi.fn(async () => ({ id: "task-1" }));
     const runCreate = vi.fn(async () => ({ id: "run-1" }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -2010,6 +2038,11 @@ describe("createRunExecutor", () => {
       },
       $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
         callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
           routine: {
             updateMany,
             findUnique: vi.fn(async () => ({
@@ -2068,6 +2101,10 @@ describe("createRunExecutor", () => {
       claimedModel = model,
     ) {
       return {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         routine: {
           findUnique: vi.fn(async () => ({
             id: "routine-1",
@@ -2089,6 +2126,11 @@ describe("createRunExecutor", () => {
         agentSkill: { findMany: vi.fn(async () => []) },
         $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
           callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
             routine: {
               updateMany: vi.fn(async () => ({ count: 1 })),
               findUnique: vi.fn(async () => claimedModel),
@@ -2164,6 +2206,11 @@ describe("createRunExecutor", () => {
     const updateMany = vi.fn(async () => ({ count: 1 }));
     const $transaction = vi.fn();
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -2211,6 +2258,10 @@ describe("createRunExecutor", () => {
     const append = vi.fn(async () => undefined);
     const findFirst = vi.fn(async () => ({ id: "group-thread-1" }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -2235,6 +2286,11 @@ describe("createRunExecutor", () => {
       agentSkill: { findMany: vi.fn(async () => []) },
       $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
         callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
           routine: {
             updateMany: vi.fn(async () => ({ count: 1 })),
             findUnique: vi.fn(async () => ({
@@ -2283,6 +2339,10 @@ describe("createRunExecutor", () => {
     const append = vi.fn(async () => undefined);
     const findFirst = vi.fn(async () => ({ id: "dm-thread-1" }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -2307,6 +2367,11 @@ describe("createRunExecutor", () => {
       agentSkill: { findMany: vi.fn(async () => []) },
       $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
         callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
           routine: {
             updateMany: vi.fn(async () => ({ count: 1 })),
             findUnique: vi.fn(async () => ({
@@ -2364,6 +2429,10 @@ description: Prepare standup notes
 1. Summarize wins.
 `;
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -2396,6 +2465,11 @@ description: Prepare standup notes
       },
       $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
         callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
           routine: {
             updateMany: vi.fn(async () => ({ count: 1 })),
             findUnique: vi.fn(async () => ({
@@ -2405,7 +2479,9 @@ description: Prepare standup notes
             })),
           },
           task: { create: taskCreate },
-          run: { create: vi.fn(async () => ({ id: "run-1" })) },
+          run: {
+      findMany: vi.fn(async () => []),
+ create: vi.fn(async () => ({ id: "run-1" })) },
         }),
       ),
     } as unknown as PrismaClient;
@@ -2431,6 +2507,10 @@ description: Prepare standup notes
     });
     const updateMany = vi.fn(async () => ({ count: 1 }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -2456,6 +2536,11 @@ description: Prepare standup notes
       },
       $transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) =>
         callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
           routine: {
             updateMany,
             findUnique: vi.fn(async () => ({
@@ -2465,7 +2550,9 @@ description: Prepare standup notes
             })),
           },
           task: { create: vi.fn(async () => ({ id: "task-1" })) },
-          run: { create: vi.fn(async () => ({ id: "run-1", taskId: "task-1" })) },
+          run: {
+      findMany: vi.fn(async () => []),
+ create: vi.fn(async () => ({ id: "run-1", taskId: "task-1" })) },
         }),
       ),
     } as unknown as PrismaClient;
@@ -2494,6 +2581,10 @@ description: Prepare standup notes
     const deleteTaskMany = vi.fn(async () => ({ count: 1 }));
     let transactionCalls = 0;
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       routine: {
         findUnique: vi.fn(async () => ({
           id: "routine-1",
@@ -2521,6 +2612,11 @@ description: Prepare standup notes
         transactionCalls += 1;
         if (transactionCalls === 1) {
           return callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
             routine: {
               updateMany: claimUpdateMany,
               findUnique: vi.fn(async () => ({
@@ -2530,13 +2626,22 @@ description: Prepare standup notes
               })),
             },
             task: { create: vi.fn(async () => ({ id: "task-1" })) },
-            run: { create: vi.fn(async () => ({ id: "run-1", taskId: "task-1" })) },
+            run: {
+      findMany: vi.fn(async () => []),
+ create: vi.fn(async () => ({ id: "run-1", taskId: "task-1" })) },
           });
         }
         return callback({
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
           routine: { updateMany: restoreUpdateMany },
           task: { deleteMany: deleteTaskMany },
-          run: { deleteMany: deleteRunMany },
+          run: {
+      findMany: vi.fn(async () => []),
+ deleteMany: deleteRunMany },
         });
       }),
     } as unknown as PrismaClient;
@@ -2556,7 +2661,14 @@ description: Prepare standup notes
   it("consumes a persisted takeover checkpoint when claiming the run", async () => {
     const updateMany = vi.fn(async () => ({ count: 0 }));
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
+      findMany: vi.fn(async () => []),
+
         findUnique: vi.fn(async () => ({
           id: "run-1",
           botId: "bot-1",
@@ -2609,7 +2721,14 @@ description: Prepare standup notes
       return { count: matchesClaim(args.where, row) ? 1 : 0 };
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
+      findMany: vi.fn(async () => []),
+
         findUnique: vi.fn(async () => ({
           id: "run-1",
           botId: "bot-1",
@@ -2649,7 +2768,14 @@ description: Prepare standup notes
     );
     const enqueue = vi.fn(async () => undefined);
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
+      findMany: vi.fn(async () => []),
+
         findUnique: vi.fn(async () => ({
           id: "run-1",
           botId: "bot-1",
@@ -2708,7 +2834,14 @@ description: Prepare standup notes
     );
     const enqueue = vi.fn(async () => undefined);
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
+      findMany: vi.fn(async () => []),
+
         findUnique: vi.fn(async () => ({
           id: "run-1",
           botId: "bot-1",
@@ -2765,7 +2898,14 @@ description: Prepare standup notes
     );
     const enqueue = vi.fn(async () => undefined);
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
+      findMany: vi.fn(async () => []),
+
         findUnique: vi.fn(async () => ({
           id: "run-1",
           botId: "bot-1",
@@ -2845,7 +2985,11 @@ description: Prepare standup notes
             },
       );
       const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
         run: {
+      findMany: vi.fn(async () => []),
+
           findUnique: vi.fn(async () => run),
           findUniqueOrThrow: vi.fn(async () => ({ status: "leased", startedAt: null })),
           updateMany: vi.fn(async () => ({ count: 1 })),
@@ -2855,6 +2999,8 @@ description: Prepare standup notes
           findUniqueOrThrow: vi.fn(async () => ({ scope: "private", state: "running" })),
         },
         attempt: {
+      findMany: vi.fn(async () => []),
+
           create: vi.fn(async () => ({ id: "attempt-1" })),
           updateMany: vi.fn(async () => ({ count: 1 })),
         },
@@ -2963,7 +3109,13 @@ description: Prepare standup notes
       leaseFence: 0,
     };
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
       run: {
+      findMany: vi.fn(async () => []),
+
         findUnique: vi.fn(async () => run),
         findUniqueOrThrow: vi.fn(async () => ({ status: "leased", startedAt: null })),
         updateMany: vi.fn(async () => ({ count: 1 })),
@@ -2987,6 +3139,8 @@ description: Prepare standup notes
         findUniqueOrThrow: vi.fn(async () => ({ scope: "private", state: "running" })),
       },
       attempt: {
+      findMany: vi.fn(async () => []),
+
         create: vi.fn(async () => ({ id: "attempt-1" })),
         updateMany: vi.fn(async () => ({ count: 1 })),
       },
@@ -3065,6 +3219,10 @@ description: Prepare standup notes
       return null;
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: {
         findFirst: vi.fn(async () => ({
           modelProvider: "xai",
@@ -3237,6 +3395,10 @@ description: Prepare standup notes
         }),
       };
       const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
         userModelPreference: {
           findMany: vi.fn(async () => [preference]),
           findFirst: vi.fn(async () => null),
@@ -3399,6 +3561,11 @@ description: Prepare standup notes
     const plaintext = compatibleSecret();
     const executor = compatibleExecutor(
       {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         ...compatiblePrismaParts("space-model", plaintext),
         bot: {
           findFirst: vi.fn(async () => ({
@@ -3453,6 +3620,11 @@ description: Prepare standup notes
     const plaintext = compatibleSecret(["space-model", "second-model"]);
     const executor = compatibleExecutor(
       {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+
         ...compatiblePrismaParts("space-model", plaintext),
         bot: {
           findFirst: vi.fn(async () => ({
@@ -3480,6 +3652,10 @@ description: Prepare standup notes
       expires: Date.now() + 60_000,
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: {
         findFirst: vi.fn(async () => ({
           modelProvider: provider,
@@ -3524,6 +3700,10 @@ description: Prepare standup notes
       accountId: "acct-live",
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: {
         findFirst: vi.fn(async () => ({
           modelProvider: provider,
@@ -3587,6 +3767,10 @@ description: Prepare standup notes
       accountId: "acct-live",
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: {
         findFirst: vi.fn(async () => ({
           modelProvider: provider,
@@ -3636,6 +3820,10 @@ description: Prepare standup notes
       }),
     );
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: {
         findFirst: vi.fn(async () => ({
           modelProvider: provider,
@@ -3691,6 +3879,10 @@ description: Prepare standup notes
       thinkingLevel: null,
     };
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: { findFirst: vi.fn(async () => bot) },
       userModelPreference: { findFirst },
       userModelCredential: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
@@ -3742,6 +3934,10 @@ description: Prepare standup notes
       return null;
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: {
         findFirst: vi.fn(async () => ({
           modelProvider: "xai",
@@ -3815,6 +4011,10 @@ description: Prepare standup notes
 
   it("withholds the deployment key when settings name a different provider", async () => {
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: { findFirst: vi.fn(async () => null) },
       userModelPreference: { findFirst: vi.fn(async () => null) },
       userModelCredential: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null) },
@@ -3848,6 +4048,10 @@ description: Prepare standup notes
       });
     });
     const prisma = {
+    botSkillPin: { findMany: vi.fn(async () => []) },
+
+    agentSkill: { findMany: vi.fn(async () => []) },
+
       bot: {
         findFirst: vi.fn(async () => ({
           modelProvider: null,
