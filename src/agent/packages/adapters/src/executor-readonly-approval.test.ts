@@ -32,6 +32,13 @@ vi.mock("./computer-lifecycle.js", async (importOriginal) => ({
 
 // Group writes run against Postgres in the journeys; here only the dispatch is under test.
 const createFleetGroupMock = vi.hoisted(() => vi.fn());
+const createScheduleMock = vi.hoisted(() =>
+  vi.fn(async (_deps: unknown, input: Record<string, unknown>) => ({ id: "routine-1", ...input })),
+);
+vi.mock("./schedule-tools.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./schedule-tools.js")>()),
+  createScheduleFromTool: createScheduleMock,
+}));
 vi.mock("./fleet-tools.js", async (importOriginal) => ({
   ...(await importOriginal<typeof FleetToolsModule>()),
   createFleetGroup: createFleetGroupMock,
@@ -954,7 +961,7 @@ describe("connector read-only metadata and approval enforcement", () => {
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
     });
 
-    it("refuses a webhook-triggered write in Never ask instead of asking", async () => {
+    it("honors the account owner's Never ask permission for unattended writes", async () => {
       const f = fixture({
         catalog,
         name: "demo_send_message",
@@ -962,9 +969,9 @@ describe("connector read-only metadata and approval enforcement", () => {
         skipApprovals: true,
       });
       await f.run();
-      expect(f.execute).not.toHaveBeenCalled();
+      expect(f.execute).toHaveBeenCalledOnce();
       expect(f.pauseRunForInput).not.toHaveBeenCalled();
-      expect(JSON.stringify(f.results[0])).toContain("never asks");
+      expect(f.results[0]).toEqual({ item: "item-1" });
     });
 
     it("refuses a blocked tool in Never ask without asking or running it", async () => {
@@ -1255,13 +1262,14 @@ describe("self instruction proposals", () => {
     expect(f.instructionState.instructionHistory).toHaveLength(1);
     expect(f.effects[0]?.status).toBe("completed");
   });
-  it("is refused in Never ask once outside content entered the run", async () => {
+  it("keeps standing permission in Never ask after outside content entered the run", async () => {
     const f = fixture({ name: "propose_instructions_update", builtin: true, skipApprovals: true });
     f.claimedOutsideSteering(true);
     f.setCalls([{ args, executionId: "call-1" }]);
     await f.run();
     expect(f.pauseRunForInput).not.toHaveBeenCalled();
-    expect(f.instructionState.instructions).toBe("Draft only");
+    expect(f.instructionState.instructions).toBe(args.instructions);
+    expect(f.effects[0]?.status).toBe("completed");
   });
   it("requires human approval even with the legacy self-update setting enabled", async () => {
     const f = fixture({
@@ -2314,4 +2322,35 @@ it("uses the OpenRouter environment key for a decision checker on another deploy
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
   }
+});
+
+describe("standing owner permission for all agents' routines", () => {
+  beforeEach(() => { createScheduleMock.mockClear(); reviewMock.mockReset(); });
+  it.each([
+    ["Research", "user", false],
+    ["Networking", "user", false],
+    ["Maintenance", "user", true],
+    ["Coordinator", "follow_up", true],
+    ["Analyst", "bot_message", false],
+  ] as const)("creates %s's daily routine after outside information without asking (%s, resumed=%s)", async (name, trigger, resumed) => {
+    const f=fixture({builtin:true,skipApprovals:true,trigger,sourceRole:"user",bot:{name,title:name,description:"An owner-configured agent"},prompt:"Research software improvements every day"});
+    if(resumed)f.prisma.attempt.count.mockResolvedValue(2);
+    f.setCalls([
+      {name:"web_search",args:{query:"official software releases"},executionId:"search-1"},
+      {name:"schedule_create",args:{name:"Daily research",prompt:"Read https://research.example/releases and compare with our project",cron:"0 9 * * *",timezone:"Europe/Madrid"},executionId:"schedule-1"},
+    ]);
+    await f.run();
+    expect(f.offeredTools()).toContain("schedule_create");
+    expect(createScheduleMock).toHaveBeenCalledOnce();
+    expect(createScheduleMock.mock.calls[0]?.[1]).toMatchObject({spaceId:"space-1",botId:"bot-1",userId:"user-1",schedule:{cron:"0 9 * * *"},timezone:"Europe/Madrid"});
+    expect(f.pauseRunForInput).not.toHaveBeenCalled();
+    expect(reviewMock).not.toHaveBeenCalled();
+    expect(f.results.at(-1)).toMatchObject({id:"routine-1"});
+    expect(f.effects.filter(e=>e.kind==="schedule_create")).toHaveLength(1);
+  });
+  it("keeps an explicit routine deny in force even with standing permission",async()=>{
+    const f=fixture({builtin:true,skipApprovals:true,sourceRole:"user",rules:[{effect:"deny",matchKind:"tool",matchValue:"schedule_create"}]});
+    f.setCalls([{name:"schedule_create",args:{name:"Daily",prompt:"Research daily",cron:"0 9 * * *"},executionId:"schedule-1"}]);
+    await f.run();expect(createScheduleMock).not.toHaveBeenCalled();expect(f.pauseRunForInput).not.toHaveBeenCalled();expect(JSON.stringify(f.results)).toContain("blocked");
+  });
 });
