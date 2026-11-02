@@ -455,19 +455,17 @@ export function approvalPreferenceFromMode(mode: ApprovalMode): {
 export type AutoReviewJudgeDecision = "pass" | "ask" | "error";
 
 /**
- * The gate after rule resolution. A block refuses in every mode. An approval a person must give
- * asks, except in Never ask, which never waits: there it runs when the owner started the run and no
- * outside content entered it, and is refused otherwise, since outside text could have asked for
- * it. Otherwise Never ask runs it, an ask rule asks, and anything that would ask goes to the approval
- * model in Auto, falling back to asking when no model is set up.
+ * The gate after rule resolution. Explicit blocks refuse in every mode. Never ask is the
+ * account owner's standing approval choice, including resumed and unattended runs. It does
+ * not override tool availability, ownership, credential scope or native computer consent.
+ * In Auto and Ask, mandatory actions still require a person; other consequential actions
+ * follow the approval model or ask when no checker is configured.
  */
 export function planActionGate(input: {
   resolved: ActionApprovalResolved;
   mode: ApprovalMode;
-  /** Needs a person whatever the rules say (see toolRequiresExplicitApproval). */
+  /** Needs a person in Auto and Ask (see toolRequiresExplicitApproval). */
   mandatory?: boolean;
-  /** The owner did not start this run, or outside content entered it. */
-  steerable?: boolean;
   consequential: boolean;
   /**
    * A read whose arguments outside content may have chosen (see connectorReadRequiresApproval).
@@ -479,11 +477,8 @@ export function planActionGate(input: {
   newDestination?: boolean;
 }): "ask" | "allow" | "judge" | "deny" {
   if (input.resolved.decision === "deny") return "deny";
-  if (input.mandatory) {
-    if (input.mode !== "never") return "ask";
-    return input.steerable ? "deny" : "allow";
-  }
   if (input.mode === "never") return "allow";
+  if (input.mandatory) return "ask";
   if (input.resolved.decision === "ask") return "ask";
   const review = input.mode === "auto" && input.checkerConfigured ? "judge" : "ask";
   // A rule for the whole tool is not a choice of sites, so it never allows a new one; only a site

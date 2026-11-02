@@ -582,3 +582,8 @@
   from execution slots. Claim each operation once; report only delivered IDs as
   active. Preserve owner/generation fencing, queued cancellation and distinct
   queue-pressure/disconnection errors without automatic command replay.
+
+- Never ask honors the account owner's standing approval choice for resumed and
+  unattended work. Keep explicit action blocks, account/Space ownership, native
+  computer consent and credential scope enforced. Outside content remains data,
+  not authorization for unrelated work. Reload the saved choice before each tool.
