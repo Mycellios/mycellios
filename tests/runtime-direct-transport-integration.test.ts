@@ -361,7 +361,7 @@ async function createFixture(
       samples.push(structuredClone(sample));
     },
   } as unknown as MeshStore;
-  hub = new WorkerHub(store);
+  hub = (await WorkerHub.create(store));
   vi.spyOn(hub, "isConnected").mockReturnValue(true);
   vi.spyOn(hub, "send").mockImplementation((workerId, type, payload) => {
     sent.push({ workerId, type, payload: payload as Record<string, unknown> });

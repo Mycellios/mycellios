@@ -163,6 +163,8 @@ export function assertNativeSourceProvenanceMatches(
 function collectFiles(root, directory, output, observedPaths) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const absolute = join(directory, entry.name);
+    // Agent is a separate compiler/release workspace with its own continuity receipts.
+    if (portablePath(root, absolute) === "src/agent") continue;
     if (entry.isSymbolicLink()) {
       throw new Error(
         `Build input cannot contain a symbolic link: ${portablePath(root, absolute)}.`,

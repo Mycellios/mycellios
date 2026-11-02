@@ -101,7 +101,7 @@ export class StablecoinCheckoutService {
     userId: string;
     idempotencyKey: string;
   }): Promise<StablecoinCheckoutResult> {
-    const plan = this.billing.getPlan(this.config.planId, this.config.planVersion);
+    const plan = (await this.billing.getPlan(this.config.planId, this.config.planVersion));
     if (!plan || plan.status !== "active") {
       throw new BillingCheckoutError("billing_plan_not_active", "The stablecoin subscription plan is not active.", 503);
     }
@@ -168,8 +168,8 @@ export class StablecoinCheckoutService {
     ])).digest("hex");
     const now = this.config.now?.() ?? Date.now();
     const ttl = this.config.intentTtlMs ?? 30 * 60_000;
-    let intent = this.database.transaction(() => {
-      const existing = this.readIntent(input.userId, input.idempotencyKey);
+    let intent = (await this.database.transaction(async () => {
+      const existing = (await this.readIntent(input.userId, input.idempotencyKey));
       if (existing) {
         if (existing.request_digest !== digest) {
           throw new BillingCheckoutError(
@@ -180,22 +180,22 @@ export class StablecoinCheckoutService {
         }
         return existing;
       }
-      ensureAccount(this.database, input.userId, now);
+      (await ensureAccount(this.database, input.userId, now));
       const id = newId("coinpay");
       const expiresAt = now + ttl;
       let quoteId: string | null = null;
       if (input.kind === "topup") {
         quoteId = `quote_${createHash("sha256").update(id).digest("hex").slice(0, 32)}`;
-        this.billing.createTopUpQuote({
+        (await this.billing.createTopUpQuote({
           quoteId,
           userId: input.userId,
           amountMicros: input.amountMicros,
           currency: input.currency,
           tokenAmount: input.tokenAmount!,
           expiresAt,
-        });
+        }));
       }
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO billing_stablecoin_intents(
            id, user_id, idempotency_key, request_digest, kind, quote_id,
            plan_id, plan_version, subscription_id, period_duration_ms,
@@ -208,9 +208,9 @@ export class StablecoinCheckoutService {
         input.periodDurationMs ?? null, input.amountMicros, input.currency.toUpperCase(),
         this.config.chainId, this.config.asset.toUpperCase(), input.assetAtomicAmount,
         expiresAt, now, now,
-      );
-      return this.readIntent(input.userId, input.idempotencyKey)!;
-    });
+      ));
+      return (await this.readIntent(input.userId, input.idempotencyKey))!;
+    }));
     if (intent.status === "awaiting_payment" || intent.status === "consumed") {
       return resultFromRow(intent, true);
     }
@@ -229,7 +229,7 @@ export class StablecoinCheckoutService {
     validateProviderReference(allocated.providerReference);
     validateRecipient(allocated.recipient);
     if (allocated.checkoutUrl !== undefined) validateHttpsUrl(allocated.checkoutUrl);
-    this.database.raw.prepare(
+    (await this.database.raw.prepare(
       `UPDATE billing_stablecoin_intents
        SET recipient = ?, provider_reference = ?, checkout_url = ?,
            status = 'awaiting_payment', updated_at = ?
@@ -237,18 +237,18 @@ export class StablecoinCheckoutService {
     ).run(
       allocated.recipient, allocated.providerReference, allocated.checkoutUrl ?? null,
       now, intent.id,
-    );
-    intent = this.readIntent(input.userId, input.idempotencyKey)!;
+    ));
+    intent = (await this.readIntent(input.userId, input.idempotencyKey))!;
     return resultFromRow(intent, false);
   }
 
-  private readIntent(userId: string, idempotencyKey: string): IntentRow | null {
-    return (this.database.raw.prepare(
+  private async readIntent(userId: string, idempotencyKey: string): Promise<IntentRow | null> {
+    return ((await this.database.raw.prepare(
       `SELECT id, request_digest, kind, quote_id, amount_micros, currency,
               chain_id, asset, asset_atomic_amount, recipient, provider_reference,
               checkout_url, status, expires_at
        FROM billing_stablecoin_intents WHERE user_id = ? AND idempotency_key = ?`,
-    ).get(userId, idempotencyKey) as IntentRow | undefined) ?? null;
+    ).get(userId, idempotencyKey)) as IntentRow | undefined) ?? null;
   }
 }
 
@@ -271,11 +271,11 @@ function resultFromRow(row: IntentRow, duplicate: boolean): StablecoinCheckoutRe
   };
 }
 
-function ensureAccount(database: MeshDatabase, userId: string, now: number): void {
-  database.raw.prepare(
+async function ensureAccount(database: MeshDatabase, userId: string, now: number): Promise<void> {
+  (await database.raw.prepare(
     `INSERT OR IGNORE INTO api_accounts(user_id, token_balance, usd_micros, created_at, updated_at)
      VALUES (?, 0, 0, ?, ?)`,
-  ).run(userId, now, now);
+  ).run(userId, now, now));
 }
 
 function validatePack(pack: StablecoinTopUpPack): void {

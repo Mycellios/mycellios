@@ -17,6 +17,8 @@ import zlib
 
 import torch
 
+from .tcp_writes import send_frame_bytes
+
 MAGIC = b"GDLP"
 # Transactional sparse-tree capacity quotes extend the v4 frame vocabulary.
 # v6 adds an end-to-end COMMIT result: the root cannot emit FORK until the last
@@ -586,9 +588,7 @@ class LinkEmulator:
                     self._condition.notify_all()
 
             try:
-                item.sock.sendall(item.header)
-                if item.payload:
-                    item.sock.sendall(item.payload)
+                send_frame_bytes(item.sock, item.header, item.payload)
             except BaseException as error:
                 with self._condition:
                     self._failure = error
@@ -895,10 +895,25 @@ def send_frame(
     if selected_emulator is not None:
         selected_emulator.send(sock, header, payload)
     else:
-        sock.sendall(header)
-        if payload:
-            sock.sendall(payload)
+        send_frame_bytes(sock, header, payload)
     return len(header) + payload_size
+
+
+def accept_initial_frame(listener: socket.socket, timeout_seconds: float) -> tuple[socket.socket, Frame]:
+    """Discard interrupted connections before any session or decoder KV exists."""
+    while True:
+        upstream, _ = listener.accept()
+        try:
+            configure_socket(upstream)
+            upstream.settimeout(timeout_seconds)
+            hello = recv_frame(upstream)
+            upstream.settimeout(None)
+            return upstream, hello
+        except (EOFError, ConnectionResetError, TimeoutError):
+            upstream.close()
+        except BaseException:
+            upstream.close()
+            raise
 
 
 def recv_frame(sock: socket.socket) -> Frame:
@@ -1155,6 +1170,10 @@ def encode_tensor(tensor: torch.Tensor, codec: TensorCodec) -> bytes:
 
 def _transport_staging_tensor(tensor: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
     detached = tensor.detach()
+    if detached.device.type == "privateuseone":
+        # DirectML's combined device/dtype transfer can retain the source
+        # dtype. Materialize CPU memory before converting the wire codec.
+        detached = detached.cpu()
     if detached.device.type == "cpu" and detached.dtype == dtype:
         # The returned memoryview must be a snapshot. A runner is allowed to
         # reuse or mutate its scratch tensor as soon as encode returns, while a

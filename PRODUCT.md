@@ -27,3 +27,7 @@ For the current landing, follow the supplied Compute, Antseed and Rakazo referen
 ## Evidence on Hand
 
 Existing brand artwork and procedural mushroom, shared UI/Storybook components, public network routes and source code. The public Agent endpoint redirects anonymous visitors to sign-in; an authenticated workspace screenshot was not supplied for public use.
+
+## Product terminology
+
+Spore is the official token name. Credits are the internal spending balance: a paid top-up of 10.00 USD buys 10.00 credits. Mico (plural Micos) names each user agent. Preserve ledger precision, historical identifiers and balances; do not rename financial records or mix promotional grants with earnings. Naming Spore does not launch the token or set its market price.

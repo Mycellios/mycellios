@@ -160,11 +160,12 @@ class TorchExecutionDeviceTests(unittest.TestCase):
         self.assertEqual(snapshot["peak_allocated_bytes"], 333)
 
     def test_unknown_backends_are_rejected(self) -> None:
-        for requested in ("", "directml", "vulkan", "cuda:-1", "cuda:x"):
+        for requested in ("", "vulkan", "cuda:-1", "cuda:x", "directml:-1", "directml:x"):
             with self.subTest(requested=requested), self.assertRaises(ValueError):
                 normalize_torch_device_request(requested)
-        with self.assertRaises(ValueError):
-            PipelineEngineConfig("model", (0, 1, 2), device="directml")
+        # Configuration describes a supported backend; resolution checks availability.
+        self.assertEqual(normalize_torch_device_request("directml"), "directml")
+        self.assertEqual(PipelineEngineConfig("model", (0, 1, 2), device="directml").device, "directml")
 
 
 class StageDeviceWiringTests(unittest.TestCase):

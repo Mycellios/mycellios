@@ -1,0 +1,24 @@
+@import "@rakazo/ui-tokens/css";
+@import "./typography.css";
+
+html, body { margin: 0; background: var(--background); color: var(--foreground); }
+.app-startup {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  background: var(--background);
+  color: var(--foreground);
+}
+.app-loading-mark {
+  display: inline-grid;
+  justify-items: center;
+  gap: 14px;
+  color: var(--foreground);
+  font-family: "Geist Variable", var(--font-sans, ui-sans-serif), sans-serif;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.app-loading-mark img { display: block; width: 76px; height: 76px; }
+

@@ -177,11 +177,11 @@ interface RequestedModelRow {
 export class MeshStore {
   constructor(readonly database: MeshDatabase) {}
 
-  saveRuntimeLinkSample(
+  async saveRuntimeLinkSample(
     sample: StoredRuntimeLinkSample,
     maximumAgeMs = 5 * 60_000,
     maximumSamplesPerLink = 32,
-  ): void {
+  ): Promise<void> {
     if (
       !sample.fromNodeId
       || !sample.toNodeId
@@ -200,8 +200,8 @@ export class MeshStore {
     ) {
       throw new Error("runtime_link_sample_is_invalid");
     }
-    this.database.transaction(() => {
-      this.database.raw.prepare(
+    (await this.database.transaction(async () => {
+      (await this.database.raw.prepare(
         `INSERT INTO runtime_link_samples(
            from_node_id, to_node_id, measured_at, rtt_ms, goodput_mbps, transport_mode
          ) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -212,11 +212,11 @@ export class MeshStore {
         sample.rttMs,
         sample.goodputMbps,
         sample.transportMode,
-      );
-      this.database.raw.prepare(
+      ));
+      (await this.database.raw.prepare(
         "DELETE FROM runtime_link_samples WHERE measured_at < ?",
-      ).run(sample.measuredAt - maximumAgeMs);
-      this.database.raw.prepare(
+      ).run(sample.measuredAt - maximumAgeMs));
+      (await this.database.raw.prepare(
         `DELETE FROM runtime_link_samples
          WHERE from_node_id = ? AND to_node_id = ? AND transport_mode = ? AND id NOT IN (
            SELECT id FROM runtime_link_samples
@@ -232,23 +232,23 @@ export class MeshStore {
         sample.toNodeId,
         sample.transportMode,
         maximumSamplesPerLink,
-      );
-    });
+      ));
+    }));
   }
 
-  listRuntimeLinkSamples(
+  async listRuntimeLinkSamples(
     now = Date.now(),
     maximumAgeMs = 5 * 60_000,
-  ): StoredRuntimeLinkSample[] {
+  ): Promise<StoredRuntimeLinkSample[]> {
     if (!Number.isFinite(now) || !Number.isFinite(maximumAgeMs) || maximumAgeMs <= 0) {
       throw new Error("runtime_link_sample_query_is_invalid");
     }
-    const rows = this.database.raw.prepare(
+    const rows = (await this.database.raw.prepare(
       `SELECT from_node_id, to_node_id, measured_at, rtt_ms, goodput_mbps, transport_mode
        FROM runtime_link_samples
        WHERE measured_at >= ?
        ORDER BY from_node_id, to_node_id, transport_mode, measured_at, id`,
-    ).all(now - maximumAgeMs) as unknown as Array<{
+    ).all(now - maximumAgeMs)) as unknown as Array<{
       from_node_id: string;
       to_node_id: string;
       measured_at: number;
@@ -266,13 +266,13 @@ export class MeshStore {
     }));
   }
 
-  getSupportAssistantSettings(): SupportAssistantSettings {
-    const row = this.database.raw.prepare(
+  async getSupportAssistantSettings(): Promise<SupportAssistantSettings> {
+    const row = (await this.database.raw.prepare(
       `SELECT enabled, model_id, system_prompt, welcome_message, suggestions_json,
               max_output_tokens, temperature, allow_device_control, updated_at
        FROM assistant_settings
        WHERE id = ?`,
-    ).get(ASSISTANT_SETTINGS_ID) as {
+    ).get(ASSISTANT_SETTINGS_ID)) as {
       enabled: number;
       model_id: string | null;
       system_prompt: string;
@@ -306,11 +306,11 @@ export class MeshStore {
     };
   }
 
-  saveSupportAssistantSettings(
+  async saveSupportAssistantSettings(
     input: Omit<SupportAssistantSettings, "updatedAt">,
-  ): SupportAssistantSettings {
+  ): Promise<SupportAssistantSettings> {
     const updatedAt = Date.now();
-    this.database.raw.prepare(
+    (await this.database.raw.prepare(
       `INSERT INTO assistant_settings(
          id, enabled, model_id, system_prompt, welcome_message, suggestions_json,
          max_output_tokens, temperature, allow_device_control, updated_at
@@ -336,32 +336,32 @@ export class MeshStore {
       input.temperature,
       input.allowDeviceControl ? 1 : 0,
       updatedAt,
-    );
+    ));
     return { ...input, updatedAt };
   }
 
-  registerWorker(registration: WorkerRegistration): StoredWorker {
-    return this.database.transaction(() => {
+  async registerWorker(registration: WorkerRegistration): Promise<StoredWorker> {
+    return (await this.database.transaction(async () => {
       const now = Date.now();
       const identity = registration.identity;
       const existing = identity
-        ? this.database.raw
+        ? (await this.database.raw
             .prepare("SELECT id FROM workers WHERE identity_kind = ? AND identity_id = ?")
-            .get(identity.kind, identity.id) as { id: string } | undefined
+            .get(identity.kind, identity.id)) as { id: string } | undefined
         : undefined;
       if (existing) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `UPDATE workers
            SET capabilities_json = ?, last_seen_at = ?, updated_at = ?,
                 deregistered = 0
            WHERE id = ?`,
-        ).run(JSON.stringify(registration.capabilities), now, now, existing.id);
-        this.queueWorker(existing.id);
-        return this.getWorker(existing.id)!;
+        ).run(JSON.stringify(registration.capabilities), now, now, existing.id));
+        (await this.queueWorker(existing.id));
+        return (await this.getWorker(existing.id))!;
       }
 
       const workerId = newId("wrk");
-      this.database.raw
+      (await this.database.raw
         .prepare(
           `INSERT INTO workers(
              id, status, capabilities_json, last_seen_at, created_at, updated_at,
@@ -376,106 +376,106 @@ export class MeshStore {
           now,
           identity?.kind ?? null,
           identity?.id ?? null,
-        );
-      this.queueWorker(workerId);
-      return this.getWorker(workerId)!;
-    });
+        ));
+      (await this.queueWorker(workerId));
+      return (await this.getWorker(workerId))!;
+    }));
   }
 
-  getWorker(workerId: string): StoredWorker | null {
-    const row = this.database.raw
+  async getWorker(workerId: string): Promise<StoredWorker | null> {
+    const row = (await this.database.raw
       .prepare("SELECT * FROM workers WHERE id = ? AND deregistered = 0")
-      .get(workerId) as
+      .get(workerId)) as
       | WorkerRow
       | undefined;
     return row ? this.mapWorker(row) : null;
   }
 
-  listWorkers(): StoredWorker[] {
-    const rows = this.database.raw
+  async listWorkers(): Promise<StoredWorker[]> {
+    const rows = (await this.database.raw
       .prepare("SELECT * FROM workers WHERE deregistered = 0")
-      .all() as unknown as WorkerRow[];
+      .all()) as unknown as WorkerRow[];
     return rows.map((row) => this.mapWorker(row));
   }
 
-  listSchedulableWorkers(now = Date.now(), staleAfterMs = 15_000): StoredWorker[] {
-    const rows = this.database.raw
+  async listSchedulableWorkers(now = Date.now(), staleAfterMs = 15_000): Promise<StoredWorker[]> {
+    const rows = (await this.database.raw
       .prepare(
         "SELECT * FROM workers WHERE deregistered = 0 AND status = 'online' AND last_seen_at >= ?",
       )
-      .all(now - staleAfterMs) as unknown as WorkerRow[];
+      .all(now - staleAfterMs)) as unknown as WorkerRow[];
     return rows.map((row) => this.mapWorker(row));
   }
 
-  updateWorkerHeartbeat(
+  async updateWorkerHeartbeat(
     workerId: string,
     capabilities: WorkerCapabilities,
     status: WorkerStatus,
-  ): void {
-    this.database.transaction(() => {
+  ): Promise<void> {
+    (await this.database.transaction(async () => {
       const now = Date.now();
-      this.database.raw
+      (await this.database.raw
         .prepare(
           `UPDATE workers
            SET capabilities_json = ?, status = ?, last_seen_at = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .run(JSON.stringify(capabilities), status, now, now, workerId);
-      this.queueWorker(workerId);
-    });
+        .run(JSON.stringify(capabilities), status, now, now, workerId));
+      (await this.queueWorker(workerId));
+    }));
   }
 
-  setWorkerStatus(workerId: string, status: WorkerStatus): void {
-    this.database.transaction(() => {
-      this.database.raw
+  async setWorkerStatus(workerId: string, status: WorkerStatus): Promise<void> {
+    (await this.database.transaction(async () => {
+      (await this.database.raw
         .prepare("UPDATE workers SET status = ?, updated_at = ? WHERE id = ?")
-        .run(status, Date.now(), workerId);
-      this.queueWorker(workerId);
-    });
+        .run(status, Date.now(), workerId));
+      (await this.queueWorker(workerId));
+    }));
   }
 
-  deregisterWorker(workerId: string): boolean {
-    return this.database.transaction(() => {
-      const result = this.database.raw
+  async deregisterWorker(workerId: string): Promise<boolean> {
+    return (await this.database.transaction(async () => {
+      const result = (await this.database.raw
         .prepare(
           `UPDATE workers
            SET deregistered = 1, status = 'offline', updated_at = ?
            WHERE id = ? AND deregistered = 0`,
         )
-        .run(Date.now(), workerId);
-      if (Number(result.changes) === 1) this.queueWorker(workerId);
+        .run(Date.now(), workerId));
+      if (Number(result.changes) === 1) (await this.queueWorker(workerId));
       return Number(result.changes) === 1;
-    });
+    }));
   }
 
-  deregisterOfflineWorkers(): number {
-    return this.database.transaction(() => {
-      const rows = this.database.raw.prepare(
+  async deregisterOfflineWorkers(): Promise<number> {
+    return (await this.database.transaction(async () => {
+      const rows = (await this.database.raw.prepare(
         "SELECT id FROM workers WHERE deregistered = 0 AND status IN ('offline', 'suspect')",
-      ).all() as unknown as Array<{ id: string }>;
-      const result = this.database.raw
+      ).all()) as unknown as Array<{ id: string }>;
+      const result = (await this.database.raw
         .prepare(
           `UPDATE workers
            SET deregistered = 1, updated_at = ?
            WHERE deregistered = 0 AND status IN ('offline', 'suspect')`,
         )
-        .run(Date.now());
-      for (const row of rows) this.queueWorker(row.id);
+        .run(Date.now()));
+      for (const row of rows) (await this.queueWorker(row.id));
       return Number(result.changes);
-    });
+    }));
   }
 
-  upsertRequestedModel(input: {
+  async upsertRequestedModel(input: {
     id: string;
     source: string;
     revision: string | null;
     contextTokens: number;
     minimumNodes: number;
     autoActivate: boolean;
-  }): StoredRequestedModel {
-    return this.database.transaction(() => {
+  }): Promise<StoredRequestedModel> {
+    return (await this.database.transaction(async () => {
       const now = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO requested_models(
            id, source, revision, context_tokens, minimum_nodes, auto_activate,
            created_at, updated_at
@@ -500,31 +500,31 @@ export class MeshStore {
         input.autoActivate ? 1 : 0,
         now,
         now,
-      );
-      this.queueRequestedModel(input.id);
-      return this.getRequestedModel(input.id)!;
-    });
+      ));
+      (await this.queueRequestedModel(input.id));
+      return (await this.getRequestedModel(input.id))!;
+    }));
   }
 
-  getRequestedModel(id: string): StoredRequestedModel | null {
-    const row = this.database.raw.prepare("SELECT * FROM requested_models WHERE id = ?").get(id) as
+  async getRequestedModel(id: string): Promise<StoredRequestedModel | null> {
+    const row = (await this.database.raw.prepare("SELECT * FROM requested_models WHERE id = ?").get(id)) as
       | RequestedModelRow
       | undefined;
     return row ? this.mapRequestedModel(row) : null;
   }
 
-  listRequestedModels(): StoredRequestedModel[] {
-    const rows = this.database.raw
+  async listRequestedModels(): Promise<StoredRequestedModel[]> {
+    const rows = (await this.database.raw
       .prepare("SELECT * FROM requested_models ORDER BY created_at DESC")
-      .all() as unknown as RequestedModelRow[];
+      .all()) as unknown as RequestedModelRow[];
     return rows.map((row) => this.mapRequestedModel(row));
   }
 
-  replaceEngineRuntimeActivationPlans(
+  async replaceEngineRuntimeActivationPlans(
     modelId: string,
     activationId: string,
     values: readonly unknown[],
-  ): EngineRuntimeActivationPlan[] {
+  ): Promise<EngineRuntimeActivationPlan[]> {
     const plans = values.map((value) => engineRuntimeActivationPlanSchema.parse(value));
     if (
       plans.some((plan) => plan.modelId !== modelId || plan.activationId !== activationId)
@@ -533,146 +533,154 @@ export class MeshStore {
     ) {
       throw new Error("engine_runtime_activation_plan_set_is_invalid");
     }
-    return this.database.transaction(() => {
+    return (await this.database.transaction(async () => {
       const now = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         "DELETE FROM engine_runtime_activation_plans WHERE model_id = ?",
-      ).run(modelId);
+      ).run(modelId));
       const insert = this.database.raw.prepare(
         `INSERT INTO engine_runtime_activation_plans(
            model_id, activation_id, worker_id, plan_json, created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, ?)`,
       );
       for (const plan of plans) {
-        insert.run(
+        (await insert.run(
           modelId,
           activationId,
           plan.workerId,
           JSON.stringify(plan),
           Date.parse(plan.createdAt),
           now,
-        );
+        ));
       }
       return plans.map((plan) => structuredClone(plan));
-    });
+    }));
   }
 
-  listEngineRuntimeActivationPlans(): EngineRuntimeActivationPlan[] {
-    const rows = this.database.raw.prepare(
+  async listEngineRuntimeActivationPlans(): Promise<EngineRuntimeActivationPlan[]> {
+    const rows = (await this.database.raw.prepare(
       `SELECT plan_json FROM engine_runtime_activation_plans
        ORDER BY model_id, worker_id`,
-    ).all() as unknown as EngineRuntimeActivationPlanRow[];
+    ).all()) as unknown as EngineRuntimeActivationPlanRow[];
     return rows.map((row) => engineRuntimeActivationPlanSchema.parse(JSON.parse(row.plan_json)));
   }
 
-  removeEngineRuntimeActivationPlans(modelId: string): number {
-    return Number(this.database.raw.prepare(
+  async removeEngineRuntimeActivationPlans(modelId: string): Promise<number> {
+    return Number((await this.database.raw.prepare(
       "DELETE FROM engine_runtime_activation_plans WHERE model_id = ?",
-    ).run(modelId).changes);
+    ).run(modelId)).changes);
   }
 
-  setRequestedModelProfile(
+  async setRequestedModelProfile(
     id: string,
     profile: Record<string, unknown> | null,
     error: string | null,
-  ): void {
-    this.database.transaction(() => {
-      this.database.raw.prepare(
+  ): Promise<void> {
+    (await this.database.transaction(async () => {
+      (await this.database.raw.prepare(
         `UPDATE requested_models
          SET profile_json = ?, profile_error = ?, activation_requested_at = NULL,
              activation_error = NULL, updated_at = ?
          WHERE id = ?`,
-      ).run(profile ? JSON.stringify(profile) : null, error, Date.now(), id);
-      this.queueRequestedModel(id);
-    });
+      ).run(profile ? JSON.stringify(profile) : null, error, Date.now(), id));
+      (await this.queueRequestedModel(id));
+    }));
   }
 
-  setRequestedModelActivation(id: string, requested: boolean): void {
-    this.database.transaction(() => {
+  async setRequestedModelActivation(id: string, requested: boolean): Promise<void> {
+    (await this.database.transaction(async () => {
       const now = Date.now();
       if (requested) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `UPDATE requested_models
            SET activation_requested_at = ?, activation_error = NULL, updated_at = ?
            WHERE id = ?`,
-        ).run(now, now, id);
+        ).run(now, now, id));
       } else {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `UPDATE requested_models
            SET activation_requested_at = NULL, updated_at = ?
            WHERE id = ?`,
-        ).run(now, id);
+        ).run(now, id));
       }
-      this.queueRequestedModel(id);
-    });
+      (await this.queueRequestedModel(id));
+    }));
   }
 
-  setRequestedModelActivationError(id: string, error: string): void {
-    this.database.transaction(() => {
-      this.database.raw.prepare(
+  async setRequestedModelActivationError(id: string, error: string): Promise<void> {
+    (await this.database.transaction(async () => {
+      (await this.database.raw.prepare(
         `UPDATE requested_models
          SET activation_requested_at = NULL, activation_error = ?, updated_at = ?
          WHERE id = ?`,
-      ).run(error, Date.now(), id);
-      this.queueRequestedModel(id);
-    });
+      ).run(error, Date.now(), id));
+      (await this.queueRequestedModel(id));
+    }));
   }
 
-  clearRequestedModelActivationError(id: string): void {
-    this.database.transaction(() => {
-      this.database.raw.prepare(
+  async clearRequestedModelActivationError(id: string): Promise<void> {
+    (await this.database.transaction(async () => {
+      (await this.database.raw.prepare(
         `UPDATE requested_models
          SET activation_requested_at = NULL, activation_error = NULL, updated_at = ?
          WHERE id = ?`,
-      ).run(Date.now(), id);
-      this.queueRequestedModel(id);
-    });
+      ).run(Date.now(), id));
+      (await this.queueRequestedModel(id));
+    }));
   }
 
-  removeRequestedModel(id: string): boolean {
-    return this.database.transaction(() => {
+  async removeRequestedModel(id: string): Promise<boolean> {
+    return (await this.database.transaction(async () => {
+      // The outbox may coalesce a parent delete followed by recreation into an
+      // upsert. Explicit child tombstones preserve the cascade remotely too.
+      for (const table of ["deployment_operations", "route_reservations", "deployment_stage_leases"]) {
+        const rows = (await this.database.raw.prepare(`SELECT id FROM ${table} WHERE model_id = ?`)
+          .all(id)) as Array<{ id: string }>;
+        for (const row of rows) (await this.database.enqueueRemoteChange(table, row.id, "delete", null));
+      }
+      (await this.database.enqueueRemoteChange("deployment_states", id, "delete", null));
       const removed = Number(
-        this.database.raw.prepare("DELETE FROM requested_models WHERE id = ?").run(id).changes,
+        (await this.database.raw.prepare("DELETE FROM requested_models WHERE id = ?").run(id)).changes,
       ) === 1;
-      if (removed) this.database.enqueueRemoteChange("requested_models", id, "delete", null);
+      if (removed) (await this.database.enqueueRemoteChange("requested_models", id, "delete", null));
       return removed;
-    });
+    }));
   }
 
-  markStaleWorkers(now = Date.now()): { suspect: number; offline: number } {
-    return this.database.transaction(() => {
-      const candidates = this.database.raw.prepare(
+  async markStaleWorkers(now = Date.now()): Promise<{ suspect: number; offline: number }> {
+    return (await this.database.transaction(async () => {
+      const candidates = (await this.database.raw.prepare(
         `SELECT id FROM workers
          WHERE (status = 'online' AND last_seen_at < ?)
             OR (status IN ('online', 'suspect') AND last_seen_at < ?)`,
-      ).all(now - 10_000, now - 15_000) as unknown as Array<{ id: string }>;
-      const suspect = this.database.raw
+      ).all(now - 10_000, now - 15_000)) as unknown as Array<{ id: string }>;
+      const suspect = (await this.database.raw
         .prepare(
           `UPDATE workers SET status = 'suspect', updated_at = ?
            WHERE status = 'online' AND last_seen_at < ?`,
         )
-        .run(now, now - 10_000).changes;
-      const offline = this.database.raw
+        .run(now, now - 10_000)).changes;
+      const offline = (await this.database.raw
         .prepare(
           `UPDATE workers SET status = 'offline', updated_at = ?
            WHERE status IN ('online', 'suspect') AND last_seen_at < ?`,
         )
-        .run(now, now - 15_000).changes;
-      for (const candidate of candidates) this.queueWorker(candidate.id);
+        .run(now, now - 15_000)).changes;
+      for (const candidate of candidates) (await this.queueWorker(candidate.id));
       return { suspect: Number(suspect), offline: Number(offline) };
-    });
+    }));
   }
 
-  createJob(input: {
+  async createJob(input: {
     id: string;
     sessionId: string;
     model: string;
     workloadClass: string;
     deadlineAt: number;
-  }): StoredJob {
-    return this.database.transaction(() => {
+  }): Promise<StoredJob> {
+    return (await this.database.transaction(async () => {
       const now = Date.now();
-      this.database.raw
+      (await this.database.raw
         .prepare(
           `INSERT INTO jobs(
              id, session_id, model, workload_class, status, deadline_at, created_at, updated_at
@@ -686,49 +694,49 @@ export class MeshStore {
           input.deadlineAt,
           now,
           now,
-        );
-      this.queueJob(input.id);
-      return this.getJob(input.id)!;
-    });
+        ));
+      (await this.queueJob(input.id));
+      return (await this.getJob(input.id))!;
+    }));
   }
 
-  getIdempotentJob(idempotencyKey: string): { jobId: string; requestHash: string } | null {
-    const row = this.database.raw
+  async getIdempotentJob(idempotencyKey: string): Promise<{ jobId: string; requestHash: string } | null> {
+    const row = (await this.database.raw
       .prepare("SELECT job_id, request_hash FROM idempotency_keys WHERE idempotency_key = ?")
-      .get(idempotencyKey) as { job_id: string; request_hash: string } | undefined;
+      .get(idempotencyKey)) as { job_id: string; request_hash: string } | undefined;
     return row ? { jobId: row.job_id, requestHash: row.request_hash } : null;
   }
 
-  bindIdempotencyKey(idempotencyKey: string, requestHash: string, jobId: string): void {
-    this.database.transaction(() => {
+  async bindIdempotencyKey(idempotencyKey: string, requestHash: string, jobId: string): Promise<void> {
+    (await this.database.transaction(async () => {
       const createdAt = Date.now();
-      this.database.raw
+      (await this.database.raw
         .prepare(
           `INSERT INTO idempotency_keys(idempotency_key, request_hash, job_id, created_at)
            VALUES (?, ?, ?, ?)`,
         )
-        .run(idempotencyKey, requestHash, jobId, createdAt);
-      this.database.enqueueRemoteChange("idempotency_keys", idempotencyKey, "upsert", {
+        .run(idempotencyKey, requestHash, jobId, createdAt));
+      (await this.database.enqueueRemoteChange("idempotency_keys", idempotencyKey, "upsert", {
         idempotency_key: idempotencyKey,
         request_hash: requestHash,
         job_id: jobId,
         created_at: createdAt,
-      });
-    });
+      }));
+    }));
   }
 
-  getJob(jobId: string): StoredJob | null {
-    const row = this.database.raw.prepare("SELECT * FROM jobs WHERE id = ?").get(jobId) as
+  async getJob(jobId: string): Promise<StoredJob | null> {
+    const row = (await this.database.raw.prepare("SELECT * FROM jobs WHERE id = ?").get(jobId)) as
       | JobRow
       | undefined;
     return row ? this.mapJob(row) : null;
   }
 
-  setJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): void {
+  async setJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): Promise<void> {
     const first = route.stages[0];
     if (!first) throw new Error("Cannot assign an empty route");
-    this.database.transaction(() => {
-      this.database.raw
+    (await this.database.transaction(async () => {
+      (await this.database.raw
         .prepare(
           `UPDATE jobs
            SET status = 'leasing', worker_id = ?, deployment_id = ?, lease_id = ?,
@@ -742,16 +750,16 @@ export class MeshStore {
           first.modelDigest,
           Date.now(),
           jobId,
-        );
-      this.queueJob(jobId);
-    });
+        ));
+      (await this.queueJob(jobId));
+    }));
   }
 
-  promoteJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): void {
+  async promoteJobRoute(jobId: string, route: ScheduledRoute, leaseId: string): Promise<void> {
     const first = route.stages[0];
     if (!first) throw new Error("Cannot promote an empty route");
-    this.database.transaction(() => {
-      const result = this.database.raw
+    (await this.database.transaction(async () => {
+      const result = (await this.database.raw
         .prepare(
           `UPDATE jobs
            SET status = 'leasing', worker_id = ?, deployment_id = ?, lease_id = ?,
@@ -765,90 +773,90 @@ export class MeshStore {
           first.modelDigest,
           Date.now(),
           jobId,
-        );
+        ));
       if (result.changes !== 1) throw new Error("job_route_promotion_conflict");
-      this.queueJob(jobId);
-    });
+      (await this.queueJob(jobId));
+    }));
   }
 
-  setJobStatus(jobId: string, status: JobStatus, failureCode?: string): void {
-    this.database.transaction(() => {
-      this.database.raw
+  async setJobStatus(jobId: string, status: JobStatus, failureCode?: string): Promise<void> {
+    (await this.database.transaction(async () => {
+      (await this.database.raw
         .prepare("UPDATE jobs SET status = ?, failure_code = ?, updated_at = ? WHERE id = ?")
-        .run(status, failureCode ?? null, Date.now(), jobId);
-      this.queueJob(jobId);
-    });
+        .run(status, failureCode ?? null, Date.now(), jobId));
+      (await this.queueJob(jobId));
+    }));
   }
 
-  requeueJob(jobId: string, failureCode?: string): void {
-    this.database.transaction(() => {
-      this.database.raw
+  async requeueJob(jobId: string, failureCode?: string): Promise<void> {
+    (await this.database.transaction(async () => {
+      (await this.database.raw
         .prepare(
           `UPDATE jobs
            SET status = 'queued', worker_id = NULL, deployment_id = NULL,
                model_digest = NULL, lease_id = NULL, failure_code = ?, updated_at = ?
            WHERE id = ? AND status NOT IN ('completed', 'cancelled', 'expired')`,
         )
-        .run(failureCode ?? null, Date.now(), jobId);
-      this.queueJob(jobId);
-    });
+        .run(failureCode ?? null, Date.now(), jobId));
+      (await this.queueJob(jobId));
+    }));
   }
 
-  completeJob(jobId: string, metrics: CompletionMetrics): void {
-    this.database.transaction(() => {
-      this.database.raw
+  async completeJob(jobId: string, metrics: CompletionMetrics): Promise<void> {
+    (await this.database.transaction(async () => {
+      (await this.database.raw
         .prepare(
           `UPDATE jobs
            SET status = 'completed', input_tokens = ?, output_tokens = ?, updated_at = ?
            WHERE id = ?`,
         )
-        .run(metrics.inputTokens, metrics.outputTokens, Date.now(), jobId);
-      this.database.raw
+        .run(metrics.inputTokens, metrics.outputTokens, Date.now(), jobId));
+      (await this.database.raw
         .prepare(
           `UPDATE workers SET jobs_completed = jobs_completed + 1, updated_at = ?
            WHERE id = (SELECT worker_id FROM jobs WHERE id = ?)`,
         )
-        .run(Date.now(), jobId);
-      this.queueJob(jobId);
-      const workerId = this.getJob(jobId)?.workerId;
-      if (workerId) this.queueWorker(workerId);
-    });
+        .run(Date.now(), jobId));
+      (await this.queueJob(jobId));
+      const workerId = (await this.getJob(jobId))?.workerId;
+      if (workerId) (await this.queueWorker(workerId));
+    }));
   }
 
-  countActiveJobs(workerId: string): number {
-    const row = this.database.raw
+  async countActiveJobs(workerId: string): Promise<number> {
+    const row = (await this.database.raw
       .prepare(
         `SELECT COUNT(*) AS count FROM jobs
          WHERE worker_id = ? AND status IN ('leasing', 'running', 'streaming')`,
       )
-      .get(workerId) as { count: number };
+      .get(workerId)) as { count: number };
     return Number(row.count);
   }
 
-  listActiveJobsForWorker(workerId: string): StoredJob[] {
-    const rows = this.database.raw
+  async listActiveJobsForWorker(workerId: string): Promise<StoredJob[]> {
+    const rows = (await this.database.raw
       .prepare(
         `SELECT * FROM jobs
          WHERE worker_id = ? AND status IN ('leasing', 'running', 'streaming')`,
       )
-      .all(workerId) as unknown as JobRow[];
+      .all(workerId)) as unknown as JobRow[];
     return rows.map((row) => this.mapJob(row));
   }
 
-  listNonterminalJobs(): StoredJob[] {
-    const rows = this.database.raw
+  async listNonterminalJobs(): Promise<StoredJob[]> {
+    const rows = (await this.database.raw
       .prepare(
         `SELECT * FROM jobs
          WHERE status IN ('queued', 'leasing', 'running', 'streaming')`,
       )
-      .all() as unknown as JobRow[];
+      .all()) as unknown as JobRow[];
     return rows.map((row) => this.mapJob(row));
   }
 
-  saveSession(sessionId: string, model: string, route: ScheduledRoute, ttlMs = 15 * 60_000): void {
-    this.database.transaction(() => {
+  async saveSession(sessionId: string, model: string, route: ScheduledRoute, ttlMs = 15 * 60_000): Promise<void> {
+    (await this.database.transaction(async () => {
       const now = Date.now();
-      this.database.raw
+      (await this.database.raw
         .prepare(
           `INSERT INTO sessions(id, model, route_json, expires_at, last_used_at)
            VALUES (?, ?, ?, ?, ?)
@@ -859,8 +867,8 @@ export class MeshStore {
              last_used_at = excluded.last_used_at,
              version = sessions.version + 1`,
         )
-        .run(sessionId, model, JSON.stringify(route), now + ttlMs, now);
-      const row = this.database.raw.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId) as
+        .run(sessionId, model, JSON.stringify(route), now + ttlMs, now));
+      const row = (await this.database.raw.prepare("SELECT * FROM sessions WHERE id = ?").get(sessionId)) as
         | {
             id: string;
             model: string;
@@ -871,61 +879,61 @@ export class MeshStore {
           }
         | undefined;
       if (row) {
-        this.database.enqueueRemoteChange("sessions", sessionId, "upsert", {
+        (await this.database.enqueueRemoteChange("sessions", sessionId, "upsert", {
           id: row.id,
           model: row.model,
           route_json: JSON.parse(row.route_json) as unknown,
           expires_at: Number(row.expires_at),
           last_used_at: Number(row.last_used_at),
           version: Number(row.version),
-        });
+        }));
       }
-    });
+    }));
   }
 
-  getSessionRoute(sessionId: string, model: string): ScheduledRoute | null {
-    const row = this.database.raw
+  async getSessionRoute(sessionId: string, model: string): Promise<ScheduledRoute | null> {
+    const row = (await this.database.raw
       .prepare(
         `SELECT route_json FROM sessions
          WHERE id = ? AND model = ? AND expires_at > ?`,
       )
-      .get(sessionId, model, Date.now()) as { route_json: string } | undefined;
+      .get(sessionId, model, Date.now())) as { route_json: string } | undefined;
     return row ? (JSON.parse(row.route_json) as ScheduledRoute) : null;
   }
 
-  listJobs(limit = 100): StoredJob[] {
-    const rows = this.database.raw
+  async listJobs(limit = 100): Promise<StoredJob[]> {
+    const rows = (await this.database.raw
       .prepare("SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?")
-      .all(limit) as unknown as JobRow[];
+      .all(limit)) as unknown as JobRow[];
     return rows.map((row) => this.mapJob(row));
   }
 
-  countCompletedJobs(): number {
-    const row = this.database.raw
+  async countCompletedJobs(): Promise<number> {
+    const row = (await this.database.raw
       .prepare("SELECT COUNT(*) AS count FROM jobs WHERE status = 'completed'")
-      .get() as { count: number };
+      .get()) as { count: number };
     return Number(row.count);
   }
 
-  queueAllForRemotePersistence(): number {
-    return this.database.transaction(() => {
+  async queueAllForRemotePersistence(): Promise<number> {
+    return (await this.database.transaction(async () => {
       let queued = 0;
-      const workers = this.database.raw.prepare("SELECT id FROM workers").all() as unknown as Array<{ id: string }>;
+      const workers = (await this.database.raw.prepare("SELECT id FROM workers").all()) as unknown as Array<{ id: string }>;
       for (const worker of workers) {
-        this.queueWorker(worker.id);
+        (await this.queueWorker(worker.id));
         queued += 1;
       }
-      const jobs = this.database.raw.prepare("SELECT id FROM jobs").all() as unknown as Array<{ id: string }>;
+      const jobs = (await this.database.raw.prepare("SELECT id FROM jobs").all()) as unknown as Array<{ id: string }>;
       for (const job of jobs) {
-        this.queueJob(job.id);
+        (await this.queueJob(job.id));
         queued += 1;
       }
-      const models = this.database.raw.prepare("SELECT id FROM requested_models").all() as unknown as Array<{ id: string }>;
+      const models = (await this.database.raw.prepare("SELECT id FROM requested_models").all()) as unknown as Array<{ id: string }>;
       for (const model of models) {
-        this.queueRequestedModel(model.id);
+        (await this.queueRequestedModel(model.id));
         queued += 1;
       }
-      const sessions = this.database.raw.prepare("SELECT * FROM sessions").all() as unknown as Array<{
+      const sessions = (await this.database.raw.prepare("SELECT * FROM sessions").all()) as unknown as Array<{
         id: string;
         model: string;
         route_json: string;
@@ -934,60 +942,60 @@ export class MeshStore {
         version: number;
       }>;
       for (const row of sessions) {
-        this.database.enqueueRemoteChange("sessions", row.id, "upsert", {
+        (await this.database.enqueueRemoteChange("sessions", row.id, "upsert", {
           id: row.id,
           model: row.model,
           route_json: JSON.parse(row.route_json) as unknown,
           expires_at: Number(row.expires_at),
           last_used_at: Number(row.last_used_at),
           version: Number(row.version),
-        });
+        }));
         queued += 1;
       }
-      const keys = this.database.raw.prepare("SELECT * FROM idempotency_keys").all() as unknown as Array<{
+      const keys = (await this.database.raw.prepare("SELECT * FROM idempotency_keys").all()) as unknown as Array<{
         idempotency_key: string;
         request_hash: string;
         job_id: string;
         created_at: number;
       }>;
       for (const row of keys) {
-        this.database.enqueueRemoteChange("idempotency_keys", row.idempotency_key, "upsert", {
+        (await this.database.enqueueRemoteChange("idempotency_keys", row.idempotency_key, "upsert", {
           ...row,
           created_at: Number(row.created_at),
-        });
+        }));
         queued += 1;
       }
-      const conversations = this.database.raw.prepare(
+      const conversations = (await this.database.raw.prepare(
         "SELECT id FROM inference_conversations",
-      ).all() as unknown as Array<{ id: string }>;
+      ).all()) as unknown as Array<{ id: string }>;
       for (const row of conversations) {
-        this.queueInferenceConversation(row.id);
+        (await this.queueInferenceConversation(row.id));
         queued += 1;
       }
-      const messages = this.database.raw.prepare(
+      const messages = (await this.database.raw.prepare(
         "SELECT id FROM inference_messages",
-      ).all() as unknown as Array<{ id: string }>;
+      ).all()) as unknown as Array<{ id: string }>;
       for (const row of messages) {
-        this.queueInferenceMessage(row.id);
+        (await this.queueInferenceMessage(row.id));
         queued += 1;
       }
-      const activationEvents = this.database.raw.prepare(
+      const activationEvents = (await this.database.raw.prepare(
         "SELECT id FROM activation_events",
-      ).all() as unknown as Array<{ id: string }>;
+      ).all()) as unknown as Array<{ id: string }>;
       for (const row of activationEvents) {
-        this.queueActivationEvent(row.id);
+        (await this.queueActivationEvent(row.id));
         queued += 1;
       }
-      const diagnosticEvents = this.database.raw.prepare(
+      const diagnosticEvents = (await this.database.raw.prepare(
         "SELECT id FROM diagnostic_events",
-      ).all() as unknown as Array<{ id: string }>;
+      ).all()) as unknown as Array<{ id: string }>;
       for (const row of diagnosticEvents) {
-        this.queueDiagnosticEvent(row.id);
+        (await this.queueDiagnosticEvent(row.id));
         queued += 1;
       }
-      const deploymentStates = this.database.raw.prepare(
+      const deploymentStates = (await this.database.raw.prepare(
         "SELECT * FROM deployment_states",
-      ).all() as unknown as Array<{
+      ).all()) as unknown as Array<{
         model_id: string;
         desired_state: string;
         observed_state: string;
@@ -1003,12 +1011,12 @@ export class MeshStore {
         updated_at: number;
       }>;
       for (const row of deploymentStates) {
-        this.database.enqueueRemoteChange("deployment_states", row.model_id, "upsert", row);
+        (await this.database.enqueueRemoteChange("deployment_states", row.model_id, "upsert", row));
         queued += 1;
       }
-      const deploymentOperations = this.database.raw.prepare(
+      const deploymentOperations = (await this.database.raw.prepare(
         "SELECT * FROM deployment_operations",
-      ).all() as unknown as Array<{
+      ).all()) as unknown as Array<{
         id: string;
         model_id: string;
         generation: number;
@@ -1025,15 +1033,15 @@ export class MeshStore {
       }>;
       for (const row of deploymentOperations) {
         const { metadata_json: metadataJson, ...operation } = row;
-        this.database.enqueueRemoteChange("deployment_operations", row.id, "upsert", {
+        (await this.database.enqueueRemoteChange("deployment_operations", row.id, "upsert", {
           ...operation,
           metadata: JSON.parse(metadataJson) as unknown,
-        });
+        }));
         queued += 1;
       }
-      const routeReservations = this.database.raw.prepare(
+      const routeReservations = (await this.database.raw.prepare(
         "SELECT * FROM route_reservations",
-      ).all() as unknown as Array<{
+      ).all()) as unknown as Array<{
         id: string;
         model_id: string;
         operation_id: string;
@@ -1055,46 +1063,46 @@ export class MeshStore {
           canary_json: canaryJson,
           ...reservation
         } = row;
-        this.database.enqueueRemoteChange("route_reservations", row.id, "upsert", {
+        (await this.database.enqueueRemoteChange("route_reservations", row.id, "upsert", {
           ...reservation,
           stages: JSON.parse(stagesJson) as unknown,
           canary: canaryJson ? JSON.parse(canaryJson) as unknown : null,
-        });
+        }));
         queued += 1;
       }
-      const deploymentStageLeases = this.database.raw.prepare(
+      const deploymentStageLeases = (await this.database.raw.prepare(
         "SELECT * FROM deployment_stage_leases",
-      ).all() as unknown as Array<Record<string, unknown> & { id: string }>;
+      ).all()) as unknown as Array<Record<string, unknown> & { id: string }>;
       for (const row of deploymentStageLeases) {
-        this.database.enqueueRemoteChange("deployment_stage_leases", row.id, "upsert", row);
+        (await this.database.enqueueRemoteChange("deployment_stage_leases", row.id, "upsert", row));
         queued += 1;
       }
-      const studioAgents = this.database.raw.prepare("SELECT * FROM studio_agents").all() as unknown as Array<Record<string, unknown> & { id: string; configuration_json: string; created_at: number; updated_at: number; archived_at: number | null }>;
+      const studioAgents = (await this.database.raw.prepare("SELECT * FROM studio_agents").all()) as unknown as Array<Record<string, unknown> & { id: string; configuration_json: string; created_at: number; updated_at: number; archived_at: number | null }>;
       for (const { configuration_json: configurationJson, created_at: createdAt, updated_at: updatedAt, archived_at: archivedAt, ...row } of studioAgents) {
-        this.database.enqueueRemoteChange("studio_agents", row.id, "upsert", { ...row, configuration: JSON.parse(configurationJson), created_at: new Date(createdAt).toISOString(), updated_at: new Date(updatedAt).toISOString(), archived_at: archivedAt === null ? null : new Date(archivedAt).toISOString() });
+        (await this.database.enqueueRemoteChange("studio_agents", row.id, "upsert", { ...row, configuration: JSON.parse(configurationJson), created_at: new Date(createdAt).toISOString(), updated_at: new Date(updatedAt).toISOString(), archived_at: archivedAt === null ? null : new Date(archivedAt).toISOString() }));
         queued += 1;
       }
-      const studioRevisions = this.database.raw.prepare("SELECT * FROM studio_agent_revisions").all() as unknown as Array<Record<string, unknown> & { id: string; configuration_json: string; created_at: number }>;
+      const studioRevisions = (await this.database.raw.prepare("SELECT * FROM studio_agent_revisions").all()) as unknown as Array<Record<string, unknown> & { id: string; configuration_json: string; created_at: number }>;
       for (const { configuration_json: configurationJson, created_at: createdAt, ...row } of studioRevisions) {
-        this.database.enqueueRemoteChange("studio_agent_revisions", row.id, "upsert", { ...row, configuration: JSON.parse(configurationJson), created_at: new Date(createdAt).toISOString() });
+        (await this.database.enqueueRemoteChange("studio_agent_revisions", row.id, "upsert", { ...row, configuration: JSON.parse(configurationJson), created_at: new Date(createdAt).toISOString() }));
         queued += 1;
       }
-      const studioDeployments = this.database.raw.prepare("SELECT * FROM studio_channel_deployments").all() as unknown as Array<Record<string, unknown> & { id: string; created_at: number; updated_at: number; revoked_at: number | null }>;
+      const studioDeployments = (await this.database.raw.prepare("SELECT * FROM studio_channel_deployments").all()) as unknown as Array<Record<string, unknown> & { id: string; created_at: number; updated_at: number; revoked_at: number | null }>;
       for (const { created_at: createdAt, updated_at: updatedAt, revoked_at: revokedAt, ...row } of studioDeployments) {
-        this.database.enqueueRemoteChange("studio_channel_deployments", row.id, "upsert", { ...row, created_at: new Date(createdAt).toISOString(), updated_at: new Date(updatedAt).toISOString(), revoked_at: revokedAt === null ? null : new Date(revokedAt).toISOString() });
+        (await this.database.enqueueRemoteChange("studio_channel_deployments", row.id, "upsert", { ...row, created_at: new Date(createdAt).toISOString(), updated_at: new Date(updatedAt).toISOString(), revoked_at: revokedAt === null ? null : new Date(revokedAt).toISOString() }));
         queued += 1;
       }
-      const studioEvents = this.database.raw.prepare("SELECT * FROM studio_agent_events").all() as unknown as Array<Record<string, unknown> & { event_digest: string; details_json: string; occurred_at: number }>;
+      const studioEvents = (await this.database.raw.prepare("SELECT * FROM studio_agent_events").all()) as unknown as Array<Record<string, unknown> & { event_digest: string; details_json: string; occurred_at: number }>;
       for (const { details_json: detailsJson, occurred_at: occurredAt, ...row } of studioEvents) {
-        this.database.enqueueRemoteChange("studio_agent_events", row.event_digest, "upsert", { ...row, details: JSON.parse(detailsJson), occurred_at: new Date(occurredAt).toISOString() });
+        (await this.database.enqueueRemoteChange("studio_agent_events", row.event_digest, "upsert", { ...row, details: JSON.parse(detailsJson), occurred_at: new Date(occurredAt).toISOString() }));
         queued += 1;
       }
       return queued;
-    });
+    }));
   }
 
-  queueBenchmarkRun(run: BenchmarkRun): void {
-    this.database.enqueueRemoteChange("benchmark_runs", run.runId, "upsert", {
+  async queueBenchmarkRun(run: BenchmarkRun): Promise<void> {
+    (await this.database.enqueueRemoteChange("benchmark_runs", run.runId, "upsert", {
       run_id: run.runId,
       version: run.version,
       label: run.label,
@@ -1104,52 +1112,52 @@ export class MeshStore {
       started_at: run.startedAt,
       finished_at: run.finishedAt,
       document: run,
-    });
+    }));
   }
 
-  startInferenceConversation(
+  async startInferenceConversation(
     sessionId: string,
     model: string,
     messages: ReadonlyArray<{ role: "system" | "developer" | "user" | "assistant" | "tool"; content: string }>,
-  ): string {
-    return this.database.transaction(() => {
+  ): Promise<string> {
+    return (await this.database.transaction(async () => {
       const now = Date.now();
-      const existing = this.database.raw.prepare(
+      const existing = (await this.database.raw.prepare(
         "SELECT id FROM inference_conversations WHERE session_id = ?",
-      ).get(sessionId) as { id: string } | undefined;
+      ).get(sessionId)) as { id: string } | undefined;
       const conversationId = existing?.id ?? newId("cnv");
       if (existing) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           "UPDATE inference_conversations SET model = ?, updated_at = ? WHERE id = ?",
-        ).run(model, now, conversationId);
+        ).run(model, now, conversationId));
       } else {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `INSERT INTO inference_conversations(id, session_id, model, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?)`,
-        ).run(conversationId, sessionId, model, now, now);
+        ).run(conversationId, sessionId, model, now, now));
       }
-      this.queueInferenceConversation(conversationId);
+      (await this.queueInferenceConversation(conversationId));
 
-      const messageCount = this.database.raw.prepare(
+      const messageCount = (await this.database.raw.prepare(
         "SELECT COUNT(*) AS count FROM inference_messages WHERE conversation_id = ?",
-      ).get(conversationId) as { count: number };
+      ).get(conversationId)) as { count: number };
       const selected = Number(messageCount.count) === 0
         ? messages
         : messages.length > 0 ? [messages.at(-1)!] : [];
       for (const message of selected) {
-        this.appendInferenceMessage({
+        (await this.appendInferenceMessage({
           conversationId,
           jobId: null,
           role: message.role,
           content: message.content,
           status: "completed",
-        });
+        }));
       }
       return conversationId;
-    });
+    }));
   }
 
-  appendInferenceMessage(input: {
+  async appendInferenceMessage(input: {
     conversationId: string;
     jobId: string | null;
     role: StoredInferenceMessage["role"];
@@ -1160,11 +1168,11 @@ export class MeshStore {
     routeClass?: string | null;
     latencyMs?: number | null;
     metadata?: Record<string, unknown>;
-  }): StoredInferenceMessage {
-    return this.database.transaction(() => {
+  }): Promise<StoredInferenceMessage> {
+    return (await this.database.transaction(async () => {
       const id = newId("msg");
       const createdAt = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO inference_messages(
            id, conversation_id, job_id, role, content, status, input_tokens,
            output_tokens, route_class, latency_ms, metadata_json, created_at
@@ -1182,12 +1190,12 @@ export class MeshStore {
         input.latencyMs ?? null,
         JSON.stringify(input.metadata ?? {}),
         createdAt,
-      );
-      this.database.raw.prepare(
+      ));
+      (await this.database.raw.prepare(
         "UPDATE inference_conversations SET updated_at = ? WHERE id = ?",
-      ).run(createdAt, input.conversationId);
-      this.queueInferenceConversation(input.conversationId);
-      this.queueInferenceMessage(id);
+      ).run(createdAt, input.conversationId));
+      (await this.queueInferenceConversation(input.conversationId));
+      (await this.queueInferenceMessage(id));
       return {
         id,
         conversationId: input.conversationId,
@@ -1202,17 +1210,17 @@ export class MeshStore {
         metadata: input.metadata ?? {},
         createdAt,
       };
-    });
+    }));
   }
 
-  listInferenceMessages(sessionId: string): StoredInferenceMessage[] {
-    const rows = this.database.raw.prepare(
+  async listInferenceMessages(sessionId: string): Promise<StoredInferenceMessage[]> {
+    const rows = (await this.database.raw.prepare(
       `SELECT m.*
        FROM inference_messages m
        JOIN inference_conversations c ON c.id = m.conversation_id
        WHERE c.session_id = ?
        ORDER BY m.created_at, m.id`,
-    ).all(sessionId) as unknown as Array<{
+    ).all(sessionId)) as unknown as Array<{
       id: string;
       conversation_id: string;
       job_id: string | null;
@@ -1242,11 +1250,11 @@ export class MeshStore {
     }));
   }
 
-  appendActivationEvent(modelId: string, event: StoredActivationEvent): void {
-    this.database.transaction(() => {
+  async appendActivationEvent(modelId: string, event: StoredActivationEvent): Promise<void> {
+    (await this.database.transaction(async () => {
       const id = newId("act");
       const occurredAt = Date.parse(event.at);
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO activation_events(
            id, model_id, phase, state, message, node_id, process_id, device,
            details_json, occurred_at
@@ -1262,18 +1270,18 @@ export class MeshStore {
         event.device ?? null,
         event.details ? JSON.stringify(event.details) : null,
         Number.isFinite(occurredAt) ? occurredAt : Date.now(),
-      );
-      this.queueActivationEvent(id);
-    });
+      ));
+      (await this.queueActivationEvent(id));
+    }));
   }
 
-  listActivationEvents(modelId: string, limit = 100): StoredActivationEvent[] {
-    const rows = this.database.raw.prepare(
+  async listActivationEvents(modelId: string, limit = 100): Promise<StoredActivationEvent[]> {
+    const rows = (await this.database.raw.prepare(
       `SELECT * FROM activation_events
        WHERE model_id = ?
        ORDER BY occurred_at DESC
        LIMIT ?`,
-    ).all(modelId, limit) as unknown as Array<{
+    ).all(modelId, limit)) as unknown as Array<{
       phase: string;
       state: StoredActivationEvent["state"];
       message: string;
@@ -1295,10 +1303,10 @@ export class MeshStore {
     }));
   }
 
-  appendDiagnosticEvents(
+  async appendDiagnosticEvents(
     events: readonly RemoteDiagnosticEvent[],
-  ): { accepted: number; duplicates: number } {
-    return this.database.transaction(() => {
+  ): Promise<{ accepted: number; duplicates: number }> {
+    return (await this.database.transaction(async () => {
       const insert = this.database.raw.prepare(
         `INSERT OR IGNORE INTO diagnostic_events(
            id, source_id, app_version, platform, arch, level, source, event,
@@ -1312,7 +1320,7 @@ export class MeshStore {
         const safeOccurredAt = Number.isFinite(occurredAt)
           ? Math.min(occurredAt, receivedAt + 5 * 60_000)
           : receivedAt;
-        const result = insert.run(
+        const result = (await insert.run(
           event.id,
           event.sourceId,
           event.appVersion,
@@ -1325,17 +1333,17 @@ export class MeshStore {
           event.details ?? null,
           safeOccurredAt,
           receivedAt,
-        );
+        ));
         if (Number(result.changes) === 0) continue;
         accepted += 1;
-        this.queueDiagnosticEvent(event.id);
+        (await this.queueDiagnosticEvent(event.id));
       }
-      this.pruneDiagnosticEvents(receivedAt);
+      (await this.pruneDiagnosticEvents(receivedAt));
       return { accepted, duplicates: events.length - accepted };
-    });
+    }));
   }
 
-  listDiagnosticEvents(query: DiagnosticEventQuery = {}): StoredDiagnosticEvent[] {
+  async listDiagnosticEvents(query: DiagnosticEventQuery = {}): Promise<StoredDiagnosticEvent[]> {
     const where: string[] = [];
     const parameters: Array<string | number> = [];
     if (query.level) {
@@ -1354,12 +1362,12 @@ export class MeshStore {
       }
     }
     const limit = Math.max(1, Math.min(500, Math.trunc(query.limit ?? 100)));
-    const rows = this.database.raw.prepare(
+    const rows = (await this.database.raw.prepare(
       `SELECT * FROM diagnostic_events
        ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
        ORDER BY occurred_at DESC, id DESC
        LIMIT ?`,
-    ).all(...parameters, limit) as unknown as Array<{
+    ).all(...parameters, limit)) as unknown as Array<{
       id: string;
       source_id: string;
       app_version: string;
@@ -1389,8 +1397,8 @@ export class MeshStore {
     }));
   }
 
-  recordNetworkTelemetrySample(sample: StoredNetworkTelemetrySample): void {
-    this.database.raw.prepare(
+  async recordNetworkTelemetrySample(sample: StoredNetworkTelemetrySample): Promise<void> {
+    (await this.database.raw.prepare(
       `INSERT INTO network_telemetry_history(
          captured_at, registered_nodes, connected_nodes, online_nodes, browser_nodes,
          active_models, model_replicas, model_pipelines, offered_vram_mb, free_vram_mb,
@@ -1423,12 +1431,12 @@ export class MeshStore {
       sample.inflightJobs,
       sample.runningJobs,
       sample.completedJobs,
-    );
+    ));
   }
 
-  listNetworkTelemetrySamples(since: number, limit = 13_000): StoredNetworkTelemetrySample[] {
+  async listNetworkTelemetrySamples(since: number, limit = 13_000): Promise<StoredNetworkTelemetrySample[]> {
     const boundedLimit = Math.max(1, Math.min(13_000, Math.trunc(limit)));
-    const rows = this.database.raw.prepare(
+    const rows = (await this.database.raw.prepare(
       `SELECT * FROM (
          SELECT captured_at, registered_nodes, connected_nodes, online_nodes, browser_nodes,
                 active_models, model_replicas, model_pipelines, offered_vram_mb, free_vram_mb,
@@ -1438,7 +1446,7 @@ export class MeshStore {
          ORDER BY captured_at DESC
          LIMIT ?
        ) AS recent_samples ORDER BY captured_at ASC`,
-    ).all(since, boundedLimit) as unknown as Array<{
+    ).all(since, boundedLimit)) as unknown as Array<{
       captured_at: number;
       registered_nodes: number;
       connected_nodes: number;
@@ -1470,16 +1478,16 @@ export class MeshStore {
     }));
   }
 
-  pruneNetworkTelemetrySamples(before: number): number {
+  async pruneNetworkTelemetrySamples(before: number): Promise<number> {
     return Number(
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         "DELETE FROM network_telemetry_history WHERE captured_at < ?",
-      ).run(before).changes,
+      ).run(before)).changes,
     );
   }
 
-  private queueWorker(workerId: string): void {
-    const row = this.database.raw.prepare("SELECT * FROM workers WHERE id = ?").get(workerId) as
+  private async queueWorker(workerId: string): Promise<void> {
+    const row = (await this.database.raw.prepare("SELECT * FROM workers WHERE id = ?").get(workerId)) as
       | (WorkerRow & {
           created_at: number;
           updated_at: number;
@@ -1487,7 +1495,7 @@ export class MeshStore {
         })
       | undefined;
     if (!row) return;
-    this.database.enqueueRemoteChange("workers", workerId, "upsert", {
+    (await this.database.enqueueRemoteChange("workers", workerId, "upsert", {
       id: row.id,
       status: row.status,
       capabilities_json: JSON.parse(row.capabilities_json) as unknown,
@@ -1499,15 +1507,15 @@ export class MeshStore {
       deregistered: row.deregistered === 1,
       identity_kind: row.identity_kind,
       identity_id: row.identity_id,
-    });
+    }));
   }
 
-  private queueJob(jobId: string): void {
-    const row = this.database.raw.prepare("SELECT * FROM jobs WHERE id = ?").get(jobId) as
+  private async queueJob(jobId: string): Promise<void> {
+    const row = (await this.database.raw.prepare("SELECT * FROM jobs WHERE id = ?").get(jobId)) as
       | JobRow
       | undefined;
     if (!row) return;
-    this.database.enqueueRemoteChange("jobs", jobId, "upsert", {
+    (await this.database.enqueueRemoteChange("jobs", jobId, "upsert", {
       id: row.id,
       session_id: row.session_id,
       model: row.model,
@@ -1523,15 +1531,15 @@ export class MeshStore {
       deadline_at: Number(row.deadline_at),
       created_at: Number(row.created_at),
       updated_at: Number(row.updated_at),
-    });
+    }));
   }
 
-  private queueRequestedModel(modelId: string): void {
-    const row = this.database.raw.prepare("SELECT * FROM requested_models WHERE id = ?").get(modelId) as
+  private async queueRequestedModel(modelId: string): Promise<void> {
+    const row = (await this.database.raw.prepare("SELECT * FROM requested_models WHERE id = ?").get(modelId)) as
       | RequestedModelRow
       | undefined;
     if (!row) return;
-    this.database.enqueueRemoteChange("requested_models", modelId, "upsert", {
+    (await this.database.enqueueRemoteChange("requested_models", modelId, "upsert", {
       id: row.id,
       source: row.source,
       revision: row.revision,
@@ -1544,29 +1552,29 @@ export class MeshStore {
       activation_error: row.activation_error,
       created_at: Number(row.created_at),
       updated_at: Number(row.updated_at),
-    });
+    }));
   }
 
-  private queueInferenceConversation(conversationId: string): void {
-    const row = this.database.raw.prepare(
+  private async queueInferenceConversation(conversationId: string): Promise<void> {
+    const row = (await this.database.raw.prepare(
       "SELECT * FROM inference_conversations WHERE id = ?",
-    ).get(conversationId) as
+    ).get(conversationId)) as
       | { id: string; session_id: string; model: string; created_at: number; updated_at: number }
       | undefined;
     if (!row) return;
-    this.database.enqueueRemoteChange("inference_conversations", conversationId, "upsert", {
+    (await this.database.enqueueRemoteChange("inference_conversations", conversationId, "upsert", {
       id: row.id,
       session_id: row.session_id,
       model: row.model,
       created_at: new Date(Number(row.created_at)).toISOString(),
       updated_at: new Date(Number(row.updated_at)).toISOString(),
-    });
+    }));
   }
 
-  private queueInferenceMessage(messageId: string): void {
-    const row = this.database.raw.prepare(
+  private async queueInferenceMessage(messageId: string): Promise<void> {
+    const row = (await this.database.raw.prepare(
       "SELECT * FROM inference_messages WHERE id = ?",
-    ).get(messageId) as
+    ).get(messageId)) as
       | {
           id: string;
           conversation_id: string;
@@ -1583,7 +1591,7 @@ export class MeshStore {
         }
       | undefined;
     if (!row) return;
-    this.database.enqueueRemoteChange("inference_messages", messageId, "upsert", {
+    (await this.database.enqueueRemoteChange("inference_messages", messageId, "upsert", {
       id: row.id,
       conversation_id: row.conversation_id,
       job_id: row.job_id,
@@ -1596,13 +1604,13 @@ export class MeshStore {
       latency_ms: row.latency_ms,
       metadata: JSON.parse(row.metadata_json) as unknown,
       created_at: new Date(Number(row.created_at)).toISOString(),
-    });
+    }));
   }
 
-  private queueActivationEvent(eventId: string): void {
-    const row = this.database.raw.prepare(
+  private async queueActivationEvent(eventId: string): Promise<void> {
+    const row = (await this.database.raw.prepare(
       "SELECT * FROM activation_events WHERE id = ?",
-    ).get(eventId) as
+    ).get(eventId)) as
       | {
           id: string;
           model_id: string;
@@ -1617,7 +1625,7 @@ export class MeshStore {
         }
       | undefined;
     if (!row) return;
-    this.database.enqueueRemoteChange("activation_events", eventId, "upsert", {
+    (await this.database.enqueueRemoteChange("activation_events", eventId, "upsert", {
       id: row.id,
       model_id: row.model_id,
       phase: row.phase,
@@ -1628,13 +1636,13 @@ export class MeshStore {
       device: row.device,
       details: row.details_json ? JSON.parse(row.details_json) as unknown : null,
       occurred_at: Number(row.occurred_at),
-    });
+    }));
   }
 
-  private queueDiagnosticEvent(eventId: string): void {
-    const row = this.database.raw.prepare(
+  private async queueDiagnosticEvent(eventId: string): Promise<void> {
+    const row = (await this.database.raw.prepare(
       "SELECT * FROM diagnostic_events WHERE id = ?",
-    ).get(eventId) as {
+    ).get(eventId)) as {
       id: string;
       source_id: string;
       app_version: string;
@@ -1649,26 +1657,26 @@ export class MeshStore {
       received_at: number;
     } | undefined;
     if (!row) return;
-    this.database.enqueueRemoteChange("diagnostic_events", eventId, "upsert", row);
+    (await this.database.enqueueRemoteChange("diagnostic_events", eventId, "upsert", row));
   }
 
-  private pruneDiagnosticEvents(now: number): void {
+  private async pruneDiagnosticEvents(now: number): Promise<void> {
     const cutoff = now - 30 * 24 * 60 * 60 * 1_000;
-    const expired = this.database.raw.prepare(
+    const expired = (await this.database.raw.prepare(
       "SELECT id FROM diagnostic_events WHERE occurred_at < ?",
-    ).all(cutoff) as unknown as Array<{ id: string }>;
-    const overflow = this.database.raw.prepare(
+    ).all(cutoff)) as unknown as Array<{ id: string }>;
+    const overflow = (await this.database.raw.prepare(
       `SELECT id FROM diagnostic_events
        ORDER BY occurred_at DESC, id DESC
        LIMIT -1 OFFSET 10000`,
-    ).all() as unknown as Array<{ id: string }>;
+    ).all()) as unknown as Array<{ id: string }>;
     const ids = new Set([...expired, ...overflow].map((row) => row.id));
     const remove = this.database.raw.prepare(
       "DELETE FROM diagnostic_events WHERE id = ?",
     );
     for (const id of ids) {
-      remove.run(id);
-      this.database.enqueueRemoteChange("diagnostic_events", id, "delete", null);
+      (await remove.run(id));
+      (await this.database.enqueueRemoteChange("diagnostic_events", id, "delete", null));
     }
   }
 

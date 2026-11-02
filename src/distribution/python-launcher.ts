@@ -1,3 +1,11 @@
+import { appendDenseTieringArguments, validateDenseStageBackend } from "./dense-stage-arguments.js";
+import { boundedInteger, positiveFinite, nonNegativeFinite } from "./python-number-validation.js";
+import { normalizeStartupPolicy, type StartupOptions } from "./startup-policy.js";
+import { isRecord } from "./python-value-guards.js";
+import { normalizeTcpWritePolicy, tcpWriteArguments, type TcpWriteOptions } from "./tcp-write-arguments.js";
+import { normalizeRouteProbes, routeProbeArguments, type ProbeOptions } from "./route-probe-arguments.js";
+import { appendStagePackageIdentity, normalizeStagePackageBindings } from "./stage-package-bindings.js";
+import type { DenseStagePolicy } from "../contracts/dense-stage.js";
 import { createHash } from "node:crypto";
 import {
   validateRuntimePipelineManifest,
@@ -164,8 +172,8 @@ export type PythonDraftModelDevice =
   | "cuda"
   | `cuda:${number}`
   | "mps"
-  | "xpu"
-  | `xpu:${number}`;
+  | "xpu" | `xpu:${number}`
+  | "directml" | `directml:${number}`;
 
 export interface PythonDraftModelInput extends PythonRuntimeModelInput {
   schema: typeof LOCAL_DRAFT_MODEL_SCHEMA;
@@ -173,7 +181,8 @@ export interface PythonDraftModelInput extends PythonRuntimeModelInput {
   dtype: "float32" | "float16" | "bfloat16";
 }
 
-export interface PythonLaunchCompilerOptions {
+export interface PythonLaunchCompilerOptions extends ProbeOptions, TcpWriteOptions, StartupOptions {
+  stagePackageIdentities?: Record<string, string>;
   /** Bind address for the Mycellios root server. */
   apiEndpoint: RuntimeEndpoint;
   /** Address advertised to remote stages for ACK/token return. */
@@ -193,6 +202,7 @@ export interface PythonLaunchCompilerOptions {
   serverModule?: typeof MYCELLIOS_SERVER_MODULE;
   threadsPerStage?: number;
   connectTimeoutSeconds?: number;
+  operationTimeoutSeconds?: number;
   batchWindowMs?: number;
   /** Maximum ordered prefill chunks allowed on the physical route at once. */
   prefillInflightChunks?: number;
@@ -406,7 +416,8 @@ export interface PythonDraftStrategyAuthority {
   certification: DraftStrategyCertification;
 }
 
-export interface PythonLaunchConfiguration {
+export interface PythonLaunchConfiguration extends ProbeOptions, TcpWriteOptions, StartupOptions {
+  stagePackageIdentities?: Record<string, string>;
   apiEndpoint: RuntimeEndpoint;
   returnEndpoint: RuntimeEndpoint;
   returnBindHost: string;
@@ -420,6 +431,7 @@ export interface PythonLaunchConfiguration {
   serverModule: typeof MYCELLIOS_SERVER_MODULE;
   threadsPerStage: number;
   connectTimeoutSeconds: number;
+  operationTimeoutSeconds: number;
   batchWindowMs: number;
   prefillInflightChunks: number;
   prefillInflightBytes: number;
@@ -485,6 +497,7 @@ export interface PythonDownstreamStage {
 }
 
 interface PythonLaunchBase {
+  dense?: DenseStagePolicy;
   launchIndex: number;
   processId: string;
   routeId: string;
@@ -789,6 +802,7 @@ function buildDescription(
     const downstream = next ? downstreamStage(next) : null;
     const nativeGguf = configuration.nativeGgufStages[stage.stageId] ?? null;
     const cell = tensorParallelCellExecution(stage.execution);
+    validateDenseStageBackend(stage.dense, [nativeGguf, cell, configuration.ramBackedMoeStages[stage.stageId], configuration.pagedKvStages[stage.stageId]]);
     const macroWave = stage.macroWave;
     if (cell?.fixture.location === "member-local") {
       const external = cell.external!;
@@ -863,6 +877,7 @@ function buildDescription(
       ...frameLimits,
       anchor: structuredClone(stage.anchor),
       members: structuredClone(stage.members),
+      ...(stage.dense !== undefined ? { dense: structuredClone(stage.dense) } : {}),
       macroWave: macroWave ? structuredClone(macroWave) : null,
       isolation: structuredClone(configuration.executorIsolation),
       downstream,
@@ -890,6 +905,7 @@ function buildDescription(
   const rootStage = stages[0]!;
   const rootNativeGguf =
     configuration.nativeGgufStages[rootStage.stageId] ?? null;
+  validateDenseStageBackend(rootStage.dense, [rootNativeGguf, rootStage.execution, configuration.ramBackedMoeStages[rootStage.stageId], configuration.pagedKvStages[rootStage.stageId]]);
   const firstRemoteStage = stages[1] ? downstreamStage(stages[1]) : null;
   const rootProcessId = rootProcessIdentity(
     routeId,
@@ -912,6 +928,7 @@ function buildDescription(
     ...frameLimits,
     anchor: structuredClone(rootStage.anchor),
     members: structuredClone(rootStage.members),
+    ...(rootStage.dense !== undefined ? { dense: structuredClone(rootStage.dense) } : {}),
     macroWave: rootStage.macroWave
       ? structuredClone(rootStage.macroWave)
       : null,
@@ -1138,6 +1155,7 @@ function renderRemoteStageArguments(
   waveArtifactIdentity: string,
 ): string[] {
   const args = pythonModulePrefix(configuration.stageModule);
+  args.push(...tcpWriteArguments(configuration));
   const ramBackedMoe = configuration.ramBackedMoeStages[launch.stageId];
   const pagedKv = configuration.pagedKvStages[launch.stageId];
   if (ramBackedMoe) {
@@ -1157,6 +1175,7 @@ function renderRemoteStageArguments(
     );
   } else {
     appendModelArguments(args, configuration.runtimeModel);
+    appendStagePackageIdentity(args, configuration.stagePackageIdentities, launch.anchor.memberId);
   }
   if (pagedKv) appendPagedKvArguments(args, pagedKv);
   args.push(
@@ -1196,8 +1215,8 @@ function renderRemoteStageArguments(
     );
   }
   if (!ramBackedMoe && !launch.cell) {
-    args.push("--device", "auto");
-    appendDenseTieringArguments(args, launch.macroWave);
+    args.push("--device", launch.dense?.executionTarget === "cpu" ? "cpu" : "auto");
+    appendDenseTieringArguments(args, launch.macroWave, launch.dense);
   }
   if (launch.downstream) {
     args.push(
@@ -1343,6 +1362,7 @@ function renderRootEngineArguments(
     throw new Error("python_max_pending_requests_is_too_small");
   }
   const args = pythonModulePrefix(configuration.serverModule);
+  args.push(...tcpWriteArguments(configuration));
   const ramBackedMoe = configuration.ramBackedMoeStages[launch.stageId];
   const pagedKv = configuration.pagedKvStages[launch.stageId];
   if (ramBackedMoe) {
@@ -1354,6 +1374,7 @@ function renderRootEngineArguments(
     appendRamBackedMoeArguments(args, ramBackedMoe);
   } else {
     appendModelArguments(args, configuration.runtimeModel);
+    if (!launch.nativeGguf) appendStagePackageIdentity(args, configuration.stagePackageIdentities, launch.anchor.memberId);
     if (launch.nativeGguf) {
       args.push(
         "--stage-package-identity",
@@ -1437,8 +1458,9 @@ function renderRootEngineArguments(
     "--startup-timeout-seconds",
     finiteNumber(configuration.connectTimeoutSeconds),
     "--socket-timeout-seconds",
-    finiteNumber(configuration.connectTimeoutSeconds),
+    finiteNumber(configuration.operationTimeoutSeconds),
   );
+  args.push(...routeProbeArguments(configuration));
   if (launch.firstRemoteStage) {
     args.push(
       "--first-stage-host",
@@ -1467,31 +1489,9 @@ function renderRootEngineArguments(
       args.push("--recovery-standby-route", canonicalJson(route));
     }
   }
-  if (!ramBackedMoe) args.push("--device", "auto");
-  if (!ramBackedMoe) appendDenseTieringArguments(args, launch.macroWave);
+  if (!ramBackedMoe) args.push("--device", launch.dense?.executionTarget === "cpu" ? "cpu" : "auto");
+  if (!ramBackedMoe) appendDenseTieringArguments(args, launch.macroWave, launch.dense);
   return args;
-}
-
-function appendDenseTieringArguments(
-  args: string[],
-  contract: MacroWaveStageExecutionContractV1 | null,
-): void {
-  if (
-    contract === null
-    || contract.residentKind !== "layers"
-    || contract.ramArtifact !== undefined
-  ) return;
-  args.push(
-    "--dense-host-ram-budget-bytes",
-    String(contract.budgets.hostRamBytes),
-    "--dense-vram-budget-bytes",
-    String(contract.budgets.vramBytes),
-    "--dense-activation-reserve-bytes",
-    String(contract.requirements.activationBufferBytes),
-  );
-  if (contract.memoryMode === "resident") {
-    args.push("--dense-require-full-residency");
-  }
 }
 
 function appendPagedKvArguments(
@@ -1701,6 +1701,7 @@ function normalizeConfiguration(
     ["apiEndpoint", "returnEndpoint", "returnBindHost"],
     [
       "runtimeModel",
+      "stagePackageIdentities",
       "draftModel",
       "draftStrategyAuthority",
       "publicModelName",
@@ -1708,7 +1709,10 @@ function normalizeConfiguration(
       "stageModule",
       "serverModule",
       "threadsPerStage",
-      "connectTimeoutSeconds",
+      "tcpWriteChunkBytes",
+      "independentParallelStartup", "rootStartupDelayMs",
+      "connectTimeoutSeconds", "operationTimeoutSeconds",
+      "routeProbeIntervalSeconds", "routeProbeTimeoutSeconds",
       "batchWindowMs",
       "prefillInflightChunks",
       "prefillInflightBytes",
@@ -2000,6 +2004,7 @@ function normalizeConfiguration(
     value.executorIsolation,
   );
   const normalized: PythonLaunchConfiguration = {
+    ...(value.stagePackageIdentities === undefined ? {} : {stagePackageIdentities: normalizeStagePackageBindings(value.stagePackageIdentities, manifest)}),
     apiEndpoint: { ...value.apiEndpoint },
     returnEndpoint: { ...value.returnEndpoint },
     returnBindHost,
@@ -2024,16 +2029,17 @@ function normalizeConfiguration(
       MYCELLIOS_SERVER_MODULE,
       "python_server_module_must_be_mycellios_native",
     ),
+    ...normalizeTcpWritePolicy(value),
+    ...normalizeStartupPolicy(value),
     threadsPerStage: boundedInteger(
       value.threadsPerStage ?? 1,
       1,
       1_024,
       "python_threads_per_stage_is_invalid",
     ),
-    connectTimeoutSeconds: positiveFinite(
-      value.connectTimeoutSeconds ?? 180,
-      "python_connect_timeout_is_invalid",
-    ),
+    connectTimeoutSeconds: positiveFinite(value.connectTimeoutSeconds ?? 180, "python_connect_timeout_is_invalid"),
+    operationTimeoutSeconds: positiveFinite(value.operationTimeoutSeconds ?? value.connectTimeoutSeconds ?? 180, "python_operation_timeout_is_invalid"),
+    ...normalizeRouteProbes(value),
     batchWindowMs: nonNegativeFinite(
       value.batchWindowMs ?? 2,
       "python_batch_window_is_invalid",
@@ -2871,6 +2877,7 @@ function samePhysicalTopology(
           })),
         ) &&
       canonicalJson(stage.execution) === canonicalJson(other.execution) &&
+      canonicalJson(stage.dense) === canonicalJson(other.dense) &&
       canonicalJson(stage.macroWave) === canonicalJson(other.macroWave)
     );
   });
@@ -2917,7 +2924,7 @@ function routeIdentity(
           capabilities: member.capabilities,
         })),
         execution: stage.execution,
-        macroWave: stage.macroWave,
+        dense: stage.dense, macroWave: stage.macroWave,
       })),
     }),
     20,
@@ -2938,7 +2945,7 @@ function rootProcessIdentity(
       layers: [stage.layerStart, stage.layerEnd],
       anchor: stage.anchor,
       execution: stage.execution,
-      macroWave: stage.macroWave,
+      dense: stage.dense, macroWave: stage.macroWave,
       draftModel,
     }),
     20,
@@ -2963,7 +2970,7 @@ function processIdentity(
       layers: [stage.layerStart, stage.layerEnd],
       anchor: stage.anchor,
       execution: stage.execution,
-      macroWave: stage.macroWave,
+      dense: stage.dense, macroWave: stage.macroWave,
       memberId: memberId ?? null,
       rank: rank ?? null,
     }),
@@ -3447,7 +3454,7 @@ function sha256Identity(value: unknown, error: string): string {
 function draftModelDevice(value: unknown): PythonDraftModelDevice {
   if (
     typeof value !== "string"
-    || !/^(?:cpu|mps|cuda(?::(?:0|[1-9]\d*))?|xpu(?::(?:0|[1-9]\d*))?)$/.test(
+    || !/^(?:cpu|mps|cuda(?::(?:0|[1-9]\d*))?|xpu(?::(?:0|[1-9]\d*))?|directml(?::(?:0|[1-9]\d*))?)$/.test(
       value,
     )
   ) {
@@ -3518,27 +3525,6 @@ function assertExactKeys(
   }
 }
 
-function boundedInteger(value: unknown, min: number, max: number, error: string): number {
-  if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max) {
-    throw new Error(error);
-  }
-  return value as number;
-}
-
-function positiveFinite(value: unknown, error: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    throw new Error(error);
-  }
-  return value;
-}
-
-function nonNegativeFinite(value: unknown, error: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    throw new Error(error);
-  }
-  return value;
-}
-
 function probability(value: unknown, error: string): number {
   const result = nonNegativeFinite(value, error);
   if (result > 1) throw new Error(error);
@@ -3568,10 +3554,6 @@ function canonicalValue(value: unknown): unknown {
       .sort()
       .map((key) => [key, canonicalValue(value[key])]),
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function digest(value: string, length: number): string {

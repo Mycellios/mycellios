@@ -728,23 +728,26 @@ def parse_stage_artifact_manifest(value: object) -> SafeTensorsStageArtifact:
     )
 
 
-def verify_stage_artifact(
-    directory: str | os.PathLike[str],
-    *,
-    expected_layer_start: int | None = None,
-    expected_layer_end: int | None = None,
-    expected_total_layers: int | None = None,
-    expected_package_id: str | None = None,
-) -> VerifiedStageArtifact:
-    """Authenticate a stage package and re-derive its family tensor contract."""
+def read_stage_artifact_manifest(
+    directory: str | os.PathLike[str], *, expected_package_id: str,
+) -> SafeTensorsStageArtifact:
+    """Authenticate immutable manifest coordinates, without verifying weight bytes."""
+    return _read_stage_artifact_manifest(directory, expected_package_id=_sha256(expected_package_id, "expected package ID"))
 
+
+def _read_stage_artifact_manifest(
+    directory: str | os.PathLike[str], *, expected_package_id: str | None,
+) -> SafeTensorsStageArtifact:
     root = Path(directory).resolve()
     if not root.is_dir() or root.is_symlink():
         raise FileNotFoundError(f"stage artifact directory does not exist: {root}")
     manifest_path = root / STAGE_ARTIFACT_MANIFEST
     if not manifest_path.is_file() or manifest_path.is_symlink():
         raise FileNotFoundError(f"stage artifact manifest is missing: {manifest_path}")
-    manifest_bytes = manifest_path.read_bytes()
+    with manifest_path.open("rb") as stream:
+        manifest_bytes = stream.read(16 * 1024 * 1024 + 1)
+    if len(manifest_bytes) > 16 * 1024 * 1024:
+        raise ValueError("stage artifact manifest exceeds the metadata limit")
     manifest_document = _json_object(manifest_bytes, "stage artifact manifest")
     manifest = parse_stage_artifact_manifest(manifest_document)
     canonical_manifest = (
@@ -762,6 +765,21 @@ def verify_stage_artifact(
         expected_package_id, "expected package ID"
     ):
         raise ValueError("stage artifact package identity does not match the request")
+    return manifest
+
+
+def verify_stage_artifact(
+    directory: str | os.PathLike[str],
+    *,
+    expected_layer_start: int | None = None,
+    expected_layer_end: int | None = None,
+    expected_total_layers: int | None = None,
+    expected_package_id: str | None = None,
+) -> VerifiedStageArtifact:
+    """Authenticate a stage package and re-derive its family tensor contract."""
+
+    root = Path(directory).resolve()
+    manifest = _read_stage_artifact_manifest(root, expected_package_id=expected_package_id)
     for expected, actual, name in (
         (expected_layer_start, manifest.layer_start, "layer start"),
         (expected_layer_end, manifest.layer_end, "layer end"),
@@ -1390,7 +1408,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
     )
     parser.add_argument("model_name")
-    parser.add_argument("destination")
+    parser.add_argument("destination", nargs="?")
     parser.add_argument("--revision")
     parser.add_argument("--layer-start", type=int, required=True)
     parser.add_argument("--layer-end", type=int, required=True)
@@ -1399,11 +1417,36 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="reuse an existing package only after full fail-closed verification",
     )
-    return parser.parse_args(argv)
+    parser.add_argument("--verify-only", action="store_true")
+    parser.add_argument("--expected-package-id")
+    parser.add_argument("--expected-model-identity")
+    parser.add_argument("--total-layers", type=int)
+    args = parser.parse_args(argv)
+    verification = (args.expected_package_id, args.expected_model_identity, args.total_layers)
+    if args.verify_only:
+        if args.destination is not None or args.reuse_verified or args.revision is not None or not all(verification):
+            parser.error("verification requires package/model identities and total layers, without compilation options")
+    elif args.destination is None or any(value is not None for value in verification):
+        parser.error("compilation requires a destination; verification flags require --verify-only")
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
+    if args.verify_only:
+        verified = verify_stage_artifact(args.model_name,
+            expected_layer_start=args.layer_start, expected_layer_end=args.layer_end,
+            expected_total_layers=args.total_layers, expected_package_id=args.expected_package_id)
+        if verified.manifest.model_identity != args.expected_model_identity:
+            raise ValueError("stage artifact belongs to a different model identity")
+        result = {"destination": str(verified.root), "package_id": verified.manifest.package_id,
+                  "artifact_identity": f"sha256:{verified.manifest.package_id}",
+                  "model_identity": verified.manifest.model_identity,
+                  "layer_start": verified.manifest.layer_start, "layer_end": verified.manifest.layer_end,
+                  "total_layers": verified.manifest.total_layers,
+                  "weights_size_bytes": verified.weights_path.stat().st_size}
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     compiler = (
         prepare_safetensors_stage_artifact
         if args.reuse_verified

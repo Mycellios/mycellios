@@ -59,13 +59,13 @@ export async function registerBillingInboundRoutes(
       try {
         const command = options.stripe.verifyAndNormalize(rawBody, signature);
         if (!command) return { accepted: true, ignored: true };
-        const result = applyBillingCommand(options.manager, command);
+        const result = (await applyBillingCommand(options.manager, command));
         return reply.code(result.duplicate ? 200 : 202).send({
           accepted: true,
           duplicate: result.duplicate,
         });
       } catch (error) {
-        return sendBillingInboundError(reply, error);
+        return (await sendBillingInboundError(reply, error));
       }
     });
   });
@@ -85,13 +85,13 @@ export async function registerBillingInboundRoutes(
       const command = options.stablecoin.verifyAndNormalize(
         request.body as SignedStablecoinWatcherEvent,
       );
-      const result = applyBillingCommand(options.manager, command);
+      const result = (await applyBillingCommand(options.manager, command));
       return reply.code(result.duplicate ? 200 : 202).send({
         accepted: true,
         duplicate: result.duplicate,
       });
     } catch (error) {
-      return sendBillingInboundError(reply, error);
+      return (await sendBillingInboundError(reply, error));
     }
   });
 }

@@ -27,27 +27,27 @@ describe("signed billing inbound adapters", () => {
   let database: MeshDatabase;
   let billing: BillingManager;
 
-  beforeEach(() => {
-    database = new MeshDatabase(":memory:");
+  beforeEach(async () => {
+    database = (await MeshDatabase.open(":memory:"));
     billing = new BillingManager(database, new ApiAccessManager(database, {
       starterTokens: 0,
       requestsPerMinute: 10,
       maxConcurrent: 2,
       maxActiveKeys: 2,
     }));
-    billing.registerPlan({
+    (await billing.registerPlan({
       planId: "mycellios-go",
       version: 1,
       priceCurrency: "EUR",
       priceMicros: 10_000_000,
       includedTokens: 50_000,
       status: "active",
-    });
+    }));
   });
 
-  afterEach(() => database.close());
+  afterEach(async () => (await database.close()));
 
-  it("verifies raw Stripe bytes and applies a subscription invoice once", () => {
+  it("verifies raw Stripe bytes and applies a subscription invoice once", async () => {
     const stripe = new StripeBillingInbound({
       endpointSecrets: ["old_rotating_secret_at_least_32_chars", stripeSecret],
       expectedLivemode: false,
@@ -74,13 +74,13 @@ describe("signed billing inbound adapters", () => {
     });
     const command = stripe.verifyAndNormalize(delivery.rawBody, delivery.header);
     expect(command?.kind).toBe("paid_subscription");
-    const first = applyBillingCommand(billing, command!);
-    const replay = applyBillingCommand(billing, command!);
+    const first = (await applyBillingCommand(billing, command!));
+    const replay = (await applyBillingCommand(billing, command!));
     expect(first).toMatchObject({ tokenBalance: 50_000, duplicate: false });
     expect(replay).toMatchObject({ tokenBalance: 50_000, duplicate: true });
   });
 
-  it("reads current Stripe invoice subscription metadata and period fields", () => {
+  it("reads current Stripe invoice subscription metadata and period fields", async () => {
     const stripe = new StripeBillingInbound({
       endpointSecrets: [stripeSecret], expectedLivemode: false, nowSeconds: () => nowSeconds,
     });
@@ -115,21 +115,21 @@ describe("signed billing inbound adapters", () => {
         periodEnd: 1_788_678_400_000,
       },
     });
-    expect(applyBillingCommand(billing, command!)).toMatchObject({ tokenBalance: 50_000 });
+    expect((await applyBillingCommand(billing, command!))).toMatchObject({ tokenBalance: 50_000 });
   });
 
-  it("maps actionable subscription updates and ignores non-terminal noise", () => {
+  it("maps actionable subscription updates and ignores non-terminal noise", async () => {
     const stripe = new StripeBillingInbound({
       endpointSecrets: [stripeSecret], expectedLivemode: false, nowSeconds: () => nowSeconds,
     });
-    billing.applyPaidSubscription({
+    (await billing.applyPaidSubscription({
       provider: "stripe", providerEventId: "evt_update_seed",
       providerSubscriptionId: "sub_update", userId: "buyer-update",
       planId: "mycellios-go", planVersion: 1, amountMicros: 10_000_000,
       currency: "EUR", periodStart: 1_786_000_000_000,
       periodEnd: 1_788_678_400_000, occurredAt: 1_786_000_000_000,
       finalized: true,
-    });
+    }));
     const base = {
       type: "customer.subscription.updated", created: nowSeconds,
       livemode: false, data: { object: {
@@ -142,22 +142,22 @@ describe("signed billing inbound adapters", () => {
     const pastDue = stripeDelivery({ ...base, id: "evt_update_past_due", data: { object: { ...base.data.object, status: "past_due" } } });
     const command = stripe.verifyAndNormalize(pastDue.rawBody, pastDue.header);
     expect(command).toMatchObject({ kind: "subscription_status", event: { status: "past_due" } });
-    applyBillingCommand(billing, command!);
-    expect(billing.getSubscription("buyer-update")?.status).toBe("past_due");
+    (await applyBillingCommand(billing, command!));
+    expect((await billing.getSubscription("buyer-update"))?.status).toBe("past_due");
   });
 
-  it("maps paid Checkout top-ups and rejects unpaid sessions", () => {
+  it("maps paid Checkout top-ups and rejects unpaid sessions", async () => {
     const stripe = new StripeBillingInbound({
       endpointSecrets: [stripeSecret], expectedLivemode: false, nowSeconds: () => nowSeconds,
     });
-    billing.createTopUpQuote({
+    (await billing.createTopUpQuote({
       quoteId: "quote-stripe-topup",
       userId: "buyer-topup",
       amountMicros: 20_000_000,
       currency: "EUR",
       tokenAmount: 80_000,
       expiresAt: Date.now() + 60_000,
-    });
+    }));
     const base = {
       id: "evt_checkout_paid",
       type: "checkout.session.completed",
@@ -174,7 +174,7 @@ describe("signed billing inbound adapters", () => {
       } },
     };
     const paid = stripeDelivery(base);
-    const result = applyBillingCommand(billing, stripe.verifyAndNormalize(paid.rawBody, paid.header)!);
+    const result = (await applyBillingCommand(billing, stripe.verifyAndNormalize(paid.rawBody, paid.header)!));
     expect(result).toMatchObject({ tokenBalance: 80_000 });
 
     const unpaid = stripeDelivery({
@@ -212,7 +212,7 @@ describe("signed billing inbound adapters", () => {
     );
   });
 
-  it("verifies a finalized stablecoin watcher event and applies its top-up once", () => {
+  it("verifies a finalized stablecoin watcher event and applies its top-up once", async () => {
     const pair = generateKeyPairSync("ed25519");
     const adapter = new StablecoinBillingInbound({
       trustedWatcherKeys: new Map([
@@ -220,15 +220,15 @@ describe("signed billing inbound adapters", () => {
       ]),
       chains: new Map([["base-mainnet", { asset: "USDC", minimumConfirmations: 20 }]]),
     });
-    billing.createTopUpQuote({
+    (await billing.createTopUpQuote({
       quoteId: "quote-crypto-topup",
       userId: "buyer-crypto",
       amountMicros: 20_000_000,
       currency: "USDC",
       tokenAmount: 80_000,
       expiresAt: Date.now() + 60_000,
-    });
-    createStablecoinTopUpIntent({
+    }));
+    (await createStablecoinTopUpIntent({
       id: "coinpay-crypto-topup",
       userId: "buyer-crypto",
       quoteId: "quote-crypto-topup",
@@ -236,7 +236,7 @@ describe("signed billing inbound adapters", () => {
       currency: "USDC",
       atomicAmount: "20000000",
       recipient: "0xrecipientcrypto001",
-    });
+    }));
     const payload = {
       schema: "mycellios.stablecoin-payment.v1" as const,
       eventId: "base-mainnet:0xabc123:7",
@@ -265,8 +265,8 @@ describe("signed billing inbound adapters", () => {
       signature: sign(null, stablecoinWatcherSigningBytes(payload), pair.privateKey).toString("base64url"),
     };
     const command = adapter.verifyAndNormalize(signed);
-    const first = applyBillingCommand(billing, command);
-    const replay = applyBillingCommand(billing, command);
+    const first = (await applyBillingCommand(billing, command));
+    const replay = (await applyBillingCommand(billing, command));
     expect(first).toMatchObject({ tokenBalance: 80_000, duplicate: false });
     expect(replay).toMatchObject({ tokenBalance: 80_000, duplicate: true });
   });
@@ -321,12 +321,12 @@ describe("signed billing inbound adapters", () => {
     })).toThrowError(expect.objectContaining({ code: "stablecoin_chain_not_allowed" }));
   });
 
-  function createStablecoinTopUpIntent(input: {
+  async function createStablecoinTopUpIntent(input: {
     id: string; userId: string; quoteId: string; amountMicros: number;
     currency: string; atomicAmount: string; recipient: string;
   }) {
     const now = Date.now();
-    database.raw.prepare(
+    (await database.raw.prepare(
       `INSERT INTO billing_stablecoin_intents(
          id, user_id, idempotency_key, request_digest, kind, quote_id,
          amount_micros, currency, chain_id, asset, asset_atomic_amount,
@@ -337,6 +337,6 @@ describe("signed billing inbound adapters", () => {
       input.id, input.userId, `fixture:${input.id}`, input.quoteId,
       input.amountMicros, input.currency, input.atomicAmount, input.recipient,
       `deposit:${input.id}`, now + 60_000, now, now,
-    );
+    ));
   }
 });

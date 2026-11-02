@@ -1,3 +1,4 @@
+import { mapAsync } from "../core/async-collections.js";
 import { createHash } from "node:crypto";
 import { newId } from "../core/ids.js";
 import type { MeshDatabase } from "../storage/database.js";
@@ -63,12 +64,12 @@ export class PayoutManager {
     }
   }
 
-  prepare(input: {
+  async prepare(input: {
     sellerId: string;
     payoutMethod: PayoutMethod;
     earningIds: string[];
     idempotencyKey: string;
-  }): PayoutMutationResult {
+  }): Promise<PayoutMutationResult> {
     validateId(input.sellerId, "seller id");
     validateId(input.idempotencyKey, "idempotency key");
     validateMethod(input.payoutMethod);
@@ -80,26 +81,26 @@ export class PayoutManager {
     for (const id of earningIds) validateId(id, "earning id");
     const digest = requestDigest(input.sellerId, input.payoutMethod, earningIds);
 
-    return this.database.transaction(() => {
-      const existing = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      const existing = (await this.database.raw.prepare(
         "SELECT id, request_digest FROM payout_batches WHERE idempotency_key = ?",
-      ).get(input.idempotencyKey) as { id: string; request_digest: string } | undefined;
+      ).get(input.idempotencyKey)) as { id: string; request_digest: string } | undefined;
       if (existing) {
         if (existing.request_digest !== digest) {
           throw new PayoutError("payout_idempotency_conflict", "The payout key was reused with different items.");
         }
-        return { batch: this.getBatchRequired(existing.id), duplicate: true };
+        return { batch: (await this.getBatchRequired(existing.id)), duplicate: true };
       }
 
       const placeholders = earningIds.map(() => "?").join(",");
-      const rows = this.database.raw.prepare(
+      const rows = (await this.database.raw.prepare(
         `SELECT e.id, e.seller_id, e.amount_usd_micros, e.payout_method, e.status,
                 (SELECT COUNT(*)
                  FROM payout_batch_items i
                  JOIN payout_batches b ON b.id = i.batch_id
                  WHERE i.earning_id = e.id AND b.status <> 'cancelled') AS active_batch_count
          FROM seller_earnings e WHERE e.id IN (${placeholders}) ORDER BY e.id`,
-      ).all(...earningIds) as unknown as Array<{
+      ).all(...earningIds)) as unknown as Array<{
         id: string; seller_id: string; amount_usd_micros: number;
         payout_method: PayoutMethod; status: string; active_batch_count: number;
       }>;
@@ -123,11 +124,11 @@ export class PayoutManager {
           );
         }
       }
-      const destination = this.database.raw.prepare(
+      const destination = (await this.database.raw.prepare(
         `SELECT id, destination_reference, destination_fingerprint
          FROM seller_payout_destinations
          WHERE seller_id = ? AND payout_method = ? AND status = 'active' AND expires_at > ?`,
-      ).get(input.sellerId, input.payoutMethod, Date.now()) as {
+      ).get(input.sellerId, input.payoutMethod, Date.now())) as {
         id: string; destination_reference: string; destination_fingerprint: string;
       } | undefined;
       if (this.policy.requireVerifiedDestination && !destination) {
@@ -137,9 +138,9 @@ export class PayoutManager {
         );
       }
       const grossUsdMicros = rows.reduce((sum, row) => sum + Number(row.amount_usd_micros), 0);
-      const debtRow = this.database.raw.prepare(
+      const debtRow = (await this.database.raw.prepare(
         "SELECT amount_usd_micros FROM seller_debts WHERE seller_id = ?",
-      ).get(input.sellerId) as { amount_usd_micros: number } | undefined;
+      ).get(input.sellerId)) as { amount_usd_micros: number } | undefined;
       const sellerDebt = Number(debtRow?.amount_usd_micros ?? 0);
       const debtOffsetUsdMicros = Math.min(sellerDebt, grossUsdMicros);
       const amountUsdMicros = grossUsdMicros - debtOffsetUsdMicros;
@@ -152,7 +153,7 @@ export class PayoutManager {
       }
       const now = Date.now();
       const batchId = newId("payout");
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
          `INSERT INTO payout_batches(
            id, seller_id, payout_method, idempotency_key, request_digest,
            gross_usd_micros, debt_offset_usd_micros, amount_usd_micros,
@@ -164,34 +165,34 @@ export class PayoutManager {
         digest, grossUsdMicros, debtOffsetUsdMicros, amountUsdMicros,
         destination?.id ?? null, destination?.destination_reference ?? null,
         destination?.destination_fingerprint ?? null, now, now,
-      );
+      ));
       if (debtOffsetUsdMicros > 0) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           "UPDATE seller_debts SET amount_usd_micros = amount_usd_micros - ?, updated_at = ? WHERE seller_id = ?",
-        ).run(debtOffsetUsdMicros, now, input.sellerId);
+        ).run(debtOffsetUsdMicros, now, input.sellerId));
       }
       const insertItem = this.database.raw.prepare(
         "INSERT INTO payout_batch_items(batch_id, earning_id, amount_usd_micros) VALUES (?, ?, ?)",
       );
-      for (const row of rows) insertItem.run(batchId, row.id, row.amount_usd_micros);
-      this.database.raw.prepare(
+      for (const row of rows) (await insertItem.run(batchId, row.id, row.amount_usd_micros));
+      (await this.database.raw.prepare(
         `UPDATE seller_earnings SET status = 'batched'
          WHERE id IN (${placeholders}) AND status = 'available'`,
-      ).run(...earningIds);
-      return { batch: this.getBatchRequired(batchId), duplicate: false };
-    });
+      ).run(...earningIds));
+      return { batch: (await this.getBatchRequired(batchId)), duplicate: false };
+    }));
   }
 
-  markSubmitted(input: {
+  async markSubmitted(input: {
     batchId: string;
     dispatchKey: string;
     externalReference: string;
-  }): PayoutMutationResult {
+  }): Promise<PayoutMutationResult> {
     validateId(input.batchId, "batch id");
     validateId(input.dispatchKey, "dispatch key");
     validateId(input.externalReference, "external reference");
-    return this.database.transaction(() => {
-      const batch = this.getBatchRequired(input.batchId);
+    return (await this.database.transaction(async () => {
+      const batch = (await this.getBatchRequired(input.batchId));
       if (batch.status === "submitted" || batch.status === "paid") {
         if (batch.dispatchKey !== input.dispatchKey || batch.externalReference !== input.externalReference) {
           throw new PayoutError("payout_submission_conflict", "A submitted batch cannot change external identity.");
@@ -203,30 +204,30 @@ export class PayoutManager {
       }
       const now = Date.now();
       try {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `UPDATE payout_batches
            SET status = 'submitted', dispatch_key = ?, external_reference = ?,
                submitted_at = ?, updated_at = ? WHERE id = ?`,
-        ).run(input.dispatchKey, input.externalReference, now, now, input.batchId);
+        ).run(input.dispatchKey, input.externalReference, now, now, input.batchId));
       } catch (error) {
         throw new PayoutError("payout_external_identity_conflict", errorMessage(error));
       }
-      return { batch: this.getBatchRequired(input.batchId), duplicate: false };
-    });
+      return { batch: (await this.getBatchRequired(input.batchId)), duplicate: false };
+    }));
   }
 
-  markPaid(input: {
+  async markPaid(input: {
     batchId: string;
     settlementReference: string;
     paidAt: number;
-  }): PayoutMutationResult {
+  }): Promise<PayoutMutationResult> {
     validateId(input.batchId, "batch id");
     validateId(input.settlementReference, "settlement reference");
     if (!Number.isSafeInteger(input.paidAt) || input.paidAt <= 0) {
       throw new PayoutError("invalid_paid_at", "The payout settlement timestamp is invalid.");
     }
-    return this.database.transaction(() => {
-      const batch = this.getBatchRequired(input.batchId);
+    return (await this.database.transaction(async () => {
+      const batch = (await this.getBatchRequired(input.batchId));
       if (batch.status === "paid") {
         if (batch.settlementReference !== input.settlementReference || batch.paidAt !== input.paidAt) {
           throw new PayoutError("payout_settlement_conflict", "A paid batch cannot change settlement evidence.");
@@ -237,54 +238,54 @@ export class PayoutManager {
         throw new PayoutError("payout_not_submitted", "A payout must be submitted before it can be paid.");
       }
       const now = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `UPDATE payout_batches SET status = 'paid', settlement_reference = ?, paid_at = ?, updated_at = ?
          WHERE id = ?`,
-      ).run(input.settlementReference, input.paidAt, now, input.batchId);
-      this.database.raw.prepare(
+      ).run(input.settlementReference, input.paidAt, now, input.batchId));
+      (await this.database.raw.prepare(
         `UPDATE seller_earnings SET status = 'paid'
          WHERE id IN (SELECT earning_id FROM payout_batch_items WHERE batch_id = ?)`,
-      ).run(input.batchId);
-      const pendingReversals = this.database.raw.prepare(
+      ).run(input.batchId));
+      const pendingReversals = (await this.database.raw.prepare(
         `SELECT r.id, r.earning_id, r.seller_id, r.amount_usd_micros
          FROM seller_earning_reversals r
          JOIN payout_batch_items i ON i.earning_id = r.earning_id
          WHERE i.batch_id = ? AND r.state = 'pending_payout'`,
-      ).all(input.batchId) as unknown as Array<{
+      ).all(input.batchId)) as unknown as Array<{
         id: string; earning_id: string; seller_id: string; amount_usd_micros: number;
       }>;
       for (const reversal of pendingReversals) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `INSERT INTO seller_debts(seller_id, amount_usd_micros, updated_at)
            VALUES (?, ?, ?)
            ON CONFLICT(seller_id) DO UPDATE
-           SET amount_usd_micros = amount_usd_micros + excluded.amount_usd_micros,
+           SET amount_usd_micros = seller_debts.amount_usd_micros + excluded.amount_usd_micros,
                updated_at = excluded.updated_at`,
-        ).run(reversal.seller_id, reversal.amount_usd_micros, now);
-        this.database.raw.prepare(
+        ).run(reversal.seller_id, reversal.amount_usd_micros, now));
+        (await this.database.raw.prepare(
           "UPDATE seller_earnings SET status = 'reversed' WHERE id = ? AND status = 'paid'",
-        ).run(reversal.earning_id);
-        this.database.raw.prepare(
+        ).run(reversal.earning_id));
+        (await this.database.raw.prepare(
           `UPDATE seller_earning_reversals
            SET state = 'seller_debt', resolved_at = ? WHERE id = ? AND state = 'pending_payout'`,
-        ).run(now, reversal.id);
+        ).run(now, reversal.id));
       }
-      return { batch: this.getBatchRequired(input.batchId), duplicate: false };
-    });
+      return { batch: (await this.getBatchRequired(input.batchId)), duplicate: false };
+    }));
   }
 
-  cancelPrepared(batchId: string): PayoutMutationResult {
+  async cancelPrepared(batchId: string): Promise<PayoutMutationResult> {
     validateId(batchId, "batch id");
-    return this.database.transaction(() => {
-      const batch = this.getBatchRequired(batchId);
+    return (await this.database.transaction(async () => {
+      const batch = (await this.getBatchRequired(batchId));
       if (batch.status === "cancelled") return { batch, duplicate: true };
       if (batch.status !== "prepared") {
         throw new PayoutError("payout_cancellation_unsafe", "A submitted or paid payout cannot be released automatically.");
       }
-      const dispatch = this.database.raw.prepare(
+      const dispatch = (await this.database.raw.prepare(
         `SELECT state, external_reference, settlement_reference
          FROM payout_dispatch_operations WHERE batch_id = ?`,
-      ).get(batchId) as {
+      ).get(batchId)) as {
         state: string;
         external_reference: string | null;
         settlement_reference: string | null;
@@ -299,42 +300,42 @@ export class PayoutManager {
         );
       }
       const now = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         "UPDATE payout_batches SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?",
-      ).run(now, now, batchId);
+      ).run(now, now, batchId));
       if (batch.payoutMethod === "spore") {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `UPDATE spore_conversion_quotes SET status = 'superseded', replaced_at = ?
            WHERE batch_id = ? AND status = 'active'`,
-        ).run(now, batchId);
+        ).run(now, batchId));
       }
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `UPDATE seller_earnings SET status = 'available'
          WHERE id IN (SELECT earning_id FROM payout_batch_items WHERE batch_id = ?)
            AND status = 'batched'`,
-      ).run(batchId);
+      ).run(batchId));
       if (batch.debtOffsetUsdMicros > 0) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           `INSERT INTO seller_debts(seller_id, amount_usd_micros, updated_at)
            VALUES (?, ?, ?)
            ON CONFLICT(seller_id) DO UPDATE
-           SET amount_usd_micros = amount_usd_micros + excluded.amount_usd_micros,
+           SET amount_usd_micros = seller_debts.amount_usd_micros + excluded.amount_usd_micros,
                updated_at = excluded.updated_at`,
-        ).run(batch.sellerId, batch.debtOffsetUsdMicros, now);
+        ).run(batch.sellerId, batch.debtOffsetUsdMicros, now));
       }
-      return { batch: this.getBatchRequired(batchId), duplicate: false };
-    });
+      return { batch: (await this.getBatchRequired(batchId)), duplicate: false };
+    }));
   }
 
-  getBatch(batchId: string): PayoutBatch | null {
-    const row = this.database.raw.prepare(
+  async getBatch(batchId: string): Promise<PayoutBatch | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT id, seller_id, payout_method, idempotency_key, gross_usd_micros,
               debt_offset_usd_micros, amount_usd_micros, status,
               destination_id, destination_reference, destination_fingerprint,
               dispatch_key, external_reference, settlement_reference, created_at, updated_at,
               submitted_at, paid_at, cancelled_at
        FROM payout_batches WHERE id = ?`,
-    ).get(batchId) as {
+    ).get(batchId)) as {
       id: string; seller_id: string; payout_method: PayoutMethod; idempotency_key: string;
       gross_usd_micros: number; debt_offset_usd_micros: number;
       amount_usd_micros: number; status: PayoutStatus; dispatch_key: string | null;
@@ -345,9 +346,9 @@ export class PayoutManager {
       paid_at: number | null; cancelled_at: number | null;
     } | undefined;
     if (!row) return null;
-    const items = this.database.raw.prepare(
+    const items = (await this.database.raw.prepare(
       "SELECT earning_id FROM payout_batch_items WHERE batch_id = ? ORDER BY earning_id",
-    ).all(batchId) as unknown as Array<{ earning_id: string }>;
+    ).all(batchId)) as unknown as Array<{ earning_id: string }>;
     return {
       id: row.id,
       sellerId: row.seller_id,
@@ -372,16 +373,16 @@ export class PayoutManager {
     };
   }
 
-  listSellerBatches(sellerId: string, limit = 50): PayoutBatch[] {
+  async listSellerBatches(sellerId: string, limit = 50): Promise<PayoutBatch[]> {
     validateId(sellerId, "seller id");
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       throw new PayoutError("invalid_limit", "The payout limit must be between 1 and 100.");
     }
-    const rows = this.database.raw.prepare(
+    const rows = (await this.database.raw.prepare(
       `SELECT id FROM payout_batches WHERE seller_id = ?
        ORDER BY created_at DESC, id DESC LIMIT ?`,
-    ).all(sellerId, limit) as unknown as Array<{ id: string }>;
-    return rows.map((row) => this.getBatchRequired(row.id));
+    ).all(sellerId, limit)) as unknown as Array<{ id: string }>;
+    return (await mapAsync(rows, async (row) => (await this.getBatchRequired(row.id))));
   }
 
   assertPayoutMethodEnabled(method: PayoutMethod): void {
@@ -389,8 +390,8 @@ export class PayoutManager {
     this.assertMethodEnabled(method);
   }
 
-  private getBatchRequired(batchId: string): PayoutBatch {
-    const batch = this.getBatch(batchId);
+  private async getBatchRequired(batchId: string): Promise<PayoutBatch> {
+    const batch = (await this.getBatch(batchId));
     if (!batch) throw new PayoutError("payout_not_found", "The payout batch does not exist.");
     return batch;
   }

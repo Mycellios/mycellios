@@ -21,6 +21,7 @@ interface PendingStart {
   ready: Deferred<void>;
   exited: Deferred<LaunchProcessExit>;
   output: LaunchCapturedOutput;
+  stopPromise?: Promise<void>;
 }
 
 /** Minimal authenticated transport port required by the Engine launcher. */
@@ -93,7 +94,7 @@ export class WorkerTunnelLaunchAgent implements LaunchAgent {
       this.pending.delete(requestId);
       throw new Error(`distributed_worker_not_connected:${this.workerId}`);
     }
-    const abort = () => void this.stop(requestId, "launch_aborted");
+    const abort = () => void this.stop(requestId, "launch_aborted", start).catch(() => undefined);
     signal.addEventListener("abort", abort, { once: true });
     // Do not use an ignored `finally()` here. `finally()` returns a second
     // promise which rejects when the worker disconnects; leaving that derived
@@ -106,9 +107,24 @@ export class WorkerTunnelLaunchAgent implements LaunchAgent {
     return {
       ready: start.ready.promise,
       exited: start.exited.promise,
-      stop: (reason: string) => this.stop(requestId, reason),
+      stop: (reason: string) => this.stop(requestId, reason, start),
       output: () => ({ ...start.output }),
     };
+  }
+
+  async prepareRuntime(description: PythonPipelineLaunchDescription, nodeId: string,
+    _onProgress?: (event: RuntimePreparationProgressEvent) => void,
+    signal: AbortSignal = new AbortController().signal): Promise<readonly PythonPipelineLaunchDescription["launchOrder"][number][]> {
+    if (nodeId !== this.nodeId || JSON.stringify(description) !== JSON.stringify(this.description)) {
+      throw new Error("worker_tunnel_preparation_description_mismatch");
+    }
+    if (signal.aborted) throw abortError(signal);
+    if (this.closed) throw new Error(`worker_tunnel_closed:${this.workerId}`);
+    const generation = this.connectionGeneration;
+    await this.prepare(signal);
+    if (signal.aborted) throw abortError(signal);
+    if (this.closed || generation !== this.connectionGeneration) throw new Error(`distributed_worker_disconnected:${this.workerId}`);
+    return structuredClone(this.description.launchOrder.filter(process => process.anchor.memberId === nodeId));
   }
 
   async createRuntimeProxy(targetPort: number): Promise<RuntimeProxyHandle> {
@@ -167,32 +183,46 @@ export class WorkerTunnelLaunchAgent implements LaunchAgent {
     this.prepared = true;
   }
 
-  private async stop(requestId: string, reason: string): Promise<void> {
-    const start = this.pending.get(requestId);
-    if (!start) return;
+  private stop(requestId: string, reason: string, start = this.pending.get(requestId)): Promise<void> {
+    if (!start) return Promise.resolve();
+    start.stopPromise ??= this.stopInternal(requestId, reason, start);
+    return start.stopPromise;
+  }
+
+  private async stopInternal(requestId: string, reason: string, start: PendingStart): Promise<void> {
+    if (this.pending.get(requestId) !== start) {
+      await start.exited.promise;
+      return;
+    }
     if (!this.hub.send(this.workerId, "runtime.stop", { requestId, reason })) {
       this.pending.delete(requestId);
       const error = new Error(`distributed_worker_not_connected:${this.workerId}`);
       start.ready.reject(error);
       start.exited.reject(error);
       await start.exited.promise.catch(() => undefined);
-      return;
+      throw error;
     }
     let timer: NodeJS.Timeout | null = null;
-    const acknowledged = await Promise.race([
-      start.exited.promise.then(() => true, () => true),
-      new Promise<boolean>((resolve) => {
-        timer = setTimeout(() => resolve(false), this.timeoutMs);
-      }),
-    ]);
-    if (timer) clearTimeout(timer);
+    let acknowledged: boolean;
+    try {
+      acknowledged = await Promise.race([
+        start.exited.promise.then(() => true),
+        new Promise<boolean>((resolve) => {
+          timer = setTimeout(() => resolve(false), this.timeoutMs);
+        }),
+      ]);
+    } finally { if (timer) clearTimeout(timer); }
     if (acknowledged) return;
-    if (this.pending.get(requestId) !== start) return;
+    if (this.pending.get(requestId) !== start) {
+      await start.exited.promise;
+      return;
+    }
     this.pending.delete(requestId);
     const error = new Error(`worker_tunnel_stop_timeout:${this.workerId}`);
     start.ready.reject(error);
     start.exited.reject(error);
     await start.exited.promise.catch(() => undefined);
+    throw error;
   }
 
   private handleEnvelope(envelope: WorkerEnvelope): void {

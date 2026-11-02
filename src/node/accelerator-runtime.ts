@@ -1,3 +1,5 @@
+import { WINDOWS_DIRECTML_PACK, DIRECTML_PROBE_LINES, removeCopiedDirectmlTorch } from "./directml-runtime-pack.js";
+export { WINDOWS_DIRECTML_PACK } from "./directml-runtime-pack.js";
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -37,7 +39,7 @@ const WINDOWS_CUDA_RUNTIME_TARGET = "cuda";
 const ACCELERATOR_STAGING_PREFIX = "stg-";
 const PORTABLE_MANIFEST = "runtime-manifest.json";
 
-export type AcceleratorBackend = "cuda" | "rocm" | "mps" | "xpu";
+export type AcceleratorBackend = "cuda" | "rocm" | "mps" | "xpu" | "directml";
 export type EffectiveRuntimeBackend = "cpu" | AcceleratorBackend;
 export type AcceleratorRuntimeStatus = "cpu-ready" | "gpu-ready" | "gpu-fallback";
 
@@ -190,8 +192,8 @@ export interface AcceleratorProbe {
   operation: "fp16_matmul";
   checksum: number;
   totalMemoryBytes: number;
-  allocatedBytes: number;
-  reservedBytes: number;
+  allocatedBytes: number | null;
+  reservedBytes: number | null;
 }
 
 export interface AcceleratorRuntimeResult {
@@ -204,7 +206,7 @@ export interface AcceleratorRuntimeResult {
   pythonPathAdditions: string[];
   pathAdditions: string[];
   /** Exact Torch device request used by the distributed stage launcher. */
-  launchDevice: "cpu" | "mps" | `cuda:${number}` | `xpu:${number}`;
+  launchDevice: "cpu" | "mps" | `cuda:${number}` | `xpu:${number}` | `directml:${number}`;
   deviceName: string;
   precision: "float32" | "float16";
   torchVersion: string;
@@ -231,6 +233,7 @@ export type RuntimeCommandRunner = (
 
 export interface PrepareAcceleratorRuntimeOptions {
   baseRuntimeRoot: string;
+  pythonProductPath?: string | undefined;
   userDataPath: string;
   hardware: AcceleratorHardware;
   /**
@@ -258,7 +261,7 @@ interface AcceleratorPack {
   platform: NodeJS.Platform;
   arch: string;
   strategy: "bundled" | "pinned-download";
-  launchDevice: "cuda" | "mps" | "xpu";
+  launchDevice: "cuda" | "mps" | "xpu" | "directml";
   torchVersion: string;
   minimumFreeBytes: number;
   installGroups: readonly (readonly AcceleratorPackageArtifact[])[];
@@ -397,6 +400,7 @@ const CERTIFIED_ACCELERATOR_PACKS: readonly AcceleratorPack[] = [
   WINDOWS_ACCELERATOR_PACKS.cuda,
   WINDOWS_ACCELERATOR_PACKS.rocm,
   MACOS_MPS_PACK,
+  WINDOWS_DIRECTML_PACK,
 ];
 
 /** Select only combinations for which this release has a certified native provider. */
@@ -415,6 +419,9 @@ export function selectAcceleratorPack(
       pack.backend === preferredBackend && pack.platform === platform && pack.arch === arch
     ) ?? null;
     if (!selected) return null;
+    if (selected.backend === "directml") {
+      return ["intel", "nvidia", "amd"].includes(vendor) ? selected : null;
+    }
     if (selected.backend === "rocm") {
       return vendor === "amd"
         && isWindows11Release(hardware.osRelease)
@@ -440,6 +447,7 @@ export function selectAcceleratorPack(
     return MACOS_MPS_PACK;
   }
   if (platform !== "win32" || arch !== "x64") return null;
+  if ((vendor === "intel" && /iris.*xe/.test(gpu)) || /gtx\s*8[56]0m/.test(gpu)) return WINDOWS_DIRECTML_PACK;
   if (vendor === "nvidia" || gpu.includes("nvidia") || /\b(?:rtx|gtx)\b/.test(gpu)) {
     return WINDOWS_ACCELERATOR_PACKS.cuda;
   }
@@ -516,7 +524,12 @@ export async function prepareAcceleratorRuntime(
     `${pack.backend.toUpperCase()} setup selected for ${options.hardware.gpuModel?.trim() || "the detected GPU"}. CPU remains available.`,
   );
 
-  const runner = options.commandRunner ?? runRuntimeCommand;
+  const commandRunner = options.commandRunner ?? runRuntimeCommand;
+  const runner: RuntimeCommandRunner = (executable, args, commandOptions) => commandRunner(executable, args, {
+    ...commandOptions, env: { ...commandOptions?.env, ...(options.pythonProductPath ? {
+      PYTHONPATH: [commandOptions?.env?.PYTHONPATH, options.pythonProductPath].filter(Boolean).join(delimiter),
+    } : {}) },
+  });
   const gpuDeviceIndex = normalizeGpuDeviceIndex(options.hardware.gpuDeviceIndex);
   const expectedGpuModel = options.hardware.gpuModel?.trim() || undefined;
   if (pack.strategy === "bundled") {
@@ -712,12 +725,12 @@ export async function prepareAcceleratorRuntime(
     await cp(baseRoot, staging, { recursive: true, force: false, errorOnExist: true });
     const python = runtimePythonExecutable(staging, baseManifest.executable);
     const initialEnvironment = runtimeEnvironmentAdditions(staging);
+    if (pack.backend === "directml") await removeCopiedDirectmlTorch(staging);
     failurePhase = "installing";
     // The certified portable base deliberately omits wheel RECORD files. A
-    // regular uninstall/reinstall therefore cannot remove its CPU-only torch
-    // package and pip aborts with `uninstall-no-record-file`. The accelerator
-    // runtime is an isolated copy, so overwrite that package in place and rely
-    // on the mandatory physical probe below before activating the runtime.
+    // regular uninstall fails without RECORD. Install into the isolated copy
+    // and require the physical probe before activation. DirectML removes old
+    // Torch namespaces first because it uses an older provider version.
     emit("installing", 74, "Replacing CPU-only PyTorch inside the isolated GPU runtime.");
     for (const [index, group] of pack.installGroups.entries()) {
       const installPercent = 76 + 16 * (index / pack.installGroups.length);
@@ -1043,6 +1056,7 @@ function acceleratorRuntimeRootPath(
   pack: AcceleratorPack,
   platform: string,
 ): string {
+  if (platform === "win32" && pack.backend === "directml") return resolve(dirname(resolve(userDataPath)), "mdml");
   if (platform === "win32" && pack.backend === "cuda") {
     // PyTorch ships nested headers and license trees that can exceed MAX_PATH
     // even with a short staging name. A compact per-user sibling remains
@@ -1056,8 +1070,8 @@ function acceleratorRuntimeTargetName(
   pack: AcceleratorPack,
   platform: string,
 ): string {
-  return platform === "win32" && pack.backend === "cuda"
-    ? WINDOWS_CUDA_RUNTIME_TARGET
+  return platform === "win32" && (pack.backend === "cuda" || pack.backend === "directml")
+    ? (pack.backend === "cuda" ? WINDOWS_CUDA_RUNTIME_TARGET : "directml")
     : pack.id;
 }
 
@@ -1094,6 +1108,7 @@ function acceleratorProbeScript(): string {
     "    total_memory = int(props.total_memory)",
     "    allocated_memory = lambda: int(torch.cuda.memory_allocated(device))",
     "    reserved_memory = lambda: int(torch.cuda.memory_reserved(device))",
+    ...DIRECTML_PROBE_LINES,
     "elif expected == 'mps':",
     "    actual = 'mps'",
     "    backend = getattr(torch.backends, 'mps', None)",
@@ -1132,10 +1147,10 @@ function acceleratorProbeScript(): string {
     // float16 overflows above 65504, making an otherwise healthy GPU produce
     // an infinite/NaN checksum and forcing a false CPU fallback.
     "a = torch.full((256, 256), 0.5, device=device, dtype=torch.float16)",
-    "b = torch.eye(256, device=device, dtype=torch.float16)",
+    "b = torch.eye(256, dtype=torch.float16).to(device)",
     "c = a @ b",
     "synchronize()",
-    "checksum = float(c.float().sum().item())",
+    "checksum = float(c.cpu().float().sum().item())",
     "assert c.device.type == device.type and c.dtype == torch.float16",
     "assert math.isfinite(checksum) and checksum != 0.0",
     "payload = {'backend': actual, 'device': str(device), 'device_name': device_name, 'torch_version': str(torch.__version__), 'python_version': '.'.join(map(str, sys.version_info[:3])), 'cuda_version': str(cuda) if cuda else None, 'hip_version': str(hip) if hip else None, 'precision': 'float16', 'operation': 'fp16_matmul', 'checksum': checksum, 'total_memory_bytes': total_memory, 'allocated_bytes': allocated_memory(), 'reserved_bytes': reserved_memory()}",
@@ -1154,7 +1169,9 @@ function validateProbe(
   }
   const devicePrefix = expectedBackend === "cuda" || expectedBackend === "rocm"
     ? "cuda"
-    : expectedBackend === "xpu"
+    : expectedBackend === "directml"
+      ? "privateuseone"
+      : expectedBackend === "xpu"
       ? "xpu"
       : "mps";
   const expectedDevice = deviceIndex === null || devicePrefix === "mps"
@@ -1174,14 +1191,15 @@ function validateProbe(
     }
   }
   for (const key of ["checksum", "total_memory_bytes", "allocated_bytes", "reserved_bytes"] as const) {
+    if (expectedBackend === "directml" && ["allocated_bytes", "reserved_bytes"].includes(key) && value[key] === null) continue;
     if (typeof value[key] !== "number" || !Number.isFinite(value[key]) || value[key] < 0) {
       throw new Error(`accelerator probe has invalid ${key}`);
     }
   }
   const checksum = value.checksum as number;
   const totalMemoryBytes = value.total_memory_bytes as number;
-  const allocatedBytes = value.allocated_bytes as number;
-  if (checksum === 0 || totalMemoryBytes <= 0 || allocatedBytes <= 0) {
+  const allocatedBytes = value.allocated_bytes as number | null;
+  if (checksum === 0 || totalMemoryBytes <= 0 || (expectedBackend !== "directml" && (allocatedBytes === null || allocatedBytes <= 0))) {
     throw new Error("accelerator probe has no physical device allocation evidence");
   }
   if (expectedBackend === "cuda" && (typeof value.cuda_version !== "string" || value.hip_version !== null)) {
@@ -1213,7 +1231,7 @@ function validateProbe(
     checksum,
     totalMemoryBytes,
     allocatedBytes,
-    reservedBytes: value.reserved_bytes as number,
+    reservedBytes: value.reserved_bytes as number | null,
   };
 }
 
@@ -1430,9 +1448,9 @@ function gpuResult(
     runtimeRoot: root,
     pythonExecutable: python,
     ...additions,
-    launchDevice: probe.device as "mps" | `cuda:${number}` | `xpu:${number}`,
+    launchDevice: (pack.backend === "directml" ? `directml:${probe.device.split(":")[1] ?? "0"}` : probe.device) as "mps" | `cuda:${number}` | `xpu:${number}` | `directml:${number}`,
     deviceName: probe.deviceName,
-    precision: "float16",
+    precision: pack.backend === "directml" ? "float32" : "float16",
     torchVersion: probe.torchVersion,
     probe,
   };

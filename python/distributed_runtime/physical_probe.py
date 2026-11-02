@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import redirect_stdout
 import hashlib
 import json
 import os
@@ -11,7 +12,9 @@ import sys
 from typing import Any
 import uuid
 
-import torch
+# Vendor Python bootstrap messages must not contaminate the JSON protocol.
+with redirect_stdout(sys.stderr):
+    import torch
 
 
 SCHEMA = "gdlp-physical-probe/1"
@@ -113,6 +116,30 @@ def collect_physical_probe(nonce: str) -> dict[str, Any]:
             }
         )
     distributed_available = bool(torch.distributed.is_available())
+    directml_available = False
+    if not cuda_available:
+        try:
+            import torch_directml
+        except ImportError:
+            torch_directml = None
+        if torch_directml is not None and torch_directml.device_count() > 0:
+            import warnings
+            from .directml import video_memory_budget, selected_device_index
+            index = selected_device_index(torch_directml.device_count())
+            name = torch_directml.device_name(index).strip("\0")
+            target = torch_directml.device(index)
+            with warnings.catch_warnings(record=True) as alerts:
+                a = torch.full((32, 32), 0.5, device=target, dtype=torch.float16)
+                output = a @ a
+                actual = output.cpu()
+            if alerts or output.device != target or not torch.equal(actual, torch.full((32, 32), 8.0, dtype=torch.float16)):
+                raise RuntimeError("DirectML physical operation failed or used unsupported fallback")
+            budget, usage = video_memory_budget(name)
+            fingerprint = _sha256(b"gdlp-directml-device-v1", f"{host_fingerprint}|{index}|{name}".encode())
+            devices.append({"index": index, "name": name, "totalMemoryBytes": budget,
+                            "freeMemoryBytes": max(0, budget - usage), "runtimeTotalMemoryBytes": budget,
+                            "capability": [0, 0], "uuidSha256": None, "fingerprintSha256": fingerprint})
+            directml_available = True
     nccl_available = bool(
         distributed_available and torch.distributed.is_nccl_available()
     )
@@ -126,12 +153,14 @@ def collect_physical_probe(nonce: str) -> dict[str, Any]:
             "architecture": platform.machine().lower(),
             "kernelRelease": platform.release(),
             "pythonVersion": platform.python_version(),
+            "cpuDeviceName": platform.processor().strip() or "CPU",
         },
         "runtime": {
             "torchVersion": str(torch.__version__),
             "cudaVersion": _version_text(getattr(torch.version, "cuda", None)),
             "rocmVersion": _version_text(getattr(torch.version, "hip", None)),
             "cudaApiAvailable": cuda_available,
+            **({"directmlApiAvailable": True} if directml_available else {}),
             "distributedAvailable": distributed_available,
             "ncclAvailable": nccl_available,
             "ncclVersion": _nccl_version() if nccl_available else None,
@@ -150,9 +179,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    with redirect_stdout(sys.stderr):
+        probe = collect_physical_probe(args.nonce)
     print(
         json.dumps(
-            collect_physical_probe(args.nonce),
+            probe,
             ensure_ascii=False,
             separators=(",", ":"),
             sort_keys=True,

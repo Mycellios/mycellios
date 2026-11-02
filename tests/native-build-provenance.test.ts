@@ -26,7 +26,8 @@ describe("native node source provenance", () => {
     );
     expect(
       provenance.files.some(({ path }) =>
-        path.startsWith("landing-dist/")
+        path.startsWith("src/agent/")
+        || path.startsWith("landing-dist/")
         || path.startsWith("mobile-dist/")
         || path.startsWith("out/")
         || path.includes("/.vite/")

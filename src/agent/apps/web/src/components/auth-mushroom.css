@@ -1,0 +1,50 @@
+.auth-mushroom {
+  --auth-mascot-color: color-mix(in srgb, var(--success) 75%, var(--background));
+  transform-origin: 50% 88%;
+  animation: auth-mushroom-sway 4s ease-in-out infinite;
+}
+
+.auth-mushroom-body {
+  fill: var(--auth-mascot-color);
+}
+
+.auth-mycelium-branches {
+  fill: none;
+  stroke: var(--auth-mascot-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.auth-mushroom-eyes { fill: var(--foreground); }
+.dark .auth-mushroom-eyes { fill: var(--background); }
+
+.auth-mushroom-gaze { animation: auth-mushroom-look 9s ease-in-out infinite; }
+
+.auth-mushroom-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auth-mushroom-blink 6s ease-in-out infinite;
+}
+
+@keyframes auth-mushroom-sway {
+  0%, 100% { transform: rotate(-3deg) translateY(0); }
+  50% { transform: rotate(3deg) translateY(-1px); }
+}
+
+@keyframes auth-mushroom-look {
+  0%, 20%, 85%, 100% { transform: translate(0, 0); }
+  30%, 42% { transform: translate(2px, 0); }
+  55%, 68% { transform: translate(-2px, 1px); }
+}
+
+@keyframes auth-mushroom-blink {
+  0%, 40%, 44%, 89%, 93%, 100% { transform: scaleY(1); }
+  42%, 91% { transform: scaleY(.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-mushroom,
+  .auth-mushroom-gaze,
+  .auth-mushroom-blink { animation: none; }
+}

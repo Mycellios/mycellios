@@ -1,3 +1,4 @@
+import { mapAsync } from "../core/async-collections.js";
 import type { StoredRequestedModel, StoredWorker } from "../storage/store.js";
 import type { HubCatalogModel, HubCatalogPage, HubCatalogSearchInput } from "../contracts/types.js";
 import {
@@ -194,6 +195,8 @@ export interface ModelActivationProgressEvent {
 export interface ModelExecutionCapacityNode {
   id: string;
   availableVramMiB: number;
+  /** Fresh verified native host capacity for planning; never reported as VRAM. */
+  availableHostMemoryMiB?: number;
 }
 
 export async function inspectHubModelCapacity(
@@ -252,17 +255,17 @@ export async function inspectHubModelCapacity(
   };
 }
 
-export function requestedModelCapacityViews(input: {
+export async function requestedModelCapacityViews(input: {
   requests: StoredRequestedModel[];
   workers: StoredWorker[];
   connectedWorkerIds: ReadonlySet<string>;
   activeModelIds: ReadonlySet<string>;
   executionNodesForModel?: (modelId: string) => readonly ModelExecutionCapacityNode[];
-  activationProgressForModel?: (modelId: string) => readonly ModelActivationProgressEvent[];
+  activationProgressForModel?: (modelId: string) => readonly ModelActivationProgressEvent[] | Promise<readonly ModelActivationProgressEvent[]>;
   activationStatusMessageForModel?: (modelId: string) => string | null;
-  activationIncidentForModel?: (modelId: string) => ActivationIncident | null;
+  activationIncidentForModel?: (modelId: string) => ActivationIncident | null | Promise<ActivationIncident | null>;
   activationAvailable?: boolean;
-}): RequestedModelCapacityView[] {
+}): Promise<RequestedModelCapacityView[]> {
   const workerCapacity = input.workers
     .filter((worker) => input.connectedWorkerIds.has(worker.id) && worker.status === "online")
     .map((worker) => {
@@ -276,8 +279,8 @@ export function requestedModelCapacityViews(input: {
       );
       return { id: worker.id, availableVramMiB: Math.max(0, offered - reserved) };
     });
-  return input.requests.map((request) => {
-    const capacityNodes = input.executionNodesForModel
+  return await mapAsync(input.requests, async (request) => {
+    const capacityNodes: readonly ModelExecutionCapacityNode[] = input.executionNodesForModel
       ? input.executionNodesForModel(request.id)
       : workerCapacity;
     const profile = parseProfile(request.profile);
@@ -290,6 +293,12 @@ export function requestedModelCapacityViews(input: {
       ? null
       : Math.max(0, requiredVramMiB - availableVramMiB);
     const missingNodes = Math.max(0, requiredNodes - eligible.length);
+    const planningNodes = capacityNodes.filter(node =>
+      Math.max(node.availableVramMiB, node.availableHostMemoryMiB ?? 0) >= minimumStage);
+    const boundedPlanningAvailable = requiredVramMiB !== null
+      && planningNodes.length >= requiredNodes
+      && planningNodes.reduce((sum, node) => sum
+        + Math.max(node.availableVramMiB, node.availableHostMemoryMiB ?? 0), 0) >= requiredVramMiB;
     const active = input.activeModelIds.has(request.id);
     const compatible = profile?.compatible ?? null;
     let status: RequestedModelStatus;
@@ -309,13 +318,15 @@ export function requestedModelCapacityViews(input: {
     } else if (!profile.compatible) {
       status = "incompatible";
       message = profile.incompatibilityReason ?? "This architecture has no registered native adapter.";
-    } else if ((missingVramMiB ?? 0) > 0 || missingNodes > 0) {
+    } else if (((missingVramMiB ?? 0) > 0 || missingNodes > 0) && !boundedPlanningAvailable) {
       status = "waiting_capacity";
       message = capacityMessage(missingVramMiB ?? 0, missingNodes);
     } else if (request.autoActivate && (input.activationAvailable ?? true)) {
       status = "activating";
       message = input.activationStatusMessageForModel?.(request.id)
-        ?? "Capacity reached. Automatic activation is queued.";
+        ?? (boundedPlanningAvailable && (missingVramMiB ?? 0) > 0
+          ? "Host memory is available. Verifying placement, memory budgets and links before bounded activation."
+          : "Capacity reached. Automatic activation is queued.");
     } else {
       status = "ready";
       message = request.autoActivate
@@ -341,8 +352,8 @@ export function requestedModelCapacityViews(input: {
       message,
       activationIncident: active
         ? null
-        : input.activationIncidentForModel?.(request.id) ?? null,
-      activationProgress: input.activationProgressForModel?.(request.id) ?? [],
+        : (await input.activationIncidentForModel?.(request.id)) ?? null,
+      activationProgress: (await input.activationProgressForModel?.(request.id)) ?? [],
       activationRequestedAt: request.activationRequestedAt === null
         ? null
         : new Date(request.activationRequestedAt).toISOString(),

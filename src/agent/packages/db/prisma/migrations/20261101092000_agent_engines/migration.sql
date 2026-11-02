@@ -1,0 +1,3 @@
+BEGIN;
+ALTER TABLE "bots" ADD COLUMN "agentEngine" TEXT NOT NULL DEFAULT 'pi';
+COMMIT;

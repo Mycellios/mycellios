@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { DECISION_CONTEXT_LIMIT, DECISION_DEADLINE_MS, DECISION_DIGEST, DECISION_MODEL, decisionWorkerAdapterSchema, parseDecisionRequest } from "./decision.js";
+import { hostMemoryObservationSchema } from "./host-memory.js";
+import { embeddingWorkerAdapterSchema, EMBEDDING_DIGEST, EMBEDDING_MODEL } from "./embedding.js";
 import { kokoroWorkerAdapterSchema, KOKORO_WEIGHT_DIGEST, KOKORO_MODEL, speechOptionsSchema, resolveSpeechOptions } from "./speech.js";
 import {
   coordinatorRuntimePerformanceEvidenceSchema,
@@ -9,6 +11,7 @@ import {
   deploymentMetricsFromCanaryEvidence,
 } from "./deployment-canary.js";
 import { nativeBuildIdentitySchema } from "./build-identity.js";
+import { nativeReplicaEvidenceSchema } from "./native-replica-evidence.js";
 import { engineRuntimeProfileSchema } from "./engine-runtime-profile.js";
 import {
   workerAdmissionProofSchema,
@@ -18,11 +21,12 @@ import {
 const adapterKind = z.enum([
   "mycellios-native",
   "kokoro",
+  "embedding",
   "decision",
   "mycellios-pipeline",
   "mock",
 ]);
-const deploymentAdapterKind = z.enum(["mycellios-pipeline", "kokoro", "decision", "mock"]);
+const deploymentAdapterKind = z.enum(["mycellios-pipeline", "kokoro", "embedding", "decision", "mock"]);
 const executionBackend = z.enum(["cpu", "cuda", "rocm", "directml", "mps", "xpu", "vulkan", "webgpu"]);
 const sha256Digest = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 
@@ -94,6 +98,7 @@ export const chatCompletionRequestSchema = z.object({
   model: z.string().min(1),
   messages: z.array(chatMessageSchema).min(1),
   stream: z.boolean().default(false),
+  stream_options: z.object({ include_usage: z.boolean().optional() }).strict().optional(),
   max_tokens: z.number().int().min(1).max(32_768).default(256),
   temperature: z.number().min(0).max(2).default(0.7),
   top_p: z.number().gt(0).max(1).default(1),
@@ -125,8 +130,9 @@ export const chatCompletionRequestSchema = z.object({
   } else if (request.language !== undefined || request.voice !== undefined || request.speed !== undefined) {
     context.addIssue({ code: "custom", message: "Speech controls require a Kokoro deployment", path: ["model"] });
   }
-}).transform((request) => ({ ...request,
-  deadline_ms: request.deadline_ms ?? (request.model === DECISION_MODEL ? DECISION_DEADLINE_MS : 120_000),
+}).transform(({ stream_options: _streamOptions, ...request }) => ({ ...request,
+  // HTTP response controls must not enter the versioned worker protocol.
+  deadline_ms: request.deadline_ms ?? (request.model === DECISION_MODEL ? DECISION_DEADLINE_MS : request.model === EMBEDDING_MODEL ? 300_000 : 120_000),
 }));
 
 export const deploymentSchema = z
@@ -146,6 +152,7 @@ export const deploymentSchema = z
     ttftMs: z.number().nonnegative(),
     verificationState: z.enum(["pending", "verified"]).optional(),
     canaryEvidence: deploymentCanaryEvidenceSchema.optional(),
+    nativeReplicaEvidence: nativeReplicaEvidenceSchema.optional(),
     dataLocality: z.literal("local"),
     stage: z
       .object({
@@ -260,6 +267,15 @@ export const deploymentSchema = z
         || deployment.canaryEvidence || deployment.verificationState || deployment.throughputSource === "measured") {
         context.addIssue({ code: "custom", message: "Decision replicas require pinned identity, a bound activation and separate decision qualification" });
       }
+    } else if (deployment.adapter === "embedding") {
+      if (!deployment.activationId || deployment.modelDigest !== EMBEDDING_DIGEST || deployment.canaryEvidence || deployment.verificationState) {
+        context.addIssue({ code: "custom", message: "Embedding requires its pinned activation and separate embedding qualification", path: ["activationId"] });
+      }
+    } else if (deployment.adapter === "kokoro" && deployment.activationId) {
+      if (deployment.model !== KOKORO_MODEL || deployment.modelDigest !== KOKORO_WEIGHT_DIGEST
+        || deployment.canaryEvidence || deployment.verificationState || deployment.throughputSource === "measured") {
+        context.addIssue({ code: "custom", message: "Speech activation requires the pinned model and separate native qualification", path: ["activationId"] });
+      }
     } else if (
       deployment.canaryEvidence
       || deployment.activationId
@@ -306,6 +322,7 @@ export const gpuSchema = z
   });
 
 export const workerCapabilitiesSchema = z.object({
+  hostMemory: hostMemoryObservationSchema.optional(),
   region: z.string().min(1),
   agentVersion: z.string().min(1),
   buildIdentity: nativeBuildIdentitySchema.optional(),
@@ -348,7 +365,7 @@ export const workerCapabilitiesSchema = z.object({
           schema: z.literal("mycellios-accelerator-diagnostics/1"),
           appVersion: z.string().min(1).max(64),
           state: z.enum(["idle", "preparing", "cpu-ready", "gpu-ready", "gpu-fallback", "error"]),
-          backend: z.enum(["cpu", "cuda", "rocm", "mps", "xpu"]).nullable(),
+          backend: z.enum(["cpu", "cuda", "rocm", "directml", "mps", "xpu"]).nullable(),
           deviceName: z.string().max(256).nullable(),
           gpuVendor: z.string().max(128).nullable(),
           gpuModel: z.string().max(256).nullable(),
@@ -484,6 +501,7 @@ export const workerConfigSchema = z.object({
   }),
   adapter: z.discriminatedUnion("kind", [
     decisionWorkerAdapterSchema,
+    embeddingWorkerAdapterSchema,
     kokoroWorkerAdapterSchema,
     z.object({
       kind: z.literal("mycellios-native"),
@@ -550,6 +568,9 @@ export const workerConfigSchema = z.object({
     || config.deployment.contextLimit !== DECISION_CONTEXT_LIMIT || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) {
     context.addIssue({ code: "custom", message: "Decision replicas require a pinned activation, context limit, one slot and whole-cell scope" });
   }
+  if (config.adapter.kind === "embedding" && (config.deployment.modelDigest !== EMBEDDING_DIGEST || !config.deployment.activationId || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) {
+    context.addIssue({ code: "custom", message: "Embedding requires the pinned artifact, activation, one slot and whole-cell scope" });
+  }
   if (config.adapter.kind === "kokoro" && (
     config.deployment.modelDigest !== KOKORO_WEIGHT_DIGEST || config.limits.maxConcurrency !== 1
   )) context.addIssue({ code: "custom", message: "Kokoro requires the pinned weight digest and one inference slot" });
@@ -563,7 +584,7 @@ export const workerConfigSchema = z.object({
       path: ["deployment", "modelDigest"],
     });
   }
-  if (config.capacityScope === "cell" && config.adapter.kind !== "mycellios-pipeline" && config.adapter.kind !== "decision") {
+  if (config.capacityScope === "cell" && config.adapter.kind !== "mycellios-pipeline" && config.adapter.kind !== "embedding" && config.adapter.kind !== "decision") {
     context.addIssue({
       code: "custom",
       message: "capacityScope=cell requires a native Mycellios pipeline gateway",

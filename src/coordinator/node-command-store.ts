@@ -38,16 +38,16 @@ export class NodeCommandStore {
     private readonly now: () => number = Date.now,
   ) {}
 
-  enqueue(input: unknown, minimumGeneration: number): DurableNodeCommand {
+  async enqueue(input: unknown, minimumGeneration: number): Promise<DurableNodeCommand> {
     const parsed = nodeCommandSchema.parse(input);
-    return this.database.transaction(() => {
-      const existing = this.readCommand(parsed.id);
+    return (await this.database.transaction(async () => {
+      const existing = (await this.readCommand(parsed.id));
       if (existing) {
         if (existing.command_json !== canonicalJson(parsed)) throw new Error("node_command_id_conflict");
         return this.toDurable(existing);
       }
       const consumedNonces = new Set(
-        (this.database.raw.prepare("SELECT nonce FROM node_commands WHERE node_id = ?").all(parsed.nodeId) as Array<{ nonce: string }>).map(({ nonce }) => nonce),
+        ((await this.database.raw.prepare("SELECT nonce FROM node_commands WHERE node_id = ?").all(parsed.nodeId)) as Array<{ nonce: string }>).map(({ nonce }) => nonce),
       );
       const command = parseAuthorizedNodeCommand(parsed, {
         now: new Date(this.now()),
@@ -56,7 +56,7 @@ export class NodeCommandStore {
         expectedNodeId: parsed.nodeId,
       });
       const createdAt = this.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO node_commands(
            id, node_id, generation, nonce, command_json, state,
            issued_at, expires_at, created_at
@@ -70,80 +70,80 @@ export class NodeCommandStore {
         Date.parse(command.issuedAt),
         Date.parse(command.expiresAt),
         createdAt,
-      );
-      this.updateDesiredState(command);
-      this.appendEvent(command.nodeId, command.generation, command.actor, "command.queued", command);
+      ));
+      (await this.updateDesiredState(command));
+      (await this.appendEvent(command.nodeId, command.generation, command.actor, "command.queued", command));
       return { command, state: "queued" };
-    });
+    }));
   }
 
-  pull(nodeId: string, generation: number, limit = 32): DurableNodeCommand[] {
+  async pull(nodeId: string, generation: number, limit = 32): Promise<DurableNodeCommand[]> {
     if (!Number.isSafeInteger(generation) || generation < 1) throw new Error("node_command_generation_invalid");
-    return this.database.transaction(() => {
-      this.expirePending(nodeId, generation);
-      const rows = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      (await this.expirePending(nodeId, generation));
+      const rows = (await this.database.raw.prepare(
         `SELECT id, node_id, generation, nonce, command_json, state, expires_at
          FROM node_commands
          WHERE node_id = ? AND generation = ? AND state IN ('queued', 'delivered')
          ORDER BY created_at, id LIMIT ?`,
-      ).all(nodeId, generation, Math.max(1, Math.min(256, Math.trunc(limit)))) as unknown as CommandRow[];
+      ).all(nodeId, generation, Math.max(1, Math.min(256, Math.trunc(limit))))) as unknown as CommandRow[];
       const deliveredAt = this.now();
       for (const row of rows) {
         if (row.state !== "queued") continue;
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           "UPDATE node_commands SET state = 'delivered', delivered_at = ? WHERE id = ? AND state = 'queued'",
-        ).run(deliveredAt, row.id);
+        ).run(deliveredAt, row.id));
         const command = nodeCommandSchema.parse(JSON.parse(row.command_json));
-        this.appendEvent(nodeId, generation, command.actor, "command.delivered", { commandId: row.id });
+        (await this.appendEvent(nodeId, generation, command.actor, "command.delivered", { commandId: row.id }));
         row.state = "delivered";
       }
       return rows.map((row) => this.toDurable(row));
-    });
+    }));
   }
 
-  recordResult(input: unknown): NodeCommandResult {
+  async recordResult(input: unknown): Promise<NodeCommandResult> {
     const result = nodeCommandResultSchema.parse(input);
     if (result.state === "accepted") throw new Error("node_command_result_not_terminal");
-    return this.database.transaction(() => {
-      const commandRow = this.readCommand(result.commandId);
+    return (await this.database.transaction(async () => {
+      const commandRow = (await this.readCommand(result.commandId));
       if (!commandRow) throw new Error("node_command_unknown");
       if (commandRow.node_id !== result.nodeId) throw new Error("node_command_result_wrong_node");
       if (commandRow.generation !== result.generation) throw new Error("node_command_result_wrong_generation");
       const json = canonicalJson(result);
-      const existing = this.database.raw.prepare(
+      const existing = (await this.database.raw.prepare(
         "SELECT result_json FROM node_command_results WHERE command_id = ?",
-      ).get(result.commandId) as { result_json: string } | undefined;
+      ).get(result.commandId)) as { result_json: string } | undefined;
       if (existing) {
         if (existing.result_json !== json) throw new Error("node_command_result_conflict");
         return nodeCommandResultSchema.parse(JSON.parse(existing.result_json));
       }
       const finalState = commandStateSchema.parse(result.state);
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO node_command_results(
            id, command_id, node_id, generation, result_digest, result_json, observed_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ).run(result.id, result.commandId, result.nodeId, result.generation, result.resultDigest, json, Date.parse(result.observedAt));
-      this.database.raw.prepare(
+      ).run(result.id, result.commandId, result.nodeId, result.generation, result.resultDigest, json, Date.parse(result.observedAt)));
+      (await this.database.raw.prepare(
         `UPDATE node_commands SET state = ?, completed_at = ?
          WHERE id = ? AND state IN ('queued', 'delivered')`,
-      ).run(finalState, this.now(), result.commandId);
-      this.appendEvent(result.nodeId, result.generation, {
+      ).run(finalState, this.now(), result.commandId));
+      (await this.appendEvent(result.nodeId, result.generation, {
         kind: "node",
         id: result.nodeId,
         scopes: ["node:read"],
-      }, `command.${finalState}`, result);
+      }, `command.${finalState}`, result));
       return result;
-    });
+    }));
   }
 
-  eventsAfter(nodeId: string, cursor: string | null, limit = 100): NodeEvent[] {
-    const after = cursor === null ? 0 : this.cursorSequence(nodeId, cursor);
-    const rows = this.database.raw.prepare(
+  async eventsAfter(nodeId: string, cursor: string | null, limit = 100): Promise<NodeEvent[]> {
+    const after = cursor === null ? 0 : (await this.cursorSequence(nodeId, cursor));
+    const rows = (await this.database.raw.prepare(
       `SELECT sequence, node_id, generation, actor_json, event_type, payload_digest,
               previous_event_digest, event_digest, occurred_at
        FROM node_control_events WHERE node_id = ? AND sequence > ?
        ORDER BY sequence LIMIT ?`,
-    ).all(nodeId, after, Math.max(1, Math.min(1_000, Math.trunc(limit)))) as Array<Record<string, unknown>>;
+    ).all(nodeId, after, Math.max(1, Math.min(1_000, Math.trunc(limit))))) as Array<Record<string, unknown>>;
     return rows.map((row) => nodeEventSchema.parse({
       schema: "mycellios-node-event/1",
       cursor: formatCursor(Number(row.sequence), String(row.event_digest)),
@@ -157,64 +157,64 @@ export class NodeCommandStore {
     }));
   }
 
-  cursorSequence(nodeId: string, cursor: string): number {
-    return cursor === NODE_EVENT_ORIGIN_CURSOR ? 0 : this.validateCursor(nodeId, cursor);
+  async cursorSequence(nodeId: string, cursor: string): Promise<number> {
+    return cursor === NODE_EVENT_ORIGIN_CURSOR ? 0 : (await this.validateCursor(nodeId, cursor));
   }
 
-  latestCursor(nodeId: string): string {
-    const row = this.database.raw.prepare(
+  async latestCursor(nodeId: string): Promise<string> {
+    const row = (await this.database.raw.prepare(
       "SELECT sequence, event_digest FROM node_control_events WHERE node_id = ? ORDER BY sequence DESC LIMIT 1",
-    ).get(nodeId) as { sequence: number; event_digest: string } | undefined;
+    ).get(nodeId)) as { sequence: number; event_digest: string } | undefined;
     return row ? formatCursor(Number(row.sequence), row.event_digest) : NODE_EVENT_ORIGIN_CURSOR;
   }
 
-  acknowledgedCommandIds(nodeId: string, generation: number, limit = 256): string[] {
-    return (this.database.raw.prepare(
+  async acknowledgedCommandIds(nodeId: string, generation: number, limit = 256): Promise<string[]> {
+    return ((await this.database.raw.prepare(
       `SELECT id FROM node_commands WHERE node_id = ? AND generation = ? AND state = 'applied'
        ORDER BY completed_at DESC, id DESC LIMIT ?`,
-    ).all(nodeId, generation, Math.max(1, Math.min(1_000, Math.trunc(limit)))) as Array<{ id: string }>).map(({ id }) => id);
+    ).all(nodeId, generation, Math.max(1, Math.min(1_000, Math.trunc(limit))))) as Array<{ id: string }>).map(({ id }) => id);
   }
 
-  replayDesiredCommands(nodeId: string, generation: number): void {
-    const rows = this.database.raw.prepare(
+  async replayDesiredCommands(nodeId: string, generation: number): Promise<void> {
+    const rows = (await this.database.raw.prepare(
       `SELECT command_json FROM node_commands
        WHERE node_id = ? AND generation = ? AND state != 'expired'
        ORDER BY created_at, id`,
-    ).all(nodeId, generation) as Array<{ command_json: string }>;
-    for (const row of rows) this.updateDesiredState(nodeCommandSchema.parse(JSON.parse(row.command_json)));
+    ).all(nodeId, generation)) as Array<{ command_json: string }>;
+    for (const row of rows) (await this.updateDesiredState(nodeCommandSchema.parse(JSON.parse(row.command_json))));
   }
 
-  private validateCursor(nodeId: string, cursor: string): number {
+  private async validateCursor(nodeId: string, cursor: string): Promise<number> {
     const sequence = parseCursorSequence(cursor);
-    const row = this.database.raw.prepare(
+    const row = (await this.database.raw.prepare(
       "SELECT event_digest FROM node_control_events WHERE node_id = ? AND sequence = ?",
-    ).get(nodeId, sequence) as { event_digest: string } | undefined;
+    ).get(nodeId, sequence)) as { event_digest: string } | undefined;
     if (!row || formatCursor(sequence, row.event_digest) !== cursor) {
       throw new Error("node_event_cursor_unknown");
     }
     return sequence;
   }
 
-  private expirePending(nodeId: string, generation: number): void {
-    const rows = this.database.raw.prepare(
+  private async expirePending(nodeId: string, generation: number): Promise<void> {
+    const rows = (await this.database.raw.prepare(
       `SELECT id, node_id, generation, nonce, command_json, state, expires_at
        FROM node_commands
        WHERE node_id = ? AND state IN ('queued', 'delivered')
          AND (expires_at <= ? OR generation < ?)`,
-    ).all(nodeId, this.now(), generation) as unknown as CommandRow[];
+    ).all(nodeId, this.now(), generation)) as unknown as CommandRow[];
     for (const row of rows) {
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         "UPDATE node_commands SET state = 'expired', completed_at = ? WHERE id = ? AND state IN ('queued', 'delivered')",
-      ).run(this.now(), row.id);
+      ).run(this.now(), row.id));
       const command = nodeCommandSchema.parse(JSON.parse(row.command_json));
-      this.appendEvent(nodeId, row.generation, command.actor, "command.expired", { commandId: row.id });
+      (await this.appendEvent(nodeId, row.generation, command.actor, "command.expired", { commandId: row.id }));
     }
   }
 
-  private updateDesiredState(command: NodeCommand): void {
-    const row = this.database.raw.prepare(
+  private async updateDesiredState(command: NodeCommand): Promise<void> {
+    const row = (await this.database.raw.prepare(
       "SELECT desired_json FROM node_desired_states WHERE node_id = ?",
-    ).get(command.nodeId) as { desired_json: string } | undefined;
+    ).get(command.nodeId)) as { desired_json: string } | undefined;
     if (!row) return;
     const current = nodeDesiredStateSchema.parse(JSON.parse(row.desired_json));
     if (current.generation !== command.generation) throw new Error("node_desired_state_generation_mismatch");
@@ -231,16 +231,16 @@ export class NodeCommandStore {
       updatedAt: new Date(this.now()).toISOString(),
       updatedBy: command.actor,
     });
-    this.database.raw.prepare(
+    (await this.database.raw.prepare(
       "UPDATE node_desired_states SET desired_json = ?, updated_at = ? WHERE node_id = ? AND generation = ?",
-    ).run(canonicalJson(next), this.now(), command.nodeId, command.generation);
+    ).run(canonicalJson(next), this.now(), command.nodeId, command.generation));
   }
 
-  private readCommand(id: string): CommandRow | null {
-    const row = this.database.raw.prepare(
+  private async readCommand(id: string): Promise<CommandRow | null> {
+    const row = (await this.database.raw.prepare(
       `SELECT id, node_id, generation, nonce, command_json, state, expires_at
        FROM node_commands WHERE id = ?`,
-    ).get(id) as CommandRow | undefined;
+    ).get(id)) as CommandRow | undefined;
     return row ?? null;
   }
 
@@ -248,17 +248,17 @@ export class NodeCommandStore {
     return { command: nodeCommandSchema.parse(JSON.parse(row.command_json)), state: commandStateSchema.parse(row.state) };
   }
 
-  private appendEvent(
+  private async appendEvent(
     nodeId: string,
     generation: number,
     actorInput: unknown,
     eventType: string,
     payload: unknown,
-  ): void {
+  ): Promise<void> {
     const actor = nodeControlActorSchema.parse(actorInput);
-    const previous = this.database.raw.prepare(
+    const previous = (await this.database.raw.prepare(
       "SELECT event_digest FROM node_control_events WHERE node_id = ? ORDER BY sequence DESC LIMIT 1",
-    ).get(nodeId) as { event_digest: string } | undefined;
+    ).get(nodeId)) as { event_digest: string } | undefined;
     const occurredAt = this.now();
     const payloadDigest = digest(canonicalJson(payload));
     const eventDigest = digest(canonicalJson({
@@ -270,12 +270,12 @@ export class NodeCommandStore {
       previousEventDigest: previous?.event_digest ?? null,
       occurredAt,
     }));
-    this.database.raw.prepare(
+    (await this.database.raw.prepare(
       `INSERT INTO node_control_events(
          node_id, generation, actor_json, event_type, payload_digest,
          previous_event_digest, event_digest, occurred_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(nodeId, generation, canonicalJson(actor), eventType, payloadDigest, previous?.event_digest ?? null, eventDigest, occurredAt);
+    ).run(nodeId, generation, canonicalJson(actor), eventType, payloadDigest, previous?.event_digest ?? null, eventDigest, occurredAt));
   }
 }
 

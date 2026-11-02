@@ -72,7 +72,7 @@ def parser() -> argparse.ArgumentParser:
         description="Measure a sealed-input Mycellios runtime performance profile."
     )
     result.add_argument(
-        "--backend", required=True, choices=("cuda", "rocm", "mps", "xpu", "cpu")
+        "--backend", required=True, choices=("cuda", "rocm", "mps", "xpu", "directml", "cpu")
     )
     result.add_argument("--device", required=True)
     result.add_argument(
@@ -106,7 +106,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def resolve_runtime_target(backend: str, device: str, precision: str) -> RuntimeTarget:
-    requested = torch.device(device)
+    if backend == "directml":
+        from .device import resolve_torch_execution_device
+        resolved = resolve_torch_execution_device(device)
+        if resolved.backend != "directml":
+            raise RuntimeError("DirectML calibration requires a DirectML device")
+        requested = resolved.device
+    else:
+        requested = torch.device(device)
     dtype = torch.float16 if precision == "float16" else torch.float32
     if backend == "cpu":
         if requested.type != "cpu" or precision != "float32":
@@ -121,6 +128,8 @@ def resolve_runtime_target(backend: str, device: str, precision: str) -> Runtime
         if backend == "cuda" and hip_version:
             raise RuntimeError("CUDA calibration cannot use a ROCm PyTorch runtime")
         device_name = torch.cuda.get_device_name(requested)
+    elif backend == "directml":
+        device_name = resolved.name
     elif backend == "mps":
         mps = getattr(torch.backends, "mps", None)
         if requested.type != "mps" or mps is None or not mps.is_available():
@@ -139,7 +148,9 @@ def resolve_runtime_target(backend: str, device: str, precision: str) -> Runtime
         device_name = get_name(requested) if callable(get_name) else str(requested)
     else:
         raise RuntimeError(f"unsupported physical backend {backend}")
-    if backend != "cpu" and precision != "float16":
+    if backend == "directml" and precision != "float32":
+        raise RuntimeError("DirectML calibration requires the FP32 production precision")
+    if backend not in ("cpu", "directml") and precision != "float16":
         raise RuntimeError("accelerator calibration requires the FP16 production precision")
     return RuntimeTarget(
         backend=backend,
@@ -332,6 +343,8 @@ def _rounded(value: float) -> float:
 
 
 def _synchronizer(target: RuntimeTarget) -> Callable[[], None]:
+    if target.backend == "directml":
+        return lambda: torch.empty(1, device=target.device).cpu()
     if target.device.type == "cuda":
         return lambda: torch.cuda.synchronize(target.device)
     if target.device.type == "mps":

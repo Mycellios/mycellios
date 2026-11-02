@@ -1,9 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import type { PublicDownloadAvailability } from "../../src/contracts/public-downloads.js";
-import { downloadAvailabilityNotice } from "./Downloads";
+import { downloadAvailabilityNotice, DownloadsPage } from "./Downloads";
 import { fetchPublicDownloadAvailability } from "./public-downloads";
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("never presents a standalone runtime package as Mycellios Desktop", () => {
+  vi.stubGlobal("window", { location: { search: "?product=desktop" } });
+  vi.stubGlobal("navigator", { platform: "Win32" });
+  const html = renderToStaticMarkup(createElement(DownloadsPage, {
+    title: "Downloads", publicLink: (path: string) => path, external: false,
+  }));
+  expect(html).toContain("Checking downloads");
+  expect(html).toContain('href="/agent/app"');
+  expect(html).toContain("Standalone runtime");
+  expect(html).not.toContain('href="/downloads/windows"');
+  expect(html).not.toContain('href="/downloads/linux"');
+});
 
 describe("public package availability", () => {
   const availability: PublicDownloadAvailability = {

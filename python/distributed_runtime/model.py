@@ -23,6 +23,7 @@ from transformers.cache_utils import DynamicLayer
 from .decode_attention import apply_to as apply_grouped_prefix_attention
 from .dense_tiering import DenseTieringConfig, configure_dense_tiering
 from .device import TorchExecutionDevice, resolve_torch_execution_device
+from .directml import stage_inference_mode, configure_decode_attention, directml_stage_spec
 from .kv_arena import (
     ArenaCache,
     ArenaLayer,
@@ -32,6 +33,9 @@ from .kv_arena import (
 from .model_adapters import (
     SelectiveStageAdapter,
     resolve_selective_stage_adapter,
+)
+from .browser_layer_bridge import (
+    initialize_browser_layer_stage, close_browser_stage, reset_browser_stage, run_browser_stage,
 )
 
 MAX_PHYSICAL_STAGE_BATCH_SIZE = 8
@@ -264,20 +268,22 @@ class StageRunner:
     ) -> None:
         torch.set_num_threads(spec.threads)
         execution_device = resolve_torch_execution_device(device)
-        compute_dtype = (
-            torch.float16 if execution_device.accelerated else torch.float32
-        )
+        spec = directml_stage_spec(spec, execution_device.backend)
+        tiering_config = dense_tiering or DenseTieringConfig()
+        if tiering_config.execution_target == "cpu" and device.strip().lower() != "cpu":
+            raise ValueError("dense_cpu_target_requires_explicit_cpu_device")
+        if tiering_config.execution_target == "cpu" and spec.quantize is not None:
+            raise ValueError("dense_cpu_target_requires_original_safetensors_weights")
+        compute_dtype = tiering_config.resolve_compute_dtype(execution_device)
         if spec.quantize == "dynamic-int8" and execution_device.accelerated:
             raise ValueError("dynamic-int8 stage quantization is CPU-only")
-        tiering_config = dense_tiering or DenseTieringConfig()
         model = _load_selective_stage_model(
             spec,
             resident_dtype=compute_dtype,
             host_ram_budget_bytes=tiering_config.host_ram_budget_bytes,
         )
-        self._initialize_from_loaded_model(
-            spec,
-            model,
+        from .browser_dense_bridge import initialize_dense_stage_with_browser_bridge
+        initialize_dense_stage_with_browser_bridge(self, spec, model,
             loader="selective-safetensors",
             device_kinds=(execution_device.device.type,),
             execution_device=execution_device,
@@ -285,6 +291,7 @@ class StageRunner:
             move_model=True,
             dense_tiering=tiering_config,
         )
+        initialize_browser_layer_stage(self)
 
     def _initialize_from_loaded_model(
         self,
@@ -347,10 +354,7 @@ class StageRunner:
         self.compute_device = execution_device.device
         self.compute_dtype = compute_dtype
         self.hidden_size = int(model.config.hidden_size)
-        self._grouped_prefix_attention = bool(
-            spec.decode_attention == "grouped-prefix"
-            and apply_grouped_prefix_attention(self.base)
-        )
+        self._grouped_prefix_attention = configure_decode_attention(self.base, spec.decode_attention, execution_device.backend)
         self.parameter_bytes = _unique_parameter_bytes(self.base, self.head)
         self.loader = loader
         self.spec = spec
@@ -508,6 +512,7 @@ class StageRunner:
         self.active_requests.add(request_id)
 
     def end(self, request_id: int) -> None:
+        reset_browser_stage(self, request_id, end=True)
         self.caches.pop(request_id, None)
         self.tokens_seen.pop(request_id, None)
         self.active_requests.discard(request_id)
@@ -515,6 +520,7 @@ class StageRunner:
     def close(self) -> None:
         """Release request state; resident model tensors follow process lifetime."""
 
+        close_browser_stage(self)
         self.caches.clear()
         self.tokens_seen.clear()
         self.active_requests.clear()
@@ -538,6 +544,7 @@ class StageRunner:
             if not callable(crop):
                 raise TypeError("model cache does not support speculative rollback")
             crop(token_count)
+            reset_browser_stage(self, request_id, disable=True)
         self.tokens_seen[request_id] = token_count
 
     def request_cache_bytes(self, request_id: int) -> int:
@@ -825,6 +832,7 @@ class StageRunner:
             self.caches.pop(child_request_id, None)
         self.tokens_seen[child_request_id] = self.tokens_seen[parent_request_id]
         self.active_requests.add(child_request_id)
+        reset_browser_stage(self, child_request_id, disable=True)
         from .executor_abi import StageKVForkReport
 
         self._last_fork_report = StageKVForkReport(
@@ -848,6 +856,8 @@ class StageRunner:
             raise ValueError("promote parent and child request IDs must differ")
         self._require_active(parent_request_id)
         self._require_active(child_request_id)
+        reset_browser_stage(self, parent_request_id, disable=True)
+        reset_browser_stage(self, child_request_id, end=True)
 
         child_has_cache = child_request_id in self.caches
         child_cache = self.caches.get(child_request_id)
@@ -889,7 +899,7 @@ class StageRunner:
             torch.float32,
         )
 
-    @torch.inference_mode()
+    @stage_inference_mode()
     def forward_ids(self, request_id: int, input_ids: torch.Tensor) -> torch.Tensor:
         if not self.spec.first:
             raise RuntimeError("only the first stage accepts token IDs")
@@ -899,17 +909,14 @@ class StageRunner:
         if input_ids.dtype not in (torch.int32, torch.int64):
             raise TypeError("input_ids must contain integer token IDs")
         input_ids = input_ids.to(device=self._effective_compute_device())
-        output = self.base(
-            input_ids=input_ids,
-            past_key_values=self.caches.get(request_id),
-            use_cache=True,
-        )
+        output = run_browser_stage(self, request_id, input_ids=input_ids,
+            past_key_values=self.caches.get(request_id), use_cache=True)
         self.model_forward_calls += 1
         self.caches[request_id] = output.past_key_values
         self.tokens_seen[request_id] += int(input_ids.shape[1])
         return output.last_hidden_state
 
-    @torch.inference_mode()
+    @stage_inference_mode()
     def forward_ids_with_tokens(
         self,
         request_id: int,
@@ -936,7 +943,7 @@ class StageRunner:
             return hidden, tuple(int(token) for token in tokens)
         return hidden, int(tokens[-1])
 
-    @torch.inference_mode()
+    @stage_inference_mode()
     def forward_ids_batch(
         self,
         request_ids: Sequence[int],
@@ -949,6 +956,8 @@ class StageRunner:
         tensors before this method returns.
         """
 
+        if getattr(self, "_browser_layer_bridge", None) is not None:
+            raise ValueError("browser layer stages require sequential requests")
         if not self.spec.first:
             raise RuntimeError("only the first stage accepts token IDs")
         ids, tensors, token_count = self._validate_physical_batch_inputs(
@@ -995,7 +1004,7 @@ class StageRunner:
             for index in range(len(ids))
         )
 
-    @torch.inference_mode()
+    @stage_inference_mode()
     def forward_hidden(
         self,
         request_id: int,
@@ -1021,11 +1030,8 @@ class StageRunner:
             device=self._effective_compute_device(),
             dtype=self._effective_compute_dtype(),
         )
-        output = self.base(
-            inputs_embeds=hidden,
-            past_key_values=self.caches.get(request_id),
-            use_cache=True,
-        )
+        output = run_browser_stage(self, request_id, inputs_embeds=hidden,
+            past_key_values=self.caches.get(request_id), use_cache=True)
         self.model_forward_calls += 1
         self.caches[request_id] = output.past_key_values
         self.tokens_seen[request_id] += int(hidden.shape[1])
@@ -1042,7 +1048,7 @@ class StageRunner:
             return output.last_hidden_state, tuple(int(token) for token in tokens)
         return output.last_hidden_state, int(tokens[-1])
 
-    @torch.inference_mode()
+    @stage_inference_mode()
     def project_sampling_logits(self, hidden: torch.Tensor) -> torch.Tensor:
         """Project target logits for lossless sampling without mutating KV.
 
@@ -1086,6 +1092,8 @@ class StageRunner:
         """
 
         self._require_active(request_id)
+        if getattr(self, "_browser_layer_bridge", None) is not None:
+            return None
         if not self._physical_batch_cache_supported:
             return None
         if (
@@ -1134,7 +1142,7 @@ class StageRunner:
         _current, count, mode = key
         return count, mode
 
-    @torch.inference_mode()
+    @stage_inference_mode()
     def forward_hidden_batch(
         self,
         request_ids: Sequence[int],
@@ -1147,6 +1155,8 @@ class StageRunner:
     ]:
         """Execute one real tensor batch and split outputs/KV by request."""
 
+        if getattr(self, "_browser_layer_bridge", None) is not None:
+            raise ValueError("browser layer stages require sequential requests")
         if token_mode not in ("none", "last", "all"):
             raise ValueError("token_mode must be none, last or all")
         ids, tensors, token_count = self._validate_physical_batch_inputs(
@@ -2030,32 +2040,11 @@ def _load_selective_stage_model(
         layer_end=spec.layer_end,
         total_layers=spec.total_layers,
     )
-    original_vocab_size = int(local_config.vocab_size)
-    original_pad_token_id = getattr(local_config, "pad_token_id", None)
-    # Intermediate stages never look up token IDs or project logits. Avoid even
-    # temporarily allocating a full vocabulary matrix on those contributors.
-    if not spec.first and not spec.last:
-        local_config.vocab_size = 1
-        local_config.pad_token_id = 0
-    model = AutoModelForCausalLM.from_config(
-        local_config,
-        dtype=resident_dtype,
+    from .model_vocabulary import construct_selective_architecture
+    model = construct_selective_architecture(
+        local_config, spec, adapter, resident_dtype=resident_dtype,
+        construct=AutoModelForCausalLM.from_config,
     )
-    adapter.inspect_constructed_model(model, local_layers=local_layers)
-    if not spec.last:
-        model.model.norm = nn.Identity()
-        # Drop an untied vocabulary projection before streaming checkpoint tensors;
-        # it is never retained or executed on a non-final contributor.
-        model.lm_head = nn.Identity()
-    if not spec.first:
-        # On a last stage lm_head keeps the original tied vocabulary parameter;
-        # replacing the unused lookup table releases the duplicate module path.
-        model.model.embed_tokens = nn.Embedding(1, model.config.hidden_size)
-    if not spec.first and not spec.last:
-        # The reduced vocabulary is only a construction-time allocation trick.
-        # Preserve the original semantic config for any forward code that reads it.
-        model.config.vocab_size = original_vocab_size
-        model.config.pad_token_id = original_pad_token_id
     model._mycellios_dense_storage_evidence = (
         _load_stage_parameters_from_safetensors(
             model,
@@ -2246,6 +2235,7 @@ def _load_stage_parameters_from_safetensors(
             (local_name, target, checkpoint_name)
         )
 
+    maximum_source_buffer_bytes = 0
     storage_bytes = 0
     storage_operations = 0
     storage_to_ram_nanoseconds = 0
@@ -2254,22 +2244,18 @@ def _load_stage_parameters_from_safetensors(
             with safe_open(file_path, framework="pt", device="cpu") as tensors:
                 for local_name, target, checkpoint_name in file_targets:
                     started = time.perf_counter_ns()
-                    value = tensors.get_tensor(checkpoint_name)
-                    if tuple(value.shape) != tuple(target.shape):
-                        raise ValueError(
-                            f"shape mismatch for {local_name}: checkpoint {tuple(value.shape)}, "
-                            f"stage {tuple(target.shape)}"
-                        )
-                    # copy_ performs dtype conversion directly into the resident
-                    # destination. An explicit value.to(...) would allocate another
-                    # full-size tensor, which is especially damaging for vocab matrices.
-                    target.copy_(value)
+                    from .checkpoint_copy import copy_checkpoint_tensor
+                    source_bytes, source_buffer_bytes = copy_checkpoint_tensor(
+                        file_path, checkpoint_name, target, tensors,
+                    )
+                    maximum_source_buffer_bytes = max(
+                        maximum_source_buffer_bytes, source_buffer_bytes,
+                    )
                     storage_to_ram_nanoseconds += max(
                         0, time.perf_counter_ns() - started
                     )
-                    storage_bytes += value.numel() * value.element_size()
+                    storage_bytes += source_bytes
                     storage_operations += 1
-                    del value
     return {
         "schema": "mycellios-storage-to-ram/1",
         "format": "safetensors",
@@ -2278,6 +2264,7 @@ def _load_stage_parameters_from_safetensors(
         # not labelled physical disk traffic.
         "artifactBytesMaterialized": storage_bytes,
         "tensorReadOperations": storage_operations,
+        "maximumExplicitSourceBufferBytes": maximum_source_buffer_bytes,
         "materializeAndCopyNanoseconds": storage_to_ram_nanoseconds,
         "physicalDiskBytes": None,
         "osPageCacheHits": None,
@@ -2450,7 +2437,7 @@ def _unique_parameter_bytes(*modules: nn.Module | None) -> int:
     return total
 
 
-@torch.inference_mode()
+@stage_inference_mode()
 def reference_generate(
     model_name: str,
     input_ids: torch.Tensor,

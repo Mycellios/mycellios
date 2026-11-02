@@ -1,4 +1,13 @@
+import { runtimeChallengeIdentity } from "./worker-runtime-challenge.js";
+import { connectionIsReady, connectedWorkerIdentifiers, authenticatedConnectionAuthority, workerHeartbeatArrival, workerConnectionIsHeartbeatStale, type AuthorizedWorkerSession, type ConnectionState, type WorkerDisconnectDetails } from "./worker-connection-state.js";
+import { WorkerEventDelivery, WorkerInboundQueue, type WorkerEventConsumer, type WorkerDisconnectObserver } from "./worker-event-delivery.js";
+import { AsyncTaskScope } from "../core/async-task-scope.js";
+export type { AuthorizedWorkerSession, WorkerDisconnectDetails } from "./worker-connection-state.js";
+export { workerConnectionIsHeartbeatStale } from "./worker-connection-state.js";
+import { logRuntimeStreamTermination, logDuplicateWorkerHello, runtimeStreamReportEquals,
+  type RuntimeStreamRecoveryReport, type RuntimeStreamTerminalDiagnostic } from "./runtime-stream-lifecycle.js";
 import { EventEmitter } from "node:events";
+import { WorkerMaintenance } from "./worker-maintenance.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -25,7 +34,7 @@ export type {
 } from "../contracts/runtime-transport.js";
 import {
   createCoordinatorDeploymentCanaryEvidence,
-  deploymentMetricsFromCanaryEvidence,
+  deploymentMetricsFromCanaryEvidence, DEPLOYMENT_CANARY_MAXIMUM_AGE_MS,
   type DeploymentCanarySample,
 } from "../contracts/deployment-canary.js";
 import {
@@ -85,30 +94,9 @@ import {
 
 interface HubEvents {
   envelope: [WorkerEnvelope];
-  disconnect: [string];
+  disconnect: [string, WorkerDisconnectDetails?];
   activationCheckpointRestored: [string, string, string];
   activationCheckpointRestoreFailed: [string, string, string, string];
-}
-
-export interface AuthorizedWorkerSession {
-  workerId: string;
-  identityKind: "device" | "cell";
-  identityId: string;
-  credentialFingerprint: string;
-  generation: number | null;
-}
-
-interface ConnectionState {
-  socket: WebSocket;
-  workerId: string | null;
-  authorizedWorkerId?: string | null;
-  authorizedSession?: AuthorizedWorkerSession | null;
-  ready: boolean;
-  helloTimer: NodeJS.Timeout;
-  pending: boolean;
-  messageWindowStartedAt: number;
-  messagesInWindow: number;
-  sessionId: string;
 }
 
 interface PendingCanarySample {
@@ -184,13 +172,6 @@ interface RuntimeStreamSession {
   endedAt: number | null;
 }
 
-interface RuntimeStreamRecoveryReport {
-  sendOffset: number;
-  acknowledgedOffset: number;
-  receiveOffset: number;
-  bufferedFromOffset: number;
-}
-
 interface RuntimeStreamRecoverySession {
   recoveryToken: string;
   generation: number;
@@ -225,22 +206,6 @@ const DIRECT_GRANT_TTL_MS = 10_000;
 const DIRECT_ROUTE_MAX_LIFETIME_MS = 4 * 60 * 60 * 1_000;
 const EVIDENCE_RETRY_AFTER_MS = 60_000;
 const MAX_PENDING_EVIDENCE_CHALLENGES = 1_024;
-const WORKER_HEARTBEAT_GRACE_MS = 10_000;
-
-/**
- * Registration and the first heartbeat are separate messages. A freshly
- * authenticated socket may therefore still have the persisted offline status
- * for a few milliseconds and must not be reaped by the stale-worker sweep.
- */
-export function workerConnectionIsHeartbeatStale(
-  worker: Pick<StoredWorker, "status" | "lastSeenAt"> | null,
-  now = Date.now(),
-): boolean {
-  if (!worker) return true;
-  if (worker.status !== "suspect" && worker.status !== "offline") return false;
-  return worker.lastSeenAt < now - WORKER_HEARTBEAT_GRACE_MS;
-}
-
 export function workerSessionSupersedes(previous: AuthorizedWorkerSession, incoming: AuthorizedWorkerSession): boolean {
   return previous.identityKind === incoming.identityKind
     && previous.identityId === incoming.identityId
@@ -250,7 +215,14 @@ export function workerSessionSupersedes(previous: AuthorizedWorkerSession, incom
 }
 
 export class WorkerHub extends EventEmitter<HubEvents> {
+  private readonly background = new AsyncTaskScope((task, error) => this.logger?.error({ task, error }, "worker background task failed"));
+
+  subscribeWorkerEvents(consumer: WorkerEventConsumer): () => void { return this.workerEvents.subscribe(consumer); }
+
+  private readonly workerEvents = new WorkerEventDelivery(this, () => this.logger);
+  private readonly inboundFrames = new WorkerInboundQueue(this.background, (state, raw) => this.handleRawMessage(state, raw));
   private readonly connections = new Map<string, ConnectionState>();
+  private readonly validatedHeartbeatTimes = new WeakMap<ConnectionState, number>();
   private readonly allConnections = new Set<ConnectionState>();
   private logger: FastifyInstance["log"] | null = null;
   private pendingConnections = 0;
@@ -270,18 +242,22 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     string,
     PendingActivationCheckpointRestoreCompletion
   >();
-  private sessionIsCurrent: ((session: AuthorizedWorkerSession) => boolean) | undefined;
+  private sessionIsCurrent: ((session: AuthorizedWorkerSession) => boolean | Promise<boolean>) | undefined;
 
-  constructor(
+  static async create(store: MeshStore, options: { activationCheckpointTransfers?: ActivationCheckpointTransferAuthority } = {}): Promise<WorkerHub> {
+    return new WorkerHub(store, { ...options, runtimeLinkSamples: await store.listRuntimeLinkSamples() });
+  }
+
+  private constructor(
     private readonly store: MeshStore,
-    options: { activationCheckpointTransfers?: ActivationCheckpointTransferAuthority } = {},
+    options: { activationCheckpointTransfers?: ActivationCheckpointTransferAuthority; runtimeLinkSamples?: Awaited<ReturnType<MeshStore["listRuntimeLinkSamples"]>> } = {},
   ) {
     super();
     this.activationCheckpointTransfers = options.activationCheckpointTransfers ?? null;
     this.runtimeLinkObservationsStore = new RuntimeLinkObservationStore(
       DEFAULT_RUNTIME_LINK_SAMPLE_AGE_MS,
       DEFAULT_RUNTIME_LINK_SAMPLES_PER_LINK,
-      this.store.listRuntimeLinkSamples?.() ?? [],
+      options.runtimeLinkSamples ?? [],
     );
   }
 
@@ -290,7 +266,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     options: {
       authorizedWorkerId?: (request: FastifyRequest) => string | null;
       authorizedSession?: (request: FastifyRequest) => AuthorizedWorkerSession | null;
-      sessionIsCurrent?: (session: AuthorizedWorkerSession) => boolean;
+      sessionIsCurrent?: (session: AuthorizedWorkerSession) => boolean | Promise<boolean>;
     } = {},
   ): void {
     this.logger = app.log;
@@ -314,44 +290,49 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       };
       this.pendingConnections += 1;
       this.allConnections.add(state);
-      socket.on("message", (raw) => this.handleRawMessage(state, raw.toString()));
-      socket.on("close", (code, reason) => {
+      socket.on("message", raw => this.receiveRawMessage(state, raw.toString()));
+      socket.on("close", (code, reason) => this.background.run("worker-hub:301", async () => {
         app.log.warn({
           workerId: state.workerId,
           code,
           reason: reason.toString("utf8"),
           ready: state.ready,
         }, "worker websocket closed");
-        this.handleClose(state);
-      });
-      socket.on("error", (error) => {
+        (await this.handleClose(state, true));
+      }, state));
+      socket.on("error", (error) => this.background.run("worker-hub:310", async () => {
         app.log.warn({
           workerId: state.workerId,
           error: error instanceof Error ? error.message : String(error),
           ready: state.ready,
         }, "worker websocket error");
-        this.handleClose(state);
-      });
+        (await this.handleClose(state, true));
+      }, state));
     });
     if (!this.runtimeLinkProbeTimer) {
       this.runtimeLinkProbeTimer = setInterval(
-        () => this.sampleRuntimeLinks(),
+        () => this.background.run("worker-hub:321", async () => (await this.sampleRuntimeLinks()), "setInterval"),
         RUNTIME_LINK_PROBE_INTERVAL_MS,
       );
       this.runtimeLinkProbeTimer.unref();
     }
   }
+  private readonly maintenance = new WorkerMaintenance();
+  async setWorkerMaintenance(workerId: string, enabled: boolean): Promise<void> { await this.maintenance.set(workerId, enabled, this.store, this.isConnected(workerId)); }
+  currentWorkerSessionId(workerId: string): string | null { const state = this.connections.get(workerId); return state?.ready ? state.sessionId : null; }
 
-  connectedWorkerIds(): ReadonlySet<string> {
-    return new Set(
-      [...this.connections.entries()]
-        .filter(([, state]) => state.ready)
-        .map(([workerId]) => workerId),
-    );
-  }
+  beforeDisconnect(observer: WorkerDisconnectObserver): () => void { return this.workerEvents.beforeDisconnect(observer); }
 
-  isConnected(workerId: string): boolean {
-    return this.connections.get(workerId)?.ready === true;
+  connectedWorkerIds(): ReadonlySet<string> { return connectedWorkerIdentifiers(this.connections); }
+
+  isConnected(workerId: string): boolean { return connectionIsReady(this.connections.get(workerId)); }
+
+  authenticatedWorkerAuthority(workerId: string): Promise<AuthorizedWorkerSession | null> { return authenticatedConnectionAuthority(this.connections, workerId, this.sessionIsCurrent); }
+
+  recoverablePeerTransports(): RuntimeTransportSnapshot[] {
+    return [...this.runtimeStreams.values()].filter(s => s.sourceNodeId !== null && s.opened
+      && (s.recovery !== null || (s.transportMode === "direct" && s.direct?.state === "committed")))
+      .map(s => this.runtimeTransportSnapshotForSession(s));
   }
 
   runtimeTransportSnapshot(): RuntimeTransportSnapshot[] {
@@ -417,13 +398,13 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     if (!state?.ready || !this.activationCheckpointTransfers) {
       throw new Error("activation_checkpoint_restore_worker_is_unavailable");
     }
-    const prepared = this.activationCheckpointTransfers.prepareRestore({
+    const prepared = (await this.activationCheckpointTransfers.prepareRestore({
       workerId,
       workerSessionId: state.sessionId,
       checkpointId,
       expected,
       expiresAt,
-    }, now);
+    }, now));
     if (prepared.payload.byteLength > maximumBytes) {
       prepared.payload.fill(0);
       this.activationCheckpointTransfers.abortRestore(prepared.transferId);
@@ -521,13 +502,13 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
   }
 
-  startEngineRuntimeProfileChallenge(
+  async startEngineRuntimeProfileChallenge(
     workerId: string,
     request: EngineRuntimeChallengeRequest,
     now = Date.now(),
-  ): string | null {
+  ): Promise<string | null> {
     const state = this.connections.get(workerId);
-    const worker = this.store.getWorker(workerId);
+    const worker = (await this.store.getWorker(workerId));
     const executor = worker?.capabilities.distributedExecutor;
     if (!state?.ready || !worker || !executor || this.connections.get(workerId) !== state) {
       return null;
@@ -558,36 +539,36 @@ export class WorkerHub extends EventEmitter<HubEvents> {
    * profiles. Invalid or disconnected targets fail closed in the existing
    * challenge path; retry cooldowns also prevent duplicate in-flight probes.
    */
-  reconcileEngineRuntimeProfileChallenges(
+  async reconcileEngineRuntimeProfileChallenges(
     plans: readonly CertifiedEngineRuntimeChallengePlan[],
     now = Date.now(),
-  ): string[] {
+  ): Promise<string[]> {
     const started: string[] = [];
     const seenWorkers = new Set<string>();
     for (const plan of plans) {
       if (seenWorkers.has(plan.workerId)) continue;
       seenWorkers.add(plan.workerId);
-      const profiles = this.store.getWorker(plan.workerId)
+      const profiles = (await this.store.getWorker(plan.workerId))
         ?.capabilities.distributedExecutor?.engineProfiles ?? [];
       if (!engineRuntimeProfileNeedsChallenge(profiles, plan.request, now)) continue;
-      const challengeId = this.startEngineRuntimeProfileChallenge(
+      const challengeId = (await this.startEngineRuntimeProfileChallenge(
         plan.workerId,
         plan.request,
         now,
-      );
+      ));
       if (challengeId) started.push(challengeId);
     }
     return started;
   }
 
-  reconcileStoredEngineRuntimeProfileChallenges(now = Date.now()): string[] {
-    return this.reconcileEngineRuntimeProfileChallenges(
-      this.store.listEngineRuntimeActivationPlans().map((plan) => ({
+  async reconcileStoredEngineRuntimeProfileChallenges(now = Date.now()): Promise<string[]> {
+    return (await this.reconcileEngineRuntimeProfileChallenges(
+      (await this.store.listEngineRuntimeActivationPlans()).map((plan) => ({
         workerId: plan.workerId,
         request: plan.request,
       })),
       now,
-    );
+    ));
   }
 
   /**
@@ -607,9 +588,9 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       || !Number.isFinite(pollIntervalMs) || pollIntervalMs <= 0
     ) throw new Error("engine_runtime_profile_gate_policy_is_invalid");
     const deadline = Date.now() + timeoutMs;
-    while (!engineRuntimeActivationPlansReady(plans, this.store.listWorkers())) {
+    while (!engineRuntimeActivationPlansReady(plans, (await this.store.listWorkers()))) {
       await onPoll?.();
-      this.reconcileEngineRuntimeProfileChallenges(plans);
+      (await this.reconcileEngineRuntimeProfileChallenges(plans));
       const remaining = deadline - Date.now();
       if (remaining <= 0) throw new Error("engine_runtime_profile_gate_timed_out");
       await new Promise<void>((resolve) => setTimeout(
@@ -624,13 +605,13 @@ export class WorkerHub extends EventEmitter<HubEvents> {
    * The source worker owns the monotonic clock, so coordinator event-loop delay
    * before and after the round trip is not charged to the observed link.
    */
-  sampleRuntimeLinks(
+  async sampleRuntimeLinks(
     maximum = RUNTIME_LINK_PROBES_PER_TICK,
     now = Date.now(),
-  ): number {
+  ): Promise<number> {
     if (!Number.isInteger(maximum) || maximum < 1) return 0;
     if (this.runtimeLinkProbes.size >= MAX_CONCURRENT_RUNTIME_LINK_PROBES) return 0;
-    const executors = this.store.listWorkers()
+    const executors = (await this.store.listWorkers())
       .filter((worker) => this.isConnected(worker.id))
       .map((worker) => ({
         workerId: worker.id,
@@ -670,37 +651,38 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       ) {
         continue;
       }
-      if (this.startRuntimeLinkProbe(
+      if ((await this.startRuntimeLinkProbe(
         pair.source.workerId,
         pair.source.executor.nodeId,
         pair.destination.workerId,
         pair.destination.executor.nodeId,
         now,
-      )) {
+      ))) {
         started += 1;
       }
     }
     return started;
   }
 
-  removeWorker(workerId: string, closeReason = "removed from mycellios panel"): boolean {
-    const existed = Boolean(this.store.getWorker(workerId));
+  async removeWorker(workerId: string, closeReason = "removed from mycellios panel"): Promise<boolean> {
+    const existed = Boolean((await this.store.getWorker(workerId)));
     const state = this.connections.get(workerId);
     if (state) {
       // Disconnect handling owns lease recovery, stream teardown and the
       // scheduler notification. Run it synchronously before acknowledging a
       // security-sensitive eviction; the later socket close is idempotent.
-      this.handleClose(state);
+      (await this.handleClose(state));
       try {
         state.socket.close(4403, closeReason);
       } catch {
         // State was already detached above.
       }
     }
-    return this.store.deregisterWorker(workerId) || existed;
+    return (await this.store.deregisterWorker(workerId)) || existed;
   }
 
   send(workerId: string, type: string, payload: unknown): boolean {
+    if (type === "lease.offer" && this.maintenance.blocked(workerId)) return false;
     const state = this.connections.get(workerId);
     if (!state?.ready || state.socket.readyState !== state.socket.OPEN) return false;
     return this.sendSocket(state.socket, type, payload);
@@ -714,10 +696,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       throw new Error("runtime_proxy_target_port_is_invalid");
     }
     const sockets = new Set<Socket>();
-    const server = createServer((socket) => {
+    const server = createServer(async (socket) => {
       sockets.add(socket);
       socket.once("close", () => sockets.delete(socket));
-      this.attachLocalRuntimeStream(socket, destinationWorkerId, targetPort);
+      (await this.attachLocalRuntimeStream(socket, destinationWorkerId, targetPort));
     });
     this.runtimeProxyServers.add(server);
     await new Promise<void>((resolve, reject) => {
@@ -752,7 +734,8 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     };
   }
 
-  close(): void {
+  async close(): Promise<void> {
+    this.inboundFrames.stop();
     if (this.runtimeLinkProbeTimer) clearInterval(this.runtimeLinkProbeTimer);
     this.runtimeLinkProbeTimer = null;
     for (const state of this.allConnections) state.socket.close(1001, "coordinator shutting down");
@@ -760,10 +743,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     this.allConnections.clear();
     this.pendingConnections = 0;
     for (const stream of [...this.runtimeStreams.values()]) {
-      this.terminateRuntimeStream(stream, "coordinator shutting down");
+      (await this.terminateRuntimeStream(stream, "coordinator shutting down"));
     }
     for (const probe of [...this.runtimeLinkProbes.values()]) {
-      this.finishRuntimeLinkProbe(probe, null, null);
+      (await this.finishRuntimeLinkProbe(probe, null, null));
     }
     for (const pending of this.evidenceChallenges.values()) clearTimeout(pending.timeout);
     this.evidenceChallenges.clear();
@@ -776,25 +759,35 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
     for (const server of this.runtimeProxyServers) server.close();
     this.runtimeProxyServers.clear();
+    await this.background.close();
   }
 
-  closeStaleConnections(): number {
+  async closeStaleConnections(): Promise<number> {
     let closed = 0;
-    const now = Date.now();
     for (const [workerId, state] of this.connections) {
-      const worker = this.store.getWorker(workerId);
-      if (!workerConnectionIsHeartbeatStale(worker, now)) continue;
+      const worker = (await this.store.getWorker(workerId));
+      if (this.connections.get(workerId) !== state) continue;
+      if (!workerConnectionIsHeartbeatStale(worker, Date.now(), this.validatedHeartbeatTimes.get(state))) continue;
       closed += 1;
       try {
         state.socket.close(4410, "worker heartbeat stale");
       } catch {
-        this.handleClose(state);
+        (await this.handleClose(state));
       }
     }
     return closed;
   }
 
-  private handleRawMessage(state: ConnectionState, raw: string): void {
+  private receiveRawMessage(state: ConnectionState, raw: string): void {
+    const arrival = workerHeartbeatArrival(state, raw, state.workerId ? this.connections.get(state.workerId) : undefined);
+    if (arrival !== undefined) this.validatedHeartbeatTimes.set(state, arrival);
+    this.inboundFrames.enqueue(state, raw);
+  }
+
+  private async handleRawMessage(state: ConnectionState, raw: string): Promise<void> {
+    // Frames were admitted while OPEN and share a serial key with handleClose.
+    // A peer can close its socket before its already accepted goodbye is processed.
+    if (state.closed || state.recoveryDenied) return;
     try {
       const now = Date.now();
       if (now - state.messageWindowStartedAt >= 1_000) {
@@ -806,11 +799,11 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       // legitimately exceed the control-plane rate while remaining under the
       // per-frame and per-stream memory ceilings enforced below.
       if (state.messagesInWindow > 2_048) {
-        this.closeInvalid(state, "worker message rate exceeded", 4429);
+        (await this.closeInvalid(state, "worker message rate exceeded", 4429));
         return;
       }
       if (Buffer.byteLength(raw, "utf8") > 2_200_000) {
-        this.closeInvalid(state, "frame too large");
+        (await this.closeInvalid(state, "frame too large"));
         return;
       }
       const decoded = JSON.parse(raw) as unknown;
@@ -821,31 +814,37 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           messageType: messageType(decoded),
           issues: workerEnvelopeValidationIssues(decoded),
         }, "worker message validation failed");
-        this.closeInvalid(state, "invalid worker message");
+        (await this.closeInvalid(state, "invalid worker message"));
         return;
       }
       if (
         state.authorizedSession
         && (envelope.type === "worker.hello" || envelope.type === "worker.heartbeat")
         && this.sessionIsCurrent
-        && !this.sessionIsCurrent(state.authorizedSession)
+        && !(await this.sessionIsCurrent(state.authorizedSession))
       ) {
-        this.closeInvalid(state, "worker session superseded", 4403);
+        (await this.closeInvalid(state, "worker session superseded", 4403));
         return;
       }
 
+      // Frames were admitted while OPEN and share a serial key with handleClose.
+    // A peer can close its socket before its already accepted goodbye is processed.
+    if (state.closed || state.recoveryDenied) return;
       if (!state.workerId) {
         if (
           envelope.type !== "worker.hello"
-          || !this.store.getWorker(envelope.workerId)
+          || !(await this.store.getWorker(envelope.workerId))
           || (
             typeof state.authorizedWorkerId === "string"
             && state.authorizedWorkerId !== envelope.workerId
           )
         ) {
-          this.closeInvalid(state, "invalid worker hello", 4404);
+          (await this.closeInvalid(state, "invalid worker hello", 4404));
           return;
         }
+        // Frames were admitted while OPEN and share a serial key with handleClose.
+    // A peer can close its socket before its already accepted goodbye is processed.
+    if (state.closed || state.recoveryDenied) return;
         const previous = this.connections.get(envelope.workerId);
         const incomingSupersedes = previous?.authorizedSession && state.authorizedSession
           ? workerSessionSupersedes(previous.authorizedSession, state.authorizedSession)
@@ -857,10 +856,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           previous.socket.readyState === previous.socket.OPEN &&
           !incomingSupersedes
         ) {
-          // Two desktop starts can briefly overlap around an application
-          // update. Keep the already-healthy connection authoritative so the
+          // Desktop starts can overlap during updates. Keep the healthy connection so the
           // duplicate cannot create an endless mutual-supersession loop.
-          this.closeInvalid(state, "duplicate worker connection", 4409);
+          logDuplicateWorkerHello(this.logger, envelope.workerId, (await this.store.getWorker(envelope.workerId))?.identityKind ?? null);
+          (await this.closeInvalid(state, "duplicate worker connection", 4409));
           return;
         }
         if (previous && previous !== state) previous.socket.close(4409, "superseded connection");
@@ -874,54 +873,56 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       }
 
       if (state.workerId !== envelope.workerId) {
-        this.closeInvalid(state, "worker id changed", 4409);
+        (await this.closeInvalid(state, "worker id changed", 4409));
         return;
       }
       if (envelope.type === "worker.hello") {
-        this.closeInvalid(state, "duplicate worker hello", 4409);
+        (await this.closeInvalid(state, "duplicate worker hello", 4409));
         return;
       }
       if (envelope.type === "worker.heartbeat") {
         const wasReady = state.ready;
         state.ready = true;
-        this.applyHeartbeat(state, envelope.payload);
-        this.ensureEvidenceChallenges(state, envelope.payload.capabilities);
-        if (!wasReady) queueMicrotask(() => this.sampleRuntimeLinks());
+        (await this.applyHeartbeat(state, envelope.payload));
+        (await this.ensureEvidenceChallenges(state, envelope.payload.capabilities));
+        if (!wasReady) queueMicrotask(() => this.background.run("worker-hub:909", async () => (await this.sampleRuntimeLinks()), "queueMicrotask"));
       }
       if (envelope.type === "worker.goodbye") {
-        this.store.deregisterWorker(envelope.workerId);
+        this.clearEvidenceChallengesForSession(envelope.workerId, state.sessionId);
+        const nodeId = (await this.store.getWorker(envelope.workerId))?.capabilities.distributedExecutor?.nodeId;
+        (await this.store.deregisterWorker(envelope.workerId));
         if (this.connections.get(envelope.workerId) === state) {
           this.connections.delete(envelope.workerId);
           state.ready = false;
           state.workerId = null;
-          this.emit("disconnect", envelope.workerId);
+          await this.workerEvents.disconnect(envelope.workerId, { recoverable: false, ...(nodeId ? { nodeId } : {}) });
         }
         state.socket.close(1000, envelope.payload.reason);
         return;
       }
       if (envelope.type.startsWith("runtime.stream.")) {
-        if (this.store.getWorker(envelope.workerId)?.capabilities.distributedExecutor?.protocol
+        if ((await this.store.getWorker(envelope.workerId))?.capabilities.distributedExecutor?.protocol
           !== "gdlp-worker-tunnel/2") {
-          this.closeInvalid(state, "runtime stream protocol is not enabled", 4403);
+          (await this.closeInvalid(state, "runtime stream protocol is not enabled", 4403));
           return;
         }
-        this.handleRuntimeStreamEnvelope(envelope);
+        (await this.handleRuntimeStreamEnvelope(envelope));
         return;
       }
       if (envelope.type.startsWith("runtime.direct.")) {
         if (
-          this.store.getWorker(envelope.workerId)?.capabilities.distributedExecutor
+          (await this.store.getWorker(envelope.workerId))?.capabilities.distributedExecutor
             ?.directTransport?.protocol !== "mycellios-direct/1"
         ) {
-          this.closeInvalid(state, "direct runtime transport is not enabled", 4403);
+          (await this.closeInvalid(state, "direct runtime transport is not enabled", 4403));
           return;
         }
-        this.handleRuntimeDirectEnvelope(envelope);
+        (await this.handleRuntimeDirectEnvelope(envelope));
         return;
       }
       if (envelope.type.startsWith("runtime.checkpoint.")) {
         if (!this.activationCheckpointTransfers) {
-          this.closeInvalid(state, "activation checkpoint transfer is not enabled", 4403);
+          (await this.closeInvalid(state, "activation checkpoint transfer is not enabled", 4403));
           return;
         }
         if (envelope.type === "runtime.checkpoint.begin") {
@@ -933,9 +934,9 @@ export class WorkerHub extends EventEmitter<HubEvents> {
             envelope.workerId, state.sessionId, envelope.payload,
           );
         } else if (envelope.type === "runtime.checkpoint.commit") {
-          const checkpoint = this.activationCheckpointTransfers.commit(
+          const checkpoint = (await this.activationCheckpointTransfers.commit(
             envelope.workerId, state.sessionId, envelope.payload,
-          );
+          ));
           this.send(envelope.workerId, "runtime.checkpoint.committed", {
             transferId: envelope.payload.transferId,
             checkpointId: checkpoint.checkpointId,
@@ -981,48 +982,52 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         return;
       }
       if (envelope.type.startsWith("runtime.link.probe.")) {
-        if (this.store.getWorker(envelope.workerId)?.capabilities.distributedExecutor?.protocol
+        if ((await this.store.getWorker(envelope.workerId))?.capabilities.distributedExecutor?.protocol
           !== "gdlp-worker-tunnel/2") {
-          this.closeInvalid(state, "runtime link probes are not enabled", 4403);
+          (await this.closeInvalid(state, "runtime link probes are not enabled", 4403));
           return;
         }
-        this.handleRuntimeLinkProbeEnvelope(envelope);
+        (await this.handleRuntimeLinkProbeEnvelope(envelope));
         return;
       }
       if (envelope.type.startsWith("evidence.")) {
-        this.handleEvidenceEnvelope(state, envelope);
+        (await this.handleEvidenceEnvelope(state, envelope));
         return;
       }
+      await this.workerEvents.envelope(envelope);
       this.emit("envelope", envelope);
     } catch (error) {
       this.logger?.warn({
         workerId: state.workerId,
         error: error instanceof Error ? error.message : String(error),
       }, "worker message processing failed");
-      this.closeInvalid(state, "invalid worker message");
+      (await this.closeInvalid(state, "invalid worker message"));
     }
   }
 
-  private applyHeartbeat(state: ConnectionState, payload: WorkerHeartbeatPayload): void {
+  private async applyHeartbeat(state: ConnectionState, payload: WorkerHeartbeatPayload): Promise<void> {
     const workerId = state.workerId!;
-    const status = payload.heartbeat.draining ? "draining" : "online";
-    const current = this.store.getWorker(workerId)?.capabilities ?? null;
-    this.store.updateWorkerHeartbeat(
+    const status = this.maintenance.status(workerId, payload.heartbeat.draining ? "draining" : "online");
+    const current = (await this.store.getWorker(workerId))?.capabilities ?? null;
+    (await this.store.updateWorkerHeartbeat(
       workerId,
       mergeCurrentSessionEvidence(workerId, state.sessionId, payload.capabilities, current),
       status,
-    );
+    ));
   }
 
-  private closeInvalid(state: ConnectionState, reason: string, code = 4400): void {
+  private async closeInvalid(state: ConnectionState, reason: string, code = 4400): Promise<void> {
+    state.recoveryDenied = true;
     try {
       state.socket.close(code, reason);
     } catch {
-      this.handleClose(state);
+      (await this.handleClose(state));
     }
   }
 
-  private handleClose(state: ConnectionState): void {
+  private async handleClose(state: ConnectionState, recoverableSocketClose = false): Promise<void> {
+    if (state.closed) return;
+    state.closed = true;
     clearTimeout(state.helloTimer);
     this.allConnections.delete(state);
     if (state.pending) {
@@ -1038,9 +1043,13 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         "activation_checkpoint_restore_worker_disconnected",
       );
       this.clearEvidenceChallengesForSession(disconnectedWorkerId, state.sessionId);
+      const session = state.authorizedSession;
+      const recoverable = Boolean(recoverableSocketClose && !state.recoveryDenied && state.ready && session
+        && (!this.sessionIsCurrent || await this.sessionIsCurrent(session)));
+      if (this.connections.get(disconnectedWorkerId) !== state) return;
       this.connections.delete(state.workerId);
-      this.store.setWorkerStatus(state.workerId, "offline");
-      this.emit("disconnect", state.workerId);
+      (await this.store.setWorkerStatus(state.workerId, "offline"));
+      await this.workerEvents.disconnect(state.workerId, { recoverable });
       for (const stream of [...this.runtimeStreams.values()]) {
         if (
           stream.sourceWorkerId === disconnectedWorkerId ||
@@ -1056,10 +1065,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
               `distributed_worker_disconnected:${disconnectedWorkerId}`,
             );
           } else {
-            this.terminateRuntimeStream(
+            (await this.terminateRuntimeStream(
               stream,
               `distributed_worker_disconnected:${disconnectedWorkerId}`,
-            );
+            ));
           }
         }
       }
@@ -1068,20 +1077,20 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           probe.sourceWorkerId === disconnectedWorkerId
           || probe.destinationWorkerId === disconnectedWorkerId
         ) {
-          this.finishRuntimeLinkProbe(probe, null, null);
+          (await this.finishRuntimeLinkProbe(probe, null, null));
         }
       }
     }
   }
 
-  private ensureEvidenceChallenges(
+  private async ensureEvidenceChallenges(
     state: ConnectionState,
     claims: WorkerCapabilities,
     now = Date.now(),
-  ): void {
+  ): Promise<void> {
     const workerId = state.workerId;
     if (!workerId || !state.ready || this.connections.get(workerId) !== state) return;
-    const stored = this.store.getWorker(workerId);
+    const stored = (await this.store.getWorker(workerId));
     if (!stored) return;
 
     for (const claim of claims.deployments
@@ -1095,7 +1104,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       );
       if (
         !claim.activationId
-        || current?.verificationState === "verified"
+        || (current?.verificationState === "verified" && current.canaryEvidence && now - Date.parse(current.canaryEvidence.observedAt) <= DEPLOYMENT_CANARY_MAXIMUM_AGE_MS)
         || !this.challengeMayStart(
           evidenceChallengeKey(workerId, "deployment-canary", claim.deploymentId),
           now,
@@ -1233,21 +1242,21 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     return timeout;
   }
 
-  private handleEvidenceEnvelope(
+  private async handleEvidenceEnvelope(
     state: ConnectionState,
     envelope: WorkerEnvelope,
-  ): void {
+  ): Promise<void> {
     const payload = envelope.payload as Record<string, unknown>;
     const challengeId = payload.challengeId as string;
     const pending = this.evidenceChallenges.get(challengeId);
     if (!pending || !this.evidenceResponseMatches(state, pending, payload)) {
-      this.closeInvalid(state, "invalid or replayed evidence response", 4403);
+      (await this.closeInvalid(state, "invalid or replayed evidence response", 4403));
       return;
     }
     const now = Date.now();
     if (now > Date.parse(pending.challenge.expiresAt)) {
       this.finishEvidenceChallenge(pending, false);
-      this.closeInvalid(state, "expired evidence response", 4403);
+      (await this.closeInvalid(state, "expired evidence response", 4403));
       return;
     }
 
@@ -1257,26 +1266,26 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
     if (pending.kind === "runtime-performance") {
       if (envelope.type !== "evidence.runtime.complete") {
-        this.closeInvalid(state, "evidence response kind mismatch", 4403);
+        (await this.closeInvalid(state, "evidence response kind mismatch", 4403));
         return;
       }
-      this.completeRuntimePerformanceChallenge(state, pending, payload.profile, now);
+      (await this.completeRuntimePerformanceChallenge(state, pending, payload.profile, now));
       return;
     }
     if (pending.kind === "engine-runtime") {
       if (envelope.type !== "evidence.engine-runtime.complete") {
-        this.closeInvalid(state, "evidence response kind mismatch", 4403);
+        (await this.closeInvalid(state, "evidence response kind mismatch", 4403));
         return;
       }
-      this.completeEngineRuntimeChallenge(
+      (await this.completeEngineRuntimeChallenge(
         state,
         pending,
         payload.measurement,
         now,
-      );
+      ));
       return;
     }
-    this.handleDeploymentCanaryEnvelope(state, pending, envelope.type, payload, now);
+    (await this.handleDeploymentCanaryEnvelope(state, pending, envelope.type, payload, now));
   }
 
   private evidenceResponseMatches(
@@ -1291,25 +1300,25 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       && this.connections.get(pending.challenge.workerId) === state;
   }
 
-  private handleDeploymentCanaryEnvelope(
+  private async handleDeploymentCanaryEnvelope(
     state: ConnectionState,
     pending: PendingDeploymentCanary,
     type: string,
     payload: Record<string, unknown>,
     now: number,
-  ): void {
+  ): Promise<void> {
     const sampleIndex = payload.sampleIndex as number;
     if (
       !Number.isInteger(sampleIndex)
       || sampleIndex < 0
       || sampleIndex >= pending.challenge.samples
     ) {
-      this.closeInvalid(state, "invalid canary sample index", 4403);
+      (await this.closeInvalid(state, "invalid canary sample index", 4403));
       return;
     }
     if (type === "evidence.canary.started") {
       if (pending.samples.has(sampleIndex)) {
-        this.closeInvalid(state, "duplicate canary sample", 4403);
+        (await this.closeInvalid(state, "duplicate canary sample", 4403));
         return;
       }
       pending.samples.set(sampleIndex, {
@@ -1324,7 +1333,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
     const sample = pending.samples.get(sampleIndex);
     if (!sample || sample.completedAt !== null) {
-      this.closeInvalid(state, "canary sample was not started", 4403);
+      (await this.closeInvalid(state, "canary sample was not started", 4403));
       return;
     }
     if (type === "evidence.canary.token") {
@@ -1336,7 +1345,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         || index !== sample.nextTokenIndex
         || sample.outputBytes + bytes > pending.challenge.maxOutputTokens * 64
       ) {
-        this.closeInvalid(state, "invalid canary token sequence", 4403);
+        (await this.closeInvalid(state, "invalid canary token sequence", 4403));
         return;
       }
       sample.firstTokenAt ??= now;
@@ -1345,7 +1354,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       return;
     }
     if (type !== "evidence.canary.complete") {
-      this.closeInvalid(state, "evidence response kind mismatch", 4403);
+      (await this.closeInvalid(state, "evidence response kind mismatch", 4403));
       return;
     }
     const outputTokens = payload.outputTokens as number;
@@ -1356,7 +1365,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       || outputTokens < 1
       || outputTokens > pending.challenge.maxOutputTokens
     ) {
-      this.closeInvalid(state, "invalid completed canary sample", 4403);
+      (await this.closeInvalid(state, "invalid completed canary sample", 4403));
       return;
     }
     sample.completedAt = now;
@@ -1365,16 +1374,16 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       pending.samples.size === pending.challenge.samples
       && [...pending.samples.values()].every((candidate) => candidate.completedAt !== null)
     ) {
-      this.publishDeploymentCanaryEvidence(state, pending, now);
+      (await this.publishDeploymentCanaryEvidence(state, pending, now));
     }
   }
 
-  private publishDeploymentCanaryEvidence(
+  private async publishDeploymentCanaryEvidence(
     state: ConnectionState,
     pending: PendingDeploymentCanary,
     now: number,
-  ): void {
-    const worker = this.store.getWorker(pending.challenge.workerId);
+  ): Promise<void> {
+    const worker = (await this.store.getWorker(pending.challenge.workerId));
     const deployment = worker?.capabilities.deployments.find(
       (candidate) =>
         candidate.deploymentId === pending.challenge.deploymentId
@@ -1432,16 +1441,16 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           }
         : candidate
     );
-    this.store.updateWorkerHeartbeat(worker.id, capabilities, worker.status);
+    (await this.store.updateWorkerHeartbeat(worker.id, capabilities, worker.status));
     this.finishEvidenceChallenge(pending, true);
   }
 
-  private completeRuntimePerformanceChallenge(
+  private async completeRuntimePerformanceChallenge(
     state: ConnectionState,
     pending: PendingRuntimePerformance,
     input: unknown,
     now: number,
-  ): void {
+  ): Promise<void> {
     try {
       const profile = runtimePerformanceProfileSchema.parse(input);
       const challenge = pending.challenge;
@@ -1462,7 +1471,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       ) {
         throw new Error("runtime_performance_profile_does_not_match_challenge");
       }
-      const worker = this.store.getWorker(challenge.workerId);
+      const worker = (await this.store.getWorker(challenge.workerId));
       const executor = worker?.capabilities.distributedExecutor;
       if (
         !worker
@@ -1485,7 +1494,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       });
       const capabilities = structuredClone(worker.capabilities);
       capabilities.distributedExecutor!.performanceEvidence = evidence;
-      this.store.updateWorkerHeartbeat(worker.id, capabilities, worker.status);
+      (await this.store.updateWorkerHeartbeat(worker.id, capabilities, worker.status));
       this.finishEvidenceChallenge(pending, true);
     } catch (error) {
       this.logger?.warn({
@@ -1497,21 +1506,21 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
   }
 
-  private completeEngineRuntimeChallenge(
+  private async completeEngineRuntimeChallenge(
     state: ConnectionState,
     pending: PendingEngineRuntime,
     input: unknown,
     now: number,
-  ): void {
+  ): Promise<void> {
     try {
       const measurement = engineRuntimeMeasurementSchema.parse(input);
       const challenge = pending.challenge;
-      const worker = this.store.getWorker(challenge.workerId);
+      const worker = (await this.store.getWorker(challenge.workerId));
       const executor = worker?.capabilities.distributedExecutor;
       const performance = executor?.performanceEvidence;
       const physical = executor?.physicalIdentity;
       const build = worker?.capabilities.buildIdentity;
-      const activationPlan = this.store.listEngineRuntimeActivationPlans().find(
+      const activationPlan = (await this.store.listEngineRuntimeActivationPlans()).find(
         (candidate) => candidate.workerId === challenge.workerId
           && candidate.modelId === challenge.modelId
           && canonicalEvidenceJson(candidate.request) === canonicalEvidenceJson({
@@ -1600,7 +1609,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           runtimePerformanceEvidenceId: performance.evidenceId,
         },
       });
-      publishCoordinatorEngineRuntimeProfile(this.store, worker.id, profile);
+      (await publishCoordinatorEngineRuntimeProfile(this.store, worker.id, profile));
       this.finishEvidenceChallenge(pending, true);
     } catch (error) {
       this.logger?.warn({
@@ -1663,18 +1672,18 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
   }
 
-  private startRuntimeLinkProbe(
+  private async startRuntimeLinkProbe(
     sourceWorkerId: string,
     sourceNodeId: string,
     destinationWorkerId: string,
     destinationNodeId: string,
     now: number,
-  ): boolean {
+  ): Promise<boolean> {
     const probeId = `link-${randomUUID()}`;
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(() => this.background.run("worker-hub:1703", async () => {
       const pending = this.runtimeLinkProbes.get(probeId);
-      if (pending) this.finishRuntimeLinkProbe(pending, null, null);
-    }, RUNTIME_LINK_PROBE_TIMEOUT_MS);
+      if (pending) (await this.finishRuntimeLinkProbe(pending, null, null));
+    }, "setTimeout"), RUNTIME_LINK_PROBE_TIMEOUT_MS);
     timeout.unref();
     const session: RuntimeLinkProbeSession = {
       probeId,
@@ -1692,13 +1701,13 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       timeoutMs: RUNTIME_LINK_PROBE_TIMEOUT_MS,
       payloadBytes: RUNTIME_LINK_PROBE_PAYLOAD_BYTES,
     })) {
-      this.finishRuntimeLinkProbe(session, null, null);
+      (await this.finishRuntimeLinkProbe(session, null, null));
       return false;
     }
     return true;
   }
 
-  private handleRuntimeLinkProbeEnvelope(envelope: WorkerEnvelope): void {
+  private async handleRuntimeLinkProbeEnvelope(envelope: WorkerEnvelope): Promise<void> {
     const payload = envelope.payload as Record<string, unknown>;
     const probeId = payload.probeId as string;
     const probe = this.runtimeLinkProbes.get(probeId);
@@ -1709,28 +1718,28 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         envelope.workerId !== probe.sourceWorkerId
         || payload.destinationNodeId !== probe.destinationNodeId
       ) {
-        this.finishRuntimeLinkProbe(probe, null, null);
+        (await this.finishRuntimeLinkProbe(probe, null, null));
         return;
       }
       if (!this.send(probe.destinationWorkerId, "runtime.link.probe.ping", {
         probeId,
         data: payload.data,
       })) {
-        this.finishRuntimeLinkProbe(probe, null, null);
+        (await this.finishRuntimeLinkProbe(probe, null, null));
       }
       return;
     }
 
     if (envelope.type === "runtime.link.probe.pong") {
       if (envelope.workerId !== probe.destinationWorkerId) {
-        this.finishRuntimeLinkProbe(probe, null, null);
+        (await this.finishRuntimeLinkProbe(probe, null, null));
         return;
       }
       if (!this.send(probe.sourceWorkerId, "runtime.link.probe.pong", {
         probeId,
         data: payload.data,
       })) {
-        this.finishRuntimeLinkProbe(probe, null, null);
+        (await this.finishRuntimeLinkProbe(probe, null, null));
       }
       return;
     }
@@ -1740,22 +1749,22 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         envelope.workerId !== probe.sourceWorkerId
         || payload.destinationNodeId !== probe.destinationNodeId
       ) {
-        this.finishRuntimeLinkProbe(probe, null, null);
+        (await this.finishRuntimeLinkProbe(probe, null, null));
         return;
       }
-      this.finishRuntimeLinkProbe(
+      (await this.finishRuntimeLinkProbe(
         probe,
         payload.rttMs as number | null,
         payload.goodputMbps as number | null,
-      );
+      ));
     }
   }
 
-  private finishRuntimeLinkProbe(
+  private async finishRuntimeLinkProbe(
     probe: RuntimeLinkProbeSession,
     rttMs: number | null,
     goodputMbps: number | null,
-  ): void {
+  ): Promise<void> {
     if (!this.runtimeLinkProbes.delete(probe.probeId)) return;
     clearTimeout(probe.timeout);
     const measuredAt = Date.now();
@@ -1776,17 +1785,17 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         "relay",
       );
     }
-    this.store.saveRuntimeLinkSample?.({
+    (await this.store.saveRuntimeLinkSample?.({
       fromNodeId: probe.sourceNodeId,
       toNodeId: probe.destinationNodeId,
       measuredAt,
       rttMs,
       goodputMbps,
       transportMode: "relay",
-    });
+    }));
   }
 
-  private handleRuntimeStreamEnvelope(envelope: WorkerEnvelope): void {
+  private async handleRuntimeStreamEnvelope(envelope: WorkerEnvelope): Promise<void> {
     const payload = envelope.payload as Record<string, unknown>;
     const streamId = payload.streamId as string;
     if (envelope.type === "runtime.stream.open") {
@@ -1800,8 +1809,8 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         return;
       }
       const destinationNodeId = payload.destinationNodeId as string;
-      const source = this.store.getWorker(envelope.workerId);
-      const destination = this.store.listWorkers().find((worker) =>
+      const source = (await this.store.getWorker(envelope.workerId));
+      const destination = (await this.store.listWorkers()).find((worker) =>
         this.isConnected(worker.id) &&
         worker.capabilities.distributedExecutor?.protocol === "gdlp-worker-tunnel/2" &&
         worker.capabilities.distributedExecutor?.nodeId === destinationNodeId
@@ -1881,9 +1890,9 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           targetPort,
           expiresAt: Date.now() + DIRECT_GRANT_TTL_MS,
         });
-        const timeout = setTimeout(() => {
-          this.fallbackRuntimeStreamToRelay(session, "direct_negotiation_timeout");
-        }, DIRECT_NEGOTIATION_TIMEOUT_MS);
+        const timeout = setTimeout(() => this.background.run("worker-hub:1913", async () => {
+          (await this.fallbackRuntimeStreamToRelay(session, "direct_negotiation_timeout"));
+        }, "setTimeout"), DIRECT_NEGOTIATION_TIMEOUT_MS);
         timeout.unref();
         session.direct = {
           grant,
@@ -1895,10 +1904,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           streamId,
           grant,
         })) {
-          this.fallbackRuntimeStreamToRelay(session, "direct_destination_disconnected");
+          (await this.fallbackRuntimeStreamToRelay(session, "direct_destination_disconnected"));
         }
       } else {
-        this.startRuntimeRelay(session);
+        (await this.startRuntimeRelay(session));
       }
       return;
     }
@@ -1926,7 +1935,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     if (envelope.type === "runtime.stream.opened") {
       if (!fromDestination || session.opened) return;
       if (!this.runtimeStreamIdentityMatches(session, payload)) {
-        this.terminateRuntimeStream(session, "runtime_stream_opened_identity_mismatch");
+        (await this.terminateRuntimeStream(session, "runtime_stream_opened_identity_mismatch"));
         return;
       }
       session.opened = true;
@@ -1949,21 +1958,21 @@ export class WorkerHub extends EventEmitter<HubEvents> {
 
     if (envelope.type === "runtime.stream.data") {
       if (!session.opened) {
-        this.terminateRuntimeStream(session, "runtime_stream_data_before_open");
+        (await this.terminateRuntimeStream(session, "runtime_stream_data_before_open"));
         return;
       }
       if (session.recovery) {
-        this.handleRecoverableRuntimeData(session, envelope.workerId, payload);
+        (await this.handleRecoverableRuntimeData(session, envelope.workerId, payload));
         return;
       }
       if (!this.runtimeStreamIdentityMatches(session, payload)) {
-        this.terminateRuntimeStream(session, "runtime_stream_unnegotiated_recovery_data");
+        (await this.terminateRuntimeStream(session, "runtime_stream_unnegotiated_recovery_data"));
         return;
       }
       const sequence = payload.sequence as number;
       const expected = fromSource ? session.sourceSequence : session.destinationSequence;
       if (sequence !== expected) {
-        this.terminateRuntimeStream(session, `runtime_stream_sequence_mismatch:${expected}:${sequence}`);
+        (await this.terminateRuntimeStream(session, `runtime_stream_sequence_mismatch:${expected}:${sequence}`));
         return;
       }
       if (fromSource) session.sourceSequence += 1;
@@ -1973,16 +1982,16 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       else session.bytesDestinationToSource += byteLength;
       if (fromSource) {
         if (!this.send(session.destinationWorkerId, "runtime.stream.data", payload)) {
-          this.terminateRuntimeStream(session, "runtime_stream_destination_backpressure");
+          (await this.terminateRuntimeStream(session, "runtime_stream_destination_backpressure"));
         }
       } else if (session.sourceWorkerId) {
         if (!this.send(session.sourceWorkerId, "runtime.stream.data", payload)) {
-          this.terminateRuntimeStream(session, "runtime_stream_source_backpressure");
+          (await this.terminateRuntimeStream(session, "runtime_stream_source_backpressure"));
         }
       } else {
         const socket = session.localSocket;
         if (!socket || socket.destroyed || socket.writableLength > MAX_RUNTIME_STREAM_BUFFERED_BYTES) {
-          this.terminateRuntimeStream(session, "runtime_stream_local_buffer_exceeded");
+          (await this.terminateRuntimeStream(session, "runtime_stream_local_buffer_exceeded"));
           return;
         }
         socket.write(Buffer.from(payload.data as string, "base64"));
@@ -1991,18 +2000,18 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
 
     if (envelope.type === "runtime.stream.ack") {
-      this.handleRuntimeStreamAcknowledgement(session, envelope.workerId, payload);
+      (await this.handleRuntimeStreamAcknowledgement(session, envelope.workerId, payload));
       return;
     }
 
     if (envelope.type === "runtime.stream.resume") {
-      this.handleRuntimeStreamResume(session, envelope.workerId, payload);
+      (await this.handleRuntimeStreamResume(session, envelope.workerId, payload));
       return;
     }
 
     if (envelope.type === "runtime.stream.end") {
       if (!this.runtimeStreamIdentityMatches(session, payload)) {
-        this.terminateRuntimeStream(session, "runtime_stream_end_identity_mismatch");
+        (await this.terminateRuntimeStream(session, "runtime_stream_end_identity_mismatch"));
         return;
       }
       if (session.recovery) {
@@ -2010,20 +2019,25 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       } else {
         this.forwardRuntimeTerminal(session, envelope.workerId, "runtime.stream.end", { streamId });
       }
-      this.terminateRuntimeStream(session);
+      (await this.terminateRuntimeStream(session, undefined, {
+        type: "runtime.stream.end", originWorkerId: envelope.workerId,
+      }));
       return;
     }
     if (envelope.type === "runtime.stream.error") {
       if (!this.runtimeStreamIdentityMatches(session, payload)) {
-        this.terminateRuntimeStream(session, "runtime_stream_error_identity_mismatch");
+        (await this.terminateRuntimeStream(session, "runtime_stream_error_identity_mismatch"));
         return;
       }
       this.forwardRuntimeTerminal(session, envelope.workerId, "runtime.stream.error", payload);
-      this.terminateRuntimeStream(session);
+      (await this.terminateRuntimeStream(session, undefined, {
+        type: "runtime.stream.error", originWorkerId: envelope.workerId,
+        ...(typeof payload.message === "string" ? { reason: payload.message } : {}),
+      }));
     }
   }
 
-  private handleRuntimeDirectEnvelope(envelope: WorkerEnvelope): void {
+  private async handleRuntimeDirectEnvelope(envelope: WorkerEnvelope): Promise<void> {
     const payload = envelope.payload as Record<string, unknown>;
     const streamId = payload.streamId as string;
     const connectionId = payload.connectionId as string;
@@ -2036,12 +2050,12 @@ export class WorkerHub extends EventEmitter<HubEvents> {
 
     if (envelope.type === "runtime.direct.ready") {
       if (!fromDestination || direct.state !== "offered" || !session.sourceWorkerId) {
-        this.terminateRuntimeStream(session, "direct_ready_identity_is_invalid");
+        (await this.terminateRuntimeStream(session, "direct_ready_identity_is_invalid"));
         return;
       }
       direct.state = "ready";
       const candidates =
-        this.store.getWorker(session.destinationWorkerId)
+        (await this.store.getWorker(session.destinationWorkerId))
           ?.capabilities.distributedExecutor?.directTransport?.candidates ?? [];
       if (candidates.length === 0 || !this.send(session.sourceWorkerId, "runtime.direct.connect", {
         streamId,
@@ -2050,20 +2064,20 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         candidates,
         timeoutMs: Math.min(2_000, DIRECT_NEGOTIATION_TIMEOUT_MS),
       })) {
-        this.fallbackRuntimeStreamToRelay(session, "direct_source_unavailable");
+        (await this.fallbackRuntimeStreamToRelay(session, "direct_source_unavailable"));
       }
       return;
     }
 
     if (envelope.type === "runtime.direct.fallback") {
       if (direct.state === "committed" || session.opened || this.runtimeStreamMovedBytes(session)) {
-        this.terminateRuntimeStream(session, "direct_downgrade_after_commit_is_forbidden");
+        (await this.terminateRuntimeStream(session, "direct_downgrade_after_commit_is_forbidden"));
         return;
       }
-      this.fallbackRuntimeStreamToRelay(
+      (await this.fallbackRuntimeStreamToRelay(
         session,
         typeof payload.reason === "string" ? payload.reason : "direct_candidate_unreachable",
-      );
+      ));
       return;
     }
 
@@ -2075,7 +2089,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         || !Number.isFinite(payload.connectRttMs)
         || payload.connectRttMs <= 0
       ) {
-        this.terminateRuntimeStream(session, "direct_established_identity_is_invalid");
+        (await this.terminateRuntimeStream(session, "direct_established_identity_is_invalid"));
         return;
       }
       direct.state = "established";
@@ -2090,20 +2104,20 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         { streamId, connectionId },
       );
       if (!destinationCommitSent) {
-        this.terminateRuntimeStream(session, "direct_commit_delivery_failed");
+        (await this.terminateRuntimeStream(session, "direct_commit_delivery_failed"));
         return;
       }
       direct.state = "destination-committing";
-      direct.timeout = setTimeout(() => {
-        this.terminateRuntimeStream(session, "direct_destination_commit_ack_timeout");
-      }, DIRECT_NEGOTIATION_TIMEOUT_MS);
+      direct.timeout = setTimeout(() => this.background.run("worker-hub:2131", async () => {
+        (await this.terminateRuntimeStream(session, "direct_destination_commit_ack_timeout"));
+      }, "setTimeout"), DIRECT_NEGOTIATION_TIMEOUT_MS);
       direct.timeout.unref();
       return;
     }
 
     if (envelope.type === "runtime.direct.committed") {
       if (!fromDestination || direct.state !== "destination-committing") {
-        this.terminateRuntimeStream(session, "direct_commit_ack_identity_is_invalid");
+        (await this.terminateRuntimeStream(session, "direct_commit_ack_identity_is_invalid"));
         return;
       }
       clearTimeout(direct.timeout);
@@ -2114,23 +2128,23 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           })
         : false;
       if (!sourceCommitted) {
-        this.terminateRuntimeStream(session, "direct_commit_delivery_failed");
+        (await this.terminateRuntimeStream(session, "direct_commit_delivery_failed"));
         return;
       }
       direct.state = "committed";
       session.transportMode = "direct";
       session.opened = true;
       session.connectedAt = Date.now();
-      direct.timeout = setTimeout(() => {
-        this.terminateRuntimeStream(session, "direct_route_lifetime_exceeded");
-      }, DIRECT_ROUTE_MAX_LIFETIME_MS);
+      direct.timeout = setTimeout(() => this.background.run("worker-hub:2158", async () => {
+        (await this.terminateRuntimeStream(session, "direct_route_lifetime_exceeded"));
+      }, "setTimeout"), DIRECT_ROUTE_MAX_LIFETIME_MS);
       direct.timeout.unref();
       return;
     }
 
     if (envelope.type === "runtime.direct.telemetry") {
       if (direct.state !== "committed") {
-        this.terminateRuntimeStream(session, "direct_telemetry_before_commit");
+        (await this.terminateRuntimeStream(session, "direct_telemetry_before_commit"));
         return;
       }
       const bytesTx = payload.bytesTx as number;
@@ -2147,7 +2161,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
 
     if (envelope.type === "runtime.direct.closed") {
       if (direct.state !== "committed") {
-        this.terminateRuntimeStream(session, "direct_close_before_commit");
+        (await this.terminateRuntimeStream(session, "direct_close_before_commit"));
         return;
       }
       const bytesTx = payload.bytesTx as number;
@@ -2162,11 +2176,11 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       if (typeof payload.reason === "string") {
         this.recordRuntimeLinkFailure(session, "direct", payload.reason);
       }
-      this.terminateRuntimeStream(session);
+      (await this.terminateRuntimeStream(session));
     }
   }
 
-  private startRuntimeRelay(session: RuntimeStreamSession): void {
+  private async startRuntimeRelay(session: RuntimeStreamSession): Promise<void> {
     if (!this.runtimeStreams.has(session.streamId)) return;
     session.transportMode = "relay";
     session.direct = null;
@@ -2180,17 +2194,17 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           }
         : {}),
     })) {
-      this.terminateRuntimeStream(session, "runtime_stream_destination_disconnected");
+      (await this.terminateRuntimeStream(session, "runtime_stream_destination_disconnected"));
     }
   }
 
-  private fallbackRuntimeStreamToRelay(
+  private async fallbackRuntimeStreamToRelay(
     session: RuntimeStreamSession,
     _reason: string,
-  ): void {
+  ): Promise<void> {
     const direct = session.direct;
     if (!direct || direct.state === "committed" || this.runtimeStreamMovedBytes(session)) {
-      this.terminateRuntimeStream(session, "direct_downgrade_after_bytes_is_forbidden");
+      (await this.terminateRuntimeStream(session, "direct_downgrade_after_bytes_is_forbidden"));
       return;
     }
     clearTimeout(direct.timeout);
@@ -2202,14 +2216,14 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         measuredAt,
         "direct",
       );
-      this.store.saveRuntimeLinkSample?.({
+      (await this.store.saveRuntimeLinkSample?.({
         fromNodeId: session.sourceNodeId,
         toNodeId: session.destinationNodeId,
         measuredAt,
         rttMs: null,
         goodputMbps: null,
         transportMode: "direct",
-      });
+      }));
     }
     const cancel = {
       streamId: session.streamId,
@@ -2217,7 +2231,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     };
     if (session.sourceWorkerId) this.send(session.sourceWorkerId, "runtime.direct.cancel", cancel);
     this.send(session.destinationWorkerId, "runtime.direct.cancel", cancel);
-    this.startRuntimeRelay(session);
+    (await this.startRuntimeRelay(session));
   }
 
   private runtimeStreamMovedBytes(session: RuntimeStreamSession): boolean {
@@ -2227,14 +2241,14 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     );
   }
 
-  private handleRecoverableRuntimeData(
+  private async handleRecoverableRuntimeData(
     session: RuntimeStreamSession,
     originWorkerId: string,
     payload: Record<string, unknown>,
-  ): void {
+  ): Promise<void> {
     const recovery = session.recovery;
     if (!recovery || !this.runtimeStreamIdentityMatches(session, payload)) {
-      this.terminateRuntimeStream(session, "runtime_stream_data_identity_mismatch");
+      (await this.terminateRuntimeStream(session, "runtime_stream_data_identity_mismatch"));
       return;
     }
     const fromSource = session.sourceWorkerId === originWorkerId;
@@ -2245,10 +2259,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       : recovery.destinationForwardOffset;
     if (offset < expected && offset + byteLength <= expected) return;
     if (offset !== expected) {
-      this.terminateRuntimeStream(
+      (await this.terminateRuntimeStream(
         session,
         `runtime_stream_offset_mismatch:${expected}:${offset}`,
-      );
+      ));
       return;
     }
     if (fromSource) session.bytesSourceToDestination += byteLength;
@@ -2264,14 +2278,14 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
   }
 
-  private handleRuntimeStreamAcknowledgement(
+  private async handleRuntimeStreamAcknowledgement(
     session: RuntimeStreamSession,
     originWorkerId: string,
     payload: Record<string, unknown>,
-  ): void {
+  ): Promise<void> {
     const recovery = session.recovery;
     if (!recovery || !this.runtimeStreamIdentityMatches(session, payload)) {
-      this.terminateRuntimeStream(session, "runtime_stream_ack_identity_mismatch");
+      (await this.terminateRuntimeStream(session, "runtime_stream_ack_identity_mismatch"));
       return;
     }
     const fromSource = session.sourceWorkerId === originWorkerId;
@@ -2280,10 +2294,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       ? recovery.destinationForwardOffset
       : recovery.sourceForwardOffset;
     if (acknowledgedOffset > maximum) {
-      this.terminateRuntimeStream(
+      (await this.terminateRuntimeStream(
         session,
         `runtime_stream_ack_exceeds_forwarded_offset:${maximum}:${acknowledgedOffset}`,
-      );
+      ));
       return;
     }
     if (recovery.suspended) return;
@@ -2295,18 +2309,18 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
   }
 
-  private handleRuntimeStreamResume(
+  private async handleRuntimeStreamResume(
     session: RuntimeStreamSession,
     originWorkerId: string,
     payload: Record<string, unknown>,
-  ): void {
+  ): Promise<void> {
     const recovery = session.recovery;
     if (
       !recovery
       || !recovery.suspended
       || !this.runtimeStreamIdentityMatches(session, payload)
     ) {
-      this.terminateRuntimeStream(session, "runtime_stream_resume_identity_mismatch");
+      (await this.terminateRuntimeStream(session, "runtime_stream_resume_identity_mismatch"));
       return;
     }
     const report: RuntimeStreamRecoveryReport = {
@@ -2319,19 +2333,19 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       report.acknowledgedOffset > report.sendOffset
       || report.bufferedFromOffset > report.acknowledgedOffset
     ) {
-      this.terminateRuntimeStream(session, "runtime_stream_resume_report_is_invalid");
+      (await this.terminateRuntimeStream(session, "runtime_stream_resume_report_is_invalid"));
       return;
     }
     const existing = recovery.reports.get(originWorkerId);
     if (existing && !runtimeStreamReportEquals(existing, report)) {
-      this.terminateRuntimeStream(session, "runtime_stream_resume_report_changed");
+      (await this.terminateRuntimeStream(session, "runtime_stream_resume_report_changed"));
       return;
     }
     recovery.reports.set(originWorkerId, report);
-    this.tryResumeRuntimeStream(session);
+    (await this.tryResumeRuntimeStream(session));
   }
 
-  private tryResumeRuntimeStream(session: RuntimeStreamSession): void {
+  private async tryResumeRuntimeStream(session: RuntimeStreamSession): Promise<void> {
     const recovery = session.recovery;
     const sourceWorkerId = session.sourceWorkerId;
     if (!recovery || !sourceWorkerId) return;
@@ -2346,7 +2360,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       || source.acknowledgedOffset > destination.receiveOffset
       || destination.acknowledgedOffset > source.receiveOffset
     ) {
-      this.terminateRuntimeStream(session, "runtime_stream_resume_offsets_are_inconsistent");
+      (await this.terminateRuntimeStream(session, "runtime_stream_resume_offsets_are_inconsistent"));
       return;
     }
     if (
@@ -2358,7 +2372,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     const previousGeneration = recovery.generation;
     const generation = previousGeneration + 1;
     if (generation > 1_000_000) {
-      this.terminateRuntimeStream(session, "runtime_stream_generation_exhausted");
+      (await this.terminateRuntimeStream(session, "runtime_stream_generation_exhausted"));
       return;
     }
     recovery.generation = generation;
@@ -2387,7 +2401,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       },
     );
     if (!sourceAccepted || !destinationAccepted) {
-      this.terminateRuntimeStream(session, "runtime_stream_resume_delivery_failed");
+      (await this.terminateRuntimeStream(session, "runtime_stream_resume_delivery_failed"));
     }
   }
 
@@ -2401,10 +2415,10 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     recovery.suspended = true;
     recovery.reports.clear();
     const deadlineAt = Date.now() + RUNTIME_STREAM_RECOVERY_GRACE_MS;
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(() => this.background.run("worker-hub:2438", async () => {
       if (session.recovery?.timeout !== timeout) return;
-      this.terminateRuntimeStream(session, "runtime_stream_recovery_timeout");
-    }, RUNTIME_STREAM_RECOVERY_GRACE_MS);
+      (await this.terminateRuntimeStream(session, "runtime_stream_recovery_timeout"));
+    }, "setTimeout"), RUNTIME_STREAM_RECOVERY_GRACE_MS);
     timeout.unref();
     recovery.timeout = timeout;
     const suspension = {
@@ -2463,7 +2477,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     );
   }
 
-  private attachLocalRuntimeStream(socket: Socket, destinationWorkerId: string, targetPort: number): void {
+  private async attachLocalRuntimeStream(socket: Socket, destinationWorkerId: string, targetPort: number): Promise<void> {
     if (this.runtimeStreams.size >= MAX_RUNTIME_STREAMS) {
       socket.destroy(new Error("runtime_stream_capacity_exceeded"));
       return;
@@ -2492,7 +2506,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     this.runtimeStreams.set(streamId, session);
     socket.setNoDelay(true);
     socket.pause();
-    socket.on("data", (chunk: Buffer) => {
+    socket.on("data", (chunk: Buffer) => this.background.run("worker-hub:2529", async () => {
       if (!session.opened) return;
       for (let offset = 0; offset < chunk.byteLength; offset += MAX_RUNTIME_STREAM_CHUNK_BYTES) {
         const piece = chunk.subarray(
@@ -2505,25 +2519,25 @@ export class WorkerHub extends EventEmitter<HubEvents> {
           sequence: session.sourceSequence++,
           data: piece.toString("base64"),
         })) {
-          this.terminateRuntimeStream(session, "runtime_stream_destination_backpressure");
+          (await this.terminateRuntimeStream(session, "runtime_stream_destination_backpressure"));
           return;
         }
       }
-    });
-    socket.once("end", () => {
+    }, "socket.on"));
+    socket.once("end", () => this.background.run("worker-hub:2547", async () => {
       this.send(destinationWorkerId, "runtime.stream.end", { streamId });
-      this.terminateRuntimeStream(session);
-    });
-    socket.once("error", (error) => {
+      (await this.terminateRuntimeStream(session));
+    }, "socket.once"));
+    socket.once("error", (error) => this.background.run("worker-hub:2551", async () => {
       this.send(destinationWorkerId, "runtime.stream.error", {
         streamId,
         message: error.message.slice(0, 1_024),
       });
-      this.terminateRuntimeStream(session);
-    });
-    socket.once("close", () => this.terminateRuntimeStream(session));
+      (await this.terminateRuntimeStream(session));
+    }, "socket.once"));
+    socket.once("close", () => this.background.run("worker-hub:2558", async () => (await this.terminateRuntimeStream(session)), "socket.once"));
     if (!this.send(destinationWorkerId, "runtime.stream.open", { streamId, targetPort })) {
-      this.terminateRuntimeStream(session, "runtime_stream_destination_disconnected");
+      (await this.terminateRuntimeStream(session, "runtime_stream_destination_disconnected"));
     }
   }
 
@@ -2540,8 +2554,9 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     }
   }
 
-  private terminateRuntimeStream(session: RuntimeStreamSession, message?: string): void {
+  private async terminateRuntimeStream(session: RuntimeStreamSession, message?: string, terminal?: RuntimeStreamTerminalDiagnostic): Promise<void> {
     if (!this.runtimeStreams.delete(session.streamId)) return;
+    logRuntimeStreamTermination(this.logger, session, message, terminal);
     if (session.recovery?.timeout) clearTimeout(session.recovery.timeout);
     if (session.direct) {
       clearTimeout(session.direct.timeout);
@@ -2553,7 +2568,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       this.send(session.destinationWorkerId, "runtime.direct.cancel", cancel);
     }
     session.endedAt = Date.now();
-    this.recordCompletedDirectTransport(session);
+    (await this.recordCompletedDirectTransport(session));
     this.completedRuntimeTransports.unshift(this.runtimeTransportSnapshotForSession(session));
     if (this.completedRuntimeTransports.length > 512) {
       this.completedRuntimeTransports.length = 512;
@@ -2581,7 +2596,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
     session.localSocket?.destroy();
   }
 
-  private recordCompletedDirectTransport(session: RuntimeStreamSession): void {
+  private async recordCompletedDirectTransport(session: RuntimeStreamSession): Promise<void> {
     if (
       session.transportMode !== "direct"
       || !session.sourceNodeId
@@ -2604,14 +2619,14 @@ export class WorkerHub extends EventEmitter<HubEvents> {
         session.endedAt,
         "direct",
       );
-      this.store.saveRuntimeLinkSample?.({
+      (await this.store.saveRuntimeLinkSample?.({
         fromNodeId,
         toNodeId,
         measuredAt: session.endedAt,
         rttMs: session.direct.connectRttMs,
         goodputMbps,
         transportMode: "direct",
-      });
+      }));
     }
   }
 
@@ -2665,59 +2680,8 @@ function evidenceChallengeKey(
   return `${workerId}\u0000${kind}\u0000${target}`;
 }
 
-function runtimeChallengeIdentity(
-  capabilities: WorkerCapabilities,
-): {
-  nodeId: string;
-  backend: RuntimePerformanceChallenge["backend"];
-  deviceName: string;
-  precision: RuntimePerformanceChallenge["precision"];
-} | null {
-  const executor = capabilities.distributedExecutor;
-  if (!executor) return null;
-  const acceleration = executor.acceleration;
-  if (
-    acceleration?.state === "gpu-ready"
-    && acceleration.backend
-    && acceleration.backend !== "cpu"
-    && acceleration.deviceName
-    && executor.computeMode !== "cpu-only"
-  ) {
-    return {
-      nodeId: executor.nodeId,
-      backend: acceleration.backend,
-      deviceName: acceleration.deviceName,
-      precision: "float16",
-    };
-  }
-  if (
-    executor.cpuEligible === true
-    && executor.computeMode !== "gpu-only"
-    && acceleration?.backend === "cpu"
-    && acceleration.deviceName
-  ) {
-    return {
-      nodeId: executor.nodeId,
-      backend: "cpu",
-      deviceName: acceleration.deviceName,
-      precision: "float32",
-    };
-  }
-  return null;
-}
 
 function normalizeDeviceName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function runtimeStreamReportEquals(
-  left: RuntimeStreamRecoveryReport,
-  right: RuntimeStreamRecoveryReport,
-): boolean {
-  return (
-    left.sendOffset === right.sendOffset
-    && left.acknowledgedOffset === right.acknowledgedOffset
-    && left.receiveOffset === right.receiveOffset
-    && left.bufferedFromOffset === right.bufferedFromOffset
-  );
-}

@@ -127,46 +127,41 @@ export class ApiAccessManager {
     private readonly database: MeshDatabase,
     readonly limits: ApiAccessLimits,
     private readonly operatorQuotaModels: Readonly<Record<string, readonly string[]>> = parseOperatorQuotaModels(process.env.MYCELLIOS_API_OPERATOR_QUOTA_MODELS_JSON),
-  ) {
-    // Persist the decision with the reservation so restart/config changes cannot
-    // retroactively charge an operator-funded request or refund unreserved tokens.
-    database.raw.exec(`CREATE TABLE IF NOT EXISTS api_operator_funded_usage (
-      usage_id TEXT PRIMARY KEY REFERENCES api_usage(id) ON DELETE CASCADE
-    )`);
-  }
+    private readonly contributionFundingEnabled = false,
+  ) {}
 
-  getOrCreateAccount(userId: string): ApiAccount {
-    return this.database.transaction(() => {
-      const existing = this.accountRow(userId);
+  async getOrCreateAccount(userId: string): Promise<ApiAccount> {
+    return (await this.database.transaction(async () => {
+      const existing = (await this.accountRow(userId));
       if (existing) return accountFromRow(existing);
       const now = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO api_accounts(
            user_id, token_balance, usd_micros, lifetime_input_tokens,
            lifetime_output_tokens, request_count, created_at, updated_at
          ) VALUES (?, ?, 0, 0, 0, 0, ?, ?)`,
-      ).run(userId, this.limits.starterTokens, now, now);
-      return accountFromRow(this.accountRow(userId)!);
-    });
+      ).run(userId, this.limits.starterTokens, now, now));
+      return accountFromRow((await this.accountRow(userId))!);
+    }));
   }
 
-  listKeys(userId: string): ApiKeyRecord[] {
-    this.getOrCreateAccount(userId);
-    const rows = this.database.raw.prepare(
+  async listKeys(userId: string): Promise<ApiKeyRecord[]> {
+    (await this.getOrCreateAccount(userId));
+    const rows = (await this.database.raw.prepare(
       `SELECT id, user_id, name, prefix, secret_hash, created_at, last_used_at, revoked_at
        FROM api_keys
        WHERE user_id = ?
        ORDER BY created_at DESC, id DESC`,
-    ).all(userId) as unknown as ApiKeyRow[];
+    ).all(userId)) as unknown as ApiKeyRow[];
     return rows.map(keyFromRow);
   }
 
-  createKey(userId: string, name: string): ApiKeyCreation {
-    return this.database.transaction(() => {
-      this.getOrCreateAccount(userId);
-      const active = this.database.raw.prepare(
+  async createKey(userId: string, name: string): Promise<ApiKeyCreation> {
+    return (await this.database.transaction(async () => {
+      (await this.getOrCreateAccount(userId));
+      const active = (await this.database.raw.prepare(
         "SELECT COUNT(*) AS count FROM api_keys WHERE user_id = ? AND revoked_at IS NULL",
-      ).get(userId) as { count: number };
+      ).get(userId)) as { count: number };
       if (Number(active.count) >= this.limits.maxActiveKeys) {
         throw new ApiAccessError(
           "api_key_limit_reached",
@@ -179,11 +174,11 @@ export class ApiAccessManager {
       const secret = randomBytes(32).toString("base64url");
       const token = `${API_KEY_PREFIX}${prefix}_${secret}`;
       const now = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO api_keys(
            id, user_id, name, prefix, secret_hash, created_at, last_used_at, revoked_at
          ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)`,
-      ).run(id, userId, name, prefix, hashApiKey(token), now);
+      ).run(id, userId, name, prefix, hashApiKey(token), now));
       return {
         id,
         userId,
@@ -194,51 +189,54 @@ export class ApiAccessManager {
         revokedAt: null,
         secret: token,
       };
-    });
+    }));
   }
 
-  revokeKey(userId: string, keyId: string): boolean {
-    const result = this.database.raw.prepare(
+  async revokeKey(userId: string, keyId: string): Promise<boolean> {
+    const result = (await this.database.raw.prepare(
       `UPDATE api_keys
        SET revoked_at = ?
        WHERE id = ? AND user_id = ? AND revoked_at IS NULL`,
-    ).run(Date.now(), keyId, userId);
+    ).run(Date.now(), keyId, userId));
     return Number(result.changes) === 1;
   }
 
-  authenticateKey(token: string): ApiKeyPrincipal | null {
+  async authenticateKey(token: string): Promise<ApiKeyPrincipal | null> {
     const match = /^myc_live_([A-Za-z0-9_-]{10})_[A-Za-z0-9_-]{43}$/.exec(token);
     if (!match) return null;
-    const row = this.database.raw.prepare(
+    const row = (await this.database.raw.prepare(
       `SELECT id, user_id, name, prefix, secret_hash, created_at, last_used_at, revoked_at
        FROM api_keys
        WHERE prefix = ? AND revoked_at IS NULL
        LIMIT 1`,
-    ).get(match[1]!) as ApiKeyRow | undefined;
+    ).get(match[1]!)) as ApiKeyRow | undefined;
     if (!row || !verifyApiKeyHash(token, row.secret_hash)) return null;
     if (!row.secret_hash.startsWith("scrypt$")) {
-      this.database.raw.prepare("UPDATE api_keys SET secret_hash = ? WHERE id = ? AND secret_hash = ?")
-        .run(hashApiKey(token), row.id, row.secret_hash);
+      (await this.database.raw.prepare("UPDATE api_keys SET secret_hash = ? WHERE id = ? AND secret_hash = ?")
+        .run(hashApiKey(token), row.id, row.secret_hash));
     }
-    this.getOrCreateAccount(row.user_id);
+    (await this.getOrCreateAccount(row.user_id));
     return { kind: "api_key", userId: row.user_id, apiKeyId: row.id };
   }
 
-  beginUsage(
+  async beginUsage(
     userId: string,
     apiKeyId: string | null,
     request: ChatCompletionRequest,
-  ): ApiUsageReservation {
-    return this.database.transaction(() => {
-      const account = this.getOrCreateAccount(userId);
+    contributionFunded = false,
+  ): Promise<ApiUsageReservation> {
+    if (contributionFunded && !this.contributionFundingEnabled)
+      throw new ApiAccessError("unsupported_funding_mode", "Contribution funding is unavailable.", 503);
+    return (await this.database.transaction(async () => {
+      const account = (await this.getOrCreateAccount(userId));
       const now = Date.now();
       const windowStart = now - 60_000;
-      const recentRows = this.database.raw.prepare(
+      const recentRows = (await this.database.raw.prepare(
         `SELECT created_at
          FROM api_usage
          WHERE user_id = ? AND created_at >= ?
          ORDER BY created_at ASC`,
-      ).all(userId, windowStart) as unknown as Array<{ created_at: number }>;
+      ).all(userId, windowStart)) as unknown as Array<{ created_at: number }>;
       if (recentRows.length >= this.limits.requestsPerMinute) {
         const resetAt = Number(recentRows[0]!.created_at) + 60_000;
         throw new ApiAccessError(
@@ -248,9 +246,9 @@ export class ApiAccessManager {
           Math.max(1, Math.ceil((resetAt - now) / 1_000)),
         );
       }
-      const pending = this.database.raw.prepare(
+      const pending = (await this.database.raw.prepare(
         "SELECT COUNT(*) AS count FROM api_usage WHERE user_id = ? AND status = 'pending'",
-      ).get(userId) as { count: number };
+      ).get(userId)) as { count: number };
       if (Number(pending.count) >= this.limits.maxConcurrent) {
         throw new ApiAccessError(
           "concurrency_limit_exceeded",
@@ -262,7 +260,7 @@ export class ApiAccessManager {
       const operatorFunded = apiKeyId !== null
         && Object.hasOwn(this.operatorQuotaModels, apiKeyId)
         && this.operatorQuotaModels[apiKeyId]!.includes(request.model);
-      const reservedTokens = operatorFunded ? 0 : estimateInputTokens(request) + (request.max_tokens ?? 256);
+      const reservedTokens = operatorFunded || contributionFunded ? 0 : estimateInputTokens(request) + (request.max_tokens ?? 256);
       if (account.tokenBalance < reservedTokens) {
         throw new ApiAccessError(
           "insufficient_token_balance",
@@ -271,7 +269,7 @@ export class ApiAccessManager {
         );
       }
       const id = newId("use");
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `INSERT INTO api_usage(
            id, user_id, api_key_id, job_id, session_id, model, reserved_tokens,
            input_tokens, output_tokens, status, error_code, created_at, completed_at
@@ -284,17 +282,18 @@ export class ApiAccessManager {
         request.model,
         reservedTokens,
         now,
-      );
+      ));
+      if (contributionFunded) await this.database.raw.prepare("INSERT INTO api_contribution_funded_usage(usage_id) VALUES (?)").run(id);
       if (operatorFunded) {
-        this.database.raw.prepare("INSERT INTO api_operator_funded_usage(usage_id) VALUES (?)").run(id);
+        (await this.database.raw.prepare("INSERT INTO api_operator_funded_usage(usage_id) VALUES (?)").run(id));
       }
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         "UPDATE api_accounts SET token_balance = token_balance - ?, updated_at = ? WHERE user_id = ?",
-      ).run(reservedTokens, now, userId);
+      ).run(reservedTokens, now, userId));
       if (apiKeyId) {
-        this.database.raw.prepare(
+        (await this.database.raw.prepare(
           "UPDATE api_keys SET last_used_at = ? WHERE id = ? AND user_id = ?",
-        ).run(now, apiKeyId, userId);
+        ).run(now, apiKeyId, userId));
       }
       return {
         id,
@@ -307,64 +306,65 @@ export class ApiAccessManager {
           resetAt: recentRows.length === 0 ? now + 60_000 : Number(recentRows[0]!.created_at) + 60_000,
         },
       };
-    });
+    }));
   }
 
-  attachJob(usageId: string, jobId: string, sessionId: string): void {
-    this.database.raw.prepare(
+  async attachJob(usageId: string, jobId: string, sessionId: string): Promise<void> {
+    (await this.database.raw.prepare(
       `UPDATE api_usage
        SET job_id = ?, session_id = ?
        WHERE id = ? AND status = 'pending'`,
-    ).run(jobId, sessionId, usageId);
+    ).run(jobId, sessionId, usageId));
   }
 
-  completeUsage(usageId: string, inputTokens: number, outputTokens: number): ApiAccount | null {
-    return this.database.transaction(() => {
-      const usage = this.usageRow(usageId);
+  async completeUsage(usageId: string, inputTokens: number, outputTokens: number): Promise<ApiAccount | null> {
+    return (await this.database.transaction(async () => {
+      const usage = (await this.usageRow(usageId));
       if (!usage || usage.status !== "pending") return null;
       const now = Date.now();
-      const operatorFunded = this.database.raw.prepare(
+      const operatorFunded = (await this.database.raw.prepare(
         "SELECT 1 FROM api_operator_funded_usage WHERE usage_id = ?",
-      ).get(usageId) !== undefined;
-      const actualTokens = operatorFunded ? 0 : Math.max(0, inputTokens) + Math.max(0, outputTokens);
+      ).get(usageId)) !== undefined;
+      const contributionFunded = this.contributionFundingEnabled && (await this.database.raw.prepare("SELECT 1 FROM api_contribution_funded_usage WHERE usage_id=?").get(usageId)) !== undefined;
+      const actualTokens = operatorFunded || contributionFunded ? 0 : Math.max(0, inputTokens) + Math.max(0, outputTokens);
       const refund = Math.max(0, usage.reserved_tokens - actualTokens);
       const additionalCharge = Math.max(0, actualTokens - usage.reserved_tokens);
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `UPDATE api_accounts
-         SET token_balance = MAX(0, token_balance + ? - ?),
+         SET token_balance = ${this.database.raw.dialect === "postgres" ? "GREATEST" : "MAX"}(0, token_balance + ? - ?),
              lifetime_input_tokens = lifetime_input_tokens + ?,
              lifetime_output_tokens = lifetime_output_tokens + ?,
              request_count = request_count + 1,
              updated_at = ?
          WHERE user_id = ?`,
-      ).run(refund, additionalCharge, inputTokens, outputTokens, now, usage.user_id);
-      this.database.raw.prepare(
+      ).run(refund, additionalCharge, inputTokens, outputTokens, now, usage.user_id));
+      (await this.database.raw.prepare(
         `UPDATE api_usage
          SET input_tokens = ?, output_tokens = ?, status = 'completed',
              error_code = NULL, completed_at = ?
          WHERE id = ?`,
-      ).run(inputTokens, outputTokens, now, usageId);
-      return accountFromRow(this.accountRow(usage.user_id)!);
-    });
+      ).run(inputTokens, outputTokens, now, usageId));
+      return accountFromRow((await this.accountRow(usage.user_id))!);
+    }));
   }
 
-  failUsage(usageId: string, errorCode: string): ApiAccount | null {
-    return this.database.transaction(() => {
-      const usage = this.usageRow(usageId);
+  async failUsage(usageId: string, errorCode: string): Promise<ApiAccount | null> {
+    return (await this.database.transaction(async () => {
+      const usage = (await this.usageRow(usageId));
       if (!usage || usage.status !== "pending") return null;
       const now = Date.now();
-      this.database.raw.prepare(
+      (await this.database.raw.prepare(
         `UPDATE api_accounts
          SET token_balance = token_balance + ?, updated_at = ?
          WHERE user_id = ?`,
-      ).run(usage.reserved_tokens, now, usage.user_id);
-      this.database.raw.prepare(
+      ).run(usage.reserved_tokens, now, usage.user_id));
+      (await this.database.raw.prepare(
         `UPDATE api_usage
          SET status = 'failed', error_code = ?, completed_at = ?
          WHERE id = ?`,
-      ).run(errorCode.slice(0, 120), now, usageId);
-      return accountFromRow(this.accountRow(usage.user_id)!);
-    });
+      ).run(errorCode.slice(0, 120), now, usageId));
+      return accountFromRow((await this.accountRow(usage.user_id))!);
+    }));
   }
 
   /** Startup-only settlement after job recovery; never refunds or changes limits. */
@@ -379,76 +379,76 @@ export class ApiAccessManager {
     return Number(result.changes);
   }
 
-  listUsage(userId: string, limit = 25): ApiUsageRecord[] {
-    const rows = this.database.raw.prepare(
+  async listUsage(userId: string, limit = 25): Promise<ApiUsageRecord[]> {
+    const rows = (await this.database.raw.prepare(
       `SELECT id, user_id, api_key_id, job_id, session_id, model, reserved_tokens,
               input_tokens, output_tokens, status, error_code, created_at, completed_at
        FROM api_usage
        WHERE user_id = ?
        ORDER BY created_at DESC, id DESC
        LIMIT ?`,
-    ).all(userId, Math.max(1, Math.min(100, limit))) as unknown as ApiUsageRow[];
+    ).all(userId, Math.max(1, Math.min(100, limit)))) as unknown as ApiUsageRow[];
     return rows.map(usageFromRow);
   }
 
-  userOwnsJob(userId: string, jobId: string): boolean {
-    const row = this.database.raw.prepare(
+  async userOwnsJob(userId: string, jobId: string): Promise<boolean> {
+    const row = (await this.database.raw.prepare(
       "SELECT 1 AS found FROM api_usage WHERE user_id = ? AND job_id = ? LIMIT 1",
-    ).get(userId, jobId) as { found: number } | undefined;
+    ).get(userId, jobId)) as { found: number } | undefined;
     return row?.found === 1;
   }
 
-  userOwnsSession(userId: string, sessionId: string): boolean {
-    const row = this.database.raw.prepare(
+  async userOwnsSession(userId: string, sessionId: string): Promise<boolean> {
+    const row = (await this.database.raw.prepare(
       `SELECT 1 AS found FROM api_usage WHERE user_id = ? AND session_id = ?
        AND NOT EXISTS (SELECT 1 FROM api_usage WHERE session_id = ? AND user_id <> ?)
        LIMIT 1`,
-    ).get(userId, sessionId, sessionId, userId) as { found: number } | undefined;
+    ).get(userId, sessionId, sessionId, userId)) as { found: number } | undefined;
     return row?.found === 1;
   }
 
   /** Recheck immediately before dispatch because capacity waits can admit other callers. */
-  assertSessionAccess(userId: string | null, sessionId?: string): void {
+  async assertSessionAccess(userId: string | null, sessionId?: string): Promise<void> {
     if (!sessionId) return;
-    const foreignUsage = this.database.raw.prepare(
+    const foreignUsage = (await this.database.raw.prepare(
       `SELECT 1 FROM api_usage WHERE session_id = ?
-       AND (? IS NULL OR user_id <> ?) LIMIT 1`,
-    ).get(sessionId, userId, userId);
-    const unownedConversation = userId !== null && !this.userOwnsSession(userId, sessionId)
-      && this.database.raw.prepare(
+       AND (CAST(? AS TEXT) IS NULL OR user_id <> ?) LIMIT 1`,
+    ).get(sessionId, userId, userId));
+    const unownedConversation = userId !== null && !(await this.userOwnsSession(userId, sessionId))
+      && (await this.database.raw.prepare(
         "SELECT 1 FROM inference_conversations WHERE session_id = ? LIMIT 1",
-      ).get(sessionId);
+      ).get(sessionId));
     if (foreignUsage || unownedConversation) {
       throw new ApiAccessError("session_not_found", "The requested session was not found", 404);
     }
   }
 
-  grantTokens(userId: string, amount: number): ApiAccount {
-    return this.database.transaction(() => {
-      this.getOrCreateAccount(userId);
-      this.database.raw.prepare(
+  async grantTokens(userId: string, amount: number): Promise<ApiAccount> {
+    return (await this.database.transaction(async () => {
+      (await this.getOrCreateAccount(userId));
+      (await this.database.raw.prepare(
         `UPDATE api_accounts
          SET token_balance = token_balance + ?, updated_at = ?
          WHERE user_id = ?`,
-      ).run(amount, Date.now(), userId);
-      return accountFromRow(this.accountRow(userId)!);
-    });
+      ).run(amount, Date.now(), userId));
+      return accountFromRow((await this.accountRow(userId))!);
+    }));
   }
 
-  private accountRow(userId: string): ApiAccountRow | undefined {
-    return this.database.raw.prepare(
+  private async accountRow(userId: string): Promise<ApiAccountRow | undefined> {
+    return (await this.database.raw.prepare(
       `SELECT user_id, token_balance, usd_micros, lifetime_input_tokens,
               lifetime_output_tokens, request_count, created_at, updated_at
        FROM api_accounts WHERE user_id = ?`,
-    ).get(userId) as ApiAccountRow | undefined;
+    ).get(userId)) as ApiAccountRow | undefined;
   }
 
-  private usageRow(usageId: string): ApiUsageRow | undefined {
-    return this.database.raw.prepare(
+  private async usageRow(usageId: string): Promise<ApiUsageRow | undefined> {
+    return (await this.database.raw.prepare(
       `SELECT id, user_id, api_key_id, job_id, session_id, model, reserved_tokens,
               input_tokens, output_tokens, status, error_code, created_at, completed_at
        FROM api_usage WHERE id = ?`,
-    ).get(usageId) as ApiUsageRow | undefined;
+    ).get(usageId)) as ApiUsageRow | undefined;
   }
 }
 

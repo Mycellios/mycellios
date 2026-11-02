@@ -67,7 +67,9 @@ describe("Fedora Desktop window integration", () => {
     expect(extractFile(output, "native/helper.node")).toEqual(extractFile(archive, "native/helper.node"));
     const native = statFile(output, "native/helper.node") as { unpacked?: boolean };
     expect(native.unpacked).toBe(true);
-    expect((await stat(output + ".unpacked/native/helper.node")).mode & 0o777).toBe(0o755);
+    const originalMode = (await stat(join(source, "native/helper.node"))).mode & 0o777;
+    expect((await stat(output + ".unpacked/native/helper.node")).mode & 0o777).toBe(originalMode);
+    if (process.platform !== "win32") expect(originalMode).toBe(0o755);
     expect(extractFile(output, "dist/main.js").toString()).toBe(patchDesktopMain(original));
   });
 });

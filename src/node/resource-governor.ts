@@ -1,4 +1,4 @@
-import { opendir, stat } from "node:fs/promises";
+import { measureCacheDiskBytes } from "./cache-disk-usage.js";
 import { resolve } from "node:path";
 import { setTimeout as wait } from "node:timers/promises";
 import type { NodeConfiguration } from "../contracts/node-configuration.js";
@@ -127,7 +127,7 @@ export function createNodeResourceObserver(
       remainingMs = 5_000 - Number(cpuClock.nowNanoseconds() - previousTime) / 1_000_000;
     }
     const [diskBytes, hardware] = await Promise.all([
-      directoryBytes(root),
+      measureCacheDiskBytes(root),
       hardwareProbe(),
     ]);
     const cpu = cpuClock.readCpuUsage();
@@ -156,18 +156,3 @@ export function createNodeResourceObserver(
   return Object.assign(observe, { resetCpuBaseline });
 }
 
-async function directoryBytes(path: string): Promise<number> {
-  let total = 0;
-  let directory;
-  try { directory = await opendir(path); } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
-    throw error;
-  }
-  for await (const entry of directory) {
-    const child = resolve(path, entry.name);
-    if (entry.isSymbolicLink()) continue;
-    if (entry.isDirectory()) total += await directoryBytes(child);
-    else if (entry.isFile()) total += (await stat(child)).size;
-  }
-  return total;
-}

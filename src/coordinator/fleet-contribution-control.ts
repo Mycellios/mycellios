@@ -9,7 +9,7 @@ import type { StoredWorker } from "../storage/store.js";
 const CONTRIBUTION_CONTROL_PROTOCOL = "mycellios-contribution-control/1";
 
 interface FleetContributionStore {
-  listWorkers(): StoredWorker[];
+  listWorkers(): StoredWorker[] | Promise<StoredWorker[]>;
 }
 
 interface FleetContributionHub {
@@ -41,8 +41,8 @@ export class FleetContributionController {
     private readonly acknowledgementTimeoutMs = 3_000,
   ) {}
 
-  status(): FleetContributionStatus {
-    const nodes = this.desktopWorkers().map((worker) => {
+  async status(): Promise<FleetContributionStatus> {
+    const nodes = (await this.desktopWorkers()).map((worker) => {
       const connected = this.hub.isConnected(worker.id);
       const controlReady =
         worker.capabilities.administration?.contributionControl
@@ -82,7 +82,7 @@ export class FleetContributionController {
   async setAll(enabled: boolean): Promise<FleetContributionCommandResponse> {
     const commandId = randomUUID();
     const issuedAt = Date.now();
-    const targets = this.desktopWorkers().filter(
+    const targets = (await this.desktopWorkers()).filter(
       (worker) =>
         this.hub.isConnected(worker.id)
         && worker.capabilities.administration?.contributionControl
@@ -96,7 +96,7 @@ export class FleetContributionController {
       enabled,
       issuedAt: new Date(issuedAt).toISOString(),
       results,
-      status: this.status(),
+      status: await this.status(),
     };
   }
 
@@ -128,9 +128,8 @@ export class FleetContributionController {
     this.pending.clear();
   }
 
-  private desktopWorkers(): StoredWorker[] {
-    return this.store
-      .listWorkers()
+  private async desktopWorkers(): Promise<StoredWorker[]> {
+    return (await this.store.listWorkers())
       .filter((worker) => worker.identityKind !== "cell");
   }
 

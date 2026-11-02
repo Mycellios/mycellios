@@ -15,6 +15,11 @@ const catalog = () => ({
 });
 
 describe("Desktop downloads", () => {
+  it("distinguishes Intel and Apple Silicon without removing supported downloads", () => {
+    const html=renderToStaticMarkup(<DesktopDownloads />);
+    expect(html).toContain('Download for Mac (Intel)');expect(html).toContain('Download for Mac (Apple Silicon)');expect(html).toContain('macOS 13 or later');
+    expect(html).not.toContain('Intel Macs are not supported');
+  });
   it("exposes the published Fedora RPM independently of the legacy catalog", () => {
     const html = renderToStaticMarkup(<DesktopDownloads />);
     expect(html).toContain(`href="${FEDORA_DESKTOP_DOWNLOAD.path}"`);

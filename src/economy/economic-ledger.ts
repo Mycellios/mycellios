@@ -1,3 +1,4 @@
+import { mapAsync } from "../core/async-collections.js";
 import { z } from "zod";
 import { createPublicKey, type KeyLike } from "node:crypto";
 
@@ -93,17 +94,17 @@ export class EconomicLedger {
     private readonly options: { receiptSigning: { keyId: string; privateKey: KeyLike } },
   ) {}
 
-  registerPricingPolicy(value: unknown): PricingPolicy {
+  async registerPricingPolicy(value: unknown): Promise<PricingPolicy> {
     const input = pricingPolicyInputSchema.parse(value);
     const id = sha256CanonicalEvidence({ schema: "mycellios-pricing-policy/1", ...input });
-    this.database.transaction(() => {
-      const existing = this.database.raw.prepare("SELECT * FROM pricing_policies WHERE id = ?").get(id);
+    (await this.database.transaction(async () => {
+      const existing = (await this.database.raw.prepare("SELECT * FROM pricing_policies WHERE id = ?").get(id));
       if (existing) return;
-      const competing = this.database.raw.prepare(
+      const competing = (await this.database.raw.prepare(
         "SELECT id FROM pricing_policies WHERE model_id = ? AND route_class = ? AND version = ?",
-      ).get(input.modelId, input.routeClass, input.version) as { id: string } | undefined;
+      ).get(input.modelId, input.routeClass, input.version)) as { id: string } | undefined;
       if (competing) throw new Error("economic_pricing_version_conflict");
-      this.database.raw.prepare(`
+      (await this.database.raw.prepare(`
         INSERT INTO pricing_policies(
           id, model_id, route_class, version, input_microunits_per_token,
           output_microunits_per_token, platform_fee_bps, effective_at, retired_at
@@ -112,24 +113,24 @@ export class EconomicLedger {
         id, input.modelId, input.routeClass, input.version,
         input.inputMicrounitsPerToken, input.outputMicrounitsPerToken,
         input.platformFeeBps, input.effectiveAt, input.retiredAt,
-      );
-    });
+      ));
+    }));
     return { id, ...input };
   }
 
-  resolvePricingPolicy(modelId: string, routeClass: PricingPolicy["routeClass"], at: number): PricingPolicy | null {
-    const row = this.database.raw.prepare(`
+  async resolvePricingPolicy(modelId: string, routeClass: PricingPolicy["routeClass"], at: number): Promise<PricingPolicy | null> {
+    const row = (await this.database.raw.prepare(`
       SELECT id FROM pricing_policies
       WHERE model_id IN (?, '*') AND route_class = ? AND effective_at <= ?
         AND (retired_at IS NULL OR retired_at > ?)
       ORDER BY CASE WHEN model_id = ? THEN 0 ELSE 1 END, version DESC LIMIT 1
-    `).get(identifierSchema.parse(modelId), routeClass, at, at, modelId) as { id: string } | undefined;
-    return row ? this.readPricingPolicy(row.id) : null;
+    `).get(identifierSchema.parse(modelId), routeClass, at, at, modelId)) as { id: string } | undefined;
+    return row ? (await this.readPricingPolicy(row.id)) : null;
   }
 
-  registerDefaultInternalPricing(): PricingPolicy[] {
-    return (["remote-replica", "distributed-pipeline"] as const).map((routeClass) =>
-      this.registerPricingPolicy({
+  async registerDefaultInternalPricing(): Promise<PricingPolicy[]> {
+    return (await mapAsync((["remote-replica", "distributed-pipeline"] as const), async (routeClass) =>
+      (await this.registerPricingPolicy({
         modelId: "*",
         routeClass,
         version: 1,
@@ -138,8 +139,8 @@ export class EconomicLedger {
         platformFeeBps: 1_500,
         effectiveAt: 0,
         retiredAt: null,
-      })
-    );
+      }))
+    ));
   }
 
   receiptVerificationKey(): { keyId: string; spki: string } {
@@ -151,25 +152,25 @@ export class EconomicLedger {
     };
   }
 
-  settle(value: unknown): EconomicSettlement {
+  async settle(value: unknown): Promise<EconomicSettlement> {
     const input = settlementInputSchema.parse(value);
     const requestDigest = sha256CanonicalEvidence({ schema: "mycellios-economic-settlement-request/1", ...input });
-    return this.database.transaction(() => {
-      const replay = this.database.raw.prepare(
+    return (await this.database.transaction(async () => {
+      const replay = (await this.database.raw.prepare(
         "SELECT id, request_digest FROM economic_settlements WHERE job_id = ?",
-      ).get(input.jobId) as { id: string; request_digest: string } | undefined;
+      ).get(input.jobId)) as { id: string; request_digest: string } | undefined;
       if (replay) {
         if (replay.request_digest !== requestDigest) throw new Error("economic_settlement_job_conflict");
-        return this.readSettlement(replay.id);
+        return (await this.readSettlement(replay.id));
       }
-      const receiptReplay = this.database.raw.prepare(
+      const receiptReplay = (await this.database.raw.prepare(
         "SELECT job_id FROM economic_settlements WHERE execution_receipt_id = ?",
-      ).get(input.executionReceiptId) as { job_id: string } | undefined;
+      ).get(input.executionReceiptId)) as { job_id: string } | undefined;
       if (receiptReplay) throw new Error("economic_settlement_receipt_replay");
-      const policy = this.readPricingPolicy(input.pricingPolicyId);
-      const evidenceRow = this.database.raw.prepare(
+      const policy = (await this.readPricingPolicy(input.pricingPolicyId));
+      const evidenceRow = (await this.database.raw.prepare(
         "SELECT evidence_json FROM economic_contribution_evidence WHERE id = ?",
-      ).get(input.contributionEvidenceId) as { evidence_json: string } | undefined;
+      ).get(input.contributionEvidenceId)) as { evidence_json: string } | undefined;
       if (!evidenceRow) throw new Error("economic_contribution_evidence_not_found");
       const evidence = physicalContributionEvidenceSchema.parse(JSON.parse(evidenceRow.evidence_json));
       if (evidence.jobId !== input.jobId || evidence.executionReceiptId !== input.executionReceiptId) {
@@ -196,7 +197,7 @@ export class EconomicLedger {
       const platform = gross - provider;
       const credits = distribute(provider, input.contributors);
       const settlementId = sha256CanonicalEvidence({ schema: "mycellios-economic-settlement/1", requestDigest, gross, provider, platform, credits });
-      this.database.raw.prepare(`
+      (await this.database.raw.prepare(`
         INSERT INTO economic_settlements(
           id, job_id, execution_receipt_id, contribution_evidence_id, pricing_policy_id, payer_account_id,
           input_tokens, output_tokens, gross_microunits, provider_microunits,
@@ -206,34 +207,34 @@ export class EconomicLedger {
         settlementId, input.jobId, input.executionReceiptId, input.contributionEvidenceId, policy.id,
         input.payerAccountId, input.inputTokens, input.outputTokens, gross,
         provider, platform, requestDigest, input.createdAt,
-      );
-      const payer = this.ensureAccount("account", input.payerAccountId, input.createdAt);
-      const platformAccount = this.ensureAccount("platform", "mycellios", input.createdAt);
-      this.insertEntry(settlementId, payer, "usage", -gross, input.createdAt);
+      ));
+      const payer = (await this.ensureAccount("account", input.payerAccountId, input.createdAt));
+      const platformAccount = (await this.ensureAccount("platform", "mycellios", input.createdAt));
+      (await this.insertEntry(settlementId, payer, "usage", -gross, input.createdAt));
       for (const credit of credits) {
         if (credit.amountMicrounits === 0) continue;
-        this.insertEntry(settlementId, this.ensureAccount("node", credit.nodeId, input.createdAt), "work", credit.amountMicrounits, input.createdAt);
+        (await this.insertEntry(settlementId, (await this.ensureAccount("node", credit.nodeId, input.createdAt)), "work", credit.amountMicrounits, input.createdAt));
       }
-      if (platform > 0) this.insertEntry(settlementId, platformAccount, "platform_fee", platform, input.createdAt);
-      this.assertBalanced(settlementId);
+      if (platform > 0) (await this.insertEntry(settlementId, platformAccount, "platform_fee", platform, input.createdAt));
+      (await this.assertBalanced(settlementId));
       for (const participant of evidence.participants) {
         const earned = credits.find(({ nodeId }) => nodeId === participant.nodeId)?.amountMicrounits ?? 0;
-        this.database.raw.prepare(`
+        (await this.database.raw.prepare(`
           INSERT INTO economic_node_reputation(
             node_id, verified_jobs, verified_stage_count, verified_physical_boundaries,
             earned_microunits, last_evidence_id, updated_at
           ) VALUES (?, 1, ?, ?, ?, ?, ?)
           ON CONFLICT(node_id) DO UPDATE SET
-            verified_jobs = verified_jobs + 1,
-            verified_stage_count = verified_stage_count + excluded.verified_stage_count,
-            verified_physical_boundaries = verified_physical_boundaries + excluded.verified_physical_boundaries,
-            earned_microunits = earned_microunits + excluded.earned_microunits,
+            verified_jobs = economic_node_reputation.verified_jobs + 1,
+            verified_stage_count = economic_node_reputation.verified_stage_count + excluded.verified_stage_count,
+            verified_physical_boundaries = economic_node_reputation.verified_physical_boundaries + excluded.verified_physical_boundaries,
+            earned_microunits = economic_node_reputation.earned_microunits + excluded.earned_microunits,
             last_evidence_id = excluded.last_evidence_id,
             updated_at = excluded.updated_at
         `).run(
           participant.nodeId, participant.stageCount, evidence.physicalBoundaryCount,
           earned, evidence.id, input.createdAt,
-        );
+        ));
       }
       const receipt = signEconomicSettlementReceipt({
         schema: "mycellios-economic-settlement-receipt/1",
@@ -256,27 +257,27 @@ export class EconomicLedger {
           .sort((left, right) => left.nodeIdHash.localeCompare(right.nodeIdHash)),
         createdAt: input.createdAt,
       }, this.options.receiptSigning);
-      this.database.raw.prepare(`
+      (await this.database.raw.prepare(`
         INSERT INTO economic_settlement_receipts(settlement_id, receipt_id, key_id, receipt_json, created_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(settlementId, receipt.receiptId, receipt.keyId, JSON.stringify(receipt), input.createdAt);
-      return this.readSettlement(settlementId);
-    });
+      `).run(settlementId, receipt.receiptId, receipt.keyId, JSON.stringify(receipt), input.createdAt));
+      return (await this.readSettlement(settlementId));
+    }));
   }
 
-  balance(ownerKind: "account" | "node" | "platform", ownerId: string): number {
-    const row = this.database.raw.prepare(`
+  async balance(ownerKind: "account" | "node" | "platform", ownerId: string): Promise<number> {
+    const row = (await this.database.raw.prepare(`
       SELECT COALESCE(SUM(entries.amount_microunits), 0) AS balance
       FROM economic_accounts accounts
       LEFT JOIN economic_ledger_entries entries ON entries.account_id = accounts.id
       WHERE accounts.owner_kind = ? AND accounts.owner_id = ? AND accounts.asset = ?
-    `).get(ownerKind, identifierSchema.parse(ownerId), ECONOMIC_ASSET) as { balance: number };
+    `).get(ownerKind, identifierSchema.parse(ownerId), ECONOMIC_ASSET)) as { balance: number };
     return Number(row.balance);
   }
 
-  summary(ownerKind: "account" | "node" | "platform", ownerId: string): EconomicAccountSummary {
+  async summary(ownerKind: "account" | "node" | "platform", ownerId: string): Promise<EconomicAccountSummary> {
     const normalizedOwnerId = identifierSchema.parse(ownerId);
-    const row = this.database.raw.prepare(`
+    const row = (await this.database.raw.prepare(`
       SELECT
         COALESCE(SUM(entries.amount_microunits), 0) AS balance,
         COUNT(DISTINCT entries.settlement_id) AS settled_jobs,
@@ -284,7 +285,7 @@ export class EconomicLedger {
       FROM economic_accounts accounts
       LEFT JOIN economic_ledger_entries entries ON entries.account_id = accounts.id
       WHERE accounts.owner_kind = ? AND accounts.owner_id = ? AND accounts.asset = ?
-    `).get(ownerKind, normalizedOwnerId, ECONOMIC_ASSET) as { balance: number; settled_jobs: number; lifetime: number };
+    `).get(ownerKind, normalizedOwnerId, ECONOMIC_ASSET)) as { balance: number; settled_jobs: number; lifetime: number };
     return {
       asset: ECONOMIC_ASSET,
       balanceMicrounits: Number(row.balance),
@@ -293,19 +294,19 @@ export class EconomicLedger {
     };
   }
 
-  settlementReceiptForPayer(settlementId: string, payerAccountId: string): EconomicSettlementReceipt | null {
-    const row = this.database.raw.prepare(`
+  async settlementReceiptForPayer(settlementId: string, payerAccountId: string): Promise<EconomicSettlementReceipt | null> {
+    const row = (await this.database.raw.prepare(`
       SELECT receipts.receipt_json
       FROM economic_settlements settlements
       JOIN economic_settlement_receipts receipts ON receipts.settlement_id = settlements.id
       WHERE settlements.id = ? AND settlements.payer_account_id = ?
-    `).get(sha256Schema.parse(settlementId), identifierSchema.parse(payerAccountId)) as { receipt_json: string } | undefined;
+    `).get(sha256Schema.parse(settlementId), identifierSchema.parse(payerAccountId))) as { receipt_json: string } | undefined;
     return row ? economicSettlementReceiptSchema.parse(JSON.parse(row.receipt_json)) : null;
   }
 
-  nodeReputation(nodeId: string): EconomicNodeReputation {
-    const row = this.database.raw.prepare("SELECT * FROM economic_node_reputation WHERE node_id = ?")
-      .get(identifierSchema.parse(nodeId)) as Record<string, unknown> | undefined;
+  async nodeReputation(nodeId: string): Promise<EconomicNodeReputation> {
+    const row = (await this.database.raw.prepare("SELECT * FROM economic_node_reputation WHERE node_id = ?")
+      .get(identifierSchema.parse(nodeId))) as Record<string, unknown> | undefined;
     return row ? {
       verifiedJobs: Number(row.verified_jobs),
       verifiedStageCount: Number(row.verified_stage_count),
@@ -318,8 +319,8 @@ export class EconomicLedger {
     };
   }
 
-  private readPricingPolicy(id: string): PricingPolicy {
-    const row = this.database.raw.prepare("SELECT * FROM pricing_policies WHERE id = ?").get(sha256Schema.parse(id)) as Record<string, unknown> | undefined;
+  private async readPricingPolicy(id: string): Promise<PricingPolicy> {
+    const row = (await this.database.raw.prepare("SELECT * FROM pricing_policies WHERE id = ?").get(sha256Schema.parse(id))) as Record<string, unknown> | undefined;
     if (!row) throw new Error("economic_pricing_policy_not_found");
     return {
       id: String(row.id), modelId: String(row.model_id), routeClass: String(row.route_class) as PricingPolicy["routeClass"],
@@ -329,17 +330,17 @@ export class EconomicLedger {
     };
   }
 
-  private readSettlement(id: string): EconomicSettlement {
-    const row = this.database.raw.prepare("SELECT * FROM economic_settlements WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+  private async readSettlement(id: string): Promise<EconomicSettlement> {
+    const row = (await this.database.raw.prepare("SELECT * FROM economic_settlements WHERE id = ?").get(id)) as Record<string, unknown> | undefined;
     if (!row) throw new Error("economic_settlement_not_found");
-    const credits = this.database.raw.prepare(`
+    const credits = (await this.database.raw.prepare(`
       SELECT accounts.owner_id AS node_id, entries.amount_microunits AS amount
       FROM economic_ledger_entries entries JOIN economic_accounts accounts ON accounts.id = entries.account_id
       WHERE entries.settlement_id = ? AND entries.category = 'work' ORDER BY accounts.owner_id
-    `).all(id) as Array<{ node_id: string; amount: number }>;
-    const receiptRow = this.database.raw.prepare(
+    `).all(id)) as Array<{ node_id: string; amount: number }>;
+    const receiptRow = (await this.database.raw.prepare(
       "SELECT receipt_json FROM economic_settlement_receipts WHERE settlement_id = ?",
-    ).get(id) as { receipt_json: string } | undefined;
+    ).get(id)) as { receipt_json: string } | undefined;
     if (!receiptRow) throw new Error("economic_settlement_receipt_not_found");
     const receipt = economicSettlementReceiptSchema.parse(JSON.parse(receiptRow.receipt_json));
     return {
@@ -354,22 +355,22 @@ export class EconomicLedger {
     };
   }
 
-  private ensureAccount(ownerKind: "account" | "node" | "platform", ownerId: string, createdAt: number): string {
+  private async ensureAccount(ownerKind: "account" | "node" | "platform", ownerId: string, createdAt: number): Promise<string> {
     const id = sha256CanonicalEvidence({ schema: "mycellios-economic-account/1", ownerKind, ownerId, asset: ECONOMIC_ASSET });
-    this.database.raw.prepare("INSERT OR IGNORE INTO economic_accounts(id, owner_kind, owner_id, asset, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run(id, ownerKind, ownerId, ECONOMIC_ASSET, createdAt);
+    (await this.database.raw.prepare("INSERT OR IGNORE INTO economic_accounts(id, owner_kind, owner_id, asset, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(id, ownerKind, ownerId, ECONOMIC_ASSET, createdAt));
     return id;
   }
 
-  private insertEntry(settlementId: string, accountId: string, category: "usage" | "work" | "platform_fee", amount: number, createdAt: number): void {
+  private async insertEntry(settlementId: string, accountId: string, category: "usage" | "work" | "platform_fee", amount: number, createdAt: number): Promise<void> {
     const id = sha256CanonicalEvidence({ schema: "mycellios-economic-ledger-entry/1", settlementId, accountId, category, amount });
-    this.database.raw.prepare("INSERT INTO economic_ledger_entries(id, settlement_id, account_id, category, amount_microunits, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(id, settlementId, accountId, category, amount, createdAt);
+    (await this.database.raw.prepare("INSERT INTO economic_ledger_entries(id, settlement_id, account_id, category, amount_microunits, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, settlementId, accountId, category, amount, createdAt));
   }
 
-  private assertBalanced(settlementId: string): void {
-    const row = this.database.raw.prepare("SELECT COALESCE(SUM(amount_microunits), 0) AS total FROM economic_ledger_entries WHERE settlement_id = ?")
-      .get(settlementId) as { total: number };
+  private async assertBalanced(settlementId: string): Promise<void> {
+    const row = (await this.database.raw.prepare("SELECT COALESCE(SUM(amount_microunits), 0) AS total FROM economic_ledger_entries WHERE settlement_id = ?")
+      .get(settlementId)) as { total: number };
     if (Number(row.total) !== 0) throw new Error("economic_ledger_is_unbalanced");
   }
 }

@@ -17,3 +17,14 @@ specs
 *.log
 .env
 .env.*
+
+# Nested Agent workspace and machine-local qualification never enter an image.
+**/node_modules
+**/outputs
+**/data
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+**/*.tsbuildinfo
+**/apps/desktop/local-server*

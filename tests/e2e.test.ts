@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { workerConfigSchema } from "../src/contracts/schemas.js";
@@ -85,17 +85,17 @@ describe("inference-only coordinator and worker", () => {
       stages: [],
       physicalBoundaryCount: null,
     });
-    expect(runtime.store.listJobs()).toHaveLength(1);
-    expect(runtime.store.listJobs()[0]?.status).toBe("completed");
+    expect((await runtime.store.listJobs())).toHaveLength(1);
+    expect((await runtime.store.listJobs())[0]?.status).toBe("completed");
     await waitUntil(
-      () => runtime.store.listWorkers()[0]?.capabilities.deployments[0]?.throughputSource === "measured",
+      async () => (await runtime.store.listWorkers())[0]?.capabilities.deployments[0]?.throughputSource === "measured",
       2_000,
     );
-    expect(runtime.store.listWorkers()[0]?.capabilities.deployments[0]).toMatchObject({
+    expect((await runtime.store.listWorkers())[0]?.capabilities.deployments[0]).toMatchObject({
       throughputSource: "measured",
     });
     expect(
-      runtime.store.listWorkers()[0]?.capabilities.deployments[0]?.tokensPerSecond,
+      (await runtime.store.listWorkers())[0]?.capabilities.deployments[0]?.tokensPerSecond,
     ).toBeGreaterThan(0);
 
     const replay = await fetch(new URL("v1/chat/completions", `${address}/`), {
@@ -112,7 +112,7 @@ describe("inference-only coordinator and worker", () => {
       }),
     });
     expect(replay.status).toBe(409);
-    expect(runtime.store.listJobs()).toHaveLength(1);
+    expect((await runtime.store.listJobs())).toHaveLength(1);
   });
 
   it("returns OpenAI SSE chunks and a DONE marker", async () => {
@@ -147,17 +147,17 @@ describe("inference-only coordinator and worker", () => {
       await run;
       await runtime.close();
     });
-    expect(runtime.store.listWorkers()).toHaveLength(1);
+    expect((await runtime.store.listWorkers())).toHaveLength(1);
 
     await agent.stop();
     await run;
-    await waitUntil(() => runtime.store.listWorkers().length === 0, 2_000);
+    await waitUntil(async () => (await runtime.store.listWorkers()).length === 0, 2_000);
 
-    expect(runtime.store.listWorkers()).toHaveLength(0);
+    expect((await runtime.store.listWorkers())).toHaveLength(0);
     expect(runtime.hub.connectedWorkerIds().size).toBe(0);
-    const retained = runtime.database.raw
+    const retained = (await runtime.database.raw
       .prepare("SELECT status, deregistered FROM workers")
-      .get() as { status: string; deregistered: number };
+      .get()) as { status: string; deregistered: number };
     expect(retained).toEqual({ status: "offline", deregistered: 1 });
   });
 
@@ -251,7 +251,8 @@ describe("inference-only coordinator and worker", () => {
 
   it("reports published downloads and serves archive files when available", async () => {
     const downloadsRoot = mkdtempSync(join(tmpdir(), "mycellios-downloads-"));
-    const archiveName = "mycellios-node-windows-x64.zip";
+    const version = JSON.parse(readFileSync(resolve("package.json"), "utf8")).version;
+    const archiveName = `mycellios-node-${version}-windows-x64.msi`;
     writeFileSync(join(downloadsRoot, archiveName), "fixture archive");
     const { runtime, address, agent, run } = await startNetwork({ releaseDownloadsPath: downloadsRoot });
     cleanup.push(async () => {
@@ -267,9 +268,9 @@ describe("inference-only coordinator and worker", () => {
     expect(availability).toMatchObject({
       schema: "mycellios-public-downloads/1",
       packages: [
-        { id: "windows-x64", format: "ZIP", path: "/downloads/windows", available: true, fileName: archiveName },
-        { id: "macos-arm64", format: "TAR.GZ", path: "/downloads/macos-arm64" },
-        { id: "linux-x64", format: "TAR.GZ", path: "/downloads/linux" },
+        { id: "windows-x64", format: "MSI", path: "/downloads/windows", available: true, fileName: archiveName },
+        { id: "macos-arm64", format: "PKG", path: "/downloads/macos-arm64" },
+        { id: "linux-x64", format: "DEB", path: "/downloads/linux" },
       ],
     });
 
@@ -300,7 +301,7 @@ describe("inference-only coordinator and worker", () => {
     });
 
     expect(runtime.hub.connectedWorkerIds().size).toBe(1);
-    expect(runtime.database.listWorkerAdmissionCredentials()).toHaveLength(1);
+    expect((await runtime.database.listWorkerAdmissionCredentials())).toHaveLength(1);
   });
 });
 
@@ -379,9 +380,9 @@ async function startNetwork(options: {
   return { runtime, address, agent, run };
 }
 
-async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<void> {
+async function waitUntil(predicate: () => boolean | Promise<boolean>, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  while (!predicate()) {
+  while (!(await predicate())) {
     if (Date.now() > deadline) throw new Error("Timed out waiting for test worker");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }

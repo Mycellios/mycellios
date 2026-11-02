@@ -38,21 +38,21 @@ describe("SPORE quote administrative routes", () => {
     runtimes.push(runtime);
     expect(runtime.payoutDispatch).not.toBeNull();
     const now = Date.now();
-    runtime.database.raw.prepare(`
+    (await runtime.database.raw.prepare(`
       INSERT INTO seller_payout_destinations (
         id, seller_id, payout_method, destination_kind, destination_reference,
         destination_fingerprint, verifier_key_id, attestation_signature, status,
         verified_at, expires_at, created_at
       ) VALUES ('destination-spore', 'seller-1', 'spore', 'wallet', 'wallet-spore',
         ?, 'destination', 'signature', 'active', ?, ?, ?)
-    `).run("a".repeat(64), now - 1_000, now + 86_400_000, now);
-    runtime.database.raw.prepare(
+    `).run("a".repeat(64), now - 1_000, now + 86_400_000, now));
+    (await runtime.database.raw.prepare(
       `INSERT INTO payout_batches(id, seller_id, payout_method, idempotency_key, request_digest,
        gross_usd_micros, debt_offset_usd_micros, amount_usd_micros,
        destination_id, destination_reference, destination_fingerprint,
        status, created_at, updated_at) VALUES ('batch-spore', 'seller-1', 'spore', 'key', ?,
        1000000, 0, 1000000, 'destination-spore', 'wallet-spore', ?, 'prepared', ?, ?)`,
-    ).run("b".repeat(64), "a".repeat(64), now, now);
+    ).run("b".repeat(64), "a".repeat(64), now, now));
     const unsigned = {
       schema: "mycellios.spore-conversion-quote.v1" as const, quoteId: "quote-1",
       batchId: "batch-spore", sellerId: "seller-1", usdMicros: 1_000_000,
@@ -86,11 +86,11 @@ describe("SPORE quote administrative routes", () => {
     expect(JSON.stringify(history.json())).not.toContain("seller-1");
     expect(JSON.stringify(history.json())).not.toContain(payload.signature);
 
-    runtime.database.transaction(() => {
-      runtime.database.raw.prepare(
+    (await runtime.database.transaction(async () => {
+      (await runtime.database.raw.prepare(
         "UPDATE spore_conversion_quotes SET status = 'superseded', replaced_at = ? WHERE quote_id = 'quote-1'",
-      ).run(now + 1);
-      runtime.database.raw.prepare(
+      ).run(now + 1));
+      (await runtime.database.raw.prepare(
         `INSERT INTO spore_conversion_quotes(
            quote_id, batch_id, seller_id, usd_micros, chain_id, asset_id,
            token_decimals, token_atomic_amount, destination_fingerprint,
@@ -99,8 +99,8 @@ describe("SPORE quote administrative routes", () => {
            token_decimals, token_atomic_amount, destination_fingerprint,
            issued_at, expires_at, oracle_key_id, signature, 'active', recorded_at + 1
          FROM spore_conversion_quotes WHERE quote_id = 'quote-1'`,
-      ).run();
-    });
+      ).run());
+    }));
 
     const bounded = await runtime.app.inject({
       method: "GET", url: "/public/v1/admin/seller-payouts/batch-spore/spore-quote-history?limit=1",

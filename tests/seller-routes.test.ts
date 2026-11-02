@@ -111,8 +111,8 @@ describe("account-bound seller finance routes", () => {
 
   it("derives seller identity from the account session and hides other earnings", async () => {
     const { runtime, asUser } = await setup();
-    seedEarning(runtime, "earning-one", "seller-one", 250_000);
-    seedEarning(runtime, "earning-two", "seller-two", 350_000);
+    (await seedEarning(runtime, "earning-one", "seller-one", 250_000));
+    (await seedEarning(runtime, "earning-two", "seller-two", 350_000));
 
     const summary = await runtime.app.inject({
       method: "GET", url: "/v1/seller", headers: asUser("seller-one"),
@@ -130,7 +130,7 @@ describe("account-bound seller finance routes", () => {
       expect.objectContaining({ id: "earning-one", sellerId: "seller-one" }),
     ]);
 
-    const apiKey = runtime.apiAccess.createKey("seller-one", "seller-finance-denied");
+    const apiKey = (await runtime.apiAccess.createKey("seller-one", "seller-finance-denied"));
     const denied = await runtime.app.inject({
       method: "GET",
       url: "/v1/seller/earnings",
@@ -142,7 +142,7 @@ describe("account-bound seller finance routes", () => {
 
   it("prepares idempotently, isolates ownership and cancels only its own payout", async () => {
     const { runtime, asUser, destinationAttestation } = await setup();
-    seedEarning(runtime, "earning-payout", "seller-one", 250_000);
+    (await seedEarning(runtime, "earning-payout", "seller-one", 250_000));
     const destination = await runtime.app.inject({
       method: "PUT",
       url: "/v1/seller/payout-destinations",
@@ -204,12 +204,12 @@ describe("account-bound seller finance routes", () => {
     });
     expect(response.statusCode).toBe(409);
     expect(response.json().error.code).toBe("spore_payout_gates_closed");
-    expect(runtime.sellerEarnings.getPayoutPreference("seller-one")).toBe("stable");
+    expect((await runtime.sellerEarnings.getPayoutPreference("seller-one"))).toBe("stable");
   });
 
   it("allows only an administrator to dispatch a prepared stable payout", async () => {
     const { runtime, asUser, destinationAttestation, settlementAttestation, stableGateway } = await setup();
-    seedEarning(runtime, "earning-admin-dispatch", "seller-one", 250_000);
+    (await seedEarning(runtime, "earning-admin-dispatch", "seller-one", 250_000));
     await runtime.app.inject({
       method: "PUT", url: "/v1/seller/payout-destinations",
       headers: asUser("seller-one"), payload: destinationAttestation("seller-one"),
@@ -301,14 +301,14 @@ describe("account-bound seller finance routes", () => {
   });
 });
 
-function seedEarning(
+async function seedEarning(
   runtime: CoordinatorRuntime,
   id: string,
   sellerId: string,
   amountUsdMicros: number,
-): void {
+): Promise<void> {
   const now = Date.now();
-  runtime.database.raw.prepare(
+  (await runtime.database.raw.prepare(
     `INSERT INTO verified_work_receipts(
        receipt_id, seller_id, worker_id, job_id, stage_id, pricing_version,
        amount_usd_micros, evidence_digest, accepted_at, verifier_key_id, signature, recorded_at
@@ -316,10 +316,10 @@ function seedEarning(
   ).run(
     `receipt-${id}`, sellerId, `worker-${id}`, `job-${id}`, `stage-${id}`,
     amountUsdMicros, "a".repeat(64), now, now,
-  );
-  runtime.database.raw.prepare(
+  ));
+  (await runtime.database.raw.prepare(
     `INSERT INTO seller_earnings(
        id, seller_id, receipt_id, amount_usd_micros, payout_method, status, created_at
      ) VALUES (?, ?, ?, ?, 'stable', 'available', ?)`,
-  ).run(id, sellerId, `receipt-${id}`, amountUsdMicros, now);
+  ).run(id, sellerId, `receipt-${id}`, amountUsdMicros, now));
 }

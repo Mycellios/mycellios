@@ -9,6 +9,7 @@ import { DEFAULT_NODE_WORK_POLICY, nodeWorkPolicySchema } from "./node-work-poli
 
 export const NODE_CONTROL_PROTOCOL_VERSION = 1 as const;
 export const NODE_CONTROL_MAX_CLOCK_SKEW_MS = 30_000;
+export const NODE_ENROLLMENT_MAX_TTL_SECONDS = 1_800;
 export const NODE_EVENT_ORIGIN_CURSOR = "evt_0_0000000000000000" as const;
 
 const identifier = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
@@ -39,7 +40,7 @@ export const nodeEnrollmentCreateSchema = z.object({
   schema: z.literal("mycellios-node-enrollment-create/1"),
   accountId: identifier,
   requestedBy: nodeControlActorSchema,
-  expiresInSeconds: z.number().int().min(60).max(900),
+  expiresInSeconds: z.number().int().min(60).max(NODE_ENROLLMENT_MAX_TTL_SECONDS),
 }).strict();
 
 export const nodeEnrollmentRedeemSchema = z.object({

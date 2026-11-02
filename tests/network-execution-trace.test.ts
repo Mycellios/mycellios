@@ -173,21 +173,21 @@ describe("physical network execution trace", () => {
 
 describe("MeshService route evidence", () => {
   const databases: MeshDatabase[] = [];
-  afterEach(() => {
-    for (const database of databases.splice(0)) database.close();
+  afterEach(async () => {
+    for (const database of databases.splice(0)) (await database.close());
   });
 
   it("attaches the successful deployment route and interval-scoped transport to completion", async () => {
-    const database = new MeshDatabase(":memory:");
+    const database = (await MeshDatabase.open(":memory:"));
     databases.push(database);
     const store = new MeshStore(database);
     for (const worker of workers()) {
-      store.registerWorker({
+      (await store.registerWorker({
         identity: { kind: "device", id: worker.identityId ?? worker.id },
         capabilities: worker.capabilities,
-      });
+      }));
     }
-    const registered = store.listWorkers();
+    const registered = (await store.listWorkers());
     const workerA = registered.find(
       (worker) => worker.capabilities.distributedExecutor?.nodeId === "node-a",
     )!;
@@ -227,24 +227,24 @@ describe("MeshService route evidence", () => {
         })),
       }),
     });
-    store.updateWorkerHeartbeat(workerA.id, workerA.capabilities, "online");
-    store.updateWorkerHeartbeat(workerB.id, workerB.capabilities, "online");
+    (await store.updateWorkerHeartbeat(workerA.id, workerA.capabilities, "online"));
+    (await store.updateWorkerHeartbeat(workerB.id, workerB.capabilities, "online"));
 
     const hub = new TraceHub();
     hub.connected.add(workerA.id);
     hub.connected.add(workerB.id);
     hub.snapshots = [transport({ bytesForward: 10, bytesReturn: 5 })];
-    const service = new MeshService(
+    const service = (await MeshService.create(
       store,
       new Scheduler(store),
       hub as unknown as WorkerHub,
       30_000,
-    );
-    const handle = service.submit({
+    ));
+    const handle = (await service.submit({
       model: "distributed-small",
       messages: [{ role: "user", content: "ruta física" }],
       max_tokens: 8,
-    });
+    }));
     const offer = hub.sent.find((message) => message.type === "lease.offer")!;
     const payload = offer.payload as { leaseId: string };
     hub.workerMessage(envelope(workerA.id, "lease.accept", {

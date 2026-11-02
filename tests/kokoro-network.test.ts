@@ -75,7 +75,7 @@ describe("Kokoro over the real Mycellios worker protocol", () => {
       expect(body.choices[0]!.finish_reason).toBe("stop");
       expect(body.usage).toMatchObject({ prompt_tokens: 2, completion_tokens: 0 });
     }
-    expect(runtime.store.listJobs().every((j) => j.status === "completed")).toBe(true);
+    expect((await runtime.store.listJobs()).every((j) => j.status === "completed")).toBe(true);
     const streamed = await speak(address, "Hola stream", true);
     const sse = await streamed.text();
     expect(sse).toContain("data: [DONE]");

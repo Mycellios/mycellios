@@ -53,16 +53,16 @@ describe("public control-plane deterministic stateful fuzzing", () => {
     }
   });
 
-  it("never accepts enrollment or command replay across a randomized state sequence", () => {
-    const database = new MeshDatabase(":memory:");
+  it("never accepts enrollment or command replay across a randomized state sequence", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     const now = Date.parse("2026-08-10T12:00:01.000Z");
     const enrollments = new NodeEnrollmentStore(database, () => now);
     const commands = new NodeCommandStore(database, () => now);
     const random = seededRandom(0x73746174);
 
     for (let index = 0; index < 64; index += 1) {
-      const issued = enrollments.issue({ accountId: actor.id, actor, expiresInSeconds: 120 });
-      if (random() < 0.8) enrollments.confirm({ enrollmentId: issued.enrollmentId, accountId: actor.id, actorId: actor.id });
+      const issued = (await enrollments.issue({ accountId: actor.id, actor, expiresInSeconds: 120 }));
+      if (random() < 0.8) (await enrollments.confirm({ enrollmentId: issued.enrollmentId, accountId: actor.id, actorId: actor.id }));
       const input = {
         enrollmentToken: issued.enrollmentToken,
         nonce: issued.nonce,
@@ -70,24 +70,24 @@ describe("public control-plane deterministic stateful fuzzing", () => {
         identityId: `node-${index}`,
         publicKeyFingerprint: digest(index % 2 === 0 ? "a" : "b"),
       };
-      const first = enrollments.consume(input);
-      const replay = enrollments.consume(input);
+      const first = (await enrollments.consume(input));
+      const replay = (await enrollments.consume(input));
       if (first.state === "consumed") expect(replay.state).toBe("already-consumed");
       else expect(["unconfirmed", "expired", "nonce-mismatch", "credential-conflict"]).toContain(first.state);
 
       const command = commandFixture(index);
-      expect(commands.enqueue(command, 3).state).toBe("queued");
-      expect(commands.enqueue(command, 3).state).toBe("queued");
-      expect(() => commands.enqueue({ ...commandFixture(index + 10_000), nonce: command.nonce }, 3))
+      expect((await commands.enqueue(command, 3)).state).toBe("queued");
+      expect((await commands.enqueue(command, 3)).state).toBe("queued");
+      await expect((async () => (await commands.enqueue({ ...commandFixture(index + 10_000), nonce: command.nonce }, 3)))()).rejects
         .toThrow("node_command_replay");
     }
 
-    const events = commands.eventsAfter("node-fuzz", null);
+    const events = (await commands.eventsAfter("node-fuzz", null));
     for (const event of events.slice(0, 32)) {
       const forged = `${event.cursor.slice(0, -1)}${event.cursor.endsWith("0") ? "1" : "0"}`;
-      expect(() => commands.eventsAfter("node-fuzz", forged)).toThrow(/node_event_cursor/);
+      await expect((async () => (await commands.eventsAfter("node-fuzz", forged)))()).rejects.toThrow(/node_event_cursor/);
     }
-    database.close();
+    (await database.close());
   });
 
   it("treats payload-shaped code as data and rejects unknown command fields", () => {

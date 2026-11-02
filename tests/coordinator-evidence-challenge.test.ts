@@ -17,34 +17,34 @@ import {
 import { Scheduler } from "../src/scheduler/scheduler.js";
 
 describe("coordinator evidence authority", () => {
-  it("keeps a pipeline unschedulable until it observes every challenged sample", () => {
+  it("keeps a pipeline unschedulable until it observes every challenged sample", async () => {
     const worker = storedWorker(pipelineCapabilities());
-    const { hub, socket, state, current } = harness(worker);
+    const { hub, socket, state, current } = (await harness(worker));
     const scheduler = new Scheduler({
       listSchedulableWorkers: () => [current.worker],
       countActiveJobs: () => 0,
       getSessionRoute: () => null,
     } as unknown as MeshStore);
 
-    expect(scheduler.listAvailableModels()).toEqual([]);
-    issueChallenges(hub, state, worker.capabilities);
+    expect((await scheduler.listAvailableModels())).toEqual([]);
+    await issueChallenges(hub, state, worker.capabilities);
     const challenge = socket.sent.find(
       (message) => message.type === "evidence.challenge"
         && (message.payload as { kind?: string }).kind === "deployment-canary",
     )!.payload as Record<string, unknown>;
 
     for (let sampleIndex = 0; sampleIndex < 3; sampleIndex += 1) {
-      deliver(hub, state, "evidence.canary.started", {
+      await deliver(hub, state, "evidence.canary.started", {
         ...binding(challenge),
         sampleIndex,
       });
-      deliver(hub, state, "evidence.canary.token", {
+      await deliver(hub, state, "evidence.canary.token", {
         ...binding(challenge),
         sampleIndex,
         index: 0,
         text: "measured answer",
       });
-      deliver(hub, state, "evidence.canary.complete", {
+      await deliver(hub, state, "evidence.canary.complete", {
         ...binding(challenge),
         sampleIndex,
         outputTokens: 4,
@@ -64,11 +64,11 @@ describe("coordinator evidence authority", () => {
       },
     });
     expect(deployment.tokensPerSecond).toBeGreaterThan(0);
-    expect(scheduler.listAvailableModels()).toEqual([
+    expect((await scheduler.listAvailableModels())).toEqual([
       { id: "qwen-test", replicas: 1, pipelines: 0 },
     ]);
 
-    deliver(hub, state, "evidence.canary.complete", {
+    await deliver(hub, state, "evidence.canary.complete", {
       ...binding(challenge),
       sampleIndex: 2,
       outputTokens: 4,
@@ -78,14 +78,14 @@ describe("coordinator evidence authority", () => {
       code: 4403,
       reason: "invalid or replayed evidence response",
     });
-    hub.close();
+    (await hub.close());
   });
 
-  it("publishes a runtime profile only after the directed current-session challenge", () => {
+  it("publishes a runtime profile only after the directed current-session challenge", async () => {
     const capabilities = executorCapabilities();
     const worker = storedWorker(capabilities);
-    const { hub, socket, state, current } = harness(worker);
-    issueChallenges(hub, state, capabilities);
+    const { hub, socket, state, current } = (await harness(worker));
+    await issueChallenges(hub, state, capabilities);
     const challenge = socket.sent.find(
       (message) => message.type === "evidence.challenge"
         && (message.payload as { kind?: string }).kind === "runtime-performance",
@@ -102,7 +102,7 @@ describe("coordinator evidence authority", () => {
       activationCodec: series("GB/s", 2),
     });
 
-    deliver(hub, state, "evidence.runtime.complete", {
+    await deliver(hub, state, "evidence.runtime.complete", {
       ...binding(challenge),
       profile,
     });
@@ -136,10 +136,10 @@ describe("coordinator evidence authority", () => {
             capabilities: WorkerCapabilities;
             metrics: { ready: boolean; activeJobs: number; loadedModels: string[] };
           },
-        ): void;
+        ): Promise<void>;
       }
     );
-    merged.applyHeartbeat(nextState, {
+    await merged.applyHeartbeat(nextState, {
       heartbeat: {
         draining: false,
         pausedReason: null,
@@ -153,7 +153,7 @@ describe("coordinator evidence authority", () => {
     });
     expect(current.worker.capabilities.distributedExecutor?.performanceEvidence)
       .toBeUndefined();
-    hub.close();
+    (await hub.close());
   });
 
   it("revokes coordinator observations when the executable source changes", () => {
@@ -186,7 +186,7 @@ describe("coordinator evidence authority", () => {
     expect(merged.deployments[0]?.canaryEvidence).toBeUndefined();
   });
 
-  it("challenges the loaded engine and publishes a bound runtime profile", () => {
+  it("challenges the loaded engine and publishes a bound runtime profile", async () => {
     const capabilities = executorCapabilities();
     capabilities.buildIdentity = buildIdentity("d");
     capabilities.distributedExecutor!.physicalIdentity = {
@@ -209,8 +209,8 @@ describe("coordinator evidence authority", () => {
       contextLimit: 8_192,
     }];
     const worker = storedWorker(capabilities);
-    const { hub, socket, state, current } = harness(worker);
-    issueChallenges(hub, state, capabilities);
+    const { hub, socket, state, current } = (await harness(worker));
+    await issueChallenges(hub, state, capabilities);
     const runtimeChallenge = socket.sent.find(
       (message) => message.type === "evidence.challenge"
         && (message.payload as { kind?: string }).kind === "runtime-performance",
@@ -226,7 +226,7 @@ describe("coordinator evidence authority", () => {
       prefillCompute: series("TFLOP/s", 20),
       activationCodec: series("GB/s", 2),
     });
-    deliver(hub, state, "evidence.runtime.complete", {
+    await deliver(hub, state, "evidence.runtime.complete", {
       ...binding(runtimeChallenge),
       profile,
     });
@@ -263,13 +263,13 @@ describe("coordinator evidence authority", () => {
         canaryEvidenceId: current.worker.capabilities.deployments[0]!.canaryEvidence!.evidenceId,
       },
     }];
-    const challengeId = hub.startEngineRuntimeProfileChallenge(worker.id, engineRequest);
+    const challengeId = (await hub.startEngineRuntimeProfileChallenge(worker.id, engineRequest));
     expect(challengeId).toMatch(/^challenge-/);
     const engineChallenge = socket.sent.find(
       (message) => message.type === "evidence.challenge"
         && (message.payload as { kind?: string }).kind === "engine-runtime",
     )!.payload as Record<string, unknown>;
-    deliver(hub, state, "evidence.engine-runtime.complete", {
+    await deliver(hub, state, "evidence.engine-runtime.complete", {
       ...binding(engineChallenge),
       measurement: {
         measuredAt: new Date().toISOString(),
@@ -308,7 +308,7 @@ describe("coordinator evidence authority", () => {
         workerId: worker.id,
         sessionId: "session-test",
       })]);
-    hub.close();
+    (await hub.close());
   });
 });
 
@@ -434,9 +434,10 @@ function storedWorker(capabilities: WorkerCapabilities): StoredWorker {
   };
 }
 
-function harness(initial: StoredWorker) {
+async function harness(initial: StoredWorker) {
   const current = { worker: initial, plans: [] as Array<Record<string, unknown>> };
   const store = {
+    listRuntimeLinkSamples: async () => [],
     getWorker: (workerId: string) => workerId === current.worker.id ? current.worker : null,
     updateWorkerHeartbeat: (
       workerId: string,
@@ -450,7 +451,7 @@ function harness(initial: StoredWorker) {
     listEngineRuntimeActivationPlans: () => current.plans,
     setWorkerStatus: () => undefined,
   } as unknown as MeshStore;
-  const hub = new WorkerHub(store);
+  const hub = (await WorkerHub.create(store));
   const socket = {
     OPEN: 1,
     readyState: 1,
@@ -479,33 +480,33 @@ function harness(initial: StoredWorker) {
   return { hub, socket, state, current };
 }
 
-function issueChallenges(
+async function issueChallenges(
   hub: WorkerHub,
-  state: ReturnType<typeof harness>["state"],
+  state: Awaited<ReturnType<typeof harness>>["state"],
   capabilities: WorkerCapabilities,
-): void {
-  (
+): Promise<void> {
+  await (
     hub as unknown as {
       ensureEvidenceChallenges(
         connection: typeof state,
         claims: WorkerCapabilities,
-      ): void;
+      ): Promise<void>;
     }
   ).ensureEvidenceChallenges(state, capabilities);
 }
 
-function deliver(
+async function deliver(
   hub: WorkerHub,
-  state: ReturnType<typeof harness>["state"],
+  state: Awaited<ReturnType<typeof harness>>["state"],
   type: string,
   payload: Record<string, unknown>,
-): void {
-  (
+): Promise<void> {
+  await (
     hub as unknown as {
       handleEvidenceEnvelope(
         connection: typeof state,
         envelope: WorkerEnvelope,
-      ): void;
+      ): Promise<void>;
     }
   ).handleEvidenceEnvelope(state, {
     v: 1,

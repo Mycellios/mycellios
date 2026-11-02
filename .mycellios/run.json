@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "services": [
+    {
+      "id": "backend",
+      "cwd": "src/agent",
+      "ready": {
+        "timeoutMs": 120000,
+        "url": "http://127.0.0.1:3101/ready"
+      },
+      "command": "node scripts/project-local.mjs backend",
+      "dependsOn": []
+    },
+    {
+      "id": "web",
+      "cwd": "src/agent",
+      "ready": {
+        "timeoutMs": 60000,
+        "url": "http://127.0.0.1:5192/"
+      },
+      "command": "node scripts/project-local.mjs web",
+      "dependsOn": [
+        "backend"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "id": "web",
+      "url": "http://127.0.0.1:5192/app",
+      "services": [
+        "backend",
+        "web"
+      ],
+      "name": "App local: datos y autenticación"
+    }
+  ]
+}

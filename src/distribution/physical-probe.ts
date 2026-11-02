@@ -15,6 +15,7 @@ export interface PhysicalProbeHostV1 {
   architecture: string;
   kernelRelease: string;
   pythonVersion: string;
+  cpuDeviceName?: string;
 }
 
 export interface PhysicalProbeRuntimeV1 {
@@ -22,6 +23,7 @@ export interface PhysicalProbeRuntimeV1 {
   cudaVersion: string | null;
   rocmVersion: string | null;
   cudaApiAvailable: boolean;
+  directmlApiAvailable?: boolean;
   distributedAvailable: boolean;
   ncclAvailable: boolean;
   ncclVersion: string | null;
@@ -101,7 +103,13 @@ export class PythonPhysicalProbe implements PhysicalProbeCollector {
           encoding: "utf8",
           ...(this.cwd === undefined ? {} : { cwd: this.cwd }),
           env: buildIsolatedProcessEnvironment(
-            this.env === undefined ? {} : { overrides: this.env },
+            {
+              ...(this.env === undefined ? {} : { overrides: this.env }),
+              // Windows Python uses these public system values for CPU identity.
+              additionalInheritedKeys: [
+                "PROCESSOR_ARCHITECTURE", "PROCESSOR_ARCHITEW6432", "PROCESSOR_IDENTIFIER",
+              ],
+            },
           ),
           ...(signal === undefined ? {} : { signal }),
         },
@@ -165,7 +173,7 @@ export function validatePhysicalProbe(
     indices.add(device.index);
     fingerprints.add(device.fingerprintSha256);
   }
-  if (!value.runtime.cudaApiAvailable && value.devices.length !== 0) {
+  if (!value.runtime.cudaApiAvailable && !value.runtime.directmlApiAvailable && value.devices.length !== 0) {
     throw new Error("physical_probe_devices_require_cuda_api");
   }
   if (value.runtime.ncclAvailable && !value.runtime.distributedAvailable) {
@@ -184,6 +192,7 @@ function validateHost(value: unknown): asserts value is PhysicalProbeHostV1 {
       "architecture",
       "kernelRelease",
       "pythonVersion",
+      ...(value.cpuDeviceName === undefined ? [] : ["cpuDeviceName"]),
     ],
     "physical_probe_host",
   );
@@ -194,6 +203,7 @@ function validateHost(value: unknown): asserts value is PhysicalProbeHostV1 {
     "architecture",
     "kernelRelease",
     "pythonVersion",
+    ...(value.cpuDeviceName === undefined ? [] : ["cpuDeviceName"]),
   ] as const) {
     normalizedText(value[key], `physical_probe_host_${key}_is_invalid`);
   }
@@ -211,10 +221,12 @@ function validateRuntime(value: unknown): asserts value is PhysicalProbeRuntimeV
       "distributedAvailable",
       "ncclAvailable",
       "ncclVersion",
+      ...(value.directmlApiAvailable === undefined ? [] : ["directmlApiAvailable"]),
     ],
     "physical_probe_runtime",
   );
   normalizedText(value.torchVersion, "physical_probe_torch_version_is_invalid");
+  if (value.directmlApiAvailable !== undefined && typeof value.directmlApiAvailable !== "boolean") throw new Error("physical_probe_directml_is_invalid");
   for (const key of ["cudaVersion", "rocmVersion", "ncclVersion"] as const) {
     if (value[key] !== null) normalizedText(value[key], `physical_probe_${key}_is_invalid`);
   }

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessByStdio } from "node:child_process";
+import { resolveStartupPolicy } from "./startup-policy.js";
 import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { activationCheckpointControlRequest } from "./activation-checkpoint-control.js";
@@ -107,6 +108,7 @@ export interface LaunchAgent {
     description: PythonPipelineLaunchDescription,
     nodeId: string,
     onProgress?: (event: RuntimePreparationProgressEvent) => void,
+    signal?: AbortSignal,
   ): Promise<readonly PythonLaunchProcess[]>;
   subscribeRuntimePreparation?(
     listener: (event: RuntimePreparationProgressEvent) => void,
@@ -128,6 +130,8 @@ export type LaunchAgentResolver = (
 
 export interface LaunchSupervisorOptions {
   resolveAgent: LaunchAgentResolver;
+  /** Explicit calibration mode; only disjoint physical endpoints may overlap. */
+  independentParallelStartup?: boolean;
   readinessTimeoutMs?: number;
   maxTelemetryEvents?: number;
   now?: () => number;
@@ -214,6 +218,7 @@ export class PythonLaunchSupervisor {
   private readonly description: PythonPipelineLaunchDescription;
   private readonly resolveAgent: LaunchAgentResolver;
   private readonly readinessTimeoutMs: number;
+  private readonly independentParallelStartup: boolean;
   private readonly maxTelemetryEvents: number;
   private readonly now: () => number;
   private readonly processes: MutableProcessRecord[];
@@ -239,6 +244,7 @@ export class PythonLaunchSupervisor {
     assertPythonLaunchDraftStrategyCurrent(descriptionValue, clock());
     this.description = structuredClone(descriptionValue);
     this.resolveAgent = options.resolveAgent;
+    this.independentParallelStartup = resolveStartupPolicy(this.description.configuration, options);
     this.readinessTimeoutMs = boundedInteger(
       options.readinessTimeoutMs ?? 180_000,
       1,
@@ -311,45 +317,28 @@ export class PythonLaunchSupervisor {
     const controller = new AbortController();
     this.lifecycleController = controller;
     const removeExternalAbort = linkAbortSignal(externalSignal, controller);
+    let parallelFailureProcessId: string | undefined;
     try {
-      for (const record of this.processes) {
-        throwIfAborted(controller.signal);
-        record.state = "starting";
-        record.startedAtMs = this.now();
-        this.emit("process_starting", record);
-        const agent = this.resolveAgent(record.nodeId, record.launch);
-        if (!agent) throw new Error(`launch_agent_not_found:${record.nodeId}`);
-        record.agentId = agent.id;
-        const deadline = this.now() + this.readinessTimeoutMs;
-        const handle = await waitForOperation(
-          agent.start(
-            {
-              launchId: this.description.launchId,
-              pipelineId: this.description.pipelineId,
-              deploymentGeneration: this.description.deploymentGeneration,
-              nodeId: record.nodeId,
-              process: structuredClone(record.launch),
-            },
-            controller.signal,
-          ),
-          controller.signal,
-          remainingMs(deadline, this.now()),
-          () => new LaunchReadinessTimeoutError(record.processId, this.readinessTimeoutMs),
-        );
-        validateHandle(handle, record.processId);
-        record.handle = handle;
-        await waitUntilReady(
-          handle,
-          record.processId,
-          controller.signal,
-          remainingMs(deadline, this.now()),
-          this.readinessTimeoutMs,
-        );
-        throwIfAborted(controller.signal);
-        record.state = "ready";
-        record.readyAtMs = this.now();
-        this.emit("process_ready", record);
-        this.monitorReadyProcess(record);
+      if (this.independentParallelStartup) {
+        const nodes = new Set<string>(), hosts = new Set<string>();
+        for (const record of this.processes) {
+          if (record.launch.members.length !== 1 || nodes.has(record.nodeId) || hosts.has(record.launch.anchor.endpoint.host)) {
+            throw new Error("parallel_startup_requires_disjoint_nodes");
+          }
+          nodes.add(record.nodeId); hosts.add(record.launch.anchor.endpoint.host);
+        }
+        const results = await Promise.allSettled(this.processes.map(record =>
+          this.startRecord(record, controller).catch(error => {
+            if (!controller.signal.aborted) {
+              parallelFailureProcessId = record.processId;
+              controller.abort(error);
+            }
+            throw error;
+          })));
+        const failed = results.find(result => result.status === "rejected");
+        if (failed?.status === "rejected") throw failed.reason;
+      } else {
+        for (const record of this.processes) await this.startRecord(record, controller);
       }
       throwIfAborted(controller.signal);
       this.state = "running";
@@ -358,7 +347,11 @@ export class PythonLaunchSupervisor {
     } catch (error) {
       const normalized = normalizeError(error);
       const cancelled = normalized instanceof LaunchCancelledError;
-      const active = this.processes.find((record) => record.state === "starting");
+      const failedProcessId = normalized instanceof LaunchProcessExitedError
+        || normalized instanceof LaunchReadinessTimeoutError ? normalized.processId : parallelFailureProcessId;
+      const active = failedProcessId === undefined
+        ? this.processes.find((record) => record.state === "starting")
+        : this.processes.find((record) => record.processId === failedProcessId);
       if (active) {
         if (cancelled && !active.handle) {
           active.state = "stopped";
@@ -380,6 +373,62 @@ export class PythonLaunchSupervisor {
     } finally {
       removeExternalAbort();
     }
+  }
+
+  private async startRecord(record: MutableProcessRecord, controller: AbortController): Promise<void> {
+    throwIfAborted(controller.signal);
+    record.state = "starting";
+    record.startedAtMs = this.now();
+    this.emit("process_starting", record);
+    const agent = this.resolveAgent(record.nodeId, record.launch);
+    if (!agent) throw new Error(`launch_agent_not_found:${record.nodeId}`);
+    record.agentId = agent.id;
+    const deadline = this.now() + this.readinessTimeoutMs;
+    const delay = record.launch.kind === "root-engine" ? this.description.configuration.rootStartupDelayMs ?? 0 : 0;
+    if (delay > 0) {
+      if (delay >= remainingMs(deadline, this.now())) throw new LaunchReadinessTimeoutError(record.processId, this.readinessTimeoutMs);
+      await waitStartupDelay(delay, controller.signal);
+    }
+    const handle = await waitForOperation(
+      agent.start(
+        {
+          launchId: this.description.launchId,
+          pipelineId: this.description.pipelineId,
+          deploymentGeneration: this.description.deploymentGeneration,
+          nodeId: record.nodeId,
+          process: structuredClone(record.launch),
+        },
+        controller.signal,
+      ).then(async handle => {
+        validateHandle(handle, record.processId);
+        record.handle = handle;
+        if (controller.signal.aborted) {
+          await handle.stop("launch_cancelled_after_start");
+          record.state = "stopped";
+          record.stoppedAtMs = this.now();
+          this.emit("process_stopped", record, "launch_cancelled_after_start");
+        }
+        return handle;
+      }),
+      controller.signal,
+      remainingMs(deadline, this.now()),
+      () => new LaunchReadinessTimeoutError(record.processId, this.readinessTimeoutMs),
+    );
+    validateHandle(handle, record.processId);
+    record.handle = handle;
+    await waitUntilReady(
+      handle,
+      record.processId,
+      controller.signal,
+      remainingMs(deadline, this.now()),
+      this.readinessTimeoutMs,
+    );
+    throwIfAborted(controller.signal);
+    record.state = "ready";
+    record.readyAtMs = this.now();
+    this.emit("process_ready", record);
+    this.monitorReadyProcess(record);
+
   }
 
   private async stopInternal(reason: string): Promise<LaunchSupervisorSnapshot> {
@@ -983,6 +1032,15 @@ async function waitUntilReady(
   );
 }
 
+function waitStartupDelay(delay: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); signal.removeEventListener("abort", abort); reject(cancellationFromSignal(signal)); };
+    const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, delay);
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  });
+}
+
 function waitForOperation<T>(
   operation: Promise<T>,
   signal: AbortSignal,
@@ -1001,14 +1059,12 @@ function waitForOperation<T>(
     const abort = () => finish(() => reject(cancellationFromSignal(signal)));
     const timer = setTimeout(() => finish(() => reject(timeoutError())), Math.max(1, timeoutMs));
     signal.addEventListener("abort", abort, { once: true });
-    if (signal.aborted) {
-      abort();
-      return;
-    }
     operation.then(
       (value) => finish(() => resolve(value)),
       (error) => finish(() => reject(normalizeError(error))),
     );
+    // Observe the already-created operation even when cancellation won the race.
+    if (signal.aborted) abort();
   });
 }
 

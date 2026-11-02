@@ -1,3 +1,4 @@
+import type { DenseStagePolicy } from "../contracts/dense-stage.js";
 export type ActivationCodecId =
   | "fp16"
   | "int8"
@@ -89,6 +90,10 @@ export interface ComputeNodeProfile {
   region: string;
   memoryBytes: number;
   reserveBytes: number;
+  /** Independent available host RAM ceiling for explicit dense policies. */
+  hostMemoryBytes?: number;
+  /** Observed graphics sharing; absence does not establish dedicated memory. */
+  deviceMemorySharesHost?: boolean;
   decodeScale: number;
   prefillScale: number;
   codecScale: number;
@@ -177,6 +182,7 @@ export interface DistributionWorkload {
 }
 
 export interface StagePlacement {
+  dense?: DenseStagePolicy;
   nodeId: string;
   layerStart: number;
   layerEnd: number;

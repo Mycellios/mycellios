@@ -1,0 +1,54 @@
+name: Agent workspace quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  agent:
+    name: Agent types, tests and builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/agent/package-lock.json
+      - name: Install the two owned dependency graphs
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
+      - name: Generate the database client without connecting to a database
+        working-directory: src/agent
+        run: npm run generate --workspace @rakazo/db
+      - name: Check deployed application surfaces
+        working-directory: src/agent
+        run: |
+          npm run check --workspace @rakazo/api
+          npm run check --workspace @rakazo/worker
+          npm run check --workspace @rakazo/desktop
+          npm run check --workspace @rakazo/web
+      - name: Run offline Agent tests
+        working-directory: src/agent
+        run: |
+          npm test -- --maxWorkers 2 --no-file-parallelism
+          node --test scripts/project-local-env.test.mjs apps/desktop/scripts/release-continuity.test.mjs
+      - name: Compile API, worker, bundled web and Desktop host
+        working-directory: src/agent
+        run: |
+          npm run build --workspace @rakazo/api --workspace @rakazo/worker
+          npm run build --workspace @rakazo/web -- --desktop
+          npm run build --workspace @rakazo/desktop

@@ -1,0 +1,192 @@
+# Self-host sandbox / computer providers
+
+`SANDBOX_PROVIDER` selects where bot computers run. Workspace bots share a Team Computer by
+default; Private Computers are optional. See [computer runtime and isolation](./computer-runtime.md)
+for the sharing and persistence contract.
+
+## Quick pick
+
+| Goal | Set | Also need |
+| --- | --- | --- |
+| Local Docker computers | `SANDBOX_PROVIDER=docker` | `SANDBOX_SUPERVISOR_TOKEN`, computer image, Docker socket for supervisor |
+| UI only, no computers | `SANDBOX_PROVIDER=none` | No provider credential; published-images Compose still requires `SANDBOX_SUPERVISOR_TOKEN` |
+| Managed remote desktop | `e2b` / `daytona` / `boat` | `SANDBOX_SUPERVISOR_TOKEN` (published-images Compose), matching API key (and optional URL knobs for Daytona/Boat) |
+
+Published-images [Compose](../infra/compose/docker-compose.images.yml) defaults to **`docker`**.
+It always starts the supervisor and requires `SANDBOX_SUPERVISOR_TOKEN`, including for `none`
+and remote providers. This stack credential does not replace a remote provider's API key.
+
+## `docker` (in-stack supervisor)
+
+Compose starts a **sandbox supervisor** (from the app image) on the internal
+network (port `7091` in published-images). It creates sibling **computer**
+containers from `RAKAZO_COMPUTER_IMAGE` + `RAKAZO_COMPUTER_IMAGE_TAG`.
+
+Requirements:
+
+- Non-empty `SANDBOX_SUPERVISOR_TOKEN` (distinct from auth / screen / encryption secrets)
+- Reachable computer image (GHCR default or your mirror; on arm64 pin multi-arch tags for both app and computer)
+- Docker Engine available to the supervisor (socket mount on the Compose path)
+
+Verify:
+
+```bash
+curl -fsS http://127.0.0.1:3100/internal/health
+# expect sandbox: docker
+```
+
+Missing supervisor token is a **setup failure**: do not treat `sandbox: "none"` as success for this path.
+
+Signup and local Docker computers work **without** an E2B (or other remote) account.
+
+### Bot browser
+
+The published computer image uses Chromium. To use Brave instead, build the image with
+`BROWSER=brave` and point Compose at it:
+
+```bash
+docker build --build-arg BROWSER=brave -t rakazo-computer-brave infra/sandboxes/computer
+```
+
+```env
+RAKAZO_COMPUTER_IMAGE=rakazo-computer-brave
+RAKAZO_COMPUTER_IMAGE_TAG=latest
+```
+
+The image holds one browser, and `rakazo-browser` launches whichever is installed. A locally built
+image is not on a registry, so start the stack with `bash install-images.sh --pull-never` after
+pulling the other images once. Brave's Rewards, Wallet, Leo, VPN and News are disabled by managed
+policy. Browser identity is only one input to bot-check challenges; the host's IP reputation usually
+matters more.
+
+## `none`
+
+Runs API/web without provisioning bot computers.
+
+## Remote providers
+
+Set `SANDBOX_PROVIDER` to exactly one of:
+
+| Value | Credential | Notes |
+| --- | --- | --- |
+| `e2b` | `E2B_API_KEY` | Hosted sandboxes |
+| `daytona` | `DAYTONA_API_KEY` | Optional `DAYTONA_API_URL`, `DAYTONA_TARGET`, `DAYTONA_SNAPSHOT` |
+| `boat` | `BOAT_API_KEY` | Optional `BOAT_API_URL` (see `.env.example`) |
+
+Remote paths still need a working API/worker; they do not replace Postgres or
+the web UI. They require egress to the provider. For air-gapped hosts prefer
+`docker` with pre-loaded images, or `none`.
+
+A run starts its computer only when it first uses a computer tool. With idle sleep on,
+a computer suspends after `SANDBOX_IDLE_MS` idle. On providers that bill while running
+(E2B, Daytona, Boat, CreateOS, Railway), it also suspends after `COMPUTER_MAX_ACTIVE_MS`
+(default 2 hours) up in one stretch, even with background work or an open screen, unless
+a run is executing on it or a user is in control of its screen. `0` turns the cap off.
+That exception lifts only the uptime cap; idle suspension after `SANDBOX_IDLE_MS` still
+applies once nothing holds the computer.
+Docker and this-Mac computers are never capped. The next use resumes it. Asking for
+takeover restarts the idle timer, and on providers that do not bill while running the run
+also holds the computer for 30 minutes after asking, so the user can answer the push on
+the same open page.
+
+### Computer run time
+
+Each stretch a computer runs at its provider is a row in `computer_runs`, attributed to the
+computer's owner and space. A run starts when the computer becomes ready (boot time is not
+counted) and ends when it stops. `endReason` says how: `stopped`, `idle`, `active_limit`,
+`replaced` (update, recovery, or reset), `gone` (the provider had already stopped or lost
+the sandbox), `deleted`, or `reconciled` (the end was never seen; the worker found the
+computer no longer running). For `gone` and `reconciled`, `endedAt` is when Rakazo
+noticed, so the true end may be earlier. The worker also opens the run of a running
+computer whose start was not recorded. An open run whose computer still reads as running
+is a computer that may be left on. Deleting a user or space keeps their runs with
+`userId` and `spaceId` cleared. This-Mac computers are not recorded.
+
+The table has row-level security, so query it as the database owner. Timestamps are UTC.
+Run hours per user over the last 7 days, counting runs still open up to now:
+
+```sql
+WITH now_utc AS (SELECT now() AT TIME ZONE 'UTC' AS at)
+SELECT r."userId", u.email,
+       round(sum(extract(epoch FROM
+         coalesce(r."endedAt", n.at) - greatest(r."startedAt", n.at - interval '7 days')
+       )) / 3600, 1) AS hours
+FROM computer_runs r
+CROSS JOIN now_utc n
+LEFT JOIN "user" u ON u.id = r."userId"
+WHERE coalesce(r."endedAt", n.at) > n.at - interval '7 days'
+GROUP BY r."userId", u.email
+ORDER BY hours DESC;
+```
+
+Runs open longer than 6 hours:
+
+```sql
+SELECT r."computerId", r."userId", r."spaceId", r.kind, r."startedAt",
+       round(extract(epoch FROM (now() AT TIME ZONE 'UTC') - r."startedAt") / 3600, 1) AS hours_open
+FROM computer_runs r
+WHERE r."endedAt" IS NULL
+  AND r."startedAt" < (now() AT TIME ZONE 'UTC') - interval '6 hours'
+ORDER BY r."startedAt";
+```
+
+### Linux background-work inspection
+
+The fallback background-work probe and cancellation commands require Bash,
+Python 3.7 or newer, and a readable/searchable `/proc` root. Both supplied images
+install `python3` explicitly in `infra/sandboxes/computer/Dockerfile` and
+`infra/sandboxes/desktop/Dockerfile`. Custom and remote images must provide this
+capability. The scanner itself never installs Python.
+
+The scanner reads marker file descriptors regardless of the holder's UID,
+including duplicated, inherited, and deleted-but-open markers. Individual
+entries that disappear or deny access are skipped because their links cannot
+be observed. A failed root traversal, unexpected filesystem error, or missing
+Python capability makes inspection unknown. Such failures do not authorize marker
+cleanup or cancellation signals from partial scanner output. Cancellation
+rechecks each selected PID's marker descriptors before signaling it.
+
+### E2B computer template
+
+E2B computers start from the `rakazo-computer` template: E2B's stock desktop at
+2 vCPU and 4 GB instead of its 8 vCPU and 8 GB. Build it once in the E2B team that
+owns `E2B_API_KEY`, and again whenever its definition in
+`packages/adapters/src/e2b-template.ts` changes:
+
+```bash
+E2B_API_KEY=<deployment key> pnpm sandbox:e2b-template
+```
+
+Until it exists, new computers use the stock desktop template. Existing computers keep
+the size they were created with until they are replaced.
+
+### Boat computer snapshot
+
+Boat computers start from a named snapshot, `rakazo-computer-<hash>`, that already has the
+desktop tools installed. The hash follows the setup in `packages/adapters/src/boat-sandbox.ts`,
+so changing it produces a new name and existing computers keep the one they started from.
+
+No setup is needed: when the snapshot for the current setup is missing, the API or worker
+logs `sandbox.base_image` with `outcome: "missing"`, builds it once in the background from a
+fresh sandbox with no account environment and no bot data, and deletes the build sandbox.
+Until it is ready, new computers install the tools themselves. To build it ahead of the
+first computer, in the Boat account that owns `BOAT_API_KEY`:
+
+```bash
+BOAT_API_KEY=<deployment key> pnpm sandbox:boat-snapshot
+```
+
+## Verify a provider change
+
+After changing provider or keys (from the published-images drop directory that
+holds `docker-compose.images.yml` and `.env`):
+
+```bash
+docker compose --env-file .env -f docker-compose.images.yml up -d
+curl -fsS http://127.0.0.1:3100/internal/health
+```
+
+Confirm `sandbox` equals the intended provider (`e2b`, `daytona`, or `boat`).
+HTTP 200 alone does not verify a remote provider: a missing API key falls back to `sandbox: "none"`.
+A present but invalid key still reports the selected provider. Open a bot's computer to verify
+provisioning and desktop access.

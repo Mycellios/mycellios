@@ -1,0 +1,1 @@
+These nested workflow and action files preserve the imported Agent CI reference and its offline boundary tests. GitHub runs workflows only from the repository-root .github/workflows. Mycellios release and quality policy is defined there; these nested references do not publish or deploy anything.

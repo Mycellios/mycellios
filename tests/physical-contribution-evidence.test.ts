@@ -9,13 +9,27 @@ import type { StoredWorker } from "../src/storage/store.js";
 const sha = (character: string) => `sha256:${character.repeat(64)}`;
 
 describe("physical contribution evidence", () => {
-  it("certifies an exact physical route idempotently", () => {
-    const database = new MeshDatabase(":memory:");
+  it("never credits a runtime that lacks a verified deployment canary", async () => {
+    const database = await MeshDatabase.open(":memory:");
+    try {
+      const authority = new PhysicalContributionEvidenceAuthority(database);
+      const workers = [worker("worker-a", "node-a", "a", "dep-a"), worker("worker-b", "node-b", "b", "dep-b")];
+      delete workers[0]!.capabilities.deployments[0]!.canaryEvidence;
+      const trace = physicalTrace();
+      await expect(authority.certify({ jobId: trace.jobId, executionReceiptId: sha("e"), trace, workers, createdAt: 2_100 }))
+        .rejects.toThrow("economic_contribution_verified_canary_is_missing");
+      expect(await database.raw.prepare("SELECT COUNT(*) AS count FROM economic_contribution_evidence").get())
+        .toEqual({ count: 0 });
+    } finally { await database.close(); }
+  });
+
+  it("certifies an exact physical route idempotently", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     const authority = new PhysicalContributionEvidenceAuthority(database);
     const workers = [worker("worker-a", "node-a", "a", "dep-a"), worker("worker-b", "node-b", "b", "dep-b")];
     const trace = physicalTrace();
     const input = { jobId: trace.jobId, executionReceiptId: sha("e"), trace, workers, createdAt: 2_100 };
-    const evidence = authority.certify(input);
+    const evidence = (await authority.certify(input));
 
     expect(evidence).toMatchObject({
       schema: "mycellios-physical-contribution-evidence/1",
@@ -27,37 +41,37 @@ describe("physical contribution evidence", () => {
         { nodeId: "node-b", workerId: "worker-b", stageCount: 1 },
       ],
     });
-    expect(authority.certify(input)).toEqual(evidence);
-    expect(authority.read(evidence.id)).toEqual(evidence);
-    database.close();
+    expect((await authority.certify(input))).toEqual(evidence);
+    expect((await authority.read(evidence.id))).toEqual(evidence);
+    (await database.close());
   });
 
-  it("rejects replay conflicts, collocated identities and unmeasured boundaries", () => {
-    const database = new MeshDatabase(":memory:");
+  it("rejects replay conflicts, collocated identities and unmeasured boundaries", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     const authority = new PhysicalContributionEvidenceAuthority(database);
     const trace = physicalTrace();
     const workers = [worker("worker-a", "node-a", "a", "dep-a"), worker("worker-b", "node-b", "b", "dep-b")];
-    authority.certify({ jobId: trace.jobId, executionReceiptId: sha("e"), trace, workers, createdAt: 2_100 });
-    expect(() => authority.certify({
+    (await authority.certify({ jobId: trace.jobId, executionReceiptId: sha("e"), trace, workers, createdAt: 2_100 }));
+    await expect(authority.certify({
       jobId: trace.jobId, executionReceiptId: sha("e"),
       trace: { ...trace, observedUntil: 2_001, durationMs: 1_001 }, workers, createdAt: 2_100,
-    })).toThrow("economic_contribution_evidence_replay_conflict");
+    })).rejects.toThrow("economic_contribution_evidence_replay_conflict");
 
     const duplicate = worker("worker-b", "node-b", "b", "dep-b");
     duplicate.capabilities.distributedExecutor!.physicalIdentity = structuredClone(
       workers[0]!.capabilities.distributedExecutor!.physicalIdentity,
     );
-    expect(() => new PhysicalContributionEvidenceAuthority(new MeshDatabase(":memory:")).certify({
+    await expect(authority.certify({
       jobId: trace.jobId, executionReceiptId: sha("f"), trace,
       workers: [workers[0]!, duplicate], createdAt: 2_100,
-    })).toThrow("economic_contribution_collocated_identity_detected");
+    })).rejects.toThrow("economic_contribution_collocated_identity_detected");
 
-    expect(() => new PhysicalContributionEvidenceAuthority(new MeshDatabase(":memory:")).certify({
+    await expect(authority.certify({
       jobId: trace.jobId, executionReceiptId: sha("f"),
       trace: { ...trace, boundaries: [{ ...trace.boundaries[0]!, transport: "unobserved", streamId: null, countersExclusive: null, bytesSourceToDestination: null, bytesDestinationToSource: null, connectRttMs: null, streamCreatedAt: null, streamConnectedAt: null, streamEndedAt: null, observedOverlapMs: null }] },
       workers, createdAt: 2_100,
-    })).toThrow("economic_contribution_physical_boundary_is_unverified");
-    database.close();
+    })).rejects.toThrow("economic_contribution_physical_boundary_is_unverified");
+    (await database.close());
   });
 });
 

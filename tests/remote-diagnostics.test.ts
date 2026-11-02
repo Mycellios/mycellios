@@ -13,8 +13,8 @@ import { MeshStore } from "../src/storage/store.js";
 
 const databases: MeshDatabase[] = [];
 
-afterEach(() => {
-  for (const database of databases.splice(0)) database.close();
+afterEach(async () => {
+  for (const database of databases.splice(0)) (await database.close());
 });
 
 describe("remote desktop diagnostics", () => {
@@ -115,8 +115,8 @@ describe("remote desktop diagnostics", () => {
     expect(requests[0]?.body).not.toContain("visible");
   });
 
-  it("deduplicates, filters and prunes expired events", () => {
-    const database = new MeshDatabase(":memory:");
+  it("deduplicates, filters and prunes expired events", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     databases.push(database);
     const store = new MeshStore(database);
     const recent = event({
@@ -130,20 +130,20 @@ describe("remote desktop diagnostics", () => {
       occurredAt: "2026-01-01T00:00:00.000Z",
     });
 
-    expect(store.appendDiagnosticEvents([recent, expired])).toEqual({
+    expect((await store.appendDiagnosticEvents([recent, expired]))).toEqual({
       accepted: 2,
       duplicates: 0,
     });
-    expect(store.appendDiagnosticEvents([recent])).toEqual({
+    expect((await store.appendDiagnosticEvents([recent]))).toEqual({
       accepted: 0,
       duplicates: 1,
     });
-    expect(store.listDiagnosticEvents()).toHaveLength(1);
-    expect(store.listDiagnosticEvents({ level: "error" })[0]).toMatchObject({
+    expect((await store.listDiagnosticEvents())).toHaveLength(1);
+    expect((await store.listDiagnosticEvents({ level: "error" }))[0]).toMatchObject({
       id: recent.id,
       message: recent.message,
     });
-    expect(store.listDiagnosticEvents({ level: "warning" })).toEqual([]);
+    expect((await store.listDiagnosticEvents({ level: "warning" }))).toEqual([]);
   });
 });
 

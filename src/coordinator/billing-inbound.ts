@@ -33,15 +33,15 @@ export class BillingInboundError extends Error {
   }
 }
 
-export function applyBillingCommand(
+export async function applyBillingCommand(
   manager: BillingManager,
   command: NormalizedBillingCommand,
-): BillingCommandResult {
+): Promise<BillingCommandResult> {
   switch (command.kind) {
-    case "paid_subscription": return manager.applyPaidSubscription(command.event);
-    case "paid_topup": return manager.applyPaidTopUp(command.event);
-    case "payment_reversal": return manager.applyPaymentReversal(command.event);
-    case "subscription_status": return manager.applySubscriptionStatus(command.event);
+    case "paid_subscription": return (await manager.applyPaidSubscription(command.event));
+    case "paid_topup": return (await manager.applyPaidTopUp(command.event));
+    case "payment_reversal": return (await manager.applyPaymentReversal(command.event));
+    case "subscription_status": return (await manager.applySubscriptionStatus(command.event));
   }
 }
 

@@ -241,7 +241,7 @@ export async function registerContentHubRoutes(
   app.get("/blog", async (request, reply) => {
     const query = blogListQuerySchema.safeParse(request.query);
     if (!query.success) {
-      return sendBlogHtml(
+      return (await sendBlogHtml(
         reply,
         renderBlogStatePage(
           "Invalid page",
@@ -249,39 +249,39 @@ export async function registerContentHubRoutes(
           { noIndex: true },
         ),
         400,
-      );
+      ));
     }
     if (!options.client) {
-      return sendBlogHtml(reply, renderBlogUnavailablePage(), 503);
+      return (await sendBlogHtml(reply, renderBlogUnavailablePage(), 503));
     }
     try {
       const posts = await options.client.getPosts(query.data.page);
       if (query.data.page > 1 && posts.items.length === 0) {
-        return sendBlogHtml(
+        return (await sendBlogHtml(
           reply,
           renderBlogStatePage("Page not found", "There are no articles on this page.", {
             noIndex: true,
           }),
           404,
-        );
+        ));
       }
-      return sendBlogHtml(reply, renderBlogIndex(posts), 200);
+      return (await sendBlogHtml(reply, renderBlogIndex(posts), 200));
     } catch (error) {
       request.log.warn({ err: error }, "Content Hub blog listing failed");
-      return sendBlogHtml(reply, renderBlogUnavailablePage(), 503);
+      return (await sendBlogHtml(reply, renderBlogUnavailablePage(), 503));
     }
   });
 
   app.get("/blog/:slug/", async (request, reply) => {
     const params = blogPostParamsSchema.safeParse(request.params);
     if (!params.success) {
-      return sendBlogHtml(
+      return (await sendBlogHtml(
         reply,
         renderBlogStatePage("Article not found", "This article is not available.", {
           noIndex: true,
         }),
         404,
-      );
+      ));
     }
     const query = request.url.includes("?")
       ? request.url.slice(request.url.indexOf("?"))
@@ -298,32 +298,32 @@ export async function registerContentHubRoutes(
   app.get("/blog/:slug", async (request, reply) => {
     const params = blogPostParamsSchema.safeParse(request.params);
     if (!params.success) {
-      return sendBlogHtml(
+      return (await sendBlogHtml(
         reply,
         renderBlogStatePage("Article not found", "This article is not available.", {
           noIndex: true,
         }),
         404,
-      );
+      ));
     }
     if (!options.client) {
-      return sendBlogHtml(reply, renderBlogUnavailablePage(), 503);
+      return (await sendBlogHtml(reply, renderBlogUnavailablePage(), 503));
     }
     try {
       const post = await options.client.getPost(params.data.slug);
       if (!post) {
-        return sendBlogHtml(
+        return (await sendBlogHtml(
           reply,
           renderBlogStatePage("Article not found", "This article is not available.", {
             noIndex: true,
           }),
           404,
-        );
+        ));
       }
-      return sendBlogHtml(reply, renderBlogPost(post), 200);
+      return (await sendBlogHtml(reply, renderBlogPost(post), 200));
     } catch (error) {
       request.log.warn({ err: error }, "Content Hub blog article failed");
-      return sendBlogHtml(reply, renderBlogUnavailablePage(), 503);
+      return (await sendBlogHtml(reply, renderBlogUnavailablePage(), 503));
     }
   });
 

@@ -21,11 +21,11 @@ describe("network telemetry history", () => {
     }
   });
 
-  it("persists ten-minute network samples across coordinator restarts", () => {
+  it("persists ten-minute network samples across coordinator restarts", async () => {
     const directory = mkdtempSync(join(tmpdir(), "mycellios-network-history-"));
     directories.push(directory);
     const path = join(directory, "mesh.db");
-    let database = new MeshDatabase(path);
+    let database = (await MeshDatabase.open(path));
     let store = new MeshStore(database);
     const sample = telemetrySample({
       capturedAt: 1_800_000,
@@ -34,28 +34,28 @@ describe("network telemetry history", () => {
       offeredVramMb: 98_304,
       freeVramMb: 65_536,
     });
-    store.recordNetworkTelemetrySample(sample);
-    database.close();
+    (await store.recordNetworkTelemetrySample(sample));
+    (await database.close());
 
-    database = new MeshDatabase(path);
+    database = (await MeshDatabase.open(path));
     store = new MeshStore(database);
-    expect(store.listNetworkTelemetrySamples(0)).toEqual([sample]);
-    database.close();
+    expect((await store.listNetworkTelemetrySamples(0))).toEqual([sample]);
+    (await database.close());
   });
 
-  it("returns the newest bounded samples in chronological order", () => {
-    const database = new MeshDatabase(":memory:");
+  it("returns the newest bounded samples in chronological order", async () => {
+    const database = await MeshDatabase.open(":memory:");
     try {
       const store = new MeshStore(database);
       for (const capturedAt of [1_800_000, 600_000, 1_200_000]) {
-        store.recordNetworkTelemetrySample(telemetrySample({ capturedAt }));
+        await store.recordNetworkTelemetrySample(telemetrySample({ capturedAt }));
       }
-      expect(store.listNetworkTelemetrySamples(0, 2).map((sample) => sample.capturedAt))
+      expect((await store.listNetworkTelemetrySamples(0, 2)).map((sample) => sample.capturedAt))
         .toEqual([1_200_000, 1_800_000]);
-      expect(store.listNetworkTelemetrySamples(1_500_000).map((sample) => sample.capturedAt))
+      expect((await store.listNetworkTelemetrySamples(1_500_000)).map((sample) => sample.capturedAt))
         .toEqual([1_800_000]);
     } finally {
-      database.close();
+      await database.close();
     }
   });
 
@@ -68,15 +68,15 @@ describe("network telemetry history", () => {
     }, { logger: false });
     runtimes.push(runtime);
     const now = Date.now();
-    runtime.store.recordNetworkTelemetrySample(telemetrySample({
+    (await runtime.store.recordNetworkTelemetrySample(telemetrySample({
       capturedAt: now - 8 * 24 * 60 * 60_000,
       connectedNodes: 99,
-    }));
-    runtime.store.recordNetworkTelemetrySample(telemetrySample({
+    })));
+    (await runtime.store.recordNetworkTelemetrySample(telemetrySample({
       capturedAt: now - 60 * 60_000,
       connectedNodes: 2,
       offeredVramMb: 24_576,
-    }));
+    })));
 
     const response = await runtime.app.inject({
       method: "GET",
@@ -112,20 +112,20 @@ describe("network telemetry history", () => {
     runtimes.push(runtime);
     for (let index = 0; index < 101; index += 1) {
       const id = `completed-${index}`;
-      runtime.store.createJob({
+      (await runtime.store.createJob({
         id,
         sessionId: "history-test",
         model: "test-model",
         workloadClass: "interactive",
         deadlineAt: Date.now() + 60_000,
-      });
-      runtime.store.setJobStatus(id, "completed");
+      }));
+      (await runtime.store.setJobStatus(id, "completed"));
     }
 
     const response = await runtime.app.inject({ method: "GET", url: "/public/v1/snapshot" });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ summary: { completedJobs: 101 } });
-    expect(runtime.store.listJobs(100)).toHaveLength(100);
+    expect((await runtime.store.listJobs(100))).toHaveLength(100);
   });
 });
 

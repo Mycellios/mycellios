@@ -1,5 +1,14 @@
 # Third-party software
 
+## Mycellios Agent
+
+The Agent under `src/agent` incorporates Rakazo, originally published at
+https://github.com/elie222/rakazo, based on revision
+`2150350db0c90a99871884c1ad8ebdf6ee6156d5`, with Mycellios adaptations.
+Its Apache-2.0 license and upstream copyright notices remain in that directory.
+Internal `@rakazo` package names are retained for compatibility, not as a separate
+publication destination. The npm migration is not yet release-qualified.
+
 Unless a file states otherwise, Mycellios source code is licensed under the
 GNU General Public License, version 3 only (`GPL-3.0-only`).
 
@@ -69,3 +78,18 @@ assets or bundled dependencies from these repositories; it does not replace
 the existing adapted-code notices above. In particular, c0mpute's unspecified
 license is not treated as permission to copy its implementation or assets.
 The resulting work plan is maintained in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+
+## Mycellios Agent typeface
+
+The web Agent bundles Geist Variable 5.3.0 from `@fontsource-variable/geist`.
+Copyright 2024 The Geist Project Authors. Its SIL Open Font License 1.1 is
+shipped at `src/agent/apps/web/public/licenses/geist-OFL.txt`.
+
+## Integrated development tooling
+
+Desktop development resources may bundle npm and its bundled dependencies from
+its build toolchain, including npm's Artistic-2.0 license in the copied npm
+resource directory. The managed source copy retains this repository's GPL-3.0
+and Agent's upstream Apache-2.0 notices. Development dependencies are installed
+separately into per-device app data; they do not replace the stable application.

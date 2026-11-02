@@ -1,5 +1,10 @@
+import { createRootRecoveryProbe, verifyRootHealth, type RootRecoveryProbe } from "./activation-recovery-probe.js";
 import { spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { prepareLaunchAgents } from "./launch-preparation.js";
+import { normalizeTcpWritePolicy } from "./tcp-write-arguments.js";
+import { normalizeStartupPolicy } from "./startup-policy.js";
+import type { FleetResourcePlan } from "./fleet-resource-roles.js";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
@@ -8,7 +13,14 @@ import type { NativeBuildIdentity } from "../contracts/build-identity.js";
 import { workerConfigSchema, type WorkerConfig } from "../contracts/schemas.js";
 import { readNativeRuntimeBuildMetadata } from "../core/native-build-identity.js";
 import { WorkerAgent } from "../worker/agent.js";
+import { WorkerRegistrationError } from "../worker/registration-error.js";
+import {
+  loadOrCreateWorkerAdmissionCredential,
+  workerAdmissionSigner,
+} from "../worker/admission-credential.js";
 import { evaluateDistributionPlan, stageMemoryBytes } from "./cost-model.js";
+import { activationStartupObservation, type ActivationStartupObservation } from "./activation-startup-observation.js";
+import { enumerateDenseCandidates, type DenseCandidateOffer } from "./dense-candidates.js";
 import { HttpLaunchAgent } from "./launch-agent-rpc.js";
 import {
   LocalProcessAgent,
@@ -36,6 +48,7 @@ import type {
   StagePlacement,
 } from "./types.js";
 import { UNMEASURED_RTT_MS } from "../core/rtt.js";
+import { browserLayerRuntimeEnvironment } from "./process-environment.js";
 
 export const AUTO_DISTRIBUTE_SCHEMA = "gdlp-auto-distribute/1";
 export const MODEL_PROFILE_SCHEMA = "gdlp-model-profile/1";
@@ -69,6 +82,8 @@ const nodeSchema = z
     region: z.string().min(1).max(128),
     endpoint: endpointSchema,
     memoryMiB: z.number().int().min(512),
+    hostMemoryMiB: z.number().int().positive().max(Number.MAX_SAFE_INTEGER / MIB).optional(),
+    deviceMemorySharesHost: z.boolean().optional(),
     reserveMiB: z.number().int().nonnegative().default(256),
     decodeScale: z.number().positive().finite().default(1),
     prefillScale: z.number().positive().finite().default(1),
@@ -141,15 +156,24 @@ export const autoDistributionConfigSchema = z
         publicName: z.string().regex(IDENTIFIER),
       })
       .strict(),
-    nodes: z.array(nodeSchema).min(2).max(64),
+    nodes: z.array(nodeSchema).min(1).max(64),
     links: z.array(linkSchema).max(4_032).default([]),
     distribution: z
       .object({
-        minimumStages: z.number().int().min(2).max(8).default(2),
-        maximumStages: z.number().int().min(2).max(8).default(4),
+        minimumStages: z.number().int().min(1).max(8).default(2),
+        maximumStages: z.number().int().min(1).max(8).default(4),
+        eligibleNodeIds: z.array(z.string().trim().min(1).max(256)).min(1).max(64)
+          .refine((ids) => new Set(ids).size === ids.length, "eligibleNodeIds must be unique")
+          .optional(),
         allowLossyActivation: z.boolean().default(false),
       })
       .strict()
+      .superRefine((value, context) => {
+        if (value.eligibleNodeIds && value.eligibleNodeIds.length < value.minimumStages) {
+          context.addIssue({ code: "custom", path: ["eligibleNodeIds"],
+            message: "eligibleNodeIds must cover minimumStages" });
+        }
+      })
       .default({ minimumStages: 2, maximumStages: 4, allowLossyActivation: false }),
     workload: z
       .object({
@@ -175,6 +199,7 @@ export const autoDistributionConfigSchema = z
       .object({
         pythonExecutable: z.string().min(1).max(4_096),
         stagePythonExecutable: z.string().min(1).max(4_096).optional(),
+        stagePackageIdentities: z.record(z.string(),z.string().regex(/^sha256:[a-f0-9]{64}$/)).optional(),
         pythonPath: z.string().min(1).max(4_096).default("python"),
         hfHome: z.string().min(1).max(4_096).default("runtime/hf-cache"),
         apiEndpoint: endpointSchema,
@@ -182,7 +207,14 @@ export const autoDistributionConfigSchema = z
         returnEndpoint: endpointSchema,
         returnBindHost: z.string().min(1).max(253).default("0.0.0.0"),
         threadsPerStage: z.number().int().positive().max(1_024).default(1),
+        tcpWriteChunkBytes: z.number().int().min(64).max(1_048_576).optional(),
+        independentParallelStartup: z.boolean().optional(),
+        rootStartupDelayMs: z.number().int().nonnegative().max(60_000).optional(),
+        prefillInflightChunks: z.number().int().min(1).max(64).optional(),
         connectTimeoutSeconds: z.number().positive().max(86_400).default(300),
+        operationTimeoutSeconds: z.number().positive().max(86_400).optional(),
+        routeProbeIntervalSeconds: z.number().nonnegative().max(86_400).optional(),
+        routeProbeTimeoutSeconds: z.number().positive().max(86_400).optional(),
         readinessTimeoutMs: z.number().int().positive().max(86_400_000).default(600_000),
         maxOutputTokens: z.number().int().positive().max(32_768).default(2_048),
       })
@@ -281,16 +313,27 @@ export interface AutoDistributionCompilation {
   manifest: RuntimePipelineManifestV2;
   launch: PythonPipelineLaunchDescription;
   boundaries: number[];
+  /** Scheduling decisions, not evidence that support transfers completed. */
+  resourceRoles?: FleetResourcePlan;
 }
 
 export interface AutoDistributionRunResult extends AutoDistributionCompilation {
   health: Record<string, unknown>;
   canaryText: string;
   canaryMetrics: AutoDistributionCanaryMetrics;
+  canaryEvidence?: AutoDistributionCanarySample[];
+  activationStartupObservation?: ActivationStartupObservation;
+  observedExecution?: NonNullable<ModelDeployment["execution"]>;
   workerId: string | null;
 }
 
 export interface AutoDistributionCanaryMetrics {
+  /** Client wall time through complete response parsing, independent of server metrics. */
+  totalRequestMs?: number;
+  requestSha256?: string;
+  outputTokenIdsSha256?: string;
+  outputTokenHashScheme?: "gdlp-output-token-ids-v1";
+  reusedKvTokens?: number;
   completionTokens: number;
   ttftMs: number;
   tpotMs: number;
@@ -298,17 +341,33 @@ export interface AutoDistributionCanaryMetrics {
   measuredTokensPerSecond: number;
 }
 
+export interface AutoDistributionCanarySample {
+  requestSha256: string;
+  sampleId: string;
+  outputTokens: number;
+  activeMs: number;
+  ttftMs: number;
+  completed: true;
+  totalRequestMs: number;
+  measuredAt: number;
+  outputSha256?: string;
+  outputHashScheme?: "gdlp-output-token-ids-v1";
+  reusedKvTokens?: number;
+}
+
 export interface AutoDistributionRunOptions {
+  /** Experimental cold-start policy; qualify complete requests before enabling. */
+  independentParallelStartup?: boolean;
   resolveManagedAgent?: (
     nodeId: string,
     launch: PythonPipelineLaunchDescription,
-  ) => LaunchAgent | undefined;
+  ) => LaunchAgent | undefined | Promise<LaunchAgent | undefined>;
   onProgress?: (event: AutoDistributionProgressEvent) => void;
   /**
    * Atomic publication hook. It runs after health and real inference canary
    * succeed, but before the model is announced as active.
    */
-  onActivated?: (result: AutoDistributionRunResult) => void | Promise<void>;
+  onActivated?: (result: AutoDistributionRunResult, recoveryProbe?: RootRecoveryProbe) => void | Promise<void>;
   /** Exact native release cohort announced by the generated cell worker. */
   workerBuildIdentity?: NativeBuildIdentity;
   /** Runtime version paired with workerBuildIdentity. */
@@ -378,9 +437,14 @@ export async function profileCompatibleModelWithRuntime(
 export function compileAutoDistribution(
   configValue: AutoDistributionConfig,
   profileValue: CompiledModelProfile,
+  /** Server-owned candidate; normal manifest validation still applies. */
+  phasePlans?: NonNullable<RuntimePlanRequest["phasePlans"]>,
 ): AutoDistributionCompilation {
   const config = parseAutoDistributionConfig(configValue);
   const profile = validateCompiledProfile(profileValue);
+  if (phasePlans !== undefined && (!phasePlans.prefill || !phasePlans.decode)) {
+    throw new Error("automatic_candidate_requires_both_phases");
+  }
   assertCompatibleProfile(profile);
   const topology = runtimeTopology(config);
   const workload = distributionWorkload(config);
@@ -391,15 +455,14 @@ export function compileAutoDistribution(
     topology,
     workload,
     allowLossyActivation: config.distribution.allowLossyActivation,
+    ...(phasePlans === undefined ? {} : { phasePlans: structuredClone(phasePlans) }),
   };
   let manifest = buildRuntimePipelineManifest(request);
   if (manifest.plans.decode.stages.length < config.distribution.minimumStages) {
+    if (phasePlans !== undefined) throw new Error("automatic_candidate_below_minimum_stages");
     const forced = exactStagePlan(request, config.distribution.minimumStages);
     request.phasePlans = { prefill: forced, decode: forced };
     manifest = buildRuntimePipelineManifest(request);
-  }
-  if (manifest.plans.decode.stages.length < 2) {
-    throw new Error("automatic_distribution_requires_at_least_two_stages");
   }
   const cwd = process.cwd();
   const snapshotIdentity = BigInt(`0x${profile.source.snapshotIdentityUint64Hex}`).toString(10);
@@ -416,9 +479,18 @@ export function compileAutoDistribution(
       canonicalRevision: profile.source.canonicalRevision,
     },
     publicModelName: config.model.publicName,
+    ...(config.runtime.stagePackageIdentities === undefined ? {} : {stagePackageIdentities: config.runtime.stagePackageIdentities}),
       pythonExecutable: config.runtime.stagePythonExecutable ?? absoluteFrom(cwd, config.runtime.pythonExecutable),
     threadsPerStage: config.runtime.threadsPerStage,
+    ...normalizeTcpWritePolicy(config.runtime),
+    ...normalizeStartupPolicy(config.runtime),
+    ...(config.runtime.prefillInflightChunks === undefined ? {} : {
+      prefillInflightChunks: config.runtime.prefillInflightChunks,
+    }),
     connectTimeoutSeconds: config.runtime.connectTimeoutSeconds,
+    ...(config.runtime.operationTimeoutSeconds === undefined ? {} : { operationTimeoutSeconds: config.runtime.operationTimeoutSeconds }),
+    ...(config.runtime.routeProbeIntervalSeconds === undefined ? {} : { routeProbeIntervalSeconds: config.runtime.routeProbeIntervalSeconds }),
+    ...(config.runtime.routeProbeTimeoutSeconds === undefined ? {} : { routeProbeTimeoutSeconds: config.runtime.routeProbeTimeoutSeconds }),
     batchWindowMs: config.workload.batchWindowMs,
     maxOutputTokens: config.runtime.maxOutputTokens,
   });
@@ -429,6 +501,34 @@ export function compileAutoDistribution(
     launch,
     boundaries: stageBoundaries(manifest),
   };
+}
+
+/** Constructs calibration launches without first requiring a resident default route. */
+export function compileDenseCalibrationCandidates(
+  configValue: AutoDistributionConfig, profileValue: CompiledModelProfile,
+  input: { offers: readonly DenseCandidateOffer[]; rootNodeId: string; now: number; maximumEvaluations?: number },
+): { candidates: ReadonlyMap<string, AutoDistributionCompilation>; examined: number;
+  exhaustive: boolean; requiresCalibration: true } {
+  const config = parseAutoDistributionConfig(configValue);
+  const profile = validateCompiledProfile(profileValue);
+  assertCompatibleProfile(profile);
+  const root = config.nodes.find(node => node.id === input.rootNodeId);
+  if (!root || root.endpoint.host !== config.runtime.apiAdvertiseHost
+      || root.endpoint.host !== config.runtime.returnEndpoint.host) {
+    throw new Error("dense_calibration_root_identity_mismatch");
+  }
+  const topology = runtimeTopology(config);
+  const calibrationTopology = { ...topology, nodes: topology.nodes.map(({ ramVram, ...node }) =>
+    ({ ...node, ...(ramVram === undefined ? {} : { ramVram }) })) };
+  const enumerated = enumerateDenseCandidates({ model: profile.model, topology: calibrationTopology,
+    workload: distributionWorkload(config), offers: input.offers, rootNodeId: input.rootNodeId,
+    now: input.now, minimumStages: config.distribution.minimumStages,
+    ...(input.maximumEvaluations === undefined ? {} : { maximumEvaluations: input.maximumEvaluations }) });
+  const candidates = new Map<string, AutoDistributionCompilation>();
+  for (const { id, plan } of enumerated.candidates) {
+    candidates.set(id, compileAutoDistribution(config, profile, { prefill: plan, decode: plan }));
+  }
+  return { candidates, examined: enumerated.examined, exhaustive: enumerated.exhaustive, requiresCalibration: true };
 }
 
 export async function writeAutoDistributionArtifacts(
@@ -445,6 +545,9 @@ export async function writeAutoDistributionArtifacts(
     writeJson(resolve(directory, "profile.json"), compilation.profile),
     writeJson(resolve(directory, "runtime-manifest.json"), compilation.manifest),
     writeJson(resolve(directory, "python-launch.json"), compilation.launch),
+    ...(compilation.resourceRoles === undefined ? [] : [
+      writeJson(resolve(directory, "resource-roles.json"), compilation.resourceRoles),
+    ]),
   ]);
   return directory;
 }
@@ -457,6 +560,7 @@ export async function runAutoDistribution(
   shutdownSignal?: AbortSignal,
   options: AutoDistributionRunOptions = {},
 ): Promise<AutoDistributionRunResult> {
+  const activationTiming = { activationStart: performance.now(), startedAt: Date.now() / 1000 };
   const config = parseAutoDistributionConfig(configValue);
   const runtimeMetadata = existsSync(resolve(cwd, "package.json"))
     ? readNativeRuntimeBuildMetadata(cwd)
@@ -511,6 +615,9 @@ export async function runAutoDistribution(
   const supervisor = new PythonLaunchSupervisor(compilation.launch, {
     resolveAgent: (nodeId) => agents.get(nodeId),
     readinessTimeoutMs: config.runtime.readinessTimeoutMs,
+    ...(options.independentParallelStartup === undefined ? {} : {
+      independentParallelStartup: options.independentParallelStartup,
+    }),
   });
   let worker: WorkerAgent | null = null;
   let workerPromise: Promise<void> | null = null;
@@ -560,11 +667,12 @@ export async function runAutoDistribution(
     });
   });
   try {
+    await prepareLaunchAgents(compilation.launch, agents, shutdownSignal);
     options.onProgress?.({
       phase: "launching_stages",
       message: `Launching ${compilation.manifest.plans.decode.stages.length} distributed model stages.`,
     });
-    const runningSnapshot = await supervisor.start();
+    await supervisor.start(shutdownSignal);
     options.onProgress?.({ phase: "stages_ready", message: "All model stages reported ready." });
     const rootProcess = compilation.launch.launchOrder.find((process) => process.kind === "root-engine");
     if (!rootProcess) throw new Error("distributed_root_process_is_missing");
@@ -576,9 +684,13 @@ export async function runAutoDistribution(
       ? `http://${runtimeProxy.host}:${runtimeProxy.port}`
       : `http://${config.runtime.apiAdvertiseHost}:${config.runtime.apiEndpoint.port}`;
     options.onProgress?.({ phase: "checking_health", message: "Checking the distributed pipeline health." });
-    const health = await verifyRootHealth(apiBaseUrl, config, compilation);
+    const healthIdentity = { model: config.model.publicName,
+      artifactIdentity: compilation.profile.source.artifactIdentity,
+      stages: compilation.boundaries.length - 1, boundaries: compilation.boundaries };
+    const health = await verifyRootHealth(apiBaseUrl, healthIdentity);
     options.onProgress?.({ phase: "running_canary", message: "Running a real inference canary across the network." });
-    const canary = await runCanary(apiBaseUrl, config);
+    const canary = await runCanary(apiBaseUrl, config, activationTiming);
+    const execution = requireDenseExecutionTelemetry(compilation, supervisor.snapshot());
     if (config.coordinator) {
       options.onProgress?.({ phase: "publishing_model", message: "Canary passed. Publishing the model to the network." });
       const workerConfig = buildCellWorkerConfig(
@@ -586,30 +698,58 @@ export async function runAutoDistribution(
         compilation,
         apiBaseUrl,
         health.pipeline_snapshot_identity as string,
-        collectExecutionTelemetry(compilation, runningSnapshot),
+        execution,
       );
       const token = optionalSecret(environment, config.coordinator.networkTokenEnv);
-      worker = new WorkerAgent(workerConfig, {
-        coordinatorUrl: config.coordinator.url,
+      const legacyCredentialPath = resolve(
+        cwd,
+        environment.MYCELLIOS_WORKER_CREDENTIAL_PATH
+          ?? "runtime/worker-admission-credential.json",
+      );
+      const cellIdentity = automaticCellIdentity(config, compilation);
+      const cellCredentialPath = automaticCellCredentialPath(legacyCredentialPath, cellIdentity);
+      const createCellWorker = (credentialPath: string) => new WorkerAgent(workerConfig, {
+        coordinatorUrl: config.coordinator!.url,
+        admissionSigner: workerAdmissionSigner(
+          loadOrCreateWorkerAdmissionCredential(credentialPath),
+        ),
         ...(workerAgentVersion ? { agentVersion: workerAgentVersion } : {}),
         ...(workerBuildIdentity ? { buildIdentity: workerBuildIdentity } : {}),
         ...(token ? { networkToken: token } : {}),
-        identity: {
-          kind: "cell",
-          id: automaticCellIdentity(config, compilation),
-        },
+        identity: { kind: "cell", id: cellIdentity },
       });
+      // An existing installation may have enrolled its first cell with the
+      // historical shared key. New cell identities get their own key.
+      const useLegacyKey = existsSync(legacyCredentialPath) && !existsSync(cellCredentialPath);
+      worker = createCellWorker(useLegacyKey ? legacyCredentialPath : cellCredentialPath);
       workerPromise = worker.start();
-      await waitForWorkerRegistration(worker, workerPromise, 30_000);
+      try {
+        await waitForWorkerRegistration(worker, workerPromise, 30_000);
+      } catch (error) {
+        const reusedLegacyKey = useLegacyKey
+          && error instanceof WorkerRegistrationError
+          && error.status === 409
+          && error.code === "worker_credential_reused";
+        if (!reusedLegacyKey) throw error;
+        await worker.stop();
+        await workerPromise.catch(() => undefined);
+        worker = createCellWorker(cellCredentialPath);
+        workerPromise = worker.start();
+        await waitForWorkerRegistration(worker, workerPromise, 30_000);
+      }
     }
     const result: AutoDistributionRunResult = {
       ...compilation,
       health,
       canaryText: canary.text,
       canaryMetrics: canary.metrics,
+      canaryEvidence: canary.evidenceSamples,
+      ...(canary.startupObservation === undefined ? {} : { activationStartupObservation: canary.startupObservation }),
+      ...(execution === undefined ? {} : { observedExecution: execution }),
       workerId: worker?.workerId ?? null,
     };
-    await options.onActivated?.(result);
+    await options.onActivated?.(result, createRootRecoveryProbe(apiBaseUrl,
+      healthIdentity, health.pipeline_snapshot_identity as string, shutdownSignal));
     await writeRuntimeStatus(config, result, cwd, "running");
     options.onProgress?.({
       phase: "active",
@@ -629,7 +769,7 @@ export async function runAutoDistribution(
     await supervisor.stop("auto_distribute_shutdown").catch(() => undefined);
     await runtimeProxy?.close().catch(() => undefined);
     await Promise.all(
-      [...new Set(agents.values())].map((agent) => Promise.resolve(agent.close?.()).catch(() => undefined)),
+      [...new Set(agents.values())].map(async (agent) => Promise.resolve((await agent.close?.())).catch(() => undefined)),
     );
   }
 }
@@ -643,13 +783,13 @@ function requestedLaunchDevice(
   return device?.trim() || undefined;
 }
 
-function activationFailureProgress(
+export function activationFailureProgress(
   error: unknown,
   supervisor: LaunchSupervisorSnapshot,
 ): AutoDistributionProgressEvent {
   const rawError = error instanceof Error ? error.message : String(error);
   const failedProcess = supervisor.processes.find((process) => process.state === "failed")
-    ?? supervisor.processes.find((process) => process.output);
+    ?? (supervisor.state === "starting" ? supervisor.processes.find((process) => process.output) : undefined);
   const output = `${failedProcess?.output?.stdout ?? ""}\n${failedProcess?.output?.stderr ?? ""}`;
   const exitCode = Number(/(?:code=|code\s+)(\d+)/i.exec(rawError)?.[1] ?? Number.NaN);
   const requestedDevice = /"requested_device"\s*:\s*"([^"]+)"/i.exec(output)?.[1];
@@ -667,7 +807,9 @@ function activationFailureProgress(
     phase: "failed",
     message: accessViolation
       ? "The Windows accelerator runtime crashed while loading this model stage (memory access violation)."
-      : `The model stage stopped before it became ready: ${rawError}`,
+      : failedProcess
+        ? `The model stage failed ${failedProcess.readyAtMs === undefined ? "before readiness" : "after readiness"}: ${rawError}`
+        : `Distributed activation failed after stage readiness: ${rawError}`,
     ...(failedProcess ? { nodeId: failedProcess.nodeId, processId: failedProcess.processId } : {}),
     ...(requestedDevice ? { device: requestedDevice } : {}),
     details,
@@ -701,6 +843,13 @@ function automaticCellIdentity(
     .digest("hex")
     .slice(0, 32);
   return `cell-${digest}`;
+}
+
+export function automaticCellCredentialPath(basePath: string, cellIdentity: string): string {
+  if (!/^cell-[a-f0-9]{32}$/.test(cellIdentity)) {
+    throw new Error("automatic_cell_identity_invalid");
+  }
+  return resolve(`${basePath}.cells`, `${cellIdentity}.json`);
 }
 
 function validateCompiledProfile(value: unknown): CompiledModelProfile {
@@ -753,6 +902,8 @@ function runtimeTopology(config: AutoDistributionConfig): RuntimeTopology {
     region: node.region,
     memoryBytes: node.memoryMiB * MIB,
     reserveBytes: node.reserveMiB * MIB,
+    ...(node.hostMemoryMiB !== undefined ? { hostMemoryBytes: node.hostMemoryMiB * MIB } : {}),
+    ...(node.deviceMemorySharesHost !== undefined ? { deviceMemorySharesHost: node.deviceMemorySharesHost } : {}),
     decodeScale: node.decodeScale,
     prefillScale: node.prefillScale,
     codecScale: node.codecScale,
@@ -907,12 +1058,12 @@ function latencyGreedyOrder(
   if (ids.length === 0) return [];
   const cost = new Map<string, number>();
   for (const link of request.topology.links) {
-    cost.set(`${link.from} ${link.to}`, link.oneWayLatencyMs);
+    cost.set(`${link.from}\0${link.to}`, link.oneWayLatencyMs);
   }
   const linkMs = (from: string, to: string): number =>
     // Una arista no declarada se cobra como no medida, igual que en
     // `runtimeTopology`. No declarar un enlace no puede salir barato.
-    cost.get(`${from} ${to}`) ?? UNMEASURED_RTT_MS;
+    cost.get(`${from}\0${to}`) ?? UNMEASURED_RTT_MS;
 
   const start = root && ids.includes(root) ? root : ids[0]!;
   const ordered = [start];
@@ -1026,6 +1177,7 @@ async function createLaunchAgents(
       PYTHONPATH: absoluteFrom(cwd, config.runtime.pythonPath),
       HF_HOME: absoluteFrom(cwd, config.runtime.hfHome),
       TOKENIZERS_PARALLELISM: "false",
+      ...browserLayerRuntimeEnvironment(environment),
     },
   });
   for (const node of config.nodes) {
@@ -1034,7 +1186,7 @@ async function createLaunchAgents(
       continue;
     }
     if (node.agent.kind === "managed") {
-      const agent = options.resolveManagedAgent?.(node.id, launch);
+      const agent = await options.resolveManagedAgent?.(node.id, launch);
       if (!agent) throw new Error(`managed_launch_agent_is_unavailable:${node.id}`);
       agents.set(node.id, agent);
       continue;
@@ -1055,81 +1207,64 @@ async function createLaunchAgents(
   return agents;
 }
 
-async function verifyRootHealth(
+export async function runCanary(
   apiBaseUrl: string,
   config: AutoDistributionConfig,
-  compilation: AutoDistributionCompilation,
-): Promise<Record<string, unknown>> {
-  const response = await fetch(`${apiBaseUrl}/health`, {
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`distributed_root_health_http_${response.status}`);
-  const value = (await response.json()) as unknown;
-  if (!isRecord(value)) throw new Error("distributed_root_health_is_invalid");
-  if (
-    value.status !== "ready" ||
-    value.model !== config.model.publicName ||
-    value.artifact_identity !== compilation.profile.source.artifactIdentity ||
-    typeof value.pipeline_snapshot_identity !== "string" ||
-    !value.pipeline_snapshot_identity.trim() ||
-    value.pipeline_snapshot_identity.length > 256 ||
-    value.stages !== compilation.boundaries.length - 1 ||
-    JSON.stringify(value.boundaries) !== JSON.stringify(compilation.boundaries)
-  ) {
-    throw new Error("distributed_root_health_identity_mismatch");
-  }
-  return value;
-}
-
-async function runCanary(
-  apiBaseUrl: string,
-  config: AutoDistributionConfig,
+  activationTiming?: { activationStart: number; startedAt: number },
 ): Promise<{
   text: string;
   metrics: AutoDistributionCanaryMetrics;
-  evidenceSamples: Array<{
-    sampleId: string;
-    outputTokens: number;
-    activeMs: number;
-    ttftMs: number;
-    completed: true;
-  }>;
+  evidenceSamples: AutoDistributionCanarySample[];
+  startupObservation?: ActivationStartupObservation;
 }> {
-  await runCanarySample(apiBaseUrl, config);
+  const firstRequestStart = performance.now();
+  const first = await runCanarySample(apiBaseUrl, config);
+  const firstRequestEnd = performance.now();
+  const startupObservation = activationTiming === undefined ? undefined : activationStartupObservation({
+    ...activationTiming, firstRequestStart, firstRequestEnd, measuredAt: first.measuredAt, metrics: first.metrics });
   const measured = [];
   for (let index = 0; index < 3; index += 1) {
     measured.push(await runCanarySample(apiBaseUrl, config));
   }
   return {
     ...measured[0]!,
-    evidenceSamples: measured.map(({ metrics }, index) => ({
-      sampleId: `activation-canary-${index + 1}`,
+    ...(startupObservation === undefined ? {} : { startupObservation }),
+    evidenceSamples: measured.map(({ metrics, measuredAt }) => ({
+      sampleId: randomUUID(),
       outputTokens: metrics.completionTokens,
       activeMs: Math.max(1, Math.round(metrics.pipelineMs)),
       ttftMs: Math.max(0, Math.round(metrics.ttftMs)),
       completed: true,
+      totalRequestMs: metrics.totalRequestMs!, measuredAt,
+      requestSha256: metrics.requestSha256!,
+      ...(metrics.reusedKvTokens === undefined ? {} : { reusedKvTokens: metrics.reusedKvTokens }),
+      ...(metrics.outputTokenIdsSha256 === undefined ? {} : {
+        outputSha256: metrics.outputTokenIdsSha256, outputHashScheme: metrics.outputTokenHashScheme,
+      }),
     })),
   };
 }
 
-async function runCanarySample(
+export async function runCanarySample(
   apiBaseUrl: string,
   config: AutoDistributionConfig,
-): Promise<{ text: string; metrics: AutoDistributionCanaryMetrics }> {
+): Promise<{ text: string; metrics: AutoDistributionCanaryMetrics; measuredAt: number }> {
+  const started = performance.now();
+  const requestBody = JSON.stringify({
+    model: config.model.publicName,
+    messages: [{ role: "user", content: config.canary.prompt }],
+    temperature: 0, max_tokens: config.canary.maxTokens, stream: false,
+  });
   const response = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      model: config.model.publicName,
-      messages: [{ role: "user", content: config.canary.prompt }],
-      temperature: 0,
-      max_tokens: config.canary.maxTokens,
-      stream: false,
-    }),
+    body: requestBody,
     signal: AbortSignal.timeout(config.canary.timeoutMs),
   });
   if (!response.ok) throw new Error(`distributed_canary_http_${response.status}`);
   const value = (await response.json()) as unknown;
+  const totalRequestMs = performance.now() - started;
+  const measuredAt = Date.now() / 1000;
   const text = isRecord(value) && Array.isArray(value.choices) && isRecord(value.choices[0]) &&
     isRecord(value.choices[0].message) && typeof value.choices[0].message.content === "string"
     ? value.choices[0].message.content.trim()
@@ -1155,9 +1290,28 @@ async function runCanarySample(
     throw new Error("distributed_canary_metrics_are_invalid");
   }
   const completionTokens = usage.completion_tokens as number;
+  const tokenHash = distribution.output_token_ids_sha256;
+  const tokenHashScheme = distribution.output_token_ids_hash_scheme;
+  const reusedKvTokens = distribution.reused_kv_tokens;
+  if (reusedKvTokens !== undefined && (typeof reusedKvTokens !== "number"
+      || !Number.isSafeInteger(reusedKvTokens) || reusedKvTokens < 0)) {
+    throw new Error("distributed_canary_reused_kv_invalid");
+  }
+  if ((tokenHash !== undefined || tokenHashScheme !== undefined)
+      && (typeof tokenHash !== "string" || !/^(?:sha256:)?[a-f0-9]{64}$/.test(tokenHash)
+          || tokenHashScheme !== "gdlp-output-token-ids-v1")) {
+    throw new Error("distributed_canary_output_token_hash_invalid");
+  }
   return {
-    text,
+    text, measuredAt,
     metrics: {
+      totalRequestMs,
+      requestSha256: createHash("sha256").update(requestBody).digest("hex"),
+      ...(reusedKvTokens === undefined ? {} : { reusedKvTokens }),
+      ...(tokenHash === undefined ? {} : {
+        outputTokenIdsSha256: (tokenHash as string).replace(/^sha256:/, ""),
+        outputTokenHashScheme: "gdlp-output-token-ids-v1" as const,
+      }),
       completionTokens,
       ttftMs: distribution.ttft_ms,
       tpotMs: distribution.tpot_ms,
@@ -1210,11 +1364,35 @@ export function buildCellWorkerConfig(
   });
 }
 
+/** A measured dense policy may not activate with missing or conflicting execution evidence. */
+export function requireDenseExecutionTelemetry(
+  compilation: AutoDistributionCompilation, snapshot: LaunchSupervisorSnapshot,
+): NonNullable<ModelDeployment["execution"]> | undefined {
+  if (compilation.launch.launchOrder.some((process) => process.dense !== undefined)) {
+    const records = new Map(snapshot.processes.map((process) => [process.processId, process]));
+    if (snapshot.state !== "running" || snapshot.failure !== null
+        || snapshot.launchId !== compilation.launch.launchId
+        || snapshot.pipelineId !== compilation.launch.pipelineId
+        || compilation.launch.launchOrder.some((launch) => {
+          const observed = records.get(launch.processId);
+          return !observed || observed.state !== "ready" || observed.exit !== undefined
+            || observed.nodeId !== launch.anchor.memberId || observed.kind !== launch.kind
+            || observed.stageIndex !== launch.stageIndex;
+        })) throw new Error("dense_activation_supervisor_identity_invalid");
+  }
+  const execution = collectExecutionTelemetry(compilation, snapshot);
+  if (!execution && compilation.launch.launchOrder.some((process) => process.dense !== undefined)) {
+    throw new Error("dense_activation_execution_evidence_invalid");
+  }
+  return execution;
+}
+
 export function collectExecutionTelemetry(
   compilation: AutoDistributionCompilation,
   snapshot: LaunchSupervisorSnapshot,
 ): NonNullable<ModelDeployment["execution"]> | undefined {
   const processes = new Map(snapshot.processes.map((process) => [process.processId, process]));
+  if (processes.size !== snapshot.processes.length) return undefined;
   const stages: NonNullable<NonNullable<ModelDeployment["execution"]>["stages"]> = [];
   for (const launch of compilation.launch.launchOrder) {
     if (launch.kind === "cell-member") continue;
@@ -1222,7 +1400,7 @@ export function collectExecutionTelemetry(
     const evidence = parseExecutionEvidence(process?.output);
     if (!evidence) return undefined;
     const backend = executionBackend(evidence.backend);
-    if (!backend || !new Set(["cpu", "cuda", "rocm", "mps", "xpu"]).has(backend)) return undefined;
+    if (!backend || !new Set(["cpu", "cuda", "rocm", "directml", "mps", "xpu"]).has(backend)) return undefined;
     if (
       typeof evidence.accelerated !== "boolean"
       || typeof evidence.requested_device !== "string"
@@ -1235,23 +1413,30 @@ export function collectExecutionTelemetry(
       || typeof evidence.precision !== "string"
       || !evidence.precision.trim()
       || typeof evidence.weight_bytes !== "number"
+      || !Number.isSafeInteger(evidence.weight_bytes)
       || evidence.weight_bytes <= 0
     ) return undefined;
     const gpu = evidence.accelerated === true && backend !== "cpu";
+    if (launch.dense && (evidence.precision !== launch.dense.precision
+        || (launch.dense.executionTarget === "cpu"
+          ? backend !== "cpu" || gpu || evidence.requested_device.trim().toLowerCase() !== "cpu"
+          : !gpu))) return undefined;
     if (backend === "cpu" && (
       evidence.accelerated !== false
       || evidence.device_kind !== "cpu"
       || !evidence.device.trim().toLowerCase().startsWith("cpu")
     )) return undefined;
-    const expectedDevicePrefix = backend === "rocm" ? "cuda" : backend;
+    const expectedDevicePrefix = backend === "directml" ? "privateuseone:" : backend === "rocm" ? "cuda" : backend;
     if (backend !== "cpu" && (
       evidence.accelerated !== true
       || evidence.device_kind !== "gpu"
       || !evidence.device.trim().toLowerCase().startsWith(expectedDevicePrefix)
     )) return undefined;
+    const residency = backend === "directml" && isRecord(evidence.denseTiering)
+      ? evidence.denseTiering.currentVramWeightBytes : evidence.allocated_bytes;
     if (gpu && (
-      typeof evidence.allocated_bytes !== "number"
-      || evidence.allocated_bytes <= 0
+      typeof residency !== "number"
+      || !Number.isFinite(residency) || residency <= 0
     )) return undefined;
     if (!gpu && backend !== "cpu") return undefined;
     const requested = evidence.requested_device.trim().toLowerCase();
@@ -1396,6 +1581,8 @@ async function writeRuntimeStatus(
     workerId: result.workerId,
     canaryText: result.canaryText,
     canaryMetrics: result.canaryMetrics,
+    ...(result.canaryEvidence === undefined ? {} : { canaryEvidence: result.canaryEvidence }),
+    ...(result.activationStartupObservation === undefined ? {} : { activationStartupObservation: result.activationStartupObservation }),
     startedAt: new Date().toISOString(),
   });
 }

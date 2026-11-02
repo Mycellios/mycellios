@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "sourceId": "sha256:da905e65d83e9c7bd66854df833bd13d479d47e7916643a15383ada9832e9fb6",
+  "compilerVersion": "6.0.3",
+  "filesIdentical": [
+    "embedding-admission-proxy.js",
+    "start.mjs",
+    "config.json"
+  ]
+}

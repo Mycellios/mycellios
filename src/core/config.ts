@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { createPublicKey } from "node:crypto";
 import { isIP } from "node:net";
 import { resolve } from "node:path";
+import { parseModelRequestTimeouts } from "./model-request-deadline.js";
 import { workerConfigSchema, type WorkerConfig } from "../contracts/schemas.js";
 
 export interface CoordinatorConfig {
@@ -9,6 +10,7 @@ export interface CoordinatorConfig {
   port: number;
   databasePath: string;
   requestTimeoutMs: number;
+  modelRequestTimeoutsMs?: Record<string, number>;
   networkToken?: string | undefined;
   internalToken?: string | undefined;
   modelAdminToken?: string | undefined;
@@ -30,10 +32,16 @@ export interface CoordinatorConfig {
   publicSupabaseUrl?: string | undefined;
   supabaseServiceRoleKey?: string | undefined;
   supabaseAnonKey?: string | undefined;
+  supabaseTrustedOAuthClientIds?: string[] | undefined;
+  supabaseTrustedOAuthIssuer?: string | undefined;
   supabasePersistenceRequired?: boolean | undefined;
+  storageBackend?: "sqlite" | "postgres" | undefined;
+  databaseUrl?: string | undefined;
+  databaseSchema?: string | undefined;
   /** Explicit test/development escape hatch; production defaults to native adapters only. */
   allowDevelopmentAdapters?: boolean | undefined;
   apiAccessEnabled?: boolean | undefined;
+  contributionCreditFunding?: boolean | undefined;
   apiStarterTokens?: number | undefined;
   apiRequestsPerMinute?: number | undefined;
   apiMaxConcurrent?: number | undefined;
@@ -114,6 +122,8 @@ export function assertCoordinatorNetworkSecurity(
 export function loadCoordinatorConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): CoordinatorConfig {
+  const storageBackend = environment.MYCELLIOS_STORAGE_BACKEND?.trim();
+  if (storageBackend && storageBackend !== "sqlite" && storageBackend !== "postgres") throw new Error("mycellios_storage_backend_invalid");
   const networkToken = loadSecret(
     environment.MYCELLIOS_NETWORK_TOKEN,
     environment.MYCELLIOS_NETWORK_TOKEN_FILE,
@@ -172,6 +182,15 @@ export function loadCoordinatorConfig(
     environment.PUBLICATION_WEBHOOK_SECRET_FILE,
   );
   const supabaseUrl = environment.MYCELLIOS_SUPABASE_URL?.trim();
+  const supabaseTrustedOAuthClientIds = (environment.MYCELLIOS_SUPABASE_TRUSTED_OAUTH_CLIENT_IDS ?? "")
+    .split(",").map(value => value.trim()).filter(Boolean);
+  const supabaseTrustedOAuthIssuer = environment.MYCELLIOS_SUPABASE_TRUSTED_OAUTH_ISSUER?.trim();
+  if (supabaseTrustedOAuthIssuer) {
+    const authority = new URL(supabaseTrustedOAuthIssuer);
+    if (authority.protocol !== "https:" || authority.username || authority.password || authority.search || authority.hash)
+      throw new Error("The OAuth authority must be a pinned HTTPS issuer.");
+  }
+
   const publicSupabaseUrlValue = environment.MYCELLIOS_SUPABASE_PUBLIC_URL?.trim();
   let publicSupabaseUrl: string | undefined;
   if (publicSupabaseUrlValue) {
@@ -304,7 +323,11 @@ export function loadCoordinatorConfig(
       environment.GPU_MESH_DB === ":memory:"
         ? ":memory:"
         : resolve(environment.GPU_MESH_DB ?? "./data/gpu-mesh.db"),
+    storageBackend: environment.MYCELLIOS_STORAGE_BACKEND?.trim() === "postgres" ? "postgres" : "sqlite",
+    databaseUrl: loadSecret(environment.MYCELLIOS_DATABASE_URL, environment.MYCELLIOS_DATABASE_URL_FILE),
+    databaseSchema: environment.MYCELLIOS_DATABASE_SCHEMA?.trim() || "mycellios",
     requestTimeoutMs: parseInteger(environment.GPU_MESH_REQUEST_TIMEOUT_MS, 120_000),
+    modelRequestTimeoutsMs: parseModelRequestTimeouts(environment.GPU_MESH_MODEL_REQUEST_TIMEOUTS_JSON),
     supabasePersistenceRequired: environment.MYCELLIOS_SUPABASE_PERSISTENCE_REQUIRED?.trim() === "1",
     allowDevelopmentAdapters: environment.MYCELLIOS_ALLOW_DEV_ADAPTERS?.trim() === "1",
     apiAccessEnabled,
@@ -342,6 +365,9 @@ export function loadCoordinatorConfig(
     ...(contentHubApiUrl ? { contentHubApiUrl } : {}),
     ...(publicationWebhookSecret ? { publicationWebhookSecret } : {}),
     ...(supabaseUrl ? { supabaseUrl } : {}),
+    contributionCreditFunding: environment.MYCELLIOS_CONTRIBUTION_CREDITS_ENABLED === "true",
+    supabaseTrustedOAuthClientIds,
+    ...(supabaseTrustedOAuthIssuer ? { supabaseTrustedOAuthIssuer } : {}),
     ...(publicSupabaseUrl ? { publicSupabaseUrl } : {}),
     ...(supabaseServiceRoleKey ? { supabaseServiceRoleKey } : {}),
     ...(supabaseAnonKey ? { supabaseAnonKey } : {}),

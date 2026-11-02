@@ -53,6 +53,8 @@ export const nodeConfigurationSchema = z.object({
     pythonPath: absolutePath,
     cachePath: absolutePath,
     stagePort: z.number().int().min(1_024).max(65_535),
+    executionBackend: z.enum(["automatic", "cpu"]).optional(),
+    transport: z.enum(["automatic", "relay-only"]).optional(),
   }).strict(),
   limits: z.object({
     maxConcurrency: z.number().int().min(1).max(64),

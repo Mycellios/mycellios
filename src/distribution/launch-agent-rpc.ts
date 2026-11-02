@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { nativeEntrypointForCommandKind } from "./python-command-policy.js";
 import {
   createServer,
   type IncomingMessage,
@@ -34,15 +35,14 @@ import {
   type NativeBuildIdentity,
 } from "../contracts/build-identity.js";
 import { validateExecutorIsolationPolicy } from "./process-environment.js";
+import { validateDenseRpcStage } from "./dense-stage-arguments.js";
 
 const START_SCHEMA = "gdlp-launch-agent-start/1";
 const STOP_SCHEMA = "gdlp-launch-agent-stop/1";
 const SNAPSHOT_SCHEMA = "gdlp-launch-agent-process/1";
 const HEALTH_SCHEMA = "gdlp-launch-agent-health/3";
 const ERROR_SCHEMA = "gdlp-launch-agent-error/1";
-
 type RpcProcessState = "starting" | "ready" | "exited";
-
 export interface LaunchAgentRpcProcessSnapshot {
   schema: typeof SNAPSHOT_SCHEMA;
   handleId: string;
@@ -580,7 +580,7 @@ export class LaunchAgentRpcServer {
     this.agent = options.agent;
     if (options.nodeId !== undefined) assertIdentifier(options.nodeId, "nodeId");
     this.nodeId = options.nodeId;
-    this.buildIdentity = options.buildIdentity === undefined
+    this.buildIdentity = options.buildIdentity == null
       ? null
       : nativeBuildIdentitySchema.parse(options.buildIdentity);
     const authToken = normalizeOptionalAuthToken(options.authToken);
@@ -927,7 +927,7 @@ export class LaunchAgentRpcServer {
         (error) => this.finishWithError(entry, normalizeError(error)),
       );
       void handle.exited.then(
-        (exit) => this.finish(entry, sanitizeExit(exit)),
+        (exit) => { try { this.finish(entry, sanitizeExit(exit)); } catch (error) { this.finishWithError(entry, normalizeError(error)); } },
         (error) => this.finishWithError(entry, normalizeError(error)),
       );
     } catch (error) {
@@ -1116,7 +1116,8 @@ function validatePythonLaunchProcess(value: unknown, nodeId: string): asserts va
             "prefill",
             "decode",
           ];
-  assertExactKeys(value, [...common, ...variant], [], "python_launch_process");
+  assertExactKeys(value, [...common, ...variant], ["dense"], "python_launch_process");
+  validateDenseRpcStage(value);
   validateExecutorIsolationPolicy(value.isolation);
   for (const name of ["launchIndex", "stageIndex", "layerStart", "layerEnd", "totalLayers"] as const) {
     assertInteger(value[name], 0, Number.MAX_SAFE_INTEGER, `python_launch_${name}`);
@@ -1385,12 +1386,8 @@ function validateCommand(
   ) {
     throw new Error("command_args_are_invalid");
   }
-  const expectedModule =
-    kind === "cell-member"
-      ? MYCELLIOS_CELL_MEMBER_MODULE
-      : kind === "remote-stage"
-        ? MYCELLIOS_STAGE_MODULE
-        : MYCELLIOS_SERVER_MODULE;
+  assertOptionalCommandIntegerFlag(value.args, "--tcp-write-chunk-bytes", 64, 1_048_576, "tcp_write_chunk_bytes");
+  const expectedModule = nativeEntrypointForCommandKind(kind);
   if (
     value.args[0] !== "-u" ||
     value.args[1] !== "-m" ||
@@ -2361,7 +2358,7 @@ function boundText(value: string, maxBytes: number): { text: string; truncated: 
 function sanitizeExit(value: unknown): LaunchProcessExit {
   assertRecord(value, "launch_process_exit");
   assertExactKeys(value, ["code", "signal"], ["error"], "launch_process_exit");
-  if (value.code !== null && (!Number.isInteger(value.code) || Math.abs(value.code as number) > 2 ** 31)) {
+  if (value.code !== null && (!Number.isInteger(value.code) || (value.code as number) < -(2 ** 31) || (value.code as number) > 2 ** 32 - 1)) {
     throw new Error("launch_process_exit_code_is_invalid");
   }
   if (value.signal !== null && (typeof value.signal !== "string" || !/^SIG[A-Z0-9]+$/.test(value.signal))) {

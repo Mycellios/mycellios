@@ -1,4 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { QualifiedWarmRouteAuthority } from "./qualified-warm-route.js";
+import { readFile, writeFile, rename } from "node:fs/promises";
+import { activationCanaryRecord } from "./activation-canary-record.js";
 import { isAbsolute, resolve } from "node:path";
 import { loadCoordinatorConfig } from "../core/config.js";
 import { parseAutoDistributionConfig } from "../distribution/auto-distribute.js";
@@ -19,12 +21,18 @@ import {
 } from "./engine-activation-authority.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
 import { NativeDraftStrategyCatalog } from "../distribution/draft-strategy-catalog.js";
+import { readMeasuredActivationCatalog, buildMeasuredActivationCatalogEvidence } from "./measured-activation-catalog.js";
 
 const runtimeRoot = resolve(import.meta.dirname, "../..");
 const runtimeMetadata = readNativeRuntimeBuildMetadata(runtimeRoot);
 const config = loadCoordinatorConfig();
 const activationConfigPath = process.env.MYCELLIOS_AUTO_DISTRIBUTE_CONFIG?.trim();
 const dynamicWorkerActivation = process.env.MYCELLIOS_DYNAMIC_WORKER_ACTIVATION?.trim() === "1";
+const measuredCatalogPath = process.env.MYCELLIOS_MEASURED_ACTIVATION_CATALOG?.trim();
+const measuredCatalogSha256 = process.env.MYCELLIOS_MEASURED_ACTIVATION_CATALOG_SHA256?.trim();
+const calibrationCandidateId = process.env.MYCELLIOS_ACTIVATION_CALIBRATION_CANDIDATE?.trim();
+if (calibrationCandidateId && !measuredCatalogPath) throw new Error("activation_calibration_requires_pinned_catalog");
+if (measuredCatalogPath && !/^[a-f0-9]{64}$/.test(measuredCatalogSha256 ?? "")) throw new Error("measured_catalog_digest_required");
 const engineAuthorityPath = process.env.MYCELLIOS_ENGINE_ACTIVATION_AUTHORITY?.trim();
 const draftCatalogPath = process.env.MYCELLIOS_DRAFT_STRATEGY_CATALOG?.trim();
 const draftKeyringPath = process.env.MYCELLIOS_DRAFT_STRATEGY_KEYRING?.trim();
@@ -89,21 +97,37 @@ const runtime = await createCoordinator(config, {
   ...(activationManager ? { activationManager } : {}),
   ...(baseActivationConfig && dynamicWorkerActivation
     ? {
-        activationManagerFactory: ({ store, hub, deploymentController }) => new DynamicModelActivationManager({
+        activationManagerFactory: ({ store, hub, deploymentController }) => {
+          const recovery = new QualifiedWarmRouteAuthority(store, hub);
+          return new DynamicModelActivationManager({
+          createRecoveryLease: async (modelId, context) => (await recovery.capture(modelId, context)),
+          ...(calibrationCandidateId ? { calibrationCandidateId } : {}),
+          ...(measuredCatalogPath ? { measuredCandidateEvidence: async (modelId, currentConfig, profile) => {
+            if (calibrationCandidateId) {
+              const path = resolve(process.cwd(), measuredCatalogPath + ".calibration-input.json");
+              await writeFile(path + ".tmp", JSON.stringify({ modelId, config: currentConfig, profile }), { mode: 0o600 });
+              await rename(path + ".tmp", path);
+            }
+            return buildMeasuredActivationCatalogEvidence(await readMeasuredActivationCatalog(
+              resolve(process.cwd(), measuredCatalogPath), measuredCatalogSha256!), {
+              modelId, config: currentConfig, profile, workers: (await store.listWorkers()),
+              connectedWorkerIds: hub.connectedWorkerIds(), pythonExecutable: currentConfig.runtime.pythonExecutable,
+            }); } } : {}),
           cwd: runtimeRoot,
           workerAgentVersion: runtimeMetadata.version,
           ...(runtimeMetadata.buildIdentity
             ? { workerBuildIdentity: runtimeMetadata.buildIdentity }
             : {}),
-          snapshot: () => buildConnectedExecutorActivationSnapshot(
+          snapshot: async () => buildConnectedExecutorActivationSnapshot(
             baseActivationConfig,
-            store.listWorkers(),
+            (await store.listWorkers()),
             hub.connectedWorkerIds(),
             hub.runtimeLinkObservations(),
             engineActivationAuthority,
+            await deploymentController.reservedMemoryByNode(),
           ),
-          resolveManagedAgent: (nodeId, launch) => resolveConnectedExecutorAgent(
-            store.listWorkers(),
+          resolveManagedAgent: async (nodeId, launch) => resolveConnectedExecutorAgent(
+            (await store.listWorkers()),
             hub.connectedWorkerIds(),
             hub,
             nodeId,
@@ -111,11 +135,11 @@ const runtime = await createCoordinator(config, {
           ),
           ...(draftStrategyCatalog && engineActivationAuthority && draftCompatibility
             ? {
-                resolveDraftStrategyAuthority: (launch) => {
+                resolveDraftStrategyAuthority: async (launch) => {
                   const rootNodeId = launch.launchOrder.find(
                     (process) => process.kind === "root-engine",
                   )?.anchor.memberId;
-                  const worker = store.listWorkers().find((candidate) =>
+                  const worker = (await store.listWorkers()).find((candidate) =>
                     candidate.capabilities.distributedExecutor?.nodeId === rootNodeId
                   );
                   const backend = worker?.capabilities.distributedExecutor
@@ -142,45 +166,42 @@ const runtime = await createCoordinator(config, {
                 },
               }
             : {}),
-          loadProgress: (modelId) => store.listActivationEvents(modelId),
-          onProgress: (modelId, event) => {
-            store.appendActivationEvent(modelId, event);
+          loadProgress: async (modelId) => (await store.listActivationEvents(modelId)),
+          onProgress: async (modelId, event) => {
+            (await store.appendActivationEvent(modelId, event));
             if (event.phase === "running_canary") {
-              const operation = deploymentController.activeOperationForModel(modelId);
-              if (operation) deploymentController.markCanary(operation.id);
+              const operation = (await deploymentController.activeOperationForModel(modelId));
+              if (operation) (await deploymentController.markCanary(operation.id));
             }
           },
-          onPlanPrepared: (modelId, stages) => {
-            const operation = deploymentController.activeOperationForModel(modelId);
+          onPlanPrepared: async (modelId, stages) => {
+            const operation = (await deploymentController.activeOperationForModel(modelId));
             if (!operation) throw new Error(`deployment_operation_missing:${modelId}`);
-            const reservation = deploymentController.prepareRoute(operation.id, stages);
+            const reservation = (await deploymentController.prepareRoute(operation.id, stages));
+            await recovery.prepare(modelId, stages);
             return { id: reservation.id, generation: reservation.generation };
           },
-          onPlanHeartbeat: (_modelId, reservationId) =>
-            deploymentController.renewRoute(reservationId),
-          onActivated: (modelId, reservationId, result) => {
-            const canary = {
-              passed: true,
-              text: result.canaryText,
-              ...result.canaryMetrics,
-              workerId: result.workerId,
-            };
+          onPlanHeartbeat: async (_modelId, reservationId) =>
+            (await deploymentController.renewRoute(reservationId)),
+          onActivated: async (modelId, reservationId, result) => {
+            const canary = activationCanaryRecord(result);
             if (reservationId) {
               try {
-                deploymentController.commitRoute(reservationId, canary);
+                (await deploymentController.commitRoute(reservationId, canary));
               } catch (error) {
-                store.removeEngineRuntimeActivationPlans(modelId);
+                (await store.removeEngineRuntimeActivationPlans(modelId));
                 throw error;
               }
               return;
             }
-            const operation = deploymentController.activeOperationForModel(modelId);
-            if (operation) deploymentController.completeOperation(operation.id, "active", { canary });
+            const operation = (await deploymentController.activeOperationForModel(modelId));
+            if (operation) (await deploymentController.completeOperation(operation.id, "active", { canary }));
           },
-          onStopped: (modelId) => {
-            store.removeEngineRuntimeActivationPlans(modelId);
+          onStopped: async (modelId) => {
+            recovery.forget(modelId);
+            (await store.removeEngineRuntimeActivationPlans(modelId));
           },
-        }),
+        }); },
       }
     : {}),
 });

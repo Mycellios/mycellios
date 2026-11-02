@@ -14,6 +14,26 @@ import { sealEngineRuntimeProfile } from "../src/contracts/engine-runtime-profil
 import { sha256CanonicalEvidence } from "../src/core/json.js";
 
 describe("connected executor activation", () => {
+  it("excludes clients whose sealed launch options predate the required native protocol", () => {
+    const old = worker("worker-old", "node-old", "192.168.1.10", 9850, 4096, 3500, 12);
+    old.capabilities.agentVersion = "0.2.16";
+    expect(buildConnectedExecutorActivationSnapshot(baseConfig(), [old], new Set([old.id])).capacityNodes).toEqual([]);
+  });
+  it("deducts live reservations while retaining the full reservation ceiling and owner roles", () => {
+    const config = baseConfig();
+    config.nodes[0]!.id = "node-a";
+    config.nodes[0]!.stageRoles = ["head"];
+    const snapshot = buildConnectedExecutorActivationSnapshot(config, [
+      worker("worker-a", "node-a", "192.168.1.10", 9_850, 4_096, 3_500, 12),
+      worker("worker-b", "node-b", "192.168.1.11", 9_851, 6_144, 5_000, 20),
+    ], new Set(["worker-a", "worker-b"]), measuredLinks("node-a", "node-b"), undefined,
+    { "node-a": 700 });
+    expect(snapshot.capacityNodes.find(node => node.id === "node-a")?.availableVramMiB).toBe(2_800);
+    expect(snapshot.config?.nodes.find(node => node.id === "node-a")).toMatchObject({
+      reserveMiB: 956, stageRoles: ["head"],
+    });
+    expect(snapshot.reservationCapacityMiBByNode?.["node-a"]).toBe(3_840);
+  });
   it("uses only connected unique desktop executors as model capacity", () => {
     const workers = [
       worker("worker-a", "node-a", "192.168.1.10", 9_850, 4_096, 3_500, 12),
@@ -462,7 +482,7 @@ function worker(
     identityId: nodeId,
     capabilities: {
       region: "test",
-      agentVersion: "0.2.16",
+      agentVersion: "0.2.99",
       gpus: [{
         id: `${id}-gpu`,
         vendor: "nvidia",

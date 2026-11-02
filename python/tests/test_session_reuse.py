@@ -144,6 +144,8 @@ def _finished_job(
     )
     job.wire_id = wire_id
     job.step = step
+    # Completed dispatches advance the next wire step before retaining their KV.
+    job.next_step = step + 1
     job.token_ids = list(token_ids)
     job.kv_valid = kv_valid
     return job

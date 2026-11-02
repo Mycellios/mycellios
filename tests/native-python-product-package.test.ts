@@ -69,6 +69,9 @@ describe("native Python product package", () => {
       "distributed_runtime/lossless_sampling.py",
       "distributed_runtime/failure_evidence.py",
       "distributed_runtime/recovery_outcome.py",
+      "distributed_runtime/prefill.py",
+      "distributed_runtime/tcp_writes.py",
+      "distributed_runtime/directml.py",
     ]));
     for (const forbidden of [
       "distributed_runtime/external_gguf_runtime.py",

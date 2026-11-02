@@ -110,12 +110,12 @@ export class ActivationCheckpointTransferAuthority {
     transfer.chunks.push(bytes);
   }
 
-  commit(
+  async commit(
     workerId: string,
     workerSessionId: string,
     value: unknown,
     now = Date.now(),
-  ): ActivationCheckpoint {
+  ): Promise<ActivationCheckpoint> {
     const commit = activationCheckpointCommitSchema.parse(value);
     const transfer = this.requireTransfer(commit.transferId, workerId, workerSessionId, now);
     const checkpoint = transfer.checkpoint;
@@ -125,12 +125,12 @@ export class ActivationCheckpointTransferAuthority {
       || transfer.receivedBytes !== checkpoint.bytes
     ) throw new Error("activation_checkpoint_transfer_is_incomplete");
     try {
-      return this.store.put(
+      return (await this.store.put(
         checkpoint,
         Buffer.concat(transfer.chunks, transfer.receivedBytes),
         transfer.expected,
         now,
-      );
+      ));
     } finally {
       this.abort(commit.transferId);
     }
@@ -158,21 +158,21 @@ export class ActivationCheckpointTransferAuthority {
     return count;
   }
 
-  prepareRestore(input: {
+  async prepareRestore(input: {
     workerId: string;
     workerSessionId: string;
     checkpointId: string;
     expected: ActivationCheckpointCompatibility;
     expiresAt: number;
-  }, now = Date.now()): {
+  }, now = Date.now()): Promise<{
     transferId: string;
     checkpoint: ActivationCheckpoint;
     payload: Buffer;
-  } {
+  }> {
     if (!input.workerId || !input.workerSessionId || input.expiresAt <= now) {
       throw new Error("activation_checkpoint_restore_expectation_is_invalid");
     }
-    const stored = this.store.get(input.checkpointId, input.expected, now);
+    const stored = (await this.store.get(input.checkpointId, input.expected, now));
     if (!stored) throw new Error("activation_checkpoint_restore_is_unavailable");
     const transferId = randomUUID();
     this.restores.set(transferId, {

@@ -7,13 +7,13 @@ import { classifyRuntimeLinkFailure } from "../src/contracts/runtime-link-failur
 const RECOVERY_TOKEN = "recovery_token_0123456789";
 
 describe("WorkerHub recoverable runtime streams", () => {
-  it("resumes from the peer-confirmed offset and ignores an idempotent duplicate", () => {
-    const { hub, sent, store } = recoveryHub(true);
-    openRecoverableStream(hub);
-    deliver(hub, "worker-b", "runtime.stream.opened", recoveryIdentity());
+  it("resumes from the peer-confirmed offset and ignores an idempotent duplicate", async () => {
+    const { hub, sent, store } = (await recoveryHub(true));
+    await openRecoverableStream(hub);
+    await deliver(hub, "worker-b", "runtime.stream.opened", recoveryIdentity());
     sent.splice(0);
 
-    deliver(hub, "worker-a", "runtime.stream.data", {
+    await deliver(hub, "worker-a", "runtime.stream.data", {
       ...recoveryIdentity(),
       sequence: 0,
       offset: 0,
@@ -21,7 +21,7 @@ describe("WorkerHub recoverable runtime streams", () => {
     });
     expect(sent.filter((message) => message.type === "runtime.stream.data")).toHaveLength(1);
 
-    disconnectWorker(hub, "worker-b");
+    await disconnectWorker(hub, "worker-b");
     expect(store.setWorkerStatus).toHaveBeenCalledWith("worker-b", "offline");
     expect(sent).toContainEqual(expect.objectContaining({
       workerId: "worker-a",
@@ -45,14 +45,14 @@ describe("WorkerHub recoverable runtime streams", () => {
     });
 
     // Source retained four bytes; destination proves it delivered none.
-    deliver(hub, "worker-a", "runtime.stream.resume", {
+    await deliver(hub, "worker-a", "runtime.stream.resume", {
       ...recoveryIdentity(),
       sendOffset: 4,
       acknowledgedOffset: 0,
       receiveOffset: 0,
       bufferedFromOffset: 0,
     });
-    deliver(hub, "worker-b", "runtime.stream.resume", {
+    await deliver(hub, "worker-b", "runtime.stream.resume", {
       ...recoveryIdentity(),
       sendOffset: 0,
       acknowledgedOffset: 0,
@@ -80,14 +80,14 @@ describe("WorkerHub recoverable runtime streams", () => {
       data: Buffer.from("lost").toString("base64"),
     };
     const beforeReplay = sent.filter((message) => message.type === "runtime.stream.data").length;
-    deliver(hub, "worker-a", "runtime.stream.data", replay);
-    deliver(hub, "worker-a", "runtime.stream.data", replay);
+    await deliver(hub, "worker-a", "runtime.stream.data", replay);
+    await deliver(hub, "worker-a", "runtime.stream.data", replay);
     // The second copy is wholly behind the contiguous offset and is ignored.
     expect(sent.filter((message) => message.type === "runtime.stream.data")).toHaveLength(
       beforeReplay + 1,
     );
 
-    deliver(hub, "worker-a", "runtime.stream.data", {
+    await deliver(hub, "worker-a", "runtime.stream.data", {
       ...replay,
       sequence: 1,
       offset: 9,
@@ -97,12 +97,12 @@ describe("WorkerHub recoverable runtime streams", () => {
       && String(message.payload.message).includes("runtime_stream_offset_mismatch:4:9")
     )).toBe(true);
     expect(runtimeStreamCount(hub)).toBe(0);
-    hub.close();
+    (await hub.close());
   });
 
-  it("downgrades a mixed v2 route before its first byte without claiming recovery", () => {
-    const legacy = recoveryHub(false);
-    openRecoverableStream(legacy.hub);
+  it("downgrades a mixed v2 route before its first byte without claiming recovery", async () => {
+    const legacy = (await recoveryHub(false));
+    await openRecoverableStream(legacy.hub);
     expect(legacy.sent).toContainEqual(expect.objectContaining({
       workerId: "worker-b",
       type: "runtime.stream.open",
@@ -110,7 +110,7 @@ describe("WorkerHub recoverable runtime streams", () => {
     }));
     expect(runtimeStreamCount(legacy.hub)).toBe(1);
 
-    deliver(legacy.hub, "worker-a", "runtime.stream.open", {
+    await deliver(legacy.hub, "worker-a", "runtime.stream.open", {
       streamId: "legacy-stream",
       destinationNodeId: "node-b",
       targetPort: 9_850,
@@ -121,25 +121,26 @@ describe("WorkerHub recoverable runtime streams", () => {
       payload: { streamId: "legacy-stream", targetPort: 9_850 },
     }));
     expect(runtimeStreamCount(legacy.hub)).toBe(2);
-    legacy.hub.close();
+    (await legacy.hub.close());
   });
 });
 
-function recoveryHub(destinationSupportsRecovery: boolean): {
+async function recoveryHub(destinationSupportsRecovery: boolean): Promise<{
   hub: WorkerHub;
   sent: Array<{ workerId: string; type: string; payload: Record<string, unknown> }>;
   store: { setWorkerStatus: ReturnType<typeof vi.fn> };
-} {
+}> {
   const workers = [
     worker("worker-a", "node-a", true),
     worker("worker-b", "node-b", destinationSupportsRecovery),
   ];
   const store = {
+    listRuntimeLinkSamples: async () => [],
     getWorker: vi.fn((workerId: string) => workers.find((candidate) => candidate.id === workerId)),
     listWorkers: vi.fn(() => workers),
     setWorkerStatus: vi.fn(),
   };
-  const hub = new WorkerHub(store as unknown as MeshStore);
+  const hub = (await WorkerHub.create(store as unknown as MeshStore));
   const sent: Array<{ workerId: string; type: string; payload: Record<string, unknown> }> = [];
   vi.spyOn(hub, "isConnected").mockReturnValue(true);
   vi.spyOn(hub, "send").mockImplementation((workerId, type, payload) => {
@@ -165,8 +166,8 @@ function worker(workerId: string, nodeId: string, recovery: boolean) {
   };
 }
 
-function openRecoverableStream(hub: WorkerHub): void {
-  deliver(hub, "worker-a", "runtime.stream.open", {
+async function openRecoverableStream(hub: WorkerHub): Promise<void> {
+  await deliver(hub, "worker-a", "runtime.stream.open", {
     ...recoveryIdentity(),
     destinationNodeId: "node-b",
     targetPort: 9_850,
@@ -181,19 +182,19 @@ function recoveryIdentity(): Record<string, unknown> {
   };
 }
 
-function deliver(
+async function deliver(
   hub: WorkerHub,
   workerId: string,
   type: string,
   payload: Record<string, unknown>,
-): void {
+): Promise<void> {
   const internal = hub as unknown as {
-    handleRuntimeStreamEnvelope(envelope: WorkerEnvelope): void;
+    handleRuntimeStreamEnvelope(envelope: WorkerEnvelope): Promise<void>;
   };
-  internal.handleRuntimeStreamEnvelope({ v: 1, workerId, type, payload });
+  await internal.handleRuntimeStreamEnvelope({ v: 1, workerId, type, payload });
 }
 
-function disconnectWorker(hub: WorkerHub, workerId: string): void {
+async function disconnectWorker(hub: WorkerHub, workerId: string): Promise<void> {
   const timer = setTimeout(() => undefined, 60_000);
   timer.unref();
   const state = {
@@ -208,11 +209,11 @@ function disconnectWorker(hub: WorkerHub, workerId: string): void {
   const internal = hub as unknown as {
     connections: Map<string, typeof state>;
     allConnections: Set<typeof state>;
-    handleClose(connection: typeof state): void;
+    handleClose(connection: typeof state): Promise<void>;
   };
   internal.connections.set(workerId, state);
   internal.allConnections.add(state);
-  internal.handleClose(state);
+  await internal.handleClose(state);
 }
 
 function runtimeStreamCount(hub: WorkerHub): number {

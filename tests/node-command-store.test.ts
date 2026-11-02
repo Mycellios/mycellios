@@ -41,72 +41,72 @@ function result(commandId: string, overrides: Record<string, unknown> = {}) {
 }
 
 describe("NodeCommandStore", () => {
-  it("redelivers after reconnect and records an applied result exactly once", () => {
-    const database = new MeshDatabase(":memory:");
+  it("redelivers after reconnect and records an applied result exactly once", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     const now = () => Date.parse("2026-08-10T12:00:01.000Z");
     const first = new NodeCommandStore(database, now);
     const input = command();
 
-    expect(first.enqueue(input, 3).state).toBe("queued");
-    expect(first.enqueue(input, 3).state).toBe("queued");
-    expect(first.pull("node-1", 3)).toMatchObject([{ state: "delivered", command: { id: input.id } }]);
+    expect((await first.enqueue(input, 3)).state).toBe("queued");
+    expect((await first.enqueue(input, 3)).state).toBe("queued");
+    expect((await first.pull("node-1", 3))).toMatchObject([{ state: "delivered", command: { id: input.id } }]);
 
     const restarted = new NodeCommandStore(database, now);
-    expect(restarted.pull("node-1", 3)).toMatchObject([{ state: "delivered", command: { id: input.id } }]);
+    expect((await restarted.pull("node-1", 3))).toMatchObject([{ state: "delivered", command: { id: input.id } }]);
     const applied = result(input.id);
-    expect(restarted.recordResult(applied)).toEqual(applied);
-    expect(restarted.recordResult(applied)).toEqual(applied);
-    expect(restarted.pull("node-1", 3)).toEqual([]);
-    expect(() => restarted.recordResult({ ...applied, resultDigest: `sha256:${"b".repeat(64)}` })).toThrow("node_command_result_conflict");
+    expect((await restarted.recordResult(applied))).toEqual(applied);
+    expect((await restarted.recordResult(applied))).toEqual(applied);
+    expect((await restarted.pull("node-1", 3))).toEqual([]);
+    await expect((async () => (await restarted.recordResult({ ...applied, resultDigest: `sha256:${"b".repeat(64)}` })))()).rejects.toThrow("node_command_result_conflict");
 
-    const events = restarted.eventsAfter("node-1", null);
+    const events = (await restarted.eventsAfter("node-1", null));
     expect(events.map(({ type }) => type)).toEqual([
       "command.queued",
       "command.delivered",
       "command.applied",
     ]);
     expect(events.at(-1)?.actor).toMatchObject({ kind: "node", id: "node-1" });
-    expect(restarted.eventsAfter("node-1", events[1]!.cursor).map(({ type }) => type)).toEqual(["command.applied"]);
+    expect((await restarted.eventsAfter("node-1", events[1]!.cursor)).map(({ type }) => type)).toEqual(["command.applied"]);
     const forgedCursor = `${events[1]!.cursor.slice(0, -1)}${events[1]!.cursor.endsWith("0") ? "1" : "0"}`;
-    expect(() => restarted.eventsAfter("node-1", forgedCursor)).toThrow("node_event_cursor_unknown");
-    database.close();
+    await expect((async () => (await restarted.eventsAfter("node-1", forgedCursor)))()).rejects.toThrow("node_event_cursor_unknown");
+    (await database.close());
   });
 
-  it("rejects nonce replay, stale generations and conflicting command ids", () => {
-    const database = new MeshDatabase(":memory:");
+  it("rejects nonce replay, stale generations and conflicting command ids", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     const store = new NodeCommandStore(database, () => Date.parse("2026-08-10T12:00:01.000Z"));
     const input = command();
-    store.enqueue(input, 3);
-    expect(() => store.enqueue({ ...input, type: "resume" }, 3)).toThrow("node_command_id_conflict");
-    expect(() => store.enqueue(command({ nonce: input.nonce }), 3)).toThrow("node_command_replay");
-    expect(() => store.enqueue(command({ generation: 2 }), 3)).toThrow("node_command_generation_downgrade");
-    database.close();
+    (await store.enqueue(input, 3));
+    await expect((async () => (await store.enqueue({ ...input, type: "resume" }, 3)))()).rejects.toThrow("node_command_id_conflict");
+    await expect((async () => (await store.enqueue(command({ nonce: input.nonce }), 3)))()).rejects.toThrow("node_command_replay");
+    await expect((async () => (await store.enqueue(command({ generation: 2 }), 3)))()).rejects.toThrow("node_command_generation_downgrade");
+    (await database.close());
   });
 
-  it("expires commands before delivery and retires old generations", () => {
+  it("expires commands before delivery and retires old generations", async () => {
     let clock = Date.parse("2026-08-10T12:00:01.000Z");
-    const database = new MeshDatabase(":memory:");
+    const database = (await MeshDatabase.open(":memory:"));
     const store = new NodeCommandStore(database, () => clock);
     const expiring = command({ expiresAt: "2026-08-10T12:00:02.000Z" });
-    store.enqueue(expiring, 3);
+    (await store.enqueue(expiring, 3));
     clock += 2_000;
-    expect(store.pull("node-1", 3)).toEqual([]);
+    expect((await store.pull("node-1", 3))).toEqual([]);
 
     const oldGeneration = command({ generation: 3 });
-    store.enqueue(oldGeneration, 3);
-    expect(store.pull("node-1", 4)).toEqual([]);
-    expect(store.eventsAfter("node-1", null).filter(({ type }) => type === "command.expired")).toHaveLength(2);
-    database.close();
+    (await store.enqueue(oldGeneration, 3));
+    expect((await store.pull("node-1", 4))).toEqual([]);
+    expect((await store.eventsAfter("node-1", null)).filter(({ type }) => type === "command.expired")).toHaveLength(2);
+    (await database.close());
   });
 
-  it("requires terminal, matching results", () => {
-    const database = new MeshDatabase(":memory:");
+  it("requires terminal, matching results", async () => {
+    const database = (await MeshDatabase.open(":memory:"));
     const store = new NodeCommandStore(database, () => Date.parse("2026-08-10T12:00:01.000Z"));
     const input = command();
-    store.enqueue(input, 3);
-    expect(() => store.recordResult(result(input.id, { state: "accepted" }))).toThrow("node_command_result_not_terminal");
-    expect(() => store.recordResult(result(input.id, { nodeId: "node-2" }))).toThrow("node_command_result_wrong_node");
-    expect(() => store.recordResult(result(input.id, { generation: 4 }))).toThrow("node_command_result_wrong_generation");
-    database.close();
+    (await store.enqueue(input, 3));
+    await expect((async () => (await store.recordResult(result(input.id, { state: "accepted" }))))()).rejects.toThrow("node_command_result_not_terminal");
+    await expect((async () => (await store.recordResult(result(input.id, { nodeId: "node-2" }))))()).rejects.toThrow("node_command_result_wrong_node");
+    await expect((async () => (await store.recordResult(result(input.id, { generation: 4 }))))()).rejects.toThrow("node_command_result_wrong_generation");
+    (await database.close());
   });
 });

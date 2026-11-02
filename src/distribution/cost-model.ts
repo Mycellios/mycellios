@@ -1,4 +1,5 @@
 import { activationCodec } from "./codecs.js";
+import { denseStageMemoryAdmission } from "./dense-stage-memory.js";
 import type {
   ComputeNodeProfile,
   DirectedLinkProfile,
@@ -138,7 +139,10 @@ export function evaluateDistributionPlan(
     ) {
       return { ...empty, infeasibleReason: `engine_layer_capacity_exceeded:${node.id}` };
     }
-    const memoryBytes = stageMemoryBytes(model, stage, workload, first, last);
+    const completeStageBytes = stageMemoryBytes(model, stage, workload, first, last);
+    const dense = denseStageMemoryAdmission(model, stage, node, workload, completeStageBytes, first, last);
+    if (dense?.error) return { ...empty, infeasibleReason: dense.error };
+    const memoryBytes = dense?.graphicsBytes ?? completeStageBytes;
     const memoryLimitBytes = Math.max(0, node.memoryBytes - node.reserveBytes);
     if (memoryBytes > memoryLimitBytes) {
       return {
@@ -269,6 +273,10 @@ export function evaluateDistributionPlan(
 
   return {
     feasible: true,
+    ...(plan.stages.some(stage => stage.dense !== undefined) ? {
+      calibrationRequired: true,
+      calibrationReasons: ["dense_streaming_requires_complete_request_calibration"],
+    } : {}),
     infeasibleReason: null,
     stages: plan.stages.length,
     ttftMs,

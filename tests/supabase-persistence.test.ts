@@ -13,64 +13,64 @@ describe("Supabase durable persistence", () => {
   const databases: MeshDatabase[] = [];
   const directories: string[] = [];
 
-  afterEach(() => {
-    for (const database of databases.splice(0)) database.close();
+  afterEach(async () => {
+    for (const database of databases.splice(0)) (await database.close());
     for (const directory of directories.splice(0)) {
       rmSync(directory, { recursive: true, force: true });
     }
   });
 
   it("flushes transactional coordinator state and history to Supabase", async () => {
-    const database = new MeshDatabase(":memory:");
+    const database = (await MeshDatabase.open(":memory:"));
     databases.push(database);
     const store = new MeshStore(database);
-    const worker = addWorker(store, { id: "persisted-worker" });
-    store.upsertRequestedModel({
+    const worker = (await addWorker(store, { id: "persisted-worker" }));
+    (await store.upsertRequestedModel({
       id: "qwen-test",
       source: "Qwen/Qwen-test",
       revision: null,
       contextTokens: 4096,
       minimumNodes: 1,
       autoActivate: true,
-    });
-    store.createJob({
+    }));
+    (await store.createJob({
       id: "job-persisted",
       sessionId: "session-persisted",
       model: "qwen-test",
       workloadClass: "interactive",
       deadlineAt: Date.now() + 60_000,
-    });
-    const conversationId = store.startInferenceConversation(
+    }));
+    const conversationId = (await store.startInferenceConversation(
       "session-persisted",
       "qwen-test",
       [{ role: "user", content: "hello" }],
-    );
-    store.appendInferenceMessage({
+    ));
+    (await store.appendInferenceMessage({
       conversationId,
       jobId: "job-persisted",
       role: "assistant",
       content: "hello back",
       status: "completed",
       outputTokens: 2,
-    });
-    store.appendActivationEvent("qwen-test", {
+    }));
+    (await store.appendActivationEvent("qwen-test", {
       phase: "active",
       state: "completed",
       message: "Model is active.",
       at: new Date().toISOString(),
       nodeId: worker.id,
-    });
+    }));
     const deployments = new DeploymentControlPlane(store, "test-controller");
-    deployments.initialize();
-    const operation = deployments.claimOperation("qwen-test", "activate")!;
-    deployments.prepareRoute(operation.id, [{
+    (await deployments.initialize());
+    const operation = (await deployments.claimOperation("qwen-test", "activate"))!;
+    (await deployments.prepareRoute(operation.id, [{
       nodeId: "persisted-worker",
       stageIndex: 0,
       layerStart: 0,
       layerEnd: 8,
       memoryMiB: 512,
       capacityMiB: 4_096,
-    }]);
+    }]));
 
     const postedTables: string[] = [];
     const sync = new SupabasePersistence(store, {
@@ -89,7 +89,7 @@ describe("Supabase durable persistence", () => {
     });
     await sync.initialize();
 
-    expect(database.pendingRemoteChangeCount()).toBe(0);
+    expect((await database.pendingRemoteChangeCount())).toBe(0);
     expect(new Set(postedTables)).toEqual(new Set([
       "workers",
       "requested_models",
@@ -102,7 +102,7 @@ describe("Supabase durable persistence", () => {
       "route_reservations",
       "deployment_stage_leases",
     ]));
-    expect(sync.status()).toMatchObject({
+    expect((await sync.status())).toMatchObject({
       connected: true,
       pendingChanges: 0,
       lastError: null,
@@ -111,10 +111,10 @@ describe("Supabase durable persistence", () => {
   });
 
   it("keeps unsent changes in the local outbox while Supabase is unavailable", async () => {
-    const database = new MeshDatabase(":memory:");
+    const database = (await MeshDatabase.open(":memory:"));
     databases.push(database);
     const store = new MeshStore(database);
-    addWorker(store, { id: "offline-sync-worker" });
+    (await addWorker(store, { id: "offline-sync-worker" }));
     const sync = new SupabasePersistence(store, {
       url: "https://supabase.example.test",
       serviceRoleKey: "test-service-role",
@@ -123,8 +123,8 @@ describe("Supabase durable persistence", () => {
 
     await sync.initialize();
 
-    expect(database.pendingRemoteChangeCount()).toBeGreaterThan(0);
-    expect(sync.status()).toMatchObject({
+    expect((await database.pendingRemoteChangeCount())).toBeGreaterThan(0);
+    expect((await sync.status())).toMatchObject({
       connected: false,
       required: false,
     });
@@ -132,7 +132,7 @@ describe("Supabase durable persistence", () => {
   });
 
   it("restores workers from Supabase before the coordinator starts", async () => {
-    const database = new MeshDatabase(":memory:");
+    const database = (await MeshDatabase.open(":memory:"));
     databases.push(database);
     const store = new MeshStore(database);
     const remoteWorker = {
@@ -170,7 +170,7 @@ describe("Supabase durable persistence", () => {
 
     await sync.initialize();
 
-    expect(store.getWorker("wrk-remote")).toMatchObject({
+    expect((await store.getWorker("wrk-remote"))).toMatchObject({
       id: "wrk-remote",
       reliability: 0.99,
       jobsCompleted: 12,
@@ -180,7 +180,7 @@ describe("Supabase durable persistence", () => {
   });
 
   it("backs runtime artifacts up to Supabase Storage with durable metadata", async () => {
-    const database = new MeshDatabase(":memory:");
+    const database = (await MeshDatabase.open(":memory:"));
     databases.push(database);
     const store = new MeshStore(database);
     const directory = mkdtempSync(join(tmpdir(), "mycellios-artifact-"));
@@ -202,7 +202,7 @@ describe("Supabase durable persistence", () => {
       },
     });
     await sync.initialize();
-    sync.registerArtifactBackup({
+    (await sync.registerArtifactBackup({
       id: `mobile-weight-${sha256}`,
       localPath,
       storagePath: `mobile-experts/weights/${sha256}.bin`,
@@ -210,10 +210,10 @@ describe("Supabase durable persistence", () => {
       sha256,
       sizeBytes: bytes.length,
       metadata: { kind: "mobile-expert-weights" },
-    });
+    }));
     await sync.flush();
 
-    expect(database.pendingArtifactBackupCount()).toBe(0);
+    expect((await database.pendingArtifactBackupCount())).toBe(0);
     expect(requests).toContain(
       `POST /storage/v1/object/mycellios-artifacts/mobile-experts/weights/${sha256}.bin`,
     );

@@ -151,29 +151,29 @@ export class DeploymentControlPlane {
     readonly ownerId = `coordinator-${process.pid}-${newId("ctl")}`,
   ) {}
 
-  initialize(now = Date.now()): {
+  async initialize(now = Date.now()): Promise<{
     models: number;
     interruptedOperations: number;
     expiredReservations: number;
-  } {
-    return this.store.database.transaction(() => {
-      const models = this.store.listRequestedModels();
-      for (const model of models) this.ensureModel(model, now);
-      const interruptedOperations = Number(this.store.database.raw.prepare(
+  }> {
+    return (await this.store.database.transaction(async () => {
+      const models = (await this.store.listRequestedModels());
+      for (const model of models) (await this.ensureModel(model, now));
+      const interruptedOperations = Number((await this.store.database.raw.prepare(
         `UPDATE deployment_operations
          SET status = 'interrupted', error_code = 'coordinator_restarted',
              error_message = 'The coordinator restarted while the operation was running.',
              updated_at = ?, finished_at = ?
          WHERE status IN ('pending', 'running')`,
-      ).run(now, now).changes);
+      ).run(now, now)).changes);
       if (interruptedOperations > 0) {
-        this.store.database.raw.prepare(
+        (await this.store.database.raw.prepare(
           `UPDATE deployment_states
            SET observed_state = CASE
                  WHEN desired_state = 'active' THEN 'degraded'
                  ELSE 'inactive'
                END,
-               next_retry_at = CASE WHEN desired_state = 'active' THEN ? ELSE NULL END,
+               next_retry_at = CASE WHEN desired_state = 'active' THEN CAST(? AS BIGINT) ELSE NULL END,
                last_error = CASE
                  WHEN desired_state = 'active' THEN 'coordinator_restarted'
                  ELSE NULL
@@ -183,40 +183,40 @@ export class DeploymentControlPlane {
                controller_lease_until = NULL,
                updated_at = ?
            WHERE active_operation_id IS NOT NULL`,
-        ).run(now, now);
+        ).run(now, now));
       }
-      const expiredReservations = this.expireReservations(now);
-      this.queueAll();
+      const expiredReservations = (await this.expireReservations(now));
+      (await this.queueAll());
       return { models: models.length, interruptedOperations, expiredReservations };
-    });
+    }));
   }
 
-  ensureModel(
+  async ensureModel(
     model: Pick<StoredRequestedModel, "id" | "autoActivate">,
     now = Date.now(),
-  ): DeploymentState {
+  ): Promise<DeploymentState> {
     const desiredState: DeploymentDesiredState = model.autoActivate ? "active" : "inactive";
-    this.store.database.raw.prepare(
+    (await this.store.database.raw.prepare(
       `INSERT INTO deployment_states(
          model_id, desired_state, observed_state, generation, observed_generation,
          retry_count, created_at, updated_at
        ) VALUES (?, ?, 'inactive', 1, 0, 0, ?, ?)
        ON CONFLICT(model_id) DO NOTHING`,
-    ).run(model.id, desiredState, now, now);
-    this.queueState(model.id);
-    return this.getState(model.id)!;
+    ).run(model.id, desiredState, now, now));
+    (await this.queueState(model.id));
+    return (await this.getState(model.id))!;
   }
 
-  setDesiredState(
+  async setDesiredState(
     modelId: string,
     desiredState: DeploymentDesiredState,
     now = Date.now(),
-  ): DeploymentState {
-    return this.store.database.transaction(() => {
-      const model = this.store.getRequestedModel(modelId);
+  ): Promise<DeploymentState> {
+    return (await this.store.database.transaction(async () => {
+      const model = (await this.store.getRequestedModel(modelId));
       if (!model) throw new Error(`deployment_model_not_found:${modelId}`);
-      this.ensureModel(model, now);
-      this.store.database.raw.prepare(
+      (await this.ensureModel(model, now));
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET desired_state = ?,
              generation = generation + CASE WHEN desired_state = ? THEN 0 ELSE 1 END,
@@ -233,25 +233,25 @@ export class DeploymentControlPlane {
         desiredState,
         now,
         modelId,
-      );
-      this.queueState(modelId);
-      return this.getState(modelId)!;
-    });
+      ));
+      (await this.queueState(modelId));
+      return (await this.getState(modelId))!;
+    }));
   }
 
-  rearmAfterRuntimeChange(
+  async rearmAfterRuntimeChange(
     modelId: string,
     reason: string,
     now = Date.now(),
-  ): DeploymentState {
-    return this.store.database.transaction(() => {
-      const model = this.store.getRequestedModel(modelId);
+  ): Promise<DeploymentState> {
+    return (await this.store.database.transaction(async () => {
+      const model = (await this.store.getRequestedModel(modelId));
       if (!model) throw new Error(`deployment_model_not_found:${modelId}`);
-      const state = this.ensureModel(model, now);
+      const state = (await this.ensureModel(model, now));
       if (state.activeOperationId !== null) {
         throw new Error(`deployment_operation_is_active:${modelId}`);
       }
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET generation = generation + 1,
              observed_state = 'failed',
@@ -262,28 +262,28 @@ export class DeploymentControlPlane {
              controller_lease_until = NULL,
              updated_at = ?
          WHERE model_id = ? AND active_operation_id IS NULL`,
-      ).run(reason.slice(0, 2_000), now, modelId);
-      this.queueState(modelId);
-      return this.getState(modelId)!;
-    });
+      ).run(reason.slice(0, 2_000), now, modelId));
+      (await this.queueState(modelId));
+      return (await this.getState(modelId))!;
+    }));
   }
 
-  getState(modelId: string): DeploymentState | null {
-    const row = this.store.database.raw.prepare(
+  async getState(modelId: string): Promise<DeploymentState | null> {
+    const row = (await this.store.database.raw.prepare(
       "SELECT * FROM deployment_states WHERE model_id = ?",
-    ).get(modelId) as DeploymentStateRow | undefined;
+    ).get(modelId)) as DeploymentStateRow | undefined;
     return row ? mapDeploymentState(row) : null;
   }
 
-  listStates(): DeploymentState[] {
-    const rows = this.store.database.raw.prepare(
+  async listStates(): Promise<DeploymentState[]> {
+    const rows = (await this.store.database.raw.prepare(
       "SELECT * FROM deployment_states ORDER BY created_at, model_id",
-    ).all() as unknown as DeploymentStateRow[];
+    ).all()) as unknown as DeploymentStateRow[];
     return rows.map(mapDeploymentState);
   }
 
-  listDueStates(now = Date.now()): DeploymentState[] {
-    const rows = this.store.database.raw.prepare(
+  async listDueStates(now = Date.now()): Promise<DeploymentState[]> {
+    const rows = (await this.store.database.raw.prepare(
       `SELECT * FROM deployment_states
        WHERE (
          desired_state = 'active'
@@ -294,11 +294,11 @@ export class DeploymentControlPlane {
          AND observed_state != 'inactive'
        )
        ORDER BY updated_at, model_id`,
-    ).all(now) as unknown as DeploymentStateRow[];
+    ).all(now)) as unknown as DeploymentStateRow[];
     return rows.map(mapDeploymentState);
   }
 
-  claimOperation(
+  async claimOperation(
     modelId: string,
     kind: DeploymentOperationKind,
     options: {
@@ -306,14 +306,14 @@ export class DeploymentControlPlane {
       metadata?: Record<string, unknown>;
       now?: number;
     } = {},
-  ): DeploymentOperation | null {
-    return this.store.database.transaction(() => {
+  ): Promise<DeploymentOperation | null> {
+    return (await this.store.database.transaction(async () => {
       const now = options.now ?? Date.now();
-      const model = this.store.getRequestedModel(modelId);
+      const model = (await this.store.getRequestedModel(modelId));
       if (!model) throw new Error(`deployment_model_not_found:${modelId}`);
-      let state = this.ensureModel(model, now);
+      let state = (await this.ensureModel(model, now));
       const active = state.activeOperationId
-        ? this.getOperation(state.activeOperationId)
+        ? (await this.getOperation(state.activeOperationId))
         : null;
       if (
         active?.status === "running"
@@ -330,23 +330,32 @@ export class DeploymentControlPlane {
         return null;
       }
       if (active?.status === "running") {
-        this.finishOperationRow(
+        (await this.finishOperationRow(
           active.id,
           "interrupted",
           "controller_lease_expired",
           "The previous controller lease expired before the operation completed.",
           now,
-        );
+        ));
       }
-      state = this.getState(modelId)!;
-      const attempt = state.retryCount + 1;
-      const idempotencyKey = `${modelId}:${state.generation}:${kind}:${attempt}`;
-      const existing = this.store.database.raw.prepare(
+      state = (await this.getState(modelId))!;
+      // retryCount tracks consecutive failures and resets after success. The
+      // operation attempt must remain unique within a generation after an
+      // active route loses capacity and needs another activation.
+      const previous = (await this.store.database.raw.prepare(
+        `SELECT MAX(attempt) AS attempt FROM deployment_operations
+         WHERE model_id = ? AND generation = ? AND kind = ?`,
+      ).get(modelId, state.generation, kind)) as { attempt: number | null };
+      const attempt = Math.max(state.retryCount, previous.attempt ?? 0) + 1;
+      const incarnation = (await this.store.getRequestedModel(modelId))?.createdAt;
+      if (incarnation === undefined) throw new Error("deployment_model_missing");
+      const idempotencyKey = `${modelId}:${incarnation}:${state.generation}:${kind}:${attempt}`;
+      const existing = (await this.store.database.raw.prepare(
         "SELECT * FROM deployment_operations WHERE idempotency_key = ?",
-      ).get(idempotencyKey) as DeploymentOperationRow | undefined;
+      ).get(idempotencyKey)) as DeploymentOperationRow | undefined;
       if (existing?.status === "running") return mapDeploymentOperation(existing);
       const operationId = newId("dop");
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `INSERT INTO deployment_operations(
            id, model_id, generation, kind, status, attempt, idempotency_key,
            metadata_json, started_at, updated_at
@@ -361,10 +370,10 @@ export class DeploymentControlPlane {
         JSON.stringify(options.metadata ?? {}),
         now,
         now,
-      );
+      ));
       const observedState: DeploymentObservedState =
         kind === "deactivate" ? "stopping" : "preparing";
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET observed_state = ?, active_operation_id = ?, controller_owner = ?,
              controller_lease_until = ?, next_retry_at = NULL, updated_at = ?
@@ -376,56 +385,56 @@ export class DeploymentControlPlane {
         now + Math.max(1_000, options.leaseMs ?? 60_000),
         now,
         modelId,
-      );
-      this.queueOperation(operationId);
-      this.queueState(modelId);
-      return this.getOperation(operationId)!;
-    });
+      ));
+      (await this.queueOperation(operationId));
+      (await this.queueState(modelId));
+      return (await this.getOperation(operationId))!;
+    }));
   }
 
-  renewOperation(operationId: string, leaseMs = 60_000, now = Date.now()): boolean {
-    return this.store.database.transaction(() => {
-      const operation = this.getOperation(operationId);
+  async renewOperation(operationId: string, leaseMs = 60_000, now = Date.now()): Promise<boolean> {
+    return (await this.store.database.transaction(async () => {
+      const operation = (await this.getOperation(operationId));
       if (!operation || operation.status !== "running") return false;
-      const changed = Number(this.store.database.raw.prepare(
+      const changed = Number((await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET controller_lease_until = ?, updated_at = ?
          WHERE model_id = ? AND active_operation_id = ? AND controller_owner = ?`,
-      ).run(now + Math.max(1_000, leaseMs), now, operation.modelId, operationId, this.ownerId).changes);
-      if (changed === 1) this.queueState(operation.modelId);
+      ).run(now + Math.max(1_000, leaseMs), now, operation.modelId, operationId, this.ownerId)).changes);
+      if (changed === 1) (await this.queueState(operation.modelId));
       return changed === 1;
-    });
+    }));
   }
 
-  markWaitingCapacity(modelId: string, message: string | null = null, now = Date.now()): void {
-    this.store.database.transaction(() => {
-      this.store.database.raw.prepare(
+  async markWaitingCapacity(modelId: string, message: string | null = null, now = Date.now()): Promise<void> {
+    (await this.store.database.transaction(async () => {
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET observed_state = 'waiting_capacity', last_error = ?,
              active_operation_id = NULL, controller_owner = NULL,
              controller_lease_until = NULL, updated_at = ?
          WHERE model_id = ? AND desired_state = 'active'`,
-      ).run(message, now, modelId);
-      this.queueState(modelId);
-    });
+      ).run(message, now, modelId));
+      (await this.queueState(modelId));
+    }));
   }
 
-  adoptObservedState(
+  async adoptObservedState(
     modelId: string,
     observedState: "active" | "inactive" | "degraded",
     now = Date.now(),
-  ): void {
-    this.store.database.transaction(() => {
-      const state = this.getState(modelId);
+  ): Promise<void> {
+    (await this.store.database.transaction(async () => {
+      const state = (await this.getState(modelId));
       if (!state) return;
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET observed_state = ?,
              observed_generation = CASE
                WHEN ? IN ('active', 'inactive') THEN generation
                ELSE observed_generation
              END,
-             next_retry_at = CASE WHEN ? = 'degraded' THEN ? ELSE NULL END,
+             next_retry_at = CASE WHEN ? = 'degraded' THEN CAST(? AS BIGINT) ELSE NULL END,
              last_error = CASE WHEN ? = 'degraded' THEN last_error ELSE NULL END,
              updated_at = ?
          WHERE model_id = ? AND active_operation_id IS NULL`,
@@ -437,100 +446,100 @@ export class DeploymentControlPlane {
         observedState,
         now,
         modelId,
-      );
-      this.queueState(modelId);
-    });
+      ));
+      (await this.queueState(modelId));
+    }));
   }
 
-  activeOperationForModel(modelId: string): DeploymentOperation | null {
-    const state = this.getState(modelId);
-    return state?.activeOperationId ? this.getOperation(state.activeOperationId) : null;
+  async activeOperationForModel(modelId: string): Promise<DeploymentOperation | null> {
+    const state = (await this.getState(modelId));
+    return state?.activeOperationId ? (await this.getOperation(state.activeOperationId)) : null;
   }
 
-  markCanary(operationId: string, now = Date.now()): boolean {
-    return this.setOperationObservedState(operationId, "canary", now);
+  async markCanary(operationId: string, now = Date.now()): Promise<boolean> {
+    return (await this.setOperationObservedState(operationId, "canary", now));
   }
 
-  completeOperation(
+  async completeOperation(
     operationId: string,
     observedState: "active" | "inactive",
     metadata: Record<string, unknown> = {},
     now = Date.now(),
-  ): boolean {
-    return this.store.database.transaction(() => {
-      const operation = this.getOperation(operationId);
+  ): Promise<boolean> {
+    return (await this.store.database.transaction(async () => {
+      const operation = (await this.getOperation(operationId));
       if (!operation || operation.status !== "running") return false;
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_operations
          SET status = 'succeeded', metadata_json = ?, updated_at = ?, finished_at = ?
          WHERE id = ? AND status = 'running'`,
-      ).run(JSON.stringify({ ...operation.metadata, ...metadata }), now, now, operationId);
-      this.store.database.raw.prepare(
+      ).run(JSON.stringify({ ...operation.metadata, ...metadata }), now, now, operationId));
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET observed_state = ?, observed_generation = generation,
              retry_count = 0, next_retry_at = NULL, last_error = NULL,
              active_operation_id = NULL, controller_owner = NULL,
              controller_lease_until = NULL, updated_at = ?
          WHERE model_id = ? AND active_operation_id = ?`,
-      ).run(observedState, now, operation.modelId, operationId);
-      this.queueOperation(operationId);
-      this.queueState(operation.modelId);
+      ).run(observedState, now, operation.modelId, operationId));
+      (await this.queueOperation(operationId));
+      (await this.queueState(operation.modelId));
       return true;
-    });
+    }));
   }
 
-  failOperation(
+  async failOperation(
     operationId: string,
     errorCode: string,
     errorMessage: string,
     options: { retryAt?: number | null; now?: number } = {},
-  ): boolean {
-    return this.store.database.transaction(() => {
+  ): Promise<boolean> {
+    return (await this.store.database.transaction(async () => {
       const now = options.now ?? Date.now();
-      const operation = this.getOperation(operationId);
+      const operation = (await this.getOperation(operationId));
       if (!operation || operation.status !== "running") return false;
-      this.finishOperationRow(operationId, "failed", errorCode, errorMessage, now);
-      this.store.database.raw.prepare(
+      (await this.finishOperationRow(operationId, "failed", errorCode, errorMessage, now));
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET observed_state = 'failed', retry_count = retry_count + 1,
              next_retry_at = ?, last_error = ?, active_operation_id = NULL,
              controller_owner = NULL, controller_lease_until = NULL, updated_at = ?
          WHERE model_id = ? AND active_operation_id = ?`,
-      ).run(options.retryAt ?? null, errorMessage.slice(0, 2_000), now, operation.modelId, operationId);
-      this.failPreparedReservations(operationId, errorMessage, now);
-      this.queueOperation(operationId);
-      this.queueState(operation.modelId);
+      ).run(options.retryAt ?? null, errorMessage.slice(0, 2_000), now, operation.modelId, operationId));
+      (await this.failPreparedReservations(operationId, errorMessage, now));
+      (await this.queueOperation(operationId));
+      (await this.queueState(operation.modelId));
       return true;
-    });
+    }));
   }
 
-  getOperation(operationId: string): DeploymentOperation | null {
-    const row = this.store.database.raw.prepare(
+  async getOperation(operationId: string): Promise<DeploymentOperation | null> {
+    const row = (await this.store.database.raw.prepare(
       "SELECT * FROM deployment_operations WHERE id = ?",
-    ).get(operationId) as DeploymentOperationRow | undefined;
+    ).get(operationId)) as DeploymentOperationRow | undefined;
     return row ? mapDeploymentOperation(row) : null;
   }
 
-  listOperations(modelId: string, limit = 100): DeploymentOperation[] {
-    const rows = this.store.database.raw.prepare(
+  async listOperations(modelId: string, limit = 100): Promise<DeploymentOperation[]> {
+    const rows = (await this.store.database.raw.prepare(
       `SELECT * FROM deployment_operations
        WHERE model_id = ?
        ORDER BY started_at DESC, id DESC
        LIMIT ?`,
-    ).all(modelId, limit) as unknown as DeploymentOperationRow[];
+    ).all(modelId, limit)) as unknown as DeploymentOperationRow[];
     return rows.map(mapDeploymentOperation).toReversed();
   }
 
-  prepareRoute(
+  async prepareRoute(
     operationId: string,
     stages: readonly RouteStageReservation[],
     ttlMs = 90_000,
     now = Date.now(),
-  ): RouteReservation {
+  ): Promise<RouteReservation> {
     if (stages.length === 0) throw new Error("route_reservation_requires_stages");
-    return this.store.database.transaction(() => {
-      this.expireReservations(now);
-      const operation = this.getOperation(operationId);
+    return (await this.store.database.transaction(async () => {
+      (await this.expireReservations(now));
+      const operation = (await this.getOperation(operationId));
       if (!operation || operation.status !== "running") {
         throw new Error(`deployment_operation_not_running:${operationId}`);
       }
@@ -556,11 +565,11 @@ export class DeploymentControlPlane {
         requestedByNode.set(stage.nodeId, current);
       }
       for (const [nodeId, request] of requestedByNode) {
-        const row = this.store.database.raw.prepare(
+        const row = (await this.store.database.raw.prepare(
           `SELECT COALESCE(SUM(memory_mib), 0) AS leased
            FROM deployment_stage_leases
            WHERE node_id = ? AND status IN ('prepared', 'committed') AND expires_at > ?`,
-        ).get(nodeId, now) as { leased: number };
+        ).get(nodeId, now)) as { leased: number };
         if (Number(row.leased) + request.requested > request.capacity) {
           throw new Error(
             `route_capacity_conflict:${nodeId}:requested=${request.requested}:`
@@ -573,7 +582,7 @@ export class DeploymentControlPlane {
       const routeDigest = createHash("sha256")
         .update(JSON.stringify(normalized))
         .digest("hex");
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `INSERT INTO route_reservations(
            id, model_id, operation_id, generation, status, route_digest,
            stages_json, expires_at, created_at, updated_at
@@ -588,7 +597,7 @@ export class DeploymentControlPlane {
         expiresAt,
         now,
         now,
-      );
+      ));
       const insertLease = this.store.database.raw.prepare(
         `INSERT INTO deployment_stage_leases(
            id, reservation_id, model_id, node_id, stage_index, memory_mib,
@@ -596,7 +605,7 @@ export class DeploymentControlPlane {
          ) VALUES (?, ?, ?, ?, ?, ?, 'prepared', ?, ?, ?)`,
       );
       for (const stage of normalized) {
-        insertLease.run(
+        (await insertLease.run(
           newId("dls"),
           reservationId,
           operation.modelId,
@@ -606,237 +615,247 @@ export class DeploymentControlPlane {
           expiresAt,
           now,
           now,
-        );
+        ));
       }
-      this.queueReservation(reservationId);
-      return this.getReservation(reservationId)!;
-    });
+      (await this.queueReservation(reservationId));
+      return (await this.getReservation(reservationId))!;
+    }));
   }
 
-  commitRoute(
+  async commitRoute(
     reservationId: string,
     canary: Record<string, unknown>,
     now = Date.now(),
-  ): RouteReservation {
-    return this.store.database.transaction(() => {
-      const reservation = this.getReservation(reservationId);
+  ): Promise<RouteReservation> {
+    return (await this.store.database.transaction(async () => {
+      const reservation = (await this.getReservation(reservationId));
       if (!reservation) throw new Error(`route_reservation_not_found:${reservationId}`);
       if (reservation.status === "committed") return reservation;
       if (reservation.status !== "prepared") {
         throw new Error(`route_reservation_not_prepared:${reservationId}:${reservation.status}`);
       }
       if (reservation.expiresAt <= now) {
-        this.expireReservations(now);
+        (await this.expireReservations(now));
         throw new Error(`route_reservation_expired:${reservationId}`);
       }
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `UPDATE route_reservations
          SET status = 'committed', canary_json = ?, committed_at = ?, updated_at = ?
          WHERE id = ? AND status = 'prepared'`,
-      ).run(JSON.stringify(canary), now, now, reservationId);
-      this.store.database.raw.prepare(
+      ).run(JSON.stringify(canary), now, now, reservationId));
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_stage_leases
          SET status = 'committed', updated_at = ?
          WHERE reservation_id = ? AND status = 'prepared'`,
-      ).run(now, reservationId);
-      this.completeOperation(
+      ).run(now, reservationId));
+      (await this.completeOperation(
         reservation.operationId,
         "active",
         { routeReservationId: reservationId, routeDigest: reservation.routeDigest, canary },
         now,
-      );
-      this.queueReservation(reservationId);
-      return this.getReservation(reservationId)!;
-    });
+      ));
+      (await this.queueReservation(reservationId));
+      return (await this.getReservation(reservationId))!;
+    }));
   }
 
-  renewRoute(reservationId: string, ttlMs = 90_000, now = Date.now()): boolean {
-    return this.store.database.transaction(() => {
+  async renewRoute(reservationId: string, ttlMs = 90_000, now = Date.now()): Promise<boolean> {
+    return (await this.store.database.transaction(async () => {
       const expiresAt = now + Math.max(1_000, ttlMs);
-      const changed = Number(this.store.database.raw.prepare(
+      const changed = Number((await this.store.database.raw.prepare(
         `UPDATE route_reservations
          SET expires_at = ?, updated_at = ?
          WHERE id = ? AND status IN ('prepared', 'committed') AND expires_at > ?`,
-      ).run(expiresAt, now, reservationId, now).changes);
+      ).run(expiresAt, now, reservationId, now)).changes);
       if (changed === 0) return false;
-      this.store.database.raw.prepare(
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_stage_leases
          SET expires_at = ?, updated_at = ?
          WHERE reservation_id = ? AND status IN ('prepared', 'committed')`,
-      ).run(expiresAt, now, reservationId);
-      this.queueReservation(reservationId);
+      ).run(expiresAt, now, reservationId));
+      (await this.queueReservation(reservationId));
       return true;
-    });
+    }));
   }
 
-  renewCommittedRoutesForModel(
+  async renewCommittedRoutesForModel(
     modelId: string,
     ttlMs = 90_000,
     now = Date.now(),
-  ): number {
-    const rows = this.store.database.raw.prepare(
+  ): Promise<number> {
+    const rows = (await this.store.database.raw.prepare(
       `SELECT id FROM route_reservations
        WHERE model_id = ? AND status = 'committed' AND expires_at > ?`,
-    ).all(modelId, now) as unknown as Array<{ id: string }>;
+    ).all(modelId, now)) as unknown as Array<{ id: string }>;
     let renewed = 0;
     for (const row of rows) {
-      if (this.renewRoute(row.id, ttlMs, now)) renewed += 1;
+      if ((await this.renewRoute(row.id, ttlMs, now))) renewed += 1;
     }
     return renewed;
   }
 
-  releaseRoutesForModel(modelId: string, now = Date.now()): number {
-    return this.store.database.transaction(() => {
-      const rows = this.store.database.raw.prepare(
+  async releaseRoutesForModel(modelId: string, now = Date.now()): Promise<number> {
+    return (await this.store.database.transaction(async () => {
+      const rows = (await this.store.database.raw.prepare(
         `SELECT id FROM route_reservations
          WHERE model_id = ? AND status IN ('prepared', 'committed')`,
-      ).all(modelId) as unknown as Array<{ id: string }>;
-      this.store.database.raw.prepare(
+      ).all(modelId)) as unknown as Array<{ id: string }>;
+      (await this.store.database.raw.prepare(
         `UPDATE route_reservations
          SET status = 'released', released_at = ?, updated_at = ?
          WHERE model_id = ? AND status IN ('prepared', 'committed')`,
-      ).run(now, now, modelId);
-      this.store.database.raw.prepare(
+      ).run(now, now, modelId));
+      (await this.store.database.raw.prepare(
         `UPDATE deployment_stage_leases
          SET status = 'released', updated_at = ?
          WHERE model_id = ? AND status IN ('prepared', 'committed')`,
-      ).run(now, modelId);
-      for (const row of rows) this.queueReservation(row.id);
+      ).run(now, modelId));
+      for (const row of rows) (await this.queueReservation(row.id));
       return rows.length;
-    });
+    }));
   }
 
-  getReservation(reservationId: string): RouteReservation | null {
-    const row = this.store.database.raw.prepare(
+  async getReservation(reservationId: string): Promise<RouteReservation | null> {
+    const row = (await this.store.database.raw.prepare(
       "SELECT * FROM route_reservations WHERE id = ?",
-    ).get(reservationId) as RouteReservationRow | undefined;
+    ).get(reservationId)) as RouteReservationRow | undefined;
     return row ? mapRouteReservation(row) : null;
   }
 
-  listReservations(modelId: string, limit = 100): RouteReservation[] {
-    const rows = this.store.database.raw.prepare(
+  async reservedMemoryByNode(now = Date.now()): Promise<Record<string, number>> {
+    const rows = await this.store.database.raw.prepare(
+      `SELECT node_id, SUM(memory_mib) AS leased
+       FROM deployment_stage_leases
+       WHERE status IN ('prepared', 'committed') AND expires_at > ?
+       GROUP BY node_id`,
+    ).all(now) as Array<{ node_id: string; leased: number | string }>;
+    return Object.fromEntries(rows.map(row => [row.node_id, Math.max(0, Number(row.leased))]));
+  }
+
+  async listReservations(modelId: string, limit = 100): Promise<RouteReservation[]> {
+    const rows = (await this.store.database.raw.prepare(
       `SELECT * FROM route_reservations
        WHERE model_id = ?
        ORDER BY created_at DESC, id DESC
        LIMIT ?`,
-    ).all(modelId, limit) as unknown as RouteReservationRow[];
+    ).all(modelId, limit)) as unknown as RouteReservationRow[];
     return rows.map(mapRouteReservation).toReversed();
   }
 
-  timeline(modelId: string): DeploymentTimeline | null {
-    const state = this.getState(modelId);
+  async timeline(modelId: string): Promise<DeploymentTimeline | null> {
+    const state = (await this.getState(modelId));
     if (!state) return null;
     return {
       state,
-      operations: this.listOperations(modelId),
-      reservations: this.listReservations(modelId),
+      operations: (await this.listOperations(modelId)),
+      reservations: (await this.listReservations(modelId)),
     };
   }
 
-  removeModelState(modelId: string): void {
-    this.store.database.transaction(() => {
-      this.releaseRoutesForModel(modelId);
-      this.store.database.raw.prepare(
+  async removeModelState(modelId: string): Promise<void> {
+    (await this.store.database.transaction(async () => {
+      (await this.releaseRoutesForModel(modelId));
+      (await this.store.database.raw.prepare(
         "DELETE FROM deployment_states WHERE model_id = ?",
-      ).run(modelId);
-      this.store.database.enqueueRemoteChange("deployment_states", modelId, "delete", null);
-    });
+      ).run(modelId));
+      (await this.store.database.enqueueRemoteChange("deployment_states", modelId, "delete", null));
+    }));
   }
 
-  private setOperationObservedState(
+  private async setOperationObservedState(
     operationId: string,
     observedState: DeploymentObservedState,
     now: number,
-  ): boolean {
-    return this.store.database.transaction(() => {
-      const operation = this.getOperation(operationId);
+  ): Promise<boolean> {
+    return (await this.store.database.transaction(async () => {
+      const operation = (await this.getOperation(operationId));
       if (!operation || operation.status !== "running") return false;
-      const changed = Number(this.store.database.raw.prepare(
+      const changed = Number((await this.store.database.raw.prepare(
         `UPDATE deployment_states
          SET observed_state = ?, updated_at = ?
          WHERE model_id = ? AND active_operation_id = ? AND controller_owner = ?`,
-      ).run(observedState, now, operation.modelId, operationId, this.ownerId).changes);
+      ).run(observedState, now, operation.modelId, operationId, this.ownerId)).changes);
       if (changed === 1) {
-        this.store.database.raw.prepare(
+        (await this.store.database.raw.prepare(
           "UPDATE deployment_operations SET updated_at = ? WHERE id = ?",
-        ).run(now, operationId);
-        this.queueOperation(operationId);
-        this.queueState(operation.modelId);
+        ).run(now, operationId));
+        (await this.queueOperation(operationId));
+        (await this.queueState(operation.modelId));
       }
       return changed === 1;
-    });
+    }));
   }
 
-  private finishOperationRow(
+  private async finishOperationRow(
     operationId: string,
     status: Extract<DeploymentOperationStatus, "failed" | "interrupted">,
     errorCode: string,
     errorMessage: string,
     now: number,
-  ): void {
-    this.store.database.raw.prepare(
+  ): Promise<void> {
+    (await this.store.database.raw.prepare(
       `UPDATE deployment_operations
        SET status = ?, error_code = ?, error_message = ?, updated_at = ?, finished_at = ?
        WHERE id = ? AND status IN ('pending', 'running')`,
-    ).run(status, errorCode, errorMessage.slice(0, 2_000), now, now, operationId);
+    ).run(status, errorCode, errorMessage.slice(0, 2_000), now, now, operationId));
   }
 
-  private failPreparedReservations(operationId: string, error: string, now: number): void {
-    const rows = this.store.database.raw.prepare(
+  private async failPreparedReservations(operationId: string, error: string, now: number): Promise<void> {
+    const rows = (await this.store.database.raw.prepare(
       `SELECT id FROM route_reservations
        WHERE operation_id = ? AND status = 'prepared'`,
-    ).all(operationId) as unknown as Array<{ id: string }>;
-    this.store.database.raw.prepare(
+    ).all(operationId)) as unknown as Array<{ id: string }>;
+    (await this.store.database.raw.prepare(
       `UPDATE route_reservations
        SET status = 'failed', error = ?, released_at = ?, updated_at = ?
        WHERE operation_id = ? AND status = 'prepared'`,
-    ).run(error.slice(0, 2_000), now, now, operationId);
-    this.store.database.raw.prepare(
+    ).run(error.slice(0, 2_000), now, now, operationId));
+    (await this.store.database.raw.prepare(
       `UPDATE deployment_stage_leases
        SET status = 'released', updated_at = ?
        WHERE reservation_id IN (
          SELECT id FROM route_reservations WHERE operation_id = ?
        ) AND status = 'prepared'`,
-    ).run(now, operationId);
-    for (const row of rows) this.queueReservation(row.id);
+    ).run(now, operationId));
+    for (const row of rows) (await this.queueReservation(row.id));
   }
 
-  private expireReservations(now: number): number {
-    const rows = this.store.database.raw.prepare(
+  private async expireReservations(now: number): Promise<number> {
+    const rows = (await this.store.database.raw.prepare(
       `SELECT id FROM route_reservations
        WHERE status IN ('prepared', 'committed') AND expires_at <= ?`,
-    ).all(now) as unknown as Array<{ id: string }>;
+    ).all(now)) as unknown as Array<{ id: string }>;
     if (rows.length === 0) return 0;
-    this.store.database.raw.prepare(
+    (await this.store.database.raw.prepare(
       `UPDATE route_reservations
        SET status = 'expired', released_at = ?, updated_at = ?
        WHERE status IN ('prepared', 'committed') AND expires_at <= ?`,
-    ).run(now, now, now);
-    this.store.database.raw.prepare(
+    ).run(now, now, now));
+    (await this.store.database.raw.prepare(
       `UPDATE deployment_stage_leases
        SET status = 'expired', updated_at = ?
        WHERE status IN ('prepared', 'committed') AND expires_at <= ?`,
-    ).run(now, now);
-    for (const row of rows) this.queueReservation(row.id);
+    ).run(now, now));
+    for (const row of rows) (await this.queueReservation(row.id));
     return rows.length;
   }
 
-  private queueAll(): void {
-    for (const state of this.listStates()) this.queueState(state.modelId);
-    const operations = this.store.database.raw.prepare(
+  private async queueAll(): Promise<void> {
+    for (const state of (await this.listStates())) (await this.queueState(state.modelId));
+    const operations = (await this.store.database.raw.prepare(
       "SELECT id FROM deployment_operations",
-    ).all() as unknown as Array<{ id: string }>;
-    for (const operation of operations) this.queueOperation(operation.id);
-    const reservations = this.store.database.raw.prepare(
+    ).all()) as unknown as Array<{ id: string }>;
+    for (const operation of operations) (await this.queueOperation(operation.id));
+    const reservations = (await this.store.database.raw.prepare(
       "SELECT id FROM route_reservations",
-    ).all() as unknown as Array<{ id: string }>;
-    for (const reservation of reservations) this.queueReservation(reservation.id);
+    ).all()) as unknown as Array<{ id: string }>;
+    for (const reservation of reservations) (await this.queueReservation(reservation.id));
   }
 
-  private queueState(modelId: string): void {
-    const state = this.getState(modelId);
+  private async queueState(modelId: string): Promise<void> {
+    const state = (await this.getState(modelId));
     if (!state) return;
-    this.store.database.enqueueRemoteChange("deployment_states", modelId, "upsert", {
+    (await this.store.database.enqueueRemoteChange("deployment_states", modelId, "upsert", {
       model_id: state.modelId,
       desired_state: state.desiredState,
       observed_state: state.observedState,
@@ -850,13 +869,13 @@ export class DeploymentControlPlane {
       controller_lease_until: state.controllerLeaseUntil,
       created_at: state.createdAt,
       updated_at: state.updatedAt,
-    });
+    }));
   }
 
-  private queueOperation(operationId: string): void {
-    const operation = this.getOperation(operationId);
+  private async queueOperation(operationId: string): Promise<void> {
+    const operation = (await this.getOperation(operationId));
     if (!operation) return;
-    this.store.database.enqueueRemoteChange("deployment_operations", operationId, "upsert", {
+    (await this.store.database.enqueueRemoteChange("deployment_operations", operationId, "upsert", {
       id: operation.id,
       model_id: operation.modelId,
       generation: operation.generation,
@@ -870,13 +889,13 @@ export class DeploymentControlPlane {
       started_at: operation.startedAt,
       updated_at: operation.updatedAt,
       finished_at: operation.finishedAt,
-    });
+    }));
   }
 
-  private queueReservation(reservationId: string): void {
-    const reservation = this.getReservation(reservationId);
+  private async queueReservation(reservationId: string): Promise<void> {
+    const reservation = (await this.getReservation(reservationId));
     if (!reservation) return;
-    this.store.database.enqueueRemoteChange("route_reservations", reservationId, "upsert", {
+    (await this.store.database.enqueueRemoteChange("route_reservations", reservationId, "upsert", {
       id: reservation.id,
       model_id: reservation.modelId,
       operation_id: reservation.operationId,
@@ -891,17 +910,17 @@ export class DeploymentControlPlane {
       error: reservation.error,
       created_at: reservation.createdAt,
       updated_at: reservation.updatedAt,
-    });
-    const leases = this.store.database.raw.prepare(
+    }));
+    const leases = (await this.store.database.raw.prepare(
       "SELECT id FROM deployment_stage_leases WHERE reservation_id = ?",
-    ).all(reservationId) as unknown as Array<{ id: string }>;
-    for (const lease of leases) this.queueStageLease(lease.id);
+    ).all(reservationId)) as unknown as Array<{ id: string }>;
+    for (const lease of leases) (await this.queueStageLease(lease.id));
   }
 
-  private queueStageLease(leaseId: string): void {
-    const row = this.store.database.raw.prepare(
+  private async queueStageLease(leaseId: string): Promise<void> {
+    const row = (await this.store.database.raw.prepare(
       "SELECT * FROM deployment_stage_leases WHERE id = ?",
-    ).get(leaseId) as
+    ).get(leaseId)) as
       | {
           id: string;
           reservation_id: string;
@@ -916,7 +935,7 @@ export class DeploymentControlPlane {
         }
       | undefined;
     if (!row) return;
-    this.store.database.enqueueRemoteChange("deployment_stage_leases", leaseId, "upsert", {
+    (await this.store.database.enqueueRemoteChange("deployment_stage_leases", leaseId, "upsert", {
       id: row.id,
       reservation_id: row.reservation_id,
       model_id: row.model_id,
@@ -927,7 +946,7 @@ export class DeploymentControlPlane {
       expires_at: Number(row.expires_at),
       created_at: Number(row.created_at),
       updated_at: Number(row.updated_at),
-    });
+    }));
   }
 }
 

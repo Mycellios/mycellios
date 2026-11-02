@@ -16,8 +16,8 @@ describe("receipt-driven seller earnings", () => {
   let manager: SellerEarningsManager;
   let privateKey: ReturnType<typeof generateKeyPairSync>["privateKey"];
 
-  beforeEach(() => {
-    database = new MeshDatabase(":memory:");
+  beforeEach(async () => {
+    database = (await MeshDatabase.open(":memory:"));
     const pair = generateKeyPairSync("ed25519");
     privateKey = pair.privateKey;
     manager = new SellerEarningsManager(database, new Map([
@@ -25,7 +25,7 @@ describe("receipt-driven seller earnings", () => {
     ]));
   });
 
-  afterEach(() => database.close());
+  afterEach(async () => (await database.close()));
 
   function receipt(overrides: Partial<SignedWorkReceipt> = {}): SignedWorkReceipt {
     const payload = {
@@ -70,10 +70,10 @@ describe("receipt-driven seller earnings", () => {
     };
   }
 
-  it("creates one stable earning from one valid accepted receipt", () => {
+  it("creates one stable earning from one valid accepted receipt", async () => {
     const signed = receipt();
-    const first = manager.recordAcceptedReceipt(signed);
-    const replay = manager.recordAcceptedReceipt(signed);
+    const first = (await manager.recordAcceptedReceipt(signed));
+    const replay = (await manager.recordAcceptedReceipt(signed));
 
     expect(first).toMatchObject({
       sellerId: "seller-1",
@@ -82,77 +82,77 @@ describe("receipt-driven seller earnings", () => {
       status: "available",
     });
     expect(replay).toEqual(first);
-    expect(manager.listAvailable("seller-1")).toEqual([first]);
+    expect((await manager.listAvailable("seller-1"))).toEqual([first]);
   });
 
-  it("seals the verified receipt and derived earning economic snapshot", () => {
-    const earning = manager.recordAcceptedReceipt(receipt());
+  it("seals the verified receipt and derived earning economic snapshot", async () => {
+    const earning = (await manager.recordAcceptedReceipt(receipt()));
 
-    expect(() => database.raw.prepare(
+    await expect((async () => (await database.raw.prepare(
       "UPDATE verified_work_receipts SET amount_usd_micros = 999999 WHERE receipt_id = ?",
-    ).run(earning.receiptId)).toThrow(/immutable_verified_work_receipt/);
-    expect(() => database.raw.prepare(
+    ).run(earning.receiptId)))()).rejects.toThrow(/immutable_verified_work_receipt/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earnings SET payout_method = 'spore' WHERE id = ?",
-    ).run(earning.id)).toThrow(/immutable_seller_earning_economic_snapshot/);
-    expect(() => database.raw.prepare(
+    ).run(earning.id)))()).rejects.toThrow(/immutable_seller_earning_economic_snapshot/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earnings SET amount_usd_micros = 999999 WHERE id = ?",
-    ).run(earning.id)).toThrow(/immutable_seller_earning_economic_snapshot/);
-    expect(() => database.raw.prepare(
+    ).run(earning.id)))()).rejects.toThrow(/immutable_seller_earning_economic_snapshot/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM seller_earnings WHERE id = ?",
-    ).run(earning.id)).toThrow(/immutable_seller_earning/);
-    expect(() => database.raw.prepare(
+    ).run(earning.id)))()).rejects.toThrow(/immutable_seller_earning/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM verified_work_receipts WHERE receipt_id = ?",
-    ).run(earning.receiptId)).toThrow(/immutable_verified_work_receipt/);
+    ).run(earning.receiptId)))()).rejects.toThrow(/immutable_verified_work_receipt/);
 
     const now = Date.now();
-    database.raw.prepare(
+    (await database.raw.prepare(
       `INSERT INTO verified_work_receipts(
          receipt_id, seller_id, worker_id, job_id, stage_id, pricing_version,
          amount_usd_micros, evidence_digest, accepted_at, verifier_key_id, signature, recorded_at
        ) VALUES ('receipt-binding', 'seller-1', 'worker-binding', 'job-binding',
                  'stage-binding', 'pricing-1', 125000, ?, ?, 'verifier-1', 'signed-fixture', ?)`,
-    ).run("c".repeat(64), now, now);
-    expect(() => database.raw.prepare(
+    ).run("c".repeat(64), now, now));
+    await expect((async () => (await database.raw.prepare(
       `INSERT INTO seller_earnings(
          id, seller_id, receipt_id, amount_usd_micros, payout_method, status, created_at
        ) VALUES ('earning-binding', 'seller-1', 'receipt-binding', 999999, 'stable', 'available', ?)`,
-    ).run(now)).toThrow(/invalid_seller_earning_receipt_binding/);
+    ).run(now)))()).rejects.toThrow(/invalid_seller_earning_receipt_binding/);
   });
 
-  it("snapshots an explicit SPORE payout preference without changing stable value", () => {
-    manager.setPayoutPreference("seller-1", "spore");
-    const earning = manager.recordAcceptedReceipt(receipt());
+  it("snapshots an explicit SPORE payout preference without changing stable value", async () => {
+    (await manager.setPayoutPreference("seller-1", "spore"));
+    const earning = (await manager.recordAcceptedReceipt(receipt()));
     expect(earning).toMatchObject({ payoutMethod: "spore", amountUsdMicros: 125_000 });
   });
 
-  it("fails closed for tampering, rejected work and untrusted verifiers", () => {
+  it("fails closed for tampering, rejected work and untrusted verifiers", async () => {
     const signed = receipt();
-    expect(() => manager.recordAcceptedReceipt({ ...signed, amountUsdMicros: 999_000 })).toThrowError(
+    await expect((async () => (await manager.recordAcceptedReceipt({ ...signed, amountUsdMicros: 999_000 })))()).rejects.toThrowError(
       expect.objectContaining({ code: "invalid_receipt_signature" } satisfies Partial<SellerEarningsError>),
     );
-    expect(() => manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-rejected", accepted: false }))).toThrowError(
+    await expect((async () => (await manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-rejected", accepted: false }))))()).rejects.toThrowError(
       expect.objectContaining({ code: "work_not_accepted" } satisfies Partial<SellerEarningsError>),
     );
-    expect(() => manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-untrusted", verifierKeyId: "unknown-key" }))).toThrowError(
+    await expect((async () => (await manager.recordAcceptedReceipt(receipt({ receiptId: "receipt-untrusted", verifierKeyId: "unknown-key" }))))()).rejects.toThrowError(
       expect.objectContaining({ code: "untrusted_receipt_verifier" } satisfies Partial<SellerEarningsError>),
     );
-    expect(database.raw.prepare("SELECT COUNT(*) AS count FROM seller_earnings").get()).toEqual({ count: 0 });
+    expect((await database.raw.prepare("SELECT COUNT(*) AS count FROM seller_earnings").get())).toEqual({ count: 0 });
   });
 
-  it("applies a signed reversal once while an earning is still available", () => {
-    const earning = manager.recordAcceptedReceipt(receipt());
+  it("applies a signed reversal once while an earning is still available", async () => {
+    const earning = (await manager.recordAcceptedReceipt(receipt()));
     const signed = reversal(earning.id);
-    const first = manager.recordEarningReversal(signed);
-    const replay = manager.recordEarningReversal(signed);
+    const first = (await manager.recordEarningReversal(signed));
+    const replay = (await manager.recordEarningReversal(signed));
 
     expect(first).toMatchObject({ state: "applied", amountUsdMicros: 125_000, duplicate: false });
     expect(replay).toMatchObject({ id: first.id, state: "applied", duplicate: true });
-    expect(manager.listAvailable("seller-1")).toEqual([]);
-    expect(manager.getSellerDebt("seller-1")).toBe(0);
+    expect((await manager.listAvailable("seller-1"))).toEqual([]);
+    expect((await manager.getSellerDebt("seller-1"))).toBe(0);
   });
 
-  it("creates seller debt when already-paid work is later revoked", () => {
-    const earning = manager.recordAcceptedReceipt(receipt());
+  it("creates seller debt when already-paid work is later revoked", async () => {
+    const earning = (await manager.recordAcceptedReceipt(receipt()));
     const payouts = new PayoutManager(database, {
       minimumUsdMicros: 100_000,
       spore: {
@@ -162,33 +162,33 @@ describe("receipt-driven seller earnings", () => {
         antifraudApproved: false,
       },
     });
-    const batch = payouts.prepare({
+    const batch = (await payouts.prepare({
       sellerId: "seller-1",
       payoutMethod: "stable",
       earningIds: [earning.id],
       idempotencyKey: "paid-reversal-fixture",
-    }).batch;
-    payouts.markSubmitted({
+    })).batch;
+    (await payouts.markSubmitted({
       batchId: batch.id,
       dispatchKey: "paid-reversal-dispatch",
       externalReference: "paid-reversal-transfer",
-    });
-    payouts.markPaid({
+    }));
+    (await payouts.markPaid({
       batchId: batch.id,
       settlementReference: "paid-reversal-settlement",
       paidAt: Date.now(),
-    });
+    }));
 
-    const result = manager.recordEarningReversal(reversal(earning.id));
+    const result = (await manager.recordEarningReversal(reversal(earning.id)));
     expect(result.state).toBe("seller_debt");
-    expect(manager.getSellerDebt("seller-1")).toBe(125_000);
-    expect(database.raw.prepare("SELECT status FROM seller_earnings WHERE id = ?").get(earning.id)).toEqual({
+    expect((await manager.getSellerDebt("seller-1"))).toBe(125_000);
+    expect((await database.raw.prepare("SELECT status FROM seller_earnings WHERE id = ?").get(earning.id))).toEqual({
       status: "reversed",
     });
   });
 
-  it("holds a submitted payout reversal until settlement then creates debt", () => {
-    const earning = manager.recordAcceptedReceipt(receipt());
+  it("holds a submitted payout reversal until settlement then creates debt", async () => {
+    const earning = (await manager.recordAcceptedReceipt(receipt()));
     const payouts = new PayoutManager(database, {
       minimumUsdMicros: 100_000,
       spore: {
@@ -198,49 +198,49 @@ describe("receipt-driven seller earnings", () => {
         antifraudApproved: false,
       },
     });
-    const batch = payouts.prepare({
+    const batch = (await payouts.prepare({
       sellerId: "seller-1",
       payoutMethod: "stable",
       earningIds: [earning.id],
       idempotencyKey: "pending-reversal-batch",
-    }).batch;
-    payouts.markSubmitted({
+    })).batch;
+    (await payouts.markSubmitted({
       batchId: batch.id,
       dispatchKey: "pending-reversal-dispatch",
       externalReference: "pending-reversal-transfer",
-    });
+    }));
 
-    const pending = manager.recordEarningReversal(reversal(earning.id));
+    const pending = (await manager.recordEarningReversal(reversal(earning.id)));
     expect(pending.state).toBe("pending_payout");
-    expect(manager.getSellerDebt("seller-1")).toBe(0);
-    expect(() => database.raw.prepare(
+    expect((await manager.getSellerDebt("seller-1"))).toBe(0);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earning_reversals SET amount_usd_micros = 999999 WHERE id = ?",
-    ).run(pending.id)).toThrow(/immutable_seller_earning_reversal_content/);
-    expect(() => database.raw.prepare(
+    ).run(pending.id)))()).rejects.toThrow(/immutable_seller_earning_reversal_content/);
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earning_reversals SET state = 'applied', resolved_at = ? WHERE id = ?",
-    ).run(Date.now(), pending.id)).toThrow(/invalid_seller_earning_reversal_lifecycle/);
-    expect(() => database.raw.prepare(
+    ).run(Date.now(), pending.id)))()).rejects.toThrow(/invalid_seller_earning_reversal_lifecycle/);
+    await expect((async () => (await database.raw.prepare(
       "DELETE FROM seller_earning_reversals WHERE id = ?",
-    ).run(pending.id)).toThrow(/immutable_seller_earning_reversal/);
+    ).run(pending.id)))()).rejects.toThrow(/immutable_seller_earning_reversal/);
 
-    payouts.markPaid({
+    (await payouts.markPaid({
       batchId: batch.id,
       settlementReference: "pending-reversal-settlement",
       paidAt: 1_786_200_000_000,
-    });
-    expect(manager.getSellerDebt("seller-1")).toBe(125_000);
-    expect(database.raw.prepare(
+    }));
+    expect((await manager.getSellerDebt("seller-1"))).toBe(125_000);
+    expect((await database.raw.prepare(
       "SELECT state, resolved_at FROM seller_earning_reversals WHERE reversal_id = ?",
-    ).get(`reversal-${earning.id}`)).toEqual({ state: "seller_debt", resolved_at: expect.any(Number) });
-    expect(() => database.raw.prepare(
+    ).get(`reversal-${earning.id}`))).toEqual({ state: "seller_debt", resolved_at: expect.any(Number) });
+    await expect((async () => (await database.raw.prepare(
       "UPDATE seller_earning_reversals SET state = 'pending_payout', resolved_at = NULL WHERE id = ?",
-    ).run(pending.id)).toThrow(/invalid_seller_earning_reversal_lifecycle/);
+    ).run(pending.id)))()).rejects.toThrow(/invalid_seller_earning_reversal_lifecycle/);
   });
 
-  it("rejects tampered reversals and requires prepared payouts to be cancelled first", () => {
-    const earning = manager.recordAcceptedReceipt(receipt());
+  it("rejects tampered reversals and requires prepared payouts to be cancelled first", async () => {
+    const earning = (await manager.recordAcceptedReceipt(receipt()));
     const signed = reversal(earning.id);
-    expect(() => manager.recordEarningReversal({ ...signed, reason: "fraud" })).toThrowError(
+    await expect((async () => (await manager.recordEarningReversal({ ...signed, reason: "fraud" })))()).rejects.toThrowError(
       expect.objectContaining({ code: "invalid_reversal_signature" }),
     );
 
@@ -253,13 +253,13 @@ describe("receipt-driven seller earnings", () => {
         antifraudApproved: false,
       },
     });
-    payouts.prepare({
+    (await payouts.prepare({
       sellerId: "seller-1",
       payoutMethod: "stable",
       earningIds: [earning.id],
       idempotencyKey: "prepared-reversal-batch",
-    });
-    expect(() => manager.recordEarningReversal(signed)).toThrowError(
+    }));
+    await expect((async () => (await manager.recordEarningReversal(signed)))()).rejects.toThrowError(
       expect.objectContaining({ code: "earning_in_prepared_payout" }),
     );
   });

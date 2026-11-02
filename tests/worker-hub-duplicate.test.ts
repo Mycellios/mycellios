@@ -3,16 +3,16 @@ import { WorkerHub, workerSessionSupersedes } from "../src/coordinator/worker-hu
 import type { MeshStore } from "../src/storage/store.js";
 
 describe("WorkerHub duplicate desktop connections", () => {
-  it("keeps the healthy connection instead of letting duplicates supersede each other", () => {
+  it("keeps the healthy connection instead of letting duplicates supersede each other", async () => {
     const store = {
-      getWorker: vi.fn(() => ({ id: "worker-stable" })),
+      listRuntimeLinkSamples: vi.fn(async () => []), getWorker: vi.fn(() => ({ id: "worker-stable" })),
     } as unknown as MeshStore;
-    const hub = new WorkerHub(store);
+    const hub = (await WorkerHub.create(store));
     const first = connectionState();
     const duplicate = connectionState();
-    const deliver = (state: ReturnType<typeof connectionState>) => {
-      (hub as unknown as {
-        handleRawMessage(connection: unknown, raw: string): void;
+    const deliver = async (state: ReturnType<typeof connectionState>) => {
+      await (hub as unknown as {
+        handleRawMessage(connection: unknown, raw: string): Promise<void>;
       }).handleRawMessage(state, JSON.stringify({
         v: 1,
         type: "worker.hello",
@@ -21,9 +21,9 @@ describe("WorkerHub duplicate desktop connections", () => {
       }));
     };
 
-    deliver(first);
+    await deliver(first);
     first.ready = true;
-    deliver(duplicate);
+    await deliver(duplicate);
 
     expect(first.socket.close).not.toHaveBeenCalled();
     expect(duplicate.socket.close).toHaveBeenCalledWith(4409, "duplicate worker connection");
@@ -31,15 +31,15 @@ describe("WorkerHub duplicate desktop connections", () => {
     clearTimeout(duplicate.helloTimer);
   });
 
-  it("lets a higher ownership generation replace the still-healthy old socket", () => {
-    const store = { getWorker: vi.fn(() => ({ id: "worker-stable" })) } as unknown as MeshStore;
-    const hub = new WorkerHub(store);
+  it("lets a higher ownership generation replace the still-healthy old socket", async () => {
+    const store = { listRuntimeLinkSamples: vi.fn(async () => []), getWorker: vi.fn(() => ({ id: "worker-stable" })) } as unknown as MeshStore;
+    const hub = (await WorkerHub.create(store));
     const first = connectionState(1);
     const recovered = connectionState(2);
     const deliver = (state: ReturnType<typeof connectionState>) => (hub as unknown as {
-      handleRawMessage(connection: unknown, raw: string): void;
+      handleRawMessage(connection: unknown, raw: string): Promise<void>;
     }).handleRawMessage(state, JSON.stringify({ v: 1, type: "worker.hello", workerId: "worker-stable", payload: {} }));
-    deliver(first); first.ready = true; deliver(recovered);
+    await deliver(first); first.ready = true; await deliver(recovered);
     expect(first.socket.close).toHaveBeenCalledWith(4409, "superseded connection");
     expect(recovered.socket.close).not.toHaveBeenCalled();
     expect(hub.isConnected("worker-stable")).toBe(false);
@@ -53,29 +53,29 @@ describe("WorkerHub duplicate desktop connections", () => {
     expect(workerSessionSupersedes(session(2), first)).toBe(false);
   });
 
-  it("closes a bound socket when its credential generation is no longer current", () => {
-    const store = { getWorker: vi.fn(() => ({ id: "worker-stable" })) } as unknown as MeshStore;
-    const hub = new WorkerHub(store);
+  it("closes a bound socket when its credential generation is no longer current", async () => {
+    const store = { listRuntimeLinkSamples: vi.fn(async () => []), getWorker: vi.fn(() => ({ id: "worker-stable" })) } as unknown as MeshStore;
+    const hub = (await WorkerHub.create(store));
     (hub as unknown as { sessionIsCurrent: () => boolean }).sessionIsCurrent = () => false;
     const stale = connectionState(1);
-    (hub as unknown as { handleRawMessage(connection: unknown, raw: string): void }).handleRawMessage(
+    await (hub as unknown as { handleRawMessage(connection: unknown, raw: string): Promise<void> }).handleRawMessage(
       stale, JSON.stringify({ v: 1, type: "worker.hello", workerId: "worker-stable", payload: {} }),
     );
     expect(stale.socket.close).toHaveBeenCalledWith(4403, "worker session superseded");
     clearTimeout(stale.helloTimer);
   });
 
-  it("emits disconnect synchronously when a security action evicts a worker", () => {
-    const store = { getWorker: vi.fn(() => ({ id: "worker-stable" })),
+  it("emits disconnect before acknowledging a security eviction", async () => {
+    const store = { listRuntimeLinkSamples: vi.fn(async () => []), getWorker: vi.fn(() => ({ id: "worker-stable" })),
       setWorkerStatus: vi.fn(), deregisterWorker: vi.fn(() => true) } as unknown as MeshStore;
-    const hub = new WorkerHub(store);
+    const hub = (await WorkerHub.create(store));
     const active = connectionState();
     (hub as unknown as { connections: Map<string, unknown>; allConnections: Set<unknown> }).connections.set("worker-stable", active);
     (hub as unknown as { connections: Map<string, unknown>; allConnections: Set<unknown> }).allConnections.add(active);
     active.workerId = "worker-stable"; active.ready = true; active.pending = false;
     const disconnected = vi.fn(); hub.on("disconnect", disconnected);
-    expect(hub.removeWorker("worker-stable", "node credential revoked")).toBe(true);
-    expect(disconnected).toHaveBeenCalledWith("worker-stable");
+    expect((await hub.removeWorker("worker-stable", "node credential revoked"))).toBe(true);
+    expect(disconnected).toHaveBeenCalledWith("worker-stable", { recoverable: false });
     expect(active.socket.close).toHaveBeenCalledWith(4403, "node credential revoked");
     clearTimeout(active.helloTimer);
   });

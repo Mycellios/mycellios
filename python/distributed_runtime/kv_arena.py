@@ -16,7 +16,9 @@ churn, and this concat is a first-class part of it.
 What this module changes
 ------------------------
 ``ArenaLayer`` keeps a preallocated arena per layer and *writes new positions into
-it*, growing by amortised doubling.  ``keys``/``values`` stay live views over the
+it*, growing by amortised doubling on CPU and bounded pages on CUDA to avoid
+doubling the GPU memory requirement at long-context boundaries.
+``keys``/``values`` stay live views over the
 written prefix, so every consumer -- attention, the physical batching merge/split,
 storage accounting, speculative rollback -- reads exactly the tensor a
 concatenating layer would have produced.
@@ -51,6 +53,20 @@ from transformers.cache_utils import (
 )
 
 MINIMUM_ARENA_TOKENS = 64
+GPU_ARENA_GROWTH_TOKENS = 256
+
+
+def arena_target_tokens(capacity: int, needed: int, *, exact: bool, gpu: bool) -> int:
+    """Bound GPU slack; CPU retains amortised doubling for cheaper appends."""
+    if exact:
+        return needed
+    if gpu:
+        return max(capacity, ((needed + GPU_ARENA_GROWTH_TOKENS - 1)
+                              // GPU_ARENA_GROWTH_TOKENS) * GPU_ARENA_GROWTH_TOKENS)
+    target = max(MINIMUM_ARENA_TOKENS, capacity)
+    while target < needed:
+        target *= 2
+    return target
 
 
 class ArenaLayer(DynamicLayer):
@@ -91,14 +107,10 @@ class ArenaLayer(DynamicLayer):
         )
         if batch_matches and capacity >= needed:
             return
-        if exact:
-            # A batch arena lives for exactly one forward, so power-of-two doubling
-            # would allocate (and fault in) up to twice the batch for nothing.
-            target = needed
-        else:
-            target = max(MINIMUM_ARENA_TOKENS, capacity if batch_matches else 0)
-            while target < needed:
-                target *= 2
+        target = arena_target_tokens(
+            capacity if batch_matches else 0, needed,
+            exact=exact, gpu=template.device.type == "cuda",
+        )
         shape = (template.shape[0], template.shape[1], target, template.shape[3])
         keys = torch.empty(shape, dtype=template.dtype, device=template.device)
         values = torch.empty(shape, dtype=template.dtype, device=template.device)

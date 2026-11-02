@@ -1,0 +1,3 @@
+-- Compatibility release: new reads use space_model_role_choices, but the
+-- previous deployed runtime still reads this table during rollout and rollback.
+-- Retain it until a separately qualified contract migration.

@@ -29,8 +29,8 @@ describe("economic API", () => {
       apiAccessEnabled: true, apiStarterTokens: 10_000, modelAdminToken: "admin-secret",
     }, { logger: false, supabaseAuthService: auth });
     runtimes.push(runtime);
-    const key = runtime.apiAccess.createKey("user-economy", "Economy test");
-    const policy = runtime.economicLedger.resolvePricingPolicy("qwen3", "remote-replica", Date.now());
+    const key = (await runtime.apiAccess.createKey("user-economy", "Economy test"));
+    const policy = (await runtime.economicLedger.resolvePricingPolicy("qwen3", "remote-replica", Date.now()));
     expect(policy).not.toBeNull();
     const contributionEvidenceId = sha("b");
     const evidence = {
@@ -39,14 +39,14 @@ describe("economic API", () => {
       participants: [{ nodeId: "node-economy", workerId: "worker-economy", physicalIdentityDigest: sha("d"), canaryEvidenceIds: [sha("e")], stageCount: 1 }],
       physicalBoundaryCount: 0, observedFrom: 1, observedUntil: 2, createdAt: 3,
     };
-    runtime.database.raw.prepare("INSERT INTO economic_contribution_evidence(id, job_id, execution_receipt_id, trace_digest, evidence_json, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(contributionEvidenceId, "job-economy", sha("a"), sha("c"), JSON.stringify(evidence), 3);
-    const settlement = runtime.economicLedger.settle({
+    (await runtime.database.raw.prepare("INSERT INTO economic_contribution_evidence(id, job_id, execution_receipt_id, trace_digest, evidence_json, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(contributionEvidenceId, "job-economy", sha("a"), sha("c"), JSON.stringify(evidence), 3));
+    const settlement = (await runtime.economicLedger.settle({
       jobId: "job-economy", executionReceiptId: sha("a"), pricingPolicyId: policy!.id,
       contributionEvidenceId,
       payerAccountId: "user-economy", inputTokens: 100, outputTokens: 25,
       contributors: [{ nodeId: "node-economy", weight: 1 }], createdAt: Date.now(),
-    });
+    }));
     const response = await runtime.app.inject({
       method: "GET", url: "/v1/account/economy", headers: { authorization: `Bearer ${key.secret}` },
     });
@@ -56,10 +56,10 @@ describe("economic API", () => {
       balanceMicrounits: -200, settledJobs: 1,
     });
     const now = Date.now();
-    runtime.database.raw.prepare(
+    (await runtime.database.raw.prepare(
       `INSERT INTO node_ownership(identity_kind, identity_id, account_id, credential_fingerprint,
        status, generation, created_at, updated_at) VALUES ('device', 'node-economy', 'user-economy', ?, 'active', 1, ?, ?)`,
-    ).run(sha("f"), now, now);
+    ).run(sha("f"), now, now));
     expect((await runtime.app.inject({ method: "GET", url: "/v1/nodes/node-economy/earnings",
       headers: { authorization: `Bearer ${key.secret}` } })).statusCode).toBe(403);
     const earnings = await runtime.app.inject({ method: "GET", url: "/v1/nodes/node-economy/earnings",
@@ -77,28 +77,28 @@ describe("economic API", () => {
     });
     expect(keyResponse.statusCode).toBe(200);
     expect(verifyEconomicSettlementReceipt(receiptResponse.json(), keyResponse.json())).toEqual(receiptResponse.json());
-    const otherKey = runtime.apiAccess.createKey("other-user", "Isolation test");
+    const otherKey = (await runtime.apiAccess.createKey("other-user", "Isolation test"));
     expect((await runtime.app.inject({
       method: "GET", url: `/v1/economy/settlements/${encodeURIComponent(settlement.id)}/receipt`,
       headers: { authorization: `Bearer ${otherKey.secret}` },
     })).statusCode).toBe(404);
-    runtime.store.createJob({ id: "job-receipt", sessionId: "session-receipt", model: "qwen3", workloadClass: "interactive", deadlineAt: Date.now() + 1_000 });
-    const reservation = runtime.apiAccess.beginUsage("user-economy", key.id, {
+    (await runtime.store.createJob({ id: "job-receipt", sessionId: "session-receipt", model: "qwen3", workloadClass: "interactive", deadlineAt: Date.now() + 1_000 }));
+    const reservation = (await runtime.apiAccess.beginUsage("user-economy", key.id, {
       model: "qwen3", messages: [{ role: "user", content: "private prompt contents" }], max_tokens: 4,
-    });
-    runtime.apiAccess.attachJob(reservation.id, "job-receipt", "session-receipt");
-    const executionReceipt = runtime.executionReceipts.record({
+    }));
+    (await runtime.apiAccess.attachJob(reservation.id, "job-receipt", "session-receipt"));
+    const executionReceipt = (await runtime.executionReceipts.record({
       schema: "mycellios-execution-receipt/1", jobId: "job-receipt", modelIdHash: sha("1"), routeClass: "replica",
       metrics: { inputTokens: 3, outputTokens: 1, ttftMs: 10, activeMs: 20 }, networkTraceDigest: sha("2"),
       recovery: { mode: "none", attempts: 1, replayedTokenEvents: 0 }, completedAt: Date.now(),
       privacy: { trust: "default", boundary: "trusted-edges", pinnedIdentityHashes: [] },
-    });
+    }));
     const topology = { schema: "mycellios-execution-topology/1", jobId: "job-receipt",
       receiptId: executionReceipt.receiptId, traceDigest: executionReceipt.networkTraceDigest,
       classification: "loopback", stages: [{ stageIndex: 0, alias: "stage-0", region: "Madrid", deviceType: "gpu", backend: "cuda" }],
       boundaries: [], createdAt: executionReceipt.completedAt };
-    runtime.database.raw.prepare("INSERT INTO execution_topologies(job_id, receipt_id, trace_digest, topology_json, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run("job-receipt", executionReceipt.receiptId, executionReceipt.networkTraceDigest, JSON.stringify(topology), executionReceipt.completedAt);
+    (await runtime.database.raw.prepare("INSERT INTO execution_topologies(job_id, receipt_id, trace_digest, topology_json, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run("job-receipt", executionReceipt.receiptId, executionReceipt.networkTraceDigest, JSON.stringify(topology), executionReceipt.completedAt));
     const executionResponse = await runtime.app.inject({ method: "GET", url: "/v1/requests/job-receipt/receipt",
       headers: { authorization: `Bearer ${key.secret}` } });
     const executionKeyResponse = await runtime.app.inject({ method: "GET", url: "/v1/execution-receipt-key",

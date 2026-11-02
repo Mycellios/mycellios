@@ -50,8 +50,8 @@ describe("Studio agent management API", () => {
     const unavailable = await runtime.app.inject({ method: "POST", url: `/public/v1/studio/web/${web.publicId}/invoke`, payload: { idempotencyKey: "no-capacity", subjectId: "visitor", message: "Hello" } });
     expect(unavailable.statusCode).toBe(503);
     expect(unavailable.json()).toMatchObject({ error: { code: "studio_waiting_for_capacity" } });
-    expect(runtime.database.raw.prepare("SELECT COUNT(*) AS count FROM studio_invocations").get()).toEqual({ count: 0 });
-    expect(runtime.database.raw.prepare("SELECT COUNT(*) AS count FROM api_usage").get()).toEqual({ count: 0 });
+    expect((await runtime.database.raw.prepare("SELECT COUNT(*) AS count FROM studio_invocations").get())).toEqual({ count: 0 });
+    expect((await runtime.database.raw.prepare("SELECT COUNT(*) AS count FROM api_usage").get())).toEqual({ count: 0 });
   });
 
   it("manages bounded context and exposes an idempotent Web invocation after certified activation", async () => {
@@ -74,7 +74,7 @@ describe("Studio agent management API", () => {
     const publishedResponse = await runtime.app.inject({ method: "POST", url: `/v1/studio/agents/${agent.id}/publish`, headers, payload: { idempotencyKey: "publish-context", expectedVersion: 2, channels: ["web", "telegram", "api"] } });
     const deployments = publishedResponse.json<{ deployments: Array<{ id: string; publicId: string; channel: string }> }>().deployments;
     const deployment = deployments.find((item) => item.channel === "web")!;
-    runtime.studioAgents.activateCompatibleWaiting("Qwen/Qwen3-0.6B");
+    (await runtime.studioAgents.activateCompatibleWaiting("Qwen/Qwen3-0.6B"));
     const payload = { idempotencyKey: "invoke-1", subjectId: "visitor", message: "What is Studio?" };
     const first = await runtime.app.inject({ method: "POST", url: `/public/v1/studio/web/${deployment.publicId}/invoke`, payload });
     const replay = await runtime.app.inject({ method: "POST", url: `/public/v1/studio/web/${deployment.publicId}/invoke`, payload });

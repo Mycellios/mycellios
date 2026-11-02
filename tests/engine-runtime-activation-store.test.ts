@@ -30,50 +30,50 @@ function plan(workerId = "worker-1", activationId = "activation-1") {
   };
 }
 
-afterEach(() => {
-  for (const database of databases.splice(0)) database.close();
+afterEach(async () => {
+  for (const database of databases.splice(0)) (await database.close());
 });
 
-function openStore(): MeshStore {
-  const database = new MeshDatabase(":memory:");
+async function openStore(): Promise<MeshStore> {
+  const database = (await MeshDatabase.open(":memory:"));
   databases.push(database);
   return new MeshStore(database);
 }
 
 describe("durable engine runtime activation plans", () => {
-  it("atomically replaces one model generation and restores strict plans", () => {
-    const store = openStore();
-    store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [
+  it("atomically replaces one model generation and restores strict plans", async () => {
+    const store = (await openStore());
+    (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [
       plan("worker-1"), plan("worker-2"),
-    ]);
-    expect(store.listEngineRuntimeActivationPlans().map((value) => value.workerId))
+    ]));
+    expect((await store.listEngineRuntimeActivationPlans()).map((value) => value.workerId))
       .toEqual(["worker-1", "worker-2"]);
 
-    store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-2", [
+    (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-2", [
       plan("worker-2", "activation-2"),
-    ]);
-    expect(store.listEngineRuntimeActivationPlans()).toEqual([
+    ]));
+    expect((await store.listEngineRuntimeActivationPlans())).toEqual([
       expect.objectContaining({ activationId: "activation-2", workerId: "worker-2" }),
     ]);
   });
 
-  it("rejects cross-model, cross-generation, duplicate, and unknown-field plans", () => {
-    const store = openStore();
-    expect(() => store.replaceEngineRuntimeActivationPlans("other", "activation-1", [plan()]))
+  it("rejects cross-model, cross-generation, duplicate, and unknown-field plans", async () => {
+    const store = (await openStore());
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("other", "activation-1", [plan()])))()).rejects
       .toThrow("engine_runtime_activation_plan_set_is_invalid");
-    expect(() => store.replaceEngineRuntimeActivationPlans("qwen-test", "other", [plan()]))
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "other", [plan()])))()).rejects
       .toThrow("engine_runtime_activation_plan_set_is_invalid");
-    expect(() => store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [plan(), plan()]))
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [plan(), plan()])))()).rejects
       .toThrow("engine_runtime_activation_plan_set_is_invalid");
-    expect(() => store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [
+    await expect((async () => (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [
       { ...plan(), workerClaim: true },
-    ])).toThrow();
+    ])))()).rejects.toThrow();
   });
 
-  it("removes retired activation authority", () => {
-    const store = openStore();
-    store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [plan()]);
-    expect(store.removeEngineRuntimeActivationPlans("qwen-test")).toBe(1);
-    expect(store.listEngineRuntimeActivationPlans()).toEqual([]);
+  it("removes retired activation authority", async () => {
+    const store = (await openStore());
+    (await store.replaceEngineRuntimeActivationPlans("qwen-test", "activation-1", [plan()]));
+    expect((await store.removeEngineRuntimeActivationPlans("qwen-test"))).toBe(1);
+    expect((await store.listEngineRuntimeActivationPlans())).toEqual([]);
   });
 });

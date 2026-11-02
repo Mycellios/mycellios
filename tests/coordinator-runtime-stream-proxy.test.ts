@@ -7,13 +7,13 @@ import type { MeshStore } from "../src/storage/store.js";
 const cleanup: Array<() => Promise<void>> = [];
 
 afterEach(async () => {
-  await Promise.all(cleanup.splice(0).map((close) => close()));
+  for (const close of cleanup.splice(0)) await close();
   vi.restoreAllMocks();
 });
 
 describe("WorkerHub runtime proxy", () => {
   it("bridges a coordinator-local TCP client through one connected worker", async () => {
-    const hub = new WorkerHub({} as MeshStore);
+    const hub = (await WorkerHub.create({ listRuntimeLinkSamples: async () => [] } as unknown as MeshStore));
     const sent: Array<{ workerId: string; type: string; payload: Record<string, unknown> }> = [];
     vi.spyOn(hub, "isConnected").mockReturnValue(true);
     vi.spyOn(hub, "send").mockImplementation((workerId, type, payload) => {
@@ -24,6 +24,7 @@ describe("WorkerHub runtime proxy", () => {
     cleanup.push(() => proxy.close());
     const client = connect({ host: proxy.host, port: proxy.port });
     cleanup.push(() => closeSocket(client));
+    cleanup.push(() => hub.close());
     await connected(client);
     await waitUntil(() => sent.some((message) => message.type === "runtime.stream.open"));
     const opened = sent.find((message) => message.type === "runtime.stream.open")!;
@@ -31,14 +32,14 @@ describe("WorkerHub runtime proxy", () => {
     expect(opened.payload.targetPort).toBe(9_860);
     const streamId = opened.payload.streamId as string;
 
-    deliver(hub, "worker-root", "runtime.stream.opened", { streamId });
+    await deliver(hub, "worker-root", "runtime.stream.opened", { streamId });
     client.write(Buffer.from("health request"));
     await waitUntil(() => sent.some((message) => message.type === "runtime.stream.data"));
     const outbound = sent.find((message) => message.type === "runtime.stream.data")!;
     expect(Buffer.from(outbound.payload.data as string, "base64").toString("utf8")).toBe("health request");
 
     const response = readOnce(client);
-    deliver(hub, "worker-root", "runtime.stream.data", {
+    await deliver(hub, "worker-root", "runtime.stream.data", {
       streamId,
       sequence: 0,
       data: Buffer.from("HTTP/1.1 200 OK\r\n\r\nready").toString("base64"),
@@ -47,7 +48,7 @@ describe("WorkerHub runtime proxy", () => {
   });
 
   it("closes active client sockets instead of blocking route deactivation", async () => {
-    const hub = new WorkerHub({} as MeshStore);
+    const hub = (await WorkerHub.create({ listRuntimeLinkSamples: async () => [] } as unknown as MeshStore));
     vi.spyOn(hub, "isConnected").mockReturnValue(true);
     vi.spyOn(hub, "send").mockReturnValue(true);
     const proxy = await hub.createRuntimeProxy("worker-root", 9_860);
@@ -64,16 +65,16 @@ describe("WorkerHub runtime proxy", () => {
   });
 });
 
-function deliver(
+async function deliver(
   hub: WorkerHub,
   workerId: string,
   type: string,
   payload: Record<string, unknown>,
-): void {
+): Promise<void> {
   const internal = hub as unknown as {
-    handleRuntimeStreamEnvelope(envelope: WorkerEnvelope): void;
+    handleRuntimeStreamEnvelope(envelope: WorkerEnvelope): Promise<void>;
   };
-  internal.handleRuntimeStreamEnvelope({ v: 1, workerId, type, payload });
+  await internal.handleRuntimeStreamEnvelope({ v: 1, workerId, type, payload });
 }
 
 function connected(socket: Socket): Promise<void> {

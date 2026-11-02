@@ -1,0 +1,3 @@
+-- Compatibility release: the previous deployed runtime still reads isDefault.
+-- Keep the column, its default and indexes through rollout and rollback.
+-- Removal requires a later contract migration after the legacy runtime retires.

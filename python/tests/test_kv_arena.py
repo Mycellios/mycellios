@@ -36,6 +36,18 @@ def _states(tokens: int, batch: int = 1, seed: int | None = None) -> tuple[torch
 
 
 class ArenaLayerEquivalenceTests(unittest.TestCase):
+    @unittest.skipUnless(torch.cuda.is_available(), "CUDA required")
+    def test_gpu_growth_bounds_slack_without_changing_cached_values(self) -> None:
+        arena = ArenaLayer()
+        dynamic = DynamicLayer()
+        for size in [128] * 33 + [1, 127, 256]:
+            keys, values = (tensor.cuda() for tensor in _states(size))
+            arena.update(keys, values)
+            dynamic.update(keys, values)
+            self.assertTrue(torch.equal(arena.keys, dynamic.keys))
+            self.assertTrue(torch.equal(arena.values, dynamic.values))
+            self.assertLess(arena.arena_capacity_tokens - arena.get_seq_length(), 256)
+
     def test_append_sequence_matches_concatenating_layer_exactly(self) -> None:
         arena = ArenaLayer()
         dynamic = DynamicLayer()

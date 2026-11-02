@@ -20,8 +20,8 @@ export interface AcceleratorPreparationLogEntry {
 
 export interface NodeAccelerationStatus {
   state: "idle" | "preparing" | "cpu-ready" | "gpu-ready" | "gpu-fallback" | "error";
-  requestedBackend: "cpu" | "cuda" | "rocm" | "mps" | "xpu" | null;
-  effectiveBackend: "cpu" | "cuda" | "rocm" | "mps" | "xpu" | null;
+  requestedBackend: "cpu" | "cuda" | "rocm" | "mps" | "xpu" | "directml" | null;
+  effectiveBackend: "cpu" | "cuda" | "rocm" | "mps" | "xpu" | "directml" | null;
   deviceName: string | null;
   precision: "float32" | "float16" | null;
   message: string;
@@ -30,7 +30,7 @@ export interface NodeAccelerationStatus {
     state: "not-detected" | "unsupported" | "checking" | "downloading" | "installing" | "verifying" | "ready" | "fallback" | "error";
     vendor: string | null;
     model: string | null;
-    backend: "cuda" | "rocm" | "mps" | "xpu" | null;
+    backend: "cuda" | "rocm" | "mps" | "xpu" | "directml" | null;
     activeStages: number;
   };
   preparation: {

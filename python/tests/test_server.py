@@ -46,12 +46,11 @@ class EngineConfigurationTests(unittest.TestCase):
                 }
             }
         )
-        verified = SimpleNamespace(manifest=manifest)
         with (
             patch(
-                "distributed_runtime.stage_artifact.verify_stage_artifact",
-                return_value=verified,
-            ) as verify,
+                "distributed_runtime.stage_artifact.read_stage_artifact_manifest",
+                return_value=manifest,
+            ) as read_manifest,
             patch(
                 "distributed_runtime.server.resolve_model_metadata_snapshot",
                 return_value="/cache/authenticated-tokenizer",
@@ -63,7 +62,7 @@ class EngineConfigurationTests(unittest.TestCase):
             )
 
         self.assertEqual(tokenizer_snapshot, "/cache/authenticated-tokenizer")
-        verify.assert_called_once_with(
+        read_manifest.assert_called_once_with(
             "/cache/root-stage-package",
             expected_package_id="a" * 64,
         )

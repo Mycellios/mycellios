@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <mask id="hub"><rect width="256" height="256" fill="white"/><circle cx="128" cy="128" r="10" fill="black"/></mask>
+  <g mask="url(#hub)" fill="currentColor" stroke="currentColor" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path fill="none" d="M128 128V44 M128 128C102 117 95 85 78 65 M128 128C102 121 76 139 43 121 M128 128C105 141 91 167 64 184 M128 128C133 168 105 182 105 212 M128 128C123 168 151 182 151 212 M128 128C153 141 165 167 192 184 M128 128C156 121 180 139 213 121 M128 128C154 117 161 85 178 65"/>
+    <circle cx="128" cy="44" r="12" stroke="none"/><circle cx="78" cy="65" r="12" stroke="none"/>
+    <circle cx="43" cy="121" r="12" stroke="none"/><circle cx="64" cy="184" r="12" stroke="none"/>
+    <circle cx="105" cy="212" r="12" stroke="none"/><circle cx="151" cy="212" r="12" stroke="none"/>
+    <circle cx="192" cy="184" r="12" stroke="none"/><circle cx="213" cy="121" r="12" stroke="none"/>
+    <circle cx="178" cy="65" r="12" stroke="none"/>
+  </g>
+</svg>

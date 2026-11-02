@@ -79,6 +79,59 @@ describe("native Mycellios pipeline adapter", () => {
     });
   });
 
+  it.each([
+    ["GPU failure", 'data: {"error":{"message":"CUDA out of memory. private-diagnostic","type":"pipeline_error"}}\n\ndata: [DONE]\n\n', "mycellios_pipeline_memory_exhausted"],
+    ["runtime failure", 'data: {"error":{"message":"private-diagnostic"}}\n\ndata: [DONE]\n\n', "mycellios_pipeline_generation_failed"],
+    ["missing terminal", 'data: [DONE]\n\n', "mycellios_pipeline_truncated_stream"],
+    ["missing usage", 'data: {"choices":[{"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', "mycellios_pipeline_truncated_stream"],
+    ["missing DONE", 'data: {"choices":[{"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1}}\n\n', "mycellios_pipeline_truncated_stream"],
+    ["invalid usage", 'data: {"choices":[{"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":-1}}\n\ndata: [DONE]\n\n', "mycellios_pipeline_invalid_stream"],
+    ["invalid JSON", 'data: not-json-private-diagnostic\n\n', "mycellios_pipeline_invalid_stream"],
+  ])("never completes a native stream after %s", async (_name, stream, code) => {
+    const adapter = await streamAdapter(stream);
+    const collect = async () => {
+      const chunks = [];
+      for await (const chunk of adapter.generate({jobId: "failed-job", request: {
+        model: "test-model", messages: [{role: "user", content: "fixture"}],
+      }}, new AbortController().signal)) chunks.push(chunk);
+      return chunks;
+    };
+    const failure = await collect().then(() => undefined, error => error);
+    expect(failure).toMatchObject({code});
+    expect(String(failure)).not.toContain("private-diagnostic");
+    expect(await adapter.metrics()).toMatchObject({activeJobs: 0});
+  });
+
+  it("retains partial output but fails instead of reporting it as a completed generation", async () => {
+    const adapter = await streamAdapter('data: {"choices":[{"delta":{"content":"partial"}}]}\n\ndata: {"error":{"message":"CUDA out of memory"}}\n\ndata: [DONE]\n\n');
+    const chunks: string[] = [];
+    let failure: unknown;
+    try {
+      for await (const chunk of adapter.generate({jobId: "partial-job", request: {
+        model: "test-model", messages: [{role: "user", content: "fixture"}],
+      }}, new AbortController().signal)) chunks.push(chunk.text);
+    } catch (error) { failure = error; }
+    expect(chunks).toEqual(["partial"]);
+    expect(failure).toMatchObject({code: "mycellios_pipeline_memory_exhausted", retryable: false});
+    expect(await adapter.metrics()).toMatchObject({activeJobs: 0});
+  });
+
+  async function streamAdapter(stream: string) {
+    const baseUrl = await listen((request, response) => {
+      if (request.url === "/health") {
+        response.setHeader("content-type", "application/json");
+        response.end(JSON.stringify({status: "ready",model:"test-model",artifact_identity:MODEL_DIGEST,
+          pipeline_snapshot_identity:ACTIVATION_ID,stages:1,boundaries:[0,28]}));
+      } else {
+        response.setHeader("content-type", "text/event-stream");
+        response.end(stream);
+      }
+    });
+    const adapter = new MycelliosPipelineAdapter({baseUrl,model:"test-model",modelDigest:MODEL_DIGEST,activationId:ACTIVATION_ID});
+    await adapter.probe();
+    return adapter;
+  }
+
   it("rejects every external, credentialed or path-prefixed endpoint", () => {
     for (const endpoint of [
       "https://inference.example",

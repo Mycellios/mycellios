@@ -67,7 +67,7 @@ describe("requested model API activation flow", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json().model.status).toBe("activating");
     expect(manager.activated.map((model) => model.id)).toEqual(["qwen-ui"]);
-    const stored = runtime.store.getRequestedModel("qwen-ui")!;
+    const stored = (await runtime.store.getRequestedModel("qwen-ui"))!;
     expect(stored.activationRequestedAt).not.toBeNull();
     expect(stored.activationError).toBeNull();
     const timeline = await runtime.app.inject({
@@ -133,14 +133,14 @@ describe("requested model API activation flow", () => {
       databasePath: ":memory:",
       requestTimeoutMs: 30_000,
     }, { activationManager: manager });
-    runtime.store.upsertRequestedModel({
+    (await runtime.store.upsertRequestedModel({
       id: "panel-projection",
       source: "Qwen/Qwen3-0.6B",
       revision: null,
       contextTokens: 4_096,
       minimumNodes: 2,
       autoActivate: false,
-    });
+    }));
 
     const full = await runtime.app.inject({ method: "GET", url: "/public/v1/snapshot" });
     const overview = await runtime.app.inject({ method: "GET", url: "/public/v1/snapshot?view=overview" });
@@ -169,15 +169,15 @@ describe("requested model API activation flow", () => {
       activationManager: manager,
       automaticActivationRetryDelaysMs: [0],
     });
-    runtime.store.upsertRequestedModel({
+    (await runtime.store.upsertRequestedModel({
       id: "recover-me",
       source: "Qwen/Qwen3-0.6B",
       revision: null,
       contextTokens: 4_096,
       minimumNodes: 2,
       autoActivate: true,
-    });
-    runtime.store.setRequestedModelProfile("recover-me", {
+    }));
+    (await runtime.store.setRequestedModelProfile("recover-me", {
       schema: "mycellios-hub-model-capacity/1",
       compatible: true,
       adapterId: "transformers-qwen3-v1",
@@ -187,11 +187,11 @@ describe("requested model API activation flow", () => {
       requiredVramMiB: 2_200,
       minimumStageVramMiB: 512,
       minimumNodes: 2,
-    }, null);
-    runtime.store.setRequestedModelActivationError(
+    }, null));
+    (await runtime.store.setRequestedModelActivationError(
       "recover-me",
       "managed_launch_agent_is_unavailable:desktop-a",
-    );
+    ));
 
     const response = await runtime.app.inject({
       method: "GET",
@@ -200,8 +200,8 @@ describe("requested model API activation flow", () => {
 
     expect(response.statusCode).toBe(200);
     expect(manager.activated.map((model) => model.id)).toEqual(["recover-me"]);
-    expect(runtime.store.getRequestedModel("recover-me")?.activationError).toBeNull();
-    expect(runtime.store.getRequestedModel("recover-me")?.activationRequestedAt).not.toBeNull();
+    expect((await runtime.store.getRequestedModel("recover-me"))?.activationError).toBeNull();
+    expect((await runtime.store.getRequestedModel("recover-me"))?.activationRequestedAt).not.toBeNull();
     const model = response.json().requestedModels.find(
       (entry: { id: string }) => entry.id === "recover-me",
     );
@@ -242,15 +242,15 @@ describe("requested model API activation flow", () => {
       activationManager: manager,
       automaticActivationRetryDelaysMs: [0],
     });
-    runtime.store.upsertRequestedModel({
+    (await runtime.store.upsertRequestedModel({
       id: "retry-live",
       source: "Qwen/Qwen3-0.6B",
       revision: null,
       contextTokens: 4_096,
       minimumNodes: 2,
       autoActivate: true,
-    });
-    runtime.store.setRequestedModelProfile("retry-live", {
+    }));
+    (await runtime.store.setRequestedModelProfile("retry-live", {
       schema: "mycellios-hub-model-capacity/1",
       compatible: true,
       adapterId: "transformers-qwen3-v1",
@@ -260,11 +260,11 @@ describe("requested model API activation flow", () => {
       requiredVramMiB: 2_200,
       minimumStageVramMiB: 512,
       minimumNodes: 2,
-    }, null);
+    }, null));
 
     await runtime.app.inject({ method: "GET", url: "/public/v1/snapshot" });
-    await vi.waitFor(() => {
-      expect(runtime?.store.getRequestedModel("retry-live")?.activationRequestedAt).toBeNull();
+    await vi.waitFor(async () => {
+      expect((await runtime?.store.getRequestedModel("retry-live"))?.activationRequestedAt).toBeNull();
     });
     const retryResponse = await runtime.app.inject({
       method: "GET",
@@ -272,7 +272,7 @@ describe("requested model API activation flow", () => {
     });
 
     expect(manager.activated.map((model) => model.id)).toEqual(["retry-live", "retry-live"]);
-    expect(runtime.store.getRequestedModel("retry-live")?.activationError).toBeNull();
+    expect((await runtime.store.getRequestedModel("retry-live"))?.activationError).toBeNull();
     const model = retryResponse.json().requestedModels.find(
       (entry: { id: string }) => entry.id === "retry-live",
     );
@@ -300,12 +300,12 @@ describe("requested model API activation flow", () => {
       databasePath: ":memory:",
       requestTimeoutMs: 30_000,
     }, { activationManager: manager });
-    const requested = requestedModel(runtime, "repair-adapter");
-    const cell = addWorker(runtime.store, {
+    const requested = (await requestedModel(runtime, "repair-adapter"));
+    const cell = (await addWorker(runtime.store, {
       id: "cell-route",
       model: requested.id,
       identity: { kind: "cell", id: "cell-route" },
-    });
+    }));
     void manager.activate(requested);
 
     runtime.service.emit("degraded", {
@@ -332,8 +332,8 @@ describe("requested model API activation flow", () => {
       databasePath: ":memory:",
       requestTimeoutMs: 30_000,
     }, { activationManager: manager });
-    const requested = requestedModel(runtime, "repair-disconnect");
-    const executor = addWorker(runtime.store, {
+    const requested = (await requestedModel(runtime, "repair-disconnect"));
+    const executor = (await addWorker(runtime.store, {
       id: "executor-route",
       identity: { kind: "device", id: "executor-route" },
       distributedExecutor: {
@@ -345,8 +345,8 @@ describe("requested model API activation flow", () => {
         computeMode: "automatic",
         cpuEligible: false,
       },
-    });
-    addWorker(runtime.store, {
+    }));
+    (await addWorker(runtime.store, {
       id: "cell-route",
       model: requested.id,
       identity: { kind: "cell", id: "cell-route" },
@@ -368,7 +368,7 @@ describe("requested model API activation flow", () => {
           fallback: false,
         }],
       },
-    });
+    }));
     void manager.activate(requested);
 
     runtime.hub.emit("disconnect", executor.id);
@@ -431,39 +431,39 @@ describe("automatic activation recovery", () => {
       },
     });
     try {
-      requestedModel(localRuntime, "runtime-upgrade");
+      (await requestedModel(localRuntime, "runtime-upgrade"));
       for (let attempt = 0; attempt < 7; attempt += 1) {
-        const operation = localRuntime.deploymentController.claimOperation(
+        const operation = (await localRuntime.deploymentController.claimOperation(
           "runtime-upgrade",
           "activate",
-        );
+        ));
         expect(operation).not.toBeNull();
-        localRuntime.deploymentController.failOperation(
+        (await localRuntime.deploymentController.failOperation(
           operation!.id,
           "transient_activation_failure",
           "distributed_activation_requires_two_connected_shard_executors",
-        );
+        ));
       }
       expect(
-        localRuntime.deploymentController.getState("runtime-upgrade")?.retryCount,
+        (await localRuntime.deploymentController.getState("runtime-upgrade"))?.retryCount,
       ).toBe(7);
-      localRuntime.store.setRequestedModelActivationError(
+      (await localRuntime.store.setRequestedModelActivationError(
         "runtime-upgrade",
         "automatic_activation_retries_exhausted:7:runtime=0.2.64:"
           + "distributed_activation_requires_two_connected_shard_executors",
-      );
+      ));
 
       await localRuntime.app.inject({ method: "GET", url: "/public/v1/snapshot" });
 
       expect(manager.activated.map((model) => model.id)).toEqual(["runtime-upgrade"]);
-      expect(localRuntime.store.getRequestedModel("runtime-upgrade")?.activationError).toBeNull();
-      expect(localRuntime.deploymentController.getState("runtime-upgrade")).toMatchObject({
+      expect((await localRuntime.store.getRequestedModel("runtime-upgrade"))?.activationError).toBeNull();
+      expect((await localRuntime.deploymentController.getState("runtime-upgrade"))).toMatchObject({
         generation: 2,
         retryCount: 0,
         lastError: "distributed_activation_requires_two_connected_shard_executors",
       });
       expect(
-        localRuntime.deploymentController.activeOperationForModel("runtime-upgrade"),
+        (await localRuntime.deploymentController.activeOperationForModel("runtime-upgrade")),
       ).toMatchObject({
         attempt: 1,
         generation: 2,
@@ -492,11 +492,11 @@ describe("automatic activation recovery", () => {
       },
     });
     try {
-      requestedModel(localRuntime, "same-runtime");
+      (await requestedModel(localRuntime, "same-runtime"));
       const failure =
         "automatic_activation_retries_exhausted:5:runtime=0.2.65:"
         + "managed_launch_agent_is_unavailable:desktop-a";
-      localRuntime.store.setRequestedModelActivationError("same-runtime", failure);
+      (await localRuntime.store.setRequestedModelActivationError("same-runtime", failure));
 
       const response = await localRuntime.app.inject({
         method: "GET",
@@ -505,7 +505,7 @@ describe("automatic activation recovery", () => {
 
       expect(response.statusCode).toBe(200);
       expect(manager.activated).toEqual([]);
-      expect(localRuntime.store.getRequestedModel("same-runtime")?.activationError).toBe(failure);
+      expect((await localRuntime.store.getRequestedModel("same-runtime"))?.activationError).toBe(failure);
     } finally {
       await localRuntime.close();
     }
@@ -550,16 +550,16 @@ class FakeActivationManager implements ModelActivationManager {
   async close(): Promise<void> { this.managing = null; }
 }
 
-function requestedModel(runtime: CoordinatorRuntime, id: string): StoredRequestedModel {
-  runtime.store.upsertRequestedModel({
+async function requestedModel(runtime: CoordinatorRuntime, id: string): Promise<StoredRequestedModel> {
+  (await runtime.store.upsertRequestedModel({
     id,
     source: "Qwen/Qwen3-0.6B",
     revision: null,
     contextTokens: 4_096,
     minimumNodes: 2,
     autoActivate: true,
-  });
-  runtime.store.setRequestedModelProfile(id, {
+  }));
+  (await runtime.store.setRequestedModelProfile(id, {
     schema: "mycellios-hub-model-capacity/1",
     compatible: true,
     adapterId: "transformers-qwen3-v1",
@@ -569,8 +569,8 @@ function requestedModel(runtime: CoordinatorRuntime, id: string): StoredRequeste
     requiredVramMiB: 2_200,
     minimumStageVramMiB: 512,
     minimumNodes: 2,
-  }, null);
-  return runtime.store.getRequestedModel(id)!;
+  }, null));
+  return (await runtime.store.getRequestedModel(id))!;
 }
 
 function qwenAdapterIdentity(): {

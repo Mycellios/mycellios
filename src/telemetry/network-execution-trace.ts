@@ -197,6 +197,8 @@ const routeReasonSchema = z.enum([
   "candidate_capacity_exhausted",
   "candidate_context_exceeded",
   "candidate_trust_rejected",
+  "candidate_boundary_trust_rejected",
+  "candidate_boundary_pin_rejected",
   "candidate_residency_rejected",
   "candidate_failure_domain_rejected",
   "candidate_cost_exceeded",

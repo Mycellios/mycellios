@@ -1,7 +1,15 @@
+import { createInferenceSettlement } from "./settle-completed-inference.js";
+import { beginContributionUsage } from "./contribution-funding.js";
+import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
+import { AsyncTaskScope, coalesceAsync } from "../core/async-task-scope.js";
+import { flatMapAsync, mapAsync } from "../core/async-collections.js";
+import { InferenceRouteRecovery } from "./inference-route-recovery.js";
+import { networkInventory } from "../contracts/network-inventory.js";
 import websocket from "@fastify/websocket";
 import staticFiles from "@fastify/static";
 import rateLimit from "@fastify/rate-limit";
-import { resolveChatIdempotencyKey, parseIdempotencyKey, waitForChatCapacity } from "./chat-admission.js";
+import { resolveChatIdempotencyKey, parseIdempotencyKey, waitForChatCapacity, parseChatRequest } from "./chat-admission.js";
+import { AutomaticBenchmarkPriority, waitForBenchmarkCancellation } from "./automatic-benchmark-priority.js";
 import {
   claimSupportAssistantRequest,
   supportAssistantClientRateKey,
@@ -20,6 +28,7 @@ import {
 } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { z, ZodError } from "zod";
+import { registerNativeReplicaQualifications } from "./native-replica-qualification.js";
 import {
   StableBenchmarkActivationTracker,
   type BenchmarkActivation,
@@ -95,6 +104,7 @@ import {
 } from "../support/assistant.js";
 import { MeshService, MeshServiceError, type JobStreamEvent } from "./mesh-service.js";
 import { MobileComputeHub, type MobileWorkerSnapshot } from "./mobile-compute-hub.js";
+import { queueExistingMobileArtifacts } from "./mobile-artifact-backup.js";
 import {
   verifyGitHubReleaseUploadToken,
   type GitHubReleaseClaims,
@@ -398,8 +408,9 @@ export async function createCoordinator(
   const runtimeVersion = runtimeMetadata.version;
   const runtimeRevision = runtimeMetadata.revision;
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
+  const background = new AsyncTaskScope((task, error) => app.log.error({ task, error }, "coordinator background task failed"));
   registerCanonicalLandingHostRedirect(app);
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler(async (error, request, reply) => {
     if (error instanceof ZodError) {
       return reply.code(400).send({
         error: { code: "invalid_request", message: "Request validation failed", details: error.issues },
@@ -407,13 +418,13 @@ export async function createCoordinator(
     }
     if (error instanceof ComponentReleaseStoreError) {
       const path = request.url.split("?", 1)[0] ?? request.url;
-      return sendComponentReleaseError(
+      return (await sendComponentReleaseError(
         reply,
         error,
         request.method === "GET" && path.startsWith("/updates/v1/")
           ? "public"
           : "admin",
-      );
+      ));
     }
     if (error instanceof MeshServiceError) {
       return reply.code(error.statusCode).send({ error: { code: error.code, message: error.message } });
@@ -503,7 +514,8 @@ export async function createCoordinator(
   const internalToken = config.internalToken ?? config.modelAdminToken ?? config.networkToken;
   app.addHook("onRequest", async (request, reply) => {
     const path = request.url.split("?", 1)[0] ?? request.url;
-    if (!path.startsWith("/internal/v1/mobile/experts/")) return;
+    if (!path.startsWith("/internal/v1/mobile/experts/")
+      && !path.startsWith("/internal/v1/mobile/layers/")) return;
     if (!internalToken) {
       return reply.code(503).send({
         error: {
@@ -542,7 +554,8 @@ export async function createCoordinator(
       // Mobile expert administration has its own stronger control-plane
       // credential above. Requiring both secrets in one Authorization header
       // would make the route impossible to use when the tokens differ.
-      if (path.startsWith("/internal/v1/mobile/experts/")) return;
+      if (path.startsWith("/internal/v1/mobile/experts/")
+        || path.startsWith("/internal/v1/mobile/layers/")) return;
       if (
         (path === WORKER_CONNECT_PATH || WORKER_NODE_CONTROL_PATH.test(path))
         && received?.startsWith(`${WORKER_SESSION_TOKEN_PREFIX}.`)
@@ -553,7 +566,7 @@ export async function createCoordinator(
     });
   }
   const supabaseAuth = options.supabaseAuthService ?? (config.supabaseUrl && config.supabaseServiceRoleKey
-    ? new SupabaseAuthService(config.supabaseUrl, config.supabaseServiceRoleKey)
+    ? new SupabaseAuthService(config.supabaseUrl, config.supabaseServiceRoleKey, fetch, config.supabaseTrustedOAuthClientIds, config.supabaseTrustedOAuthIssuer)
     : null);
   const authorizedAdministrativeRequests = new WeakSet<FastifyRequest>();
   const markAdministrativeRequestAuthorized = (
@@ -648,7 +661,10 @@ export async function createCoordinator(
     { parseAs: "buffer", bodyLimit: 512 * 1024 * 1024 },
     (_request, body, done) => done(null, body),
   );
-  const database = new MeshDatabase(config.databasePath);
+  if (config.storageBackend === "postgres" && !config.databaseUrl) throw new Error("mycellios_postgres_database_url_required");
+  const database = config.storageBackend === "postgres"
+    ? await MeshDatabase.openPostgres(config.databaseUrl!, config.databaseSchema)
+    : await MeshDatabase.open(config.databasePath);
   if (
     !isCoordinatorLoopbackHost(config.host)
     && (!config.economicReceiptSigningKeyId || !config.economicReceiptSigningPrivateKey)
@@ -661,11 +677,13 @@ export async function createCoordinator(
     privateKey: config.economicReceiptSigningPrivateKey ?? developmentEconomicKey!,
   };
   const economicLedger = new EconomicLedger(database, { receiptSigning });
+  const creditWallet = config.contributionCreditFunding ? new ContributionCreditWallet(database, economicLedger) : null;
+  if (creditWallet) await creditWallet.initialize();
   const executionReceipts = new ExecutionReceiptStore(database, receiptSigning);
   const modelCertifications = config.modelCertificationPinnedKeys?.length
     ? new ModelCertificationRegistry(database, config.modelCertificationPinnedKeys) : null;
   const physicalContributionEvidence = new PhysicalContributionEvidenceAuthority(database);
-  economicLedger.registerDefaultInternalPricing();
+  (await economicLedger.registerDefaultInternalPricing());
   const workerAdmission = new WorkerAdmissionAuthority(database);
   const nodeEnrollments = new NodeEnrollmentStore(database);
   const nodeCommands = new NodeCommandStore(database);
@@ -685,10 +703,10 @@ export async function createCoordinator(
       if (token && constantTimeEqual(token, config.networkToken!)) return;
       const claims = token ? verifyWorkerSessionToken(config.networkToken!, token) : null;
       const credential = claims
-        ? database.getWorkerAdmissionCredential(claims.identityKind, claims.identityId)
+        ? (await database.getWorkerAdmissionCredential(claims.identityKind, claims.identityId))
         : null;
       const ownership = claims?.identityKind === "device"
-        ? database.getNodeOwnership("device", claims.identityId)
+        ? (await database.getNodeOwnership("device", claims.identityId))
         : null;
       if (
         !claims
@@ -719,7 +737,7 @@ export async function createCoordinator(
     requestsPerMinute: config.apiRequestsPerMinute ?? 30,
     maxConcurrent: config.apiMaxConcurrent ?? 2,
     maxActiveKeys: config.apiMaxActiveKeys ?? 10,
-  });
+  }, undefined, Boolean(creditWallet));
   const studioAgents = new StudioAgentStore(database);
   const studioContext = new StudioContextStore(database);
   const billing = new BillingManager(database, apiAccess);
@@ -820,14 +838,14 @@ export async function createCoordinator(
       }
     : null);
   if (config.stripeCheckout) {
-    billing.registerPlan({
+    (await billing.registerPlan({
       planId: "mycellios-go",
       version: 1,
       priceCurrency: "EUR",
       priceMicros: 10_000_000,
       includedTokens: config.stripeCheckout.includedTokens,
       status: "active",
-    });
+    }));
   }
   const billingCheckout = configuredCheckout
     ? new BillingCheckoutService(
@@ -885,7 +903,7 @@ export async function createCoordinator(
       return;
     }
     if (token.startsWith(API_KEY_PREFIX)) {
-      const principal = apiAccess.authenticateKey(token);
+      const principal = (await apiAccess.authenticateKey(token));
       if (!principal) {
         return reply.code(401).send({
           error: { code: "invalid_api_key", message: "The Mycellios API key is invalid or revoked." },
@@ -909,7 +927,7 @@ export async function createCoordinator(
           error: { code: "invalid_access_token", message: "The account session is invalid or expired." },
         });
       }
-      apiAccess.getOrCreateAccount(user.id);
+      (await apiAccess.getOrCreateAccount(user.id));
       apiPrincipals.set(request, {
         kind: "user",
         userId: user.id,
@@ -939,7 +957,7 @@ export async function createCoordinator(
     : null;
   await persistence?.initialize();
   const deploymentController = new DeploymentControlPlane(store);
-  deploymentController.initialize();
+  (await deploymentController.initialize());
   await app.register(websocket, { options: { maxPayload: 10 * 1024 * 1024 } });
   const mobileAssetsPath = resolveMobileAssetsPath(
     config.mobileAssetsPath,
@@ -1036,7 +1054,7 @@ export async function createCoordinator(
           verifyArtifacts: false,
         });
       } catch (error) {
-        return sendComponentReleaseError(reply, error, "public");
+        return (await sendComponentReleaseError(reply, error, "public"));
       }
       if (!manifest) return reply.code(404).send();
       reply.header("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -1057,7 +1075,7 @@ export async function createCoordinator(
           sha256: `sha256:${digest}`,
         });
       } catch (error) {
-        return sendComponentReleaseError(reply, error, "public");
+        return (await sendComponentReleaseError(reply, error, "public"));
       }
       reply.header("Cache-Control", "public, max-age=31536000, immutable");
       reply.header("ETag", `"sha256:${digest}"`);
@@ -1103,7 +1121,7 @@ export async function createCoordinator(
           body: request.body,
         });
       } catch (error) {
-        return sendComponentReleaseError(reply, error, "admin");
+        return (await sendComponentReleaseError(reply, error, "admin"));
       }
       return reply.code(stored.alreadyStored ? 200 : 201).send({
         data: stored,
@@ -1144,7 +1162,7 @@ export async function createCoordinator(
           );
         });
       } catch (error) {
-        return sendComponentReleaseError(reply, error, "admin");
+        return (await sendComponentReleaseError(reply, error, "admin"));
       }
       return reply.code(published.alreadyPublished ? 200 : 201).send({
         data: {
@@ -1210,7 +1228,7 @@ export async function createCoordinator(
           },
         });
       } catch (error) {
-        return sendDevelopmentLabError(reply, error);
+        return (await sendDevelopmentLabError(reply, error));
       }
     },
   );
@@ -1249,7 +1267,7 @@ export async function createCoordinator(
           },
         });
       } catch (error) {
-        return sendDevelopmentLabError(reply, error);
+        return (await sendDevelopmentLabError(reply, error));
       }
     },
   );
@@ -1274,7 +1292,7 @@ export async function createCoordinator(
           data: await developmentLabs.revokeLab(labId),
         });
       } catch (error) {
-        return sendDevelopmentLabError(reply, error);
+        return (await sendDevelopmentLabError(reply, error));
       }
     },
   );
@@ -1301,7 +1319,7 @@ export async function createCoordinator(
           },
         });
       } catch (error) {
-        return sendDevelopmentLabError(reply, error);
+        return (await sendDevelopmentLabError(reply, error));
       }
     },
   );
@@ -1323,9 +1341,9 @@ export async function createCoordinator(
         return reply.send(manifest);
       } catch (error) {
         if (error instanceof DevelopmentLabStoreError) {
-          return sendDevelopmentLabError(reply, error);
+          return (await sendDevelopmentLabError(reply, error));
         }
-        return sendComponentReleaseError(reply, error, "public");
+        return (await sendComponentReleaseError(reply, error, "public"));
       }
     },
   );
@@ -1351,9 +1369,9 @@ export async function createCoordinator(
         );
       } catch (error) {
         if (error instanceof DevelopmentLabStoreError) {
-          return sendDevelopmentLabError(reply, error);
+          return (await sendDevelopmentLabError(reply, error));
         }
-        return sendComponentReleaseError(reply, error, "public");
+        return (await sendComponentReleaseError(reply, error, "public"));
       }
     },
   );
@@ -1394,9 +1412,9 @@ export async function createCoordinator(
         });
       } catch (error) {
         if (error instanceof DevelopmentLabStoreError) {
-          return sendDevelopmentLabError(reply, error);
+          return (await sendDevelopmentLabError(reply, error));
         }
-        return sendComponentReleaseError(reply, error, "admin");
+        return (await sendComponentReleaseError(reply, error, "admin"));
       }
     },
   );
@@ -1444,9 +1462,9 @@ export async function createCoordinator(
         });
       } catch (error) {
         if (error instanceof DevelopmentLabStoreError) {
-          return sendDevelopmentLabError(reply, error);
+          return (await sendDevelopmentLabError(reply, error));
         }
-        return sendComponentReleaseError(reply, error, "admin");
+        return (await sendComponentReleaseError(reply, error, "admin"));
       }
     },
   );
@@ -1454,7 +1472,7 @@ export async function createCoordinator(
     const { fileName } = z.object({
       fileName: z.string().min(1).max(160),
     }).parse(request.params);
-    return serveReleaseAsset(
+    return (await serveReleaseAsset(
       request,
       reply,
       await releasePublicAssetPath(
@@ -1463,14 +1481,14 @@ export async function createCoordinator(
         fileName,
         nodeUpdatesPath,
       ),
-    );
+    ));
   });
   app.get("/downloads/", async (_request, reply) => reply.redirect("/downloads"));
   app.get("/downloads/:fileName", async (request, reply) => {
     const { fileName } = z.object({
       fileName: z.string().min(1).max(160),
     }).parse(request.params);
-    return serveReleaseAsset(
+    return (await serveReleaseAsset(
       request,
       reply,
       await releasePublicAssetPath(
@@ -1479,15 +1497,15 @@ export async function createCoordinator(
         fileName,
         releaseDownloadsPath,
       ),
-    );
+    ));
   });
   registerPublicDownloadRoutes(app, {
     version: publicAssetVersion,
     downloadsRoot: releaseDownloadsPath,
     transactions: releaseTransactions,
   });
-  const activationCheckpoints = new ActivationCheckpointStore((keyId) => {
-    const credential = database.listWorkerAdmissionCredentials(10_000)
+  const activationCheckpoints = new ActivationCheckpointStore(async (keyId) => {
+    const credential = (await database.listWorkerAdmissionCredentials(10_000))
       .find((candidate) => candidate.fingerprint === keyId);
     if (!credential || credential.status !== "active" || credential.algorithm !== "ed25519") {
       return undefined;
@@ -1506,20 +1524,20 @@ export async function createCoordinator(
     maxEntryBytes: 512 * 1024 * 1024,
     maxTotalBytes: 1024 * 1024 * 1024,
   });
-  const hub = new WorkerHub(store, {
+  const hub = (await WorkerHub.create(store, {
     activationCheckpointTransfers: new ActivationCheckpointTransferAuthority(
       activationCheckpoints,
     ),
-  });
+  }));
   const fleetContribution = new FleetContributionController(store, hub);
   hub.attach(app, {
     authorizedWorkerId: (request) => workerSessionPrincipals.get(request) ?? null,
     authorizedSession: (request) => workerSessionContexts.get(request) ?? null,
-    sessionIsCurrent: (session) => {
-      const credential = database.getWorkerAdmissionCredential(session.identityKind, session.identityId);
+    sessionIsCurrent: async (session) => {
+      const credential = (await database.getWorkerAdmissionCredential(session.identityKind, session.identityId));
       if (!credential || credential.status !== "active" || credential.fingerprint !== session.credentialFingerprint) return false;
       if (session.identityKind !== "device") return true;
-      const ownership = database.getNodeOwnership("device", session.identityId);
+      const ownership = (await database.getNodeOwnership("device", session.identityId));
       return Boolean(ownership && ownership.status === "active"
         && ownership.credentialFingerprint === session.credentialFingerprint
         && ownership.generation === session.generation);
@@ -1536,23 +1554,23 @@ export async function createCoordinator(
     admissionAuthority: workerAdmission,
     isTrustedLocalRequest,
     ...(persistence
-      ? { onArtifactStored: (artifact: Parameters<SupabasePersistence["registerArtifactBackup"]>[0]) =>
-          persistence.registerArtifactBackup(artifact) }
+      ? { onArtifactStored: async (artifact: Parameters<SupabasePersistence["registerArtifactBackup"]>[0]) =>
+          (await persistence.registerArtifactBackup(artifact)) }
       : {}),
   });
   mobileHub.attach(app);
   if (persistence && config.mobileExpertArtifactsPath) {
-    queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath);
+    (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }
-  const service = new MeshService(store, scheduler, hub, config.requestTimeoutMs);
+  const service = (await MeshService.create(store, scheduler, hub, config.requestTimeoutMs, { modelRequestTimeoutsMs: config.modelRequestTimeoutsMs }));
   await apiAccess.reconcileRestartedZeroTokenUsage();
-  const attachExecutionReceipt = (
+  const attachExecutionReceipt = async (
     event: Extract<JobStreamEvent, { type: "completed" }>,
     modelId: string,
     routeClass: "replica" | "pipeline",
-  ): Extract<JobStreamEvent, { type: "completed" }> => {
+  ): Promise<Extract<JobStreamEvent, { type: "completed" }>> => {
     if (!event.result.networkTrace || !event.result.recovery || !event.result.privacy) throw new Error("execution_receipt_evidence_is_incomplete");
-    const job = store.getJob(event.result.jobId);
+    const job = (await store.getJob(event.result.jobId));
     if (!job || job.status !== "completed") throw new Error("execution_receipt_job_is_not_completed");
     const receiptBody = {
       schema: "mycellios-execution-receipt/1",
@@ -1570,12 +1588,14 @@ export async function createCoordinator(
       privacy: event.result.privacy,
       completedAt: job.updatedAt,
     } as const;
-    const receipt = executionReceipts.record(receiptBody, {
+    const receipt = (await executionReceipts.record(receiptBody, {
       trace: event.result.networkTrace,
-      regionForWorker: (workerId) => store.getWorker(workerId)?.capabilities.region ?? null,
-    });
+      regionForWorker: async (workerId) => (await store.getWorker(workerId))?.capabilities.region ?? null,
+    }));
     return { ...event, result: { ...event.result, executionReceiptId: receipt.receiptId } };
   };
+  registerNativeReplicaQualifications(app, { adminToken: config.modelAdminToken, networkToken: config.networkToken,
+    hub, store, service, attachReceipt: attachExecutionReceipt });
   const studioInference: StudioInference = options.studioInference ?? (async (request) => {
     const chat: ChatCompletionRequest = {
       model: request.model,
@@ -1584,17 +1604,17 @@ export async function createCoordinator(
       deadline_ms: request.deadlineMs,
       privacy: { trust: "trusted-only", boundary: "trusted-edges" },
     };
-    if (!service.hasCapacity(chat)) throw new StudioAgentError("studio_waiting_for_capacity", "No compatible Mycellios route is available.", 503);
-    const usage = apiAccessEnabled ? apiAccess.beginUsage(request.ownerId, null, chat) : null;
-    let handle: ReturnType<MeshService["submit"]>;
+    if (!(await service.hasCapacity(chat))) throw new StudioAgentError("studio_waiting_for_capacity", "No compatible Mycellios route is available.", 503);
+    const usage = apiAccessEnabled ? (await apiAccess.beginUsage(request.ownerId, null, chat)) : null;
+    let handle: Awaited<ReturnType<MeshService["submit"]>>;
     try {
-      handle = service.submit(chat, request.sessionId, `studio-${randomUUID()}`);
+      handle = (await service.submit(chat, request.sessionId, `studio-${randomUUID()}`));
     } catch (error) {
-      if (usage) apiAccess.failUsage(usage.id, "submission_failed");
+      if (usage) (await apiAccess.failUsage(usage.id, "submission_failed"));
       throw error;
     }
-    if (usage) apiAccess.attachJob(usage.id, handle.jobId, handle.sessionId);
-    const conversationId = store.startInferenceConversation(handle.sessionId, request.model, request.messages);
+    if (usage) (await apiAccess.attachJob(usage.id, handle.jobId, handle.sessionId));
+    const conversationId = (await store.startInferenceConversation(handle.sessionId, request.model, request.messages));
     let completed: Extract<JobStreamEvent, { type: "completed" }> | null = null;
     let routeClass: "replica" | "pipeline" = "replica";
     try {
@@ -1602,24 +1622,24 @@ export async function createCoordinator(
         if (event.type === "accepted") routeClass = event.route.routeClass;
         if (event.type === "token") request.onToken?.(event.token.text);
         if (event.type === "failed") throw new StudioAgentError(event.code, event.message, 502);
-        if (event.type === "completed") completed = attachExecutionReceipt(event, request.model, routeClass);
+        if (event.type === "completed") completed = (await attachExecutionReceipt(event, request.model, routeClass));
       }
       if (!completed) throw new StudioAgentError("studio_inference_missing_result", "Inference ended without a result.", 502);
     } catch (error) {
-      if (usage) apiAccess.failUsage(usage.id, error instanceof StudioAgentError ? error.code : "studio_inference_failed");
-      store.appendInferenceMessage({
+      if (usage) (await apiAccess.failUsage(usage.id, error instanceof StudioAgentError ? error.code : "studio_inference_failed"));
+      (await store.appendInferenceMessage({
         conversationId,
         jobId: handle.jobId,
         role: "assistant",
         content: "",
         status: "failed",
         metadata: { failure_code: error instanceof StudioAgentError ? error.code : "studio_inference_failed" },
-      });
+      }));
       throw error;
     }
     if (usage) {
-      apiAccess.completeUsage(usage.id, completed.result.metrics.inputTokens, completed.result.metrics.outputTokens);
-      if (completed.result.networkTrace) settleCompletedInference({
+      (await apiAccess.completeUsage(usage.id, completed.result.metrics.inputTokens, completed.result.metrics.outputTokens));
+      if (completed.result.networkTrace) (await settleCompletedInference({
         userId: request.ownerId,
         jobId: handle.jobId,
         modelId: request.model,
@@ -1629,9 +1649,9 @@ export async function createCoordinator(
         networkTrace: completed.result.networkTrace,
         recovery: completed.result.recovery ?? { mode: "none", attempts: 1, replayedTokenEvents: 0 },
         executionReceiptId: completed.result.executionReceiptId!,
-      });
+      }));
     }
-    store.appendInferenceMessage({
+    (await store.appendInferenceMessage({
       conversationId,
       jobId: handle.jobId,
       role: "assistant",
@@ -1642,7 +1662,7 @@ export async function createCoordinator(
       routeClass,
       latencyMs: completed.result.metrics.activeMs,
       metadata: { execution_receipt_id: completed.result.executionReceiptId ?? null },
-    });
+    }));
     void persistence?.flush();
     return { text: completed.result.text, inputTokens: completed.result.metrics.inputTokens, outputTokens: completed.result.metrics.outputTokens, receiptId: completed.result.executionReceiptId ?? null };
   });
@@ -1667,7 +1687,7 @@ export async function createCoordinator(
     || resolve(runtimeMetadata.root, "benchmarks");
   const benchmarkHistoryDirectory = resolve(benchmarkStorageRoot, "history");
   for (const run of loadBenchmarkRuns(benchmarkWorkspace, benchmarkHistoryDirectory)) {
-    store.queueBenchmarkRun(run);
+    (await store.queueBenchmarkRun(run));
   }
   void persistence?.flush();
   type PersistedBenchmark = Awaited<ReturnType<typeof runAndPersistCoordinatorSuite>>;
@@ -1676,13 +1696,15 @@ export async function createCoordinator(
     activation: BenchmarkActivation;
   }
   let benchmarkRunInFlight: Promise<PersistedBenchmark> | null = null;
+  const automaticBenchmarkPriority = new AutomaticBenchmarkPriority();
+  let benchmarkDeferralTimer: NodeJS.Timeout | null = null;
   const automaticBenchmarkQueue: QueuedAutomaticBenchmark[] = [];
   const queuedAutomaticBenchmarkActivations = new Set<string>();
   const benchmarkActivationTracker = new StableBenchmarkActivationTracker(3, 12_000);
   const automaticBenchmarkRetryAttempts = new Map<string, number>();
   const automaticBenchmarkRetryTimers = new Set<NodeJS.Timeout>();
-  const benchmarkTargetForModel = (modelId: string): CoordinatorBenchmarkModel => {
-    const requested = store.getRequestedModel(modelId);
+  const benchmarkTargetForModel = async (modelId: string): Promise<CoordinatorBenchmarkModel> => {
+    const requested = (await store.getRequestedModel(modelId));
     const connectedWorkerIds = hub.connectedWorkerIds();
     return coordinatorBenchmarkModelIdentity(
       {
@@ -1690,28 +1712,28 @@ export async function createCoordinator(
         source: requested?.source ?? modelId,
         revision: requested?.revision ?? null,
       },
-      store.listWorkers(),
+      (await store.listWorkers()),
       connectedWorkerIds,
     );
   };
-  const benchmarkableActiveModelIds = (): string[] => {
+  const benchmarkableActiveModelIds = async (): Promise<string[]> => {
     const connectedWorkerIds = hub.connectedWorkerIds();
     const realDeploymentModels = new Set(
-      store.listWorkers()
+      (await store.listWorkers())
         .filter((worker) => connectedWorkerIds.has(worker.id))
         .flatMap((worker) => worker.capabilities.deployments)
         .filter((deployment) => deployment.adapter === "mycellios-pipeline")
         .map((deployment) => deployment.model),
     );
-    return scheduler
-      .listAvailableModels({ connectedWorkerIds })
+    return (await scheduler
+      .listAvailableModels({ connectedWorkerIds }))
       .map((model) => model.id)
       .filter((modelId) => realDeploymentModels.has(modelId));
   };
-  const currentBenchmarkActivations = (): BenchmarkActivation[] =>
+  const currentBenchmarkActivations = async (): Promise<BenchmarkActivation[]> =>
     coordinatorBenchmarkActivations(
-      new Set(benchmarkableActiveModelIds()),
-      store.listWorkers(),
+      new Set((await benchmarkableActiveModelIds())),
+      (await store.listWorkers()),
       hub.connectedWorkerIds(),
       coordinatorBuildIdentity,
     );
@@ -1727,17 +1749,17 @@ export async function createCoordinator(
     ...(benchmarkHistoryDirectory ? { historyDirectory: benchmarkHistoryDirectory } : {}),
     coordinatorUrl: `http://127.0.0.1:${config.port}`,
     model,
-    inventory: (routedWorkerIds) => buildCoordinatorBenchmarkInventory(
+    inventory: async (routedWorkerIds) => buildCoordinatorBenchmarkInventory(
       model.id,
-      store.listWorkers(),
+      (await store.listWorkers()),
       hub.connectedWorkerIds(),
       routedWorkerIds,
     ),
-    telemetrySnapshot: () => buildCoordinatorBenchmarkTelemetrySnapshot(
-      store.listWorkers(),
+    telemetrySnapshot: async () => buildCoordinatorBenchmarkTelemetrySnapshot(
+      (await store.listWorkers()),
       hub.connectedWorkerIds(),
     ),
-    resolveWorkerId: (jobId) => store.getJob(jobId)?.workerId ?? null,
+    resolveWorkerId: async (jobId) => (await store.getJob(jobId))?.workerId ?? null,
     ...(config.networkToken ? { networkToken: config.networkToken } : {}),
     buildIdentity: coordinatorBuildIdentity,
     ...(metadata.label ? { label: metadata.label } : {}),
@@ -1745,11 +1767,11 @@ export async function createCoordinator(
     ...(metadata.activation ? { activation: metadata.activation } : {}),
     ...(metadata.activation
       ? {
-          validateActivation: (
+          validateActivation: async (
             activation: BenchmarkActivation,
             routedWorkerIds: ReadonlySet<string>,
           ) => {
-            const current = currentBenchmarkActivations().find(
+            const current = (await currentBenchmarkActivations()).find(
               (candidate) => candidate.activationId === activation.activationId,
             );
             if (!current) {
@@ -1771,13 +1793,26 @@ export async function createCoordinator(
         }
       : {}),
     trigger,
-  }).then((result) => {
-    store.queueBenchmarkRun(result.run);
+    ...(trigger === "automatic-model-start" ? { fetchImpl: automaticBenchmarkPriority.fetch } : {}),
+  }).then(async (result) => {
+    (await store.queueBenchmarkRun(result.run));
     void persistence?.flush();
     return result;
   });
   const drainAutomaticBenchmarkQueue = (): void => {
     if (benchmarkRunInFlight) return;
+    const next = automaticBenchmarkQueue[0];
+    if (next && automaticBenchmarkPriority.deferred(next.model.id)) {
+      if (benchmarkDeferralTimer) return;
+      const timer = setTimeout(() => {
+        benchmarkDeferralTimer = null;
+        automaticBenchmarkRetryTimers.delete(timer);
+        drainAutomaticBenchmarkQueue();
+      }, 5_000);
+      automaticBenchmarkRetryTimers.add(timer);
+      benchmarkDeferralTimer = timer;
+      return;
+    }
     const queued = automaticBenchmarkQueue.shift();
     if (!queued) return;
     const { model, activation } = queued;
@@ -1811,9 +1846,9 @@ export async function createCoordinator(
         drainAutomaticBenchmarkQueue();
       });
   };
-  const queueAutomaticBenchmark = (activation: BenchmarkActivation): void => {
+  const queueAutomaticBenchmark = async (activation: BenchmarkActivation): Promise<void> => {
     if (queuedAutomaticBenchmarkActivations.has(activation.activationId)) return;
-    const model = benchmarkTargetForModel(activation.modelId);
+    const model = (await benchmarkTargetForModel(activation.modelId));
     if (model.digest !== activation.modelDigest) {
       app.log.warn(
         {
@@ -1827,6 +1862,7 @@ export async function createCoordinator(
       return;
     }
     queuedAutomaticBenchmarkActivations.add(activation.activationId);
+    automaticBenchmarkPriority.deferAfterActivation(model.id);
     automaticBenchmarkQueue.push({ model, activation });
     drainAutomaticBenchmarkQueue();
   };
@@ -1837,13 +1873,13 @@ export async function createCoordinator(
     if (attempts >= 2) return;
     automaticBenchmarkRetryAttempts.set(queued.activation.activationId, attempts + 1);
     const delayMs = attempts === 0 ? 30_000 : 120_000;
-    const timer = setTimeout(() => {
+    const timer = setTimeout(() => background.run("server:1867", async () => {
       automaticBenchmarkRetryTimers.delete(timer);
-      const current = currentBenchmarkActivations().find(
+      const current = (await currentBenchmarkActivations()).find(
         (activation) => activation.activationId === queued.activation.activationId,
       );
-      if (current) queueAutomaticBenchmark(current);
-    }, delayMs);
+      if (current) (await queueAutomaticBenchmark(current));
+    }, "setTimeout"), delayMs);
     timer.unref();
     automaticBenchmarkRetryTimers.add(timer);
   }
@@ -1855,7 +1891,7 @@ export async function createCoordinator(
     ?? DEFAULT_AUTOMATIC_ACTIVATION_RETRY_DELAYS_MS
   ).map((delay) => Math.max(0, Math.round(delay)));
   const automaticActivationRetryState = new Map<string, AutomaticActivationRetryState>(
-    deploymentController.listStates()
+    (await deploymentController.listStates())
       .filter((state) => state.nextRetryAt !== null && state.lastError !== null)
       .map((state) => [
         state.modelId,
@@ -1895,10 +1931,10 @@ export async function createCoordinator(
       details: [retry.lastError],
     }];
   };
-  const activationProgressForModel = (
+  const activationProgressForModel = async (
     modelId: string,
-  ): readonly ModelActivationProgressEvent[] => {
-    const managerProgress = activationManager?.activationProgressForModel?.(modelId) ?? [];
+  ): Promise<readonly ModelActivationProgressEvent[]> => {
+    const managerProgress = (await activationManager?.activationProgressForModel?.(modelId)) ?? [];
     const retryProgress = automaticActivationRetryProgressForModel(modelId);
     if (retryProgress.length === 0) return managerProgress;
     return [...managerProgress, ...retryProgress]
@@ -1929,11 +1965,11 @@ export async function createCoordinator(
       ? `${incident.title}. Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} starts in ${secondsRemaining}s.`
       : `Automatic retry ${retryNumber} of ${automaticActivationRetryDelaysMs.length} is ready and waiting for healthy capacity and a free activation slot.`;
   };
-  const activationIncidentForModel = (
+  const activationIncidentForModel = async (
     modelId: string,
-  ): ActivationIncident | null => {
+  ): Promise<ActivationIncident | null> => {
     const retry = automaticActivationRetryState.get(modelId);
-    const stored = store.getRequestedModel(modelId);
+    const stored = (await store.getRequestedModel(modelId));
     const message = retry?.lastError ?? stored?.activationError;
     if (!message) return null;
     return classifyActivationIncident({
@@ -1948,23 +1984,23 @@ export async function createCoordinator(
       maximumAttempts: automaticActivationRetryDelaysMs.length,
     });
   };
-  const handleRequestedModelActivationFailure = (
+  const handleRequestedModelActivationFailure = async (
     modelId: string,
     error: unknown,
-    operation: DeploymentOperation | null = deploymentController.activeOperationForModel(modelId),
-  ): void => {
-    if (!store.getRequestedModel(modelId)) return;
+    operation?: DeploymentOperation | null,
+  ): Promise<void> => {
+    if (!(await store.getRequestedModel(modelId))) return;
     const message = error instanceof Error ? error.message : String(error);
     if (!automaticActivationFailureIsTransient(message)) {
       automaticActivationRetryState.delete(modelId);
-      store.setRequestedModelActivationError(modelId, message);
+      (await store.setRequestedModelActivationError(modelId, message));
       if (operation) {
-        deploymentController.failOperation(
+        (await deploymentController.failOperation(
           operation.id,
           "activation_failed",
           message,
           { retryAt: null },
-        );
+        ));
       }
       return;
     }
@@ -1985,61 +2021,65 @@ export async function createCoordinator(
         runtimeVersion,
         message,
       );
-      store.setRequestedModelActivationError(modelId, exhausted);
+      (await store.setRequestedModelActivationError(modelId, exhausted));
       if (operation) {
-        deploymentController.failOperation(
+        (await deploymentController.failOperation(
           operation.id,
           "activation_retries_exhausted",
           exhausted,
           { retryAt: null },
-        );
+        ));
       }
       return;
     }
     automaticActivationRetryState.set(modelId, nextRetry);
-    store.setRequestedModelActivation(modelId, false);
+    (await store.setRequestedModelActivation(modelId, false));
     if (operation) {
-      deploymentController.failOperation(
+      (await deploymentController.failOperation(
         operation.id,
         "transient_activation_failure",
         message,
         { retryAt: nextRetry.nextAttemptAt },
-      );
+      ));
     }
   };
-  const launchRequestedModel = (model: StoredRequestedModel): boolean => {
-    if (!activationManager || activationManager.isManaging(model.id) || activationManager.isBusy()) {
+  let claimingRequestedActivation = false;
+  const launchRequestedModel = async (model: StoredRequestedModel): Promise<boolean> => {
+    if (!activationManager || claimingRequestedActivation || activationManager.isManaging(model.id) || activationManager.isBusy()) {
       return false;
     }
-    deploymentController.ensureModel(model);
-    deploymentController.setDesiredState(
-      model.id,
-      model.autoActivate ? "active" : "inactive",
-    );
-    const state = deploymentController.getState(model.id);
-    const operation = deploymentController.claimOperation(
-      model.id,
-      state?.observedState === "active" || state?.observedState === "degraded"
-        ? "repair"
-        : "activate",
-      { leaseMs: 90_000 },
-    );
-    if (!operation) return false;
+    claimingRequestedActivation = true;
     try {
-      void activationManager.activate(model)
-        .then(() => {
-          if (deploymentController.getState(model.id)?.observedState === "active") {
-            automaticActivationRetryState.delete(model.id);
-          }
-        })
-        .catch((error: unknown) => {
-          handleRequestedModelActivationFailure(model.id, error, operation);
-        });
-      return true;
-    } catch (error) {
-      handleRequestedModelActivationFailure(model.id, error, operation);
-      return true;
-    }
+      (await deploymentController.ensureModel(model));
+      (await deploymentController.setDesiredState(
+        model.id,
+        model.autoActivate ? "active" : "inactive",
+      ));
+      const state = (await deploymentController.getState(model.id));
+      const operation = (await deploymentController.claimOperation(
+        model.id,
+        state?.observedState === "active" || state?.observedState === "degraded"
+          ? "repair"
+          : "activate",
+        { leaseMs: 90_000 },
+      ));
+      if (!operation) return false;
+      try {
+        void activationManager.activate(model)
+          .then(async () => {
+            if ((await deploymentController.getState(model.id))?.observedState === "active") {
+              automaticActivationRetryState.delete(model.id);
+            }
+          })
+          .catch(async (error: unknown) => {
+            (await handleRequestedModelActivationFailure(model.id, error, operation));
+          });
+        return true;
+      } catch (error) {
+        (await handleRequestedModelActivationFailure(model.id, error, operation));
+        return true;
+      }
+    } finally { claimingRequestedActivation = false; }
   };
   const reconcileAutomaticGpuRepair = (
     model: StoredRequestedModel,
@@ -2074,20 +2114,20 @@ export async function createCoordinator(
       // health check and real inference canary before publishing it again.
       const stopped = await activationManager.deactivate(model.id);
       if (!stopped) return;
-      deploymentController.releaseRoutesForModel(model.id);
-      deploymentController.adoptObservedState(model.id, "degraded");
-      const latest = store.getRequestedModel(model.id);
+      (await deploymentController.releaseRoutesForModel(model.id));
+      (await deploymentController.adoptObservedState(model.id, "degraded"));
+      const latest = (await store.getRequestedModel(model.id));
       if (!latest?.autoActivate) return;
-      store.setRequestedModelActivation(model.id, true);
-      launchRequestedModel(store.getRequestedModel(model.id)!);
+      (await store.setRequestedModelActivation(model.id, true));
+      (await launchRequestedModel((await store.getRequestedModel(model.id))!));
     })().catch((error: unknown) => {
       app.log.warn({ modelId: model.id, error }, "automatic GPU repair could not be started");
     }).finally(() => {
       automaticRepairInFlight.delete(model.id);
     });
   };
-  const startInferenceRouteRepair = (modelId: string, reason: string): void => {
-    const requested = store.getRequestedModel(modelId);
+  const startInferenceRouteRepair = async (modelId: string, reason: string): Promise<void> => {
+    const requested = (await store.getRequestedModel(modelId));
     if (
       !activationManager ||
       !requested?.autoActivate ||
@@ -2099,12 +2139,12 @@ export async function createCoordinator(
       app.log.warn({ modelId, reason }, "rebuilding an unresponsive distributed model route");
       const stopped = await activationManager.deactivate(modelId);
       if (!stopped) return;
-      deploymentController.releaseRoutesForModel(modelId);
-      deploymentController.adoptObservedState(modelId, "degraded");
-      const latest = store.getRequestedModel(modelId);
+      (await deploymentController.releaseRoutesForModel(modelId));
+      (await deploymentController.adoptObservedState(modelId, "degraded"));
+      const latest = (await store.getRequestedModel(modelId));
       if (!latest?.autoActivate) return;
-      store.setRequestedModelActivation(modelId, true);
-      launchRequestedModel(store.getRequestedModel(modelId)!);
+      (await store.setRequestedModelActivation(modelId, true));
+      (await launchRequestedModel((await store.getRequestedModel(modelId))!));
     })().catch((error: unknown) => {
       app.log.warn(
         { modelId, reason, error: error instanceof Error ? error.message : String(error) },
@@ -2114,11 +2154,11 @@ export async function createCoordinator(
       automaticRepairInFlight.delete(modelId);
     });
   };
-  const modelsDependingOnExecutor = (workerId: string): string[] => {
-    const nodeId = store.getWorker(workerId)?.capabilities.distributedExecutor?.nodeId;
+  const modelsDependingOnExecutor = async (workerId: string, disconnectedNodeId?: string): Promise<string[]> => {
+    const nodeId = (await store.getWorker(workerId))?.capabilities.distributedExecutor?.nodeId ?? disconnectedNodeId;
     if (!nodeId) return [];
     return [...new Set(
-      store.listWorkers()
+      (await store.listWorkers())
         .filter((worker) => worker.identityKind === "cell")
         .flatMap((worker) => worker.capabilities.deployments)
         .filter((deployment) => deployment.execution?.stages?.some(
@@ -2127,16 +2167,18 @@ export async function createCoordinator(
         .map((deployment) => deployment.model),
     )];
   };
-  const reconcileRequestedModels = () => {
-    const workers = store.listWorkers();
+  const inferenceRouteRecovery = new InferenceRouteRecovery(hub, activationManager,
+    modelsDependingOnExecutor, startInferenceRouteRepair);
+  const reconcileRequestedModels = coalesceAsync(async () => {
+    const workers = (await store.listWorkers());
     const connectedWorkerIds = hub.connectedWorkerIds();
     const now = Date.now();
     const activeModelIds = new Set(
-      scheduler
-        .listAvailableModels({ connectedWorkerIds })
+      (await scheduler
+        .listAvailableModels({ connectedWorkerIds }))
         .map((model) => model.id),
     );
-    const benchmarkableRoutes = new Set(benchmarkableActiveModelIds());
+    const benchmarkableRoutes = new Set((await benchmarkableActiveModelIds()));
     const benchmarkableModelIds = new Set(
       [...activeModelIds].filter((modelId) => benchmarkableRoutes.has(modelId)),
     );
@@ -2146,19 +2188,19 @@ export async function createCoordinator(
       connectedWorkerIds,
     );
     for (const activation of benchmarkActivationTracker.observe(activations, now)) {
-      queueAutomaticBenchmark(activation);
+      (await queueAutomaticBenchmark(activation));
     }
-    let requests = store.listRequestedModels();
+    let requests = (await store.listRequestedModels());
     for (const request of requests) {
-      deploymentController.ensureModel(request, now);
-      deploymentController.setDesiredState(
+      (await deploymentController.ensureModel(request, now));
+      (await deploymentController.setDesiredState(
         request.id,
         request.autoActivate ? "active" : "inactive",
         now,
-      );
-      const operation = deploymentController.activeOperationForModel(request.id);
+      ));
+      const operation = (await deploymentController.activeOperationForModel(request.id));
       if (operation && activationManager?.isManaging(request.id)) {
-        deploymentController.renewOperation(operation.id, 90_000, now);
+        (await deploymentController.renewOperation(operation.id, 90_000, now));
       }
     }
     for (const request of requests) {
@@ -2177,11 +2219,11 @@ export async function createCoordinator(
         )
       ) {
         if (runtimeChangedFailure !== null) {
-          deploymentController.rearmAfterRuntimeChange(
+          (await deploymentController.rearmAfterRuntimeChange(
             request.id,
             runtimeChangedFailure,
             now,
-          );
+          ));
           const retry = nextAutomaticActivationRetry(
             0,
             runtimeChangedFailure,
@@ -2198,11 +2240,11 @@ export async function createCoordinator(
           );
           if (retry) automaticActivationRetryState.set(request.id, retry);
         }
-        store.clearRequestedModelActivationError(request.id);
+        (await store.clearRequestedModelActivationError(request.id));
       }
     }
-    requests = store.listRequestedModels();
-    const views = requestedModelCapacityViews({
+    requests = (await store.listRequestedModels());
+    const views = (await requestedModelCapacityViews({
       requests,
       workers,
       connectedWorkerIds,
@@ -2218,29 +2260,29 @@ export async function createCoordinator(
         : {}),
       activationIncidentForModel,
       activationAvailable: activationManager !== undefined,
-    });
+    }));
     for (const view of views) {
       const stored = requests.find((request) => request.id === view.id)!;
       if (view.status === "active") {
         automaticActivationRetryState.delete(view.id);
-        if (stored.activationError) store.clearRequestedModelActivationError(view.id);
-        const operation = deploymentController.activeOperationForModel(view.id);
+        if (stored.activationError) (await store.clearRequestedModelActivationError(view.id));
+        const operation = (await deploymentController.activeOperationForModel(view.id));
         if (operation) {
-          deploymentController.completeOperation(
+          (await deploymentController.completeOperation(
             operation.id,
             "active",
             { publication: "scheduler-observed-active" },
             now,
-          );
+          ));
         } else {
-          deploymentController.adoptObservedState(view.id, "active", now);
+          (await deploymentController.adoptObservedState(view.id, "active", now));
         }
-        deploymentController.renewCommittedRoutesForModel(view.id, 90_000, now);
+        (await deploymentController.renewCommittedRoutesForModel(view.id, 90_000, now));
       } else if (
         view.status === "waiting_capacity"
-        && !deploymentController.activeOperationForModel(view.id)
+        && !(await deploymentController.activeOperationForModel(view.id))
       ) {
-        deploymentController.markWaitingCapacity(view.id, view.message, now);
+        (await deploymentController.markWaitingCapacity(view.id, view.message, now));
       }
       if (shouldQueueAutomaticActivation(view)) {
         const retry = automaticActivationRetryState.get(view.id);
@@ -2262,15 +2304,15 @@ export async function createCoordinator(
             launching: true,
           };
           automaticActivationRetryState.set(view.id, launchingRetry);
-          store.setRequestedModelActivation(view.id, true);
-          if (!launchRequestedModel(store.getRequestedModel(view.id)!)) {
+          (await store.setRequestedModelActivation(view.id, true));
+          if (!(await launchRequestedModel((await store.getRequestedModel(view.id))!))) {
             automaticActivationRetryState.set(view.id, retry);
-            store.setRequestedModelActivation(view.id, false);
+            (await store.setRequestedModelActivation(view.id, false));
           }
           continue;
         }
-        store.setRequestedModelActivation(view.id, true);
-        launchRequestedModel(store.getRequestedModel(view.id)!);
+        (await store.setRequestedModelActivation(view.id, true));
+        (await launchRequestedModel((await store.getRequestedModel(view.id))!));
       } else if (
         view.status === "activating" &&
         stored.activationRequestedAt !== null &&
@@ -2278,18 +2320,18 @@ export async function createCoordinator(
         !activationManager.isManaging(view.id) &&
         !activationManager.isBusy()
       ) {
-        launchRequestedModel(stored);
+        (await launchRequestedModel(stored));
       } else if (
         stored.activationRequestedAt !== null &&
         (view.status === "waiting_capacity" || view.status === "incompatible" || view.status === "failed")
       ) {
-        store.setRequestedModelActivation(view.id, false);
+        (await store.setRequestedModelActivation(view.id, false));
       }
     }
     for (const model of requests) {
       reconcileAutomaticGpuRepair(model, activeModelIds, workers, connectedWorkerIds);
     }
-  };
+  });
   hub.on("envelope", (envelope) => {
     if (envelope.type === "contribution.ack") {
       const acknowledgement = contributionAckEnvelopeSchema.parse(envelope);
@@ -2298,19 +2340,19 @@ export async function createCoordinator(
         acknowledgement.payload,
       );
     }
-    if (envelope.type === "worker.heartbeat") queueMicrotask(reconcileRequestedModels);
+    if (envelope.type === "worker.heartbeat") queueMicrotask(() => background.run("requested-models:reconcile", reconcileRequestedModels));
   });
-  hub.on("disconnect", (workerId) => {
-    for (const modelId of modelsDependingOnExecutor(workerId)) {
-      startInferenceRouteRepair(modelId, `pipeline_stage_disconnected:${workerId}`);
+  hub.on("disconnect", (workerId, details) => background.run("server:2332", async () => {
+    for (const modelId of (await modelsDependingOnExecutor(workerId, details?.nodeId))) {
+      inferenceRouteRecovery.requestRepair(modelId, `pipeline_stage_disconnected:${workerId}`);
     }
-    queueMicrotask(reconcileRequestedModels);
-  });
-  service.on("healthy", ({ model }) => {
+    queueMicrotask(() => background.run("requested-models:reconcile", reconcileRequestedModels));
+  }, "hub.on"));
+  service.on("healthy", ({ model }) => background.run("server:2338", async () => {
     inferenceRouteFailures.delete(model);
-    studioAgents.activateCompatibleWaiting(model);
-  });
-  service.on("degraded", ({ model, code, jobId, workerId }) => {
+    (await studioAgents.activateCompatibleWaiting(model));
+  }, "service.on"));
+  service.on("degraded", ({ model, code, jobId, workerId }) => background.run("server:2342", async () => {
     const now = Date.now();
     const previous = inferenceRouteFailures.get(model);
     const count = previous && now - previous.lastAt <= 5 * 60_000
@@ -2321,56 +2363,56 @@ export async function createCoordinator(
       { modelId: model, code, jobId, workerId, consecutiveFailures: count },
       "distributed inference route degraded before its first token",
     );
-    const routeWorker = workerId ? store.getWorker(workerId) : null;
+    const routeWorker = workerId ? (await store.getWorker(workerId)) : null;
     const definitelyBrokenCellRoute =
       code === "adapter_error" && routeWorker?.identityKind === "cell";
     if (definitelyBrokenCellRoute || count >= 2) {
       inferenceRouteFailures.delete(model);
-      startInferenceRouteRepair(model, `${code}:${jobId}`);
+      inferenceRouteRecovery.requestRepair(model, `${code}:${jobId}`);
     }
-  });
-  const staleTimer = setInterval(() => {
-    store.markStaleWorkers();
-    hub.closeStaleConnections();
+  }, "service.on"));
+  const staleTimer = setInterval(() => background.run("server:2361", async () => {
+    (await store.markStaleWorkers());
+    (await hub.closeStaleConnections());
     mobileHub.expireDisconnectedWorkers();
-    void activationManager?.refresh();
+    (await activationManager?.refresh());
     if (options.engineRuntimeProfileReconciliation === true) {
-      const activePlans = activeEngineRuntimeActivationPlans(
-        store.listEngineRuntimeActivationPlans(),
+      const activePlans = (await activeEngineRuntimeActivationPlans(
+        (await store.listEngineRuntimeActivationPlans()),
         deploymentController,
-      );
-      hub.reconcileEngineRuntimeProfileChallenges(activePlans.map((plan) => ({
+      ));
+      (await hub.reconcileEngineRuntimeProfileChallenges(activePlans.map((plan) => ({
         workerId: plan.workerId,
         request: plan.request,
-      })));
+      }))));
     }
-    reconcileRequestedModels();
-  }, 5_000);
+    (await reconcileRequestedModels());
+  }, "setInterval"), 5_000);
   staleTimer.unref();
-  const captureNetworkTelemetry = (now = Date.now()) => {
-    reconcileRequestedModels();
-    const snapshot = publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
+  const captureNetworkTelemetry = async (now = Date.now()) => {
+    (await reconcileRequestedModels());
+    const snapshot = (await publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
       activationProgressForModel,
       activationStatusMessageForModel,
       activationIncidentForModel,
-    }, runtimeVersion, coordinatorBuildIdentity);
+    }, runtimeVersion, coordinatorBuildIdentity));
     const capturedAt = Math.floor(now / NETWORK_TELEMETRY_INTERVAL_MS)
       * NETWORK_TELEMETRY_INTERVAL_MS;
-    store.recordNetworkTelemetrySample(networkTelemetrySample(snapshot, capturedAt));
-    store.pruneNetworkTelemetrySamples(
+    (await store.recordNetworkTelemetrySample(networkTelemetrySample(snapshot, capturedAt)));
+    (await store.pruneNetworkTelemetrySamples(
       now - NETWORK_TELEMETRY_RETENTION_DAYS * 24 * 60 * 60_000,
-    );
+    ));
     return snapshot;
   };
-  captureNetworkTelemetry();
+  (await captureNetworkTelemetry());
   const networkTelemetryTimer = setInterval(
-    () => captureNetworkTelemetry(),
+    () => background.run("server:2396", async () => (await captureNetworkTelemetry()), "setInterval"),
     NETWORK_TELEMETRY_INTERVAL_MS,
   );
   networkTelemetryTimer.unref();
 
   app.get("/health", async () => {
-    const workers = store.listWorkers();
+    const workers = (await store.listWorkers());
     const mobileWorkers = mobileHub.listWorkers();
     return {
       status: "ok",
@@ -2393,12 +2435,12 @@ export async function createCoordinator(
         distributedActivation: activationManager !== undefined,
         apiAccess: apiAccessEnabled,
       },
-      persistence: persistence?.status() ?? {
+      persistence: (await persistence?.status()) ?? {
         configured: false,
         connected: false,
         required: false,
-        pendingChanges: database.pendingRemoteChangeCount(),
-        pendingArtifacts: database.pendingArtifactBackupCount(),
+        pendingChanges: (await database.pendingRemoteChangeCount()),
+        pendingArtifacts: (await database.pendingArtifactBackupCount()),
         lastSuccessfulSyncAt: null,
         lastError: null,
       },
@@ -2427,7 +2469,7 @@ export async function createCoordinator(
     }
     const user = await supabaseAuth.authenticate(token);
     if (!user) return reply.code(401).send({ error: { code: "invalid_access_token" } });
-    const account = apiAccess.getOrCreateAccount(user.id);
+    const account = (await apiAccess.getOrCreateAccount(user.id));
     return { user, account: apiAccountJson(account, apiAccess.limits) };
   });
 
@@ -2442,7 +2484,7 @@ export async function createCoordinator(
       });
     }
     return { object: "account", ...apiAccountJson(
-      apiAccess.getOrCreateAccount(principal.userId),
+      (await apiAccess.getOrCreateAccount(principal.userId)),
       apiAccess.limits,
     ) };
   });
@@ -2468,7 +2510,7 @@ export async function createCoordinator(
   app.get("/v1/studio/agents", async (request, reply) => {
     const ownerId = studioOwner(request, reply);
     if (!ownerId) return;
-    return { object: "list", data: studioAgents.list(ownerId) };
+    return { object: "list", data: (await studioAgents.list(ownerId)) };
   });
 
   app.post("/v1/studio/agents", async (request, reply) => {
@@ -2476,17 +2518,17 @@ export async function createCoordinator(
     if (!ownerId) return;
     const input = studioAgentCreateSchema.parse(request.body);
     try {
-      return reply.code(201).send(studioAgents.create({ ownerId, ...input }));
-    } catch (error) { return studioError(reply, error); }
+      return reply.code(201).send((await studioAgents.create({ ownerId, ...input })));
+    } catch (error) { return (await studioError(reply, error)); }
   });
 
   app.get("/v1/studio/agents/:agentId", async (request, reply) => {
     const ownerId = studioOwner(request, reply);
     if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
-    const agent = studioAgents.get(agentId, ownerId);
+    const agent = (await studioAgents.get(agentId, ownerId));
     if (!agent) return reply.code(404).send({ error: { code: "studio_agent_not_found" } });
-    return { agent, revisions: studioAgents.revisions(agentId, ownerId), deployments: studioAgents.deployments(agentId, ownerId) };
+    return { agent, revisions: (await studioAgents.revisions(agentId, ownerId)), deployments: (await studioAgents.deployments(agentId, ownerId)) };
   });
 
   app.patch("/v1/studio/agents/:agentId/draft", async (request, reply) => {
@@ -2494,8 +2536,8 @@ export async function createCoordinator(
     if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
     const input = studioAgentUpdateSchema.parse(request.body);
-    try { return studioAgents.update(agentId, ownerId, input.expectedVersion, input.configuration); }
-    catch (error) { return studioError(reply, error); }
+    try { return (await studioAgents.update(agentId, ownerId, input.expectedVersion, input.configuration)); }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.post("/v1/studio/agents/:agentId/publish", async (request, reply) => {
@@ -2503,74 +2545,74 @@ export async function createCoordinator(
     if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
     const input = studioPublishRequestSchema.parse(request.body);
-    const agent = studioAgents.get(agentId, ownerId);
-    const hasCapacity = Boolean(agent && service.hasCapacity({ model: agent.configuration.modelPolicy.preferredModel, messages: [{ role: "user", content: "capacity" }], max_tokens: 1 }));
-    try { return studioAgents.publish({ agentId, ownerId, hasCapacity, ...input }); }
-    catch (error) { return studioError(reply, error); }
+    const agent = (await studioAgents.get(agentId, ownerId));
+    const hasCapacity = Boolean(agent && (await service.hasCapacity({ model: agent.configuration.modelPolicy.preferredModel, messages: [{ role: "user", content: "capacity" }], max_tokens: 1 })));
+    try { return (await studioAgents.publish({ agentId, ownerId, hasCapacity, ...input })); }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.post("/v1/studio/agents/:agentId/rollback", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
     const input = studioRollbackRequestSchema.parse(request.body);
-    const revision = studioAgents.revision(input.revisionId, agentId, ownerId);
-    const hasCapacity = service.hasCapacity({ model: revision.configuration.modelPolicy.preferredModel, messages: [{ role: "user", content: "capacity" }], max_tokens: 1 });
-    try { return studioAgents.rollback({ agentId, ownerId, hasCapacity, ...input }); } catch (error) { return studioError(reply, error); }
+    const revision = (await studioAgents.revision(input.revisionId, agentId, ownerId));
+    const hasCapacity = (await service.hasCapacity({ model: revision.configuration.modelPolicy.preferredModel, messages: [{ role: "user", content: "capacity" }], max_tokens: 1 }));
+    try { return (await studioAgents.rollback({ agentId, ownerId, hasCapacity, ...input })); } catch (error) { return (await studioError(reply, error)); }
   });
 
   app.delete("/v1/studio/agents/:agentId", async (request, reply) => {
     const ownerId = studioOwner(request, reply);
     if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
-    try { return studioAgents.archive(agentId, ownerId); }
-    catch (error) { return studioError(reply, error); }
+    try { return (await studioAgents.archive(agentId, ownerId)); }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.post("/v1/studio/agents/:agentId/knowledge", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
-    try { return reply.code(201).send(studioContext.ingestText({ ownerId, agentId, ...studioKnowledgeIngestSchema.parse(request.body) })); }
-    catch (error) { return studioError(reply, error); }
+    try { return reply.code(201).send((await studioContext.ingestText({ ownerId, agentId, ...studioKnowledgeIngestSchema.parse(request.body) }))); }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.delete("/v1/studio/agents/:agentId/knowledge/:sourceId", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { agentId, sourceId } = request.params as { agentId: string; sourceId: string };
-    try { studioContext.deleteSource(ownerId, agentId, sourceId); return reply.code(204).send(); }
-    catch (error) { return studioError(reply, error); }
+    try { (await studioContext.deleteSource(ownerId, agentId, sourceId)); return reply.code(204).send(); }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.get("/v1/studio/agents/:agentId/memory", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
     const { subjectId = "owner" } = request.query as { subjectId?: string };
-    try { return { object: "list", data: studioContext.listFacts(ownerId, agentId, subjectId) }; }
-    catch (error) { return studioError(reply, error); }
+    try { return { object: "list", data: (await studioContext.listFacts(ownerId, agentId, subjectId)) }; }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.post("/v1/studio/agents/:agentId/memory", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { agentId } = request.params as { agentId: string };
-    try { return reply.code(201).send(studioContext.addFact({ ownerId, agentId, ...studioMemoryFactCreateSchema.parse(request.body) })); }
-    catch (error) { return studioError(reply, error); }
+    try { return reply.code(201).send((await studioContext.addFact({ ownerId, agentId, ...studioMemoryFactCreateSchema.parse(request.body) }))); }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.post("/v1/studio/agents/:agentId/memory/:factId/approve", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { agentId, factId } = request.params as { agentId: string; factId: string };
-    try { return studioContext.approveFact(ownerId, agentId, factId); } catch (error) { return studioError(reply, error); }
+    try { return (await studioContext.approveFact(ownerId, agentId, factId)); } catch (error) { return (await studioError(reply, error)); }
   });
 
   app.delete("/v1/studio/agents/:agentId/memory/:factId", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { agentId, factId } = request.params as { agentId: string; factId: string };
-    try { studioContext.deleteFact(ownerId, agentId, factId); return reply.code(204).send(); } catch (error) { return studioError(reply, error); }
+    try { (await studioContext.deleteFact(ownerId, agentId, factId)); return reply.code(204).send(); } catch (error) { return (await studioError(reply, error)); }
   });
 
   app.delete("/v1/studio/deployments/:deploymentId", async (request, reply) => {
     const ownerId = studioOwner(request, reply); if (!ownerId) return;
     const { deploymentId } = request.params as { deploymentId: string };
-    try { return studioAgents.revokeDeployment(deploymentId, ownerId); } catch (error) { return studioError(reply, error); }
+    try { return (await studioAgents.revokeDeployment(deploymentId, ownerId)); } catch (error) { return (await studioError(reply, error)); }
   });
 
   app.post("/v1/studio/deployments/:deploymentId/telegram", async (request, reply) => {
@@ -2579,9 +2621,9 @@ export async function createCoordinator(
     const body = request.body as { secret?: unknown; allowedChats?: unknown };
     try {
       if (typeof body?.secret !== "string" || !Array.isArray(body.allowedChats) || body.allowedChats.some((item) => typeof item !== "string")) throw new StudioAgentError("studio_telegram_policy_invalid", "Telegram policy is invalid.");
-      studioRuntime.configureTelegram({ deploymentId, ownerId, secret: body.secret, allowedChats: body.allowedChats as string[] });
+      (await studioRuntime.configureTelegram({ deploymentId, ownerId, secret: body.secret, allowedChats: body.allowedChats as string[] }));
       return reply.code(204).send();
-    } catch (error) { return studioError(reply, error); }
+    } catch (error) { return (await studioError(reply, error)); }
   });
 
   const invokeStudio = async (
@@ -2625,7 +2667,7 @@ export async function createCoordinator(
     const release = claimPublicCatalogRequest(studioPublicRateLimits, rateKey);
     if (!release) return reply.code(429).send({ error: { code: "studio_rate_limit_exceeded", message: "Too many Studio requests." } });
     try { return await invokeStudio(reply, { publicId, channel: "web", ...studioInvocationSchema.parse(request.body) }); }
-    catch (error) { return studioError(reply, error); }
+    catch (error) { return (await studioError(reply, error)); }
     finally { release(); }
   });
 
@@ -2633,10 +2675,10 @@ export async function createCoordinator(
     const principal = principalFor(request);
     if (principal.kind === "system") return reply.code(403).send({ error: { code: "account_identity_required" } });
     const { publicId } = request.params as { publicId: string };
-    const deployment = studioAgents.deploymentByPublicId(publicId, "api");
+    const deployment = (await studioAgents.deploymentByPublicId(publicId, "api"));
     if (!deployment || deployment.ownerId !== principal.userId) return reply.code(404).send({ error: { code: "studio_deployment_not_found" } });
     try { return await invokeStudio(reply, { publicId, channel: "api", ...studioInvocationSchema.parse(request.body) }); }
-    catch (error) { return studioError(reply, error); }
+    catch (error) { return (await studioError(reply, error)); }
   });
 
   app.post("/public/v1/studio/telegram/:publicId", async (request, reply) => {
@@ -2649,7 +2691,7 @@ export async function createCoordinator(
       return result.replayed
         ? { ok: true, replayed: true }
         : { method: "sendMessage", chat_id: body.message.chat.id, text: result.text };
-    } catch (error) { return studioError(reply, error); }
+    } catch (error) { return (await studioError(reply, error)); }
   });
 
   const billingSessionPrincipal = (request: FastifyRequest) => {
@@ -2666,14 +2708,14 @@ export async function createCoordinator(
         },
       });
     }
-    const plan = billing.getPlan("mycellios-go", 1);
-    const subscription = billing.getSubscription(principal.userId);
+    const plan = (await billing.getPlan("mycellios-go", 1));
+    const subscription = (await billing.getSubscription(principal.userId));
     return {
       object: "billing_account",
       checkoutAvailable: Boolean(billingCheckout),
-      portalAvailable: Boolean(billingCheckout?.hasCustomer(principal.userId)),
+      portalAvailable: Boolean((await billingCheckout?.hasCustomer(principal.userId))),
       topUpsAvailable: billingCheckout?.hasTopUpPacks() ?? false,
-      tokenDebt: billing.getTokenDebt(principal.userId),
+      tokenDebt: (await billing.getTokenDebt(principal.userId)),
       plan: plan ? {
         id: plan.planId,
         version: plan.version,
@@ -2887,13 +2929,13 @@ export async function createCoordinator(
   app.get("/v1/seller", async (request, reply) => {
     const principal = sellerSessionPrincipal(request, reply);
     if (!principal) return;
-    const available = sellerEarnings.listAvailable(principal.userId);
+    const available = (await sellerEarnings.listAvailable(principal.userId));
     return {
       object: "seller_account",
       sellerId: principal.userId,
-      payoutPreference: sellerEarnings.getPayoutPreference(principal.userId),
+      payoutPreference: (await sellerEarnings.getPayoutPreference(principal.userId)),
       availableUsdMicros: available.reduce((sum, earning) => sum + earning.amountUsdMicros, 0),
-      debtUsdMicros: sellerEarnings.getSellerDebt(principal.userId),
+      debtUsdMicros: (await sellerEarnings.getSellerDebt(principal.userId)),
     };
   });
 
@@ -2905,7 +2947,7 @@ export async function createCoordinator(
     }).parse(request.query);
     return {
       object: "list",
-      data: sellerEarnings.list(principal.userId, query.limit),
+      data: (await sellerEarnings.list(principal.userId, query.limit)),
     };
   });
 
@@ -2931,11 +2973,11 @@ export async function createCoordinator(
         throw error;
       }
     }
-    sellerEarnings.setPayoutPreference(principal.userId, body.method);
+    (await sellerEarnings.setPayoutPreference(principal.userId, body.method));
     return {
       object: "seller_payout_preference",
       sellerId: principal.userId,
-      method: sellerEarnings.getPayoutPreference(principal.userId),
+      method: (await sellerEarnings.getPayoutPreference(principal.userId)),
       appliesTo: "future_earnings",
     };
   });
@@ -2943,8 +2985,8 @@ export async function createCoordinator(
   app.get("/v1/seller/payout-destinations", async (request, reply) => {
     const principal = sellerSessionPrincipal(request, reply);
     if (!principal) return;
-    const data = (["stable", "spore"] as const).flatMap((method) => {
-      const destination = sellerDestinations.active(principal.userId, method);
+    const data = (await flatMapAsync((["stable", "spore"] as const), async (method) => {
+      const destination = (await sellerDestinations.active(principal.userId, method));
       return destination ? [{
         id: destination.id,
         payoutMethod: destination.payoutMethod,
@@ -2953,7 +2995,7 @@ export async function createCoordinator(
         verifiedAt: destination.verifiedAt,
         expiresAt: destination.expiresAt,
       }] : [];
-    });
+    }));
     return { object: "list", data };
   });
 
@@ -2980,7 +3022,7 @@ export async function createCoordinator(
       return reply.code(403).send({ error: { code: "destination_owner_conflict" } });
     }
     try {
-      const destination = sellerDestinations.record(body);
+      const destination = (await sellerDestinations.record(body));
       return reply.code(201).send({
         object: "seller_payout_destination",
         id: destination.id,
@@ -3002,7 +3044,7 @@ export async function createCoordinator(
     const principal = sellerSessionPrincipal(request, reply);
     if (!principal) return;
     const { method } = z.object({ method: z.enum(["stable", "spore"]) }).parse(request.params);
-    if (!sellerDestinations.revoke(principal.userId, method)) {
+    if (!(await sellerDestinations.revoke(principal.userId, method))) {
       return reply.code(404).send({ error: { code: "payout_destination_not_found" } });
     }
     return reply.code(204).send();
@@ -3019,7 +3061,7 @@ export async function createCoordinator(
     }).parse(request.query);
     return {
       object: "list",
-      data: sellerPayouts.listSellerBatches(principal.userId, query.limit).map(sellerPayoutJson),
+      data: (await sellerPayouts.listSellerBatches(principal.userId, query.limit)).map(sellerPayoutJson),
     };
   });
 
@@ -3039,12 +3081,12 @@ export async function createCoordinator(
     }).strict().parse(request.body);
     let result;
     try {
-      result = sellerPayouts.prepare({
+      result = (await sellerPayouts.prepare({
         sellerId: principal.userId,
         payoutMethod: body.payoutMethod,
         earningIds: body.earningIds,
         idempotencyKey,
-      });
+      }));
     } catch (error) {
       if (error instanceof PayoutError) {
         return reply.code(error.code.startsWith("invalid_") ? 400 : 409).send({
@@ -3067,7 +3109,7 @@ export async function createCoordinator(
       return reply.code(503).send({ error: { code: "seller_payouts_not_configured" } });
     }
     const { batchId } = z.object({ batchId: z.string().min(1).max(192) }).parse(request.params);
-    const batch = sellerPayouts.getBatch(batchId);
+    const batch = (await sellerPayouts.getBatch(batchId));
     if (!batch || batch.sellerId !== principal.userId) {
       return reply.code(404).send({ error: { code: "payout_not_found" } });
     }
@@ -3081,11 +3123,11 @@ export async function createCoordinator(
       return reply.code(503).send({ error: { code: "spore_conversion_not_configured" } });
     }
     const { batchId } = z.object({ batchId: z.string().min(1).max(192) }).parse(request.params);
-    const batch = sellerPayouts.getBatch(batchId);
+    const batch = (await sellerPayouts.getBatch(batchId));
     if (!batch || batch.sellerId !== principal.userId || batch.payoutMethod !== "spore") {
       return reply.code(404).send({ error: { code: "payout_not_found" } });
     }
-    const quote = sporeConversionQuotes.getByBatchId(batchId);
+    const quote = (await sporeConversionQuotes.getByBatchId(batchId));
     if (!quote) return reply.code(404).send({ error: { code: "spore_quote_not_found" } });
     return {
       object: "spore_conversion_quote",
@@ -3100,12 +3142,12 @@ export async function createCoordinator(
       return reply.code(503).send({ error: { code: "seller_payouts_not_configured" } });
     }
     const { batchId } = z.object({ batchId: z.string().min(1).max(192) }).parse(request.params);
-    const existing = sellerPayouts.getBatch(batchId);
+    const existing = (await sellerPayouts.getBatch(batchId));
     if (!existing || existing.sellerId !== principal.userId) {
       return reply.code(404).send({ error: { code: "payout_not_found" } });
     }
     try {
-      const result = sellerPayouts.cancelPrepared(batchId);
+      const result = (await sellerPayouts.cancelPrepared(batchId));
       return {
         object: "seller_payout",
         duplicate: result.duplicate,
@@ -3128,7 +3170,7 @@ export async function createCoordinator(
       return reply.code(403).send({ error: { code: "node_enrollment_account_mismatch" } });
     }
     try {
-      return reply.code(201).send(nodeEnrollments.issue({
+      return reply.code(201).send((await nodeEnrollments.issue({
         accountId: principal.userId,
         actor: {
           kind: "account",
@@ -3136,9 +3178,9 @@ export async function createCoordinator(
           scopes: ["node:identity"],
         },
         expiresInSeconds: input.expiresInSeconds,
-      }));
+      })));
     } catch (error) {
-      return sendNodeEnrollmentError(reply, error);
+      return (await sendNodeEnrollmentError(reply, error));
     }
   });
 
@@ -3149,14 +3191,14 @@ export async function createCoordinator(
     }
     const { enrollmentId } = z.object({ enrollmentId: z.string().uuid() }).strict().parse(request.params);
     try {
-      nodeEnrollments.confirm({
+      (await nodeEnrollments.confirm({
         enrollmentId,
         accountId: principal.userId,
         actorId: principal.userId,
-      });
+      }));
       return reply.code(204).send();
     } catch (error) {
-      return sendNodeEnrollmentError(reply, error);
+      return (await sendNodeEnrollmentError(reply, error));
     }
   });
 
@@ -3167,7 +3209,7 @@ export async function createCoordinator(
     const input = workerCredentialRecoveryChallengeRequestSchema.parse(request.body);
     if (input.identity.id !== identityId) return reply.code(403).send({ error: { code: "worker_recovery_identity_mismatch" } });
     try {
-      return reply.code(201).send(workerAdmission.issueRecovery(input, principal.userId));
+      return reply.code(201).send((await workerAdmission.issueRecovery(input, principal.userId)));
     } catch (error) {
       if (!(error instanceof WorkerAdmissionError)) throw error;
       return reply.code(error.statusCode).send({ error: { code: error.code, message: error.message } });
@@ -3184,7 +3226,7 @@ export async function createCoordinator(
     }).strict().parse(request.body);
     if (input.identity.kind !== "device" || input.identity.id !== identityId) return reply.code(403).send({ error: { code: "worker_recovery_identity_mismatch" } });
     try {
-      return reply.code(200).send(workerAdmission.verifyRecovery(input.identity, input.proof, principal.userId));
+      return reply.code(200).send((await workerAdmission.verifyRecovery(input.identity, input.proof, principal.userId)));
     } catch (error) {
       if (!(error instanceof WorkerAdmissionError)) throw error;
       return reply.code(error.statusCode).send({ error: { code: error.code, message: error.message } });
@@ -3202,22 +3244,22 @@ export async function createCoordinator(
       confirmation: z.string().min(1).max(128),
     }).strict().parse(request.body);
     if (body.confirmation !== identityId) return reply.code(400).send({ error: { code: "node_revocation_confirmation_mismatch" } });
-    const ownership = database.getNodeOwnership("device", identityId);
+    const ownership = (await database.getNodeOwnership("device", identityId));
     if (!ownership || ownership.accountId !== principal.userId) return reply.code(404).send({ error: { code: "node_not_found" } });
-    const result = database.revokeWorkerAdmissionCredential({ identityKind: "device", identityId,
+    const result = (await database.revokeWorkerAdmissionCredential({ identityKind: "device", identityId,
       expectedFingerprint: body.expectedFingerprint, reason: body.reason,
-      actor: { kind: "account", id: principal.userId } });
+      actor: { kind: "account", id: principal.userId } }));
     if (result.state === "not_found") return reply.code(404).send({ error: { code: "worker_credential_unknown" } });
     if (result.state === "fingerprint_mismatch") return reply.code(409).send({ error: { code: "worker_credential_changed" } });
     let disconnected = 0;
     let affectedLeases = 0;
-    for (const worker of store.listWorkers()) {
+    for (const worker of (await store.listWorkers())) {
       if (worker.identityKind !== "device" || worker.identityId !== identityId) continue;
-      affectedLeases += store.listActiveJobsForWorker(worker.id).length;
-      if (hub.removeWorker(worker.id, "node credential revoked")) disconnected += 1;
+      affectedLeases += (await store.listActiveJobsForWorker(worker.id)).length;
+      if ((await hub.removeWorker(worker.id, "node credential revoked"))) disconnected += 1;
     }
     return reply.code(200).send({ state: result.state, identityId,
-      generation: database.getNodeOwnership("device", identityId)?.generation,
+      generation: (await database.getNodeOwnership("device", identityId))?.generation,
       disconnected, affectedLeases });
   });
 
@@ -3234,9 +3276,9 @@ export async function createCoordinator(
     }).strict().parse(request.body);
     if (body.confirmation !== identityId) return reply.code(400).send({ error: { code: "node_transfer_confirmation_mismatch" } });
     try {
-      return reply.code(201).send(nodeOwnershipTransfers.create({ nodeId: identityId,
+      return reply.code(201).send((await nodeOwnershipTransfers.create({ nodeId: identityId,
         sourceAccountId: principal.userId, targetAccountId: body.targetAccountId,
-        expectedGeneration: body.expectedGeneration, expiresInSeconds: body.expiresInSeconds }));
+        expectedGeneration: body.expectedGeneration, expiresInSeconds: body.expiresInSeconds })));
     } catch (error) {
       const code = error instanceof Error ? error.message : "node_transfer_failed";
       const status = code.endsWith("_mismatch") ? 404 : code.endsWith("_conflict") ? 409 : 400;
@@ -3252,10 +3294,10 @@ export async function createCoordinator(
     const body = z.object({ nodeId: z.string().min(1).max(128), transferToken: z.string().min(32).max(256), confirmation: z.string().min(1).max(128) }).strict().parse(request.body);
     if (body.confirmation !== body.nodeId) return reply.code(400).send({ error: { code: "node_transfer_confirmation_mismatch" } });
     try {
-      const result = nodeOwnershipTransfers.accept({ transferId, transferToken: body.transferToken,
-        targetAccountId: principal.userId, nodeId: body.nodeId });
-      for (const worker of store.listWorkers()) {
-        if (worker.identityKind === "device" && worker.identityId === body.nodeId) hub.removeWorker(worker.id, "node ownership transferred");
+      const result = (await nodeOwnershipTransfers.accept({ transferId, transferToken: body.transferToken,
+        targetAccountId: principal.userId, nodeId: body.nodeId }));
+      for (const worker of (await store.listWorkers())) {
+        if (worker.identityKind === "device" && worker.identityId === body.nodeId) (await hub.removeWorker(worker.id, "node ownership transferred"));
       }
       return reply.code(200).send(result);
     } catch (error) {
@@ -3271,7 +3313,7 @@ export async function createCoordinator(
     const principal = principalFor(request);
     if (principal.kind !== "user") return reply.code(403).send({ error: { code: "account_session_required" } });
     const { identityId } = z.object({ identityId: z.string().min(1).max(256) }).strict().parse(request.params);
-    const ownership = database.getNodeOwnership("device", identityId);
+    const ownership = (await database.getNodeOwnership("device", identityId));
     if (!ownership || ownership.accountId !== principal.userId || ownership.status !== "active") {
       return reply.code(404).send({ error: { code: "node_not_found" } });
     }
@@ -3281,7 +3323,7 @@ export async function createCoordinator(
       return reply.code(403).send({ error: { code: "node_command_actor_mismatch" } });
     }
     try {
-      return reply.code(202).send(nodeCommands.enqueue(command, ownership.generation));
+      return reply.code(202).send((await nodeCommands.enqueue(command, ownership.generation)));
     } catch (error) {
       const code = error instanceof Error ? error.message : "node_command_invalid";
       return reply.code(code.endsWith("conflict") || code.endsWith("replay") ? 409 : 400).send({ error: { code } });
@@ -3292,11 +3334,11 @@ export async function createCoordinator(
     const principal = principalFor(request);
     if (principal.kind !== "user") return reply.code(403).send({ error: { code: "account_session_required" } });
     const { identityId } = z.object({ identityId: z.string().min(1).max(256) }).strict().parse(request.params);
-    const ownership = database.getNodeOwnership("device", identityId);
+    const ownership = (await database.getNodeOwnership("device", identityId));
     if (!ownership || ownership.accountId !== principal.userId) return reply.code(404).send({ error: { code: "node_not_found" } });
     const query = z.object({ cursor: z.string().optional(), limit: z.coerce.number().int().min(1).max(1_000).default(100) }).parse(request.query);
     try {
-      const data = nodeCommands.eventsAfter(identityId, query.cursor ?? null, query.limit);
+      const data = (await nodeCommands.eventsAfter(identityId, query.cursor ?? null, query.limit));
       return { object: "list", data, nextCursor: data.at(-1)?.cursor ?? query.cursor ?? null };
     } catch (error) {
       return reply.code(400).send({ error: { code: error instanceof Error ? error.message : "node_event_cursor_invalid" } });
@@ -3306,40 +3348,40 @@ export async function createCoordinator(
   app.get("/v1/nodes", async (request, reply) => {
     const principal = principalFor(request);
     if (principal.kind !== "user") return reply.code(403).send({ error: { code: "account_session_required" } });
-    const ownershipRows = database.raw.prepare(
+    const ownershipRows = (await database.raw.prepare(
       `SELECT identity_id FROM node_ownership
        WHERE identity_kind = 'device' AND account_id = ? ORDER BY updated_at DESC`,
-    ).all(principal.userId) as Array<{ identity_id: string }>;
-    const workers = store.listWorkers();
-    return { object: "list", data: ownershipRows.map(({ identity_id: nodeId }) => {
-      const ownership = database.getNodeOwnership("device", nodeId)!;
+    ).all(principal.userId)) as Array<{ identity_id: string }>;
+    const workers = (await store.listWorkers());
+    return { object: "list", data: (await mapAsync(ownershipRows, async ({ identity_id: nodeId }) => {
+      const ownership = (await database.getNodeOwnership("device", nodeId))!;
       const worker = workers.find((candidate) => candidate.identityKind === "device" && candidate.identityId === nodeId);
       return {
         nodeId, status: ownership.status, generation: ownership.generation,
         credentialFingerprint: ownership.credentialFingerprint,
         connected: worker ? hub.isConnected(worker.id) : false,
         workerId: worker?.id ?? null,
-        observed: nodeReconciliation.latestSnapshot(nodeId),
-        desired: nodeReconciliation.desiredState(nodeId),
-        commands: (database.raw.prepare(
+        observed: (await nodeReconciliation.latestSnapshot(nodeId)),
+        desired: (await nodeReconciliation.desiredState(nodeId)),
+        commands: ((await database.raw.prepare(
           `SELECT id, command_json, state, created_at, completed_at FROM node_commands
            WHERE node_id = ? ORDER BY created_at DESC, id DESC LIMIT 20`,
-        ).all(nodeId) as Array<{ id: string; command_json: string; state: string; created_at: number; completed_at: number | null }>)
+        ).all(nodeId)) as Array<{ id: string; command_json: string; state: string; created_at: number; completed_at: number | null }>)
           .map((row) => ({ id: row.id, type: nodeCommandSchema.parse(JSON.parse(row.command_json)).type,
             state: row.state, createdAt: new Date(row.created_at).toISOString(),
             completedAt: row.completed_at === null ? null : new Date(row.completed_at).toISOString() })),
       };
-    }) };
+    })) };
   });
 
   app.get("/v1/nodes/:identityId/identity-events", async (request, reply) => {
     const principal = principalFor(request);
     if (principal.kind !== "user") return reply.code(403).send({ error: { code: "account_session_required" } });
     const { identityId } = z.object({ identityId: z.string().min(1).max(128) }).strict().parse(request.params);
-    const ownership = database.getNodeOwnership("device", identityId);
+    const ownership = (await database.getNodeOwnership("device", identityId));
     if (!ownership || ownership.accountId !== principal.userId) return reply.code(404).send({ error: { code: "node_not_found" } });
     try {
-      return { object: "list", data: database.nodeIdentityEvents("device", identityId) };
+      return { object: "list", data: (await database.nodeIdentityEvents("device", identityId)) };
     } catch (error) {
       const code = error instanceof Error ? error.message : "node_identity_audit_invalid";
       return reply.code(500).send({ error: { code } });
@@ -3354,14 +3396,14 @@ export async function createCoordinator(
     }).parse(request.query);
     return {
       object: "list",
-      data: apiAccess.listUsage(principal.userId, query.limit).map(apiUsageJson),
+      data: (await apiAccess.listUsage(principal.userId, query.limit)).map(apiUsageJson),
     };
   });
 
   app.get("/v1/account/economy", async (request, reply) => {
     const principal = principalFor(request);
     if (principal.kind === "system") return reply.code(403).send({ error: { code: "account_session_required" } });
-    return { object: "economic_account", ...economicLedger.summary("account", principal.userId) };
+    return { object: "economic_account", ...(creditWallet ? await creditWallet.summary("account", principal.userId) : await economicLedger.summary("account", principal.userId)), contributionFundingSupported: Boolean(creditWallet) };
   });
 
   app.get("/v1/economy/receipt-key", async () => ({
@@ -3378,7 +3420,7 @@ export async function createCoordinator(
     const principal = principalFor(request);
     if (principal.kind === "system") return reply.code(403).send({ error: { code: "account_session_required" } });
     const { settlementId } = z.object({ settlementId: z.string().regex(/^sha256:[0-9a-f]{64}$/) }).strict().parse(request.params);
-    const receipt = economicLedger.settlementReceiptForPayer(settlementId, principal.userId);
+    const receipt = (await economicLedger.settlementReceiptForPayer(settlementId, principal.userId));
     return receipt ?? reply.code(404).send({ error: { code: "settlement_not_found" } });
   });
 
@@ -3386,21 +3428,21 @@ export async function createCoordinator(
     const principal = principalFor(request);
     if (principal.kind !== "user") return reply.code(403).send({ error: { code: "account_session_required" } });
     const { identityId } = z.object({ identityId: z.string().min(1).max(256) }).strict().parse(request.params);
-    const ownership = database.getNodeOwnership("device", identityId);
+    const ownership = (await database.getNodeOwnership("device", identityId));
     if (!ownership || ownership.accountId !== principal.userId) return reply.code(404).send({ error: { code: "node_not_found" } });
     return {
       object: "node_earnings", node_id: identityId,
       asset_scope: "internal-ledger-only",
       public_earnings_enabled: false,
       payout_enabled: false,
-      ...economicLedger.summary("node", identityId),
-      reputation: economicLedger.nodeReputation(identityId),
+      ...(await economicLedger.summary("node", identityId)),
+      reputation: (await economicLedger.nodeReputation(identityId)),
     };
   });
 
   app.post("/internal/v1/economy/pricing", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply)) return;
-    return reply.code(201).send({ object: "pricing_policy", ...economicLedger.registerPricingPolicy(request.body) });
+    return reply.code(201).send({ object: "pricing_policy", ...(await economicLedger.registerPricingPolicy(request.body)) });
   });
 
   app.get("/v1/api-keys", async (request, reply) => {
@@ -3415,7 +3457,7 @@ export async function createCoordinator(
     }
     return {
       object: "list",
-      data: apiAccess.listKeys(principal.userId).map(apiKeyJson),
+      data: (await apiAccess.listKeys(principal.userId)).map(apiKeyJson),
     };
   });
 
@@ -3432,7 +3474,7 @@ export async function createCoordinator(
     const body = z.object({
       name: z.string().trim().min(1).max(80),
     }).parse(request.body);
-    const created = apiAccess.createKey(principal.userId, body.name);
+    const created = (await apiAccess.createKey(principal.userId, body.name));
     return reply.code(201).send({
       object: "api_key",
       ...apiKeyJson(created),
@@ -3451,7 +3493,7 @@ export async function createCoordinator(
       });
     }
     const { keyId } = z.object({ keyId: z.string().min(1).max(100) }).parse(request.params);
-    if (!apiAccess.revokeKey(principal.userId, keyId)) {
+    if (!(await apiAccess.revokeKey(principal.userId, keyId))) {
       return reply.code(404).send({ error: { code: "api_key_not_found" } });
     }
     return reply.code(204).send();
@@ -3476,21 +3518,21 @@ export async function createCoordinator(
     }).parse(request.body);
     return {
       object: "account",
-      ...apiAccountJson(apiAccess.grantTokens(userId, amount), apiAccess.limits),
+      ...apiAccountJson((await apiAccess.grantTokens(userId, amount)), apiAccess.limits),
     };
   });
 
   app.get("/public/v1/snapshot", async (request) => {
-    reconcileRequestedModels();
-    const snapshot = publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
+    (await reconcileRequestedModels());
+    const snapshot = (await publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
       activationProgressForModel,
       activationStatusMessageForModel,
       activationIncidentForModel,
-    }, runtimeVersion, coordinatorBuildIdentity);
+    }, runtimeVersion, coordinatorBuildIdentity));
     const view = typeof (request.query as { view?: unknown }).view === "string"
       ? (request.query as { view: string }).view
       : null;
-    return view ? panelSnapshotForView(snapshot, view) : snapshot;
+    return view ? (await panelSnapshotForView(snapshot, view)) : snapshot;
   });
 
   app.post("/internal/v1/diagnostics", async (request, reply) => {
@@ -3512,7 +3554,7 @@ export async function createCoordinator(
         ? { details: redactDiagnosticDetails(event.details) }
         : {}),
     }));
-    const result = store.appendDiagnosticEvents(events);
+    const result = (await store.appendDiagnosticEvents(events));
     void persistence?.flush();
     return reply.code(result.accepted > 0 ? 201 : 200).send(result);
   });
@@ -3532,18 +3574,18 @@ export async function createCoordinator(
     const query = parsed.data;
     return {
       capturedAt: new Date().toISOString(),
-      events: store.listDiagnosticEvents({
+      events: (await store.listDiagnosticEvents({
         limit: query.limit,
         ...(query.level ? { level: query.level } : {}),
         ...(query.sourceId ? { sourceId: query.sourceId } : {}),
         ...(query.since ? { since: query.since } : {}),
-      }),
+      })),
     };
   });
 
   app.get("/public/v1/admin/billing-operations", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply, ["owner", "admin"])) return;
-    return billingOperations.snapshot();
+    return (await billingOperations.snapshot());
   });
 
   app.post("/public/v1/admin/seller-payouts/:batchId/dispatch", async (request, reply) => {
@@ -3575,7 +3617,7 @@ export async function createCoordinator(
       return reply.code(503).send({ error: { code: "payout_gateway_not_configured" } });
     }
     const { batchId } = z.object({ batchId: z.string().min(1).max(192) }).parse(request.params);
-    const operation = payoutDispatch.getByBatchId(batchId);
+    const operation = (await payoutDispatch.getByBatchId(batchId));
     if (!operation) return reply.code(404).send({ error: { code: "payout_dispatch_not_found" } });
     return { object: "payout_dispatch", operation };
   });
@@ -3615,7 +3657,7 @@ export async function createCoordinator(
       if (verified.batchId !== batchId) {
         return reply.code(409).send({ error: { code: "payout_settlement_batch_conflict" } });
       }
-      const result = payoutDispatch.recordSettlement(verified);
+      const result = (await payoutDispatch.recordSettlement(verified));
       return reply.code(result.duplicate ? 200 : 202).send({
         object: "payout_settlement",
         operation: result.operation,
@@ -3637,7 +3679,7 @@ export async function createCoordinator(
       return reply.code(503).send({ error: { code: "stable_payout_gateway_not_configured" } });
     }
     const { batchId } = z.object({ batchId: z.string().min(1).max(192) }).parse(request.params);
-    const evidence = payoutDispatch.getSettlementEvidence(batchId);
+    const evidence = (await payoutDispatch.getSettlementEvidence(batchId));
     if (!evidence) return reply.code(404).send({ error: { code: "payout_settlement_not_found" } });
     const { signature, ...safeEvidence } = evidence;
     return {
@@ -3660,7 +3702,7 @@ export async function createCoordinator(
       if (input.batchId !== batchId) {
         return reply.code(409).send({ error: { code: "spore_quote_batch_conflict" } });
       }
-      const result = sporeConversionQuotes.record(input);
+      const result = (await sporeConversionQuotes.record(input));
       return reply.code(result.duplicate ? 200 : 201).send({
         object: "spore_conversion_quote",
         duplicate: result.duplicate,
@@ -3682,7 +3724,7 @@ export async function createCoordinator(
       return reply.code(503).send({ error: { code: "spore_conversion_not_configured" } });
     }
     const { batchId } = z.object({ batchId: z.string().min(1).max(192) }).parse(request.params);
-    const quote = sporeConversionQuotes.getByBatchId(batchId);
+    const quote = (await sporeConversionQuotes.getByBatchId(batchId));
     if (!quote) return reply.code(404).send({ error: { code: "spore_quote_not_found" } });
     return { object: "spore_conversion_quote", quote: safeSporeQuote(quote) };
   });
@@ -3705,7 +3747,7 @@ export async function createCoordinator(
       recordedAt: query.afterRecordedAt,
       quoteId: query.afterQuoteId!,
     };
-    const history = sporeConversionQuotes.listHistoryByBatchId(batchId, query.limit + 1, after);
+    const history = (await sporeConversionQuotes.listHistoryByBatchId(batchId, query.limit + 1, after));
     const hasMore = history.length > query.limit;
     const quotes = history.slice(0, query.limit);
     if (quotes.length === 0) return reply.code(404).send({ error: { code: "spore_quote_history_not_found" } });
@@ -3720,9 +3762,9 @@ export async function createCoordinator(
 
   app.get("/public/v1/admin/operations", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply, ["owner", "admin", "operator"])) return;
-    const snapshot = publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
+    const snapshot = (await publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
       activationProgressForModel, activationStatusMessageForModel, activationIncidentForModel,
-    }, runtimeVersion, coordinatorBuildIdentity);
+    }, runtimeVersion, coordinatorBuildIdentity));
     const releases: Array<{ channel: string; platform: string; arch: string; manifestId: string; sequence: number }> = [];
     if (componentReleases) {
       for (const channel of ["dev", "stable"] as const) for (const platform of ["any", "win32", "linux", "darwin"] as const) {
@@ -3737,13 +3779,13 @@ export async function createCoordinator(
       incidents: snapshot.requestedModels.flatMap((model) => model.activationIncident ? [{ modelId: model.id, incident: model.activationIncident }] : []),
       releases: { configured: componentReleases !== null, items: releases },
       certifications: { configured: modelCertifications !== null,
-        items: modelCertifications?.list(100).map((certification) => ({ certificationId: certification.certificationId,
+        items: (await modelCertifications?.list(100))?.map((certification) => ({ certificationId: certification.certificationId,
           modelFamily: certification.modelFamily, decision: certification.decision, topology: certification.topology.kind,
           platform: certification.hardware.platform, backend: certification.hardware.backend,
           evidenceReceiptId: certification.evidence.receiptId, reviewedAt: certification.review.reviewedAt,
           expiresAt: certification.expiresAt })) ?? [],
         blocker: modelCertifications ? null : "durable_model_certification_registry_not_configured" },
-      receipts: executionReceipts.listRecent(20).map((receipt) => ({ receiptId: receipt.receiptId, jobId: receipt.jobId,
+      receipts: (await executionReceipts.listRecent(20)).map((receipt) => ({ receiptId: receipt.receiptId, jobId: receipt.jobId,
         routeClass: receipt.routeClass, recoveryMode: receipt.recovery.mode, traceDigest: receipt.networkTraceDigest,
         completedAt: receipt.completedAt })),
     };
@@ -3753,7 +3795,7 @@ export async function createCoordinator(
     if (!await authorizeAdministrativeMutation(request, reply, ["owner", "admin"])) return;
     if (!modelCertifications) return reply.code(503).send({ error: { code: "model_certification_registry_not_configured" } });
     try {
-      const published = modelCertifications.publish(request.body);
+      const published = (await modelCertifications.publish(request.body));
       return reply.code(published.alreadyPublished ? 200 : 201).send({ data: published });
     } catch (error) {
       return reply.code(400).send({ error: { code: "model_certification_rejected",
@@ -3761,12 +3803,12 @@ export async function createCoordinator(
     }
   });
 
-  const availableSupportAssistantModels = (): string[] =>
-    benchmarkableActiveModelIds().sort((left, right) => left.localeCompare(right));
+  const availableSupportAssistantModels = async (): Promise<string[]> =>
+    (await benchmarkableActiveModelIds()).sort((left, right) => left.localeCompare(right));
 
-  const publicSupportAssistantConfig = () => {
-    const settings = store.getSupportAssistantSettings();
-    const availableModels = availableSupportAssistantModels();
+  const publicSupportAssistantConfig = async () => {
+    const settings = (await store.getSupportAssistantSettings());
+    const availableModels = (await availableSupportAssistantModels());
     const selectedModel = resolveSupportAssistantModel(settings, availableModels);
     return {
       enabled: settings.enabled,
@@ -3782,11 +3824,11 @@ export async function createCoordinator(
     };
   };
 
-  app.get("/public/v1/assistant/config", async () => publicSupportAssistantConfig());
+  app.get("/public/v1/assistant/config", async () => (await publicSupportAssistantConfig()));
 
   app.get("/public/v1/admin/fleet-contribution", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply)) return;
-    return fleetContribution.status();
+    return (await fleetContribution.status());
   });
 
   app.post("/public/v1/admin/fleet-contribution", async (request, reply) => {
@@ -3798,15 +3840,15 @@ export async function createCoordinator(
   app.get("/public/v1/admin/assistant", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply)) return;
     return {
-      settings: store.getSupportAssistantSettings(),
-      runtime: publicSupportAssistantConfig(),
+      settings: (await store.getSupportAssistantSettings()),
+      runtime: (await publicSupportAssistantConfig()),
     };
   });
 
   app.put("/public/v1/admin/assistant", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply)) return;
     const body = supportAssistantSettingsUpdateSchema.parse(request.body);
-    const availableModels = availableSupportAssistantModels();
+    const availableModels = (await availableSupportAssistantModels());
     if (body.modelId && !availableModels.includes(body.modelId)) {
       return reply.code(409).send({
         error: {
@@ -3815,10 +3857,10 @@ export async function createCoordinator(
         },
       });
     }
-    const settings = store.saveSupportAssistantSettings(body);
+    const settings = (await store.saveSupportAssistantSettings(body));
     return {
       settings,
-      runtime: publicSupportAssistantConfig(),
+      runtime: (await publicSupportAssistantConfig()),
     };
   });
 
@@ -3862,7 +3904,7 @@ export async function createCoordinator(
     let releaseGlobalRateLimit: (() => void) | null = null;
     activeSupportAssistantRequests += 1;
     try {
-      const settings = store.getSupportAssistantSettings();
+      const settings = (await store.getSupportAssistantSettings());
       if (!settings.enabled) {
         return reply.code(503).send({
           error: {
@@ -3871,7 +3913,7 @@ export async function createCoordinator(
           },
         });
       }
-      const availableModels = availableSupportAssistantModels();
+      const availableModels = (await availableSupportAssistantModels());
       const selectedModel = resolveSupportAssistantModel(settings, availableModels);
       if (!selectedModel) {
         return reply.code(503).send({
@@ -3899,11 +3941,11 @@ export async function createCoordinator(
         });
       }
 
-      const snapshot = publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
+      const snapshot = (await publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
         activationProgressForModel,
         activationStatusMessageForModel,
         activationIncidentForModel,
-      }, runtimeVersion, coordinatorBuildIdentity);
+      }, runtimeVersion, coordinatorBuildIdentity));
       const parsed: ChatCompletionRequest = {
         model: selectedModel,
         messages: buildSupportAssistantMessages(
@@ -3930,22 +3972,22 @@ export async function createCoordinator(
         deadline_ms: Math.min(config.requestTimeoutMs, 180_000),
       };
 
-      apiAccess.assertSessionAccess(null, parsed.session_id);
-      const supersededJobId = service.cancelMatchingActiveSession(parsed, parsed.session_id);
+      (await apiAccess.assertSessionAccess(null, parsed.session_id));
+      const supersededJobId = (await service.cancelMatchingActiveSession(parsed, parsed.session_id));
       if (supersededJobId) {
         await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 1_000));
       }
-      if (!service.hasCapacity(parsed, parsed.session_id)) {
+      if (!(await service.hasCapacity(parsed, parsed.session_id))) {
         await waitForChatCapacity(service, parsed, parsed.session_id, 30_000, reply.raw);
       }
       if (reply.raw.destroyed) return;
-      apiAccess.assertSessionAccess(null, parsed.session_id);
-      const handle = service.submit(parsed, parsed.session_id);
-      const conversationId = store.startInferenceConversation(
+      (await apiAccess.assertSessionAccess(null, parsed.session_id));
+      const handle = (await service.submit(parsed, parsed.session_id));
+      const conversationId = (await store.startInferenceConversation(
         handle.sessionId,
         parsed.model,
         parsed.messages,
-      );
+      ));
       reply.header("x-network-request-id", handle.jobId);
       reply.header("x-network-session-id", handle.sessionId);
       reply.header("x-mycellios-assistant-provider", "mycellios-network");
@@ -3968,9 +4010,9 @@ export async function createCoordinator(
       let streamedResult: Extract<JobStreamEvent, { type: "completed" }> | null = null;
       let streamedFailure: Extract<JobStreamEvent, { type: "failed" }> | null = null;
       let streamedRecoveryMode: Extract<JobStreamEvent, { type: "progress" }>["recoveryMode"];
-      reply.raw.once("close", () => {
-        if (!finished) service.cancel(handle.jobId);
-      });
+      reply.raw.once("close", () => background.run("server:4000", async () => {
+        if (!finished) (await service.cancel(handle.jobId));
+      }, "reply.raw.once"));
       const heartbeatTimer = setInterval(() => {
         if (!reply.raw.destroyed && !reply.raw.writableEnded) {
           reply.raw.write(`: mycellios-assistant-heartbeat ${Date.now()}\n\n`);
@@ -3981,7 +4023,7 @@ export async function createCoordinator(
         for await (const event of handle.events) {
           if (event.type === "accepted") streamedRouteClass = event.route.routeClass;
           if (event.type === "token") streamedText += event.token.text;
-          if (event.type === "completed") streamedResult = attachExecutionReceipt(event, parsed.model, streamedRouteClass);
+          if (event.type === "completed") streamedResult = (await attachExecutionReceipt(event, parsed.model, streamedRouteClass));
           if (event.type === "failed") streamedFailure = event;
           if (event.type === "progress" && event.recoveryMode) streamedRecoveryMode = event.recoveryMode;
           writeMycelliosEvent(reply.raw, streamedResult && event.type === "completed" ? streamedResult : event, parsed.model, handle.jobId);
@@ -3990,7 +4032,7 @@ export async function createCoordinator(
         clearInterval(heartbeatTimer);
       }
       finished = true;
-      store.appendInferenceMessage({
+      (await store.appendInferenceMessage({
         conversationId,
         jobId: handle.jobId,
         role: "assistant",
@@ -4012,7 +4054,7 @@ export async function createCoordinator(
               execution_receipt_id: streamedResult?.result.executionReceiptId ?? null,
               execution_privacy: streamedResult?.result.privacy ?? null,
             },
-      });
+      }));
       void persistence?.flush();
       reply.raw.write("data: [DONE]\n\n");
       reply.raw.end();
@@ -4067,19 +4109,19 @@ export async function createCoordinator(
     if (!await authorizeAdministrativeMutation(request, reply)) return;
     const body = requestedModelCreateSchema.parse(request.body);
     automaticActivationRetryState.delete(body.id);
-    const stored = store.upsertRequestedModel({
+    const stored = (await store.upsertRequestedModel({
       id: body.id,
       source: body.source,
       revision: body.revision,
       contextTokens: body.contextTokens,
       minimumNodes: body.minimumNodes,
       autoActivate: body.autoActivate,
-    });
-    deploymentController.ensureModel(stored);
-    deploymentController.setDesiredState(
+    }));
+    (await deploymentController.ensureModel(stored));
+    (await deploymentController.setDesiredState(
       stored.id,
       stored.autoActivate ? "active" : "inactive",
-    );
+    ));
     try {
       const profile = await (options.modelCapacityInspector ?? inspectHubModelCapacity)({
         source: stored.source,
@@ -4087,20 +4129,20 @@ export async function createCoordinator(
         contextTokens: stored.contextTokens,
         minimumNodes: stored.minimumNodes,
       });
-      store.setRequestedModelProfile(stored.id, profile as unknown as Record<string, unknown>, null);
+      (await store.setRequestedModelProfile(stored.id, profile as unknown as Record<string, unknown>, null));
     } catch (error) {
-      store.setRequestedModelProfile(
+      (await store.setRequestedModelProfile(
         stored.id,
         null,
         error instanceof Error ? error.message : String(error),
-      );
+      ));
     }
-    reconcileRequestedModels();
-    const snapshot = publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
+    (await reconcileRequestedModels());
+    const snapshot = (await publicSnapshot(store, scheduler, hub, mobileHub, activationManager, {
       activationProgressForModel,
       activationStatusMessageForModel,
       activationIncidentForModel,
-    }, runtimeVersion, coordinatorBuildIdentity);
+    }, runtimeVersion, coordinatorBuildIdentity));
     return reply.code(201).send({
       model: snapshot.requestedModels.find((model) => model.id === stored.id),
     });
@@ -4109,17 +4151,17 @@ export async function createCoordinator(
   app.delete("/public/v1/requested-models/:modelId", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply)) return;
     const { modelId } = requestedModelParamsSchema.parse(request.params);
-    if (!store.getRequestedModel(modelId)) {
+    if (!(await store.getRequestedModel(modelId))) {
       return reply.code(404).send({ error: { code: "requested_model_not_found" } });
     }
-    deploymentController.setDesiredState(modelId, "inactive");
-    const deactivation = deploymentController.claimOperation(modelId, "deactivate", {
+    (await deploymentController.setDesiredState(modelId, "inactive"));
+    const deactivation = (await deploymentController.claimOperation(modelId, "deactivate", {
       leaseMs: 60_000,
-    });
+    }));
     await activationManager?.deactivate(modelId);
-    deploymentController.releaseRoutesForModel(modelId);
-    if (deactivation) deploymentController.completeOperation(deactivation.id, "inactive");
-    store.removeRequestedModel(modelId);
+    (await deploymentController.releaseRoutesForModel(modelId));
+    if (deactivation) (await deploymentController.completeOperation(deactivation.id, "inactive"));
+    (await store.removeRequestedModel(modelId));
     automaticActivationRetryState.delete(modelId);
     automaticRepairState.delete(modelId);
     automaticRepairInFlight.delete(modelId);
@@ -4128,7 +4170,7 @@ export async function createCoordinator(
 
   app.get("/public/v1/requested-models/:modelId/timeline", async (request, reply) => {
     const { modelId } = requestedModelParamsSchema.parse(request.params);
-    const timeline = deploymentController.timeline(modelId);
+    const timeline = (await deploymentController.timeline(modelId));
     if (!timeline) {
       return reply.code(404).send({ error: { code: "requested_model_not_found" } });
     }
@@ -4136,9 +4178,9 @@ export async function createCoordinator(
   });
 
   app.get("/internal/v1/model-activation-requests", async () => {
-    reconcileRequestedModels();
+    (await reconcileRequestedModels());
     return {
-      data: store.listRequestedModels()
+      data: (await store.listRequestedModels())
         .filter((model) => model.activationRequestedAt !== null)
         .map((model) => ({
           id: model.id,
@@ -4189,14 +4231,14 @@ export async function createCoordinator(
       range: z.enum(["24h", "7d", "30d", "90d"]).default("24h"),
     }).parse(request.query);
     const now = Date.now();
-    captureNetworkTelemetry(now);
+    (await captureNetworkTelemetry(now));
     const since = now - networkHistoryRanges[range] * 60 * 60_000;
     return {
       capturedAt: new Date(now).toISOString(),
       intervalMinutes: NETWORK_TELEMETRY_INTERVAL_MS / 60_000,
       retentionDays: NETWORK_TELEMETRY_RETENTION_DAYS,
       range,
-      samples: store.listNetworkTelemetrySamples(since).map((sample) => ({
+      samples: (await store.listNetworkTelemetrySamples(since)).map((sample) => ({
         ...sample,
         capturedAt: new Date(sample.capturedAt).toISOString(),
       })),
@@ -4224,7 +4266,7 @@ export async function createCoordinator(
         },
       });
     }
-    const activeModelIds = benchmarkableActiveModelIds();
+    const activeModelIds = (await benchmarkableActiveModelIds());
     const modelId = body.model ?? activeModelIds[0];
     if (!modelId || !activeModelIds.includes(modelId)) {
       return reply.code(409).send({
@@ -4236,7 +4278,7 @@ export async function createCoordinator(
         },
       });
     }
-    const activation = currentBenchmarkActivations().find(
+    const activation = (await currentBenchmarkActivations()).find(
       (candidate) => candidate.modelId === modelId,
     );
     if (!activation) {
@@ -4249,7 +4291,7 @@ export async function createCoordinator(
       });
     }
     benchmarkRunInFlight = startCoordinatorBenchmark(
-      benchmarkTargetForModel(modelId),
+      (await benchmarkTargetForModel(modelId)),
       "manual",
       {
         ...(body.label ? { label: body.label } : {}),
@@ -4277,7 +4319,7 @@ export async function createCoordinator(
     // the same authorization as any other mutation of shared state.
     if (!await authorizeAdministrativeMutation(request, reply)) return;
     const { workerId } = workerIdParamsSchema.parse(request.params);
-    const removed = hub.removeWorker(workerId) || mobileHub.removeWorker(workerId);
+    const removed = (await hub.removeWorker(workerId)) || mobileHub.removeWorker(workerId);
     if (!removed) return reply.code(404).send({ error: { code: "worker_not_found" } });
     return { removed: true, workerId };
   });
@@ -4285,7 +4327,7 @@ export async function createCoordinator(
   app.post("/public/v1/workers/clear-offline", async (request, reply) => {
     if (!await authorizeAdministrativeMutation(request, reply)) return;
     return {
-      removed: store.deregisterOfflineWorkers() + mobileHub.removeOfflineWorkers(),
+      removed: (await store.deregisterOfflineWorkers()) + mobileHub.removeOfflineWorkers(),
     };
   });
 
@@ -4310,13 +4352,13 @@ export async function createCoordinator(
       if (!(error instanceof WorkerAdmissionError)) throw error;
       return reply.code(error.statusCode).send({ error: { code: error.code, message: error.message } });
     }
-    const consumed = nodeEnrollments.consume({
+    const consumed = (await nodeEnrollments.consume({
       enrollmentToken: input.enrollmentToken,
       nonce: input.nonce,
       identityKind: input.identity.kind === "browser" ? "cell" : input.identity.kind,
       identityId: input.identity.id,
       publicKeyFingerprint: fingerprint as `sha256:${string}`,
-    });
+    }));
     if (consumed.state !== "consumed") {
       const status = consumed.state === "unknown" ? 404
         : consumed.state === "already-consumed" ? 409
@@ -4336,11 +4378,11 @@ export async function createCoordinator(
     const { identityId } = z.object({ identityId: z.string().min(1).max(256) }).strict().parse(request.params);
     if (workerSessionPrincipals.get(request) !== identityId) return reply.code(401).send({ error: { code: "worker_session_required" } });
     const query = z.object({ generation: z.coerce.number().int().positive(), limit: z.coerce.number().int().min(1).max(256).default(32) }).parse(request.query);
-    const ownership = database.getNodeOwnership("device", identityId);
+    const ownership = (await database.getNodeOwnership("device", identityId));
     if (!ownership || ownership.status !== "active" || ownership.generation !== query.generation) {
       return reply.code(409).send({ error: { code: "node_generation_mismatch" } });
     }
-    return { object: "list", data: nodeCommands.pull(identityId, query.generation, query.limit) };
+    return { object: "list", data: (await nodeCommands.pull(identityId, query.generation, query.limit)) };
   });
 
   app.post("/internal/v1/nodes/:identityId/commands/results", async (request, reply) => {
@@ -4349,8 +4391,8 @@ export async function createCoordinator(
     const result = nodeCommandResultSchema.parse(request.body);
     if (result.nodeId !== identityId) return reply.code(403).send({ error: { code: "node_command_result_wrong_node" } });
     try {
-      const recorded = nodeCommands.recordResult(result);
-      reply.header("x-mycellios-node-event-cursor", nodeCommands.latestCursor(identityId));
+      const recorded = (await nodeCommands.recordResult(result));
+      reply.header("x-mycellios-node-event-cursor", (await nodeCommands.latestCursor(identityId)));
       return reply.code(200).send(recorded);
     } catch (error) {
       const code = error instanceof Error ? error.message : "node_command_result_invalid";
@@ -4363,14 +4405,14 @@ export async function createCoordinator(
     if (workerSessionPrincipals.get(request) !== identityId) return reply.code(401).send({ error: { code: "worker_session_required" } });
     const snapshot = nodeSnapshotSchema.parse(request.body);
     if (snapshot.nodeId !== identityId) return reply.code(403).send({ error: { code: "node_snapshot_wrong_node" } });
-    const ownership = database.getNodeOwnership("device", identityId);
+    const ownership = (await database.getNodeOwnership("device", identityId));
     if (!ownership || ownership.status !== "active" || ownership.generation !== snapshot.generation) {
       return reply.code(409).send({ error: { code: "node_generation_mismatch" } });
     }
     try {
       return reply.code(200).send({
-        ...nodeReconciliation.reconcile(snapshot),
-        acknowledgedCommandIds: nodeCommands.acknowledgedCommandIds(identityId, snapshot.generation),
+        ...(await nodeReconciliation.reconcile(snapshot)),
+        acknowledgedCommandIds: (await nodeCommands.acknowledgedCommandIds(identityId, snapshot.generation)),
       });
     } catch (error) {
       const code = error instanceof Error ? error.message : "node_snapshot_invalid";
@@ -4382,7 +4424,7 @@ export async function createCoordinator(
   app.post("/internal/v1/workers/credential-rotation-challenge", async (request, reply) => {
     const rotation = workerCredentialRotationChallengeRequestSchema.parse(request.body);
     try {
-      return workerAdmission.issueRotation(rotation);
+      return (await workerAdmission.issueRotation(rotation));
     } catch (error) {
       if (!(error instanceof WorkerAdmissionError)) throw error;
       return reply.code(error.statusCode).send({
@@ -4397,7 +4439,7 @@ export async function createCoordinator(
       proof: workerCredentialRotationProofSchema,
     }).strict().parse(request.body);
     try {
-      return workerAdmission.verifyRotation(rotation);
+      return (await workerAdmission.verifyRotation(rotation));
     } catch (error) {
       if (!(error instanceof WorkerAdmissionError)) throw error;
       return reply.code(error.statusCode).send({
@@ -4442,7 +4484,7 @@ export async function createCoordinator(
       }
       let verified;
       try {
-        verified = workerAdmission.verify({
+        verified = (await workerAdmission.verify({
           identity: registration.identity,
           registrationDigest: workerRegistrationDigest({
             identity: registration.identity,
@@ -4450,7 +4492,7 @@ export async function createCoordinator(
             protocol,
           }),
           proof: registration.admission,
-        });
+        }));
       } catch (error) {
         if (!(error instanceof WorkerAdmissionError)) throw error;
         return reply.code(error.statusCode).send({
@@ -4476,10 +4518,10 @@ export async function createCoordinator(
         enrollment: "local-legacy",
       };
     }
-    const worker = store.registerWorker({
+    const worker = (await store.registerWorker({
       ...(registration.identity ? { identity: registration.identity } : {}),
       capabilities: stripWorkerDeclaredEvidence(registration.capabilities),
-    });
+    }));
     const workerSessionToken = config.networkToken
       && registration.identity
       && admission.credentialFingerprint
@@ -4491,9 +4533,9 @@ export async function createCoordinator(
         })
       : undefined;
     const nodeOwnership = registration.identity?.kind === "device"
-      ? database.getNodeOwnership("device", registration.identity.id)
+      ? (await database.getNodeOwnership("device", registration.identity.id))
       : null;
-    return reply.code(201).send({
+    return reply.header("x-mycellios-host-memory-observation", "1").code(201).send({
       workerId: worker.id,
       protocolVersion: admission.protocolVersion,
       ...(admission.credentialFingerprint
@@ -4510,10 +4552,11 @@ export async function createCoordinator(
 
   app.get("/internal/v1/workers", async () => ({
     data: [
-      ...store.listWorkers().filter((worker) => storedWorkerIsVisible(worker, hub)).map((worker) => ({
+      ...(await store.listWorkers()).filter((worker) => storedWorkerIsVisible(worker, hub)).map((worker) => ({
       id: worker.id,
       status: worker.status,
       connected: hub.isConnected(worker.id),
+      authenticatedSessionId: hub.currentWorkerSessionId(worker.id),
       region: worker.capabilities.region,
       agentVersion: worker.capabilities.agentVersion,
       buildIdentity: worker.capabilities.buildIdentity,
@@ -4543,7 +4586,7 @@ export async function createCoordinator(
   app.get("/public/v1/worker-credentials", async (request, reply) => {
     if (!(await authorizeAdministrativeMutation(request, reply))) return;
     return {
-      data: database.listWorkerAdmissionCredentials().map((credential) => ({
+      data: (await database.listWorkerAdmissionCredentials()).map((credential) => ({
         ...admissionCredentialSummary(credential),
         createdAt: new Date(credential.createdAt).toISOString(),
         updatedAt: new Date(credential.updatedAt).toISOString(),
@@ -4568,10 +4611,10 @@ export async function createCoordinator(
         expectedFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/),
         reason: z.string().trim().min(3).max(300),
       }).strict().parse(request.body);
-      const result = database.revokeWorkerAdmissionCredential({
+      const result = (await database.revokeWorkerAdmissionCredential({
         ...params,
         ...body,
-      });
+      }));
       if (result.state === "not_found") {
         return reply.code(404).send({
           error: { code: "worker_credential_unknown" },
@@ -4595,11 +4638,11 @@ export async function createCoordinator(
           }
         }
       } else {
-        for (const worker of store.listWorkers()) {
+        for (const worker of (await store.listWorkers())) {
           if (
             worker.identityKind === params.identityKind
             && worker.identityId === params.identityId
-            && hub.removeWorker(worker.id)
+            && (await hub.removeWorker(worker.id))
           ) {
             disconnected += 1;
           }
@@ -4620,7 +4663,7 @@ export async function createCoordinator(
   );
 
   app.get("/v1/models", async () => {
-    const models = scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() });
+    const models = (await scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() }));
     return {
       object: "list",
       data: models.map((model) => ({
@@ -4634,69 +4677,18 @@ export async function createCoordinator(
     };
   });
 
-  const settleCompletedInference = (input: {
-    userId: string;
-    jobId: string;
-    modelId: string;
-    routeClass: "replica" | "pipeline";
-    inputTokens: number;
-    outputTokens: number;
-    networkTrace: NonNullable<Extract<JobStreamEvent, { type: "completed" }>["result"]["networkTrace"]>;
-    recovery: NonNullable<Extract<JobStreamEvent, { type: "completed" }>["result"]["recovery"]>;
-    executionReceiptId: string;
-  }): void => {
-    const pricingRoute = input.routeClass === "pipeline"
-      ? "distributed-pipeline" as const
-      : "remote-replica" as const;
-    const createdAt = Date.now();
-    const policy = economicLedger.resolvePricingPolicy(input.modelId, pricingRoute, createdAt);
-    if (!policy) return;
-    const weights = new Map<string, number>();
-    for (const stage of input.networkTrace.stages) {
-      const nodeId = stage.nodeId ?? stage.workerId;
-      if (nodeId) weights.set(nodeId, (weights.get(nodeId) ?? 0) + 1);
-    }
-    if (weights.size === 0) {
-      app.log.error({ jobId: input.jobId }, "Economic settlement lacks an attributable execution node");
-      return;
-    }
-    const executionReceiptId = input.executionReceiptId;
-    try {
-      const contributionEvidence = physicalContributionEvidence.certify({
-        jobId: input.jobId,
-        executionReceiptId,
-        trace: input.networkTrace,
-        workers: store.listWorkers(),
-        createdAt,
-      });
-      economicLedger.settle({
-        jobId: input.jobId,
-        executionReceiptId,
-        contributionEvidenceId: contributionEvidence.id,
-        pricingPolicyId: policy.id,
-        executionRecovery: input.recovery,
-        payerAccountId: input.userId,
-        inputTokens: input.inputTokens,
-        outputTokens: input.outputTokens,
-        contributors: [...weights].map(([nodeId, weight]) => ({ nodeId, weight })),
-        createdAt,
-      });
-    } catch (error) {
-      app.log.error({
-        jobId: input.jobId,
-        error: error instanceof Error ? error.message : String(error),
-      }, "Economic settlement rejected because physical contribution was not verified");
-    }
-  };
+  const settleCompletedInference = createInferenceSettlement({
+    economicLedger, creditWallet, physicalContributionEvidence, store, hub, logger: app.log,
+  });
 
   app.post("/v1/chat/completions", async (request, reply) => {
-    const parsed = chatCompletionRequestSchema.parse(request.body) as ChatCompletionRequest;
+    const parsed = parseChatRequest(request.body, config.modelRequestTimeoutsMs);
     const principal: ApiRequestPrincipal = apiAccessEnabled
       ? principalFor(request)
       : { kind: "system" };
-    if (principal.kind !== "system") apiAccess.assertSessionAccess(principal.userId, parsed.session_id);
-    const idempotencyKey = resolveChatIdempotencyKey(service, parsed, request.headers["idempotency-key"], principal);
-    const supersededJobId = idempotencyKey ? null : service.cancelMatchingActiveSession(parsed, parsed.session_id);
+    if (principal.kind !== "system") (await apiAccess.assertSessionAccess(principal.userId, parsed.session_id));
+    const idempotencyKey = (await resolveChatIdempotencyKey(service, parsed, request.headers["idempotency-key"], principal));
+    const supersededJobId = idempotencyKey ? null : (await service.cancelMatchingActiveSession(parsed, parsed.session_id));
     if (supersededJobId) {
       app.log.warn({
         supersededJobId,
@@ -4707,40 +4699,62 @@ export async function createCoordinator(
       // slot before the replacement lease is offered on the same socket.
       await new Promise<void>((resolveDelay) => setTimeout(resolveDelay, 1_000));
     }
-    if (parsed.stream && !service.hasCapacity(parsed, parsed.session_id)) {
-      // A reconnect can race both route rebuilding and the automatic startup
-      // benchmark. Keep the fetch pending while capacity returns instead of
-      // making the installed web surface a transient 503.
+    if (parsed.stream && !automaticBenchmarkPriority.running(parsed.model)
+        && !(await service.hasCapacity(parsed, parsed.session_id))) {
       await waitForChatCapacity(service, parsed, parsed.session_id, 45_000, reply.raw);
     }
     if (reply.raw.destroyed) return;
-    if (principal.kind !== "system") apiAccess.assertSessionAccess(principal.userId, parsed.session_id);
-    const usage = principal.kind === "system"
-      ? null
-      : apiAccess.beginUsage(
-          principal.userId,
-          principal.kind === "api_key" ? principal.apiKeyId : null,
-          parsed,
-        );
+    if (principal.kind !== "system") (await apiAccess.assertSessionAccess(principal.userId, parsed.session_id));
+    const { funded, usage } = await beginContributionUsage({
+      mode: request.headers["x-mycellios-funding"], principal, api: apiAccess,
+      wallet: creditWallet, request: parsed, idempotencyKey,
+      onClose: (release) => { reply.raw.once("close", release); },
+    });
     if (usage) {
       reply.header("x-ratelimit-limit", usage.rateLimit.limit);
       reply.header("x-ratelimit-remaining", usage.rateLimit.remaining);
       reply.header("x-ratelimit-reset", Math.ceil(usage.rateLimit.resetAt / 1_000));
       reply.header("x-token-balance", usage.remainingTokens);
     }
-    let handle: ReturnType<MeshService["submit"]>;
+    const foreground = parsed.workload_class === "benchmark" ? null
+      : (await automaticBenchmarkPriority.beginForeground(parsed.model, (await store.listNonterminalJobs()), async id => (await service.cancel(id))));
+    if (foreground) {
+      reply.raw.once("finish", foreground.release);
+      reply.raw.once("close", foreground.release);
+    }
     try {
-      handle = service.submit(parsed, parsed.session_id, idempotencyKey);
+      if (foreground) await waitForBenchmarkCancellation(hub, foreground.leases);
+      if ((foreground?.interrupted ?? 0) > 0 && !(await service.hasCapacity(parsed, parsed.session_id))) {
+        await waitForChatCapacity(service, parsed, parsed.session_id, 45_000, reply.raw);
+      }
+      if (principal.kind !== "system") (await apiAccess.assertSessionAccess(principal.userId, parsed.session_id));
     } catch (error) {
-      if (usage) apiAccess.failUsage(usage.id, "submission_failed");
+      if (usage) (await apiAccess.failUsage(usage.id, "admission_failed"));
       throw error;
     }
-    if (usage) apiAccess.attachJob(usage.id, handle.jobId, handle.sessionId);
-    const conversationId = store.startInferenceConversation(
+    let handle: Awaited<ReturnType<MeshService["submit"]>>;
+    try {
+      handle = (await service.submit(parsed, parsed.session_id, idempotencyKey));
+    } catch (error) {
+      if (usage) (await apiAccess.failUsage(usage.id, "submission_failed"));
+      throw error;
+    }
+    if (!parsed.stream) reply.raw.once("close", () => background.run("server:4781", async () => (await service.cancel(handle.jobId)), "reply.raw.once"));
+    if (usage) (await apiAccess.attachJob(usage.id, handle.jobId, handle.sessionId));
+    if (funded && usage && creditWallet) {
+      try { await creditWallet.attach(usage.id, handle.jobId); }
+      catch {
+        await creditWallet.release(usage.id);
+        await apiAccess.failUsage(usage.id, "contribution_credit_binding_failed");
+        await service.cancel(handle.jobId);
+        throw new MeshServiceError("contribution_credit_binding_failed", "The credit reservation could not be bound.", 409);
+      }
+    }
+    const conversationId = (await store.startInferenceConversation(
       handle.sessionId,
       parsed.model,
       parsed.messages,
-    );
+    ));
     reply.header("x-network-request-id", handle.jobId);
     reply.header("x-network-session-id", handle.sessionId);
 
@@ -4760,9 +4774,9 @@ export async function createCoordinator(
       let streamedResult: Extract<JobStreamEvent, { type: "completed" }> | null = null;
       let streamedFailure: Extract<JobStreamEvent, { type: "failed" }> | null = null;
       let streamError: unknown = null;
-      reply.raw.once("close", () => {
-        if (!finished) service.cancel(handle.jobId);
-      });
+      reply.raw.once("close", () => background.run("server:4807", async () => {
+        if (!finished) (await service.cancel(handle.jobId));
+      }, "reply.raw.once"));
       const heartbeatTimer = setInterval(() => {
         if (!reply.raw.destroyed && !reply.raw.writableEnded) {
           reply.raw.write(`: mycellios-heartbeat ${Date.now()}\n\n`);
@@ -4773,11 +4787,11 @@ export async function createCoordinator(
         for await (const event of handle.events) {
           if (event.type === "accepted") streamedRouteClass = event.route.routeClass;
           if (event.type === "token") streamedText += event.token.text;
-          if (event.type === "completed") streamedResult = attachExecutionReceipt(
+          if (event.type === "completed") streamedResult = (await attachExecutionReceipt(
             event,
             parsed.model,
             streamedRouteClass as "replica" | "pipeline",
-          );
+          ));
           if (event.type === "failed") streamedFailure = event;
           writeMycelliosEvent(reply.raw, streamedResult && event.type === "completed" ? streamedResult : event, parsed.model, handle.jobId);
         }
@@ -4789,13 +4803,7 @@ export async function createCoordinator(
       finished = true;
       if (usage) {
         if (streamedResult) {
-          const account = apiAccess.completeUsage(
-            usage.id,
-            streamedResult.result.metrics.inputTokens,
-            streamedResult.result.metrics.outputTokens,
-          );
-          void account;
-          if (streamedResult.result.networkTrace) settleCompletedInference({
+          if (streamedResult.result.networkTrace) (await settleCompletedInference({
             userId: usage.userId,
             jobId: handle.jobId,
             modelId: parsed.model,
@@ -4805,15 +4813,26 @@ export async function createCoordinator(
             networkTrace: streamedResult.result.networkTrace,
             recovery: streamedResult.result.recovery ?? { mode: "none", attempts: 1, replayedTokenEvents: 0 },
             executionReceiptId: streamedResult.result.executionReceiptId!,
-          });
+          }));
+          try {
+            if (funded && creditWallet) await creditWallet.assertSettled(usage.id);
+            await apiAccess.completeUsage(usage.id, streamedResult.result.metrics.inputTokens, streamedResult.result.metrics.outputTokens);
+          } catch {
+            streamError = new Error("Contribution credit settlement could not be verified.");
+            await apiAccess.failUsage(usage.id, "contribution_credit_settlement_failed");
+          }
         } else {
-          apiAccess.failUsage(
+          (await apiAccess.failUsage(
             usage.id,
             streamedFailure?.code ?? (streamError ? "stream_failed" : "missing_result"),
-          );
+          ));
         }
       }
-      store.appendInferenceMessage({
+      if (funded && usage && creditWallet) {
+        try { await creditWallet.assertSettled(usage.id); }
+        catch { streamError = new Error("Contribution credit settlement could not be verified."); }
+      }
+      (await store.appendInferenceMessage({
         conversationId,
         jobId: handle.jobId,
         role: "assistant",
@@ -4836,7 +4855,7 @@ export async function createCoordinator(
               execution_receipt_id: streamedResult?.result.executionReceiptId ?? null,
               execution_privacy: streamedResult?.result.privacy ?? null,
             },
-      });
+      }));
       void persistence?.flush();
       if (streamError && !reply.raw.destroyed && !reply.raw.writableEnded) {
         reply.raw.write(`data: ${JSON.stringify({
@@ -4863,28 +4882,22 @@ export async function createCoordinator(
         if (event.type === "failed") {
           throw new MeshServiceError(event.code, event.message, 502);
         }
-        if (event.type === "completed") result = attachExecutionReceipt(event, parsed.model, routeClass);
+        if (event.type === "completed") result = (await attachExecutionReceipt(event, parsed.model, routeClass));
       }
       if (!result) {
         throw new MeshServiceError("missing_result", "Worker stream ended without a result", 502);
       }
     } catch (error) {
       if (usage) {
-        apiAccess.failUsage(
+        (await apiAccess.failUsage(
           usage.id,
           error instanceof MeshServiceError ? error.code : "inference_failed",
-        );
+        ));
       }
       throw error;
     }
     if (usage) {
-      const account = apiAccess.completeUsage(
-        usage.id,
-        result.result.metrics.inputTokens,
-        result.result.metrics.outputTokens,
-      );
-      if (account) reply.header("x-token-balance", account.tokenBalance);
-      if (result.result.networkTrace) settleCompletedInference({
+      if (result.result.networkTrace) (await settleCompletedInference({
         userId: usage.userId,
         jobId: handle.jobId,
         modelId: parsed.model,
@@ -4894,10 +4907,18 @@ export async function createCoordinator(
         networkTrace: result.result.networkTrace,
         recovery: result.result.recovery ?? { mode: "none", attempts: 1, replayedTokenEvents: 0 },
         executionReceiptId: result.result.executionReceiptId!,
-      });
+      }));
+      try {
+        if (funded && creditWallet) await creditWallet.assertSettled(usage.id);
+        const account = await apiAccess.completeUsage(usage.id, result.result.metrics.inputTokens, result.result.metrics.outputTokens);
+        if (account) reply.header("x-token-balance", account.tokenBalance);
+      } catch {
+        await apiAccess.failUsage(usage.id, "contribution_credit_settlement_failed");
+        throw new MeshServiceError("contribution_credit_settlement_failed", "The credit settlement could not be verified.", 502);
+      }
     }
     reply.header("x-route-class", routeClass);
-    store.appendInferenceMessage({
+    (await store.appendInferenceMessage({
       conversationId,
       jobId: handle.jobId,
       role: "assistant",
@@ -4917,7 +4938,7 @@ export async function createCoordinator(
         execution_receipt_id: result.result.executionReceiptId ?? null,
         execution_privacy: result.result.privacy ?? null,
       },
-    });
+    }));
     void persistence?.flush();
     return {
       id: handle.jobId,
@@ -4960,11 +4981,11 @@ export async function createCoordinator(
     const principal = apiAccessEnabled ? principalFor(request) : { kind: "system" as const };
     if (
       principal.kind !== "system"
-      && !apiAccess.userOwnsJob(principal.userId, jobId)
+      && !(await apiAccess.userOwnsJob(principal.userId, jobId))
     ) {
       return reply.code(404).send({ error: { code: "not_found" } });
     }
-    const job = store.getJob(jobId);
+    const job = (await store.getJob(jobId));
     if (!job) return reply.code(404).send({ error: { code: "not_found" } });
     return {
       id: job.id,
@@ -4983,20 +5004,20 @@ export async function createCoordinator(
   app.get("/v1/requests/:jobId/receipt", async (request, reply) => {
     const { jobId } = jobIdParamsSchema.parse(request.params);
     const principal = apiAccessEnabled ? principalFor(request) : { kind: "system" as const };
-    if (principal.kind !== "system" && !apiAccess.userOwnsJob(principal.userId, jobId)) {
+    if (principal.kind !== "system" && !(await apiAccess.userOwnsJob(principal.userId, jobId))) {
       return reply.code(404).send({ error: { code: "not_found" } });
     }
-    const receipt = executionReceipts.forJob(jobId);
+    const receipt = (await executionReceipts.forJob(jobId));
     return receipt ?? reply.code(404).send({ error: { code: "receipt_not_found" } });
   });
 
   app.get("/v1/requests/:jobId/topology", async (request, reply) => {
     const { jobId } = jobIdParamsSchema.parse(request.params);
     const principal = apiAccessEnabled ? principalFor(request) : { kind: "system" as const };
-    if (principal.kind !== "system" && !apiAccess.userOwnsJob(principal.userId, jobId)) {
+    if (principal.kind !== "system" && !(await apiAccess.userOwnsJob(principal.userId, jobId))) {
       return reply.code(404).send({ error: { code: "not_found" } });
     }
-    const topology = executionReceipts.topologyForJob(jobId);
+    const topology = (await executionReceipts.topologyForJob(jobId));
     return topology ?? reply.code(404).send({ error: { code: "topology_not_found" } });
   });
 
@@ -5005,12 +5026,12 @@ export async function createCoordinator(
     const principal = apiAccessEnabled ? principalFor(request) : { kind: "system" as const };
     if (
       principal.kind !== "system"
-      && !apiAccess.userOwnsSession(principal.userId, sessionId)
+      && !(await apiAccess.userOwnsSession(principal.userId, sessionId))
     ) {
       return reply.code(404).send({ error: { code: "not_found" } });
     }
     return {
-      data: store.listInferenceMessages(sessionId).map((message) => ({
+      data: (await store.listInferenceMessages(sessionId)).map((message) => ({
         id: message.id,
         job_id: message.jobId,
         role: message.role,
@@ -5031,11 +5052,11 @@ export async function createCoordinator(
     const principal = apiAccessEnabled ? principalFor(request) : { kind: "system" as const };
     if (
       principal.kind !== "system"
-      && !apiAccess.userOwnsJob(principal.userId, jobId)
+      && !(await apiAccess.userOwnsJob(principal.userId, jobId))
     ) {
       return reply.code(404).send({ error: { code: "not_found_or_terminal" } });
     }
-    if (!service.cancel(jobId)) {
+    if (!(await service.cancel(jobId))) {
       return reply.code(404).send({ error: { code: "not_found_or_terminal" } });
     }
     return reply.code(202).send({ id: jobId, status: "cancelled" });
@@ -5240,17 +5261,23 @@ export async function createCoordinator(
     persistence,
     deploymentController,
     async close() {
+      const failures: unknown[] = [];
+      const attempt = async (action: () => unknown | Promise<unknown>) => { try { await action(); } catch (error) { failures.push(error); } };
       clearInterval(staleTimer);
       clearInterval(networkTelemetryTimer);
       for (const timer of automaticBenchmarkRetryTimers) clearTimeout(timer);
       automaticBenchmarkRetryTimers.clear();
       fleetContribution.close();
-      hub.close();
+      inferenceRouteRecovery.close();
+      await attempt(() => hub.close());
       mobileHub.close();
-      await activationManager?.close();
-      await app.close();
-      await persistence?.close();
-      database.close();
+      await attempt(() => activationManager?.close());
+      await attempt(() => app.close());
+      await attempt(() => background.close());
+      await attempt(() => service.drainEvents());
+      await attempt(() => persistence?.close());
+      await attempt(() => database.close());
+      if (failures.length) throw new AggregateError(failures, "Coordinator shutdown reported failures");
     },
   };
 }
@@ -5311,49 +5338,6 @@ function sendDevelopmentLabError(
         : "The development lab request was rejected.",
     },
   });
-}
-
-function queueExistingMobileArtifacts(
-  persistence: SupabasePersistence,
-  directory: string,
-): void {
-  let files: string[];
-  try {
-    files = readdirSync(directory);
-  } catch {
-    return;
-  }
-  for (const file of files) {
-    const path = resolve(directory, file);
-    if (file.endsWith(".bin")) {
-      const weightsHash = file.slice(0, -4);
-      if (!/^[a-f0-9]{64}$/.test(weightsHash)) continue;
-      const sizeBytes = statSync(path).size;
-      persistence.registerArtifactBackup({
-        id: `mobile-weight-${weightsHash}`,
-        localPath: path,
-        storagePath: `mobile-experts/weights/${file}`,
-        contentType: "application/octet-stream",
-        sha256: weightsHash,
-        sizeBytes,
-        metadata: { kind: "mobile-expert-weights", weightsHash },
-      });
-      continue;
-    }
-    if (!file.endsWith(".json")) continue;
-    const artifactId = file.slice(0, -5);
-    if (!/^[a-f0-9]{64}$/.test(artifactId)) continue;
-    const body = readFileSync(path);
-    persistence.registerArtifactBackup({
-      id: `mobile-manifest-${artifactId}`,
-      localPath: path,
-      storagePath: `mobile-experts/manifests/${file}`,
-      contentType: "application/json",
-      sha256: createHash("sha256").update(body).digest("hex"),
-      sizeBytes: body.length,
-      metadata: { kind: "mobile-expert-manifest", artifactId },
-    });
-  }
 }
 
 const benchmarkRunRequestSchema = z.object({
@@ -5619,9 +5603,16 @@ function resolveLandingAssetsPath(
   return candidates.find((candidate) => existsSync(resolve(candidate, "index.html"))) ?? null;
 }
 
-function dashboardWorkers(store: MeshStore, hub: WorkerHub, mobileHub: MobileComputeHub) {
+function resourceDeviceId(nodeId: string | undefined): string | undefined {
+  const raw = process.env.MYCELLIOS_NETWORK_DEVICE_ALIASES;
+  if (!raw || !nodeId) return undefined;
+  const aliases = z.record(z.string().min(1).max(128), z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/)).parse(JSON.parse(raw));
+  return Object.hasOwn(aliases, nodeId) ? aliases[nodeId] : undefined;
+}
+
+async function dashboardWorkers(store: MeshStore, hub: WorkerHub, mobileHub: MobileComputeHub) {
   return [
-    ...store.listWorkers().filter((worker) => storedWorkerIsVisible(worker, hub)).map((worker) => ({
+    ...(await store.listWorkers()).filter((worker) => storedWorkerIsVisible(worker, hub)).map((worker) => ({
       id: worker.id,
       status: worker.status,
       connected: hub.isConnected(worker.id),
@@ -5635,6 +5626,7 @@ function dashboardWorkers(store: MeshStore, hub: WorkerHub, mobileHub: MobileCom
       gpus: worker.capabilities.gpus,
       deployments: worker.capabilities.deployments,
       executionNodeId: worker.capabilities.distributedExecutor?.nodeId,
+      resourceDeviceId: resourceDeviceId(worker.capabilities.distributedExecutor?.nodeId),
       computeMode: worker.capabilities.distributedExecutor?.computeMode,
       acceleration: worker.capabilities.distributedExecutor?.acceleration,
       isolation: worker.capabilities.distributedExecutor?.isolation,
@@ -5665,25 +5657,26 @@ function storedWorkerIsVisible(worker: StoredWorker, hub: WorkerHub): boolean {
   return storedWorkerKind(worker) !== "cell" || hub.isConnected(worker.id);
 }
 
-function publicSnapshot(
+async function publicSnapshot(
   store: MeshStore,
   scheduler: Scheduler,
   hub: WorkerHub,
   mobileHub: MobileComputeHub,
   activationManager: ModelActivationManager | undefined,
   activationPresentation: {
-    activationProgressForModel(modelId: string): readonly ModelActivationProgressEvent[];
+    activationProgressForModel(modelId: string): readonly ModelActivationProgressEvent[] | Promise<readonly ModelActivationProgressEvent[]>;
     activationStatusMessageForModel(modelId: string): string | null;
-    activationIncidentForModel(modelId: string): ActivationIncident | null;
+    activationIncidentForModel(modelId: string): ActivationIncident | null | Promise<ActivationIncident | null>;
   } | undefined,
   version: string,
   buildIdentity: NativeBuildIdentity | null = null,
 ) {
-  const workers = dashboardWorkers(store, hub, mobileHub);
-  const models = scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() });
-  const requestedModels = requestedModelCapacityViews({
-    requests: store.listRequestedModels(),
-    workers: store.listWorkers(),
+  const workers = (await dashboardWorkers(store, hub, mobileHub));
+  const inventory = networkInventory(workers);
+  const models = (await scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() }));
+  const requestedModels = (await requestedModelCapacityViews({
+    requests: (await store.listRequestedModels()),
+    workers: (await store.listWorkers()),
     connectedWorkerIds: hub.connectedWorkerIds(),
     activeModelIds: new Set(models.map((model) => model.id)),
     ...(activationManager
@@ -5696,11 +5689,11 @@ function publicSnapshot(
           activationIncidentForModel: activationPresentation.activationIncidentForModel,
         }
       : activationManager?.activationProgressForModel
-        ? { activationProgressForModel: (modelId: string) => activationManager.activationProgressForModel!(modelId) }
+        ? { activationProgressForModel: async (modelId: string) => (await activationManager.activationProgressForModel!(modelId)) }
         : {}),
     activationAvailable: activationManager !== undefined,
-  });
-  const jobs = store.listJobs(100).map((job) => ({
+  }));
+  const jobs = (await store.listJobs(100)).map((job) => ({
     id: job.id,
     model: job.model,
     status: job.status,
@@ -5716,12 +5709,15 @@ function publicSnapshot(
     version,
     buildIdentity,
     summary: {
-      registered: workers.length,
-      connected: workers.filter((worker) => worker.connected).length,
-      online: workers.filter((worker) => worker.status === "online").length,
+      registered: inventory.workers.length,
+      connected: inventory.connected,
+      online: inventory.online.length,
       mobile: workers.filter((worker) => worker.kind === "browser").length,
-      offeredVramMb: workers.reduce((sum, worker) => sum + worker.offeredVramMb, 0),
-      completedJobs: store.countCompletedJobs(),
+      offeredVramMb: inventory.offeredMemoryMb,
+      gpuCount: inventory.gpuCount,
+      unidentifiedSessions: inventory.unidentifiedSessions,
+      virtualWorkers: inventory.virtualWorkers,
+      completedJobs: (await store.countCompletedJobs()),
     },
     workers,
     models: models.map((model) => ({
@@ -5735,9 +5731,9 @@ function publicSnapshot(
 }
 
 function panelSnapshotForView(
-  snapshot: ReturnType<typeof publicSnapshot>,
+  snapshot: Awaited<ReturnType<typeof publicSnapshot>>,
   view: string,
-): ReturnType<typeof publicSnapshot> {
+): Awaited<ReturnType<typeof publicSnapshot>> {
   const lightweightRequests = snapshot.requestedModels.map((model) => ({
     ...model,
     activationProgress: [],
@@ -5747,7 +5743,7 @@ function panelSnapshotForView(
     models: [],
     requestedModels: [],
     jobs: [],
-  } satisfies Pick<ReturnType<typeof publicSnapshot>, "workers" | "models" | "requestedModels" | "jobs">;
+  } satisfies Pick<Awaited<ReturnType<typeof publicSnapshot>>, "workers" | "models" | "requestedModels" | "jobs">;
   if (view === "overview") return {
     ...snapshot,
     requestedModels: lightweightRequests,
@@ -5777,12 +5773,10 @@ function panelSnapshotForView(
 }
 
 function networkTelemetrySample(
-  snapshot: ReturnType<typeof publicSnapshot>,
+  snapshot: Awaited<ReturnType<typeof publicSnapshot>>,
   capturedAt: number,
 ): StoredNetworkTelemetrySample {
-  const onlineWorkers = snapshot.workers.filter(
-    (worker) => worker.connected && worker.status === "online",
-  );
+  const onlineWorkers = networkInventory(snapshot.workers).online;
   const offeredVramMb = onlineWorkers.reduce(
     (total, worker) => total + worker.offeredVramMb,
     0,

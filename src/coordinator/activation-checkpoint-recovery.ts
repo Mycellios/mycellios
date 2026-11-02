@@ -83,22 +83,22 @@ export class ActivationCheckpointRecoveryAuthority {
     private readonly restorer: ActivationCheckpointRestorer,
   ) {}
 
-  initialize(now = Date.now()): number {
-    return Number(this.database.raw.prepare(
+  async initialize(now = Date.now()): Promise<number> {
+    return Number((await this.database.raw.prepare(
       `UPDATE activation_checkpoint_recoveries
        SET status = 'failed', error = 'coordinator_restarted_during_recovery', updated_at = ?
        WHERE status IN ('restoring', 'promoting')`,
-    ).run(now).changes);
+    ).run(now)).changes);
   }
 
-  prepare(value: unknown, now = Date.now()): ActivationCheckpointRecoveryRecord {
+  async prepare(value: unknown, now = Date.now()): Promise<ActivationCheckpointRecoveryRecord> {
     const input = recoveryInputSchema.parse(value);
     if (input.expiresAt <= now) throw new Error("activation_checkpoint_recovery_is_expired");
     const identity = { schema: "mycellios-activation-checkpoint-recovery/1", ...input };
     const operationKey = sha256CanonicalEvidence(identity);
     const id = `acr_${operationKey.slice("sha256:".length, "sha256:".length + 32)}`;
     const compatibilityJson = canonicalEvidenceJson(input.expected);
-    this.database.raw.prepare(
+    (await this.database.raw.prepare(
       `INSERT INTO activation_checkpoint_recoveries(
          id, operation_key, model_id, reservation_id, recovery_generation,
          source_checkpoint_id, target_worker_id, target_launch_request_id,
@@ -111,14 +111,14 @@ export class ActivationCheckpointRecoveryAuthority {
       input.sourceCheckpointId, input.targetWorkerId, input.targetLaunchRequestId,
       input.targetStageRequestId, compatibilityJson, input.maximumBytes, input.expiresAt,
       now, now,
-    );
-    return this.require(id);
+    ));
+    return (await this.require(id));
   }
 
-  get(id: string): ActivationCheckpointRecoveryRecord | null {
-    const row = this.database.raw.prepare(
+  async get(id: string): Promise<ActivationCheckpointRecoveryRecord | null> {
+    const row = (await this.database.raw.prepare(
       "SELECT * FROM activation_checkpoint_recoveries WHERE id = ?",
-    ).get(id) as RecoveryRow | undefined;
+    ).get(id)) as RecoveryRow | undefined;
     return row ? mapRecovery(row) : null;
   }
 
@@ -127,16 +127,16 @@ export class ActivationCheckpointRecoveryAuthority {
     promote: (record: ActivationCheckpointRecoveryRecord) => Promise<void> | void,
     now = Date.now(),
   ): Promise<ActivationCheckpointRecoveryRecord> {
-    const prepared = this.require(id);
+    const prepared = (await this.require(id));
     if (prepared.status === "promoted") return prepared;
     if (prepared.status !== "prepared") {
       throw new Error(`activation_checkpoint_recovery_is_not_prepared:${prepared.status}`);
     }
     if (prepared.expiresAt <= now) {
-      this.fail(id, "activation_checkpoint_recovery_is_expired", now);
+      (await this.fail(id, "activation_checkpoint_recovery_is_expired", now));
       throw new Error("activation_checkpoint_recovery_is_expired");
     }
-    this.transition(id, "prepared", "restoring", now);
+    (await this.transition(id, "prepared", "restoring", now));
     try {
       const restored = await this.restorer.restoreActivationCheckpoint(
         prepared.targetWorkerId,
@@ -152,51 +152,51 @@ export class ActivationCheckpointRecoveryAuthority {
         throw new Error("activation_checkpoint_recovery_ack_identity_is_invalid");
       }
       const restoredAt = Date.now();
-      const restoredChanges = this.database.raw.prepare(
+      const restoredChanges = (await this.database.raw.prepare(
         `UPDATE activation_checkpoint_recoveries
          SET status = 'restored', transfer_id = ?, restored_at = ?, updated_at = ?
          WHERE id = ? AND status = 'restoring'`,
-      ).run(restored.transferId, restoredAt, restoredAt, id).changes;
-      if (restoredChanges !== 1n) throw new Error("activation_checkpoint_recovery_restore_fence_failed");
-      this.transition(id, "restored", "promoting", restoredAt);
-      await promote(this.require(id));
+      ).run(restored.transferId, restoredAt, restoredAt, id)).changes;
+      if (restoredChanges !== 1) throw new Error("activation_checkpoint_recovery_restore_fence_failed");
+      (await this.transition(id, "restored", "promoting", restoredAt));
+      await promote((await this.require(id)));
       const promotedAt = Date.now();
-      const promotedChanges = this.database.raw.prepare(
+      const promotedChanges = (await this.database.raw.prepare(
         `UPDATE activation_checkpoint_recoveries
          SET status = 'promoted', promoted_at = ?, updated_at = ?
          WHERE id = ? AND status = 'promoting' AND restored_at IS NOT NULL AND transfer_id IS NOT NULL`,
-      ).run(promotedAt, promotedAt, id).changes;
-      if (promotedChanges !== 1n) throw new Error("activation_checkpoint_recovery_promotion_fence_failed");
-      return this.require(id);
+      ).run(promotedAt, promotedAt, id)).changes;
+      if (promotedChanges !== 1) throw new Error("activation_checkpoint_recovery_promotion_fence_failed");
+      return (await this.require(id));
     } catch (error) {
-      this.fail(id, error instanceof Error ? error.message : String(error), Date.now());
+      (await this.fail(id, error instanceof Error ? error.message : String(error), Date.now()));
       throw error;
     }
   }
 
-  private transition(
+  private async transition(
     id: string,
     from: ActivationCheckpointRecoveryStatus,
     to: ActivationCheckpointRecoveryStatus,
     now: number,
-  ): void {
-    const changes = this.database.raw.prepare(
+  ): Promise<void> {
+    const changes = (await this.database.raw.prepare(
       `UPDATE activation_checkpoint_recoveries SET status = ?, updated_at = ?
        WHERE id = ? AND status = ?`,
-    ).run(to, now, id, from).changes;
-    if (changes !== 1n) throw new Error(`activation_checkpoint_recovery_transition_failed:${from}:${to}`);
+    ).run(to, now, id, from)).changes;
+    if (changes !== 1) throw new Error(`activation_checkpoint_recovery_transition_failed:${from}:${to}`);
   }
 
-  private fail(id: string, error: string, now: number): void {
-    this.database.raw.prepare(
+  private async fail(id: string, error: string, now: number): Promise<void> {
+    (await this.database.raw.prepare(
       `UPDATE activation_checkpoint_recoveries
        SET status = 'failed', error = ?, updated_at = ?
        WHERE id = ? AND status != 'promoted'`,
-    ).run(error.slice(0, 2_000), now, id);
+    ).run(error.slice(0, 2_000), now, id));
   }
 
-  private require(id: string): ActivationCheckpointRecoveryRecord {
-    const record = this.get(id);
+  private async require(id: string): Promise<ActivationCheckpointRecoveryRecord> {
+    const record = (await this.get(id));
     if (!record) throw new Error(`activation_checkpoint_recovery_not_found:${id}`);
     return record;
   }

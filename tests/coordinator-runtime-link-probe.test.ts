@@ -4,14 +4,15 @@ import type { WorkerEnvelope } from "../src/contracts/types.js";
 import type { MeshStore } from "../src/storage/store.js";
 
 describe("WorkerHub runtime link probes", () => {
-  it("measures the directed path used by live relay traffic", () => {
+  it("measures the directed path used by live relay traffic", async () => {
     const workers = [
       runtimeWorker("worker-a", "node-a"),
       runtimeWorker("worker-b", "node-b"),
     ];
-    const hub = new WorkerHub({
+    const hub = (await WorkerHub.create({
+      listRuntimeLinkSamples: async () => [],
       listWorkers: () => workers,
-    } as unknown as MeshStore);
+    } as unknown as MeshStore));
     const sent: Array<{
       workerId: string;
       type: string;
@@ -23,7 +24,7 @@ describe("WorkerHub runtime link probes", () => {
       return true;
     });
 
-    expect(hub.sampleRuntimeLinks(1, 10_000)).toBe(1);
+    expect((await hub.sampleRuntimeLinks(1, 10_000))).toBe(1);
     const start = sent.find((message) => message.type === "runtime.link.probe.start")!;
     expect(start.workerId).toBe("worker-a");
     expect(start.payload.destinationNodeId).toBe("node-b");
@@ -64,17 +65,18 @@ describe("WorkerHub runtime link probes", () => {
         availability: 1,
       }),
     ]);
-    hub.close();
+    (await hub.close());
   });
 
-  it("rejects a result from a worker that does not own the probe", () => {
+  it("rejects a result from a worker that does not own the probe", async () => {
     const workers = [
       runtimeWorker("worker-a", "node-a"),
       runtimeWorker("worker-b", "node-b"),
     ];
-    const hub = new WorkerHub({
+    const hub = (await WorkerHub.create({
+      listRuntimeLinkSamples: async () => [],
       listWorkers: () => workers,
-    } as unknown as MeshStore);
+    } as unknown as MeshStore));
     const sent: Array<{ workerId: string; type: string; payload: Record<string, unknown> }> = [];
     vi.spyOn(hub, "isConnected").mockReturnValue(true);
     vi.spyOn(hub, "send").mockImplementation((workerId, type, payload) => {
@@ -82,7 +84,7 @@ describe("WorkerHub runtime link probes", () => {
       return true;
     });
 
-    hub.sampleRuntimeLinks(1, 10_000);
+    (await hub.sampleRuntimeLinks(1, 10_000));
     const probeId = sent[0]!.payload.probeId as string;
     deliver(hub, "worker-b", "runtime.link.probe.result", {
       probeId,
@@ -91,7 +93,7 @@ describe("WorkerHub runtime link probes", () => {
       goodputMbps: 1_000,
     });
     expect(hub.runtimeLinkObservations()).toEqual([]);
-    hub.close();
+    (await hub.close());
   });
 });
 

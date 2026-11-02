@@ -13,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
+import { macSupplementFromEnvironment } from "./macos-release-supplement.js";
 
 export type ReleaseAssetChannel = "updates" | "downloads";
 
@@ -46,7 +47,7 @@ export interface ReleaseAssetEvidence {
 }
 
 export interface ReleaseTransactionManifest extends ReleaseTransactionIdentity {
-  schema: "mycellios-native-public-release/1";
+  schema: "mycellios-native-public-release/1" | "mycellios-native-public-release/2" | "mycellios-native-windows-beta/1";
   assets: ReleaseAssetEvidence[];
   releaseId: `sha256:${string}`;
 }
@@ -69,14 +70,16 @@ export interface ReleaseAbortResult {
   alreadyAborted: boolean;
 }
 
-const RELEASE_SCHEMA = "mycellios-native-public-release/1";
+const LEGACY_RELEASE_SCHEMA = "mycellios-native-public-release/1";
+const RELEASE_SCHEMA = "mycellios-native-public-release/2";
+const WINDOWS_BETA_SCHEMA = "mycellios-native-windows-beta/1";
 const TRANSACTION_SEAL_SCHEMA = "mycellios-native-release-transaction-seal/1";
 const COMMIT_SCHEMA = "mycellios-native-release-commit/1";
 const ACTIVE_SCHEMA = "mycellios-native-release-active/1";
 const ROLLBACK_SCHEMA = "mycellios-native-release-rollback/1";
 
 const UPDATE_FILE = /^mycellios-node-latest\.json$/;
-const DOWNLOAD_FILE = /^mycellios-node-(?:windows-x64\.zip|macos-arm64\.tar\.gz|linux-x64\.tar\.gz)$/;
+const DOWNLOAD_FILE = /^mycellios-node-(?:windows-x64\.zip|macos-arm64\.tar\.gz|linux-x64\.tar\.gz|\d+\.\d+\.\d+-(?:windows-x64\.msi|source\.zip|macos-arm64\.pkg|linux-x64\.deb))$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const MAX_RELEASE_FILE_SIZE = 1_500_000_000;
 const MAX_RELEASE_CHUNKS = 2_048;
@@ -99,12 +102,16 @@ export function parseReleaseTransactionIdentity(
 }
 
 export function buildReleaseTransactionManifest(
-  input: ReleaseTransactionIdentity & { assets: ReleaseAssetEvidence[] },
+  input: ReleaseTransactionIdentity & {
+    assets: ReleaseAssetEvidence[];
+    schema?: ReleaseTransactionManifest["schema"];
+  },
 ): ReleaseTransactionManifest {
   const identity = validateTransactionIdentity(input);
-  const assets = validateManifestAssets(identity.version, input.assets);
+  const schema = input.schema ?? RELEASE_SCHEMA;
+  const assets = validateManifestAssets(identity.version, input.assets, schema);
   const sealed = {
-    schema: RELEASE_SCHEMA,
+    schema,
     transactionId: identity.transactionId,
     sourceId: identity.sourceId,
     revision: identity.revision,
@@ -134,7 +141,7 @@ export function parseReleaseTransactionManifest(
     ],
     "release_manifest",
   );
-  if (candidate.schema !== RELEASE_SCHEMA) {
+  if (candidate.schema !== RELEASE_SCHEMA && candidate.schema !== LEGACY_RELEASE_SCHEMA && candidate.schema !== WINDOWS_BETA_SCHEMA) {
     throw new Error("release_manifest_schema_invalid");
   }
   if (typeof candidate.releaseId !== "string" || !SOURCE_ID.test(candidate.releaseId)) {
@@ -147,6 +154,7 @@ export function parseReleaseTransactionManifest(
   const expected = buildReleaseTransactionManifest({
     ...identity,
     assets: candidate.assets,
+    schema: candidate.schema,
   });
   if (canonicalJson(candidate) !== canonicalJson(expected)) {
     throw new Error("release_manifest_seal_invalid");
@@ -155,6 +163,7 @@ export function parseReleaseTransactionManifest(
 }
 
 export class NativeReleaseTransactionStore {
+  readonly #macSupplement = macSupplementFromEnvironment();
   readonly #storageRoot: string;
   readonly #legacyRoots: Partial<Record<ReleaseAssetChannel, string>>;
   readonly #expected: Omit<ReleaseTransactionIdentity, "transactionId">;
@@ -427,6 +436,10 @@ export class NativeReleaseTransactionStore {
     });
   }
 
+  get publishedVersion(): string | null {
+    return this.#active?.manifest.version ?? null;
+  }
+
   async publicAssetPath(
     channel: ReleaseAssetChannel,
     fileName: string,
@@ -440,7 +453,12 @@ export class NativeReleaseTransactionStore {
       const evidence = this.#active.manifest.assets.find(
         (asset) => asset.channel === channel && asset.fileName === fileName,
       );
-      if (!evidence) return null;
+      if (!evidence) {
+        const parent = this.#active.manifest;
+        if (channel !== "downloads" || fileName !== `mycellios-node-${parent.version}-macos-arm64.pkg`) return null;
+        const supplemental = await this.#macSupplement?.assetPath(parent, channel, fileName) ?? null;
+        return this.#active?.manifest.releaseId === parent.releaseId ? supplemental : null;
+      }
       return resolveInside(
         this.#transactionRoot(this.#active.manifest.transactionId),
         `assets/${channel}/${fileName}`,
@@ -888,10 +906,30 @@ function validateTransactionId(value: string): void {
   }
 }
 
-export function expectedPublicReleaseAssets(version: string): Array<{
+export function expectedPublicReleaseAssets(
+  version: string,
+  schema: ReleaseTransactionManifest["schema"] = RELEASE_SCHEMA,
+): Array<{
   channel: ReleaseAssetChannel;
   fileName: string;
 }> {
+  if (!VERSION.test(version)) throw new Error("release_transaction_version_invalid");
+  if (schema === WINDOWS_BETA_SCHEMA) {
+    return [
+      { channel: "downloads", fileName: `mycellios-node-${version}-windows-x64.msi` },
+      { channel: "downloads", fileName: `mycellios-node-${version}-source.zip` },
+      { channel: "updates", fileName: "mycellios-node-latest.json" },
+    ];
+  }
+  if (schema === RELEASE_SCHEMA) {
+    return [
+      { channel: "downloads", fileName: `mycellios-node-${version}-linux-x64.deb` },
+      { channel: "downloads", fileName: `mycellios-node-${version}-macos-arm64.pkg` },
+      { channel: "downloads", fileName: `mycellios-node-${version}-windows-x64.msi` },
+      { channel: "updates", fileName: "mycellios-node-latest.json" },
+    ];
+  }
+  if (schema !== LEGACY_RELEASE_SCHEMA) throw new Error("release_manifest_schema_invalid");
   return [
     { channel: "downloads", fileName: "mycellios-node-linux-x64.tar.gz" },
     { channel: "downloads", fileName: "mycellios-node-macos-arm64.tar.gz" },
@@ -903,8 +941,9 @@ export function expectedPublicReleaseAssets(version: string): Array<{
 function validateManifestAssets(
   version: string,
   candidates: unknown[],
+  schema: ReleaseTransactionManifest["schema"],
 ): ReleaseAssetEvidence[] {
-  const expected = expectedPublicReleaseAssets(version);
+  const expected = expectedPublicReleaseAssets(version, schema);
   if (candidates.length !== expected.length) {
     throw new Error("release_manifest_asset_count_invalid");
   }
@@ -952,7 +991,8 @@ function assertExpectedAsset(
   channel: ReleaseAssetChannel,
   fileName: string,
 ): void {
-  if (!expectedPublicReleaseAssets(version).some(
+  const allowed = [...expectedPublicReleaseAssets(version), ...expectedPublicReleaseAssets(version, WINDOWS_BETA_SCHEMA)];
+  if (!allowed.some(
     (asset) => asset.channel === channel && asset.fileName === fileName,
   )) {
     throw new Error("release_transaction_asset_not_expected");
@@ -1227,18 +1267,20 @@ async function verifyFeedCoherence(
   if (!Array.isArray(latest.packages)) {
     throw new Error("release_transaction_latest_packages_invalid");
   }
-  const latestPackages = [
-    ["linux-x64", "mycellios-node-linux-x64.tar.gz"],
-    ["macos-arm64", "mycellios-node-macos-arm64.tar.gz"],
-    ["windows-x64", "mycellios-node-windows-x64.zip"],
-  ].map(([target, name]) => {
-    const evidence = observed.get(`downloads/${name}`);
-    if (!target || !name || !evidence) {
+  const targets = manifest.schema === WINDOWS_BETA_SCHEMA
+    ? ["windows-x64"] as const
+    : ["linux-x64", "macos-arm64", "windows-x64"] as const;
+  const latestPackages = expectedPublicReleaseAssets(manifest.version, manifest.schema)
+    .filter((asset) => asset.channel === "downloads" && !asset.fileName.endsWith("-source.zip"))
+    .map(({ fileName }, index) => {
+    const target = targets[index];
+    const evidence = observed.get(`downloads/${fileName}`);
+    if (!target || !evidence) {
       throw new Error("release_transaction_latest_packages_invalid");
     }
     return {
       target,
-      name,
+      name: fileName,
       bytes: evidence.bytes,
       sha256: evidence.sha256,
     };

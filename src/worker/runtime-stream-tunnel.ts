@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { createConnection, createServer, type AddressInfo, type Server, type Socket } from "node:net";
+import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
+import { connectPreparedLoopback } from "./loopback-connect.js";
 import { MAX_RUNTIME_STREAM_CHUNK_BYTES } from "../contracts/worker-protocol.js";
 import type {
   PythonLaunchProcess,
@@ -200,6 +201,10 @@ export interface RuntimeStreamTransportSnapshot {
 export class RuntimeStreamTunnel {
   private readonly proxyServers = new Set<Server>();
   private readonly sessions = new Map<string, StreamSession>();
+  private readonly pendingIncoming = new Map<string, {
+    controller: AbortController; finished: Promise<void>;
+    recovery: { generation: number; recoveryToken: string } | undefined;
+  }>();
   private readonly allowedTargetPorts = new Set<number>();
   private readonly rewrites = new Map<string, CommandRewrite>();
   private readonly maxReplayBytes: number;
@@ -435,6 +440,7 @@ export class RuntimeStreamTunnel {
   transportDisconnected(): void {
     if (!this.transportAvailable) return;
     this.transportAvailable = false;
+    for (const pending of this.pendingIncoming.values()) pending.controller.abort();
     for (const session of [...this.sessions.values()]) {
       if (session.transportMode === "direct") continue;
       this.recordCoordinatorFailure(session);
@@ -529,6 +535,9 @@ export class RuntimeStreamTunnel {
   }
 
   private async resetPreparedRuntime(): Promise<void> {
+    const pending = [...this.pendingIncoming.values()];
+    for (const opening of pending) opening.controller.abort();
+    await Promise.allSettled(pending.map(opening => opening.finished));
     for (const session of [...this.sessions.values()]) this.closeSession(session.streamId, true);
     const servers = [...this.proxyServers];
     this.proxyServers.clear();
@@ -545,7 +554,7 @@ export class RuntimeStreamTunnel {
   }
 
   private openOutgoing(socket: Socket, destinationNodeId: string, targetPort: number): void {
-    if (this.sessions.size >= MAX_STREAMS) {
+    if (this.sessions.size + this.pendingIncoming.size >= MAX_STREAMS) {
       socket.destroy(new Error("runtime_stream_capacity_exceeded"));
       return;
     }
@@ -577,15 +586,15 @@ export class RuntimeStreamTunnel {
     recoveryToken?: string,
   ): Promise<void> {
     if (
-      this.sessions.has(streamId) ||
-      this.sessions.size >= MAX_STREAMS ||
+      this.sessions.has(streamId) || this.pendingIncoming.has(streamId) ||
+      this.sessions.size + this.pendingIncoming.size >= MAX_STREAMS ||
       !this.allowedTargetPorts.has(targetPort)
     ) {
       this.sendEnvelope("runtime.stream.error", {
         streamId,
-        message: this.sessions.has(streamId)
+        message: this.sessions.has(streamId) || this.pendingIncoming.has(streamId)
           ? "runtime_stream_is_duplicate"
-          : this.sessions.size >= MAX_STREAMS
+          : this.sessions.size + this.pendingIncoming.size >= MAX_STREAMS
             ? "runtime_stream_capacity_exceeded"
             : `runtime_stream_target_is_not_authorized:${targetPort}`,
       });
@@ -600,37 +609,33 @@ export class RuntimeStreamTunnel {
       });
       return;
     }
-    const socket = createConnection({ host: LOOPBACK, port: targetPort });
-    socket.setNoDelay(true);
-    socket.setTimeout(CONNECT_TIMEOUT_MS);
     const recovery = generation !== undefined && recoveryToken !== undefined
       ? { generation, recoveryToken }
       : undefined;
-    const session = this.attachSocket(
-      streamId,
-      socket,
-      true,
-      recovery,
-      { destinationNodeId: null, targetPort, transportMode: "relay" },
-    );
-    await new Promise<void>((resolve) => {
-      const fail = (error: Error) => {
-        if (!this.sessions.has(streamId)) return resolve();
-        this.sendSessionEnvelope(session, "runtime.stream.error", {
-          message: error.message.slice(0, 1_024),
+    const pending = { controller: new AbortController(), finished: Promise.resolve(), recovery };
+    this.pendingIncoming.set(streamId, pending);
+    pending.finished = (async () => {
+      try {
+        const socket = await connectPreparedLoopback(targetPort, CONNECT_TIMEOUT_MS,
+          pending.controller.signal, () => this.allowedTargetPorts.has(targetPort));
+        if (pending.controller.signal.aborted || !this.allowedTargetPorts.has(targetPort)) {
+          socket.destroy(); return;
+        }
+        const session = this.attachSocket(streamId, socket, true, recovery,
+          { destinationNodeId: null, targetPort, transportMode: "relay" });
+        if (!this.sendSessionEnvelope(session, "runtime.stream.opened", {})) {
+          this.closeSession(streamId, false, new Error("runtime_stream_transport_unavailable")); return;
+        }
+        socket.resume();
+      } catch (error) {
+        if (!pending.controller.signal.aborted) this.sendEnvelope("runtime.stream.error", {
+          streamId, ...recovery, message: String((error as Error).message).slice(0, 1_024),
         });
-        this.closeSession(streamId, false, error);
-        resolve();
-      };
-      socket.once("connect", () => {
-        socket.setTimeout(0);
-        session.opened = true;
-        this.sendSessionEnvelope(session, "runtime.stream.opened", {});
-        resolve();
-      });
-      socket.once("timeout", () => fail(new Error(`runtime_stream_connect_timeout:${targetPort}`)));
-      socket.once("error", fail);
-    });
+      } finally {
+        if (this.pendingIncoming.get(streamId) === pending) this.pendingIncoming.delete(streamId);
+      }
+    })();
+    await pending.finished;
   }
 
   private attachSocket(
@@ -1081,6 +1086,7 @@ export class RuntimeStreamTunnel {
     recoveryToken?: string;
     finalOffset?: number;
   }): void {
+    if (this.cancelPendingIncoming(payload)) return;
     const session = this.sessions.get(payload.streamId);
     if (!session) return;
     if (!this.matchesRecoveryIdentity(session, payload)) {
@@ -1113,6 +1119,7 @@ export class RuntimeStreamTunnel {
     recoveryToken?: string;
     message: string;
   }): void {
+    if (this.cancelPendingIncoming(payload)) return;
     const session = this.sessions.get(payload.streamId);
     if (!session) return;
     if (!this.matchesRecoveryIdentity(session, payload)) {
@@ -1137,6 +1144,22 @@ export class RuntimeStreamTunnel {
       payload.generation === session.recovery.generation
       && payload.recoveryToken === session.recovery.recoveryToken
     );
+  }
+
+  private cancelPendingIncoming(payload: {
+    streamId: string; generation?: number; recoveryToken?: string;
+  }): boolean {
+    const pending = this.pendingIncoming.get(payload.streamId);
+    if (!pending) return false;
+    const matched = pending.recovery
+      ? pending.recovery.generation === payload.generation && pending.recovery.recoveryToken === payload.recoveryToken
+      : payload.generation === undefined && payload.recoveryToken === undefined;
+    pending.controller.abort();
+    if (!matched) this.sendEnvelope("runtime.stream.error", {
+      streamId: payload.streamId, ...pending.recovery,
+      message: "runtime_stream_pending_recovery_identity_mismatch",
+    });
+    return true;
   }
 
   private sendSessionEnvelope(

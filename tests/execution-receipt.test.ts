@@ -34,19 +34,19 @@ describe("execution receipt", () => {
     expect(() => verifyExecutionReceipt(receipt, { ...pinned, keyId: "other" })).toThrow("execution_receipt_key_id_mismatch");
   });
 
-  it("persists identical replay idempotently and rejects a changed job receipt", () => {
+  it("persists identical replay idempotently and rejects a changed job receipt", async () => {
     const keys = generateKeyPairSync("ed25519");
-    const database = new MeshDatabase(":memory:");
+    const database = (await MeshDatabase.open(":memory:"));
     const jobs = new MeshStore(database);
-    jobs.createJob({ id: "job-durable", sessionId: "session", model: "qwen", workloadClass: "interactive", deadlineAt: 2_000 });
+    (await jobs.createJob({ id: "job-durable", sessionId: "session", model: "qwen", workloadClass: "interactive", deadlineAt: 2_000 }));
     const store = new ExecutionReceiptStore(database, { keyId: "key", privateKey: keys.privateKey });
     const body = { schema: "mycellios-execution-receipt/1" as const, jobId: "job-durable", modelIdHash: sha("a"), routeClass: "replica" as const,
       metrics: { inputTokens: 2, outputTokens: 1, ttftMs: 10, activeMs: 20 }, networkTraceDigest: sha("b"),
       recovery: { mode: "none" as const, attempts: 1, replayedTokenEvents: 0 },
       privacy: { trust: "default" as const, boundary: "trusted-edges" as const, pinnedIdentityHashes: [] }, completedAt: 1_000 };
-    expect(store.record(body)).toEqual(store.record(body));
-    expect(store.forJob("job-durable")).toEqual(store.record(body));
-    expect(() => store.record({ ...body, metrics: { ...body.metrics, outputTokens: 2 } })).toThrow("execution_receipt_job_conflict");
-    database.close();
+    expect((await store.record(body))).toEqual((await store.record(body)));
+    expect((await store.forJob("job-durable"))).toEqual((await store.record(body)));
+    await expect((async () => (await store.record({ ...body, metrics: { ...body.metrics, outputTokens: 2 } })))()).rejects.toThrow("execution_receipt_job_conflict");
+    (await database.close());
   });
 });

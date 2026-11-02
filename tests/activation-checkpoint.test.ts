@@ -56,16 +56,16 @@ function payload(label: string): Buffer {
 }
 
 describe("bounded activation checkpoints", () => {
-  it("resolves the pinned signing key lazily without accepting another key id", () => {
+  it("resolves the pinned signing key lazily without accepting another key id", async () => {
     const bytes = payload("lazy-key");
     const checkpoint = fixture(bytes);
     const resolver = (keyId: string) => keyId === "stage-key" ? publicKey : undefined;
     const store = new ActivationCheckpointStore(resolver, {
       maxEntries: 1, maxEntryBytes: 1_024, maxTotalBytes: 1_024,
     });
-    expect(store.put(checkpoint, bytes, expected(), 2_000).checkpointId)
+    expect((await store.put(checkpoint, bytes, expected(), 2_000)).checkpointId)
       .toBe(checkpoint.checkpointId);
-    expect(() => store.put(checkpoint, bytes, { ...expected(), keyId: "unknown" }, 2_000))
+    await expect((async () => (await store.put(checkpoint, bytes, { ...expected(), keyId: "unknown" }, 2_000)))()).rejects
       .toThrow(/keyId_is_incompatible|signature_is_invalid/);
   });
 
@@ -116,7 +116,7 @@ describe("bounded activation checkpoints", () => {
     )).toThrow(/identity/);
   });
 
-  it("bounds memory, evicts least-recently-used entries and returns copies", () => {
+  it("bounds memory, evicts least-recently-used entries and returns copies", async () => {
     const store = new ActivationCheckpointStore(new Map([["stage-key", publicKey]]), {
       maxEntries: 2,
       maxEntryBytes: 16,
@@ -128,13 +128,13 @@ describe("bounded activation checkpoints", () => {
     const first = fixture(firstBytes, "a");
     const second = fixture(secondBytes, "b");
     const third = fixture(thirdBytes, "c");
-    store.put(first, firstBytes, expected("a"), 2_000);
-    store.put(second, secondBytes, expected("b"), 2_001);
-    const read = store.get(first.checkpointId, expected("a"), 2_002)!;
+    (await store.put(first, firstBytes, expected("a"), 2_000));
+    (await store.put(second, secondBytes, expected("b"), 2_001));
+    const read = (await store.get(first.checkpointId, expected("a"), 2_002))!;
     read.payload.fill(0);
-    store.put(third, thirdBytes, expected("c"), 2_003);
-    expect(store.get(second.checkpointId, expected("b"), 2_004)).toBeNull();
-    expect(store.get(first.checkpointId, expected("a"), 2_005)!.payload.equals(firstBytes)).toBe(true);
+    (await store.put(third, thirdBytes, expected("c"), 2_003));
+    expect((await store.get(second.checkpointId, expected("b"), 2_004))).toBeNull();
+    expect((await store.get(first.checkpointId, expected("a"), 2_005))!.payload.equals(firstBytes)).toBe(true);
     expect(store.snapshot()).toEqual({ entries: 2, totalBytes: 10 });
   });
 });

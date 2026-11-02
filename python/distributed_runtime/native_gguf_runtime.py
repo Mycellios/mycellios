@@ -141,6 +141,8 @@ class NativeGgufStageRunner(StageRunner):
         if spec.quantize == "dynamic-int8" and execution_device.accelerated:
             raise ValueError("dynamic-int8 stage quantization is CPU-only")
         tiering_config = dense_tiering or DenseTieringConfig()
+        if tiering_config.compute_precision is not None:
+            raise ValueError("explicit_dense_precision_requires_safetensors_stage")
         model, startup = _load_native_gguf_stage_model(
             spec,
             package,
