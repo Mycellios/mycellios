@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            runner: macos-26
+            runner: macos-15
             machine: arm64
             app_dir: mac-arm64
           - arch: x64
@@ -68,7 +68,7 @@ jobs:
         if: matrix.arch == 'arm64'
         run: |
           set -euo pipefail
-          sudo /usr/sbin/installer -pkg build/runtime.pkg -target / > build/evidence/runtime-install.log
+          sudo /usr/sbin/installer -pkg build/runtime.pkg -target / | tee build/evidence/runtime-install.log
           '/Library/Application Support/Mycellios/Product/bin/node' -e 'if(process.platform!=="darwin"||process.arch!=="arm64")process.exit(1);console.log(JSON.stringify({platform:process.platform,arch:process.arch,version:process.version,enrolled:false,physicalInference:false}))' > build/evidence/runtime-architecture.json
           test -f '/Library/Application Support/Mycellios/Product/app/node/install-main.js'
       - name: Preserve packages and qualification evidence

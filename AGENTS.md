@@ -111,8 +111,8 @@ These rules apply to the complete repository.
   unsupported before creating pairing grants or prompting for administrator access.
   Qualify each architecture natively; require macOS 13 or newer. Keep the default
   and earlier arm64 catalogs compatible; both Mac builds use the all-Mac opt-in.
-  The download page opts into `?include=macos-arm64`; retain the byte-identical
-  legacy two-platform catalog for older clients without that query.
+  The download page opts into `?include=macos-all`; retain the three-platform
+  `macos-arm64` opt-in and byte-identical legacy two-platform default catalog.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
   canonical docs when complete.
 - Run `npm run verify:structure`, relevant focused tests and `npm run typecheck`.

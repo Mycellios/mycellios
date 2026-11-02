@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDesktopDownloadCatalog } from "../src/contracts/desktop-downloads";
+import { isDesktopDownloadCatalog } from "../src/contracts/desktop-downloads.js";
 
 it('retains both Mac architectures alongside the required Windows and Linux packages',()=>{
  const c=catalog();c.packages.push({id:'macos-arm64',format:'DMG',fileName:'Mac-arm.dmg',path:'/downloads/desktop/releases/0.3.9/Mac-arm.dmg',sha256:'c'.repeat(64),bytes:300},{id:'macos-x64',format:'DMG',fileName:'Mac-intel.dmg',path:'/downloads/desktop/releases/0.3.9/Mac-intel.dmg',sha256:'d'.repeat(64),bytes:400});
