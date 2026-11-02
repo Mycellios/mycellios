@@ -1,7 +1,7 @@
 import { createServer, type RequestListener, type Server } from "node:http";
 import { createConnection } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
-import type { InferenceAdapter } from "../src/adapters/base.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AdapterMetrics, InferenceAdapter } from "../src/adapters/base.js";
 import { MycelliosPipelineAdapter } from "../src/adapters/mycellios-pipeline.js";
 import { workerConfigSchema } from "../src/contracts/schemas.js";
 import type {
@@ -27,6 +27,43 @@ const CELL_ACTIVATION_ID = "pipeline-activation-7";
 
 describe("worker boundary hardening", () => {
   const servers: Server[] = [];
+
+  it("keeps heartbeats alive while probes hang, closes admission and recovers with fresh metrics", async () => {
+    vi.useFakeTimers();
+    try {
+      const agent = new WorkerAgent(baseConfig(), {
+        coordinatorUrl: "http://127.0.0.1:8080",
+        hardwareProbe: () => new Promise(() => {}),
+      });
+      const harness = agent as unknown as AgentHarness;
+      const sent: Array<{ type: string; payload: unknown }> = [];
+      harness.registeredWorkerId = "worker-heartbeat";
+      harness.capabilities = capabilities();
+      harness.socket = { readyState: 1, send: (value) => sent.push(JSON.parse(value)) };
+      let resolveProbe!: (value: { ready: boolean; activeJobs: number; loadedModels: string[] }) => void;
+      harness.adapter.metrics = vi.fn(() => new Promise<AdapterMetrics>((resolve) => { resolveProbe = resolve; }));
+      const first = harness.sendHeartbeat();
+      await vi.advanceTimersByTimeAsync(1_000);
+      await first;
+      expect(sent[0]).toMatchObject({ type: "worker.heartbeat", payload: {
+        heartbeat: { draining: true, deployments: [{ freeSlots: 0 }] },
+        metrics: { ready: false, loadedModels: [] },
+      } });
+      const second = harness.sendHeartbeat();
+      await vi.advanceTimersByTimeAsync(1_000);
+      await second;
+      expect(harness.adapter.metrics).toHaveBeenCalledTimes(1);
+      resolveProbe({ ready: true, activeJobs: 0, loadedModels: ["test-model"] });
+      await vi.advanceTimersByTimeAsync(0);
+      harness.adapter.metrics = async () => ({ ready: true, activeJobs: 0, loadedModels: ["test-model"] });
+      const recovery = harness.sendHeartbeat();
+      await vi.advanceTimersByTimeAsync(1_000);
+      await recovery;
+      expect(sent.at(-1)).toMatchObject({ payload: {
+        heartbeat: { draining: false, deployments: [{ freeSlots: 1 }] }, metrics: { ready: true },
+      } });
+    } finally { vi.useRealTimers(); }
+  });
 
   afterEach(async () => {
     await Promise.all(
@@ -587,6 +624,7 @@ describe("worker boundary hardening", () => {
 });
 
 interface AgentHarness {
+  sendHeartbeat(): Promise<void>;
   registeredWorkerId?: string;
   capabilities: WorkerCapabilities;
   socket: {

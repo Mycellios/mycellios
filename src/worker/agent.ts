@@ -18,7 +18,8 @@ import type {
   WorkerExecutorIsolationCapability,
   WorkerHeartbeat,
 } from "../contracts/types.js";
-import type { AdapterChunk, InferenceAdapter } from "../adapters/base.js";
+import type { AdapterChunk, AdapterMetrics, InferenceAdapter } from "../adapters/base.js";
+import { HeartbeatObservation } from "./heartbeat-observation.js";
 import { createAdapter } from "../adapters/factory.js";
 import { sha256Text } from "../core/json.js";
 import { estimateInputTokens } from "../core/request.js";
@@ -1313,7 +1314,7 @@ export class WorkerAgent {
    * so every consumer scored placement on a constant: the scheduler's latency
    * term (`scheduler.ts`) was always 0, and the desktop planner concluded that
    * every worker-to-worker link cost 0.1 ms. Measured reality on the fleet is
-   * 54-437 ms per hop, and picking the right node is worth ~1.8x — a decision
+   * 54-437 ms per hop, and picking the right node is worth ~1.8x â€” a decision
    * the planner could not make because it never saw the number.
    *
    * WebSocket ping/pong is the honest probe: it rides the same connection as
@@ -1364,7 +1365,7 @@ export class WorkerAgent {
     this.lastRttSampleMs = sampleMs;
   }
 
-  /** Última muestra cruda de RTT, sin suavizar. Diagnóstico y pruebas. */
+  /** Ãšltima muestra cruda de RTT, sin suavizar. DiagnÃ³stico y pruebas. */
   get measuredRttMs(): number | null {
     return this.lastRttSampleMs;
   }
@@ -2478,26 +2479,27 @@ export class WorkerAgent {
     for (const [, controller] of jobs) controller.abort(new Error(reason));
     await Promise.allSettled(jobs.map(([jobId]) => this.adapter.cancel(jobId)));
   }
-
   private rejectServerMessage(socket: WebSocket, error: unknown): void {
     this.logger.warn(`Rejected invalid coordinator message: ${errorText(error)}`);
     if (socket.readyState === WebSocket.OPEN) {
       socket.close(1008, "invalid coordinator message");
     }
   }
-
+  private readonly heartbeatMetrics = new HeartbeatObservation<AdapterMetrics>();
+  private readonly heartbeatHardware = new HeartbeatObservation<HardwareProbe>();
   private async sendHeartbeat(): Promise<void> {
     if (!this.capabilities || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     this.capabilities = {
       ...this.capabilities,
       hostMemory: observeHostMemory(this.options.offeredHostMemoryBytes?.()),
     };
-    const [metrics, liveHardware] = await Promise.all([
-      this.adapter.metrics(),
+    const [observedMetrics, liveHardware] = await Promise.all([
+      this.heartbeatMetrics.read(() => this.adapter.metrics()),
       this.config.capacityScope === "host"
-        ? (this.options.hardwareProbe?.() ?? probeHardware()).catch(() => null)
+        ? this.heartbeatHardware.read(() => this.options.hardwareProbe?.() ?? probeHardware())
         : Promise.resolve(null),
     ]);
+    const metrics = observedMetrics ?? { ready: false, activeJobs: this.activeJobs.size, loadedModels: [] };
     if (liveHardware) {
       this.capabilities = {
         ...this.capabilities,
@@ -2521,7 +2523,7 @@ export class WorkerAgent {
       };
     }
     const heartbeat: WorkerHeartbeat = {
-      draining: !this.acceptsNewWork() || ((this.adapter.kind === "embedding" || this.adapter.kind === "decision") && !metrics.ready),
+      draining: !this.acceptsNewWork() || !metrics.ready,
       pausedReason: !this.contributionEnabled
         ? "Contribution paused"
         : this.updateDraining
@@ -2537,7 +2539,7 @@ export class WorkerAgent {
       })),
       deployments: this.capabilities.deployments.map((deployment) => ({
         deploymentId: deployment.deploymentId,
-        freeSlots: deployment.freeSlots,
+        freeSlots: metrics.ready ? deployment.freeSlots : 0,
       })),
       network: {
         coordinatorRttMs: this.capabilities.network.coordinatorRttMs,
@@ -2553,7 +2555,6 @@ export class WorkerAgent {
       },
     });
   }
-
   private updateFreeSlots(): void {
     if (!this.capabilities) return;
     const freeSlots = this.acceptsNewWork()

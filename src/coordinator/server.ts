@@ -25,6 +25,7 @@ import {
 } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { z, ZodError } from "zod";
+import { registerNativeReplicaQualifications } from "./native-replica-qualification.js";
 import {
   StableBenchmarkActivationTracker,
   type BenchmarkActivation,
@@ -1588,6 +1589,8 @@ export async function createCoordinator(
     }));
     return { ...event, result: { ...event.result, executionReceiptId: receipt.receiptId } };
   };
+  registerNativeReplicaQualifications(app, { adminToken: config.modelAdminToken, networkToken: config.networkToken,
+    hub, store, service, attachReceipt: attachExecutionReceipt });
   const studioInference: StudioInference = options.studioInference ?? (async (request) => {
     const chat: ChatCompletionRequest = {
       model: request.model,
@@ -4250,7 +4253,7 @@ export async function createCoordinator(
         error: {
           code: "benchmark_version_mismatch",
           message:
-            `La versión solicitada ${body.version} no coincide con el runtime real ${runtimeVersion}.`,
+            `La versiÃ³n solicitada ${body.version} no coincide con el runtime real ${runtimeVersion}.`,
         },
       });
     }
@@ -4261,8 +4264,8 @@ export async function createCoordinator(
         error: {
           code: "benchmark_model_unavailable",
           message: body.model
-            ? `El modelo ${body.model} no está activo; no se ha generado ningún dato.`
-            : "No hay ningún modelo activo para medir; no se ha generado ningún dato.",
+            ? `El modelo ${body.model} no estÃ¡ activo; no se ha generado ningÃºn dato.`
+            : "No hay ningÃºn modelo activo para medir; no se ha generado ningÃºn dato.",
         },
       });
     }
@@ -4274,7 +4277,7 @@ export async function createCoordinator(
         error: {
           code: "benchmark_activation_unsealed",
           message:
-            "El modelo está activo, pero su cohorte de build declarada no coincide de forma estable con el coordinador.",
+            "El modelo estÃ¡ activo, pero su cohorte de build declarada no coincide de forma estable con el coordinador.",
         },
       });
     }
@@ -4544,6 +4547,7 @@ export async function createCoordinator(
       id: worker.id,
       status: worker.status,
       connected: hub.isConnected(worker.id),
+      authenticatedSessionId: hub.currentWorkerSessionId(worker.id),
       region: worker.capabilities.region,
       agentVersion: worker.capabilities.agentVersion,
       buildIdentity: worker.capabilities.buildIdentity,
@@ -4693,6 +4697,7 @@ export async function createCoordinator(
     const executionReceiptId = input.executionReceiptId;
     try {
       const contributionEvidence = (await physicalContributionEvidence.certify({
+        currentSessionIdForWorker: workerId => hub.currentWorkerSessionId(workerId),
         jobId: input.jobId,
         executionReceiptId,
         trace: input.networkTrace,
@@ -5850,7 +5855,7 @@ function mobileDashboardWorker(worker: MobileWorkerSnapshot) {
       {
         id: `mobile-${worker.id}`,
         vendor: worker.backend === "webgpu" ? "WebGPU" : "Browser CPU",
-        model: `${worker.name} · ${worker.backend.toUpperCase()}`,
+        model: `${worker.name} Â· ${worker.backend.toUpperCase()}`,
         physicalVramMb: 0,
         sharedMemoryMb: worker.capabilities.deviceMemoryGb
           ? Math.round(worker.capabilities.deviceMemoryGb * 1_024)

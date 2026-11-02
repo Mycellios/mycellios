@@ -5,6 +5,7 @@ export type { AuthorizedWorkerSession, WorkerDisconnectDetails } from "./worker-
 import { logRuntimeStreamTermination, logDuplicateWorkerHello, runtimeStreamReportEquals,
   type RuntimeStreamRecoveryReport, type RuntimeStreamTerminalDiagnostic } from "./runtime-stream-lifecycle.js";
 import { EventEmitter } from "node:events";
+import { WorkerMaintenance } from "./worker-maintenance.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -329,6 +330,9 @@ export class WorkerHub extends EventEmitter<HubEvents> {
       this.runtimeLinkProbeTimer.unref();
     }
   }
+  private readonly maintenance = new WorkerMaintenance();
+  async setWorkerMaintenance(workerId: string, enabled: boolean): Promise<void> { await this.maintenance.set(workerId, enabled, this.store, this.isConnected(workerId)); }
+  currentWorkerSessionId(workerId: string): string | null { const state = this.connections.get(workerId); return state?.ready ? state.sessionId : null; }
 
   beforeDisconnect(observer: WorkerDisconnectObserver): () => void { return this.workerEvents.beforeDisconnect(observer); }
 
@@ -691,6 +695,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
   }
 
   send(workerId: string, type: string, payload: unknown): boolean {
+    if (type === "lease.offer" && this.maintenance.blocked(workerId)) return false;
     const state = this.connections.get(workerId);
     if (!state?.ready || state.socket.readyState !== state.socket.OPEN) return false;
     return this.sendSocket(state.socket, type, payload);
@@ -1003,7 +1008,7 @@ export class WorkerHub extends EventEmitter<HubEvents> {
 
   private async applyHeartbeat(state: ConnectionState, payload: WorkerHeartbeatPayload): Promise<void> {
     const workerId = state.workerId!;
-    const status = payload.heartbeat.draining ? "draining" : "online";
+    const status = this.maintenance.status(workerId, payload.heartbeat.draining ? "draining" : "online");
     const current = (await this.store.getWorker(workerId))?.capabilities ?? null;
     (await this.store.updateWorkerHeartbeat(
       workerId,

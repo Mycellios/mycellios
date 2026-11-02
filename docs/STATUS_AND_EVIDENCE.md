@@ -4,7 +4,7 @@ Updated: 2026-11-01 (local Desktop development window installed and checked; bro
 
 <!-- Local Desktop evidence below does not promote any public installer or backend. -->
 
-## Local Desktop development window — 2026-11-01
+## Local Desktop development window â€” 2026-11-01
 
 The installed Windows preview now offers General / Advanced / Open development.
 It opens a separate sandboxed window with a loopback Vite server, an explicit
@@ -29,7 +29,7 @@ integration; the root typecheck also reports an unrelated import-extension error
 in the desktop download test. This evidence does not qualify a public release.
 
 
-## Shared Agent visual qualification — 2026-10-31
+## Shared Agent visual qualification â€” 2026-10-31
 
 Local source corrections bound long select values and menus, prevent shared dialog
 headings from overlapping their close controls, fit the sign-in heading on narrow
@@ -48,7 +48,7 @@ These are local Chrome/emulated viewport checks, not physical phone tests or a
 live-account/backend qualification. No account mutations, inference, installer
 update or production deployment was performed for this visual change.
 
-## Simple Desktop startup and recovery candidate — 2026-10-31
+## Simple Desktop startup and recovery candidate â€” 2026-10-31
 
 Normal startup opens the existing Mycellios account route directly. A damaged
 saved preference no longer opens server setup or starts a local stack. Explicit
@@ -92,7 +92,7 @@ This is packaging and packaged-executable proof, not a clean Windows installatio
 an upgrade of the user's installation or a new Linux/macOS qualification.
 Repository structure verification passed. No commit, push or publication occurred.
 
-## Unified Agent typography — 2026-10-31
+## Unified Agent typography â€” 2026-10-31
 
 Agent body text, display headings, wordmarks, startup and first-party account
 forms now share self-hosted Geist Variable. The login's Georgia shorthand and
@@ -129,7 +129,7 @@ anonymous loading probe is not proof of authenticated OAuth compatibility.
 Public native installers were not replaced. Receipts and screenshots are under
 `src/agent/outputs/typography-consistency-20261031`.
 
-## Persistent Desktop control strip — 2026-10-31
+## Persistent Desktop control strip â€” 2026-10-31
 
 The initially qualified local Windows Desktop 0.3.9 application used the requested red/yellow/green
 controls without the Windows title bar. A sandboxed local WebContentsView owns
@@ -156,7 +156,7 @@ and four new local strip assets. The public Windows/Linux installers remain
 unchanged. Receipts and the native-window login screenshot are under
 `src/agent/outputs/persistent-chrome-20261031`.
 
-## Agent balance recovery and window controls — 2026-10-31
+## Agent balance recovery and window controls â€” 2026-10-31
 
 Production frontend build `20261031122612`, immutable patch
 `8a495031a359a5eca67c4ecdcd1ad876b76766a725468887ef44dee40c3b8a5e`,
@@ -195,9 +195,9 @@ The public 0.3.9 installers have **not** been replaced with this native fix.
 Receipts are under `src/agent/outputs/credit-balance-recovery-20261031` and
 `src/agent/outputs/native-chrome-20261031`.
 
-## Agent terminology publication — 2026-10-31
+## Agent terminology publication â€” 2026-10-31
 
-Production Agent build `20261031115929` uses Credits (Créditos in Spanish) for
+Production Agent build `20261031115929` uses Credits (CrÃ©ditos in Spanish) for
 the internal balance and Mico/Micos for user agents. Spore names the separate
 official token; this release does not activate the token or change balances.
 The paid-credit conversion remains 10 USD = 10 Credits, with integer micro-unit
@@ -220,13 +220,13 @@ Nginx configuration; the API, workers, database, old web service and model servi
 were not replaced or restarted. The active Nginx configuration and release receipt,
 not the old web container label alone, identify the served frontend revision.
 
-A real signed-in browser verified Créditos, Nuevo Mico and the Desktop link.
+A real signed-in browser verified CrÃ©ditos, Nuevo Mico and the Desktop link.
 The account lookup currently returns unavailable, so the sidebar shows an em dash.
 The numeric production balance was **not** reverified; no zero or cached amount
 was substituted. Receipts and screenshots are under
 `src/agent/outputs/credits-micos-release-20261031`.
 
-## Desktop preview publication — 2026-10-31
+## Desktop preview publication â€” 2026-10-31
 
 Mycellios Desktop 0.3.9 is published for Windows x64 (EXE) and Debian/Ubuntu
 x64 (DEB) at https://www.mycellios.com/downloads/desktop, with the bundled
@@ -647,7 +647,7 @@ not an additional physical run or AntSeed delivery.
 
 Private receipts live under `outputs/kev-distributed-20261021`; secrets, identities,
 model weights and caches are excluded from source/public delivery. Remaining
-publication gates already closed include source promotion through PRs #70–72
+publication gates already closed include source promotion through PRs #70â€“72
 and account-confirmed independent cell admission. A real 55-token SDK call and
 a real 55-token OmniRoute/AntSeed buyer call returned the correct decision;
 the buyer call did not meet the free gate because its implicit provider selector
@@ -1112,3 +1112,121 @@ was changed by this candidate. The earlier installed Play/Stop build is unchange
 - 328 focused cases and 5 packaging cases pass, with scoped incremental typing and native/backend/both web builds. The actual compiled backend boots against temporary PostgreSQL, returns health/session HTTP 200 and shuts down cleanly. Upgrade fixtures retain permission and private project notes.
 - Structure verification passes. The general imported-Agent architecture gate remains failing (10 cycle groups, 25 module-size findings); no public installer, main integration, commit or deployment is claimed. Physical OS upgrade and authenticated native-provider inference are not covered by this task's fixtures.
 - Evidence: src/agent/outputs/update-continuity-20261102/QUALIFICATION.md and verification.json. Qualified source digest: 64f9111bb8a537e0bdecc744b1a83f43e47532f7f3708c027e55bbfc3e9f7688.
+
+### Native replica availability and evidence (2026-10-26)
+
+The deployed coordinator preserves its existing PostgreSQL, authentication and
+credit-wallet overlays. Bounded worker observations prevent stalled health or
+hardware probes from blocking heartbeats; missing readiness stops new admission.
+An operator-only native qualification uses three normal leased executions and
+binds their signed receipts to the current authenticated session, source build,
+model digest, activation and physical GPU node. It preserves zero generated text
+tokens for embeddings and speech. A pinned backend watcher refreshes only the two
+approved replicas, with a persistent three-attempt daily limit per worker.
+
+The RTX 2060 completed both three-request qualifications, a direct HTTP vector
+request with 2,560 normalized dimensions and a Spanish WAV request. Reconnecting
+the embedding worker invalidated its previous session proof; the watcher produced
+a new proof for the replacement session. Its managed Windows bootstrap also
+passed a real cold start with normal priority inside the unchanged 4 GiB / 90%
+Windows Job, preserving the pre-import barrier and kill-on-close protection.
+
+The actual economic evidence authority accepted both direct API receipts in a
+read-only preview. No customer debit, contributor credit or settlement was
+performed by that preview. The public AntSeed request returned 502 and the seller
+reported advertising paused below its gas floor; this rollout did not fund its
+wallet or qualify that external route. These are two replicas on one physical GPU,
+not evidence of inference distributed across two physical computers. Sanitized
+identities, receipts and observations are recorded in
+[`native-replica-production-evidence.json`](../tests/fixtures/native-replica-production-evidence.json).
+
+### AntSeed production follow-up (2026-10-26)
+
+This follow-up supersedes the preceding preview-only and failed public-route
+observations. Actual customer requests for Spanish speech and GPU embeddings
+completed, each with a persisted execution receipt and balanced internal-credit
+settlement. Both execution and economic signatures were verified, and the
+customer could retrieve both settlement receipts. These are non-monetary
+Mycellios credits, not AntSeed revenue or on-chain settlement.
+
+After deployment and credential rotation, fresh requests through OmniRoute,
+AntSeed gateway, seller and Mycellios completed with HTTP 200 and
+`served_free=1`. Speech used the RTX 2060 replica; embeddings used the native CPU
+pipeline selected by the scheduler, returning 2,560 normalized dimensions.
+Both recorded zero generated-text tokens and persisted execution receipts.
+The public speech job has an internal settlement; the public CPU embedding job
+has none. This does not qualify CPU financial contribution or establish inference
+across two physical computers. Sanitized observations are in
+[`antseed-native-e2e-production-evidence.json`](../tests/fixtures/antseed-native-e2e-production-evidence.json).
+
+The seller explicitly selects its existing speech, research and decisions
+providers. The stale text provider returned 503 and is excluded from selection;
+its original configuration remains recoverable. Identity, remaining prices,
+images and resource limits were preserved, and plugin versions are pinned.
+Research and decisions were preserved, not newly qualified by these probes.
+Three credentials exposed during diagnosis were rotated in the canonical vault
+and consumers; all replacement credentials returned 200 and all revoked values
+returned 401. Account identity, quotas and permissions were preserved.
+
+Production health returned 200, PostgreSQL was connected without an error, and
+the qualification watcher was active. The deployed coordinator source identity
+is `sha256:bb4c6d7950156bd8e69eda1f3f33e2e3e446ae91d15dc933a23e53808217a2b9`,
+based on fetched main `4f4d8e8745348b199da4e1e0dbd6a0fa09ab95d1` plus
+the recorded local reliability patches. This does not imply those patches were
+committed, pushed or merged.
+
+An earlier SDK observation paused advertising with a Base mainnet balance of
+0.000038496637378844 ETH, below its 0.00005 ETH floor. Daniel subsequently funded
+the wallet. Jarvis's recovery evidence at 18:43 UTC records the SDK reporting
+0.002168874558129165 ETH and advertising resumed. The previous funding request
+is obsolete; no additional transfer is requested. This intervention performed
+no transfer or gas-guard bypass. Successful requests and announcement recovery
+are bounded observations, not a continuous-availability guarantee.
+
+### Public embedding admission ingress (2026-10-26, 21:07:39 UTC)
+
+A separate ingress validator now rejects invalid embedding envelopes before
+upstream job creation or usage reservation. It reuses the exact deployed embedding
+contract and delegates authentication to the coordinator's protected, read-only
+execution-receipt-key endpoint. Valid requests retain their original body bytes,
+authentication and idempotency headers; other models keep their existing route.
+The HTTP handler's cancellation path was exercised with a fixture executor, not
+physical inference. The native coordinator process itself was not replaced.
+
+Nine local transport tests passed. The unmodified production coordinator image
+with isolated PostgreSQL passed 23 HTTP cases covering validation, real API and
+operator authentication, and native handler cancellation on deadline/disconnect.
+The exact Nginx image preserved an active SSE call through both promotion and
+rollback. TypeScript, architecture and structure checks passed before activation.
+The isolated builder reproduces identical executable/configuration bytes using
+its explicitly pinned TypeScript 6.0.3 compiler API; TypeScript 7 remains the
+project's normal typechecker. The extra ingress source identity is
+`sha256:da905e65d83e9c7bd66854df833bd13d479d47e7916643a15383ada9832e9fb6`.
+It is a pinned addition to the existing runtime image, not code contained by
+base source commit `c7b4479` or a replacement for its coordinator build identity.
+
+Activation used Nginx reload only. A non-generative CORS preflight verified the
+live route marker before one negative HTTP control returned 400 at the validator.
+The protected container IDs, images, start times and host PIDs remained unchanged,
+and public health returned 200. The validator publishes no host port, holds no
+stored API key or database credentials, and runs with a read-only filesystem.
+Its JSON bound is 2 MiB; non-JSON parser exceptions and other endpoints remain
+upstream. Existing ingress buffering, limits and logging were preserved.
+Explicit request deadlines also bound the proxy transport without rewriting the
+body or retrying execution. Existing seller channels and engines were preserved.
+
+This covers the public chat-completions ingress used by the selected speech and
+embedding provider. Direct/internal port 4174 callers remain outside this filter;
+there is no claim of global coordinator admission closure. A subsequent Jarvis
+readback reported three new vectors after its post-activation baseline, all three
+valid, and eight successful free gateway responses with one concurrency rejection
+in a short window. Further validator rejections occurred after the single control
+request. These observations show continued operation and pre-execution rejection,
+not a measured migration speedup or reduction of on-chain channel-open fees.
+The channel opens before its request payload is validated. Buyer addresses in
+metering do not establish the operator or originating process. No buyer was
+blocked and price, account limits, daily cap and channel TTL were not changed.
+
+Sanitized evidence: [native HTTP cases](../tests/fixtures/embedding-ingress-native-http-evidence.json),
+[active-stream reload](../tests/fixtures/embedding-ingress-reload-evidence.json) and
+[activation receipt](../tests/fixtures/embedding-ingress-deployment-evidence.json).

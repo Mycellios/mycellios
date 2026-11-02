@@ -1,0 +1,128 @@
+{
+  "passed": true,
+  "checks": 23,
+  "observations": [
+    {
+      "name": "plain-hi",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "malformed",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "json-null",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "wrong-schema",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "empty-input",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "blank-text",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "nine-inputs",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "too-long",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "bad-dimensions",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "bad-revision",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "bad-model-field",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "two-users",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "assistant",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "missing-key",
+      "status": 401,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "revoked-key",
+      "status": 401,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "operator-key",
+      "status": 400,
+      "noAccountingOrJob": true
+    },
+    {
+      "name": "valid-default",
+      "status": 409,
+      "reachedSubmission": true,
+      "physicalInference": false
+    },
+    {
+      "name": "valid-eight",
+      "status": 409,
+      "reachedSubmission": true,
+      "physicalInference": false
+    },
+    {
+      "name": "valid-long",
+      "status": 409,
+      "reachedSubmission": true,
+      "physicalInference": false
+    },
+    {
+      "name": "kokoro",
+      "status": 409,
+      "reachedSubmission": true,
+      "physicalInference": false
+    },
+    {
+      "name": "other-chat",
+      "status": 409,
+      "reachedSubmission": true,
+      "physicalInference": false
+    },
+    {
+      "name": "native-deadline-calls-service-cancel",
+      "passed": true,
+      "physicalInference": false
+    },
+    {
+      "name": "native-client-disconnect-calls-service-cancel",
+      "passed": true,
+      "physicalInference": false
+    }
+  ],
+  "scope": "Actual unmodified production coordinator plus ingress proxy with isolated PostgreSQL, actual auth and contract; no GPU or public AntSeed request",
+  "productionChanged": false
+}
