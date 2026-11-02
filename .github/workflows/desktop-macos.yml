@@ -1,4 +1,4 @@
-name: Mycellios Desktop Apple Silicon
+name: Mycellios Desktop macOS
 on:
   push:
     branches: [codex/desktop-macos-arm64-20261102]
@@ -7,11 +7,23 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: desktop-macos-arm64
+  group: desktop-macos
   cancel-in-progress: false
 jobs:
   package:
-    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-26
+            machine: arm64
+            app_dir: mac-arm64
+          - arch: x64
+            runner: macos-26-intel
+            machine: x86_64
+            app_dir: mac
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
@@ -23,28 +35,37 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(uname -m)" = arm64
+          test "$(uname -m)" = '${{ matrix.machine }}'
           mkdir -p build/input build/evidence
           gh release download desktop-v0.3.9-macos-preview --repo Mycellios/mycellios --pattern macos-build-input.tar.gz --dir build
           echo 'c9021cf6378aa832b2f1f396c98cc4adcfe39e773aa82b515b964f3370946f0d  build/macos-build-input.tar.gz' | shasum -a 256 -c
           tar -xzf build/macos-build-input.tar.gz -C build/input
-          curl --fail --location --proto '=https' --retry 2 https://www.mycellios.com/downloads/macos-arm64 --output build/runtime.pkg
-          echo '66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  build/runtime.pkg' | shasum -a 256 -c
+          if [ '${{ matrix.arch }}' = arm64 ]; then
+            curl --fail --location --proto '=https' --retry 2 https://www.mycellios.com/downloads/macos-arm64 --output build/runtime.pkg
+            echo '66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  build/runtime.pkg' | shasum -a 256 -c
+          fi
       - name: Build locally qualified Mac adaptation
         run: |
           set -euo pipefail
           npm ci --prefix scripts/desktop-macos --ignore-scripts --no-audit --no-fund
-          node --test scripts/desktop-macos/macos-installer.test.mjs
-          node scripts/desktop-macos/assemble.mjs build/input build/payload
+          node --test scripts/desktop-macos/macos-installer.test.mjs scripts/desktop-macos/signature-check.test.mjs scripts/desktop-macos/runtime-support.test.mjs
+          node scripts/desktop-macos/assemble.mjs build/input build/payload '${{ matrix.arch }}'
           ln -s "$PWD/scripts/desktop-macos/node_modules" build/payload/node_modules
           npm ci --prefix build/payload/src/agent/apps/desktop --ignore-scripts --no-audit --no-fund
-          node build/payload/src/agent/apps/desktop/scripts/package-macos.mjs --runtime "$PWD/build/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$PWD/build/release"
+          if [ '${{ matrix.arch }}' = arm64 ]; then
+            node build/payload/src/agent/apps/desktop/scripts/package-macos.mjs --arch arm64 --runtime "$PWD/build/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$PWD/build/release"
+          else
+            node build/payload/src/agent/apps/desktop/scripts/package-macos.mjs --arch x64 --out "$PWD/build/release"
+          fi
           cp build/payload/build-inputs.json build/evidence/
           printf '%s\n' "$GITHUB_SHA" > build/evidence/candidate-sha.txt
           shasum -a 256 build/release/*.dmg build/release/*.zip > build/evidence/SHA256SUMS
-      - name: Launch and reopen packaged Desktop on Apple Silicon
-        run: node scripts/desktop-macos/qualify.mjs 'build/release/mac-arm64/Mycellios Desktop.app' build/evidence
+      - name: Launch and reopen the native Mac package
+        run: node scripts/desktop-macos/qualify.mjs 'build/release/${{ matrix.app_dir }}/Mycellios Desktop.app' build/evidence
+      - name: Verify signature inside the final read-only disk image
+        run: node scripts/desktop-macos/qualify-dmg.mjs 'build/release/${{ matrix.app_dir }}/Mycellios Desktop.app' 'build/release/Mycellios-Desktop-0.3.9-macos-${{ matrix.arch }}-preview.dmg' build/evidence/dmg-signature.json
       - name: Install bundled runtime without enrolling any account
+        if: matrix.arch == 'arm64'
         run: |
           set -euo pipefail
           sudo /usr/sbin/installer -pkg build/runtime.pkg -target / > build/evidence/runtime-install.log
@@ -54,7 +75,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mycellios-desktop-macos-arm64-preview
+          name: mycellios-desktop-macos-${{ matrix.arch }}-preview
           path: |
             build/release/*.dmg
             build/release/*.zip

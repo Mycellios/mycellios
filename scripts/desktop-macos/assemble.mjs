@@ -10,6 +10,7 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const repository=path.resolve(here,'../..');
 const input=path.resolve(process.argv[2]);
 const output=path.resolve(process.argv[3]);
+const arch=process.argv[4]??'arm64';if(!['arm64','x64'].includes(arch))throw Error('Unsupported Mac architecture');
 const source=path.join(input,'Mycellios-Desktop-0.3.9-source');
 const agent=path.join(output,'src/agent');
 const desktop=path.join(agent,'apps/desktop');
@@ -37,5 +38,5 @@ await build({entryPoints:[path.join(here,'source/contribution-runtime.ts')],outf
 const needle='new ContributionRuntime(';
 if(baseline.toString().split(needle).length!==2) throw Error('Native patch anchor is not unique');
 await fs.writeFile(path.join(desktop,'dist/main.js'),'import {ContributionRuntime as MacContributionRuntime} from "./mac-contribution-runtime.js";\n'+baseline.toString().replace(needle,'new MacContributionRuntime('));
-await fs.writeFile(path.join(output,'build-inputs.json'),JSON.stringify({...provenance,macSourceSha256:digest(await fs.readFile(path.join(here,'source/contribution-runtime.ts'))),nativeOutputSha256:digest(await fs.readFile(path.join(desktop,'dist/main.js'))),runtimeSha256:'66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608',physicalMacTest:false},null,2));
+await fs.writeFile(path.join(output,'build-inputs.json'),JSON.stringify({...provenance,desktopArchitecture:arch,macSourceSha256:digest(await fs.readFile(path.join(here,'source/contribution-runtime.ts'))),macSupportSha256:digest(await fs.readFile(path.join(here,'source/runtime-support.ts'))),nativeOutputSha256:digest(await fs.readFile(path.join(desktop,'dist/main.js'))),runtimeSha256:arch==='arm64'?'66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608':null,physicalMacTest:false},null,2));
 console.log(JSON.stringify({desktopRoot:desktop,nativeBaselineSha256:digest(baseline)}));

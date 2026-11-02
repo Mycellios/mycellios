@@ -6,6 +6,7 @@ import path from "node:path";
 import { nodeEnrollmentBundleSchema } from "../../../../contracts/node-control.js";
 import type { DesktopRuntimeStatus } from "../../../../contracts/desktop-runtime.js";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
+import {supportsContribution}from'./runtime-support.js';
 
 export const CONTRIBUTION_ORIGIN = "https://www.mycellios.com";
 
@@ -22,6 +23,7 @@ export class ContributionRuntime {
   private installing = false;
   constructor(private readonly options: {
     platform: NodeJS.Platform;
+    arch?: NodeJS.Architecture;
     resources: string;
     userData: string;
     programFiles: string;
@@ -89,11 +91,11 @@ export class ContributionRuntime {
       const value = JSON.parse(raw ?? "null");
       if (typeof value?.version === "string" && /^\d+\.\d+\.\d+$/.test(value.version)) version = value.version;
     } catch {}
-    return { supported: ["win32", "linux", "darwin"].includes(this.options.platform), installed, enrolled, nodeId, version, installing: this.installing };
+    return { supported: supportsContribution(this.options.platform,this.options.arch??process.arch), installed, enrolled, nodeId, version, installing: this.installing };
   }
 
   async identify(): Promise<DesktopRuntimeStatus> {
-    if (!["win32", "linux", "darwin"].includes(this.options.platform)) throw new Error("Contribution setup is not available on this platform.");
+    if (!supportsContribution(this.options.platform,this.options.arch??process.arch)) throw new Error("Contribution setup is not available on this platform.");
     if (this.installing) throw new Error("Contribution setup is already running.");
     const before = await this.status();
     if (!before.installed || !before.enrolled) return before;
@@ -108,7 +110,7 @@ export class ContributionRuntime {
   }
 
   async enroll(value: unknown): Promise<DesktopRuntimeStatus> {
-    if (!["win32", "linux", "darwin"].includes(this.options.platform)) throw new Error("Contribution setup is not available on this platform.");
+    if (!supportsContribution(this.options.platform,this.options.arch??process.arch)) throw new Error("Contribution setup is not available on this platform.");
     if (this.installing) throw new Error("Contribution setup is already running.");
     const parsed = nodeEnrollmentBundleSchema.safeParse(value);
     if (!parsed.success) throw new Error("Invalid contribution pairing request.");

@@ -6,12 +6,14 @@ export interface DesktopDownloadCatalog {
   channel: "preview";
   automaticUpdates: false;
   packages: Array<{
-    id: "windows-x64" | "linux-x64" | "macos-arm64";
+    id: "windows-x64" | "linux-x64" | "macos-arm64" | "macos-x64";
     format: "EXE" | "DEB" | "DMG";
     fileName: string;
     path: string;
     sha256: string;
     bytes: number;
+    version?: string;
+    source?: { path: string; sha256: string };
   }>;
   source: { path: string; sha256: string };
 }
@@ -21,16 +23,25 @@ export function isDesktopDownloadCatalog(value: unknown): value is DesktopDownlo
   const c = value as Record<string, unknown>;
   if (c.schema !== "mycellios-desktop-downloads/1" || typeof c.version !== "string" || !/^\d+\.\d+\.\d+$/.test(c.version)
     || typeof c.runtimeVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(c.runtimeVersion)
-    || c.channel !== "preview" || c.automaticUpdates !== false || !Array.isArray(c.packages) || c.packages.length < 2 || c.packages.length > 3) return false;
+    || c.channel !== "preview" || c.automaticUpdates !== false || !Array.isArray(c.packages) || c.packages.length < 2 || c.packages.length > 4) return false;
   const version = c.version;
-  const safePath = (p: unknown) => typeof p === "string" && new RegExp(`^/downloads/desktop/releases/${version.replaceAll(".", "\\.")}/[A-Za-z0-9._-]+$`).test(p) && !p.includes("..");
+  const safePath = (p: unknown, release = version) => typeof p === "string" && new RegExp(`^/downloads/desktop/releases/${release.replaceAll(".", "\\.")}/[A-Za-z0-9._-]+$`).test(p) && !p.includes("..");
+  const safeSource = (value: unknown, release: string) => {
+    if (!value || typeof value !== "object") return false;
+    const source = value as Record<string, unknown>;
+    return safePath(source.path, release) && typeof source.sha256 === "string" && /^[a-f0-9]{64}$/.test(source.sha256);
+  };
   const ids = new Set<string>();
   for (const item of c.packages) {
     if (!item || typeof item !== "object") return false;
     const p = item as Record<string, unknown>;
-    const extension = p.id === "windows-x64" && p.format === "EXE" ? ".exe" : p.id === "linux-x64" && p.format === "DEB" ? ".deb" : p.id === "macos-arm64" && p.format === "DMG" ? ".dmg" : null;
+    const release = p.version === undefined ? version : p.version;
+    if (typeof release !== "string" || !/^\d+\.\d+\.\d+$/.test(release)
+      || (p.source !== undefined && !safeSource(p.source, release))
+      || (release !== version && !safeSource(p.source, release))) return false;
+    const extension = p.id === "windows-x64" && p.format === "EXE" ? ".exe" : p.id === "linux-x64" && p.format === "DEB" ? ".deb" : ["macos-arm64","macos-x64"].includes(String(p.id)) && p.format === "DMG" ? ".dmg" : null;
     if (!extension || ids.has(String(p.id)) || typeof p.fileName !== "string" || !p.fileName.endsWith(extension)
-      || !safePath(p.path) || !(p.path as string).endsWith("/" + p.fileName)
+      || !safePath(p.path, release) || !(p.path as string).endsWith("/" + p.fileName)
       || typeof p.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(p.sha256)
       || typeof p.bytes !== "number" || !Number.isSafeInteger(p.bytes) || p.bytes <= 0) return false;
     ids.add(String(p.id));

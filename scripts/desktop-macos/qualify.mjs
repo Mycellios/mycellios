@@ -4,21 +4,25 @@ import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {_electron as electron} from '@playwright/test';
 import {waitForMycelliosSignIn} from './signin-probe.mjs';
+import {checkPreviewSignature} from './signature-check.mjs';
 const app=path.resolve(process.argv[2]);
 const output=path.resolve(process.argv[3]);
-if(process.platform!=='darwin'||process.arch!=='arm64')throw Error('Qualification needs Apple Silicon macOS');
+if(process.platform!=='darwin'||!['arm64','x64'].includes(process.arch))throw Error('Qualification needs native Intel or Apple Silicon macOS');
 await fs.mkdir(output,{recursive:true});
 const binary=path.join(app,'Contents/MacOS/Mycellios Desktop');
 const arch=execFileSync('/usr/bin/lipo',['-archs',binary],{encoding:'utf8'}).trim();
-if(arch!=='arm64')throw Error('Unexpected application architecture');
+if(arch!==(process.arch==='arm64'?'arm64':'x86_64'))throw Error('Unexpected application architecture');
 const resources=path.join(app,'Contents/Resources');
-for(const f of ['app.asar','contribution/mycellios-runtime.pkg','contribution/runtime.json','contribution/install-runtime-macos.sh','contribution/describe-runtime-macos.sh','licenses/Agent-Apache-2.0.txt','licenses/Mycellios-GPL-3.0.txt'])await fs.access(path.join(resources,f));
+for(const f of ['app.asar','licenses/Agent-Apache-2.0.txt','licenses/Mycellios-GPL-3.0.txt'])await fs.access(path.join(resources,f));
+if(process.arch==='arm64'){
+for(const f of ['contribution/mycellios-runtime.pkg','contribution/runtime.json','contribution/install-runtime-macos.sh','contribution/describe-runtime-macos.sh'])await fs.access(path.join(resources,f));
 execFileSync('/bin/sh',['-n',path.join(resources,'contribution/install-runtime-macos.sh')]);
 execFileSync('/bin/sh',['-n',path.join(resources,'contribution/describe-runtime-macos.sh')]);
+}else if(await fs.stat(path.join(resources,'contribution/mycellios-runtime.pkg')).then(()=>true,()=>false))throw Error('Intel Desktop contains an incompatible ARM runtime');
 execFileSync('/usr/bin/shlock',['-p',String(process.pid),'-f',path.join(output,'lock-probe')]);
 await fs.unlink(path.join(output,'lock-probe'));
 const userData=await fs.mkdtemp(path.join(os.tmpdir(),'mycellios-mac-qa-'));
-const receipt={platform:process.platform,architecture:arch,profile:'isolated-empty',physicalMac:false,realAccountSignIn:false,modelInference:false,launches:[]};
+const receipt={platform:process.platform,architecture:arch,minimumMacOS:'13.0',contributionRuntimeBundled:process.arch==='arm64',profile:'isolated-empty',physicalMac:false,realAccountSignIn:false,modelInference:false,signature:checkPreviewSignature(app),launches:[]};
 try{
  for(let i=0;i<2;i++){
   const client=await electron.launch({executablePath:binary,env:{...process.env,RAKAZO_PERFORMANCE_USER_DATA:userData},timeout:90000});
