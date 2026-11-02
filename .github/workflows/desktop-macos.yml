@@ -1,0 +1,63 @@
+name: Mycellios Desktop Apple Silicon
+on:
+  push:
+    branches: [codex/desktop-macos-arm64-20261102]
+    paths: [scripts/desktop-macos/**, .github/workflows/desktop-macos.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-macos-arm64
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: macos-26
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - name: Authenticate immutable build inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          mkdir -p build/input build/evidence
+          gh release download desktop-v0.3.9-macos-preview --repo Mycellios/mycellios --pattern macos-build-input.tar.gz --dir build
+          echo 'c9021cf6378aa832b2f1f396c98cc4adcfe39e773aa82b515b964f3370946f0d  build/macos-build-input.tar.gz' | shasum -a 256 -c
+          tar -xzf build/macos-build-input.tar.gz -C build/input
+          curl --fail --location --proto '=https' --retry 2 https://www.mycellios.com/downloads/macos-arm64 --output build/runtime.pkg
+          echo '66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  build/runtime.pkg' | shasum -a 256 -c
+      - name: Build locally qualified Mac adaptation
+        run: |
+          set -euo pipefail
+          npm ci --prefix scripts/desktop-macos --ignore-scripts --no-audit --no-fund
+          node --test scripts/desktop-macos/macos-installer.test.mjs
+          node scripts/desktop-macos/assemble.mjs build/input build/payload
+          ln -s "$PWD/scripts/desktop-macos/node_modules" build/payload/node_modules
+          npm ci --prefix build/payload/src/agent/apps/desktop --ignore-scripts --no-audit --no-fund
+          node build/payload/src/agent/apps/desktop/scripts/package-macos.mjs --runtime "$PWD/build/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$PWD/build/release"
+          cp build/payload/build-inputs.json build/evidence/
+          printf '%s\n' "$GITHUB_SHA" > build/evidence/candidate-sha.txt
+          shasum -a 256 build/release/*.dmg build/release/*.zip > build/evidence/SHA256SUMS
+      - name: Launch and reopen packaged Desktop on Apple Silicon
+        run: node scripts/desktop-macos/qualify.mjs 'build/release/mac-arm64/Mycellios Desktop.app' build/evidence
+      - name: Install bundled runtime without enrolling any account
+        run: |
+          set -euo pipefail
+          sudo /usr/sbin/installer -pkg build/runtime.pkg -target / > build/evidence/runtime-install.log
+          '/Library/Application Support/Mycellios/Product/bin/node' -e 'if(process.platform!=="darwin"||process.arch!=="arm64")process.exit(1);console.log(JSON.stringify({platform:process.platform,arch:process.arch,version:process.version,enrolled:false,physicalInference:false}))' > build/evidence/runtime-architecture.json
+          test -f '/Library/Application Support/Mycellios/Product/app/node/install-main.js'
+      - name: Preserve packages and qualification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mycellios-desktop-macos-arm64-preview
+          path: |
+            build/release/*.dmg
+            build/release/*.zip
+            build/evidence/
+          if-no-files-found: error
+          retention-days: 14

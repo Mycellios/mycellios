@@ -98,6 +98,10 @@ These rules apply to the complete repository.
   `landing/index.html` and `landing/src/seo.ts`. Keep static and runtime metadata
   aligned; verify `tests/landing-seo.test.ts` when changing social cards.
 - Preserve unrelated worktree changes.
+- Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
+  pinned published native baseline, source provenance, explicit runtime pairing
+  and unsigned-preview update policy. Qualify packaging and launch on macOS;
+  runner checks do not substitute for physical Mac inference evidence.
 - Use a spec for medium or large cross-area changes; fold durable outcomes into
   canonical docs when complete.
 - Run `npm run verify:structure`, relevant focused tests and `npm run typecheck`.
