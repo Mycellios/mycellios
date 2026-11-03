@@ -13,6 +13,6 @@ refusal must retain the message without connecting the shared record or sending.
 No automatic cancellation, replay or silent fallback is introduced.
 
 Verify the API assignment filter, onboarding setup wait, native admission order,
-existing transport tests and affected incremental TypeScript checks. This side
-conversation prepares a local patch only; shared installation and production
-promotion remain outside this change.
+existing transport tests and affected incremental TypeScript checks. Production promotion updates API and web only, reuses the current dependency
+graph, retains old assets and containers, and verifies native first-message
+admission without replaying a user draft. Preserve unrelated Desktop/GPU services.
