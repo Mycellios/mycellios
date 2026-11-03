@@ -15,7 +15,7 @@ afterEach(async () => {
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
 const fixture = fileURLToPath(new URL("./fixtures/native-agent.mjs", import.meta.url));
-async function setup(engine: "codex" | "claude" | "acp", extra: string[] = []) {
+async function setup(engine: "codex" | "claude" | "acp", extra: string[] = [], fixturePath = fixture) {
   const dataDir = await mkdtemp(join(tmpdir(), "rakazo-native-test-"));
   roots.push(dataDir);
   await writeFile(
@@ -25,9 +25,9 @@ async function setup(engine: "codex" | "claude" | "acp", extra: string[] = []) {
   const runtime = new NativeAgentRuntime({
     dataDir,
     fallback: new ScriptedAgentRuntime(),
-    commands: { [engine]: { command: process.execPath, args: [fixture, engine, ...extra] } },
+    commands: { [engine]: { command: process.execPath, args: [fixturePath, engine, ...extra] } },
   });
-  const executeTool = vi.fn(async () => ({ content: "fixture file" }));
+  const executeTool = vi.fn<NonNullable<AgentRunRequest['executeTool']>>(async () => ({ content: "fixture file" }));
   const onCheckpoint = vi.fn();
   const onUsage = vi.fn();
   const request: AgentRunRequest = {
@@ -183,4 +183,33 @@ describe("native agent protocol integration", () => {
       }),
     ).toEqual({ PATH: "/bin" });
   });
+});
+
+const workFixture = fileURLToPath(new URL('./fixtures/work-continuation.mjs', import.meta.url));
+it.each(['codex','claude','acp'] as const)('continues unfinished %s work in its existing session without replaying a completed action', async engine=>{
+ const test=await setup(engine,[],workFixture);const events:AgentRuntimeEvent[]=[];
+ for await(const event of test.runtime.run(test.request,test.context))events.push(event);
+ expect(test.executeTool).toHaveBeenCalledOnce();
+ expect(events.filter(e=>e.type==='turn')).toHaveLength(1);
+ expect(events.filter(e=>e.type==='done')).toHaveLength(1);
+ expect(events.filter(e=>e.type==='text').map(e=>e.text).join('')).toContain('Hecho y verificado.');
+});
+it.each(['codex','claude','acp'] as const)('reports incomplete %s work after a bounded change of strategy', async engine=>{
+ const test=await setup(engine,['--no-progress'],workFixture);
+ const consume=async()=>{for await(const _event of test.runtime.run(test.request,test.context)){};};
+ await expect(consume()).rejects.toThrow('WORK_INCOMPLETE');
+ expect(test.executeTool).toHaveBeenCalledOnce();
+});
+it.each(['codex','claude','acp'] as const)('waits for the actual background result before finishing %s work', async engine=>{
+ const test=await setup(engine,[],workFixture);
+ let finished=false;
+ test.executeTool.mockImplementation(async(_name,_args,_id,_route,observer)=>{
+  observer?.onShellStillRunning?.(new Promise(resolve=>setTimeout(()=>{finished=true;resolve({stdout:'verified output',stderr:'',code:0});},75)));
+  return {stdout:'still running',stderr:'',code:null};
+ });
+ const events:AgentRuntimeEvent[]=[];
+ for await(const event of test.runtime.run(test.request,test.context)){if(event.type==='done')expect(finished).toBe(true);events.push(event);}
+ expect(test.executeTool).toHaveBeenCalledOnce();
+ expect(events.filter(e=>e.type==='turn')).toHaveLength(1);
+ expect(events.some(e=>e.type==='done')).toBe(true);
 });

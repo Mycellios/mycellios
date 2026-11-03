@@ -100,7 +100,7 @@ lines.on("line", (line) => {
           }),
         );
         const listed = await client.listTools();
-        if (listed.tools.length !== 1 || listed.tools[0].name !== "tool_0")
+        if (listed.tools.length !== 2 || listed.tools[0].name !== "tool_0")
           throw new Error("Unexpected MCP tool catalog");
         await client.callTool({ name: "tool_0", arguments: { path: "notes.txt" } });
         await client.close();

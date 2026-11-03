@@ -593,3 +593,11 @@
   JSX and verify the compiled fixture with scripts/build-server.test.mjs. After
   building API and worker, run scripts/verify-server-startup.mjs to evaluate their
   imports without credentials or a database before promoting the sealed package.
+
+- Interactive Pi/Codex/Claude/ACP runs share update_work_plan and bounded
+  continuation in their existing session. Never infer task completion from a
+  provider turn ending. Preserve Stop, human pauses, usage observers and effect
+  idempotency. Await actual background-shell results without rerunning commands;
+  fail exhausted/no-progress runs explicitly. Silent delegated/routine runs retain
+  their separate lifecycle. Verify work-continuation, native-agent-runtime, Pi
+  dispatch, shell-command-stream and executor repeated-call regression tests.
