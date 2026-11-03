@@ -114,7 +114,8 @@ describe("Pi computer tool dispatch", () => {
     expect(fakeAgentState.result).toMatchObject({
       content: [{ type: "text" }, { type: "image", mimeType: "image/png", data: "iVBORw0KGgo=" }],
     });
-    expect(fakeAgentState.systemPrompt).toBe("Follow the user's instructions.");
+    expect(fakeAgentState.systemPrompt).toContain("Follow the user's instructions.");
+    expect(fakeAgentState.systemPrompt).toContain("not new user authorization");
   });
 
   it("keeps the run alive when a graphical tool returns an error object", async () => {

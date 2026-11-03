@@ -35,7 +35,7 @@ it('stops after explicit steering and never treats a cancellation as unfinished 
  const other=new WorkContinuation();other.update(plan('pending'));expect(other.next('Me detengo.')).toBeUndefined();
 });
 it('replans after a tool failure but never retries the tool itself',()=>{
- const state=new WorkContinuation();state.result({details:{code:1}});expect(state.next('Could not finish')).toContain('alternative');
+ const state=new WorkContinuation();state.result({details:{code:1}});expect(state.next('')).toContain('alternative');
  state.result({code:0});expect(state.next('Verified')).toBeUndefined();
  expect(toolFailed({details:{error:'failed'}})).toBe(true);
 });
@@ -46,7 +46,7 @@ it('requires valid unique steps and skips silent/background work',()=>{
 });
 it('changes strategy before executing a fourth identical no-progress action, but permits changing results',async()=>{
  const executeTool=vi.fn(async()=>({code:1}));
- const request={instructions:'Original scope',tools:[],executeTool} as unknown as AgentRunRequest;
+ const request={instructions:'Original scope',tools:[{name:'shell',description:'fixture',inputSchema:{type:'object'}}],executeTool} as unknown as AgentRunRequest;
  const wrapped=withWorkContinuation(request,new WorkContinuation());
  for(let i=0;i<3;i++)await wrapped.executeTool!('shell',{command:'missing'},String(i));
  expect(await wrapped.executeTool!('shell',{command:'missing'},'four')).toHaveProperty('error');
@@ -55,4 +55,10 @@ it('changes strategy before executing a fourth identical no-progress action, but
  let n=0;executeTool.mockImplementation(async()=>({code:n++}));
  for(let i=0;i<5;i++)await wrapped.executeTool!('shell',{command:'changing'},'new'+i);
  expect(executeTool).toHaveBeenCalledTimes(8);
+});
+
+it('keeps pure chat requests unchanged and accepts an explicit final failure report',()=>{
+ const request={instructions:'Original',tools:[]} as unknown as AgentRunRequest;
+ expect(withWorkContinuation(request,new WorkContinuation())).toBe(request);
+ const state=new WorkContinuation();state.failed();expect(state.next('The requested action failed because the service is unavailable.')).toBeUndefined();
 });

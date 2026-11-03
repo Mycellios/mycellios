@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { WorkContinuation, withWorkContinuation } from "./work-continuation.js";
+import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation } from "./work-continuation.js";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type {
@@ -1334,7 +1334,7 @@ function runtimeToolsForInitialState(
     return allTools;
   // Paging cannot make a single oversized required schema usable. Preserve
   // fail-before-spend admission for that case rather than hiding its failure.
-  if (allTools.length <= 1) throw new Error(MODEL_CONTEXT_TOO_SMALL_ERROR);
+  if (definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length <= 1) throw new Error(MODEL_CONTEXT_TOO_SMALL_ERROR);
   const named = namedAgentTools(definitions);
   const wireNames = new Map(named.map(({ tool, name }) => [tool, name]));
   const originalsByWire = new Map(named.map(({ tool, name }) => [name, tool]));

@@ -77,7 +77,7 @@ export class WorkContinuation {
       this.previousOpen=signature;
       reason ??= 'Continue the pending work and verify its result. Do not repeat finished steps.';
       reason+='\nPending steps: '+open.map(step=>step.title).join('; ');
-    } else if(this.failure) {
+    } else if(this.failure && (!answer.trim() || nextStep(answer))) {
       if(this.repairs>=2) throw new Error('WORK_INCOMPLETE: Tool failures remain after two recovery turns. Report the concrete blocker and evidence.');
       this.repairs++;
       reason='The latest tool result failed. Inspect it and try a suitable alternative within the existing authorization. Verify uncertain actions before doing anything else; never blindly replay them.';
@@ -95,14 +95,16 @@ export class WorkContinuation {
 
 export function withWorkContinuation(request: AgentRunRequest, state: WorkContinuation): AgentRunRequest {
   if(request.script || request.allowSilentEmpty) return request;
+  const claimSteering=request.claimSteering;
+  if(claimSteering) request={...request,claimSteering:async(seenIds:string[])=>{
+    const messages=await claimSteering(seenIds);
+    if(messages.some(message=>/^(?:para(?: ahora)?|detente|no sigas|cancela(?: la tarea)?|stop(?: now)?|cancel (?:this|the) task)[.!\s]*$/i.test(message.text.trim()))) state.stop();
+    return messages;
+  }};
+  if(request.tools.length===0) return request;
   if(request.tools.some(tool=>tool.name===WORK_PLAN_TOOL)) throw new Error('Reserved work-plan tool name');
   let repeated: {key: string; result: string; count: number}|undefined;
   return {...request,instructions:request.instructions+'\n\n'+guidance,tools:[...request.tools,planTool],
-    ...(request.claimSteering ? {claimSteering:async(seenIds:string[])=>{
-      const messages=await request.claimSteering!(seenIds);
-      if(messages.some(message=>/^(?:para(?: ahora)?|detente|no sigas|cancela(?: la tarea)?|stop(?: now)?|cancel (?:this|the) task)[.!\s]*$/i.test(message.text.trim()))) state.stop();
-      return messages;
-    }} : {}),
     executeTool:async(name,args,id,route,observer)=>{
       if(name===WORK_PLAN_TOOL) return state.update(args);
       const key=JSON.stringify([name,args]);

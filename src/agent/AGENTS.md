@@ -606,3 +606,6 @@
   workspaces are already account/server/bot scoped. Never switch computer mode to
   admit a message or bypass active-run checks. Verify native-computer-workspace
   and native-computer-execution tests, including waiting introductions.
+
+- Namespaced web routing accepts both the bare entry and its trailing-slash form;
+  keep asset URLs namespaced and preserve deep links. Verify app-path.test.ts.
