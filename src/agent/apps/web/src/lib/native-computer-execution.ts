@@ -54,8 +54,10 @@ export function nativeComputerAdmission(
           throw new Error("Local computer access is unavailable. Reconnect Desktop first.");
         if (!(await computer.requestAccess()))
           throw new Error("Local computer access was not allowed. The message was not sent.");
-        await computer.connect!(botId);
+        // Assign the private cloud record before native connect provisions it.
+        // Otherwise the unanswered automatic greeting can block that assignment.
         await prepareWorkspace(botId);
+        await computer.connect!(botId);
         if (!(await computer.connected!(botId)))
           throw new Error("The local computer is disconnected. The message was not sent.");
       });

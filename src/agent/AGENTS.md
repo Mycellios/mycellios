@@ -33,6 +33,9 @@
   Advertise native project controls independently of consent and network readiness;
   a failed identity probe must not hide the connection action. Authenticate and
   enforce the grant when requesting access or connecting, before any file/command work.
+  Initial native admission prepares the private computer record before connecting.
+  An idle Desktop team record may switch while only its created greeting waits;
+  preserve user control, execution IDs/leases and every other active-run refusal.
   A connected agent already receives a persistent native workspace automatically;
   do not require folder selection to enable shell/file tools. Existing projects can
   be addressed with the shell's cwd/native paths under the existing access policy.

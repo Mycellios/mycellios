@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { nativeComputerFetch } from "./native-computer-execution";
+import { nativeComputerAdmission, nativeComputerFetch } from "./native-computer-execution";
 
 function fixture() {
   const order: string[] = [];
@@ -106,4 +106,20 @@ describe("native computer admission", () => {
     await f.fetch(url, message());
     expect(f.computer.connect).toHaveBeenCalledTimes(2);
   });
+});
+
+it("assigns a new private workspace before provisioning native execution", async () => {
+  const f=fixture();
+  const prepare=vi.fn(async()=>{f.order.push("prepare");});
+  const admit=nativeComputerAdmission(f.computer,prepare);
+  await admit("new-bot");
+  expect(f.order).toEqual(["consent","prepare","bind"]);
+});
+it("does not bind a shared computer or send a message after assignment refusal", async () => {
+  const f=fixture();
+  const prepare=vi.fn(async()=>{throw new Error("assignment refused");});
+  const send=nativeComputerFetch(f.send,f.computer,"https://example.test","/agent",nativeComputerAdmission(f.computer,prepare));
+  await expect(send(url,message())).rejects.toThrow("assignment refused");
+  expect(f.computer.connect).not.toHaveBeenCalled();
+  expect(f.send).not.toHaveBeenCalled();
 });
