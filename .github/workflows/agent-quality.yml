@@ -14,6 +14,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  contribution-ui:
+    name: Contribution controls browser proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: src/agent/package-lock.json
+      - run: npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
+      - name: Install browser
+        working-directory: src/agent/apps/web
+        run: npm exec -- playwright install --with-deps chromium
+      - name: Verify translated controls without an account or compute
+        working-directory: src/agent/apps/web
+        run: npm exec -- playwright test --config playwright.contribution.config.ts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: contribution-controls-browser-proof
+          path: src/agent/playwright-contribution-report
+          if-no-files-found: error
+          retention-days: 7
   agent:
     name: Agent types, tests and builds
     runs-on: ubuntu-latest

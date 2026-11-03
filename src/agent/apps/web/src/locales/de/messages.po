@@ -6305,3 +6305,31 @@ msgstr "Version saved for this agent"
 
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "Die Anfrage passte nicht in den Kontext des Modells. Versuche es erneut oder wähle ein Modell mit größerem Kontext."
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "Rechenleistung beitragen"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "Diesen Computer überprüfen"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "Dieser Computer wird überprüft…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "Überprüfe die vorhandene Installation, bevor du Rechenleistung beiträgst."
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "Dieser Computer konnte nicht überprüft werden. Versuche es erneut oder öffne das Dashboard."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "Klare Beschriftungen für die Beitragssteuerung."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "Überprüfe deinen Computer oder frage seinen Status erneut ab, bevor du einen Beitrag startest."

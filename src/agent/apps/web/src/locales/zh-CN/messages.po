@@ -6305,3 +6305,31 @@ msgstr "Version saved for this agent"
 
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "请求超出了模型的上下文容量。请重试或选择上下文容量更大的模型。"
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "使用此电脑贡献算力"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "验证此电脑"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "正在验证此电脑…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "贡献算力前，请验证现有安装。"
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "无法验证此电脑。请重试或打开控制面板。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "贡献控制按钮使用清晰的标签。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "开始贡献前，可以验证电脑或重试查询其状态。"

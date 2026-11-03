@@ -1,10 +1,10 @@
 import { compareBuilds, isBuildId } from "@rakazo/contracts/client-build";
 
 export const RELEASE_NOTES = {
-  id: "2026-11-02-mobile-updates",
-  version: "2026.11.02",
-  date: "2026-11-02",
-  minimumBuild: "20261102061307",
+  id: "2026-11-03-contribution-status",
+  version: "2026.11.03",
+  date: "2026-11-03",
+  minimumBuild: "20261103211604",
 } as const;
 const SEEN_BUILD = "mycellios.release-notes.last-build.v1";
 const ACKNOWLEDGED = "mycellios.release-notes.acknowledged.v1";

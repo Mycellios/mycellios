@@ -6305,3 +6305,31 @@ msgstr "Version saved for this agent"
 
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "Het verzoek paste niet in de context van het model. Probeer opnieuw of kies een model met een grotere context."
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "Rekenkracht bijdragen"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "Deze computer controleren"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "Deze computer controleren…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "Controleer de bestaande installatie voordat je bijdraagt."
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "Deze computer kon niet worden gecontroleerd. Probeer het opnieuw of open het dashboard."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "Duidelijke labels voor de bediening van bijdragen."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "Controleer je computer of vraag de status opnieuw op voordat je een bijdrage start."

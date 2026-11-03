@@ -6305,3 +6305,31 @@ msgstr "Version saved for this agent"
 
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "İstek modelin bağlamına sığmadı. Yeniden deneyin veya daha geniş bağlamlı bir model seçin."
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "Bu bilgisayarla katkıda bulun"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "Bu bilgisayarı doğrula"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "Bu bilgisayar doğrulanıyor…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "Katkıda bulunmadan önce mevcut kurulumu doğrula."
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "Bu bilgisayar doğrulanamadı. Tekrar dene veya kontrol panelini aç."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "Katkı kontrolleri için anlaşılır etiketler."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "Katkıya başlamadan önce bilgisayarınızı doğrulayın veya durumunu tekrar kontrol edin."

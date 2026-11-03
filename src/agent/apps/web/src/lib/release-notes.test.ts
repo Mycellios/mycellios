@@ -1,7 +1,7 @@
 import {beforeEach,expect,it,vi} from "vitest";
 beforeEach(()=>vi.resetModules());
 function store(){const map=new Map<string,string>();return {getItem:(key:string)=>map.get(key)??null,setItem:(key:string,value:string)=>{map.set(key,value);}};}
-const old="20261101164621",current="20261102090000";
+const old="20261101164621",current="20261103211604";
 it("records the first visit without claiming an update",async()=>{
  const {observeRelease}=await import('./release-notes');const s=store();
  expect(observeRelease(current,s,null)?.show).toBe(false);
@@ -30,7 +30,7 @@ it("does not advertise unreleased notes or treat a rollback as a new version",as
 it("acknowledges one notes edition without resetting it for hotfix builds",async()=>{
  const {observeRelease,acknowledgeRelease}=await import('./release-notes');const s=store();
  observeRelease(old,s,null);expect(observeRelease(current,s,null)?.show).toBe(true);
- acknowledgeRelease(s);expect(observeRelease('20261103000000',s,null)?.show).toBe(false);
+ acknowledgeRelease(s);expect(observeRelease('20261104000000',s,null)?.show).toBe(false);
 });
 it("handles development and denied storage without breaking startup",async()=>{
  const {observeRelease}=await import('./release-notes');const denied={getItem:()=>{throw Error('denied');},setItem:()=>{throw Error('denied');}};

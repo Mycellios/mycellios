@@ -7276,3 +7276,62 @@ msgstr "Version history"
 msgid "Version saved for this agent"
 msgstr "Version saved for this agent"
 
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "Contribute compute"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "Verify this computer"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "Verifying this computer…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "Verify the existing installation before contributing."
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "Could not verify this computer. Try again or open the dashboard."
+
+#: src/components/SidebarContribution.tsx
+msgid "Setting up contribution…"
+msgstr "Setting up contribution…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Waiting for this computer…"
+msgstr "Waiting for this computer…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Pause contribution"
+msgstr "Pause contribution"
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not confirm contribution. Try again or open the dashboard."
+msgstr "Could not confirm contribution. Try again or open the dashboard."
+
+#: src/components/SidebarContribution.tsx
+msgid "Use this browser to contribute while the page stays open."
+msgstr "Use this browser to contribute while the page stays open."
+
+#: src/components/SidebarContribution.tsx
+msgid "Computer offline. Waiting for reconnection."
+msgstr "Computer offline. Waiting for reconnection."
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute in browser"
+msgstr "Contribute in browser"
+
+#: src/components/SidebarContribution.tsx
+msgid "Open dashboard"
+msgstr "Open dashboard"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "Clear labels for contribution controls."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "Verify your computer or retry its status before starting contribution."
