@@ -7432,3 +7432,15 @@ msgstr "Historial de versiones"
 msgid "Version saved for this agent"
 msgstr "Versión guardada para este agente"
 
+
+msgid "Sign in again to prepare this agent. Your message has been kept."
+msgstr "Vuelve a iniciar sesión para preparar este agente. Tu mensaje se ha conservado."
+
+msgid "This account cannot prepare this agent. Your message has been kept."
+msgstr "Esta cuenta no puede preparar este agente. Tu mensaje se ha conservado."
+
+msgid "This agent changed while preparing it. Try again; your message has been kept."
+msgstr "El agente ha cambiado mientras se preparaba. Reinténtalo; tu mensaje se ha conservado."
+
+msgid "Could not prepare this agent. Your message has been kept."
+msgstr "No se ha podido preparar el agente. Tu mensaje se ha conservado."

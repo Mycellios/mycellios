@@ -601,3 +601,8 @@
   fail exhausted/no-progress runs explicitly. Silent delegated/routine runs retain
   their separate lifecycle. Verify work-continuation, native-agent-runtime, Pi
   dispatch, shell-command-stream and executor repeated-call regression tests.
+
+- Desktop send preparation preserves the saved Team/dedicated assignment; native
+  workspaces are already account/server/bot scoped. Never switch computer mode to
+  admit a message or bypass active-run checks. Verify native-computer-workspace
+  and native-computer-execution tests, including waiting introductions.
