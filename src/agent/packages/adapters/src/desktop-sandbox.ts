@@ -164,14 +164,16 @@ export class DesktopSandboxProvider implements SandboxProvider {
     const existing = [...this.boxes.values()].find(
       (box) => box.ref.botId === request.botId || box.home === home,
     );
+    // File probes can reconstruct a cached reference before provision. A cache
+    // entry is not proof that its persistent directory has been created.
+    // Recursive mkdir preserves existing files and identifies a new home even
+    // after adapter restarts or loss of a previously cached directory.
+    const created = await mkdir(home, { recursive: true });
     if (existing) {
       existing.running = true;
-      return { ...existing.ref, fresh: false };
+      return { ...existing.ref, fresh: created !== undefined };
     }
     const id = `desktop-${request.botId}`;
-    // Recursive mkdir returns undefined when the directory already exists. This
-    // survives adapter/process restarts and distinguishes live files from a new home.
-    const created = await mkdir(home, { recursive: true });
     const ref: ComputerRef = {
       id,
       botId: request.botId,
@@ -243,7 +245,14 @@ export class DesktopSandboxProvider implements SandboxProvider {
   }
 
   async isRunning(computer: ComputerRef, _context: AdapterContext) {
-    return this.boxes.get(computer.id)?.running ?? false;
+    const box = this.boxes.get(computer.id);
+    if (!box?.running) return false;
+    try {
+      return (await stat(box.home)).isDirectory();
+    } catch (error) {
+      if (hasErrorCode(error, "ENOENT")) return false;
+      throw error;
+    }
   }
 
   async environment() {
