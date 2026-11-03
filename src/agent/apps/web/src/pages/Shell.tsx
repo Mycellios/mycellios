@@ -191,6 +191,8 @@ import {
   writeRightPanelState,
 } from "../lib/right-panel-state";
 import { clearSpaceSelection, createSpaceRpc, selectedSpaceId, selectSpace } from "../lib/rpc";
+import { unsafeRunRetryText } from "../lib/retry-error";
+import { canRetryThreadRun, retryOriginalThreadRun } from "../lib/retry-thread-run";
 import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-storage";
 import { useSignOut } from "../lib/sign-out";
 import {
@@ -433,6 +435,9 @@ function SpaceShell() {
   const [replyQuote, setReplyQuote] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+  const retryInFlight = useRef<string | null>(null);
+  const [unretryableRunIds, setUnretryableRunIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => () => { retryInFlight.current = null; }, []);
   useEffect(() => {
     setComposerUnsavedWork(sending || pendingAttachments.length > 0);
     return () => setComposerUnsavedWork(false);
@@ -3223,20 +3228,46 @@ function SpaceShell() {
 
   async function retryFailedRun() {
     const runId = displayedRunErrorId;
-    if (!runId || retryingRunId || !activeSnapshot) return;
+    if (!runId || retryInFlight.current || !activeSnapshot) return;
     const target: { groupId: string } | { botId: string } = inGroup
       ? { groupId: groupId! } : { botId: active!.id };
+    const epoch = historyEpoch.current;
+    const isCurrent = () => retryInFlight.current === runId && epoch === historyEpoch.current &&
+      ("groupId" in target ? activeGroupId.current === target.groupId : activeBotId.current === target.botId);
+    const refresh = () => "groupId" in target ? refreshGroupThread(target.groupId) : refreshThread(target.botId);
+    retryInFlight.current = runId;
     setRetryingRunId(runId);
     try {
-      await rpc.threads.retry({ ...target, runId });
-      // Keep the draft and its pending attachments; retry references the saved original turn.
-      if ("groupId" in target) await refreshGroupThread(target.groupId);
-      else await refreshThread(target.botId);
-      setDismissedRunErrorIds((current) => new Set(current).add(runId));
+      const outcome = await retryOriginalThreadRun({runId, threadId: activeSnapshot.threadId,
+        refresh, retry: () => rpc.threads.retry({ ...target, runId }), isCurrent});
+      if (!isCurrent() || outcome === "inactive") return;
+      if (outcome === "not_retryable" || outcome === "unsafe") {
+        setUnretryableRunIds(current => new Set(current).add(runId));
+      }
+      if (outcome === "unsafe") {
+        rememberSeenRunErrorId(runId);
+        setDismissedRunErrorIds(current => new Set(current).add(runId));
+      }
+      if (outcome === "retried") {
+        setSendError(null);
+        setDismissedRunErrorIds(current => new Set(current).add(runId));
+      } else if (outcome === "not_retryable") {
+        setSendError(t`This task cannot be retried. Continue in the chat.`);
+      } else if (outcome === "changed") {
+        setSendError(null);
+        toast.info(t`The task state changed. The chat has been refreshed.`);
+      } else {
+        setSendError(outcome === "unsafe"
+          ? unsafeRunRetryText()
+          : t`Wait for the current task to finish before retrying.`);
+      }
     } catch (error) {
-      setSendError(error instanceof Error ? error.message : t`Could not continue`);
+      if (isCurrent()) setSendError(errorText(error, t`Could not continue`));
     } finally {
-      setRetryingRunId(null);
+      if (retryInFlight.current === runId) {
+        retryInFlight.current = null;
+        setRetryingRunId(null);
+      }
     }
   }
 
@@ -3983,7 +4014,7 @@ function SpaceShell() {
               runErrorId={displayedRunErrorId}
               onRunErrorPresented={handleRunErrorPresented}
               onDismissError={dismissComposerError}
-              onRetryError={() => void retryFailedRun()}
+              onRetryError={displayedRunErrorId && !unretryableRunIds.has(displayedRunErrorId) && canRetryThreadRun(activeSnapshot) ? () => void retryFailedRun() : undefined}
               retrying={retryingRunId === displayedRunErrorId && retryingRunId !== null}
               sending={sending}
               fileInputRef={fileInputRef}

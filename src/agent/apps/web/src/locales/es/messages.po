@@ -7472,3 +7472,17 @@ msgstr "El agente ha cambiado mientras se preparaba. Reinténtalo; tu mensaje se
 
 msgid "Could not prepare this agent. Your message has been kept."
 msgstr "No se ha podido preparar el agente. Tu mensaje se ha conservado."
+
+msgid "The task state changed. The chat has been refreshed."
+msgstr "El estado de la tarea ha cambiado. El chat se ha actualizado."
+
+msgid "This task cannot be retried. Continue in the chat."
+msgstr "Esta tarea no se puede reintentar. Continúa en el chat."
+
+
+msgid "Wait for the current task to finish before retrying."
+msgstr "Espera a que termine la tarea actual antes de reintentar."
+
+
+msgid "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
+msgstr "Esta petición se interrumpió después de producir resultados o acciones. Envía un nuevo mensaje para continuar; reintentarla podría repetir acciones."

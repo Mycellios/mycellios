@@ -615,3 +615,7 @@
 - Namespaced web routing accepts both the bare entry and its trailing-slash form;
   keep asset URLs namespaced and preserve deep links. Verify app-path.test.ts.
 
+- Composer retry re-reads the owned thread and targets only the saved failed user
+  run. Never offer it for introductions or copy text/files to replay a request.
+  Keep API effect fences and chat/Space/unmount guards; reconcile known conflicts
+  without another POST. Verify web/API retry-thread-run and composer tests.
