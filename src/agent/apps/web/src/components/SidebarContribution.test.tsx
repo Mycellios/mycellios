@@ -2,7 +2,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, expect, it, vi } from "vitest";
-const f = vi.hoisted(() => ({ status: vi.fn(), control: vi.fn(), enrollment: vi.fn(), native: vi.fn(), enroll: vi.fn(), bridge: vi.fn() }));
+const f = vi.hoisted(() => ({ status: vi.fn(), control: vi.fn(), enrollment: vi.fn(), native: vi.fn(), enroll: vi.fn(), identify: vi.fn(), bridge: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ rpc: { models: { contributionStatus: f.status, contributionControl: f.control, contributionEnrollment: f.enrollment } } }));
 vi.mock("../lib/desktop", () => ({ desktopBridge: f.bridge }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
@@ -11,7 +11,7 @@ import { SidebarContribution } from "./SidebarContribution";
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   for (const mock of Object.values(f)) mock.mockReset();
-  f.bridge.mockReturnValue({ runtime: { status: f.native, enroll: f.enroll } });
+  f.bridge.mockReturnValue({ runtime: { status: f.native, enroll: f.enroll, identify: f.identify } });
   f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
   f.status.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: false, pending: null, rejected: false });
   f.control.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: false, pending: "resume", rejected: false });
@@ -67,10 +67,66 @@ it("does not issue a second command while the first acknowledgement is pending",
 });
 it("never overwrites an existing unreadable identity", async () => {
   f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: null });
+  f.identify.mockRejectedValue(new Error("Verification cancelled"));
   await rendered(async host => {
+    expect(host.textContent).toContain("Verify this computer");
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(f.identify).not.toHaveBeenCalled();
     await act(async () => host.querySelector("button")!.click());
+    expect(f.identify).toHaveBeenCalledOnce();
     expect(f.enrollment).not.toHaveBeenCalled(); expect(f.enroll).not.toHaveBeenCalled(); expect(f.control).not.toHaveBeenCalled();
     expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  });
+});
+
+it("verifies the existing installation before offering a separate start action", async () => {
+  f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: null });
+  f.identify.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
+  await rendered(async host => {
+    expect(f.status).not.toHaveBeenCalled();
+    await act(async () => host.querySelector("button")!.click());
+    expect(f.identify).toHaveBeenCalledOnce();
+    expect(f.enrollment).not.toHaveBeenCalled();
+    expect(f.enroll).not.toHaveBeenCalled();
+    expect(f.control).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("Contribute compute");
+    f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
+    await act(async () => host.querySelector("button")!.click());
+    expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
+  });
+});
+
+it("keeps verification read-only when another process has already repaired the identity", async () => {
+  f.native.mockResolvedValueOnce({ supported: true, enrolled: true, installed: true, nodeId: null });
+  await rendered(async host => {
+    expect(host.textContent).toContain("Verify this computer");
+    await act(async () => host.querySelector("button")!.click());
+    expect(f.identify).not.toHaveBeenCalled();
+    expect(f.control).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("Contribute compute");
+  });
+});
+
+it("retries a failed observation without starting or enrolling compute", async () => {
+  f.status.mockRejectedValueOnce(new Error("Offline"));
+  await rendered(async host => {
+    expect(host.querySelector("button")!.textContent).toContain("Retry");
+    await act(async () => host.querySelector("button")!.click());
+    expect(f.status).toHaveBeenCalledTimes(2);
+    expect(f.control).not.toHaveBeenCalled();
+    expect(f.identify).not.toHaveBeenCalled();
+    expect(f.enrollment).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+});
+
+it("refreshes a rejected command instead of replaying its effect", async () => {
+  f.status.mockResolvedValueOnce({ nodeId: "same-node", connected: true, enabled: false, pending: null, rejected: true });
+  await rendered(async host => {
+    expect(host.querySelector("button")!.textContent).toContain("Retry");
+    await act(async () => host.querySelector("button")!.click());
+    expect(f.control).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("Contribute compute");
   });
 });
 it("keeps a newly enrolled contributor running instead of immediately pausing it", async () => {

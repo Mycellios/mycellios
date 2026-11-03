@@ -6305,3 +6305,31 @@ msgstr "Version saved for this agent"
 
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "अनुरोध मॉडल के संदर्भ में नहीं समाया। फिर से प्रयास करें या बड़े संदर्भ वाला मॉडल चुनें।"
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "इस कंप्यूटर से योगदान दें"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "इस कंप्यूटर को सत्यापित करें"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "इस कंप्यूटर का सत्यापन हो रहा है…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "योगदान देने से पहले मौजूदा इंस्टॉलेशन को सत्यापित करें।"
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "इस कंप्यूटर को सत्यापित नहीं किया जा सका। फिर से प्रयास करें या डैशबोर्ड खोलें।"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "योगदान नियंत्रणों के लिए स्पष्ट लेबल।"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "योगदान शुरू करने से पहले अपने कंप्यूटर को सत्यापित करें या उसकी स्थिति फिर से जाँचें।"

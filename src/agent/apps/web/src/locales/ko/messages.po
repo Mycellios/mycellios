@@ -6305,3 +6305,31 @@ msgstr "Version saved for this agent"
 
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "요청이 모델의 컨텍스트에 맞지 않았습니다. 다시 시도하거나 더 큰 컨텍스트를 지원하는 모델을 선택하세요."
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "이 컴퓨터로 연산 자원 기여"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "이 컴퓨터 확인"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "이 컴퓨터 확인 중…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "기여하기 전에 기존 설치를 확인하세요."
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "이 컴퓨터를 확인하지 못했습니다. 다시 시도하거나 대시보드를 여세요."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "기여 제어 기능에 명확한 이름을 표시합니다."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "기여를 시작하기 전에 컴퓨터를 확인하거나 상태를 다시 조회하세요."

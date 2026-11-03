@@ -3,3 +3,5 @@
 src/locales/**/*.mjs
 src/locales/**/*.js
 scripts/msgids.json
+
+.contribution-preview/

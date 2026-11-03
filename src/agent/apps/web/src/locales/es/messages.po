@@ -6934,6 +6934,34 @@ msgstr "Introduce la URL de una vista previa local."
 
 
 
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "Contribuir con este equipo"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "Verificar este equipo"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "Verificando este equipo…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "Verifica la instalación existente antes de contribuir."
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "No se pudo verificar este equipo. Reintenta o abre el panel."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "Etiquetas claras en los controles de contribución."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "Verifica tu equipo o reintenta consultar su estado antes de iniciar la contribución."
+
 msgid "Setting up contribution…"
 msgstr "Preparando la contribución…"
 

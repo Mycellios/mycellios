@@ -6,6 +6,25 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { UI_LOCALES } from "./ui-locale";
 
 describe("lingui catalogs", () => {
+  it("includes the contribution and verification labels instead of exposing message IDs", () => {
+    const messages = [
+      "Contribute compute",
+      "Verify this computer",
+      "Verifying this computer…",
+      "Verify the existing installation before contributing.",
+      "Could not verify this computer. Try again or open the dashboard.",
+      "Clear labels for contribution controls.",
+      "Verify your computer or retry its status before starting contribution.",
+    ];
+    for (const locale of UI_LOCALES) {
+      const catalog = readFileSync(fileURLToPath(new URL(`../locales/${locale}/messages.po`, import.meta.url)), "utf8");
+      for (const message of messages) {
+        const entry = catalog.split("\n\n").find(block => block.includes(`msgid ${JSON.stringify(message)}\n`));
+        expect(entry, `${locale}: ${message}`).toMatch(/msgstr ".+"/);
+      }
+    }
+  });
+
   it("translates sign-out failures in every supported language", () => {
     for (const locale of ["de", "es", "fr", "hi", "ja", "ko", "nl", "pt-BR", "ru", "tr", "zh-CN"]) {
       const catalog = readFileSync(

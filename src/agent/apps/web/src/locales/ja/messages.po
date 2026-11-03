@@ -6305,3 +6305,31 @@ msgstr "Version saved for this agent"
 
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "リクエストがモデルのコンテキストに収まりませんでした。再試行するか、より大きなコンテキストのモデルを選択してください。"
+
+#: src/components/SidebarContribution.tsx
+msgid "Contribute compute"
+msgstr "このコンピューターで計算資源を提供"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify this computer"
+msgstr "このコンピューターを確認"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verifying this computer…"
+msgstr "このコンピューターを確認中…"
+
+#: src/components/SidebarContribution.tsx
+msgid "Verify the existing installation before contributing."
+msgstr "提供を開始する前に既存のインストールを確認してください。"
+
+#: src/components/SidebarContribution.tsx
+msgid "Could not verify this computer. Try again or open the dashboard."
+msgstr "このコンピューターを確認できませんでした。再試行するか、ダッシュボードを開いてください。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear labels for contribution controls."
+msgstr "計算資源の提供操作に分かりやすいラベルを表示。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Verify your computer or retry its status before starting contribution."
+msgstr "提供を開始する前に、コンピューターの確認や状態の再確認ができます。"

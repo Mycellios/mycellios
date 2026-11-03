@@ -92,37 +92,16 @@ export function ReleaseNotes({
         <div className="min-h-0 overflow-y-auto px-6 pb-6" data-testid="release-notes-content">
           <section>
             <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
-              <Trans context="release-notes">New</Trans>
-              <span className="rounded-full bg-primary/10 px-1.5 tabular-nums">2</span>
-            </h3>
-            <ul className="list-disc space-y-3 ps-4 text-sm leading-relaxed marker:text-primary">
-              <li>
-                <Trans>
-                  Add Mycellios to your phone from the sidebar, with simple steps for iPhone and
-                  Android.
-                </Trans>
-              </li>
-              <li>
-                <Trans>
-                  See a short summary of what changed after an update. Reopen it anytime from your
-                  account menu.
-                </Trans>
-              </li>
-            </ul>
-          </section>
-          <section className="mt-6">
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
               <Trans>Improved</Trans>
               <span className="rounded-full bg-primary/10 px-1.5 tabular-nums">2</span>
             </h3>
             <ul className="list-disc space-y-3 ps-4 text-sm leading-relaxed marker:text-primary">
               <li>
-                <Trans>Update notices are easier to find in the sidebar.</Trans>
+                <Trans>Clear labels for contribution controls.</Trans>
               </li>
               <li>
                 <Trans>
-                  Updating keeps your saved chats and waits for unsent drafts, attachments and
-                  calls.
+                  Verify your computer or retry its status before starting contribution.
                 </Trans>
               </li>
             </ul>

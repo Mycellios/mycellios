@@ -4,6 +4,17 @@ Updated: 2026-11-02 (local project Play/Stop and full-stack preview qualified; i
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
 
+- Agent contribution sidebar (local candidate): missing translated labels are
+  present in all thirteen catalogs. An existing unreadable installation offers
+  explicit verification; successful verification never starts compute, including
+  when another process has already repaired its public descriptor. Retry refreshes
+  observations instead of replaying rejected or uncertain commands. Fifty-five
+  focused UI/catalog, announcement, native-runtime and account-adapter tests pass;
+  web typecheck/build pass. Browser fixtures exercise the production component and
+  compiled Spanish catalog without a real account or contribution activity. The
+  companion Spanish patch still applies cleanly. The announcement is prepared for
+  the next web build; this candidate has not been published.
+
 ## Local project preview and integrated release candidate — 2026-11-02
 
 The generic Browser beside a chat now owns project Play/Stop, service profiles,
