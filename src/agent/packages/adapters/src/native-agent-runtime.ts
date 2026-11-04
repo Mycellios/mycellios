@@ -470,6 +470,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           if (continuity.canContinue(answerText)) await deliverFinishedShells(text => { finishedCommand = text; }, pendingShells, { toolResults: [] }, signal);
           if (signal.aborted || paused) return;
           const note = finishedCommand ? continuity.afterWait(finishedCommand) : continuity.next(answerText);
+          await continuity.flush();
           if (note && continueTurn) {
             answerText = "";
             queue.push({ type: "turn" });

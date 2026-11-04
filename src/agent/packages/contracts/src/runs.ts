@@ -20,6 +20,8 @@ export const RUN_TRIGGERS = [
   "created",
   "tickets",
   "project_prepare",
+  "delegated_task",
+  "task_return",
 ] as const;
 export const RunTriggerSchema = z.enum(RUN_TRIGGERS);
 export type RunTrigger = z.infer<typeof RunTriggerSchema>;

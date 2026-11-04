@@ -9,6 +9,8 @@ const file = z.object({
   executable: z.boolean().optional(),
 });
 const command = z.object({
+  commandId: z.string().min(1).max(256).optional(),
+  executionId: z.string().min(1).max(256).optional(),
   argv: z
     .array(z.string().max(1024 * 1024))
     .min(1)
@@ -43,6 +45,7 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
     ]),
   }),
   z.object({ ...base, method: z.literal("execute"), command }),
+  z.object({ ...base, method: z.literal("commandStatus"), commandId: z.string().min(1).max(256).optional() }),
   z.object({ ...base, method: z.literal("workspaceDirectories"), directories }),
   z.object({
     ...base,
@@ -60,6 +63,7 @@ export const hostComputerRequest = z.discriminatedUnion("method", [
 ]);
 export type HostComputerRequest = z.infer<typeof hostComputerRequest>;
 export interface HostComputerEnvironment {
+  durableCommands?: boolean;
   platform: string;
   home: string;
   shell: string;

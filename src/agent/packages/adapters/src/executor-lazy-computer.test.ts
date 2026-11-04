@@ -227,7 +227,7 @@ async function runRoutine(
   if (options.copyFailureOnce)
     sandbox.writeFile.mockRejectedValueOnce(new Error("temporary copy failure"));
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
-  const enqueue = vi.fn(async () => undefined);
+  const enqueue = vi.fn(async (_job: unknown) => undefined);
   Object.assign(prisma, {
     $transaction: vi.fn(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma)),
   });

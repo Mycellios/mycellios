@@ -12,6 +12,9 @@ import { scheduleComputerControlExpiry } from "./computer-control.js";
 import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
 import { isUserProgressClientNonce } from "./user-progress.js";
+import { reconcileWork } from "@rakazo/db";
+import type { SandboxProvider } from "@rakazo/adapter-kit";
+import { reconcileWorkStops } from "./work-stop-reconciler.js";
 
 const DEFAULT_INTERVAL_MS = 30_000;
 const DEFAULT_BATCH_SIZE = 100;
@@ -108,6 +111,7 @@ export function createJobReconciler(
   deps: {
     prisma: PrismaClient;
     jobs: JobPublisher;
+    sandbox?: SandboxProvider;
     events?: ThreadEvents;
     notifications?: NotificationProvider;
     leadership?: ReconciliationLeadership;
@@ -140,6 +144,9 @@ export function createJobReconciler(
         [
           () => reconcileCallRequests(deps),
           () => reconcileComputerRuns(deps.prisma),
+          () => deps.sandbox ? reconcileWorkStops({ ...deps, sandbox: deps.sandbox }) : undefined,
+          async () => { for (const runId of await reconcileWork(deps.prisma, batchSize))
+            await deps.jobs.enqueue({ ...runContinueJob(runId), keepExisting: true }); },
           deps.reconcileCloudAgents,
           deps.reconcileModelCredits,
           deps.reconcileComputerUpdates,

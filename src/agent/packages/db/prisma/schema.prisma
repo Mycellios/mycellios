@@ -710,6 +710,23 @@ model Event {
 }
 
 model Task {
+  workPlan Json?
+  parentTaskId String?
+  workParent Task? @relation("WorkTree", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  workChildren Task[] @relation("WorkTree")
+  delegationRootId String?
+  delegationKey String? @unique
+  delegationState String?
+  delegationRevision Int @default(0)
+  delegatedRunId String?
+  expectedResult String?
+  resources String[] @default([])
+  dependencies String[] @default([])
+  returnRunId String?
+  returnedToParentAt DateTime?
+  delegationCheckedAt DateTime?
+  workStopPending Boolean @default(false)
+  workStopTargets Json?
   assignmentVersion Int @default(1)
   paused Boolean @default(false)
   id        String   @id @default(cuid())
@@ -727,6 +744,8 @@ model Task {
   runs      Run[]
 
   @@index([spaceId, botId])
+  @@index([spaceId, userId, delegationState])
+  @@index([parentTaskId])
   @@map("tasks")
 }
 

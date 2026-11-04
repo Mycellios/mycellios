@@ -618,12 +618,14 @@ export class PiAgentRuntime implements AgentRuntime {
               turn,
               turnSignal,
             );
+            await continuity.flush();
             if (continuityFailure) return { action: "end" as const };
             if (shellResultDelivered || turnSignal?.aborted || signal.aborted || host.pausePending ||
               turn.message.role !== "assistant" || messageHasToolCall(turn.message) ||
               turn.toolResults.length || providerFailureText(turn.message)) return;
             try {
               const note = continuity.next(assistantText(turn.message));
+              await continuity.flush();
               if (note) agent.followUp({ role: "user", content: note, timestamp: Date.now() });
             } catch (error) {
               continuityFailure = error instanceof Error ? error : new Error('Work could not complete');

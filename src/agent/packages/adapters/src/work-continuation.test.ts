@@ -1,6 +1,26 @@
 import {expect,it,vi} from 'vitest';
 import type {AgentRunRequest} from '@rakazo/adapter-kit';
 import {WorkContinuation,withWorkContinuation,WORK_PLAN_TOOL,toolFailed} from './work-continuation.js';
+it('restores the work plan and continuation budget across runtime instances',async()=>{
+ let snapshot:unknown;
+ const first=new WorkContinuation();first.configure(undefined,async value=>{snapshot=value;});
+ first.update({steps:[{id:'verify',title:'Verify the existing command result',status:'running'}]});
+ first.next('Working');await first.flush();
+ const restored=new WorkContinuation();restored.configure(snapshot);
+ expect(restored.hasPendingWork()).toBe(true);
+ expect(restored.next('Working')).toContain('different approach');
+ expect(()=>restored.next('Working')).toThrow('No progress');
+ const exhausted=new WorkContinuation();exhausted.configure({version:1,steps:[],count:8,nextCount:0,repairs:0});
+ expect(()=>exhausted.afterWait('finished')).toThrow('budget');
+});
+it('does not execute a tool when persisting its preceding plan failed',async()=>{
+ const executeTool=vi.fn();
+ const wrapped=withWorkContinuation({instructions:'existing scope',tools:[{name:'shell'}],executeTool,
+  saveWorkState:async()=>{throw new Error('storage unavailable');}} as unknown as AgentRunRequest,new WorkContinuation());
+ await expect(wrapped.executeTool!(WORK_PLAN_TOOL,{steps:[{id:'one',title:'One',status:'pending'}]},'plan')).rejects.toThrow('storage unavailable');
+ await expect(wrapped.executeTool!('shell',{command:'never execute'},'tool')).rejects.toThrow('storage unavailable');
+ expect(executeTool).not.toHaveBeenCalled();
+});
 const plan=(status:string)=>({steps:[{id:'verify',title:'Verify the change',status}]});
 it('continues pending work, changes approach once on no progress, then reports incomplete',()=>{
  const state=new WorkContinuation();state.update(plan('running'));

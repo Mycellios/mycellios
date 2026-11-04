@@ -33,6 +33,8 @@ const NON_CONVERSATIONAL_RUN_TRIGGERS = new Set([
   "tickets",
   "project_prepare",
   "bot_message",
+  "delegated_task",
+  "task_return",
 ]);
 
 /**

@@ -93,6 +93,8 @@ import type {
 } from "./types.js";
 
 export interface SandboxProvider {
+  /** Read receipts on the already-authorized native computer, without executing work. */
+  commandStatus?(computer: ComputerRef, commandId: string | undefined, context: AdapterContext): Promise<unknown>;
   /** True when every running minute is billed, so the active-lifetime cap applies. */
   billsWhileRunning?(computer: ComputerRef): boolean;
   describe(): AdapterDescriptor<SandboxCapabilities>;
@@ -106,7 +108,7 @@ export interface SandboxProvider {
   environment?(
     computer: ComputerRef,
     context: AdapterContext,
-  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; projectSessionId?:string; runtimeExecutable?: string } | undefined>;
+  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string } | undefined>;
   /** Optional live browser on the same leased screen as observe/act. */
   pageBrowser?(
     computer: ComputerRef,

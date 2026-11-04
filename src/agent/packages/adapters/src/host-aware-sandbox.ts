@@ -162,8 +162,19 @@ export class HostAwareSandbox implements SandboxProvider {
     return manageComputerWorkspaceDirectories(this.route(computer), computer, request, context);
   }
 
+  async commandStatus(computer: ComputerRef, commandId: string | undefined, context: AdapterContext) {
+    if (computer.kind === "desktop" && !(await this.hostEnabled(context)))
+      throw new Error("Local computer access is disabled");
+    const provider = this.route(computer);
+    if (!provider.commandStatus) throw new Error("This computer does not support command receipts");
+    return provider.commandStatus(computer, commandId, context);
+  }
+
   cancelRunWork(computer: ComputerRef, computerId: string, runId: string, context: AdapterContext) {
-    return cancelComputerRunWork(this.route(computer), computer, computerId, runId, context);
+    const provider = this.route(computer);
+    if (provider.cancelRunWork) return provider.cancelRunWork(computer, computerId, runId, context);
+    if (computer.kind === "desktop") return Promise.reject(new Error("Native work cancellation is unavailable"));
+    return cancelComputerRunWork(provider, computer, computerId, runId, context);
   }
 
   connectScreen(computer: ComputerRef, request: ScreenRequest, context: AdapterContext) {
