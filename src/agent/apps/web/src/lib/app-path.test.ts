@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { appPath, appRoute } from "./app-path";
+import { matchRoutes } from "react-router-dom";
+import { appBasePath, appPath, appRoute } from "./app-path";
 
 describe("deployment namespace", () => {
   it("keeps API, auth, assets and deep links within the application", () => {
@@ -21,4 +22,15 @@ describe("deployment namespace", () => {
     expect(appPath("https://example.com/path", "/agent/")).toBe("https://example.com/path");
     expect(appPath("//example.com/path", "/agent/")).toBe("//example.com/path");
   });
+});
+
+
+it("matches the namespace entry with or without its trailing slash and preserves deep links", () => {
+  const routes = [{ path: "/", id: "home" }, { path: "/app/:botId", id: "chat" }];
+  for (const pathname of ["/agent", "/agent/"]) {
+    expect(matchRoutes(routes, pathname, appBasePath("/agent/"))?.at(-1)?.route.id).toBe("home");
+  }
+  expect(matchRoutes(routes,"/agent/app/bot",appBasePath("/agent/"))?.at(-1)?.params.botId).toBe("bot");
+  expect(matchRoutes(routes,"/agent-other",appBasePath("/agent/"))).toBeNull();
+  expect(matchRoutes(routes,"/",appBasePath("/"))?.at(-1)?.route.id).toBe("home");
 });

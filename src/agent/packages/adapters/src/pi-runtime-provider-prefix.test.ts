@@ -321,6 +321,7 @@ describe("Pi outgoing provider prefixes", () => {
         expect.objectContaining({
           function: expect.objectContaining({ name: "fixture_read" }),
         }),
+        expect.objectContaining({ function: expect.objectContaining({ name: "update_work_plan" }) }),
       ]);
       for (const request of requests)
         expect(request.messages[0]).toMatchObject({

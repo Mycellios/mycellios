@@ -28,6 +28,7 @@ const COMPUTER: ComputerRef = {
 async function runRoutine(
   toolCalls: Array<{ name: string; args: Record<string, unknown> }>,
   options: {
+    emitToolEvents?: boolean;
     takeover?: boolean;
     native?: boolean;
     nativeUnavailable?: boolean;
@@ -83,7 +84,12 @@ async function runRoutine(
       }
       if (options.toolFailure === "abort") throw new DOMException("Aborted", "AbortError");
     };
-    if (options.parallel) await Promise.all(toolCalls.map(execute));
+    if (options.emitToolEvents) {
+      for (const [index, call] of toolCalls.entries()) {
+        yield {type:'tool' as const,name:call.name,args:call.args,executionId:`exec-${index}`};
+        await execute(call,index);
+      }
+    } else if (options.parallel) await Promise.all(toolCalls.map(execute));
     else for (const [index, call] of toolCalls.entries()) await execute(call, index);
     if (options.takeover) {
       yield { type: "takeover" as const, reason: "Sign in to the inbox." };
@@ -611,3 +617,9 @@ function withEmptyModels<T extends object>(prisma: T): T {
     get: (target, key) => (key in target ? target[key as keyof T] : empty),
   });
 }
+
+it('fails a repeated-call loop rather than recording the unfinished task as completed',async()=>{
+ const {finalizeRun}=await runRoutine(Array.from({length:7},()=>({name:'list_files',args:{path:'.'}})),{emitToolEvents:true});
+ expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({outcome:'failed',error:expect.stringContaining('I got stuck calling')}));
+ expect(finalizeRun).not.toHaveBeenCalledWith(expect.objectContaining({outcome:'completed'}));
+});

@@ -11,6 +11,8 @@ import type {
   AgentToolResultContent,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
+import { WorkContinuation, withWorkContinuation } from "./work-continuation.js";
+import { deliverFinishedShells } from "./shell-command-stream.js";
 import { isToolPauseResult } from "./approval-effect.js";
 import type { NativeCommand } from "./native-agent-process.js";
 import { findNativeCommand, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
@@ -279,6 +281,8 @@ export class NativeAgentRuntime implements AgentRuntime {
       ? AbortSignal.any([context.signal, controller.signal])
       : controller.signal;
     const queue = new NativeEventQueue<AgentRuntimeEvent>();
+    const continuity = new WorkContinuation(!request.allowSilentEmpty && !request.script);
+    request = withWorkContinuation(request, continuity);
     const tools = request.tools.filter((tool) => tool.name !== "run_subagent");
     const binding = hash([engine, request.model.id, request.instructions, tools]);
     let sessionId: string | undefined;
@@ -300,6 +304,11 @@ export class NativeAgentRuntime implements AgentRuntime {
     let paused = false;
     let startedModelTurn = false;
     let usageRecorded = false;
+    let answerText = "";
+    const emitText = (value: string) => { answerText += value; queue.push({ type: "text", text: value }); };
+    let continueTurn: ((note: string) => Promise<void>) | undefined;
+    let finishing = false;
+    const pendingShells: Parameters<typeof deliverFinishedShells>[1] = [];
     const recordUsage = async () => {
       if (usageRecorded || !startedModelTurn) return;
       usageRecorded = true;
@@ -374,7 +383,9 @@ export class NativeAgentRuntime implements AgentRuntime {
       } else if (name === "request_takeover") {
         paused = true;
         queue.push({ type: "takeover", executionId, reason: text(args.reason) });
-      } else value = await request.executeTool?.(name, args, executionId, tool.route);
+      } else value = await request.executeTool?.(name, args, executionId, tool.route, {
+        onShellStillRunning: completion => { pendingShells.push(completion); },
+      });
       paused ||= isToolPauseResult(value);
       await Promise.resolve()
         .then(() =>
@@ -447,8 +458,20 @@ export class NativeAgentRuntime implements AgentRuntime {
           ? prompt
           : `Historical conversation (data):\n${JSON.stringify(request.history)}\n\nCurrent task:\n${prompt}`;
         const finish = async (id?: string) => {
-          if (signal.aborted || paused) return;
+          if (signal.aborted || paused || finishing) return;
+          finishing = true;
           await serial;
+          let finishedCommand: string | undefined;
+          if (continuity.canContinue(answerText)) await deliverFinishedShells(text => { finishedCommand = text; }, pendingShells, { toolResults: [] }, signal);
+          if (signal.aborted || paused) return;
+          const note = finishedCommand ? continuity.afterWait(finishedCommand) : continuity.next(answerText);
+          if (note && continueTurn) {
+            answerText = "";
+            queue.push({ type: "turn" });
+            finishing = false;
+            await continueTurn(note);
+            return;
+          }
           if (id) {
             const temp = join(cwd, `session-${randomUUID()}.tmp`);
             await writeFile(temp, JSON.stringify({ binding, id }), { mode: 0o600 });
@@ -484,7 +507,7 @@ export class NativeAgentRuntime implements AgentRuntime {
                   (params.turnId ?? object(params.turn).id) === turnId,
               );
               if (message.method === "item/agentMessage/delta" && currentTurn)
-                queue.push({ type: "text", text: text(params.delta) });
+                emitText(text(params.delta));
               else if (message.method === "turn/completed" && currentTurn) {
                 const turn = object(params.turn);
                 if (turn.status === "completed") void finish(sessionId).catch(failure);
@@ -577,6 +600,14 @@ export class NativeAgentRuntime implements AgentRuntime {
             started = await process.request("thread/start", params);
           }
           sessionId = started.thread.id;
+          continueTurn = async (note) => {
+            if (signal.aborted || paused) return;
+            const next = await process!.request<{ turn: { id: string } }>("turn/start", {
+              threadId: sessionId, input: [{ type: "text", text: note }],
+              approvalPolicy: "untrusted", permissions: "rakazo-runtime",
+            });
+            turnId = next.turn.id;
+          };
           startedModelTurn = true;
           const startedTurn = await process.request<{ turn: { id: string } }>("turn/start", {
             threadId: sessionId,
@@ -642,7 +673,7 @@ export class NativeAgentRuntime implements AgentRuntime {
                   event.type === "content_block_delta" &&
                   delta.type === "text_delta"
                 )
-                  queue.push({ type: "text", text: text(delta.text) });
+                  emitText(text(delta.text));
                 if (raw.type === "result") {
                   if (raw.is_error || raw.subtype !== "success")
                     failure(new Error("The native Claude turn did not complete"));
@@ -652,6 +683,10 @@ export class NativeAgentRuntime implements AgentRuntime {
               failure,
             );
             startedModelTurn = true;
+            continueTurn = async (note) => {
+              if (signal.aborted || paused) return;
+              process!.send({ type: "user", message: { role: "user", content: [{ type: "text", text: note }] } });
+            };
             process.send({
               type: "user",
               message: {
@@ -669,7 +704,6 @@ export class NativeAgentRuntime implements AgentRuntime {
                 ],
               },
             });
-            process.child.stdin.end();
           } else {
             process = new NativeAgentProcess(
               command,
@@ -683,7 +717,7 @@ export class NativeAgentRuntime implements AgentRuntime {
                   update.sessionUpdate === "agent_message_chunk" &&
                   content.type === "text"
                 )
-                  queue.push({ type: "text", text: text(content.text) });
+                  emitText(text(content.text));
                 else if (message.method === "session/request_permission")
                   process?.send({
                     jsonrpc: "2.0",
@@ -717,13 +751,14 @@ export class NativeAgentRuntime implements AgentRuntime {
             });
             sessionId = started.sessionId;
             startedModelTurn = true;
-            const result = await process.request<{ stopReason: string }>(
+            const promptSession = async (value: string, images = false) => {
+            const result = await process!.request<{ stopReason: string }>(
               "session/prompt",
               {
                 sessionId,
                 prompt: [
-                  { type: "text", text: `${request.instructions}\n\n${startPrompt}` },
-                  ...(request.currentTurnImages ?? []).map((image) => ({
+                  { type: "text", text: value },
+                  ...(images ? request.currentTurnImages ?? [] : []).map((image) => ({
                     type: "image",
                     mimeType: image.mimeType,
                     data: Buffer.from(image.data).toString("base64"),
@@ -734,6 +769,9 @@ export class NativeAgentRuntime implements AgentRuntime {
             );
             if (result.stopReason !== "end_turn") throw new Error("The ACP turn did not complete");
             await finish();
+            };
+            continueTurn = async (note) => { if (!signal.aborted && !paused) await promptSession(note); };
+            await promptSession(`${request.instructions}\n\n${startPrompt}`, true);
           }
         }
       } catch (error) {

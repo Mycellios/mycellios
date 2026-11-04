@@ -8574,55 +8574,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               const loopGuard = advanceToolCallLoopGuard(toolCallStreak, event.name, event.args);
               toolCallStreak = loopGuard.streak;
               if (loopGuard.stuck) {
-                approvedEffectReplays.assertDrained();
-                flushPendingTools();
-                if (!(await renewRunLease(deps, runId, workerId, fence))) return;
-                if (messageSegments.length > 0) {
-                  await publishMessage(deps, run, "bot", redactBlocks(messageSegments, runSecrets));
-                }
-                await workspaceCheckpoint.flush();
-                terminalCheckpointComplete = true;
-                const stuckText = loopGuardStopText(
-                  humanizeToolName(event.name),
-                  toolCallStreak.count,
-                );
-                await settleRunningHelpers();
-                const stopped = await deps.events.finalizeRun({
-                  spaceId: run.spaceId,
-                  threadId: thread.id,
-                  botId: bot.id,
-                  runId,
-                  taskId: run.taskId,
-                  attemptId: attempt.id,
-                  leaseOwner: workerId,
-                  leaseFence: fence,
-                  outcome: "completed",
-                  blocks: isBackgroundRunTrigger(run.trigger)
-                    ? []
-                    : [{ kind: "text", text: stuckText }],
-                });
-                if (!stopped) return;
-                stopHeartbeatAfterCompletion();
-                if (run.trigger === "routine" && run.routineId) {
-                  await clearRoutineBackoff(deps, run.routineId);
-                }
-                if (stopped.continuationRunId) {
-                  await deps.jobs
-                    .enqueue(runContinueJob(stopped.continuationRunId))
-                    .catch((error) => getLogger().error("steering continuation enqueue", error));
-                }
-                if (run.trigger === "bot_message") {
-                  await returnBotMessageOutcome(
-                    deps,
-                    { ...run, sourceMessageId: run.sourceMessageId },
-                    { id: bot.id, name: bot.name },
-                    stuckText,
-                    "result",
-                    { forceUnread: true },
-                  ).catch((error) => getLogger().error("bot message loop-guard return", error));
-                }
-                runAbortController?.abort();
-                return;
+                throw new Error(loopGuardStopText(humanizeToolName(event.name), toolCallStreak.count));
               }
               if (scripted) {
                 const startedAt = Date.now();

@@ -33,6 +33,10 @@
   Advertise native project controls independently of consent and network readiness;
   a failed identity probe must not hide the connection action. Authenticate and
   enforce the grant when requesting access or connecting, before any file/command work.
+  Initial native admission prepares owned instructions before connecting and
+  preserves the saved computer assignment. Explicit legacy assignments may move
+  an idle Desktop team record while only its created greeting waits; preserve
+  user control, execution IDs/leases and every other active-run refusal.
   A connected agent already receives a persistent native workspace automatically;
   do not require folder selection to enable shell/file tools. Existing projects can
   be addressed with the shell's cwd/native paths under the existing access policy.
@@ -509,11 +513,11 @@
   execution-details disclosure. Preserve actionable blocked/waiting states and
   keep observation independent from cancellation/retry. Verify RunActivityStatus.test.tsx.
 
-- Initial computer assignment may ignore only the automatic created/waiting_input
-  introduction on an unprovisioned, unoccupied team placeholder. Never relax
-  active-run blocking for user questions, queued/running introductions, provisioned
-  machines, controls or execution leases. Preserve the original run and reply flow;
-  verify initial-computer-assignment.test.ts and the real API fixture.
+- Explicit initial computer assignment may ignore only the automatic
+  created/waiting_input introduction on an unoccupied team placeholder or idle
+  native Desktop binding. User questions, queued/running introductions, controls
+  and execution leases still block reassignment. Modern sends preserve mode.
+  Verify initial-computer-assignment and modern/legacy native-first-chat fixtures.
 
 - Remember native computer permission by the authenticated account and configured
   server, independently of transient sessions, Spaces and transport credentials.
@@ -598,3 +602,24 @@
   creates the owned home before reusing a cached reference, and running checks
   verify its directory. Preserve existing files and contained writes; verify
   desktop-workspace-recovery and host-computer tests with attachment transfer.
+
+- Interactive Pi/Codex/Claude/ACP runs share update_work_plan and bounded
+  continuation in their existing session. Never infer task completion from a
+  provider turn ending. Preserve Stop, human pauses, usage observers and effect
+  idempotency. Await actual background-shell results without rerunning commands;
+  fail exhausted/no-progress runs explicitly. Silent delegated/routine runs retain
+  their separate lifecycle. Verify work-continuation, native-agent-runtime, Pi
+  dispatch, shell-command-stream and executor repeated-call regression tests.
+
+- Desktop send preparation preserves the saved Team/dedicated assignment; native
+  workspaces are already account/server/bot scoped. Never switch computer mode to
+  admit a message or bypass active-run checks. Verify native-computer-workspace
+  and native-computer-execution tests, including waiting introductions.
+
+- Namespaced web routing accepts both the bare entry and its trailing-slash form;
+  keep asset URLs namespaced and preserve deep links. Verify app-path.test.ts.
+
+- Composer retry re-reads the owned thread and targets only the saved failed user
+  run. Never offer it for introductions or copy text/files to replay a request.
+  Keep API effect fences and chat/Space/unmount guards; reconcile known conflicts
+  without another POST. Verify web/API retry-thread-run and composer tests.

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation } from "./work-continuation.js";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type {
@@ -299,12 +300,15 @@ export class PiAgentRuntime implements AgentRuntime {
     controller: AbortController,
     context?: Partial<AdapterContext>,
   ): AsyncGenerator<AgentRuntimeEvent, void> {
+    const continuity = new WorkContinuation(!request.allowSilentEmpty && !request.script);
+    request = withWorkContinuation(request, continuity);
     const signal = context?.signal
       ? AbortSignal.any([controller.signal, context.signal])
       : controller.signal;
     const queue = createQueue();
 
     const work = withPiTelemetry(request, async (span) => {
+      let continuityFailure: Error | undefined;
       let trackedBudget: ToolCallBudget | undefined;
       let resumeHost: ToolHost | undefined;
       try {
@@ -600,18 +604,31 @@ export class PiAgentRuntime implements AgentRuntime {
             ? async () => activeStreamTarget.credentials?.accessToken ?? activeStreamTarget.apiKey
             : async () => apiKey,
           finishTurn: async (turn, turnSignal) => {
+            let shellResultDelivered = false;
             await deliverFinishedShells(
               (text) => {
-                agent.followUp({
+                shellResultDelivered = true;
+                try { const content = request.allowSilentEmpty ? text : continuity.afterWait(text); if (content) agent.followUp({
                   role: "user",
-                  content: text,
+                  content,
                   timestamp: Date.now(),
-                });
+                }); } catch (error) { continuityFailure = error instanceof Error ? error : new Error('Work could not complete'); }
               },
               host.pendingShells,
               turn,
               turnSignal,
             );
+            if (continuityFailure) return { action: "end" as const };
+            if (shellResultDelivered || turnSignal?.aborted || signal.aborted || host.pausePending ||
+              turn.message.role !== "assistant" || messageHasToolCall(turn.message) ||
+              turn.toolResults.length || providerFailureText(turn.message)) return;
+            try {
+              const note = continuity.next(assistantText(turn.message));
+              if (note) agent.followUp({ role: "user", content: note, timestamp: Date.now() });
+            } catch (error) {
+              continuityFailure = error instanceof Error ? error : new Error('Work could not complete');
+              return { action: "end" as const };
+            }
           },
           prepareNextTurnWithContext: async ({ context: turnContext }) => {
             const update = host.toolsForModel
@@ -1051,10 +1068,13 @@ export class PiAgentRuntime implements AgentRuntime {
         // A continuation that failed or stopped early still hands over what it wrote.
         releaseJoin();
 
+        if (continuityFailure) throw continuityFailure;
+
         // Budget abort stops the agent underneath the model, which leaves
         // errorMessage set. Treat that as a soft stop so the turn still ends
         // with a durable assistant message instead of a failed run.
         const budgetExceeded = host.toolCallBudget.exceeded;
+        if (budgetExceeded && continuity.hasPendingWork()) throw new Error('WORK_INCOMPLETE: Tool-call budget exhausted with pending work.');
         const terminalMessage = agent.state.messages.at(-1);
         // pi-agent-core records ordinary provider failures as an empty assistant
         // message (stopReason "error" / "length") and still resolves the run.
@@ -1314,7 +1334,7 @@ function runtimeToolsForInitialState(
     return allTools;
   // Paging cannot make a single oversized required schema usable. Preserve
   // fail-before-spend admission for that case rather than hiding its failure.
-  if (allTools.length <= 1) throw new Error(MODEL_CONTEXT_TOO_SMALL_ERROR);
+  if (definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length <= 1) throw new Error(MODEL_CONTEXT_TOO_SMALL_ERROR);
   const named = namedAgentTools(definitions);
   const wireNames = new Map(named.map(({ tool, name }) => [tool, name]));
   const originalsByWire = new Map(named.map(({ tool, name }) => [name, tool]));

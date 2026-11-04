@@ -1,10 +1,12 @@
 import type { AgentToolCompletion, ConnectorTool } from "@rakazo/adapter-kit";
+import type { FinishTurn } from "@earendil-works/pi-agent-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { builtinAgentTools } from "./builtin-tools.js";
 
 const fakeAgentState = vi.hoisted(() => ({
   mode: "dispatch" as
     | "dispatch"
+    | "work-continuation"
     | "empty"
     | "two-boundaries"
     | "silent-continuation"
@@ -63,14 +65,17 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
       context: { messages: unknown[] };
     }) => Promise<{ context?: { messages: unknown[] } } | undefined>;
     private aborted = false;
+    private readonly finishTurn?: FinishTurn;
 
     constructor(options: {
+      finishTurn?: FinishTurn;
       initialState: { tools: typeof fakeAgentState.tools; messages: unknown[] };
       prepareNextTurnWithContext?: (input: {
         context: { messages: unknown[] };
       }) => Promise<{ context?: { messages: unknown[] } } | undefined>;
     }) {
       this.tools = options.initialState.tools;
+      this.finishTurn = options.finishTurn;
       this.prepareNextTurnWithContext = options.prepareNextTurnWithContext;
       fakeAgentState.tools = this.tools;
       fakeAgentState.initialMessages = options.initialState.messages;
@@ -83,6 +88,20 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
     async prompt(prompt: string, images?: unknown[]) {
       fakeAgentState.promptInputs.push(prompt);
       fakeAgentState.promptImages.push(images ?? []);
+      if (fakeAgentState.mode === "work-continuation") {
+        const plan = this.tools.find(tool => tool.name === "update_work_plan")!;
+        const work = this.tools.find(tool => tool.name !== "update_work_plan")!;
+        await plan.execute('plan-1', {steps:[{id:'verify',title:'Verify change',status:'running'}]});
+        await work.execute('work-1', fakeAgentState.invoke.args);
+        const turn = (text:string) => ({message:{role:'assistant',content:[{type:'text',text}],stopReason:'stop'},toolResults:[],context:{},newMessages:[]}) as unknown as Parameters<FinishTurn>[0];
+        await this.finishTurn?.(turn('Voy a comprobar el resultado.'));
+        await plan.execute('plan-2', {steps:[{id:'verify',title:'Verify change',status:'done'}]});
+        const final = turn('Hecho y verificado.');
+        await this.finishTurn?.(final);
+        this.state.messages.push(final.message);
+        this.emit({type:'message_end',message:final.message});
+        return;
+      }
       if (fakeAgentState.mode === "empty" || fakeAgentState.mode === "two-boundaries") {
         await this.prepareNextTurnWithContext?.({ context: { messages: [] } });
         if (fakeAgentState.mode === "two-boundaries") {
@@ -780,7 +799,7 @@ describe("Pi connector tool dispatch", () => {
       // Exhaust the runtime event stream so tool execution completes.
     }
 
-    expect(fakeAgentState.tools.map((tool) => tool.name)).toEqual(["destination_write"]);
+    expect(fakeAgentState.tools.map((tool) => tool.name)).toEqual(["destination_write", "update_work_plan"]);
     expect(executeTool).toHaveBeenCalledWith(
       "destination.write",
       { collection: "notes", title: "Result", body: "Done" },
@@ -2290,4 +2309,14 @@ describe("Pi connector tool dispatch", () => {
       { onShellStillRunning: expect.any(Function) },
     );
   });
+});
+
+it('continues Pi work through its completed-turn hook without repeating its tool action', async()=>{
+ fakeAgentState.mode='work-continuation';fakeAgentState.followUpMessages=[];
+ const executeTool=vi.fn(async()=>({ok:true}));
+ const runtime=new PiAgentRuntime();
+ for await(const _event of runtime.run({botId:'b',threadId:'t',runId:'pi-work-continuation',prompt:'Complete the task',instructions:'Authorized scope',history:[],tools:[destinationTool],model:{provider:'test',id:'dispatch-test-model'},executeTool},{spaceId:'w',userId:'u',signal:AbortSignal.timeout(5000)})){}
+ expect(executeTool).toHaveBeenCalledOnce();
+ expect(fakeAgentState.followUpMessages).toHaveLength(1);
+ expect(JSON.stringify(fakeAgentState.followUpMessages)).toContain('Pending steps: Verify change');
 });
