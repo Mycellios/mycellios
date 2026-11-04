@@ -1058,4 +1058,6 @@ export const NL_MESSAGES: Record<string, string> = {
   "{sender} rollup hours": "Bundeluren voor {sender}",
   "Connect Slack": "Slack verbinden",
   "Link DMs": "DM’s koppelen",
+  "This integration needs server setup. Contact the administrator.":
+    "Deze integratie moet op de server worden ingesteld. Neem contact op met de beheerder.",
 };

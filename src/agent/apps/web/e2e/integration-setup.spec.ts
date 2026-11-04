@@ -1,6 +1,80 @@
 import { expect, test } from "@playwright/test";
 import { captureScreenshot, completeOnboarding, signup } from "./helpers";
 
+test("integration setup failures show actionable copy without provider details", async ({
+  page,
+}, testInfo) => {
+  await signup(
+    page,
+    `integration-auth-${Date.now()}@rakazo.test`,
+    "password12",
+    "Integration Auth",
+  );
+  await completeOnboarding(page);
+  await page.route("**/rpc/connections/catalog", (route) =>
+    route.fulfill({
+      json: {
+        json: [
+          {
+            connectorId: "composio",
+            slug: "twitter",
+            name: "X",
+            logo: null,
+            connected: false,
+            noAuth: false,
+          },
+        ],
+      },
+    }),
+  );
+  let attempts = 0;
+  await page.route("**/rpc/connections/begin", (route) => {
+    attempts++;
+    return route.fulfill({
+      status: 400,
+      json: {
+        json: {
+          defined: false,
+          code: "BAD_REQUEST",
+          status: 400,
+          message: "INTEGRATION_AUTH_SETUP_REQUIRED",
+        },
+      },
+    });
+  });
+  await page.goto("/app");
+  await page.waitForURL(/\/app\/[^/]+$/);
+  await page.getByRole("button", { name: "Connect apps", exact: true }).click();
+  await page.getByRole("textbox", { name: "Search apps", exact: true }).fill("X");
+  await page.locator("#integration-list").getByRole("button", { name: "Add", exact: true }).click();
+  const alert = page.getByRole("alert");
+  await expect(alert).toHaveText("This integration needs server setup. Contact the administrator.");
+  expect(attempts).toBe(1);
+  await captureScreenshot(page, testInfo, "integration-auth-setup-required");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(alert).toBeVisible();
+  await captureScreenshot(page, testInfo, "integration-auth-setup-required-mobile");
+
+  await page.route("**/rpc/connections/begin", (route) =>
+    route.fulfill({
+      status: 400,
+      json: {
+        json: {
+          defined: false,
+          code: "BAD_REQUEST",
+          status: 400,
+          message:
+            '400 {"error":{"slug":"ToolRouterV2_NoManagedAuth","request_id":"private-request"}}',
+        },
+      },
+    }),
+  );
+  await page.locator("#integration-list").getByRole("button", { name: "Add", exact: true }).click();
+  await expect(alert).toHaveText("Could not connect");
+  await expect(page.getByRole("dialog")).not.toContainText("private-request");
+  await expect(page.getByRole("dialog")).not.toContainText("ToolRouter");
+});
+
 test("signup never grants server authority and settings contain only account controls", async ({
   page,
 }, testInfo) => {

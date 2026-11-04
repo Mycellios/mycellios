@@ -6333,3 +6333,15 @@ msgstr "Понятные подписи элементов управления 
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "Проверьте компьютер или повторно запросите его состояние перед предоставлением ресурсов."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "Для этой интеграции нужна настройка на сервере. Обратитесь к администратору."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "При необходимости подключайте приложения со своим API-ключом."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "Понятные сообщения, если интеграции нужна настройка на сервере."

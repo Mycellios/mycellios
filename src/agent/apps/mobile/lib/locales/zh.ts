@@ -1061,4 +1061,6 @@ export const ZH_MESSAGES: Record<string, string> = {
   "{sender} rollup hours": "{sender} 合并间隔（小时）",
   "Connect Slack": "连接 Slack",
   "Link DMs": "关联私信",
+  "This integration needs server setup. Contact the administrator.":
+    "此集成需要在服务器端配置。请联系管理员。",
 };

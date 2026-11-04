@@ -16,7 +16,11 @@ export function errorText(
 ): string {
   return (
     voiceAccountErrorText(error) ??
-    userErrorMessage(error, { fallback, offline: t("Could not reach the server") })
+    userErrorMessage(error, {
+      fallback,
+      offline: t("Could not reach the server"),
+      integrationSetup: t("This integration needs server setup. Contact the administrator."),
+    })
   );
 }
 

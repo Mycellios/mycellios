@@ -725,8 +725,10 @@ export function PluginsOverlay({
           className="rk-scroll min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8"
         >
           {catalogError || loadError ? (
-            <div className="mb-4 flex items-center gap-3">
-              <p className="text-sm text-destructive">{catalogError ?? loadError}</p>
+            <div className="mb-4 flex min-w-0 flex-wrap items-center gap-3" role="alert">
+              <p className="min-w-0 break-words text-sm text-destructive">
+                {catalogError ?? loadError}
+              </p>
               {!catalogLoaded || (loadError && !catalogError) ? (
                 <Button variant="outline" size="sm" onClick={() => void integrations.refetch()}>
                   <Trans>Retry</Trans>

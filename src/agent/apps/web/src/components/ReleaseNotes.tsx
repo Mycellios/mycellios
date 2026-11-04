@@ -8,8 +8,8 @@ import {
   DialogTitle,
 } from "@rakazo/ui-web";
 import { useEffect, useRef, useState } from "react";
-import { CLIENT_BUILD } from "../lib/client-build";
 import { getSnapshot as activeCall } from "../lib/call-session";
+import { CLIENT_BUILD } from "../lib/client-build";
 import { dictation } from "../lib/dictation";
 import {
   acknowledgeRelease,
@@ -97,12 +97,10 @@ export function ReleaseNotes({
             </h3>
             <ul className="list-disc space-y-3 ps-4 text-sm leading-relaxed marker:text-primary">
               <li>
-                <Trans>Clear labels for contribution controls.</Trans>
+                <Trans>Connect apps with your own API key when required.</Trans>
               </li>
               <li>
-                <Trans>
-                  Verify your computer or retry its status before starting contribution.
-                </Trans>
+                <Trans>Clear messages when an integration needs server setup.</Trans>
               </li>
             </ul>
           </section>

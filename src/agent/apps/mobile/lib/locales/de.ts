@@ -1106,4 +1106,6 @@ export const DE_MESSAGES: Record<string, string> = {
   "{sender} rollup hours": "{sender}: Bündelung in Stunden",
   "Connect Slack": "Slack verbinden",
   "Link DMs": "DMs verknüpfen",
+  "This integration needs server setup. Contact the administrator.":
+    "Diese Integration muss auf dem Server eingerichtet werden. Wende dich an die Administration.",
 };

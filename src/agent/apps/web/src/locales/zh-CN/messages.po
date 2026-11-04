@@ -6333,3 +6333,15 @@ msgstr "贡献控制按钮使用清晰的标签。"
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "开始贡献前，可以验证电脑或重试查询其状态。"
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "此集成需要在服务器端配置。请联系管理员。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "需要时使用自己的 API 密钥连接应用。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "集成需要服务器配置时显示清晰提示。"

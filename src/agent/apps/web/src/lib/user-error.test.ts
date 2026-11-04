@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { authErrorText } from "./user-error";
+import { authErrorText, errorText } from "./user-error";
+
+describe("integration errorText", () => {
+  it("explains server setup without a provider JSON dump", () => {
+    expect(errorText(new Error("INTEGRATION_AUTH_SETUP_REQUIRED"))).toBe(
+      "This integration needs server setup. Contact the administrator.",
+    );
+    expect(
+      errorText(new Error('400 {"error":{"request_id":"private-request"}}'), "Could not connect"),
+    ).toBe("Could not connect");
+  });
+});
 
 describe("authErrorText", () => {
   it("maps PASSWORD_AUTH_DISABLED before the server message", () => {

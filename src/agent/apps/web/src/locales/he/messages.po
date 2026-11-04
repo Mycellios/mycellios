@@ -6333,3 +6333,15 @@ msgstr "תוויות ברורות לבקרות התרומה."
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "אפשר לאמת את המחשב או לבדוק שוב את מצבו לפני תחילת התרומה."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "יש להגדיר את השילוב הזה בשרת. יש לפנות למנהל המערכת."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "חיבור יישומים באמצעות מפתח API אישי בעת הצורך."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "הודעות ברורות כאשר נדרשת הגדרת שילוב בשרת."

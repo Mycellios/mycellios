@@ -7335,3 +7335,15 @@ msgstr "Clear labels for contribution controls."
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "Verify your computer or retry its status before starting contribution."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "This integration needs server setup. Contact the administrator."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "Connect apps with your own API key when required."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "Clear messages when an integration needs server setup."

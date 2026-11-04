@@ -74,6 +74,9 @@ describe("isTechnicalErrorMessage", () => {
       "TypeError: undefined is not a function",
       "Could not open (at ExpoModulesCore/Promise.swift:56)",
       '{"error":"boom"}',
+      '400 {"error":{"message":"Provider failure","request_id":"private-request"}}',
+      'HTTP 403 {"error":"access denied"}',
+      '502 ["upstream unavailable"]',
       "rpc bots/list failed",
       "rpc threads/subscribe failed (502)",
       "Voice failed (500)",
@@ -101,6 +104,13 @@ describe("isTechnicalErrorMessage", () => {
 });
 
 describe("userErrorMessage", () => {
+  it("uses client-language copy for server integration setup and hides it on older clients", () => {
+    const error = new Error("INTEGRATION_AUTH_SETUP_REQUIRED");
+    expect(
+      userErrorMessage(error, { ...copy, integrationSetup: "Configure server authentication" }),
+    ).toBe("Configure server authentication");
+    expect(userErrorMessage(error, copy)).toBe(copy.fallback);
+  });
   it("says the server is unreachable for transport failures", () => {
     expect(userErrorMessage(new TypeError("Failed to fetch"), copy)).toBe(copy.offline);
     expect(userErrorMessage(Object.assign(new Error("Bad Gateway"), { status: 502 }), copy)).toBe(

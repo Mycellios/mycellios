@@ -14,6 +14,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  integration-ui:
+    name: Integration authentication browser proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: src/agent/package-lock.json
+      - run: npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
+      - name: Install browser
+        working-directory: src/agent/apps/web
+        run: npm exec -- playwright install --with-deps chromium
+      - name: Verify integration authentication without accounts or provider credentials
+        working-directory: src/agent/apps/web
+        run: npm exec -- playwright test --config playwright.integrations.config.ts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: integration-authentication-browser-proof
+          path: src/agent/playwright-integration-report
+          if-no-files-found: error
+          retention-days: 7
   contribution-ui:
     name: Contribution controls browser proof
     runs-on: ubuntu-latest
@@ -70,7 +95,7 @@ jobs:
         working-directory: src/agent
         run: |
           npm test -- --maxWorkers 2 --no-file-parallelism
-          node --test scripts/project-local-env.test.mjs scripts/build-server.test.mjs apps/desktop/scripts/release-continuity.test.mjs
+          node --test scripts/project-local-env.test.mjs scripts/build-server.test.mjs scripts/configure-composio-auth.test.mjs apps/desktop/scripts/release-continuity.test.mjs
       - name: Compile API, worker, bundled web and Desktop host
         working-directory: src/agent
         run: |

@@ -1,5 +1,7 @@
+import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@rakazo/contracts";
+
 /** Copy each client supplies in its own language. */
-export type UserErrorCopy = { fallback: string; offline: string };
+export type UserErrorCopy = { fallback: string; offline: string; integrationSetup?: string };
 
 /** Browser, React Native, Expo, and Node wordings for a request that never got a response. */
 const NETWORK_FAILURE =
@@ -21,6 +23,7 @@ const TECHNICAL_MESSAGE = [
   /^\w*Error:/,
   /\(at \S+:\d+|\bat \S+ \(\S+:\d+(?::\d+)?\)|\.(?:swift|kt|java|mm?|[cm]?[jt]sx?):\d+/, // stack frames
   /^\s*[[{]/, // JSON
+  /^\s*(?:HTTP\s+)?[45]\d{2}\s*[[{]/i, // provider JSON prefixed with an HTTP status
   /^rpc \S+ failed|\(\d{3}\)|\bstatus(?: code)? \d{3}\b/i, // HTTP status dumps
   /\bE(?:CONN[A-Z]+|TIMEDOUT|NOTFOUND|AI_AGAIN|PIPE|HOSTUNREACH|NETUNREACH)\b/,
   /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/, // bare internal codes
@@ -94,6 +97,7 @@ export function userErrorMessage(error: unknown, copy: UserErrorCopy): string {
   const message = (
     error instanceof Error ? error.message : typeof error === "string" ? error : ""
   ).trim();
+  if (message === INTEGRATION_AUTH_SETUP_REQUIRED) return copy.integrationSetup ?? copy.fallback;
   return message && !isTechnicalErrorMessage(message) ? message : copy.fallback;
 }
 

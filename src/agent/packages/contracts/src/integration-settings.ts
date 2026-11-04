@@ -1,5 +1,8 @@
 import * as z from "zod";
 
+/** Safe connection failure shared by adapters and translated by clients. */
+export const INTEGRATION_AUTH_SETUP_REQUIRED = "INTEGRATION_AUTH_SETUP_REQUIRED";
+
 export const IntegrationProviderIdSchema = z.enum(["composio", "pipedream"]);
 export const IntegrationProviderConfigSchema = z.discriminatedUnion("provider", [
   z.object({ provider: z.literal("composio"), apiKey: z.string().trim().min(1).max(16384) }),
