@@ -138,7 +138,7 @@
     "@gsap/react": "2.1.2",
     "@react-sigma/core": "^5.0.6",
     "@remotion/player": "^4.0.498",
-    "fastify": "5.12.5",
+    "fastify": "5.12.6",
     "fflate": "0.8.3",
     "graphology": "^0.26.0",
     "graphology-types": "^0.24.8",
