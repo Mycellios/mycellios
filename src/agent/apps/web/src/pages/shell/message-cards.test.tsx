@@ -2,10 +2,15 @@
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 const calls = vi.hoisted(() => ({
-  begin: vi.fn(async () => ({ connectionId: "connection", authorizationUrl: null })),
+  begin: vi.fn(
+    async (): Promise<{ connectionId: string; authorizationUrl: string | null }> => ({
+      connectionId: "connection",
+      authorizationUrl: null,
+    }),
+  ),
   complete: vi.fn(async () => ({ status: "connected" })),
   mark: vi.fn(async () => ({ ok: true })),
 }));
@@ -24,6 +29,11 @@ vi.mock("@lingui/react/macro", () => ({
 }));
 
 import { AppConnectCard } from "./message-cards";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+});
 
 it("authorizes a card in a normal chat and marks its thread connected", async () => {
   const host = document.createElement("div");
@@ -57,6 +67,50 @@ it("authorizes a card in a normal chat and marks its thread connected", async ()
     });
     expect(host.textContent).toContain("Connected");
     expect(host.querySelector("button")).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+it("finishes browser authorization through the server when Desktop returns no popup", async () => {
+  const authorizationUrl = "https://connect.composio.dev/link/fixture-not-a-real-connection";
+  calls.begin.mockResolvedValueOnce({ connectionId: "external-connection", authorizationUrl });
+  const opened = vi.spyOn(window, "open").mockReturnValue(null);
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <AppConnectCard
+          botId="bot"
+          threadId="normal-chat"
+          block={{
+            kind: "app_connect",
+            connectorId: "composio",
+            provider: "twitter",
+            name: "X",
+            description: "",
+            logo: null,
+            status: "pending",
+          }}
+        />,
+      ),
+    );
+    await act(async () => host.querySelector("button")?.click());
+    expect(opened).toHaveBeenCalledWith(authorizationUrl, "_blank", "noopener,noreferrer");
+    expect(calls.complete).toHaveBeenCalledWith(
+      { connectionId: "external-connection" },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(calls.mark).toHaveBeenCalledWith({
+      botId: "bot",
+      threadId: "normal-chat",
+      connectorId: "composio",
+      provider: "twitter",
+    });
+    expect(host.textContent).toContain("Connected");
   } finally {
     await act(async () => root.unmount());
     host.remove();

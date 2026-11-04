@@ -110,8 +110,11 @@
   when the bridge advertises it. Older frameless builds retain their page controls.
   Sign-in proceeds without an intermediate login launcher or popup. Keep the persistent
   server-specific Electron session, state/PKCE and explicit retry after failure.
-  Generic self-hosted SSO and model/integration authorization retain their existing
-  popup behavior; never broaden main-window navigation to arbitrary identity hosts.
+  Generic self-hosted SSO, model and MCP authorization retain their existing
+  popup behavior. Managed integration connections use an ordinary external browser
+  target; the original client confirms completion through the owned server request,
+  without depending on a popup handle or shared browser cookies. Never broaden
+  main-window navigation to arbitrary identity hosts.
   Normal Desktop startup opens Mycellios directly, including after unusable saved
   preferences. Connection failures show Retry/Close with server setup folded under
   Advanced; retry only the native-owned failed target, without configuration writes,

@@ -6345,3 +6345,7 @@ msgstr "При необходимости подключайте приложе�
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "Понятные сообщения, если интеграции нужна настройка на сервере."
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "В настольной версии подключение приложений открывается в браузере."

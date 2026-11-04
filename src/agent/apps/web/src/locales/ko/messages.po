@@ -6345,3 +6345,7 @@ msgstr "필요한 경우 자신의 API 키로 앱을 연결하세요."
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "연동에 서버 설정이 필요하면 명확한 메시지를 표시합니다."
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "데스크톱에서 앱 연결이 브라우저로 열립니다."

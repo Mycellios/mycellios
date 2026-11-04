@@ -1319,3 +1319,27 @@ their recorded main base while preserving newer continuation/retry fixes.
 134 focused preservation/integration tests pass, together with API/worker/web/
 Desktop types, server builds and credential-free compiled startup. Private source
 receipts retain the comparison; production promotion is still pending.
+
+## External browser integration authorization candidate (2026-11-04)
+
+Managed integration connections from the catalog and chat cards now request an
+ordinary external browser target. The original client still confirms the owned
+connection through the server, including when Desktop returns no popup handle.
+Existing cancellation, revocation and account ownership checks remain in place.
+Generic SSO, model and MCP authorization retain their existing popup behavior.
+
+The existing update announcement describes the change in all 13 web locales; its
+guarded refresh action remains unchanged. Focused qualification passed 36 tests
+across Desktop routing, chat connection cards, server completion polling and
+release notes, together with web/Desktop typechecks and the web production build.
+Root structure, documentation, text format, UI-kit, component-boundary, architecture
+and typecheck gates also passed.
+A read-only routing check against the installed Fedora host confirms that an
+external target bypasses its named integration popup policy; no installed files
+were modified and no browser or real account authorization was exercised.
+
+An isolated browser regression now covers the catalog connection with an external
+target and a null popup handle. That new browser case has not yet run in CI.
+Publication and deployment require the exact merged-main release checks and a
+separate promotion receipt. These local checks do not establish successful X
+sign-in or provider tool execution.

@@ -6345,3 +6345,7 @@ msgstr "需要时使用自己的 API 密钥连接应用。"
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "集成需要服务器配置时显示清晰提示。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "桌面版会在浏览器中打开应用连接。"

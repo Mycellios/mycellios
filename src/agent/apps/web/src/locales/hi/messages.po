@@ -6345,3 +6345,7 @@ msgstr "ज़रूरत पड़ने पर ऐप्स को अपन�
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "इंटीग्रेशन को सर्वर पर सेट अप करने की ज़रूरत होने पर स्पष्ट संदेश।"
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "डेस्कटॉप पर ऐप कनेक्शन आपके ब्राउज़र में खुलते हैं।"
