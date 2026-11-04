@@ -15,6 +15,7 @@ import {
   runProviderTransaction,
 } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
+import { connectionAccountDetails } from "../connection-account-details.js";
 import { connectionCreatedEvent } from "../security-audit.js";
 import type { RouterContext } from "./context.js";
 
@@ -260,6 +261,15 @@ export function connectionsRoutes(ctx: RouterContext) {
           createdAt: row.createdAt.toISOString(),
         }));
       }),
+      accounts: authed.connections.accounts.handler(async ({ context, input }) =>
+        connectionAccountDetails(
+          deps.prisma,
+          { userId: context.actor.userId, spaceId: context.actor.spaceId },
+          input,
+          deps.connectors.managed(input.connectorId),
+          connectionContext(context.actor, "connections.accounts", context.signal),
+        ),
+      ),
       begin: authed.connections.begin.handler(async ({ context, input }) => {
         const connector =
           deps.integrationSettings &&

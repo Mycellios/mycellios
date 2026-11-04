@@ -18,6 +18,7 @@ import {
   mergeCatalogWithConnected,
   type ToolkitDirectoryEntry,
 } from "./composio-catalog-cache.js";
+import { createComposioIdentityReader } from "./composio-identity.js";
 import { isVitestRuntime } from "./test-runtime.js";
 
 type SdkSession = Awaited<ReturnType<Composio["create"]>>;
@@ -34,6 +35,8 @@ export type ComposioClient = {
   sessions: { use(sessionId: string): Promise<ComposioSession> };
   connectedAccounts: Pick<Composio["connectedAccounts"], "list" | "waitForConnection" | "delete">;
   authConfigs?: Pick<Composio["authConfigs"], "list">;
+  toolkits?: Pick<Composio["toolkits"], "get">;
+  tools?: Pick<Composio["tools"], "proxyExecute">;
 };
 
 /** Account states the user can only leave by reconnecting. */
@@ -336,6 +339,7 @@ export function planLiveConnectionSync(
 }
 
 export class ComposioConnector implements ComposioProvider {
+  readonly describeConnection = createComposioIdentityReader(() => this.sdk());
   private client: ComposioClient | undefined;
   private readonly apiKey: string | undefined;
   /** An injected client has its own catalog, so it must not share the process-wide cache. */

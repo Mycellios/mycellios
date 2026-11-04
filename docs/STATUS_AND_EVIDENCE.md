@@ -1,6 +1,6 @@
 # Status and evidence
 
-Updated: 2026-11-02 (local project Play/Stop and full-stack preview qualified; integrated production candidate under verification).
+Updated: 2026-11-04 (integration account identities qualified locally; no publication for this candidate).
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
 
@@ -35,6 +35,38 @@ deployed release.
 Design: `specs/agent-resilient-work/spec.md`. Reproduce through the shared scheduler with
 `src/agent/scripts/verify-resilient-work.ps1`; evidence is in the isolated workspace's
 `src/agent/outputs/resilient-work/checks.json` and associated logs.
+## Integration account identities — 2026-11-04
+
+Local candidate starts from fetched canonical main
+`7337e761ce16ccbf45ee38213092c9dea36c944e`. The selected integration detail
+reads an exact owned active authorization's public profile label, separately from
+its editable alias. Pending attempts have their own disclosure and cancellation;
+individual disconnection preserves other accounts. Missing profile information
+is shown as unavailable, never inferred from a generic provider name or another
+account. The dialogue fits its content, respects safe viewport insets and uses the
+existing thirteen translated catalogs. The update announcement is prepared.
+
+The provider lookup is read-only, bounded and cached per user, Space and exact
+authorization. Only public identity labels reach the client. The API re-reads the
+owned records after lookup so a concurrent revoke/reconnect cannot resurrect or
+mislabel a grant. The additive optional contract needs no database migration.
+
+One hundred ten focused offline tests pass, including provider projection,
+ownership, pagination/cache separation, revoke/reconnect races, catalog behavior,
+chat cards and update announcements. Web/API/Desktop typechecks and web/API
+builds pass. Four browser tests render the actual integration component and
+Spanish catalog at 1440/768/390 pixels, covering external-browser authorization,
+safe provider errors, separate account identities and pending cancellation.
+Screenshots use invented fixture accounts, not production identities. Root
+structure, documentation, format, UI-kit, component boundaries, architecture and
+TypeScript checks pass. This is local evidence; no live provider authorization,
+physical device acceptance, native installer or production deployment is claimed.
+Standalone contracts/adapters typechecks additionally report errors in unchanged
+test imports, mock types and the adapter rootDir boundary. Those wider checks
+are not qualified by this change; the application and adapter-kit checks above
+remain separate evidence.
+
+Publication will require both API and web artifacts from the integrated main SHA.
 
 
 - Agent contribution sidebar (local candidate): missing translated labels are
