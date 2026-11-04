@@ -1300,7 +1300,9 @@ Local verification passed 92 focused Agent and catalog/release-note tests,
 six operator CLI tests, root structure/architecture/type checks, the shared UI-kit
 gate, API/worker/web types and builds, and credential-free compiled server startup.
 The real integration dialog was reviewed at desktop, tablet and phone widths with
-an isolated fixture. Full CI browser acceptance has not run for this candidate.
+an isolated fixture. The dedicated CI browser proof exercises those widths,
+legacy error hiding and an independent successful connection without real accounts.
+Check its screenshots and the complete release checks on the exact candidate SHA.
 The standalone adapters package typecheck still reports existing errors in
 unchanged runtime/test files; the deployed API and worker typecheck commands pass.
 
