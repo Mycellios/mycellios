@@ -10,6 +10,9 @@ describe("work resource reservations", () => {
     expect(nativeWorkProjectSession(internal,{delegationState:"running"})).toBeUndefined();
     expect(nativeWorkProjectSession({...internal,taskKey:"work-transfer:task:1"},{delegationState:"running"})).toBeUndefined();
     expect(nativeWorkProjectSession({...thread,taskBotId:null},{})).toBeUndefined();
+    expect(nativeWorkProjectSession({...thread,projectKey:"mico:mico",taskKey:"mico-task:mico:one"},{})).toBeUndefined();
+    expect(nativeWorkProjectSession({...thread,projectKey:"mico:other",taskKey:"mico-task:mico:one"},{})).toBe("thread");
+    expect(nativeWorkProjectSession({...thread,projectKey:"mico:mico",taskKey:"project-task"},{})).toBe("thread");
   });
   it("detects Windows aliases and ancestor paths without conflicting siblings", () => {
     const parent = normalizeWorkResources(["workspace:C:\\Projects\\App\\"]);

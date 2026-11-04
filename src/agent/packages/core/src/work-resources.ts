@@ -1,4 +1,9 @@
 /** Resource names are coordination metadata, never a filesystem or permission grant. */
+export function isMicoTaskThread(thread: { taskBotId?: string | null; projectKey?: string | null; taskKey?: string | null }) {
+  return Boolean(thread.taskBotId && thread.projectKey === `mico:${thread.taskBotId}` &&
+    thread.taskKey?.startsWith(`mico-task:${thread.taskBotId}:`));
+}
+
 export function nativeWorkProjectSession(
   thread: { id: string; taskBotId?: string | null; projectKey?: string | null; taskKey?: string | null },
   task: { delegationState?: string | null },
@@ -7,7 +12,7 @@ export function nativeWorkProjectSession(
   // development projects retain the native binding and its independent admission.
   const internalWork = task.delegationState && thread.projectKey?.startsWith("work:") &&
     (thread.taskKey?.startsWith("delegation:") || thread.taskKey?.startsWith("work-transfer:"));
-  return thread.taskBotId && !internalWork ? thread.id : undefined;
+  return thread.taskBotId && !internalWork && !isMicoTaskThread(thread) ? thread.id : undefined;
 }
 
 export function normalizeWorkResources(resources: string[]): string[] {

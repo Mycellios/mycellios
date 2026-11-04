@@ -36,6 +36,7 @@ export const RoutineRunSchema = z.object({
   startedAt: IsoDate.nullable(),
   completedAt: IsoDate.nullable(),
   messageId: Id.nullable(),
+  taskThreadId: Id.optional(),
 });
 export type RoutineRun = z.infer<typeof RoutineRunSchema>;
 

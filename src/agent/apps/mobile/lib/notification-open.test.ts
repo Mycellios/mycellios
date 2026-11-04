@@ -3,6 +3,7 @@ import {
   notificationOpenTarget,
   notificationOpenTargetFromLink,
   notificationResponseRoute,
+  privateTaskWebUrl,
   threadRouteSpaceOnFocus,
   threadSpaceRequest,
   threadSpaceSwitchResult,
@@ -11,6 +12,14 @@ import {
 const DEFAULT_ACTION = "expo.modules.notifications.actions.DEFAULT";
 
 describe("notification tap routing", () => {
+  it("preserves explicit private targets without reinterpreting legacy thread ids", () => {
+    expect(notificationOpenTarget({ botId: "b", threadId: "t", taskThreadId: "t", spaceId: "s" }))
+      .toEqual({ pathname: "/thread", params: { botId: "b", threadId: "t", taskThreadId: "t", spaceId: "s" } });
+    expect(notificationOpenTarget({ botId: "b", groupId: "g", taskThreadId: "t" }))
+      .toEqual({ pathname: "/group-thread", params: { groupId: "g" } });
+    expect(privateTaskWebUrl("https://example.test/agent", "b", "private", "s"))
+      .toBe("https://example.test/agent/app/b?task=private&taskSpace=s");
+  });
   it("opens the bot thread from an Expo push payload", () => {
     expect(
       notificationOpenTarget({

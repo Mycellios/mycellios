@@ -29,6 +29,8 @@ export async function findPendingRoutineTick(
     botId: string;
     userId: string;
     threadId: string;
+    /** Only the same Mico's former primary target during private-routine adoption. */
+    legacyPrimaryThreadId?: string;
     prompt: string;
     modelProvider?: string;
     modelId?: string;
@@ -44,7 +46,7 @@ export async function findPendingRoutineTick(
     spaceId: config.spaceId,
     botId: config.botId,
     userId: config.userId,
-    threadId: config.threadId,
+    threadId: config.legacyPrimaryThreadId ? { in: [config.threadId, config.legacyPrimaryThreadId] } : config.threadId,
     trigger: "routine",
     status: "queued",
     retryOfRunId: null,
@@ -67,7 +69,7 @@ export async function findPendingRoutineTick(
   const candidates = await tx.run.findMany({
     where: pristine,
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, taskId: true, leaseFence: true, updatedAt: true },
+    select: { id: true, taskId: true, threadId: true, leaseFence: true, updatedAt: true },
     take: 100,
   });
   if (!candidates.length) return null;
@@ -116,13 +118,13 @@ export async function findPendingRoutineTick(
     });
     const event = await appendEventInTransaction(tx, {
       spaceId: config.spaceId,
-      threadId: config.threadId,
+      threadId: candidate.threadId,
       botId: config.botId,
       type: "run.cancelled",
       runId: candidate.id,
       payload: { reason: "routine_coalesced", supersededByRunId: retained.id },
     });
-    cancelledEvents.push({ threadId: config.threadId, seq: event.seq });
+    cancelledEvents.push({ threadId: candidate.threadId, seq: event.seq });
   }
   return retained && { ...retained, ...(cancelledEvents.length ? { cancelledEvents } : {}) };
 }

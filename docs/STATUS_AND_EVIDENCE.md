@@ -4,6 +4,37 @@ Updated: 2026-11-04 (integration account identities qualified locally; no public
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
 
+## Mico task and routine isolation candidate
+
+The local candidate adds task tabs to the shared web/PWA/Desktop renderer with
+separate RPC scope, caches and drafts. Routine cron, Test, webhook and GitHub paths
+allocate owned private conversations by default and preserve explicit targets and
+old history. Event fanout retains each routine's model. New routing receipts and
+Run identities prevent new routine deliveries from replaying after clearing chat
+or changing recipients. Raw webhooks retain their previous deduplication limits.
+
+Focused local tests cover task transport, notifications, routine history and
+scheduled/event execution. Incremental web/API/adapters/native-mobile typechecks
+passed. `scripts/verify-routine-isolation-db.ts` passed nine real loopback PostgreSQL
+checks, including the actual additive migration, concurrent preparation, event
+replay, legacy history, timer adoption and RLS owner/Space read/write denial.
+Its accounts and prompts are synthetic; no production database or model was used.
+
+Routine screen exclusion is enforced in tool offering and execution, while actual
+computer resource leases remain. Private voice calls are disabled until scoped.
+Private-task push on the separate native client offers its exact web conversation;
+it does not silently load the primary chat. Real phone and installed-app validation
+have not run. Native executable discovery and safe provider refusal classification
+have focused local tests; missing provider usage remains unknown.
+
+The OpenBot v0.61.0 review covers all 119 supplied changelog entries against main
+`dd91e477`. The baseline comparison found 14 present, 55 partial, 17 absent, 21
+not applicable and 12 in other work in progress. Those counts do not include this
+uncommitted candidate and do not mean complete OpenBot parity. Workflows and live
+voice work owned by other agents were preserved. OpenBot's PolyForm Noncommercial
+source was read as reference; this candidate contains independent implementations.
+No new candidate, migration or installer has been published or deployed.
+
 ## Integration profile owner repair — 2026-11-04
 
 A live, read-only diagnostic reproduced `ExternalProxy_UserIdRequired` while

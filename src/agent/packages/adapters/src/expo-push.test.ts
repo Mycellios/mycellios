@@ -31,6 +31,11 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 describe("expo push tickets", () => {
+  it("carries an explicit private target and gives groups precedence", () => {
+    const message = { kind: "completion" as const, title: "Done", body: "Done", botId: "b", threadId: "t", taskThreadId: "t" };
+    expect(expoPushData(message, "s", "delivery")).toMatchObject({ taskThreadId: "t", spaceId: "s", botId: "b" });
+    expect(expoPushData({ ...message, groupId: "g" }, "s", "delivery")).not.toHaveProperty("taskThreadId");
+  });
   it("reads a single Expo ticket and a ticket array", () => {
     expect(expoPushErrorMessage({ data: { status: "ok", id: "1" } }, 200)).toBeUndefined();
     expect(expoPushErrorMessage({ data: { status: "error", message: "bad token" } }, 200)).toBe(

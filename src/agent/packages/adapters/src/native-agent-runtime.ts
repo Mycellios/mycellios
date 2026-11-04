@@ -12,10 +12,11 @@ import type {
   ConnectorTool,
 } from "@rakazo/adapter-kit";
 import { WorkContinuation, withWorkContinuation } from "./work-continuation.js";
+import { nativeAgentProtocolError } from "./native-agent-errors.js";
 import { deliverFinishedShells } from "./shell-command-stream.js";
 import { isToolPauseResult } from "./approval-effect.js";
 import type { NativeCommand } from "./native-agent-process.js";
-import { findNativeCommand, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
+import { findNativeCommand, nativeCommandAvailable, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
 import {
   restoreTurnCheckpoint,
   serializeTurnCheckpoint,
@@ -116,14 +117,14 @@ export async function discoverNativeEngines(dataDir?: string) {
     {
       id: "codex" as const,
       name: "Codex",
-      available: Boolean(configured.codex ?? findNativeCommand("codex")),
+      available: nativeCommandAvailable(configured.codex ?? findNativeCommand("codex")),
     },
     {
       id: "claude" as const,
       name: "Claude Code",
-      available: Boolean(configured.claude ?? findNativeCommand("claude")),
+      available: nativeCommandAvailable(configured.claude ?? findNativeCommand("claude")),
     },
-    { id: "acp" as const, name: "ACP", available: Boolean(configured.acp) },
+    { id: "acp" as const, name: "ACP", available: nativeCommandAvailable(configured.acp) },
   ];
 }
 
@@ -278,6 +279,8 @@ export class NativeAgentRuntime implements AgentRuntime {
       throw new Error(
         `Install and sign in to ${engine} on the computer running this server first.`,
       );
+    if (!nativeCommandAvailable(command))
+      throw new Error("The configured native agent executable is unavailable. Correct its path or remove the override.");
     const scope = hash([context.spaceId, context.userId, request.botId, request.threadId, engine]);
     const cwd = join(this.options.dataDir, "native-agents", scope);
     await mkdir(cwd, { recursive: true, mode: 0o700 });
@@ -528,11 +531,9 @@ export class NativeAgentRuntime implements AgentRuntime {
                     /* Provider diagnostics are not always JSON. */
                   }
                   failure(
-                    new Error(
-                      providerCode === "model_not_found"
-                        ? "The configured Codex model is unavailable for this CLI account. Select an available model in the CLI configuration and retry."
-                        : "The native Codex turn did not complete",
-                    ),
+                    providerCode === "model_not_found"
+                      ? new Error("The configured Codex model is unavailable for this CLI account. Select an available model in the CLI configuration and retry.")
+                      : nativeAgentProtocolError(turn.error, "The native Codex turn did not complete"),
                   );
                 }
               } else if (message.method === "item/tool/call" && message.id !== undefined) {
@@ -684,7 +685,7 @@ export class NativeAgentRuntime implements AgentRuntime {
                   emitText(text(delta.text));
                 if (raw.type === "result") {
                   if (raw.is_error || raw.subtype !== "success")
-                    failure(new Error("The native Claude turn did not complete"));
+                    failure(nativeAgentProtocolError({ errors: raw.errors, message: raw.result }, "The native Claude turn did not complete"));
                   else void finish(sessionId).catch(failure);
                 }
               },

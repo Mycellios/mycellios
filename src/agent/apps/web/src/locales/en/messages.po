@@ -7387,3 +7387,23 @@ msgstr "{pendingCount, plural, one {# pending connection} other {# pending conne
 #: src/components/ReleaseNotes.tsx
 msgid "See which accounts are connected to each app."
 msgstr "See which accounts are connected to each app."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Mico tasks"
+msgstr "Mico tasks"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Main chat"
+msgstr "Main chat"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "New task"
+msgstr "New task"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Task"
+msgstr "Task"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not create task. Try again."
+msgstr "Could not create task. Try again."

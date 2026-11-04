@@ -47,6 +47,7 @@ import { deleteRunSecretsInTransaction } from "./run-secrets.js";
 import { isRunResponse, readRunTimingFields } from "./run-timing.js";
 import { RUN_TURN_CHECKPOINT_KIND } from "./run-turn-checkpoint.js";
 import { recordSecurityEvent } from "./security-events.js";
+import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
 /** A one-time answer longer than a saved value may be. Nothing is stored or echoed. */
@@ -263,6 +264,9 @@ export interface SendUserMessageInput {
   prompt: string;
   trigger: "user" | "follow_up" | "webhook" | "messaging";
   clientNonce?: string;
+  /** Internal authenticated routine delivery; never accepted from a chat request body. */
+  routineId?: string;
+  routineWebhookSource?: "webhook" | "github";
   linkMessageToRun?: boolean;
   /** Internal bot sender: enforce both bots' cross-space policy in the write transaction. */
   crossSpaceSenderBotId?: string;
@@ -339,7 +343,7 @@ export async function clearThread(
       where: {
         id: input.threadId,
         spaceId: input.spaceId,
-        ...(input.groupId ? { groupId: input.groupId } : { botId: input.botId }),
+        ...(input.groupId ? { groupId: input.groupId } : { OR: [{ botId: input.botId }, { taskBotId: input.botId }] }),
       },
       data: { unread: false },
       select: { nextMessageSeq: true, historyCompactionGeneration: true },
@@ -440,6 +444,8 @@ export async function sendUserMessage(
     const run =
       created ??
       (message.runId ? await prisma.run.findUnique({ where: { id: message.runId } }) : null);
+    if (input.routineId && (run?.routineId !== input.routineId || run.botId !== input.botId ||
+      run.spaceId !== input.spaceId || run.userId !== input.userId)) throw new IsolationError();
     return {
       messageId: message.id,
       seq: message.seq,
@@ -452,6 +458,15 @@ export async function sendUserMessage(
 
   const commit = () =>
     prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      if (input.routineId) {
+        if (!input.routineWebhookSource) throw new IsolationError();
+        const routine = await tx.routine.findFirst({ where: {
+          id: input.routineId, botId: input.botId, threadId: input.threadId,
+          spaceId: input.spaceId, userId: input.userId, active: true, bot: { archivedAt: null },
+          ...(input.routineWebhookSource === "github" ? { githubEnabled: true } : { webhookEnabled: true }),
+        }, select: { id: true } });
+        if (!routine) throw new IsolationError();
+      }
       // Message first: its thread-row lock serializes the whole send against clearThread, so a
       // concurrent clear either sees the committed run and cancels it, or strictly precedes this
       // transaction. Created in separate transactions, the run could land inside the clear's
@@ -511,7 +526,8 @@ export async function sendUserMessage(
             userId: input.userId,
             status: "queued",
             trigger: input.trigger,
-            clientNonce: input.clientNonce ? `send:${message.id}` : undefined,
+            routineId: input.routineId,
+            clientNonce: input.clientNonce ? input.routineId ? input.clientNonce : `send:${message.id}` : undefined,
             sourceMessageId: message.id,
             ...(input.modelPin
               ? {

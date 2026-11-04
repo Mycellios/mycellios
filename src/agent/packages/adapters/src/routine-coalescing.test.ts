@@ -16,7 +16,7 @@ function fixture(
   const updatedAt = new Date("2026-01-01T00:00:00Z");
   const findMany = vi.fn(async (_args: Prisma.RunFindManyArgs) =>
     clientNonce?.startsWith("routine-timer:routine-1:")
-      ? [{ id: "run-1", taskId: "task-1", leaseFence: 0, updatedAt }]
+      ? [{ id: "run-1", taskId: "task-1", threadId: config.threadId, leaseFence: 0, updatedAt }]
       : [],
   );
   const updateMany = vi.fn(async () => ({ count: 1 }));
@@ -28,6 +28,14 @@ function fixture(
   return { tx, findMany, updateMany, updatedAt };
 }
 describe("pending routine timer coalescing", () => {
+  it("includes only the former primary target when adopting an isolated routine", async () => {
+    const { tx, findMany } = fixture();
+    await findPendingRoutineTick(tx, { ...config, legacyPrimaryThreadId: "former-main" });
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+      threadId: { in: [config.threadId, "former-main"] },
+      attempts: { none: {} }, effects: { none: {} },
+    }) }));
+  });
   it("reuses only pristine matching work and keeps its schedule and timestamps", async () => {
     const { tx, findMany, updateMany, updatedAt } = fixture();
     expect(await findPendingRoutineTick(tx, config)).toEqual({ id: "run-1", taskId: "task-1" });

@@ -134,6 +134,8 @@ import {
   createThreadMessageInTransaction,
   dropRunTurnCheckpoint,
   effectiveMemoryScope,
+  ensureRoutineThread,
+  isOwnedRoutineThread,
   findAutoReviewPreference,
   InstructionConflictError,
   InvalidSpaceNameError,
@@ -3344,25 +3346,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         return;
       }
       if (!bot?.thread) return;
-      const targetThread = routine.threadId
-        ? await deps.prisma.thread.findFirst({
-            where: {
-              id: routine.threadId,
-              spaceId: routine.spaceId,
-              OR: [
-                { botId: bot.id },
-                {
-                  group: {
-                    archivedAt: null,
-                    members: { some: { botId: bot.id } },
-                  },
-                },
-              ],
-            },
-            select: { id: true },
-          })
-        : null;
-      const thread = targetThread ?? bot.thread;
+      const primaryThreadId = bot.thread.id;
+      const thread = await ensureRoutineThread(deps.prisma, routine, routine.id);
       // A change trigger checks first, without a model; only news becomes a run.
       const watchTick =
         routine.watch == null
@@ -3426,6 +3411,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             botId: bot.id,
             userId: routine.userId,
             threadId: thread.id,
+            ...(thread.privateRoutine ? { legacyPrimaryThreadId: primaryThreadId } : {}),
             prompt: routinePrompt,
             ...routineRunModelPin(currentModel),
           });
@@ -4043,7 +4029,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         const context = {
           operationId: runId,
-          projectSessionId: nativeWorkProjectSession(thread, task),
+          projectSessionId: await isOwnedRoutineThread(deps.prisma, run, thread)
+            ? undefined : nativeWorkProjectSession(thread, task),
           traceId: runId,
           spaceId: run.spaceId,
           userId: run.userId,
@@ -4451,10 +4438,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const callEndRun = run.trigger === "call_end";
         const callClientNonceForRun = callEndRun ? run.clientNonce : sourceClientNonce;
         const voiceCall = callEndRun || isCallClientNonce(sourceClientNonce);
-        const graphicalToolsAllowed = graphical && acceptsImages && !heldForTakeover;
+        const routineConversation = run.trigger === "routine" || Boolean(run.routineId);
+        const graphicalToolsAllowed = !routineConversation && graphical && acceptsImages && !heldForTakeover;
         const pageBrowserAllowed =
-          graphical && browser.describe().capabilities.page && !heldForTakeover;
+          !routineConversation && graphical && browser.describe().capabilities.page && !heldForTakeover;
         const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+        if (thread.taskBotId) disabledBuiltinTools.add("call_user");
+        if (routineConversation) {
+          for (const name of ["computer_observe", "computer_act", "open_path", "launch_app", "request_takeover", ...PAGE_BROWSER_TOOL_NAMES])
+            disabledBuiltinTools.add(name);
+        }
         if (!computerAvailable) {
           for (const name of COMPUTER_REQUIRED_TOOL_NAMES) disabledBuiltinTools.add(name);
         }
@@ -4686,7 +4679,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           : undefined;
         const computerInstruction = computerAvailable
           ? [
-              "Use the computer only when the task needs files, commands, a browser, or an installed application. Answer directly from the conversation when sufficient; use connected tools for app data. A website with no connected app is still yours to use in the computer's browser, now and in scheduled routines, so a missing connection alone is never a reason to decline. Do not inspect the computer just to prepare for an unrelated task. If what you are about to buy, send or submit differs from what the user confirmed, such as a changed item or total, show the difference and confirm again first.",
+              routineConversation
+                ? "This routine has its own conversation. Use its available files, shell and connected apps. Do not control the user's screen or browser, which belong to the interactive chat. If the task requires graphical interaction, explain that it needs the main chat. Shell commands retain the OS user's permissions; this tool policy is not an OS sandbox."
+                : "Use the computer only when the task needs files, commands, a browser, or an installed application. Answer directly from the conversation when sufficient; use connected tools for app data. A website with no connected app is still yours to use in the computer's browser, so a missing connection alone is never a reason to decline. Do not inspect the computer just to prepare for an unrelated task. If what you are about to buy, send or submit differs from what the user confirmed, such as a changed item or total, show the difference and confirm again first.",
               hostInstruction
                 ? `${baseComputerInstruction} ${hostInstruction} ${projectInstruction ?? ""}`
                 : dockerToolInstruction
@@ -6846,6 +6841,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             );
           }
           if (name === "call_user") {
+            if (thread.taskBotId) throw new Error("Voice calls are available in the Mico's main chat.");
             if (
               messagingChannelRun ||
               thread.groupId ||
@@ -9173,7 +9169,7 @@ async function runNotice(
   prisma: PrismaClient,
   run: { spaceId: string; userId: string; botId: string; threadId: string },
   routineId?: string | null,
-): Promise<{ enabled: boolean; groupId: string | null }> {
+): Promise<{ enabled: boolean; groupId: string | null; taskThreadId?: string }> {
   // A routine carries its own notify setting, which decides on its failures.
   const routine = routineId
     ? await prisma.routine.findUnique({ where: { id: routineId }, select: { notify: true } })
@@ -9187,13 +9183,14 @@ async function runNotice(
     },
     select: {
       bot: { select: { notifyOnFinish: true } },
-      thread: { select: { groupId: true } },
+      thread: { select: { groupId: true, taskBotId: true } },
     },
   });
   if (!source) return { enabled: false, groupId: null };
   return {
     enabled: routine ? routine.notify : Boolean(source.thread.groupId || source.bot.notifyOnFinish),
     groupId: source.thread.groupId,
+    ...(!source.thread.groupId && source.thread.taskBotId === run.botId ? { taskThreadId: run.threadId } : {}),
   };
 }
 
@@ -9367,6 +9364,7 @@ async function notifyRun(
       {
         ...message,
         ...(notice.groupId ? { groupId: notice.groupId } : {}),
+        ...(notice.taskThreadId ? { taskThreadId: notice.taskThreadId } : {}),
         ...(badge === undefined ? {} : { badge }),
       },
       {

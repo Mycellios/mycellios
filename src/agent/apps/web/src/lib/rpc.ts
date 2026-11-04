@@ -11,6 +11,7 @@ import { CLIENT_BUILD } from "./client-build";
 import { i18n } from "./i18n";
 import { identityLabels } from "./identity-display";
 import { reportClientError } from "./monitoring";
+import { taskThreadInput, taskThreadResult, type TaskThreadScope } from "./task-thread-scope";
 
 const SPACE_STORAGE_KEY = "rakazo:space-id";
 
@@ -157,17 +158,37 @@ const displayLink = {
 export const rpc: RpcClient = createORPCClient(displayLink);
 
 /** Keep late async follow-up requests in the shell's original auth boundary. */
-export function createSpaceRpc(spaceId: string | null): typeof rpc {
+export function createSpaceRpc(spaceId: string | null, taskScope?: TaskThreadScope): typeof rpc {
+  const boundTask = taskScope ? { ...taskScope } : undefined;
+  let taskAdmitted = false;
   return createORPCClient({
-    call: (path, input, options) =>
-      displayLink.call(path, input, {
+    call: async (path, input, options) => {
+      const boundInput = taskThreadInput(path, input, boundTask);
+      const privateRequest = Boolean(boundTask && boundInput && typeof boundInput === "object" &&
+        "taskThreadId" in boundInput && boundInput.taskThreadId === boundTask.taskThreadId);
+      const admissionRead = privateRequest && (path[0] === "bootstrap" ||
+        (path[0] === "threads" && ["get", "head", "messages"].includes(path[1] ?? "")));
+      if (privateRequest && options.context.spaceId !== undefined && options.context.spaceId !== spaceId)
+        throw new Error("This task request belongs to a different Space.");
+      if (privateRequest && !admissionRead && !taskAdmitted)
+        throw new Error("Load this task conversation before sending changes. Update the server if it does not support tasks.");
+      const result = await displayLink.call(path, boundInput, {
         ...options,
         // A call that names its own space (e.g. renaming another space's section) keeps it.
         context: {
           ...options.context,
           spaceId: options.context.spaceId === undefined ? spaceId : options.context.spaceId,
         },
-      }),
+      });
+      try {
+        const validated = taskThreadResult(path, boundInput, result, boundTask);
+        if (admissionRead) taskAdmitted = true;
+        return validated;
+      } catch (error) {
+        if (admissionRead) taskAdmitted = false;
+        throw error;
+      }
+    },
   });
 }
 

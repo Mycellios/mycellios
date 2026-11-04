@@ -30,6 +30,8 @@ function pendingTimerFixture(reuse = true) {
     spaceId: "space-1",
     botId: "bot-1",
     userId: "user-1",
+    name: "Current work",
+    threadId: "routine-thread-1",
     prompt: "check current work",
     crons: ["* * * * *"],
     timezone: "UTC",
@@ -44,6 +46,8 @@ function pendingTimerFixture(reuse = true) {
     updatedAt: scheduledAt,
   };
   const tx = {
+    $queryRaw: vi.fn(async () => []),
+    thread: { findFirst: vi.fn(async () => ({ id: routine.threadId })) },
     botSkillPin: { findMany: vi.fn(async () => []) },
 
     agentSkill: { findMany: vi.fn(async () => []) },
@@ -52,6 +56,7 @@ function pendingTimerFixture(reuse = true) {
     computerExecutionLease: { findMany: vi.fn(async () => []) },
     computer: { findMany: vi.fn(async () => []) },
     routine: {
+      findFirst: vi.fn(async () => routine),
       updateMany: vi.fn(async () => ({ count: 1 })),
       findUnique: vi.fn(async () => ({ modelProvider: null, modelId: null, thinkingLevel: null })),
     },

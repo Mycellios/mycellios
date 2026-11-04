@@ -1,5 +1,20 @@
 # AGENTS.md
 
+- Mico task tabs bind immutable bot/thread/Space RPC clients, separate query caches
+  and composer drafts. Reject snapshots for another thread; never derive task
+  identity from mutable global location state. Cron, Test and event routines use
+  the owned routine-thread resolver, preserving explicit targets and history.
+  Delivery receipts freeze routine recipients and retain Run nonces after clearing
+  chat; do not promise universal exactly-once execution for raw/legacy deliveries.
+  Routine runs exclude screen tools at offering and execution. Preserve computer
+  leases and private-call restrictions until those transports are scoped.
+  Verify affected task/RPC, routine, webhook, push and native runtime tests;
+  `node --import tsx --test scripts/verify-routine-isolation-db.ts` uses a fresh
+  loopback PostgreSQL cluster, and `node scripts/verify-mico-tasks-ui.mjs` checks
+  the real task component in a browser with synthetic RPCs. Run both in the shared
+  scheduler. Native private-task push targets use the exact web fallback until
+  native task rendering is qualified; never silently open the primary chat.
+
 - Mico work delegation uses durable parent/child Tasks, expected results, dependency
   and resource reservations, and revisioned controls. Native command receipts belong
   to the admitted host/Mico and are observed with command_status; a lost observer or

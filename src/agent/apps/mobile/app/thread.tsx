@@ -229,6 +229,7 @@ import {
 import { openModelSettings } from "../lib/model-settings";
 import { useMobileTokens, useResolvedAppearance, useThemedStyles } from "../lib/native";
 import {
+  privateTaskWebUrl,
   threadRouteSpaceOnFocus,
   threadSpaceRequest,
   threadSpaceSwitchResult,
@@ -393,7 +394,9 @@ export default function ThreadRoute() {
   const { t } = useI18n();
   const router = useRouter();
   const focused = useIsFocused();
-  const { spaceId } = useLocalSearchParams<{ spaceId?: string | string[] }>();
+  const { spaceId, botId, taskThreadId, groupId } = useLocalSearchParams<{
+    spaceId?: string | string[]; botId?: string; taskThreadId?: string; groupId?: string;
+  }>();
   const [activeSpaceId, setActiveSpaceId] = useState<string | null>(() => selectedSpaceId());
   const [switchFailed, setSwitchFailed] = useState(false);
   const [appliedFocus, setAppliedFocus] = useState(focused);
@@ -439,6 +442,17 @@ export default function ThreadRoute() {
     };
   }, [activeSpaceId, focused, spaceId]);
 
+  if (request.action === "show" && !focusSync.switchFailed && taskThreadId && botId && !groupId)
+    return <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16, padding: 24 }}>
+      <Text style={{ color: tokens.foreground, textAlign: "center" }}>{t("This task is available in the web app.")}</Text>
+      <Pressable accessibilityRole="button" onPress={() => {
+        void Linking.openURL(privateTaskWebUrl(currentApiBase(), botId, taskThreadId, focusSync.activeSpaceId ?? undefined))
+          .catch(error => Alert.alert(t("Could not continue"), errorText(error)));
+      }}><Text style={{ color: tokens.foreground, textDecorationLine: "underline" }}>{t("Open task")}</Text></Pressable>
+      <Pressable accessibilityRole="button" onPress={() => router.replace("/")}>
+        <Text style={{ color: tokens.foreground }}>{t("Return to inbox")}</Text>
+      </Pressable>
+    </View>;
   if (request.action === "show" && !focusSync.switchFailed)
     return (
       <>

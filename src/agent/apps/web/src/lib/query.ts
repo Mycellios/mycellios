@@ -7,7 +7,8 @@ import { hashKey, isCancelledError, QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import type { RpcClient } from "./rpc";
 import { createSpaceRpc, rpcForSpace, selectedSpaceId } from "./rpc";
-import { useBoundSpaceId } from "./space-rpc";
+import { useBoundSpaceId, useBoundTaskThreadScope } from "./space-rpc";
+import type { TaskThreadScope } from "./task-thread-scope";
 
 /**
  * Screens paint what they last saw and refresh it in the background, so moving between
@@ -35,12 +36,13 @@ const scopes = new Map<string, SpaceQueries>();
  * Query helpers for one signed-in user in one space. Both are in every key, so cached data never
  * crosses an auth boundary, and each scope's client pins its own space header.
  */
-export function spaceQueries(userId: string | null, spaceId: string | null): SpaceQueries {
+export function spaceQueries(userId: string | null, spaceId: string | null, taskScope?: TaskThreadScope): SpaceQueries {
   const path = [`user:${userId ?? ""}`, `space:${spaceId ?? ""}`];
+  if (taskScope) path.push(`mico:${taskScope.botId}`, `task:${taskScope.taskThreadId}`);
   const id = path.join("\n");
   let scope = scopes.get(id);
   if (!scope) {
-    scope = createTanstackQueryUtils(spaceId ? rpcForSpace(spaceId) : createSpaceRpc(null), {
+    scope = createTanstackQueryUtils(taskScope ? createSpaceRpc(spaceId, taskScope) : spaceId ? rpcForSpace(spaceId) : createSpaceRpc(null), {
       path,
     });
     scopes.set(id, scope);
@@ -52,8 +54,8 @@ export function spaceQueries(userId: string | null, spaceId: string | null): Spa
  * Where a space's last bootstrap is kept. It holds the whole space (bots, groups, account), so
  * it is not keyed by bot: a visited space opens at once through any of its chats.
  */
-export function spaceSeedKey(userId: string | null, spaceId: string | null) {
-  return spaceQueries(userId, spaceId).bootstrap.queryKey({ input: {} });
+export function spaceSeedKey(userId: string | null, spaceId: string | null, taskScope?: TaskThreadScope) {
+  return spaceQueries(userId, spaceId, taskScope).bootstrap.queryKey({ input: {} });
 }
 
 /** A bot chat or a group chat. */
@@ -114,7 +116,8 @@ export function useQueryUserId(): string | null {
 export function useSpaceQueries(): SpaceQueries {
   const userId = useQueryUserId();
   const spaceId = useBoundSpaceId() ?? selectedSpaceId();
-  return spaceQueries(userId, spaceId);
+  const taskScope = useBoundTaskThreadScope();
+  return spaceQueries(userId, spaceId, taskScope);
 }
 
 let cachedUserId: string | null | undefined;

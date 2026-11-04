@@ -16,6 +16,7 @@ function event(
       | "run.completed"
       | "run.failed"
       | "run.cancelled"
+      | "thread.subagent"
       | "run.started";
     threadId: string;
     id: string;
@@ -51,7 +52,7 @@ function context(overrides: Partial<BrowserNotificationContext> = {}): BrowserNo
 describe("browser notifications", () => {
   beforeEach(() => {
     i18n.load("en", {
-      "{name} failed": "Chief failed",
+      "{name} failed": "{name} failed",
       "{name} finished": "Chief finished",
       "{name} stopped": "Chief stopped",
       "Failed.": "Failed.",
@@ -138,6 +139,29 @@ describe("browser notifications", () => {
     expect(delivery("granted")).toBe("discarded");
     expect(delivery("granted", event({ id: "event-2" }))).toBe("delivered");
     expect(show).toHaveBeenCalledTimes(3);
+  });
+
+  it("alerts on a failed helper, without exposing its error or replaying its saved card", () => {
+    const failed = event({ type: "thread.subagent", payload: {
+      agentId: "helper-1", name: "Reviewer", status: "failed", task: "Inspect code",
+      result: "private provider diagnostic",
+    } });
+    expect(shouldNotifyBrowser(failed, context())).toBe(true);
+    expect(browserNotificationMessage(failed, "Chief")).toEqual({ title: "Chief · Reviewer failed", body: "Failed." });
+    const notifiedEventIds = new Set<string>();
+    const show = vi.fn();
+    const delivery = { enabled: true, pageVisible: false, windowFocused: false,
+      permission: "granted" as const, notifiedEventIds, show };
+    expect(deliverBrowserNotification(failed, "Chief", delivery)).toBe("delivered");
+    const saved = event({ id: "saved-failure", payload: { role: "bot", blocks: [
+      { kind: "subagent", ...failed.payload },
+    ] } });
+    expect(shouldNotifyBrowser(saved, context({ notifiedEventIds }))).toBe(false);
+    expect(deliverBrowserNotification(saved, "Chief", delivery)).toBe("discarded");
+    expect(show).toHaveBeenCalledTimes(1);
+    expect(shouldNotifyBrowser(event({ ...failed, id: "next-run", runId: "run-2" }), context({ notifiedEventIds }))).toBe(true);
+    expect(shouldNotifyBrowser(event({ ...failed, id: "other", payload: { ...failed.payload, status: "running" } }), context())).toBe(false);
+    expect(shouldNotifyBrowser(event({ ...failed, id: "other", payload: { ...failed.payload, status: "completed" } }), context())).toBe(false);
   });
 
   it("allows a later send gesture to retry a dismissed permission prompt", async () => {
