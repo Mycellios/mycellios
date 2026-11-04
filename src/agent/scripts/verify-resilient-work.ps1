@@ -21,7 +21,7 @@ function Invoke-Stage([string]$Label, [string]$Program, [string[]]$TaskArguments
 $taskNode = (Get-Command node).Source
 Invoke-Stage 'prisma-generate' $taskNode @('node_modules/prisma/build/index.js','generate','--config','packages/db/prisma.config.ts')
 if ($taskFailures.Count) { $taskResults | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $taskOutput 'checks.json'); exit 1 }
-foreach ($component in @('adapters','api','worker')) {
+foreach ($component in @('adapters','api','worker','desktop','web')) {
   $config = if ($component -eq 'adapters') { 'packages/adapters/tsconfig.json' } else { "apps/$component/tsconfig.json" }
   Invoke-Stage "type-$component" $taskNode @('node_modules/typescript/bin/tsc','--noEmit','-p',$config,'--incremental','--tsBuildInfoFile',"outputs/resilient-work/$component.tsbuildinfo")
 }
@@ -51,10 +51,14 @@ $taskTests = @(
   'apps/api/src/development-conversations.test.ts',
   'apps/api/src/mico-task-computer.test.ts',
   'apps/api/src/thread-target.test.ts'
+  'apps/api/src/connection-account-details.test.ts',
+  'packages/adapters/src/composio-identity.test.ts'
 )
 foreach ($taskTest in $taskTests) { if (!(Test-Path -LiteralPath $taskTest)) { throw "Missing selected test: $taskTest" } }
 Invoke-Stage 'affected-tests' $taskNode (@('node_modules/vitest/vitest.mjs','run') + $taskTests + @('--maxWorkers=1'))
 Invoke-Stage 'postgres-acceptance' $taskNode @('--import','tsx','scripts/verify-resilient-work-db.ts')
+Invoke-Stage 'repository-structure' $taskNode @('scripts/verify-repository-structure.mjs') ([IO.Path]::GetFullPath((Join-Path $taskRoot '../..')))
+Invoke-Stage 'documentation' $taskNode @('scripts/verify-documentation.mjs') ([IO.Path]::GetFullPath((Join-Path $taskRoot '../..')))
 if (!$ChecksOnly -and !$taskFailures.Count) {
   Invoke-Stage 'build-api' $taskNode @('../../scripts/build-server.mjs','src/index.ts','src/cli/migrate-database.ts','src/cli/bootstrap-owner.ts','src/cli/shared-storage.ts') (Join-Path $taskRoot 'apps/api')
   Invoke-Stage 'build-worker' $taskNode @('../../scripts/build-server.mjs','src/index.ts','src/health-check.ts') (Join-Path $taskRoot 'apps/worker')
