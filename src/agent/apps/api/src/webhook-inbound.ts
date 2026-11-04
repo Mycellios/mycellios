@@ -5,6 +5,7 @@ import { inboundRoutineModelPin } from "@rakazo/adapters";
 import type { MessageBlock } from "@rakazo/contracts";
 import { escapePromptData, inboundRoutineBlock, messageBlockForArtifact } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
+import { ensureRoutineThread, routineDeliveryRouting } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 
 export const WEBHOOK_MAX_BODY_BYTES = 64 * 1024;
@@ -20,6 +21,8 @@ export type WebhookEvents = {
     prompt: string;
     trigger: "webhook";
     clientNonce?: string;
+    routineId?: string;
+    routineWebhookSource?: "webhook" | "github";
     allowParallelRun?: boolean;
     modelPin?: {
       modelProvider: string;
@@ -260,7 +263,7 @@ export function inboundDeliveryClientNonce(
   return `${source}:${botId}:${createHash("sha256").update(idempotencyKey).digest("base64url")}`;
 }
 
-export async function deliverWebhookEvent(
+async function deliverOneWebhookEvent(
   deps: Pick<WebhookDeps, "events" | "jobs">,
   target: InboundTarget,
   input: {
@@ -278,6 +281,7 @@ export async function deliverWebhookEvent(
     /** Messaging wakes share the live chat thread; keep a separate webhook run. */
     allowParallelRun?: boolean;
   },
+  routine?: { id: string; source: "webhook" | "github" },
 ) {
   const promptText =
     input.routines.length > 0
@@ -310,6 +314,7 @@ export async function deliverWebhookEvent(
     prompt: promptText,
     trigger: "webhook",
     clientNonce,
+    ...(routine ? { routineId: routine.id, routineWebhookSource: routine.source, allowParallelRun: true } : {}),
     ...(input.allowParallelRun ? { allowParallelRun: true } : {}),
     ...(pin.modelProvider && pin.modelId
       ? {
@@ -329,4 +334,70 @@ export async function deliverWebhookEvent(
   }
 
   return { ok: true as const, messageId: sent.messageId, runId: sent.runId, seq: sent.seq };
+}
+
+/** Each configured routine receives its own owned thread, model and delivery identity. */
+export async function deliverWebhookEvent(
+  deps: Pick<WebhookDeps, "events" | "jobs"> & Partial<Pick<WebhookDeps, "prisma">>,
+  target: InboundTarget,
+  input: Omit<Parameters<typeof deliverOneWebhookEvent>[2], "routines"> & {
+    routines: Array<Parameters<typeof deliverOneWebhookEvent>[2]["routines"][number] & { id?: string }>;
+  },
+) {
+  if (input.source === "messaging") return deliverOneWebhookEvent(deps, target, input);
+  if (!deps.prisma) throw new Error("Routine delivery requires its owned database scope");
+  const prisma = deps.prisma;
+  const scope = { spaceId: target.bot.spaceId, userId: target.bot.userId, botId: target.bot.id };
+  // A delivery accepted by the older, shared-chat implementation is already work.
+  // Do not replay it into new conversations during an upgrade.
+  if (input.idempotencyKey) {
+    const legacy = await prisma.message.findFirst({ where: {
+      threadId: target.threadId,
+      clientNonce: inboundDeliveryClientNonce(input.source, target.bot.id, input.idempotencyKey),
+      thread: { spaceId: scope.spaceId, userId: scope.userId },
+    }, select: { id: true, seq: true, runId: true } });
+    if (legacy) {
+      const run = await prisma.run.findFirst({ where: { ...scope, sourceMessageId: legacy.id }, select: { id: true } });
+      return { ok: true as const, messageId: legacy.id, runId: run?.id ?? legacy.runId, seq: legacy.seq };
+    }
+  }
+  const proposedIds = input.routines.map(routine => {
+    if (!routine.id) throw new Error("Routine delivery requires an identity");
+    return routine.id;
+  });
+  const routing = input.idempotencyKey ? await routineDeliveryRouting(prisma, scope, {
+    source: input.source, keyDigest: createHash("sha256").update(input.idempotencyKey).digest("hex"), routineIds: proposedIds,
+  }) : { routineIds: proposedIds };
+  if (routing.routineIds.length === 0) {
+    if (input.source === "github") return { ok: true as const, ignored: true, messageId: null, runId: null, seq: null };
+    return deliverOneWebhookEvent(deps, target, { ...input, routines: [] });
+  }
+  const current = await prisma.routine.findMany({ where: {
+    ...scope, id: { in: routing.routineIds }, active: true,
+    ...(input.source === "github" ? { githubEnabled: true } : { webhookEnabled: true }),
+  }, select: { id: true, name: true, prompt: true, modelProvider: true, modelId: true, thinkingLevel: true } });
+  const deliveries = [];
+  for (const routineId of routing.routineIds) {
+    const key = input.idempotencyKey ? JSON.stringify([input.idempotencyKey, routineId]) : undefined;
+    const nonce = key ? inboundDeliveryClientNonce(input.source, target.bot.id, key) : undefined;
+    // Runs retain this external identity even when their original messages are cleared.
+    const accepted = nonce ? await prisma.run.findFirst({ where: { ...scope, clientNonce: nonce },
+      select: { id: true, sourceMessageId: true, sourceMessage: { select: { seq: true } } } }) : null;
+    if (accepted) {
+      deliveries.push({ routineId, ok: true as const, messageId: accepted.sourceMessageId, runId: accepted.id, seq: accepted.sourceMessage?.seq ?? null });
+      continue;
+    }
+    const routine = current.find(candidate => candidate.id === routineId);
+    // Disabling or deleting a selected routine never redirects its event into the main chat.
+    if (!routine) { deliveries.push({ routineId, ok: true as const, ignored: true, messageId: null, runId: null, seq: null }); continue; }
+    const thread = await ensureRoutineThread(prisma, target.bot, routineId);
+    const result = await deliverOneWebhookEvent(deps, { ...target, threadId: thread.id }, {
+      ...input, routines: [routine],
+      idempotencyKey: key,
+    }, { id: routineId, source: input.source });
+    deliveries.push({ routineId, ...result });
+  }
+  const first = deliveries[0]!;
+  const { routineId: _routineId, ...reply } = first;
+  return deliveries.length === 1 ? reply : { ...reply, deliveries };
 }

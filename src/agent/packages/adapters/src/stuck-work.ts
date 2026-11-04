@@ -28,7 +28,7 @@ type StuckCandidate = {
   userId: string;
   taskId: string;
   bot: { name: string; notifyOnFinish: boolean };
-  thread: { groupId: string | null };
+  thread: { groupId: string | null; taskBotId?: string | null };
 };
 
 /**
@@ -82,7 +82,7 @@ export async function reconcileStuckWork(deps: {
       userId: true,
       taskId: true,
       bot: { select: { name: true, notifyOnFinish: true } },
-      thread: { select: { groupId: true } },
+      thread: { select: { groupId: true, taskBotId: true } },
     },
   });
 
@@ -358,7 +358,8 @@ async function sendStuckNotice(
     botId: run.botId,
     signal: new AbortController().signal,
   };
-  const notice = run.thread.groupId ? { ...message, groupId: run.thread.groupId } : message;
+  const notice = run.thread.groupId ? { ...message, groupId: run.thread.groupId }
+    : run.thread.taskBotId === run.botId ? { ...message, taskThreadId: run.threadId } : message;
   try {
     if (notifications instanceof ExpoPushProvider) {
       return await notifications.deliver(notice, context);

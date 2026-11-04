@@ -191,6 +191,9 @@ import {
   writeRightPanelState,
 } from "../lib/right-panel-state";
 import { clearSpaceSelection, createSpaceRpc, selectedSpaceId, selectSpace } from "../lib/rpc";
+import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
+import type { TaskThreadScope } from "../lib/task-thread-scope";
+import { MicoTaskTabs } from "../components/MicoTaskTabs";
 import { unsafeRunRetryText } from "../lib/retry-error";
 import { canRetryThreadRun, retryOriginalThreadRun } from "../lib/retry-thread-run";
 import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-storage";
@@ -326,26 +329,37 @@ export function ShellPage() {
   // A new key per space switch, so nothing from the previous space survives it.
   const spaceEpoch = useSpaceEpoch();
   const reviewTarget = useParams();
+  const [taskSearch] = useSearchParams();
+  const taskThreadId = reviewTarget.botId ? taskSearch.get("task") || undefined : undefined;
+  const taskSpaceId = taskThreadId ? taskSearch.get("taskSpace") || selectedSpaceId() : selectedSpaceId();
+  const taskScope = useMemo(() => taskThreadId && reviewTarget.botId
+    ? { botId: reviewTarget.botId, taskThreadId } : undefined, [reviewTarget.botId, taskThreadId]);
+  const scopedRpc = useMemo(() => createSpaceRpc(taskSpaceId, taskScope), [spaceEpoch, taskScope, taskSpaceId]);
   const owner = authClient.useSession().data?.user.id ?? "";
   useEffect(() => {
     document.documentElement.setAttribute("data-preview-owner", owner);
     return () => document.documentElement.removeAttribute("data-preview-owner");
   }, [owner]);
-  return <ReviewWorkspaceProvider key={JSON.stringify([owner, spaceEpoch])} scope={JSON.stringify([owner, reviewTarget.botId ?? reviewTarget.groupId])}><SpaceShell /></ReviewWorkspaceProvider>;
+  return <SpaceRpcProvider spaceId={taskSpaceId} client={scopedRpc} taskScope={taskScope}>
+    <ReviewWorkspaceProvider key={JSON.stringify([owner, spaceEpoch, taskSpaceId, taskScope])} scope={JSON.stringify(taskThreadId ? [owner, taskSpaceId, reviewTarget.botId, taskThreadId] : [owner, reviewTarget.botId ?? reviewTarget.groupId])}>
+      <SpaceShell taskScope={taskScope} spaceId={taskSpaceId} />
+    </ReviewWorkspaceProvider>
+  </SpaceRpcProvider>;
 }
 
-function SpaceShell() {
+function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskThreadScope; spaceId?: string | null }) {
   const { t, i18n } = useLingui();
   const reviewWorkspace = useReviewWorkspace();
   const { botId, groupId } = useParams();
-  const [shellSpaceId] = useState(selectedSpaceId);
-  const [rpc] = useState(() => createSpaceRpc(shellSpaceId));
+  const [shellSpaceId] = useState(() => initialSpaceId ?? selectedSpaceId());
+  const rpc = useSpaceRpc();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
   const [createMenuOpen, setCreateMenuOpen] = useCreateMenu();
   // A revisited space, or the shell reopened from another page, starts from what it showed
   // last time while its fresh bootstrap loads.
   const [{ seed, startChat }] = useState(() => {
+    if (taskScope) return { seed: undefined, startChat: undefined };
     const primed = peekBootstrapSeed(botId);
     if (primed) return { seed: primed, startChat: undefined };
     const cached = queryClient.getQueryData(spaceSeedKey(userId ?? null, shellSpaceId));
@@ -385,7 +399,7 @@ function SpaceShell() {
       ),
     [navigate],
   );
-  const queries = spaceQueries(userId ?? null, shellSpaceId);
+  const queries = spaceQueries(userId ?? null, shellSpaceId, taskScope);
   const [groups, setGroups] = useState<Group[]>(seed?.groups ?? []);
   const [bots, setBots] = useState<Bot[]>(seed?.bots ?? []);
   const botsRef = useRef(bots);
@@ -580,6 +594,7 @@ function SpaceShell() {
   const call = useCallSession();
   /** Calls a bot, or opens voice settings first when no voice is connected. */
   const callBot = (bot: Bot) => {
+    if (taskScope) return;
     if (!bootstrapMe?.phoneCallsEnabled) return;
     if (!voiceStatus?.ready) {
       openSettings("voice");
@@ -680,11 +695,16 @@ function SpaceShell() {
   // A failed first load falls back to the shell, whose polling and footer can still recover.
   const [initialLoadFailed, setInitialLoadFailed] = useState(false);
   const [bootstrapMe, setBootstrapMe] = useState<Me | null | undefined>(seed?.me);
+  useEffect(() => {
+    // A cross-Space task link selects its Space only after the server admits it.
+    if (taskScope && shellSpaceId && bootstrapMe?.spaceId === shellSpaceId && selectedSpaceId() !== shellSpaceId)
+      selectSpace(shellSpaceId);
+  }, [taskScope, shellSpaceId, bootstrapMe?.spaceId]);
   const callsEnabledRef = useRef(false);
   useEffect(() => {
     callsEnabledRef.current = bootstrapMe?.phoneCallsEnabled === true;
   }, [bootstrapMe?.phoneCallsEnabled]);
-  const currentSpaceId = selectedSpaceId() ?? bootstrapMe?.spaceId ?? null;
+  const currentSpaceId = shellSpaceId ?? bootstrapMe?.spaceId ?? null;
   // null: settings follow the space the app is showing.
   const settingsSpaceId = overlay?.kind === "settings" ? overlay.spaceId : null;
   const settingsSpace =
@@ -973,6 +993,13 @@ function SpaceShell() {
     refreshThread,
     setPanel,
     messageProviders: messagingProviders,
+    onOpenRoutineRun: target => {
+      if (activeBotId.current !== target.botId) return;
+      const next = new URLSearchParams(searchParamsRef.current);
+      next.delete("routine"); next.delete("m");
+      if (target.taskThreadId) next.set("task", target.taskThreadId); else next.delete("task");
+      navigate({ pathname: target.groupId ? `/app/g/${encodeURIComponent(target.groupId)}` : `/app/${encodeURIComponent(target.botId)}`, search: next.toString() });
+    },
   });
   const screenRequest = useRef(0);
   const contextBot =
@@ -1357,8 +1384,8 @@ function SpaceShell() {
   function saveSeed(bootstrap: AppBootstrap, chat?: ChatTarget) {
     // With no space chosen the server picks one, so a shell reopened that way looks there too.
     for (const spaceId of shellSpaceId ? [bootstrap.me.spaceId] : [bootstrap.me.spaceId, null]) {
-      queryClient.setQueryData(spaceSeedKey(userId ?? null, spaceId), bootstrap);
-      if (chat) queryClient.setQueryData(lastChatKey(userId ?? null, spaceId), chat);
+      queryClient.setQueryData(spaceSeedKey(userId ?? null, spaceId, taskScope), bootstrap);
+      if (chat && !taskScope) queryClient.setQueryData(lastChatKey(userId ?? null, spaceId), chat);
     }
   }
   const seedStateRef = useRef<
@@ -1389,7 +1416,7 @@ function SpaceShell() {
       const state = seedStateRef.current;
       if (!state?.me) return;
       const { me, chat, ...lists } = state;
-      const previous = queryClient.getQueryData(spaceSeedKey(userId ?? null, me.spaceId));
+      const previous = queryClient.getQueryData(spaceSeedKey(userId ?? null, me.spaceId, taskScope));
       if (!previous) return;
       saveSeed(seedOnLeave(previous, { ...lists, me }, chat, snapshotRef.current), chat);
     };
@@ -1398,7 +1425,7 @@ function SpaceShell() {
   useEffect(() => {
     let cancelled = false;
     const appliedAtStart = botsRefreshApplied.current;
-    void takeInitialBootstrap(botId ?? startChat?.botId)
+    void (taskScope ? rpc.bootstrap({ botId: taskScope.botId }) : takeInitialBootstrap(botId ?? startChat?.botId))
       .then((bootstrap) => {
         // Kept for the space it belongs to, so switching back to it can paint at once.
         saveSeed(bootstrap);
@@ -2507,7 +2534,8 @@ function SpaceShell() {
     async (text: string, mentions: ComposerMention[], clientNonce: string) => {
       const initialBotTarget = activeBotId.current;
       const initialGroupTarget = activeGroupId.current;
-      if ((!initialBotTarget && !initialGroupTarget) || sending) return false;
+      if ((!initialBotTarget && !initialGroupTarget) || sending ||
+        (taskScope && activeSnapshot?.threadId !== taskScope.taskThreadId)) return false;
       const originThreadKey = initialGroupTarget ?? initialBotTarget;
       const attachments = attachmentsForThread(pendingAttachments, originThreadKey);
       const plan = resolveComposerSendPlan({
@@ -2659,6 +2687,8 @@ function SpaceShell() {
     [
       activeReplyTarget?.id,
       activeReplyQuote,
+      activeSnapshot?.threadId,
+      taskScope,
       clearReply,
       flushPendingBrowserNotifications,
       navigate,
@@ -3817,7 +3847,7 @@ function SpaceShell() {
               </span>
             </Button>
             <div className="flex items-center justify-self-end gap-2">
-              {bootstrapMe?.phoneCallsEnabled && !inGroup && active ? (
+              {bootstrapMe?.phoneCallsEnabled && !inGroup && active && !taskScope ? (
                 <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
                   <Button
                     variant="floating"
@@ -3864,6 +3894,14 @@ function SpaceShell() {
               ) : null}
             </div>
           </div>
+          {active && !inGroup ? <div className="absolute inset-x-0 top-16 z-10 px-3 md:px-[22px]">
+            <MicoTaskTabs key={active.id} botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc} onSelect={threadId => {
+              const next = new URLSearchParams(searchParamsRef.current);
+              next.delete("m");
+              if (threadId) next.set("task", threadId); else next.delete("task");
+              navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: next.toString() });
+            }} />
+          </div> : null}
           {!active && !activeGroup && initialBotsLoaded ? (
             <div className="grid flex-1 place-items-center">
               <Button onClick={() => setCreateBotOpen(true)}>
@@ -3873,6 +3911,7 @@ function SpaceShell() {
             </div>
           ) : (
             <Transcript
+              headerTabs={Boolean(active && !inGroup)}
               key={activeSnapshot?.threadId}
               scrollRef={messageScroll}
               scrollRequest={scrollRequest}
@@ -3902,7 +3941,7 @@ function SpaceShell() {
               }
               userBubble={userBubble}
               onCallBack={
-                bootstrapMe?.phoneCallsEnabled && !inGroup && active
+                bootstrapMe?.phoneCallsEnabled && !inGroup && active && !taskScope
                   ? () => callBot(active)
                   : undefined
               }
@@ -3983,7 +4022,7 @@ function SpaceShell() {
             ) : null}
             <Composer
               key={inGroup ? `group:${groupId}` : `bot:${active?.id}`}
-              draftKey={inGroup ? `group:${groupId}` : `bot:${active?.id}`}
+              draftKey={inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : `bot:${active?.id}`}
               enterToSend={enterToSend}
               onImportAgent={(agent) => {
                 setDroppedAgent(agent);
@@ -3992,7 +4031,7 @@ function SpaceShell() {
               }}
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
               running={composerRunning}
-              disabled={Boolean(recordingSkill)}
+              disabled={Boolean(recordingSkill) || Boolean(taskScope && activeSnapshot?.threadId !== taskScope.taskThreadId)}
               pendingAttachments={activePendingAttachments}
               attachmentNotice={attachmentNotice}
               sendError={sendError}

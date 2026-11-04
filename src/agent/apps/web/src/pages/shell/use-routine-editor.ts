@@ -27,6 +27,7 @@ export function useRoutineEditor({
   refreshThread,
   setPanel,
   messageProviders,
+  onOpenRoutineRun,
 }: {
   rpc: ReturnType<typeof createSpaceRpc>;
   active: Bot | undefined;
@@ -36,6 +37,7 @@ export function useRoutineEditor({
   setBots: Dispatch<SetStateAction<Bot[]>>;
   refreshThread: (botId: string) => Promise<ThreadSnapshot>;
   setPanel: (panel: Panel) => void;
+  onOpenRoutineRun?: (target: { botId: string; taskThreadId?: string; groupId?: string }) => void;
 }) {
   const { t } = useLingui();
   const [routineDraft, setRoutineDraft] = useState<RoutineDraftState>(emptyRoutineDraft());
@@ -44,6 +46,7 @@ export function useRoutineEditor({
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState<Routine | null>(null);
   const [savingRoutine, setSavingRoutine] = useState(false);
   const [runningRoutine, setRunningRoutine] = useState(false);
+  const routineTestRequest = useRef<{ routineId: string; nonce: string } | null>(null);
   const [routineError, setRoutineError] = useState<string | null>(null);
   const routineSavePending = useRef(false);
   const webhookSecretProvisionRef = useRef(new Map<string, Promise<string>>());
@@ -236,7 +239,16 @@ export function useRoutineEditor({
           setRunningRoutine(true);
           setRoutineError(null);
           try {
-            await rpc.routines.testRun({ routineId: targetRoutine.id });
+            if (routineTestRequest.current?.routineId !== targetRoutine.id)
+              routineTestRequest.current = { routineId: targetRoutine.id, nonce: crypto.randomUUID() };
+            const started = await rpc.routines.testRun({ routineId: targetRoutine.id, clientNonce: routineTestRequest.current.nonce });
+            routineTestRequest.current = null;
+            // Do not discard an unsaved editor draft to follow the run automatically.
+            if (activeBotId.current === targetBotId && (started.taskThreadId || started.groupId) &&
+              JSON.stringify(routineDraft) === JSON.stringify(draftFromRoutine(targetRoutine))) {
+              onOpenRoutineRun?.({ botId: targetBotId, ...started });
+              if (onOpenRoutineRun) return;
+            }
             await refreshThread(targetBotId);
           } catch (error) {
             if (activeBotId.current === targetBotId) {

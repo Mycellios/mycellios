@@ -28,6 +28,12 @@ describe("previewFromBlocks", () => {
 });
 
 describe("primaryActiveRun", () => {
+  it("keeps a private task's wait out of the main chat's error suppression", () => {
+    const runs = [{ status: "waiting_input", threadId: "task" }, { status: "running", threadId: "main" }];
+    expect(primaryActiveRun(runs)?.threadId).toBe("task");
+    expect(primaryActiveRun(runs, "main")?.status).toBe("running");
+    expect(primaryActiveRun([runs[0]!], "main")).toBeUndefined();
+  });
   it.each([
     [["queued", "running"], "running"],
     [["queued"], "queued"],

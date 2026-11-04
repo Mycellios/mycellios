@@ -277,6 +277,7 @@ model Space {
   tasks                       Task[]
   runs                        Run[]
   routines                    Routine[]
+  routineDeliveryReceipts      RoutineDeliveryReceipt[]
   scratchpadItems             ScratchpadItem[]
   taughtSkills                TaughtSkill[]
   agentSkills                 AgentSkill[]
@@ -528,6 +529,7 @@ model Bot {
   crossSpaceCommunication Boolean @default(false)
   fleetManagement        Boolean @default(true)
   routines          Routine[]
+  routineDeliveryReceipts RoutineDeliveryReceipt[]
   scratchpadItems   ScratchpadItem[]
   taughtSkills      TaughtSkill[]
   memoryDocuments   MemoryDocument[]
@@ -907,6 +909,24 @@ model ExternalEffect {
   @@unique([idempotencyKey])
   @@index([runId, status])
   @@map("external_effects")
+}
+
+/// Operational routing identities contain no webhook payload or credentials and survive chat clearing.
+model RoutineDeliveryReceipt {
+  id String @id @default(cuid())
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  botId String
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+  source String
+  keyDigest String
+  routineIds String[]
+  createdAt DateTime @default(now())
+
+  @@unique([spaceId, userId, botId, source, keyDigest], map: "routine_delivery_receipts_scope_key")
+  @@index([botId, createdAt])
+  @@map("routine_delivery_receipts")
 }
 
 model Routine {

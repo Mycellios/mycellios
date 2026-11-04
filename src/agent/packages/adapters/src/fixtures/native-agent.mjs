@@ -31,7 +31,7 @@ lines.on("line", (line) => {
       else if (message.method === "turn/start") {
         reply(message, { turn: { id: "fixture-turn" } });
         if (process.argv.includes("--fixture-hang")) return;
-        if (process.argv.includes("--fixture-model-unavailable")) {
+        if (process.argv.includes("--fixture-model-unavailable") || process.argv.includes("--fixture-quota")) {
           send({
             method: "turn/started",
             params: { threadId: "fixture-thread", turn: { id: "fixture-turn" } },
@@ -43,7 +43,7 @@ lines.on("line", (line) => {
               turn: {
                 id: "fixture-turn",
                 status: "failed",
-                error: { message: JSON.stringify({ error: { code: "model_not_found" } }) },
+                error: { message: JSON.stringify({ error: { code: process.argv.includes("--fixture-quota") ? "insufficient_quota" : "model_not_found", detail: "synthetic-private-token" } }) },
               },
             },
           });

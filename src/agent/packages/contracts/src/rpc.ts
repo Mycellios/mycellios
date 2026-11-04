@@ -260,7 +260,9 @@ export const appContract = {
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
   },
-  bootstrap: oc.input(z.object({ botId: Id.optional() })).output(AppBootstrapSchema),
+  bootstrap: oc.input(z.object({ botId: Id.optional(), taskThreadId: Id.optional() })
+    .refine(input => !input.taskThreadId || Boolean(input.botId), "A task conversation requires its Mico"))
+    .output(AppBootstrapSchema),
   deployment: {
     get: oc.output(DeploymentSettingsSchema),
     update: oc
@@ -759,7 +761,7 @@ export const appContract = {
           clientNonce: z.string().min(1).max(200).optional(),
         }),
       )
-      .output(z.object({ runId: Id })),
+      .output(z.object({ runId: Id, taskThreadId: Id.optional(), groupId: Id.optional() })),
   },
   scratchpad: {
     list: oc

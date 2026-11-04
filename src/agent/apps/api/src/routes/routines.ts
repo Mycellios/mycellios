@@ -12,7 +12,7 @@ import {
   hasMixedOneShotSchedule,
   isOneShotRoutineCrons,
 } from "@rakazo/core";
-import { IsolationError, Prisma } from "@rakazo/db";
+import { ensureRoutineThread, IsolationError, Prisma } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import { assertRoutineModel } from "../model-pins.js";
 import { listRoutineRuns } from "../routine-runs.js";
@@ -299,25 +299,31 @@ export function routinesRoutes(ctx: RouterContext) {
         if (!routine) throw new IsolationError();
         const bot = await repos.getBot(context.actor, routine.botId);
         if (!bot.thread) throw new IsolationError();
-        const threadId = bot.thread.id;
+        const runReply = (row: { id: string; threadId: string; thread: { taskBotId: string | null; groupId: string | null } }) => ({
+          runId: row.id,
+          ...(row.thread.groupId ? { groupId: row.thread.groupId } : row.thread.taskBotId === bot.id ? { taskThreadId: row.threadId } : {}),
+        });
         const nonce = input.clientNonce ? `routine-test:${input.clientNonce}` : undefined;
+        const replayWhere = { routineId: routine.id, botId: bot.id,
+          spaceId: context.actor.spaceId, userId: context.actor.userId, clientNonce: nonce };
         if (nonce) {
           const existing = await deps.prisma.run.findFirst({
-            where: { threadId, clientNonce: nonce },
-            select: { id: true },
+            where: replayWhere,
+            select: { id: true, threadId: true, thread: { select: { taskBotId: true, groupId: true } } },
           });
-          if (existing) return { runId: existing.id };
+          if (existing) return runReply(existing);
         }
+        const { id: threadId } = await ensureRoutineThread(deps.prisma, context.actor, routine.id);
         const skillRecords = await agentSkills.listWithContent(context.actor);
         const prompt = expandSkillReferencesInPrompt(routine.prompt, skillRecords);
-        let run: { id: string };
+        let run: { id: string; threadId: string; thread: { taskBotId: string | null; groupId: string | null } };
         try {
           // Task + run must commit together so a nonce collision cannot leave an orphan queued Task.
           run = await deps.prisma.$transaction(async (tx) => {
             if (nonce) {
               const existing = await tx.run.findFirst({
-                where: { threadId, clientNonce: nonce },
-                select: { id: true },
+                where: replayWhere,
+                select: { id: true, threadId: true, thread: { select: { taskBotId: true, groupId: true } } },
               });
               if (existing) return existing;
             }
@@ -349,16 +355,16 @@ export function routinesRoutes(ctx: RouterContext) {
                 ...routineRunModelPin(currentModel),
                 clientNonce: nonce,
               },
-              select: { id: true },
+              select: { id: true, threadId: true, thread: { select: { taskBotId: true, groupId: true } } },
             });
           });
         } catch (error) {
           if (nonce) {
             const existing = await deps.prisma.run.findFirst({
-              where: { threadId, clientNonce: nonce },
-              select: { id: true },
+              where: replayWhere,
+              select: { id: true, threadId: true, thread: { select: { taskBotId: true, groupId: true } } },
             });
-            if (existing) return { runId: existing.id };
+            if (existing) return runReply(existing);
           }
           throw error;
         }
@@ -367,7 +373,7 @@ export function routinesRoutes(ctx: RouterContext) {
         await deps.jobs.enqueue(runContinueJob(run.id)).catch((error) => {
           getLogger().error("routine testRun enqueue", error);
         });
-        return { runId: run.id };
+        return runReply(run);
       }),
     },
   };

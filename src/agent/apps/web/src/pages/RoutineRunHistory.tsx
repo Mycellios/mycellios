@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { rpc } from "../lib/rpc";
 import { translateRunError } from "../lib/run-error";
 import { formatToolActivityDuration } from "../lib/tool-activity-view";
+import { routineThreadPath } from "../lib/routine-thread-path";
 import { statusLabel, statusTone } from "./ActivityList";
 
 export function RoutineRunHistory({ routineId }: { routineId: string }) {
@@ -166,11 +167,7 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
       run.startedAt && run.completedAt
         ? formatToolActivityDuration(Date.parse(run.completedAt) - Date.parse(run.startedAt))
         : null;
-    const chatTo = run.messageId
-      ? run.groupId
-        ? `/app/g/${encodeURIComponent(run.groupId)}?m=${encodeURIComponent(run.messageId)}`
-        : `/app/${encodeURIComponent(run.botId)}?m=${encodeURIComponent(run.messageId)}`
-      : null;
+    const chatTo = routineThreadPath(run);
     return (
       <li key={run.id} className="py-2.5 text-[13px]" data-testid="routine-run-row">
         <div className="flex items-center justify-between gap-2">

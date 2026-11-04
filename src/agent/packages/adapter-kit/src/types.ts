@@ -767,6 +767,8 @@ export interface NotificationMessage {
   threadId: string;
   /** Group chat that owns threadId, so a tap does not open the bot's direct thread. */
   groupId?: string;
+  /** Explicit private conversation; never infer this from a legacy threadId. */
+  taskThreadId?: string;
   /** Unread chats to show on the app icon, when the sender knows them. */
   badge?: number;
 }

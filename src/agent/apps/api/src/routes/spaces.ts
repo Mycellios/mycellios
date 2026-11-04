@@ -161,9 +161,10 @@ export function spacesRoutes(ctx: RouterContext) {
       ]);
       const { bots, groups, botSections } = navigation.current;
       const active = bots.find((bot) => bot.id === input.botId) ?? bots[0];
+      if (input.taskThreadId && (!active || active.id !== input.botId)) throw new IsolationError();
       const [thread, routines] = active
         ? await Promise.all([
-            resolveThreadTarget(deps.prisma, actor, { botId: active.id }).then((target) =>
+            resolveThreadTarget(deps.prisma, actor, { botId: active.id, taskThreadId: input.taskThreadId }).then((target) =>
               threadSnapshot(deps, target),
             ),
             listRoutinesDto(deps, actor, active.id),

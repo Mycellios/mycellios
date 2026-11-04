@@ -6,7 +6,7 @@ import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { approvalPausedToolResult } from "./approval-effect.js";
 import { nativeEnvironment } from "./native-agent-process.js";
-import { codexToolContent, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
+import { codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
 import { ScriptedAgentRuntime } from "./scripted-runtime.js";
 import { restoreTurnCheckpoint } from "./turn-checkpoint.js";
 
@@ -59,6 +59,21 @@ async function setup(engine: "codex" | "claude" | "acp", extra: string[] = [], f
 }
 
 describe("native agent protocol integration", () => {
+  it("does not advertise missing executables or directories and does not replace a broken override", async () => {
+    const test = await setup("acp");
+    await writeFile(join(test.dataDir, "native-agents.json"), JSON.stringify({
+      authorizedScopes: [{ userId: "user", spaceId: "space" }],
+      acp: { command: join(test.dataDir, "missing-agent.exe") },
+      claude: { command: test.dataDir },
+    }));
+    const engines = await discoverNativeEngines(test.dataDir);
+    expect(engines.find(engine => engine.id === "acp")?.available).toBe(false);
+    expect(engines.find(engine => engine.id === "claude")?.available).toBe(false);
+    const runtime = new NativeAgentRuntime({ dataDir: test.dataDir, fallback: new ScriptedAgentRuntime() });
+    const consume = async () => { for await (const _event of runtime.run(test.request, test.context)) { /* consume */ } };
+    await expect(consume()).rejects.toThrow("Correct its path or remove the override");
+    expect(test.executeTool).not.toHaveBeenCalled();
+  });
   it("rejects another user, another Space and a revoked grant before executing a native tool", async () => {
     const test = await setup("codex");
     const consume = async (context: typeof test.context) => {
@@ -123,6 +138,16 @@ describe("native agent protocol integration", () => {
     ).rejects.toThrow("configured Codex model is unavailable");
     expect(test.executeTool).not.toHaveBeenCalled();
     expect(test.onUsage).toHaveBeenCalledOnce();
+  }, 25000);
+  it("explains a failed-turn quota refusal without exposing provider details or running tools", async () => {
+    const test = await setup("codex", ["--fixture-quota"]);
+    let failure: unknown;
+    try { for await (const _event of test.runtime.run(test.request, test.context)) { /* drain */ } }
+    catch (error) { failure = error; }
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain("usage limit");
+    expect((failure as Error).message).not.toContain("synthetic-private-token");
+    expect(test.executeTool).not.toHaveBeenCalled();
   }, 25000);
   it("does not execute an MCP tool twice when the CLI retries the same request", async () => {
     const test = await setup("claude", ["--fixture-retry-mcp"]);

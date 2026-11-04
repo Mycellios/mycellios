@@ -53,6 +53,7 @@ export function bubbleFrameWidth(role: ThreadMessage["role"]) {
 }
 
 export const Transcript = memo(function Transcript({
+  headerTabs = false,
   scrollRef,
   scrollRequest,
   onScrollRequestHandled,
@@ -92,6 +93,7 @@ export const Transcript = memo(function Transcript({
   onOpenImportSetup,
   onOpenImport,
 }: {
+  headerTabs?: boolean;
   scrollRef: RefObject<HTMLDivElement | null>;
   scrollRequest: { messageId: string; nonce: number } | null;
   onScrollRequestHandled: () => void;
@@ -436,7 +438,7 @@ export const Transcript = memo(function Transcript({
             following.current = false;
           }
         }}
-        className="rk-scroll flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto scroll-pt-16 scroll-pb-7 px-4 pt-20 pb-12 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pt-[84px] md:pb-13"
+        className={`rk-scroll flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto scroll-pb-7 px-4 pb-12 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pb-13 ${headerTabs ? "scroll-pt-28 pt-32 md:pt-[132px]" : "scroll-pt-16 pt-20 md:pt-[84px]"}`}
         style={
           userBubble
             ? ({

@@ -215,6 +215,10 @@ export function mountGithubWebhookRoute(
       take: 5,
     });
     if (githubRoutines.length === 0) {
+      const deliveryId = c.req.header("x-github-delivery")?.trim();
+      if (deliveryId) await deliverWebhookEvent(deps, target, {
+        prompt: "", routines: [], source: "github", idempotencyKey: deliveryId,
+      });
       return c.json({ ok: true, ignored: true });
     }
 
