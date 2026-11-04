@@ -511,6 +511,7 @@ model Bot {
   children          Bot[]             @relation("BotChildren")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  taskThreads       Thread[] @relation("MicoTaskThreads")
   thread            Thread?
   computerId        String?
   computer          Computer?         @relation(fields: [computerId], references: [id], onDelete: SetNull)
@@ -622,6 +623,11 @@ model ChatGroupMember {
 }
 
 model Thread {
+  taskBotId String?
+  taskBot Bot? @relation("MicoTaskThreads", fields: [taskBotId], references: [id], onDelete: Cascade)
+  projectKey String?
+  taskKey String?
+  title String?
   id                          String     @id @default(cuid())
   spaceId                     String
   space                       Space      @relation(fields: [spaceId], references: [id], onDelete: Cascade)
@@ -648,6 +654,8 @@ model Thread {
   routines                    Routine[]
 
   @@index([spaceId])
+  @@unique([spaceId, userId, taskKey])
+  @@index([taskBotId, projectKey])
   @@map("threads")
 }
 

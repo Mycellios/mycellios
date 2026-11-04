@@ -23,6 +23,7 @@ import {
   prepareProject,
   projectPreparationStatus,
 } from "../project-preparation.js";
+import {admitMicoTaskComputer}from"../mico-task-computer.js";
 import { withResponseLanguage } from "../response-language.js";
 import { retryThreadRun } from "../retry-thread-run.js";
 import { assertTeachingSendAllowed } from "../taught-skills.js";
@@ -73,13 +74,14 @@ export function threadsRoutes(ctx: RouterContext) {
     threads: {
       prepareProject: authed.threads.prepareProject.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, {
-          botId: input.botId,
+          botId: input.botId, taskThreadId: input.taskThreadId,
         });
         if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
         const nativeEngine = "agentEngine" in target.bot && ["codex", "claude", "acp"].includes(String(target.bot.agentEngine));
         if (!nativeEngine && (await modelSetup(deps, context.actor)).needsModel)
           throw new ORPCError("BAD_REQUEST", { message: MODEL_REQUIRED_SEND_ERROR });
         await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
+        await admitMicoTaskComputer(deps.sandbox,context.actor,target);
         return prepareProject(deps, context.actor, target, {
           ...input,
           prompt: withResponseLanguage(input.prompt, input.responseLocale),
@@ -87,7 +89,7 @@ export function threadsRoutes(ctx: RouterContext) {
       }),
       projectPreparation: authed.threads.projectPreparation.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, {
-          botId: input.botId,
+          botId: input.botId, taskThreadId: input.taskThreadId,
         });
         if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
         return projectPreparationStatus(deps.prisma, context.actor, target, input.runId);
@@ -95,7 +97,7 @@ export function threadsRoutes(ctx: RouterContext) {
       stopProjectPreparation: authed.threads.stopProjectPreparation.handler(
         async ({ context, input }) => {
           const target = await resolveThreadTarget(deps.prisma, context.actor, {
-            botId: input.botId,
+            botId: input.botId, taskThreadId: input.taskThreadId,
           });
           if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
           await ownedProjectPreparation(deps.prisma, context.actor, target, input.runId);
@@ -191,6 +193,7 @@ export function threadsRoutes(ctx: RouterContext) {
       }),
       send: authed.threads.send.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        await admitMicoTaskComputer(deps.sandbox,context.actor,target);
         if ((target.kind !== "bot" || !target.bot.agentEngine || target.bot.agentEngine === "pi") &&
           (await modelSetup(deps, context.actor)).needsModel) {
           throw new ORPCError("BAD_REQUEST", { message: MODEL_REQUIRED_SEND_ERROR });

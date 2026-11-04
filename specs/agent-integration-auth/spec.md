@@ -41,3 +41,19 @@ user-driven acceptance check; template availability is not account connectivity.
 The Fedora backport uses a transparent native caption background and keeps only
 the theme-derived symbol color. Its existing local package work is preserved;
 neither a new installer nor installed-window acceptance is implied by source tests.
+
+## Production backend preservation
+
+The live API/worker contain an earlier unpublished Mico task-conversation overlay.
+Recover the sealed source entries, verify their hashes, and integrate the runtime
+changes against their recorded main base while retaining current main fixes.
+Preserve owned independent task threads, local task/worktree admission, command
+observations and the already-applied migration. Keep its original bytes and checksum;
+this release must not reapply or reverse that migration. Native-only unpublished
+project UI/bridge declarations remain in the private source snapshot and are outside
+this server release.
+
+Qualify the combined sources and build only from the merged main revision. The
+source snapshot, service identities and operator project binding remain private
+release evidence. Do not replace the live backend until its preservation proof and
+active-work handoff are verified.

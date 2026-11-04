@@ -235,7 +235,12 @@ async function toolBridge(
 export class NativeAgentRuntime implements AgentRuntime {
   private active = new Map<string, { controller: AbortController; stopped: Promise<void> }>();
   constructor(
-    private readonly options: { dataDir: string; fallback: AgentRuntime; commands?: NativeConfig },
+    private readonly options: {
+      dataDir: string;
+      fallback: AgentRuntime;
+      commands?: NativeConfig;
+      codexArgs?: string[];
+    },
   ) {}
   describe() {
     return this.options.fallback.describe();
@@ -495,6 +500,7 @@ export class NativeAgentRuntime implements AgentRuntime {
               `permissions.rakazo-runtime.filesystem={":root"="deny",":minimal"="read",${JSON.stringify(cwd)}="read"}`,
               "-c",
               "permissions.rakazo-runtime.network.enabled=false",
+              ...(this.options.codexArgs ?? []),
             ],
             cwd,
             (message) => {
@@ -579,6 +585,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           process.send({ method: "initialized", params: {} });
           const params = {
             cwd,
+            ...(request.model.id !== "default" ? { model: request.model.id } : {}),
             approvalPolicy: "untrusted",
             permissions: "rakazo-runtime",
             developerInstructions: request.instructions,

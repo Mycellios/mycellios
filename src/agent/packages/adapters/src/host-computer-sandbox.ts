@@ -33,7 +33,7 @@ export class HostComputerSandbox implements SandboxProvider {
   }
 
   private async *request<T>(input: HostComputerRequest, context: AdapterContext): AsyncIterable<T> {
-    input = { ...input, botId: context.botId ?? input.botId };
+    input = { ...input, botId: context.botId ?? input.botId, ...(context.projectSessionId?{projectSessionId:context.projectSessionId}:{}) };
     if ((!this.url || !this.token) && !this.transport)
       throw new Error("Local computer access requires the desktop app. Enable it in the app menu.");
     const body = JSON.stringify({ ...input, runId: context.runId });

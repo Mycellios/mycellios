@@ -4043,6 +4043,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           userId: run.userId,
           botId: bot.id,
           runId,
+          ...(thread.taskBotId?{projectSessionId:thread.id}:{}),
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           ...connectedContext(connectedPlugins),
@@ -4294,7 +4295,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const runComputer = lazyRunComputer(
           async () => {
             getLogger().info("computer.requested");
-            const computer = await provisionComputer(deps, storedComputer.id, context, "bot");
+            const computer = context.projectSessionId
+              ? await deps.sandbox.provision({botId:bot.id,homePath:"",providerKind:"desktop"},context)
+              : await provisionComputer(deps, storedComputer.id, context, "bot");
+            if(context.projectSessionId && computer.kind!=="desktop")throw new Error("Task projects require the linked local computer; no other workspace may be used.");
             screenRelease = { computer, context, keepWarm: false };
             scheduleComputerSleep(deps.jobs, storedComputer.id);
             // Earlier attachments wait for the computer's first use; every start copies them
@@ -4316,7 +4320,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           provisionKind,
         );
         const workspaceCheckpoint = createRunWorkspaceCheckpoint(async () => {
-          if (!runComputer.ready) return;
+          if (!runComputer.ready || context.projectSessionId) return;
           await checkpointRunComputerWorkspace(deps, storedComputer, runComputer.ready, context);
         }, context.signal);
         const pendingTurnFiles: MessageBlock[][] = [turnBlocks ?? []];
@@ -4666,6 +4670,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 )
                 .catch(() => undefined)
             : undefined;
+        if(context.projectSessionId && (computerKind!=="desktop"||hostEnvironment?.projectSessionId!==context.projectSessionId)){
+          await failRunBeforeModel("Connect this Mico task to its local project on the current PC before editing. No other computer workspace will be used.",false);return;
+        }
         const hostInstruction = hostEnvironment
           ? `Commands run on the user's ${hostEnvironment.platform} computer with their account permissions. Home: ${JSON.stringify(hostEnvironment.home)}. Shell: ${JSON.stringify(hostEnvironment.shell)}. The shell tool executes commands with that shell. Use its native syntax, paths and installed tools; do not assume Linux or bash. Local files outside the bot workspace can be accessed through commands. App launching is available through OS commands; graphical screen control is unavailable.`
           : undefined;

@@ -203,6 +203,17 @@ export const MessageBlock = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("steps"),
     steps: z.array(z.object({ label: z.string(), count: z.number().int().positive() })),
+    tools: z.array(z.object({
+      id: z.string().max(256), name: z.string().max(200),
+      outcome: z.enum(["running", "succeeded", "error", "paused"]),
+      updatedAt: z.string().optional(), durationMs: z.number().nonnegative().optional(),
+      error: z.string().max(500).optional(), detail: z.string().max(2000).optional(),
+      command: z.string().max(2000).optional(), cwd: z.string().max(1000).optional(),
+      output: z.string().max(12000).optional(), exitCode: z.number().int().nullable().optional(),
+      outputTruncated: z.boolean().optional(),
+      commandStatus: z.enum(["running", "done"]).optional(),
+      commandStartedAt: z.string().optional(), commandFinishedAt: z.string().optional(),
+    })).max(16).optional(),
     durationMs: z.number().int().nonnegative().optional(),
   }),
   z.object({

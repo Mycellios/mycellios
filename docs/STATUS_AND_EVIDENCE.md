@@ -1310,3 +1310,12 @@ A separate local Fedora caption backport keeps the native overlay transparent an
 restricts theme messages to symbol colors. Its ten focused tests pass; installed
 Electron visual acceptance and a replacement installer remain unqualified.
 Neither these source changes nor a new native package have been published.
+
+The combined release candidate also retains the serving backend's independent
+Mico task conversations, owned local task/worktree admission and bounded command
+observations. Its previously applied migration is recovered byte-for-byte; no
+new migration execution is implied. The runtime sources were reconciled against
+their recorded main base while preserving newer continuation/retry fixes.
+134 focused preservation/integration tests pass, together with API/worker/web/
+Desktop types, server builds and credential-free compiled startup. Private source
+receipts retain the comparison; production promotion is still pending.
