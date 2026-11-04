@@ -7,9 +7,11 @@ placeholder: native connection can already have provisioned the shared record.
 Reject active control holders, execution IDs and even stale execution lease dates.
 Retain ownership, shared-resource preservation and all other active-run checks.
 
-On Desktop obtain consent, prepare the owned private record, connect native
-execution, verify connection, then send the original message once. Preparation
-refusal must retain the message without connecting the shared record or sending.
+On Desktop obtain consent, prepare owned instructions without changing the saved
+Team/dedicated assignment, connect native execution, verify connection, then send
+the original message once. The assignment filter above retains compatibility for
+explicit older-client assignments; modern sends do not request that switch.
+Preparation refusal retains the message without connecting or sending.
 No automatic cancellation, replay or silent fallback is introduced.
 
 Verify the API assignment filter, onboarding setup wait, native admission order,

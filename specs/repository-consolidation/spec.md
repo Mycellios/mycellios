@@ -12,6 +12,9 @@ whether its implementation is superseded or intentionally deferred.
 Do not downgrade a package already upgraded on main or introduce an incomplete
 major-version migration as housekeeping. Keep the separate Expo Router and
 Mermaid migration proposals for their own compatibility qualification.
+Python requirement changes must also qualify their relationship to the separately
+certified portable wheel graph; a declaration-only bump is not proof of runtime
+compatibility. Retain an unqualified proposal rather than report it as verified.
 
 Qualify the combined source locally with affected tests and incremental types,
 then require the protected CI checks on the integrated candidate. Fetch main

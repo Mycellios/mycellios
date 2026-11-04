@@ -33,9 +33,10 @@
   Advertise native project controls independently of consent and network readiness;
   a failed identity probe must not hide the connection action. Authenticate and
   enforce the grant when requesting access or connecting, before any file/command work.
-  Initial native admission prepares the private computer record before connecting.
-  An idle Desktop team record may switch while only its created greeting waits;
-  preserve user control, execution IDs/leases and every other active-run refusal.
+  Initial native admission prepares owned instructions before connecting and
+  preserves the saved computer assignment. Explicit legacy assignments may move
+  an idle Desktop team record while only its created greeting waits; preserve
+  user control, execution IDs/leases and every other active-run refusal.
   A connected agent already receives a persistent native workspace automatically;
   do not require folder selection to enable shell/file tools. Existing projects can
   be addressed with the shell's cwd/native paths under the existing access policy.
@@ -512,11 +513,11 @@
   execution-details disclosure. Preserve actionable blocked/waiting states and
   keep observation independent from cancellation/retry. Verify RunActivityStatus.test.tsx.
 
-- Initial computer assignment may ignore only the automatic created/waiting_input
-  introduction on an unprovisioned, unoccupied team placeholder. Never relax
-  active-run blocking for user questions, queued/running introductions, provisioned
-  machines, controls or execution leases. Preserve the original run and reply flow;
-  verify initial-computer-assignment.test.ts and the real API fixture.
+- Explicit initial computer assignment may ignore only the automatic
+  created/waiting_input introduction on an unoccupied team placeholder or idle
+  native Desktop binding. User questions, queued/running introductions, controls
+  and execution leases still block reassignment. Modern sends preserve mode.
+  Verify initial-computer-assignment and modern/legacy native-first-chat fixtures.
 
 - Remember native computer permission by the authenticated account and configured
   server, independently of transient sessions, Spaces and transport credentials.
