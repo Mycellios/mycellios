@@ -97,7 +97,7 @@ export function ReleaseNotes({
             </h3>
             <ul className="list-disc space-y-3 ps-4 text-sm leading-relaxed marker:text-primary">
               <li>
-                <Trans>App connections open in your browser on desktop.</Trans>
+                <Trans>See which accounts are connected to each app.</Trans>
               </li>
             </ul>
           </section>

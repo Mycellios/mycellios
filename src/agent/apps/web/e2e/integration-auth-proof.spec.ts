@@ -13,6 +13,15 @@ test("server setup is translated, bounded on small screens, and does not prevent
   for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(alert).toBeVisible();
+    await expect
+      .poll(async () => {
+        const bounds = await page.getByRole("dialog").boundingBox();
+        return Boolean(bounds && bounds.x >= 15 && bounds.x + bounds.width <= width - 15);
+      })
+      .toBe(true);
+    const geometry = await page.getByRole("dialog").boundingBox();
+    expect(geometry?.x).toBeGreaterThanOrEqual(15);
+    expect(geometry!.x + geometry!.width).toBeLessThanOrEqual(width - 15);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
@@ -67,4 +76,69 @@ test("integration authorization opens an external target and completes without a
     body: await page.screenshot(),
     contentType: "image/png",
   });
+});
+
+test("account details identify each account and separate pending authorizations", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/?accounts=1");
+  await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill("Twitter");
+  await page.getByRole("button", { name: "Agregado", exact: true }).click();
+  const accounts = page.getByTestId("connection-accounts");
+  await expect(accounts).toContainText("@forest_fixture");
+  await expect(accounts).toContainText("@mycelium_team");
+  expect(
+    await page
+      .getByRole("dialog")
+      .evaluate((element) => Number.parseFloat(getComputedStyle(element).borderTopLeftRadius)),
+  ).toBeGreaterThan(8);
+  await expect(accounts).not.toContainText("Autorización pendiente");
+  await expect(page.getByTestId("pending-connections")).toContainText("1 conexión pendiente");
+  await expect(page.getByRole("button", { name: "Desconectar todo", exact: true })).toBeVisible();
+  await page
+    .getByRole("group", { name: "@forest_fixture", exact: true })
+    .getByRole("button", { name: "Cambiar nombre", exact: true })
+    .click();
+  await page.getByRole("textbox", { name: "Etiqueta de cuenta", exact: true }).fill("Personal");
+  await page.getByRole("textbox", { name: "Etiqueta de cuenta", exact: true }).press("Enter");
+  await expect(page.getByRole("group", { name: "@forest_fixture", exact: true })).toContainText(
+    "Personal",
+  );
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(accounts).toBeVisible();
+    await expect
+      .poll(async () => {
+        const bounds = await page.getByRole("dialog").boundingBox();
+        return Boolean(bounds && bounds.x >= 15 && bounds.x + bounds.width <= width - 15);
+      })
+      .toBe(true);
+    const geometry = await page.getByRole("dialog").boundingBox();
+    expect(geometry?.height).toBeLessThan(650);
+    expect(geometry?.x).toBeGreaterThanOrEqual(15);
+    expect(geometry!.x + geometry!.width).toBeLessThanOrEqual(width - 15);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    await testInfo.attach(`account-identities-${width}`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+  }
+  await page
+    .getByRole("group", { name: "@forest_fixture", exact: true })
+    .getByRole("button", { name: "Desconectar", exact: true })
+    .click();
+  await expect(accounts).not.toContainText("@forest_fixture");
+  await expect(accounts).toContainText("@mycelium_team");
+  await page
+    .getByTestId("pending-connections")
+    .getByText("1 conexión pendiente", { exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "Autorización pendiente", exact: true })
+    .getByRole("button", { name: "Cancelar", exact: true })
+    .click();
+  await expect(page.getByTestId("pending-connections")).toBeHidden();
+  await expect(accounts).toContainText("@mycelium_team");
 });

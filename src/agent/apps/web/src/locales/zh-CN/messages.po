@@ -326,7 +326,7 @@ msgstr "{title}，保存为 {savedAs}"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "{toolCount, plural, one {# tool} other {# tools}}"
-msgstr ""
+msgstr "{toolCount, plural, other {# 个工具}}"
 
 #. placeholder {0}: mention.name
 #: src/pages/shell/composer.tsx
@@ -384,7 +384,7 @@ msgstr "账户 ID"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Account label"
-msgstr ""
+msgstr "账户标签"
 
 #: src/components/SidebarFooter.tsx
 msgid "Account menu for {name}"
@@ -465,7 +465,7 @@ msgstr "请填写 HTTPS 服务器 URL。"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Add another"
-msgstr ""
+msgstr "添加其他账户"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add credential"
@@ -5287,7 +5287,7 @@ msgstr "工具源"
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Tools"
-msgstr ""
+msgstr "工具"
 
 #: src/components/ModelCredits.tsx
 msgid "Top up anytime"
@@ -6349,3 +6349,39 @@ msgstr "集成需要服务器配置时显示清晰提示。"
 #: src/components/ReleaseNotes.tsx
 msgid "App connections open in your browser on desktop."
 msgstr "桌面版会在浏览器中打开应用连接。"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Account identity unavailable"
+msgstr "无法获取账户身份"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Authorization pending"
+msgstr "等待授权"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Loading account…"
+msgstr "正在加载账户…"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Could not load account identities."
+msgstr "无法加载账户身份。"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Connected accounts"
+msgstr "已连接的账户"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "No connected accounts"
+msgstr "没有已连接的账户"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Disconnect all"
+msgstr "断开全部连接"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+msgstr "{pendingCount, plural, other {# 个待授权连接}}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "See which accounts are connected to each app."
+msgstr "查看每个应用已连接的账户。"

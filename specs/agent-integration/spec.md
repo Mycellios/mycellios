@@ -35,6 +35,33 @@ step must leave the role unchanged. No models are silently evicted to make room.
 The legacy connection API still requires a bootstrap model ID; the first discovered
 ID supplies this connection metadata, without assigning it to any role.
 
+## Linked integration account identities
+
+The selected integration detail uses a separate authenticated `connections.accounts`
+read, scoped to the actor's user and Space and the chosen connector/provider.
+It returns a public identity label alongside the existing connection DTO.
+The editable local alias remains separate from the provider identity.
+
+The managed adapter resolves only the exact owned active authorization. Composio
+lookup uses its published current-user GET endpoint and exact connected-account
+ID, with a bounded deadline and a short owner/Space/authorization-scoped cache.
+Only public profile labels or the documented provider displayName are projected;
+credentials, arbitrary provider payloads and aliases are never identity evidence.
+Legacy slug-only records and unavailable profiles remain explicitly unidentified.
+A second scoped database read drops revoked grants and prevents an old identity
+from being attached to a reconnected authorization. No migration or account
+mutation is needed to view the detail.
+
+Confirmed accounts and pending authorizations render separately. Users can
+disconnect one account without removing the others, cancel an unfinished attempt,
+or disconnect all explicitly. The dialogue fits its content and safe viewport;
+all new copy and the update announcement use the thirteen existing catalogs.
+
+Qualify the provider/ownership races with offline tests and the actual production
+React component at phone, tablet and desktop widths. Fixtures do not prove live
+provider identity resolution. Publication requires both API and web artifacts;
+retain the existing external-browser OAuth completion and native-host boundaries.
+
 ## Remaining migration gates
 
 Desktop update continuity uses the canonical npm workspace and lock, rather than
