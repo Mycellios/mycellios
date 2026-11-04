@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import { RELEASE_NOTES } from "./release-notes";
 
 beforeEach(() => vi.resetModules());
 function store() {
@@ -11,7 +12,7 @@ function store() {
   };
 }
 const old = "20261103211604",
-  current = "20261104080218";
+  current = RELEASE_NOTES.minimumBuild;
 it("records the first visit without claiming an update", async () => {
   const { observeRelease } = await import("./release-notes");
   const s = store();
@@ -57,7 +58,7 @@ it("acknowledges one notes edition without resetting it for hotfix builds", asyn
   observeRelease(old, s, null);
   expect(observeRelease(current, s, null)?.show).toBe(true);
   acknowledgeRelease(s);
-  expect(observeRelease("20261105000000", s, null)?.show).toBe(false);
+  expect(observeRelease("20990101000000", s, null)?.show).toBe(false);
 });
 it("handles development and denied storage without breaking startup", async () => {
   const { observeRelease } = await import("./release-notes");

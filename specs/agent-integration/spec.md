@@ -141,8 +141,12 @@ web and Desktop. It uses the existing Better Auth/OIDC redirect, callbacks and
 persistent per-server Electron session. The intermediate sign-in launcher is
 replaced by the existing branded loading view while navigation starts. A failed
 or rejected attempt stays on the explicit retry screen instead of redirecting
-again. Keep generic self-hosted SSO, model and integration popup flows intact;
+again. Keep generic self-hosted SSO, model and MCP popup flows intact;
 do not allow arbitrary identity origins in Desktop main-window navigation.
+
+Managed app connections open an ordinary external browser target on Desktop.
+Both the integration catalog and chat authorization cards retain server-owned
+completion polling, so a missing popup handle does not abort authorization.
 
 Qualification: affected local tests and incremental web/native types pass.
 The compiled first-party flow was checked with an isolated identity fixture;

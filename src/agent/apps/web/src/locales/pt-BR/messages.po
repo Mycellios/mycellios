@@ -6345,3 +6345,7 @@ msgstr "Conecte apps com sua própria chave de API quando necessário."
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "Mensagens claras quando uma integração precisa ser configurada no servidor."
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "No desktop, as conexões de aplicativos abrem no seu navegador."

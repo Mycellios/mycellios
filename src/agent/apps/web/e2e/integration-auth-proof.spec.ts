@@ -39,3 +39,32 @@ test("old API provider dumps never reach the screen", async ({ page }, testInfo)
     contentType: "image/png",
   });
 });
+
+test("integration authorization opens an external target and completes without a popup handle", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    const calls: Array<{ url: string; target: string | undefined; features: string | undefined }> =
+      [];
+    Object.defineProperty(window, "__integrationOpenCalls", { value: calls });
+    window.open = (url, target, features) => {
+      calls.push({ url: String(url), target, features });
+      return null;
+    };
+  });
+  await page.goto("/?external=1");
+  await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill("Twitter");
+  await page.getByRole("button", { name: "Agregar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Agregado", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => Reflect.get(window, "__integrationOpenCalls"))).toEqual([
+    {
+      url: "https://connect.composio.dev/link/fixture-not-a-real-connection",
+      target: "_blank",
+      features: "noopener,noreferrer",
+    },
+  ]);
+  await testInfo.attach("external-integration-connected", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+});

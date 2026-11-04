@@ -6345,3 +6345,7 @@ msgstr "必要に応じて自分のAPIキーでアプリを接続できます。
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "連携にサーバー設定が必要な場合に、わかりやすいメッセージを表示します。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "デスクトップ版では、アプリの接続がブラウザーで開きます。"
