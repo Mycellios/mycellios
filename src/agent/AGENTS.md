@@ -593,3 +593,8 @@
   JSX and verify the compiled fixture with scripts/build-server.test.mjs. After
   building API and worker, run scripts/verify-server-startup.mjs to evaluate their
   imports without credentials or a database before promoting the sealed package.
+
+- Native workspace probes do not prove that the directory exists. Provision
+  creates the owned home before reusing a cached reference, and running checks
+  verify its directory. Preserve existing files and contained writes; verify
+  desktop-workspace-recovery and host-computer tests with attachment transfer.
