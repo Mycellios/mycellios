@@ -65,7 +65,7 @@ async function readIdentity(
       // alias, wordId, userId and legacy data/params are not provider identities.
       const displayName = label(object(object(account.state)?.val)?.displayName);
       const fallback = displayName ? { label: displayName } : null;
-      if (!sdk.toolkits || !sdk.tools) return fallback;
+      if (!sdk.toolkits || !sdk.getClient) return fallback;
       try {
         const toolkit = await sdk.toolkits.get(request.provider, options);
         if (
@@ -81,10 +81,16 @@ async function readIdentity(
           endpoint.hash
         )
           return fallback;
-        const response = await sdk.tools.proxyExecute(
-          { endpoint: endpoint.href, method: "GET", connectedAccountId: account.id },
-          options,
-        );
+        // The pinned high-level SDK strips userId; its public client preserves the owner check.
+        const proxyRequest = {
+          endpoint: endpoint.href,
+          method: "GET" as const,
+          connected_account_id: account.id,
+          user_id: context.userId,
+        };
+        const response = await sdk
+          .getClient()
+          .tools.proxy(proxyRequest, { ...options, maxRetries: 0 });
         return response.status === 200 ? (profileIdentity(response.data) ?? fallback) : fallback;
       } catch {
         return fallback;

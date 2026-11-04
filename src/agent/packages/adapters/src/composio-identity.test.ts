@@ -1,3 +1,4 @@
+import { Composio } from "@composio/core";
 import type { AdapterContext } from "@rakazo/adapter-kit";
 import { expect, it, vi } from "vitest";
 import type { ComposioClient } from "./composio-connector.js";
@@ -21,7 +22,7 @@ function fixture() {
     },
   });
   sdk.toolkits = { get };
-  sdk.tools = { proxyExecute: proxy };
+  sdk.getClient = () => ({ tools: { proxy } });
   return { fake, id, sdk, get, proxy, read: createComposioIdentityReader(() => sdk) };
 }
 
@@ -31,8 +32,13 @@ it("reads the exact owned authorization through the read-only profile endpoint",
   const result = await read({ provider: "twitter", connectionRef: id }, owner);
   expect(result).toEqual({ label: "@forest_fixture" });
   expect(proxy).toHaveBeenCalledWith(
-    { endpoint: "https://api.example.test/2/users/me", method: "GET", connectedAccountId: id },
-    { signal: expect.any(AbortSignal) },
+    {
+      endpoint: "https://api.example.test/2/users/me",
+      method: "GET",
+      connected_account_id: id,
+      user_id: owner.userId,
+    },
+    { signal: expect.any(AbortSignal), maxRetries: 0 },
   );
   expect(fake.accountListCalls[0]).toMatchObject({
     userIds: [owner.userId],
@@ -40,6 +46,35 @@ it("reads the exact owned authorization through the read-only profile endpoint",
     statuses: ["ACTIVE"],
   });
   expect(JSON.stringify(result)).not.toContain("fixture-secret");
+});
+
+it("sends the actor and exact account through the installed SDK's actual HTTP transport", async () => {
+  const { sdk, id, read } = fixture();
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const request = new Request(input, init);
+    expect(request.url).toBe("https://backend.composio.dev/api/v3.1/tools/execute/proxy");
+    expect(request.method).toBe("POST");
+    expect(await request.json()).toEqual({
+      endpoint: "https://api.example.test/2/users/me",
+      method: "GET",
+      connected_account_id: id,
+      user_id: owner.userId,
+    });
+    return new Response(
+      JSON.stringify({ status: 200, data: { data: { username: "forest_fixture" } }, headers: {} }),
+      { headers: { "content-type": "application/json" } },
+    );
+  });
+  try {
+    const real = new Composio({ apiKey: "fixture-not-a-real-key", disableVersionCheck: true });
+    sdk.getClient = () => real.getClient();
+    expect(await read({ provider: "twitter", connectionRef: id }, owner)).toEqual({
+      label: "@forest_fixture",
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  } finally {
+    fetch.mockRestore();
+  }
 });
 
 it("never substitutes another owner's, pending or wrong-provider account", async () => {
@@ -56,9 +91,9 @@ it("never substitutes another owner's, pending or wrong-provider account", async
 it("resolves separate profiles for two authorizations of the same provider", async () => {
   const { fake, id, read, proxy } = fixture();
   const second = fake.connect(owner.userId, "twitter");
-  proxy.mockImplementation(async ({ connectedAccountId }) => ({
+  proxy.mockImplementation(async ({ connected_account_id }) => ({
     status: 200,
-    data: { data: { username: connectedAccountId === id ? "forest_fixture" : "mycelium_team" } },
+    data: { data: { username: connected_account_id === id ? "forest_fixture" : "mycelium_team" } },
   }));
   expect(await read({ provider: "twitter", connectionRef: id }, owner)).toEqual({
     label: "@forest_fixture",

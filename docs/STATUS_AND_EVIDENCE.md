@@ -4,6 +4,25 @@ Updated: 2026-11-04 (integration account identities qualified locally; no public
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
 
+## Integration profile owner repair — 2026-11-04
+
+A live, read-only diagnostic reproduced `ExternalProxy_UserIdRequired` while
+the connection was active: the pinned high-level SDK omitted the acting user on
+its profile proxy request. The same exact authorization returned a profile with
+username/name when the public API client sent the matching owner. No credentials
+or profile values were recorded, no account was reconnected and project owner
+verification was retained.
+
+The local repair uses the public client, forwards the server actor's user ID and
+exact connection, and disables automatic retries. A regression observes the
+actual installed SDK's serialized HTTP request, preserving the existing offline
+ownership, cancellation, cache and safe projection checks. The 111 affected offline tests, application types, API/web builds and root
+structure/documentation/format/architecture/boundary/type checks pass. A separate
+read-only production-record probe confirmed exact ownership and a successful
+profile response without recording the identity. An update announcement is
+prepared; this repair still requires normal PR integration and release proof
+before it is described as deployed.
+
 ## Integration account identities — 2026-11-04
 
 Local candidate starts from fetched canonical main
