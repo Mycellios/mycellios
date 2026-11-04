@@ -16,7 +16,9 @@ verification was retained.
 The local repair uses the public client, forwards the server actor's user ID and
 exact connection, and disables automatic retries. A regression observes the
 actual installed SDK's serialized HTTP request, preserving the existing offline
-ownership, cancellation, cache and safe projection checks. The 111 affected offline tests, application types, API/web builds and root
+ownership, cancellation, cache and safe projection checks. The configured-provider wrapper also forwards the new identity operation,
+including credential rotation; the previous wrapper omitted it. The 118 affected
+offline tests, application types, API/web builds and root
 structure/documentation/format/architecture/boundary/type checks pass. A separate
 read-only production-record probe confirmed exact ownership and a successful
 profile response without recording the identity. An update announcement is

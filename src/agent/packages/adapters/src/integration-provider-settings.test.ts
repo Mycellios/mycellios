@@ -85,6 +85,34 @@ describe("integration provider settings", () => {
     }
     expect(f.factory).not.toHaveBeenCalled();
   });
+  it("forwards profile lookup through configured credentials and observes credential rotation", async () => {
+    const f = fixture();
+    const first = vi.fn(async () => ({ label: "@forest_fixture" }));
+    f.adapter.describeConnection = first;
+    await f.settings.save({ provider: "composio", apiKey: "fake-first-key" }, context);
+    const provider = f.settings.providers().find((entry) => entry.describe().id === "composio")!;
+    const request = { provider: "twitter", connectionRef: "fixture-authorization" };
+    expect(await provider.describeConnection!(request, context)).toEqual({
+      label: "@forest_fixture",
+    });
+    expect(first).toHaveBeenCalledExactlyOnceWith(request, context);
+    const second = vi.fn(async () => ({ label: "@mycelium_team" }));
+    f.factory.mockReturnValue({ ...f.adapter, describeConnection: second });
+    await f.settings.save({ provider: "composio", apiKey: "fake-rotated-key" }, context);
+    expect(await provider.describeConnection!(request, context)).toEqual({
+      label: "@mycelium_team",
+    });
+    expect(second).toHaveBeenCalledExactlyOnceWith(request, context);
+    expect(first).toHaveBeenCalledOnce();
+  });
+  it("returns no profile when the configured adapter is absent or does not support identities", async () => {
+    const f = fixture();
+    const provider = f.settings.providers().find((entry) => entry.describe().id === "composio")!;
+    const request = { provider: "twitter", connectionRef: "fixture-authorization" };
+    expect(await provider.describeConnection!(request, context)).toBeNull();
+    await f.settings.save({ provider: "composio", apiKey: "fake-key" }, context);
+    expect(await provider.describeConnection!(request, context)).toBeNull();
+  });
   it("warms directories only for configured providers", async () => {
     const f = fixture();
     const warm = vi.fn(async () => undefined);

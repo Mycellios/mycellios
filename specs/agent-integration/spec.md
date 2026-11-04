@@ -54,7 +54,9 @@ unscoped request even when the account is active. The pinned core SDK's high-lev
 proxy drops that field; use its public API client with `user_id` and
 `connected_account_id`, retaining cancellation and zero automatic retries.
 An offline wire regression must inspect the installed client's serialized body,
-not just a mock of the high-level helper.
+not just a mock of the high-level helper. Configured provider wrappers must
+forward the identity operation through their normal credential resolver and
+observe credential rotation, returning null when unsupported or unconfigured.
 
 A second scoped database read drops revoked grants and prevents an old identity
 from being attached to a reconnected authorization. No migration or account

@@ -177,6 +177,12 @@ class ConfiguredIntegrationProvider implements ManagedConnectorProvider {
   async listReconnectRefs(context: AdapterContext) {
     return (await (await this.resolve())?.listReconnectRefs?.(context)) ?? [];
   }
+  async describeConnection(
+    request: Parameters<NonNullable<ManagedConnectorProvider["describeConnection"]>>[0],
+    context: AdapterContext,
+  ) {
+    return (await (await this.resolve())?.describeConnection?.(request, context)) ?? null;
+  }
   async connectionReady(context: AdapterContext, externalId: string) {
     return (await this.required()).connectionReady(context, externalId);
   }
