@@ -657,9 +657,12 @@ export async function sendThreadMessage(
     clientNonce?: string;
     responseLocale?: string;
     taskInstructions?: string;
+    queueOnlyWhenIdle?: boolean;
   },
   releaseTakeover?: (runId: string) => Promise<void>,
 ) {
+  if (input.queueOnlyWhenIdle && target.kind !== "bot")
+    throw new ORPCError("BAD_REQUEST", { message: "Idle-only sends require a Mico." });
   if(input.taskInstructions){const ownTask=await deps.prisma.thread.findFirst({where:{id:target.threadId,taskBotId:target.kind==="bot"?target.botId:"",spaceId:actor.spaceId,userId:actor.userId}});if(!ownTask)throw new IsolationError();}
   const existing = await replayExistingSend(
     deps,
@@ -754,6 +757,8 @@ export async function sendThreadMessage(
           },
           select: { id: true, taskId: true, status: true, trigger: true },
         });
+        if (input.queueOnlyWhenIdle && activeRuns.length)
+          throw new ORPCError("CONFLICT", { message: "The Mico is not idle." });
         const answered: typeof activeRuns = [];
         for (const run of activeRuns.filter((run) => run.status === "waiting_input")) {
           if (

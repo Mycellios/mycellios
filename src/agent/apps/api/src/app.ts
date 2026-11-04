@@ -878,6 +878,18 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     if (actor) enrichLogContext({ "user.id": actor.userId, "space.id": actor.spaceId });
     return actor;
   });
+  let stopRtcVoiceTrial = async () => {};
+  if (process.env.MYCELLIOS_VOICE_RTC_MVP === "1") {
+    const { localVoiceTrialEnabled, mountRtcVoiceTrial } = await import("./voice-rtc/http.js");
+    if (localVoiceTrialEnabled(process.env.MYCELLIOS_VOICE_RTC_MVP, env.databaseUrl)) {
+      const { currentMicoVoice } = await import("./voice-rtc/mico.js");
+      stopRtcVoiceTrial = mountRtcVoiceTrial(app, {
+        authenticate: sessionActor,
+        makeMico: (actor, request, target) => currentMicoVoice(app, { prisma, secrets, env }, actor, request, target, sessionActor),
+        trustedOrigin: origin => isTrustedOrigin(origin, env),
+      });
+    }
+  }
   mountWebhookHttpRoutes(app, { prisma, secrets, events, jobs });
   if (billing && billingProvider) {
     mountBillingRoutes(app, {
@@ -1296,6 +1308,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     backgroundFailures: inMemoryJobs ? () => inMemoryJobs.failureCounts() : undefined,
     stop: async () => {
       stopDesktopRelay();
+      await stopRtcVoiceTrial();
       // Abort in-flight continueRun boot waits before draining jobs so stop() cannot sit
       // on waitForComputerReady for the full boot-wait window during shared Postgres journeys.
       auth.disposeOidcDiscovery();

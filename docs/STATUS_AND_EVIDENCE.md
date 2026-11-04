@@ -4,6 +4,34 @@ Updated: 2026-11-02 (local project Play/Stop and full-stack preview qualified; i
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
 
+## Shared PWA WebRTC voice MVP - local candidate, 2026-11-04
+
+An opt-in shared browser/PWA panel retains one microphone and incoming audio stream.
+The local API adapter uses the selected existing Mico's authenticated conversation
+route, model and speech providers. Atomic idle-only admission refuses steering and
+pending approval/secret cards; reply reads remain fixed to the accepted run and owned
+Mico/task. Session limits are reserved before asynchronous negotiation. The feature
+is disabled by default and refuses remote database URLs.
+
+On the PR candidate based on main `e0f6459ef5ef6823d3a6289bb786ff10ec8a8f40`, API/web
+incremental TypeScript checks pass, as do 118 focused voice/conversation regressions
+and two local-environment tests. The browser transport qualification uses real Chrome,
+synthetic microphone audio and a scripted response; it checks audible RTP in both
+directions and microphone release on hangup. It is not a real-account or live-provider
+conversation. Transactional refusal tests use isolated fixtures, not PostgreSQL
+concurrency acceptance. Full CI and platform packaging are intentionally not run in
+the temporary agility mode.
+
+Existing-account web access was observed, but the live voice check was interrupted
+before completion. Live speech/model providers and physical Android/iPhone lock-screen
+behavior remain unverified. A hidden page or mobile viewport does not establish a
+screen-lock result. There is no TURN/WAN qualification. No production service, model
+configuration, database or installed client was changed for this MVP.
+
+Design and local commands: `specs/pwa-webrtc-voice/spec.md`. Local verification and
+collaborator-preservation evidence remain outside the checkout in
+`outputs/voice-webrtc-mvp-20261104` and `outputs/voice-webrtc-pr-20261104`.
+
 - Agent contribution sidebar (local candidate): missing translated labels are
   present in all thirteen catalogs. An existing unreadable installation offers
   explicit verification; successful verification never starts compute, including

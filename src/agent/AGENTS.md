@@ -1,5 +1,13 @@
 # AGENTS.md
 
+- The shared PWA WebRTC voice MVP is opt-in (`MYCELLIOS_VOICE_RTC_MVP=1`) and mounts
+  only with a loopback database. Reuse the authenticated Mico/task send route with
+  atomic idle admission; never answer secret/approval cards by this transport or
+  copy production credentials into a local fixture. Scope capture to account/Space/
+  Mico/task and release media on hangup or scope change. Hidden pages and mobile
+  viewports do not qualify physical lock-screen support. See specs/pwa-webrtc-voice/
+  spec.md at the repository root; record verified status in docs/STATUS_AND_EVIDENCE.md.
+
 - Mobile dependency updates must match the installed Expo SDK's
   `bundledNativeModules.json` and the proposed lockfile's peer requirements;
   an isolated Router major update is not an SDK migration. Mermaid's API route
