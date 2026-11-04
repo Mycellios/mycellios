@@ -1,5 +1,6 @@
 import type { ToolkitConnectionState } from "@composio/core";
 import type { AdapterContext, ConnectorEvent, ConnectorTool } from "@rakazo/adapter-kit";
+import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@rakazo/contracts";
 import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
 import { describe, expect, it, vi } from "vitest";
 import { composioToolkitDirectory } from "./composio-catalog-cache.js";
@@ -13,6 +14,7 @@ import {
   executeSessionKey,
   expandComposioMultiExecute,
   filterCatalog,
+  isComposioAuthSetupRequired,
   isComposioEnabled,
   isNoAuthToolkitError,
   mergeConnectedPlugins,
@@ -314,6 +316,151 @@ describe("composio tool mapping", () => {
       ),
     ).toBe(true);
     expect(isNoAuthToolkitError(new Error("redirect required"))).toBe(false);
+  });
+
+  it("reports missing server authentication without exposing or replaying the provider failure", async () => {
+    const raw =
+      '400 {"error":{"message":"Composio does not manage auth for toolkit twitter","code":4308,"slug":"ToolRouterV2_NoManagedAuth","request_id":"private-request"}}';
+    for (const failure of [
+      new Error(raw),
+      { status: 400, error: { slug: "ToolRouterV2_NoManagedAuth" } },
+      { error: { error: { code: 4308 } } },
+    ]) {
+      const authorize = vi.fn().mockRejectedValue(failure);
+      const connector = new ComposioConnector({
+        client: {
+          create: async () => ({ sessionId: "auth-session", authorize }),
+        } as never,
+      });
+      await expect(
+        connector.begin(
+          { provider: "twitter", redirectUrl: "https://app.example.test/integrations/callback" },
+          { userId: "user-1" } as AdapterContext,
+        ),
+      ).rejects.toThrow(INTEGRATION_AUTH_SETUP_REQUIRED);
+      expect(authorize).toHaveBeenCalledTimes(1);
+    }
+    expect(isComposioAuthSetupRequired(new Error("Invalid OAuth state"))).toBe(false);
+    expect(isComposioAuthSetupRequired(new Error("does not require authentication"))).toBe(false);
+    expect(isComposioAuthSetupRequired(null)).toBe(false);
+  });
+
+  it("keeps genuine no-auth toolkits connectable", async () => {
+    const authorize = vi
+      .fn()
+      .mockRejectedValue(new Error('400 {"error":{"slug":"ToolRouterV2_ToolkitsIsNoAuth"}}'));
+    const connector = new ComposioConnector({
+      client: {
+        create: async () => ({ sessionId: "no-auth-session", authorize }),
+      } as never,
+    });
+    await expect(
+      connector.begin(
+        { provider: "hackernews", redirectUrl: "https://app.example.test/integrations/callback" },
+        { userId: "user-1" } as AdapterContext,
+      ),
+    ).resolves.toEqual({ authorizationUrl: null, state: "hackernews" });
+    expect(authorize).toHaveBeenCalledTimes(1);
+  });
+
+  it("pins the existing custom auth config so Connect Link can collect the user's own key", async () => {
+    const authorize = vi
+      .fn()
+      .mockResolvedValue({ id: "request-key", redirectUrl: "https://connect.example.test/key" });
+    const create = vi.fn(async () => ({ sessionId: "custom-auth-session", authorize }));
+    const list = vi.fn().mockResolvedValue({
+      items: [
+        {
+          id: "auth-key",
+          toolkit: { slug: "perplexityai" },
+          status: "ENABLED",
+          isEnabledForToolRouter: true,
+          isComposioManaged: false,
+          expectedInputFields: [{ name: "api_key" }],
+          credentials: { secret: "must-not-leave-adapter" },
+        },
+      ],
+      nextCursor: null,
+    });
+    const connector = new ComposioConnector({ client: { create, authConfigs: { list } } as never });
+    const context = { userId: "user-1", signal: new AbortController().signal } as AdapterContext;
+    await expect(
+      connector.begin(
+        { provider: "perplexityai", redirectUrl: "https://app.example.test/callback" },
+        context,
+      ),
+    ).resolves.toEqual({
+      state: "request-key",
+      authorizationUrl: "https://connect.example.test/key",
+    });
+    expect(create).toHaveBeenCalledExactlyOnceWith("user-1", {
+      manageConnections: false,
+      sandbox: { enable: false },
+      toolkits: ["perplexityai"],
+      authConfigs: { perplexityai: "auth-key" },
+    });
+    expect(list).toHaveBeenCalledWith(
+      { toolkit: "perplexityai", showDisabled: true, limit: 100 },
+      { signal: context.signal },
+    );
+    expect(JSON.stringify(create.mock.calls)).not.toContain("must-not-leave-adapter");
+    expect(authorize).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["disabled", "ambiguous"])(
+    "refuses %s configuration without creating a session or authorization",
+    async (state) => {
+      const config = {
+        id: "auth-1",
+        toolkit: { slug: "twitter" },
+        status: state === "disabled" ? "DISABLED" : "ENABLED",
+        isEnabledForToolRouter: true,
+        isComposioManaged: false,
+      };
+      const create = vi.fn();
+      const list = vi
+        .fn()
+        .mockResolvedValue({
+          items: state === "disabled" ? [config] : [config, { ...config, id: "auth-2" }],
+          nextCursor: null,
+        });
+      const connector = new ComposioConnector({
+        client: { create, authConfigs: { list } } as never,
+      });
+      await expect(
+        connector.begin({ provider: "twitter", redirectUrl: "https://app.example.test/callback" }, {
+          userId: "user-1",
+        } as AdapterContext),
+      ).rejects.toThrow(INTEGRATION_AUTH_SETUP_REQUIRED);
+      expect(create).not.toHaveBeenCalled();
+    },
+  );
+
+  it("re-reads custom config status on each click rather than using a stale authorization session", async () => {
+    const authorize = vi
+      .fn()
+      .mockResolvedValue({ id: "request-1", redirectUrl: "https://connect.example.test/oauth" });
+    const create = vi.fn(async () => ({ sessionId: "auth-session", authorize }));
+    const config = {
+      id: "auth-1",
+      toolkit: { slug: "twitter" },
+      status: "ENABLED",
+      isEnabledForToolRouter: true,
+      isComposioManaged: false,
+    };
+    const list = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [config], nextCursor: null })
+      .mockResolvedValueOnce({ items: [{ ...config, status: "DISABLED" }], nextCursor: null });
+    const connector = new ComposioConnector({ client: { create, authConfigs: { list } } as never });
+    const request = { provider: "twitter", redirectUrl: "https://app.example.test/callback" };
+    const context = { userId: "user-1" } as AdapterContext;
+    await connector.begin(request, context);
+    await expect(connector.begin(request, context)).rejects.toThrow(
+      INTEGRATION_AUTH_SETUP_REQUIRED,
+    );
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(authorize).toHaveBeenCalledTimes(1);
   });
 
   it("collects nested Composio log ids", () => {

@@ -10,6 +10,7 @@ import type {
   ConnectorTool,
   ManagedConnectorProvider,
 } from "@rakazo/adapter-kit";
+import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@rakazo/contracts";
 import { getLogger } from "@rakazo/logging";
 import {
   composioToolkitDirectory,
@@ -32,6 +33,7 @@ export type ComposioClient = {
   create(userId: string, config: ToolRouterCreateSessionConfig): Promise<ComposioSession>;
   sessions: { use(sessionId: string): Promise<ComposioSession> };
   connectedAccounts: Pick<Composio["connectedAccounts"], "list" | "waitForConnection" | "delete">;
+  authConfigs?: Pick<Composio["authConfigs"], "list">;
 };
 
 /** Account states the user can only leave by reconnecting. */
@@ -585,8 +587,9 @@ export class ComposioConnector implements ComposioProvider {
     request: { provider: string; redirectUrl: string },
     context: AdapterContext,
   ): Promise<{ authorizationUrl: string | null; state: string }> {
-    const session = await this.sessionFor(context.userId);
+    const session = await this.authorizationSession(request.provider, context);
     try {
+      context.signal?.throwIfAborted();
       const connectionRequest = await session.authorize(request.provider, {
         callbackUrl: request.redirectUrl,
       });
@@ -602,11 +605,50 @@ export class ComposioConnector implements ComposioProvider {
         state: connectionRequest.id || request.provider,
       };
     } catch (error) {
+      if (isComposioAuthSetupRequired(error)) {
+        throw new Error(INTEGRATION_AUTH_SETUP_REQUIRED);
+      }
       if (isNoAuthToolkitError(error)) {
         return { authorizationUrl: null, state: request.provider };
       }
       throw new Error(sanitizeComposioError(error));
     }
+  }
+
+  /** Custom auth (including keys entered on Connect Link) must be pinned explicitly. */
+  private async authorizationSession(
+    provider: string,
+    context: AdapterContext,
+  ): Promise<ComposioSession> {
+    context.signal?.throwIfAborted();
+    const sdk = this.sdk();
+    if (!sdk.authConfigs) return this.sessionFor(context.userId);
+    const configs = await collectPages(async (cursor) => {
+      const page = await sdk.authConfigs!.list(
+        { toolkit: provider, showDisabled: true, limit: 100, ...(cursor ? { cursor } : {}) },
+        { signal: context.signal },
+      );
+      return { items: page.items, cursor: page.nextCursor ?? undefined };
+    }, MAX_ACCOUNT_PAGES);
+    const matches = configs.filter(
+      (config) => composioSlugKey(config.toolkit.slug) === composioSlugKey(provider),
+    );
+    const enabled = matches.filter(
+      (config) => config.status === "ENABLED" && config.isEnabledForToolRouter === true,
+    );
+    const custom = enabled.filter((config) => config.isComposioManaged === false);
+    if (custom.length > 1 || (matches.length > 0 && enabled.length === 0)) {
+      throw new Error(INTEGRATION_AUTH_SETUP_REQUIRED);
+    }
+    const selected = custom[0];
+    if (!selected) return this.sessionFor(context.userId);
+    context.signal?.throwIfAborted();
+    return sdk.create(context.userId, {
+      manageConnections: false,
+      sandbox: { enable: false },
+      toolkits: [selected.toolkit.slug],
+      authConfigs: { [selected.toolkit.slug]: selected.id },
+    });
   }
 
   async connectionReady(context: AdapterContext, slug: string): Promise<boolean> {
@@ -947,6 +989,26 @@ export function isNoAuthToolkitError(error: unknown): boolean {
   return (
     message.includes("ToolkitsIsNoAuth") || message.includes("does not require authentication")
   );
+}
+
+/** Missing managed/custom authentication is operator setup, never a no-auth toolkit. */
+export function isComposioAuthSetupRequired(error: unknown): boolean {
+  const hasSetupCode = (value: unknown): boolean => {
+    if (!value || typeof value !== "object") return false;
+    const record = value as { slug?: unknown; code?: unknown; error?: unknown };
+    return record.slug === "ToolRouterV2_NoManagedAuth" || record.code === 4308;
+  };
+  if (hasSetupCode(error)) return true;
+  const body = error && typeof error === "object" && "error" in error ? error.error : undefined;
+  if (hasSetupCode(body)) return true;
+  if (body && typeof body === "object" && "error" in body && hasSetupCode(body.error)) return true;
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  try {
+    const parsed = JSON.parse(message.replace(/^\s*\d{3}\s+/, ""));
+    return hasSetupCode(parsed) || hasSetupCode(parsed?.error);
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -6333,3 +6333,15 @@ msgstr "計算資源の提供操作に分かりやすいラベルを表示。"
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "提供を開始する前に、コンピューターの確認や状態の再確認ができます。"
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "この連携にはサーバー側の設定が必要です。管理者にお問い合わせください。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "必要に応じて自分のAPIキーでアプリを接続できます。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "連携にサーバー設定が必要な場合に、わかりやすいメッセージを表示します。"

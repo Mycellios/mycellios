@@ -6,3 +6,6 @@ infra/sandboxes/computer/fluxbox.* text eol=lf
 *.png binary
 *.jpg binary
 *.ico binary
+
+# Preserve the exact checksum of the migration already applied in production.
+packages/db/prisma/migrations/20261103170000_mico_project_conversations/migration.sql -text whitespace=cr-at-eol

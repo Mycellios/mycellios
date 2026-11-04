@@ -1102,4 +1102,6 @@ export const RU_MESSAGES: Record<string, string> = {
   "{sender} rollup hours": "{sender}: интервал группировки в часах",
   "Connect Slack": "Подключить Slack",
   "Link DMs": "Привязать ЛС",
+  "This integration needs server setup. Contact the administrator.":
+    "Для этой интеграции нужна настройка на сервере. Обратитесь к администратору.",
 };

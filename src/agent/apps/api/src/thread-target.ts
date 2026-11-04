@@ -55,6 +55,7 @@ export type ThreadTarget =
       kind: "bot";
       botId: string;
       threadId: string;
+      projectSessionId?: string;
       bot: Awaited<ReturnType<ReturnType<typeof createRepos>["getBot"]>>;
     }
   | {
@@ -290,18 +291,22 @@ async function lockAndLoadGroupMembers(
 export async function resolveThreadTarget(
   prisma: PrismaClient,
   actor: Actor,
-  input: { botId?: string; groupId?: string },
+  input: { botId?: string; groupId?: string; taskThreadId?: string },
   options: { includeArchived?: boolean } = {},
 ): Promise<ThreadTarget> {
+  if(input.taskThreadId&&(!input.botId||input.groupId))throw new IsolationError();
   const repos = createRepos(prisma);
   const groupRepos = createGroupRepos(prisma);
   if (input.botId) {
     const bot = await repos.getBot(actor, input.botId, options);
     if (!bot.thread) throw new IsolationError();
+    const taskThread = input.taskThreadId ? await prisma.thread.findFirst({where:{id:input.taskThreadId,taskBotId:bot.id,userId:actor.userId,spaceId:actor.spaceId}}) : null;
+    if(input.taskThreadId && !taskThread) throw new IsolationError();
     return {
       kind: "bot",
       botId: bot.id,
-      threadId: bot.thread.id,
+      threadId: taskThread?.id ?? bot.thread.id,
+      ...(taskThread?{projectSessionId:taskThread.id}:{}),
       bot,
     };
   }
@@ -651,9 +656,11 @@ export async function sendThreadMessage(
     replyQuote?: string;
     clientNonce?: string;
     responseLocale?: string;
+    taskInstructions?: string;
   },
   releaseTakeover?: (runId: string) => Promise<void>,
 ) {
+  if(input.taskInstructions){const ownTask=await deps.prisma.thread.findFirst({where:{id:target.threadId,taskBotId:target.kind==="bot"?target.botId:"",spaceId:actor.spaceId,userId:actor.userId}});if(!ownTask)throw new IsolationError();}
   const existing = await replayExistingSend(
     deps,
     target.threadId,
@@ -833,7 +840,7 @@ export async function sendThreadMessage(
             threadId: target.threadId,
             userId: actor.userId,
             prompt: withResponseLanguage(
-              buildSendPrompt(input.text, artifacts, connectorNames),
+              (input.taskInstructions ? input.taskInstructions + "\n\nCurrent user request:\n" : "") + buildSendPrompt(input.text, artifacts, connectorNames),
               input.responseLocale,
             ),
             status: "queued",
@@ -1418,6 +1425,7 @@ export async function stopThreadRuns(
     teardownTargets.map(async ({ computer, botId, runId, lease }) => {
       if (!computer.providerRef) return;
       const context = {
+        ...(target.kind==="bot"&&target.projectSessionId?{projectSessionId:target.projectSessionId}:{}),
         operationId: "stop",
         traceId: "stop",
         spaceId: actor.spaceId,

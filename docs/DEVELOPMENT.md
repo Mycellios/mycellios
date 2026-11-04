@@ -626,3 +626,35 @@ gateway's implicit selection may use the first provider's pricing telemetry.
 Confirm the signed `jev` offer has zero prices and a successful gateway receipt
 records `served_free=1`, actual input usage and zero output usage. A configured
 zero price or a schema-rejected request alone does not close the buyer gate.
+
+## Agent integration authentication setup
+
+The Agent's Composio adapter resolves enabled custom authentication configurations
+on each explicit connect attempt. A unique custom config is pinned to that user's
+authorization session; managed defaults remain available for other toolkits.
+Disabled-only or ambiguous custom configurations require operator attention.
+Provider credentials stay in Composio's hosted Connect Link, not the app UI or model.
+
+From `src/agent`, with the existing `COMPOSIO_API_KEY` injected privately:
+
+```bash
+node scripts/configure-composio-auth.mjs --output=/private/integration-plan.json
+node scripts/configure-composio-auth.mjs --apply \
+  --plan=/private/integration-plan.json --plan-sha256=<reviewed-plan-sha256> \
+  --output=/private/integration-receipt.json
+node --test scripts/configure-composio-auth.test.mjs
+```
+
+Dry-run is the default. Review the generated plan and hash before applying it.
+Existing configs, including disabled ones, are retained. New templates use
+managed auth or a supported scheme with no missing operator credentials; keys
+remain empty until each user connects. OAuth services without managed support
+still require their own registered developer app and provider-approved callback.
+An account's login/password is not an OAuth Client ID or Client Secret.
+
+The CLI does not connect accounts, execute tools, import shared credentials or
+change scopes. It checks for concurrent configuration before each create and never
+retries an uncertain creation. Inspect those entries before another explicit run.
+Reports contain availability metadata and field names, never credential values.
+Configuring a template does not prove an authenticated provider round trip; that
+acceptance remains user-driven. Keep operator reports and secret references out of Git.

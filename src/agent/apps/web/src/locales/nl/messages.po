@@ -6333,3 +6333,15 @@ msgstr "Duidelijke labels voor de bediening van bijdragen."
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "Controleer je computer of vraag de status opnieuw op voordat je een bijdrage start."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "Deze integratie moet op de server worden ingesteld. Neem contact op met de beheerder."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "Verbind apps waar nodig met je eigen API-sleutel."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "Duidelijke meldingen als een integratie serverconfiguratie nodig heeft."

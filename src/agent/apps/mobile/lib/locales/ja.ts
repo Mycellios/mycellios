@@ -1092,4 +1092,6 @@ export const JA_MESSAGES: Record<string, string> = {
   "{sender} rollup hours": "{sender}のまとめ間隔（時間）",
   "Connect Slack": "Slackを接続",
   "Link DMs": "DMを連携",
+  "This integration needs server setup. Contact the administrator.":
+    "この連携にはサーバー側の設定が必要です。管理者にお問い合わせください。",
 };

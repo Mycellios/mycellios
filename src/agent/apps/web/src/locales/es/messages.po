@@ -557,7 +557,7 @@ msgstr "Agregar disparador"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Added"
-msgstr ""
+msgstr "Agregado"
 
 #: src/pages/McpServersOverlay.tsx
 #: src/pages/PluginsOverlay.tsx
@@ -7486,3 +7486,15 @@ msgstr "Espera a que termine la tarea actual antes de reintentar."
 
 msgid "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
 msgstr "Esta petición se interrumpió después de producir resultados o acciones. Envía un nuevo mensaje para continuar; reintentarla podría repetir acciones."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "Esta integración necesita configuración en el servidor. Contacta con el administrador."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "Conecta aplicaciones con tu propia clave API cuando sea necesario."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "Mensajes claros si una integración necesita configuración en el servidor."

@@ -27,7 +27,7 @@ const directories = z.discriminatedUnion("action", [
     names: z.array(z.string().max(256)).max(256),
   }),
 ]);
-const base = { botId: z.string().min(1).max(256), runId: z.string().min(1).max(256).optional() };
+const base = { projectSessionId: z.string().min(1).max(256).optional(), botId: z.string().min(1).max(256), runId: z.string().min(1).max(256).optional() };
 export const hostComputerRequest = z.discriminatedUnion("method", [
   z.object({
     ...base,
@@ -66,6 +66,7 @@ export interface HostComputerEnvironment {
   runtimeExecutable?: string;
   projectPath?: string;
   projectRoot?:boolean;
+  projectSessionId?:string;
 }
 export type HostComputerFrame<T> =
   | { value: T }

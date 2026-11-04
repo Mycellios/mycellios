@@ -6333,3 +6333,15 @@ msgstr "Katkı kontrolleri için anlaşılır etiketler."
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "Katkıya başlamadan önce bilgisayarınızı doğrulayın veya durumunu tekrar kontrol edin."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "Bu entegrasyon sunucuda yapılandırılmalıdır. Yöneticiyle iletişime geçin."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "Gerektiğinde uygulamaları kendi API anahtarınızla bağlayın."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "Bir entegrasyon sunucu kurulumu gerektirdiğinde anlaşılır mesajlar."

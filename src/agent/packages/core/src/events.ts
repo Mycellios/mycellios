@@ -1,6 +1,7 @@
 import type { MessageBlock, ThreadMessage } from "@rakazo/contracts";
 import { cloudAgentBlockFromPayload } from "./cloud-agent.js";
 import { preserveIdentitySource } from "./identity-source.js";
+import { observeToolEvent } from "./tool-observations.js";
 import { modelFallbackFailure, parseModelFallbackFailure } from "./run-error.js";
 
 export function projectMessages(
@@ -17,6 +18,7 @@ export function projectMessages(
   runs?: readonly { id: string; status: string }[],
 ): ThreadMessage[] {
   const messages: ThreadMessage[] = [];
+  const endedRuns = new Set<string>();
   type LiveProjection = {
     blocks: MessageBlock[];
     meta: {
@@ -99,6 +101,7 @@ export function projectMessages(
     if (event.type === "thread.progress") {
       const live = liveProjection(event, createdAt);
       live.blocks = reduceLiveMessageBlocks(live.blocks, { type: "progress", payload });
+      live.blocks = observeToolEvent(live.blocks, { type: event.type, payload, createdAt });
       live.meta = {
         ...live.meta,
         seq: event.seq,
@@ -113,6 +116,7 @@ export function projectMessages(
         type: "tool",
         name: String(payload.name ?? ""),
       });
+      live.blocks = observeToolEvent(live.blocks, { type: event.type, payload, createdAt });
       live.meta = {
         ...live.meta,
         seq: event.seq,
@@ -121,7 +125,16 @@ export function projectMessages(
       };
       continue;
     }
+    if (event.type === "agent.tool.completed" || event.type === "computer.command") {
+      if (typeof payload.executionId !== "string" || !payload.executionId) continue;
+      if (event.type === "computer.command" && (!event.runId || endedRuns.has(event.runId))) continue;
+      const live = liveProjection(event, createdAt);
+      live.blocks = observeToolEvent(live.blocks, { type: event.type, payload, createdAt });
+      live.meta = { ...live.meta, seq: event.seq, botId: event.botId ?? undefined, createdAt };
+      continue;
+    }
     if (event.type === "thread.cleared") {
+      for (const live of liveById.values()) if (live.meta.runId) endedRuns.add(live.meta.runId);
       messages.length = 0;
       liveById.clear();
       liveSubagents.clear();
@@ -148,6 +161,7 @@ export function projectMessages(
       event.type === "run.failed" ||
       event.type === "run.cancelled"
     ) {
+      if (event.runId) endedRuns.add(event.runId);
       clearLive(event);
     }
   }
@@ -423,7 +437,7 @@ export function appendToolCallSegment(
   const priorSteps = last?.kind === "steps" ? last.steps : [];
   const steps = appendToolStep(priorSteps, toolName);
   if (last?.kind === "steps") {
-    return [...segments.slice(0, -1), { kind: "steps", steps }];
+    return [...segments.slice(0, -1), { ...last, steps }];
   }
   return [...segments, { kind: "steps", steps }];
 }

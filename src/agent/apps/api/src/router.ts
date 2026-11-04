@@ -42,6 +42,7 @@ import { messagingRoutes } from "./routes/messaging.js";
 import { modelsRoutes } from "./routes/models.js";
 import { routinesRoutes } from "./routes/routines.js";
 import { spacesRoutes } from "./routes/spaces.js";
+import { developmentRoutes } from "./routes/development.js";
 import { threadsRoutes } from "./routes/threads.js";
 
 export { nextConnectionLabel } from "./model-credentials.js";
@@ -147,6 +148,7 @@ export function createRouter(deps: RouterDeps) {
     ...spacesRoutes(ctx),
     ...modelsRoutes(ctx),
     ...botsRoutes(ctx),
+    ...developmentRoutes(ctx),
     ...threadsRoutes(ctx),
     ...computerRoutes(ctx),
     ...memoryRoutes(ctx),

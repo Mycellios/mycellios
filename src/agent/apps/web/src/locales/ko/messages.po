@@ -6333,3 +6333,15 @@ msgstr "기여 제어 기능에 명확한 이름을 표시합니다."
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "기여를 시작하기 전에 컴퓨터를 확인하거나 상태를 다시 조회하세요."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "이 연동은 서버 설정이 필요합니다. 관리자에게 문의하세요."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "필요한 경우 자신의 API 키로 앱을 연결하세요."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "연동에 서버 설정이 필요하면 명확한 메시지를 표시합니다."

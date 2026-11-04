@@ -1279,3 +1279,43 @@ blocked and price, account limits, daily cap and channel TTL were not changed.
 Sanitized evidence: [native HTTP cases](../tests/fixtures/embedding-ingress-native-http-evidence.json),
 [active-stream reload](../tests/fixtures/embedding-ingress-reload-evidence.json) and
 [activation receipt](../tests/fixtures/embedding-ingress-deployment-evidence.json).
+
+## Agent integration authentication candidate (2026-11-04)
+
+The local candidate resolves each toolkit's enabled custom auth configuration on
+an explicit connect attempt and pins it to the owned authorization session.
+Managed defaults and genuine no-auth toolkits retain their existing route.
+Disabled-only and ambiguous custom configs fail closed. Missing operator setup
+uses translated copy; raw provider JSON and request IDs are not user-facing.
+
+The operator CLI can prepare a credential-free template plan and apply that exact
+reviewed file by SHA256. It retains existing/disabled configs, rechecks concurrent
+creation, supplies no shared credentials and never retries an uncertain POST.
+An authorized provider-project application was read back successfully. This is
+template-state evidence, not authenticated provider or tool-execution acceptance.
+Services requiring their own developer app, including X, remain dependent on
+operator-provided OAuth configuration. Private project reports are not committed.
+
+Local verification passed 92 focused Agent and catalog/release-note tests,
+six operator CLI tests, root structure/architecture/type checks, the shared UI-kit
+gate, API/worker/web types and builds, and credential-free compiled server startup.
+The real integration dialog was reviewed at desktop, tablet and phone widths with
+an isolated fixture. The dedicated CI browser proof exercises those widths,
+legacy error hiding and an independent successful connection without real accounts.
+Check its screenshots and the complete release checks on the exact candidate SHA.
+The standalone adapters package typecheck still reports existing errors in
+unchanged runtime/test files; the deployed API and worker typecheck commands pass.
+
+A separate local Fedora caption backport keeps the native overlay transparent and
+restricts theme messages to symbol colors. Its ten focused tests pass; installed
+Electron visual acceptance and a replacement installer remain unqualified.
+Neither these source changes nor a new native package have been published.
+
+The combined release candidate also retains the serving backend's independent
+Mico task conversations, owned local task/worktree admission and bounded command
+observations. Its previously applied migration is recovered byte-for-byte; no
+new migration execution is implied. The runtime sources were reconciled against
+their recorded main base while preserving newer continuation/retry fixes.
+134 focused preservation/integration tests pass, together with API/worker/web/
+Desktop types, server builds and credential-free compiled startup. Private source
+receipts retain the comparison; production promotion is still pending.

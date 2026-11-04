@@ -6333,3 +6333,15 @@ msgstr "Rótulos claros nos controles de contribuição."
 #: src/components/ReleaseNotes.tsx
 msgid "Verify your computer or retry its status before starting contribution."
 msgstr "Verifique seu computador ou consulte o status novamente antes de iniciar a contribuição."
+
+#: src/lib/user-error.ts
+msgid "This integration needs server setup. Contact the administrator."
+msgstr "Esta integração precisa ser configurada no servidor. Entre em contato com o administrador."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Connect apps with your own API key when required."
+msgstr "Conecte apps com sua própria chave de API quando necessário."
+
+#: src/components/ReleaseNotes.tsx
+msgid "Clear messages when an integration needs server setup."
+msgstr "Mensagens claras quando uma integração precisa ser configurada no servidor."

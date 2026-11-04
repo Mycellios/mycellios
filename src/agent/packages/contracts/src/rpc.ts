@@ -144,10 +144,12 @@ const threadTarget = z
   .object({
     botId: Id.optional(),
     groupId: Id.optional(),
+    taskThreadId: Id.optional(),
   })
   .superRefine((input, ctx) => {
     const hasBot = Boolean(input.botId);
     const hasGroup = Boolean(input.groupId);
+    if (input.taskThreadId && !hasBot) ctx.addIssue({code:"custom",message:"Task conversations require a Mico",path:["taskThreadId"]});
     if (hasBot === hasGroup) {
       ctx.addIssue({
         code: "custom",
@@ -167,6 +169,7 @@ const structuredMentionTarget = z.discriminatedUnion("kind", [
 const threadSendInput = threadTarget
   .safeExtend({
     text: z.string().optional(),
+    taskInstructions: z.string().max(16000).optional(),
     artifactIds: z.array(Id).max(ATTACHMENT_MAX_COUNT).optional(),
     /** Bare bot ids (legacy) or typed mention chips from the composer. */
     mentions: z
@@ -459,16 +462,22 @@ export const appContract = {
       }),
     ),
   },
+  development: {
+    status: oc.input(z.object({botId:Id,taskThreadId:Id,runId:Id})).output(z.object({status:z.string(),detail:z.string().max(128000),error:z.string().nullable()})),
+    open: oc.input(z.object({botId:Id,projectKey:z.uuid(),taskKey:z.uuid(),title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id})),
+    list: oc.input(z.object({botId:Id,projectKey:z.uuid().optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
+  },
   threads: {
     prepareProject: oc.input(z.object({
       botId: Id,
+      taskThreadId: Id.optional(),
       requestId: z.string().uuid(),
       prompt: z.string().trim().min(1).max(16000),
       responseLocale: z.string().max(16).optional(),
     })).output(z.object({ runId: Id, taskId: Id })),
-    projectPreparation: oc.input(z.object({ botId: Id, runId: Id }))
+    projectPreparation: oc.input(z.object({ botId: Id, taskThreadId: Id.optional(), runId: Id }))
       .output(z.object({ status: z.string(), detail: z.string().max(8000) })),
-    stopProjectPreparation: oc.input(z.object({ botId: Id, runId: Id }))
+    stopProjectPreparation: oc.input(z.object({ botId: Id, taskThreadId: Id.optional(), runId: Id }))
       .output(z.object({ ok: z.literal(true) })),
     head: oc.input(threadTarget).output(
       z.object({

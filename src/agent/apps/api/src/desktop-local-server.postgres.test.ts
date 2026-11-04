@@ -10,6 +10,8 @@ import { describeRowSecurity, runAsSystem, runAsTenant } from "@rakazo/db";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createAgentSkillsService } from "./agent-skills.js";
 import { freeLocalPort, startDesktopLocalServer } from "./desktop-local-server.js";
+import { resolveThreadTarget, sendThreadMessage } from "./thread-target.js";
+import { randomUUID } from "node:crypto";
 import { createTaskControls } from "./task-controls.js";
 
 const local = process.env.VERIFY_DESKTOP_LOCAL === "1" ? describe.sequential : describe.skip;
@@ -102,6 +104,27 @@ local("desktop local database lifecycle", () => {
       });
     });
   }, 180000);
+  it("keeps Mico task conversations independent on the real local database",async()=>{
+    await runAsTenant(actor,async()=>{
+      const db=handles.prisma;
+      const primary=await db.thread.create({data:{spaceId:actor.spaceId,userId:actor.userId,botId:"agent-a"}});
+      const projectKey=randomUUID();
+      const one=await db.thread.create({data:{spaceId:actor.spaceId,userId:actor.userId,taskBotId:"agent-a",projectKey,taskKey:randomUUID(),title:"First task"}});
+      const two=await db.thread.create({data:{spaceId:actor.spaceId,userId:actor.userId,taskBotId:"agent-a",projectKey,taskKey:randomUUID(),title:"Second task"}});
+      const before=await db.bot.findUniqueOrThrow({where:{id:"agent-a"}});
+      const target=await resolveThreadTarget(db,actor,{botId:"agent-a",taskThreadId:one.id});
+      const sent=await sendThreadMessage({prisma:db,events:{notify:vi.fn(async()=>{})}as never,jobs:{enqueue:vi.fn(async()=>{})}as never},actor,target,{text:"Modify only the first task",taskInstructions:"Use this task's isolated working directory.",clientNonce:randomUUID()});
+      expect(await db.message.count({where:{threadId:primary.id}})).toBe(0);
+      expect(await db.message.count({where:{threadId:two.id}})).toBe(0);
+      expect(await db.message.count({where:{threadId:one.id,role:"user"}})).toBe(1);
+      const run=await db.run.findUniqueOrThrow({where:{id:sent.runId},include:{task:true}});
+      expect(run.botId).toBe("agent-a");expect(run.threadId).toBe(one.id);expect(run.task.prompt).toContain("isolated working directory");
+      const message=await db.message.findFirstOrThrow({where:{threadId:one.id,role:"user"}});expect(JSON.stringify(message.blocks)).not.toContain("isolated working directory");
+      await expect(resolveThreadTarget(db,actor,{botId:"agent-b",taskThreadId:one.id})).rejects.toThrow();
+      const after=await db.bot.findUniqueOrThrow({where:{id:"agent-a"}});expect([after.modelId,after.modelProvider,after.instructions]).toEqual([before.modelId,before.modelProvider,before.instructions]);
+    });
+  },30000);
+
   afterAll(async () => {
     await handles?.close();
     for (const key of Object.keys(process.env)) if (!(key in initialEnv)) delete process.env[key];
