@@ -46,3 +46,5 @@ export * from "./usage.js";
 export * from "./voice-credentials.js";
 
 export * from "./run-secrets.js";
+export * from "./work-delegation.js";
+export * from "./work-controls.js";

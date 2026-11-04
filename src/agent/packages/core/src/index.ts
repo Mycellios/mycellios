@@ -90,3 +90,4 @@ export * from "./unread-divider.js";
 export * from "./user-error.js";
 export * from "./voice-chat-groups.js";
 export * from "./tool-observations.js";
+export * from "./work-resources.js";

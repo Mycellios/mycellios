@@ -464,8 +464,8 @@ export const appContract = {
   },
   development: {
     status: oc.input(z.object({botId:Id,taskThreadId:Id,runId:Id})).output(z.object({status:z.string(),detail:z.string().max(128000),error:z.string().nullable()})),
-    open: oc.input(z.object({botId:Id,projectKey:z.uuid(),taskKey:z.uuid(),title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id})),
-    list: oc.input(z.object({botId:Id,projectKey:z.uuid().optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
+    open: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240),taskKey:z.string().min(1).max(240),title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id})),
+    list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
   },
   threads: {
     prepareProject: oc.input(z.object({
@@ -1156,6 +1156,16 @@ export const appContract = {
       .output(z.object({ icon: z.string().nullable(), retry: z.boolean().optional() })),
   },
   tasks: {
+    work: oc.input(z.object({taskId:Id})).output(z.array(z.object({
+      id:Id,botId:Id,parentTaskId:Id.nullable(),delegationState:z.string().nullable(),
+      delegationRevision:z.number().int(),paused:z.boolean(),workStopPending:z.boolean(),
+      expectedResult:z.string().nullable(),resources:z.array(z.string()),dependencies:z.array(Id),
+      delegatedRunId:Id.nullable(),updatedAt:IsoDate,threadId:Id,result:z.string(),resultIsUntrustedData:z.boolean(),
+    }))),
+    controlWork: oc.input(z.object({taskId:Id,expectedRevision:z.number().int().nonnegative(),
+      action:z.enum(['pause','resume','cancel','reassign']),botId:Id.optional()}))
+      .output(z.object({taskId:Id,revision:z.number().int(),paused:z.boolean(),stopping:z.boolean()})),
+
     get: oc.input(z.object({ runId: Id })).output(
       z.object({
         taskId: Id,

@@ -2,11 +2,12 @@ import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@rakazo/adapter-kit";
 import type { Actor } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
-import { IsolationError } from "@rakazo/db";
+import { IsolationError, controlWorkTree } from "@rakazo/db";
+import { reconcileWorkStops } from "@rakazo/adapters";
 import type { RouterDeps } from "./router.js";
 import { resolveThreadTarget, stopThreadRuns } from "./thread-target.js";
 
-/** A task keeps its thread and earlier runs when its owner changes. */
+/** Ownership transfer preserves earlier runs; private work retains an independent conversation. */
 export function createTaskControls(
   deps: Pick<RouterDeps, "prisma" | "sandbox" | "events" | "jobs">,
 ) {
@@ -18,7 +19,8 @@ export function createTaskControls(
         thread: { include: { group: { include: { members: { include: { bot: true } } } } } },
       },
     });
-    if (!run?.thread.group || run.thread.group.archivedAt) throw new IsolationError();
+    if (!run || run.thread.group?.archivedAt ||
+      (!run.thread.group && (run.thread.userId !== actor.userId || (run.thread.botId !== run.botId && run.thread.taskBotId !== run.botId)))) throw new IsolationError();
     return run;
   }
   return {
@@ -33,15 +35,16 @@ export function createTaskControls(
         version: run.task.assignmentVersion,
         paused: run.task.paused,
         active: Boolean(
-          latest && (ACTIVE_RUN_STATUSES as readonly string[]).includes(latest.status),
+          (latest && (ACTIVE_RUN_STATUSES as readonly string[]).includes(latest.status)) ||
+          (!run.task.paused && ["queued","running","waiting"].includes(run.task.delegationState ?? "")),
         ),
         botId: run.task.botId,
         runId: latest?.id ?? run.id,
-        bots: run.thread
-          .group!.members.filter(
+        bots: run.thread.group ? run.thread.group.members.filter(
             (member) => !member.bot.archivedAt && member.bot.userId === actor.userId,
           )
-          .map((member) => ({ id: member.botId, name: member.bot.name })),
+          .map((member) => ({ id: member.botId, name: member.bot.name })) :
+          await deps.prisma.bot.findMany({where:{spaceId:actor.spaceId,userId:actor.userId,archivedAt:null},select:{id:true,name:true}}),
       };
     },
     async control(
@@ -54,6 +57,15 @@ export function createTaskControls(
       },
     ) {
       const original = await owned(actor, input.runId);
+      if(original.task.delegationState){
+        if(original.task.assignmentVersion!==input.expectedVersion)
+          throw new ORPCError("CONFLICT",{message:"Task changed. Reload its controls."});
+        const result=await controlWorkTree(deps.prisma,actor,{taskId:original.taskId,
+          expectedRevision:original.task.delegationRevision,action:input.action,botId:input.botId});
+        void reconcileWorkStops(deps,actor).catch(()=>undefined);
+        return {taskId:result.taskId,version:original.task.assignmentVersion+1,runId:original.id,paused:result.paused};
+      }
+      if(!original.thread.group)throw new ORPCError("CONFLICT",{message:"This run has no persistent work controls."});
       const target = await resolveThreadTarget(deps.prisma, actor, {
         groupId: original.thread.groupId!,
       });

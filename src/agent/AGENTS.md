@@ -1,5 +1,15 @@
 # AGENTS.md
 
+- Mico work delegation uses durable parent/child Tasks, expected results, dependency
+  and resource reservations, and revisioned controls. Native command receipts belong
+  to the admitted host/Mico and are observed with command_status; a lost observer or
+  missing exit is never success or authorization to replay. Preserve native Windows
+  Job ownership, consent, Stop, bounded budgets and exact run/fence teardown. Plans
+  and continuation counters are fenced Task metadata, not new instructions. Verify
+  native-command-journal/recovery, work-continuation, work-resources, work-stop-reconciler
+  and API work-controls tests plus scripts/verify-resilient-work-db.ts through the
+  shared scheduler. Keep production and existing user accounts out of these fixtures.
+
 - Mobile dependency updates must match the installed Expo SDK's
   `bundledNativeModules.json` and the proposed lockfile's peer requirements;
   an isolated Router major update is not an SDK migration. Mermaid's API route

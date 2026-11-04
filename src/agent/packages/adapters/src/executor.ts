@@ -290,6 +290,9 @@ import {
   unchangedVisualStreakAfterPageBrowser,
 } from "./computer-tools.js";
 import { checkpointRunComputerWorkspace } from "./computer-workspace.js";
+import { nativeWorkProjectSession } from "@rakazo/core";
+import { delegateWork, workStatus, saveWorkState, settleObservedShell } from "@rakazo/db";
+import type { NativeCommandReceipt } from "./native-command-journal.js";
 import { connectApp } from "./connect-app.js";
 import { connectedContext, selectRunConnections } from "./connection-context.js";
 import { redactConnectorPayload, sanitizeConnectorError } from "./connector-safety.js";
@@ -548,6 +551,8 @@ function connectorTrustKeys(
 /** Effects that got past the approval gate: approved, allowed by a rule or review, or run. */
 const PASSED_EFFECT_STATUSES = ["approved", "executing", "uncertain", "completed"];
 const READ_ONLY_AGENT_TOOLS = new Set([
+  "command_status",
+  "work_status",
   "computer_observe",
   "list_files",
   "list_fleet",
@@ -4038,12 +4043,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         const context = {
           operationId: runId,
+          projectSessionId: nativeWorkProjectSession(thread, task),
           traceId: runId,
           spaceId: run.spaceId,
           userId: run.userId,
           botId: bot.id,
           runId,
-          ...(thread.taskBotId?{projectSessionId:thread.id}:{}),
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           ...connectedContext(connectedPlugins),
@@ -4946,6 +4951,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           runId,
         };
 
+        let awaitingDelegatedWork = task.delegationState === "waiting";
+        const pendingCommands = new Set<string>();
         const dispatchTool = async (
           name: string,
           args: Record<string, unknown>,
@@ -4954,6 +4961,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           observer?: AgentToolExecutionObserver,
         ) => {
           context.signal.throwIfAborted();
+          if (awaitingDelegatedWork && name !== "work_status" && name !== "command_status")
+            return { waitingForTasks: true, error: "This turn delegated its pending work. End the turn; child results will wake the parent. No further actions were executed." };
           if (handedOff) {
             return {
               error: "This stage was handed off. End the turn without more tool calls.",
@@ -6254,6 +6263,28 @@ export function createRunExecutor(deps: ExecutorDeps) {
               return failAttach(error instanceof Error ? error.message : "could not attach file");
             }
           }
+          if (name === "command_status") {
+            const computer = await getRunComputer("tool", name);
+            if (!deps.sandbox.commandStatus) return finish({ error: "This computer does not support durable command recovery. Inspect existing work before retrying." });
+            const result=await deps.sandbox.commandStatus(computer,args.command_id?String(args.command_id):undefined,context);
+            for(const receipt of (Array.isArray(result)?result:[result]) as Array<NativeCommandReceipt|null>){
+              if(!receipt||receipt.runId!==runId||!Number.isInteger(receipt.exitCode)||
+                !['completed','failed','interrupted'].includes(receipt.state)||typeof receipt.stdout!=='string'||typeof receipt.stderr!=='string')continue;
+              const recovered=await settleObservedShell(deps.prisma,{...run,leaseOwner:workerId,leaseFence:fence},{
+                commandId:receipt.id,runId,code:receipt.exitCode!,
+                stdout:redactSecrets(receipt.stdout+(receipt.outputTruncated?'\n[retained tail]\n'+(receipt.stdoutTail??''):''),runSecrets),
+                stderr:redactSecrets(receipt.stderr+(receipt.outputTruncated?'\n[retained tail]\n'+(receipt.stderrTail??''):''),runSecrets)});
+              if(recovered){
+                pendingCommands.delete(receipt.id);
+                const request=recovered.request as {command?:unknown;cwd?:unknown};
+                if(receipt.executionId&&typeof request?.command==='string')await appendComputerCommand({
+                  executionId:receipt.executionId,kind:'shell',command:redactSecrets(request.command,runSecrets),
+                  cwd:typeof request.cwd==='string'?redactSecrets(request.cwd,runSecrets):'.',status:'done',exitCode:receipt.exitCode,
+                  output:redactSecrets(receipt.stdout+receipt.stderr,runSecrets).slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS)});
+              }
+            }
+            return finish(result);
+          }
           if (name === "shell") {
             const command = String(args.command ?? args.cmd ?? "");
             const refusal = protectedComputerLifecycleRefusal(command);
@@ -6281,6 +6312,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               command: redactSecrets(command, runSecrets),
               cwd: redactSecrets(cwd ?? ".", runSecrets),
             };
+            const commandId = `${runId}:${effectKey}`;
             await appendComputerCommand({
               ...commandEvent,
               status: "running",
@@ -6326,6 +6358,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 (computer.kind === "desktop"
                   ? await deps.sandbox.environment?.(computer, context)
                   : undefined);
+              pendingCommands.add(commandId);
               const observed = await observeShellCommand(
                 deps.sandbox.execute(
                   computer,
@@ -6350,7 +6383,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                         ? commandEnvironment.env
                         : undefined,
                     unsetEnv: commandEnvironment.unsetEnv,
-                    timeoutMs: sandboxCommandTimeoutMs(),
+                    commandId: shellEnvironment?.durableCommands ? commandId : undefined,
+                    executionId,
+                    timeoutMs: typeof args.timeout_ms === "number" && Number.isSafeInteger(args.timeout_ms) && args.timeout_ms >= 1000 && args.timeout_ms <= 3600000
+                      ? args.timeout_ms : shellEnvironment?.durableCommands ? 60 * 60_000 : sandboxCommandTimeoutMs(),
                   },
                   context,
                 ),
@@ -6363,8 +6399,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 },
               );
               if (observed.completion) {
+                let releaseStored!:()=>void;
+                const runningStored=new Promise<void>(resolve=>{releaseStored=resolve;});
                 const completion = observed.completion.then(async (final) => {
+                  await runningStored;
                   clearPublishTimer();
+                  if(applied)await deps.prisma.externalEffect.updateMany({where:{id:applied.effect.id,runId,status:'completed',
+                    run:{leaseOwner:workerId,leaseFence:fence,status:'running'}},data:{result:{...final,commandId}}});
+                  pendingCommands.delete(commandId);
                   await appendComputerCommand({
                     ...commandEvent,
                     status: "done",
@@ -6376,34 +6418,39 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 void completion.catch(() => undefined);
                 publishRunning(commandOutput(observed.result, true), true);
                 const returned = await finish({
+                  commandId,
+                  durable: shellEnvironment?.durableCommands===true,
                   stdout: observed.result.stdout,
                   stderr: observed.result.stderr,
                   code: null,
                   running: true,
                   notice: SHELL_STILL_RUNNING_NOTICE,
-                });
+                }).finally(releaseStored);
                 if (isRunningShellCommand(returned)) observer?.onShellStillRunning?.(completion);
                 return returned;
               }
               clearPublishTimer();
               const redacted = observed.result;
+              pendingCommands.delete(commandId);
               await appendComputerCommand({
                 ...commandEvent,
                 status: "done",
                 exitCode: redacted.code,
                 output: commandOutput(redacted, false).slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS),
               });
-              return finish(redacted);
+              return finish({...redacted,commandId});
             } catch (error) {
               await appendComputerCommand({
                 ...commandEvent,
-                status: "done",
-                exitCode: 1,
+                status: "running",
+                exitCode: null,
                 output: redactSecrets(
                   error instanceof Error ? error.message : "command failed",
                   runSecrets,
                 ).slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS),
               });
+              await finish({error:redactSecrets(error instanceof Error?error.message:'Command outcome unknown',runSecrets),
+                uncertain:true,commandId,code:null});
               throw error;
             }
           }
@@ -7715,6 +7762,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 : { ok: true },
             );
           }
+          if (name === "delegate_task") {
+            if(pendingCommands.size)return finish({error:"A command still runs or has an uncertain result. Wait for its result or inspect command_status before delegating overlapping work."});
+            const delegated = await delegateWork(deps.prisma, { ...run, leaseOwner: workerId, leaseFence: fence }, {
+              key: effectKey, botId: String(args.bot_id ?? ""),
+              instruction: redactSecrets(String(args.instruction ?? ""), runSecrets),
+              expectedResult: redactSecrets(String(args.expected_result ?? ""), runSecrets),
+              resources: Array.isArray(args.resources) ? args.resources.map(String) : undefined,
+              dependencies: Array.isArray(args.dependencies) ? args.dependencies.map(String) : undefined,
+            });
+            awaitingDelegatedWork = true;
+            return finish({ ...delegated, note: "The child task is durable. End this turn; its result will resume this request automatically. Do not send progress acknowledgements or poll." });
+          }
+          if (name === "work_status") return finish(await workStatus(deps.prisma, { ...run, taskId: run.taskId }));
           if (name === "message_bot") {
             const sent = await messageBot(
               deps,
@@ -8162,6 +8222,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
               threadId: thread.id,
               runId,
               routineId: run.routineId,
+              workState: task.workPlan,
+              saveWorkState: (state) => saveWorkState(deps.prisma, { ...run, leaseOwner: workerId, leaseFence: fence },
+                JSON.parse(redactSecrets(JSON.stringify(state), runSecrets))),
               sourceMessageId: run.sourceMessageId,
               onUsage: async (event) => {
                 await recordUsage(deps.prisma, event, {
@@ -9527,6 +9590,7 @@ const COMPUTER_REQUIRED_TOOL_NAMES = new Set<string>([
   ...FILE_TOOL_NAMES,
   ...PAGE_BROWSER_TOOL_NAMES,
   "shell",
+  "command_status",
   "open_path",
   "launch_app",
   "computer_observe",

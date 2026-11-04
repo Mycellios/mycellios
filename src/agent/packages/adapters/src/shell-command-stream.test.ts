@@ -8,6 +8,10 @@ import {
 } from "./shell-command-stream.js";
 
 describe("observeShellCommand", () => {
+  it("fails closed when the transport ends without an exit event", async () => {
+    await expect(observeShellCommand((async function* () { yield { type: "stdout" as const, data: "partial" }; })(),
+      { secrets: [], idleMs: 30 })).rejects.toThrow("without a confirmed exit status");
+  });
   it("redacts provider errors before they reach the runtime", async () => {
     const secret = "fake-shell-error-secret";
     const error = await observeShellCommand(

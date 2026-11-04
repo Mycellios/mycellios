@@ -21,6 +21,7 @@ type TaskCatalogInput = {
  * records returned by task_catalog are the source of truth for names and ids.
  */
 export const TASK_CATALOG_GUIDANCE = [
+  "For concrete work assigned to another owned Mico, use delegate_task with an expected result and the actual resources. The parent request remains responsible for verification. End the turn while waiting; child results wake it automatically. Use message_bot for useful information or questions, never as a substitute for a durable work assignment. Do not acknowledge unchanged status repeatedly.",
   "Task execution: task_catalog is the source of truth for this bot's open work, routines, skills, and exposed tools; conversation or memory text is not proof that a task exists.",
   "When a request refers to an existing task, routine, skill, or capability, call task_catalog first and use the exact returned id/name.",
   "For an open task, perform the work with the exposed tools, verify the result, then use scratchpad_update or scratchpad_complete. Never mark work done before verification.",
