@@ -63,6 +63,3 @@ Cargo.lock -diff
 *.woff binary
 *.woff2 binary
 *.zip binary
-
-# Preserve the exact bytes of this migration already applied in production.
-src/agent/packages/db/prisma/migrations/20261103170000_mico_project_conversations/migration.sql -text whitespace=cr-at-eol
