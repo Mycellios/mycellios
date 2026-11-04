@@ -99,6 +99,7 @@ import { ComputerMaintenanceActions } from "../components/ComputerMaintenanceAct
 import { computersAreUnavailable } from "../components/ComputersUnavailableHint";
 import { ComputerUpdateProgress } from "../components/ComputerUpdateProgress";
 import { CallCard, CallReturnBar } from "../components/call/CallCard";
+import { RtcVoiceMvp } from "../components/call/RtcVoiceMvp";
 import { IncomingCall } from "../components/call/IncomingCall";
 import { lazyOverlay } from "../components/ErrorBoundary";
 import { IconTooltip } from "../components/IconTooltip";
@@ -3773,6 +3774,11 @@ function SpaceShell() {
           />
         ) : null}
         <CallReturnBar />
+        {active && !inGroup && userId && !searchParams.get("task") && <RtcVoiceMvp
+          key={JSON.stringify([userId, shellSpaceId, active.id])}
+          botId={active.id} botName={active.name} spaceId={shellSpaceId}
+          ordinaryCallActive={Boolean(call)}
+        />}
         {/* The header floats so the transcript scrolls under its buttons. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
           {/* Only the pills take input; the gaps pass clicks and scrolling to the transcript. */}

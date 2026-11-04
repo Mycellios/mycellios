@@ -18,5 +18,8 @@ describe('isolated project backend',()=>{
     assert.equal(env.BETTER_AUTH_URL,'http://127.0.0.1:5192');
     assert.equal(env.API_PROXY_TARGET,'http://127.0.0.1:3100');
     assert.equal(env.DATA_DIR,localDataDir);assert.equal(env.RAKAZO_PROJECT_LOCAL,'1');
+    assert.equal(env.MYCELLIOS_VOICE_RTC_MVP,'0');
+    assert.equal(projectLocalEnvironment({MYCELLIOS_VOICE_RTC_MVP:'1',DATABASE_URL:'production'}).MYCELLIOS_VOICE_RTC_MVP,'1');
+    assert.equal(projectLocalEnvironment({MYCELLIOS_VOICE_RTC_MVP:'1',DATABASE_URL:'production'}).DATABASE_URL,undefined);
   });
 });

@@ -170,6 +170,8 @@ const threadSendInput = threadTarget
   .safeExtend({
     text: z.string().optional(),
     taskInstructions: z.string().max(16000).optional(),
+    /** Refuse steering and pending cards atomically, without retaining a message. */
+    queueOnlyWhenIdle: z.boolean().optional(),
     artifactIds: z.array(Id).max(ATTACHMENT_MAX_COUNT).optional(),
     /** Bare bot ids (legacy) or typed mention chips from the composer. */
     mentions: z

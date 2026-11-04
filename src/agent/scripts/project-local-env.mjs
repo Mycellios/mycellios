@@ -21,6 +21,8 @@ export function projectLocalEnvironment(inherited = process.env) {
     API_PORT: '3100', API_HOST: '127.0.0.1', API_URL: 'http://127.0.0.1:3100',
     API_PROXY_TARGET: 'http://127.0.0.1:3100', APP_BASE_PATH: '/', RAKAZO_DEV_HOST: '127.0.0.1',
     DATA_DIR: localDataDir, SIGNUPS_ENABLED: 'true', SIGNUP_ALLOWLIST: '',
+    // Explicit local opt-in only; never inherit a remote database or provider key.
+    MYCELLIOS_VOICE_RTC_MVP: inherited.MYCELLIOS_VOICE_RTC_MVP === '1' ? '1' : '0',
     AUTH_PASSWORD_ENABLED: 'true', MYCELLIOS_SSO_ENABLED: 'false',
     SANDBOX_PROVIDER: 'none', CLOUD_AGENT_PROVIDER: 'none', AGENT_RUNTIME: 'pi',
     WAKEUP_DRIVER: 'graphile', SECRET_STORE: 'encrypted', CONTENT_ENCRYPTION: 'on',
