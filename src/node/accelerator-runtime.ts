@@ -334,22 +334,22 @@ const CERTIFIED_PORTABLE_RUNTIME = {
 const CERTIFIED_PORTABLE_WHEEL_LOCKS = {
   "win32/x64": {
     path: "scripts/wheel-locks/win32-x64-cp312.txt",
-    sha256: "de504739e05a89229e437ec5d09a45dc00f2080db042d11519204926e1a90040",
+    sha256: "e1bf3439efda596b446b4d594f9e0c7fda688a243f0c514dc4708b2965e84100",
   },
   "linux/x64": {
     path: "scripts/wheel-locks/linux-x64-cp312.txt",
-    sha256: "f3d9a819ebcc82c33da8ccad858eecf2d9ac4c35d5e8ad4b1da6702bfeb9748a",
+    sha256: "89e62b6c1f562afc1bb1aece4bf51f82292f95298a2aa32325e56574207b6568",
   },
   "darwin/arm64": {
     path: "scripts/wheel-locks/darwin-arm64-cp312.txt",
-    sha256: "1adf58ca36108ca3c7e26c303a8c6c802bf25825e87e7d1d9f6ab2d86de3371a",
+    sha256: "cd2bdfc8ea45509fc2df1b69f8c9859bd4e54177bc3177e0818e381e19819374",
   },
 } as const;
 
 const CERTIFIED_PORTABLE_PACKAGES = {
   accelerateVersion: "1.14.0",
   safetensorsVersion: "0.8.0",
-  aiohttpVersion: "3.14.3",
+  aiohttpVersion: "3.14.4",
   sentencepieceVersion: "0.2.2",
   numpyVersion: "1.26.4",
 } as const;

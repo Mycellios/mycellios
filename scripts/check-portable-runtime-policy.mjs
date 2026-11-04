@@ -15,9 +15,9 @@ import {
 } from "./portable-runtime-wheel-lock.mjs";
 
 const expected = [
-  ["win32", "x64", true, "2.13.0+cpu", [], "cpython-3.12.13+20260510-x86_64-pc-windows-msvc-install_only_stripped.tar.gz", 21_921_642, "24168aff2e7d93784c6a436124c4ebb79b076a4e289bde4902c08333507b71d0", "scripts/wheel-locks/win32-x64-cp312.txt", "de504739e05a89229e437ec5d09a45dc00f2080db042d11519204926e1a90040"],
-  ["linux", "x64", true, "2.13.0+cpu", [], "cpython-3.12.13+20260510-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz", 34_075_380, "d480f5d5878910ecbae212bf23bd7c25d7b209eb8cf5e98823c977384d272e88", "scripts/wheel-locks/linux-x64-cp312.txt", "f3d9a819ebcc82c33da8ccad858eecf2d9ac4c35d5e8ad4b1da6702bfeb9748a"],
-  ["darwin", "arm64", true, "2.11.0", ["mps"], "cpython-3.12.13+20260510-aarch64-apple-darwin-install_only_stripped.tar.gz", 24_942_229, "55bc1a5edbc8ac4da0081f4f5731ed2d1ed10c57cb37a820b2a0dbc7cad742e9", "scripts/wheel-locks/darwin-arm64-cp312.txt", "1adf58ca36108ca3c7e26c303a8c6c802bf25825e87e7d1d9f6ab2d86de3371a"],
+  ["win32", "x64", true, "2.13.0+cpu", [], "cpython-3.12.13+20260510-x86_64-pc-windows-msvc-install_only_stripped.tar.gz", 21_921_642, "24168aff2e7d93784c6a436124c4ebb79b076a4e289bde4902c08333507b71d0", "scripts/wheel-locks/win32-x64-cp312.txt", "e1bf3439efda596b446b4d594f9e0c7fda688a243f0c514dc4708b2965e84100"],
+  ["linux", "x64", true, "2.13.0+cpu", [], "cpython-3.12.13+20260510-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz", 34_075_380, "d480f5d5878910ecbae212bf23bd7c25d7b209eb8cf5e98823c977384d272e88", "scripts/wheel-locks/linux-x64-cp312.txt", "89e62b6c1f562afc1bb1aece4bf51f82292f95298a2aa32325e56574207b6568"],
+  ["darwin", "arm64", true, "2.11.0", ["mps"], "cpython-3.12.13+20260510-aarch64-apple-darwin-install_only_stripped.tar.gz", 24_942_229, "55bc1a5edbc8ac4da0081f4f5731ed2d1ed10c57cb37a820b2a0dbc7cad742e9", "scripts/wheel-locks/darwin-arm64-cp312.txt", "cd2bdfc8ea45509fc2df1b69f8c9859bd4e54177bc3177e0818e381e19819374"],
   ["darwin", "x64", false, undefined, undefined, undefined, undefined, undefined, undefined, undefined],
   ["linux", "arm64", false, undefined, undefined, undefined, undefined, undefined, undefined, undefined],
 ];

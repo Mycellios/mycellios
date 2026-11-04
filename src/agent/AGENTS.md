@@ -1,5 +1,12 @@
 # AGENTS.md
 
+- Mobile dependency updates must match the installed Expo SDK's
+  `bundledNativeModules.json` and the proposed lockfile's peer requirements;
+  an isolated Router major update is not an SDK migration. Mermaid's API route
+  serves the library's browser bundle directly to native WebViews, so a package
+  major must preserve the supported iOS/Safari floor as well as passing current
+  Chromium tests. Keep the existing browser floor unless explicitly migrating it.
+
 - Project browsing belongs beside any chat in the shared review workspace. Desktop
   uses an isolated, sandboxed native WebContentsView with its own ephemeral session
   and inspector preload; webpages receive no application bridge, account cookies or

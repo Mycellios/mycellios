@@ -42,6 +42,12 @@ These rules apply to the complete repository.
   surfaces consume contracts; contracts must not import a product surface.
 - The Python data plane belongs under `python/distributed_runtime`. TypeScript
   launch/orchestration code belongs under `src/distribution`.
+- Distribution Python requirements, portable-runtime policy, accelerator runtime
+  probes and the three hashed wheel locks must agree. Regenerate locks from
+  reviewed pip reports with `scripts/generate-portable-runtime-wheel-locks.mjs`;
+  never edit artifact hashes by hand. Check `npm run node:runtime:check`, the
+  portable-runtime-wheel-lock and accelerator-runtime tests, and affected Python
+  HTTP tests on CPython 3.12 before changing those pins.
 - Generated output, model caches and runtime state are not source.
 
 ## Documentation
