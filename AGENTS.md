@@ -63,6 +63,13 @@ These rules apply to the complete repository.
 
 ## Changes and verification
 
+- During Daniel's temporary fast-delivery mode, `.github/workflows/ci.yml`
+  records source readiness without waiting for full test/security/platform jobs.
+  Its summary must say they were NOT RUN and must not claim deployment success.
+  Real release builds, artifact identity and health verification remain required.
+  Verify workflow changes with `node --test scripts/ci-fast-delivery.test.mjs`
+  through the shared queue; do not re-enable the paused full suites implicitly.
+
 - Reusable web controls live in `landing/src/ui`. Use the production kit in every
   surface and import the same components in Storybook; do not add parallel demo
   implementations or native controls outside the kit. Run `npm run verify:ui-kit`.
