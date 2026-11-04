@@ -48,6 +48,16 @@ ID, with a bounded deadline and a short owner/Space/authorization-scoped cache.
 Only public profile labels or the documented provider displayName are projected;
 credentials, arbitrary provider payloads and aliases are never identity evidence.
 Legacy slug-only records and unavailable profiles remain explicitly unidentified.
+Always send the acting application user ID alongside the exact authorization on
+profile proxy requests. Composio projects enforcing owner verification reject an
+unscoped request even when the account is active. The pinned core SDK's high-level
+proxy drops that field; use its public API client with `user_id` and
+`connected_account_id`, retaining cancellation and zero automatic retries.
+An offline wire regression must inspect the installed client's serialized body,
+not just a mock of the high-level helper. Configured provider wrappers must
+forward the identity operation through their normal credential resolver and
+observe credential rotation, returning null when unsupported or unconfigured.
+
 A second scoped database read drops revoked grants and prevents an old identity
 from being attached to a reconnected authorization. No migration or account
 mutation is needed to view the detail.

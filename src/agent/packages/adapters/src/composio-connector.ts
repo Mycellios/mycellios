@@ -36,7 +36,9 @@ export type ComposioClient = {
   connectedAccounts: Pick<Composio["connectedAccounts"], "list" | "waitForConnection" | "delete">;
   authConfigs?: Pick<Composio["authConfigs"], "list">;
   toolkits?: Pick<Composio["toolkits"], "get">;
-  tools?: Pick<Composio["tools"], "proxyExecute">;
+  getClient?: () => {
+    tools: Pick<ReturnType<Composio["getClient"]>["tools"], "proxy">;
+  };
 };
 
 /** Account states the user can only leave by reconnecting. */
