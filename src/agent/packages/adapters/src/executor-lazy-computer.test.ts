@@ -43,6 +43,7 @@ async function runRoutine(
     onRunStarted?: () => void;
     missingComputer?: boolean;
     preflightClaimLost?: boolean;
+    preflightFinalizeLost?: boolean;
   } = {},
 ) {
   const attachment: Extract<MessageBlock, { kind: "file" | "image" }> = {
@@ -220,7 +221,9 @@ async function runRoutine(
   };
   if (options.copyFailureOnce)
     sandbox.writeFile.mockRejectedValueOnce(new Error("temporary copy failure"));
-  const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
+  const finalizeRun = vi.fn(async () =>
+    options.preflightFinalizeLost ? false : { continuationRunId: null },
+  );
   const enqueue = vi.fn(async () => undefined);
   Object.assign(prisma, {
     $transaction: vi.fn(async (fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma)),
@@ -328,6 +331,29 @@ describe("run computer provisioning", () => {
     });
     expect(prisma.attempt.create).not.toHaveBeenCalled();
     expect(finalizeRun).not.toHaveBeenCalled();
+    expect(runtimeRun).not.toHaveBeenCalled();
+  });
+  it("settles only its own preflight attempt when finalization loses the fence", async () => {
+    const onRunStarted = vi.fn();
+    const { finalizeRun, runtimeRun, prisma, run } = await runRoutine([], {
+      missingComputer: true,
+      preflightFinalizeLost: true,
+      onRunStarted,
+    });
+    expect(finalizeRun).toHaveBeenCalledTimes(1);
+    expect(prisma.attempt.updateMany).toHaveBeenCalledExactlyOnceWith({
+      where: { id: "attempt-1", runId: run.id, fence: 1, status: "running" },
+      data: {
+        status: "setup_failed",
+        error: "Bot has no computer",
+        finishedAt: expect.any(Date),
+      },
+    });
+    expect(prisma.run.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "failed" }) }),
+    );
+    expect(run).not.toHaveProperty("startedAt");
+    expect(onRunStarted).not.toHaveBeenCalled();
     expect(runtimeRun).not.toHaveBeenCalled();
   });
   it("retries handed-off setup failures with durable attempt accounting and backoff", async () => {

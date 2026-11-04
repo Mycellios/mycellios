@@ -3747,24 +3747,37 @@ export function createRunExecutor(deps: ExecutorDeps) {
         },
       });
       if (!leaseTarget.computerId) {
-        // A deleted/unlinked computer needs user action, not an unbounded queue retry.
-        // Recheck ownership before recording an attempt; never settle a stolen lease.
-        const claimed = await deps.prisma.run.updateMany({
-          where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },
-          data: { error: "Bot has no computer" },
+        const message = "Bot has no computer";
+        // Lock the owned run until its preflight attempt exists. A lost fence
+        // must not leave an attempt attributed to a different worker's claim.
+        const preflightAttempt = await deps.prisma.$transaction(async (tx) => {
+          const owned = await tx.run.updateMany({
+            where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },
+            data: { error: message },
+          });
+          if (owned.count !== 1) return null;
+          return tx.attempt.create({ data: { runId, fence, status: "running" } });
         });
-        if (claimed.count !== 1) return;
-        const failedAttempt = await deps.prisma.attempt.create({
-          data: { runId, fence, status: "running" },
-        });
+        if (!preflightAttempt) return;
         const bot = await deps.prisma.bot.findUnique({
           where: { id: run.botId },
           select: { name: true },
         });
-        await failRunBeforeTurn(
-          deps, run, bot?.name ?? "", { attemptId: failedAttempt.id, workerId, fence },
-          "Bot has no computer",
+        const failed = await failRunBeforeTurn(
+          deps,
+          run,
+          bot?.name ?? "",
+          { attemptId: preflightAttempt.id, workerId, fence },
+          message,
         );
+        if (!failed) {
+          // Finalization can lose the fence after commit. Settle only our
+          // unclosed attempt; never mutate the run now owned by another worker.
+          await deps.prisma.attempt.updateMany({
+            where: { id: preflightAttempt.id, runId, fence, status: "running" },
+            data: { status: "setup_failed", error: message, finishedAt: new Date() },
+          });
+        }
         return;
       }
       if (leaseTarget.computerSwitching) {
