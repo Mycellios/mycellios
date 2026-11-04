@@ -72,6 +72,7 @@ function secretAskToolSurface() {
 }
 
 export const DELEGATION_TOOL_NAMES = new Set<string>([
+  "delegate_task",
   "run_subagent",
   "spawn_bot",
   "archive_bot",
@@ -403,6 +404,12 @@ export const builtinAgentTools: ConnectorTool[] = [
     },
   },
   {
+    name: "command_status",
+    readOnly: true,
+    description: "Inspect durable native command receipts after a lost response or restart. Omit command_id to list recent commands. This never starts, retries or cancels a command. Unknown means inspect existing effects before any new execution.",
+    inputSchema: { type: "object", properties: { command_id: { type: "string" } } },
+  },
+  {
     name: "shell",
     description:
       "Run a command inside this bot's computer. cwd defaults to the bot's folder on a Team Computer and the workspace root on a Private Computer. Output can arrive while the command is still running; tell the user any one-time code or sign-in URL in that output.",
@@ -411,6 +418,7 @@ export const builtinAgentTools: ConnectorTool[] = [
       properties: {
         command: { type: "string" },
         cwd: { type: "string" },
+        timeout_ms: { type: "integer", minimum: 1000, maximum: 3600000, description: "Execution deadline, including any wait inside a scheduler. Use a suitable bounded budget for installs/builds. A timeout is not a successful result." },
       },
       required: ["command"],
     },
@@ -1421,6 +1429,21 @@ export const builtinAgentTools: ConnectorTool[] = [
       },
       required: ["confirm_name"],
     },
+  },
+  {
+    name: "delegate_task",
+    description: "Delegate a concrete part of the current authorized request to another owned Mico. Creates a durable child task with an expected result and resource/dependency reservations. Use this for work; message_bot is for information. After delegating, end this turn; verified terminal results wake the parent automatically. Never poll or expand permissions.",
+    inputSchema: { type: "object", properties: {
+      bot_id: { type: "string" }, instruction: { type: "string" }, expected_result: { type: "string" },
+      resources: { type: "array", items: { type: "string" }, maxItems: 16, description: "host (safe default), browser, or workspace:<absolute path>. Coordination only; no permissions granted." },
+      dependencies: { type: "array", items: { type: "string" }, maxItems: 16 },
+    }, required: ["bot_id", "instruction", "expected_result"] },
+  },
+  {
+    name: "work_status",
+    readOnly: true,
+    description: "Read the current request's durable parent/child task states and result run IDs. Read results before repeating work; do not poll unchanged status.",
+    inputSchema: { type: "object", properties: {} },
   },
   {
     name: "message_bot",

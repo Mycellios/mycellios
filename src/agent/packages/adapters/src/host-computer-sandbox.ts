@@ -121,6 +121,9 @@ export class HostComputerSandbox implements SandboxProvider {
       context,
     );
   }
+  commandStatus(computer: ComputerRef, commandId: string | undefined, context: AdapterContext) {
+    return this.one({ method: "commandStatus", botId: computer.botId, commandId }, context);
+  }
   provision(input: { botId: string; homePath: string }, context: AdapterContext) {
     return this.one<ComputerRef>({ method: "provision", botId: input.botId }, context);
   }

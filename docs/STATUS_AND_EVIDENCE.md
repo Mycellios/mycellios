@@ -25,6 +25,38 @@ profile response without recording the identity. An update announcement is
 prepared; this repair still requires normal PR integration and release proof
 before it is described as deployed.
 
+
+## Durable Mico work and Windows command recovery - local candidate, 2026-11-04
+
+The integrated `codex/resilient-work-release-20261104` candidate adds persistent parent/child
+work, expected results, dependencies, scoped resource reservations and a durable return
+to the parent Mico. Existing Micos, models and permissions remain the execution route.
+Private delegated work and ownership transfers use separate task conversations; earlier
+runs retain their original history. Revisioned pause/resume/reassignment and composer Stop
+use a persistent exact-run teardown outbox before replacement work is admitted. Plans
+and bounded continuation counters are stored under the active execution fence.
+
+Native commands have stable identities and bounded, redacted receipts. An HTTP observer
+disconnect does not relaunch the command. Recorded results can be read after reconnect or
+host restart; a crashed host without an exit leaves an unknown outcome, never success.
+Windows execution retains owned Job Objects, explicit cancellation and bounded deadlines.
+This does not promise process survival through a PC reboot or automatic resolution of
+every uncertain external effect. OpenBot d3ec956 is a behavior reference, not imported code.
+
+Local qualification: 518 focused tests in 25 files pass; Prisma generation, incremental
+adapter/API/worker typechecks and real API/worker/Desktop bundles pass. Synthetic local
+PostgreSQL acceptance applies the additive migration and checks duplicate admission,
+dependency/resource contention, missed publication and restart, parent return, scope/fence
+refusal, persistent teardown and independent conversations after reassignment. Native
+fixtures use real Windows processes, HTTP disconnect, host crash, timeout and exact-run
+cancellation. No production database, live model provider, installed-app session or
+multi-computer deployment was exercised. Full CI and installer packaging were not run
+under the temporary agility policy. This is source qualification, not an installed or
+deployed release.
+
+Design: `specs/agent-resilient-work/spec.md`. Reproduce through the shared scheduler with
+`src/agent/scripts/verify-resilient-work.ps1`; evidence is in the isolated workspace's
+`src/agent/outputs/resilient-work/checks.json` and associated logs.
 ## Integration account identities — 2026-11-04
 
 Local candidate starts from fetched canonical main

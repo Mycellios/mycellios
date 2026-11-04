@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { AdapterContext, ComputerRef } from "@rakazo/adapter-kit";
+import { safeNativeCommandError } from "./native-command-journal.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
 import {
@@ -158,6 +159,7 @@ export async function startHostComputerServer(options: {
           /^computer file exceeds \d+ bytes$/.test(error.message) ||
           error.message === "Link this agent's project on this computer before continuing." ||
           error.message === "Project link in progress" ||
+          safeNativeCommandError(error) ||
           error.message === "Project binding changed" ||
           error.message === "Link this task on this computer before continuing." ||
           error.message.startsWith("This Mico has an isolated task running"))
@@ -336,6 +338,9 @@ export async function startHostComputerServer(options: {
         );
         break;
       }
+      case "commandStatus":
+        yield await provider.commandStatus(computer, input.commandId);
+        break;
       case "workspaceDirectories":
         yield await provider.workspaceDirectories(computer, input.directories, context);
         break;
@@ -412,6 +417,8 @@ export async function startHostComputerServer(options: {
       if (!/^[a-zA-Z0-9_-]{1,256}$/.test(sessionId) || !botId || botId.length > 256)
         throw new Error("Invalid task binding");
       await validate();
+      if (providers.get(botId)?.hasActiveCommands())
+        throw new Error("Finish the active local task before changing its project");
       if (activeTaskBots.has(botId) && activeTaskBots.get(botId) !== sessionId)
         throw new Error(
           "This Mico already has an active local task. Wait or stop it before starting another.",
@@ -455,7 +462,7 @@ export async function startHostComputerServer(options: {
     workspace: (botId: string) => ref(botId).providerRef,
     lockProject(botId: string) {
       if (
-        projectLocks.has(botId) ||
+        projectLocks.has(botId) || providers.get(botId)?.hasActiveCommands() ||
         [...active.values()].some((work) => !work || work.botId === botId)
       )
         throw new Error("Wait for this agent's current operation to finish");
@@ -473,6 +480,7 @@ export async function startHostComputerServer(options: {
       },
     ) {
       if (!enabled) throw new Error("Local computer access is disabled");
+      if (providers.get(botId)?.hasActiveCommands()) throw new Error("Finish the active local task before changing its project");
       if (!botId || botId.length > 256) throw new Error("Invalid agent");
       if ([...active.values()].some((work) => work?.botId === botId))
         throw new Error("Wait for this agent's current operation to finish");
@@ -510,6 +518,7 @@ export async function startHostComputerServer(options: {
       providers.clear();
     },
     hasActiveWork: () =>
+      [...providers.values()].some(provider => provider.hasActiveCommands()) ||
       [...active.values()].some(
         (work) => work?.method === "execute" || work?.method === "writeFile",
       ),
@@ -522,6 +531,8 @@ export async function startHostComputerServer(options: {
     },
     async close() {
       enabled = false;
+      for (const provider of providers.values()) provider.cancelAllCommands();
+      await Promise.all([...providers.values()].map(provider => provider.settleCommands()));
       for (const controller of active.keys()) controller.abort();
       for (const provider of providers.values()) provider.cancelAllCommands();
       server.closeAllConnections();

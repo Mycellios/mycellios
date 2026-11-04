@@ -97,6 +97,9 @@ export type WorkspaceDirectoryRequest =
   | { action: "remove"; parent: ".browser-profiles" | "bots"; names: string[] };
 
 export interface CommandRequest {
+  /** Stable effect identity on a capable native host; repeating it only reattaches. */
+  commandId?: string;
+  executionId?: string;
   argv: string[];
   cwd?: string;
   env?: Record<string, string>;
@@ -471,6 +474,9 @@ export type AgentContextStrategy = "current" | "retrieval" | "snapshots" | "cach
 export const DEFAULT_CONTEXT_STRATEGY: AgentContextStrategy = "retrieval";
 
 export interface AgentRunRequest {
+  /** Request metadata only; never grants new permissions or replays tools. */
+  workState?: unknown;
+  saveWorkState?: (state: unknown) => Promise<void>;
   agentEngine?: "pi" | "codex" | "claude" | "acp";
   /** Awaited producer-side accounting, independent of event-consumer cancellation. */
   onUsage?: (event: Extract<AgentRuntimeEvent, { type: "usage" }>) => void | Promise<void>;

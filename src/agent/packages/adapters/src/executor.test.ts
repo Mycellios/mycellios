@@ -3564,8 +3564,6 @@ description: Prepare standup notes
     botSkillPin: { findMany: vi.fn(async () => []) },
 
     agentSkill: { findMany: vi.fn(async () => []) },
-    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
-
         ...compatiblePrismaParts("space-model", plaintext),
         bot: {
           findFirst: vi.fn(async () => ({
@@ -3623,8 +3621,6 @@ description: Prepare standup notes
     botSkillPin: { findMany: vi.fn(async () => []) },
 
     agentSkill: { findMany: vi.fn(async () => []) },
-    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
-
         ...compatiblePrismaParts("space-model", plaintext),
         bot: {
           findFirst: vi.fn(async () => ({
