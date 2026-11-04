@@ -326,7 +326,7 @@ msgstr "{title}, {savedAs} नाम से सेव होगा"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "{toolCount, plural, one {# tool} other {# tools}}"
-msgstr ""
+msgstr "{toolCount, plural, one {# टूल} other {# टूल}}"
 
 #. placeholder {0}: mention.name
 #: src/pages/shell/composer.tsx
@@ -384,7 +384,7 @@ msgstr "खाता आईडी"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Account label"
-msgstr ""
+msgstr "खाते का लेबल"
 
 #: src/components/SidebarFooter.tsx
 msgid "Account menu for {name}"
@@ -465,7 +465,7 @@ msgstr "एक HTTPS सर्वर URL दर्ज करें।"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Add another"
-msgstr ""
+msgstr "एक और खाता जोड़ें"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add credential"
@@ -5287,7 +5287,7 @@ msgstr "टूल स्रोत"
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Tools"
-msgstr ""
+msgstr "टूल"
 
 #: src/components/ModelCredits.tsx
 msgid "Top up anytime"
@@ -6349,3 +6349,39 @@ msgstr "इंटीग्रेशन को सर्वर पर सेट �
 #: src/components/ReleaseNotes.tsx
 msgid "App connections open in your browser on desktop."
 msgstr "डेस्कटॉप पर ऐप कनेक्शन आपके ब्राउज़र में खुलते हैं।"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Account identity unavailable"
+msgstr "खाते की पहचान उपलब्ध नहीं है"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Authorization pending"
+msgstr "अनुमति लंबित है"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Loading account…"
+msgstr "खाता लोड हो रहा है…"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Could not load account identities."
+msgstr "खातों की पहचान लोड नहीं हो सकी।"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Connected accounts"
+msgstr "जुड़े हुए खाते"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "No connected accounts"
+msgstr "कोई खाता जुड़ा नहीं है"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Disconnect all"
+msgstr "सभी डिस्कनेक्ट करें"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+msgstr "{pendingCount, plural, one {# लंबित कनेक्शन} other {# लंबित कनेक्शन}}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "See which accounts are connected to each app."
+msgstr "देखें कि हर ऐप से कौन से खाते जुड़े हैं।"

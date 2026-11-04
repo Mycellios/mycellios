@@ -987,6 +987,9 @@ export const appContract = {
       .input(z.object({ query: z.string().optional(), connectorId: z.string().optional() }))
       .output(z.array(ConnectionCatalogItemSchema)),
     list: oc.output(z.array(ConnectionSchema)),
+    accounts: oc
+      .input(z.object({ connectorId: z.string(), provider: z.string() }))
+      .output(z.array(ConnectionSchema)),
     begin: oc
       .input(
         z.object({

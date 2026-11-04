@@ -1,3 +1,4 @@
+import type { ConnectionIdentity } from "@rakazo/contracts";
 import type {
   AdapterContext,
   AdapterDescriptor,
@@ -241,6 +242,11 @@ export interface ManagedConnectorProvider
   listConnectedExternalIds(context: AdapterContext): Promise<string[]>;
   /** Connection refs the provider reports as dead until the user reconnects them. */
   listReconnectRefs?(context: AdapterContext): Promise<string[]>;
+  /** Public identity of this exact owned authorization, never its editable alias or credentials. */
+  describeConnection?(
+    request: { provider: string; connectionRef: string },
+    context: AdapterContext,
+  ): Promise<ConnectionIdentity | null>;
   connectionReady(context: AdapterContext, externalId: string): Promise<boolean>;
   warmDirectory?(): Promise<void>;
 }

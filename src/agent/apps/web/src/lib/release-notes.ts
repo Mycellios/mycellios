@@ -1,10 +1,10 @@
 import { compareBuilds, isBuildId } from "@rakazo/contracts/client-build";
 
 export const RELEASE_NOTES = {
-  id: "2026-11-04-external-integration-auth",
+  id: "2026-11-04-integration-account-identities",
   version: "2026.11.04",
   date: "2026-11-04",
-  minimumBuild: "20261104155901",
+  minimumBuild: "20261104171143",
 } as const;
 const SEEN_BUILD = "mycellios.release-notes.last-build.v1";
 const ACKNOWLEDGED = "mycellios.release-notes.acknowledged.v1";

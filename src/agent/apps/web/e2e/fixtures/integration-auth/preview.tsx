@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { activateUiLocale, i18n } from "../../../src/lib/i18n";
 import { PluginsOverlay } from "../../../src/pages/PluginsOverlay";
-import "../../../src/styles.css";
+import "./preview.css";
 
 await activateUiLocale("es");
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

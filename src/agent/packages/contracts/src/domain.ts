@@ -720,6 +720,11 @@ export function isDeletableMemoryDocument(path: string): boolean {
   return path !== MEMORY_INDEX_PATH;
 }
 
+export const ConnectionIdentitySchema = z.object({
+  label: z.string().trim().min(1).max(240),
+});
+export type ConnectionIdentity = z.infer<typeof ConnectionIdentitySchema>;
+
 export const ConnectionSchema = z.object({
   id: Id,
   connectorId: z.string(),
@@ -728,6 +733,7 @@ export const ConnectionSchema = z.object({
   status: z.enum(["pending", "connected", "revoked", "error"]),
   capabilities: z.array(z.string()),
   createdAt: z.string(),
+  identity: ConnectionIdentitySchema.nullable().optional(),
 });
 export type Connection = z.infer<typeof ConnectionSchema>;
 
