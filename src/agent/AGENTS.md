@@ -598,3 +598,20 @@
   creates the owned home before reusing a cached reference, and running checks
   verify its directory. Preserve existing files and contained writes; verify
   desktop-workspace-recovery and host-computer tests with attachment transfer.
+
+- Interactive Pi/Codex/Claude/ACP runs share update_work_plan and bounded
+  continuation in their existing session. Never infer task completion from a
+  provider turn ending. Preserve Stop, human pauses, usage observers and effect
+  idempotency. Await actual background-shell results without rerunning commands;
+  fail exhausted/no-progress runs explicitly. Silent delegated/routine runs retain
+  their separate lifecycle. Verify work-continuation, native-agent-runtime, Pi
+  dispatch, shell-command-stream and executor repeated-call regression tests.
+
+- Desktop send preparation preserves the saved Team/dedicated assignment; native
+  workspaces are already account/server/bot scoped. Never switch computer mode to
+  admit a message or bypass active-run checks. Verify native-computer-workspace
+  and native-computer-execution tests, including waiting introductions.
+
+- Namespaced web routing accepts both the bare entry and its trailing-slash form;
+  keep asset URLs namespaced and preserve deep links. Verify app-path.test.ts.
+

@@ -1,6 +1,7 @@
 import { withNativeProjectInstructions } from "./native-project-instructions";
+import { t } from "@lingui/core/macro";
 
-/** Preserve the account/Space boundary while assigning an individual native workspace. */
+/** Native main owns per-agent folders. Sending a message must preserve server assignments. */
 export async function prepareNativeWorkspace(
   send: typeof fetch,
   origin: string,
@@ -15,7 +16,12 @@ export async function prepareNativeWorkspace(
       method: "POST", headers, credentials: "include", redirect: "error",
       body: JSON.stringify({ json: input }), signal: AbortSignal.timeout(15_000),
     });
-    if (!response.ok) throw new Error("Could not prepare this Mico's local workspace. The message was not sent.");
+    if (!response.ok) {
+      if (response.status === 401) throw new Error(t`Sign in again to prepare this agent. Your message has been kept.`);
+      if (response.status === 403) throw new Error(t`This account cannot prepare this agent. Your message has been kept.`);
+      if (response.status === 409) throw new Error(t`This agent changed while preparing it. Try again; your message has been kept.`);
+      throw new Error(t`Could not prepare this agent. Your message has been kept.`);
+    }
     const value = (await response.json()).json as { id?: unknown; computerMode?: unknown; instructions?: unknown } | undefined;
     if (value?.id !== botId || !["team", "dedicated"].includes(String(value?.computerMode)))
       throw new Error("The workspace response did not match this Mico.");
@@ -29,8 +35,7 @@ export async function prepareNativeWorkspace(
     // The server rejects concurrent instruction changes. Never overwrite or retry a stale snapshot.
     await call("update", { botId, instructions, expectedInstructions: bot.instructions });
   }
-  if (bot.computerMode !== "dedicated") {
-    const updated = await call("setComputer", { botId, mode: "dedicated" });
-    if (updated?.computerMode !== "dedicated") throw new Error("The local workspace was not assigned.");
-  }
+  // connect(botId) already verifies the native owner and creates that bot's private
+  // folder. Changing team/dedicated here can reject a waiting introduction or
+  // disrupt existing computer work; the explicit computer settings own that choice.
 }

@@ -10,6 +10,7 @@ import { DesktopUpdatesProvider } from "./components/DesktopUpdates";
 import { I18nBootstrap } from "./components/I18nBootstrap";
 import { WebUpdates } from "./components/WebUpdates";
 import { applyUiDirection } from "./lib/apply-ui-direction";
+import { appBasePath } from "./lib/app-path";
 import { clientUpdates } from "./lib/client-update";
 import { reportCaughtReactError } from "./lib/monitoring";
 import { markAfterPaint, markOnce } from "./lib/performance";
@@ -62,7 +63,7 @@ createRoot(document.getElementById("root")!, { onCaughtError: reportCaughtReactE
           preempted indefinitely — useSearchParams/useParams then keep serving
           the stale location, so deep links (?m=) and thread switches never
           land while the URL already moved. */}
-      <BrowserRouter basename={import.meta.env.BASE_URL} useTransitions={false}>
+      <BrowserRouter basename={appBasePath()} useTransitions={false}>
         <ClientUpdateOnNavigate />
         <QueryClientProvider client={queryClient}>
           <DesktopUpdatesProvider>
