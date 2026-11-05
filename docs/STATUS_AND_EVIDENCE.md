@@ -34,11 +34,13 @@ the preserved host styles. It caught and verified a fix for an unbound developme
 so its header controls remain reachable. Windows redirected the initial new asset folder into Codex's
 private cache; a same-user non-virtualized copy restored the admitted profile path.
 The installer now rejects such redirection before replacing the native package.
-Local archive, renderer and draft-store backups are retained. No production
-deployment. A later Git synchronization/upload attempt failed because the
-authorized enterprise App has no Mycellios installation (HTTP 404); the separate
-connector's coverage is only nodecodex-org. No alternate credential or permission
-expansion was used, and no Git upload is claimed.
+Local archive, renderer and draft-store backups are retained. The earlier
+enterprise-App check used an organization-only endpoint and returned HTTP 404.
+Subsequent readback confirms that Mycellios is a personal GitHub account, outside
+the enterprise installer, and that the existing Mycellios CLI session already has
+repository admin/write access. No new App installation, credential change or
+permission expansion is needed. Publication is tracked separately from these
+local acceptance results.
 Full CI, platform installers, Cloud execution, public catalog/votes, shared project
 sync, generated illustrations/music and social publishing were NOT RUN or are
 not implemented in this first private version.

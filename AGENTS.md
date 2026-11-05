@@ -63,6 +63,11 @@ These rules apply to the complete repository.
 
 ## Changes and verification
 
+- GitHub owner `Mycellios` is a personal account, outside the Nodecodex enterprise
+  organization installer. Verify the existing `gh` identity and repository write
+  permission for delivery; an `/orgs/Mycellios/installation` 404 is not evidence
+  that this account lacks access. Never print credentials or change auth profiles.
+
 - Apps authoring uses `specs/apps-standard/spec.md`, the versioned contracts in
   `src/agent/packages/contracts/src/app-*.ts` and the
   `src/agent/skills/create-mycellios-app` starter/guide. From `src/agent`, use
