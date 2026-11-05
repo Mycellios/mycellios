@@ -87,7 +87,6 @@ export function GeneralSettingsPanels({
   onTimezoneChange,
   messagingEnabled = false,
   onOpenMessaging,
-  onOpenSkills,
 }: SettingsGeneralProps) {
   const { t } = useLingui();
   const account = accountDisplay({ name, email }, t`You`);

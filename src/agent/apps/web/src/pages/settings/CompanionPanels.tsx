@@ -9,7 +9,6 @@ import { SkillLibrarySettings } from "../SkillLibrarySettings";
 export function MicosSettingsPanel({
   bots = [],
   onOpen,
-  onSkills,
 }: {
   bots?: Bot[];
   onOpen?: (id: string) => void;
