@@ -15,7 +15,7 @@ before requesting close.
 | Micos | Selected owned Space | Open the canonical Mico editor; shared skills use the canonical editor |
 | Models | Account; Space overrides remain in Space | Existing encrypted credentials, providers, OAuth, defaults/backups and limits |
 | Notifications | Device policy per member; Mico settings in their Space | Reply enablement, message-preview privacy, explicit OS permission, local test and per-Mico flags |
-| Voice | Account services; device voice panel | Existing speech connections and samples; open the existing conversation panel for local/browser voice |
+| Voice | Account services; optional device voice entry | Existing speech connections and samples; conversation entry appears only when the host supplies that capability |
 | Approvals | Account | Existing rule editor and server validation |
 | Space | Selected owned Space | Existing name, members, model overrides and removal |
 | Memory | Selected owned Space | Existing provider forms, default scope and encrypted credentials |

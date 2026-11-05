@@ -63,7 +63,10 @@ test("unified settings persist real local changes, guard drafts and keep every s
       "Settings qualification",
     );
     await page.getByRole("heading", { name: "Choose your language", exact: true }).waitFor();
-    await page.getByTestId("language-entry").getByRole("button", { name: "Continue", exact: true }).click();
+    await page
+      .getByTestId("language-entry")
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
     await rpc(page, "models/connect", {
       provider: "openai-compatible",
       scope: "account",
@@ -314,7 +317,13 @@ test("unified settings persist real local changes, guard drafts and keep every s
     });
   } finally {
     await info.attach("local-page-state", {
-      body: JSON.stringify({ url: page.url(), body: await page.locator("body").innerText().catch(() => "unavailable") }),
+      body: JSON.stringify({
+        url: page.url(),
+        body: await page
+          .locator("body")
+          .innerText()
+          .catch(() => "unavailable"),
+      }),
       contentType: "application/json",
     });
     await info.attach("redacted-local-network", {
