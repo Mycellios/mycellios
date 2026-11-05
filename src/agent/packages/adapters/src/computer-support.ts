@@ -80,6 +80,12 @@ export function teamBotWorkspaceDirectory(botId: string): string {
   return path.posix.join("bots", normalizeWorkspacePath(botId));
 }
 
+/** An admitted native task already owns a distinct workspace root. This changes
+ * path mapping only; the stored Team assignment and its authorization stay intact. */
+export function executionWorkspaceMode(scope: ComputerMode, projectSessionId?: string): ComputerMode {
+  return projectSessionId ? "dedicated" : scope;
+}
+
 export function resolveBotWorkspacePath(
   scope: ComputerMode,
   botId: string,

@@ -30,7 +30,7 @@ import { ReviewPdfViewer } from "./ReviewPdfViewer";
 import { SandboxedHtmlViewer } from "./SandboxedHtmlViewer";
 import { ProjectRunControls, type ProjectPreparationStatus } from "./ProjectRunControls";
 
-export function ReviewWorkspacePanel({ botId, prepareProject, inspectPreparation, cancelPreparation }: { botId?: string; prepareProject?: (prompt: string, id: string) => Promise<string | undefined>; inspectPreparation?: (runId: string) => Promise<ProjectPreparationStatus>; cancelPreparation?: (runId: string) => Promise<unknown> } = {}) {
+export function ReviewWorkspacePanel({ botId, taskThreadId, prepareProject, inspectPreparation, cancelPreparation }: { botId?: string; taskThreadId?: string; prepareProject?: (prompt: string, id: string) => Promise<string | undefined>; inspectPreparation?: (runId: string) => Promise<ProjectPreparationStatus>; cancelPreparation?: (runId: string) => Promise<unknown> } = {}) {
   const review = useReviewWorkspace();
   const { t } = useLingui();
   const [url, setUrl] = useState("");
@@ -112,7 +112,7 @@ export function ReviewWorkspacePanel({ botId, prepareProject, inspectPreparation
               }}
             />
           </header>
-          {botId && prepareProject && <ProjectRunControls key={botId} botId={botId} prepare={prepareProject} inspectPreparation={inspectPreparation} cancelPreparation={cancelPreparation} />}
+          {botId && prepareProject && <ProjectRunControls key={`${botId}:${taskThreadId ?? "main"}`} botId={botId} taskThreadId={taskThreadId} prepare={prepareProject} inspectPreparation={inspectPreparation} cancelPreparation={cancelPreparation} />}
           <form
             className="flex shrink-0 gap-2 border-b border-border p-3"
             onSubmit={(event) => {

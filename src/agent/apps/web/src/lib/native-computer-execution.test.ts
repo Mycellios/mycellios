@@ -28,6 +28,17 @@ function fixture() {
   };
 }
 const url = "https://example.test/agent/rpc/threads/send";
+it("binds the exact project task before sending and never sends when worktree preparation fails", async () => {
+  const f = fixture();
+  const prepareTask = vi.fn(async () => {});
+  const fetch = nativeComputerFetch(f.send, { ...f.computer, prepareTask }, "https://example.test", "/agent");
+  const init = { method: "POST", body: JSON.stringify({ json: { botId: "owned-bot", taskThreadId: "one" } }) };
+  await fetch(url, init);
+  expect(prepareTask).toHaveBeenCalledWith({ botId: "owned-bot", taskThreadId: "one" });
+  f.send.mockClear(); prepareTask.mockRejectedValueOnce(Error("revoked"));
+  await expect(fetch(url, init)).rejects.toThrow("revoked");
+  expect(f.send).not.toHaveBeenCalled();
+});
 const message = (botId = "owned-bot") => ({
   method: "POST",
   headers: { "content-type": "application/json" },

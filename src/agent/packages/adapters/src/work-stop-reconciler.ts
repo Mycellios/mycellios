@@ -2,6 +2,7 @@ import type { JobPublisher, SandboxProvider, ComputerRef } from "@rakazo/adapter
 import { runJobKey } from "@rakazo/adapter-kit";
 import type { PrismaClient, ThreadEvents } from "@rakazo/db";
 import { cancelComputerRunWorkArgv } from "./computer-idle.js";
+import { projectLeaseOwner } from "./project-execution.js";
 
 /** Durable teardown outbox; only explicit user tree controls put work in this queue. */
 export async function reconcileWorkStops(deps: {
@@ -16,7 +17,8 @@ export async function reconcileWorkStops(deps: {
     }>}|null;
     if(!payload||!Array.isArray(payload.targets)||!Array.isArray(payload.runIds))throw new Error('Invalid durable work teardown receipt');
     for(const target of payload.targets){
-      const run=await deps.prisma.run.findFirst({where:{id:target.runId,taskId:task.id,spaceId:task.spaceId,userId:task.userId,botId:target.botId,status:'cancelled'}});
+      const identity = projectLeaseOwner(target.botId);
+      const run=await deps.prisma.run.findFirst({where:{id:target.runId,taskId:task.id,spaceId:task.spaceId,userId:task.userId,botId:identity?.botId ?? target.botId,...(identity ? {threadId:identity.projectSessionId}:{}),status:'cancelled'}});
       if(!run)throw new Error('Work teardown lost its exact cancelled-run identity');
       const computer:ComputerRef={id:target.computerId,botId:target.botId,kind:target.kind as ComputerRef['kind'],providerRef:target.providerRef??''};
       const context={operationId:`work-stop:${task.id}:${target.runId}`,traceId:`work-stop:${task.id}`,

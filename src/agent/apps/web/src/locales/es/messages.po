@@ -7551,6 +7551,54 @@ msgstr "Principal"
 msgid "New task"
 msgstr "Nueva tarea"
 
+#: src/components/SidebarProjects.tsx
+msgid "Projects"
+msgstr "Proyectos"
+
+#: src/components/SidebarProjects.tsx src/pages/shell/sidebar-header.tsx
+msgid "New project"
+msgstr "Nuevo proyecto"
+
+#: src/components/SidebarProjects.tsx
+msgid "Project name"
+msgstr "Nombre del proyecto"
+
+#: src/components/SidebarProjects.tsx
+msgid "Conversation title"
+msgstr "Nombre de la conversación"
+
+#: src/components/SidebarProjects.tsx
+msgid "What do you want to work on?"
+msgstr "¿En qué quieres trabajar?"
+
+#: src/components/SidebarProjects.tsx
+msgid "New conversation in {0}"
+msgstr "Nueva conversación en {0}"
+
+#: src/components/SidebarProjects.tsx
+msgid "Create conversation"
+msgstr "Crear conversación"
+
+#: src/components/SidebarProjects.tsx
+msgid "Add a conversation to begin."
+msgstr "Añade una conversación para empezar."
+
+#: src/components/SidebarProjects.tsx
+msgid "Could not save the project. Try again."
+msgstr "No se ha podido guardar el proyecto. Vuelve a intentarlo."
+
+#: src/components/SidebarProjects.tsx
+msgid "Could not create the conversation. Try again."
+msgstr "No se ha podido crear la conversación. Vuelve a intentarlo."
+
+#: src/components/SidebarProjects.tsx
+msgid "Projects are unavailable. Try again."
+msgstr "Los proyectos no están disponibles. Vuelve a intentarlo."
+
+#: src/components/ProjectRunControls.tsx
+msgid "Update Desktop before running this project."
+msgstr "Actualiza Desktop antes de ejecutar este proyecto."
+
 #: src/components/MicoTaskTabs.tsx
 msgid "Task"
 msgstr "Tarea"

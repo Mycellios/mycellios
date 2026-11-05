@@ -117,6 +117,8 @@ import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
 import { desktopBridge } from "../lib/desktop";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
+import { SidebarProjects } from "../components/SidebarProjects";
+import { useProjects } from "../lib/use-projects";
 import { PanelRightOpen } from "lucide-react";
 import { authClient } from "../lib/auth";
 import { autoReadStillWanted } from "../lib/auto-read";
@@ -357,6 +359,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const rpc = useSpaceRpc();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const projectCollection = useProjects(rpc, userId ?? null, shellSpaceId);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const activeProject = projectCollection.projects.find(project => project.conversations.some(chat => chat.threadId === taskScope?.taskThreadId));
   const [createMenuOpen, setCreateMenuOpen] = useCreateMenu();
   // A revisited space, or the shell reopened from another page, starts from what it showed
   // last time while its fresh bootstrap loads.
@@ -3623,6 +3628,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           navigate={navigate}
           setNewSpaceOpen={setNewSpaceOpen}
           setCreateBotOpen={setCreateBotOpen}
+          onCreateProject={() => { setBotsSidebarCollapsedPref(false); setQuery(""); setSearchOpen(false); if (activityMode) toggleActivityMode(); setCreatingProject(true); }}
         />
         {miniSidebar || !(activityMode || searchOpen || query) ? null : (
           <InputGroup
@@ -3697,6 +3703,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   }}
                 />
               ) : null}
+              {!miniSidebar && !activityMode ? <SidebarProjects key={JSON.stringify([userId, shellSpaceId])} projects={projectCollection.projects} rpc={rpc} bots={bots}
+                activeThread={taskScope?.taskThreadId} creating={creatingProject} onCreating={setCreatingProject} onRefresh={projectCollection.refresh} failed={projectCollection.error}
+                onSelect={(botId, threadId) => { setMobileSidebarOpen(false); navigate(`/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}`); }} /> : null}
               <SidebarRoster
                 mini={miniSidebar}
                 sidebarGroups={sidebarGroups}
@@ -3850,7 +3859,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 <span className="block truncate text-[16px] font-medium text-foreground" dir="auto">
                   {inGroup
                     ? (activeGroup?.name ?? activeSnapshot?.groupName ?? t`Group`)
-                    : (active?.name ?? t`Select a bot`)}
+                    : (activeProject ? `${activeProject.name} · ${activeProject.conversations.find(chat => chat.threadId === taskScope?.taskThreadId)?.title ?? active?.name}` : active?.name ?? t`Select a bot`)}
                 </span>
               </span>
             </Button>
@@ -3902,7 +3911,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               ) : null}
             </div>
           </div>
-          {active && !inGroup ? <div className="absolute inset-x-0 top-16 z-10 px-3 md:px-[22px]">
+          {active && !inGroup && !activeProject ? <div className="absolute inset-x-0 top-16 z-10 px-3 md:px-[22px]">
             <MicoTaskTabs key={active.id} botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc} onSelect={threadId => {
               const next = new URLSearchParams(searchParamsRef.current);
               next.delete("m");
@@ -3919,7 +3928,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             </div>
           ) : (
             <Transcript
-              headerTabs={Boolean(active && !inGroup)}
+              headerTabs={Boolean(active && !inGroup && !activeProject)}
               key={activeSnapshot?.threadId}
               scrollRef={messageScroll}
               scrollRequest={scrollRequest}
@@ -4103,10 +4112,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onAnswered={(botId) => navigate(`/app/${botId}`)}
       />
 
-      <ReviewWorkspacePanel botId={inGroup ? undefined : active?.id} prepareProject={async (prompt, id) => {
+      <ReviewWorkspacePanel botId={inGroup ? undefined : active?.id} taskThreadId={taskScope?.taskThreadId} prepareProject={async (prompt, id) => {
         const botId = active?.id;
         if (!botId || activeBotId.current !== botId || activeGroupId.current) throw new Error(t`Open the project's agent chat first.`);
-        await rpc.bots.setComputer({ botId, mode: "dedicated" });
+        // Project conversations already have an admitted native worktree. Never
+        // reassign the Mico's computer while its other conversations are running.
+        if (!taskScope) await rpc.bots.setComputer({ botId, mode: "dedicated" });
         if (activeBotId.current !== botId || activeGroupId.current) throw new Error(t`The active chat changed.`);
         const sent = await rpc.threads.prepareProject({ botId, prompt, requestId: id, responseLocale: i18n.locale });
         void refreshBots().catch(() => undefined);

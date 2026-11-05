@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   state: vi.fn(), play: vi.fn(), stop: vi.fn(), add: vi.fn(), prepare: vi.fn(), inspect: vi.fn(), cancel: vi.fn(),
-  requestAccess: vi.fn(), connect: vi.fn(),
+  requestAccess: vi.fn(), connect: vi.fn(), prepareTask: vi.fn(),
   t: (parts: TemplateStringsArray) => parts.join(""),
 }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: mocks.t }) }));
@@ -12,18 +12,32 @@ vi.mock("../lib/desktop", () => ({ desktopBridge: () => ({ projectRunner: runner
 vi.mock("../lib/review-workspace", () => ({ useReviewWorkspace: () => ({ add: mocks.add }) }));
 import { ProjectRunControls } from "./ProjectRunControls";
 const runner = { state: mocks.state, play: mocks.play, stop: mocks.stop };
-const computer = { requestAccess: mocks.requestAccess, connect: mocks.connect };
+const computer = { requestAccess: mocks.requestAccess, connect: mocks.connect, prepareTask: mocks.prepareTask };
 const idle = { phase: "idle", services: [], profiles: [], urls: [], logs: "" };
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.useFakeTimers();
-  mocks.state.mockResolvedValue(idle); mocks.requestAccess.mockResolvedValue(true); mocks.connect.mockResolvedValue(undefined); mocks.prepare.mockResolvedValue(undefined);
+  mocks.state.mockResolvedValue(idle); mocks.requestAccess.mockResolvedValue(true); mocks.connect.mockResolvedValue(undefined); mocks.prepareTask.mockResolvedValue(undefined); mocks.prepare.mockResolvedValue(undefined);
   mocks.inspect.mockResolvedValue({ status: "running", detail: "" }); mocks.cancel.mockResolvedValue({ ok: true });
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
 });
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); });
 const render = async () => { await act(async () => root.render(<ProjectRunControls botId="bot" prepare={mocks.prepare} inspectPreparation={mocks.inspect} cancelPreparation={mocks.cancel} />)); };
 const click = async (label: string) => { await act(async () => host.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click()); };
+it("binds the exact project conversation before starting its preview", async () => {
+  mocks.play.mockResolvedValue({ ...idle, phase: "running" });
+  await act(async () => root.render(<ProjectRunControls botId="bot" taskThreadId="task-one" prepare={mocks.prepare} />));
+  await click("Run project");
+  expect(mocks.prepareTask).toHaveBeenCalledExactlyOnceWith({ botId: "bot", taskThreadId: "task-one" });
+  expect(mocks.prepareTask.mock.invocationCallOrder[0]).toBeLessThan(mocks.play.mock.invocationCallOrder[0]!);
+});
+it("does not start a preview when its conversation binding is refused", async () => {
+  mocks.prepareTask.mockRejectedValue(new Error("The project account changed"));
+  await act(async () => root.render(<ProjectRunControls botId="bot" taskThreadId="task-one" prepare={mocks.prepare} />));
+  await click("Run project");
+  expect(host.textContent).toContain("The project account changed");
+  expect(mocks.play).not.toHaveBeenCalled(); expect(mocks.prepare).not.toHaveBeenCalled();
+});
 it("prepares once, waits for config, then opens the ready URL through the adjacent workspace", async () => {
   const prep = { id: "request", prompt: "prepare config" };
   mocks.play.mockResolvedValue({ ...idle, phase: "preparing", preparation: prep });

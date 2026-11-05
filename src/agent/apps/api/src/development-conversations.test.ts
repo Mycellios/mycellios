@@ -45,7 +45,7 @@ function fixture(row: object) {
   const handler = { handler: (fn: unknown) => fn };
   const routes = developmentRoutes({
     deps: { prisma },
-    authed: { development: { open: handler, list: handler, status: handler } },
+    authed: { development: { open: handler, list: handler, status: handler, projects: handler, saveProject: handler, projectTask: handler, primaryRun: handler } },
   } as never);
   return { prisma, open: routes.development.open as unknown as (v: unknown) => Promise<unknown> };
 }

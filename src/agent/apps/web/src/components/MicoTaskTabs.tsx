@@ -37,7 +37,7 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect }: {
       pending = true;
       try {
         const rows = await rpc.development.list({ botId });
-        if (active) { setTabs(rows); setLoadFailed(false); }
+        if (active) { setTabs(rows.filter(row => !row.projectKey?.startsWith("project:"))); setLoadFailed(false); }
       } catch (cause) { refused = !isRetryableError(cause); if (active) setLoadFailed(true); }
       finally { pending = false; }
     };
