@@ -74,3 +74,35 @@ scope/fence rejection and revisioned pause/reassignment. Use scripts/verify-resi
 only through compilar.ps1; it creates a synthetic loopback PostgreSQL cluster and
 never loads .env or uses production accounts. Test/build results are recorded after
 execution, not implied by this specification.
+
+## Mico work controls, concurrency and workflows
+
+The existing Mico task bar exposes Work and Workflows. Work inspects the durable
+parent/child tree, its actual Run state and expected/result data. Pause, resume,
+cancel and reassignment use the existing revisioned controls and teardown outbox;
+stale revisions require a refresh. Recent delegated work remains owner/Space scoped.
+Failure notifications respect existing per-Mico and device preferences and hide
+names when notification previews are disabled.
+
+Pi Micos admit up to four concurrent turns (configurable 1–4), atomically under
+the Bot row lock across workers. One thread still has one live turn. Native engines
+retain one turn until their shared provider sessions are qualified for concurrency.
+Private Pi tasks acquire the existing exclusive computer lease lazily before their
+first file, command or screen operation. This permits independent model/app work
+without overlapping operations on the same computer. No filesystem or provider
+permission is expanded, and resource/dependency reservations remain in force.
+
+Workflows reuse existing Micos and their model/permission configuration. The visual
+editor saves bounded DAGs with triggers, instructions, Micos, conditions, outputs
+and notes. Manual and cron executions freeze a graph version, persist step outcomes
+and run each Mico step in an owned private task conversation. The existing worker
+reconciler advances them after restart without reinserting an accepted Run.
+Conditions compare text; they do not evaluate source code. Prior output is untrusted
+input, never new authorization. Explicit direct owner workflow requests may also
+use the existing agent tool/effect/approval pipeline to prepare or run a graph.
+
+Stop commits graph cancellation, exact Run cancellation and the existing durable
+process teardown outbox together. An HTTP response does not certify OS teardown.
+Additive migrations 20261105100000 and 20261105101000 supply the concurrency policy
+and owner/Space-bound workflow records. Migration application, production promotion
+and native session concurrency are separate qualifications, not implied here.

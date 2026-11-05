@@ -13,6 +13,7 @@ import { reconcileStuckWork } from "./stuck-work.js";
 import { isLoopGuardStopText } from "./tool-loop.js";
 import { isUserProgressClientNonce } from "./user-progress.js";
 import { reconcileWork } from "@rakazo/db";
+import { reconcileWorkflowExecutions } from "./workflows.js";
 import type { SandboxProvider } from "@rakazo/adapter-kit";
 import { reconcileWorkStops } from "./work-stop-reconciler.js";
 
@@ -143,6 +144,7 @@ export function createJobReconciler(
       const auxiliary = await Promise.allSettled(
         [
           () => reconcileCallRequests(deps),
+          () => reconcileWorkflowExecutions(deps.prisma, deps.jobs),
           () => reconcileComputerRuns(deps.prisma),
           () => deps.sandbox ? reconcileWorkStops({ ...deps, sandbox: deps.sandbox }) : undefined,
           async () => { for (const runId of await reconcileWork(deps.prisma, batchSize))

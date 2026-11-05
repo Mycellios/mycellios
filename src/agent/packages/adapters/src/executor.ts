@@ -1,4 +1,6 @@
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
+import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
+import { claimMicoRun, isOwnedWorkflowThread } from "@rakazo/db";
 import { randomUUID } from "node:crypto";
 import type {
   AdapterContext,
@@ -3684,8 +3686,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
       const fence = nextFence(run.leaseFence);
       const now = new Date();
-      const leased = await deps.prisma.run.updateMany({
-        where: {
+      const leased = await claimMicoRun(deps.prisma, run, {
           id: runId,
           ...continueRunClaimFence(run),
           task: { paused: false },
@@ -3697,8 +3698,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               leaseExpiresAt: { lte: now },
             },
           ],
-        },
-        data: {
+        }, {
           status: "leased",
           leaseOwner: workerId,
           leaseFence: fence,
@@ -3706,7 +3706,6 @@ export function createRunExecutor(deps: ExecutorDeps) {
           error: null,
           checkpoint: null,
           wakeAt: null,
-        },
       });
       if (leased.count !== 1) return;
 
@@ -3734,6 +3733,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const leaseTarget = await deps.prisma.bot.findUniqueOrThrow({
         where: { id: run.botId },
         select: {
+          agentEngine: true,
           computerId: true,
           computerSwitching: true,
           computer: { select: { id: true, kind: true, scope: true, providerRef: true, homeKey: true } },
@@ -3782,22 +3782,35 @@ export function createRunExecutor(deps: ExecutorDeps) {
         ? await projectExecutionLeaseKey(deps.prisma, deps.sandbox, run, leaseTarget.computer)
         : undefined;
       const isolatedProjectRun = Boolean(projectLeaseKey);
-      try {
+      const assignedComputerId = leaseTarget.computerId;
+      const privateLane = !isolatedProjectRun && leaseTarget.agentEngine === "pi" && Boolean(await deps.prisma.thread.findFirst({
+        where: { id: run.threadId, taskBotId: run.botId, spaceId: run.spaceId, userId: run.userId }, select: { id: true },
+      }));
+      let pendingComputerReservation: Promise<void> | undefined;
+      const reserveComputer = async () => {
+        if (computerLease) return;
+        if (pendingComputerReservation) return pendingComputerReservation;
+        pendingComputerReservation = (async () => {
         computerLease = await acquireComputerExecutionLease(deps.prisma, {
-          computerId: leaseTarget.computerId,
+          computerId: assignedComputerId,
           runId,
           botId: projectLeaseKey ?? run.botId,
           resumeHeldLease,
         });
         if (!computerLease && leaseTarget.computer?.scope === "dedicated") {
           computerLease = await acquireDedicatedScreenLeaseFence(deps.prisma, {
-            computerId: leaseTarget.computerId,
+            computerId: assignedComputerId,
             runId,
             botId: run.botId,
             workerId,
             runFence: fence,
           });
         }
+        })();
+        try { await pendingComputerReservation; } finally { pendingComputerReservation = undefined; }
+      };
+      try {
+        if (!privateLane) await reserveComputer();
       } catch (error) {
         if (!(error instanceof ComputerBusyError)) throw error;
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
@@ -4035,7 +4048,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         const context = {
           operationId: runId,
-          projectSessionId: await isOwnedRoutineThread(deps.prisma, run, thread)
+          projectSessionId: (await isOwnedRoutineThread(deps.prisma, run, thread)) || (await isOwnedWorkflowThread(deps.prisma, run, thread))
             ? undefined : nativeWorkProjectSession(thread, task),
           traceId: runId,
           spaceId: run.spaceId,
@@ -4444,11 +4457,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const callEndRun = run.trigger === "call_end";
         const callClientNonceForRun = callEndRun ? run.clientNonce : sourceClientNonce;
         const voiceCall = callEndRun || isCallClientNonce(sourceClientNonce);
-        const routineConversation = run.trigger === "routine" || Boolean(run.routineId);
+        const routineConversation = run.trigger === "routine" || run.trigger === "workflow" || Boolean(run.routineId);
         const graphicalToolsAllowed = !routineConversation && !isolatedProjectRun && graphical && acceptsImages && !heldForTakeover;
         const pageBrowserAllowed =
           !routineConversation && !isolatedProjectRun && graphical && browser.describe().capabilities.page && !heldForTakeover;
         const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+        const workflowToolsAllowed = ownerStartedRun && !thread.groupId && /\b(workflows?|flujos?)\b/i.test(task.prompt);
+        if (!workflowToolsAllowed) for (const name of WORKFLOW_TOOL_NAMES) disabledBuiltinTools.add(name);
         if (thread.taskBotId) disabledBuiltinTools.add("call_user");
         if (isolatedProjectRun) {
           for (const name of [...PROJECT_SHARED_SCREEN_TOOLS, ...PAGE_BROWSER_TOOL_NAMES]) disabledBuiltinTools.add(name);
@@ -4983,6 +4998,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return pauseForApproval();
           if (disabledBuiltinTools.has(name)) {
             return { error: "This tool is disabled for this bot." };
+          }
+          if (privateLane && COMPUTER_REQUIRED_TOOL_NAMES.has(name)) {
+            try { await reserveComputer(); context.screenLeaseId = screenLeaseIdForRun(computerLease, runId, fence); }
+            catch (error) {
+              if (!(error instanceof ComputerBusyError)) throw error;
+              return { error: "This Mico's computer is in use by another task. No computer action was executed. Continue independent work or retry after that task releases it.", code: "COMPUTER_BUSY" };
+            }
           }
           if (PAGE_BROWSER_TOOL_NAMES.has(name) && !pageBrowserAllowed) {
             return { error: "Page browser is unavailable on this computer." };
@@ -7787,6 +7809,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish({ ...delegated, note: "The child task is durable. End this turn; its result will resume this request automatically. Do not send progress acknowledgements or poll." });
           }
           if (name === "work_status") return finish(await workStatus(deps.prisma, { ...run, taskId: run.taskId }));
+          if ((WORKFLOW_TOOL_NAMES as readonly string[]).includes(name)) {
+            if (!workflowToolsAllowed) return finish({ error: "Workflow changes and execution require the owner's direct request in a Mico conversation." });
+            return finish(await executeWorkflowTool(deps.prisma, run, name, args, effectKey));
+          }
           if (name === "message_bot") {
             const sent = await messageBot(
               deps,

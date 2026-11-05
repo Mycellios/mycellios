@@ -11,7 +11,10 @@ import EmbeddedPostgres from "embedded-postgres";
 // A fresh loopback cluster and synthetic accounts only. No existing database, models or keys.
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, createThreadEvents, ensureRoutineThread, isOwnedRoutineThread, routineDeliveryRouting } = await import("@rakazo/db");
+const { createDb, asSystem, createThreadEvents, ensureRoutineThread, isOwnedRoutineThread, routineDeliveryRouting, claimMicoRun, controlWorkTree, workStatus, isOwnedWorkflowThread, stopWorkflowExecution } = await import("@rakazo/db");
+const { createWorkflowExecution, reconcileWorkflowExecutions } = await import("../packages/adapters/src/workflows.js");
+const { executeWorkflowTool } = await import("../packages/adapters/src/workflow-tools.js");
+const { acquireComputerExecutionLease, releaseComputerExecutionLease } = await import("../packages/adapters/src/computer-lifecycle.js");
 const { deliverWebhookEvent, inboundDeliveryClientNonce } = await import("../apps/api/src/webhook-inbound.js");
 const { findPendingRoutineTick, routineTimerNonce } = await import("../packages/adapters/src/routine-coalescing.js");
 const server = createServer(); await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -34,6 +37,11 @@ try {
     await sql.query('DROP TABLE "routine_delivery_receipts"');
     await sql.query(await readFile("packages/db/prisma/migrations/20261104200000_routine_delivery_routing/migration.sql", "utf8"));
     checks.push("actual additive routing migration applies to an isolated PostgreSQL schema");
+    await sql.query('ALTER TABLE bots DROP COLUMN "taskConcurrency"');
+    await sql.query(await readFile("packages/db/prisma/migrations/20261105100000_mico_concurrency/migration.sql", "utf8"));
+    await sql.query('DROP TABLE workflow_executions; DROP TABLE workflows');
+    await sql.query(await readFile("packages/db/prisma/migrations/20261105101000_workflow_canvas/migration.sql", "utf8"));
+    checks.push("actual additive Mico concurrency and workflow migrations apply with owned foreign keys");
   } finally { await sql.end(); }
   db = createDb(url, { encryptContent: false, applicationName: "synthetic-routine-acceptance" });
   const prisma = asSystem(db.prisma, "isolated routine acceptance fixtures");
@@ -42,6 +50,8 @@ try {
   await prisma.user.create({ data: { id: scope.userId, name: "Synthetic owner", email: `${suffix}@example.invalid` } });
   await prisma.organization.create({ data: { id: `org-${suffix}`, name: "Synthetic", slug: suffix, createdAt: new Date() } });
   await prisma.space.create({ data: { id: scope.spaceId, name: "Synthetic", organizationId: `org-${suffix}` } });
+  await prisma.member.create({ data: { id: `member-${suffix}`, organizationId: `org-${suffix}`, userId: scope.userId, role: "owner", createdAt: new Date() } });
+  await prisma.spaceMember.create({ data: { id: `membership-${suffix}`, ...scope, organizationId: `org-${suffix}`, role: "owner", createdAt: new Date() } });
   const bot = await prisma.bot.create({ data: { ...scope, name: "Synthetic Mico", color: "#10B981", thread: { create: { ...scope } } }, include: { thread: true } });
   const routines = await Promise.all(["A", "B"].map(name => prisma.routine.create({ data: {
     ...scope, botId: bot.id, name: `Synthetic ${name}`, prompt: `Synthetic ${name} task`, crons: [], active: true,
@@ -110,15 +120,102 @@ try {
   assert.equal((await prisma.run.findUniqueOrThrow({ where: { id: timerRuns[1]!.id } })).status, "cancelled");
   assert.equal(retained?.cancelledEvents?.[0]?.threadId, timerThread.id);
   checks.push("upgrade catch-up retains unattempted timer work in its original thread without creating another tick");
+  const slots = [];
+  for (let n = 0; n < 6; n++) {
+    const thread = await prisma.thread.create({ data: { ...scope, taskBotId: bot.id, projectKey: `mico:${bot.id}`, taskKey: `mico-task:${bot.id}:${n}` } });
+    const task = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: thread.id, prompt: "Synthetic concurrency", status: "queued" } });
+    slots.push(await prisma.run.create({ data: { ...scope, botId: bot.id, taskId: task.id, threadId: thread.id, status: "queued", trigger: "user" } }));
+  }
+  const claim = (run: typeof slots[number]) => claimMicoRun(prisma, run, { id: run.id, status: "queued", leaseFence: 0 },
+    { status: "leased", leaseOwner: "synthetic-worker", leaseFence: 1, leaseExpiresAt: new Date(Date.now() + 60000) });
+  const claims = await Promise.all(slots.map(claim)); assert.equal(claims.filter(value => value.count === 1).length, 4);
+  const held = slots.find((_, index) => claims[index]!.count === 1)!;
+  await prisma.run.updateMany({ where: { botId: bot.id, id: { not: held.id }, status: "leased" }, data: { status: "completed", leaseOwner: null, leaseExpiresAt: null } });
+  const duplicateTask = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: held.threadId, prompt: "Same conversation", status: "queued" } });
+  const duplicateRun = await prisma.run.create({ data: { ...scope, botId: bot.id, taskId: duplicateTask.id, threadId: held.threadId, status: "queued", trigger: "user" } });
+  assert.equal((await claim(duplicateRun)).count, 0);
+  const waiting = slots.find((_, index) => claims[index]!.count === 0)!;
+  await prisma.bot.update({ where: { id: bot.id }, data: { agentEngine: "codex" } });
+  assert.equal((await claim(waiting)).count, 0);
+  await prisma.bot.update({ where: { id: bot.id }, data: { agentEngine: "pi", taskConcurrency: 1 } });
+  assert.equal((await claim(waiting)).count, 0);
+  assert.equal((await claimMicoRun(prisma, { ...waiting, userId: "foreign" }, { id: waiting.id }, { status: "leased" })).count, 0);
+  await prisma.run.updateMany({ where: { botId: bot.id, status: "leased" }, data: { status: "completed", leaseOwner: null, leaseExpiresAt: null } });
+  assert.equal((await claimMicoRun(prisma, { ...waiting, threadId: held.threadId }, { id: waiting.id, status: "queued" }, { status: "leased" })).count, 0);
+  checks.push("simultaneous workers admit at most four Mico lanes, preserve one turn per thread, and enforce native/owner/configured limits");
+  const computer = await prisma.computer.create({ data: { ...scope, scope: "team", scopeKey: `synthetic:${suffix}`, homeKey: `synthetic:${suffix}`, kind: "docker", state: "running" } });
+  await prisma.bot.update({ where: { id: bot.id }, data: { computerId: computer.id } });
+  const firstLease = await acquireComputerExecutionLease(prisma, { computerId: computer.id, botId: bot.id, runId: held.id });
+  assert.ok(firstLease);
+  await assert.rejects(acquireComputerExecutionLease(prisma, { computerId: computer.id, botId: bot.id, runId: waiting.id }));
+  await releaseComputerExecutionLease(prisma, firstLease);
+  const nextLease = await acquireComputerExecutionLease(prisma, { computerId: computer.id, botId: bot.id, runId: waiting.id });
+  assert.ok(nextLease); await releaseComputerExecutionLease(prisma, nextLease);
+  checks.push("parallel conversation admission never shares the same Mico computer lease across runs");
+  const delegated = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: bot.thread!.id, prompt: "Synthetic parent", status: "queued", delegationState: "waiting" } });
+  const child = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: held.threadId, prompt: "Synthetic child", status: "queued", parentTaskId: delegated.id, delegationRootId: delegated.id, delegationState: "queued" } });
+  await controlWorkTree(prisma, { ...scope, email: "not-a-Prisma-field" } as typeof scope, { taskId: child.id, expectedRevision: child.delegationRevision, action: "pause" });
+  const paused = await prisma.task.findUniqueOrThrow({ where: { id: child.id } }); assert.equal(paused.paused, true);
+  await assert.rejects(controlWorkTree(prisma, scope, { taskId: child.id, expectedRevision: child.delegationRevision, action: "cancel" }));
+  await prisma.task.update({ where: { id: child.id }, data: { workStopPending: false } });
+  await controlWorkTree(prisma, scope, { taskId: child.id, expectedRevision: paused.delegationRevision, action: "cancel" });
+  const cancelled = await prisma.task.findUniqueOrThrow({ where: { id: child.id } }); assert.equal(cancelled.delegationState, "cancelled");
+  await assert.rejects(controlWorkTree(prisma, scope, { taskId: child.id, expectedRevision: cancelled.delegationRevision, action: "resume" }));
+  assert.ok((await workStatus(prisma, { ...scope, taskId: delegated.id })).some(value => value.id === child.id && value.delegationState === "cancelled"));
+  checks.push("delegated controls preserve version fences, reject stale changes and never silently resume cancelled work");
+  const graph = { nodes: [
+    { id: "start", kind: "trigger", trigger: "manual", title: "Start", text: "approved", x: 0, y: 0 },
+    { id: "condition", kind: "condition", title: "Decision", text: "", x: 200, y: 0, condition: { operator: "contains", value: "approved" } },
+    { id: "agent", kind: "agent", botId: bot.id, title: "Mico", text: "Synthetic task", x: 400, y: 0 },
+    { id: "no", kind: "output", title: "No", text: "Rejected", x: 400, y: 200 },
+    { id: "result", kind: "output", title: "Result", text: "", x: 600, y: 0 },
+  ], edges: [{ id: "a", from: "start", to: "condition" }, { id: "b", from: "condition", to: "agent", branch: "yes" }, { id: "c", from: "condition", to: "no", branch: "no" }, { id: "d", from: "agent", to: "result" }] };
+  const flow = await executeWorkflowTool(prisma, scope, "save_workflow", { name: "Synthetic workflow", graph }, "synthetic-save");
+  const replayFlow = await executeWorkflowTool(prisma, scope, "save_workflow", { name: "Synthetic workflow", graph }, "synthetic-save");
+  assert.equal((flow as { id: string }).id, (replayFlow as { id: string }).id);
+  const flowId = (flow as { id: string }).id;
+  const execution = await executeWorkflowTool(prisma, scope, "run_workflow", { id: flowId, expectedVersion: 1, triggerId: "start" }, "synthetic-execute") as { id: string };
+  await reconcileWorkflowExecutions(prisma, deps.jobs);
+  const stepRun = await prisma.run.findFirstOrThrow({ where: { clientNonce: `workflow:${execution.id}:agent` }, include: { thread: true } });
+  assert.equal(stepRun.thread.taskBotId, bot.id); assert.notEqual(stepRun.threadId, bot.thread!.id);
+  assert.equal(await isOwnedWorkflowThread(prisma, scope, stepRun.thread), true);
+  await reconcileWorkflowExecutions(prisma, deps.jobs);
+  assert.equal(await prisma.run.count({ where: { clientNonce: stepRun.clientNonce } }), 1);
+  await prisma.message.create({ data: { threadId: stepRun.threadId, role: "bot", seq: 1, runId: stepRun.id, blocks: [{ kind: "text", text: "Synthetic verified result" }] } });
+  await prisma.run.update({ where: { id: stepRun.id }, data: { status: "completed" } });
+  await reconcileWorkflowExecutions(prisma, deps.jobs);
+  const finished = await prisma.workflowExecution.findUniqueOrThrow({ where: { id: execution.id } });
+  assert.equal(finished.status, "completed");
+  assert.equal((finished.steps as Record<string, { status: string }>).no?.status, "skipped");
+  assert.match((finished.steps as Record<string, { output?: string }>).result?.output ?? "", /Synthetic verified result/);
+  await assert.rejects(executeWorkflowTool(prisma, { ...scope, userId: "foreign" }, "run_workflow", { id: flowId, expectedVersion: 1, triggerId: "start" }, "foreign-execute"));
+  await assert.rejects(executeWorkflowTool(prisma, scope, "save_workflow", { id: flowId, expectedVersion: 99, name: "Stale edit", graph }, "stale-save"));
+  checks.push("workflows resume durable steps exactly once, use private Mico conversations, select a condition branch and retain output across reconciliations");
+  checks.push("workflow tools enforce ownership, deterministic creation identity and optimistic graph versions");
+  const stoppedExecution = await executeWorkflowTool(prisma, scope, "run_workflow", { id: flowId, expectedVersion: 1, triggerId: "start" }, "synthetic-stop") as { id: string };
+  await reconcileWorkflowExecutions(prisma, deps.jobs);
+  const stoppedRun = await prisma.run.findFirstOrThrow({ where: { clientNonce: `workflow:${stoppedExecution.id}:agent` } });
+  await assert.rejects(stopWorkflowExecution(prisma, { ...scope, userId: "foreign" }, stoppedExecution.id));
+  await stopWorkflowExecution(prisma, scope, stoppedExecution.id);
+  await stopWorkflowExecution(prisma, scope, stoppedExecution.id);
+  assert.equal((await prisma.run.findUniqueOrThrow({ where: { id: stoppedRun.id } })).status, "cancelled");
+  assert.equal((await prisma.task.findUniqueOrThrow({ where: { id: stoppedRun.taskId } })).workStopPending, true);
+  await reconcileWorkflowExecutions(prisma, deps.jobs);
+  assert.equal(await prisma.run.count({ where: { clientNonce: stoppedRun.clientNonce } }), 1);
+  checks.push("workflow Stop atomically cancels its exact runs and persists teardown across retries and reconciliation");
   const rls = database.getPgClient(); await rls.connect();
   try {
     await rls.query('CREATE ROLE routine_receipt_probe NOLOGIN');
-    await rls.query('GRANT SELECT, INSERT ON routine_delivery_receipts TO routine_receipt_probe');
+    await rls.query('GRANT SELECT, INSERT ON routine_delivery_receipts, workflows, workflow_executions TO routine_receipt_probe');
     await rls.query('SET ROLE routine_receipt_probe');
     await rls.query("SELECT set_config('app.space_id', $1, false), set_config('app.user_id', $2, false)", [scope.spaceId, scope.userId]);
     assert.ok(Number((await rls.query('SELECT count(*) AS count FROM routine_delivery_receipts')).rows[0].count) > 0);
+    assert.ok(Number((await rls.query('SELECT count(*) AS count FROM workflows')).rows[0].count) > 0);
+    assert.ok(Number((await rls.query('SELECT count(*) AS count FROM workflow_executions')).rows[0].count) > 0);
     await rls.query("SELECT set_config('app.user_id', 'foreign', false)");
     assert.equal(Number((await rls.query('SELECT count(*) AS count FROM routine_delivery_receipts')).rows[0].count), 0);
+    assert.equal(Number((await rls.query('SELECT count(*) AS count FROM workflows')).rows[0].count), 0);
+    assert.equal(Number((await rls.query('SELECT count(*) AS count FROM workflow_executions')).rows[0].count), 0);
     await rls.query("SELECT set_config('app.space_id', 'foreign', false), set_config('app.user_id', $1, false)", [scope.userId]);
     assert.equal(Number((await rls.query('SELECT count(*) AS count FROM routine_delivery_receipts')).rows[0].count), 0);
     await assert.rejects(rls.query('INSERT INTO routine_delivery_receipts (id, "spaceId", "userId", "botId", source, "keyDigest", "routineIds") VALUES ($1,$2,$3,$4,$5,$6,$7)',

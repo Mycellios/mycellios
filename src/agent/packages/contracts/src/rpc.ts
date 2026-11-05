@@ -1,6 +1,7 @@
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
 import { ProjectId, ProjectName, ProjectSummary } from "./projects.js";
+import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema } from "./workflows.js";
 import { ContributionEnrollmentSchema, ContributionNodeInput, ContributionStateSchema } from "./contribution.js";
 import {
   AgentImportCreateInput,
@@ -705,6 +706,16 @@ export const appContract = {
       .output(SpaceMemoryConfigSchema),
     disconnectProvider: oc.output(z.object({ ok: z.literal(true) })),
   },
+  workflows: {
+    list: oc.output(z.array(WorkflowSchema)),
+    available: oc.output(z.object({ enabled: z.literal(true) })),
+    create: oc.input(z.object({ id: Id.optional(), name: z.string().trim().min(1).max(160), graph: WorkflowGraphSchema })).output(WorkflowSchema),
+    save: oc.input(z.object({ id: Id, expectedVersion: z.number().int().positive(), name: z.string().trim().min(1).max(160), graph: WorkflowGraphSchema, active: z.boolean() })).output(WorkflowSchema),
+    archive: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    execute: oc.input(z.object({ id: Id, triggerId: Id, expectedVersion: z.number().int().positive(), clientNonce: z.string().min(1).max(160) })).output(WorkflowExecutionSchema),
+    runs: oc.input(z.object({ id: Id })).output(z.array(WorkflowExecutionSchema)),
+    stop: oc.input(z.object({ executionId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
   routines: {
     list: oc.input(botId).output(z.array(RoutineSchema)),
     history: oc
@@ -1166,11 +1177,16 @@ export const appContract = {
       .output(z.object({ icon: z.string().nullable(), retry: z.boolean().optional() })),
   },
   tasks: {
+    overview: oc.output(z.array(z.object({ taskId: Id, runId: Id.nullable(), botId: Id, name: z.string(),
+      threadId: Id, taskThreadId: Id.optional(), groupId: Id.optional(), status: z.string(), notify: z.boolean(), updatedAt: IsoDate }))),
+    concurrency: oc.input(z.object({ botId: Id, limit: z.number().int().min(1).max(4).optional() }))
+      .output(z.object({ limit: z.number().int(), effectiveLimit: z.number().int() })),
     work: oc.input(z.object({taskId:Id})).output(z.array(z.object({
       id:Id,botId:Id,parentTaskId:Id.nullable(),delegationState:z.string().nullable(),
       delegationRevision:z.number().int(),paused:z.boolean(),workStopPending:z.boolean(),
       expectedResult:z.string().nullable(),resources:z.array(z.string()),dependencies:z.array(Id),
       delegatedRunId:Id.nullable(),updatedAt:IsoDate,threadId:Id,result:z.string(),resultIsUntrustedData:z.boolean(),
+        executionStatus:z.string().nullable().optional(),
     }))),
     controlWork: oc.input(z.object({taskId:Id,expectedRevision:z.number().int().nonnegative(),
       action:z.enum(['pause','resume','cancel','reassign']),botId:Id.optional()}))

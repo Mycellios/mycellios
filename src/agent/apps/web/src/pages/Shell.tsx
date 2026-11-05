@@ -198,6 +198,8 @@ import { clearSpaceSelection, createSpaceRpc, selectedSpaceId, selectSpace } fro
 import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
 import type { TaskThreadScope } from "../lib/task-thread-scope";
 import { MicoTaskTabs } from "../components/MicoTaskTabs";
+import { MicoWorkMenu } from "../components/MicoWorkMenu";
+import { WorkflowWorkspace } from "./WorkflowWorkspace";
 import { unsafeRunRetryText } from "../lib/retry-error";
 import { canRetryThreadRun, retryOriginalThreadRun } from "../lib/retry-thread-run";
 import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-storage";
@@ -455,6 +457,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const [replyTarget, setReplyTarget] = useState<ThreadMessage | null>(null);
   const [replyQuote, setReplyQuote] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [workflowsOpen, setWorkflowsOpen] = useState(false);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
   const retryInFlight = useRef<string | null>(null);
   const [unretryableRunIds, setUnretryableRunIds] = useState<Set<string>>(() => new Set());
@@ -3912,7 +3915,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             </div>
           </div>
           {active && !inGroup && !activeProject ? <div className="absolute inset-x-0 top-16 z-10 px-3 md:px-[22px]">
-            <MicoTaskTabs key={active.id} botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc} onSelect={threadId => {
+            <MicoTaskTabs key={active.id} botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc}
+              actions={<><MicoWorkMenu key={active.id} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
+                onOpenTask={task => navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" })} />
+                <Button size="sm" variant="ghost" onClick={() => setWorkflowsOpen(true)}><Trans>Workflows</Trans></Button></>}
+              onSelect={threadId => {
               const next = new URLSearchParams(searchParamsRef.current);
               next.delete("m");
               if (threadId) next.set("task", threadId); else next.delete("task");
@@ -4105,6 +4112,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         ) : null}
       </main>
 
+      {workflowsOpen && active ? <WorkflowWorkspace botId={active.id} bots={bots} onClose={() => setWorkflowsOpen(false)} /> : null}
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall
         bots={bootstrapMe?.phoneCallsEnabled ? bots : []}

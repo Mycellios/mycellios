@@ -30,6 +30,20 @@
   records an unknown outcome, not success or permission to replay the command.
   Verify desktop-sandbox-command, desktop-process-tree and native-command-journal.
 
+- Mico Work controls reuse revisioned delegation controls and durable teardown.
+  Pi concurrency is admitted atomically per Bot and serialized per thread; native
+  engines remain single-turn. Private Pi tasks reserve the existing computer lease
+  before computer/file/command tools, never share it between runs. Workflows reuse
+  existing Micos, owner/Space RPCs and the existing reconciler, freeze graph versions
+  and persist private step runs. Stop commits cancellation and process teardown
+  receipts together. Verify workflow contracts, affected wakeup/control tests and
+  the synthetic PostgreSQL/browser acceptance scripts through compilar.ps1; never
+  use production accounts, credentials or models in these fixtures.
+  Workflow thread ownership queries project only userId/spaceId from a Run actor;
+  preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
+  Delegation from ordinary Mico tabs uses internal work scope; explicit project
+  delegation keeps its independent native project binding and admission.
+
 - Settings uses one searchable account/Space shell. General contains device UI
   preferences; Profile owns identity/security; Micos opens the existing per-Mico
   editor and its canonical skills editor. Keep Models, Voice, Approvals, Memory, Usage,

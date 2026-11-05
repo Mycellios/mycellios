@@ -219,7 +219,7 @@ export class RunWorkerHost implements JobWorkerHost {
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: batchSize,
-      select: { id: true, createdAt: true, botId: true, threadId: true, thread: { select: { projectKey: true } }, bot: { select: { computerId: true } } },
+      select: { id: true, createdAt: true, botId: true, threadId: true, thread: { select: { projectKey: true, taskBotId: true } }, bot: { select: { computerId: true, agentEngine: true } } },
     });
     // Leave resource waits queued. Reclaiming them on every scan changes their
     // age, hides stuck-work reminders, and produces false execution starts.
@@ -234,7 +234,7 @@ export class RunWorkerHost implements JobWorkerHost {
       : [];
     const runnable = rows.filter(
       (row) =>
-        !leases.some(
+        (row.bot.agentEngine === "pi" && row.thread.taskBotId === row.botId && !row.thread.projectKey?.startsWith("project:")) || !leases.some(
           (lease) =>
             lease.botId === leaseKey(row) &&
             lease.computerId === row.bot.computerId &&
