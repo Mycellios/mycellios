@@ -1,5 +1,14 @@
 # AGENTS.md
 
+- Private Apps stay disabled in production builds. Local development keeps its
+  preview; packaged private qualification requires both VITE_MYCELLIOS_PRIVATE_APPS=1
+  at web build time and MYCELLIOS_PRIVATE_APPS=1 at native launch. These release
+  flags never replace the account, Space, PC consent or revision admission.
+- Account-PC shutdown ignores late status callbacks after quitting and clears the
+  tray reference before destruction. Verify account-computer-background tests;
+  repeated stop and pending refresh completion must not touch a destroyed Tray
+  or rewrite Windows startup preferences during shutdown.
+
 - Apps opens beside the existing chat through the Shell overlay; preserve its
   draft and scope. The private Video Studio v1 definition is in Desktop assets,
   with a fixed native driver and owner/Space/device-private projects. No app HTML,

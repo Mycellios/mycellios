@@ -17,6 +17,7 @@ vi.mock("./account-computer.js", () => ({
     }
     stop() {
       state.stopped++;
+      state.changed();
     }
     refresh() {
       return Promise.resolve();
@@ -32,9 +33,11 @@ vi.mock("electron", async () => {
     quit: vi.fn(),
   });
   class Tray extends EventEmitter {
-    setToolTip = vi.fn();
+    destroyed = false;
+    isDestroyed = () => this.destroyed;
+    setToolTip = vi.fn(() => { if (this.destroyed) throw new Error("Tray is destroyed"); });
     setContextMenu = vi.fn();
-    destroy = vi.fn();
+    destroy = vi.fn(() => { this.destroyed = true; });
   }
   return { app, Tray, Menu: { buildFromTemplate: vi.fn((x) => x) } };
 });
@@ -89,4 +92,23 @@ it("keeps a consented window and its draft alive in the background, with explici
   window.emit("close", quitClose);
   expect(quitClose.preventDefault).not.toHaveBeenCalled();
   expect(state.stopped).toBeGreaterThan(0);
+});
+
+it("ignores synchronous and late connection changes after the tray has shut down", async () => {
+  vi.useFakeTimers();
+  const changed = vi.fn();
+  const service = installAccountComputerBackground({
+    profile: "shutdown-fixture", host: {} as any, localUrl: "http://127.0.0.1",
+    localToken: "fixture", context: async () => null, consentScope: () => "fixture",
+    window: () => null, changed,
+  });
+  await Promise.resolve();
+  changed.mockClear();
+  const startupCalls = vi.mocked(app.setLoginItemSettings).mock.calls.length;
+  expect(() => app.emit("before-quit")).not.toThrow();
+  state.allowed = !state.allowed;
+  expect(() => service.stop()).not.toThrow();
+  expect(() => state.changed()).not.toThrow();
+  expect(changed).not.toHaveBeenCalled();
+  expect(vi.mocked(app.setLoginItemSettings).mock.calls).toHaveLength(startupCalls);
 });
