@@ -61,6 +61,7 @@ export function verifyRepositoryStructure(root = process.cwd()) {
   const docsPath = resolve(root, "docs");
   if (existsSync(docsPath)) {
     const docs = readdirSync(docsPath, { withFileTypes: true })
+      .filter((entry) => !(entry.isDirectory() && entry.name === "images"))
       .map((entry) => entry.name)
       .sort();
     if (!sameMembers(docs, [...CANONICAL_DOCS].sort())) {

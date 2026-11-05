@@ -614,7 +614,7 @@ export function NetworkPage({
       if (hitId !== hoveredRef.current) {
         hoveredRef.current = hitId;
         canvas.style.cursor = hit ? "pointer" : "";
-        if (reduceMotion || !animate) draw();
+        draw();
       }
     };
     const onPointerUp = (event: PointerEvent) => {

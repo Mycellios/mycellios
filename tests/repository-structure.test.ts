@@ -46,6 +46,20 @@ describe("repository structure", () => {
     expect(() => verifyRepositoryStructure(root)).toThrow("canonical_docs_mismatch");
   });
 
+  it("permits the documentation image directory without admitting other areas", () => {
+    const root = fixture();
+    mkdirSync(join(root, "docs", "images"));
+    expect(() => verifyRepositoryStructure(root)).not.toThrow();
+    mkdirSync(join(root, "docs", "archive"));
+    expect(() => verifyRepositoryStructure(root)).toThrow("canonical_docs_mismatch");
+  });
+
+  it("does not treat a document named images as an asset directory", () => {
+    const root = fixture();
+    writeFileSync(join(root, "docs", "images"), "unexpected document\n");
+    expect(() => verifyRepositoryStructure(root)).toThrow("canonical_docs_mismatch");
+  });
+
   it("rejects a duplicate documentation site", () => {
     const root = fixture();
     mkdirSync(join(root, "docs-site"));
