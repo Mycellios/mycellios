@@ -1,0 +1,2 @@
+ALTER TABLE bots ADD COLUMN "taskConcurrency" INTEGER NOT NULL DEFAULT 4
+  CHECK ("taskConcurrency" BETWEEN 1 AND 4);

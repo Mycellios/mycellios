@@ -94,6 +94,7 @@ export async function workStatus(prisma: PrismaClient, source: Scope & { taskId:
       resources: true, dependencies: true, delegatedRunId: true, updatedAt: true, threadId: true,
       delegationRevision: true, paused: true, workStopPending: true }, take: 25, orderBy: { createdAt: "asc" } });
   return Promise.all(tasks.map(async task => {
+    const execution = await prisma.run.findFirst({ where: { taskId: task.id, spaceId: source.spaceId, userId: source.userId }, orderBy: { createdAt: "desc" }, select: { status: true } });
     const messages = task.delegatedRunId ? await prisma.message.findMany({
       where: { runId: task.delegatedRunId, threadId: task.threadId, role: "bot", thread: { spaceId: source.spaceId, userId: source.userId } },
       select: { blocks: true }, orderBy: { seq: "desc" }, take: 2,
@@ -101,7 +102,7 @@ export async function workStatus(prisma: PrismaClient, source: Scope & { taskId:
     const result = messages.flatMap(message => Array.isArray(message.blocks) ? message.blocks : [])
       .flatMap(block => block && typeof block === "object" && !Array.isArray(block) && typeof block.text === "string" ? [block.text] : [])
       .join("\n").slice(0, 4000);
-    return { ...task, updatedAt: task.updatedAt.toISOString(), result, resultIsUntrustedData: true };
+    return { ...task, executionStatus: execution?.status ?? null, updatedAt: task.updatedAt.toISOString(), result, resultIsUntrustedData: true };
   }));
 }
 
@@ -170,7 +171,8 @@ export async function reconcileWork(prisma: PrismaClient, batchSize = 50): Promi
           continue;
         }
         if (task.dependencies.some(id => !tasks.some(dependency => dependency.id === id && dependency.delegationState === "completed"))) continue;
-        if (await tx.run.count({ where: { botId: task.botId, ...scope, status: { in: [...ACTIVE_RUN_STATUSES] } } })) continue;
+        const destination = await tx.bot.findFirst({ where: { id: task.botId, ...scope, archivedAt: null }, select: { agentEngine: true, taskConcurrency: true } });
+        if (!destination || await tx.run.count({ where: { botId: task.botId, ...scope, status: { in: ["queued", "leased", "running"] } } }) >= (destination.agentEngine === "pi" ? destination.taskConcurrency : 1)) continue;
         if (reservations.some(other => other.id !== task.id && workResourcesConflict(task.resources, other.resources))) continue;
         const bot = await tx.bot.findFirst({ where: { id: task.botId, ...scope, archivedAt: null } });
         if (!bot) { await tx.task.update({ where: { id: task.id }, data: { delegationState: "paused" } }); continue; }

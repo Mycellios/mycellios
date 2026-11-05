@@ -51,7 +51,7 @@ export function developmentRoutes(ctx: RouterContext) {
       }),
       open: authed.development.open.handler(async ({ context, input }) => {
         const actor = context.actor;
-        if (input.taskKey.startsWith("routine:") || input.projectKey.startsWith("routine:"))
+        if (["routine:", "workflow:"].some(prefix => input.taskKey.startsWith(prefix) || input.projectKey.startsWith(prefix)))
           throw new ORPCError("BAD_REQUEST", { message: "Routine conversation identities are managed by the server." });
         await createRepos(deps.prisma).getBot(actor, input.botId);
         const row = await deps.prisma.thread.upsert({

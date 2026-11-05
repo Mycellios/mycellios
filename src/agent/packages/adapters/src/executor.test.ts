@@ -16,6 +16,9 @@ import { describe, expect, it, vi } from "vitest";
 // These scheduling fixtures exercise the committed target and publishing lifecycle.
 vi.mock("@rakazo/db", async (load) => ({
   ...await load<typeof import("@rakazo/db")>(),
+  // Atomic cross-worker admission is exercised by the isolated PostgreSQL fixture.
+  claimMicoRun: vi.fn(async (prisma: PrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<PrismaClient["run"]["updateMany"]>[0])),
   ensureRoutineThread: vi.fn(async (prisma: PrismaClient, actor: { spaceId: string; userId: string }, id: string) => {
     const routine = await prisma.routine.findUnique({ where: { id } });
     if (!routine) throw new Error("Routine unavailable");
@@ -1305,7 +1308,7 @@ describe("run notification preference", () => {
       },
       select: {
         bot: { select: { notifyOnFinish: true } },
-        thread: { select: { groupId: true } },
+        thread: { select: { groupId: true, taskBotId: true } },
       },
     });
 

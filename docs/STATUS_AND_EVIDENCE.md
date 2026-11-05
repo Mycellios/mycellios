@@ -1492,3 +1492,35 @@ API, worker, database, coordinator and other protected container identities/star
 times were unchanged; no migration, financial action or native installer update
 was performed. Full CI was not run. Detailed receipts and logs are retained in
 `outputs/settings-prod-20261105/` and the owned server release directory.
+
+## Mico work controls, concurrent tasks and workflows (local source, 2026-11-05)
+
+The Mico task bar now exposes revisioned delegated-work controls and an owned
+recent-work overview. Pi Micos admit 1–4 simultaneous turns atomically across
+workers, with one live turn per thread. Private Pi tasks reserve the existing
+exclusive computer lease before computer operations; native provider sessions
+remain single-turn. Existing resource reservations, permissions and models remain
+in use. The visual workflow editor supports manual/cron triggers, instructions,
+Micos, text conditions and outputs. Executions freeze a graph version, persist
+private step Runs and resume via the existing reconciler. Workflow Stop atomically
+cancels its Runs and records the existing durable process teardown outbox.
+
+Local qualification passed 285 directly affected tests, incremental web/API typing,
+and the isolated PostgreSQL acceptance script (16 recorded checks, including the
+actual additive migrations, concurrent admission, stale controls, owner/Space RLS,
+step recovery and durable Stop). Adapter typing also passed in the isolated remote
+compiler. Earlier local checks hit memory limits; those attempts were not passes.
+The final browser fixture passed on the PC: task controls, concurrency selection,
+workflow save/run/stop, desktop/mobile layout and light/dark task navigation.
+The desktop-width assertion caught and verified a corrected dialog-size defect.
+The scoped design detector returned no findings; the fresh finish review returned
+`ship` for the supplied synthetic captures and UI source, with delegated controls
+source-reviewed rather than visually captured open.
+
+Fixtures used synthetic accounts and a fresh loopback database, called no models
+and did not access production. Full suites, authenticated provider execution,
+installer packaging and production promotion were NOT RUN for this change.
+The changes are local on `codex/mico-workflow-concurrency-20261105`, based on
+main `6420234`; no commit, push, shared migration or deployment is implied.
+Evidence is retained in `outputs/mico-workflows-acceptance-20261105/` in Daniel's
+workspace. Other agents' original checkouts and changes were retained.

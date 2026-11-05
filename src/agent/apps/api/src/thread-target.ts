@@ -35,6 +35,7 @@ import {
   expireComputerExecutionLeases,
   IsolationError,
   isOwnedRoutineThread,
+  isOwnedWorkflowThread,
   lockOwnedGroup,
   primaryActiveRun,
   retireWaitingQuestionInTransaction,
@@ -308,7 +309,7 @@ export async function resolveThreadTarget(
       kind: "bot",
       botId: bot.id,
       threadId: taskThread?.id ?? bot.thread.id,
-      ...(taskThread && !isMicoTaskThread(taskThread) && !(await isOwnedRoutineThread(prisma, actor, taskThread)) ? { projectSessionId: taskThread.id } : {}),
+      ...(taskThread && !isMicoTaskThread(taskThread) && !(await isOwnedRoutineThread(prisma, actor, taskThread)) && !(await isOwnedWorkflowThread(prisma, actor, taskThread)) ? { projectSessionId: taskThread.id } : {}),
       bot,
     };
   }

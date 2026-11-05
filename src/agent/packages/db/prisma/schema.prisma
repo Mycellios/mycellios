@@ -22,6 +22,8 @@ model AiDataConsent {
 }
 
 model User {
+  workflows Workflow[]
+  workflowExecutions WorkflowExecution[]
   aiDataConsents AiDataConsent[]
   id                          String                       @id
   name                        String
@@ -257,6 +259,8 @@ model Member {
 }
 
 model Space {
+  workflows Workflow[]
+  workflowExecutions WorkflowExecution[]
   aiDataConsents              AiDataConsent[]
   id                          String                       @id
   organizationId              String
@@ -483,7 +487,49 @@ model SpaceVoicePreference {
   @@map("space_voice_preferences")
 }
 
+model Workflow {
+  id String @id
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  version Int @default(1)
+  graph Json
+  active Boolean @default(false)
+  nextRunAt DateTime?
+  archivedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  executions WorkflowExecution[]
+  @@unique([id,spaceId,userId], map: "workflows_identity_scope_key")
+  @@index([spaceId,userId], map: "workflows_owner_idx")
+  @@map("workflows")
+}
+model WorkflowExecution {
+  id String @id
+  workflowId String
+  workflow Workflow @relation(fields: [workflowId,spaceId,userId], references: [id,spaceId,userId], onDelete: Cascade)
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version Int
+  graph Json
+  triggerId String
+  clientNonce String
+  status String @default("queued")
+  steps Json @default("{}")
+  error String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  @@unique([spaceId,userId,clientNonce])
+  @@index([spaceId,userId,workflowId,createdAt], map: "workflow_executions_owner_idx")
+  @@map("workflow_executions")
+}
+
 model Bot {
+  taskConcurrency Int @default(4)
   agentEngine String @default("pi")
   skillPins BotSkillPin[]
   screenGeneration Int @default(0)
