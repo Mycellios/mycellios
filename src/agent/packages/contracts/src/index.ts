@@ -39,6 +39,7 @@ export * from "./workflows.js";
 export * from "./search.js";
 export * from "./security-events.js";
 export * from "./task-cost.js";
+export * from "./projects.js";
 export * from "./settings-scope.js";
 export * from "./terminal.js";
 export * from "./voice-errors.js";

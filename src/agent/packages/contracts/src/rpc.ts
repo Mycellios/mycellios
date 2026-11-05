@@ -1,5 +1,6 @@
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
+import { ProjectId, ProjectName, ProjectSummary } from "./projects.js";
 import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema } from "./workflows.js";
 import { ContributionEnrollmentSchema, ContributionNodeInput, ContributionStateSchema } from "./contribution.js";
 import {
@@ -466,6 +467,10 @@ export const appContract = {
     ),
   },
   development: {
+    projects: oc.input(z.object({})).output(z.array(ProjectSummary)),
+    primaryRun: oc.input(z.object({ botId: Id, runId: Id })).output(z.boolean()),
+    saveProject: oc.input(z.object({ id: ProjectId, name: ProjectName })).output(z.object({ id: ProjectId })),
+    projectTask: oc.input(z.object({ botId: Id, taskThreadId: Id })).output(z.object({ projectId: ProjectId, name: ProjectName, userId: Id, spaceId: Id }).nullable()),
     status: oc.input(z.object({botId:Id,taskThreadId:Id,runId:Id})).output(z.object({status:z.string(),detail:z.string().max(128000),error:z.string().nullable()})),
     open: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240),taskKey:z.string().min(1).max(240),title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id})),
     list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),

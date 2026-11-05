@@ -26,8 +26,7 @@ export async function startHostComputerServer(options: {
   let enabled = false;
   // Only the native folder picker can grant projects; this map has no HTTP write method.
   const projects = new Map<string, string>();
-  const taskProjects = new Map<string, { botId: string; key: string }>();
-  const activeTaskBots = new Map<string, string>();
+  const taskProjects = new Map<string, { botId: string; key: string; active: boolean; allowPrimaryRun?: (runId: string) => Promise<boolean> }>();
   const projectGuards = new Map<
     string,
     {
@@ -206,7 +205,7 @@ export async function startHostComputerServer(options: {
   ): AsyncIterable<unknown> {
     if (
       !input.projectSessionId &&
-      activeTaskBots.has(input.botId) &&
+      [...taskProjects.values()].some(task => task.botId === input.botId && task.active) &&
       [
         "execute",
         "readFile",
@@ -215,13 +214,15 @@ export async function startHostComputerServer(options: {
         "exportWorkspace",
         "workspaceDirectories",
       ].includes(input.method)
-    )
-      throw new Error(
+    ) {
+      const task = [...taskProjects.values()].find(task => task.botId === input.botId && task.active && task.allowPrimaryRun);
+      if (!input.runId || !task?.allowPrimaryRun || !(await task.allowPrimaryRun(input.runId))) throw new Error(
         "This Mico has an isolated task running. Unscoped file operations are disabled until it finishes.",
       );
+    }
     if (input.projectSessionId) {
       const task = taskProjects.get(input.projectSessionId);
-      if (!task || task.botId !== input.botId)
+      if (!task || !task.active || task.botId !== input.botId)
         throw new Error("Link this task on this computer before continuing.");
       input = { ...input, botId: task.key };
       const provider = providerFor(input.botId),
@@ -236,6 +237,7 @@ export async function startHostComputerServer(options: {
       if (projectLocks.has(input.botId)) throw new Error("Project link in progress");
       const grant = projectGuards.get(input.botId);
       await grant?.validate();
+      if (!enabled || context.signal.aborted) throw new Error("Local computer access is disabled");
       if (projectLocks.has(input.botId) || projectGuards.get(input.botId) !== grant)
         throw new Error("Project binding changed");
     }
@@ -267,6 +269,7 @@ export async function startHostComputerServer(options: {
           projectPath: projects.get(input.botId),
           projectRoot: projectGuards.has(input.botId),
           projectSessionId: input.projectSessionId,
+          ...(input.projectSessionId ? { taskIsolation: "worktree-v1" } : {}),
         };
         break;
       case "provision": {
@@ -413,27 +416,28 @@ export async function startHostComputerServer(options: {
       folder: string,
       validate: () => Promise<void>,
       scheduler?: string,
+      allowPrimaryRun?: (runId: string) => Promise<boolean>,
     ) {
       if (!/^[a-zA-Z0-9_-]{1,256}$/.test(sessionId) || !botId || botId.length > 256)
         throw new Error("Invalid task binding");
       await validate();
       if (providers.get(botId)?.hasActiveCommands())
         throw new Error("Finish the active local task before changing its project");
-      if (activeTaskBots.has(botId) && activeTaskBots.get(botId) !== sessionId)
-        throw new Error(
-          "This Mico already has an active local task. Wait or stop it before starting another.",
-        );
-      activeTaskBots.set(botId, sessionId);
+      const directory = await realpath(folder);
+      if ([...taskProjects].some(([id, task]) => id !== sessionId && task.active && projects.get(task.key) === directory))
+        throw new Error("Each conversation needs its own worktree.");
       try {
         const release = (key: string) => () => {
-          if (activeTaskBots.get(botId) === sessionId) activeTaskBots.delete(botId);
+          const task = taskProjects.get(sessionId);
+          if (task?.key === key) task.active = false;
           providers.get(key)?.cancelAllCommands();
         };
         const existing = taskProjects.get(sessionId);
         if (existing) {
           if (existing.botId !== botId || projects.get(existing.key) !== (await realpath(folder)))
             throw new Error("Task binding changed");
-          activeTaskBots.set(botId, sessionId);
+          existing.active = true;
+          existing.allowPrimaryRun = allowPrimaryRun;
           return release(existing.key);
         }
         const key =
@@ -444,19 +448,21 @@ export async function startHostComputerServer(options: {
         await this.selectProject(key, folder, {
           defaultFiles: true,
           validate: async () => {
-            if (activeTaskBots.get(botId) !== sessionId)
+            if (!taskProjects.get(sessionId)?.active)
               throw new Error("This task execution is no longer active.");
             await validate();
           },
           commandScheduler: scheduler,
         });
-        taskProjects.set(sessionId, { botId, key });
-        activeTaskBots.set(botId, sessionId);
+        taskProjects.set(sessionId, { botId, key, active: true, allowPrimaryRun });
         return release(key);
       } catch (error) {
-        if (activeTaskBots.get(botId) === sessionId) activeTaskBots.delete(botId);
         throw error;
       }
+    },
+    taskProject(botId: string, sessionId: string) {
+      const task = taskProjects.get(sessionId);
+      return task?.active && task.botId === botId ? projects.get(task.key) : undefined;
     },
     /** Native-only location of this agent's existing default workspace. */
     workspace: (botId: string) => ref(botId).providerRef,
@@ -511,7 +517,6 @@ export async function startHostComputerServer(options: {
     isEnabled: () => enabled,
     clearProjects() {
       for (const provider of providers.values()) provider.cancelAllCommands();
-      activeTaskBots.clear();
       taskProjects.clear();
       projects.clear();
       projectGuards.clear();

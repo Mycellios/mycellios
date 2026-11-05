@@ -1,5 +1,35 @@
 # AGENTS.md
 
+- Development projects group independent existing Mico task conversations through
+  owner/Space-scoped metadata, not cloned bots. Native repository paths stay in
+  the native profile. Project conversation admission verifies the exact owned
+  thread and provisions a distinct Git worktree before sending; ordinary Mico
+  threads keep their existing route. Never reset a source repository, import its
+  uncommitted files implicitly or merge task changes automatically. Keep review
+  drafts, native preview generations and runner keys scoped to the conversation.
+  Parallel native project runs require owner/Space metadata plus the exact native
+  worktree-v1 binding. Use per-conversation computer lease keys, retain their run
+  fences and block shared screen/browser tools in both offering and execution.
+  Ordinary/legacy computers retain their existing computer leases.
+  Admitted native task roots use dedicated path mapping without changing the
+  saved Team assignment; never prefix their commands/files with bots/<mico>.
+  Namespaced computer lease keys are not Mico identities: preserve their exact
+  DB fence and resolve the owned native conversation for Stop/crash teardown.
+  Wakeups must check the conversation's key, not serialize the whole Mico.
+  New worktree basenames use 128-bit hashes to fit Git for Windows' internal
+  metadata paths; recover existing full-hash receipts without moving owner files.
+  Verify projects API/RLS, project-workspaces, project-conversations-ipc,
+  host-task-project, task-thread-scope and native-computer-execution tests, plus
+  scripts/verify-projects-db.ts and scripts/verify-projects-ui.mjs locally.
+  scripts/verify-projects-desktop-real.ts is an explicit opt-in qualification:
+  isolated profile/database, existing unexpired subscription credential, real
+  native bridge and two barrier-synchronized tests. Run it once through the shared
+  queue with --allow-real-model; never nest the queue in its child test commands.
+  Its private PostgreSQL cluster requires UTF8 and a stored Unicode round trip.
+  Windows command pipes use overlapped I/O with early error guards. Output loss
+  records an unknown outcome, not success or permission to replay the command.
+  Verify desktop-sandbox-command, desktop-process-tree and native-command-journal.
+
 - Mico Work controls reuse revisioned delegation controls and durable teardown.
   Pi concurrency is admitted atomically per Bot and serialized per thread; native
   engines remain single-turn. Private Pi tasks reserve the existing computer lease

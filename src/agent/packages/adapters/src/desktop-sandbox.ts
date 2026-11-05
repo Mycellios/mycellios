@@ -38,7 +38,7 @@ import {
   placeholderObservation,
 } from "./computer-support.js";
 import type { NativeProcessTree } from "./desktop-process-tree.js";
-import { spawnOwnedCommand } from "./desktop-process-tree.js";
+import { NativeCommandOutputError, spawnOwnedCommand } from "./desktop-process-tree.js";
 import { isAllowedDesktopPath, normalizeDesktopWorkspacePath } from "./desktop-sandbox-paths.js";
 import {
   createExclusiveChildViaDirectoryFdWin32,
@@ -932,6 +932,7 @@ async function* streamLocalCommand(
   const queue: ProcessEvent[] = [];
   let ended = false;
   let settled = false;
+  let outputError: Error | undefined;
   let wake: (() => void) | undefined;
   const push = (event: ProcessEvent) => {
     queue.push(event);
@@ -974,6 +975,20 @@ async function* streamLocalCommand(
   });
   child.on("error", (error) => {
     if (settled) return;
+    if (error instanceof NativeCommandOutputError) {
+      outputError = error;
+      tree.kill();
+      child.stdout.destroy();
+      child.stderr.destroy();
+      clearTimeout(timeout);
+      signal.removeEventListener("abort", abort);
+      settled = true;
+      ended = true;
+      const notify = wake;
+      wake = undefined;
+      notify?.();
+      return;
+    }
     if (argv[0] === "echo") {
       push({ type: "stdout", data: `${argv.slice(1).join(" ")}\n` });
       finish(0);
@@ -987,7 +1002,8 @@ async function* streamLocalCommand(
   });
   if (signal.aborted) abort();
   try {
-    while (!ended || queue.length > 0) {
+    while (!ended || queue.length > 0 || outputError) {
+      if (outputError) throw outputError;
       if (queue.length === 0) {
         await new Promise<void>((resolve) => {
           wake = resolve;

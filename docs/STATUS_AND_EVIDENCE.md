@@ -1,8 +1,73 @@
 # Status and evidence
 
-Updated: 2026-11-04 (integration account identities qualified locally; no publication for this candidate).
+Updated: 2026-11-05 (projects and parallel conversations candidate; local verification, no publication).
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
+
+## Projects with parallel conversations — local candidate
+
+Based on `6420234cb718fa3db56b082cbc5bd8cbe5829562`. The shared Agent sidebar
+can group several independent task conversations under an optional project,
+using existing Micos. Ordinary chats, model credentials and credit balances are
+unchanged. The existing transcript, composer and adjacent review panel are reused.
+Project names are owner/Space scoped; repository choices remain native-only.
+
+Native admission prepares one detached Git worktree per conversation, preserving
+the source repository and its dirty files. Team Desktop project runs use distinct
+conversation lease keys only after proving the owned native binding; each single
+conversation retains its execution fence. Shared screen/browser tools are blocked.
+Stop and crash cleanup retain the exact project/run destination. Preview startup
+keeps its task route and does not reassign the whole Mico to a different computer.
+
+Demonstrated locally: 50 focused tests across 11 files, followed by 21 preview and
+auxiliary-preparation tests and 24 worker/native teardown/wakeup tests. Counts
+overlap and must not be added together. Real Git worktrees preserve dirty source
+files; native command fixtures exercise independent folders and targeted Stop.
+The browser fixture passed creation, two conversations on one Mico, draft
+separation, ordinary-chat return, light/dark and desktop/mobile overflow checks.
+Incremental web/API/Desktop/adapters typechecks passed, including the final
+cleanup and preview-route refinements. A deterministic two-process fixture
+confirmed targeted Stop while the other process continued, and real worktree
+checkout/read passed with a deeply nested tracked file on Windows.
+
+An isolated PostgreSQL fixture passed the actual additive project migration,
+concurrent/idempotent thread creation, two accepted task runs, original-chat
+preservation, API ownership denial and real non-superuser RLS read/write denial.
+The extended per-conversation worker-lease acceptance also passed: distinct
+conversations acquire independent leases, a competing run in the same
+conversation is refused, and releasing one preserves the other's fence.
+The final root architecture check passed. Repository
+structure reports a pre-existing canonical-doc mismatch: `docs/images` is tracked
+in the base but omitted from the canonical directory list; it was not deleted or
+hidden to make this candidate pass.
+
+The subsequent opt-in Electron qualification passed with the real remote
+`openai-codex/gpt-6.1-sol` model on 2026-11-05. One Mico's two project conversations
+modified `add.mjs` and `tidy.mjs` in distinct native Git worktrees. Both unchanged
+Node tests exited 0. Independent test PIDs 40056 and 1640 reached a shared barrier
+at 17:49:48.957 UTC, proving simultaneous test execution; this is not a throughput
+benchmark. Both model runs completed, with observed provider usage. The source
+repository, its uncommitted owner file and the other conversation's implementation
+were preserved. The private database passed UTF8 storage and a Unicode round trip.
+
+That qualification exposed and corrected a Windows output-pipe crash and the
+ordinary Team `bots/<mico>` path prefix leaking into native project commands/files.
+Output disconnection now leaves the durable command outcome unknown without
+replaying it. The cold native connection resolves its provider read-only before
+checking the exact owned worktree binding. Follow-up focused verification passed
+12 command/journal/process tests (one platform-specific case skipped), then 16
+path/isolation/admission tests, plus incremental adapters typing and a real native
+Desktop bundle build. These counts exclude earlier overlapping suites.
+
+Receipts, model messages, terminal events, separate test process timings and the
+Desktop capture are retained under
+`outputs/project-conversations-local-20261105/real-desktop-1850/` in the local
+development repository. Usage prices there are catalog estimates, not a billed
+charge. The model ran remotely through the existing subscription; no model
+inference ran on PC-DANI. No production API/database, real customer account or
+public installer was used or changed. Native consent was preauthorized only in
+the isolated test profile, so its live permission dialog remains outside this
+qualification. No commit, push or deployment was performed.
 
 ## Mico task and routine isolation candidate
 
