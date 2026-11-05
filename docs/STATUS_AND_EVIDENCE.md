@@ -1461,3 +1461,34 @@ target and a null popup handle. That new browser case has not yet run in CI.
 Publication and deployment require the exact merged-main release checks and a
 separate promotion receipt. These local checks do not establish successful X
 sign-in or provider tool execution.
+
+### Unified settings publication — 2026-11-05
+
+Published the searchable account/Space settings shell as a web-only release.
+Compiled revision `a2c59c3455ca4804e3d12210fcbeb41196192f79` includes synchronized
+main `ec93ee68e9e3d67e50b2683791dc605de7ff6e84`; it retains current task/routine
+isolation, failed-helper notifications and the canonical production skill editor.
+Marketplace and continuous-voice entry remain separate capability-gated work.
+The original development checkout and its unrelated changes were preserved.
+
+Incremental web typing and 249 focused tests passed on the integrated source on
+Daniel's PC. The constrained compiler also passed those checks and built web
+`20261105033045`. Its sealed artifact SHA256 is
+`db33e917ff2f60807a09c0b7840e58cb0871a124f8ead3cdbc88118fd1a1ab7b`.
+The previous canonical settings browser scenario passed, but the integrated
+scenario stopped at production's retained language-choice screen. Its setup was
+aligned with that screen and the account menu; no passing rerun is claimed.
+Further browser/CI repetition was omitted under the owner's proportional fast
+delivery instructions. The design capture uses synthetic local data.
+
+Private loopback and public HTTPS qualification passed for readiness, the new
+entry and Settings chunk, 15 initial assets, anonymous session handling and
+`/agent/` PWA scope. Read-only inspection in the signed-in production browser
+confirmed the new menu and served build. No account preferences were changed.
+An initial Python HTTP probe received 403 and triggered automatic rollback;
+qualification with the existing curl transport succeeded on the second promotion.
+Previous configuration and immutable assets remain available for reversal.
+API, worker, database, coordinator and other protected container identities/start
+times were unchanged; no migration, financial action or native installer update
+was performed. Full CI was not run. Detailed receipts and logs are retained in
+`outputs/settings-prod-20261105/` and the owned server release directory.

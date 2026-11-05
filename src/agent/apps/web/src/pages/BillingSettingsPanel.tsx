@@ -12,9 +12,11 @@ export function BillingSettingsPanel() {
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setError(null);
     rpc.billing
       .status()
       .then((next) => {
@@ -26,7 +28,7 @@ export function BillingSettingsPanel() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [t, attempt]);
 
   async function openPortal() {
     if (pending) return;
@@ -113,6 +115,7 @@ export function BillingSettingsPanel() {
       {error ? (
         <p role="alert" className="mt-3 text-sm text-destructive">
           {error}
+          {!status ? <Button variant="outline" className="mt-3 block" onClick={() => setAttempt(value => value + 1)}><Trans>Retry</Trans></Button> : null}
         </p>
       ) : null}
     </div>

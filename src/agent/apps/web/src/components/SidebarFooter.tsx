@@ -21,6 +21,7 @@ import { WebUpdateSlot } from "./web-update-slot";
 import { ReleaseNotes } from "./ReleaseNotes";
 
 type Props = {
+  onWhatsNew?: () => void;
   mini?: boolean;
   name: string;
   initials: string | null;
@@ -45,6 +46,7 @@ export function sidebarMarkCount(availableWidth: number) {
 }
 
 export function SidebarFooter({
+  onWhatsNew,
   mini = false,
   name,
   initials,
@@ -93,7 +95,7 @@ export function SidebarFooter({
   return (
     <>
       <MobileInstallOffer mini={mini} open={mobileHelpOpen} onOpenChange={setMobileHelpOpen} />
-      <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
+      {!onWhatsNew ? <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} /> : null}
       {!mini && <WebUpdateSlot />}
       {!mini && <DesktopSidebarUpdate />}
       <DesktopDownloadLink mini={mini} />
@@ -197,7 +199,7 @@ export function SidebarFooter({
                 className="h-9 w-full justify-start gap-2.5 font-normal"
                 onClick={() => {
                   onOpenChange(false);
-                  setReleaseNotesOpen(true);
+                  if (onWhatsNew) onWhatsNew(); else setReleaseNotesOpen(true);
                 }}
               >
                 <Sparkles className="text-muted-foreground" strokeWidth={1.75} />
