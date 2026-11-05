@@ -7,7 +7,7 @@
 .agent-product-opening:is([data-ambient-running="false"],[data-ambient-hidden="true"]) .agent-product-backdrop :is(circle,.agent-network-breath) { animation-play-state:paused; }
 .agent-living-network { position:absolute; top:385px; left:0; width:100%; height:660px; }
 .agent-network-depth, .agent-network-breath { width:100%; height:100%; }
-.agent-network-breath { position:relative; transform-origin:50% 80%; animation:agent-network-breathe 18s ease-in-out infinite alternate; }
+.agent-network-breath { position:relative; transform-origin:50% 80%; animation:agent-network-breathe 16s ease-in-out infinite alternate; }
 .agent-network-breath > img { display:block; width:100%; height:100%; object-fit:fill; }
 .agent-spore-depth { position:absolute; inset:0; }
 .agent-network-signals { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
@@ -49,10 +49,10 @@
 .agent-demo-mico { display:flex; align-items:center; gap:10px; width:100%; padding:12px 9px; text-align:left; color:#242b26; }
 .agent-demo-mico[aria-pressed="true"] { background:#faf8f4; }
 .mico-avatar { display:block; flex-shrink:0; object-fit:contain; }
-.agent-demo-mico > span { display:grid; gap:5px; flex:1; min-width:0; }
+.agent-demo-mico > span:not(.mico-avatar) { display:grid; gap:5px; flex:1; min-width:0; }
 .agent-demo-mico strong { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; line-height:1.4; font-weight:500; }
 .agent-demo-mico strong > small { font-size:10px; font-weight:400; color:#777c73; }
-.agent-demo-mico > span > span { font-size:11px; line-height:1.45; color:#62665d; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.agent-demo-mico > span:not(.mico-avatar) > span { font-size:11px; line-height:1.45; color:#62665d; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .agent-demo-sidebar-bottom { margin-top:auto; padding-top:20px; }
 .agent-demo-sidebar-bottom > a { display:flex; align-items:center; gap:9px; min-height:38px; padding:5px 7px; font-size:11px; }
 .agent-demo-sidebar-bottom > a > svg { margin-left:auto; }

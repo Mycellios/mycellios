@@ -1,0 +1,27 @@
+{
+  "site": "mycellios",
+  "status": "human_review",
+  "createdAt": "2026-11-04T17:47:01Z",
+  "topic": "Create a first Mico with a clear goal, focused project notes and a result you can review.",
+  "authorName": "Mycellios team",
+  "category": "Getting started",
+  "localizations": [
+    {
+      "locale": "en",
+      "slug": "first-mico-project-notes",
+      "title": "Your first Mico starts with a clear brief",
+      "excerpt": "Turn a small set of project notes into a useful first task. A practical guide to giving your Mico a goal, the right context and a result you can review.",
+      "seoTitle": "Create your first Mico with project notes | Mycellios",
+      "seoDescription": "Learn how to start a Mico in Mycellios with a focused goal, useful project notes and a small first task you can review before moving forward.",
+      "imageUrl": "https://www.mycellios.com/assets/agent-demo/fungal-colonies-v1.webp",
+      "imageAlt": "Two illustrated mushroom colonies with branching mycelium.",
+      "contentHtml": "<p>A useful AI project starts before the first answer. It starts with a brief that makes the work clear: what you want to achieve, what information matters and what a good result should look like.</p>\n<p>In Mycellios, your agent is a Mico. Give your first Mico one manageable task rather than an entire project. You will have a concrete result to review and a better basis for deciding what to do next.</p>\n<h2>Choose an outcome you can check</h2>\n<p>Imagine you are preparing a small product website. Your notes mention a desktop app, an API and a compute network, but the order of the page is still undecided. A useful first task would be to turn those notes into a proposed page outline.</p>\n<p>That outcome is easy to assess. You can check whether the outline explains the product, includes the right calls to action and avoids promising features that are still being developed.</p>\n<p>Write the goal as a sentence: <em>Use my project notes to suggest a landing page outline for a first-time visitor. Explain what each section should help the visitor understand.</em></p>\n<h2>Bring a short, useful set of notes</h2>\n<p>Your Mico needs enough context to make sensible choices. Start with the information that would help a new teammate understand this particular task:</p>\n<ul><li><strong>The audience:</strong> who will read the page and what they already know.</li><li><strong>The product:</strong> what someone can actually use today.</li><li><strong>The constraints:</strong> the language, tone, scope and claims to avoid.</li><li><strong>The desired result:</strong> an outline, a draft or a short list of decisions.</li></ul>\n<p>For this example, one document is enough. If a feature is planned, mark it as planned. If a price is undecided, say so. Clear boundaries help prevent an attractive draft from turning an assumption into a product promise.</p>\n<h2>Connect a model before starting</h2>\n<p>The Mico works through the model connection configured in your workspace. Check that the connection is available and supports the task you want to run. Model access and usage depend on your setup; opening a workspace does not by itself supply unlimited inference.</p>\n<p>If you are deciding between a provider, a compatible local endpoint and a network connection, read our guide to <a href=\"/blog/choosing-a-model-connection\">choosing a model connection</a>.</p>\n<h2>Ask for a draft with visible assumptions</h2>\n<p>A focused starting prompt can make the review much easier:</p>\n<blockquote><p>Read the project notes I have chosen to share. Suggest a six-section landing page outline. For each section, give its purpose, a draft heading and one call to action where useful. Use only the capabilities described as available. List missing information separately and leave the result ready for my review.</p></blockquote>\n<p>Share only the files needed for this task. Review any access or action requests shown by your setup before allowing the work to continue.</p>\n<h2>Review the first result, then narrow the next step</h2>\n<p>Check the draft against the original brief. Does it address the intended visitor? Are the product claims supported by the notes? Has the Mico identified uncertainties rather than filling them with guesses?</p>\n<p>Your next request can be smaller: rewrite the introduction, shorten a section or compare two possible calls to action. Add the decision to your project notes so the next task starts with a clearer brief.</p>\n<p>Ready to try it? <a href=\"https://www.mycellios.com/agent\">Open Mycellios Agent</a> with one goal and one useful document.</p>",
+      "sourceNotes": [
+        {
+          "url": "https://github.com/Mycellios/mycellios/blob/main/docs/STATUS_AND_EVIDENCE.md",
+          "note": "Reviewed the local status and evidence document. This draft describes a suggested workflow, avoids exact UI labels and makes no live inference, unlimited access or autonomous execution claim."
+        }
+      ]
+    }
+  ]
+}

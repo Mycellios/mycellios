@@ -11,8 +11,10 @@ afterEach(async () => { while (cleanups.length) await cleanups.pop()!(); });
 async function site() {
   const root = mkdtempSync(join(tmpdir(), "mycellios-marketing-"));
   mkdirSync(join(root, "stats")); mkdirSync(join(root, "compare", "grok-bot"), { recursive: true });
+  mkdirSync(join(root, "changelog"));
   writeFileSync(join(root, "index.html"), "<h1>Mycellios</h1>");
   writeFileSync(join(root, "stats", "index.html"), "<h1>Mycellios Stats</h1>");
+  writeFileSync(join(root, "changelog", "index.html"), "<h1>Mycellios Changelog</h1>");
   writeFileSync(join(root, "compare", "grok-bot", "index.html"), "<h1>Mycellios vs Grok Bot</h1>");
   const app = Fastify();
   await app.register(fastifyStatic, { root });
@@ -40,5 +42,12 @@ describe("marketing route entries", () => {
     const app = await site();
     const response = await app.inject("/compare/grok-bot");
     expect(response.statusCode).toBe(200); expect(response.body).toContain("Mycellios vs Grok Bot");
+  });
+  it("serves the changelog document and retains product filters in slash redirects", async () => {
+    const app = await site();
+    const response = await app.inject("/changelog?product=desktop");
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("Mycellios Changelog");
+    expect((await app.inject("/changelog/?product=agent")).headers.location).toBe("/changelog?product=agent");
   });
 });

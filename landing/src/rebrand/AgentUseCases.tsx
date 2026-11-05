@@ -3,6 +3,7 @@ import { ArrowRight, Check, FileText, ShieldCheck } from "lucide-react";
 import { Button, Card, Heading, Link, Text } from "../ui/primitives";
 import { AGENT_URL } from "./AssemblageAgent";
 import { MicoAvatar } from "./AgentHeroDemo";
+import { useDemoAutoplay } from "./use-demo-autoplay";
 
 const examples = [
   { name: "Plan a project", avatar: "planning", description: "Find a useful first step.", request: "Turn these launch notes into a plan I can review.", file: "Launch notes.md", context: "A first release for a small project: onboarding, one useful workflow, and feedback from early users.", title: "A smaller, clearer first release.", intro: "Start with one complete workflow. Learn from the first people who use it.", sections: [
@@ -25,6 +26,8 @@ const examples = [
 export default function AgentUseCases() {
   const [selected, setSelected] = useState(0);
   const preview = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLElement>(null);
+  useDemoAutoplay(root, setSelected, examples.length, 6500);
   const example = examples[selected]!;
   useEffect(() => {
     let active = true, destroy: (() => void) | undefined;
@@ -33,7 +36,7 @@ export default function AgentUseCases() {
     }).catch(() => {});
     return () => { active = false; destroy?.(); };
   }, [selected]);
-  return <section className="agent-use-cases reference-shell" aria-labelledby="agent-cases-title" data-ui-surface="agent-marketing">
+  return <section ref={root} className="agent-use-cases reference-shell" aria-labelledby="agent-cases-title" data-ui-surface="agent-marketing">
     <div className="agent-case-copy"><Heading as="h2" id="agent-cases-title">A Mico for<br />what’s next.</Heading><Text>Start with a goal. Add the context.<br /> Keep the next step yours.</Text>
       <div className="agent-case-choices" role="group" aria-label="Choose an example workflow">{examples.map((item, index) => <Button key={item.name} variant="ghost" className="agent-case-choice" aria-pressed={selected === index} aria-controls="agent-case-preview" onClick={() => setSelected(index)}><MicoAvatar name={item.avatar} /><span><strong>{item.name}</strong><span>{item.description}</span></span><ArrowRight size={18} aria-hidden="true" /></Button>)}</div>
       <Link className="agent-case-open" href={AGENT_URL}>Start with your own idea<ArrowRight size={16} aria-hidden="true" /></Link>
@@ -43,7 +46,7 @@ export default function AgentUseCases() {
       <div className="agent-case-context"><FileText size={20} aria-hidden="true" /><div><strong>{example.file}</strong><Text>{example.context}</Text></div></div>
       <div className="agent-case-permission"><ShieldCheck size={15} aria-hidden="true" /><span>Read attached notes</span><span><Check size={13} aria-hidden="true" />Allowed once</span></div>
       <Card className="agent-case-document" aria-labelledby="agent-case-document-title"><div className="agent-case-document-header"><FileText size={18} aria-hidden="true" /><span>{example.name === "Research an idea" ? "Research direction" : example.name === "Write a brief" ? "Workshop brief" : "Project plan"}</span><span>Draft</span></div><Heading as="h3" id="agent-case-document-title">{example.title}</Heading><Text>{example.intro}</Text><dl>{example.sections.map(section => <div key={section.title}><dt><Check size={14} aria-hidden="true" />{section.title}</dt><dd>{section.body}</dd></div>)}</dl></Card>
-      <Text className="agent-case-caption" aria-live="polite">{example.name} · Illustrative example. You choose what to share.</Text>
+      <Text className="agent-case-caption">{example.name} · Illustrative example. You choose what to share.</Text>
     </div>
   </section>;
 }

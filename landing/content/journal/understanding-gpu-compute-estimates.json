@@ -1,0 +1,31 @@
+{
+  "site": "mycellios",
+  "status": "human_review",
+  "createdAt": "2026-11-04T17:47:01Z",
+  "topic": "Explain the GPU calculator formula, its full-utilization assumption and why a rental reference differs from contributor rewards.",
+  "authorName": "Mycellios team",
+  "category": "Compute explained",
+  "localizations": [
+    {
+      "locale": "en",
+      "slug": "understanding-gpu-compute-estimates",
+      "title": "What the GPU calculator actually tells you",
+      "excerpt": "GPU hours, an hourly rate and a 30-day month. Understand the simple calculation, its assumptions and the difference between rental value and contributor rewards.",
+      "seoTitle": "Understand GPU compute estimates and rewards | Mycellios",
+      "seoDescription": "See how the Mycellios GPU calculator uses daily hours and an hourly rate, what costs it excludes and why a rental estimate is not a promised contributor payout.",
+      "imageUrl": "https://www.mycellios.com/assets/landing/network-fruiting.webp",
+      "imageAlt": "Computers and server hardware joined by an illustrated fungal network.",
+      "contentHtml": "<p>Spare GPU time can be described in hours. Assign an hourly rate to those hours and you have a value to explore. That is the starting point of the Mycellios GPU calculator.</p>\n<p>The result is a monthly rental reference. It helps explain the scale of a compute scenario; it does not tell you that your device will receive work for every available hour or that Mycellios will pay the displayed amount.</p>\n<h2>The calculation in one line</h2>\n<p><strong>Daily GPU hours × 30 days × hourly rate = monthly gross reference.</strong></p>\n<p>For an arithmetic example, choose 8 hours a day and enter a hypothetical rate of $0.10 per GPU-hour:</p>\n<pre><code>8 hours/day × 30 days = 240 GPU-hours\n240 GPU-hours × $0.10/hour = $24.00</code></pre>\n<p>The $0.10 rate is an example chosen to explain the formula, not an approved Mycellios payout rate. The $24 result assumes that every one of the 240 selected hours is rented at that rate.</p>\n<h2>What the GPU selection changes</h2>\n<p>Selecting a GPU selects an indicative hourly rental reference for that model. The calculator then multiplies that rate by your chosen hours.</p>\n<p>This is not a benchmark of your particular computer. It does not measure performance, test available memory, check drivers or establish that a model will run on your device. It also does not confirm that your GPU is supported by the contribution runtime you install.</p>\n<p>Check the calculation details to review the rate used. You can enter your own hourly rate to explore a different scenario; changing it changes the arithmetic, not the terms of any service or reward program.</p>\n<h2>Available time is different from completed work</h2>\n<p>A computer can be online and available without being assigned a task. Demand, model compatibility, capacity requirements and the runtime all affect whether work can be placed on a device.</p>\n<p>The calculator deliberately uses a simple assumption: all selected hours are rented. It does not predict demand or apply a hidden utilization forecast. If fewer hours are used, the fully rented reference no longer describes that actual usage.</p>\n<h2>The result comes before costs</h2>\n<p>The displayed figure excludes electricity, fees and taxes. Those costs are not inferred from a GPU name, and the calculator does not measure your computer's power use.</p>\n<p>For your own analysis, keep the rental reference and operating costs separate. A gross reference and a net result answer different questions. Increasing available hours increases the reference mathematically; it does not guarantee a better real-world outcome.</p>\n<h2>Rental references, Credits and Spore</h2>\n<p>A rental reference describes a scenario for the cost of compute. An actual contributor reward requires a defined policy and evidence of the work that qualifies under it.</p>\n<p>Mycellios contributor payouts are marked <strong>coming soon</strong>. The calculator does not promise a withdrawal amount, a payment schedule or a conversion into Spore.</p>\n<p>Credits and Spore also have different roles. Credits are the internal account unit used for usage and balances. Spore is the separate token concept. No public token or on-chain contributor settlement is active under the current documented readiness state.</p>\n<h2>Use the number as a question to investigate</h2>\n<p>Start by choosing the GPU you actually have and a realistic window when the computer could be available. Open the calculation details, review the rate and compare a few schedules.</p>\n<p>Then check the <a href=\"/spore/rewards\">Rewards page</a> for the current program status and <a href=\"/earn\">compute contribution options</a> for supported setup routes. You can also <a href=\"/#contribute\">try the calculator</a> with the assumptions visible.</p>",
+      "sourceNotes": [
+        {
+          "url": "https://github.com/Mycellios/mycellios/blob/main/landing/src/rebrand/compute-scenario.ts",
+          "note": "Reviewed the local calculator implementation: daily hours times 30 days times selected or custom hourly rate, with a full-rental assumption and no performance inference. The article uses its own explicit hypothetical rate instead of repeating a changing provider quote."
+        },
+        {
+          "url": "https://github.com/Mycellios/mycellios/blob/main/docs/STATUS_AND_EVIDENCE.md",
+          "note": "Reviewed economic/token status and capability boundaries. Contributor payouts remain coming soon; Credits and Spore are distinct and no public-token or withdrawal promise is made."
+        }
+      ]
+    }
+  ]
+}

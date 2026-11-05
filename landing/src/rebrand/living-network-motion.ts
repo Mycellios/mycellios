@@ -14,7 +14,7 @@ export function animateLivingNetwork(root: HTMLElement) {
         return { x: point.x, y: point.y };
       });
       path.style.strokeDasharray = `${length * .025} ${length}`;
-      return { path, length, points, pulses: [...group.querySelectorAll<SVGGElement>(".agent-signal-point")], duration: 12 + index * 1.7, offset: index * .137 };
+      return { path, length, points, pulses: [...group.querySelectorAll<SVGGElement>(".agent-signal-point")], duration: 6.5 + index * .7, offset: index * .137 };
     });
     const render = (elapsed: number) => {
       routes.forEach(route => route.pulses.forEach((pulse, index) => {

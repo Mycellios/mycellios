@@ -74,7 +74,9 @@ function webPage(name: string, description: string, path: string): JsonValue {
   };
 }
 
-const extraPage = (title: string, description: string, path: string): SeoPage => ({ title, description, canonicalPath: path, robots: "index, follow, max-image-preview:large", structuredData: webPage(title, description, path), staticContent: { heading: title, paragraphs: [description, "Review the linked product sources and implementation status before choosing a workflow. Mycellios is in active development; compute rewards remain planned."], links: [{ href: "/", label: "Mycellios" }, { href: "https://www.mycellios.com/agent", label: "Open Agent" }] } });
+// Build shared metadata once instead of shipping repeated descriptions and fallbacks.
+const extraPage = (title: string, description: string, path: string, staticContent: SeoPage["staticContent"] = { heading: title, paragraphs: [description, "Review the linked product sources and implementation status before choosing a workflow. Mycellios is in active development; compute rewards remain planned."], links: [{ href: "/", label: "Mycellios" }, { href: "https://www.mycellios.com/agent", label: "Open Agent" }] }): SeoPage => ({ title, description, canonicalPath: path, robots: "index, follow, max-image-preview:large", structuredData: webPage(title, description, path), staticContent });
+const privatePage = (title: string, description: string, canonicalPath: string, heading: string): SeoPage => ({ title, description, canonicalPath, robots: "noindex, nofollow, noarchive", staticContent: { heading, paragraphs: [description], links: [{ href: "/", label: "Return to Mycellios" }] } });
 type ComparisonSeoPath = `/compare/${(typeof MARKETING_COMPARISONS)[number][0]}`;
 const comparisonPages = Object.fromEntries(MARKETING_COMPARISONS.map(([slug, name]) => [`/compare/${slug}`, extraPage(slug === "best-ai-agent-apps" ? "Choose your next AI agent | Mycellios" : `Mycellios vs ${name}`, `Compare agent workflows, deployment and costs. Original guidance with links to ${name}'s product sources.`, `/compare/${slug}`)])) as Record<ComparisonSeoPath, SeoPage>;
 const comparisonPaths = Object.keys(comparisonPages) as ComparisonSeoPath[];
@@ -84,6 +86,7 @@ export const SEO_PAGES = {
   "/pricing": extraPage("Plans & pricing | Mycellios", "Mycellios plans, network usage pricing and contributor rewards are coming soon. Use the workspace today and explore an optional provider-cost estimator.", "/pricing"),
   "/compare": extraPage("Compare AI agent apps | Mycellios", "Compare Mycellios with other agent apps, with original guidance and current product sources.", "/compare"),
   "/stats": extraPage("Mycellios Stats — network observations", "Inspect observed node capacity, models, jobs and persisted history from Mycellios's public coordinator.", "/stats"),
+  "/changelog": extraPage("Changelog & release notes | Mycellios", "Follow Mycellios Desktop and Agent updates, with dated release notes, improvements, fixes and links to the original publications.", "/changelog", { heading: "What’s new in Mycellios.", paragraphs: ["Read dated notes for Mycellios Desktop previews and Agent web updates.", "Browse new features, improvements and fixes, with original publication sources and guidance for manual preview updates."], links: [{ href: "/downloads/desktop", label: "Desktop downloads" }, { href: "/blog", label: "Mycellios Journal" }] }),
   "/spore/rewards": { title: "Useful work. Shared rewards. | Mycellios", description: "SPORE rewards, staking and contributor payouts are coming soon. Explore the proposed reward flow and use Mycellios Agent today.", canonicalPath: "/spore/rewards", robots: "noindex, nofollow, noarchive", staticContent: { heading: "Useful work. Shared rewards.", paragraphs: ["SPORE rewards, staking and contributor payouts are coming soon. Confirmed rates and conditions will be published before activation."], links: [{ href: "https://www.mycellios.com/agent", label: "Open Mycellios Agent" }] } },
   "/": {
     title: "Mycellios — open compute for distributed AI",
@@ -109,13 +112,10 @@ export const SEO_PAGES = {
       "@graph": [organization, website, softwareApplication],
     },
   },
-  "/network": {
-    title: "Live distributed AI network | mycellios",
-    description:
-      "Inspect the public mycellios network snapshot: connected workers, available models, and recorded inference activity when data is available.",
-    canonicalPath: "/network",
-    robots: "index, follow, max-image-preview:large",
-    staticContent: {
+  "/network": extraPage(
+    "Live distributed AI network | mycellios",
+    "Inspect the public mycellios network snapshot: connected workers, available models, and recorded inference activity when data is available.",
+    "/network", {
       heading: "Mycellios public network status",
       paragraphs: [
         "This page reads a public snapshot from the Mycellios coordinator and reports registered or connected workers, available models, and recorded activity when that data is available.",
@@ -125,20 +125,11 @@ export const SEO_PAGES = {
         { href: "/", label: "About the Mycellios project" },
         { href: "/blog", label: "Read Mycellios research and field notes" },
       ],
-    },
-    structuredData: webPage(
-      "Live distributed AI network | mycellios",
-      "A public snapshot of Mycellios workers, models, and recorded inference activity when data is available.",
-      "/network",
-    ),
-  },
-  "/earn": {
-    title: "Contribute compute to the Mycellios test network",
-    description:
-      "Join the Mycellios test network with a compatible native client or browser worker. Contributions are voluntary, and rewards are not live.",
-    canonicalPath: "/earn",
-    robots: "index, follow, max-image-preview:large",
-    staticContent: {
+    }),
+  "/earn": extraPage(
+    "Contribute compute to the Mycellios test network",
+    "Join the Mycellios test network with a compatible native client or browser worker. Contributions are voluntary, and rewards are not live.",
+    "/earn", {
       heading: "Contribute compute to the Mycellios test network",
       paragraphs: [
         "Join the Mycellios test network with a compatible browser worker or native client. You choose what your device shares and can pause it at any time.",
@@ -148,25 +139,8 @@ export const SEO_PAGES = {
         { href: "/browser/", label: "Try the browser worker" },
         { href: "/downloads", label: "Check native package availability" },
       ],
-    },
-    structuredData: webPage(
-      "Contribute compute to the Mycellios test network",
-      "Join the Mycellios test network with a compatible native client or browser worker. Contributions are voluntary, and rewards are not live.",
-      "/earn",
-    ),
-  },
-  "/spore": {
-    title: "$SPORE participation preview | mycellios",
-    description:
-      "Preview the proposed SPORE participation flow. No token, staking contract, treasury, price feed or reward program is live.",
-    canonicalPath: "/spore",
-    robots: "noindex, nofollow, noarchive",
-    staticContent: {
-      heading: "SPORE participation preview",
-      paragraphs: ["This is a preview only. No token, staking contract, treasury, price feed, or reward program is live."],
-      links: [{ href: "/", label: "Return to Mycellios" }],
-    },
-  },
+    }),
+  "/spore": privatePage("$SPORE participation preview | mycellios", "Preview the proposed SPORE participation flow. No token, staking contract, treasury, price feed or reward program is live.", "/spore", "SPORE participation preview"),
   "/downloads": {
     title: "Native package availability | mycellios",
     description:
@@ -219,44 +193,14 @@ export const SEO_PAGES = {
       publisher: { "@id": ORGANIZATION_ID },
     },
   },
-  "/admin": {
-    title: "Network administration | mycellios",
-    description: "Operational administration for the mycellios network.",
-    canonicalPath: "/admin",
-    robots: "noindex, nofollow, noarchive",
-    staticContent: {
-      heading: "Mycellios network administration",
-      paragraphs: ["Operational administration for the Mycellios network."],
-      links: [{ href: "/", label: "Return to Mycellios" }],
-    },
-  },
-  "/dashboard": {
-    title: "Mycellios Stats dashboard",
-    description: "Inspect Mycellios capacity, model availability and recorded network work.",
-    canonicalPath: "/dashboard",
-    robots: "noindex, nofollow, noarchive",
-    staticContent: {
-      heading: "Mycellios dashboard",
-      paragraphs: ["Inspect Mycellios capacity, model availability and recorded network work."],
-      links: [{ href: "/", label: "Return to Mycellios" }],
-    },
-  },
-  "/account": {
-    title: "Account and subscription | mycellios",
-    description: "Secure account, subscription, billing and usage management for mycellios.",
-    canonicalPath: "/account",
-    robots: "noindex, nofollow, noarchive",
-    staticContent: {
-      heading: "Mycellios account and subscription",
-      paragraphs: ["Manage your Mycellios account, subscription, billing, and usage."],
-      links: [{ href: "/", label: "Return to Mycellios" }],
-    },
-  },
+  "/admin": privatePage("Network administration | mycellios", "Operational administration for the mycellios network.", "/admin", "Mycellios network administration"),
+  "/dashboard": privatePage("Mycellios Stats dashboard", "Inspect Mycellios capacity, model availability and recorded network work.", "/dashboard", "Mycellios dashboard"),
+  "/account": privatePage("Account and subscription | mycellios", "Secure account, subscription, billing and usage management for mycellios.", "/account", "Mycellios account and subscription"),
 } as const satisfies Record<string, SeoPage>;
 
 export type SeoPath = keyof typeof SEO_PAGES;
 
-export const INDEXABLE_SEO_PATHS = ["/", "/network", "/earn", "/downloads", "/browser/", "/pricing", "/compare", "/stats", ...comparisonPaths] as const;
+export const INDEXABLE_SEO_PATHS = ["/", "/network", "/earn", "/downloads", "/browser/", "/pricing", "/compare", "/stats", "/changelog", ...comparisonPaths] as const;
 export const LANDING_SEO_PATHS = [
   "/",
   "/network",
@@ -265,6 +209,7 @@ export const LANDING_SEO_PATHS = [
   "/spore/rewards",
   "/stats",
   "/pricing",
+  "/changelog",
   "/compare",
   ...comparisonPaths,
   "/downloads",

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "../ui/use-reduced-motion";
 
 export type NetworkArtwork = "fabric" | "fruiting";
 const artworkSources: Record<NetworkArtwork, string> = {
@@ -13,9 +14,7 @@ const fragment = `#version 300 es
 precision highp float;
 uniform sampler2D picture;
 uniform vec2 resolution;
-uniform vec2 pointer;
 uniform float imageRatio;
-uniform float hover;
 in vec2 uv;
 out vec4 pixel;
 float screen(vec2 p){
@@ -32,19 +31,20 @@ void main(){
   float luminance=dot(sampleColor.rgb,vec3(.299,.587,.114));
   float bit=step(screen(gl_FragCoord.xy/1.25),luminance);
   vec3 printColor=mix(vec3(.09,.13,.10),vec3(.96,.95,.92),bit);
-  float reveal=hover*step(distance(gl_FragCoord.xy/resolution,pointer),.10);
-  pixel=vec4(mix(mix(sampleColor.rgb,printColor,.46),sampleColor.rgb,reveal),sampleColor.a);
+  pixel=vec4(mix(sampleColor.rgb,printColor,.46),sampleColor.a);
 }`;
 
 /** The fallback stays visible until a local texture and a complete GPU frame exist. */
 export function NetworkPrint({ artwork = "fruiting" }: { artwork?: NetworkArtwork } = {}) {
   const art = artworkSources[artwork];
+  const reducedMotion = useReducedMotion();
   const ref = useRef<HTMLCanvasElement>(null);
   const [renderedArt, setRenderedArt] = useState<string | null>(null);
-  const ready = renderedArt === art;
+  const ready = !reducedMotion && renderedArt === art;
   useEffect(() => {
     const canvas = ref.current;
-    if (!canvas || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!canvas || reducedMotion) return;
+    setRenderedArt(null);
     const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: false, antialias: false });
     if (!gl) return;
     function shader(kind: number, source: string) {
@@ -66,25 +66,23 @@ export function NetworkPrint({ artwork = "fruiting" }: { artwork?: NetworkArtwor
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    const locations = { resolution: gl.getUniformLocation(program,"resolution"), pointer: gl.getUniformLocation(program,"pointer"), imageRatio: gl.getUniformLocation(program,"imageRatio"), hover: gl.getUniformLocation(program,"hover") };
-    let disposed = false, loaded = false, frame = 0, over = false, x = .5, y = .5;
+    const locations = { resolution: gl.getUniformLocation(program,"resolution"), imageRatio: gl.getUniformLocation(program,"imageRatio") };
+    let disposed = false, loaded = false, frame = 0;
     const image = new Image();
     const draw = () => {
       frame = 0; if (disposed || !loaded || document.hidden || !canvas.isConnected) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const width = Math.max(1, Math.round(canvas.clientWidth*dpr)), height = Math.max(1, Math.round(canvas.clientHeight*dpr));
       if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
-      gl.viewport(0,0,width,height); gl.useProgram(program); gl.uniform2f(locations.resolution,width,height); gl.uniform2f(locations.pointer,x,y); gl.uniform1f(locations.hover,over?1:0); gl.uniform1f(locations.imageRatio,image.naturalWidth/image.naturalHeight); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); setRenderedArt(art);
+      gl.viewport(0,0,width,height); gl.useProgram(program); gl.uniform2f(locations.resolution,width,height); gl.uniform1f(locations.imageRatio,image.naturalWidth/image.naturalHeight); gl.drawArrays(gl.TRIANGLE_STRIP,0,4); setRenderedArt(art);
     };
     const requestDraw = () => { if (!frame) frame = requestAnimationFrame(draw); };
     image.onload = () => { if (disposed) return; gl.bindTexture(gl.TEXTURE_2D,texture); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image); loaded = true; requestDraw(); };
     image.src = art;
-    const move = (event: PointerEvent) => { const box=canvas.getBoundingClientRect(); x=(event.clientX-box.left)/box.width; y=1-(event.clientY-box.top)/box.height; over=true; requestDraw(); };
-    const leave = () => { over=false; requestDraw(); };
     const lost = (event: Event) => { event.preventDefault(); setRenderedArt(null); };
     const resize = new ResizeObserver(requestDraw); resize.observe(canvas);
-    canvas.addEventListener("pointermove",move); canvas.addEventListener("pointerleave",leave); canvas.addEventListener("webglcontextlost",lost); document.addEventListener("visibilitychange",requestDraw);
-    return () => { disposed=true; cancelAnimationFrame(frame); resize.disconnect(); canvas.removeEventListener("pointermove",move); canvas.removeEventListener("pointerleave",leave); canvas.removeEventListener("webglcontextlost",lost); document.removeEventListener("visibilitychange",requestDraw); gl.deleteTexture(texture); gl.deleteBuffer(buffer); gl.deleteShader(vs); gl.deleteShader(fs); gl.deleteProgram(program); };
-  }, [art]);
+    canvas.addEventListener("webglcontextlost",lost); document.addEventListener("visibilitychange",requestDraw);
+    return () => { disposed=true; cancelAnimationFrame(frame); resize.disconnect(); canvas.removeEventListener("webglcontextlost",lost); document.removeEventListener("visibilitychange",requestDraw); gl.deleteTexture(texture); gl.deleteBuffer(buffer); gl.deleteShader(vs); gl.deleteShader(fs); gl.deleteProgram(program); };
+  }, [art, reducedMotion]);
   return <div className="reference-network-print" data-renderer={ready ? "webgl" : "image"} data-artwork={artwork}><img src={art} width="1774" height="877" alt="" fetchPriority="high" /><canvas ref={ref} aria-hidden="true" /></div>;
 }
