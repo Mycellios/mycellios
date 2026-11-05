@@ -4,6 +4,10 @@
   preview; packaged private qualification requires both VITE_MYCELLIOS_PRIVATE_APPS=1
   at web build time and MYCELLIOS_PRIVATE_APPS=1 at native launch. These release
   flags never replace the account, Space, PC consent or revision admission.
+  The qualified built-in Video Studio has separate released availability; its
+  projects remain private and it does not admit arbitrary app bundles. Operators
+  can disable it with VITE_MYCELLIOS_VIDEO_STUDIO=0 (web build) and
+  MYCELLIOS_VIDEO_STUDIO=0 (native launch). Keep both existing admission guards.
 - Account-PC shutdown ignores late status callbacks after quitting and clears the
   tray reference before destruction. Verify account-computer-background tests;
   repeated stop and pending refresh completion must not touch a destroyed Tray

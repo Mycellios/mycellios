@@ -2,6 +2,13 @@
 
 ## Apps and private Video Studio — local candidate, 2026-11-05
 
+The owner authorized production availability for the qualified fixed Video Studio.
+Its released switch is separate from private-preview admission: unpublished app
+bundles remain closed in production, while the built-in retains native account,
+Space, PC consent and revision checks. Operator off switches remain available.
+The release candidate also retains the concurrent shutdown and isolated-profile
+startup-preference repairs. Deployment evidence is distinct from this source state.
+
 The Shell sidebar opens Apps without sending or replacing its chat draft. The
 first fixed `mycellios.app/1` bundle is `io.mycellios.video-studio@1.0.0`, admitted
 with definition hash `97f5250383f548773a690f72232333c9a324655f6155f165ed3fb499b6b0a293`.
