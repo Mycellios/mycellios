@@ -70,6 +70,10 @@ These rules apply to the complete repository.
   the shared scheduler. Definition admission is not executor qualification,
   authorization or publication. Keep Apps v1 out of live services until those
   host boundaries are implemented and separately qualified.
+  For the private installed-Desktop addon, run
+  `node scripts/apps/verify-local-preview.mjs` from `src/agent` through the queue
+  after building and preparing it. This checks the actual browser bundle against
+  the preserved host styles; component fixtures alone do not qualify the addon.
   The first private Apps surface uses a fixed local Desktop video driver, not a
   public marketplace or arbitrary app executor. Preserve native account/Space/PC
   admission and revision-bound review; qualify the real local artifacts separately.

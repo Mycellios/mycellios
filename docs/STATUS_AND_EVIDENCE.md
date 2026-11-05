@@ -20,10 +20,24 @@ video download and project recovery after reload. Synthetic acceptance approval
 is not a recorded human artistic/commercial approval. Provider tokens are used
 only when actually reported; external provider cost remains unmeasured.
 
-The targeted preview/driver build passes. A private installation overlay is
-prepared and verifies preservation of 7419 other packaged files and the installed
-renderer. Applying it and checking the ordinary Desktop window are pending while
-another local installation change finishes. No production deployment or Git push.
+The targeted preview/driver build passes. The private overlay is installed in the
+ordinary Windows Desktop 0.3.13, preserving 6991 other packaged files and the host
+renderer. The actual account/Space admitted a private test project, generated six
+scenes through the PC's Codex session, six narrations and a 37.992698-second
+720×1280 H264/AAC MP4 (521842 bytes; SHA-256
+`e5dd092d6454739d43e445352824369ddef882b86549cfa69e7158a6608f2fa5`).
+Native FFprobe/full-decode validation passed and the installed player advanced.
+This was a technical test approval, not human artistic/commercial approval.
+The addon browser smoke checks menu/catalog/close and retained draft text against
+the preserved host styles. It caught and verified a fix for an unbound development
+`process` reference. Windows redirected the initial new asset folder into Codex's
+private cache; a same-user non-virtualized copy restored the admitted profile path.
+The installer now rejects such redirection before replacing the native package.
+Local archive, renderer and draft-store backups are retained. No production
+deployment. A later Git synchronization/upload attempt failed because the
+authorized enterprise App has no Mycellios installation (HTTP 404); the separate
+connector's coverage is only nodecodex-org. No alternate credential or permission
+expansion was used, and no Git upload is claimed.
 Full CI, platform installers, Cloud execution, public catalog/votes, shared project
 sync, generated illustrations/music and social publishing were NOT RUN or are
 not implemented in this first private version.

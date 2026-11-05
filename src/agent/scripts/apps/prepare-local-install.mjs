@@ -1,5 +1,5 @@
 import asar from "@electron/asar";
-import { readFile, writeFile, mkdir, cp, copyFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir, cp, copyFile, realpath } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { finished } from "node:stream/promises";
 import { createHash } from "node:crypto";
@@ -43,6 +43,10 @@ if (process.argv.includes("--apply")) {
     errorOnExist: true,
     force: false,
   });
+  const physicalBase = await realpath(path.join(profile, "local-web"));
+  const physicalRenderer = await realpath(path.join(profile, directory));
+  assert(physicalRenderer.startsWith(physicalBase + path.sep),
+    "Windows redirected the renderer outside the admitted profile. Preserve this copy and install it from a non-virtualized local process before changing Desktop.");
   // Apply only after the ordinary Desktop has exited. No process is killed here.
   await copyFile(path.join(output, "app.asar"), original);
   await writeFile(preferenceFile, JSON.stringify({ ...receipt.preference, directory, nativeVersion: receipt.nativeVersion }, null, 2));

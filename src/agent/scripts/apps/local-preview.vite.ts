@@ -7,6 +7,9 @@ import path from "node:path";
 import { workspaceViteAliases } from "../../apps/desktop/scripts/workspace-aliases.mjs";
 
 export default defineConfig(async () => ({
+  // Library builds preserve this reference unless defined explicitly. The private
+  // addon runs in a sandboxed renderer without Node's process global.
+  define: { "process.env.NODE_ENV": JSON.stringify("production") },
   plugins: [
     react(),
     babel({ plugins: ["@lingui/babel-plugin-lingui-macro"] }),
