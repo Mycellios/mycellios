@@ -6,6 +6,7 @@ import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
+import { privateAppsEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell, utilityProcess } from "electron";
 import type { AppDocumentState } from "./app-document-state.js";
@@ -1229,7 +1230,7 @@ app.whenReady().then(async () => {
   const contributionRequest = (event: Electron.IpcMainInvokeEvent) =>
     fromMainWindow(event) && event.senderFrame !== null &&
     mayManageContribution(event.senderFrame.url, event.senderFrame === event.sender.mainFrame);
-  installAppsStudio({ userData: userDataDir, context: async event => {
+  if (privateAppsEnabled(app.isPackaged, process.env.MYCELLIOS_PRIVATE_APPS)) installAppsStudio({ userData: userDataDir, context: async event => {
     const captured = mainWindow;
     if (!captured || !fromMainWindow(event) || event.senderFrame !== event.sender.mainFrame || !hostComputer?.isEnabled() || !isCloudComputerRequest(event)) throw new Error("Apps necesita el acceso ya autorizado a este PC y tu sesión de Mycellios.");
     const identity = await getCloudComputer().identity();

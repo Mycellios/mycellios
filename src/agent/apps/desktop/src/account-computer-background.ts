@@ -14,14 +14,16 @@ export function installAccountComputerBackground(
   const service = new AccountComputerConnection({
     ...options,
     changed: () => {
+      if (quitting) return;
       const allowed = service.hasConsent();
       if (process.platform === "win32" && app.isPackaged && login !== allowed) {
         app.setLoginItemSettings({ openAtLogin: allowed, args: ["--background"] });
         login = allowed;
       }
-      tray?.setToolTip(
-        service.online() ? "Mycellios — PC connected" : "Mycellios — PC disconnected",
-      );
+      if (tray && !tray.isDestroyed())
+        tray.setToolTip(
+          service.online() ? "Mycellios — PC connected" : "Mycellios — PC disconnected",
+        );
       options.changed?.();
     },
   });
@@ -67,7 +69,9 @@ export function installAccountComputerBackground(
     quitting = true;
     clearInterval(timer);
     service.stop();
-    tray?.destroy();
+    const closingTray = tray;
+    tray = undefined;
+    if (closingTray && !closingTray.isDestroyed()) closingTray.destroy();
   });
   return service;
 }

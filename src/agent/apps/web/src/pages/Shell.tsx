@@ -22,7 +22,7 @@ import type {
   ThreadSnapshot,
   VoiceStatus,
 } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_COUNT, attachmentMaxBytes, attachmentSizeLabel } from "@rakazo/contracts";
+import { ATTACHMENT_MAX_COUNT, attachmentMaxBytes, attachmentSizeLabel, privateAppsEnabled } from "@rakazo/contracts";
 import type { AgentImportReader, ComposerMention, ReadBoundary } from "@rakazo/core";
 import {
   accountDisplay,
@@ -3635,11 +3635,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           setCreateBotOpen={setCreateBotOpen}
           onCreateProject={() => { setBotsSidebarCollapsedPref(false); setQuery(""); setSearchOpen(false); if (activityMode) toggleActivityMode(); setCreatingProject(true); }}
         />
-        <Button variant="ghost" aria-label="Apps" aria-pressed={overlay?.kind === "apps"}
+        {privateAppsEnabled(import.meta.env.PROD, import.meta.env.VITE_MYCELLIOS_PRIVATE_APPS) ? <Button variant="ghost" aria-label="Apps" aria-pressed={overlay?.kind === "apps"}
           className={`mx-3 mb-3 justify-start ${miniSidebar ? "px-2" : "px-3"}`}
           onClick={() => { setOverlay({ kind: "apps" }); setMobileSidebarOpen(false); }}>
           <LayoutGrid size={16} aria-hidden="true" />{miniSidebar ? null : "Apps"}
-        </Button>
+        </Button> : null}
         {miniSidebar || !(activityMode || searchOpen || query) ? null : (
           <InputGroup
             data-testid="sidebar-search"
@@ -4554,7 +4554,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             onOpenMcp={() => setOverlay({ kind: "mcp" })}
           />
         ) : null}
-        {overlay?.kind === "apps" ? <AppsOverlay key={`${userId}:${currentSpaceId}`} scope={`${userId}:${currentSpaceId}`} onClose={() => setOverlay(null)} /> : null}
+        {privateAppsEnabled(import.meta.env.PROD, import.meta.env.VITE_MYCELLIOS_PRIVATE_APPS) && overlay?.kind === "apps" ? <AppsOverlay key={`${userId}:${currentSpaceId}`} scope={`${userId}:${currentSpaceId}`} onClose={() => setOverlay(null)} /> : null}
         {overlay?.kind === "mcp" ? (
           <McpServersOverlay editServerId={overlay.serverId} onClose={() => setOverlay(null)} />
         ) : null}

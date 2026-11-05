@@ -47,3 +47,4 @@ export * from "./settings-scope.js";
 export * from "./terminal.js";
 export * from "./voice-errors.js";
 export * from "./contribution.js";
+export * from "./app-release-policy.js";
