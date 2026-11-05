@@ -63,6 +63,26 @@ These rules apply to the complete repository.
 
 ## Changes and verification
 
+- GitHub owner `Mycellios` is a personal account, outside the Nodecodex enterprise
+  organization installer. Verify the existing `gh` identity and repository write
+  permission for delivery; an `/orgs/Mycellios/installation` 404 is not evidence
+  that this account lacks access. Never print credentials or change auth profiles.
+
+- Apps authoring uses `specs/apps-standard/spec.md`, the versioned contracts in
+  `src/agent/packages/contracts/src/app-*.ts` and the
+  `src/agent/skills/create-mycellios-app` starter/guide. From `src/agent`, use
+  `npm run apps:validate -- <bundle/app.json> [--previous <old/app.json>]` through
+  the shared scheduler. Definition admission is not executor qualification,
+  authorization or publication. Keep Apps v1 out of live services until those
+  host boundaries are implemented and separately qualified.
+  For the private installed-Desktop addon, run
+  `node scripts/apps/verify-local-preview.mjs` from `src/agent` through the queue
+  after building and preparing it. This checks the actual browser bundle against
+  the preserved host styles; component fixtures alone do not qualify the addon.
+  The first private Apps surface uses a fixed local Desktop video driver, not a
+  public marketplace or arbitrary app executor. Preserve native account/Space/PC
+  admission and revision-bound review; qualify the real local artifacts separately.
+
 - During Daniel's temporary fast-delivery mode, `.github/workflows/ci.yml`
   records source readiness without waiting for full test/security/platform jobs.
   Its summary must say they were NOT RUN and must not claim deployment success.

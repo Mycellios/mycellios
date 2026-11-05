@@ -1,5 +1,124 @@
 # AGENTS.md
 
+- Windows installers explicitly include Koffi's win32-x64 optional native module
+  under resources/koffi/win32_x64. Preserve this loader-supported fallback even
+  when dependency collection misses optional packages. Use the native 7z NSIS
+  payload: the full resource tree exceeds ZIP32 and nsisunz rejects ZIP64.
+  Verify windows-installer tests and a fresh-profile packaged startup before release.
+
+- Private Apps stay disabled in production builds. Local development keeps its
+  preview; packaged private qualification requires both VITE_MYCELLIOS_PRIVATE_APPS=1
+  at web build time and MYCELLIOS_PRIVATE_APPS=1 at native launch. These release
+  flags never replace the account, Space, PC consent or revision admission.
+  The qualified built-in Video Studio has separate released availability; its
+  projects remain private and it does not admit arbitrary app bundles. Operators
+  can disable it with VITE_MYCELLIOS_VIDEO_STUDIO=0 (web build) and
+  MYCELLIOS_VIDEO_STUDIO=0 (native launch). Keep both existing admission guards.
+- Account-PC shutdown ignores late status callbacks after quitting and clears the
+  tray reference before destruction. Verify account-computer-background tests;
+  repeated stop and pending refresh completion must not touch a destroyed Tray
+  or rewrite Windows startup preferences during shutdown.
+  Isolated RAKAZO_PERFORMANCE_USER_DATA qualification profiles never write the
+  installed application's Windows startup preferences.
+
+- Apps opens beside the existing chat through the Shell overlay; preserve its
+  draft and scope. The private Video Studio v1 definition is in Desktop assets,
+  with a fixed native driver and owner/Space/device-private projects. No app HTML,
+  executable commands or paths are accepted from the renderer. Keep script/media
+  revisions, review binding, actual artifact checks and existing PC consent.
+  Cloud, catalog publication and cross-device project sync are not implemented.
+  Qualify the app validator, native studio tests and `scripts/verify-apps-studio-ui.mjs`
+  through compilar.ps1. `--codex` additionally uses the PC's real provider session;
+  the ordinary fixture otherwise uses a manually entered script, not fake AI.
+
+- Development projects group independent existing Mico task conversations through
+  owner/Space-scoped metadata, not cloned bots. Native repository paths stay in
+  the native profile. Project conversation admission verifies the exact owned
+  thread and provisions a distinct Git worktree before sending; ordinary Mico
+  threads keep their existing route. Never reset a source repository, import its
+  uncommitted files implicitly or merge task changes automatically. Keep review
+  drafts, native preview generations and runner keys scoped to the conversation.
+  Parallel native project runs require owner/Space metadata plus the exact native
+  worktree-v1 binding. Use per-conversation computer lease keys, retain their run
+  fences and block shared screen/browser tools in both offering and execution.
+  Ordinary/legacy computers retain their existing computer leases.
+  Admitted native task roots use dedicated path mapping without changing the
+  saved Team assignment; never prefix their commands/files with bots/<mico>.
+  Namespaced computer lease keys are not Mico identities: preserve their exact
+  DB fence and resolve the owned native conversation for Stop/crash teardown.
+  Wakeups must check the conversation's key, not serialize the whole Mico.
+  New worktree basenames use 128-bit hashes to fit Git for Windows' internal
+  metadata paths; recover existing full-hash receipts without moving owner files.
+  Verify projects API/RLS, project-workspaces, project-conversations-ipc,
+  host-task-project, task-thread-scope and native-computer-execution tests, plus
+  scripts/verify-projects-db.ts and scripts/verify-projects-ui.mjs locally.
+  scripts/verify-projects-desktop-real.ts is an explicit opt-in qualification:
+  isolated profile/database, existing unexpired subscription credential, real
+  native bridge and two barrier-synchronized tests. Run it once through the shared
+  queue with --allow-real-model; never nest the queue in its child test commands.
+  Its private PostgreSQL cluster requires UTF8 and a stored Unicode round trip.
+  Windows command pipes use overlapped I/O with early error guards. Output loss
+  records an unknown outcome, not success or permission to replay the command.
+  Verify desktop-sandbox-command, desktop-process-tree and native-command-journal.
+
+
+- Mico Work controls reuse revisioned delegation controls and durable teardown.
+  Pi concurrency is admitted atomically per Bot and serialized per thread; native
+  engines remain single-turn. Private Pi tasks reserve the existing computer lease
+  before computer/file/command tools, never share it between runs. Workflows reuse
+  existing Micos, owner/Space RPCs and the existing reconciler, freeze graph versions
+  and persist private step runs. Stop commits cancellation and process teardown
+  receipts together. Verify workflow contracts, affected wakeup/control tests and
+  the synthetic PostgreSQL/browser acceptance scripts through compilar.ps1; never
+  use production accounts, credentials or models in these fixtures.
+  Workflow thread ownership queries project only userId/spaceId from a Run actor;
+  preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
+  Delegation from ordinary Mico tabs uses internal work scope; explicit project
+  delegation keeps its independent native project binding and admission.
+
+- Settings uses one searchable account/Space shell. General contains device UI
+  preferences; Profile owns identity/security; Micos opens the existing per-Mico
+  editor and its canonical skills editor. Keep Models, Voice, Approvals, Memory, Usage,
+  Computer, Mobile and Updates connected to their existing services, with Billing
+  and Logs gated by capability. Search matches field aliases and accents; Escape
+  clears a query before closing. Profile/model/voice/memory drafts use the shared
+  leave guard and saves block navigation while pending. Do not duplicate account
+  connection editors or cross a Space boundary with the current Space's client.
+  Reply-notification preferences are local per user/device; per-Mico switches save
+  through the owned Space RPC. Hidden previews never reveal reply text or names.
+  Web update checks share the existing guarded tracker; they never deploy servers
+  or reload through open settings/drafts/calls. Desktop uses the installed package's
+  real updater policy; do not fabricate channel/automatic-install permissions.
+  Qualify affected settings/security/model/voice/update tests and the isolated
+  `playwright.settings.config.ts` flow. No live OAuth, paid run, payment, password
+  change, account deletion, microphone permission or model download is a fixture.
+
+
+- Mico task tabs bind immutable bot/thread/Space RPC clients, separate query caches
+  and composer drafts. Reject snapshots for another thread; never derive task
+  identity from mutable global location state. Cron, Test and event routines use
+  the owned routine-thread resolver, preserving explicit targets and history.
+  Delivery receipts freeze routine recipients and retain Run nonces after clearing
+  chat; do not promise universal exactly-once execution for raw/legacy deliveries.
+  Routine runs exclude screen tools at offering and execution. Preserve computer
+  leases and private-call restrictions until those transports are scoped.
+  Verify affected task/RPC, routine, webhook, push and native runtime tests;
+  `node --import tsx --test scripts/verify-routine-isolation-db.ts` uses a fresh
+  loopback PostgreSQL cluster, and `node scripts/verify-mico-tasks-ui.mjs` checks
+  the real task component in a browser with synthetic RPCs. Run both in the shared
+  scheduler. Native private-task push targets use the exact web fallback until
+  native task rendering is qualified; never silently open the primary chat.
+
+- Mico work delegation uses durable parent/child Tasks, expected results, dependency
+  and resource reservations, and revisioned controls. Native command receipts belong
+  to the admitted host/Mico and are observed with command_status; a lost observer or
+  missing exit is never success or authorization to replay. Preserve native Windows
+  Job ownership, consent, Stop, bounded budgets and exact run/fence teardown. Plans
+  and continuation counters are fenced Task metadata, not new instructions. Verify
+  native-command-journal/recovery, work-continuation, work-resources, work-stop-reconciler
+  and API work-controls tests plus scripts/verify-resilient-work-db.ts through the
+  shared scheduler. Keep production and existing user accounts out of these fixtures.
+
 - Mobile dependency updates must match the installed Expo SDK's
   `bundledNativeModules.json` and the proposed lockfile's peer requirements;
   an isolated Router major update is not an SDK migration. Mermaid's API route
@@ -110,8 +229,11 @@
   when the bridge advertises it. Older frameless builds retain their page controls.
   Sign-in proceeds without an intermediate login launcher or popup. Keep the persistent
   server-specific Electron session, state/PKCE and explicit retry after failure.
-  Generic self-hosted SSO and model/integration authorization retain their existing
-  popup behavior; never broaden main-window navigation to arbitrary identity hosts.
+  Generic self-hosted SSO, model and MCP authorization retain their existing
+  popup behavior. Managed integration connections use an ordinary external browser
+  target; the original client confirms completion through the owned server request,
+  without depending on a popup handle or shared browser cookies. Never broaden
+  main-window navigation to arbitrary identity hosts.
   Normal Desktop startup opens Mycellios directly, including after unusable saved
   preferences. Connection failures show Retry/Close with server setup folded under
   Advanced; retry only the native-owned failed target, without configuration writes,

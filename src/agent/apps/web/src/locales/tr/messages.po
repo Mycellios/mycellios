@@ -326,7 +326,7 @@ msgstr "{title}, {savedAs} olarak kaydedilir"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "{toolCount, plural, one {# tool} other {# tools}}"
-msgstr ""
+msgstr "{toolCount, plural, other {# araç}}"
 
 #. placeholder {0}: mention.name
 #: src/pages/shell/composer.tsx
@@ -384,7 +384,7 @@ msgstr "Hesap kimliği"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Account label"
-msgstr ""
+msgstr "Hesap etiketi"
 
 #: src/components/SidebarFooter.tsx
 msgid "Account menu for {name}"
@@ -465,7 +465,7 @@ msgstr "Bir HTTPS sunucu URL'si gir."
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Add another"
-msgstr ""
+msgstr "Başka hesap ekle"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add credential"
@@ -5287,7 +5287,7 @@ msgstr "Araç kaynakları"
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Tools"
-msgstr ""
+msgstr "Araçlar"
 
 #: src/components/ModelCredits.tsx
 msgid "Top up anytime"
@@ -6345,3 +6345,43 @@ msgstr "Gerektiğinde uygulamaları kendi API anahtarınızla bağlayın."
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "Bir entegrasyon sunucu kurulumu gerektirdiğinde anlaşılır mesajlar."
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "Masaüstünde uygulama bağlantıları tarayıcınızda açılır."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Account identity unavailable"
+msgstr "Hesap kimliği kullanılamıyor"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Authorization pending"
+msgstr "Yetkilendirme bekleniyor"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Loading account…"
+msgstr "Hesap yükleniyor…"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Could not load account identities."
+msgstr "Hesap kimlikleri yüklenemedi."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Connected accounts"
+msgstr "Bağlı hesaplar"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "No connected accounts"
+msgstr "Bağlı hesap yok"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Disconnect all"
+msgstr "Tüm bağlantıları kes"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+msgstr "{pendingCount, plural, other {# bekleyen bağlantı}}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "See which accounts are connected to each app."
+msgstr "Her uygulamaya hangi hesapların bağlı olduğunu görün."

@@ -41,6 +41,7 @@ export interface RakazoDesktopOAuthCallback {
 }
 
 export interface RakazoDesktop {
+  appsStudio?: import("./app-studio.js").AppsStudioBridge;
   projectRunner?: ProjectRunnerBridge;
   /** Isolated native browser displayed inside the conversation's preview panel. */
   preview?: {
@@ -76,6 +77,7 @@ export interface RakazoDesktop {
     connect?: (botId: string) => Promise<void>;
     connected?: (botId: string) => Promise<boolean>;
     chooseProject?: (botId: string) => Promise<{ name: string; path: string } | null>;
+    prepareTask?: (request: { botId: string; taskThreadId: string }) => Promise<void>;
     project?: (botId: string) => Promise<{ name: string; path: string } | null>;
     projectAvailable?: () => Promise<boolean>;
     onConfigure: (listener: () => void) => () => void;

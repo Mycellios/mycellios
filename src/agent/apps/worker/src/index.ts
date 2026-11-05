@@ -324,6 +324,7 @@ async function main() {
   const reconciler = createJobReconciler({
     prisma,
     jobs,
+    sandbox,
     events,
     notifications,
     leadership: createPostgresReconciliationLeadership(pool),

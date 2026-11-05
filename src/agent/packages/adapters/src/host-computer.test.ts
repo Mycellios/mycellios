@@ -523,6 +523,6 @@ it.each([
 ] as const)("reports PC transport failures accurately without replaying (%s/%s)",async(status,code,message)=>{
   const transport=vi.fn(async()=>new Response("private backend diagnostics",{status,headers:code?{"x-mycellios-desktop-error":code}:{}}));
   const client=new HostComputerSandbox("","",transport);
-  await expect(client.environment({id:"host",botId:"test-bot",kind:"desktop",homePath:"/home"},context)).rejects.toThrow(message);
+  await expect(client.environment({id:"host",botId:"test-bot",kind:"desktop",providerRef:"/home"},context)).rejects.toThrow(message);
   expect(transport).toHaveBeenCalledTimes(1);
 });

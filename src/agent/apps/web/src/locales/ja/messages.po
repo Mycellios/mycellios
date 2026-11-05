@@ -6345,3 +6345,43 @@ msgstr "必要に応じて自分のAPIキーでアプリを接続できます。
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "連携にサーバー設定が必要な場合に、わかりやすいメッセージを表示します。"
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "デスクトップ版では、アプリの接続がブラウザーで開きます。"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Account identity unavailable"
+msgstr "アカウント情報を取得できません"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Authorization pending"
+msgstr "認証待ち"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Loading account…"
+msgstr "アカウントを読み込み中…"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Could not load account identities."
+msgstr "アカウント情報を読み込めませんでした。"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Connected accounts"
+msgstr "接続済みのアカウント"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "No connected accounts"
+msgstr "接続済みのアカウントはありません"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Disconnect all"
+msgstr "すべて切断"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+msgstr "{pendingCount, plural, other {認証待ちの接続 # 件}}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "See which accounts are connected to each app."
+msgstr "各アプリに接続されているアカウントを確認できます。"

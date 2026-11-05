@@ -10,11 +10,13 @@ export type ProjectPreparationStatus = { status: string; detail: string };
 
 export function ProjectRunControls({
   botId,
+  taskThreadId,
   prepare,
   inspectPreparation,
   cancelPreparation,
 }: {
   botId: string;
+  taskThreadId?: string;
   prepare(prompt: string, id: string): Promise<string | undefined>;
   inspectPreparation?(runId: string): Promise<ProjectPreparationStatus>;
   cancelPreparation?(runId: string): Promise<unknown>;
@@ -167,6 +169,11 @@ export function ProjectRunControls({
       }
       if (!current.current) return;
       await bridge!.computer!.connect!(botId);
+      if (!current.current || !intent.current) return;
+      if (taskThreadId) {
+        if (!bridge!.computer!.prepareTask) throw new Error(t`Update Desktop before running this project.`);
+        await bridge!.computer!.prepareTask({ botId, taskThreadId });
+      }
       if (!current.current || !intent.current) return;
       const next = await runner!.play({ botId, profile: profile || undefined });
       if (!current.current || !intent.current) return;

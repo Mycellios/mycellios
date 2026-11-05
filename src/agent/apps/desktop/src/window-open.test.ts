@@ -14,6 +14,16 @@ describe("desktop child windows", () => {
     ).toBe(false);
   });
 
+  it("hands integration authorization links to the system browser", () => {
+    expect(
+      shouldOpenInAppPopup(
+        appOrigin,
+        "https://connect.composio.dev/link/fixture-not-a-real-connection",
+        "_blank",
+      ),
+    ).toBe(false);
+  });
+
   it.each([
     "rakazo-model-oauth",
     "rakazo-mcp-oauth",

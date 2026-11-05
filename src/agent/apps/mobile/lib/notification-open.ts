@@ -1,7 +1,9 @@
+import { productAppUrl } from "@rakazo/contracts";
+
 export type NotificationRoute =
   | {
       pathname: "/thread";
-      params: { botId: string; threadId?: string; spaceId?: string; name?: string };
+      params: { botId: string; threadId?: string; taskThreadId?: string; spaceId?: string; name?: string };
     }
   | {
       pathname: "/group-thread";
@@ -30,7 +32,7 @@ function notificationField(data: Record<string, unknown>, key: string): string |
 }
 
 /**
- * A bot and a group each have one thread. groupId wins when both are present
+ * An explicit private target is distinct from the legacy thread identity. groupId wins
  * so a group run does not open that bot's direct chat.
  */
 export function notificationOpenTarget(data: unknown): NotificationRoute | null {
@@ -47,8 +49,16 @@ export function notificationOpenTarget(data: unknown): NotificationRoute | null 
   const groupId = notificationField(record, "groupId");
   if (groupId) return { pathname: "/group-thread", params: { groupId, ...shared } };
   const botId = notificationField(record, "botId");
-  if (botId) return { pathname: "/thread", params: { botId, ...shared } };
+  const taskThreadId = notificationField(record, "taskThreadId");
+  if (botId) return { pathname: "/thread", params: { botId, ...shared, ...(taskThreadId ? { taskThreadId } : {}) } };
   return null;
+}
+
+/** Native task rendering is not qualified yet; open the exact shared web task without tokens. */
+export function privateTaskWebUrl(base: string, botId: string, taskThreadId: string, spaceId?: string) {
+  const query = new URLSearchParams({ task: taskThreadId });
+  if (spaceId) query.set("taskSpace", spaceId);
+  return productAppUrl(base, `/app/${encodeURIComponent(botId)}?${query}`);
 }
 
 export function notificationOpenTargetFromLink(url: string): NotificationRoute | null {

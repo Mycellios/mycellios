@@ -146,6 +146,42 @@ describe("space selection storage", () => {
 });
 
 describe("shell RPC space isolation", () => {
+  it("blocks manual and automatic private writes until the server admits the exact thread", async () => {
+    vi.stubGlobal("window", { location: { origin: "https://example.test", pathname: "/app" }, localStorage: { getItem: () => "space-a" } });
+    const fetch = vi.fn(async () => Response.json({ json: { threadId: "main" } }));
+    vi.stubGlobal("fetch", fetch);
+    const client = createSpaceRpc("space-a", { botId: "mico", taskThreadId: "private" });
+    await expect(client.threads.send({ botId: "mico", text: "Do not leak", clientNonce: "nonce" })).rejects.toThrow("Load this task");
+    await expect(client.threads.markRead({ botId: "mico" })).rejects.toThrow("Load this task");
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(client.threads.get({ botId: "mico" })).rejects.toThrow("did not return this task");
+    await expect(client.threads.stop({ botId: "mico" })).rejects.toThrow("Load this task");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    fetch.mockImplementation(async () => Response.json({ json: { threadId: "private" } }));
+    await client.threads.get({ botId: "mico" });
+    await client.threads.markRead({ botId: "mico" });
+    await expect(client.threads.markRead({ botId: "mico" }, { context: { spaceId: "space-b" } })).rejects.toThrow("different Space");
+    fetch.mockImplementation(async () => Response.json({ json: { threadId: "main" } }));
+    await expect(client.threads.get({ botId: "mico" })).rejects.toThrow();
+    await expect(client.threads.markRead({ botId: "mico" })).rejects.toThrow("Load this task");
+  });
+  it("pins the actual wire request to its task and Space after another view changes selection", async () => {
+    let selected = "space-a";
+    vi.stubGlobal("window", { location: { origin: "https://example.test", pathname: "/app" }, localStorage: { getItem: () => selected } });
+    const inputs: Record<string, unknown>[] = [];
+    const fetch = vi.fn(async (request: Request, init: RequestInit) => {
+      inputs.push((await request.clone().json()).json);
+      expect(new Headers(init.headers).get("x-rakazo-space-id")).toBe("space-a");
+      return Response.json({ json: { threadId: "task-a" } });
+    });
+    vi.stubGlobal("fetch", fetch);
+    const scope = { botId: "mico", taskThreadId: "task-a" };
+    const client = createSpaceRpc("space-a", scope);
+    scope.taskThreadId = "task-b";
+    selected = "space-b";
+    await client.threads.get({ botId: "mico" });
+    expect(inputs).toEqual([{ botId: "mico", taskThreadId: "task-a" }]);
+  });
   it.each([rpc, createSpaceRpc("space-a")])(
     "passes the caller's cancellation signal directly to fetch",
     async (client) => {

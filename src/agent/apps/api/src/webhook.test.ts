@@ -83,12 +83,30 @@ function createDeps(
   }));
   const enqueue = vi.fn(async () => undefined);
   const findRoutines = vi.fn(async () => overrides.routines ?? []);
+  const receipts = new Map<string, { routineIds: string[] }>();
+  const threadForRoutine = (id: string) => `routine-thread:${id}`;
+  const transaction = {
+    $queryRaw: vi.fn(async () => []),
+    routine: { findFirst: vi.fn(async ({ where }: { where: { id: string } }) => {
+      const row = (overrides.routines ?? []).find(routine => routine.id === where.id);
+      return row ? { ...row, botId: bot?.id, threadId: threadForRoutine(row.id) } : null;
+    }) },
+    thread: { findFirst: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id })) },
+  };
 
   return {
     prisma: {
       bot: {
         findUnique: vi.fn(async () => bot),
+        findFirst: vi.fn(async () => bot),
       },
+      message: { findFirst: vi.fn(async () => null) },
+      run: { findFirst: vi.fn(async () => null) },
+      $transaction: vi.fn(async (fn: (tx: typeof transaction) => unknown) => fn(transaction)),
+      routineDeliveryReceipt: { upsert: vi.fn(async ({ create }: { create: { keyDigest: string; routineIds: string[] } }) => {
+        if (!receipts.has(create.keyDigest)) receipts.set(create.keyDigest, create);
+        return receipts.get(create.keyDigest)!;
+      }) },
       secret: {
         findUnique: vi.fn(async () => secret),
       },
@@ -343,7 +361,7 @@ describe("inbound webhook HTTP route", () => {
     );
   });
 
-  it("keeps the bot model when matching routines chose different models", async () => {
+  it("routes matching routines into separate conversations with their own selected models", async () => {
     const deps = createDeps({
       routines: [
         {
@@ -374,7 +392,13 @@ describe("inbound webhook HTTP route", () => {
       body: JSON.stringify({ event: "ping" }),
     });
     expect(res.status).toBe(200);
-    expect(deps.sendUserMessage.mock.calls[0]?.[0]).not.toHaveProperty("modelPin");
+    expect(deps.sendUserMessage).toHaveBeenCalledTimes(2);
+    expect(deps.sendUserMessage.mock.calls.map(call => call[0])).toEqual([
+      expect.objectContaining({ threadId: "routine-thread:routine-1", routineId: "routine-1",
+        modelPin: { modelProvider: "openai", modelId: "gpt", thinkingLevel: null } }),
+      expect.objectContaining({ threadId: "routine-thread:routine-2", routineId: "routine-2",
+        modelPin: { modelProvider: "anthropic", modelId: "claude", thinkingLevel: null } }),
+    ]);
   });
 
   it("accepts a plain text payload as untrusted delivery data", async () => {
@@ -652,7 +676,7 @@ describe("GitHub event HTTP route", () => {
       await githubRequest(raw, SECRET, "delivery-abc"),
     );
     expect(res.status).toBe(200);
-    const digest = createHash("sha256").update("delivery-abc").digest("base64url");
+    const digest = createHash("sha256").update(JSON.stringify(["delivery-abc", "routine-1"])).digest("base64url");
     expect(deps.sendUserMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         botId: "bot-1",

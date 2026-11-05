@@ -16,6 +16,7 @@ import {
   BACKGROUND_RUN_TRIGGERS,
   callIdFromClientNonce,
   isConversationalRun,
+  isMicoTaskThread,
   messageReaction,
   projectMessages,
   QUEUE_HOLDING_RUN_STATUSES,
@@ -33,6 +34,8 @@ import {
   createThreadMessageInTransaction,
   expireComputerExecutionLeases,
   IsolationError,
+  isOwnedRoutineThread,
+  isOwnedWorkflowThread,
   lockOwnedGroup,
   primaryActiveRun,
   retireWaitingQuestionInTransaction,
@@ -306,7 +309,7 @@ export async function resolveThreadTarget(
       kind: "bot",
       botId: bot.id,
       threadId: taskThread?.id ?? bot.thread.id,
-      ...(taskThread?{projectSessionId:taskThread.id}:{}),
+      ...(taskThread && !isMicoTaskThread(taskThread) && !(await isOwnedRoutineThread(prisma, actor, taskThread)) && !(await isOwnedWorkflowThread(prisma, actor, taskThread)) ? { projectSessionId: taskThread.id } : {}),
       bot,
     };
   }

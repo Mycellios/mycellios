@@ -1,4 +1,6 @@
 export * from "./approval-settings.js";
+export * from "./routine-thread.js";
+export * from "./routine-delivery.js";
 export * from "./artifact-versions.js";
 export * from "./billing.js";
 export * from "./board.js";
@@ -7,6 +9,7 @@ export * from "./bootstrap-user.js";
 export * from "./bot-instructions.js";
 export * from "./bot-update.js";
 export * from "./cancel-runs.js";
+export * from "./workflow-stop.js";
 export * from "./client.js";
 export * from "./computer-runs.js";
 export * from "./computers.js";
@@ -46,3 +49,7 @@ export * from "./usage.js";
 export * from "./voice-credentials.js";
 
 export * from "./run-secrets.js";
+export * from "./work-delegation.js";
+export * from "./work-controls.js";
+export * from "./mico-concurrency.js";
+export * from "./workflow-thread.js";

@@ -11,7 +11,7 @@ import { RunJobPublisher, RunWorkerHost, withRunWorker } from "./run-wakeup.js";
 afterEach(() => vi.useRealTimers());
 
 function fixture() {
-  const rows = new Map<string, { status: string; wakeAt: Date | null; trigger?: string }>();
+  const rows = new Map<string, { status: string; wakeAt: Date | null; trigger?: string; botId?: string; threadId?: string; projectKey?: string }>();
   const updateMany = vi.fn(async ({ where, data }) => {
     const row = rows.get(where.id);
     if (!row || !where.status.in.includes(row.status) || (where.wakeAt === null && row.wakeAt))
@@ -20,7 +20,10 @@ function fixture() {
     return { count: 1 };
   });
   const findMany = vi.fn(
-    async (args: { where: { trigger: { in?: string[]; notIn?: string[] } } }) =>
+    async (args: { where: { trigger: { in?: string[]; notIn?: string[] } } }): Promise<Array<{
+      id: string; botId: string; createdAt?: Date; threadId?: string;
+      thread?: { projectKey?: string; taskBotId?: string | null } | null; bot: { computerId: string; agentEngine?: string };
+    }>> =>
       [...rows]
         .filter(
           ([, row]) =>
@@ -30,7 +33,9 @@ function fixture() {
               ? args.where.trigger.in.includes(row.trigger ?? "user")
               : !args.where.trigger.notIn!.includes(row.trigger ?? "user")),
         )
-        .map(([id]) => ({ id, botId: id, bot: { computerId: "computer" } })),
+        .map(([id, row]) => ({ id, botId: row.botId ?? id, threadId: row.threadId,
+          thread: row.projectKey ? { projectKey: row.projectKey, taskBotId: row.botId ?? id } : null,
+          bot: { computerId: "computer", ...(row.projectKey ? { agentEngine: "pi" } : {}) } })),
   );
   const leases = vi.fn(async () => [] as { computerId: string; botId: string; runId: string }[]);
   const queueHealth = vi.fn(async () => [{ delayedRuns: 0, oldestDueAt: null as Date | null }]);
@@ -294,6 +299,21 @@ describe("durable direct run wakeups", () => {
       await f.host.stop();
     }
   });
+  it("does not make a project's second conversation wait for the same Mico's other worktree", async () => {
+    const f = fixture();
+    f.rows.set("first", { status: "queued", wakeAt: null, botId: "mico", threadId: "thread-one", projectKey: "project:project" });
+    f.rows.set("second", { status: "queued", wakeAt: null, botId: "mico", threadId: "thread-two", projectKey: "project:project" });
+    f.leases.mockResolvedValue([{ computerId: "computer", botId: "task-worktree:mico:thread-one", runId: "holder" }]);
+    const handler = vi.fn(async ({ runId }) => { f.rows.get(runId)!.status = "completed"; });
+    try {
+      await f.host.start({ "run.continue": handler } as unknown as BackgroundJobHandlers);
+      await vi.waitFor(() => expect(f.rows.get("second")!.status).toBe("completed"));
+      expect(f.rows.get("first")!.status).toBe("queued");
+      expect(handler).toHaveBeenCalledTimes(1);
+      f.leases.mockResolvedValue([]);
+      await vi.waitFor(() => expect(f.rows.get("first")!.status).toBe("completed"));
+    } finally { await f.host.stop(); }
+  });
 
   it("allows a run's own held lease and ignores leases on its previous computer", async () => {
     const f = fixture();
@@ -312,6 +332,23 @@ describe("durable direct run wakeups", () => {
     } finally {
       await f.host.stop();
     }
+  });
+
+  it("admits private Pi model turns while keeping ordinary chats behind the computer lease", async () => {
+    const f = fixture();
+    f.rows.set("private", { status: "queued", wakeAt: null });
+    f.rows.set("main", { status: "queued", wakeAt: null });
+    f.findMany.mockImplementation(async () => [...f.rows].filter(([, row]) => row.status === "queued").map(([id]) => ({
+      id, botId: id, bot: { computerId: "computer", agentEngine: "pi" }, thread: { taskBotId: id === "private" ? id : null },
+    })));
+    f.leases.mockResolvedValue([{ computerId: "computer", botId: "private", runId: "holder" }, { computerId: "computer", botId: "main", runId: "holder" }]);
+    const handler = vi.fn(async ({ runId }) => { f.rows.get(runId)!.status = "completed"; });
+    try {
+      await f.host.start({ "run.continue": handler } as unknown as BackgroundJobHandlers);
+      await vi.waitFor(() => expect(f.rows.get("private")!.status).toBe("completed"));
+      expect(f.rows.get("main")!.status).toBe("queued");
+      expect(handler).toHaveBeenCalledTimes(1);
+    } finally { await f.host.stop(); }
   });
 
   it("starts chat without invoking Graphile, deduplicates wakeups, and drains long executions", async () => {

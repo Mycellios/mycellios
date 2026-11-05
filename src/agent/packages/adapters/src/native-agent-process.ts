@@ -1,11 +1,22 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { accessSync, constants, existsSync, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
+import { nativeAgentProtocolError } from "./native-agent-errors.js";
 
 export interface NativeCommand {
   command: string;
   args?: string[];
+}
+
+export function nativeCommandAvailable(command: NativeCommand | null | undefined): boolean {
+  if (!command || !isAbsolute(command.command)) return false;
+  try {
+    if (!statSync(command.command).isFile()) return false;
+    if (process.platform === "win32") return /\.(?:exe|com)$/i.test(command.command);
+    accessSync(command.command, constants.X_OK);
+    return true;
+  } catch { return false; }
 }
 export type WireMessage = {
   id?: number | string;
@@ -45,7 +56,7 @@ export function findNativeCommand(
   if (home) paths.push(join(home, ".local", "bin"));
   for (const dir of paths) {
     const file = join(dir, process.platform === "win32" ? `${name}.exe` : name);
-    if (existsSync(file)) return { command: file };
+    if (nativeCommandAvailable({ command: file })) return { command: file };
   }
   // npm's Windows .cmd shim cannot be executed without a shell. Run its fixed JS entry instead.
   if (process.platform === "win32" && env.APPDATA) {
@@ -168,7 +179,7 @@ export class NativeAgentProcess {
             this.pending.delete(message.id);
             clearTimeout(waiter.timer);
             if (message.error)
-              waiter.reject(new Error("Native agent rejected the protocol request"));
+              waiter.reject(nativeAgentProtocolError(message.error));
             else waiter.resolve(message.result);
           } else onMessage(message);
         } catch {

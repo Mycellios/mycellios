@@ -3,8 +3,9 @@ import type { SettingsScope } from "@rakazo/contracts";
 import {
   compatibleConnectionName,
   connectionDisplayName,
-  isOllamaCloudBaseUrl,
+  DEFAULT_MODEL_CONTEXT_WINDOW,
   isMycelliosBaseUrl,
+  isOllamaCloudBaseUrl,
   OLLAMA_CLOUD_BASE_URL,
   OPENAI_COMPATIBLE_PROVIDER_ID,
   savedCompatibleEndpointMatches,
@@ -34,16 +35,18 @@ import type { ModelRoleConnectIntent } from "./ModelRoleSettings";
 import { ModelRoleSettings } from "./ModelRoleSettings";
 import { CompatibleModelFields } from "./model-settings/compatible-model-fields";
 import { CompatibleKeyControls, ConnectionControls } from "./model-settings/connection-controls";
+import { MycelliosProvider } from "./model-settings/mycellios-provider";
 import { ConnectionNameField, ProvidersSection } from "./model-settings/providers-section";
 import type { ConnectableProvider } from "./model-settings/role-model-picker";
 import { SpaceBotsModelNotice } from "./model-settings/space-bots-model";
 import { useModelSettings } from "./model-settings/use-model-settings";
-import { MycelliosProvider } from "./model-settings/mycellios-provider";
 
 export function ModelSettingsOverlay({
   onClose,
   embedded = false,
   scope,
+  onFormStateChange,
+  onRequestLeave,
 }: {
   onClose: () => void;
   /** Render the content only, inside the shared Settings shell's scroller. */
@@ -53,6 +56,8 @@ export function ModelSettingsOverlay({
    * account-wide, so a Space shows only its role lists.
    */
   scope: SettingsScope;
+  onFormStateChange?: (state: { busy: boolean; dirty: boolean }) => void;
+  onRequestLeave?: (next: () => void) => void;
 }) {
   const { t } = useLingui();
   const model = useModelSettings(onClose, scope);
@@ -93,7 +98,30 @@ export function ModelSettingsOverlay({
   // end of Providers when adding one. The rest of the page stays where it was.
   const [connectionAt, setConnectionAt] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const mycelliosCredential = credentials.find(entry => isMycelliosBaseUrl(entry.baseUrl));
+  const formBusy = pending !== null || model.preflightTesting || model.probing;
+  const compatibleDirty = Boolean(
+    connectionAt &&
+      isOpenAiCompatible &&
+      credential &&
+      (model.baseUrl.trim() !== (credential.baseUrl ?? "") ||
+        model.maxTokens.trim() !== String(credential.maxTokens ?? "") ||
+        model.contextWindow.trim() !==
+          String(credential.contextWindow ?? DEFAULT_MODEL_CONTEXT_WINDOW) ||
+        model.modelId !== (credential.modelId ?? "")),
+  );
+  const formDirty = Boolean(
+    connectionAt &&
+      (settingsDirty ||
+        compatibleDirty ||
+        model.apiKey.trim() ||
+        model.oauthPending ||
+        !credential),
+  );
+  useEffect(() => {
+    onFormStateChange?.({ busy: formBusy, dirty: formDirty });
+  }, [onFormStateChange, formBusy, formDirty]);
+  useEffect(() => () => onFormStateChange?.({ busy: false, dirty: false }), [onFormStateChange]);
+  const mycelliosCredential = credentials.find((entry) => isMycelliosBaseUrl(entry.baseUrl));
   useEffect(() => {
     panelRef.current?.scrollIntoView?.({ block: "nearest" });
   }, [connectionAt]);
@@ -149,9 +177,14 @@ export function ModelSettingsOverlay({
     credentialId: string | null,
     at: string,
   ) {
-    if (credentialId && credentials.some(entry => entry.id === credentialId && isMycelliosBaseUrl(entry.baseUrl))) {
+    if (
+      credentialId &&
+      credentials.some((entry) => entry.id === credentialId && isMycelliosBaseUrl(entry.baseUrl))
+    ) {
       closeConnection();
-      document.querySelector('[data-testid="mycellios-provider"]')?.scrollIntoView?.({ block: "nearest" });
+      document
+        .querySelector('[data-testid="mycellios-provider"]')
+        ?.scrollIntoView?.({ block: "nearest" });
       return;
     }
     model.chooseProvider(next.id, next.baseUrl, credentialId);
@@ -167,6 +200,15 @@ export function ModelSettingsOverlay({
   }
 
   function closeConnection() {
+    if (onRequestLeave && (formDirty || formBusy)) {
+      onRequestLeave(() => {
+        cancelOAuthAttempt();
+        model.updateApiKey("");
+        intentRef.current = null;
+        setConnectionAt(null);
+      });
+      return;
+    }
     cancelOAuthAttempt();
     intentRef.current = null;
     setConnectionAt(null);
@@ -323,8 +365,15 @@ export function ModelSettingsOverlay({
           )}
           {scope === "space" ? null : (
             <ProvidersSection
-              credentials={credentials.filter(entry => !isMycelliosBaseUrl(entry.baseUrl))}
-              primary={<MycelliosProvider credential={mycelliosCredential} onConnected={async () => { await refresh(); }} />}
+              credentials={credentials.filter((entry) => !isMycelliosBaseUrl(entry.baseUrl))}
+              primary={
+                <MycelliosProvider
+                  credential={mycelliosCredential}
+                  onConnected={async () => {
+                    await refresh();
+                  }}
+                />
+              }
               providers={allProviders}
               name={connectionName}
               disabled={busy}
@@ -347,7 +396,10 @@ export function ModelSettingsOverlay({
               panelAt={connectionAt?.slice("providers:".length) ?? null}
             />
           )}
-          <details className="mt-8 rounded-xl border border-border" open={connectionAt === "approval" || undefined}>
+          <details
+            className="mt-8 rounded-xl border border-border"
+            open={connectionAt === "approval" || undefined}
+          >
             <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Trans>Advanced</Trans>
             </summary>

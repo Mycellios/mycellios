@@ -1,5 +1,7 @@
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
+import { ProjectId, ProjectName, ProjectSummary } from "./projects.js";
+import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema } from "./workflows.js";
 import { ContributionEnrollmentSchema, ContributionNodeInput, ContributionStateSchema } from "./contribution.js";
 import {
   AgentImportCreateInput,
@@ -260,7 +262,9 @@ export const appContract = {
       .input(z.object({ spaceId: Id }))
       .output(z.object({ ok: z.literal(true), activeSpaceId: Id })),
   },
-  bootstrap: oc.input(z.object({ botId: Id.optional() })).output(AppBootstrapSchema),
+  bootstrap: oc.input(z.object({ botId: Id.optional(), taskThreadId: Id.optional() })
+    .refine(input => !input.taskThreadId || Boolean(input.botId), "A task conversation requires its Mico"))
+    .output(AppBootstrapSchema),
   deployment: {
     get: oc.output(DeploymentSettingsSchema),
     update: oc
@@ -463,9 +467,13 @@ export const appContract = {
     ),
   },
   development: {
+    projects: oc.input(z.object({})).output(z.array(ProjectSummary)),
+    primaryRun: oc.input(z.object({ botId: Id, runId: Id })).output(z.boolean()),
+    saveProject: oc.input(z.object({ id: ProjectId, name: ProjectName })).output(z.object({ id: ProjectId })),
+    projectTask: oc.input(z.object({ botId: Id, taskThreadId: Id })).output(z.object({ projectId: ProjectId, name: ProjectName, userId: Id, spaceId: Id }).nullable()),
     status: oc.input(z.object({botId:Id,taskThreadId:Id,runId:Id})).output(z.object({status:z.string(),detail:z.string().max(128000),error:z.string().nullable()})),
-    open: oc.input(z.object({botId:Id,projectKey:z.uuid(),taskKey:z.uuid(),title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id})),
-    list: oc.input(z.object({botId:Id,projectKey:z.uuid().optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
+    open: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240),taskKey:z.string().min(1).max(240),title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id})),
+    list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
   },
   threads: {
     prepareProject: oc.input(z.object({
@@ -698,6 +706,16 @@ export const appContract = {
       .output(SpaceMemoryConfigSchema),
     disconnectProvider: oc.output(z.object({ ok: z.literal(true) })),
   },
+  workflows: {
+    list: oc.output(z.array(WorkflowSchema)),
+    available: oc.output(z.object({ enabled: z.literal(true) })),
+    create: oc.input(z.object({ id: Id.optional(), name: z.string().trim().min(1).max(160), graph: WorkflowGraphSchema })).output(WorkflowSchema),
+    save: oc.input(z.object({ id: Id, expectedVersion: z.number().int().positive(), name: z.string().trim().min(1).max(160), graph: WorkflowGraphSchema, active: z.boolean() })).output(WorkflowSchema),
+    archive: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    execute: oc.input(z.object({ id: Id, triggerId: Id, expectedVersion: z.number().int().positive(), clientNonce: z.string().min(1).max(160) })).output(WorkflowExecutionSchema),
+    runs: oc.input(z.object({ id: Id })).output(z.array(WorkflowExecutionSchema)),
+    stop: oc.input(z.object({ executionId: Id })).output(z.object({ ok: z.literal(true) })),
+  },
   routines: {
     list: oc.input(botId).output(z.array(RoutineSchema)),
     history: oc
@@ -759,7 +777,7 @@ export const appContract = {
           clientNonce: z.string().min(1).max(200).optional(),
         }),
       )
-      .output(z.object({ runId: Id })),
+      .output(z.object({ runId: Id, taskThreadId: Id.optional(), groupId: Id.optional() })),
   },
   scratchpad: {
     list: oc
@@ -987,6 +1005,9 @@ export const appContract = {
       .input(z.object({ query: z.string().optional(), connectorId: z.string().optional() }))
       .output(z.array(ConnectionCatalogItemSchema)),
     list: oc.output(z.array(ConnectionSchema)),
+    accounts: oc
+      .input(z.object({ connectorId: z.string(), provider: z.string() }))
+      .output(z.array(ConnectionSchema)),
     begin: oc
       .input(
         z.object({
@@ -1156,6 +1177,21 @@ export const appContract = {
       .output(z.object({ icon: z.string().nullable(), retry: z.boolean().optional() })),
   },
   tasks: {
+    overview: oc.output(z.array(z.object({ taskId: Id, runId: Id.nullable(), botId: Id, name: z.string(),
+      threadId: Id, taskThreadId: Id.optional(), groupId: Id.optional(), status: z.string(), notify: z.boolean(), updatedAt: IsoDate }))),
+    concurrency: oc.input(z.object({ botId: Id, limit: z.number().int().min(1).max(4).optional() }))
+      .output(z.object({ limit: z.number().int(), effectiveLimit: z.number().int() })),
+    work: oc.input(z.object({taskId:Id})).output(z.array(z.object({
+      id:Id,botId:Id,parentTaskId:Id.nullable(),delegationState:z.string().nullable(),
+      delegationRevision:z.number().int(),paused:z.boolean(),workStopPending:z.boolean(),
+      expectedResult:z.string().nullable(),resources:z.array(z.string()),dependencies:z.array(Id),
+      delegatedRunId:Id.nullable(),updatedAt:IsoDate,threadId:Id,result:z.string(),resultIsUntrustedData:z.boolean(),
+        executionStatus:z.string().nullable().optional(),
+    }))),
+    controlWork: oc.input(z.object({taskId:Id,expectedRevision:z.number().int().nonnegative(),
+      action:z.enum(['pause','resume','cancel','reassign']),botId:Id.optional()}))
+      .output(z.object({taskId:Id,revision:z.number().int(),paused:z.boolean(),stopping:z.boolean()})),
+
     get: oc.input(z.object({ runId: Id })).output(
       z.object({
         taskId: Id,

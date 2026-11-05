@@ -1,8 +1,244 @@
 # Status and evidence
 
-Updated: 2026-11-02 (local project Play/Stop and full-stack preview qualified; integrated production candidate under verification).
+## Apps and private Video Studio — local candidate, 2026-11-05
+
+The owner authorized production availability for the qualified fixed Video Studio.
+Its released switch is separate from private-preview admission: unpublished app
+bundles remain closed in production, while the built-in retains native account,
+Space, PC consent and revision checks. Operator off switches remain available.
+The release candidate also retains the concurrent shutdown and isolated-profile
+startup-preference repairs. Deployment evidence is distinct from this source state.
+
+The Shell sidebar opens Apps without sending or replacing its chat draft. The
+first fixed `mycellios.app/1` bundle is `io.mycellios.video-studio@1.0.0`, admitted
+with definition hash `97f5250383f548773a690f72232333c9a324655f6155f165ed3fb499b6b0a293`.
+The native driver retains Mycellios account/Space/PC consent and private local
+project/media files. Script edits invalidate voice, frames and review; rendering
+requires the current revision. Missing tools fail explicitly. Completed script
+output is reconciled before resubmission and interrupted work is not replayed.
+
+Local qualification: 71 focused tests and incremental web/Desktop typechecks
+pass. Definition/bundle validation passes. Real browser acceptance generated a
+six-scene script with the PC's Codex account, six Windows Spanish narrations and
+a 720×1280 H264/AAC MP4 lasting 39.691882 seconds (541260 bytes). FFprobe, a full
+FFmpeg decode and browser playback passed. A second acceptance used a manually
+entered script and checked the corrected desktop width, 390px layout, audio,
+video download and project recovery after reload. Synthetic acceptance approval
+is not a recorded human artistic/commercial approval. Provider tokens are used
+only when actually reported; external provider cost remains unmeasured.
+
+The targeted preview/driver build passes. The private overlay is installed in the
+ordinary Windows Desktop 0.3.13, preserving 6991 other packaged files and the host
+renderer. The actual account/Space admitted a private test project, generated six
+scenes through the PC's Codex session, six narrations and a 37.992698-second
+720×1280 H264/AAC MP4 (521842 bytes; SHA-256
+`e5dd092d6454739d43e445352824369ddef882b86549cfa69e7158a6608f2fa5`).
+Native FFprobe/full-decode validation passed and the installed player advanced.
+This was a technical test approval, not human artistic/commercial approval.
+The addon browser smoke checks menu/catalog/close and retained draft text against
+the preserved host styles. It caught and verified a fix for an unbound development
+`process` reference and now asserts that the popup clears the native drag strip,
+so its header controls remain reachable. Windows redirected the initial new asset folder into Codex's
+private cache; a same-user non-virtualized copy restored the admitted profile path.
+The installer now rejects such redirection before replacing the native package.
+Local archive, renderer and draft-store backups are retained. The earlier
+enterprise-App check used an organization-only endpoint and returned HTTP 404.
+Subsequent readback confirms that Mycellios is a personal GitHub account, outside
+the enterprise installer, and that the existing Mycellios CLI session already has
+repository admin/write access. No new App installation, credential change or
+permission expansion is needed. Publication is tracked separately from these
+local acceptance results.
+Full CI, platform installers, Cloud execution, public catalog/votes, shared project
+sync, generated illustrations/music and social publishing were NOT RUN or are
+not implemented in this first private version.
+
+Updated: 2026-11-05 (projects and parallel conversations candidate; local verification, no publication).
+
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
+
+## Projects with parallel conversations — local candidate
+
+Based on `6420234cb718fa3db56b082cbc5bd8cbe5829562`. The shared Agent sidebar
+can group several independent task conversations under an optional project,
+using existing Micos. Ordinary chats, model credentials and credit balances are
+unchanged. The existing transcript, composer and adjacent review panel are reused.
+Project names are owner/Space scoped; repository choices remain native-only.
+
+Native admission prepares one detached Git worktree per conversation, preserving
+the source repository and its dirty files. Team Desktop project runs use distinct
+conversation lease keys only after proving the owned native binding; each single
+conversation retains its execution fence. Shared screen/browser tools are blocked.
+Stop and crash cleanup retain the exact project/run destination. Preview startup
+keeps its task route and does not reassign the whole Mico to a different computer.
+
+Demonstrated locally: 50 focused tests across 11 files, followed by 21 preview and
+auxiliary-preparation tests and 24 worker/native teardown/wakeup tests. Counts
+overlap and must not be added together. Real Git worktrees preserve dirty source
+files; native command fixtures exercise independent folders and targeted Stop.
+The browser fixture passed creation, two conversations on one Mico, draft
+separation, ordinary-chat return, light/dark and desktop/mobile overflow checks.
+Incremental web/API/Desktop/adapters typechecks passed, including the final
+cleanup and preview-route refinements. A deterministic two-process fixture
+confirmed targeted Stop while the other process continued, and real worktree
+checkout/read passed with a deeply nested tracked file on Windows.
+
+An isolated PostgreSQL fixture passed the actual additive project migration,
+concurrent/idempotent thread creation, two accepted task runs, original-chat
+preservation, API ownership denial and real non-superuser RLS read/write denial.
+The extended per-conversation worker-lease acceptance also passed: distinct
+conversations acquire independent leases, a competing run in the same
+conversation is refused, and releasing one preserves the other's fence.
+The final root architecture check passed. Repository
+structure reports a pre-existing canonical-doc mismatch: `docs/images` is tracked
+in the base but omitted from the canonical directory list; it was not deleted or
+hidden to make this candidate pass.
+
+The subsequent opt-in Electron qualification passed with the real remote
+`openai-codex/gpt-6.1-sol` model on 2026-11-05. One Mico's two project conversations
+modified `add.mjs` and `tidy.mjs` in distinct native Git worktrees. Both unchanged
+Node tests exited 0. Independent test PIDs 40056 and 1640 reached a shared barrier
+at 17:49:48.957 UTC, proving simultaneous test execution; this is not a throughput
+benchmark. Both model runs completed, with observed provider usage. The source
+repository, its uncommitted owner file and the other conversation's implementation
+were preserved. The private database passed UTF8 storage and a Unicode round trip.
+
+That qualification exposed and corrected a Windows output-pipe crash and the
+ordinary Team `bots/<mico>` path prefix leaking into native project commands/files.
+Output disconnection now leaves the durable command outcome unknown without
+replaying it. The cold native connection resolves its provider read-only before
+checking the exact owned worktree binding. Follow-up focused verification passed
+12 command/journal/process tests (one platform-specific case skipped), then 16
+path/isolation/admission tests, plus incremental adapters typing and a real native
+Desktop bundle build. These counts exclude earlier overlapping suites.
+
+Receipts, model messages, terminal events, separate test process timings and the
+Desktop capture are retained under
+`outputs/project-conversations-local-20261105/real-desktop-1850/` in the local
+development repository. Usage prices there are catalog estimates, not a billed
+charge. The model ran remotely through the existing subscription; no model
+inference ran on PC-DANI. No production API/database, real customer account or
+public installer was used or changed. Native consent was preauthorized only in
+the isolated test profile, so its live permission dialog remains outside this
+qualification. No commit, push or deployment was performed.
+
+## Mico task and routine isolation candidate
+
+The local candidate adds task tabs to the shared web/PWA/Desktop renderer with
+separate RPC scope, caches and drafts. Routine cron, Test, webhook and GitHub paths
+allocate owned private conversations by default and preserve explicit targets and
+old history. Event fanout retains each routine's model. New routing receipts and
+Run identities prevent new routine deliveries from replaying after clearing chat
+or changing recipients. Raw webhooks retain their previous deduplication limits.
+
+Focused local tests cover task transport, notifications, routine history and
+scheduled/event execution. Incremental web/API/adapters/native-mobile typechecks
+passed. `scripts/verify-routine-isolation-db.ts` passed nine real loopback PostgreSQL
+checks, including the actual additive migration, concurrent preparation, event
+replay, legacy history, timer adoption and RLS owner/Space read/write denial.
+Its accounts and prompts are synthetic; no production database or model was used.
+
+Routine screen exclusion is enforced in tool offering and execution, while actual
+computer resource leases remain. Private voice calls are disabled until scoped.
+Private-task push on the separate native client offers its exact web conversation;
+it does not silently load the primary chat. Real phone and installed-app validation
+have not run. Native executable discovery and safe provider refusal classification
+have focused local tests; missing provider usage remains unknown.
+
+The OpenBot v0.61.0 review covers all 119 supplied changelog entries against main
+`dd91e477`. The baseline comparison found 14 present, 55 partial, 17 absent, 21
+not applicable and 12 in other work in progress. Those counts do not include this
+uncommitted candidate and do not mean complete OpenBot parity. Workflows and live
+voice work owned by other agents were preserved. OpenBot's PolyForm Noncommercial
+source was read as reference; this candidate contains independent implementations.
+No new candidate, migration or installer has been published or deployed.
+
+## Integration profile owner repair — 2026-11-04
+
+A live, read-only diagnostic reproduced `ExternalProxy_UserIdRequired` while
+the connection was active: the pinned high-level SDK omitted the acting user on
+its profile proxy request. The same exact authorization returned a profile with
+username/name when the public API client sent the matching owner. No credentials
+or profile values were recorded, no account was reconnected and project owner
+verification was retained.
+
+The local repair uses the public client, forwards the server actor's user ID and
+exact connection, and disables automatic retries. A regression observes the
+actual installed SDK's serialized HTTP request, preserving the existing offline
+ownership, cancellation, cache and safe projection checks. The configured-provider wrapper also forwards the new identity operation,
+including credential rotation; the previous wrapper omitted it. The 118 affected
+offline tests, application types, API/web builds and root
+structure/documentation/format/architecture/boundary/type checks pass. A separate
+read-only production-record probe confirmed exact ownership and a successful
+profile response without recording the identity. An update announcement is
+prepared; this repair still requires normal PR integration and release proof
+before it is described as deployed.
+
+
+## Durable Mico work and Windows command recovery - local candidate, 2026-11-04
+
+The integrated `codex/resilient-work-release-20261104` candidate adds persistent parent/child
+work, expected results, dependencies, scoped resource reservations and a durable return
+to the parent Mico. Existing Micos, models and permissions remain the execution route.
+Private delegated work and ownership transfers use separate task conversations; earlier
+runs retain their original history. Revisioned pause/resume/reassignment and composer Stop
+use a persistent exact-run teardown outbox before replacement work is admitted. Plans
+and bounded continuation counters are stored under the active execution fence.
+
+Native commands have stable identities and bounded, redacted receipts. An HTTP observer
+disconnect does not relaunch the command. Recorded results can be read after reconnect or
+host restart; a crashed host without an exit leaves an unknown outcome, never success.
+Windows execution retains owned Job Objects, explicit cancellation and bounded deadlines.
+This does not promise process survival through a PC reboot or automatic resolution of
+every uncertain external effect. OpenBot d3ec956 is a behavior reference, not imported code.
+
+Local qualification: 518 focused tests in 25 files pass; Prisma generation, incremental
+adapter/API/worker typechecks and real API/worker/Desktop bundles pass. Synthetic local
+PostgreSQL acceptance applies the additive migration and checks duplicate admission,
+dependency/resource contention, missed publication and restart, parent return, scope/fence
+refusal, persistent teardown and independent conversations after reassignment. Native
+fixtures use real Windows processes, HTTP disconnect, host crash, timeout and exact-run
+cancellation. No production database, live model provider, installed-app session or
+multi-computer deployment was exercised. Full CI and installer packaging were not run
+under the temporary agility policy. This is source qualification, not an installed or
+deployed release.
+
+Design: `specs/agent-resilient-work/spec.md`. Reproduce through the shared scheduler with
+`src/agent/scripts/verify-resilient-work.ps1`; evidence is in the isolated workspace's
+`src/agent/outputs/resilient-work/checks.json` and associated logs.
+## Integration account identities — 2026-11-04
+
+Local candidate starts from fetched canonical main
+`7337e761ce16ccbf45ee38213092c9dea36c944e`. The selected integration detail
+reads an exact owned active authorization's public profile label, separately from
+its editable alias. Pending attempts have their own disclosure and cancellation;
+individual disconnection preserves other accounts. Missing profile information
+is shown as unavailable, never inferred from a generic provider name or another
+account. The dialogue fits its content, respects safe viewport insets and uses the
+existing thirteen translated catalogs. The update announcement is prepared.
+
+The provider lookup is read-only, bounded and cached per user, Space and exact
+authorization. Only public identity labels reach the client. The API re-reads the
+owned records after lookup so a concurrent revoke/reconnect cannot resurrect or
+mislabel a grant. The additive optional contract needs no database migration.
+
+One hundred ten focused offline tests pass, including provider projection,
+ownership, pagination/cache separation, revoke/reconnect races, catalog behavior,
+chat cards and update announcements. Web/API/Desktop typechecks and web/API
+builds pass. Four browser tests render the actual integration component and
+Spanish catalog at 1440/768/390 pixels, covering external-browser authorization,
+safe provider errors, separate account identities and pending cancellation.
+Screenshots use invented fixture accounts, not production identities. Root
+structure, documentation, format, UI-kit, component boundaries, architecture and
+TypeScript checks pass. This is local evidence; no live provider authorization,
+physical device acceptance, native installer or production deployment is claimed.
+Standalone contracts/adapters typechecks additionally report errors in unchanged
+test imports, mock types and the adapter rootDir boundary. Those wider checks
+are not qualified by this change; the application and adapter-kit checks above
+remain separate evidence.
+
+Publication will require both API and web artifacts from the integrated main SHA.
+
 
 - Agent contribution sidebar (local candidate): missing translated labels are
   present in all thirteen catalogs. An existing unreadable installation offers
@@ -1319,3 +1555,110 @@ their recorded main base while preserving newer continuation/retry fixes.
 134 focused preservation/integration tests pass, together with API/worker/web/
 Desktop types, server builds and credential-free compiled startup. Private source
 receipts retain the comparison; production promotion is still pending.
+
+## External browser integration authorization candidate (2026-11-04)
+
+Managed integration connections from the catalog and chat cards now request an
+ordinary external browser target. The original client still confirms the owned
+connection through the server, including when Desktop returns no popup handle.
+Existing cancellation, revocation and account ownership checks remain in place.
+Generic SSO, model and MCP authorization retain their existing popup behavior.
+
+The existing update announcement describes the change in all 13 web locales; its
+guarded refresh action remains unchanged. Focused qualification passed 36 tests
+across Desktop routing, chat connection cards, server completion polling and
+release notes, together with web/Desktop typechecks and the web production build.
+Root structure, documentation, text format, UI-kit, component-boundary, architecture
+and typecheck gates also passed.
+A read-only routing check against the installed Fedora host confirms that an
+external target bypasses its named integration popup policy; no installed files
+were modified and no browser or real account authorization was exercised.
+
+An isolated browser regression now covers the catalog connection with an external
+target and a null popup handle. That new browser case has not yet run in CI.
+Publication and deployment require the exact merged-main release checks and a
+separate promotion receipt. These local checks do not establish successful X
+sign-in or provider tool execution.
+
+### Unified settings publication — 2026-11-05
+
+Published the searchable account/Space settings shell as a web-only release.
+Compiled revision `a2c59c3455ca4804e3d12210fcbeb41196192f79` includes synchronized
+main `ec93ee68e9e3d67e50b2683791dc605de7ff6e84`; it retains current task/routine
+isolation, failed-helper notifications and the canonical production skill editor.
+Marketplace and continuous-voice entry remain separate capability-gated work.
+The original development checkout and its unrelated changes were preserved.
+
+Incremental web typing and 249 focused tests passed on the integrated source on
+Daniel's PC. The constrained compiler also passed those checks and built web
+`20261105033045`. Its sealed artifact SHA256 is
+`db33e917ff2f60807a09c0b7840e58cb0871a124f8ead3cdbc88118fd1a1ab7b`.
+The previous canonical settings browser scenario passed, but the integrated
+scenario stopped at production's retained language-choice screen. Its setup was
+aligned with that screen and the account menu; no passing rerun is claimed.
+Further browser/CI repetition was omitted under the owner's proportional fast
+delivery instructions. The design capture uses synthetic local data.
+
+Private loopback and public HTTPS qualification passed for readiness, the new
+entry and Settings chunk, 15 initial assets, anonymous session handling and
+`/agent/` PWA scope. Read-only inspection in the signed-in production browser
+confirmed the new menu and served build. No account preferences were changed.
+An initial Python HTTP probe received 403 and triggered automatic rollback;
+qualification with the existing curl transport succeeded on the second promotion.
+Previous configuration and immutable assets remain available for reversal.
+API, worker, database, coordinator and other protected container identities/start
+times were unchanged; no migration, financial action or native installer update
+was performed. Full CI was not run. Detailed receipts and logs are retained in
+`outputs/settings-prod-20261105/` and the owned server release directory.
+
+## Apps authoring standard — local foundation (2026-11-05)
+
+Apps v1 has a strict manifest/action contract, semantic graph/type/permission
+validation, a bounded read-only bundle CLI, a complete video-studio definition,
+creator skill and authoring guide. The [standard](../specs/apps-standard/spec.md)
+separates definition admission from actual runtime qualification and publication.
+Versions are immutable, project versions remain pinned, actions are declared
+contracts and both execution targets require independent future qualification.
+
+The 51 affected tests, three scoped authoring checks and an incremental typecheck of the Apps contracts, public
+exports, CLI and tests passed on Daniel's PC in an isolated checkout. Tests cover
+unsafe definitions, cycles, typed references, altered assets, path traversal,
+symlink escape, bounded reads and immutable-version CLI behavior. The broader
+contracts check encountered its existing credit-units.test.ts extension error;
+it is not reported as a passing package-wide check.
+
+No Apps catalog/sidebar, renderer, project-store migration, executable action
+adapter, billing or publisher was enabled. No global skill/profile installation,
+paid call, render or production deployment was performed. Full CI and physical
+local/Cloud execution qualification were NOT RUN under fast-delivery mode.
+## Mico work controls, concurrent tasks and workflows (local source, 2026-11-05)
+
+The Mico task bar now exposes revisioned delegated-work controls and an owned
+recent-work overview. Pi Micos admit 1–4 simultaneous turns atomically across
+workers, with one live turn per thread. Private Pi tasks reserve the existing
+exclusive computer lease before computer operations; native provider sessions
+remain single-turn. Existing resource reservations, permissions and models remain
+in use. The visual workflow editor supports manual/cron triggers, instructions,
+Micos, text conditions and outputs. Executions freeze a graph version, persist
+private step Runs and resume via the existing reconciler. Workflow Stop atomically
+cancels its Runs and records the existing durable process teardown outbox.
+
+Local qualification passed 285 directly affected tests, incremental web/API typing,
+and the isolated PostgreSQL acceptance script (16 recorded checks, including the
+actual additive migrations, concurrent admission, stale controls, owner/Space RLS,
+step recovery and durable Stop). Adapter typing also passed in the isolated remote
+compiler. Earlier local checks hit memory limits; those attempts were not passes.
+The final browser fixture passed on the PC: task controls, concurrency selection,
+workflow save/run/stop, desktop/mobile layout and light/dark task navigation.
+The desktop-width assertion caught and verified a corrected dialog-size defect.
+The scoped design detector returned no findings; the fresh finish review returned
+`ship` for the supplied synthetic captures and UI source, with delegated controls
+source-reviewed rather than visually captured open.
+
+Fixtures used synthetic accounts and a fresh loopback database, called no models
+and did not access production. Full suites, authenticated provider execution,
+installer packaging and production promotion were NOT RUN for this change.
+The changes are local on `codex/mico-workflow-concurrency-20261105`, based on
+main `6420234`; no commit, push, shared migration or deployment is implied.
+Evidence is retained in `outputs/mico-workflows-acceptance-20261105/` in Daniel's
+workspace. Other agents' original checkouts and changes were retained.

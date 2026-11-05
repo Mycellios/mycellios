@@ -61,13 +61,14 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
   let checking = false;
   let requiredRetries = 0;
   let ready: string | null = null;
-  let probing = false;
+  let probeRequest: Promise<string | null | undefined> | undefined;
   const subscribers = new Set<() => void>();
-  const probe = async () => {
+  const probe = (): Promise<string | null | undefined> => {
     // The web can deploy independently of the API. Do not require a newer API
     // header before checking the actual shell served to browsers and PWAs.
-    if (!deps.build || probing || checking || !subscribers.size || deps.document.visibilityState === "hidden") return;
-    probing = true;
+    if (probeRequest) return probeRequest;
+    if (!deps.build || checking || !subscribers.size || deps.document.visibilityState === "hidden") return Promise.resolve(undefined);
+    probeRequest = (async () => {
     try {
       const served = await deps.servedBuild().catch(() => null);
       if (newer(served) && !attempted(served) && ready !== served) {
@@ -75,7 +76,10 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
         ready = served;
         for (const notify of subscribers) notify();
       }
-    } finally { probing = false; }
+      return served;
+    } finally { probeRequest = undefined; }
+    })();
+    return probeRequest;
   };
 
   const attempted = (build: string): boolean => {
@@ -154,6 +158,7 @@ export function createClientUpdates(deps: ClientUpdateDeps) {
   };
 
   const updates = {
+    checkForUpdates: probe,
     getSnapshot: () => ready,
     subscribe(notify: () => void) {
       subscribers.add(notify);

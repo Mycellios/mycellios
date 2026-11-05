@@ -26,6 +26,7 @@ import {
 import {admitMicoTaskComputer}from"../mico-task-computer.js";
 import { withResponseLanguage } from "../response-language.js";
 import { retryThreadRun } from "../retry-thread-run.js";
+import { stopWorkForThread } from "../work-controls.js";
 import { assertTeachingSendAllowed } from "../taught-skills.js";
 import {
   isBackgroundRun,
@@ -255,6 +256,7 @@ export function threadsRoutes(ctx: RouterContext) {
       stop: authed.threads.stop.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         await stopThreadRuns(deps, context.actor, target);
+        await stopWorkForThread(deps, context.actor, target.threadId);
         return { ok: true as const };
       }),
       clear: authed.threads.clear.handler(async ({ context, input }) => {

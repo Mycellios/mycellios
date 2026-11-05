@@ -33,6 +33,11 @@ export function nativeComputerFetch(
       if (typeof botId === "string" && botId.length > 0 && botId.length <= 256) {
         await admit(botId);
         request.signal.throwIfAborted();
+        const taskThreadId = payload?.json?.taskThreadId;
+        if (typeof taskThreadId === "string" && computer.prepareTask) {
+          await computer.prepareTask({ botId, taskThreadId });
+          request.signal.throwIfAborted();
+        }
       }
     }
     return send(input, init);

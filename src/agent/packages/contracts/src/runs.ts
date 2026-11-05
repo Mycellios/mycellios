@@ -20,6 +20,8 @@ export const RUN_TRIGGERS = [
   "created",
   "tickets",
   "project_prepare",
+  "delegated_task",
+  "task_return",
 ] as const;
 export const RunTriggerSchema = z.enum(RUN_TRIGGERS);
 export type RunTrigger = z.infer<typeof RunTriggerSchema>;
@@ -34,6 +36,7 @@ export const RoutineRunSchema = z.object({
   startedAt: IsoDate.nullable(),
   completedAt: IsoDate.nullable(),
   messageId: Id.nullable(),
+  taskThreadId: Id.optional(),
 });
 export type RoutineRun = z.infer<typeof RoutineRunSchema>;
 

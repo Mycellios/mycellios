@@ -29,6 +29,15 @@ afterEach(() => {
 });
 
 describe("query scopes", () => {
+  it("separates private task snapshots from the main chat and other tasks", () => {
+    const a = { botId: "mico", taskThreadId: "one" };
+    const b = { botId: "mico", taskThreadId: "two" };
+    const keys = [spaceSeedKey("owner", "space"), spaceSeedKey("owner", "space", a), spaceSeedKey("owner", "space", b)];
+    expect(new Set(keys.map(key => JSON.stringify(key))).size).toBe(3);
+    queryClient.setQueryData(keys[1]!, { marker: "private" } as never);
+    expect(queryClient.getQueryData(keys[0]!)).toBeUndefined();
+    expect(queryClient.getQueryData(keys[2]!)).toBeUndefined();
+  });
   it("keeps every user and space in its own keys", () => {
     const keys = [
       spaceQueries("user-a", "space-a"),

@@ -326,7 +326,7 @@ msgstr "{title}, {savedAs}(으)로 저장"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "{toolCount, plural, one {# tool} other {# tools}}"
-msgstr ""
+msgstr "{toolCount, plural, other {도구 #개}}"
 
 #. placeholder {0}: mention.name
 #: src/pages/shell/composer.tsx
@@ -384,7 +384,7 @@ msgstr "계정 ID"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Account label"
-msgstr ""
+msgstr "계정 이름표"
 
 #: src/components/SidebarFooter.tsx
 msgid "Account menu for {name}"
@@ -465,7 +465,7 @@ msgstr "HTTPS 서버 URL을 입력하세요."
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Add another"
-msgstr ""
+msgstr "다른 계정 추가"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Add credential"
@@ -5287,7 +5287,7 @@ msgstr "도구 소스"
 #: src/pages/PluginsOverlay.tsx
 #: src/pages/shell/bot-panel.tsx
 msgid "Tools"
-msgstr ""
+msgstr "도구"
 
 #: src/components/ModelCredits.tsx
 msgid "Top up anytime"
@@ -6345,3 +6345,43 @@ msgstr "필요한 경우 자신의 API 키로 앱을 연결하세요."
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "연동에 서버 설정이 필요하면 명확한 메시지를 표시합니다."
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "데스크톱에서 앱 연결이 브라우저로 열립니다."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Account identity unavailable"
+msgstr "계정 정보를 사용할 수 없습니다"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Authorization pending"
+msgstr "인증 대기 중"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Loading account…"
+msgstr "계정 불러오는 중…"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Could not load account identities."
+msgstr "계정 정보를 불러오지 못했습니다."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Connected accounts"
+msgstr "연결된 계정"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "No connected accounts"
+msgstr "연결된 계정이 없습니다"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Disconnect all"
+msgstr "모두 연결 해제"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+msgstr "{pendingCount, plural, other {대기 중인 연결 #개}}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "See which accounts are connected to each app."
+msgstr "각 앱에 연결된 계정을 확인하세요."

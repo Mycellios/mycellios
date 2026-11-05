@@ -10,6 +10,7 @@ import type {
 } from "@rakazo/adapter-kit";
 import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
 import { describeDesktopSandbox } from "./desktop-sandbox.js";
+import { projectLeaseOwner } from "./project-execution.js";
 import type {
   HostComputerEnvironment,
   HostComputerFrame,
@@ -33,6 +34,14 @@ export class HostComputerSandbox implements SandboxProvider {
   }
 
   private async *request<T>(input: HostComputerRequest, context: AdapterContext): AsyncIterable<T> {
+    if (["stop", "destroy", "cancelRunWork"].includes(input.method) && context.botId) {
+      const owner = projectLeaseOwner(context.botId);
+      if (owner) {
+        if (context.projectSessionId && context.projectSessionId !== owner.projectSessionId)
+          throw new Error("The cleanup belongs to another project conversation.");
+        context = { ...context, ...owner };
+      }
+    }
     input = { ...input, botId: context.botId ?? input.botId, ...(context.projectSessionId?{projectSessionId:context.projectSessionId}:{}) };
     if ((!this.url || !this.token) && !this.transport)
       throw new Error("Local computer access requires the desktop app. Enable it in the app menu.");
@@ -120,6 +129,9 @@ export class HostComputerSandbox implements SandboxProvider {
       { method: "environment", botId: computer.botId },
       context,
     );
+  }
+  commandStatus(computer: ComputerRef, commandId: string | undefined, context: AdapterContext) {
+    return this.one({ method: "commandStatus", botId: computer.botId, commandId }, context);
   }
   provision(input: { botId: string; homePath: string }, context: AdapterContext) {
     return this.one<ComputerRef>({ method: "provision", botId: input.botId }, context);

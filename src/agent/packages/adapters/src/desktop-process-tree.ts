@@ -8,6 +8,14 @@ export interface NativeProcessTree {
   close(): void;
 }
 
+/** Lost command output is an uncertain outcome, never permission to replay. */
+export class NativeCommandOutputError extends Error {
+  constructor(cause: Error) {
+    super("Local command output disconnected; inspect its receipt before retrying", { cause });
+    this.name = "NativeCommandOutputError";
+  }
+}
+
 let windowsApi: ReturnType<typeof loadWindowsApi> | undefined;
 function loadWindowsApi() {
   const library = koffi.load("kernel32.dll");
@@ -133,8 +141,16 @@ export function spawnOwnedCommand(
       detached: !windows,
       shell: false,
       windowsHide: true,
+      // Electron on Windows needs asynchronous handles for concurrent shell reads.
+      stdio: "overlapped",
     },
   );
+  // Install stream guards before ownership/setup or any asynchronous consumer can run.
+  // A pipe error must not reach Electron's blocking uncaught-exception dialog.
+  child.on("error", () => undefined);
+  for (const stream of [child.stdin, child.stdout, child.stderr]) {
+    stream.on("error", (error: Error) => child.emit("error", new NativeCommandOutputError(error)));
+  }
   const pid = child.pid;
   let tree: NativeProcessTree;
   try {
@@ -167,7 +183,6 @@ export function spawnOwnedCommand(
     child.kill("SIGKILL");
     throw error;
   }
-  child.stdin.on("error", () => undefined);
   if (windows) child.stdin.end(JSON.stringify({ argv, env }));
   return { child, tree };
 }

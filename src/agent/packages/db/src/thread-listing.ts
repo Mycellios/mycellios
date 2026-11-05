@@ -17,16 +17,17 @@ export const activeRunSelection = {
     trigger: { notIn: backgroundRunTriggers },
   },
   orderBy: { createdAt: "desc" as const },
-  select: { status: true },
+  select: { status: true, threadId: true },
 } as const;
 
 /** Waiting, running, then leased work wins over queued work, regardless of creation order. */
-export function primaryActiveRun<T extends { status: string }>(runs: readonly T[]): T | undefined {
+export function primaryActiveRun<T extends { status: string; threadId?: string }>(runs: readonly T[], threadId?: string): T | undefined {
+  const selected = threadId ? runs.filter(run => run.threadId === threadId) : runs;
   return (
-    runs.find((run) => run.status === "waiting_takeover" || run.status === "waiting_input") ??
-    runs.find((run) => run.status === "running") ??
-    runs.find((run) => run.status === "leased") ??
-    runs[0]
+    selected.find((run) => run.status === "waiting_takeover" || run.status === "waiting_input") ??
+    selected.find((run) => run.status === "running") ??
+    selected.find((run) => run.status === "leased") ??
+    selected[0]
   );
 }
 

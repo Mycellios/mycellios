@@ -28,11 +28,14 @@ const TERMINAL: RunStatus[] = ["completed", "failed", "cancelled"];
  */
 const NON_CONVERSATIONAL_RUN_TRIGGERS = new Set([
   "routine",
+  "workflow",
   "webhook",
   "created",
   "tickets",
   "project_prepare",
   "bot_message",
+  "delegated_task",
+  "task_return",
 ]);
 
 /**

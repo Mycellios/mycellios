@@ -1,4 +1,5 @@
 import { constants } from "node:fs";
+import { createHash } from "node:crypto";
 import {
   lstat,
   mkdir,
@@ -37,7 +38,7 @@ import {
   placeholderObservation,
 } from "./computer-support.js";
 import type { NativeProcessTree } from "./desktop-process-tree.js";
-import { spawnOwnedCommand } from "./desktop-process-tree.js";
+import { NativeCommandOutputError, spawnOwnedCommand } from "./desktop-process-tree.js";
 import { isAllowedDesktopPath, normalizeDesktopWorkspacePath } from "./desktop-sandbox-paths.js";
 import {
   createExclusiveChildViaDirectoryFdWin32,
@@ -50,6 +51,7 @@ import {
 } from "./desktop-sandbox-win32-path.js";
 import { removeOwnedWorkspaceChildren } from "./desktop-workspace-cleanup.js";
 import { hostCommandEnvironment } from "./sandbox-command-environment.js";
+import { NativeCommandJournal } from "./native-command-journal.js";
 
 const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 
@@ -98,6 +100,20 @@ export class DesktopSandboxProvider implements SandboxProvider {
   readonly boxes = new Map<string, DesktopBox>();
   private readonly processTrees = new Map<NativeProcessTree, { home: string; runId?: string }>();
   private processSweep?: NodeJS.Timeout;
+  private readonly commandJournals = new Map<string, NativeCommandJournal>();
+  private commandJournal(home: string) {
+    let journal = this.commandJournals.get(home);
+    if (!journal) {
+      journal = new NativeCommandJournal(path.join(this.opts.root ?? path.join(process.cwd(), "data"),
+        "native-command-receipts", createHash("sha256").update(home).digest("hex")));
+      this.commandJournals.set(home, journal);
+    }
+    return journal;
+  }
+  async commandStatus(computer: ComputerRef, commandId?: string) {
+    const journal = this.commandJournal(this.requiredBox(computer).home);
+    return commandId ? journal.read(commandId) : journal.list();
+  }
 
   private sweepProcesses() {
     for (const tree of this.processTrees.keys()) {
@@ -113,6 +129,7 @@ export class DesktopSandboxProvider implements SandboxProvider {
   }
 
   cancelAllCommands() {
+    for (const journal of this.commandJournals.values()) journal.cancel();
     for (const tree of this.processTrees.keys()) {
       tree.kill();
       tree.close();
@@ -120,6 +137,11 @@ export class DesktopSandboxProvider implements SandboxProvider {
     this.processTrees.clear();
     clearInterval(this.processSweep);
     this.processSweep = undefined;
+  }
+  async settleCommands() { await Promise.all([...this.commandJournals.values()].map(journal => journal.settled())); }
+  hasActiveCommands() {
+    this.sweepProcesses();
+    return this.processTrees.size > 0 || [...this.commandJournals.values()].some(journal => journal.runningCount > 0);
   }
 
   async cancelRunWork(
@@ -131,9 +153,11 @@ export class DesktopSandboxProvider implements SandboxProvider {
     const box = this.boxFor(computer);
     if (!box) return;
     this.cancelOwnedProcesses(box.home, runId);
+    await this.commandJournals.get(box.home)?.settled(runId);
   }
 
   private cancelOwnedProcesses(home: string, runId?: string) {
+    this.commandJournals.get(home)?.cancel(runId);
     for (const [tree, owner] of this.processTrees) {
       if (owner.home === home && (runId === undefined || owner.runId === runId)) {
         tree.kill();
@@ -257,6 +281,7 @@ export class DesktopSandboxProvider implements SandboxProvider {
 
   async environment() {
     return {
+      durableCommands: true,
       platform: process.platform,
       home: homedir(),
       shell: process.platform === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/sh",
@@ -287,11 +312,11 @@ export class DesktopSandboxProvider implements SandboxProvider {
     const argv = request.argv.length ? request.argv : ["echo", "ready"];
     this.sweepProcesses();
     if (this.processTrees.size >= 256) throw new Error("Too many local background commands");
-    yield* streamLocalCommand(
+    const start = (signal: AbortSignal) => streamLocalCommand(
       argv,
       cwd,
       boundedSandboxCommandTimeoutMs(request.timeoutMs),
-      context.signal,
+      signal,
       request,
       (tree) => {
         this.processTrees.set(tree, { home: box.home, runId: context.runId });
@@ -302,6 +327,17 @@ export class DesktopSandboxProvider implements SandboxProvider {
       },
       () => this.sweepProcesses(),
     );
+    if (request.commandId) {
+      if (!context.runId || request.commandId.length > 256) throw new Error("A recoverable command requires its owned run identity");
+      const fingerprint = createHash("sha256").update(JSON.stringify({
+        argv, cwd, env: request.env, unsetEnv: request.unsetEnv, timeoutMs: request.timeoutMs,
+      })).digest("hex");
+      const secrets = Object.entries(hostCommandEnvironment(request))
+        .filter(([name, value]) => value && /secret|token|password|credential|api.?key/i.test(name))
+        .map(([, value]) => value!);
+      yield* this.commandJournal(box.home).execute({ id: request.commandId, executionId: request.executionId, runId: context.runId,
+        fingerprint, signal: context.signal, secrets, start });
+    } else yield* start(context.signal);
   }
 
   async connectScreen(
@@ -896,6 +932,7 @@ async function* streamLocalCommand(
   const queue: ProcessEvent[] = [];
   let ended = false;
   let settled = false;
+  let outputError: Error | undefined;
   let wake: (() => void) | undefined;
   const push = (event: ProcessEvent) => {
     queue.push(event);
@@ -938,6 +975,20 @@ async function* streamLocalCommand(
   });
   child.on("error", (error) => {
     if (settled) return;
+    if (error instanceof NativeCommandOutputError) {
+      outputError = error;
+      tree.kill();
+      child.stdout.destroy();
+      child.stderr.destroy();
+      clearTimeout(timeout);
+      signal.removeEventListener("abort", abort);
+      settled = true;
+      ended = true;
+      const notify = wake;
+      wake = undefined;
+      notify?.();
+      return;
+    }
     if (argv[0] === "echo") {
       push({ type: "stdout", data: `${argv.slice(1).join(" ")}\n` });
       finish(0);
@@ -946,12 +997,13 @@ async function* streamLocalCommand(
       finish(1);
     }
   });
-  child.on("close", (code) => {
-    finish(code ?? 0);
+  child.on("close", (code, signal) => {
+    finish(code ?? 1, code === null ? `command closed without an exit code (${signal ?? "unknown"})` : undefined);
   });
   if (signal.aborted) abort();
   try {
-    while (!ended || queue.length > 0) {
+    while (!ended || queue.length > 0 || outputError) {
+      if (outputError) throw outputError;
       if (queue.length === 0) {
         await new Promise<void>((resolve) => {
           wake = resolve;

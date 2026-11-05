@@ -37,12 +37,14 @@ export function VoiceSettingsOverlay({
   onClose,
   embedded = false,
   onBusyChange,
+  onFormStateChange,
   scope,
 }: {
   onClose: () => void;
   /** Render the content only, inside the shared Settings shell's scroller. */
   embedded?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  onFormStateChange?: (state: { busy: boolean; dirty: boolean }) => void;
   /**
    * The account's voice, or the bound Space's own when it overrides it. Connections are
    * account-wide, so a Space only picks among them and connects missing ones.
@@ -106,6 +108,11 @@ export function VoiceSettingsOverlay({
   const [notice, setNotice] = useState<string | null>(null);
 
   const busy = pending !== null;
+  const dirty = Boolean(apiKey.trim());
+  useEffect(() => {
+    onFormStateChange?.({ busy, dirty });
+  }, [onFormStateChange, busy, dirty]);
+  useEffect(() => () => onFormStateChange?.({ busy: false, dirty: false }), [onFormStateChange]);
 
   useEffect(() => {
     return () => onBusyChange?.(false);
@@ -331,9 +338,14 @@ export function VoiceSettingsOverlay({
       {notice ? <p className="mb-4 text-sm text-success">{notice}</p> : null}
       {catalog.length ? (
         <Field>
-          <SettingsLabel name={t`Voice provider`} help={t`The service used for speaking and dictation. Available voices and features depend on the provider you connect.`}><FieldLabel htmlFor={providerSelectId}>
-            <Trans>Provider</Trans>
-          </FieldLabel></SettingsLabel>
+          <SettingsLabel
+            name={t`Voice provider`}
+            help={t`The service used for speaking and dictation. Available voices and features depend on the provider you connect.`}
+          >
+            <FieldLabel htmlFor={providerSelectId}>
+              <Trans>Provider</Trans>
+            </FieldLabel>
+          </SettingsLabel>
           <NativeSelect
             id={providerSelectId}
             className="w-full"
@@ -372,9 +384,14 @@ export function VoiceSettingsOverlay({
             <>
               {selfHosted ? (
                 <Field className="mt-5">
-                  <SettingsLabel name={t`Server URL`} help={t`The address of the voice service you want to connect. Use the address supplied by that service.`}><FieldLabel htmlFor={baseUrlId}>
-                    <Trans>Server URL</Trans>
-                  </FieldLabel></SettingsLabel>
+                  <SettingsLabel
+                    name={t`Server URL`}
+                    help={t`The address of the voice service you want to connect. Use the address supplied by that service.`}
+                  >
+                    <FieldLabel htmlFor={baseUrlId}>
+                      <Trans>Server URL</Trans>
+                    </FieldLabel>
+                  </SettingsLabel>
                   <Input
                     id={baseUrlId}
                     type="url"
@@ -390,9 +407,14 @@ export function VoiceSettingsOverlay({
                 </Field>
               ) : null}
               <Field className="mt-5">
-                <SettingsLabel name={t`API key`} help={t`A secret key supplied by your voice provider to connect this account. Never share it in a conversation.`}><FieldLabel htmlFor={apiKeyId}>
-                  <Trans>API key</Trans>
-                </FieldLabel></SettingsLabel>
+                <SettingsLabel
+                  name={t`API key`}
+                  help={t`A secret key supplied by your voice provider to connect this account. Never share it in a conversation.`}
+                >
+                  <FieldLabel htmlFor={apiKeyId}>
+                    <Trans>API key</Trans>
+                  </FieldLabel>
+                </SettingsLabel>
                 <Input
                   id={apiKeyId}
                   type="password"
@@ -411,9 +433,14 @@ export function VoiceSettingsOverlay({
               {selfHosted ? (
                 <>
                   <Field className="mt-5">
-                    <SettingsLabel name={t`Speech model`} help={t`The model that turns written text into spoken audio. Use a model supported by your voice service.`}><FieldLabel htmlFor={ttsModelId}>
-                      <Trans>Speech model</Trans>
-                    </FieldLabel></SettingsLabel>
+                    <SettingsLabel
+                      name={t`Speech model`}
+                      help={t`The model that turns written text into spoken audio. Use a model supported by your voice service.`}
+                    >
+                      <FieldLabel htmlFor={ttsModelId}>
+                        <Trans>Speech model</Trans>
+                      </FieldLabel>
+                    </SettingsLabel>
                     <Input
                       id={ttsModelId}
                       autoComplete="off"
@@ -428,9 +455,14 @@ export function VoiceSettingsOverlay({
                     />
                   </Field>
                   <Field className="mt-5">
-                    <SettingsLabel name={t`Transcription model`} help={t`The model that turns your microphone recording into written text for dictation.`}><FieldLabel htmlFor={sttModelId}>
-                      <Trans>Transcription model</Trans>
-                    </FieldLabel></SettingsLabel>
+                    <SettingsLabel
+                      name={t`Transcription model`}
+                      help={t`The model that turns your microphone recording into written text for dictation.`}
+                    >
+                      <FieldLabel htmlFor={sttModelId}>
+                        <Trans>Transcription model</Trans>
+                      </FieldLabel>
+                    </SettingsLabel>
                     <Input
                       id={sttModelId}
                       autoComplete="off"
@@ -504,9 +536,14 @@ export function VoiceSettingsOverlay({
               </Field>
               {selected.id === "fish-audio" ? (
                 <Field className="mt-6">
-                  <SettingsLabel name={t`Speech model`} help={t`The model that turns written text into spoken audio. Use a model supported by your voice service.`}><FieldLabel htmlFor={speechModelId}>
-                    <Trans>Speech model</Trans>
-                  </FieldLabel></SettingsLabel>
+                  <SettingsLabel
+                    name={t`Speech model`}
+                    help={t`The model that turns written text into spoken audio. Use a model supported by your voice service.`}
+                  >
+                    <FieldLabel htmlFor={speechModelId}>
+                      <Trans>Speech model</Trans>
+                    </FieldLabel>
+                  </SettingsLabel>
                   <Input
                     id={speechModelId}
                     value={speechModel}

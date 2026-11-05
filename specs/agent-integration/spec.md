@@ -35,6 +35,43 @@ step must leave the role unchanged. No models are silently evicted to make room.
 The legacy connection API still requires a bootstrap model ID; the first discovered
 ID supplies this connection metadata, without assigning it to any role.
 
+## Linked integration account identities
+
+The selected integration detail uses a separate authenticated `connections.accounts`
+read, scoped to the actor's user and Space and the chosen connector/provider.
+It returns a public identity label alongside the existing connection DTO.
+The editable local alias remains separate from the provider identity.
+
+The managed adapter resolves only the exact owned active authorization. Composio
+lookup uses its published current-user GET endpoint and exact connected-account
+ID, with a bounded deadline and a short owner/Space/authorization-scoped cache.
+Only public profile labels or the documented provider displayName are projected;
+credentials, arbitrary provider payloads and aliases are never identity evidence.
+Legacy slug-only records and unavailable profiles remain explicitly unidentified.
+Always send the acting application user ID alongside the exact authorization on
+profile proxy requests. Composio projects enforcing owner verification reject an
+unscoped request even when the account is active. The pinned core SDK's high-level
+proxy drops that field; use its public API client with `user_id` and
+`connected_account_id`, retaining cancellation and zero automatic retries.
+An offline wire regression must inspect the installed client's serialized body,
+not just a mock of the high-level helper. Configured provider wrappers must
+forward the identity operation through their normal credential resolver and
+observe credential rotation, returning null when unsupported or unconfigured.
+
+A second scoped database read drops revoked grants and prevents an old identity
+from being attached to a reconnected authorization. No migration or account
+mutation is needed to view the detail.
+
+Confirmed accounts and pending authorizations render separately. Users can
+disconnect one account without removing the others, cancel an unfinished attempt,
+or disconnect all explicitly. The dialogue fits its content and safe viewport;
+all new copy and the update announcement use the thirteen existing catalogs.
+
+Qualify the provider/ownership races with offline tests and the actual production
+React component at phone, tablet and desktop widths. Fixtures do not prove live
+provider identity resolution. Publication requires both API and web artifacts;
+retain the existing external-browser OAuth completion and native-host boundaries.
+
 ## Remaining migration gates
 
 Desktop update continuity uses the canonical npm workspace and lock, rather than
@@ -141,8 +178,12 @@ web and Desktop. It uses the existing Better Auth/OIDC redirect, callbacks and
 persistent per-server Electron session. The intermediate sign-in launcher is
 replaced by the existing branded loading view while navigation starts. A failed
 or rejected attempt stays on the explicit retry screen instead of redirecting
-again. Keep generic self-hosted SSO, model and integration popup flows intact;
+again. Keep generic self-hosted SSO, model and MCP popup flows intact;
 do not allow arbitrary identity origins in Desktop main-window navigation.
+
+Managed app connections open an ordinary external browser target on Desktop.
+Both the integration catalog and chat authorization cards retain server-owned
+completion polling, so a missing popup handle does not abort authorization.
 
 Qualification: affected local tests and incremental web/native types pass.
 The compiled first-party flow was checked with an isolated identity fixture;
@@ -175,6 +216,45 @@ or deploy the backend to exercise this work.
 
 
 ## Complete Agent web release
+
+### Mico task and routine conversation boundaries
+
+The shared web/PWA/Desktop renderer exposes conversations inside each existing
+Mico. A tab creates a thread rather than another bot, provider connection or model.
+The URL carries the task identity; optional `taskSpace` pins cross-Space links
+until server admission. RPC clients, caches, review drafts and composer drafts
+retain owner, Space, bot and thread through navigation and late responses. A
+mismatching server snapshot fails closed rather than rendering the primary chat.
+
+Cron, Test, webhook and GitHub entry points resolve one owned conversation per
+routine when no explicit target exists. Existing group/direct targets and history
+stay where they were. Matching unattempted timer backlog may be retained in its
+original primary thread during adoption; attempted, manual, changed-model or
+externally affected work is not folded or replayed. Each event routine gets its
+own prompt and model pin. An additive receipt freezes the first recipient set,
+and the scoped Run stores its external nonce. Clearing chat or adding another
+routine cannot replay new routine deliveries. Deleted/disabled recipients never
+redirect to the main chat. Raw webhooks retain earlier deduplication behavior;
+erased pre-upgrade identities cannot be reconstructed. This is not a universal
+exactly-once side-effect guarantee.
+
+Routine runs exclude shared graphical/page controls, app launch and takeover.
+Files, shell and connected applications retain existing OS/account permissions;
+this is not a filesystem sandbox. Computer execution leases remain authoritative:
+private chats do not establish four concurrent computer jobs per Mico. Private
+live calls are disabled until their transport is scoped; dictation and reading
+replies remain. Private push on the separate native client offers the exact web
+task link until native task rendering is qualified, without forwarding tokens.
+
+Native runtime discovery checks executable availability and rejects broken
+overrides. Bounded provider diagnostics map to fixed actionable errors without
+echoing raw payloads. Unknown CLI billing stays unknown, without fabricated costs.
+
+Qualification uses focused tests and incremental types, real loopback PostgreSQL
+migration/ownership/RLS/concurrency/replay acceptance and browser component checks
+for task creation, selection and narrow/light/dark layouts. Component fixtures do
+not establish end-to-end model, phone or installed-app acceptance. Promotion of
+source and schema requires separate release qualification.
 
 Frontend releases snapshot the complete canonical `apps/web` source/public assets
 and shared browser packages, not selected UI fixes over an older application.

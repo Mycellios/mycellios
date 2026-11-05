@@ -12,6 +12,9 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   "search_history",
   "write_file",
   "shell",
+  "command_status",
+  "work_status",
+  "delegate_task",
   "open_path",
   "launch_app",
   "remember",
@@ -51,6 +54,9 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
 ]);
 
 const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
+  "command_status",
+  "work_status",
+  "delegate_task",
   "browser_snapshot",
   "cloud_agent_status",
   "computer_observe",

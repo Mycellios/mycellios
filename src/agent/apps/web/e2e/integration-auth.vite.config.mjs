@@ -11,6 +11,7 @@ const fixture = fileURLToPath(new URL("./fixtures/integration-auth/", import.met
 
 function fixtureServer() {
   let connected = false;
+  let externalConnected = false;
   const catalog = ["twitter", "gmail"].map((slug) => ({
     connectorId: "composio",
     slug,
@@ -28,6 +29,22 @@ function fixtureServer() {
     capabilities: [],
     createdAt: "2026-11-04T00:00:00Z",
   };
+  const externalConnection = {
+    ...connection,
+    id: "fixture-twitter",
+    provider: "twitter",
+    displayName: "X (Twitter)",
+  };
+  let accountRows = [
+    { ...externalConnection, id: "fixture-personal", identity: { label: "@forest_fixture" } },
+    {
+      ...externalConnection,
+      id: "fixture-team",
+      displayName: "Equipo",
+      identity: { label: "@mycelium_team" },
+    },
+    { ...externalConnection, id: "fixture-pending", status: "pending", identity: null },
+  ];
   return async (req, res, next) => {
     const path = (req.url ?? "").split("?")[0];
     if (!path.startsWith("/rpc/")) return next();
@@ -36,21 +53,56 @@ function fixtureServer() {
     const raw = Buffer.concat(chunks).toString("utf8");
     const input = raw ? JSON.parse(raw).json : null;
     const name = path.slice(5);
+    const external = new URL(req.headers.referer ?? "http://localhost/").searchParams.has(
+      "external",
+    );
+    const accountMode = new URL(req.headers.referer ?? "http://localhost/").searchParams.has(
+      "accounts",
+    );
+    const selectedConnection = external ? externalConnection : connection;
+    const selectedConnected = external ? externalConnected : connected;
+    if (name === "connections/complete" && external) externalConnected = true;
     let data = {
       "mcp/servers/list": [],
       "capabilities/list": [],
-      "connections/list": connected ? [connection] : [],
+      "connections/list": selectedConnected ? [selectedConnection] : [],
       "connections/catalog": catalog.map((item) => ({
         ...item,
-        connected: item.slug === "gmail" && connected,
+        connected: accountMode
+          ? item.slug === "twitter" && accountRows.some((row) => row.status === "connected")
+          : item.slug === selectedConnection.provider && selectedConnected,
       })),
       "capabilities/catalogSearch": { enabled: false, results: [] },
-      "connections/complete": connection,
+      "connections/complete": selectedConnection,
+      "connections/accounts": [],
+      "connections/tools": [],
     }[name];
+    if (accountMode) {
+      if (name === "connections/list")
+        data = accountRows.map(({ identity: _identity, ...row }) => row);
+      if (name === "connections/accounts") data = accountRows;
+      if (name === "connections/tools")
+        data = [{ name: "Read profile", description: "Fixture tool" }];
+      if (name === "connections/revoke") {
+        accountRows = accountRows.filter((row) => row.id !== input?.connectionId);
+        data = { ok: true };
+      }
+      if (name === "connections/rename") {
+        accountRows = accountRows.map((row) =>
+          row.id === input?.connectionId ? { ...row, displayName: input.displayName } : row,
+        );
+        data = accountRows.find((row) => row.id === input?.connectionId);
+      }
+    }
     res.setHeader("content-type", "application/json");
     res.setHeader("cache-control", "no-store");
     if (name === "connections/begin") {
-      if (input?.provider === "gmail") {
+      if (external && input?.provider === "twitter") {
+        data = {
+          connectionId: externalConnection.id,
+          authorizationUrl: "https://connect.composio.dev/link/fixture-not-a-real-connection",
+        };
+      } else if (input?.provider === "gmail") {
         connected = true;
         data = { connectionId: connection.id, authorizationUrl: null };
       } else {

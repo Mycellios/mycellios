@@ -1,3 +1,4 @@
+import type { ConnectionIdentity } from "@rakazo/contracts";
 import type {
   AdapterContext,
   AdapterDescriptor,
@@ -92,6 +93,8 @@ import type {
 } from "./types.js";
 
 export interface SandboxProvider {
+  /** Read receipts on the already-authorized native computer, without executing work. */
+  commandStatus?(computer: ComputerRef, commandId: string | undefined, context: AdapterContext): Promise<unknown>;
   /** True when every running minute is billed, so the active-lifetime cap applies. */
   billsWhileRunning?(computer: ComputerRef): boolean;
   describe(): AdapterDescriptor<SandboxCapabilities>;
@@ -105,7 +108,7 @@ export interface SandboxProvider {
   environment?(
     computer: ComputerRef,
     context: AdapterContext,
-  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; projectSessionId?:string; runtimeExecutable?: string } | undefined>;
+  ): Promise<{ platform: string; home: string; shell: string; projectPath?: string; projectRoot?: boolean; runtimeExecutable?: string; durableCommands?: boolean; projectSessionId?: string; taskIsolation?: "worktree-v1" } | undefined>;
   /** Optional live browser on the same leased screen as observe/act. */
   pageBrowser?(
     computer: ComputerRef,
@@ -241,6 +244,11 @@ export interface ManagedConnectorProvider
   listConnectedExternalIds(context: AdapterContext): Promise<string[]>;
   /** Connection refs the provider reports as dead until the user reconnects them. */
   listReconnectRefs?(context: AdapterContext): Promise<string[]>;
+  /** Public identity of this exact owned authorization, never its editable alias or credentials. */
+  describeConnection?(
+    request: { provider: string; connectionRef: string },
+    context: AdapterContext,
+  ): Promise<ConnectionIdentity | null>;
   connectionReady(context: AdapterContext, externalId: string): Promise<boolean>;
   warmDirectory?(): Promise<void>;
 }

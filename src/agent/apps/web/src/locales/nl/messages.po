@@ -6345,3 +6345,43 @@ msgstr "Verbind apps waar nodig met je eigen API-sleutel."
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "Duidelijke meldingen als een integratie serverconfiguratie nodig heeft."
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "Op desktop worden appverbindingen in je browser geopend."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Account identity unavailable"
+msgstr "Accountidentiteit niet beschikbaar"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Authorization pending"
+msgstr "Autorisatie in behandeling"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Loading account…"
+msgstr "Account laden…"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Could not load account identities."
+msgstr "Accountidentiteiten konden niet worden geladen."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Connected accounts"
+msgstr "Verbonden accounts"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "No connected accounts"
+msgstr "Geen verbonden accounts"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Disconnect all"
+msgstr "Alles ontkoppelen"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+msgstr "{pendingCount, plural, one {# verbinding in behandeling} other {# verbindingen in behandeling}}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "See which accounts are connected to each app."
+msgstr "Bekijk welke accounts met elke app verbonden zijn."

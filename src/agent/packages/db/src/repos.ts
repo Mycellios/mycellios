@@ -217,7 +217,7 @@ export function createRepos(
         parentBotId: bot.parentBotId,
         preview: previewFromBlocks(bot.thread.messages[0]?.blocks),
         status: activeRun?.status ?? "idle",
-        runErrorId: rosterRunErrorId(bot.thread.runs[0], activeRun),
+        runErrorId: rosterRunErrorId(bot.thread.runs[0], primaryActiveRun(bot.runs, bot.thread.id)),
         updatedAt: rosterUpdatedAt(bot.thread.messages[0], bot.updatedAt).toISOString(),
       };
     });
@@ -468,7 +468,7 @@ export function createRepos(
             bot,
             preview,
             activeRun?.status ?? "idle",
-            rosterRunErrorId(bot.thread?.runs[0], activeRun),
+            rosterRunErrorId(bot.thread?.runs[0], primaryActiveRun(bot.runs, bot.thread?.id)),
             updatedAt,
             ringingCall(
               bot.thread && callsByThread.has(bot.thread.id)

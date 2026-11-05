@@ -14,10 +14,10 @@ import {
 } from "@rakazo/ui-web";
 import { XIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { SettingsLabel } from "../components/SettingsRows";
 import { useSpaceRpc } from "../lib/space-rpc";
 import { errorText } from "../lib/user-error";
 import { SpaceMemorySection } from "./KnowledgeSection";
-import { SettingsLabel } from "../components/SettingsRows";
 import {
   defaultMemoryProviderSettings,
   MEMORY_PROVIDER_SETTINGS,
@@ -38,9 +38,14 @@ function ScopePicker({
   const { t } = useLingui();
   return (
     <Field aria-labelledby={labelId}>
-      <SettingsLabel name={t`Default scope`} help={t`Isolated keeps each agent's memory separate. Shared lets agents in this space use shared facts.`}><FieldLabel id={labelId}>
-        <Trans>Default scope</Trans>
-      </FieldLabel></SettingsLabel>
+      <SettingsLabel
+        name={t`Default scope`}
+        help={t`Isolated keeps each agent's memory separate. Shared lets agents in this space use shared facts.`}
+      >
+        <FieldLabel id={labelId}>
+          <Trans>Default scope</Trans>
+        </FieldLabel>
+      </SettingsLabel>
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
         {(["isolated", "shared"] as const).map((option) => (
           <Toggle
@@ -64,6 +69,7 @@ export function MemorySettingsOverlay({
   onConfigChange,
   embedded = false,
   onBusyChange,
+  onFormStateChange,
 }: {
   onClose: () => void;
   config: SpaceMemoryConfig | null | undefined;
@@ -71,6 +77,7 @@ export function MemorySettingsOverlay({
   /** Render panel body only for the shared Settings shell. */
   embedded?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  onFormStateChange?: (state: { busy: boolean; dirty: boolean }) => void;
 }) {
   const rpc = useSpaceRpc();
   const { t } = useLingui();
@@ -99,6 +106,11 @@ export function MemorySettingsOverlay({
 
   const registration = memoryProviderSettings(config?.provider ?? selectedProvider);
   const busy = pending !== null;
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    onFormStateChange?.({ busy, dirty });
+  }, [onFormStateChange, busy, dirty]);
+  useEffect(() => () => onFormStateChange?.({ busy: false, dirty: false }), [onFormStateChange]);
 
   useEffect(() => {
     return () => onBusyChange?.(false);
@@ -120,6 +132,7 @@ export function MemorySettingsOverlay({
         defaultMemoryScope: defaultScope,
       });
       onConfigChange(next);
+      setDirty(false);
       return true;
     } catch (err) {
       setError(errorText(err, t`Could not connect ${registration.name}`));
@@ -136,6 +149,7 @@ export function MemorySettingsOverlay({
       await rpc.memory.disconnectProvider();
       setAddingProvider(false);
       onConfigChange(null);
+      setDirty(false);
     } catch (err) {
       setError(errorText(err, t`Could not disconnect memory provider`));
     } finally {
@@ -150,6 +164,7 @@ export function MemorySettingsOverlay({
     try {
       const next = await rpc.memory.setDefaultScope({ defaultMemoryScope: scope });
       onConfigChange(next);
+      setDirty(false);
     } catch (err) {
       setError(errorText(err, t`Could not update the default memory scope`));
     } finally {
@@ -232,7 +247,14 @@ export function MemorySettingsOverlay({
           ) : registration ? (
             <section className="rounded-xl border border-border px-4 py-4">
               <h3 className="text-heading3 font-medium text-foreground">
-                <SettingsLabel name={t`Memory provider`} help={t`An optional service that helps agents find saved information by meaning. Connecting it can send memory content to that provider.`}><span id={providerSelectId}><Trans>Provider</Trans></span></SettingsLabel>
+                <SettingsLabel
+                  name={t`Memory provider`}
+                  help={t`An optional service that helps agents find saved information by meaning. Connecting it can send memory content to that provider.`}
+                >
+                  <span id={providerSelectId}>
+                    <Trans>Provider</Trans>
+                  </span>
+                </SettingsLabel>
               </h3>
               <p className="mt-1 text-[13px] text-muted-foreground">
                 <Trans>Lets bots save and recall facts by meaning, alongside MEMORY.md.</Trans>
@@ -273,7 +295,11 @@ export function MemorySettingsOverlay({
 
   if (embedded) {
     return (
-      <div data-testid="memory-settings" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        data-testid="memory-settings"
+        onInputCapture={() => setDirty(true)}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
         {body}
       </div>
     );

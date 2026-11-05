@@ -7347,3 +7347,63 @@ msgstr "Connect apps with your own API key when required."
 #: src/components/ReleaseNotes.tsx
 msgid "Clear messages when an integration needs server setup."
 msgstr "Clear messages when an integration needs server setup."
+
+#: src/components/ReleaseNotes.tsx
+msgid "App connections open in your browser on desktop."
+msgstr "App connections open in your browser on desktop."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Account identity unavailable"
+msgstr "Account identity unavailable"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Authorization pending"
+msgstr "Authorization pending"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Loading account…"
+msgstr "Loading account…"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Could not load account identities."
+msgstr "Could not load account identities."
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Connected accounts"
+msgstr "Connected accounts"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "No connected accounts"
+msgstr "No connected accounts"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "Disconnect all"
+msgstr "Disconnect all"
+
+#: src/pages/PluginsOverlay.tsx
+msgid "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+msgstr "{pendingCount, plural, one {# pending connection} other {# pending connections}}"
+
+#: src/components/ReleaseNotes.tsx
+msgid "See which accounts are connected to each app."
+msgstr "See which accounts are connected to each app."
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Mico tasks"
+msgstr "Mico tasks"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Main chat"
+msgstr "Main chat"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "New task"
+msgstr "New task"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Task"
+msgstr "Task"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Could not create task. Try again."
+msgstr "Could not create task. Try again."

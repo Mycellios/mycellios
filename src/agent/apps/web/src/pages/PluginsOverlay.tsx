@@ -98,7 +98,7 @@ export function PluginsOverlay({
   onOpenMcp?: () => void;
   activeBotId?: string;
 }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [setupOpen, setSetupOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(CONNECTION_CATALOG_PAGE_SIZE);
@@ -124,6 +124,7 @@ export function PluginsOverlay({
     slug: string;
   } | null>(null);
   const connectionAttempt = useRef<AbortController | null>(null);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const queries = useSpaceQueries();
   const queryClient = useQueryClient();
   const mcpOptions = queries.mcp.servers.list.queryOptions();
@@ -171,6 +172,13 @@ export function PluginsOverlay({
     }),
   );
   const tools = (detailKey && toolsQuery.data) || [];
+  const accountsQuery = useQuery(
+    queries.connections.accounts.queryOptions({
+      input: detailKey
+        ? { connectorId: detailKey.connectorId, provider: detailKey.slug }
+        : skipToken,
+    }),
+  );
   const toolsLoading = detailKey !== null && toolsQuery.isPending && toolsQuery.isFetching;
 
   function updateIntegrations(
@@ -192,6 +200,7 @@ export function PluginsOverlay({
 
   /** Reads integrations again with requests sent after a change. */
   async function refresh() {
+    void queryClient.invalidateQueries({ queryKey: queries.connections.accounts.key() });
     void fetchFresh(queryClient, mcpOptions).catch(() => undefined);
     await fetchFresh(queryClient, {
       queryKey: integrationsOptions.queryKey,
@@ -270,7 +279,7 @@ export function PluginsOverlay({
       const result = await connectCatalogItem(item, connections, {
         begin: (input) => rpc.connections.begin(input),
         complete: (input) => rpc.connections.complete(input),
-        openUrl: (url) => window.open(url, "rakazo-plugin-connect", "noopener,noreferrer"),
+        openUrl: (url) => window.open(url, "_blank", "noopener,noreferrer"),
         signal: controller.signal,
       });
       if (result.status === "aborted") return;
@@ -301,7 +310,7 @@ export function PluginsOverlay({
     setPending(row.id);
     try {
       await rpc.connections.revoke({ connectionId: row.id });
-      const remaining = catalogItemAccounts(connections, item).filter(
+      const remaining = catalogItemAccounts(accountsQuery.data ?? connections, item).filter(
         (entry) => entry.id !== row.id,
       );
       if (remaining.every((entry) => entry.status !== "connected")) {
@@ -317,7 +326,7 @@ export function PluginsOverlay({
   }
 
   async function uninstall(item: ConnectionCatalogItem) {
-    const matches = catalogItemAccounts(connections, item);
+    const matches = catalogItemAccounts(accountsQuery.data ?? connections, item);
     if (matches.length === 0) {
       void setItemConnected(item, false);
       closeDetail();
@@ -345,6 +354,7 @@ export function PluginsOverlay({
     const clearDraft = () => setLabelDrafts(({ [row.id]: _draft, ...rest }) => rest);
     if (!displayName || displayName === row.displayName) {
       clearDraft();
+      setEditingAccountId(null);
       return;
     }
     setPending(`rename:${row.id}`);
@@ -361,6 +371,8 @@ export function PluginsOverlay({
         ),
       }));
       clearDraft();
+      setEditingAccountId(null);
+      void queryClient.invalidateQueries({ queryKey: queries.connections.accounts.key() });
     } catch (err) {
       setCatalogError(errorText(err, t`Could not rename connection`));
     } finally {
@@ -549,11 +561,108 @@ export function PluginsOverlay({
   }
 
   function renderDetail(item: ConnectionCatalogItem) {
-    const accounts = catalogItemAccounts(connections, item);
+    const accounts = catalogItemAccounts(accountsQuery.data ?? connections, item);
+    const connectedAccounts = accounts.filter((row) => row.status === "connected");
+    const pendingAccounts = accounts.filter((row) => row.status === "pending");
+    const pendingCount = pendingAccounts.length;
     const key = catalogItemKey(item);
     const connecting = pending === key;
     const uninstalling = pending === `uninstall:${key}`;
     const toolCount = tools.length;
+
+    function renderAccount(row: Connection) {
+      const authorizing = row.status === "pending";
+      const editing = editingAccountId === row.id;
+      const identity = row.identity?.label;
+      const createdAt = new Date(row.createdAt);
+      const accountLabel = authorizing
+        ? t`Authorization pending`
+        : (identity ??
+          (accountsQuery.isFetching && !accountsQuery.data
+            ? t`Loading account…`
+            : t`Account identity unavailable`));
+      const customLabel = row.displayName !== item.name && row.displayName !== identity;
+      return (
+        <fieldset
+          key={row.id}
+          aria-label={accountLabel}
+          className="flex min-w-0 flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p className="min-w-0 break-all text-sm font-medium">{accountLabel}</p>
+              {!authorizing ? (
+                <span className="text-xs text-muted-foreground">
+                  <Trans>Connected</Trans>
+                </span>
+              ) : null}
+            </div>
+            {authorizing && !Number.isNaN(createdAt.getTime()) ? (
+              <time className="text-xs text-muted-foreground" dateTime={row.createdAt}>
+                {new Intl.DateTimeFormat(i18n.locale, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                }).format(createdAt)}
+              </time>
+            ) : !editing && customLabel ? (
+              <p className="break-words text-xs text-muted-foreground">{row.displayName}</p>
+            ) : null}
+            {editing ? (
+              <Input
+                autoFocus
+                value={labelDrafts[row.id] ?? row.displayName}
+                aria-label={t`Account label`}
+                maxLength={CONNECTION_LABEL_MAX_LENGTH}
+                className="mt-2 h-9"
+                onChange={(event) =>
+                  setLabelDrafts((current) => ({ ...current, [row.id]: event.target.value }))
+                }
+                onBlur={() => {
+                  void renameAccount(row);
+                  setEditingAccountId(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setLabelDrafts(({ [row.id]: _draft, ...rest }) => rest);
+                    setEditingAccountId(null);
+                  }
+                }}
+              />
+            ) : null}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-1 self-end sm:self-center">
+            {!authorizing ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingAccountId(row.id)}
+                disabled={pending !== null}
+              >
+                <Trans>Rename</Trans>
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={pending === row.id || uninstalling}
+              onClick={() => void revokeAccount(row, item)}
+            >
+              {pending === row.id ? (
+                <Trans>Removing…</Trans>
+              ) : authorizing ? (
+                <Trans>Cancel</Trans>
+              ) : (
+                <Trans>Disconnect</Trans>
+              )}
+            </Button>
+          </div>
+        </fieldset>
+      );
+    }
 
     return (
       <div data-testid="connection-detail" className="space-y-5">
@@ -591,43 +700,31 @@ export function PluginsOverlay({
             disabled={uninstalling || connecting}
             onClick={() => void uninstall(item)}
           >
-            {uninstalling ? <Trans>Removing…</Trans> : <Trans>Uninstall</Trans>}
+            {uninstalling ? <Trans>Removing…</Trans> : <Trans>Disconnect all</Trans>}
           </Button>
         </div>
 
-        <section data-testid="connection-accounts" className="space-y-1">
-          {accounts.map((row) => (
-            <div key={row.id} className="group/account flex items-center gap-2">
-              <Input
-                value={labelDrafts[row.id] ?? row.displayName}
-                aria-label={t`Account label`}
-                maxLength={CONNECTION_LABEL_MAX_LENGTH}
-                className="h-9 rounded-lg border-transparent bg-transparent px-2 text-[14px] shadow-none hover:bg-accent/60 focus-visible:bg-background dark:bg-transparent"
-                onChange={(event) =>
-                  setLabelDrafts((current) => ({
-                    ...current,
-                    [row.id]: event.target.value,
-                  }))
-                }
-                onBlur={() => void renameAccount(row)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.currentTarget.blur();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 shrink-0 px-2.5 text-[12px] text-muted-foreground pointer-fine:opacity-0 pointer-fine:group-focus-within/account:opacity-100 pointer-fine:group-hover/account:opacity-100"
-                size="sm"
-                disabled={pending === row.id || uninstalling}
-                onClick={() => void revokeAccount(row, item)}
-              >
-                {pending === row.id ? <Trans>Removing…</Trans> : <Trans>Remove</Trans>}
-              </Button>
-            </div>
-          ))}
+        {accountsQuery.isError ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">
+            <p>
+              <Trans>Could not load account identities.</Trans>
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => void accountsQuery.refetch()}>
+              <Trans>Retry</Trans>
+            </Button>
+          </div>
+        ) : null}
+        <section
+          data-testid="connection-accounts"
+          aria-label={t`Connected accounts`}
+          className="space-y-1"
+        >
+          {connectedAccounts.map(renderAccount)}
+          {!connectedAccounts.length ? (
+            <p className="py-3 text-sm text-muted-foreground">
+              <Trans>No connected accounts</Trans>
+            </p>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -640,6 +737,22 @@ export function PluginsOverlay({
             {connecting ? <Trans>Adding…</Trans> : <Trans>Add another</Trans>}
           </Button>
         </section>
+
+        {pendingCount ? (
+          <Disclosure
+            data-testid="pending-connections"
+            summary={
+              <Plural
+                value={pendingCount}
+                one="# pending connection"
+                other="# pending connections"
+              />
+            }
+            summaryClassName="text-sm text-muted-foreground"
+          >
+            <div className="pt-2">{pendingAccounts.map(renderAccount)}</div>
+          </Disclosure>
+        ) : null}
 
         {toolsLoading || tools.length > 0 ? (
           <Disclosure
@@ -681,7 +794,7 @@ export function PluginsOverlay({
     >
       <DialogContent
         showCloseButton={false}
-        className="flex h-[760px] max-h-[calc(100dvh-2rem)] w-[calc(100dvw-2rem)] max-w-[1080px] flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 sm:max-w-[1080px]"
+        className={`flex max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom)_-_2rem)] w-[calc(100dvw_-_env(safe-area-inset-left)_-_env(safe-area-inset-right)_-_2rem)] flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 ${detailItem ? "h-auto sm:max-w-2xl" : "h-[760px] sm:max-w-[1080px]"}`}
       >
         <DialogHeader className="flex-row items-start justify-between px-4 pt-5 sm:px-8 sm:pt-7">
           <DialogTitle className="text-heading2 text-foreground">

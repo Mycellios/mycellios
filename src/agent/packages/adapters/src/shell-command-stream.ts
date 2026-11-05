@@ -172,7 +172,9 @@ export async function observeShellCommand(
       finished = true;
       resolveIdle?.("done");
     }
-    return { ...redact({ stdout, stderr }, false), code: code ?? 0 };
+    if (code === undefined)
+      throw new Error("Shell stream ended without a confirmed exit status. Inspect existing work before retrying; the command outcome is unknown.");
+    return { ...redact({ stdout, stderr }, false), code };
   })();
 
   const reason = await Promise.race([

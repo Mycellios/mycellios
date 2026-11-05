@@ -11,6 +11,25 @@ import type { PrismaClient } from "@rakazo/db";
 import { RunHistoryWriteError } from "@rakazo/db";
 import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
 import { describe, expect, it, vi } from "vitest";
+
+// Thread allocation has PostgreSQL acceptance coverage in verify-routine-isolation-db.ts.
+// These scheduling fixtures exercise the committed target and publishing lifecycle.
+vi.mock("@rakazo/db", async (load) => ({
+  ...await load<typeof import("@rakazo/db")>(),
+  // Atomic cross-worker admission is exercised by the isolated PostgreSQL fixture.
+  claimMicoRun: vi.fn(async (prisma: PrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<PrismaClient["run"]["updateMany"]>[0])),
+  ensureRoutineThread: vi.fn(async (prisma: PrismaClient, actor: { spaceId: string; userId: string }, id: string) => {
+    const routine = await prisma.routine.findUnique({ where: { id } });
+    if (!routine) throw new Error("Routine unavailable");
+    if (routine.threadId) {
+      const target = await prisma.thread.findFirst({ where: { id: routine.threadId, spaceId: actor.spaceId, userId: actor.userId } });
+      if (!target) throw new Error("Routine thread unavailable");
+      return { id: target.id };
+    }
+    return { id: "routine-thread-1" };
+  }),
+}));
 import {
   appendToolCompletionAudit,
   createRunExecutor as createExecutor,
@@ -1289,7 +1308,7 @@ describe("run notification preference", () => {
       },
       select: {
         bot: { select: { notifyOnFinish: true } },
-        thread: { select: { groupId: true } },
+        thread: { select: { groupId: true, taskBotId: true } },
       },
     });
 
@@ -3564,8 +3583,6 @@ description: Prepare standup notes
     botSkillPin: { findMany: vi.fn(async () => []) },
 
     agentSkill: { findMany: vi.fn(async () => []) },
-    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
-
         ...compatiblePrismaParts("space-model", plaintext),
         bot: {
           findFirst: vi.fn(async () => ({
@@ -3623,8 +3640,6 @@ description: Prepare standup notes
     botSkillPin: { findMany: vi.fn(async () => []) },
 
     agentSkill: { findMany: vi.fn(async () => []) },
-    secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
-
         ...compatiblePrismaParts("space-model", plaintext),
         bot: {
           findFirst: vi.fn(async () => ({

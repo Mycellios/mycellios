@@ -22,6 +22,8 @@ model AiDataConsent {
 }
 
 model User {
+  workflows Workflow[]
+  workflowExecutions WorkflowExecution[]
   aiDataConsents AiDataConsent[]
   id                          String                       @id
   name                        String
@@ -43,6 +45,7 @@ model User {
   secrets                     Secret[]
   mcpServers                  McpServer[]
   botSections                 BotSection[]
+  developmentProjects         DevelopmentProject[]
   actionApprovalRules         ActionApprovalRule[]
   actionAutoReviewPreferences ActionAutoReviewPreference[]
   modelRoleChoices            UserModelRoleChoice[]
@@ -257,6 +260,8 @@ model Member {
 }
 
 model Space {
+  workflows Workflow[]
+  workflowExecutions WorkflowExecution[]
   aiDataConsents              AiDataConsent[]
   id                          String                       @id
   organizationId              String
@@ -271,12 +276,14 @@ model Space {
   memberships                 SpaceMember[]
   bots                        Bot[]
   botSections                 BotSection[]
+  developmentProjects         DevelopmentProject[]
   botDeletions                BotDeletion[]
   threads                     Thread[]
   events                      Event[]
   tasks                       Task[]
   runs                        Run[]
   routines                    Routine[]
+  routineDeliveryReceipts      RoutineDeliveryReceipt[]
   scratchpadItems             ScratchpadItem[]
   taughtSkills                TaughtSkill[]
   agentSkills                 AgentSkill[]
@@ -482,7 +489,49 @@ model SpaceVoicePreference {
   @@map("space_voice_preferences")
 }
 
+model Workflow {
+  id String @id
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  version Int @default(1)
+  graph Json
+  active Boolean @default(false)
+  nextRunAt DateTime?
+  archivedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  executions WorkflowExecution[]
+  @@unique([id,spaceId,userId], map: "workflows_identity_scope_key")
+  @@index([spaceId,userId], map: "workflows_owner_idx")
+  @@map("workflows")
+}
+model WorkflowExecution {
+  id String @id
+  workflowId String
+  workflow Workflow @relation(fields: [workflowId,spaceId,userId], references: [id,spaceId,userId], onDelete: Cascade)
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version Int
+  graph Json
+  triggerId String
+  clientNonce String
+  status String @default("queued")
+  steps Json @default("{}")
+  error String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  @@unique([spaceId,userId,clientNonce])
+  @@index([spaceId,userId,workflowId,createdAt], map: "workflow_executions_owner_idx")
+  @@map("workflow_executions")
+}
+
 model Bot {
+  taskConcurrency Int @default(4)
   agentEngine String @default("pi")
   skillPins BotSkillPin[]
   screenGeneration Int @default(0)
@@ -528,6 +577,7 @@ model Bot {
   crossSpaceCommunication Boolean @default(false)
   fleetManagement        Boolean @default(true)
   routines          Routine[]
+  routineDeliveryReceipts RoutineDeliveryReceipt[]
   scratchpadItems   ScratchpadItem[]
   taughtSkills      TaughtSkill[]
   memoryDocuments   MemoryDocument[]
@@ -622,6 +672,20 @@ model ChatGroupMember {
   @@map("chat_group_members")
 }
 
+model DevelopmentProject {
+  id String @id
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId, userId])
+  @@map("development_projects")
+}
+
 model Thread {
   taskBotId String?
   taskBot Bot? @relation("MicoTaskThreads", fields: [taskBotId], references: [id], onDelete: Cascade)
@@ -710,6 +774,23 @@ model Event {
 }
 
 model Task {
+  workPlan Json?
+  parentTaskId String?
+  workParent Task? @relation("WorkTree", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  workChildren Task[] @relation("WorkTree")
+  delegationRootId String?
+  delegationKey String? @unique
+  delegationState String?
+  delegationRevision Int @default(0)
+  delegatedRunId String?
+  expectedResult String?
+  resources String[] @default([])
+  dependencies String[] @default([])
+  returnRunId String?
+  returnedToParentAt DateTime?
+  delegationCheckedAt DateTime?
+  workStopPending Boolean @default(false)
+  workStopTargets Json?
   assignmentVersion Int @default(1)
   paused Boolean @default(false)
   id        String   @id @default(cuid())
@@ -727,6 +808,8 @@ model Task {
   runs      Run[]
 
   @@index([spaceId, botId])
+  @@index([spaceId, userId, delegationState])
+  @@index([parentTaskId])
   @@map("tasks")
 }
 
@@ -888,6 +971,24 @@ model ExternalEffect {
   @@unique([idempotencyKey])
   @@index([runId, status])
   @@map("external_effects")
+}
+
+/// Operational routing identities contain no webhook payload or credentials and survive chat clearing.
+model RoutineDeliveryReceipt {
+  id String @id @default(cuid())
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  botId String
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+  source String
+  keyDigest String
+  routineIds String[]
+  createdAt DateTime @default(now())
+
+  @@unique([spaceId, userId, botId, source, keyDigest], map: "routine_delivery_receipts_scope_key")
+  @@index([botId, createdAt])
+  @@map("routine_delivery_receipts")
 }
 
 model Routine {
@@ -1238,6 +1339,8 @@ model ComputerExecutionLease {
   id         String   @id @default(cuid())
   computerId String
   computer   Computer @relation(fields: [computerId], references: [id], onDelete: Cascade)
+  // Internal lease key: a Mico id normally; task-worktree:<Mico>:<thread> for
+  // isolated native projects. Teardown must recover the actual Mico identity.
   botId      String
   runId      String
   fence      Int      @default(0)
