@@ -22,7 +22,7 @@ function fixture() {
   const findMany = vi.fn(
     async (args: { where: { trigger: { in?: string[]; notIn?: string[] } } }): Promise<Array<{
       id: string; botId: string; createdAt?: Date; threadId?: string;
-      thread?: { projectKey: string } | null; bot: { computerId: string };
+      thread?: { projectKey?: string; taskBotId?: string | null } | null; bot: { computerId: string; agentEngine?: string };
     }>> =>
       [...rows]
         .filter(
@@ -33,7 +33,9 @@ function fixture() {
               ? args.where.trigger.in.includes(row.trigger ?? "user")
               : !args.where.trigger.notIn!.includes(row.trigger ?? "user")),
         )
-        .map(([id, row]) => ({ id, botId: row.botId ?? id, threadId: row.threadId, thread: row.projectKey ? { projectKey: row.projectKey } : null, bot: { computerId: "computer" } })),
+        .map(([id, row]) => ({ id, botId: row.botId ?? id, threadId: row.threadId,
+          thread: row.projectKey ? { projectKey: row.projectKey, taskBotId: row.botId ?? id } : null,
+          bot: { computerId: "computer", ...(row.projectKey ? { agentEngine: "pi" } : {}) } })),
   );
   const leases = vi.fn(async () => [] as { computerId: string; botId: string; runId: string }[]);
   const queueHealth = vi.fn(async () => [{ delayedRuns: 0, oldestDueAt: null as Date | null }]);
