@@ -8,6 +8,8 @@
   tray reference before destruction. Verify account-computer-background tests;
   repeated stop and pending refresh completion must not touch a destroyed Tray
   or rewrite Windows startup preferences during shutdown.
+  Isolated RAKAZO_PERFORMANCE_USER_DATA qualification profiles never write the
+  installed application's Windows startup preferences.
 
 - Apps opens beside the existing chat through the Shell overlay; preserve its
   draft and scope. The private Video Studio v1 definition is in Desktop assets,
