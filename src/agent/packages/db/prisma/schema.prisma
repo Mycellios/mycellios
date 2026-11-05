@@ -45,6 +45,7 @@ model User {
   secrets                     Secret[]
   mcpServers                  McpServer[]
   botSections                 BotSection[]
+  developmentProjects         DevelopmentProject[]
   actionApprovalRules         ActionApprovalRule[]
   actionAutoReviewPreferences ActionAutoReviewPreference[]
   modelRoleChoices            UserModelRoleChoice[]
@@ -275,6 +276,7 @@ model Space {
   memberships                 SpaceMember[]
   bots                        Bot[]
   botSections                 BotSection[]
+  developmentProjects         DevelopmentProject[]
   botDeletions                BotDeletion[]
   threads                     Thread[]
   events                      Event[]
@@ -668,6 +670,20 @@ model ChatGroupMember {
   @@unique([groupId, botId])
   @@index([botId])
   @@map("chat_group_members")
+}
+
+model DevelopmentProject {
+  id String @id
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spaceId, userId])
+  @@map("development_projects")
 }
 
 model Thread {
@@ -1323,6 +1339,8 @@ model ComputerExecutionLease {
   id         String   @id @default(cuid())
   computerId String
   computer   Computer @relation(fields: [computerId], references: [id], onDelete: Cascade)
+  // Internal lease key: a Mico id normally; task-worktree:<Mico>:<thread> for
+  // isolated native projects. Teardown must recover the actual Mico identity.
   botId      String
   runId      String
   fence      Int      @default(0)

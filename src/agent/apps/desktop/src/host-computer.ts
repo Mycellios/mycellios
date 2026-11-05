@@ -66,6 +66,8 @@ export async function prepareHostComputer(userDataDir: string) {
   return {
     connection: { url: `http://host.docker.internal:${server.port}`, token },
     selectProject: server.selectProject,
+    bindTaskProject: server.bindTaskProject,
+    taskProject: server.taskProject,
     lockProject: server.lockProject,
     project: server.project,
     workspace: server.workspace,

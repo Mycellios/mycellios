@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     set: (count) => ipcRenderer.invoke("desktop.badge.set", count),
   },
   computer: {
+    prepareTask: request => ipcRenderer.invoke("desktop.computer.prepareTask", request),
     managesHostChoice: true,
     requestAccess: () => ipcRenderer.invoke("desktop.computer.requestAccess"),
     revokeAccess: () => ipcRenderer.invoke("desktop.computer.revokeAccess"),

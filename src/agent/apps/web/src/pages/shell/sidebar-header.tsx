@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
-import { Bell, PanelLeftClose, PanelLeftOpen, Plus, Search } from "lucide-react";
+import { Bell, FolderPlus, PanelLeftClose, PanelLeftOpen, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { MycelliosWordmark } from "../../components/MycelliosBrand";
@@ -44,6 +44,7 @@ export function SidebarHeader({
   navigate,
   setNewSpaceOpen,
   setCreateBotOpen,
+  onCreateProject,
 }: {
   mini?: boolean;
   createMenuOpen: boolean;
@@ -59,6 +60,7 @@ export function SidebarHeader({
   navigate: (path: string) => void;
   setNewSpaceOpen: (open: boolean) => void;
   setCreateBotOpen: (open: boolean) => void;
+  onCreateProject?: () => void;
 }) {
   const { t } = useLingui();
   const hasWindowChrome = Boolean(desktopBridge());
@@ -161,6 +163,7 @@ export function SidebarHeader({
                   setNewSpaceOpen(true);
                 }}
               />
+              {onCreateProject ? <Button variant="ghost" className="w-full justify-start rounded-none" onClick={() => { setCreateMenuOpen(false); onCreateProject(); }}><FolderPlus size={16} />{t`New project`}</Button> : null}
             </PopoverContent>
           ) : null}
         </Popover>

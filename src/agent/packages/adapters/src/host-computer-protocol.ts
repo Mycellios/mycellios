@@ -71,6 +71,7 @@ export interface HostComputerEnvironment {
   projectPath?: string;
   projectRoot?:boolean;
   projectSessionId?:string;
+  taskIsolation?: "worktree-v1";
 }
 export type HostComputerFrame<T> =
   | { value: T }

@@ -3,11 +3,13 @@ import { ORPCError } from "@orpc/server";
 import { createRepos } from "@rakazo/db";
 import { resolveThreadTarget } from "../thread-target.js";
 import type { RouterContext } from "./context.js";
+import { projectRoutes } from "./projects.js";
 /** Task conversations reuse the real Mico; primary chat, models and secrets stay untouched. */
 export function developmentRoutes(ctx: RouterContext) {
   const { deps, authed } = ctx;
   return {
     development: {
+      ...projectRoutes(ctx),
       status: authed.development.status.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         const run = await deps.prisma.run.findFirst({
@@ -54,6 +56,9 @@ export function developmentRoutes(ctx: RouterContext) {
         if (["routine:", "workflow:"].some(prefix => input.taskKey.startsWith(prefix) || input.projectKey.startsWith(prefix)))
           throw new ORPCError("BAD_REQUEST", { message: "Routine conversation identities are managed by the server." });
         await createRepos(deps.prisma).getBot(actor, input.botId);
+        if (input.projectKey.startsWith("project:") && !(await deps.prisma.developmentProject.findFirst({
+          where: { id: input.projectKey.slice(8), userId: actor.userId, spaceId: actor.spaceId },
+        }))) throw new ORPCError("NOT_FOUND");
         const row = await deps.prisma.thread.upsert({
           where: {
             spaceId_userId_taskKey: {

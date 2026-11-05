@@ -77,6 +77,7 @@ export interface RakazoDesktop {
     connect?: (botId: string) => Promise<void>;
     connected?: (botId: string) => Promise<boolean>;
     chooseProject?: (botId: string) => Promise<{ name: string; path: string } | null>;
+    prepareTask?: (request: { botId: string; taskThreadId: string }) => Promise<void>;
     project?: (botId: string) => Promise<{ name: string; path: string } | null>;
     projectAvailable?: () => Promise<boolean>;
     onConfigure: (listener: () => void) => () => void;

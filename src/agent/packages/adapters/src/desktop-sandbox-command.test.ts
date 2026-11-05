@@ -100,6 +100,32 @@ describe("desktop command execution", () => {
     }
   });
 
+  it("records a disconnected output pipe as unknown without crashing or replaying the command", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "mycellios-output-disconnect-"));
+    roots.push(root);
+    const desktop = new DesktopSandboxProvider({ root });
+    const computer = await desktop.provision({ botId: "output", homePath: "/unused" }, ctx);
+    const original = processTree.spawnOwnedCommand;
+    const spawn = vi.spyOn(processTree, "spawnOwnedCommand").mockImplementationOnce((...args) => {
+      const owned = original(...args);
+      setTimeout(() => owned.child.stdout.emit("error", Object.assign(new Error("read ENOTCONN"), { code: "ENOTCONN" })), 50);
+      return owned;
+    });
+    const request = { commandId: "pipe-failure", argv: [process.execPath, "-e", "setTimeout(()=>process.exit(0),10000)"] };
+    const ownedContext = { ...ctx, runId: "output-run" };
+    try {
+      await expect(collect(desktop.execute(computer, request, ownedContext))).rejects.toThrow("outcome is unknown");
+      expect(await desktop.commandStatus(computer, request.commandId)).toMatchObject({ state: "unknown", exitCode: null });
+      await expect(collect(desktop.execute(computer, request, ownedContext))).rejects.toThrow("outcome is unknown");
+      expect(spawn).toHaveBeenCalledTimes(1);
+      expect(await collect(desktop.execute(computer, { argv: [process.execPath, "-e", "console.log('still available')"] }, ctx)))
+        .toMatchObject({ code: 0, stdout: "still available\n" });
+    } finally {
+      spawn.mockRestore();
+      await desktop.destroy(computer, ctx);
+    }
+  });
+
   it("does not pass the program or its arguments through a shell", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "rakazo-desktop-command-"));
     roots.push(root);

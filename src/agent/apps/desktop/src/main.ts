@@ -75,6 +75,7 @@ import { installWindowChrome } from "./window-chrome.js";
 import { installProjectBrowser } from "./project-browser.js";
 import { installProjectRunner } from "./project-runner-ipc.js";
 import { nativePreviewContext, nativeProjectSpace } from "./project-session.js";
+import { installProjectConversations } from "./project-conversations-ipc.js";
 import { assertProjectGrant } from "./project-grant.js";
 import {
   browserWindowOptions,
@@ -1364,10 +1365,12 @@ app.whenReady().then(async () => {
       if (!captured || captured.isDestroyed()) throw new Error("Open the application first.");
       const context = await nativePreviewContext(captured);
       if (mainWindow !== captured) throw new Error("The application changed.");
-      return JSON.stringify([projectServer(), new URL(captured.webContents.getURL()).pathname, context]);
+      const url = new URL(captured.webContents.getURL());
+      return JSON.stringify([projectServer(), url.pathname, url.searchParams.get("task"), context]);
     },
   });
   app.once("before-quit", () => projectBrowser.dispose());
+  let projectConversations: ReturnType<typeof installProjectConversations> | undefined;
   projectRunner = installProjectRunner({
     storage: path.join(userDataDir, "project-runs"),
     leaseValid: () => hostComputer?.isEnabled() === true && (currentSetup?.mode === "new" || Boolean(cloudComputerOwner)),
@@ -1375,7 +1378,8 @@ app.whenReady().then(async () => {
       if ((!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) || !hostComputer?.isEnabled() || !mainWindow)
         throw new Error("Connect this agent to the local computer first.");
       const captured = mainWindow;
-      const pathname = new URL(captured.webContents.getURL()).pathname;
+      const capturedUrl = captured.webContents.getURL(), projectRoute = new URL(capturedUrl);
+      const pathname = projectRoute.pathname;
       if (pathname.split("/").filter(Boolean).at(-1) !== botId) throw new Error("Open this agent's chat first.");
       let owner: string;
       if (isCloudComputerRequest(event)) {
@@ -1386,9 +1390,14 @@ app.whenReady().then(async () => {
         if (!await localStack.matchesDesiredStack()) throw new Error("The local session changed.");
         owner = JSON.stringify(await nativePreviewContext(captured));
       }
-      if (mainWindow !== captured || captured.isDestroyed() || captured.webContents.getURL() !== event.senderFrame?.url || !hostComputer.isEnabled())
+      if (mainWindow !== captured || captured.isDestroyed() || captured.webContents.getURL() !== capturedUrl || event.senderFrame?.url !== capturedUrl || !hostComputer.isEnabled())
         throw new Error("The application session changed.");
-      return { key: JSON.stringify([projectServer(), owner, botId]), workspace: hostComputer.workspace(botId), selected: hostComputer.project(botId)?.path };
+      const taskId = projectRoute.searchParams.get("task");
+      const taskFolder = taskId ? await projectConversations?.taskFolder(botId, taskId) : undefined;
+      if (mainWindow !== captured || captured.isDestroyed() || captured.webContents.getURL() !== capturedUrl || !hostComputer.isEnabled())
+        throw new Error("The project conversation changed.");
+      if (taskId && taskFolder === undefined) throw new Error("Connect this project conversation before starting its preview.");
+      return { key: JSON.stringify(taskId ? [projectServer(), owner, botId, taskId] : [projectServer(), owner, botId]), workspace: taskFolder ?? hostComputer.workspace(botId), selected: taskFolder ?? hostComputer.project(botId)?.path };
     },
   });
   app.once("before-quit", () => projectRunner?.dispose());
@@ -1527,6 +1536,21 @@ app.whenReady().then(async () => {
     }
     if(!isManagedComputerRequest(event) || !await localStack.matchesDesiredStack())throw new Error("The local session changed.");
     return hostComputer.selectProject(botId,selected.filePaths[0]);
+  });
+  if (hostComputer) projectConversations = installProjectConversations({
+    storage: path.join(userDataDir, "project-conversations"), host: hostComputer,
+    context: async event => {
+      if ((!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) || !hostComputer?.isEnabled() || !mainWindow)
+        throw new Error("Connect Desktop before opening a project conversation.");
+      const window = mainWindow, base = projectServer();
+      if (!base) throw new Error("The project server is unavailable.");
+      const spaceId = await nativeProjectSpace(window);
+      return { window, base, spaceId, validate: async () => {
+        if (mainWindow !== window || window.isDestroyed() || projectServer() !== base ||
+          !hostComputer?.isEnabled() || await nativeProjectSpace(window) !== spaceId)
+          throw new Error("The project session changed.");
+      } };
+    },
   });
   ipcMain.handle("desktop.computer.revokeAccess", async (event) => {
     if (isCloudComputerRequest(event)) {

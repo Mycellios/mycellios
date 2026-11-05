@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   displayBotWorkspacePath,
+  executionWorkspaceMode,
   resolveBotUploadPath,
   resolveBotWorkspaceCwd,
   resolveBotWorkspacePath,
@@ -8,6 +9,14 @@ import {
 } from "./computer-support.js";
 
 describe("Team Computer bot folders", () => {
+  it("uses an admitted project root without adding the ordinary Team Mico prefix", () => {
+    const mode = executionWorkspaceMode("team", "owned-task");
+    expect(resolveBotWorkspaceCwd(mode, "mico", undefined)).toBeUndefined();
+    expect(resolveBotWorkspaceCwd(mode, "mico", "src")).toBe("src");
+    expect(resolveBotWorkspacePath(mode, "mico", "project/add.mjs")).toBe("project/add.mjs");
+    expect(executionWorkspaceMode("team")).toBe("team");
+    expect(executionWorkspaceMode("dedicated")).toBe("dedicated");
+  });
   it("uses the bot folder for relative paths and cwd", () => {
     expect(teamBotWorkspaceDirectory("bot-1")).toBe("bots/bot-1");
     expect(resolveBotWorkspacePath("team", "bot-1", "notes/result.txt")).toBe(

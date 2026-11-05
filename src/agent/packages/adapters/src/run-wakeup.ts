@@ -10,6 +10,7 @@ import type { Prisma, PrismaClient } from "@rakazo/db";
 import { isTooManyDatabaseConnections, runAsSystem } from "@rakazo/db";
 import { getLogger, runCorrelatedJob } from "@rakazo/logging";
 import { RunExecutionHost } from "./run-execution.js";
+import { projectTaskLeaseKey } from "./project-execution.js";
 
 const RUN_READY_TOPIC = "runs:ready";
 const INTERACTIVE_QUEUE_WARNING_MS = 30_000;
@@ -218,22 +219,24 @@ export class RunWorkerHost implements JobWorkerHost {
       },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: batchSize,
-      select: { id: true, createdAt: true, botId: true, thread: { select: { taskBotId: true } }, bot: { select: { computerId: true, agentEngine: true } } },
+      select: { id: true, createdAt: true, botId: true, threadId: true, thread: { select: { projectKey: true, taskBotId: true } }, bot: { select: { computerId: true, agentEngine: true } } },
     });
     // Leave resource waits queued. Reclaiming them on every scan changes their
     // age, hides stuck-work reminders, and produces false execution starts.
     // The executor still acquires the lease atomically to handle races here.
+    const leaseKey = (row: typeof rows[number]) => row.thread?.projectKey?.startsWith("project:")
+      ? projectTaskLeaseKey(row.botId, row.threadId) : row.botId;
     const leases = rows.length
       ? await this.prisma.computerExecutionLease.findMany({
-          where: { botId: { in: rows.map((row) => row.botId) }, expiresAt: { gt: now } },
+          where: { botId: { in: [...new Set(rows.map(leaseKey))] }, expiresAt: { gt: now } },
           select: { computerId: true, botId: true, runId: true },
         })
       : [];
     const runnable = rows.filter(
       (row) =>
-        (row.bot.agentEngine === "pi" && row.thread.taskBotId === row.botId) || !leases.some(
+        (row.bot.agentEngine === "pi" && row.thread.taskBotId === row.botId && !row.thread.projectKey?.startsWith("project:")) || !leases.some(
           (lease) =>
-            lease.botId === row.botId &&
+            lease.botId === leaseKey(row) &&
             lease.computerId === row.bot.computerId &&
             lease.runId !== row.id,
         ),
