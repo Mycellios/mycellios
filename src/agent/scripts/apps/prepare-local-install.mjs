@@ -5,6 +5,7 @@ import { finished } from "node:stream/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 
 const extract = (archive, file) => asar.extractFile(archive, path.normalize(file));
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -16,6 +17,8 @@ const preferenceFile = path.join(profile, "local-renderer.json");
 const receiptFile = path.join(output, "install.json");
 
 if (process.argv.includes("--apply")) {
+  const running = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -eq $env:MYCELLIOS_APPS_DESKTOP_BINARY } | Select-Object -ExpandProperty ProcessId"], { encoding: "utf8", windowsHide: true, env: { ...process.env, MYCELLIOS_APPS_DESKTOP_BINARY: path.join(resources, "..", "Mycellios Desktop.exe") } });
+  assert.equal(running.trim(), "", "Exit Desktop normally before applying the native patch; never overwrite a running app.");
   const receipt = JSON.parse(await readFile(receiptFile, "utf8"));
   assert.equal(
     hash(await readFile(original)),
@@ -29,7 +32,8 @@ if (process.argv.includes("--apply")) {
   );
   assert.equal(hash(await readFile(path.join(output, "app.asar"))), receipt.candidateAsar);
   assert.match(receipt.rendererStage, /^renderer-install-[0-9]+$/);
-  assert.equal(hash(await readFile(path.join(profile, receipt.preference.directory, "index.html"))), receipt.baseIndexHash, "The installed UI changed; prepare again without losing that update.");
+  const base = receipt.baseSource === "bundled" ? path.join(resources, "web", "first-party") : path.join(profile, receipt.preference.directory);
+  assert.equal(hash(await readFile(path.join(base, "index.html"))), receipt.baseIndexHash, "The installed UI changed; prepare again without losing that update.");
   const suffix = new Date().toISOString().replace(/[:.]/g, "-");
   await copyFile(original, `${original}.before-apps-${suffix}`);
   await copyFile(preferenceFile, `${preferenceFile}.before-apps-${suffix}`);
@@ -41,7 +45,7 @@ if (process.argv.includes("--apply")) {
   });
   // Apply only after the ordinary Desktop has exited. No process is killed here.
   await copyFile(path.join(output, "app.asar"), original);
-  await writeFile(preferenceFile, JSON.stringify({ ...receipt.preference, directory }, null, 2));
+  await writeFile(preferenceFile, JSON.stringify({ ...receipt.preference, directory, nativeVersion: receipt.nativeVersion }, null, 2));
   await writeFile(
     path.join(output, "applied.json"),
     JSON.stringify(
@@ -63,6 +67,8 @@ if (process.argv.includes("--apply")) {
   const preference = JSON.parse(preferenceBytes.toString());
   assert.equal(preference.schema, "mycellios-local-renderer/1");
   assert.match(preference.directory, /^local-web\/[a-f0-9]{64}$/);
+  const nativeVersion = JSON.parse(extract(original, "package.json").toString()).version;
+  assert.match(nativeVersion, /^\d+\.\d+\.\d+$/);
   let main = extract(original, "dist/main.js").toString();
   let preload = extract(original, "dist/preload.cjs").toString();
   assert(
@@ -145,7 +151,8 @@ if (process.argv.includes("--apply")) {
       hash(changes.get(file) ?? extract(original, file)),
       `Package preservation: ${file}`,
     );
-  const base = path.join(profile, preference.directory);
+  const baseSource = preference.nativeVersion === nativeVersion ? "override" : "bundled";
+  const base = baseSource === "override" ? path.join(profile, preference.directory) : path.join(resources, "web", "first-party");
   const rendererStage = `renderer-install-${Date.now()}`;
   const renderer = path.join(output, rendererStage);
   await cp(base, renderer, { recursive: true, errorOnExist: true, force: false });
@@ -161,8 +168,10 @@ if (process.argv.includes("--apply")) {
   );
   const rendererHash = hash(
     (await readFile(path.join(renderer, "index.html"))) +
-      hash(await readFile(path.join(output, "renderer", "apps-preview.js"))),
+      hash(await readFile(path.join(output, "renderer", "apps-preview.js"))) +
+      hash(await readFile(path.join(output, "renderer", "apps-preview.css"))),
   );
+  assert.equal(hash(await readFile(original)), hash(originalBytes), "The native package changed during preparation; preserve the newer installation and prepare again.");
   await writeFile(
     receiptFile,
     JSON.stringify(
@@ -175,6 +184,8 @@ if (process.argv.includes("--apply")) {
       rendererHash,
       rendererStage,
       baseIndexHash: hash(Buffer.from(index)),
+      baseSource,
+      nativeVersion,
         preservedPackageFiles: oldFiles.length - 2,
         production: false,
       },
