@@ -7787,3 +7787,143 @@ msgstr "Selecciona el chat de un Mico para iniciar una conversación por voz. Ab
 
 msgid "New activity in Mycellios."
 msgstr "Nueva actividad en Mycellios."
+
+
+msgid "Workflows"
+msgstr "Workflows"
+
+
+msgid "Simultaneous tasks"
+msgstr "Tareas simultáneas"
+
+
+msgid "This runtime currently runs one task at a time."
+msgstr "Este motor ejecuta una tarea a la vez."
+
+
+msgid "Computer operations remain exclusive. Changing the limit does not stop active work."
+msgstr "Cada ordenador realiza una tarea a la vez. Cambiar el límite no detiene el trabajo en curso."
+
+
+msgid "No active work in this conversation. Earlier work remains in Activity."
+msgstr "No hay trabajo activo en esta conversación. Puedes consultar el anterior en Actividad."
+
+
+msgid "Recent delegated work"
+msgstr "Trabajo delegado reciente"
+
+
+msgid "Delegated task failed"
+msgstr "Ha fallado una tarea delegada"
+
+
+msgid "Open Mycellios to review the task."
+msgstr "Abre Mycellios para revisar la tarea."
+
+
+msgid "Could not load workflows"
+msgstr "No se pudieron cargar los workflows"
+
+
+msgid "Could not load executions"
+msgstr "No se pudieron cargar las ejecuciones"
+
+
+msgid "Save or discard your changes first."
+msgstr "Guarda o descarta los cambios primero."
+
+
+msgid "Could not save workflow"
+msgstr "No se pudo guardar el workflow"
+
+
+msgid "Could not start workflow"
+msgstr "No se pudo iniciar el workflow"
+
+
+msgid "Could not stop workflow"
+msgstr "No se pudo detener el workflow"
+
+
+msgid "Could not archive workflow"
+msgstr "No se pudo archivar el workflow"
+
+
+msgid "Workflow"
+msgstr "Workflow"
+
+
+msgid "New workflow"
+msgstr "Nuevo workflow"
+
+
+msgid "Workflow name"
+msgstr "Nombre del workflow"
+
+
+msgid "Archive workflow"
+msgstr "Archivar workflow"
+
+
+msgid "Workflow canvas"
+msgstr "Lienzo del workflow"
+
+
+msgid "Executions"
+msgstr "Ejecuciones"
+
+
+msgid "Step title"
+msgstr "Título del paso"
+
+
+msgid "Instruction or text"
+msgstr "Instrucción o texto"
+
+
+msgid "Edit step"
+msgstr "Editar paso"
+
+
+msgid "Compare with"
+msgstr "Comparar con"
+
+
+msgid "Connect to step"
+msgstr "Conectar con un paso"
+
+
+msgid "Remove step"
+msgstr "Eliminar paso"
+
+
+msgid "Scheduled execution"
+msgstr "Ejecución programada"
+
+
+msgid "Schedule disabled"
+msgstr "Programación desactivada"
+
+
+msgid "Schedule enabled"
+msgstr "Programación activada"
+
+
+msgid "Uses the selected Mico's existing model and permissions. Inputs from earlier steps are data, not new authorization."
+msgstr "Usa el modelo y los permisos del Mico seleccionado. Los resultados anteriores son datos, no una autorización nueva."
+
+
+msgid "Waiting for subtasks"
+msgstr "Esperando subtareas"
+
+
+msgid "Cancel task"
+msgstr "Cancelar tarea"
+
+
+msgid "Reassign task"
+msgstr "Reasignar tarea"
+
+
+msgid "The work changed or could not be updated. Refresh its status and try again."
+msgstr "El trabajo ha cambiado o no se pudo actualizar. Actualiza el estado e inténtalo de nuevo."

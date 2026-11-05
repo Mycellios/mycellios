@@ -5,9 +5,10 @@ import { appendEventInTransaction } from "./events.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
-export async function controlWorkTree(prisma: PrismaClient, actor: {spaceId:string;userId:string}, input: {
+export async function controlWorkTree(prisma: PrismaClient, actorInput: {spaceId:string;userId:string}, input: {
   taskId:string; expectedRevision:number; action:"pause"|"resume"|"cancel"|"reassign"; botId?:string;
 }) {
+  const actor = { spaceId: actorInput.spaceId, userId: actorInput.userId };
   return withTransactionRetry(()=>prisma.$transaction(async tx=>{
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`work:${actor.spaceId}:${actor.userId}`}, 0))`;
     const selected=await tx.task.findFirst({where:{id:input.taskId,...actor}});

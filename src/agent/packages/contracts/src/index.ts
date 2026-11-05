@@ -38,6 +38,7 @@ export * from "./routine-watch.js";
 export * from "./rpc.js";
 export * from "./run-logs.js";
 export * from "./runs.js";
+export * from "./workflows.js";
 export * from "./search.js";
 export * from "./security-events.js";
 export * from "./task-cost.js";

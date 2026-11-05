@@ -314,6 +314,23 @@ describe("durable direct run wakeups", () => {
     }
   });
 
+  it("admits private Pi model turns while keeping ordinary chats behind the computer lease", async () => {
+    const f = fixture();
+    f.rows.set("private", { status: "queued", wakeAt: null });
+    f.rows.set("main", { status: "queued", wakeAt: null });
+    f.findMany.mockImplementation(async () => [...f.rows].filter(([, row]) => row.status === "queued").map(([id]) => ({
+      id, botId: id, bot: { computerId: "computer", agentEngine: "pi" }, thread: { taskBotId: id === "private" ? id : null },
+    })));
+    f.leases.mockResolvedValue([{ computerId: "computer", botId: "private", runId: "holder" }, { computerId: "computer", botId: "main", runId: "holder" }]);
+    const handler = vi.fn(async ({ runId }) => { f.rows.get(runId)!.status = "completed"; });
+    try {
+      await f.host.start({ "run.continue": handler } as unknown as BackgroundJobHandlers);
+      await vi.waitFor(() => expect(f.rows.get("private")!.status).toBe("completed"));
+      expect(f.rows.get("main")!.status).toBe("queued");
+      expect(handler).toHaveBeenCalledTimes(1);
+    } finally { await f.host.stop(); }
+  });
+
   it("starts chat without invoking Graphile, deduplicates wakeups, and drains long executions", async () => {
     const f = fixture();
     f.rows.set("chat", { status: "queued", wakeAt: null });

@@ -119,6 +119,8 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "Task",
   "Routine",
   "RoutineDeliveryReceipt",
+  "Workflow",
+  "WorkflowExecution",
   "Connection",
   "McpServer",
   "McpOAuthSession",

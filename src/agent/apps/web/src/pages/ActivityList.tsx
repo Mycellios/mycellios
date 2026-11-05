@@ -369,7 +369,7 @@ function ActivityRow({ run, onOpen }: { run: RunActivityRow; onOpen: () => void 
           </div>
         </div>
       </button>
-      {run.groupId ? <TaskControls runId={run.runId} /> : null}
+      <TaskControls runId={run.runId} />
     </div>
   );
 }

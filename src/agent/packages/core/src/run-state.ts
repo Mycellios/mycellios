@@ -28,6 +28,7 @@ const TERMINAL: RunStatus[] = ["completed", "failed", "cancelled"];
  */
 const NON_CONVERSATIONAL_RUN_TRIGGERS = new Set([
   "routine",
+  "workflow",
   "webhook",
   "created",
   "tickets",
