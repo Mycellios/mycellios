@@ -9,6 +9,10 @@
   receipts together. Verify workflow contracts, affected wakeup/control tests and
   the synthetic PostgreSQL/browser acceptance scripts through compilar.ps1; never
   use production accounts, credentials or models in these fixtures.
+  Workflow thread ownership queries project only userId/spaceId from a Run actor;
+  preserve execution identity and verify scripts/verify-workflow-thread-db.ts.
+  Delegation from ordinary Mico tabs uses internal work scope; explicit project
+  delegation keeps its independent native project binding and admission.
 
 - Settings uses one searchable account/Space shell. General contains device UI
   preferences; Profile owns identity/security; Micos opens the existing per-Mico
