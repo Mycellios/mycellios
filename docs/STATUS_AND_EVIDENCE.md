@@ -1,6 +1,52 @@
 # Status and evidence
 
+## Apps and private Video Studio — local candidate, 2026-11-05
+
+The Shell sidebar opens Apps without sending or replacing its chat draft. The
+first fixed `mycellios.app/1` bundle is `io.mycellios.video-studio@1.0.0`, admitted
+with definition hash `97f5250383f548773a690f72232333c9a324655f6155f165ed3fb499b6b0a293`.
+The native driver retains Mycellios account/Space/PC consent and private local
+project/media files. Script edits invalidate voice, frames and review; rendering
+requires the current revision. Missing tools fail explicitly. Completed script
+output is reconciled before resubmission and interrupted work is not replayed.
+
+Local qualification: 71 focused tests and incremental web/Desktop typechecks
+pass. Definition/bundle validation passes. Real browser acceptance generated a
+six-scene script with the PC's Codex account, six Windows Spanish narrations and
+a 720×1280 H264/AAC MP4 lasting 39.691882 seconds (541260 bytes). FFprobe, a full
+FFmpeg decode and browser playback passed. A second acceptance used a manually
+entered script and checked the corrected desktop width, 390px layout, audio,
+video download and project recovery after reload. Synthetic acceptance approval
+is not a recorded human artistic/commercial approval. Provider tokens are used
+only when actually reported; external provider cost remains unmeasured.
+
+The targeted preview/driver build passes. The private overlay is installed in the
+ordinary Windows Desktop 0.3.13, preserving 6991 other packaged files and the host
+renderer. The actual account/Space admitted a private test project, generated six
+scenes through the PC's Codex session, six narrations and a 37.992698-second
+720×1280 H264/AAC MP4 (521842 bytes; SHA-256
+`e5dd092d6454739d43e445352824369ddef882b86549cfa69e7158a6608f2fa5`).
+Native FFprobe/full-decode validation passed and the installed player advanced.
+This was a technical test approval, not human artistic/commercial approval.
+The addon browser smoke checks menu/catalog/close and retained draft text against
+the preserved host styles. It caught and verified a fix for an unbound development
+`process` reference and now asserts that the popup clears the native drag strip,
+so its header controls remain reachable. Windows redirected the initial new asset folder into Codex's
+private cache; a same-user non-virtualized copy restored the admitted profile path.
+The installer now rejects such redirection before replacing the native package.
+Local archive, renderer and draft-store backups are retained. The earlier
+enterprise-App check used an organization-only endpoint and returned HTTP 404.
+Subsequent readback confirms that Mycellios is a personal GitHub account, outside
+the enterprise installer, and that the existing Mycellios CLI session already has
+repository admin/write access. No new App installation, credential change or
+permission expansion is needed. Publication is tracked separately from these
+local acceptance results.
+Full CI, platform installers, Cloud execution, public catalog/votes, shared project
+sync, generated illustrations/music and social publishing were NOT RUN or are
+not implemented in this first private version.
+
 Updated: 2026-11-05 (projects and parallel conversations candidate; local verification, no publication).
+
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->
 
@@ -1558,6 +1604,26 @@ times were unchanged; no migration, financial action or native installer update
 was performed. Full CI was not run. Detailed receipts and logs are retained in
 `outputs/settings-prod-20261105/` and the owned server release directory.
 
+## Apps authoring standard — local foundation (2026-11-05)
+
+Apps v1 has a strict manifest/action contract, semantic graph/type/permission
+validation, a bounded read-only bundle CLI, a complete video-studio definition,
+creator skill and authoring guide. The [standard](../specs/apps-standard/spec.md)
+separates definition admission from actual runtime qualification and publication.
+Versions are immutable, project versions remain pinned, actions are declared
+contracts and both execution targets require independent future qualification.
+
+The 51 affected tests, three scoped authoring checks and an incremental typecheck of the Apps contracts, public
+exports, CLI and tests passed on Daniel's PC in an isolated checkout. Tests cover
+unsafe definitions, cycles, typed references, altered assets, path traversal,
+symlink escape, bounded reads and immutable-version CLI behavior. The broader
+contracts check encountered its existing credit-units.test.ts extension error;
+it is not reported as a passing package-wide check.
+
+No Apps catalog/sidebar, renderer, project-store migration, executable action
+adapter, billing or publisher was enabled. No global skill/profile installation,
+paid call, render or production deployment was performed. Full CI and physical
+local/Cloud execution qualification were NOT RUN under fast-delivery mode.
 ## Mico work controls, concurrent tasks and workflows (local source, 2026-11-05)
 
 The Mico task bar now exposes revisioned delegated-work controls and an owned

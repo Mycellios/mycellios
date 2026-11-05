@@ -41,6 +41,7 @@ export interface RakazoDesktopOAuthCallback {
 }
 
 export interface RakazoDesktop {
+  appsStudio?: import("./app-studio.js").AppsStudioBridge;
   projectRunner?: ProjectRunnerBridge;
   /** Isolated native browser displayed inside the conversation's preview panel. */
   preview?: {

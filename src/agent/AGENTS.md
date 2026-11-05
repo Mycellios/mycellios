@@ -1,5 +1,15 @@
 # AGENTS.md
 
+- Apps opens beside the existing chat through the Shell overlay; preserve its
+  draft and scope. The private Video Studio v1 definition is in Desktop assets,
+  with a fixed native driver and owner/Space/device-private projects. No app HTML,
+  executable commands or paths are accepted from the renderer. Keep script/media
+  revisions, review binding, actual artifact checks and existing PC consent.
+  Cloud, catalog publication and cross-device project sync are not implemented.
+  Qualify the app validator, native studio tests and `scripts/verify-apps-studio-ui.mjs`
+  through compilar.ps1. `--codex` additionally uses the PC's real provider session;
+  the ordinary fixture otherwise uses a manually entered script, not fake AI.
+
 - Development projects group independent existing Mico task conversations through
   owner/Space-scoped metadata, not cloned bots. Native repository paths stay in
   the native profile. Project conversation admission verifies the exact owned
@@ -29,6 +39,7 @@
   Windows command pipes use overlapped I/O with early error guards. Output loss
   records an unknown outcome, not success or permission to replay the command.
   Verify desktop-sandbox-command, desktop-process-tree and native-command-journal.
+
 
 - Mico Work controls reuse revisioned delegation controls and durable teardown.
   Pi concurrency is admitted atomically per Bot and serialized per thread; native

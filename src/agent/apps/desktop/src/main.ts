@@ -1,4 +1,5 @@
 import { installAccountComputerBackground } from "./account-computer-background.js";
+import { installAppsStudio } from "./apps-studio-ipc.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
@@ -1228,6 +1229,15 @@ app.whenReady().then(async () => {
   const contributionRequest = (event: Electron.IpcMainInvokeEvent) =>
     fromMainWindow(event) && event.senderFrame !== null &&
     mayManageContribution(event.senderFrame.url, event.senderFrame === event.sender.mainFrame);
+  installAppsStudio({ userData: userDataDir, context: async event => {
+    const captured = mainWindow;
+    if (!captured || !fromMainWindow(event) || event.senderFrame !== event.sender.mainFrame || !hostComputer?.isEnabled() || !isCloudComputerRequest(event)) throw new Error("Apps necesita el acceso ya autorizado a este PC y tu sesión de Mycellios.");
+    const identity = await getCloudComputer().identity();
+    const space = await nativeProjectSpace(captured) ?? identity.spaceId;
+    const server = projectServer();
+    if (!server || !space || JSON.stringify(identity) !== cloudComputerOwner || mainWindow !== captured || captured.isDestroyed() || event.senderFrame?.url !== captured.webContents.getURL() || !hostComputer.isEnabled()) throw new Error("La cuenta o el Space han cambiado. Reconecta el PC desde Mycellios.");
+    return { owner: identity.userId, space, server };
+  } });
   ipcMain.handle("desktop.runtime.status", (event) => {
     if (!contributionRequest(event)) throw new Error("Contribution requires the Mycellios application.");
     return contributionRuntime.status();
