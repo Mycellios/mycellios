@@ -162,7 +162,7 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
       <DialogContent
         data-apps-studio="true"
         showCloseButton={false}
-        className="flex h-[min(860px,calc(100dvh-2rem))] w-[calc(100dvw-2rem)] max-w-5xl sm:max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0"
+        className="flex h-[min(860px,calc(100dvh-8rem))] max-h-[calc(100dvh-8rem)] w-[calc(100dvw-2rem)] max-w-5xl sm:max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0"
       >
         <DialogHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">

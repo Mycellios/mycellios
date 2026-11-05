@@ -30,7 +30,8 @@ Native FFprobe/full-decode validation passed and the installed player advanced.
 This was a technical test approval, not human artistic/commercial approval.
 The addon browser smoke checks menu/catalog/close and retained draft text against
 the preserved host styles. It caught and verified a fix for an unbound development
-`process` reference. Windows redirected the initial new asset folder into Codex's
+`process` reference and now asserts that the popup clears the native drag strip,
+so its header controls remain reachable. Windows redirected the initial new asset folder into Codex's
 private cache; a same-user non-virtualized copy restored the admitted profile path.
 The installer now rejects such redirection before replacing the native package.
 Local archive, renderer and draft-store backups are retained. No production

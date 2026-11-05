@@ -44,6 +44,8 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/agent/app/fixture`);
   await page.getByRole("button", { name: "Apps", exact: true }).click();
   await page.getByRole("button", { name: "Abrir estudio" }).waitFor();
+  const bounds = await page.getByRole("dialog").boundingBox();
+  assert(bounds && bounds.y >= 60, "The popup header must clear the native drag strip.");
   await page.getByRole("button", { name: "Cerrar Apps", exact: true }).click();
   assert.equal(await page.getByLabel("Draft", { exact: true }).inputValue(), "Keep this draft");
   assert.deepEqual(errors, []);

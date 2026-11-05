@@ -28,6 +28,9 @@ await writeFile(
   css,
   `/* Scoped local Apps preview; existing application styles are preserved. */\n@scope ([data-apps-studio]) {\n${source}\n}\n.apps-local-menu{display:flex;align-items:center;gap:8px;margin:0 12px 12px;padding:8px 12px;border:0;border-radius:8px;color:inherit;background:transparent;text-align:start;cursor:pointer;font:inherit;font-size:14px}.apps-local-menu:hover{background:var(--accent)}.apps-local-menu:focus-visible{outline:2px solid var(--ring);outline-offset:2px}\n`,
 );
+// The scope root also needs the popup geometry: scoped descendant utilities do
+// not style the root itself. Keep its header below the native Windows drag strip.
+await writeFile(css, (await readFile(css, "utf8")) + '\n[data-apps-studio]{height:min(860px,calc(100dvh - 8rem));max-height:calc(100dvh - 8rem)}\n');
 const files = ["apps-studio-ipc.mjs", "renderer/apps-preview.js", "renderer/apps-preview.css"];
 const hashes = {};
 for (const file of files)
