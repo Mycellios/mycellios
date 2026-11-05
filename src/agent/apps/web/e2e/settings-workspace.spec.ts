@@ -62,6 +62,8 @@ test("unified settings persist real local changes, guard drafts and keep every s
       "local-fixture-password12",
       "Settings qualification",
     );
+    await page.getByRole("heading", { name: "Choose your language", exact: true }).waitFor();
+    await page.getByTestId("language-entry").getByRole("button", { name: "Continue", exact: true }).click();
     await rpc(page, "models/connect", {
       provider: "openai-compatible",
       scope: "account",
@@ -95,6 +97,7 @@ test("unified settings persist real local changes, guard drafts and keep every s
     await expect(page.getByRole("combobox", { name: /^Message/ })).toBeVisible();
     const composer = page.getByRole("combobox", { name: /^Message/ });
     await composer.fill("Preserve settings draft.");
+    await page.getByTestId("user-menu-trigger").click();
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     const settings = page.getByTestId("user-settings");
     const nav = page.getByTestId("settings-nav");
@@ -258,6 +261,7 @@ test("unified settings persist real local changes, guard drafts and keep every s
     await expect(page.getByTestId("release-notes-dialog")).toBeVisible();
     await page.getByRole("button", { name: "Got it", exact: true }).click();
     await expect(composer).toHaveValue("Preserve settings draft.");
+    await page.getByTestId("user-menu-trigger").click();
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await page.getByTestId("settings-nav-agents").click();
     await settings.getByRole("button", { name: "Manage", exact: true }).first().click();
@@ -309,6 +313,10 @@ test("unified settings persist real local changes, guard drafts and keep every s
       animations: "disabled",
     });
   } finally {
+    await info.attach("local-page-state", {
+      body: JSON.stringify({ url: page.url(), body: await page.locator("body").innerText().catch(() => "unavailable") }),
+      contentType: "application/json",
+    });
     await info.attach("redacted-local-network", {
       body: JSON.stringify(failures, null, 2),
       contentType: "application/json",
