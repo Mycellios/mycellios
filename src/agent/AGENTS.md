@@ -1,5 +1,11 @@
 # AGENTS.md
 
+- Windows installers explicitly include Koffi's win32-x64 optional native module
+  under resources/koffi/win32_x64. Preserve this loader-supported fallback even
+  when dependency collection misses optional packages. Use the native 7z NSIS
+  payload: the full resource tree exceeds ZIP32 and nsisunz rejects ZIP64.
+  Verify windows-installer tests and a fresh-profile packaged startup before release.
+
 - Private Apps stay disabled in production builds. Local development keeps its
   preview; packaged private qualification requires both VITE_MYCELLIOS_PRIVATE_APPS=1
   at web build time and MYCELLIOS_PRIVATE_APPS=1 at native launch. These release

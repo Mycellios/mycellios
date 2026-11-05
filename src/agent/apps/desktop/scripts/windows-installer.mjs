@@ -25,6 +25,9 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
     files: ['dist/**/*', '!dist/**/*.map', 'package.json'],
     extraMetadata: { name: 'mycellios-desktop', version, main: 'dist/main.js' },
     extraResources: [
+      // Koffi 3 uses a platform optional package. Dependency collection can miss
+      // it; its loader also supports this explicit unpacked resources location.
+      { from: path.join(agentRoot, 'node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node'), to: 'koffi/win32_x64/koffi.node' },
       { from: path.join(desktopRoot, 'local-server'), to: 'local-server', filter: ['**/*', '!node_modules{,/**/*}'] },
       { from: path.join(desktopRoot, 'local-server/node_modules'), to: 'local-server/node_modules', filter: ['**/*', '!**/.bin{,/**/*}'] },
       ...(development ? [{from:development.source,to:'development-source'}, {from:development.npm,to:'development-tools/npm'}] : []),
@@ -41,7 +44,8 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       { from: path.join(desktopRoot, '../../infra/compose/stack-env.example'), to: 'stack/stack-env.example' },
     ],
     win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true },
-    nsis: { oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
+    // The resource tree exceeds ZIP32's entry limit; nsisunz rejects ZIP64.
+    nsis: { useZip: false, oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
     publish: [],
   };
 }
