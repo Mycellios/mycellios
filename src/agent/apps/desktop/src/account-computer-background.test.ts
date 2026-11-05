@@ -46,6 +46,7 @@ import { installAccountComputerBackground } from "./account-computer-background.
 afterEach(() => {
   app.emit("before-quit");
   app.removeAllListeners();
+  vi.unstubAllEnvs();
   vi.useRealTimers();
 });
 it("keeps a consented window and its draft alive in the background, with explicit quit and revocation", async () => {
@@ -110,5 +111,19 @@ it("ignores synchronous and late connection changes after the tray has shut down
   expect(() => service.stop()).not.toThrow();
   expect(() => state.changed()).not.toThrow();
   expect(changed).not.toHaveBeenCalled();
+  expect(vi.mocked(app.setLoginItemSettings).mock.calls).toHaveLength(startupCalls);
+});
+
+it("never changes the installed application's startup preferences from an isolated qualification profile", () => {
+  vi.useFakeTimers();
+  vi.stubEnv("RAKAZO_PERFORMANCE_USER_DATA", "isolated-qualification-profile");
+  const startupCalls = vi.mocked(app.setLoginItemSettings).mock.calls.length;
+  installAccountComputerBackground({
+    profile: "isolated-qualification-profile", host: {} as any, localUrl: "http://127.0.0.1",
+    localToken: "fixture", context: async () => null, consentScope: () => "fixture",
+    window: () => null,
+  });
+  state.allowed = !state.allowed;
+  state.changed();
   expect(vi.mocked(app.setLoginItemSettings).mock.calls).toHaveLength(startupCalls);
 });

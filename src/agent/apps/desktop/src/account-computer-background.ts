@@ -16,7 +16,7 @@ export function installAccountComputerBackground(
     changed: () => {
       if (quitting) return;
       const allowed = service.hasConsent();
-      if (process.platform === "win32" && app.isPackaged && login !== allowed) {
+      if (process.platform === "win32" && app.isPackaged && !process.env.RAKAZO_PERFORMANCE_USER_DATA && login !== allowed) {
         app.setLoginItemSettings({ openAtLogin: allowed, args: ["--background"] });
         login = allowed;
       }
