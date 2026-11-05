@@ -8,6 +8,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import EmbeddedPostgres from "embedded-postgres";
 import { createDb, asSystem, delegateWork, reconcileWork, saveWorkState, workStatus, controlWorkTree, settleObservedShell } from "@rakazo/db";
+import { nativeWorkProjectSession } from "@rakazo/core";
 import { reconcileWorkStops } from "../packages/adapters/src/work-stop-reconciler.js";
 
 // Synthetic loopback cluster only. Do not load .env, credentials, existing users or models.
@@ -115,6 +116,22 @@ try {
   assert.ok(newOwner.prompt.includes('inspect command_status'));
   await assert.rejects(controlWorkTree(prisma,scope,{taskId:parent.id,expectedRevision:paused.revision,action:'pause'}));
   checks.push("pause persists teardown; reassignment waits, preserves independent chats and prior run history, and rejects stale controls");
+  const micoThread=await prisma.thread.create({data:{...scope,taskBotId:bots[0]!.id,projectKey:`mico:${bots[0]!.id}`,taskKey:`mico-task:${bots[0]!.id}:${suffix}`}});
+  const micoTask=await prisma.task.create({data:{...scope,botId:bots[0]!.id,threadId:micoThread.id,prompt:"Synthetic ordinary Mico task",status:"running"}});
+  const micoRun=await prisma.run.create({data:{...scope,botId:bots[0]!.id,threadId:micoThread.id,taskId:micoTask.id,status:"running",trigger:"user",leaseOwner:"synthetic-worker",leaseFence:1,leaseExpiresAt:new Date(Date.now()+60000)}});
+  const micoChild=await delegateWork(prisma,{...micoRun,leaseOwner:"synthetic-worker"},{key:`mico-${suffix}`,botId:bots[1]!.id,instruction:"Synthetic reply only",expectedResult:"Synthetic reply",resources:["none"]});
+  const childTask=await prisma.task.findUniqueOrThrow({where:{id:micoChild.taskId}});
+  const childThread=await prisma.thread.findUniqueOrThrow({where:{id:childTask.threadId}});
+  assert.equal(childThread.projectKey,`work:${micoTask.id}`);
+  assert.equal(nativeWorkProjectSession(childThread,childTask),undefined);
+  checks.push("delegation from an ordinary Mico tab retains the receiving Mico workspace without inventing a local project binding");
+  await prisma.thread.update({where:{id:micoThread.id},data:{projectKey:"explicit-project",taskKey:"explicit-project-task"}});
+  const projectChild=await delegateWork(prisma,{...micoRun,leaseOwner:"synthetic-worker"},{key:`project-${suffix}`,botId:bots[1]!.id,instruction:"Synthetic explicit project task",expectedResult:"Project result",resources:["none"]});
+  const projectChildTask=await prisma.task.findUniqueOrThrow({where:{id:projectChild.taskId}});
+  const projectChildThread=await prisma.thread.findUniqueOrThrow({where:{id:projectChildTask.threadId}});
+  assert.equal(projectChildThread.projectKey,"explicit-project");
+  assert.equal(nativeWorkProjectSession(projectChildThread,projectChildTask),projectChildThread.id);
+  checks.push("explicit project delegation still requires its independently admitted native binding");
   await writeFile(path.join(directory,"result.json"),JSON.stringify({passed:true,checks,productionAccess:false},null,2));
   console.log(JSON.stringify({passed:true,checks,receipt:path.join(directory,"result.json"),productionAccess:false},null,2));
 } finally {

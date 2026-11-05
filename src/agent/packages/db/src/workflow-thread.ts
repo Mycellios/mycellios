@@ -10,6 +10,8 @@ export async function isOwnedWorkflowThread(
     projectKey?: string | null;
   },
 ) {
+  // Callers may pass a full Run; only identity fields belong in Prisma filters.
+  const scope = { userId: actor.userId, spaceId: actor.spaceId };
   if (
     !thread.taskBotId ||
     !thread.taskKey?.startsWith("workflow:") ||
@@ -20,7 +22,7 @@ export async function isOwnedWorkflowThread(
     where: {
       id: thread.taskKey.split(":")[1],
       workflowId: thread.projectKey.slice(9),
-      ...actor,
+      ...scope,
     },
     select: { id: true },
   });
@@ -28,7 +30,7 @@ export async function isOwnedWorkflowThread(
     execution &&
       (await prisma.run.findFirst({
         where: {
-          ...actor,
+          ...scope,
           threadId: thread.id,
           botId: thread.taskBotId,
           trigger: "workflow",
