@@ -607,7 +607,9 @@ export function SettingsOverlay({
                 ) : null}
                 {section === "voice" ? (
                   <>
-                    {onOpenVoice ? <VoiceEntryPanel onOpen={() => leaveSettings(onOpenVoice)} /> : null}
+                    {onOpenVoice ? (
+                      <VoiceEntryPanel onOpen={() => leaveSettings(onOpenVoice)} />
+                    ) : null}
                     <VoiceSettingsOverlay
                       onFormStateChange={setFormState}
                       embedded
