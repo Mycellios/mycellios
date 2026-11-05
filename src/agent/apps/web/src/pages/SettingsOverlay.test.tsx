@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 
 vi.mock("@lingui/react/macro", () => ({
+  Trans: ({ children }: { children?: ReactNode }) => children,
   useLingui: () => ({
     t: (strings: TemplateStringsArray) => strings.join(""),
     i18n: { locale: "en" },
@@ -24,6 +25,22 @@ vi.mock("@rakazo/ui-web", () => ({
     </button>
   ),
   Dialog: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  AlertDialog: ({ children, open }: { children?: ReactNode; open?: boolean }) =>
+    open ? <div role="alertdialog">{children}</div> : null,
+  AlertDialogContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children?: ReactNode }) => <h3>{children}</h3>,
+  AlertDialogDescription: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
+  AlertDialogFooter: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  AlertDialogCancel: ({ children }: { children?: ReactNode }) => (
+    <button type="button">{children}</button>
+  ),
+  AlertDialogAction: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) => (
+    <button type="button" onClick={onClick}>
+      {children}
+    </button>
+  ),
+  Input: (props: React.ComponentProps<"input">) => <input {...props} />,
   DialogClose: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DialogContent: ({
     children,
@@ -84,12 +101,17 @@ const { memoryConfigs, memoryConfigChange, providerConfig, updaterStatus } = vi.
   providerConfig: vi.fn(async (_spaceId: string): Promise<unknown> => null),
   updaterStatus: vi.fn(async (): Promise<unknown> => ({ installKind: "compose" })),
 }));
+const spaceBots = vi.hoisted(() => vi.fn(async (_spaceId: string): Promise<unknown[]> => []));
 vi.mock("../lib/rpc", () => ({
   rpc: { updater: { status: updaterStatus } },
-  createSpaceRpc: () => ({ memory: { providerConfig: () => providerConfig("") } }),
+  createSpaceRpc: () => ({
+    memory: { providerConfig: () => providerConfig("") },
+    bots: { list: () => spaceBots("") },
+  }),
   selectedSpaceId: () => null,
   rpcForSpace: (spaceId: string) => ({
     memory: { providerConfig: () => providerConfig(spaceId) },
+    bots: { list: () => spaceBots(spaceId) },
   }),
 }));
 vi.mock("./BillingSettingsPanel", () => ({ BillingSettingsPanel: () => null }));
@@ -292,11 +314,11 @@ it("opens the Space section for the space it acts on, with the space picker", as
     // The account's sections come first; the per-space ones sit together under the picker.
     expect(nav.slice(0, 6)).toEqual([
       "settings-nav-general",
+      "settings-nav-profile",
+      "settings-nav-agents",
       "settings-nav-models",
+      "settings-nav-notifications",
       "settings-nav-voice",
-      "settings-nav-confirmations",
-      "settings-nav-space",
-      "settings-nav-memory",
     ]);
     expect(container.querySelector('[data-testid="settings-space"]')?.textContent).toBe("Acme");
     const panel = container.querySelector<HTMLButtonElement>('[data-testid="space-settings"]');
@@ -480,10 +502,48 @@ it("keeps another space's saved memory config when an older read lands after it"
 const updatesNav = (container: HTMLElement) =>
   container.querySelector('[data-testid="settings-nav-updates"]');
 
-it("hides server updates and never requests server authority", async () => {
+it("loads the edited Space's Micos rather than showing an empty current-Space roster", async () => {
+  spaceBots
+    .mockReset()
+    .mockResolvedValue([
+      { id: "foreign-mico", spaceId: "space-b", name: "Other Space Mico", notifyOnFinish: true },
+    ]);
+  const view = await render({ space: spaces[1], currentSpaceId: "space-a", section: "agents" });
+  try {
+    await vi.waitFor(() => expect(view.container.textContent).toContain("Other Space Mico"));
+    expect(spaceBots).toHaveBeenCalledWith("space-b");
+    expect(view.container.textContent).not.toContain("No Micos in this space.");
+  } finally {
+    await view.cleanup();
+  }
+});
+
+it("does not report an empty roster when another Space's Mico read fails, and retries that Space", async () => {
+  spaceBots
+    .mockReset()
+    .mockRejectedValueOnce(new Error("Mico list unavailable"))
+    .mockResolvedValue([
+      { id: "retried-mico", spaceId: "space-b", name: "Recovered Mico", notifyOnFinish: true },
+    ]);
+  const view = await render({ space: spaces[1], currentSpaceId: "space-a", section: "agents" });
+  try {
+    await vi.waitFor(() => expect(view.container.querySelector('[role="alert"]')).not.toBeNull());
+    expect(view.container.textContent).not.toContain("No Micos in this space.");
+    const retry = [...view.container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Retry",
+    );
+    await act(async () => retry!.click());
+    await vi.waitFor(() => expect(view.container.textContent).toContain("Recovered Mico"));
+    expect(spaceBots.mock.calls.map(([id]) => id)).toEqual(["space-b", "space-b"]);
+  } finally {
+    await view.cleanup();
+  }
+});
+
+it("offers client updates in web without requesting server deployment authority", async () => {
   const { container, cleanup } = await render({});
   try {
-    expect(updatesNav(container)).toBeNull();
+    expect(updatesNav(container)).not.toBeNull();
     expect(updaterStatus).not.toHaveBeenCalled();
   } finally {
     await cleanup();

@@ -20,7 +20,7 @@ import {
 import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 
 import type { RefObject } from "react";
-import { useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { AccountAccess } from "../components/AccountAccess";
 import { SuccessPop } from "../components/ai/primitives";
 import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint";
@@ -64,6 +64,8 @@ import { UI_LOCALE_LABELS, UI_LOCALES } from "../lib/ui-locale";
 import { authErrorText } from "../lib/user-error";
 
 export type SettingsGeneralProps = {
+  mode?: "all" | "general" | "profile";
+  onFormStateChange?: (state: { busy: boolean; dirty: boolean }) => void;
   email?: string | null;
   name: string;
   onNameSaved?: () => Promise<void>;
@@ -72,9 +74,12 @@ export type SettingsGeneralProps = {
   onTimezoneChange?: (timezone: string) => Promise<void>;
   messagingEnabled?: boolean;
   onOpenMessaging?: () => void;
+  onOpenSkills?:()=>void;
 };
 
 export function GeneralSettingsPanels({
+  mode = "all",
+  onFormStateChange,
   email,
   name,
   onNameSaved,
@@ -82,6 +87,7 @@ export function GeneralSettingsPanels({
   onTimezoneChange,
   messagingEnabled = false,
   onOpenMessaging,
+  onOpenSkills,
 }: SettingsGeneralProps) {
   const { t } = useLingui();
   const account = accountDisplay({ name, email }, t`You`);
@@ -163,6 +169,11 @@ export function GeneralSettingsPanels({
   const [timezonePending, setTimezonePending] = useState(false);
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
   const deviceTimezone = localTimezone();
+  const dirtyName = editingName && nameDraft.trim() !== displayName(name, "");
+  useEffect(() => {
+    onFormStateChange?.({ busy: namePending || timezonePending, dirty: dirtyName });
+  }, [onFormStateChange, namePending, timezonePending, dirtyName]);
+  useEffect(() => () => onFormStateChange?.({ busy: false, dirty: false }), [onFormStateChange]);
 
   function chooseLocale(next: UiLocale) {
     if (next === locale) return;
@@ -189,7 +200,7 @@ export function GeneralSettingsPanels({
 
   return (
     <div className="space-y-8">
-      <SettingsGroup title={<Trans>Account</Trans>} data-testid="account-card">
+      {mode !== "general" ? <SettingsGroup title={<Trans>Account</Trans>} data-testid="account-card">
         {editingName ? (
           <form
             className="space-y-3 px-4 py-4"
@@ -275,9 +286,9 @@ export function GeneralSettingsPanels({
             }
           />
         ) : null}
-      </SettingsGroup>
+      </SettingsGroup> : null}
 
-      <SettingsGroup title={<Trans>Preferences</Trans>}>
+      {mode !== "profile" ? <><SettingsGroup title={<Trans>Preferences</Trans>}>
         <SettingsRow
           label={<Trans>Appearance</Trans>}
           control={
@@ -486,16 +497,17 @@ export function GeneralSettingsPanels({
           />
         </div>
       </Disclosure>
+      </> : null}
 
-      {showPassword || passkeysSupported ? (
+      {mode !== "general" && (showPassword || passkeysSupported) ? (
         <SettingsGroup title={<Trans>Security</Trans>}>
           {showPassword ? <ChangePasswordRow email={email} /> : null}
           <PasskeySettings />
         </SettingsGroup>
       ) : null}
 
-      <SkillLibrarySettings />
-      <AccountAccess onSecurity={setAccountSecurity} />
+      {mode === "all" ? <SkillLibrarySettings /> : null}
+      {mode !== "general" ? <AccountAccess onSecurity={setAccountSecurity} /> : null}
     </div>
   );
 }
@@ -532,6 +544,7 @@ export function ComputerSettingsPanel({
       <h3 className="text-heading3 font-medium text-foreground">
         <SettingsLabel name={t`Computers`} help={t`The agent's virtual computer runs tools and works with files. It is separate from the device you use to open Mycellios.`}><Trans>Computers</Trans></SettingsLabel>
       </h3>
+      <SettingsRow label={t`Current environment`} control={<span className="text-sm text-muted-foreground">{sandboxProvider ?? t`Not reported`}</span>}><p className="text-xs text-muted-foreground">{t`Manage each Mico's computer access from its chat tools. Approval rules control which actions need your confirmation.`}</p></SettingsRow>
       <ComputersUnavailableHint
         className="mt-3 text-[13px] leading-relaxed text-muted-foreground"
         sandboxProvider={sandboxProvider}

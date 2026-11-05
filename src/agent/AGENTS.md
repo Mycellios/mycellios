@@ -1,5 +1,23 @@
 # AGENTS.md
 
+- Settings uses one searchable account/Space shell. General contains device UI
+  preferences; Profile owns identity/security; Micos opens the existing per-Mico
+  editor and its canonical skills editor. Keep Models, Voice, Approvals, Memory, Usage,
+  Computer, Mobile and Updates connected to their existing services, with Billing
+  and Logs gated by capability. Search matches field aliases and accents; Escape
+  clears a query before closing. Profile/model/voice/memory drafts use the shared
+  leave guard and saves block navigation while pending. Do not duplicate account
+  connection editors or cross a Space boundary with the current Space's client.
+  Reply-notification preferences are local per user/device; per-Mico switches save
+  through the owned Space RPC. Hidden previews never reveal reply text or names.
+  Web update checks share the existing guarded tracker; they never deploy servers
+  or reload through open settings/drafts/calls. Desktop uses the installed package's
+  real updater policy; do not fabricate channel/automatic-install permissions.
+  Qualify affected settings/security/model/voice/update tests and the isolated
+  `playwright.settings.config.ts` flow. No live OAuth, paid run, payment, password
+  change, account deletion, microphone permission or model download is a fixture.
+
+
 - Mico task tabs bind immutable bot/thread/Space RPC clients, separate query caches
   and composer drafts. Reject snapshots for another thread; never derive task
   identity from mutable global location state. Cron, Test and event routines use

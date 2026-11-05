@@ -138,6 +138,7 @@ export function deliverBrowserNotification(
     permission: BrowserNotificationPermission;
     notifiedEventIds: Set<string>;
     show: (title: string, body: string, tag: string) => void;
+    preview?: boolean;
   },
 ): "delivered" | "pending" | "discarded" {
   if (
@@ -150,7 +151,9 @@ export function deliverBrowserNotification(
     return "discarded";
   }
   if (context.permission === "default") return "pending";
-  const message = browserNotificationMessage(event, botName);
+  const message = context.preview === false
+    ? { title: "Mycellios", body: i18n._("New activity in Mycellios.") }
+    : browserNotificationMessage(event, botName);
   try {
     context.show(message.title, message.body, event.threadId);
     context.notifiedEventIds.add(event.id);

@@ -188,3 +188,9 @@ describe("browser notifications", () => {
 it("uses a readable fallback for opaque notification names", () => {
   expect(browserNotificationMessage(event(), "__TestTok1__").title).toBe("Bot");
 });
+
+it("hides both private Mico names and response content when previews are disabled",()=>{
+  i18n.load("en", {"New activity in Mycellios.":"New activity in Mycellios."}); i18n.activate("en");
+  const show=vi.fn();expect(deliverBrowserNotification(event(),"Private Mico",{enabled:true,preview:false,pageVisible:false,windowFocused:false,permission:"granted",notifiedEventIds:new Set(),show})).toBe("delivered");
+  expect(show).toHaveBeenCalledWith("Mycellios","New activity in Mycellios.","thread-1");
+});

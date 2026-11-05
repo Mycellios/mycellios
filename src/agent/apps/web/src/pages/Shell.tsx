@@ -106,6 +106,8 @@ import { MycelliosCredits } from "../components/MycelliosCredits";
 import { SidebarContribution } from "../components/SidebarContribution";
 import { PageLoading } from "../components/PageLoading";
 import { PasskeyOffer } from "../components/PasskeyOffer";
+import { notificationPreferences } from "../lib/notification-preferences";
+import { ReleaseNotes } from "../components/ReleaseNotes";
 import { SidebarFooter } from "../components/SidebarFooter";
 import type { ActivityListFilters } from "../lib/activity-list-filters";
 import { emptyActivityFilters } from "../lib/activity-list-filters";
@@ -467,6 +469,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [modelFocusRequest, setModelFocusRequest] = useState(0);
   const [panel, setPanelState] = useState<Panel>(null);
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [droppedAgent, setDroppedAgent] = useState<AgentImportReader | null>(null);
   // Back returns to the New bot dialog only when the import was opened from it.
   const [importFromDialog, setImportFromDialog] = useState(false);
@@ -1080,7 +1083,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       pending.event,
       currentBot.name || pending.botName,
       {
-        enabled: pending.groupNotification || currentBot.notifyOnFinish,
+        enabled: notificationPreferences(userId ?? "").enabled && (pending.groupNotification || currentBot.notifyOnFinish),
+        preview: notificationPreferences(userId ?? "").preview,
         pageVisible: document.visibilityState === "visible",
         windowFocused: document.hasFocus(),
         permission: Notification.permission,
@@ -1089,7 +1093,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       },
     );
     return result !== "pending";
-  }, []);
+  }, [userId]);
   const flushPendingBrowserNotifications = useCallback(() => {
     for (const [threadId, pending] of pendingBrowserNotifications.current) {
       if (deliverBrowserNotification(pending)) {
@@ -1108,6 +1112,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       groupNotification: boolean,
     ) => {
       const botId = event.botId;
+      if (!notificationPreferences(userId ?? "").enabled) return;
       if (typeof botId !== "string") return;
       const eligible = shouldNotifyBrowser(event, {
         subscribedThreadId: subscribedThreadId ?? "",
@@ -1136,7 +1141,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         pendingBrowserNotifications.current.set(event.threadId, pending);
       }
     },
-    [deliverBrowserNotification],
+    [deliverBrowserNotification, userId],
   );
 
   const refreshBots = useCallback(
@@ -2550,7 +2555,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       const groupTarget = plan.rerouteGroupId ?? initialGroupTarget;
       const botTarget = reroutedToGroup ? undefined : initialBotTarget;
       if (
-        plan.shouldSend &&
+        plan.shouldSend && notificationPreferences(userId ?? "").enabled &&
         (groupTarget || botsRef.current.find((bot) => bot.id === botTarget)?.notifyOnFinish)
       ) {
         const permissionRequest = requestBrowserNotificationPermission();
@@ -3487,6 +3492,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     />
   ) : null;
   const shell = (
+    <>
+    <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
     <BotsSidebarLayout
       userId={userId}
       collapsed={botsSidebarCollapsed}
@@ -3741,6 +3748,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         <SidebarContribution mini={miniSidebar} />
         {!miniSidebar ? <MycelliosCredits key={userId} ownerId={userId ?? ""} /> : null}
         <SidebarFooter
+          onWhatsNew={() => setReleaseNotesOpen(true)}
           mini={miniSidebar}
           logos={footerLogos}
           name={userName}
@@ -4531,6 +4539,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       <Suspense fallback={null}>
         {overlay?.kind === "settings" && (settingsSpaceId === null || settingsSpace) ? (
           <SettingsOverlay
+            bots={bots.filter(bot => bot.spaceId === (settingsSpaceId ?? currentSpaceId))}
+            onBotNotificationsChange={async (botId, enabled) => { const updated = await createSpaceRpc(settingsSpaceId ?? currentSpaceId).bots.update({botId, notifyOnFinish:enabled}); setBots(current => current.map(bot => bot.id === updated.id ? updated : bot)); }}
+            onOpenMico={id => { const targetSpaceId = bots.find(bot => bot.id === id)?.spaceId ?? settingsSpaceId ?? currentSpaceId; if(targetSpaceId && userId) {writeRightPanelState(rightPanelStorageKey(userId,targetSpaceId,"bot",id),"settings"); setOverlay(null); if(active?.id === id) setPanel("settings"); openSpaceChat(targetSpaceId, `/app/${id}`);} }}
+            onWhatsNew={() => {setOverlay(null); setReleaseNotesOpen(true);}}
             space={settingsSpace}
             spaces={spaces}
             onRenameSpace={renameSpace}
@@ -4625,6 +4637,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         />
       ) : null}
     </BotsSidebarLayout>
+    </>
   );
 
   // Empty chrome until the first bot list lands would flash "Select a bot" before the chat.

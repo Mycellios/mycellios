@@ -1,5 +1,9 @@
 const SETTINGS_SECTIONS = [
   "general",
+  "profile",
+  "notifications",
+  "agents",
+  "mobile",
   "space",
   "models",
   "memory",

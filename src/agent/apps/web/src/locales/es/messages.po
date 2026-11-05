@@ -7558,3 +7558,232 @@ msgstr "Tarea"
 #: src/components/MicoTaskTabs.tsx
 msgid "Could not create task. Try again."
 msgstr "No se pudo crear la tarea. Reinténtalo."
+
+msgid "Voice conversation"
+msgstr "Conversación por voz"
+
+msgid "Micos"
+msgstr "Micos"
+
+msgid "Open voice"
+msgstr "Abrir voz"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Your Micos"
+msgstr "Tus Micos"
+
+#: src/components/HelpMenu.tsx
+msgid "Release notes"
+msgstr "Notas de actualización"
+
+#: src/components/HelpMenu.tsx
+msgid "Published releases on GitHub"
+msgstr "Versiones publicadas en GitHub"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Profile and security"
+msgstr "Perfil y seguridad"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Mobile connection"
+msgstr "Conexión móvil"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Search settings"
+msgstr "Buscar ajustes"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Search settings…"
+msgstr "Buscar ajustes…"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Clear settings search"
+msgstr "Limpiar búsqueda de ajustes"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "No settings found."
+msgstr "No se han encontrado ajustes."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Discard unsaved changes?"
+msgstr "¿Descartar los cambios sin guardar?"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Your changes have not been saved. Stay here to save them, or discard them to continue."
+msgstr "Tus cambios no se han guardado. Quédate para guardarlos o descártalos para continuar."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Keep editing"
+msgstr "Seguir editando"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Discard changes"
+msgstr "Descartar cambios"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "This device"
+msgstr "Este dispositivo"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Notify you about Mico replies while this app is open in the background."
+msgstr "Recibe avisos de las respuestas de tus Micos mientras la app esté abierta en segundo plano."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Show message previews"
+msgstr "Mostrar vistas previas de los mensajes"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Hide previews to keep message content out of system notifications."
+msgstr "Desactívalas para ocultar el contenido de los mensajes en las notificaciones del sistema."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "System permission"
+msgstr "Permiso del sistema"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Enable notifications"
+msgstr "Activar notificaciones"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Allowed"
+msgstr "Permitido"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Not supported"
+msgstr "No compatible"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Allow notifications in your browser or system settings, then return here."
+msgstr "Permite las notificaciones en los ajustes del navegador o del sistema y vuelve aquí."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "This environment does not support system notifications."
+msgstr "Este entorno no admite notificaciones del sistema."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Permission is requested only when you choose to enable notifications."
+msgstr "El permiso solo se solicita cuando eliges activar las notificaciones."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Test notification"
+msgstr "Notificación de prueba"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Send test"
+msgstr "Enviar prueba"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Notifications are working on this device."
+msgstr "Las notificaciones funcionan en este dispositivo."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Test notification sent."
+msgstr "Notificación de prueba enviada."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Could not show the test notification."
+msgstr "No se ha podido mostrar la notificación de prueba."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Could not save this preference."
+msgstr "No se ha podido guardar esta preferencia."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Could not enable notifications."
+msgstr "No se han podido activar las notificaciones."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Micos in this space"
+msgstr "Micos de este espacio"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "No Micos in this space."
+msgstr "No hay Micos en este espacio."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Open the chat to edit this Mico's instructions, tools and routine settings."
+msgstr "Abre el chat para editar las instrucciones, herramientas y rutinas de este Mico."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Use your existing account"
+msgstr "Usa tu cuenta habitual"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Your chats and Micos follow your account. Open this link on iPhone or Android and add Mycellios to your Home Screen."
+msgstr "Tus chats y Micos están vinculados a tu cuenta. Abre este enlace en iPhone o Android y añade Mycellios a la pantalla de inicio."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Mycellios updates"
+msgstr "Actualizaciones de Mycellios"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Web app version"
+msgstr "Versión de la app web"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Development preview"
+msgstr "Vista previa de desarrollo"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Web updates are delivered by the server. They wait while you have drafts, attachments, calls or settings open."
+msgstr "Las actualizaciones web llegan desde el servidor. Esperan mientras tengas borradores, adjuntos, llamadas o ajustes abiertos."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Check web updates"
+msgstr "Buscar actualizaciones web"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Could not check for updates. Try again."
+msgstr "No se han podido buscar actualizaciones. Vuelve a intentarlo."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Close settings and use the update prompt. Your unfinished work remains protected."
+msgstr "Cierra los ajustes y usa el aviso de actualización. Tu trabajo pendiente se mantiene protegido."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Return to app"
+msgstr "Volver a la app"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Desktop updates follow the policy of your installed package. Manual installations use the published downloads."
+msgstr "Las actualizaciones de escritorio siguen la política del paquete instalado. Las instalaciones manuales usan las descargas publicadas."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Desktop app updates are managed in the installed app."
+msgstr "Las actualizaciones de escritorio se gestionan desde la app instalada."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Current environment"
+msgstr "Entorno actual"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Not reported"
+msgstr "No informado"
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Manage each Mico's computer access from its chat tools. Approval rules control which actions need your confirmation."
+msgstr "Gestiona el acceso al equipo de cada Mico desde las herramientas de su chat. Las reglas de aprobación controlan qué acciones necesitan tu confirmación."
+
+#: src/pages/settings/CompanionPanels.tsx
+msgid "Talk with your Mico"
+msgstr "Habla con tu Mico"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Reply notifications"
+msgstr "Notificaciones de respuestas"
+
+#: src/pages/SettingsOverlay.tsx
+msgid "Could not load Micos."
+msgstr "No se han podido cargar los Micos."
+
+#: src/pages/settings/CompanionPanels.tsx
+msgid "Desktop can prepare local speech models in the voice panel. Browser speech depends on your device. The services below are optional alternatives."
+msgstr "La app de escritorio puede preparar modelos locales desde el panel de voz. En el navegador, la voz depende del dispositivo. Los servicios de abajo son alternativas opcionales."
+
+#: src/pages/settings/CompanionPanels.tsx
+msgid "Select a Mico chat to start a voice conversation. You can manage voice services below."
+msgstr "Selecciona el chat de un Mico para iniciar una conversación por voz. Abajo puedes gestionar los servicios de voz."
+
+
+msgid "New activity in Mycellios."
+msgstr "Nueva actividad en Mycellios."

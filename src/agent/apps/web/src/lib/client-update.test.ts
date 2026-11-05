@@ -84,6 +84,17 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 afterEach(() => vi.restoreAllMocks());
 
 describe("client updates", () => {
+  it("coalesces manual and background checks without reloading a settings dialog", async () => {
+    let finish: (value: string) => void = () => {};
+    const read = vi.fn(() => new Promise<string>(resolve => {finish = resolve;}));
+    const ctx = setup({servedBuild:read}); ctx.doc.dialog = true;
+    const unsubscribe = ctx.updates.subscribe(() => {});
+    const first = ctx.updates.checkForUpdates(); const second = ctx.updates.checkForUpdates();
+    expect(read).toHaveBeenCalledTimes(1); finish(NEW);
+    expect(await first).toBe(NEW); expect(await second).toBe(NEW);
+    expect(ctx.updates.getSnapshot()).toBe(NEW); expect(ctx.deps.reload).not.toHaveBeenCalled();
+    expect(await ctx.updates.applyUpdate()).toBe(false); unsubscribe();ctx.stop();
+  });
   it("announces a served newer build and updates only after explicit apply", async () => {
     const { updates, deps } = setup();
     const notify = vi.fn();
