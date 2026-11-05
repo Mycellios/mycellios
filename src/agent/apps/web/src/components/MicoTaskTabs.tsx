@@ -8,8 +8,8 @@ import type { RpcClient } from "../lib/rpc";
 type TaskTab = { threadId: string; title: string };
 
 /** Conversations belong to the existing Mico; a tab never creates another model or agent. */
-export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect }: {
-  botId: string; taskThreadId?: string; rpc: RpcClient; onSelect: (threadId?: string) => void;
+export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, actions }: {
+  botId: string; taskThreadId?: string; rpc: RpcClient; onSelect: (threadId?: string) => void; actions?: import("react").ReactNode;
 }) {
   const { t } = useLingui();
   const id = useId();
@@ -77,6 +77,7 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect }: {
         onClick={() => onSelect(tab.threadId)}><span className="truncate">{tab.title || t`Task`}</span></Button>)}
       {loadFailed ? <Button size="sm" variant="ghost" onClick={() => setRevision(value => value + 1)}><Trans>Retry</Trans></Button> : null}
     </div>
+    {actions}
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger render={<Button size="icon" variant="ghost" aria-label={t`New task`} />}><Plus size={16} aria-hidden="true" /></PopoverTrigger>
       <PopoverContent align="end" className="w-72 max-w-[calc(100vw-2rem)]">
