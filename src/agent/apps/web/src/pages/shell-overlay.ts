@@ -24,9 +24,10 @@ export type ShellOverlay =
   | { kind: "integrations" }
   | { kind: "mcp"; serverId?: string }
   | { kind: "messaging" }
+  | { kind: "apps" }
   | null;
 
-const OVERLAY_KEYS = ["settings", "space", "integrations", "mcp", "messaging"] as const;
+const OVERLAY_KEYS = ["settings", "space", "integrations", "mcp", "messaging", "apps"] as const;
 
 function isSettingsSection(value: string): value is SettingsSection {
   return (SETTINGS_SECTIONS as readonly string[]).includes(value);
@@ -47,6 +48,7 @@ export function readShellOverlay(params: URLSearchParams): ShellOverlay {
     return serverId ? { kind: "mcp", serverId } : { kind: "mcp" };
   }
   if (params.has("messaging")) return { kind: "messaging" };
+  if (params.has("apps")) return { kind: "apps" };
   return null;
 }
 

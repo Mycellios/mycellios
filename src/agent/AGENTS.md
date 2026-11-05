@@ -1,5 +1,15 @@
 # AGENTS.md
 
+- Apps opens beside the existing chat through the Shell overlay; preserve its
+  draft and scope. The private Video Studio v1 definition is in Desktop assets,
+  with a fixed native driver and owner/Space/device-private projects. No app HTML,
+  executable commands or paths are accepted from the renderer. Keep script/media
+  revisions, review binding, actual artifact checks and existing PC consent.
+  Cloud, catalog publication and cross-device project sync are not implemented.
+  Qualify the app validator, native studio tests and `scripts/verify-apps-studio-ui.mjs`
+  through compilar.ps1. `--codex` additionally uses the PC's real provider session;
+  the ordinary fixture otherwise uses a manually entered script, not fake AI.
+
 - Mico Work controls reuse revisioned delegation controls and durable teardown.
   Pi concurrency is admitted atomically per Bot and serialized per thread; native
   engines remain single-turn. Private Pi tasks reserve the existing computer lease

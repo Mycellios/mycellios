@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("rakazoDesktop", {
+  appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
   platform: process.platform,
   nativeWindowFrame: process.platform !== "darwin",
   projectRunner: {

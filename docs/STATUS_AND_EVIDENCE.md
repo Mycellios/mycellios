@@ -1,5 +1,33 @@
 # Status and evidence
 
+## Apps and private Video Studio — local candidate, 2026-11-05
+
+The Shell sidebar opens Apps without sending or replacing its chat draft. The
+first fixed `mycellios.app/1` bundle is `io.mycellios.video-studio@1.0.0`, admitted
+with definition hash `97f5250383f548773a690f72232333c9a324655f6155f165ed3fb499b6b0a293`.
+The native driver retains Mycellios account/Space/PC consent and private local
+project/media files. Script edits invalidate voice, frames and review; rendering
+requires the current revision. Missing tools fail explicitly. Completed script
+output is reconciled before resubmission and interrupted work is not replayed.
+
+Local qualification: 71 focused tests and incremental web/Desktop typechecks
+pass. Definition/bundle validation passes. Real browser acceptance generated a
+six-scene script with the PC's Codex account, six Windows Spanish narrations and
+a 720×1280 H264/AAC MP4 lasting 39.691882 seconds (541260 bytes). FFprobe, a full
+FFmpeg decode and browser playback passed. A second acceptance used a manually
+entered script and checked the corrected desktop width, 390px layout, audio,
+video download and project recovery after reload. Synthetic acceptance approval
+is not a recorded human artistic/commercial approval. Provider tokens are used
+only when actually reported; external provider cost remains unmeasured.
+
+The targeted preview/driver build passes. A private installation overlay is
+prepared and verifies preservation of 7419 other packaged files and the installed
+renderer. Applying it and checking the ordinary Desktop window are pending while
+another local installation change finishes. No production deployment or Git push.
+Full CI, platform installers, Cloud execution, public catalog/votes, shared project
+sync, generated illustrations/music and social publishing were NOT RUN or are
+not implemented in this first private version.
+
 Updated: 2026-11-04 (integration account identities qualified locally; no publication for this candidate).
 
 <!-- Local evidence does not by itself promote a public installer or backend. -->

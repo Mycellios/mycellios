@@ -1,5 +1,36 @@
 # Development
 
+## Private local Apps preview
+
+Apps is a Shell overlay, preserving the selected chat and composer. Video Studio
+v1 uses `src/agent/apps/desktop/assets/apps/video-studio/app.json`; its definition
+is validated by the Apps standard CLI. The fixed native driver requires existing
+Mycellios/Space/PC consent, Codex signed in on this PC for script assistance,
+an installed Spanish Windows speech voice, and FFmpeg/FFprobe on PATH. Projects
+and media stay in the ordinary Desktop profile under `apps/video-studio`, scoped
+by a hash of server/account/Space. No separate login, migrations or server worker.
+
+Run these from `src/agent` through `compilar.ps1`:
+
+- `node node_modules/vitest/vitest.mjs run apps/desktop/src/apps-studio-runtime.test.ts apps/web/src/pages/shell-overlay.test.ts --maxWorkers 1 --no-file-parallelism`
+- `node --import tsx scripts/apps/validate.ts apps/desktop/assets/apps/video-studio/app.json`
+- `node --import tsx scripts/verify-apps-studio-ui.mjs` tests a fresh synthetic
+  owner through the real UI, Windows speech, FFmpeg, reload and a narrow viewport.
+  Add `--codex` to consume the existing local provider session for a real script.
+  Synthetic review is test evidence, never a human artistic or commercial approval.
+- `node scripts/apps/build-local-preview.mjs` builds only the added surface/driver.
+- `node scripts/apps/prepare-local-install.mjs` prepares a private package overlay
+  preserving all other packaged bytes and the current local renderer. It checks
+  the installed archive has not changed; unknown layouts are rejected. Inspect
+  its receipt, exit Desktop normally after checking for active work, then run
+  `node scripts/apps/prepare-local-install.mjs --apply` and reopen Desktop.
+  The apply step verifies both original hashes and keeps recovery copies.
+
+The local preview adapter is a development delivery tool; normal releases use the
+Shell/preload/main integration. It does not publish a package, push Git or touch
+production. Cloud execution, public listing, votes, shared projects, generated
+illustrations, music and social publishing are not connected in this first version.
+
 ## Apps authoring standard
 
 The [Apps v1 standard](../specs/apps-standard/spec.md) defines immutable bundles,

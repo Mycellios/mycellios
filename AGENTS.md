@@ -70,6 +70,9 @@ These rules apply to the complete repository.
   the shared scheduler. Definition admission is not executor qualification,
   authorization or publication. Keep Apps v1 out of live services until those
   host boundaries are implemented and separately qualified.
+  The first private Apps surface uses a fixed local Desktop video driver, not a
+  public marketplace or arbitrary app executor. Preserve native account/Space/PC
+  admission and revision-bound review; qualify the real local artifacts separately.
 
 - During Daniel's temporary fast-delivery mode, `.github/workflows/ci.yml`
   records source readiness without waiting for full test/security/platform jobs.

@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { LayoutGrid } from "lucide-react";
 import type {
   AgentSkillCatalogEntry,
   AppBootstrap,
@@ -299,6 +300,7 @@ const PeerMessagesOverlay = lazyOverlay(() =>
 const PluginsOverlay = lazyOverlay(() =>
   import("./PluginsOverlay").then((module) => module.PluginsOverlay),
 );
+const AppsOverlay = lazyOverlay(() => import("./AppsOverlay").then(module => module.AppsOverlay));
 const McpServersOverlay = lazyOverlay(() =>
   import("./McpServersOverlay").then((module) => module.McpServersOverlay),
 );
@@ -3627,6 +3629,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           setNewSpaceOpen={setNewSpaceOpen}
           setCreateBotOpen={setCreateBotOpen}
         />
+        <Button variant="ghost" aria-label="Apps" aria-pressed={overlay?.kind === "apps"}
+          className={`mx-3 mb-3 justify-start ${miniSidebar ? "px-2" : "px-3"}`}
+          onClick={() => { setOverlay({ kind: "apps" }); setMobileSidebarOpen(false); }}>
+          <LayoutGrid size={16} aria-hidden="true" />{miniSidebar ? null : "Apps"}
+        </Button>
         {miniSidebar || !(activityMode || searchOpen || query) ? null : (
           <InputGroup
             data-testid="sidebar-search"
@@ -4536,6 +4543,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             onOpenMcp={() => setOverlay({ kind: "mcp" })}
           />
         ) : null}
+        {overlay?.kind === "apps" ? <AppsOverlay key={`${userId}:${currentSpaceId}`} scope={`${userId}:${currentSpaceId}`} onClose={() => setOverlay(null)} /> : null}
         {overlay?.kind === "mcp" ? (
           <McpServersOverlay editServerId={overlay.serverId} onClose={() => setOverlay(null)} />
         ) : null}

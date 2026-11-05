@@ -1,0 +1,307 @@
+{
+  "schemaVersion": "mycellios.app/1",
+  "id": "io.mycellios.video-studio",
+  "version": "1.0.0",
+  "name": "Estudio de vídeos",
+  "description": "Guion de seis escenas con la sesión de Codex del PC, voz española instalada en Windows, composiciones tipográficas 720x1280 y MP4 H264/AAC. Local y privado; sin publicación ni Cloud.",
+  "author": {
+    "name": "Mycellios"
+  },
+  "visibility": "private",
+  "session": "mycellios",
+  "permissions": [
+    "models.invoke",
+    "media.voice",
+    "media.render"
+  ],
+  "assets": [
+    {
+      "id": "studio-directions",
+      "path": "prompts/studio.md",
+      "sha256": "b9c245a572dd0ad50e0aa36ed2d9f16b9377f7160db01ae3428ccde354a70fa0"
+    },
+    {
+      "id": "project-protocol",
+      "path": "skills/protocol.md",
+      "sha256": "51f96f5f3727ceadda8206937dd59c8a3ef14937e0d8bc451e442d4bec5f77f1"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "topic",
+      "label": "¿De qué trata el vídeo?",
+      "required": true,
+      "type": "text",
+      "maxLength": 1000
+    }
+  ],
+  "workflow": {
+    "entry": "script",
+    "steps": [
+      {
+        "id": "script",
+        "title": "Preparar guion",
+        "kind": "task",
+        "dependsOn": [],
+        "action": "ai.text.generate",
+        "actionVersion": "1.0.0",
+        "targets": [
+          "local"
+        ],
+        "bindings": {
+          "prompt": {
+            "source": "input",
+            "field": "topic"
+          }
+        },
+        "instructions": [
+          "studio-directions",
+          "project-protocol"
+        ],
+        "recovery": "reconcile-before-retry",
+        "automaticRetries": 0
+      },
+      {
+        "id": "voice",
+        "title": "Preparar muestra de voz",
+        "kind": "task",
+        "dependsOn": [
+          "script"
+        ],
+        "action": "media.voice.generate",
+        "actionVersion": "1.0.0",
+        "targets": [
+          "local"
+        ],
+        "bindings": {
+          "text": {
+            "source": "step",
+            "step": "script",
+            "output": "text"
+          }
+        },
+        "instructions": [
+          "studio-directions",
+          "project-protocol"
+        ],
+        "recovery": "reconcile-before-retry",
+        "automaticRetries": 0
+      },
+      {
+        "id": "preview",
+        "title": "Preparar muestra visual",
+        "kind": "task",
+        "dependsOn": [
+          "script"
+        ],
+        "action": "media.preview.render",
+        "actionVersion": "1.0.0",
+        "targets": [
+          "local"
+        ],
+        "bindings": {
+          "storyboard": {
+            "source": "step",
+            "step": "script",
+            "output": "text"
+          }
+        },
+        "instructions": [
+          "studio-directions",
+          "project-protocol"
+        ],
+        "recovery": "reconcile-before-retry",
+        "automaticRetries": 0
+      },
+      {
+        "id": "review-voice",
+        "title": "Escuchar y revisar la voz",
+        "kind": "review",
+        "dependsOn": [
+          "voice"
+        ],
+        "artifact": {
+          "step": "voice",
+          "output": "audio"
+        },
+        "approvalBinding": "artifact-and-source-revision"
+      },
+      {
+        "id": "review-image",
+        "title": "Revisar el acabado visual",
+        "kind": "review",
+        "dependsOn": [
+          "preview"
+        ],
+        "artifact": {
+          "step": "preview",
+          "output": "image"
+        },
+        "approvalBinding": "artifact-and-source-revision"
+      },
+      {
+        "id": "render",
+        "title": "Renderizar vídeo",
+        "kind": "task",
+        "dependsOn": [
+          "review-voice",
+          "review-image"
+        ],
+        "action": "media.video.render",
+        "actionVersion": "1.0.0",
+        "targets": [
+          "local"
+        ],
+        "bindings": {
+          "storyboard": {
+            "source": "step",
+            "step": "script",
+            "output": "text"
+          },
+          "voice": {
+            "source": "step",
+            "step": "voice",
+            "output": "audio"
+          }
+        },
+        "instructions": [
+          "studio-directions",
+          "project-protocol"
+        ],
+        "recovery": "reconcile-before-retry",
+        "automaticRetries": 0,
+        "approvalStep": "review-image"
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "new-project",
+      "title": "Nuevo vídeo",
+      "blocks": [
+        {
+          "id": "intro",
+          "component": "text",
+          "text": "Configura tus conexiones y presupuesto antes de ejecutar. La definición por sí sola no genera vídeos."
+        },
+        {
+          "id": "topic-field",
+          "component": "field",
+          "field": "topic"
+        }
+      ]
+    },
+    {
+      "id": "storyboard",
+      "title": "Guion",
+      "blocks": [
+        {
+          "id": "script-status",
+          "component": "step",
+          "step": "script"
+        },
+        {
+          "id": "script-result",
+          "component": "result",
+          "step": "script",
+          "output": "text"
+        }
+      ]
+    },
+    {
+      "id": "voice",
+      "title": "Voz",
+      "blocks": [
+        {
+          "id": "voice-status",
+          "component": "step",
+          "step": "voice"
+        },
+        {
+          "id": "voice-sample",
+          "component": "result",
+          "step": "voice",
+          "output": "audio"
+        },
+        {
+          "id": "voice-review",
+          "component": "review",
+          "step": "review-voice"
+        }
+      ]
+    },
+    {
+      "id": "look",
+      "title": "Aspecto",
+      "blocks": [
+        {
+          "id": "preview-status",
+          "component": "step",
+          "step": "preview"
+        },
+        {
+          "id": "preview-image",
+          "component": "result",
+          "step": "preview",
+          "output": "image"
+        },
+        {
+          "id": "image-review",
+          "component": "review",
+          "step": "review-image"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "title": "Resultado",
+      "blocks": [
+        {
+          "id": "render-status",
+          "component": "step",
+          "step": "render"
+        },
+        {
+          "id": "video-result",
+          "component": "result",
+          "step": "render",
+          "output": "video"
+        }
+      ]
+    }
+  ],
+  "persistence": {
+    "scope": "user-space-project",
+    "schemaVersion": "1.0.0",
+    "artifacts": "private-references"
+  },
+  "updates": {
+    "existingProjects": "pinned",
+    "newVersions": "new-projects-only"
+  },
+  "execution": {
+    "runtimeProtocol": "mycellios.app-runtime/1",
+    "selection": "user-selected",
+    "environments": [
+      {
+        "target": "local",
+        "cpuCores": 2,
+        "memoryMb": 1024,
+        "gpuRequired": false,
+        "maxSeconds": 900
+      }
+    ],
+    "cloudFallback": "explicit-consent",
+    "artifactTransfer": "explicit-consent",
+    "unavailableExecutor": "wait",
+    "maxParallelSteps": 1
+  },
+  "billing": {
+    "currency": "credits",
+    "maxMicrounitsPerRun": 0,
+    "requireQuote": true,
+    "modelTokens": "actual-usage",
+    "cloudCompute": "actual-usage",
+    "uncertainUsage": "pending"
+  }
+}

@@ -9,6 +9,11 @@ import {
 const read = (search: string) => readShellOverlay(new URLSearchParams(search));
 
 describe("readShellOverlay", () => {
+  it("keeps Apps URL state across redirects and closes without touching chat state", () => {
+    expect(read("?apps")).toEqual({ kind: "apps" });
+    expect(shellOverlaySearch(new URLSearchParams("?apps&m=message"))).toBe("?apps");
+    expect(withShellOverlay(new URLSearchParams("?apps&m=message"), null).toString()).toBe("m=message");
+  });
   it("opens nothing without overlay params", () => {
     expect(read("")).toBeNull();
     expect(read("?m=msg_1&routine=r_1")).toBeNull();
