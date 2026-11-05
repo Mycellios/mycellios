@@ -3,12 +3,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
+import { registerMarketingJournalRoute } from "./marketing-journal.js";
+import { renderJournalNavigation, renderJournalFooter } from "./content-hub-navigation.js";
 
 const SITE_SLUG = "mycellios";
 const SITE_ORIGIN = "https://www.mycellios.com";
 const BLOG_PATH = "/blog";
 const BLOG_LOCALE = "en";
-const BLOG_ASSET_VERSION = "20260926b";
+const BLOG_ASSET_VERSION = "20261104";
 const DEFAULT_CACHE_TTL_MS = 60_000;
 const DEFAULT_STALE_IF_ERROR_MS = 24 * 60 * 60 * 1_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
@@ -18,7 +20,11 @@ const MAX_SITEMAP_PAGES = 200;
 const PUBLIC_PRODUCT_SITEMAP_ROUTES = [
   { path: "/", changeFrequency: "weekly", priority: "1.0" },
   { path: "/network", changeFrequency: "daily", priority: "0.9" },
-  { path: "/create", changeFrequency: "weekly", priority: "0.8" },
+  { path: "/pricing", changeFrequency: "weekly", priority: "0.8" },
+  { path: "/changelog", changeFrequency: "weekly", priority: "0.7" },
+  { path: "/compare", changeFrequency: "weekly", priority: "0.8" },
+  { path: "/spore/rewards", changeFrequency: "weekly", priority: "0.7" },
+  { path: "/stats", changeFrequency: "daily", priority: "0.9" },
   { path: "/earn", changeFrequency: "weekly", priority: "0.8" },
   { path: "/downloads", changeFrequency: "weekly", priority: "0.9" },
   { path: "/browser/", changeFrequency: "weekly", priority: "0.7" },
@@ -225,6 +231,7 @@ export async function registerContentHubRoutes(
   app: FastifyInstance,
   options: ContentHubRoutesOptions,
 ): Promise<void> {
+  registerMarketingJournalRoute(app, options.client);
   const fallbackSitemap = loadFallbackSitemap(options.fallbackSitemapPath);
   const webhookEvents = new WebhookEventRegistry(options.now);
 
@@ -483,7 +490,7 @@ function renderBlogIndex(posts: PaginatedPosts): string {
     : `${SITE_ORIGIN}${BLOG_PATH}?page=${posts.page}`;
   const entries = posts.items.length > 0
     ? posts.items.map(renderBlogEntry).join("")
-    : `<section class="blog-state"><div><p class="blog-hero__eyebrow">Field notes</p><h2>No articles yet</h2><p>Our first research note is being prepared.</p></div></section>`;
+    : `<section class="blog-state"><div><p class="blog-hero__eyebrow">Field notes</p><h2>Guides are coming soon</h2><p>Our first research note is being prepared.</p></div></section>`;
   const pagination = renderPagination(posts.page, pageCount);
   return renderDocument({
     title: "Research & field notes | mycellios",
@@ -644,13 +651,15 @@ function renderDocument(options: DocumentOptions): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#07080b" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#faf9f7" />
+    <meta name="color-scheme" content="light" />
     <title>${escapeHtml(options.title)}</title>
     <meta name="description" content="${escapeHtml(options.description)}" />
     ${options.noIndex ? `<meta name="robots" content="noindex, nofollow" />` : ""}
     <link rel="canonical" href="${escapeHtml(options.canonical)}" />
-    <link rel="stylesheet" href="/blog.css?v=${BLOG_ASSET_VERSION}" />
+    <link rel="stylesheet" href="/journal.css?v=${BLOG_ASSET_VERSION}" />
+    <link rel="stylesheet" href="/marketing-navigation.css?v=${BLOG_ASSET_VERSION}" />
+    <script type="module" src="/marketing-navigation.js?v=${BLOG_ASSET_VERSION}"></script>
     <link rel="icon" href="/assets/brand/favicon.png" type="image/png" sizes="32x32" />
     <link rel="shortcut icon" href="/assets/brand/favicon.png" type="image/png" />
     <link rel="apple-touch-icon" href="/assets/brand/app-icon.png" />
@@ -668,25 +677,7 @@ function renderDocument(options: DocumentOptions): string {
 </html>`;
 }
 
-function renderNavigation(): string {
-  return `
-    <header class="rb-header blog-header">
-      <div class="rb-header-inner rb-shell">
-        <a class="rb-brand" href="/" aria-label="mycellios, home"><img src="/assets/brand/favicon.png" alt="" width="38" height="38" /><span>mycellios</span></a>
-        <nav aria-label="Main navigation">
-          <a href="/network?view=inference">Chat</a><a href="/create">Create</a><a href="/earn">Earn</a><a href="/spore">$ SPORE</a><a href="/network">Live network</a><a class="active" href="/blog" aria-current="page">Blog</a>
-        </nav>
-        <div class="rb-header-actions rb-desktop-cta"><a class="rb-social" href="https://github.com/tych0s/mycellios" target="_blank" rel="noreferrer" aria-label="mycellios on GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6.01 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0 0 24 12.5C24 5.87 18.63.5 12 .5Z" /></svg></a><a class="rb-social" href="https://x.com/mycellios" target="_blank" rel="noreferrer" aria-label="mycellios on X"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.65l-5.22-6.82-5.96 6.82H1.68l7.73-8.84L1.25 2.25h6.82l4.71 6.23 5.46-6.23Zm-1.16 17.52h1.83L7.01 4.13H5.05l12.03 15.64Z" /></svg></a><a class="rb-social" href="https://t.me/mycellios" target="_blank" rel="noreferrer" aria-label="mycellios on Telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.94 3.4a1.2 1.2 0 0 0-1.24-.2L2.72 10.4c-.86.34-.83 1.57.05 1.86l4.4 1.47 1.7 5.24c.2.62 1 .8 1.45.33l2.47-2.56 4.5 3.3c.55.4 1.34.11 1.5-.56l3.36-14.6a1.2 1.2 0 0 0-.21-1.05ZM9.35 14.3l-.53 3.53-1.19-3.66 9.1-5.98-7.38 6.11Z" /></svg></a><a class="rb-pill rb-pill-ghost" href="/dashboard">Login</a></div>
-        <details class="blog-mobile-menu">
-          <summary aria-label="Navigation menu"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg><span class="blog-sr-only">Menu</span></summary>
-          <nav class="blog-mobile-nav" aria-label="Mobile navigation">
-            <a href="/network?view=inference">Chat</a><a href="/create">Create</a><a href="/earn">Earn</a><a href="/spore">$ SPORE</a><a href="/network">Live network</a><a href="/blog" aria-current="page">Blog</a><a href="/dashboard">Login</a>
-          </nav>
-        </details>
-      </div>
-    </header>
-  `;
-}
+function renderNavigation(): string { return renderJournalNavigation(); }
 
 function sanitizeBlogContent(contentHtml: string): string {
   return sanitizeHtml(contentHtml, {
@@ -708,14 +699,7 @@ function sanitizeBlogContent(contentHtml: string): string {
   });
 }
 
-function renderFooter(): string {
-  return `
-    <footer class="blog-footer">
-      <p>Many machines. One model.</p>
-      <a href="/">mycellios home</a>
-    </footer>
-  `;
-}
+function renderFooter(): string { return renderJournalFooter(); }
 
 function renderPagination(currentPage: number, pageCount: number): string {
   if (pageCount <= 1) return "";

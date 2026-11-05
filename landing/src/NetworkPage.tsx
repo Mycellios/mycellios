@@ -3,6 +3,7 @@ import { Button as UiButton, Card as UiCard, Heading as UiHeading, Link as UiLin
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Database, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { MarketingHeader as LandingHeader } from "./rebrand/MarketingHeader";
+import { useReducedMotion } from "./ui/use-reduced-motion";
 import {
   BORDER_LINES,
   LAND_POINTS,
@@ -368,6 +369,8 @@ export function NetworkPage({
   // Refs mirror the render inputs so the animation loop never re-subscribes and
   // never forces a React render per frame.
   const nodesRef = useRef(nodes);
+  const reduceMotion = useReducedMotion();
+  const cameraRef = useRef<{ yaw: number; tilt: number } | null>(null);
   const drawRef = useRef<(() => void) | null>(null);
   const selectedRef = useRef<string | null>(selectedId);
   const hoveredRef = useRef<string | null>(null);
@@ -386,16 +389,15 @@ export function NetworkPage({
     };
     const ink = { serving: channels("--agent-success", INK.serving), standby: channels("--agent-fg", INK.standby) };
 
-    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     const visitor = visitorLocation();
     const targetYaw = -visitor.lon * (Math.PI / 180);
     const targetTilt = Math.max(-1, Math.min(1, visitor.lat * (Math.PI / 180) * 0.9));
 
     const view = {
-      yaw: reduceMotion ? targetYaw : targetYaw - 0.55,
-      tilt: reduceMotion ? targetTilt : 0.18,
+      yaw: cameraRef.current?.yaw ?? (reduceMotion || !animate ? targetYaw : targetYaw - 0.55),
+      tilt: cameraRef.current?.tilt ?? (reduceMotion || !animate ? targetTilt : 0.18),
       velocity: 0,
-      easing: !reduceMotion && animate,
+      easing: !cameraRef.current && !reduceMotion && animate,
     };
     let width = 0;
     let height = 0;
@@ -527,22 +529,27 @@ export function NetworkPage({
       frame = 0;
       if (!shouldAnimate()) return;
       const elapsed = previous ? Math.min(timestamp - previous, 80) : 16;
+      const frames = elapsed / (1000 / 60);
       previous = timestamp;
       if (dragRef.current) {
         // The pointer owns the camera.
       } else if (Math.abs(view.velocity) > 0.0003) {
-        view.yaw += view.velocity;
-        view.velocity *= 0.93;
+        const decay = 0.93 ** frames;
+        view.yaw += view.velocity * (1 - decay) / (1 - 0.93);
+        view.velocity *= decay;
       } else if (view.easing) {
-        view.yaw = shortestAngle(view.yaw, targetYaw, 0.05);
-        view.tilt += (targetTilt - view.tilt) * 0.05;
-        if (Math.abs(shortestAngle(view.yaw, targetYaw, 1)) < 0.01
+        const fraction = 1 - 0.95 ** frames;
+        view.yaw = shortestAngle(view.yaw, targetYaw, fraction);
+        view.tilt += (targetTilt - view.tilt) * fraction;
+        if (Math.abs(shortestAngle(view.yaw, targetYaw, 1) - view.yaw) < 0.01
           && Math.abs(targetTilt - view.tilt) < 0.01) {
           view.easing = false;
         }
       }
       draw();
-      frame = window.requestAnimationFrame(tick);
+      if (!dragRef.current && (view.easing || Math.abs(view.velocity) > 0.0003)) {
+        frame = window.requestAnimationFrame(tick);
+      } else previous = 0;
     };
     const updateAnimation = () => {
       if (!shouldAnimate()) {
@@ -598,7 +605,7 @@ export function NetworkPage({
         if (Math.abs(dx) + Math.abs(dy) > 0) drag.moved = drag.moved || Math.abs(dx) + Math.abs(dy) > 5;
         drag.x = event.clientX;
         drag.y = event.clientY;
-        if (reduceMotion) draw();
+        draw();
         return;
       }
       const { x, y } = pointerPosition(event);
@@ -607,7 +614,7 @@ export function NetworkPage({
       if (hitId !== hoveredRef.current) {
         hoveredRef.current = hitId;
         canvas.style.cursor = hit ? "pointer" : "";
-        if (reduceMotion) draw();
+        if (reduceMotion || !animate) draw();
       }
     };
     const onPointerUp = (event: PointerEvent) => {
@@ -615,6 +622,7 @@ export function NetworkPage({
       dragRef.current = null;
       canvas.classList.remove("dragging");
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      updateAnimation();
       if (drag && !drag.moved) {
         const { x, y } = pointerPosition(event);
         const hit = nodeAt(x, y);
@@ -656,6 +664,9 @@ export function NetworkPage({
     updateAnimation();
 
     return () => {
+      cameraRef.current = { yaw: view.yaw, tilt: view.tilt };
+      dragRef.current = null;
+      canvas.classList.remove("dragging");
       drawRef.current = null;
       window.cancelAnimationFrame(frame);
       window.clearTimeout(resizeTimer);
@@ -668,7 +679,7 @@ export function NetworkPage({
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerCancel);
     };
-  }, [animate, viewMode]);
+  }, [animate, viewMode, reduceMotion]);
 
   useEffect(() => { drawRef.current?.(); }, [nodes, selectedId]);
 
@@ -704,7 +715,7 @@ export function NetworkPage({
     done();
   }, []);
 
-  return <main className={`net net-view-${viewMode}`}>
+  return <><LandingHeader active="network" /><main className={`net net-view-${viewMode}`}>
     <div className="net-stage">
       {viewMode === "globe" && <canvas
         ref={canvasRef}
@@ -714,8 +725,6 @@ export function NetworkPage({
       />}
 
       <UiHeading as="h1" className="net-visually-hidden">Mycellios network</UiHeading>
-
-      <LandingHeader active="network" />
 
       <div className="net-hud net-view-switcher" role="group" aria-label="Network view">
         <UiButton type="button" className={viewMode === "overview" ? "active" : ""} aria-pressed={viewMode === "overview"} onClick={() => selectViewMode("overview")}>Overview</UiButton>
@@ -1012,7 +1021,7 @@ export function NetworkPage({
         </section>
       </div>
     </section>
-  </main>;
+  </main></>;
 }
 
 function SignalCard({ label, value, tone }: { label: string; value: string | number; tone?: "healthy" }) {

@@ -26,10 +26,10 @@ export default function AgentClosingScene({ section, tail }: { section: HTMLElem
         route.samples = Array.from({ length: 61 }, (_, sample) => { const point = path.getPointAtLength(length * sample / 60); return { x: point.x, y: point.y }; });
         path.style.strokeDasharray = String(length);
         path.style.strokeDashoffset = String(length);
-        timeline.to(route.progress, { value: 1, duration: 2.35, ease: "power1.inOut", onUpdate: () => { path.style.strokeDashoffset = String(route.length * (1 - route.progress.value)); } }, index * .09);
+        timeline.to(route.progress, { value: 1, duration: 2.4, ease: "power2.inOut", onUpdate: () => { path.style.strokeDashoffset = String(route.length * (1 - route.progress.value)); } }, index * .06);
         return route;
       });
-      timeline.fromTo(section.querySelector(".agent-closing-emblem img"), { opacity: .35, scale: .94 }, { opacity: 1, scale: 1, duration: .85, ease: "power2.out" }, 1.55);
+      timeline.fromTo(section.querySelector(".agent-closing-emblem .mico-avatar"), { opacity: .35 }, { opacity: 1, duration: .8, ease: "power3.out" }, 1.55);
       // Geometry is sampled again on layout changes, never on animation frames.
       const geometry = new MutationObserver(() => routes.forEach(route => {
         route.length = route.path.getTotalLength();

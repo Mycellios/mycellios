@@ -3,6 +3,7 @@ import { Heading, Link, Text } from "../ui/primitives";
 import { AGENT_URL } from "./AssemblageAgent";
 
 const AgentUseCases = lazy(() => import("./AgentUseCases").catch(() => ({ default: CaseFallback })));
+const AgentProductStories = lazy(() => import("./AgentProductStories"));
 
 function CaseFallback() {
   return <section className="agent-use-cases agent-case-fallback reference-shell" aria-label="Example workflows"><div><Heading as="h2">A Mico for<br />what’s next.</Heading><Text>Plan a project, research an idea or write a clearer brief.</Text><Link href={AGENT_URL}>Open Mycellios Agent</Link></div></section>;
@@ -20,5 +21,5 @@ export function AgentUseCasesEntry() {
     observer.observe(root.current);
     return () => observer.disconnect();
   }, []);
-  return <div ref={root}>{ready ? <Suspense fallback={<CaseFallback />}><AgentUseCases /></Suspense> : <CaseFallback />}</div>;
+  return <div ref={root}>{ready ? <><Suspense fallback={<CaseFallback />}><AgentUseCases /></Suspense><Suspense fallback={<section className="reference-shell"><Link href={AGENT_URL}>Explore the Mycellios workspace</Link></section>}><AgentProductStories /></Suspense></> : <CaseFallback />}</div>;
 }

@@ -41,6 +41,14 @@ describe("forest bootstrap release safety", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
+  it.each(["/", "/earn", "/pricing", "/compare/grok-bot", "/changelog", "/spore/rewards", "/downloads/desktop", "/dashboard"])("matches the public paper canvas while %s loads", path => {
+    expect(boot(path).loader.dataset.theme).toBe("paper");
+  });
+
+  it.each(["/network?view=globe", "/dashboard?view=nodes", "/?landing=previous", "/?landing=saved", "/?landing=rooted", "/?landing=assemblage"])("preserves the existing loading theme for %s", path => {
+    expect(boot(path).loader.dataset.theme).toBeUndefined();
+  });
+
   it.each(["/dashboard", "/downloads/desktop", "/network", "/?landing=previous", "/?landing=saved", "/?landing=rooted", "/?landing=assemblage", "/?art=fabric", "/#network"])("does not intercept %s", path => {
     const url = new URL(path, "https://www.mycellios.com");
     url.searchParams.set("intro", "forest");

@@ -12,6 +12,13 @@ import {
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
 describe("landing SEO contract", () => {
+  it("indexes the changelog at its own canonical route", () => {
+    const page = seoPageForPath("/changelog");
+    expect(page.title).toBe("Changelog & release notes | Mycellios");
+    expect(canonicalUrl(page)).toBe("https://www.mycellios.com/changelog");
+    expect(LANDING_SEO_PATHS).toContain("/changelog");
+    expect(INDEXABLE_SEO_PATHS).toContain("/changelog");
+  });
   it("distinguishes public Stats from explicit operational console views", () => {
     expect(seoPageForPath("/dashboard").title).toBe("Mycellios Stats dashboard");
     expect(seoPageForPath("/dashboard", "?view=overview").title).toBe("Mycellios network console");

@@ -1,7 +1,6 @@
-.desktop-downloads { max-width: 736px; margin: 0 auto; padding: calc(32px + env(safe-area-inset-top)) calc(28px + env(safe-area-inset-right)) calc(56px + env(safe-area-inset-bottom)) calc(28px + env(safe-area-inset-left)); color: var(--agent-fg); }
-.desktop-downloads header, .desktop-downloads footer { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-.desktop-wordmark { font-size: 22px; font-weight: 500; text-decoration: none; }
-.desktop-downloads header > a:last-child { font-size: 14px; }
+.desktop-download-page { --agent-fg:#16221b; --agent-muted:#59635d; }
+.desktop-downloads { max-width:736px; margin:0 auto; padding:0 28px 56px; color:var(--agent-fg); }
+.desktop-downloads footer { display:flex; align-items:center; gap:24px; flex-wrap:wrap; }
 .desktop-downloads section { margin-top: 64px; }
 .desktop-downloads h1 { font-size: clamp(30px, 4vw, 40px); font-weight: 500; line-height: 1.15; letter-spacing: -.025em; margin: 0; }
 .desktop-intro { font-size: 18px; margin: 16px 0 32px; }
@@ -23,8 +22,7 @@
 .desktop-checksums code { display: block; overflow-wrap: anywhere; font-size: 12px; margin-top: 8px; color: var(--agent-muted); }
 .desktop-downloads footer { margin-top: 24px; justify-content: flex-start; }
 @media (max-width: 440px) {
- .desktop-downloads { padding: calc(24px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left)); }
- .desktop-downloads header { gap: 16px; }
+ .desktop-downloads { padding:0 20px 40px; }
  .desktop-downloads section { margin-top: 48px; }
  .desktop-package { gap: 12px; padding: 20px 0; }
  .desktop-package p { max-width: 19ch; }

@@ -20,6 +20,7 @@ const ReferenceLanding = lazy(() => import("./rebrand/ReferenceLanding").then((m
 const StatsDashboard = lazy(() => import("./StatsDashboard").then((module) => ({ default: module.StatsDashboard })));
 const PricingPage = lazy(() => import("./rebrand/PricingPage").then((module) => ({ default: module.PricingPage })));
 const ComparePage = lazy(() => import("./rebrand/ComparePage").then((module) => ({ default: module.ComparePage })));
+const ChangelogPage = lazy(() => import("./rebrand/ChangelogPage").then((module) => ({ default: module.ChangelogPage })));
 const EarnStudio = lazy(() => import("./rebrand/EarnStudio").then((module) => ({ default: module.EarnStudio })));
 const SporeStudio = lazy(() => import("./rebrand/SporeStudio").then((module) => ({ default: module.SporeStudio })));
 
@@ -97,6 +98,7 @@ const assemblageLanding = new URLSearchParams(window.location.search).get("landi
 const page = surface === "stats" ? <StatsDashboard />
   : surface === "pricing" ? <PricingPage />
   : surface === "compare" ? <ComparePage />
+  : surface === "changelog" ? <ChangelogPage />
   : isEarn ? <EarnStudio />
   : isSpore ? <SporeStudio />
   : isNetwork ? <NetworkPage />

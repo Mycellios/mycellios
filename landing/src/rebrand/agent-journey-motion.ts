@@ -1,11 +1,13 @@
 import gsap from "gsap";
 import { pointOnSamples } from "./living-network-model";
+import { createDemoAutoplay } from "./demo-autoplay";
 
 function observePlayback(root: Element, change: (active: boolean) => void) {
   const owner = root.closest<HTMLElement>("[data-journey-running]");
-  const synchronize = () => change(!document.hidden && owner?.dataset.journeyRunning !== "false");
+  const synchronize = () => change(!document.hidden && owner?.dataset.journeyRunning !== "false" && root.getAttribute("data-ambient-running") !== "false");
   const observer = new MutationObserver(synchronize);
   if (owner) observer.observe(owner, { attributes: true, attributeFilter: ["data-journey-running"] });
+  observer.observe(root, { attributes: true, attributeFilter: ["data-ambient-running"] });
   document.addEventListener("visibilitychange", synchronize);
   synchronize();
   return () => { observer.disconnect(); document.removeEventListener("visibilitychange", synchronize); };
@@ -15,8 +17,10 @@ export function animateCasePreview(root: HTMLElement) {
   const media = gsap.matchMedia(root);
   media.add("(prefers-reduced-motion: no-preference)", () => {
     if (root.closest<HTMLElement>("[data-journey-running]")?.dataset.journeyRunning === "false") return;
-    const tween = gsap.fromTo(root, { opacity: .65, y: 8 }, { opacity: 1, y: 0, duration: .35, ease: "power2.out" });
-    return observePlayback(root, active => tween.paused(!active));
+    const sequence = gsap.timeline({ defaults: { ease: "power3.out" } })
+      .fromTo(root, { opacity: .7, y: 6 }, { opacity: 1, y: 0, duration: .4 })
+      .from(root.querySelectorAll(".agent-case-document dl > div"), { opacity: .35, x: 6, duration: .6, stagger: .16 }, .2);
+    return observePlayback(root, active => sequence.paused(!active));
   });
   return () => media.revert();
 }
@@ -27,15 +31,21 @@ export function animateMicoGreeting(root: HTMLElement) {
     const button = root.querySelector<HTMLButtonElement>(".agent-mico-greeting")!;
     button.disabled = !!context.conditions?.reduced;
     if (!context.conditions?.moving) return () => { button.disabled = false; };
-    const avatar = button.querySelector("img")!;
-    let active = true, started = false;
-    const salute = gsap.timeline({ paused: true }).to(avatar, { rotation: -9, y: -4, duration: .14, ease: "power2.out" })
-      .to(avatar, { rotation: 7, y: -2, duration: .2, ease: "power1.inOut" })
-      .to(avatar, { rotation: 0, y: 0, duration: .35, ease: "power2.out" });
+    const face = button.querySelector(".mico-face")!;
+    let active = false, started = false;
+    const salute = gsap.timeline({ paused: true })
+      .to(face, { "--mico-look-y": "1px", duration: .4, ease: "power2.inOut" })
+      .to(face, { "--mico-look-y": "0px", duration: .4, ease: "power3.out" }, .8);
     const greet = () => { if (active) { started = true; salute.restart(); } };
-    const stopPlayback = observePlayback(root, value => { active = value; if (!active) salute.pause(); else if (started && salute.progress() < 1) salute.play(); });
+    const idle = createDemoAutoplay(root, greet, { duration: 9600 });
+    const stopPlayback = observePlayback(root, value => {
+      active = value;
+      if (!active) salute.pause();
+      else if (!started) greet();
+      else if (salute.progress() < 1) salute.play();
+    });
     button.addEventListener("pointerenter", greet); button.addEventListener("focus", greet); button.addEventListener("click", greet);
-    return () => { stopPlayback(); button.removeEventListener("pointerenter", greet); button.removeEventListener("focus", greet); button.removeEventListener("click", greet); };
+    return () => { idle.destroy(); stopPlayback(); button.removeEventListener("pointerenter", greet); button.removeEventListener("focus", greet); button.removeEventListener("click", greet); };
   });
   return () => media.revert();
 }
@@ -52,8 +62,10 @@ export function animateNetworkThread(root: SVGSVGElement) {
     path.style.strokeDasharray = String(length);
     const paint = () => {
       const point = pointOnSamples(points, progress.value);
+      const { a, d } = root.getScreenCTM()!;
       path.style.strokeDashoffset = String(length * (1 - progress.value));
-      light.setAttribute("transform", `translate(${point.x} ${point.y})`);
+      // Undo the SVG viewport stretch so the marker keeps its size in CSS pixels.
+      light.setAttribute("transform", `translate(${point.x} ${point.y}) scale(${1 / a} ${1 / d})`);
       light.setAttribute("opacity", String(Math.min(1, progress.value / .025, (1 - progress.value) / .025)));
     };
     const scrub = gsap.quickTo(progress, "value", { duration: .3, ease: "power1.out", onUpdate: paint });

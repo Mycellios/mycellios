@@ -41,13 +41,15 @@ export function ComputeCalculator() {
       <Text as="small" className="compute-rate-source">
         {custom ? "Your hourly rate: " : "Indicative hourly rate: "}{money(result?.hourlyRate, true)} / GPU-hour
       </Text>
-      <Disclosure className="compute-method" open={detailsOpen} onToggle={event => setDetailsOpen(event.currentTarget.open)}>
+      <Disclosure className="compute-method ui-animated-disclosure" open={detailsOpen} onToggle={event => setDetailsOpen(event.currentTarget.open)}>
         <DisclosureSummary>How is this calculated?<ChevronDown size={16} /></DisclosureSummary>
+        <div className="ui-disclosure-body">
         <Text>Daily hours × 30 days × the hourly rate. Every selected hour is assumed to be rented. Electricity, fees and taxes are excluded.</Text>
         <Text as="small">Published rental rate ({GPU_RENTAL_REFERENCE.tier} priority): {money(preset.referenceRate, true)} per GPU-hour. Checked {GPU_RENTAL_REFERENCE.checkedAt}. Availability can change. <Link href={GPU_RENTAL_REFERENCE.source} target="_blank" rel="noreferrer">View rate source<ArrowUpRight size={12} /></Link></Text>
         <Field label="Hourly rate (USD)" htmlFor={id + "-rate"} hint="Optional. Leave empty to use the published reference." {...(invalidRate ? { error: "Enter a rate between 0 and 10000 USD." } : {})}>
           <Input id={id + "-rate"} type="number" inputMode="decimal" min="0" max="10000" step="any" value={rateOverride} placeholder={String(preset.referenceRate)} aria-invalid={invalidRate} aria-describedby={id + "-rate-hint" + (invalidRate ? " " + id + "-rate-error" : "")} onChange={event => setRateOverride(event.target.value)} />
         </Field>
+        </div>
       </Disclosure>
       <Link className="compute-connect" href="/earn#earn-options" variant="primary">Connect your compute<ArrowUpRight size={15} /></Link>
     </div>

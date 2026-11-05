@@ -36,10 +36,10 @@ html[data-mycellios-design="agent"] {
   --agent-card-line: #ded9d1;
   --agent-space-card: 20px;
   --agent-space-inset: 16px;
-  --agent-motion-fast: 100ms;
-  --agent-motion-control: 150ms;
-  --agent-motion-page: 220ms;
-  --agent-ease-enter: cubic-bezier(.22, .61, .36, 1);
+  --agent-motion-fast: 120ms;
+  --agent-motion-control: 180ms;
+  --agent-motion-page: 240ms;
+  --agent-ease-enter: cubic-bezier(.165, .84, .44, 1);
   --agent-input-line: #b7b1a7;
   --agent-sidebar: #eee9e2;
   --agent-link: #6b573f;
@@ -290,13 +290,13 @@ html[data-mycellios-design="agent"] :is(.ui-button, .ui-link, .ui-input, .ui-sel
 html[data-mycellios-design="agent"] .public-panel .panel-disclosure-chevron { transition: transform var(--agent-motion-control) ease-out; }
 html[data-mycellios-design="agent"] .public-panel .panel-content-scale > :is(section, article) { animation: agent-content-enter var(--agent-motion-page) var(--agent-ease-enter); }
 html[data-mycellios-design="agent"] .public-panel .panel-page-title { animation: agent-title-enter var(--agent-motion-page) var(--agent-ease-enter); }
-html[data-mycellios-design="agent"] :is(.ui-dialog, .app-select-menu, .inference-model-menu, .inference-instructions-popover, .mesh-node-popover, .spore-menu-popover) { animation: agent-popup-enter var(--agent-motion-fast) ease-out; }
+html[data-mycellios-design="agent"] :is(.ui-dialog, .app-select-menu, .inference-model-menu, .inference-instructions-popover, .mesh-node-popover, .spore-menu-popover) { animation: agent-popup-enter var(--agent-motion-control) var(--agent-ease-enter); }
 html[data-mycellios-design="agent"] .app-select-menu { transform-origin: top center; }
 html[data-mycellios-design="agent"] .public-panel .panel-detail-drawer { animation: agent-drawer-enter var(--agent-motion-control) ease-out; }
 html[data-mycellios-design="agent"] .public-panel .modal-backdrop { animation: agent-content-enter var(--agent-motion-fast) ease-out; }
 @keyframes agent-content-enter { from { opacity: 0; } to { opacity: 1; } }
 @keyframes agent-title-enter { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
-@keyframes agent-popup-enter { from { opacity: 0; scale: .95; } to { opacity: 1; scale: 1; } }
+@keyframes agent-popup-enter { from { opacity: 0; scale: .98; } to { opacity: 1; scale: 1; } }
 @keyframes agent-drawer-enter { from { opacity: 0; translate: 12px 0; } to { opacity: 1; translate: 0 0; } }
 @supports (interpolate-size: allow-keywords) {
   html[data-mycellios-design="agent"] .public-panel :is(.panel-disclosure, .overview-detail)::details-content {

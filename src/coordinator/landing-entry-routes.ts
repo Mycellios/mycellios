@@ -15,6 +15,7 @@ const CANONICAL_LANDING_PATHS = new Set([
   "/spore/data",
   "/spore/rewards",
   "/pricing",
+  "/changelog",
   "/compare",
   "/stats",
   "/downloads",
@@ -68,6 +69,7 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
     "/spore": "spore/index.html",
     "/spore/rewards": "spore/rewards/index.html",
     "/pricing": "pricing/index.html",
+    "/changelog": "changelog/index.html",
     "/compare": "compare/index.html",
     "/stats": "stats/index.html",
     "/admin": "admin/index.html",
@@ -98,7 +100,7 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
   for (const [path, destination] of redirects) {
     app.get(path, async (_request, reply) => reply.redirect(destination));
   }
-  for (const path of ["/dashboard", "/account", "/spore", "/spore/rewards", "/stats", "/pricing", "/compare"]) {
+  for (const path of ["/dashboard", "/account", "/spore", "/spore/rewards", "/stats", "/pricing", "/compare", "/changelog"]) {
     app.get(`${path}/`, async (request, reply) => {
       const queryIndex = request.url.indexOf("?");
       return reply.redirect(`${path}${queryIndex === -1 ? "" : request.url.slice(queryIndex)}`);

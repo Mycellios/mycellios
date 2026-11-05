@@ -24,5 +24,5 @@ function Staking() {
 
 export function SporeStudio() {
   if (window.location.pathname.endsWith("/rewards")) return <RewardsPage />;
-  return <main className="rb-page spore-page"><LandingHeader /><div className="spore-shell"><Staking /></div></main>;
+  return <><LandingHeader /><main className="rb-page spore-page"><div className="spore-shell"><Staking /></div></main></>;
 }
