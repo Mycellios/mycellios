@@ -1,5 +1,27 @@
 # Development
 
+## Apps authoring standard
+
+The [Apps v1 standard](../specs/apps-standard/spec.md) defines immutable bundles,
+typed screens/workflows, current-session ownership, scoped project persistence,
+local/Cloud admission, quotes and recovery requirements. Start with the
+[authoring guide](../src/agent/skills/create-mycellios-app/references/guide.md)
+and [builder skill](../src/agent/skills/create-mycellios-app/SKILL.md).
+Copy the entire template folder, not only its JSON manifest.
+
+From `src/agent`, run `npm run apps:validate -- <bundle/app.json> --json` or add
+`--previous <old/app.json>` for immutable-version checks. `--schema` prints the
+structural JSON Schema; graph/type/path/hash checks need the complete validator.
+On Daniel's Windows PC these commands and affected tests use `compilar.ps1`.
+Focused tests are `packages/contracts/src/app-validation.test.ts` and
+`packages/contracts/src/app-bundle.test.ts`; incremental typechecks cover
+the Apps contracts, public exports, CLI and its tests via `scripts/apps/tsconfig.json`.
+
+This is an authoring/validation foundation. It does not add the Apps sidebar,
+catalog, project database, renderer, runtime handlers, charges or publication.
+CLI success explicitly leaves runtime qualification, authorization and
+publication NOT RUN. Do not activate paused full CI for definition-only work.
+
 ## Marketing and public Stats
 
 The public `/dashboard` and `/stats` entries render `StatsDashboard` from the

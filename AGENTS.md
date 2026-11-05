@@ -63,6 +63,14 @@ These rules apply to the complete repository.
 
 ## Changes and verification
 
+- Apps authoring uses `specs/apps-standard/spec.md`, the versioned contracts in
+  `src/agent/packages/contracts/src/app-*.ts` and the
+  `src/agent/skills/create-mycellios-app` starter/guide. From `src/agent`, use
+  `npm run apps:validate -- <bundle/app.json> [--previous <old/app.json>]` through
+  the shared scheduler. Definition admission is not executor qualification,
+  authorization or publication. Keep Apps v1 out of live services until those
+  host boundaries are implemented and separately qualified.
+
 - During Daniel's temporary fast-delivery mode, `.github/workflows/ci.yml`
   records source readiness without waiting for full test/security/platform jobs.
   Its summary must say they were NOT RUN and must not claim deployment success.

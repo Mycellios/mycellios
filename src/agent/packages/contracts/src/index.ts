@@ -1,4 +1,7 @@
 export * from "./agent-import.js";
+export * from "./app-actions.js";
+export * from "./app-manifest.js";
+export * from "./app-validation.js";
 export * from "./agent-import-setup.js";
 export * from "./ai-consent.js";
 export * from "./analytics.js";

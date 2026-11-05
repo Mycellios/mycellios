@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "rootDir": "../../..", "noEmit": true },
+  "include": ["*.ts", "../../packages/contracts/src/app-*.ts", "../../packages/contracts/src/index.ts"]
+}

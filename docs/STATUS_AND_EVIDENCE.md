@@ -1492,3 +1492,24 @@ API, worker, database, coordinator and other protected container identities/star
 times were unchanged; no migration, financial action or native installer update
 was performed. Full CI was not run. Detailed receipts and logs are retained in
 `outputs/settings-prod-20261105/` and the owned server release directory.
+
+## Apps authoring standard — local foundation (2026-11-05)
+
+Apps v1 has a strict manifest/action contract, semantic graph/type/permission
+validation, a bounded read-only bundle CLI, a complete video-studio definition,
+creator skill and authoring guide. The [standard](../specs/apps-standard/spec.md)
+separates definition admission from actual runtime qualification and publication.
+Versions are immutable, project versions remain pinned, actions are declared
+contracts and both execution targets require independent future qualification.
+
+The 51 affected tests, three scoped authoring checks and an incremental typecheck of the Apps contracts, public
+exports, CLI and tests passed on Daniel's PC in an isolated checkout. Tests cover
+unsafe definitions, cycles, typed references, altered assets, path traversal,
+symlink escape, bounded reads and immutable-version CLI behavior. The broader
+contracts check encountered its existing credit-units.test.ts extension error;
+it is not reported as a passing package-wide check.
+
+No Apps catalog/sidebar, renderer, project-store migration, executable action
+adapter, billing or publisher was enabled. No global skill/profile installation,
+paid call, render or production deployment was performed. Full CI and physical
+local/Cloud execution qualification were NOT RUN under fast-delivery mode.
