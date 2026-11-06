@@ -36,7 +36,7 @@ const base="apps/android/app/src/main/assets",root=base+"/web",files=[];
 function walk(dir){for(const f of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,f.name);if(f.isDirectory())walk(p);else files.push(path.relative(root,p).replaceAll("\\", "/"));}}walk(root);
 fs.writeFileSync(base+"/web-files.json",JSON.stringify(files));
 const hashes=Object.fromEntries(files.sort().map(f=>[f,crypto.createHash("sha256").update(fs.readFileSync(root+"/"+f)).digest("hex")]));
-fs.writeFileSync(process.env.MYCELLIOS_ANDROID_RECEIPT,JSON.stringify({schema:"mycellios-android-build/1",tree:process.env.MYCELLIOS_SOURCE_TREE,version:"1.0.0",versionCode:1,applicationId:"com.mycellios.android",minSdk:26,sharedWebFiles:hashes},null,2));' 
+fs.writeFileSync(process.env.MYCELLIOS_ANDROID_RECEIPT,JSON.stringify({schema:"mycellios-android-build/1",tree:process.env.MYCELLIOS_SOURCE_TREE,version:"1.0.0",versionCode:1,applicationId:"com.mycellios.android",minSdk:26,sharedWebFiles:hashes},null,2));'
 cd "$ROOT/src/agent/apps/android"
 GRADLE=/pnpm-store/mycellios-gradle-8.13/gradle-8.13/bin/gradle
 if [ ! -x "$GRADLE" ]; then
