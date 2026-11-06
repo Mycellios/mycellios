@@ -66,6 +66,16 @@ jobs:
           PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "120000"
       - name: Exercise real workspace controls with synthetic RPC fixtures
         run: node scripts/verify-workspace-sync-ui.mjs --output=workspace-proof
+      - name: Verify integration readiness and existing account management
+        working-directory: src/agent/apps/web
+        run: npm exec -- playwright test --config playwright.integrations.config.ts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: integration-readiness-proof-${{ github.sha }}
+          path: src/agent/playwright-integration-report
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
