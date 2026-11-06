@@ -1,5 +1,5 @@
 import { productAppUrl, productBrand } from "@rakazo/contracts";
-import { expo } from "@better-auth/expo";
+import { nativeExpo } from "./expo-native.js";
 import { passkey } from "@better-auth/passkey";
 import type { ProductAnalytics, TransactionalEmailProvider } from "@rakazo/adapter-kit";
 import {
@@ -282,7 +282,7 @@ export function createAuth(prisma: PrismaClient, env: AuthEnv) {
     },
     plugins: [
       signedBearer,
-      expo(),
+      nativeExpo(env.oidc),
       accountSecurity(env.email, env.oidc?.name, env.oidc?.issuer, env.passwordAuth !== false),
       ...(discovery ? [discovery.plugin] : []),
       ...(emailCodeSignIn
