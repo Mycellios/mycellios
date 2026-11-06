@@ -1063,4 +1063,6 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Link DMs": "关联私信",
   "This integration needs server setup. Contact the administrator.":
     "此集成需要在服务器端配置。请联系管理员。",
+  "Open task": "打开任务",
+  "This task is available in the web app.": "此任务可在网页版应用中查看。",
 };

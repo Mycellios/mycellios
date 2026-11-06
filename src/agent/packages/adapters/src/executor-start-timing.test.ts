@@ -1,3 +1,4 @@
+import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
 import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
@@ -29,12 +30,16 @@ function fixture(options: { startedAt?: Date; switching?: boolean; dedicated?: b
   const run = {
     id: "run-1",
     botId: "bot-1",
+    threadId: "thread-1",
+    userId: "user-1",
+    spaceId: "space-1",
     status: "queued",
     leaseFence: 0,
     checkpoint: null,
     startedAt: options.startedAt ?? null,
   };
   const prisma = {
+    thread: { findFirst: vi.fn(async () => null) },
     run: {
       findUnique: vi.fn(async () => run),
       findUniqueOrThrow: vi.fn(async () => ({ ...run, status: "leased" })),
@@ -148,3 +153,10 @@ describe("execution start timing", () => {
     },
   );
 });
+
+// Isolate timing after admission; the PostgreSQL workspace fixture exercises the real gate.
+vi.mock("@rakazo/db", async (load) => ({
+  ...await load<typeof import("@rakazo/db")>(),
+  claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
+}));

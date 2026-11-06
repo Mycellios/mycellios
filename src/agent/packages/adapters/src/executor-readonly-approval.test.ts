@@ -1,3 +1,4 @@
+import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
 import type {
   AgentRunRequest,
   AutoReviewProvider,
@@ -2354,3 +2355,11 @@ describe("standing owner permission for all agents' routines", () => {
     await f.run();expect(createScheduleMock).not.toHaveBeenCalled();expect(f.pauseRunForInput).not.toHaveBeenCalled();expect(JSON.stringify(f.results)).toContain("blocked");
   });
 });
+
+// These executor fixtures isolate post-admission behavior. Real concurrent SQL
+// admission is exercised by scripts/verify-workspace-sync-db.ts.
+vi.mock("@rakazo/db", async (load) => ({
+  ...await load<typeof import("@rakazo/db")>(),
+  claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
+}));

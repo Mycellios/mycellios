@@ -1108,4 +1108,6 @@ export const DE_MESSAGES: Record<string, string> = {
   "Link DMs": "DMs verknüpfen",
   "This integration needs server setup. Contact the administrator.":
     "Diese Integration muss auf dem Server eingerichtet werden. Wende dich an die Administration.",
+  "Open task": "Aufgabe öffnen",
+  "This task is available in the web app.": "Diese Aufgabe ist in der Web-App verfügbar.",
 };

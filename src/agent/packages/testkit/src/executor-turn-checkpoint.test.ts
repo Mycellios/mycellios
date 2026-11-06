@@ -1,3 +1,4 @@
+import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
 import type { AgentRunModel } from "@rakazo/adapter-kit";
 import { APPROVED_ACTION_NOT_RUN_ERROR } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
@@ -862,6 +863,8 @@ describe("executor paused transcript", () => {
       });
       try {
         const state = fixture(model.model, false, toolName);
+        // Scheduled conversations intentionally have no shared-screen takeover.
+        if (pause === "request_takeover") state.run.trigger = "user";
         await state.executor.continueRun(state.run.id, "fixture-worker");
         expect(
           pause === "request_takeover" ? state.pauseRunForTakeover : state.pauseRunForInput,
@@ -894,3 +897,11 @@ describe("executor paused transcript", () => {
     },
   );
 });
+
+// These executor fixtures isolate post-admission behavior. Real concurrent SQL
+// admission is exercised by scripts/verify-workspace-sync-db.ts.
+vi.mock("@rakazo/db", async (load) => ({
+  ...await load<typeof import("@rakazo/db")>(),
+  claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
+}));

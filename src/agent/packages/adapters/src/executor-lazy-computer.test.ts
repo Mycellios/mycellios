@@ -1,3 +1,4 @@
+import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
 import type { AgentRunRequest, ComputerRef } from "@rakazo/adapter-kit";
 import { SandboxRateLimitError } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
@@ -623,3 +624,11 @@ it('fails a repeated-call loop rather than recording the unfinished task as comp
  expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({outcome:'failed',error:expect.stringContaining('I got stuck calling')}));
  expect(finalizeRun).not.toHaveBeenCalledWith(expect.objectContaining({outcome:'completed'}));
 });
+
+// These executor fixtures isolate post-admission behavior. Real concurrent SQL
+// admission is exercised by scripts/verify-workspace-sync-db.ts.
+vi.mock("@rakazo/db", async (load) => ({
+  ...await load<typeof import("@rakazo/db")>(),
+  claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
+}));

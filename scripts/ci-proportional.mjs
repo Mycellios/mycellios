@@ -37,9 +37,9 @@ export function planChecks(files) {
       if (shared || files.some(f => f.startsWith(`src/agent/apps/${app}/`))) add('src/agent', 'node', ['node_modules/typescript/bin/tsc', '--noEmit', '--incremental', '--tsBuildInfoFile', `../../.ci/agent-${app}.tsbuildinfo`, '-p', `apps/${app}/tsconfig.json`], `Agent ${app} types`);
     }
     const tests = code.filter(f => f.startsWith('src/agent/') && /\.test\.[jt]sx?$/.test(f)).map(f => f.slice('src/agent/'.length));
-    if (tests.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...tests, '--maxWorkers', '2', '--no-file-parallelism'], 'Agent changed tests');
+    if (tests.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...tests, '--maxWorkers', '2'], 'Agent changed tests');
     const related = code.filter(f => f.startsWith('src/agent/') && !/\.[cm]?js$/.test(f) && !/\.test\.[jt]sx?$/.test(f) && !f.includes('.config.')).map(f => f.slice('src/agent/'.length));
-    if (related.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'related', ...related, '--run', '--passWithNoTests', '--maxWorkers', '2', '--no-file-parallelism'], 'Agent affected tests');
+    if (related.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'related', ...related, '--run', '--passWithNoTests', '--maxWorkers', '2'], 'Agent affected tests');
   }
   return commands;
 }

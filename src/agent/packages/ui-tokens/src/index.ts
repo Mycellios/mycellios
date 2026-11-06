@@ -12,24 +12,6 @@ export const UI_APPEARANCE_STORAGE_KEY = "rakazo.uiAppearance";
  * is always a border and never a fill.
  */
 export type ColorTokens = {
-  skillForeground: string;
-  skillDocument: string;
-  skillData: string;
-  skillDesign: string;
-  skillCode: string;
-  workspaceTaskBlue: string;
-  workspaceAccentForeground: string;
-  workspaceAccent: string;
-  workspacePrimaryForeground: string;
-  workspacePrimary: string;
-  workspaceMutedForeground: string;
-  workspaceSidebarBorder: string;
-  workspaceSidebarAccent: string;
-  workspaceSidebar: string;
-  workspaceBorder: string;
-  workspaceCard: string;
-  workspaceForeground: string;
-  workspaceBackground: string;
   background: string;
   /** Modals: a step lighter than the page so they read as raised above it. */
   dialog: string;
@@ -83,25 +65,6 @@ export type ColorTokens = {
 };
 
 export const darkTokens = {
-  workspaceBackground: "#202023",
-  workspaceForeground: "#eeeeef",
-  workspaceCard: "#2a2a2e",
-  workspaceBorder: "#38383d",
-  workspaceSidebar: "#18181b",
-  workspaceSidebarAccent: "#303035",
-  workspaceSidebarBorder: "#38383d",
-  workspaceMutedForeground: "#a7a7af",
-  workspacePrimary: "#f0f0f2",
-  workspacePrimaryForeground: "#18181b",
-  workspaceAccent: "#343439",
-  workspaceAccentForeground: "#eeeef0",
-  workspaceTaskBlue: "#6ba9ff",
-  skillCode: "#2465a7",
-  skillDesign: "#b93e80",
-  skillData: "#208576",
-  skillDocument: "#7556d5",
-  skillForeground: "#ffffff",
-
   background: "#142019",
   dialog: "#1E2A22",
   foreground: "#EEE9E2",
@@ -146,25 +109,6 @@ export const darkTokens = {
 } as const satisfies ColorTokens;
 
 export const lightTokens = {
-  workspaceBackground: "#f5f5f7",
-  workspaceForeground: "#19191b",
-  workspaceCard: "#fff",
-  workspaceBorder: "#e7e7eb",
-  workspaceSidebar: "#e8e8ed",
-  workspaceSidebarAccent: "#dadade",
-  workspaceSidebarBorder: "#e1e1e5",
-  workspaceMutedForeground: "#737378",
-  workspacePrimary: "#18181b",
-  workspacePrimaryForeground: "#fff",
-  workspaceAccent: "#e9e9ed",
-  workspaceAccentForeground: "#19191b",
-  workspaceTaskBlue: "#006ad4",
-  skillCode: "#2465a7",
-  skillDesign: "#b93e80",
-  skillData: "#208576",
-  skillDocument: "#7556d5",
-  skillForeground: "#ffffff",
-
   background: "#F8F5F0",
   dialog: "#F8F5F0",
   foreground: "#1E2A22",
@@ -210,21 +154,78 @@ export const lightTokens = {
 
 /** Web and Electron only: the primary fill's hover and disabled states. Mobile has no hover. */
 export type WebColorTokens = ColorTokens & {
+  skillForeground: string;
+  skillDocument: string;
+  skillData: string;
+  skillDesign: string;
+  skillCode: string;
+  workspaceTaskBlue: string;
+  workspaceAccentForeground: string;
+  workspaceAccent: string;
+  workspacePrimaryForeground: string;
+  workspacePrimary: string;
+  workspaceMutedForeground: string;
+  workspaceSidebarBorder: string;
+  workspaceSidebarAccent: string;
+  workspaceSidebar: string;
+  workspaceBorder: string;
+  workspaceCard: string;
+  workspaceForeground: string;
+  workspaceBackground: string;
+
   primaryHover: string;
   primaryDisabled: string;
 };
 
 /**
  * Web and Electron inherit the shared Mycellios forest/paper palette.
- * Only pointer interaction states differ from native surfaces.
+ * Workspace accents and pointer interaction states are web-only additions.
  */
 export const webDarkOverrides = {
+  workspaceBackground: "#202023",
+  workspaceForeground: "#eeeeef",
+  workspaceCard: "#2a2a2e",
+  workspaceBorder: "#38383d",
+  workspaceSidebar: "#18181b",
+  workspaceSidebarAccent: "#303035",
+  workspaceSidebarBorder: "#38383d",
+  workspaceMutedForeground: "#a7a7af",
+  workspacePrimary: "#f0f0f2",
+  workspacePrimaryForeground: "#18181b",
+  workspaceAccent: "#343439",
+  workspaceAccentForeground: "#eeeef0",
+  workspaceTaskBlue: "#6ba9ff",
+  skillCode: "#2465a7",
+  skillDesign: "#b93e80",
+  skillData: "#208576",
+  skillDocument: "#7556d5",
+  skillForeground: "#ffffff",
+
   primaryHover: "#D8D2C9",
   primaryDisabled: "#EEE9E221",
   destructiveFill: "#CF2B35",
 } as const satisfies Partial<WebColorTokens>;
 
 export const webLightOverrides = {
+  workspaceBackground: "#f5f5f7",
+  workspaceForeground: "#19191b",
+  workspaceCard: "#fff",
+  workspaceBorder: "#e7e7eb",
+  workspaceSidebar: "#e8e8ed",
+  workspaceSidebarAccent: "#dadade",
+  workspaceSidebarBorder: "#e1e1e5",
+  workspaceMutedForeground: "#737378",
+  workspacePrimary: "#18181b",
+  workspacePrimaryForeground: "#fff",
+  workspaceAccent: "#e9e9ed",
+  workspaceAccentForeground: "#19191b",
+  workspaceTaskBlue: "#006ad4",
+  skillCode: "#2465a7",
+  skillDesign: "#b93e80",
+  skillData: "#208576",
+  skillDocument: "#7556d5",
+  skillForeground: "#ffffff",
+
   primaryHover: "#344438",
   primaryDisabled: "#1E2A2226",
 } as const satisfies Partial<WebColorTokens>;
