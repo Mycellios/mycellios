@@ -37,6 +37,10 @@ function Save-State {
  $temporary=$Journal+'.tmp'
  $script:state|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $temporary -Encoding UTF8
  Move-Item -LiteralPath $temporary -Destination $Journal -Force
+ if($script:state.backup){
+  $folder=[IO.Path]::GetDirectoryName($script:state.backup)
+  if(Test-Path -LiteralPath $folder){Copy-Item -LiteralPath $Journal -Destination (Join-Path $folder 'receipt.json') -Force}
+ }
 }
 function Read-State {
  if(!(Test-Path -LiteralPath $Journal)){return $null}
@@ -100,6 +104,7 @@ try {
   & icacls $folder '/inheritance:r' '/grant:r' "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F'|Out-Null
   if($LASTEXITCODE -ne 0){throw 'Could not protect installation recovery'}
   $script:state.backup=Join-Path $folder 'installation'
+  Copy-Item -LiteralPath $PSCommandPath -Destination (Join-Path $folder 'restore.ps1')
   $script:state.phase='preparing';Save-State
   $index=0
   foreach($key in @($InstallRegistryKey,$UninstallRegistryKey)){

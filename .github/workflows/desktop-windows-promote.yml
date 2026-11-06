@@ -1,0 +1,73 @@
+name: Publish qualified Windows Desktop
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Desktop Windows release package run to promote
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: desktop-windows-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'Mycellios/mycellios' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_RUN: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Bind the successful build to current main
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          gh api "repos/$GH_REPO/actions/runs/$SOURCE_RUN" > source-run.json
+          workflow=$(gh api "repos/$GH_REPO/actions/workflows/desktop-windows-release.yml" --jq .id)
+          jq -e --arg repo "$GH_REPO" --argjson workflow "$workflow" '.conclusion == "success" and .status == "completed" and .workflow_id == $workflow and .head_repository.full_name == $repo' source-run.json
+          revision=$(jq -r .head_sha source-run.json)
+          [[ "$revision" =~ ^[a-f0-9]{40}$ ]]
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$revision" origin/main
+          test "$(git rev-parse "$revision^{tree}")" = "$(git rev-parse 'origin/main^{tree}')"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: desktop-windows-${{ steps.source.outputs.revision }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: release
+      - name: Publish the exact qualified artifact once
+        shell: bash
+        env:
+          REVISION: ${{ steps.source.outputs.revision }}
+        run: |
+          set -euo pipefail
+          cd release
+          sha256sum --check --strict SHA256SUMS.txt
+          jq -e --arg rev "$REVISION" '.revision == $rev and .qualifiedStartup == true and .qualifiedInstallation == true and .automaticUpdates == false and .installation.passed == true' desktop-release.json
+          version=$(jq -r .version desktop-release.json)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="desktop-v$version-windows-preview"
+          test "$(jq -r .tag desktop-release.json)" = "$tag"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$REVISION" origin/main
+          test "$(git rev-parse "$REVISION^{tree}")" = "$(git rev-parse 'origin/main^{tree}')"
+          if gh release view "$tag" >/dev/null 2>&1; then echo 'Release already exists; never replace it.' >&2; exit 1; fi
+          gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$REVISION"
+          printf 'Compact Windows update from `%s`.\n\nOffline features and explicit restart consent are retained. Installer timing and preservation were qualified on a hosted Windows runner; owner-PC timing remains separate. See the attached installation receipt.\n' "$REVISION" > notes.md
+          gh release create "$tag" --verify-tag --target "$REVISION" --draft --prerelease --latest=false --title "Mycellios Desktop $version" --notes-file notes.md
+          gh release upload "$tag" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json SHA256SUMS.txt
+          gh release edit "$tag" --draft=false --prerelease --latest=false
