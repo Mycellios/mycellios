@@ -1,3 +1,4 @@
+import { useSpaceRpc, useBoundTaskThreadScope } from "../../lib/space-rpc";
 import { useLingui } from "@lingui/react/macro";
 import type { AgentSkillCatalogEntry, ThreadMessage } from "@rakazo/contracts";
 import type { AgentImportReader, ComposerMention, SlashActionId } from "@rakazo/core";
@@ -10,8 +11,8 @@ import {
   serializeComposerPrompt,
   truncateSlashDescription,
 } from "@rakazo/core";
-import { Button } from "@rakazo/ui-web";
-import { ArrowUp, Box, Paperclip, Plus, Settings, Square, X } from "lucide-react";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
+import { ArrowUp, AudioLines, Box, FilePlus, ImagePlus, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent, RefObject } from "react";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -44,6 +45,7 @@ import {
   slashActionLabel,
 } from "./composer-mentions";
 import { useComposerLayout } from "./use-composer-layout";
+import { SideQuestion } from "./side-question";
 
 const ATTACHMENT_ACCEPT = attachmentPickerAccept(navigator.userAgent);
 export const Composer = memo(function Composer({
@@ -81,6 +83,8 @@ export const Composer = memo(function Composer({
   draftKey,
   enterToSend,
   onImportAgent,
+  onOpenVoice,
+  voiceConversationActive = false,
 }: {
   activeName?: string;
   running: boolean;
@@ -118,9 +122,15 @@ export const Composer = memo(function Composer({
   enterToSend: boolean;
   /** When set, a dropped OpenClaw or Hermes folder or backup offers Import or Attach. */
   onImportAgent?: (agent: AgentImportReader) => void;
+  onOpenVoice?: () => void;
+  voiceConversationActive?: boolean;
 }) {
   const { t } = useLingui();
+  const rpc = useSpaceRpc();
+  const taskScope = useBoundTaskThreadScope();
   const [draft, setDraft] = useState(() => readComposerDraft(draftKey));
+  const [sideQuestionOpen, setSideQuestionOpen] = useState(false);
+  const sideQuestionBotId = "botId" in artifactTarget ? artifactTarget.botId : null;
   const review = useReviewWorkspace();
   const lastReviewDraft = useRef(0);
   useEffect(() => {
@@ -143,7 +153,8 @@ export const Composer = memo(function Composer({
     const slashMatch = /^\/([^\n]*)$/.exec(draft);
     return slashMatch ? (slashMatch[1] ?? "") : null;
   });
-  const onCall = useCallSession() !== null;
+  const phoneCall = useCallSession();
+  const onCall = phoneCall !== null || voiceConversationActive;
   const talk = useHoldToTalk({
     transcribe: dictationTranscribe,
     disabled: disabled || onCall,
@@ -157,6 +168,8 @@ export const Composer = memo(function Composer({
     },
   });
   const [selectedSkill, setSelectedSkill] = useState<AgentSkillCatalogEntry | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [skillPickerOnly, setSkillPickerOnly] = useState(false);
   const [selectedMentions, setSelectedMentions] = useState<ComposerMention[]>([]);
   const editRevision = useRef(0);
   const [agentDrop, setAgentDrop] = useState<{
@@ -291,9 +304,11 @@ export const Composer = memo(function Composer({
   function insertSkill(skill: AgentSkillCatalogEntry) {
     markEdited();
     setSelectedSkill(skill);
-    writeComposerDraft(draftKey, "");
-    setDraft("");
+    const next = /^\/[^\n]*$/.test(draft) ? "" : draft;
+    writeComposerDraft(draftKey, next);
+    setDraft(next);
     setSlashQuery(null);
+    setSkillPickerOnly(false);
   }
 
   function runSlashAction(action: SlashActionId) {
@@ -350,15 +365,15 @@ export const Composer = memo(function Composer({
   }, [agentSkills, slashQuery]);
 
   const slashActionOptions = useMemo(() => {
-    if (slashQuery === null) return [];
+    if (slashQuery === null || skillPickerOnly) return [];
     const query = slashQuery.trim().toLowerCase();
     return SLASH_ACTIONS.filter((action) => !query || action.label.toLowerCase().includes(query));
-  }, [slashQuery]);
+  }, [slashQuery, skillPickerOnly]);
 
   const showSlashPicker =
     slashQuery !== null &&
     mentionQuery === null &&
-    (slashSkillOptions.length > 0 || slashActionOptions.length > 0);
+    (skillPickerOnly || slashSkillOptions.length > 0 || slashActionOptions.length > 0);
 
   async function send() {
     if (!canSend || sending || disabled) return;
@@ -680,6 +695,11 @@ export const Composer = memo(function Composer({
           data-testid="slash-picker"
           className="mb-2 overflow-hidden rounded-[14px] border border-border bg-muted"
         >
+          {skillPickerOnly && <div className="flex items-center justify-between gap-2 px-4 py-2">
+            <span className="text-xs text-muted-foreground">{t`Choose a skill`}</span>
+            <Button variant="ghost" size="icon-sm" aria-label={t`Close skills`} onClick={() => { setSlashQuery(null); setSkillPickerOnly(false); }}><X className="size-3.5" /></Button>
+          </div>}
+          {skillPickerOnly && slashSkillOptions.length === 0 && <p className="px-4 pb-3 text-xs text-muted-foreground">{t`No skills available for this Mico. Add them in chat settings.`}</p>}
           {slashSkillOptions.map((skill) => (
             <button
               key={skill.id}
@@ -732,19 +752,43 @@ export const Composer = memo(function Composer({
           className="hidden"
           onChange={(event) => pickAttachments(event.target.files)}
         />
-        <Button
+        <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon" />}
           ref={attachButtonRef}
-          variant="ghost"
-          size="icon"
-          aria-label={t`Attach file`}
+          aria-label={t`Add to message`}
           disabled={disabled}
-          onClick={() => fileInputRef.current?.click()}
           className={`col-start-1 size-8 shrink-0 rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${
             expanded ? "row-start-2" : ""
           }`}
         >
           <Plus size={16} strokeWidth={2} />
-        </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-56 max-w-[calc(100vw-2rem)] p-1.5" aria-label={t`Add to message`}>
+          <DropdownMenuItem className="min-h-10 gap-2.5" onClick={() => {
+            setAddMenuOpen(false);
+            const input = fileInputRef.current;
+            if (input) { input.accept = "image/png,image/jpeg,image/webp,image/gif"; input.click(); }
+          }}><ImagePlus aria-hidden="true" />{t`Attach image`}</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-10 gap-2.5" onClick={() => {
+            setAddMenuOpen(false);
+            onSlashOpen?.(); setMentionQuery(null); setSkillPickerOnly(true); setSlashQuery("");
+            requestAnimationFrame(() => requestAnimationFrame(() => focusComposer()));
+          }}><Puzzle aria-hidden="true" />{t`Use a skill`}</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-10 gap-2.5" onClick={() => {
+            setAddMenuOpen(false);
+            const input = fileInputRef.current;
+            if (input) { input.accept = ATTACHMENT_ACCEPT; input.click(); }
+          }}><FilePlus aria-hidden="true" />{t`Add context`}</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="min-h-10 gap-2.5" disabled={!sideQuestionBotId} onClick={() => { setAddMenuOpen(false); setSideQuestionOpen(true); }}>
+            <MessageCircleQuestion aria-hidden="true" />{t`Ask aside`}
+          </DropdownMenuItem>
+          <DropdownMenuItem className="min-h-10 gap-2.5" disabled={!onOpenVoice || onCall || !sideQuestionBotId} onClick={() => { setAddMenuOpen(false); onOpenVoice?.(); }}>
+            <AudioLines aria-hidden="true" />{t`Voice`}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+        </DropdownMenu>
         <div
           ref={composerFieldRef}
           className={`flex min-w-0 flex-wrap items-end gap-1.5 ${
@@ -906,6 +950,7 @@ export const Composer = memo(function Composer({
           )}
         </div>
       </div>
+      {sideQuestionBotId ? <SideQuestion key={`${sideQuestionBotId}:${taskScope?.taskThreadId ?? ""}`} rpc={rpc} taskThreadId={taskScope?.taskThreadId} botId={sideQuestionBotId} open={sideQuestionOpen} onOpenChange={setSideQuestionOpen} /> : null}
     </fieldset>
   );
 });

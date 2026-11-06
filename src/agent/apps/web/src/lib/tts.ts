@@ -12,9 +12,11 @@ export interface SpeechSnapshot {
   messageId?: string;
   caption?: string;
   error?: string;
+  level?: number;
 }
 
 interface SpeakOptions {
+  speed?: number;
   /** Explicit manual playback using an installed device voice. No server request. */
   browser?: boolean;
   spaceId?: string | null;
@@ -49,6 +51,7 @@ export class Speaker {
   private settlePlayback: ((finished: boolean) => void) | null = null;
   private request: AbortController | null = null;
   private settleBrowser: (() => void) | null = null;
+  private outputMeter?: { context: AudioContext; timer: ReturnType<typeof setInterval> };
 
   subscribe(fn: (s: SpeechSnapshot) => void): () => void {
     this.watchers.add(fn);
@@ -88,6 +91,7 @@ export class Speaker {
   }
 
   private teardownAudio() {
+    if (this.outputMeter) { clearInterval(this.outputMeter.timer); void this.outputMeter.context.close(); this.outputMeter = undefined; }
     if (this.audio) {
       this.audio.pause();
       this.audio.src = "";
@@ -107,7 +111,7 @@ export class Speaker {
     const controller = new AbortController();
     this.request = controller;
     const live = () => this.token === mine && !controller.signal.aborted;
-    const spaceId = opts.spaceId ?? selectedSpaceId();
+    const spaceId = opts.spaceId !== undefined ? opts.spaceId : selectedSpaceId();
 
     this.set({ status: "preparing", botId: opts.botId, messageId: opts.messageId });
     let utterances: string[];
@@ -153,7 +157,7 @@ export class Speaker {
         messageId: opts.messageId,
         caption: utterances[i],
       });
-      const finished = await this.play(rendered.blob, live);
+      const finished = await this.play(rendered.blob, live, opts.speed ?? 1);
       if (!finished || !live()) {
         if (live()) this.set(IDLE);
         if (this.request === controller) this.request = null;
@@ -173,6 +177,7 @@ export class Speaker {
     const mine = this.token;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voice;
+    utterance.rate = opts.speed ?? 1;
     utterance.lang = voice.lang;
     this.set({ status: "speaking", botId: opts.botId, messageId: opts.messageId, caption: text });
     return new Promise((resolve) => {
@@ -249,13 +254,24 @@ export class Speaker {
     }
   }
 
-  private play(blob: Blob, live: () => boolean): Promise<boolean> {
+  private play(blob: Blob, live: () => boolean, speed = 1): Promise<boolean> {
     return new Promise((resolve) => {
       if (!live()) return resolve(false);
       this.teardownAudio();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.playbackRate = speed;
       this.audio = audio;
+      if (typeof AudioContext !== "undefined") {
+        try {
+          const context = new AudioContext(), analyser = context.createAnalyser();
+          context.createMediaElementSource(audio).connect(analyser); analyser.connect(context.destination);
+          const samples = new Uint8Array(analyser.fftSize);
+          const timer = setInterval(() => { if (!live()) return; analyser.getByteTimeDomainData(samples);
+            this.set({ ...this.snapshot, level: Math.min(1, Math.sqrt(samples.reduce((n,x)=>n+((x-128)/128)**2,0)/samples.length)*6) }); }, 80);
+          this.outputMeter = {context,timer}; void context.resume();
+        } catch { /* Playback remains available on hosts without Web Audio meters. */ }
+      }
       this.objectUrl = url;
       let settled = false;
       const done = (ok: boolean) => {

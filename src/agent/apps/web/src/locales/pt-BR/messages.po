@@ -670,10 +670,9 @@ msgstr "Outro assistente"
 msgid "Answer"
 msgstr "Resposta"
 
-#: src/components/call/IncomingCall.tsx
-msgctxt "incoming call"
+#: src/components/AskCard.tsx
 msgid "Answer"
-msgstr ""
+msgstr "Resposta"
 
 #: src/components/AskCard.tsx
 msgid "Answered"
@@ -6124,37 +6123,30 @@ msgstr "Use este modelo"
 msgid "Use your own key"
 msgstr "Usar sua própria chave"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "Crédito promocional, separado dos créditos ganhos"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "O modelo atingiu o limite de saída antes de terminar a resposta."
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "Tela não conectada"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "A conexão com a tela foi encerrada."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "A tela não respondeu."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "O link da tela expirou."
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx

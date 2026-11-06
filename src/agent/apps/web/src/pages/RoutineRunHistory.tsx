@@ -1,5 +1,7 @@
+import { routineThreadPath } from "../lib/routine-thread-path";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { RoutineHistory } from "@rakazo/contracts";
+import type { RpcClient } from "../lib/rpc";
 import { isRetryableError, normalizeRunError } from "@rakazo/core";
 import { Button, Collapsible, CollapsibleContent, Spinner } from "@rakazo/ui-web";
 import { ChevronDown } from "lucide-react";
@@ -8,10 +10,16 @@ import { Link } from "react-router-dom";
 import { rpc } from "../lib/rpc";
 import { translateRunError } from "../lib/run-error";
 import { formatToolActivityDuration } from "../lib/tool-activity-view";
-import { routineThreadPath } from "../lib/routine-thread-path";
 import { statusLabel, statusTone } from "./ActivityList";
 
-export function RoutineRunHistory({ routineId }: { routineId: string }) {
+export type RoutineHistoryState = { history: RoutineHistory | null; failed: boolean };
+export function RoutineRunHistory({ routineId, client = rpc, refreshToken = 0, pollInterval = 15_000, onState }: {
+  routineId: string;
+  client?: RpcClient;
+  refreshToken?: number;
+  pollInterval?: number;
+  onState?: (routineId: string, state: RoutineHistoryState) => void;
+}) {
   const { i18n, t } = useLingui();
   const [history, setHistory] = useState<RoutineHistory | null>(null);
   const [failed, setFailed] = useState(false);
@@ -25,6 +33,7 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
   const hasLoadedOlder = useRef(false);
   const listId = useId();
   const runs = history?.runs ?? null;
+  useEffect(() => { onState?.(routineId, { history, failed }); }, [routineId, history, failed, onState]);
 
   useEffect(() => {
     expandedRef.current = expanded;
@@ -43,7 +52,7 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
 
     async function loadFirstPage() {
       try {
-        const page = await rpc.routines.history({ routineId });
+        const page = await client.routines.history({ routineId });
         if (cancelled) return;
         hasLoadedOlder.current = false;
         setHistory(page);
@@ -57,13 +66,13 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
     async function poll() {
       // Expanded browsing uses explicit Refresh only so loaded older pages stay coherent.
       if (expandedRef.current) {
-        if (!cancelled) timer = window.setTimeout(() => void poll(), 15_000);
+        if (!cancelled) timer = window.setTimeout(() => void poll(), pollInterval);
         return;
       }
       const request = generation.current;
       const sequence = ++firstPageRequest.current;
       try {
-        const page = await rpc.routines.history({ routineId });
+        const page = await client.routines.history({ routineId });
         if (
           cancelled ||
           request !== generation.current ||
@@ -85,19 +94,19 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
         )
           setFailed(true);
       } finally {
-        if (!cancelled && !refused) timer = window.setTimeout(() => void poll(), 15_000);
+        if (!cancelled && !refused) timer = window.setTimeout(() => void poll(), pollInterval);
       }
     }
 
     void loadFirstPage().then(() => {
-      if (!cancelled && !refused) timer = window.setTimeout(() => void poll(), 15_000);
+      if (!cancelled && !refused) timer = window.setTimeout(() => void poll(), pollInterval);
     });
     return () => {
       cancelled = true;
       generation.current += 1;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [routineId, revision]);
+  }, [routineId, revision, client, refreshToken, pollInterval]);
 
   function toggleExpanded() {
     const next = !expanded;
@@ -108,7 +117,7 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
     if (next || !hasLoadedOlder.current) return;
     const request = generation.current;
     const sequence = ++firstPageRequest.current;
-    void rpc.routines
+    void client.routines
       .history({ routineId })
       .then((page) => {
         if (
@@ -137,7 +146,7 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
     const request = generation.current;
     setLoadingMore(true);
     try {
-      const page = await rpc.routines.history({ routineId, before: history.nextCursor });
+      const page = await client.routines.history({ routineId, before: history.nextCursor });
       if (request !== generation.current) return;
       hasLoadedOlder.current = true;
       setHistory((current) =>
@@ -222,7 +231,7 @@ export function RoutineRunHistory({ routineId }: { routineId: string }) {
             />
           </Button>
         </h3>
-        {expanded ? (
+        {expanded || failed ? (
           <Button size="xs" variant="ghost" onClick={() => setRevision((value) => value + 1)}>
             <Trans>Refresh</Trans>
           </Button>

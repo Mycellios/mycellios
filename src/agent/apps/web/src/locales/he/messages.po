@@ -670,10 +670,9 @@ msgstr "עוזר אחר"
 msgid "Answer"
 msgstr "תשובה"
 
-#: src/components/call/IncomingCall.tsx
-msgctxt "incoming call"
+#: src/components/AskCard.tsx
 msgid "Answer"
-msgstr ""
+msgstr "תשובה"
 
 #: src/components/AskCard.tsx
 msgid "Answered"
@@ -6124,37 +6123,30 @@ msgstr "שימוש במודל הזה"
 msgid "Use your own key"
 msgstr "שימוש במפתח משלך"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "קרדיט לקידום, נפרד מהקרדיטים שנצברו"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "המודל הגיע למגבלת הפלט שלו לפני שסיים את התשובה."
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "המסך אינו מחובר"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "החיבור למסך נסגר."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "המסך לא הגיב."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "קישור המסך פג."
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx

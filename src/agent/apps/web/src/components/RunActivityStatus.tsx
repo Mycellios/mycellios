@@ -1,9 +1,47 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Run, ThreadMessage } from "@rakazo/contracts";
+import type { Run, TaskCost, ThreadMessage } from "@rakazo/contracts";
 import { lastRunOutput, runHealth } from "@rakazo/core/run-health";
+import { observedTools } from "@rakazo/core";
 import { Button, GroupAvatar } from "@rakazo/ui-web";
 import type { GroupAvatarMember } from "@rakazo/ui-web";
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { activityKind } from "../lib/activity-kind";
+import { RunExecutionDetails } from "./RunExecutionDetails";
+import { formatToolActivityDuration } from "../lib/tool-activity-view";
+import { useCommandActivity } from "../lib/use-command-activity";
+
+/** The event stream can precede run metadata. Keep activity folded and request that metadata. */
+export function PendingRunActivity({ messages, bots, onRefresh }: {
+  messages: ThreadMessage[]; bots: GroupAvatarMember[]; onRefresh: () => Promise<void>;
+}) {
+  const { t } = useLingui();
+  const refresh = useRef(onRefresh); refresh.current = onRefresh;
+  useEffect(() => {
+    let disposed = false, pending = false;
+    const update = async () => {
+      if (disposed || pending || document.hidden) return;
+      pending = true;
+      try { await refresh.current(); } catch { /* Keep unknown status; never retry the task. */ }
+      finally { pending = false; }
+    };
+    void update();
+    const timer = window.setInterval(() => void update(), 30_000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, []);
+  const live = messages.findLast(message => message.id.startsWith("progress:"));
+  const activity = live?.blocks.filter(block => block.kind === "steps" || (block.kind === "progress" && block.activity));
+  return <div className="flex min-w-0 items-start gap-2.5 px-1 py-2">
+    <GroupAvatar members={bots} size={28} />
+    <details className="min-w-0 max-w-prose text-sm text-muted-foreground">
+      <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{t`Receiving activity · task status not confirmed`}</summary>
+      <p className="mt-2 text-xs">{t`Waiting for execution metadata. Reported activity does not confirm success or failure.`}</p>
+      <details className="mt-2 text-xs"><summary className="w-fit cursor-pointer py-1">{t`Technical details`}</summary>
+        {activity?.map((block,index) => <pre key={index} className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words">{block.kind === "steps" ? block.steps.map(step => `${step.label} ×${step.count}`).join("\n") : block.kind === "progress" ? block.text : ""}</pre>)}
+      </details>
+    </details>
+  </div>;
+}
 
 /** This observer only reads state. It never stops, retries or restarts a run. */
 export function RunActivityStatus({
@@ -11,6 +49,7 @@ export function RunActivityStatus({
   messages,
   bots,
   activity,
+  cost,
   missingComputer,
   onRefresh,
   onOpenComputer,
@@ -19,6 +58,7 @@ export function RunActivityStatus({
   messages: ThreadMessage[];
   bots: GroupAvatarMember[];
   activity?: string;
+  cost?: TaskCost;
   missingComputer?: boolean;
   onRefresh: () => Promise<void>;
   onOpenComputer?: () => void;
@@ -72,7 +112,10 @@ export function RunActivityStatus({
   );
   const latestSteps = liveMessage?.blocks.findLast((block) => block.kind === "steps");
   const latestTool = latestSteps?.kind === "steps" ? latestSteps.steps.at(-1)?.label : undefined;
-  const latestActivity = activity || latestTool;
+  const tail = liveMessage?.blocks.at(-1);
+  const scopedActivity = tail?.kind === "progress" && tail.activity ? tail.text : undefined;
+  const legacyActivity = messages.some(message => message.id.startsWith("progress:")) ? undefined : activity;
+  const latestActivity = scopedActivity || latestTool || legacyActivity;
   const showActivity = latestActivity && ["running", "quiet", "unknown", "recovering"].includes(health.state);
   const labels = {
     idle: t`Finished`,
@@ -97,47 +140,110 @@ export function RunActivityStatus({
       ? `${unit(Math.floor(minutes / 60), "hour")} ${unit(minutes % 60, "minute")}`
       : minutes > 0 ? unit(minutes, "minute") : unit(Math.floor(ms / 1000), "second");
   };
-  const timestamp = (value?: string | null) =>
-    value && Number.isFinite(Date.parse(value))
-      ? new Intl.DateTimeFormat(i18n.locale || "en", {
-          dateStyle: "medium",
-          timeStyle: "medium",
-        }).format(new Date(value))
-      : t`Not available`;
+  const describe = (value: string) => {
+    switch (activityKind(value)) {
+      case "history": return t`Searching conversation history…`;
+      case "tests": return t`Running tests…`;
+      case "changes": return t`Reviewing changes…`;
+      case "editing": return t`Editing files…`;
+      case "files": return t`Reviewing files…`;
+      case "web": return t`Searching the web…`;
+      case "server": return t`Working on the server…`;
+      case "image": return t`Preparing an image…`;
+      case "schedule": return t`Managing a routine…`;
+      case "message": return t`Coordinating with another agent…`;
+      case "build": return t`Building the project…`;
+      case "command": return t`Running a command…`;
+      default: return t`Using a tool…`;
+    }
+  };
+  const toolSteps = latestSteps?.kind === "steps" ? latestSteps.steps : [];
+  const describeTool = (name: string, detail?: string) => {
+    const reported = detail && activityKind(detail) !== "tool" ? detail : name;
+    switch (activityKind(reported)) {
+      case "history": return t`Conversation history search`;
+      case "tests": return t`Tests`;
+      case "files": return t`Files`;
+      case "command": return t`Command`;
+      case "tool": return name.replaceAll("_", " ");
+      default: return describe(reported);
+    }
+  };
+  const recentSteps = toolSteps.slice(-8);
+  const toolEvents = useCommandActivity(run.id, run.botId, liveMessage ? observedTools(liveMessage.blocks) : []);
+  const runningTool = toolEvents.findLast(tool => tool.outcome === "running");
+  const settledTool = !toolEvents.some(tool => tool.outcome === "running") ? toolEvents.at(-1) : undefined;
+  const primaryLabel = health.state === "quiet" ? t`Waiting for an activity update…`
+    : health.state === "running" && settledTool ? settledTool.outcome === "error" ? t`A tool reported an error`
+      : settledTool.outcome === "paused" ? t`A tool is waiting for input` : t`Working · last action finished`
+    : showActivity && health.state === "running"
+    ? describe(runningTool?.command ?? latestActivity ?? "") : labels[health.state];
+  const timestamp = (value?: string | null) => value && Number.isFinite(Date.parse(value))
+    ? new Intl.DateTimeFormat(i18n.locale || "en", { dateStyle: "medium", timeStyle: "medium" }).format(new Date(value)) : t`Not available`;
+  const toolState = { running: t`Waiting for result`, succeeded: t`Finished`, error: t`Reported an error`, paused: t`Waiting for input` };
   return (
     <div className="flex min-w-0 items-start gap-2.5 px-1 py-2" data-testid="run-activity-status">
       <GroupAvatar members={bots} size={28} />
       <div className="min-w-0 max-w-full space-y-1 text-sm text-muted-foreground">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <p role="status" className="break-words text-foreground">{labels[health.state]}</p>
-          {health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="text-xs tabular-nums">
-            · {duration(health.elapsedMs)}
-          </span> : null}
-        </div>
-        {health.state === "blocked" ? (
-          <p>{t`No model has started. Configure a virtual computer to continue.`}</p>
-        ) : null}
-        <details key={run.id} className="text-xs">
-          <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{t`Execution details`}</summary>
-          {showActivity ? (
-            <p className="max-w-prose break-words text-sm" data-testid="latest-run-activity" aria-live="polite">
-              {t`Latest activity: ${latestActivity}`}
-            </p>
-          ) : null}
-          {health.state === "quiet" ? <p className="mt-2">{t`Worker connected · no recent output`}</p> : null}
-          {health.state === "unknown" ? <p className="mt-2">{t`Worker status is not available for this task.`}</p> : null}
-          {health.state === "quiet" || health.state === "unknown" || health.state === "recovering" ? (
-            <p className="mt-2 max-w-prose">{t`A long task is not stopped just because it has not produced new output.`}</p>
-          ) : null}
-          <dl className="mt-3 grid gap-x-4 gap-y-1 break-words sm:grid-cols-[auto_minmax(0,1fr)] [&_dt]:text-muted-foreground [&_dd]:text-foreground">
-            <dt>{t`Last worker signal`}</dt>
-            <dd>{timestamp(health.lastSignalAt)}</dd>
-            <dt>{t`Last output`}</dt>
-            <dd>{timestamp(health.lastOutputAt)}</dd>
-            <dt>{t`Worker lease valid until`}</dt>
-            <dd>{timestamp(run.leaseExpiresAt)}</dd>
-          </dl>
+        <details key={run.id} className="group/activity">
+          <summary className="flex w-fit max-w-full cursor-pointer list-none items-baseline gap-2 rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden" aria-label={t`Show task activity`}>
+            <span role="status" className={settledTool?.outcome === "error" && health.state === "running" ? "break-words text-destructive" : "break-words text-foreground"} aria-live="polite">{primaryLabel}</span>
+            {health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{t`Total`} {duration(health.elapsedMs)}</span> : null}
+            <ChevronDown aria-hidden="true" size={14} className="shrink-0 self-center transition-transform group-open/activity:rotate-180 motion-reduce:transition-none" />
+          </summary>
+          <div className="mt-2 max-w-prose space-y-3 text-xs">
+            <RunExecutionDetails run={run} cost={cost} />
+            <p>{t`Total time also includes the time between actions.`}</p>
+            {toolEvents.length ? <ol aria-label={t`Task activity`} className="max-h-72 space-y-3 overflow-y-auto py-1">
+              {toolEvents.map((tool, index) => {
+                const start = Date.parse(tool.commandStartedAt ?? "");
+                const end = tool.commandStatus === "running" ? serverNow : Date.parse(tool.commandFinishedAt ?? "");
+                const commandTime = Number.isFinite(start) && Number.isFinite(end) && end >= start ? formatToolActivityDuration(end - start) : null;
+                const callTime = !tool.commandStatus ? formatToolActivityDuration(tool.durationMs) : null;
+                return <li key={tool.id}>
+                <details>
+                  <summary className="cursor-pointer rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+                    <span className="text-foreground">{index + 1}. {describeTool(tool.name, tool.command ?? tool.detail)}</span>
+                    <span className={tool.outcome === "error" ? "ml-2 text-destructive" : "ml-2 text-muted-foreground"}>{tool.commandStatus === "running" ? t`Running` : !tool.commandStatus && tool.outcome === "succeeded" ? t`Tool returned` : toolState[tool.outcome]}</span>
+                    {commandTime ? <span className="ml-2 tabular-nums">{t`Command time`}: {commandTime}</span> : callTime ? <span className="ml-2 tabular-nums">{t`Tool call`}: {callTime}</span> : null}
+                  </summary>
+                  <div className="mt-1 space-y-1 pl-3 text-muted-foreground">
+                    {tool.command ? <><p>{t`Command`}</p><pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words">{tool.command}</pre></> : tool.detail ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words">{tool.detail}</pre> : <p>{tool.name}</p>}
+                    {tool.cwd ? <p className="break-all">{t`Working directory`}: {tool.cwd}</p> : null}
+                    {tool.exitCode != null ? <p>{t`Exit code`}: {tool.exitCode}</p> : null}
+                    {tool.commandStatus === "done" && !commandTime ? <p>{t`Command duration unavailable: its start was not observed.`}</p> : null}
+                    {tool.commandStatus ? <><p>{t`Output`}</p>{tool.output ? <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words">{tool.output}</pre> : <p>{tool.commandStatus === "running" ? t`No output yet.` : t`The command produced no text output.`}</p>}</> : null}
+                    {tool.outputTruncated ? <p>{t`Showing the last 12000 characters of output.`}</p> : null}
+                    {tool.error ? <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words text-destructive">{tool.error}</pre> : null}
+                    {!tool.commandStatus ? <p>{t`Only tool-call metadata is available; the command result has not been received.`}</p> : null}
+                  </div>
+                </details>
+              </li>})}
+            </ol> : recentSteps.length ? <ol aria-label={t`Task activity`} className="max-h-52 space-y-2 overflow-y-auto py-1">
+              {recentSteps.map((step, index) => <li key={`${index}:${step.label}`} className="flex items-baseline gap-2" aria-current={index === recentSteps.length - 1 ? "step" : undefined}>
+                <span aria-hidden="true" className="text-muted-foreground">·</span>
+                <span className={index === recentSteps.length - 1 ? "text-foreground" : "text-muted-foreground"}>{describe(step.label)}</span>
+                {step.count > 1 ? <span className="text-muted-foreground tabular-nums">×{step.count}</span> : null}
+              </li>)}
+            </ol> : <p>{showActivity ? describe(latestActivity ?? "") : t`No steps reported yet.`}</p>}
+            {!toolEvents.length ? <p>{t`Only tool summaries are available for earlier activity; individual results were not reported to this view.`}</p> : null}
+            {health.state === "blocked" ? <p>{t`No model has started. Configure a virtual computer to continue.`}</p> : null}
+            {health.state === "unknown" ? <p>{t`Worker status is not available for this task.`}</p> : null}
+            <details className="text-muted-foreground">
+              <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{t`Technical details`}</summary>
+              <dl className="grid gap-x-4 gap-y-1 break-words sm:grid-cols-[auto_minmax(0,1fr)]">
+                <dt>{t`Last worker signal`}</dt><dd>{timestamp(health.lastSignalAt)}</dd>
+                <dt>{t`Last output`}</dt><dd>{timestamp(health.lastOutputAt)}</dd>
+                <dt>{t`Worker lease valid until`}</dt><dd>{timestamp(run.leaseExpiresAt)}</dd>
+              </dl>
+              {showActivity ? <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words" data-testid="latest-run-activity">{t`Latest activity: ${latestActivity}`}</pre> : null}
+              {recentSteps.length ? <ol className="mt-2 space-y-2">{recentSteps.map((step,index) => <li key={index}><code className="whitespace-pre-wrap break-words">{step.label}</code>{step.count > 1 ? ` ×${step.count}` : ""}</li>)}</ol> : null}
+              {health.state === "quiet" ? <p className="mt-2">{t`Worker connected · no recent output`}</p> : null}
+              {health.state === "quiet" || health.state === "unknown" || health.state === "recovering" ? <p className="mt-2">{t`A long task is not stopped just because it has not produced new output.`}</p> : null}
+            </details>
+          </div>
         </details>
+        {health.state === "quiet" ? <p role="status" className="max-w-prose text-xs">{t`No new activity for ${duration(health.outputAgeMs ?? health.elapsedMs)}. This does not confirm a failure; the executor has not reported a new step.`}</p> : null}
         {health.state === "blocked" && onOpenComputer ? (
           <Button variant="ghost" size="sm" onClick={onOpenComputer}>{t`View computer`}</Button>
         ) : null}

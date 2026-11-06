@@ -1,3 +1,4 @@
+import { answerSideQuestion } from "../side-question.js";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@rakazo/adapter-kit";
 import { settleCallRequest } from "@rakazo/adapters";
@@ -73,6 +74,16 @@ export function threadsRoutes(ctx: RouterContext) {
   const { deps, authed, callsEnabled } = ctx;
   return {
     threads: {
+      sideQuestionAvailable: authed.threads.sideQuestionAvailable.handler(async ({ context, input }) => {
+        await resolveThreadTarget(deps.prisma, context.actor, input);
+        return { available: Boolean(deps.sideQuestions) };
+      }),
+      sideQuestion: authed.threads.sideQuestion.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
+        return answerSideQuestion(deps, context.actor, target, input, context.signal);
+      }),
+
       prepareProject: authed.threads.prepareProject.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, {
           botId: input.botId, taskThreadId: input.taskThreadId,

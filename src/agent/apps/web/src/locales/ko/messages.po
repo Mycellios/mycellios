@@ -670,10 +670,9 @@ msgstr "다른 어시스턴트"
 msgid "Answer"
 msgstr "답변"
 
-#: src/components/call/IncomingCall.tsx
-msgctxt "incoming call"
+#: src/components/AskCard.tsx
 msgid "Answer"
-msgstr ""
+msgstr "답변"
 
 #: src/components/AskCard.tsx
 msgid "Answered"
@@ -6124,37 +6123,30 @@ msgstr "이 모델 사용"
 msgid "Use your own key"
 msgstr "내 키 사용"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "적립한 크레딧과 구분되는 프로모션 크레딧"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "모델이 답변을 끝내기 전에 출력 한도에 도달했습니다."
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "화면이 연결되지 않음"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "화면 연결이 종료되었습니다."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "화면이 응답하지 않았습니다."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "화면 링크가 만료되었습니다."
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx

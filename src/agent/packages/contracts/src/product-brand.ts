@@ -2,6 +2,8 @@
 export const productBrand = {
   name: "Mycellios Agent",
   shortName: "Mycellios",
+  communityDiscordUrl: "https://discord.com/",
+  communityXUrl: "https://x.com/mycellios",
   companionName: "Mico",
   companionPlural: "Micos",
   tokenName: "Spore",

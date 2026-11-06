@@ -14,6 +14,7 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   const desktop = desktopBridge();
   const runtime = desktop?.runtime;
   const [node, setNode] = useState<Status | null>(null);
+  const [requested, setRequested] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [needsIdentity, setNeedsIdentity] = useState(false);
@@ -50,7 +51,7 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
     if (!runtime || !supported) { window.location.assign(new URL("/browser/", productBrand.apiBaseUrl).href); return; }
     const action = node?.enabled === true ? "pause" : "resume";
     revision.current++; operating.current = true;
-    setBusy(true); setError(false);
+    setRequested(true); setBusy(true); setError(false);
     try {
       let local = await runtime.status();
       // A verification click stays read-only even if another process has already
@@ -80,7 +81,7 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   const hasError = error || Boolean(node?.rejected);
   const label = busy ? needsIdentity ? t`Verifying this computer…` : t`Setting up contribution…`
     : needsIdentity ? t`Verify this computer` : hasError ? t`Retry`
-    : waiting ? t`Waiting for this computer…` : active ? t`Pause contribution` : t`Contribute compute`;
+    : waiting ? t`Waiting for this computer…` : active ? t`Pause contribution` : t`Earn credits with your computer`;
   const detail = needsIdentity ? error ? t`Could not verify this computer. Try again or open the dashboard.` : t`Verify the existing installation before contributing.`
     : hasError ? t`Could not confirm contribution. Try again or open the dashboard.`
     : !runtime || !supported ? t`Use this browser to contribute while the page stays open.`
@@ -91,18 +92,19 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   const Icon = spinning ? LoaderCircle : needsIdentity || hasError ? RefreshCw : active ? Pause : Play;
   return <div className={mini ? "shrink-0 px-2 py-1" : "shrink-0 px-3 pt-2"}>
     {!runtime || !supported ? <a href={new URL("/browser/", productBrand.apiBaseUrl).href}
-      target="_blank" rel="noopener noreferrer" aria-label={t`Contribute in browser`}
-      title={mini ? t`Contribute in browser` : undefined}
-      className={buttonVariants({ variant: "ghost", className: "min-h-10 w-full justify-start gap-2 px-2 text-left text-xs font-normal whitespace-normal" })}>
+      target="_blank" rel="noopener noreferrer" aria-label={t`Earn credits with your computer`}
+      title={mini ? t`Earn credits with your computer` : undefined}
+      className={buttonVariants({ variant: "ghost", className: "min-h-10 w-full justify-start gap-2 px-2 text-left text-xs font-normal truncate" })}>
       <Cpu className="size-4 shrink-0" />
-      {!mini && <span className="min-w-0 break-words">{t`Contribute in browser`}</span>}
+      {!mini && <span className="min-w-0 truncate">{t`Earn credits with your computer`}</span>}
     </a> :
     <Button variant="ghost" className="h-auto min-h-10 w-full justify-start gap-2 px-2 py-2 text-left font-normal"
       onClick={() => { if (hasError && !needsIdentity) void refresh(); else void toggle(); }} disabled={busy || (waiting && !hasError)} aria-label={label} title={mini ? `${label}. ${detail}` : undefined}>
       {mini ? <Cpu className="size-4 shrink-0" /> : <Icon className={`size-4 shrink-0 ${spinning ? "animate-spin motion-reduce:animate-none" : ""}`} />}
-      {!mini && <span className="min-w-0 break-words text-xs">{label}</span>}
+      {!mini && <span className="min-w-0 truncate text-xs">{label}</span>}
     </Button>}
-    {!mini && <p role={hasError ? "alert" : "status"} className={`px-2 pb-1 text-[11px] leading-relaxed ${hasError ? "text-destructive" : "text-muted-foreground"}`}>{detail}</p>}
-    {!mini && hasError && <a className="px-2 text-xs underline" href={new URL("/dashboard?view=contribute", productBrand.apiBaseUrl).href}>{t`Open dashboard`}</a>}
+    {!mini && (requested || active || waiting) && <p role={hasError ? "alert" : "status"} className={`px-2 pb-1 text-[11px] ${hasError ? "text-destructive" : "text-muted-foreground"}`}>{detail}</p>}
+    {!mini && <details className="px-2 text-[11px] text-muted-foreground"><summary className="w-fit cursor-pointer">{t`How it works`}</summary><p className="py-1">{t`Contribution is optional. Share processing power and earn credits for verified work.`}</p>{hasError ? <a className="underline" href={new URL("/dashboard?view=contribute", productBrand.apiBaseUrl).href}>{t`Open dashboard`}</a> : null}</details>}
+
   </div>;
 }

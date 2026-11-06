@@ -200,7 +200,20 @@ import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
 import type { TaskThreadScope } from "../lib/task-thread-scope";
 import { MicoTaskTabs } from "../components/MicoTaskTabs";
 import { MicoWorkMenu } from "../components/MicoWorkMenu";
-import { WorkflowWorkspace } from "./WorkflowWorkspace";
+import { WorkflowWorkspace } from "./workflows/WorkflowWorkspace";
+import { RoutineWorkspace } from "./routines/RoutineWorkspace";
+import { TasksWorkspace } from "./tasks/TasksWorkspace";
+import { ScheduleWorkspace } from "./schedule/ScheduleWorkspace";
+import { UsageWorkspace } from "./usage/UsageWorkspace";
+import { MarketplaceWorkspace } from "./marketplace/MarketplaceWorkspace";
+import { marketplaceTab, type MarketplaceTab } from "./marketplace/catalog";
+import { WorkspaceRail } from "./shell/workspace-rail";
+import { useChatHistory } from "./shell/use-chat-history";
+import { ChatHeaderModel } from "./shell/chat-header-model";
+import { ChatToolsPanel, ChatToolsMenu } from "./shell/chat-tools-panel";
+import { VoiceConversation } from "../components/call/VoiceConversation";
+import { ProviderQuota } from "../components/ProviderQuota";
+import { HelpMenu } from "../components/HelpMenu";
 import { unsafeRunRetryText } from "../lib/retry-error";
 import { canRetryThreadRun, retryOriginalThreadRun } from "../lib/retry-thread-run";
 import { readSeenRunErrorIds, rememberSeenRunErrorId } from "../lib/run-error-storage";
@@ -299,9 +312,7 @@ const SettingsOverlay = lazyOverlay(() =>
 const PeerMessagesOverlay = lazyOverlay(() =>
   import("./PeerMessagesOverlay").then((module) => module.PeerMessagesOverlay),
 );
-const PluginsOverlay = lazyOverlay(() =>
-  import("./PluginsOverlay").then((module) => module.PluginsOverlay),
-);
+
 const AppsOverlay = lazyOverlay(() => import("./AppsOverlay").then(module => module.AppsOverlay));
 const McpServersOverlay = lazyOverlay(() =>
   import("./McpServersOverlay").then((module) => module.McpServersOverlay),
@@ -338,7 +349,7 @@ export function ShellPage() {
   const spaceEpoch = useSpaceEpoch();
   const reviewTarget = useParams();
   const [taskSearch] = useSearchParams();
-  const taskThreadId = reviewTarget.botId ? taskSearch.get("task") || undefined : undefined;
+  const taskThreadId = reviewTarget.botId && !taskSearch.has("view") ? taskSearch.get("task") || undefined : undefined;
   const taskSpaceId = taskThreadId ? taskSearch.get("taskSpace") || selectedSpaceId() : selectedSpaceId();
   const taskScope = useMemo(() => taskThreadId && reviewTarget.botId
     ? { botId: reviewTarget.botId, taskThreadId } : undefined, [reviewTarget.botId, taskThreadId]);
@@ -363,6 +374,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const rpc = useSpaceRpc();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const chatHistory = useChatHistory();
+  const [taskAgentsOpen, setTaskAgentsOpen] = useState(false);
+  const [chatToolsOpen, setChatToolsOpen] = useState(true);
+  const [voiceConversation, setVoiceConversation] = useState<{ id: string; name: string; color: string } | null>(null);
   const projectCollection = useProjects(rpc, userId ?? null, shellSpaceId);
   const [creatingProject, setCreatingProject] = useState(false);
   const activeProject = projectCollection.projects.find(project => project.conversations.some(chat => chat.threadId === taskScope?.taskThreadId));
@@ -459,7 +474,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const [replyTarget, setReplyTarget] = useState<ThreadMessage | null>(null);
   const [replyQuote, setReplyQuote] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  const [workflowsOpen, setWorkflowsOpen] = useState(false);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
   const retryInFlight = useRef<string | null>(null);
   const [unretryableRunIds, setUnretryableRunIds] = useState<Set<string>>(() => new Set());
@@ -3501,6 +3515,44 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       }}
     />
   ) : null;
+  const chatTools = {
+    onBrowser: () => { setVoiceConversation(null); setPanel(null); reviewWorkspace?.show(); },
+    onFiles: () => navigate("/app/artifacts"),
+    onSettings: () => { setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(inGroup ? "group-settings" : "settings"); },
+    onVoice: !inGroup && active ? () => { reviewWorkspace?.hide(); setPanel(null); setVoiceConversation({ id: active.id, name: active.name, color: active.color }); } : undefined,
+  };
+  const marketplaceView = searchParams.get("view") === "marketplace" || overlay?.kind === "integrations";
+  function showMarketplace(tab:MarketplaceTab="apps") {
+    if(activityMode) toggleActivityMode(); setVoiceConversation(null); reviewWorkspace?.hide();setPanel(null);setComputerOpen(false);
+    const next=withShellOverlay(searchParams,null);next.set("view","marketplace");next.set("market",tab);next.delete("task");next.delete("routine");setSearchParams(next);setMobileSidebarOpen(false);
+  }
+  useEffect(()=>{if(searchParams.has("integrations")){const next=withShellOverlay(searchParams,null);next.set("view","marketplace");next.set("market","apps");setSearchParams(next,{replace:true});}},[searchParams,setSearchParams]);
+  const workflowView = searchParams.get("view") === "workflows";
+  const usageView = searchParams.get("view") === "usage";
+  const showUsage = () => { if (activityMode) toggleActivityMode(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(null); setComputerOpen(false); const next = new URLSearchParams(searchParams); next.set("view", "usage"); next.delete("task"); next.delete("routine"); setSearchParams(next); setMobileSidebarOpen(false); };
+  const scheduleView = searchParams.get("view") === "schedule";
+  const showSchedule = () => { if (activityMode) toggleActivityMode(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(null); setComputerOpen(false); const next = new URLSearchParams(searchParams); next.set("view", "schedule"); next.delete("task"); next.delete("routine"); setSearchParams(next); setMobileSidebarOpen(false); };
+  const taskView = searchParams.get("view") === "tasks";
+  const showTasks = () => { if (activityMode) toggleActivityMode(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(null); setComputerOpen(false); const next = new URLSearchParams(searchParams); next.set("view", "tasks"); next.delete("task"); setSearchParams(next); setMobileSidebarOpen(false); };
+  const showWorkflows = () => { if (activityMode) toggleActivityMode(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(null); setComputerOpen(false); const next = new URLSearchParams(searchParams); next.set("view", "workflows"); next.delete("flow"); setSearchParams(next); };
+  const routineView = searchParams.get("view") === "routines";
+  const exitRoutineView = () => {
+    const next = new URLSearchParams(searchParams); next.delete("view"); next.delete("flow"); next.delete("task");
+    setSearchParams(next); setPanel(null);
+  };
+  const showRoutines = () => {
+    if (activityMode) toggleActivityMode();
+    setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(null);
+    if (inGroup || !active) {
+      const first = bots[0];
+      if (first) navigate(`/app/${first.id}?view=routines`);
+      else setCreateBotOpen(true);
+    } else {
+      const next = new URLSearchParams(searchParams); next.set("view", "routines"); next.delete("m"); next.delete("routine");
+      setSearchParams(next);
+    }
+  };
+  const openRosterChat = (spaceId: string, path: string) => openSpaceChat(spaceId, routineView && /^\/app\/[^/]+$/.test(path) ? `${path}?view=routines` : path);
   const shell = (
     <>
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
@@ -3518,10 +3570,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         reviewWorkspace.add({ id: crypto.randomUUID(), url: destination, name: new URL(destination).host, mimeType: "text/uri-list" });
       }}
       onPreviewCollapsedChange={setBotsSidebarCollapsed}
-      computerOpen={computerOpen}
+      computerOpen={computerOpen || marketplaceView || workflowView || scheduleView || usageView || (taskView && !taskAgentsOpen)}
+      data-workspace-chrome="compact"
+      data-task-desktop={Boolean(desktopBridge())}
       data-testid="shell-root"
       data-ready={shellReady}
-      className="relative flex h-full min-h-0 min-w-0 overflow-hidden bg-background text-foreground/90 [&[data-resizing-sidebar]_*[data-slot=sidebar-gap]]:transition-none [&[data-resizing-sidebar]_*[data-slot=sidebar-container]]:transition-none"
+      className={`${marketplaceView ? "rk-task-shell rk-market-shell" : usageView ? "rk-task-shell rk-usage-shell" : scheduleView ? "rk-task-shell rk-schedule-shell" : taskView ? "rk-task-shell" : ""} relative flex h-full min-h-0 min-w-0 overflow-hidden bg-background text-foreground/90 [&[data-resizing-sidebar]_*[data-slot=sidebar-gap]]:transition-none [&[data-resizing-sidebar]_*[data-slot=sidebar-container]]:transition-none`}
       onTouchStartCapture={(event) => {
         if (
           mobileSidebarOpen ||
@@ -3583,7 +3637,30 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           mobileSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       />
-      <Sidebar
+      <WorkspaceRail
+        marketplace={marketplaceView}
+        scope={JSON.stringify([userId, currentSpaceId])}
+        usage={usageView}
+        schedule={scheduleView}
+        onSchedule={showSchedule}
+        tasks={taskView}
+        onTasks={showTasks}
+        activity={activityMode}
+        workflows={workflowView}
+        onWorkflows={showWorkflows}
+        routines={routineView}
+        onRoutines={showRoutines}
+        onChats={() => { exitRoutineView(); if (activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); }}
+        onActivity={() => { exitRoutineView(); if (!activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); }}
+        onArtifacts={() => navigate("/app/artifacts")}
+        onIntegrations={() => setOverlay({ kind: "integrations" })}
+        onUsage={showUsage}
+        onSettings={() => openSettings("general")}
+        onModels={isMobileSidebar ? undefined : () => openSettings("models")}
+        onWhatsNew={() => setReleaseNotesOpen(true)}
+        onBoard={bootstrapMe?.ticketBoardEnabled ? () => navigate("/app/board") : undefined}
+      />
+      {(!marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen ? <Sidebar
         collapsible={isMobileSidebar ? "none" : "icon"}
         side={document.documentElement.dir === "rtl" ? "right" : "left"}
         data-testid="bots-sidebar"
@@ -3599,6 +3676,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         }
       >
         <SidebarHeader
+          spaces={spaces} spaceId={currentSpaceId} onSpace={openRosterChat}
+          onSpaceSettings={() => currentSpaceId ? openSpaceSettings(currentSpaceId) : openSettings("general")}
+          history={chatHistory} onRoutines={showRoutines} onWorkflows={showWorkflows}
+          onTasks={showTasks} onSchedule={showSchedule} onUsage={showUsage}
           mini={miniSidebar}
           createMenuOpen={createMenuOpen}
           setCreateMenuOpen={setCreateMenuOpen}
@@ -3764,6 +3845,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         <div className={miniSidebar ? "hidden" : "contents"}>
           <PasskeyOffer />
         </div>
+        {isMobileSidebar ? <><ProviderQuota scope={JSON.stringify([userId,currentSpaceId])} onModels={() => openSettings("models")} onUsage={showUsage} compact={false} /><HelpMenu compact={false} onWhatsNew={() => setReleaseNotesOpen(true)} /></> : null}
         <SidebarContribution mini={miniSidebar} />
         {!miniSidebar ? <MycelliosCredits key={userId} ownerId={userId ?? ""} /> : null}
         <SidebarFooter
@@ -3812,7 +3894,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           signingOut={signingOut}
           logOutError={logOutError}
         />
-      </Sidebar>
+      </Sidebar> : null}
 
       {/* Keep the composer's z-index inside the chat so phone overlays like the side panel cover it. */}
       <main
@@ -3830,11 +3912,23 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           />
         ) : null}
         <CallReturnBar />
+        {marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} key={JSON.stringify([userId,currentSpaceId])} tab={marketplaceTab(searchParams.get("market"))} onTab={showMarketplace} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onOpenBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onOpenBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /> : routineView && active && !inGroup ? <RoutineWorkspace
+          key={JSON.stringify([userId, currentSpaceId, active.id])}
+          bot={active}
+          client={rpc}
+          scope={JSON.stringify([userId, currentSpaceId])}
+          messages={activeSnapshot?.messages ?? []}
+          selectedId={searchParams.get("flow")}
+          onSelect={routineId => { const next = new URLSearchParams(searchParams); next.set("flow", routineId); setSearchParams(next, { replace: true }); }}
+          onEdit={startRoutine}
+          onAsk={routine => { reviewWorkspace?.comment(t`I want to edit the routine “${routine.name}”. Changes: `); exitRoutineView(); }}
+          onExit={exitRoutineView}
+          onNavigation={() => setMobileSidebarOpen(true)}
+          editorOpen={Boolean(panel)}
+        /> : <>
         {/* The header floats so the transcript scrolls under its buttons. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {/* Only the pills take input; the gaps pass clicks and scrolling to the transcript. */}
-          <div aria-hidden="true" className="app-drag absolute inset-x-0 top-0 z-10 h-3" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 grid grid-cols-[1fr_minmax(0,auto)_1fr] items-center gap-2 px-3 py-[13px] md:px-[22px] [&_button]:pointer-events-auto">
+          <div data-testid="conversation-header" className={`${desktopBridge() ? "app-drag" : ""} rk-conversation-header relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 [&_button]:pointer-events-auto`}>
             <div className="flex items-center">
               <Button
                 variant="floating"
@@ -3850,7 +3944,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               variant="floating"
               data-testid="bot-settings-trigger"
               onClick={() => setPanel(inGroup ? "group-settings" : "settings")}
-              className="app-no-drag h-auto min-w-0 gap-2 py-1 ps-1 pe-3.5"
+              className="app-no-drag h-8 min-w-0 max-w-[40%] gap-2 rounded-md px-1.5"
             >
               {inGroup ? (
                 <GroupAvatar
@@ -3873,7 +3967,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 </span>
               </span>
             </Button>
-            <div className="flex items-center justify-self-end gap-2">
+            <div className="app-no-drag ms-auto flex min-w-0 items-center gap-1">
+              {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={async patch => {
+                const updated = await rpc.bots.update({ botId: active.id, ...patch });
+                setBots(current => current.map(bot => bot.id === updated.id ? updated : bot));
+                await refreshBots().catch(() => undefined);
+              }} /> : null}
               {bootstrapMe?.phoneCallsEnabled && !inGroup && active && !taskScope ? (
                 <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
                   <Button
@@ -3895,9 +3994,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   </Button>
                 </IconTooltip>
               ) : null}
-              {(active || activeGroup) && <IconTooltip label={t`Open browser`}>
-                <Button variant="floating" size="icon-lg" aria-label={t`Open browser`} aria-pressed={reviewWorkspace?.open} onClick={() => { setPanel(null); reviewWorkspace?.show(); }} className="app-no-drag"><PanelRightOpen size={18}/></Button>
-              </IconTooltip>}
+              {(active || activeGroup) && <><IconTooltip label={t`Chat tools`}><Button variant="ghost" size="icon-sm" aria-label={t`Chat tools`} aria-expanded={chatToolsOpen} onClick={() => setChatToolsOpen(open => !open)} className="app-no-drag hidden min-[1100px]:inline-flex"><PanelRightOpen size={17}/></Button></IconTooltip><ChatToolsMenu {...chatTools} /></>}
               {!inGroup && active ? (
                 <IconTooltip label={t`Agent computer`}>
                   <Button
@@ -3921,11 +4018,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               ) : null}
             </div>
           </div>
-          {active && !inGroup && !activeProject ? <div className="absolute inset-x-0 top-16 z-10 px-3 md:px-[22px]">
+          {active && !inGroup && !activeProject ? <div className="shrink-0 px-3 py-1">
             <MicoTaskTabs key={active.id} botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc}
               actions={<><MicoWorkMenu key={active.id} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
                 onOpenTask={task => navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" })} />
-                <Button size="sm" variant="ghost" onClick={() => setWorkflowsOpen(true)}><Trans>Workflows</Trans></Button></>}
+                <Button size="sm" variant="ghost" onClick={showWorkflows}><Trans>Workflows</Trans></Button></>}
               onSelect={threadId => {
               const next = new URLSearchParams(searchParamsRef.current);
               next.delete("m");
@@ -3942,7 +4039,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             </div>
           ) : (
             <Transcript
-              headerTabs={Boolean(active && !inGroup && !activeProject)}
+              headerTabs={false}
               key={activeSnapshot?.threadId}
               scrollRef={messageScroll}
               scrollRequest={scrollRequest}
@@ -3965,6 +4062,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               dismissableAskIds={dismissableAskIds}
               running={transcriptRunning}
               workingBots={workingBots}
+              lastRun={activeSnapshot?.run}
               activeRun={workingRuns.find((run) => Boolean(run.startedAt)) ?? workingRuns[0]}
               missingComputer={
                 !inGroup &&
@@ -4092,6 +4190,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               onRemoveAttachment={removeAttachment}
               onSend={sendMessage}
               onStop={stopRun}
+              onOpenVoice={!inGroup && active ? chatTools.onVoice : undefined}
+              voiceConversationActive={Boolean(voiceConversation)}
               dictationTranscribe={voiceStatus ? Boolean(voiceStatus.transcribe) : undefined}
               artifactTarget={transcriptArtifactTarget}
               replyTarget={activeReplyTarget}
@@ -4117,9 +4217,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             />
           </div>
         ) : null}
+        </>}
       </main>
 
-      {workflowsOpen && active ? <WorkflowWorkspace botId={active.id} bots={bots} onClose={() => setWorkflowsOpen(false)} /> : null}
+      {voiceConversation ? <VoiceConversation key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
+      {!marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && chatToolsOpen && !voiceConversation && !panel && !reviewWorkspace?.open ? <ChatToolsPanel {...chatTools} onClose={() => setChatToolsOpen(false)} /> : null}
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall
         bots={bootstrapMe?.phoneCallsEnabled ? bots : []}
@@ -4546,14 +4648,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
 
         {deleteRoutineDialogProps ? <DeleteItemDialog {...deleteRoutineDialogProps} /> : null}
 
-        {overlay?.kind === "integrations" ? (
-          <PluginsOverlay
-            onConnectedAppsChange={setFooterLogos}
-            activeBotId={activeBotId.current}
-            onClose={() => setOverlay(null)}
-            onOpenMcp={() => setOverlay({ kind: "mcp" })}
-          />
-        ) : null}
         {videoStudioEnabled(import.meta.env.VITE_MYCELLIOS_VIDEO_STUDIO) && overlay?.kind === "apps" ? <AppsOverlay key={`${userId}:${currentSpaceId}`} scope={`${userId}:${currentSpaceId}`} onClose={() => setOverlay(null)} /> : null}
         {overlay?.kind === "mcp" ? (
           <McpServersOverlay editServerId={overlay.serverId} onClose={() => setOverlay(null)} />

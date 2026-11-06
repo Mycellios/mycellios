@@ -6124,37 +6124,30 @@ msgstr "Используйте эту модель"
 msgid "Use your own key"
 msgstr "Использовать свой ключ"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "Промокредиты отдельно от заработанных"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "Модель достигла лимита вывода, не закончив ответ."
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "Экран не подключён"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "Соединение с экраном закрыто."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "Экран не ответил."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "Срок действия ссылки на экран истёк."
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx

@@ -10,6 +10,7 @@ export type DictationSnapshot = {
   status: "idle" | "listening" | "transcribing";
   transcript: string;
   error?: string;
+  level?: number;
 };
 
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
@@ -21,6 +22,7 @@ interface SpeechRecognitionLike {
   onresult: ((event: { resultIndex: number; results: SpeechRecognitionResultList }) => void) | null;
   onerror: ((event: { error?: string }) => void) | null;
   onend: (() => void) | null;
+  onspeechstart?: (() => void) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -180,8 +182,11 @@ export class Dictation {
   private restartTimer: ReturnType<typeof setTimeout> | undefined;
   private transcribeAbort: AbortController | null = null;
   private audioContext: AudioContext | null = null;
+  private meterStream: MediaStream | null = null;
   private vadTimer: ReturnType<typeof setInterval> | undefined;
   private onFinal: ((text: string) => void) | null = null;
+  private onSpeechStart: (() => void) | undefined;
+  private recordingLimit?: ReturnType<typeof setTimeout>;
 
   subscribe(fn: (s: DictationSnapshot) => void): () => void {
     this.watchers.add(fn);
@@ -201,6 +206,7 @@ export class Dictation {
   }
 
   stop(reason: "submit" | "cancel" | "replace" = "cancel") {
+    clearTimeout(this.recordingLimit);
     this.token += 1;
     this.transcribeAbort?.abort();
     this.transcribeAbort = null;
@@ -238,17 +244,25 @@ export class Dictation {
 
   async listen(opts: {
     mode: DictationMode;
+    spaceId?: string | null;
     transcribe?: boolean;
     preferServer?: boolean;
     endpointMs?: number;
     onFinal: (text: string) => void;
+    onSpeechStart?: () => void;
   }): Promise<void> {
     this.stop("replace");
     const mine = this.token;
-    const spaceId = selectedSpaceId();
+    const spaceId = opts.spaceId !== undefined ? opts.spaceId : selectedSpaceId();
     this.onFinal = opts.onFinal;
+    this.onSpeechStart = opts.onSpeechStart;
     this.set({ status: "listening", transcript: "" });
     const transcribe = Boolean(opts.transcribe);
+    if (typeof window !== "undefined" && window.rakazoDesktop?.localVoice && (await window.rakazoDesktop.localVoice.status()).ready) {
+      if (this.token !== mine) return;
+      await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
+      return;
+    }
     // An unknown capability is not a refusal: a device whose browser cannot hold the
     // microphone open goes to the server even before the voice status has loaded.
     if ((opts.preferServer || prefersServerDictation()) && opts.transcribe !== false) {
@@ -290,6 +304,7 @@ export class Dictation {
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = recognitionLanguage();
+    rec.onspeechstart = () => { if (live && this.token === mine) this.onSpeechStart?.(); };
     // Chrome numbers results per session, so a restart starts over: keep the earlier text.
     let carried = "";
     let sessionStartedAt = Date.now();
@@ -329,6 +344,8 @@ export class Dictation {
         return;
       }
       live = false;
+      this.stopVad();
+      this.releaseRecognition(rec);
       this.set({
         ...IDLE,
         error: event.error ? `Dictation failed: ${event.error}` : "Dictation failed.",
@@ -377,6 +394,7 @@ export class Dictation {
       restart();
     };
     this.recognition = rec;
+    if (this.onSpeechStart) void this.startRecognitionMeter(mine);
     try {
       sessionStartedAt = Date.now();
       rec.start();
@@ -389,6 +407,7 @@ export class Dictation {
       }
       live = false;
       this.releaseRecognition(rec);
+      this.stopVad();
       this.set({ ...IDLE, error: "Dictation failed." });
     }
   }
@@ -402,6 +421,7 @@ export class Dictation {
   ) {
     const recognized = normalizedTranscript(this.snapshot.transcript);
     this.releaseRecognition(rec);
+    this.stopVad();
     clearTimeout(this.silenceTimer);
     this.silenceTimer = undefined;
     if (this.token !== mine) return;
@@ -410,6 +430,7 @@ export class Dictation {
   }
 
   private releaseRecognition(rec: SpeechRecognitionLike) {
+    rec.onspeechstart = null;
     rec.onresult = null;
     rec.onerror = null;
     rec.onend = null;
@@ -458,10 +479,12 @@ export class Dictation {
       media.onstop = () => {
         for (const track of stream.getTracks()) track.stop();
         if (this.token !== mine) return;
+        clearTimeout(this.recordingLimit);
         this.stopVad();
         void this.transcribeChunks(mine, spaceId);
       };
       media.start(mode === "endpoint" ? 250 : undefined);
+      this.recordingLimit = setTimeout(() => { if (this.token === mine && media && media.state !== "inactive") media.stop(); }, 60_000);
     } catch (error) {
       if (media) {
         media.ondataavailable = null;
@@ -494,6 +517,7 @@ export class Dictation {
       const data = new Uint8Array(analyser.fftSize);
       let heardSpeech = alreadyHeard;
       let silentFor = 0;
+      let speechTicks = 0;
       this.vadTimer = setInterval(() => {
         const media = this.media;
         if (this.token !== mine || !media || media.state === "inactive") return;
@@ -504,11 +528,14 @@ export class Dictation {
           sum += n * n;
         }
         const rms = Math.sqrt(sum / data.length);
+        this.set({ ...this.snapshot, level: Math.min(1, rms * 8) });
         if (rms > SILENCE_RMS) {
+          if (++speechTicks === 4) this.onSpeechStart?.();
           heardSpeech = true;
           silentFor = 0;
           return;
         }
+        speechTicks = 0;
         if (!heardSpeech) return;
         silentFor += ENDPOINT_TICK_MS;
         if (silentFor < endpointMs) return;
@@ -526,7 +553,30 @@ export class Dictation {
     }
   }
 
+  private async startRecognitionMeter(mine: number) {
+    const Ctor = audioContextCtor();
+    if (!Ctor || !navigator.mediaDevices?.getUserMedia) return;
+    let stream: MediaStream | undefined;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (mine !== this.token || !this.recognition) { stream.getTracks().forEach(track => track.stop()); return; }
+      const ctx = new Ctor(), analyser = ctx.createAnalyser();
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      this.meterStream = stream; this.audioContext = ctx;
+      void ctx.resume().catch(() => undefined);
+      const samples = new Uint8Array(analyser.fftSize);
+      this.vadTimer = setInterval(() => {
+        if (mine !== this.token || !this.recognition) return;
+        analyser.getByteTimeDomainData(samples);
+        const rms = Math.sqrt(samples.reduce((sum, sample) => sum + ((sample - 128) / 128) ** 2, 0) / samples.length);
+        this.set({ ...this.snapshot, level: Math.min(1, rms * 8) });
+      }, ENDPOINT_TICK_MS);
+    } catch { stream?.getTracks().forEach(track => track.stop()); }
+  }
+
   private stopVad() {
+    this.meterStream?.getTracks().forEach(track => track.stop());
+    this.meterStream = null;
     clearInterval(this.vadTimer);
     this.vadTimer = undefined;
     const ctx = this.audioContext;
@@ -555,6 +605,20 @@ export class Dictation {
       TRANSCRIPTION_RESPONSE_TIMEOUT_MS,
     );
     try {
+      const native = typeof window !== "undefined" ? window.rakazoDesktop?.localVoice : undefined;
+      if (native && (await native.status()).ready) {
+        const context = new AudioContext();
+        try {
+          const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+          const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+          const source = offline.createBufferSource(); source.buffer = decoded; source.connect(offline.destination); source.start();
+          const samples = (await offline.startRendering()).getChannelData(0);
+          if (this.token !== mine) return;
+          const result = await native.transcribe(samples);
+          if (this.token === mine) this.finish(result.text ?? "", mine);
+          return;
+        } finally { await context.close(); }
+      }
       const audioBase64 = await blobToBase64(blob);
       if (this.token !== mine) return;
       const res = await withAbort(
@@ -626,6 +690,7 @@ export class Dictation {
       this.finish(prefix, mine, showError ? message : undefined);
       return;
     }
+    this.stopVad();
     this.set({ ...IDLE, error: message });
   }
 

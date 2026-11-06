@@ -1,5 +1,31 @@
 # Status and evidence
 
+## Agent workspace reconciliation — source candidate, 2026-11-06
+
+The retained workspace screens are integrated on the current canonical Agent
+source: rail/pins, unified Marketplace, routine diagram, workflow canvas, task
+inbox, schedule and usage. Existing project conversations, Mico task ownership,
+searchable settings, private Apps admission and released Video Studio remain.
+Inbox metadata refers to the existing task threads and execution services. Chat
+cards retain the paper/stone palette. This source state is not a deployment or
+a new installed Desktop version.
+
+Remote Linux qualification passed incremental web/API/worker/Desktop types,
+focused tests, web/API builds and an isolated PostgreSQL acceptance: additive
+migration, duplicate-start identity, independent tasks, existing task-tab visibility,
+archive/send guards, owner/Space isolation and database row-level security.
+Real browser controls passed with synthetic RPC fixtures, including workflow
+condition saving, stable pin menus, retained task draft, routine canvas, calendar,
+usage, Marketplace and help. Desktop and mobile light/dark captures were reviewed.
+The browser fixture does not prove full authenticated Shell navigation or real
+agent execution. No production database, account or model was used by these checks.
+
+Continuous voice is connected to the owned chat client, existing browser/provider
+speech and optional pinned native engines. Real microphone/audio/model inference,
+packaged native voice, platform installers, live OAuth/provider quota and full
+CI suites are not qualified by this integration. Native release acceptance and
+actual publication remain separate gates.
+
 ## Apps and private Video Studio — local candidate, 2026-11-05
 
 The owner authorized production availability for the qualified fixed Video Studio.

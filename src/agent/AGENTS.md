@@ -1,5 +1,21 @@
 # AGENTS.md
 
+- Workspace navigation uses the single rail and per-account/Space pins. Marketplace
+  reuses the existing connection and skill services; preserve multi-account editors.
+  Inbox entries refer to ordinary Mico task threads through taskBotId and the
+  mico-task key namespace, never a parallel execution engine. Keep ?task= for
+  owned task conversations and ?inbox= for the inbox selection. Archive and sends
+  share the exact thread lock; uncertain sends retain their original nonce.
+  Calendar and usage queries remain bounded and owner/Space scoped; unknown cost
+  stays unknown. Workflow condition branches retain the existing worker semantics.
+  Verify scripts/verify-workspace-sync-db.ts and verify-workspace-sync-ui.mjs;
+  the browser fixture uses synthetic RPCs and does not qualify real agent execution.
+- Continuous voice keeps its immutable Space/task client and stops its owned audio
+  resources on close. Native speech preparation is explicit and verifies pinned
+  files. Keep standalone Node, its license, optional native modules and Windows
+  Job ownership in packaging; never replace them with a renderer-selected runtime.
+  Browser tests do not qualify microphones, model inference or native installers.
+
 - Windows installers explicitly include Koffi's win32-x64 optional native module
   under resources/koffi/win32_x64. Preserve this loader-supported fallback even
   when dependency collection misses optional packages. Use the native 7z NSIS
