@@ -18,6 +18,8 @@
   A pending restart is cancellable. The detached same-user helper waits for normal
   exit, snapshots session/installation state, installs and reopens the same profile.
   Never force-stop another process, use Restart Manager shutdown or clear user data.
+  Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
+  actual Windows PowerShell encoding in manual-update-helper tests.
   Verify manual-update, desktop-update-work, composer-draft and preload tests plus
   a fresh-profile native handoff before applying it to an installed profile.
   Published Windows preview tags use the owned GitHub release's bounded
