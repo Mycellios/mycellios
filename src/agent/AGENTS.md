@@ -53,6 +53,8 @@
   Windows passes a standalone builder config file: builder API overrides concatenate
   resource arrays with package.json and would reintroduce the legacy loose tree.
   Preserve base voice unpacking and check the actual packaged file count.
+  Map compact native node_modules as a separate resource root: the builder's
+  resource filter unconditionally skips a root directory with that name.
   Fast installation journals a same-volume installation snapshot, retains the old
   uninstaller, registration and shortcut recovery, and never moves userData.
   Qualify compact-resources, fast-install, the real local server and timed NSIS
