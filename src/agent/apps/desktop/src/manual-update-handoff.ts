@@ -5,6 +5,13 @@ import path from "node:path";
 import { writePrivateFile } from "./setup-store.js";
 import type { ManualRelease } from "./manual-update.js";
 
+/** Windows PowerShell 5.1 writes UTF-8 receipts with a byte-order mark. */
+export function manualUpdatePhase(contents: string): string | null {
+  const state: unknown = JSON.parse(contents.replace(/^\uFEFF/, ""));
+  return state !== null && typeof state === "object" && "phase" in state && typeof state.phase === "string"
+    ? state.phase : null;
+}
+
 export async function launchManualUpdate(options: {
   profile: string; executable: string; oldPid: number; installer: string;
   release: ManualRelease; reopenUrl: string;
@@ -28,8 +35,8 @@ export async function launchManualUpdate(options: {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     try {
-      const state = JSON.parse(await readFile(path.join(directory, "progress.json"), "utf8"));
-      if (state.phase === "waiting-for-app") {
+      const phase = manualUpdatePhase(await readFile(path.join(directory, "progress.json"), "utf8"));
+      if (phase === "waiting-for-app") {
         await writePrivateFile(path.join(directory, "commit.json"), JSON.stringify({ approved: true }));
         return;
       }
