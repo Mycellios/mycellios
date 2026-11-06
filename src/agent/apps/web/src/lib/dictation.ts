@@ -1,4 +1,5 @@
 import { readBoundedResponseBytes, speechLocaleTag } from "@rakazo/core";
+import { isAndroidHost, startAndroidDictation } from "./android-host";
 import { appPath } from "./app-path";
 import { getActiveUiLocale } from "./i18n.js";
 import { selectedSpaceId, withSpaceHeaders } from "./rpc.js";
@@ -174,6 +175,7 @@ function audioContextCtor(): (new () => AudioContext) | undefined {
 export class Dictation {
   private snapshot: DictationSnapshot = IDLE;
   private watchers = new Set<(s: DictationSnapshot) => void>();
+  private nativeCapture: ReturnType<typeof startAndroidDictation> | null = null;
   private recognition: SpeechRecognitionLike | null = null;
   private media: MediaRecorder | null = null;
   private chunks: Blob[] = [];
@@ -206,6 +208,8 @@ export class Dictation {
   }
 
   stop(reason: "submit" | "cancel" | "replace" = "cancel") {
+    this.nativeCapture?.cancel();
+    this.nativeCapture = null;
     clearTimeout(this.recordingLimit);
     this.token += 1;
     this.transcribeAbort?.abort();
@@ -258,6 +262,14 @@ export class Dictation {
     this.onSpeechStart = opts.onSpeechStart;
     this.set({ status: "listening", transcript: "" });
     const transcribe = Boolean(opts.transcribe);
+    if (isAndroidHost()) {
+      this.nativeCapture = startAndroidDictation({
+        transcript: text => { if (this.token === mine) this.set({ status: "listening", transcript: text }); },
+        final: text => this.finish(text, mine),
+        error: message => { if (this.token === mine) { this.stop(); this.set({ ...IDLE, error: message }); } },
+      });
+      return;
+    }
     if (typeof window !== "undefined" && window.rakazoDesktop?.localVoice && (await window.rakazoDesktop.localVoice.status()).ready) {
       if (this.token !== mine) return;
       await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
@@ -676,6 +688,7 @@ export class Dictation {
   }
 
   submitHold() {
+    if (this.nativeCapture) { this.nativeCapture.finish(); return; }
     if (this.media && this.media.state !== "inactive") {
       this.media.stop();
       return;

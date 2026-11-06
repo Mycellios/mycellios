@@ -1,3 +1,4 @@
+import { isAndroidHost } from "../lib/android-host";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@rakazo/ui-web";
 import { useState, useSyncExternalStore } from "react";
@@ -8,6 +9,9 @@ import { useWebUpdateSlot } from "./web-update-slot";
 
 /** Browser and installed PWA share the same safe, server-verified update path. */
 export function WebUpdates() {
+  return isAndroidHost() ? null : <BrowserWebUpdates />;
+}
+function BrowserWebUpdates() {
   const updates = clientUpdates();
   const ready = useSyncExternalStore(updates.subscribe, updates.getSnapshot, () => null);
   const [dismissed, setDismissed] = useState<string | null>(null);

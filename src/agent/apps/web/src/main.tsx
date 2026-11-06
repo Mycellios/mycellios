@@ -1,3 +1,4 @@
+import { installAndroidHost, isAndroidHost } from "./lib/android-host";
 import "./monitoring-bootstrap";
 import "./lib/native-pc-bootstrap";
 import { Toaster, TooltipProvider } from "@rakazo/ui-web";
@@ -23,8 +24,8 @@ import "./styles.css";
 
 markOnce("rk:renderer:module-evaluated");
 installPreloadRecovery();
-clientUpdates().install();
-registerServiceWorker();
+installAndroidHost();
+if (!isAndroidHost()) { clientUpdates().install(); registerServiceWorker(); }
 applyUiDirection(resolveUiLocale());
 applyUiAppearance();
 

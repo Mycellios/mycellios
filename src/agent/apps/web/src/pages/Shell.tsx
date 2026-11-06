@@ -1,3 +1,4 @@
+import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { LayoutGrid } from "lucide-react";
 import type {
@@ -411,6 +412,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     [],
   );
   const [searchParams, setSearchParams] = useSearchParams();
+  useAndroidShortcut(setSearchParams);
   // Mirrors searchParams for effects that only need to read it once on run,
   // not re-run on every unrelated query-param change (e.g. the SSE subscribe
   // effect below, which should only restart when the active bot changes).
