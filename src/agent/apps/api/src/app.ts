@@ -813,6 +813,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   };
   const sessionActor = async (request: Request) => (await requestSession(request))?.actor ?? null;
   const stopDesktopRelay = mountDesktopRelay(app, {
+    desktopExecution: (actor, enabled) => runAsTenant(actor, async () => {
+      const where = { spaceId_userId: { spaceId: actor.spaceId, userId: actor.userId } };
+      if (enabled !== undefined) {
+        return (await prisma.desktopExecutionPreference.upsert({ where, create: { ...where.spaceId_userId, enabled }, update: { enabled } })).enabled;
+      }
+      return (await prisma.desktopExecutionPreference.findUnique({ where }))?.enabled ?? false;
+    }),
     spaces: actor => runAsSystem("native account computer memberships",async()=>
       (await prisma.spaceMember.findMany({where:{userId:actor.userId},select:{spaceId:true},take:128})).map(m=>m.spaceId)),
     enabled: process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true",

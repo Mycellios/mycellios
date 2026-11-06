@@ -3,7 +3,8 @@ import type { JobPublisher, JobWorkerHost } from "@rakazo/adapter-kit";
 import { ComposioConnector, IntegrationProviderSettings } from "@rakazo/adapters";
 import { phoneCallSettings } from "@rakazo/core";
 import { loadRootEnv } from "@rakazo/core/node/load-root-env";
-import { desktopRelayKey } from "../../../packages/adapters/src/desktop-relay.js";
+import { desktopRelayKey, desktopAgentSelection, desktopRelayTransport } from "../../../packages/adapters/src/desktop-relay.js";
+import { DesktopAgentRuntime } from "../../../packages/adapters/src/desktop-agent-runtime.js";
 import { startWorkerHealth } from "./health.js";
 import { createWorkerSecretStore } from "./secret-store.js";
 
@@ -133,13 +134,18 @@ async function main() {
   const ticketBoardEnabled = process.env.TICKET_BOARD_ENABLED === "true";
   const boardEvents = createBoardEvents(realtime);
   const dataDir = process.env.DATA_DIR ?? "./data";
-  const runtime =
+  const cloudRuntime =
     process.env.AGENT_RUNTIME === "scripted"
       ? new ScriptedAgentRuntime()
       : new NativeAgentRuntime({
           dataDir,
           fallback: new PiAgentRuntime({ sessionRoot: resolvePiSessionRoot(dataDir) }),
         });
+  const desktopUrl = `${(process.env.DESKTOP_RELAY_API_URL ?? process.env.API_URL ?? "http://127.0.0.1:3100").replace(/\/$/, "")}/api/desktop-relay/internal`;
+  const desktopKey = desktopRelayKey(resolveScreenProxySecret(process.env));
+  const runtime = process.env.MYCELLIOS_DESKTOP_RELAY_ENABLED === "true" && process.env.AGENT_RUNTIME !== "scripted"
+    ? new DesktopAgentRuntime({ fallback: cloudRuntime, select: desktopAgentSelection(desktopUrl, desktopKey), transport: desktopRelayTransport(desktopUrl, desktopKey) })
+    : cloudRuntime;
   // Same resolver the API uses, so both processes agree on provider, model and key.
   const { key: deploymentModelKey, configured: deploymentModelConfigured } =
     resolveDeploymentModel();

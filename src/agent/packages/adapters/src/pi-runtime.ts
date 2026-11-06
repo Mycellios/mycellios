@@ -129,6 +129,7 @@ import {
   unresolvedTurnCheckpointCalls,
 } from "./turn-checkpoint.js";
 import { fetchPairedWithDispatcher } from "./undici-fetch.js";
+import { desktopModelCatalog } from "./desktop-model-stream.js";
 import { argumentGiven } from "./update-bot-patch.js";
 
 const running = new Map<string, { controller: AbortController; work: Promise<void> }>();
@@ -1234,6 +1235,10 @@ export function resolveRuntimeModel(modelConfig: AgentRunRequest["model"]): {
   /** Live credential store; OAuth refreshes swap the credential mid-run. */
   credentials: PiRuntimeCredentialStore | undefined;
 } {
+  if (modelConfig.desktopTransport) {
+    const model = modelConfig.desktopTransport.model as unknown as Model<Api>;
+    return { provider: model.provider, modelId: model.id, models: desktopModelCatalog(catalogModels(), modelConfig), model, apiKey: "account-scoped-transport", credentials: undefined };
+  }
   const provider = canonicalPiProviderId(
     modelConfig.provider === "scripted" ? "openrouter" : modelConfig.provider,
   );

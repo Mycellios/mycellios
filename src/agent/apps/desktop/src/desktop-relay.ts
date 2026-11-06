@@ -16,6 +16,7 @@ export class DesktopRelayClient {
   private deviceId: string = randomUUID();
   private grants = new Map<string, { generation: string }>();
   private active = new Map<string, AbortController>();
+  private pollController?: AbortController;
   private stopped = true;
   private timer?: ReturnType<typeof setTimeout>;
   private lastContact = 0;
@@ -35,6 +36,7 @@ export class DesktopRelayClient {
       revoked(): void;
       now?: () => number;
       deviceId?:string;
+      agentExecution?: 1;
       restoreUpdate?: (identity: {userId:string;spaceId:string;connectionId:string}, botId?: string) => Promise<UpdateResumeBinding | undefined>;
     },
   ) { if(options.deviceId)this.deviceId=options.deviceId; }
@@ -157,6 +159,7 @@ export class DesktopRelayClient {
     return this.active.size > 0;
   }
   stop() {
+    this.pollController?.abort();
     ++this.intent;
     this.stopped = true;
     clearTimeout(this.timer);
@@ -168,9 +171,10 @@ export class DesktopRelayClient {
   }
   private async poll() {
     if (this.stopped) return;
+    const pollController = new AbortController(); this.pollController = pollController;
     try {
       const state = (await (
-        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity} : {}) })
+        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {})} : {}),...(this.options.agentExecution && this.lastContact ? {wait:true,active:[...this.active.keys()]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
       ).json()) as DesktopExecutorPoll & { identity?: unknown };
       if(this.stopped)return;
       if (!this.owner || JSON.stringify(state.identity) !== this.owner) {
@@ -181,7 +185,7 @@ export class DesktopRelayClient {
       if (
         !Array.isArray(state.active) ||
         !Array.isArray(state.operations) ||
-        state.operations.length > 8
+          state.operations.length > (this.options.agentExecution ? 20 : 8)
       )
         throw new Error("Invalid Desktop poll");
       // Bindings are volatile on the API. Reassert only the same owner-approved
@@ -233,7 +237,7 @@ export class DesktopRelayClient {
           continue;
         const controller = new AbortController();
         this.active.set(operation.id, controller);
-        void this.execute(operation, controller).finally(() => this.active.delete(operation.id));
+        void this.execute(operation, controller).finally(() => { this.active.delete(operation.id); });
       }
     } catch {
       if ((this.options.now ?? Date.now)() - this.lastContact > 40_000) {
@@ -245,7 +249,7 @@ export class DesktopRelayClient {
       }
     }
     if (!this.stopped) {
-      this.timer = setTimeout(() => void this.poll(), 2_000);
+      this.timer = setTimeout(() => void this.poll(), this.options.agentExecution ? 0 : 2_000);
       this.timer.unref();
     }
   }

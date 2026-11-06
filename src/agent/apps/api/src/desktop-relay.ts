@@ -27,6 +27,7 @@ export function mountDesktopRelay(
     authenticate(request: Request): Promise<{ actor: Actor; sessionId: string } | null>;
     ownsBot(actor: Pick<Actor,"userId"|"spaceId">, botId: string): Promise<boolean>;
     spaces?(actor: Actor): Promise<string[]>;
+    desktopExecution?(actor: Pick<Actor, "userId" | "spaceId">, enabled?: boolean): Promise<boolean>;
   },
 ) {
   const broker = new DesktopRelayBroker();
@@ -56,8 +57,10 @@ export function mountDesktopRelay(
         if (!await deps.ownsBot(input.scope,botId)) return c.json({available:false,error:"Unavailable agent"},404);
         broker.connectAccountBot(input.scope,botId);
       }
-      if (input.probe && !input.request)
+      if (input.probe && !input.request) {
+        if (input.agentExecution === 1) return c.json({ agentExecution: 1, available: broker.agentAvailable(input.scope, input.probe), preferred: await deps.desktopExecution?.(input.scope) ?? false });
         return c.json({ available: broker.available(input.scope, input.probe) });
+      }
       if (!input.request || input.probe) return c.json({ error: "Invalid request" }, 400);
       return broker.dispatch(hostComputerRequest.parse(input.request), {
         ...input.scope,
@@ -101,6 +104,19 @@ export function mountDesktopRelay(
     if (body === null) return c.json({ error: "Too large" }, 413);
     try {
       const input = JSON.parse(body);
+      const poll = async (value: {deviceId:string;wait?:boolean;active?:string[]}) => {
+        const state = await broker.waitPoll(owner,value.deviceId,c.req.raw.signal,value.wait,value.active);
+        if (value.wait) {
+          const current = await deps.authenticate(c.req.raw);
+          if (!current || current.sessionId !== owner.sessionId || current.actor.userId !== owner.userId || current.actor.spaceId !== owner.spaceId) {
+            broker.revoke(owner,value.deviceId); throw Error("Desktop session changed while waiting");
+          }
+          for (const botId of broker.ownedBindings(owner,value.deviceId)) if (!await deps.ownsBot(current.actor,botId)) broker.revokeBot(owner,botId);
+          const admitted = broker.poll(owner,value.deviceId);
+          return {...admitted,operations:state.operations.filter(op=>admitted.active.includes(op.id))};
+        }
+        return state;
+      };
       switch (c.req.param("action")) {
         case "identity":
           return c.json(identity);
@@ -110,10 +126,11 @@ export function mountDesktopRelay(
           const value=parseDesktopAccount(input);
           if(value.identity.userId!==identity.userId||value.identity.spaceId!==identity.spaceId||value.identity.connectionId!==identity.connectionId)
             return c.json({error:"The account session changed"},403);
+          if (value.agentExecution === 1 && broker.needsExecutionPreference(owner, value)) await deps.desktopExecution?.(session.actor, true);
           broker.register(owner,value);
           for(const botId of broker.ownedBindings(owner,value.deviceId))
             if(!await deps.ownsBot(session.actor,botId))broker.revokeBot(owner,botId);
-          return c.json({...broker.poll(owner,value.deviceId),identity});
+          return c.json({...await poll(value),identity});
         }
         case "bind": {
           const value = parseDesktopBinding(input);
@@ -127,7 +144,7 @@ export function mountDesktopRelay(
           for (const botId of broker.ownedBindings(owner, value.deviceId))
             if (!(await deps.ownsBot(session.actor, botId))) broker.revokeBot(owner, botId);
           // Membership/session was freshly checked above on every heartbeat.
-          return c.json({ ...broker.poll(owner, value.deviceId), identity });
+          return c.json({ ...await poll(value), identity });
         }
         case "result": {
           const value = parseDesktopResult(input);
@@ -136,11 +153,13 @@ export function mountDesktopRelay(
         }
         case "revoke":
           broker.revoke(owner, parseDesktopPoll(input).deviceId);
+          await deps.desktopExecution?.(session.actor, false);
           return c.json({ ok: true });
         default:
           return c.json({ error: "Unavailable" }, 404);
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message === "Desktop session changed while waiting") return c.json({error:"Sign in again"},403);
       return c.json({ error: "PC connection changed. Reconnect the paired computer." }, 409);
     }
   });

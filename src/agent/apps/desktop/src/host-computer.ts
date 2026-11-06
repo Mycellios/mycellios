@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
+import type { AgentRuntime } from "@rakazo/adapter-kit";
 import { startHostComputerServer } from "@rakazo/adapters/host-computer-server";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
 
@@ -14,7 +15,7 @@ export function computerConsentScope(serverUrl: string, identity: { userId: stri
 }
 
 /** App-private credentials and consent, never sent to a renderer or a connected remote server. */
-export async function prepareHostComputer(userDataDir: string) {
+export async function prepareHostComputer(userDataDir: string, agentRuntime?: AgentRuntime) {
   const configFile = path.join(userDataDir, "host-computer.json");
   const consentFile = path.join(userDataDir, "host-computer-consent");
   const accountConsentFile = path.join(userDataDir, "host-computer-account-consent");
@@ -31,14 +32,14 @@ export async function prepareHostComputer(userDataDir: string) {
     /* Invalid local configuration is replaced. */
   }
   let server: Awaited<ReturnType<typeof startHostComputerServer>>;
-  const options = { root: path.join(userDataDir, "computers"), token };
+  const options = { root: path.join(userDataDir, "computers"), token, agentRuntime };
   try {
     server = await startHostComputerServer({ ...options, port });
   } catch (error) {
-    if (!error || typeof error !== "object" || !("code" in error) || error.code !== "EADDRINUSE")
+    if (!error || typeof error !== "object" || !("code" in error) || !["EADDRINUSE", "EACCES"].includes(String(error.code)))
       throw error;
     // A listener on the old port may have received the old credential from a still-running backend.
-    token = randomBytes(32).toString("hex");
+    if (error.code === "EADDRINUSE") token = randomBytes(32).toString("hex");
     server = await startHostComputerServer({ ...options, token });
   }
   try {
@@ -72,6 +73,7 @@ export async function prepareHostComputer(userDataDir: string) {
     project: server.project,
     workspace: server.workspace,
     isEnabled: server.isEnabled,
+    executionScope: () => server.isEnabled() && /^[a-f0-9]{64}$/.test(rememberedAccount ?? "") ? rememberedAccount! : undefined,
     hasActiveWork: server.hasActiveWork,
     prepareUpdate: server.prepareUpdate,
     cancelUpdate: server.cancelUpdate,

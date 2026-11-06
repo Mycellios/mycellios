@@ -27,6 +27,7 @@ export class AccountComputerConnection {
     private readonly options: {
       profile: string;
       nativeVersion?: string;
+      agentExecution?: 1;
       host: Host;
       localUrl: string;
       localToken: string;
@@ -183,6 +184,7 @@ export class AccountComputerConnection {
             localUrl: this.options.localUrl,
             localToken: this.options.localToken,
             deviceId: this.deviceId,
+            agentExecution: this.options.agentExecution,
             restoreUpdate: this.options.nativeVersion ? identity => restoreUpdateBinding(this.options.profile, this.options.nativeVersion!, context.base, identity) : undefined,
             revoked: () => {
               this.clients.get(spaceId)?.stop();

@@ -11,12 +11,14 @@ export interface DesktopExecutorPoll {
   operations: DesktopExecutorOperation[];
   active: string[];
 }
-export function parseDesktopAccount(value: unknown): {deviceId: string; generation: string; identity:{userId:string;spaceId:string;connectionId:string}} {
-  const input = object(value, ["deviceId", "generation", "identity"]);
+export function parseDesktopAccount(value: unknown): {deviceId: string; generation: string; agentExecution?: 1; wait?: boolean; active?: string[]; identity:{userId:string;spaceId:string;connectionId:string}} {
+  const input = object(value, ["deviceId", "generation", "identity", "agentExecution", "wait", "active"]);
+  const waiting = parseDesktopWait(input);
+  if (input.agentExecution !== undefined && input.agentExecution !== 1) throw Error("Unsupported Desktop execution version");
   if (!uuid(input.deviceId) || !uuid(input.generation)) throw new Error("Invalid Desktop account grant");
   const owner=object(input.identity,["userId","spaceId","connectionId"]);
   if(!id(owner.userId)||!id(owner.spaceId)||!id(owner.connectionId))throw Error("Invalid account identity");
-  return {deviceId:input.deviceId,generation:input.generation,identity:{userId:owner.userId,spaceId:owner.spaceId,connectionId:owner.connectionId}};
+  return {deviceId:input.deviceId,generation:input.generation,...waiting,...(input.agentExecution === 1 ? { agentExecution: 1 as const } : {}),identity:{userId:owner.userId,spaceId:owner.spaceId,connectionId:owner.connectionId}};
 }
 export interface DesktopExecutorResult { deviceId: string; id: string; seq: number; data: string; done: boolean }
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(value);
@@ -30,20 +32,27 @@ export function parseDesktopBinding(value: unknown): DesktopExecutorBinding {
   if (!uuid(input.deviceId) || !id(input.botId) || !uuid(input.generation)) throw new Error("Invalid Desktop binding");
   return { deviceId: input.deviceId, botId: input.botId, generation: input.generation };
 }
-export function parseDesktopPoll(value: unknown): { deviceId: string } {
-  const input = object(value, ["deviceId"]);
+function parseDesktopWait(input: Record<string, unknown>): { wait?: boolean; active?: string[] } {
+  if (input.wait !== undefined && typeof input.wait !== "boolean") throw Error("Invalid Desktop wait");
+  if (input.active !== undefined && (!Array.isArray(input.active) || input.active.length > 20 || input.active.some(x => !uuid(x)))) throw Error("Invalid active Desktop operations");
+  return { ...(input.wait !== undefined ? {wait:input.wait as boolean} : {}), ...(input.active !== undefined ? {active:input.active as string[]} : {}) };
+}
+export function parseDesktopPoll(value: unknown): { deviceId: string; wait?: boolean; active?: string[] } {
+  const input = object(value, ["deviceId", "wait", "active"]);
   if (!uuid(input.deviceId)) throw new Error("Invalid Desktop device");
-  return { deviceId: input.deviceId };
+  return { deviceId: input.deviceId, ...parseDesktopWait(input) };
 }
 export function parseDesktopResult(value: unknown): DesktopExecutorResult {
   const input = object(value, ["deviceId", "id", "seq", "data", "done"]);
   if (!uuid(input.deviceId) || !uuid(input.id) || typeof input.seq !== "number" || !Number.isSafeInteger(input.seq) || input.seq < 0 || typeof input.data !== "string" || input.data.length > 350_000 || typeof input.done !== "boolean") throw new Error("Invalid Desktop result");
   return { deviceId: input.deviceId, id: input.id, seq: input.seq, data: input.data, done: input.done };
 }
-export function parseDesktopDispatch(value: unknown): { scope: { userId: string; spaceId: string }; nonce: string; request?: unknown; probe?: string } {
-  const input = object(value, ["scope", "nonce", "request", "probe"]);
+export function parseDesktopDispatch(value: unknown): { scope: { userId: string; spaceId: string }; nonce: string; request?: unknown; probe?: string; agentExecution?: 1 } {
+  const input = object(value, ["scope", "nonce", "request", "probe", "agentExecution"]);
+  if (input.agentExecution !== undefined && input.agentExecution !== 1) throw Error("Unsupported Desktop execution version");
   const scope = object(input.scope, ["userId", "spaceId"]);
   if (!id(scope.userId) || !id(scope.spaceId) || !uuid(input.nonce) || (input.probe !== undefined && !id(input.probe))) throw new Error("Invalid Desktop dispatch");
   return { scope: { userId: scope.userId, spaceId: scope.spaceId }, nonce: input.nonce, request: input.request,
+    ...(input.agentExecution === 1 ? {agentExecution: 1 as const} : {}),
     ...(input.probe === undefined ? {} : { probe: input.probe as string }) };
 }

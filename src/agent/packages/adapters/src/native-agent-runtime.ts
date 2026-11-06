@@ -241,6 +241,7 @@ export class NativeAgentRuntime implements AgentRuntime {
       fallback: AgentRuntime;
       commands?: NativeConfig;
       codexArgs?: string[];
+      hostAccess?: (scope: { userId: string; spaceId: string }) => boolean;
     },
   ) {}
   describe() {
@@ -264,7 +265,7 @@ export class NativeAgentRuntime implements AgentRuntime {
     if (!context?.spaceId || !context.userId)
       throw new Error("Native agents require an authenticated run scope");
     if (
-      !(await nativeHostAccess(this.options.dataDir, {
+      !(this.options.hostAccess ? this.options.hostAccess({ userId: context.userId, spaceId: context.spaceId }) : await nativeHostAccess(this.options.dataDir, {
         spaceId: context.spaceId,
         userId: context.userId,
       }))

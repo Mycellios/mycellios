@@ -15,6 +15,22 @@
 
 # AGENTS.md
 
+- Account-owned Desktop execution keeps the existing cloud account, conversations,
+  model connections, leases and approval effects. Advertise agentExecution v1 only
+  after the native host starts and authenticates remembered account consent.
+  Desktop owns the Mico loop; cloud owns credential renewal, real model requests
+  and producer-side credit accounting. Send only allowlisted model metadata and
+  an owned inference stream to Desktop, never keys, OAuth material or endpoints.
+  Keep approval judges on the server and preserve Team/task computer assignments.
+  Native run receipts are account/server scoped and forbid replay after restarts.
+  Disconnects must not silently substitute a cloud run for an admitted local run.
+  Keep callback/agent/command admission lanes bounded and native long polls
+  authenticated again before delivery. The additive desktop_execution migration
+  remembers the choice across API restarts; it does not move account data.
+  Verify desktop-agent runtime/engine and relay tests, host consent/native runtime,
+  and scripts/verify-desktop-execution-db.ts against isolated PostgreSQL. Physical
+  installed-Desktop/mobile acceptance is separate from fixtures and builds.
+
 - The installed PWA Voice shortcut uses ?dictate=1 and the existing scoped chat
   recorder. Consume each request once; start only in a visible standalone app
   after voice configuration is known, without busy work, calls, drafts or files.

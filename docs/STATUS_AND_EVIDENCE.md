@@ -1,5 +1,25 @@
 # Status and evidence
 
+## Desktop-owned Mico execution candidate - 2026-11-07
+
+The local candidate adds account-scoped Desktop execution of the existing Mico
+runtime through the authenticated outbound Desktop transport. Account data,
+conversations, model credentials, authorization and provider accounting remain
+server-owned. Older Desktop clients keep their existing route; a remembered local
+executor that goes offline fails explicitly instead of replaying work elsewhere.
+
+Remote focused tests cover the real Pi engine against a fixture provider, the
+authenticated API/native-client/host path without a renderer, cancellation,
+concurrency, account isolation and restart replay fences. An isolated PostgreSQL
+test applies the additive migration and verifies Prisma, tenant RLS and membership
+deletion. Agent API, worker, shared web and native Desktop bundles build remotely;
+structure, architecture, boundaries and affected incremental types pass.
+
+This is not a deployment or installed-Windows acceptance result. Production has
+not received this migration or runtime, and the current account/mobile-to-PC flow
+still requires qualification after an authorized release. Full suites and physical
+cross-device acceptance have not been run for this candidate.
+
 ## Agent production and Windows Desktop 0.3.18 - 2026-11-06
 
 [Desktop 0.3.18](https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.18-windows-preview)

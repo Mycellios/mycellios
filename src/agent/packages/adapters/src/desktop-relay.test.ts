@@ -136,3 +136,46 @@ it("retains the global eight-operation execution limit across queued agents",asy
   }
   await Promise.all(responses.map(r=>r.text()));
 });
+
+it("reserves callback and command lanes while two tasks of the same Mico own native runtime slots",async()=>{
+  broker=new DesktopRelayBroker();broker.register(owner,{...binding,agentExecution:1});broker.connectAccountBot(owner,"bot");
+  const responses:Response[]=[];
+  for(let n=0;n<2;n++)responses.push(broker.dispatch({method:"agentRun",botId:"bot",runId:`run-${n}`,sessionId:crypto.randomUUID(),request:{}},context()));
+  expect(broker.poll(owner,"device").operations).toHaveLength(2);
+  responses.push(broker.dispatch({method:"agentMessage",botId:"bot",runId:"run-0",sessionId:crypto.randomUUID(),message:{}},context()));
+  responses.push(broker.dispatch({method:"execute",botId:"bot",command:{argv:["fixture"]}},context()));
+  const next=broker.poll(owner,"device");
+  expect(next.operations.map(op=>(op.request as {method:string}).method).sort()).toEqual(["agentMessage","execute"]);
+  broker.close();await Promise.all(responses.map(r=>r.text()));
+});
+
+it("does not route an agent engine to old clients or another owner's device",()=>{
+  broker=new DesktopRelayBroker();broker.register(owner,binding);broker.connectAccountBot(owner,"bot");
+  expect(broker.agentAvailable(owner,"bot")).toBe(false);
+  expect(()=>broker.dispatch({method:"agentRun",botId:"bot",runId:"run",sessionId:crypto.randomUUID(),request:{}},context())).toThrow("unavailable");
+  broker.register(owner,{...binding,agentExecution:1});
+  expect(broker.agentAvailable(owner,"bot")).toBe(true);
+  expect(broker.agentAvailable({...owner,userId:"other"},"bot")).toBe(false);
+});
+
+it("wakes a native long poll on dispatch and cancellation without busy polling or replay",async()=>{
+  broker=new DesktopRelayBroker();broker.bind(owner,binding);
+  const controller=new AbortController();
+  const waiting=broker.waitPoll(owner,"device",controller.signal,true,[]);
+  const command=broker.dispatch({method:"environment",botId:"bot"},context());
+  const state=await waiting;expect(state.operations).toHaveLength(1);
+  expect(broker.poll(owner,"device").operations).toEqual([]);
+  const next=broker.waitPoll(owner,"device",controller.signal,true,state.active);
+  broker.result(owner,"device",state.operations[0]!.id,0,"",true);
+  expect((await next).active).toEqual([]);await command.text();
+  const stopped=broker.waitPoll(owner,"device",controller.signal,true,[]);controller.abort();await stopped;
+});
+
+it("fences a second agent start even when later callbacks share the same run",async()=>{
+ broker=new DesktopRelayBroker();broker.register(owner,{...binding,agentExecution:1});broker.connectAccountBot(owner,"bot");
+ const run={method:"agentRun" as const,botId:"bot",runId:"one-run",sessionId:crypto.randomUUID(),request:{}};
+ const first=broker.dispatch(run,context());
+ const callback=broker.dispatch({method:"agentMessage",botId:"bot",runId:run.runId,sessionId:run.sessionId,message:{}},context());
+ expect(()=>broker.dispatch({...run,sessionId:crypto.randomUUID()},context())).toThrow("already dispatched");
+ broker.close();await Promise.all([first.text(),callback.text()]);
+});
