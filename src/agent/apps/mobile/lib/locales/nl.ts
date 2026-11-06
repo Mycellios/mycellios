@@ -1060,4 +1060,6 @@ export const NL_MESSAGES: Record<string, string> = {
   "Link DMs": "DM’s koppelen",
   "This integration needs server setup. Contact the administrator.":
     "Deze integratie moet op de server worden ingesteld. Neem contact op met de beheerder.",
+  "Open task": "Taak openen",
+  "This task is available in the web app.": "Deze taak is beschikbaar in de webapp.",
 };

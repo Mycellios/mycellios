@@ -1104,4 +1104,6 @@ export const RU_MESSAGES: Record<string, string> = {
   "Link DMs": "Привязать ЛС",
   "This integration needs server setup. Contact the administrator.":
     "Для этой интеграции нужна настройка на сервере. Обратитесь к администратору.",
+  "Open task": "Открыть задачу",
+  "This task is available in the web app.": "Эта задача доступна в веб-приложении.",
 };

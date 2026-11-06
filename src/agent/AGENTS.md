@@ -79,6 +79,9 @@
 
 
 - Mico Work controls reuse revisioned delegation controls and durable teardown.
+  Keep command/workflow/delegation tools in the canonical built-in registry so
+  saved tool blocks remain enforceable. Pi shell parameters retain the declared
+  bounded timeout, including its description and validation.
   Pi concurrency is admitted atomically per Bot and serialized per thread; native
   engines remain single-turn. Private Pi tasks reserve the existing computer lease
   before computer/file/command tools, never share it between runs. Workflows reuse
@@ -581,6 +584,8 @@
   secret ownership checks; another provider's key must never reach Mycellios.
 - Offline Vitest runs disable Vite environment-file loading. Supply fixture
   configuration explicitly; never make tests depend on a maintainer's `.env`.
+  Keep the production Lingui catalog loader in Vitest: related-test discovery
+  traverses lazy PO imports. Verify catalog-asset-loader.test.ts when changing it.
   Linux lifecycle and publishing fixtures require Bash, Python 3, jq and procps
   (including the external `kill` command). Installer smoke fixtures also require
   curl, OpenSSL and the Docker CLI.

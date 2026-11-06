@@ -10,7 +10,7 @@ import EmbeddedPostgres from "embedded-postgres";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos } = await import("@rakazo/db");
+const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun } = await import("@rakazo/db");
 const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js");
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");
@@ -77,6 +77,16 @@ try {
   assert.ok(tabs.some((tab: { threadId: string }) => tab.threadId === first.threadId));
   assert.equal((await call("read", { id: first.id })).thread.threadId, first.threadId);
   assert.equal((await call("list")).length, 2);
+  const runs = await system.run.findMany({ where: { botId: bot.id } });
+  const claim = (run: (typeof runs)[number]) => runAsTenant(actor, () => claimMicoRun(prisma, run,
+    { id: run.id, status: "queued" }, { status: "leased", leaseOwner: "synthetic-worker", leaseFence: 1, leaseExpiresAt: new Date(Date.now() + 60_000) }));
+  const admitted = await Promise.all(runs.map(claim));
+  assert.deepEqual(admitted.map(result => result.count).sort(), [0, 1]);
+  const waiting = runs[admitted.findIndex(result => result.count === 0)]!;
+  assert.equal((await claim({ ...waiting, userId: "foreign" })).count, 0);
+  await system.bot.update({ where: { id: bot.id }, data: { agentEngine: "pi", taskConcurrency: 2 } });
+  assert.equal((await claim(waiting)).count, 1);
+  checks.push("real concurrent PostgreSQL admission retains the native single slot, owner fence and explicit Pi concurrency");
   await assert.rejects(call("archive", { id: first.id, archived: true }));
   await system.run.updateMany({ where: { threadId: first.threadId }, data: { status: "completed", completedAt: new Date() } });
   await call("archive", { id: first.id, archived: true });

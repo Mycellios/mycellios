@@ -28,6 +28,13 @@ test('shared Agent contracts check all consumers', () => {
   const plan = planChecks(['src/agent/packages/contracts/src/rpc.ts']);
   for (const app of ['web', 'api', 'worker', 'desktop']) assert.ok(plan.some(c => c.label === `Agent ${app} types`));
 });
+test('Agent test files share the existing two-worker budget without serializing discovery', () => {
+  const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx', 'src/agent/apps/web/src/pages/shell/composer.test.tsx']);
+  for (const check of plan.filter(c => c.label === 'Agent changed tests' || c.label === 'Agent affected tests')) {
+    assert.equal(check.args[check.args.indexOf('--maxWorkers') + 1], '2');
+    assert.ok(!check.args.includes('--no-file-parallelism'));
+  }
+});
 test('API contract changes check renderer and execution consumers', () => {
   const plan = planChecks(['src/agent/apps/api/src/router.ts']);
   for (const app of ['web', 'api', 'worker', 'desktop']) assert.ok(plan.some(c => c.label === `Agent ${app} types`));
