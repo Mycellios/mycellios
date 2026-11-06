@@ -80,4 +80,17 @@ describe("official Windows manual releases", () => {
     expect(handoff).not.toHaveBeenCalled();
     expect(await controller.check(true)).toMatchObject({ phase: "ready" });
   });
+  it("does not consume the installer repeatedly while the renderer still holds unsaved work", async () => {
+    let ready = false;
+    const { controller, directory, handoff } = await fixture({ prepare: async () => ready });
+    await controller.check(true);
+    await writeFile(path.join(directory, entry.fileName), "changed while waiting");
+    await controller.install();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(controller.state()).toMatchObject({ phase: "ready", installPending: true });
+    expect(handoff).not.toHaveBeenCalled();
+    ready = true;
+    await vi.waitFor(() => expect(controller.state()).toMatchObject({ phase: "error", installPending: false }), { timeout: 2_000 });
+    expect(handoff).not.toHaveBeenCalled();
+  });
 });

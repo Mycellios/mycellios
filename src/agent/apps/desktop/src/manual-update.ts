@@ -157,7 +157,9 @@ export class ManualUpdateController {
   private async finishInstall(intent: number) {
     try {
       while (intent === this.intent) {
-        if (!this.options.busy()) {
+        // Waiting on an unsaved form must not reread a large installer every second.
+        // The second acknowledgement below remains authoritative after hashing.
+        if (!this.options.busy() && await this.options.prepare() && !this.options.busy()) {
           if (intent !== this.intent) return;
           try { await verifyManualInstaller(this.file!, this.release!); }
           catch (error) { this.file = null; throw error; }
