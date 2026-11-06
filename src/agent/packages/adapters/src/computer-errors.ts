@@ -13,4 +13,3 @@ export class ComputerUpdatingError extends ComputerBusyError {
     this.message = "The PC is updating; pending work will resume after reconnecting.";
   }
 }
-

@@ -36,7 +36,7 @@ it("interrupts an owned real command, reconnects the same run, and never starts 
     const direct=new HostComputerSandbox(`http://127.0.0.1:${host.port}`,token);
     const computer=await direct.provision({botId:"mico",homePath:"unused"},ctx("setup"));
     await native.registerAccount(identity);
-    const worker=new HostComputerSandbox("","",async(request,context)=>broker.request(request,context));
+    const worker=new HostComputerSandbox("","",async(request,context)=>broker.dispatch(request,context));
     const marker=path.join(host.workspace("mico"),"once.txt");
     const command={commandId:"update-once",argv:[process.execPath,"-e","require('node:fs').appendFileSync(process.argv[1],'x');console.log('ready');setInterval(()=>{},1000)",marker],timeoutMs:30000};
     let notified=false;
@@ -52,6 +52,7 @@ it("interrupts an owned real command, reconnects the same run, and never starts 
     native.stop();await host.close();
     host=await startHostComputerServer({root:path.join(profile,"computers"),token,hostname:"127.0.0.1"});host.setEnabled(true);
     native=makeClient();await native.registerAccount(identity);
+    await new HostComputerSandbox(`http://127.0.0.1:${host.port}`,token).provision({botId:"mico",homePath:"unused"},ctx("reconnect"));
     const recovered:unknown[]=[];
     for await (const event of worker.execute(computer,command,context)) recovered.push(event);
     expect(recovered).toContainEqual({type:"exit",code:130});

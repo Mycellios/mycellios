@@ -4986,7 +4986,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         let awaitingDelegatedWork = task.delegationState === "waiting";
         const pendingCommands = new Set<string>();
-        const restartingTurn = turnCheckpoint && restoreTurnCheckpoint(turnCheckpoint, {provider:runModelProvider,id:runModelId}).restartInterrupted;
+        const restartingTurn = (() => {
+          try { return !!turnCheckpoint && restoreTurnCheckpoint(turnCheckpoint, {provider:runModelProvider,id:runModelId}).restartInterrupted === true; }
+          catch { return false; } // Keep the existing invalid/legacy checkpoint fallback.
+        })();
         if (restartingTurn) {
           const unresolved = await deps.prisma.externalEffect.findMany({where:{runId,spaceId:run.spaceId,kind:"shell",
             OR:[{status:"executing"},{status:"uncertain"},{result:{path:["uncertain"],equals:true}},{result:{path:["running"],equals:true}}]},
