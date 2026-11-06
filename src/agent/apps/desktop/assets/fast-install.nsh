@@ -17,6 +17,10 @@
   Function .onInstFailed
     Call MycelliosRollback
   FunctionEnd
+
+  Function .onUserAbort
+    Call MycelliosRollback
+  FunctionEnd
 !macroend
 
 !macro customCheckAppRunning
@@ -51,4 +55,21 @@
     SetErrorLevel 2
     Abort
   ${EndIf}
+!macroend
+
+!macro MycelliosCheckUninstall
+  ${If} ${Errors}
+  ${OrIf} $R0 != 0
+    Call MycelliosRollback
+    SetErrorLevel 2
+    Quit
+  ${EndIf}
+!macroend
+
+!macro customUnInstallCheck
+  !insertmacro MycelliosCheckUninstall
+!macroend
+
+!macro customUnInstallCheckCurrentUser
+  !insertmacro MycelliosCheckUninstall
 !macroend
