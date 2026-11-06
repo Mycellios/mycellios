@@ -1,5 +1,29 @@
 # Status and evidence
 
+## Agent workspace production and Windows Desktop 0.3.16 — 2026-11-06
+
+Production web, API and worker now run the workspace release from main
+`7687f4cda40af5e99218b5bacdbc7938e71a06b2`, tree
+`69151bef605c710e3f500e632d6df8f685367d04`. The equivalent reviewed build
+candidate is `21cac3c0c542b6a811abcab711bfae789b55781a`. Public build
+`20261106143633` passes readiness and anonymous browser checks, including an
+interactive sign-in control. The additive task-inbox migration is applied;
+a database backup, prior services and the prior downloads container are retained.
+
+[Windows Desktop 0.3.16](https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.16-windows-preview)
+is published in the official desktop catalog. Its native Windows build passes
+upgrade-continuity, preload, local-voice rejection and real process-ownership
+checks, release-continuity packaging, archive integrity and isolated-profile
+startup with the Apps/project bridge and unconsented Apps refusal. Installer
+SHA-256 is `0d2b264f15c647f0166c1522af893ab2ccd759a0c88aeee11fa99b4490925129`.
+The complete public installer and source downloads match their recorded hashes.
+Updates remain manual and unsigned; other platform descriptors are unchanged.
+
+Qualification did not install into the user's existing profile, authenticate a
+real account, run real microphone/model inference, validate live OAuth/provider
+quota or execute full suites. The independent connection-readiness PR is outside
+this release. Pre-release fixture evidence follows below.
+
 ## Agent workspace reconciliation â€” source candidate, 2026-11-06
 
 The retained workspace screens are integrated on the current canonical Agent
