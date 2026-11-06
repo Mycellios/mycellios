@@ -6,6 +6,7 @@ import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream } from "node:stream/web";
 import { pipeline } from "node:stream/promises";
+import { fetchDesktopArtifact } from "./published-desktop-release.js";
 
 const ORIGIN = "https://www.mycellios.com";
 const MAX_BYTES = 2_000_000_000;
@@ -42,7 +43,7 @@ export async function verifyManualInstaller(file: string, release: ManualRelease
   if (hash.digest("hex") !== release.sha256) throw Error("Installer checksum differs");
 }
 
-/** Explicit manual requests only; the unsigned automatic-update channel stays off. */
+/** Downloads may run in the background; installation always needs an explicit request. */
 export class ManualUpdateController {
   private current: DesktopUpdateState;
   private release: ManualRelease | null = null;
@@ -50,6 +51,7 @@ export class ManualUpdateController {
   private operation: Promise<DesktopUpdateState> | null = null;
   private intent = 0;
   private committed = false;
+  private checkRequested = false;
   constructor(private readonly options: {
     version: string; directory(): string;
     fetch?: typeof fetch;
@@ -57,6 +59,8 @@ export class ManualUpdateController {
     prepare(): Promise<boolean>;
     handoff(file: string, release: ManualRelease): Promise<void>;
     pause?: (ms: number) => Promise<void>;
+    backgroundDownloads?: boolean;
+    publishedRelease?: () => Promise<ManualRelease | null>;
   }) {
     this.current = { phase: "idle", currentVersion: options.version, availableVersion: null,
       percent: null, message: null, checkedAt: null };
@@ -65,14 +69,34 @@ export class ManualUpdateController {
   private fail() { this.committed = false; this.current = { ...this.current, phase: this.file ? "ready" : "error",
     installPending: false, message: "Could not complete the update. Try again." }; }
   check(userInitiated: boolean): Promise<DesktopUpdateState> {
-    if (!userInitiated || this.current.installPending || this.current.phase === "ready") return Promise.resolve(this.state());
+    if ((!userInitiated && !this.options.backgroundDownloads) || this.current.installPending || this.current.phase === "ready") return Promise.resolve(this.state());
+    if (userInitiated) this.checkRequested = true;
     if (this.operation) return this.operation;
-    this.operation = this.runCheck().finally(() => { this.operation = null; });
+    this.operation = this.runCheck().finally(() => { this.operation = null; this.checkRequested = false; });
     return this.operation;
   }
   private async runCheck() {
+    const previous = this.state();
     this.current = { ...this.current, phase: "checking", message: null };
     try {
+      const feeds = [this.catalogRelease()];
+      if (this.options.publishedRelease) feeds.push(Promise.resolve().then(() => this.options.publishedRelease!()));
+      const results = await Promise.allSettled(feeds);
+      const available = results.flatMap(r => r.status === "fulfilled" ? [r.value] : []);
+      if (!available.length) throw Error("Release feeds unavailable");
+      this.release = available.reduce<ManualRelease | null>((latest, r) =>
+        r && newerRelease(r.version, latest?.version ?? this.options.version) ? r : latest, null);
+      this.current = { ...this.current, phase: this.release ? "available" : "idle",
+        availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString() };
+      if (this.release) await this.runDownload();
+      if (this.state().phase === "error" && !this.checkRequested) this.current = previous;
+    } catch {
+      if (this.checkRequested) this.fail();
+      else this.current = previous;
+    }
+    return this.state();
+  }
+  private async catalogRelease(): Promise<ManualRelease | null> {
       const response = await (this.options.fetch ?? fetch)(ORIGIN + "/public/v1/desktop-downloads", {
         redirect: "error", credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(15_000),
       });
@@ -90,12 +114,7 @@ export class ManualUpdateController {
         }
         text += decoder.decode();
       } finally { await reader.cancel().catch(() => undefined); }
-      this.release = windowsManualRelease(JSON.parse(text), this.options.version);
-      this.current = { ...this.current, phase: this.release ? "available" : "idle",
-        availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString() };
-      if (this.release) await this.runDownload();
-    } catch { this.fail(); }
-    return this.state();
+      return windowsManualRelease(JSON.parse(text), this.options.version);
   }
   download(): Promise<DesktopUpdateState> {
     if (this.operation) return this.operation;
@@ -113,10 +132,7 @@ export class ManualUpdateController {
       const temporary = destination + ".part";
       this.current = { ...this.current, phase: "downloading", percent: 0 };
       try {
-        const response = await (this.options.fetch ?? fetch)(release.url, {
-          redirect: "error", credentials: "omit", headers: { "Accept-Encoding": "identity" },
-          signal: AbortSignal.timeout(15 * 60_000),
-        });
+        const response = await fetchDesktopArtifact(this.options.fetch ?? fetch, release.url, AbortSignal.timeout(15 * 60_000));
         if (!response.ok || !response.body) throw Error("Installer unavailable");
         let bytes = 0;
         const hash = createHash("sha256");

@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development }) {
+export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, buildIdentity }) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid Desktop version');
   if (!/^[a-f0-9]{64}$/.test(runtimeSha256)) throw new Error('A pinned runtime hash is required');
   const info = await lstat(runtimeMsi);
@@ -25,6 +25,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
     files: ['dist/**/*', '!dist/**/*.map', 'package.json'],
     extraMetadata: { name: 'mycellios-desktop', version, main: 'dist/main.js' },
     extraResources: [
+      ...(buildIdentity ? [{ from: buildIdentity, to: 'desktop-build.json' }] : []),
       // Koffi 3 uses a platform optional package. Dependency collection can miss
       // it; its loader also supports this explicit unpacked resources location.
       { from: path.join(agentRoot, 'node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node'), to: 'koffi/win32_x64/koffi.node' },
@@ -46,7 +47,9 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
     win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true },
     // The resource tree exceeds ZIP32's entry limit; nsisunz rejects ZIP64.
     nsis: { useZip: false, oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
-    publish: [],
+    // This only writes standard updater metadata/block maps at build time.
+    // The unsigned preview still installs through an explicit user action.
+    publish: [{ provider: 'generic', url: 'https://www.mycellios.com/downloads/desktop/updates/windows' }],
   };
 }
 

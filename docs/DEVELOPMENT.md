@@ -740,3 +740,36 @@ retries an uncertain creation. Inspect those entries before another explicit run
 Reports contain availability metadata and field names, never credential values.
 Configuring a template does not prove an authenticated provider round trip; that
 acceptance remains user-driven. Keep operator reports and secret references out of Git.
+
+## Versioned Desktop updates
+
+The installed Desktop runs a complete, versioned package. A Git commit, a Vite
+development server and a published Desktop release are different deliverables.
+Do not update an installed app by copying an arbitrary working tree or replacing
+only its frontend. The Windows package contains the frontend, native host and
+local server from the same recorded source, plus the pinned contribution runtime.
+
+From `src/agent`, prepare a new version with
+`node apps/desktop/scripts/prepare-desktop-version.mjs patch`, review and commit
+the Desktop package and lockfile changes. This command publishes nothing.
+The `Desktop Windows release package` workflow builds `codex/desktop-release-*`
+branches or an explicitly selected manual ref. Its real builds, native boundary
+tests, installer archive check and isolated packaged startup produce one qualified
+installer, blockmap, `latest.yml`, `desktop-build.json`, `desktop-release.json`
+and checksums. These artifacts identify the source revision/tree and each compiled
+surface. Full suites, real account login and video generation are not implied.
+
+After review and integration, an explicitly pushed tag such as
+`desktop-v0.3.17-windows-preview` builds that exact commit and publishes the
+qualified Windows preview. The tag must match the package version and belong to
+main. Existing releases are never overwritten. Branch builds and manual workflow
+runs never publish, update the website catalog, deploy the backend, or touch a PC.
+
+Installed Windows clients check the owned public catalog and qualified Desktop
+GitHub releases, downloading a newer verified package in the background. They
+ignore GitHub drafts, unrelated/headless tags and legacy packages without release
+metadata. `RAKAZO_DISABLE_AUTO_UPDATE=1` suppresses background requests. An explicit
+install action waits for local work and renderer saving, normally quits Desktop,
+installs the staged package and reopens the same profile. There is no unattended
+installation of unsigned previews. The signed electron-updater channel remains
+separately opt-in and must be qualified with the owner's signing credentials.

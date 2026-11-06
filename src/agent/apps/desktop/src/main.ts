@@ -2,6 +2,7 @@ import { LocalVoice } from "./local-voice.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
 import { ManualUpdateController } from "./manual-update.js";
+import { publishedWindowsRelease } from "./published-desktop-release.js";
 import { launchManualUpdate } from "./manual-update-handoff.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -141,6 +142,8 @@ const automaticDesktopUpdater = new DesktopUpdateController(
 const manualDesktopUpdater = process.platform === "win32" && process.arch === "x64" && app.isPackaged
   ? new ManualUpdateController({
     version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
+    backgroundDownloads: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1",
+    publishedRelease: () => publishedWindowsRelease(app.getVersion()),
     busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
     prepare: prepareRendererUpdate,
     handoff: async (file, release) => {
@@ -434,8 +437,9 @@ function createWindow(url: string, partition: string | null) {
   );
   if (!launchUpdateCheckScheduled) {
     launchUpdateCheckScheduled = true;
-    setTimeout(() => void desktopUpdater.check(false), LAUNCH_CHECK_DELAY_MS).unref();
-    setInterval(() => void desktopUpdater.check(false), 60 * 60 * 1_000).unref();
+    const check = () => { if (!quitting) void desktopUpdater.check(false); };
+    setTimeout(check, LAUNCH_CHECK_DELAY_MS).unref();
+    setInterval(check, 4 * 60 * 1_000).unref();
   }
   return { loaded, win };
 }
@@ -697,7 +701,7 @@ async function runMenuUpdateCheck() {
       : dialog.showMessageBox(options);
   if (state.phase === "ready") {
     const { response } = await alert({
-      message: `Rakazo ${state.availableVersion} is ready to install.`,
+      message: `Mycellios ${state.availableVersion} is ready to install.`,
       buttons: ["Restart", "Later"],
       defaultId: 0,
       cancelId: 1,
@@ -705,7 +709,7 @@ async function runMenuUpdateCheck() {
     });
     if (response !== 0) return;
     const result = await installUpdate();
-    if (result.message) {
+    if (result.message && !result.installPending) {
       await alert({
         type: "warning",
         message: "Could not install the update.",
@@ -720,7 +724,7 @@ async function runMenuUpdateCheck() {
       detail: state.message,
     });
   } else if (state.phase === "idle") {
-    await alert({ message: "Rakazo is up to date.", detail: `Version ${state.currentVersion}` });
+    await alert({ message: "Mycellios is up to date.", detail: `Version ${state.currentVersion}` });
   }
 }
 

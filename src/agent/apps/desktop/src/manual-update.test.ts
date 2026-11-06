@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ManualUpdateController, windowsManualRelease } from "./manual-update.js";
+import { ManualUpdateController, windowsManualRelease, type ManualRelease } from "./manual-update.js";
 
 const bytes = new Uint8Array(Buffer.from("MZcontrolled-installer-fixture"));
 const entry = { id: "windows-x64", version: "0.3.15", format: "EXE",
@@ -13,16 +13,55 @@ const entry = { id: "windows-x64", version: "0.3.15", format: "EXE",
 const catalog = { automaticUpdates: false, packages: [entry] };
 const folders: string[] = [];
 afterEach(async () => { for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true }); });
-async function fixture(overrides: { busy?: () => boolean; prepare?: () => Promise<boolean>; body?: Uint8Array } = {}) {
+async function fixture(overrides: { busy?: () => boolean; prepare?: () => Promise<boolean>; body?: Uint8Array;
+  backgroundDownloads?: boolean; publishedRelease?: () => Promise<ManualRelease | null>; catalogUnavailable?: boolean } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-")); folders.push(directory);
   const handoff = vi.fn(async () => {});
   const request = vi.fn(async (url: string | URL | Request) => String(url).endsWith("desktop-downloads")
-    ? new Response(JSON.stringify(catalog)) : new Response(overrides.body ?? bytes));
+    ? overrides.catalogUnavailable ? new Response(null, {status: 503}) : new Response(JSON.stringify(catalog)) : new Response(overrides.body ?? bytes));
   const controller = new ManualUpdateController({ version: "0.3.13", directory: () => directory,
-    fetch: request, busy: overrides.busy ?? (() => false), prepare: overrides.prepare ?? (async () => true), handoff });
+    fetch: request, busy: overrides.busy ?? (() => false), prepare: overrides.prepare ?? (async () => true), handoff,
+    backgroundDownloads: overrides.backgroundDownloads, publishedRelease: overrides.publishedRelease });
   return { controller, handoff, request, directory };
 }
 describe("official Windows manual releases", () => {
+  it("stages a newer published package even when the website catalog is unavailable", async () => {
+    const version = "0.3.17", fileName = `Mycellios-Desktop-${version}-windows-x64-pilot.exe`;
+    const published: ManualRelease = {version, fileName, bytes: bytes.byteLength, sha256: entry.sha256,
+      url: `https://github.com/Mycellios/mycellios/releases/download/desktop-v${version}-windows-preview/${fileName}`};
+    const {controller, handoff, directory} = await fixture({catalogUnavailable: true,
+      backgroundDownloads: true, publishedRelease: async () => published});
+    expect(await controller.check(false)).toMatchObject({phase: "ready", availableVersion: version});
+    expect(await readFile(path.join(directory, fileName))).toEqual(Buffer.from(bytes));
+    expect(handoff).not.toHaveBeenCalled();
+  });
+  it("retains the official catalog when the secondary feed fails", async () => {
+    const {controller, handoff} = await fixture({backgroundDownloads: true,
+      publishedRelease: async () => {throw Error("Feed offline");}});
+    expect(await controller.check(false)).toMatchObject({phase: "ready", availableVersion: entry.version});
+    expect(handoff).not.toHaveBeenCalled();
+  });
+  it("downloads the published package in the background without closing the app or installing", async () => {
+    const prepare = vi.fn(async () => true);
+    const { controller, handoff, request } = await fixture({ backgroundDownloads: true, prepare });
+    const first = controller.check(false);
+    expect(controller.check(true)).toBe(first);
+    expect(await first).toMatchObject({ phase: "ready", availableVersion: "0.3.15" });
+    expect(controller.state().installPending).not.toBe(true);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(prepare).not.toHaveBeenCalled();
+    expect(handoff).not.toHaveBeenCalled();
+    await controller.check(false);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(handoff).not.toHaveBeenCalled();
+  });
+  it("keeps a failed background transfer quiet and permits a later explicit retry", async () => {
+    const { controller, request, handoff } = await fixture({ backgroundDownloads: true, body: bytes.subarray(0, 3) });
+    expect(await controller.check(false)).toMatchObject({ phase: "idle", message: null });
+    expect(handoff).not.toHaveBeenCalled();
+    expect(await controller.check(true)).toMatchObject({ phase: "error" });
+    expect(request).toHaveBeenCalledTimes(4);
+  });
   it("rejects unsafe paths, hashes, sizes, versions and duplicate platform offers", () => {
     for (const patch of [{ path: "https://other.invalid/app.exe" }, { path: "/downloads/../other.exe" },
       { fileName: "../app.exe" }, { sha256: "wrong" }, { bytes: 2_000_000_001 }, { bytes: -1 },
