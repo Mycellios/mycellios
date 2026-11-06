@@ -743,6 +743,29 @@ it("keeps dictation disabled when the composer is unavailable", () => {
   ).toBe(true);
 });
 
+it("starts an installed-app voice shortcut hands-free but sends only on the owner's Send action", async () => {
+  vi.useFakeTimers();
+  const visible = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  const send = vi.fn(async () => true), consume = vi.fn();
+  let final!: (text: string) => void;
+  const listen = vi.spyOn(dictation, "listen").mockImplementation(async (options) => { final = options.onFinal; });
+  const submit = vi.spyOn(dictation, "submitHold").mockImplementation(() => final("voice shortcut words"));
+  try {
+    renderComposer(send, { voiceShortcutRequested: true, onVoiceShortcutConsumed: consume, dictationTranscribe: false });
+    act(() => vi.advanceTimersByTime(0));
+    expect(listen).toHaveBeenCalledOnce(); expect(consume).toHaveBeenCalledOnce();
+    expect(send).not.toHaveBeenCalled();
+    const review = [...container!.querySelectorAll("button")].find(button => button.textContent === "Review message");
+    expect(review).toBeDefined();
+    await act(async () => review!.click());
+    expect(send).not.toHaveBeenCalled();
+    expect(container!.querySelector<HTMLTextAreaElement>('textarea[aria-label="Voice transcript"]')?.value).toBe("voice shortcut words");
+    const sendButton = [...container!.querySelectorAll<HTMLButtonElement>("section button")].find(button => button.textContent === "Send");
+    await act(async () => sendButton!.click());
+    expect(send).toHaveBeenCalledWith("voice shortcut words", [], expect.any(String));
+  } finally { listen.mockRestore(); submit.mockRestore(); visible.mockRestore(); vi.useRealTimers(); }
+});
+
 describe("a dropped folder or archive", () => {
   /** A drop whose file list the browser empties once the handler returns. */
   function drop(entries: unknown[], files: File[]) {

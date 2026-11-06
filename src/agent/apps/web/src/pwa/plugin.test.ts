@@ -70,5 +70,6 @@ it("limits an embedded product manifest to its deployment namespace", () => {
   expect(manifest.scope).toBe("/agent/");
   expect(manifest.id).toBe("/agent/");
   expect(manifest.start_url).toBe("/agent/app");
+  expect(manifest.shortcuts[0]?.url).toBe("/agent/app?dictate=1");
   expect(manifest.icons[0]?.src).toBe("/agent/mycellios/app-icon-v2-192.png?brand=3");
 });
