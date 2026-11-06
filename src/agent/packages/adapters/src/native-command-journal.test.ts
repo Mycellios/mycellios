@@ -2,7 +2,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { ProcessEvent } from "@rakazo/adapter-kit";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NativeCommandJournal } from "./native-command-journal.js";
 
 const directories: string[] = [];
@@ -64,4 +64,18 @@ describe("durable native commands", () => {
     const text = await readFile(path.join(directory, (await readdir(directory)).find(name => name.endsWith(".json"))!), "utf8");
     expect(text).not.toContain("synthetic-secret"); expect(text).toContain("[redacted]");
   });
+});
+
+it("rechecks the terminal receipt when completion overtakes an observer's disk snapshot", async () => {
+  const {journal}=await fixture();
+  const read=journal.read.bind(journal);let raced=false,starts=0;
+  let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+  vi.spyOn(journal,"read").mockImplementation(async id=>{
+    const snapshot=await read(id);
+    if(snapshot && snapshot.exitCode===null && !raced){raced=true;release();await journal.settled();}
+    return snapshot;
+  });
+  const result=await collect(journal.execute({...base(),start:async function*(){starts++;await gate;yield {type:"exit" as const,code:7};}}));
+  expect(raced).toBe(true);expect(starts).toBe(1);
+  expect(result).toContainEqual({type:"exit",code:7});
 });

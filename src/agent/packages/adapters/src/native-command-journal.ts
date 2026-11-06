@@ -156,8 +156,13 @@ export class NativeCommandJournal {
         }
         yield { type: "exit", code: receipt.exitCode }; return;
       }
-      if (!this.active.has(input.id))
+      if (!this.active.has(input.id)) {
+        // drive() may have persisted its terminal receipt after this observer read
+        // the previous snapshot, then removed the active entry. Recheck once.
+        const terminal = await this.read(input.id);
+        if (terminal && terminal.exitCode !== null) continue;
         throw new Error("Command outcome is unknown after native host restart. Inspect command_status and existing effects; do not replay it");
+      }
       await new Promise<void>(resolve => {
         const finish = () => { clearTimeout(timer); input.signal.removeEventListener("abort", finish); resolve(); };
         const timer = setTimeout(finish, 100);
