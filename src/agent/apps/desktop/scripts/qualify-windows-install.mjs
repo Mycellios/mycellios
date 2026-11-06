@@ -49,6 +49,25 @@ try{
  execFileSync(zip,['e','-y','-o'+extracted,legacy,'$PLUGINSDIR/app-64.7z','$R0/Uninstall Mycellios Desktop.exe'],{stdio:'pipe'});
  execFileSync(zip,['x','-y','-o'+installation,path.join(extracted,'app-64.7z')],{stdio:'pipe'});
  await fs.copyFile(path.join(extracted,'Uninstall Mycellios Desktop.exe'),path.join(installation,'Uninstall Mycellios Desktop.exe'));
+ // Exercise the real NSIS error path, without starting an old application.
+ const refused=path.join(root,'refused/mycellios-desktop');
+ await fs.mkdir(path.join(refused,'resources'),{recursive:true});
+ await fs.copyFile(path.join(installation,'Mycellios Desktop.exe'),path.join(refused,'Mycellios Desktop.exe'));
+ await fs.copyFile(path.join(installation,'resources/desktop-build.json'),path.join(refused,'resources/desktop-build.json'));
+ const invalid='Isolated non-executable uninstaller fixture; never production.';
+ await fs.writeFile(path.join(refused,'Uninstall Mycellios Desktop.exe'),invalid);
+ for(const key of keys){reg('add','HKCU\\'+key,'/v','InstallLocation','/t','REG_SZ','/d',refused,'/f');ownsRegistration=true;}
+ reg('add','HKCU\\'+keys[1],'/v','UninstallString','/t','REG_SZ','/d','"'+path.join(refused,'Uninstall Mycellios Desktop.exe')+'" /currentuser','/f');
+ const failureResult=path.join(root,'refused-timing.json');
+ assert.throws(()=>execFileSync(ps,['-NoProfile','-NonInteractive','-File',path.join(desktop,'scripts/measure-windows-installer.ps1'),'-Candidate',candidate,'-Installation',refused,'-Result',failureResult],{windowsHide:true,timeout:60000,stdio:'pipe'}));
+ assert.equal((await json(failureResult)).exitCode,2);
+ assert.equal((await json(path.join(refused,'resources/desktop-build.json'))).version,'0.3.18');
+ assert.equal(await fs.readFile(path.join(refused,'Uninstall Mycellios Desktop.exe'),'utf8'),invalid);
+ assert.ok(reg('query','HKCU\\'+keys[0],'/v','InstallLocation').includes(refused));
+ const refusedBackups=path.join(path.dirname(refused),'mycellios-desktop-upgrade-backups');
+ const refusedFolder=(await fs.readdir(refusedBackups))[0];
+ assert.equal((await json(path.join(refusedBackups,refusedFolder,'receipt.json'))).phase,'restored');
+ await preservation('verify',path.join(refused,'resources'),'refused-drafts');
  for(const key of keys){reg('add','HKCU\\'+key,'/v','InstallLocation','/t','REG_SZ','/d',installation,'/f');ownsRegistration=true;}
  reg('add','HKCU\\'+keys[0],'/v','KeepShortcuts','/t','REG_SZ','/d','true','/f');
  reg('add','HKCU\\'+keys[1],'/v','UninstallString','/t','REG_SZ','/d','"'+path.join(installation,'Uninstall Mycellios Desktop.exe')+'" /currentuser','/f');
@@ -61,7 +80,7 @@ try{
  for(const key of keys)reg('delete','HKCU\\'+key,'/f');
  await measure(path.join(root,'fresh/mycellios-desktop'),'fresh');
  const archives=await preservation('archives',path.join(installation,'resources'),'archive-tools');
- const proof={passed:proofs.every(p=>p.elapsedMs<60000),version:identity.version,revision:identity.revision,installerSha256:digest.sha256,measurements:proofs,archives,scope:'hosted-windows-runner',physicalOwnerPc:false};
+ const proof={passed:proofs.every(p=>p.elapsedMs<60000),version:identity.version,revision:identity.revision,installerSha256:digest.sha256,measurements:proofs,legacyUninstallFailureRestored:true,archives,scope:'hosted-windows-runner',physicalOwnerPc:false};
  await fs.writeFile(path.join(output,'installer-qualification.json'),JSON.stringify(proof,null,2));
  console.log(JSON.stringify(proof));
  assert.equal(proof.passed,true,'Actual installer exceeded the 60 second target');

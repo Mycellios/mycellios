@@ -1,3 +1,5 @@
+!define MUI_CUSTOMFUNCTION_ABORT MycelliosRollback
+
 !macro MycelliosInitHelper
   InitPluginsDir
   StrCpy $MycelliosPowerShell "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe"
@@ -18,9 +20,6 @@
     Call MycelliosRollback
   FunctionEnd
 
-  Function .onUserAbort
-    Call MycelliosRollback
-  FunctionEnd
 !macroend
 
 !macro customCheckAppRunning
