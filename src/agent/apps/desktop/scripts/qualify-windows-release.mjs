@@ -12,6 +12,9 @@ assertReleaseIdentity(identity,identity.version);
 const packaged=JSON.parse(await fs.readFile(path.join(directory,'win-unpacked/resources/desktop-build.json'),'utf8'));
 assert.deepEqual(packaged,identity);
 const installer=await hashes(path.join(directory,`Mycellios-Desktop-${identity.version}-windows-x64-pilot.exe`));
+const installation=JSON.parse(await fs.readFile(path.join(directory,'installer-qualification.json'),'utf8'));
+assert.equal(installation.passed,true);assert.equal(installation.revision,identity.revision);
+assert.equal(installation.installerSha256,installer.sha256);
 const profile=await fs.mkdtemp(path.join(os.tmpdir(),'mycellios-release-qualification-'));
 let app;
 try{
@@ -32,7 +35,7 @@ try{
  assert.deepEqual(bridge,{platform:'win32',apps:'function',prepare:'function'});
  const denial=await page.evaluate(async()=>{try{await window.rakazoDesktop.appsStudio.request({action:'list'});return '';}catch(e){return String(e);}});
  assert.match(denial,/Apps necesita el acceso ya autorizado/);
- const smoke={passed:true,version:identity.version,revision:identity.revision,isolatedProfile:true,bridge,installerSha256:installer.sha256,
+ const smoke={passed:true,version:identity.version,revision:identity.revision,isolatedProfile:true,bridge,installerSha256:installer.sha256,installation,
    accountLoginSubmitted:false,realVideoGeneration:false};
  await fs.writeFile(path.join(directory,'packaged-smoke.json'),JSON.stringify(smoke,null,2));
  await writeWindowsRelease(directory,identity,smoke);

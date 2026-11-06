@@ -44,7 +44,7 @@ export async function releaseInputs(agentRoot) {
   const version = JSON.parse(await readFile(path.join(agentRoot, 'apps/desktop/package.json'), 'utf8')).version;
   const sourceHash = await digestTree(agentRoot, [
     'package.json', 'package-lock.json', 'tsconfig.base.json', 'scripts',
-    'apps/desktop/src', 'apps/desktop/scripts', 'apps/desktop/package.json',
+    'apps/desktop/src', 'apps/desktop/scripts', 'apps/desktop/assets', 'apps/desktop/package.json',
     'apps/desktop/tsconfig.json', 'apps/web/src', 'apps/web/public',
     'apps/web/index.html', 'apps/web/package.json', 'apps/web/vite.config.ts',
     'apps/api/src', 'apps/api/package.json', 'apps/worker/src', 'apps/worker/package.json',

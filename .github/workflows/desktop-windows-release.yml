@@ -63,6 +63,12 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           if($LASTEXITCODE){exit $LASTEXITCODE}
+          npm run verify:structure
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          npm run verify:architecture
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          npm run verify:component-boundaries
+          if($LASTEXITCODE){exit $LASTEXITCODE}
           Set-Location src/agent
           npm ci --ignore-scripts --no-audit --no-fund
           if($LASTEXITCODE){exit $LASTEXITCODE}
@@ -92,7 +98,7 @@ jobs:
         run: |
           npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs
+          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs apps/desktop/scripts/compact-resources.test.mjs
           exit $LASTEXITCODE
       - name: Compile all surfaces from this candidate
         working-directory: src/agent
@@ -112,6 +118,13 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
           if($LASTEXITCODE){exit $LASTEXITCODE}
+          $env:MYCELLIOS_TEST_INSTALLED_EXE=Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/Mycellios Desktop.exe'
+          node --test apps/desktop/scripts/fast-install.test.mjs
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          node apps/desktop/scripts/verify-local-server.mjs --server-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/local-server') --web-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/web')
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          node apps/desktop/scripts/qualify-windows-install.mjs $env:DESKTOP_RELEASE_OUT
+          if($LASTEXITCODE){exit $LASTEXITCODE}
           node apps/desktop/scripts/qualify-windows-release.mjs $env:DESKTOP_RELEASE_OUT
           exit $LASTEXITCODE
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -124,6 +137,7 @@ jobs:
             ${{ env.DESKTOP_RELEASE_OUT }}/desktop-build.json
             ${{ env.DESKTOP_RELEASE_OUT }}/desktop-release.json
             ${{ env.DESKTOP_RELEASE_OUT }}/packaged-smoke.json
+            ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
@@ -150,12 +164,12 @@ jobs:
           set -euo pipefail
           cd release
           sha256sum --check --strict SHA256SUMS.txt
-          jq -e --arg rev "$RELEASE_REVISION" --arg tag "$RELEASE_TAG" '.revision == $rev and .tag == $tag and .qualifiedStartup == true and .automaticUpdates == false' desktop-release.json
+          jq -e --arg rev "$RELEASE_REVISION" --arg tag "$RELEASE_TAG" '.revision == $rev and .tag == $tag and .qualifiedStartup == true and .qualifiedInstallation == true and .automaticUpdates == false' desktop-release.json
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo 'This release already exists. Never replace an existing version; prepare a new version.' >&2
             exit 1
           fi
           printf 'Versioned Windows preview from commit `%s`.\n\nVerified package, source identity and update manifests are attached. Installation requires an explicit restart.\n' "$RELEASE_REVISION" > notes.md
           gh release create "$RELEASE_TAG" --verify-tag --target "$RELEASE_REVISION" --draft --prerelease --latest=false --title "Mycellios Desktop $RELEASE_TAG" --notes-file notes.md
-          gh release upload "$RELEASE_TAG" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json SHA256SUMS.txt
           gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false

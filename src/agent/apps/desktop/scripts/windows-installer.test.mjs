@@ -27,6 +27,10 @@ test('bundles the verified runtime without accounts or shared-node uninstall act
     assert.equal(config.extraResources.some(r=>r.to==='development-tools/npm'),true);
     assert.equal(config.win.verifyUpdateCodeSignature, true);
     assert.equal(config.extraResources.some(x => x.to === 'contribution/mycellios-runtime.msi'), true);
+    const compact = await prepareWindowsInstaller({desktopRoot:root,runtimeMsi,runtimeSha256,output:path.join(root,'compact-out'),version:'0.3.19',compact:{server:path.join(root,'compact-server'),source:path.join(root,'source.asar'),npm:path.join(root,'npm.asar')}});
+    assert.equal(compact.extraResources.some(x=>x.to==='local-server/node_modules'),false);
+    assert.equal(compact.extraResources.some(x=>x.to==='development-source.asar'),true);
+    assert.equal(compact.nsis.include,path.join(root,'assets/fast-install.nsh'));
     assert.equal(JSON.parse(await readFile(path.join(root, 'out/runtime.json'))).sha256, runtimeSha256);
     const text = JSON.stringify(config);
     assert.equal(/enrollmentToken|apiKey|password|\.env/.test(text), false);

@@ -63,12 +63,20 @@ export async function writeWindowsRelease(directory, identity, smoke) {
   const fileName = `Mycellios-Desktop-${identity.version}-windows-x64-pilot.exe`;
   const artifact = {fileName, ...await hashes(path.join(directory, fileName))};
   if (smoke.installerSha256 !== artifact.sha256) throw Error('Installer changed after qualification');
+  const [major,minor,patch]=identity.version.split('.').map(Number);
+  const requireInstallation=major>0 || minor>3 || (minor===3 && patch>=19);
+  const installation=smoke.installation;
+  if(requireInstallation && (installation?.passed!==true || installation.version!==identity.version ||
+      installation.revision!==identity.revision || installation.installerSha256!==artifact.sha256 ||
+      !['fresh','legacy-to-compact'].every(label=>installation.measurements?.some(m=>m.label===label && m.exitCode===0 && Number.isFinite(m.elapsedMs) && m.elapsedMs>0 && m.elapsedMs<60000 && m.draftsPreserved===5 && m.taskMarkersPreserved===5))))
+    throw Error('Real Windows installation timing/preservation qualification is missing');
   const blockmap = {fileName: fileName + '.blockmap', ...await hashes(path.join(directory, fileName + '.blockmap'))};
   const entry = {id: 'windows-x64', version: identity.version, format: 'EXE', fileName,
     path: `/downloads/desktop/releases/${identity.version}/${fileName}`, bytes: artifact.bytes, sha256: artifact.sha256};
   const manifest = {...identity,
     schema: 'mycellios-desktop-release-package/1', tag: releaseTag(identity.version), artifact, blockmap,
-    catalogEntry: entry, qualifiedStartup: true, signature: 'unsigned-preview'};
+    catalogEntry: entry, qualifiedStartup: true, qualifiedInstallation:requireInstallation,
+    ...(requireInstallation?{installation}:{}),signature: 'unsigned-preview'};
   const previous = await readFile(path.join(directory, 'desktop-release.json'), 'utf8').then(JSON.parse).catch(e => {
     if (e.code === 'ENOENT') return null;
     throw e;
@@ -78,6 +86,9 @@ export async function writeWindowsRelease(directory, identity, smoke) {
   const yaml = `version: ${identity.version}\nfiles:\n  - url: ${fileName}\n    sha512: ${artifact.sha512}\n    size: ${artifact.bytes}\npath: ${fileName}\nsha512: ${artifact.sha512}\n`;
   await writeFile(path.join(directory, 'latest.yml'), yaml);
   await writeFile(path.join(directory, 'desktop-release.json'), JSON.stringify(manifest, null, 2) + '\n');
-  await writeFile(path.join(directory, 'SHA256SUMS.txt'), `${artifact.sha256}  ${fileName}\n${blockmap.sha256}  ${blockmap.fileName}\n`);
+  let sums=`${artifact.sha256}  ${fileName}\n${blockmap.sha256}  ${blockmap.fileName}\n`;
+  if(requireInstallation)for(const file of ['latest.yml','desktop-build.json','desktop-release.json','packaged-smoke.json','installer-qualification.json'])
+    sums+=`${(await hashes(path.join(directory,file))).sha256}  ${file}\n`;
+  await writeFile(path.join(directory, 'SHA256SUMS.txt'), sums);
   return manifest;
 }

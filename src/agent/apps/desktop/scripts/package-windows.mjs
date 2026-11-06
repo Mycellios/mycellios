@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { withWindowsCopyRetry } from './windows-copy-retry.mjs';
 import { stageDevelopmentResources } from './development-resources.mjs';
+import { stageCompactResources } from './compact-resources.mjs';
 import { prepareWindowsInstaller } from './windows-installer.mjs';
 import { writeBuildIdentity } from './desktop-release.mjs';
 
@@ -14,7 +15,9 @@ if (!runtimeMsi || !runtimeSha256) throw new Error('Use --runtime <verified MSI>
 const version = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
 const output = argument('--out') ?? path.join(root, 'release');
 const buildIdentity = await writeBuildIdentity(root, output);
-const config = await prepareWindowsInstaller({ desktopRoot: root, runtimeMsi, runtimeSha256, output, version, development: await stageDevelopmentResources(root), buildIdentity });
+const development = await stageDevelopmentResources(root);
+const compact = await stageCompactResources(root, development, output);
+const config = await prepareWindowsInstaller({ desktopRoot: root, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity });
 await withWindowsCopyRetry(async () => {
   const { Arch, build, Platform } = await import('electron-builder');
   await build({ targets: Platform.WINDOWS.createTarget('nsis', Arch.x64), projectDir: root, config, publish: 'never' });
