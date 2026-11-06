@@ -1,3 +1,8 @@
+- Native Expo sign-in may share the configured HTTPS OIDC issuer origin with Agent.
+  Its authorization proxy accepts only the configured issuer authorize path, client,
+  callback, S256 challenge and live server-issued state/nonce. Preserve the upstream
+  external-provider flow and verify packages/auth/src/oidc.test.ts for both routes.
+
 # AGENTS.md
 
 - The installed PWA Voice shortcut uses ?dictate=1 and the existing scoped chat

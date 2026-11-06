@@ -1347,3 +1347,42 @@ it("counts only stored OIDC subjects bound to the current issuer", async () => {
     false,
   );
 });
+
+
+describe("first-party native authorization on the Agent origin", () => {
+  async function sameOriginRequest() {
+    activeIssuer = origin;
+    setup({ oidc: { issuer: origin, clientId: "test-client", clientSecret: "test-client-secret", name: "SSO", scopes: ["openid", "email", "profile"], allowSignupBypass: false } });
+    const callback = await start(undefined, false, "rakazo://sign-in");
+    const callbackQuery = new URL(origin + callback).searchParams;
+    const code = codes.get(callbackQuery.get("code")!)!;
+    const authorize = new URL(origin + "/oauth/authorize");
+    for (const [key, value] of Object.entries({ state: callbackQuery.get("state")!, nonce: code.nonce, client_id: "test-client", redirect_uri: origin + "/api/auth/callback/oidc", response_type: "code", code_challenge: code.challenge, code_challenge_method: "S256" })) authorize.searchParams.set(key, value);
+    cookies = "";
+    return { callback, authorize };
+  }
+  it("completes a real native callback with PKCE and a server-issued state", async () => {
+    const { authorize, callback } = await sameOriginRequest();
+    const proxy = await request(`/expo-authorization-proxy?${new URLSearchParams({ authorizationURL: authorize.href })}`);
+    expect(proxy.headers.get("location"), await proxy.clone().text()).toBe(authorize.href);
+    const returned = await request(callback);
+    const destination = new URL(returned.headers.get("location")!);
+    expect(destination.protocol).toBe("rakazo:");
+    expect(destination.searchParams.get("cookie")).toContain("session_token");
+    expect(rows("user")).toHaveLength(1);
+  });
+  it.each(["path", "nonce", "state", "redirect", "challenge", "fragment", "duplicate-state", "expired"])("rejects a modified %s without setting a browser cookie", async change => {
+    const { authorize } = await sameOriginRequest();
+    if (change === "path") authorize.pathname = "/api/auth/sign-out";
+    if (change === "nonce") authorize.searchParams.set("nonce", "different");
+    if (change === "state") authorize.searchParams.set("state", "not-server-issued");
+    if (change === "redirect") authorize.searchParams.set("redirect_uri", "https://attacker.example.test/callback");
+    if (change === "challenge") authorize.searchParams.set("code_challenge_method", "plain");
+    if (change === "fragment") authorize.hash = "injected";
+    if (change === "duplicate-state") authorize.searchParams.append("state", "second");
+    if (change === "expired") for (const row of rows("verification")) row.expiresAt = new Date(0);
+    const proxy = await request(`/expo-authorization-proxy?${new URLSearchParams({ authorizationURL: authorize.href })}`);
+    expect(proxy.status).toBe(400); expect(proxy.headers.get("location")).toBeNull();
+    expect(proxy.headers.getSetCookie()).toHaveLength(0);
+  });
+});
