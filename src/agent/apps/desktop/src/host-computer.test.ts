@@ -43,6 +43,8 @@ describe("desktop local computer consent", () => {
     await computer.grant(scope);
     computer.activate(true);
     expect(computer.isEnabled()).toBe(true);
+    expect(computer.executionScope()).toBe(scope);
+    await computer.revoke();expect(computer.executionScope()).toBeUndefined();
   });
 
   it("does not forget account consent when transport credentials must rotate", async () => {

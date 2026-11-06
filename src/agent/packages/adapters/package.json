@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./host-computer-server": "./src/host-computer-server.ts",
+    "./desktop-agent-engine": "./src/desktop-agent-engine.ts",
     "./native-agent-process": "./src/native-agent-process.ts"
   },
   "scripts": {

@@ -19,11 +19,12 @@ const owner = {
 };
 let close = () => {};
 afterEach(() => close());
-function fixture(enabled = true) {
+function fixture(enabled = true, desktopExecution?: (actor: { userId: string; spaceId: string }, enabled?: boolean) => Promise<boolean>) {
   const app = new Hono();
   close = mountDesktopRelay(app, {
     enabled,
     secret: "test-purpose-secret",
+    desktopExecution,
     authenticate: async (request) =>
       request.headers.get("x-test-auth") === "yes"
         ? { actor: owner, sessionId: "test-session" }
@@ -33,6 +34,29 @@ function fixture(enabled = true) {
   });
   return app;
 }
+it("remembers Desktop execution across API restarts without admitting old clients or foreign bots", async () => {
+  let preferred = false;
+  let writes = 0;
+  const preference = async (_actor: {userId:string;spaceId:string}, enabled?: boolean) => { if (enabled !== undefined) { writes++; preferred = enabled; } return preferred; };
+  let app = fixture(true, preference);
+  const headers = { "x-mycellios-desktop": "1", "x-test-auth": "yes", "content-type": "application/json" };
+  const identity = await (await app.request("/api/desktop-relay/identity", { method:"POST", headers, body:"{}" })).json();
+  const registration = { deviceId: randomUUID(), generation: randomUUID(), identity };
+  expect((await app.request("/api/desktop-relay/account", { method:"POST", headers, body:JSON.stringify(registration) })).status).toBe(200);
+  expect(preferred).toBe(false);
+  expect((await app.request("/api/desktop-relay/account", { method:"POST", headers, body:JSON.stringify({...registration,agentExecution:1}) })).status).toBe(200);
+  expect((await app.request("/api/desktop-relay/account", { method:"POST", headers, body:JSON.stringify({...registration,agentExecution:1}) })).status).toBe(200);
+  expect(writes).toBe(1);
+  const probe = async (botId = "test-bot") => {
+    const body=JSON.stringify({probe:botId,agentExecution:1,scope:{userId:owner.userId,spaceId:owner.spaceId},nonce:randomUUID()});
+    const timestamp=String(Date.now());
+    return app.request("/api/desktop-relay/internal",{method:"POST",headers:{"x-desktop-time":timestamp,"x-desktop-signature":signDesktopRelay(desktopRelayKey("test-purpose-secret"),timestamp,body)},body});
+  };
+  expect(await (await probe()).json()).toEqual({agentExecution:1,available:true,preferred:true});
+  expect((await probe("foreign-bot")).status).toBe(404);
+  close();app=fixture(true,preference);
+  expect(await (await probe()).json()).toEqual({agentExecution:1,available:false,preferred:true});
+});
 it("requires an authenticated native session and owned agent, and stays off by default", async () => {
   const app = fixture();
   const payload = { deviceId: randomUUID(), generation: randomUUID(), botId: "test-bot" };

@@ -4,7 +4,8 @@ import { realpath, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { AdapterContext, ComputerRef } from "@rakazo/adapter-kit";
+import type { AdapterContext, AgentRuntime, ComputerRef } from "@rakazo/adapter-kit";
+import { DesktopAgentHost } from "./desktop-agent-host.js";
 import { safeNativeCommandError } from "./native-command-journal.js";
 import { DesktopSandboxProvider } from "./desktop-sandbox.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
@@ -21,10 +22,12 @@ export async function startHostComputerServer(options: {
   token: string;
   port?: number;
   hostname?: string;
+  agentRuntime?: AgentRuntime;
 }) {
   if (!/^[a-f0-9]{64}$/.test(options.token)) throw new Error("Invalid local computer credential");
   let enabled = false;
   let updating = false;
+  const agentHost = options.agentRuntime ? new DesktopAgentHost(options.agentRuntime) : undefined;
   // Only the native folder picker can grant projects; this map has no HTTP write method.
   const projects = new Map<string, string>();
   const taskProjects = new Map<string, { botId: string; key: string; active: boolean; allowPrimaryRun?: (runId: string) => Promise<boolean> }>();
@@ -223,6 +226,15 @@ export async function startHostComputerServer(options: {
     input: HostComputerRequest,
     context: AdapterContext,
   ): AsyncIterable<unknown> {
+    if (input.method === "agentRun" || input.method === "agentMessage") {
+      if (!agentHost || !enabled || context.signal.aborted) throw Error("Desktop agent executor unavailable");
+      if (input.method === "agentMessage") {
+        agentHost.message(input.sessionId, input.message, input.botId, input.runId, input.projectSessionId);
+        yield { accepted: true }; return;
+      }
+      yield* agentHost.run(input.sessionId, input.request, input.botId, input.runId, { ...context, projectSessionId: input.projectSessionId });
+      return;
+    }
     if (
       !input.projectSessionId &&
       [...taskProjects.values()].some(task => task.botId === input.botId && task.active) &&
@@ -562,7 +574,7 @@ export async function startHostComputerServer(options: {
     hasActiveWork: () =>
       [...providers.values()].some(provider => provider.hasActiveCommands()) ||
       [...active.values()].some(
-        (work) => work?.method === "execute" || work?.method === "writeFile",
+        (work) => work?.method === "execute" || work?.method === "writeFile" || work?.method === "agentRun",
       ),
     setEnabled(value: boolean) {
       enabled = value;

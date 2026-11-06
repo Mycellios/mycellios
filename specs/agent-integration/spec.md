@@ -2,6 +2,33 @@
 
 ## Objective
 
+### Account-owned Desktop execution
+
+Desktop owns the agent inference/tool loop for its authenticated account while it
+is online and the existing native computer consent is valid. Cloud remains the
+authority for accounts, Spaces, models, conversations, execution leases, approval
+effects and accounting; no database or account is copied to the PC. Web and mobile
+send to the same conversations. The cloud worker dispatches a bounded, ephemeral
+runtime request to the capability-advertising Desktop and awaits its events.
+Producer-side accounting, credential renewal, tool authorization, checkpoints and
+steering remain awaited callbacks to the existing scoped worker. Provider keys,
+OAuth access/refresh tokens, connection endpoints and credit observers stay in
+cloud. Desktop receives model metadata and a scoped inference stream, not those
+credentials. Genuine usage is accounted producer-side before the stream closes;
+native-client usage/cost claims are not billing evidence. The approval judge stays
+on the server so concurrent Desktop tasks cannot starve their own authorization.
+
+Reuse the authenticated account Desktop transport and its ownership/generation
+fences. Old Desktop clients do not advertise agent execution and retain their old
+behavior. Once a run is dispatched to Desktop it must never fall back or replay
+in cloud after a timeout, connection loss, Stop or update. Version the capability,
+bound frames/callbacks and preserve cancellation, completion and uncertain-effect
+semantics. Startup must not silently swallow an unavailable native executor.
+
+Qualification requires callback/accounting/credential and cancellation tests,
+old-client compatibility, remote and native builds, and a real existing-account
+turn initiated outside Desktop. A synthetic runtime is not physical acceptance.
+
 Maintain Agent changes in `Mycellios/mycellios`, alongside the distributed
 runtime, while retaining separate builds and avoiding an accidental replacement
 of either production service. The existing standalone clone is recovery evidence,

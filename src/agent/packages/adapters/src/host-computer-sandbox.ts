@@ -46,14 +46,15 @@ export class HostComputerSandbox implements SandboxProvider {
     input = { ...input, botId: context.botId ?? input.botId, ...(context.projectSessionId?{projectSessionId:context.projectSessionId}:{}) };
     if ((!this.url || !this.token) && !this.transport)
       throw new Error("Local computer access requires the desktop app. Enable it in the app menu.");
-    const body = JSON.stringify({ ...input, runId: context.runId });
+    const ownedInput = { ...input, ...(context.runId ? { runId: context.runId } : {}) };
+    const body = JSON.stringify(ownedInput);
     if (Buffer.byteLength(body) > HOST_COMPUTER_MAX_BYTES)
       throw new Error("Local computer request is too large");
     const signal = AbortSignal.any([
       context.signal,
       AbortSignal.timeout(hostComputerDeadlineMs(input)),
     ]);
-    const response = this.transport ? await this.transport({ ...input, runId: context.runId }, { ...context, signal }) : await fetch(new URL("/computer", this.url), {
+    const response = this.transport ? await this.transport(ownedInput, { ...context, signal }) : await fetch(new URL("/computer", this.url), {
       method: "POST",
       headers: { authorization: `Bearer ${this.token}`, "content-type": "application/json" },
       body,

@@ -342,6 +342,7 @@ model SpaceKey {
 }
 
 model SpaceMember {
+  desktopExecution DesktopExecutionPreference?
   id               String                 @id
   spaceId          String
   organizationId   String
@@ -360,6 +361,18 @@ model SpaceMember {
   @@index([organizationId, userId])
   @@index([userId, createdAt])
   @@map("space_members")
+}
+
+/// A remembered native execution choice, not a bearer or a transport lease.
+model DesktopExecutionPreference {
+  spaceId String
+  userId String
+  enabled Boolean @default(true)
+  updatedAt DateTime @default(now()) @updatedAt
+  membership SpaceMember @relation(fields: [spaceId, userId], references: [spaceId, userId], onDelete: Cascade)
+
+  @@id([spaceId, userId])
+  @@map("desktop_execution_preferences")
 }
 
 model Invitation {

@@ -139,7 +139,7 @@ describe("passive subscription quota", () => {
       provider: "anthropic",
       accessToken: "private",
       timeoutMs: 5,
-      fetch: vi.fn(() => new Promise(() => {})),
+      fetch: vi.fn(() => new Promise<Response>(() => {})),
     });
     expect(value).toMatchObject({ status: "unavailable", reason: "timeout", windows: [] });
     expect(

@@ -431,6 +431,14 @@ export interface AgentSteeringMessage {
 export type CacheCapabilities = ConnectionCacheCapabilities;
 
 export interface AgentRunModel {
+  /** Scoped inference stream only; the owned Desktop never receives provider credentials. */
+  desktopTransport?: {
+    model: Record<string, unknown>;
+    open(context: unknown, options: Record<string, unknown>): Promise<{
+      read(): Promise<{ events: unknown[]; done: boolean; result?: unknown }>;
+      cancel(): Promise<void>;
+    }>;
+  };
   /** Server-side spending authorization, carried with the resolved credential. */
   callObserver?: ModelCallObserver;
   cacheCapabilities?: CacheCapabilities;

@@ -28,6 +28,8 @@ import { createBadgeHandler } from "./badge.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
 import { computerConsentScope, prepareHostComputer } from "./host-computer.js";
+import { createDesktopAgentEngine } from "@rakazo/adapters/desktop-agent-engine";
+import { startDesktopExecutor } from "./executor-startup.js";
 import { ContributionRuntime, mayManageContribution } from "./contribution-runtime.js";
 import { DesktopRelayClient } from "./desktop-relay.js";
 import { desktopProjectPolicy } from "./project-preview-policy.js";
@@ -1213,10 +1215,14 @@ app.whenReady().then(async () => {
     programFiles: process.env.ProgramFiles ?? "C:\\Program Files",
     programData: process.env.ProgramData ?? "C:\\ProgramData",
   });
-  try {
-    hostComputer = await prepareHostComputer(userDataDir);
-  } catch {
-    /* Local access fails closed; Docker remains available. */
+  const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope());
+  for (;;) {
+    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine), { report: code => console.error("Desktop executor startup failed", { code }) }); break; }
+    catch {
+      // Do not open a working-looking chat with no native executor and swallow its cause.
+      const result = await dialog.showMessageBox({ type: "error", title: "Mycellios", message: "The PC executor could not start.", detail: "Retry to start local execution.", buttons: ["Retry", "Close"], defaultId: 0, cancelId: 1, noLink: true });
+      if (result.response !== 0) { app.quit(); return; }
+    }
   }
   localStack = new LocalStackController({
     hostComputer: hostComputer?.connection,
@@ -1441,6 +1447,7 @@ app.whenReady().then(async () => {
     return cloudComputer;
   };
   if(hostComputer) accountComputer = installAccountComputerBackground({
+    agentExecution: 1,
     profile:userDataDir,host:hostComputer,nativeVersion:app.getVersion(),
     localUrl:hostComputer.connection.url.replace("host.docker.internal","127.0.0.1"),localToken:hostComputer.connection.token,
     consentScope:computerConsentScope,window:()=>mainWindow,changed:installApplicationMenu,

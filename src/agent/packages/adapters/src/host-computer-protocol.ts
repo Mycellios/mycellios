@@ -31,6 +31,8 @@ const directories = z.discriminatedUnion("action", [
 ]);
 const base = { projectSessionId: z.string().min(1).max(256).optional(), botId: z.string().min(1).max(256), runId: z.string().min(1).max(256).optional() };
 export const hostComputerRequest = z.discriminatedUnion("method", [
+  z.object({ ...base, method: z.literal("agentRun"), runId: z.string().min(1).max(256), sessionId: z.string().uuid(), request: z.unknown() }),
+  z.object({ ...base, method: z.literal("agentMessage"), runId: z.string().min(1).max(256), sessionId: z.string().uuid(), message: z.unknown() }),
   z.object({
     ...base,
     method: z.enum([
@@ -81,6 +83,7 @@ export type HostComputerFrame<T> =
 
 /** Leave time for the command timeout event and final response to cross the bridge. */
 export function hostComputerDeadlineMs(request: HostComputerRequest) {
+  if (request.method === "agentRun") return 24 * 60 * 60_000;
   return request.method === "execute"
     ? boundedSandboxCommandTimeoutMs(request.command.timeoutMs) + 30_000
     : 10 * 60_000;
