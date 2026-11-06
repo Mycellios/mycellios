@@ -54,10 +54,7 @@ jobs:
           $out=Join-Path $env:RUNNER_TEMP desktop-release
           New-Item -ItemType Directory -Force $out | Out-Null
           "DESKTOP_RELEASE_OUT=$out" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Use an external canonical temporary directory
-        shell: pwsh
-        run: |
-          $temp=Join-Path $env:RUNNER_TEMP desktop-native-temporary
+          $temp=Join-Path $env:RUNNER_TEMP mycellios-desktop-release-temp
           New-Item -ItemType Directory -Force $temp | Out-Null
           "TEMP=$temp" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           "TMP=$temp" | Out-File $env:GITHUB_ENV -Append -Encoding utf8

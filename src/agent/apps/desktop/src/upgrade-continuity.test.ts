@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, it } from "vitest";
@@ -29,8 +29,11 @@ it("retains account permission and project notes when a new version replaces the
     await mkdir(packagedRoot,{recursive:true});
     await writeFile(path.join(packagedRoot,"index.html"),"next version's bundled UI");
     const input = {userData:profile,resources,targetUrl:"https://www.mycellios.com/agent/app",managedLocalStack:false};
-    expect(await localRendererOverride(profile,"https://www.mycellios.com/agent/app","0.3.9")).toBe(path.join(profile,directory));
-    expect((await resolvePackagedRenderer({...input,nativeVersion:"0.3.9"}))?.root).toBe(path.join(profile,directory));
+    // Windows may create temp directories through RUNNER~1 while realpath returns runneradmin.
+    // Compare the exact canonical destination, keeping all retention assertions below intact.
+    const previousRoot = await realpath(path.join(profile,directory));
+    expect(await localRendererOverride(profile,"https://www.mycellios.com/agent/app","0.3.9")).toBe(previousRoot);
+    expect((await resolvePackagedRenderer({...input,nativeVersion:"0.3.9"}))?.root).toBe(previousRoot);
     await computer.close(); computer = undefined;
 
     // Installer replaces application files, while both versions use the same private profile.
