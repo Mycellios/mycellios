@@ -39,6 +39,15 @@ test('API contract changes check renderer and execution consumers', () => {
   const plan = planChecks(['src/agent/apps/api/src/router.ts']);
   for (const app of ['web', 'api', 'worker', 'desktop']) assert.ok(plan.some(c => c.label === `Agent ${app} types`));
 });
+
+test('Agent script tests run after their locked workspace dependencies', () => {
+  const file='src/agent/apps/desktop/scripts/compact-resources.test.mjs';
+  const plan=planChecks([file]);
+  const installed=plan.findIndex(c=>c.label==='Agent locked dependencies');
+  const tested=plan.findIndex(c=>c.label===`test: ${file}`);
+  assert.ok(installed>=0 && tested>installed);
+  assert.ok(plan.findIndex(c=>c.label===`syntax: ${file}`)<installed);
+});
 test('root and Agent dependency graphs remain isolated', () => {
   const plan = planChecks(['src/coordinator/main.ts', 'landing/src/App.tsx']);
   assert.ok(plan.some(c => c.label === 'typecheck'));

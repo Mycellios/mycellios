@@ -5,6 +5,7 @@ import {
   copyFile,
   link,
   mkdir,
+  readFile,
   mkdtemp,
   readdir,
   readlink,
@@ -64,6 +65,8 @@ await new Promise((r) => listener.listen(0, "127.0.0.1", r));
 const port = listener.address().port;
 await new Promise((r) => listener.close(r));
 const configFile = join(profile, "server.json");
+const compact = await readFile(join(relocatedServer,'compact-resources.json'),'utf8').then(()=>true,()=>false);
+const entry = compact ? join(relocatedServer,'compact-server-entry.cjs') : join(relocatedServer,'dist','desktop-local-entry.js');
 await writeFile(
   configFile,
   JSON.stringify({
@@ -103,7 +106,7 @@ const child = spawn(
   [
     join(desktop, "scripts/fixtures/local-server-electron.cjs"),
     configFile,
-    join(relocatedServer, "dist/desktop-local-entry.js"),
+    entry,
     profile,
   ],
   { env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] },

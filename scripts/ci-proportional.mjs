@@ -10,12 +10,16 @@ export function planChecks(files) {
     || files.some(f => /^scripts\/.*\.test\.[cm]?js$/.test(f) && f !== 'scripts/ci-fast-delivery.test.mjs');
   const agent = files.some(f => f.startsWith('src/agent/') && !visual(f));
   const commands = [];
+  const agentScriptTests = [];
   const add = (cwd, bin, args, label) => commands.push({ cwd, bin, args, label });
   add('.', 'node', ['--test', 'scripts/ci-fast-delivery.test.mjs'], 'CI policy tests');
   if (root || agent) add('.', 'npm', ['install', '--global', 'npm@10.9.8', '--no-audit', '--no-fund'], 'pinned npm toolchain');
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);
-    if (/\.test\.[cm]js$/.test(file) && file !== 'scripts/ci-fast-delivery.test.mjs') add('.', 'node', ['--test', file], `test: ${file}`);
+    if (/\.test\.[cm]js$/.test(file) && file !== 'scripts/ci-fast-delivery.test.mjs') {
+      if (file.startsWith('src/agent/')) agentScriptTests.push(file);
+      else add('.', 'node', ['--test', file], `test: ${file}`);
+    }
   }
   if (root) {
     add('.', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'root locked dependencies');
@@ -31,6 +35,7 @@ export function planChecks(files) {
   }
   if (agent) {
     add('src/agent', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'Agent locked dependencies');
+    for (const file of agentScriptTests) add('.', 'node', ['--test',file], `test: ${file}`);
     add('src/agent', 'npm', ['run', 'generate', '--workspace', '@rakazo/db'], 'Prisma client generation (no database connection)');
     const shared = files.some(f => f.startsWith('src/agent/') && (!f.startsWith('src/agent/apps/') || f.startsWith('src/agent/apps/api/')));
     for (const app of ['web', 'api', 'worker', 'desktop']) {

@@ -46,9 +46,19 @@
   desktop-release.json; ignore draft, legacy and headless releases. Follow only
   the owned GitHub asset URL to its exact release CDN, without credentials.
 - Windows release packaging embeds desktop-build.json with the committed revision,
-  tree and all three current build receipts. desktop-windows-release.yml builds
-  release branches/manual runs without publishing; only a matching Desktop tag
-  already integrated in main publishes the qualified package and its manifests.
+  tree and all three current build receipts. Windows compact resources keep
+  local-server JavaScript in runtime.asar and
+  native packages at real paths, with root-scoped resolution in utility/Node
+  children. Never expand the complete server at startup or drop offline features.
+  Fast installation journals a same-volume installation snapshot, retains the old
+  uninstaller, registration and shortcut recovery, and never moves userData.
+  Qualify compact-resources, fast-install, the real local server and timed NSIS
+  legacy upgrades; report hosted timing separately from physical-PC acceptance.
+  desktop-windows-release.yml builds
+  release branches/manual runs without publishing. A matching integrated Desktop
+  tag can publish, or desktop-windows-promote.yml can promote an already-qualified
+  run from main without rebuilding. Require its exact revision/tree, checksums and
+  installer receipt; never promote an older tree over newer main changes.
   Never replace an existing release. Use scripts/prepare-desktop-version.mjs for
   a new version; keep the native runtime pin and other platform channels intact.
   Verify desktop-release, published-desktop-release, manual-update and
