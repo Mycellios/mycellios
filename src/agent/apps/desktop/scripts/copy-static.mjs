@@ -15,6 +15,7 @@ const TOKENS_FILE = path.resolve(
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 STATIC_FILES.push("project-browser-preload.cjs");
+STATIC_FILES.push("manual-update-helper.ps1");
 const dist = path.join(root, "dist");
 const webRequire = createRequire(path.join(root, "../web/package.json"));
 

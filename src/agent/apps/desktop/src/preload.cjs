@@ -66,6 +66,17 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     check: () => ipcRenderer.invoke("desktop.update.check"),
     download: () => ipcRenderer.invoke("desktop.update.download"),
     install: () => ipcRenderer.invoke("desktop.update.install"),
+    cancelInstall: () => ipcRenderer.invoke("desktop.update.cancelInstall"),
+    onPrepare: listener => {
+      const handler = async (_event, nonce) => {
+        if (typeof nonce !== "string" || !/^[a-f0-9]{32}$/.test(nonce)) return;
+        let ready = false;
+        try { ready = await listener() === true; } catch { /* Keep unsaved work open. */ }
+        ipcRenderer.send("desktop.update.prepared", { nonce, ready });
+      };
+      ipcRenderer.on("desktop.update.prepare", handler);
+      return () => ipcRenderer.off("desktop.update.prepare", handler);
+    },
   },
   oauth: {
     open: (url) => ipcRenderer.invoke("desktop.oauth.open", url),

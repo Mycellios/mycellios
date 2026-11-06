@@ -1,6 +1,9 @@
 import { LocalVoice } from "./local-voice.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
+import { ManualUpdateController } from "./manual-update.js";
+import { publishedWindowsRelease } from "./published-desktop-release.js";
+import { launchManualUpdate } from "./manual-update-handoff.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
@@ -125,7 +128,7 @@ const updaterEnvironment = {
   version: app.getVersion(),
   disabled: process.env.MYCELLIOS_AGENT_UPDATES_ENABLED !== "1" || process.env.RAKAZO_DISABLE_AUTO_UPDATE === "1",
 };
-const desktopUpdater = new DesktopUpdateController(
+const automaticDesktopUpdater = new DesktopUpdateController(
   updaterEnvironment,
   async () => {
     const module = await import("electron-updater");
@@ -136,6 +139,38 @@ const desktopUpdater = new DesktopUpdateController(
     quitting = false;
   },
 );
+const manualDesktopUpdater = process.platform === "win32" && process.arch === "x64" && app.isPackaged
+  ? new ManualUpdateController({
+    version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
+    backgroundDownloads: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1",
+    publishedRelease: () => publishedWindowsRelease(app.getVersion()),
+    busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
+    prepare: prepareRendererUpdate,
+    handoff: async (file, release) => {
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) throw Error("The app window changed");
+      const reopen = new URL(win.webContents.getURL());
+      reopen.search = "";
+      reopen.hash = "";
+      accountComputer?.stop();
+      cloudComputer?.stop();
+      hostComputer?.activate(false);
+      win.setEnabled(false);
+      try {
+        await win.webContents.session.cookies.flushStore();
+        await win.webContents.session.flushStorageData();
+        await launchManualUpdate({ profile: app.getPath("userData"), executable: process.execPath,
+          oldPid: process.pid, installer: file, release, reopenUrl: reopen.href });
+        quitting = true;
+        app.quit();
+      } catch (error) {
+        if (!win.isDestroyed()) win.setEnabled(true);
+        accountComputer?.start();
+        throw error;
+      }
+    },
+  }) : null;
+const desktopUpdater = manualDesktopUpdater ?? automaticDesktopUpdater;
 let launchUpdateCheckScheduled = false;
 let localStack: Pick<LocalStackController, "webUrl" | "state" | "matchesDesiredStack" | "start" | "stop" | "abort">;
 let hostComputer: Awaited<ReturnType<typeof prepareHostComputer>> | undefined;
@@ -186,6 +221,10 @@ function windowFrom(event: Electron.IpcMainInvokeEvent) {
 
 function fromMainWindow(event: Electron.IpcMainInvokeEvent) {
   return mainWindow !== null && windowFrom(event) === mainWindow;
+}
+
+function fromUpdateWindow(event: Electron.IpcMainInvokeEvent) {
+  return fromMainWindow(event) && event.senderFrame === event.sender.mainFrame;
 }
 
 /** Dock/taskbar icon for unpackaged launches; packaged builds get theirs from electron-builder. */
@@ -398,8 +437,9 @@ function createWindow(url: string, partition: string | null) {
   );
   if (!launchUpdateCheckScheduled) {
     launchUpdateCheckScheduled = true;
-    setTimeout(() => void desktopUpdater.check(false), LAUNCH_CHECK_DELAY_MS).unref();
-    setInterval(() => void desktopUpdater.check(false), 60 * 60 * 1_000).unref();
+    const check = () => { if (!quitting) void desktopUpdater.check(false); };
+    setTimeout(check, LAUNCH_CHECK_DELAY_MS).unref();
+    setInterval(check, 4 * 60 * 1_000).unref();
   }
   return { loaded, win };
 }
@@ -661,7 +701,7 @@ async function runMenuUpdateCheck() {
       : dialog.showMessageBox(options);
   if (state.phase === "ready") {
     const { response } = await alert({
-      message: `Rakazo ${state.availableVersion} is ready to install.`,
+      message: `Mycellios ${state.availableVersion} is ready to install.`,
       buttons: ["Restart", "Later"],
       defaultId: 0,
       cancelId: 1,
@@ -669,7 +709,7 @@ async function runMenuUpdateCheck() {
     });
     if (response !== 0) return;
     const result = await installUpdate();
-    if (result.message) {
+    if (result.message && !result.installPending) {
       await alert({
         type: "warning",
         message: "Could not install the update.",
@@ -684,11 +724,12 @@ async function runMenuUpdateCheck() {
       detail: state.message,
     });
   } else if (state.phase === "idle") {
-    await alert({ message: "Rakazo is up to date.", detail: `Version ${state.currentVersion}` });
+    await alert({ message: "Mycellios is up to date.", detail: `Version ${state.currentVersion}` });
   }
 }
 
 async function installUpdate() {
+  if (manualDesktopUpdater) return manualDesktopUpdater.install();
   if (desktopUpdater.state().phase !== "ready") return desktopUpdater.state();
   if (hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()) return {
     ...desktopUpdater.state(), message: "A local task is still running. Install the update when it finishes.",
@@ -699,6 +740,28 @@ async function installUpdate() {
   // window behavior while the user keeps working after that failure.
   if (state.phase !== "ready" || state.message !== null) quitting = false;
   return state;
+}
+
+/** Exact current main-frame acknowledgement; a missing/old renderer never permits a quit. */
+async function prepareRendererUpdate(): Promise<boolean> {
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return false;
+  const contents = win.webContents, url = contents.getURL(), nonce = randomBytes(16).toString("hex");
+  return new Promise(resolve => {
+    const finish = (ready: boolean) => {
+      clearTimeout(timer);
+      ipcMain.off("desktop.update.prepared", received);
+      resolve(ready && mainWindow === win && !win.isDestroyed() && contents.getURL() === url);
+    };
+    const received = (event: Electron.IpcMainEvent, value: unknown) => {
+      if (event.sender !== contents || event.senderFrame !== contents.mainFrame ||
+          !value || typeof value !== "object" || !("nonce" in value) || value.nonce !== nonce) return;
+      finish("ready" in value && value.ready === true);
+    };
+    const timer = setTimeout(() => finish(false), 2_000);
+    ipcMain.on("desktop.update.prepared", received);
+    contents.send("desktop.update.prepare", nonce);
+  });
 }
 
 function installApplicationMenu() {
@@ -719,7 +782,7 @@ function installApplicationMenu() {
   };
   const checkForUpdates: Electron.MenuItemConstructorOptions = {
     label: "Check for Updates…",
-    visible: updaterSupport(updaterEnvironment).supported,
+    visible: manualDesktopUpdater !== null || updaterSupport(updaterEnvironment).supported,
     click: () => void checkForUpdatesFromMenu(),
   };
   const changeServer: Electron.MenuItemConstructorOptions = {
@@ -1618,14 +1681,17 @@ app.whenReady().then(async () => {
     };
   });
   ipcMain.handle("desktop.update.state", () => desktopUpdater.state());
+  ipcMain.handle("desktop.update.cancelInstall", (event) =>
+    fromUpdateWindow(event) && manualDesktopUpdater ? manualDesktopUpdater.cancelInstall() : desktopUpdater.state(),
+  );
   ipcMain.handle("desktop.update.check", (event) =>
-    fromMainWindow(event) ? desktopUpdater.check(true) : desktopUpdater.state(),
+    fromUpdateWindow(event) ? desktopUpdater.check(true) : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.update.download", (event) =>
-    fromMainWindow(event) ? desktopUpdater.download() : desktopUpdater.state(),
+    fromUpdateWindow(event) ? desktopUpdater.download() : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.update.install", (event) =>
-    fromMainWindow(event) ? installUpdate() : desktopUpdater.state(),
+    fromUpdateWindow(event) ? installUpdate() : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.setup.state", (event) => {
     if (!fromSetupWindow(event)) return null;

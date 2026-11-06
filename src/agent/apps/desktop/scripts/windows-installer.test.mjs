@@ -22,7 +22,7 @@ test('bundles the verified runtime without accounts or shared-node uninstall act
     });
     assert.equal(config.beforePack, path.join(root,'scripts/verify-release.cjs'));
     assert.equal(config.extraResources.some(x=>x.to==='local-server'),true);
-    assert.deepEqual(config.publish, []);
+    assert.deepEqual(config.publish, [{provider:'generic',url:'https://www.mycellios.com/downloads/desktop/updates/windows'}]);
     assert.equal(config.extraResources.some(r=>r.to==='development-source'),true);
     assert.equal(config.extraResources.some(r=>r.to==='development-tools/npm'),true);
     assert.equal(config.win.verifyUpdateCodeSignature, true);

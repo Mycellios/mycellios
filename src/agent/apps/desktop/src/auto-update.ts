@@ -287,7 +287,8 @@ export class DesktopUpdateController {
     const loading = this.loadUpdater()
       .then((updater) => {
         updater.autoDownload = false;
-        updater.autoInstallOnAppQuit = true;
+        // Only the explicit install action performs the shutdown preparation.
+        updater.autoInstallOnAppQuit = false;
         updater.allowPrerelease = false;
         updater.allowDowngrade = false;
         updater.disableWebInstaller = true;
