@@ -1,4 +1,4 @@
-import { interruptedTurnCheckpoint } from "./turn-checkpoint.js";
+import { interruptedTurnCheckpoint, unresolvedTurnCheckpointCalls } from "./turn-checkpoint.js";
 import type { Api, Message, Model } from "@earendil-works/pi-ai";
 import type { AgentRunRequest } from "@rakazo/adapter-kit";
 import { describe, expect, it } from "vitest";
