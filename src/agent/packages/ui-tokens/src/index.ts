@@ -154,21 +154,78 @@ export const lightTokens = {
 
 /** Web and Electron only: the primary fill's hover and disabled states. Mobile has no hover. */
 export type WebColorTokens = ColorTokens & {
+  skillForeground: string;
+  skillDocument: string;
+  skillData: string;
+  skillDesign: string;
+  skillCode: string;
+  workspaceTaskBlue: string;
+  workspaceAccentForeground: string;
+  workspaceAccent: string;
+  workspacePrimaryForeground: string;
+  workspacePrimary: string;
+  workspaceMutedForeground: string;
+  workspaceSidebarBorder: string;
+  workspaceSidebarAccent: string;
+  workspaceSidebar: string;
+  workspaceBorder: string;
+  workspaceCard: string;
+  workspaceForeground: string;
+  workspaceBackground: string;
+
   primaryHover: string;
   primaryDisabled: string;
 };
 
 /**
  * Web and Electron inherit the shared Mycellios forest/paper palette.
- * Only pointer interaction states differ from native surfaces.
+ * Workspace accents and pointer interaction states are web-only additions.
  */
 export const webDarkOverrides = {
+  workspaceBackground: "#202023",
+  workspaceForeground: "#eeeeef",
+  workspaceCard: "#2a2a2e",
+  workspaceBorder: "#38383d",
+  workspaceSidebar: "#18181b",
+  workspaceSidebarAccent: "#303035",
+  workspaceSidebarBorder: "#38383d",
+  workspaceMutedForeground: "#a7a7af",
+  workspacePrimary: "#f0f0f2",
+  workspacePrimaryForeground: "#18181b",
+  workspaceAccent: "#343439",
+  workspaceAccentForeground: "#eeeef0",
+  workspaceTaskBlue: "#6ba9ff",
+  skillCode: "#2465a7",
+  skillDesign: "#b93e80",
+  skillData: "#208576",
+  skillDocument: "#7556d5",
+  skillForeground: "#ffffff",
+
   primaryHover: "#D8D2C9",
   primaryDisabled: "#EEE9E221",
   destructiveFill: "#CF2B35",
 } as const satisfies Partial<WebColorTokens>;
 
 export const webLightOverrides = {
+  workspaceBackground: "#f5f5f7",
+  workspaceForeground: "#19191b",
+  workspaceCard: "#fff",
+  workspaceBorder: "#e7e7eb",
+  workspaceSidebar: "#e8e8ed",
+  workspaceSidebarAccent: "#dadade",
+  workspaceSidebarBorder: "#e1e1e5",
+  workspaceMutedForeground: "#737378",
+  workspacePrimary: "#18181b",
+  workspacePrimaryForeground: "#fff",
+  workspaceAccent: "#e9e9ed",
+  workspaceAccentForeground: "#19191b",
+  workspaceTaskBlue: "#006ad4",
+  skillCode: "#2465a7",
+  skillDesign: "#b93e80",
+  skillData: "#208576",
+  skillDocument: "#7556d5",
+  skillForeground: "#ffffff",
+
   primaryHover: "#344438",
   primaryDisabled: "#1E2A2226",
 } as const satisfies Partial<WebColorTokens>;
@@ -202,6 +259,8 @@ export const typeScale = {
  * accessibility sizes keep that size, so message bubbles, rows and cards keep their layout.
  */
 export const MAX_FONT_SCALE = 23 / typeScale.body.fontSize;
+
+export const usageSeriesColors = ["#a855f7", "#3b82f6", "#0d9488", "#c77700", "#ec4899", "#6366f1"] as const;
 
 export const botColors = [
   "#3EC5A8",

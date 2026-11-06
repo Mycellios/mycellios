@@ -670,10 +670,9 @@ msgstr "Başka bir asistan"
 msgid "Answer"
 msgstr "Yanıtla"
 
-#: src/components/call/IncomingCall.tsx
-msgctxt "incoming call"
+#: src/components/AskCard.tsx
 msgid "Answer"
-msgstr ""
+msgstr "Yanıtla"
 
 #: src/components/AskCard.tsx
 msgid "Answered"
@@ -6124,37 +6123,30 @@ msgstr "Bu modeli kullan"
 msgid "Use your own key"
 msgstr "Kendi anahtarınızı kullanın"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "Kazanılan kredilerden ayrı promosyon bakiyesi"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "Model, yanıtını bitirmeden çıktı sınırına ulaştı."
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "Ekran bağlı değil"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "Ekran bağlantısı kapandı."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "Ekran yanıt vermedi."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "Ekran bağlantısının süresi doldu."
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx

@@ -1,3 +1,4 @@
+import { createModelPlanLimits } from "../model-plan-limits.js";
 import { discoverLocalModels } from "../local-model-discovery.js";
 import { nativeHostAccess } from "@rakazo/adapters";
 import { ORPCError } from "@orpc/server";
@@ -79,6 +80,7 @@ export function modelsRoutes(ctx: RouterContext) {
   } = ctx;
   // Coalesce simultaneous setup clicks in this API instance; never rotate a key
   // because two views of the same member finish onboarding together.
+  const planLimits = createModelPlanLimits(deps);
   const mycelliosConnections = new Map<string, ReturnType<typeof persistModelCredential>>();
   // A compatible provider can now have several independent connections.
   // Select an owned Mycellios endpoint, never the newest arbitrary gateway.
@@ -104,6 +106,7 @@ export function modelsRoutes(ctx: RouterContext) {
   }
   return {
     models: {
+      planLimits: authed.models.planLimits.handler(({ context, input }) => planLimits(context.actor.userId, input?.refresh)),
       discoverLocal: authed.models.discoverLocal.handler(async ({ context }) => {
         if (!(await nativeHostAccess(deps.dataDir, context.actor)))
           throw new ORPCError("FORBIDDEN");

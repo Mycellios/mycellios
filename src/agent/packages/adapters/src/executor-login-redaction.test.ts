@@ -1,3 +1,4 @@
+import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
 import type { ComputerRef } from "@rakazo/adapter-kit";
 import { encodeLoginSecret } from "@rakazo/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -35,7 +36,7 @@ type ExecuteTool = (
  */
 async function runAfterFill(
   toolCalls: Array<{ name: string; args: Record<string, unknown> }>,
-  options: { savedLogin?: boolean; reply?: string } = {},
+  options: { savedLogin?: boolean; reply?: string; trigger?: "routine" | "user" } = {},
 ) {
   const run = {
     id: "run-2",
@@ -45,8 +46,8 @@ async function runAfterFill(
     spaceId: "space-1",
     userId: "user-1",
     status: "queued",
-    trigger: "routine",
-    routineId: "routine-1",
+    trigger: options.trigger ?? "routine",
+    routineId: options.trigger === "user" ? null : "routine-1",
     retryOfRunId: null,
     leaseFence: 0,
   };
@@ -250,7 +251,7 @@ describe("saved logins in a later run", () => {
   });
 
   it("hides a password the browser window title echoes", async () => {
-    const { toolResults } = await runAfterFill([{ name: "computer_observe", args: {} }]);
+      const { toolResults } = await runAfterFill([{ name: "computer_observe", args: {} }], { trigger: "user" });
     expect(JSON.stringify(toolResults)).toContain(`${USERNAME} - [redacted]`);
   });
 
@@ -286,3 +287,11 @@ function withEmptyModels<T extends object>(prisma: T): T {
     get: (target, key) => (key in target ? target[key as keyof T] : empty),
   });
 }
+
+// These executor fixtures isolate post-admission behavior. Real concurrent SQL
+// admission is exercised by scripts/verify-workspace-sync-db.ts.
+vi.mock("@rakazo/db", async (load) => ({
+  ...await load<typeof import("@rakazo/db")>(),
+  claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
+}));

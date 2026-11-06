@@ -1,3 +1,4 @@
+import { CommunityInvitation } from "./CommunityInvitation";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { AppMarkStack, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import {
@@ -99,6 +100,7 @@ export function SidebarFooter({
       {!mini && <WebUpdateSlot />}
       {!mini && <DesktopSidebarUpdate />}
       <DesktopDownloadLink mini={mini} />
+      <CommunityInvitation mini={mini} />
       <div
         data-testid="sidebar-footer"
         className={`flex shrink-0 items-center gap-2 bg-transparent ${mini ? "flex-col px-1 py-2" : "px-2.5 py-3"}`}

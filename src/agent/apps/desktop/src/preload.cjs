@@ -3,6 +3,14 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("rakazoDesktop", {
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
   platform: process.platform,
+  localVoice: {
+    status: () => ipcRenderer.invoke("desktop.localVoice.status"),
+    prepare: () => ipcRenderer.invoke("desktop.localVoice.prepare"),
+    transcribe: samples => ipcRenderer.invoke("desktop.localVoice.transcribe", samples),
+    speak: input => ipcRenderer.invoke("desktop.localVoice.speak", input),
+    stop: () => ipcRenderer.invoke("desktop.localVoice.stop"),
+  },
+
   nativeWindowFrame: process.platform !== "darwin",
   projectRunner: {
     state: botId => ipcRenderer.invoke("desktop.projectRunner.state", botId),

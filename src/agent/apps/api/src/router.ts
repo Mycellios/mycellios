@@ -1,5 +1,7 @@
 import type {
   AgentHomeStore,
+  AgentRuntime,
+  AgentRunModel,
   ArtifactStore,
   JobPublisher,
   MemoryStore,
@@ -44,6 +46,7 @@ import { routinesRoutes } from "./routes/routines.js";
 import { workflowsRoutes } from "./routes/workflows.js";
 import { spacesRoutes } from "./routes/spaces.js";
 import { developmentRoutes } from "./routes/development.js";
+import { taskInboxRoutes } from "./routes/task-inbox.js";
 import { threadsRoutes } from "./routes/threads.js";
 
 export { nextConnectionLabel } from "./model-credentials.js";
@@ -52,6 +55,11 @@ export { HEARTBEAT_MS, SESSION_RECHECK_MS } from "./routes/shared.js";
 export { callMarkerClientNonce } from "./routes/threads.js";
 
 export interface RouterDeps {
+  sideQuestions?: {
+    runtime: AgentRuntime;
+    resolveModel: (scope: { userId: string; spaceId: string; botId: string }) => Promise<AgentRunModel>;
+  };
+
   pushTokens: PushTokenStore;
   analytics?: ProductAnalytics;
   cloudAgent?: CloudAgentConnection | null;
@@ -151,6 +159,7 @@ export function createRouter(deps: RouterDeps) {
     ...botsRoutes(ctx),
     ...developmentRoutes(ctx),
     ...threadsRoutes(ctx),
+    ...taskInboxRoutes(ctx),
     ...computerRoutes(ctx),
     ...memoryRoutes(ctx),
     ...routinesRoutes(ctx),

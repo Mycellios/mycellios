@@ -6363,282 +6363,222 @@ msgstr "Your answer"
 msgid "View question"
 msgstr "View question"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "Promotional grant, separate from earned credits"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "The model hit its output limit before finishing its reply."
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "Screen not connected"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "The screen connection closed."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "The screen did not respond."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "The screen link expired."
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx
 msgid "Automatic"
 msgstr "Automatic"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Agent"
 msgstr "Mico"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "All agents"
 msgstr "All Micos"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Copy diagnostic details"
 msgstr "Copy diagnostic details"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Could not copy details. Select the execution ID instead."
 msgstr "Could not copy details. Select the execution ID instead."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Could not refresh logs. Try again."
 msgstr "Could not refresh logs. Try again."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Diagnostic details"
 msgstr "Diagnostic details"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Error code"
 msgstr "Error code"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution ID"
 msgstr "Execution ID"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution attempts"
 msgstr "Execution attempts"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution failed. Copy the diagnostic details to report it."
 msgstr "Execution failed. Copy the diagnostic details to report it."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution logs"
 msgstr "Execution logs"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Finished"
 msgstr "Finished"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "First response"
 msgstr "First response"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Load older logs"
 msgstr "Load older logs"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Loading logs"
 msgstr "Loading logs"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Logs"
 msgstr "Logs"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "No executions yet. Activity will appear here after you send a message."
 msgstr "No executions yet. Activity will appear here after you send a message."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "No virtual computer is assigned. This execution cannot start."
 msgstr "No virtual computer is assigned. This execution cannot start."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Not recorded"
 msgstr "Not recorded"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Recent attempts"
 msgstr "Recent attempts"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Refresh logs"
 msgstr "Refresh logs"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Refreshes every 15 seconds while active"
 msgstr "Refreshes every 15 seconds while active"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Showing the latest 10 attempts."
 msgstr "Showing the latest 10 attempts."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Started"
 msgstr "Started"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The model is unavailable. Check Models in settings."
 msgstr "The model is unavailable. Check Models in settings."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The model's context limit was reached."
 msgstr "The model's context limit was reached."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The provider rejected the credential. Check Models in settings."
 msgstr "The provider rejected the credential. Check Models in settings."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The provider's request limit was reached."
 msgstr "The provider's request limit was reached."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Updated"
 msgstr "Updated"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Virtual computers are unavailable on this server."
 msgstr "Virtual computers are unavailable on this server."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Worker claims"
 msgstr "Worker claims"
 
-
 msgid "Developer mode"
 msgstr "Developer mode"
-
 
 msgid "Show execution logs on this browser."
 msgstr "Show execution logs on this browser."
 
-
 msgid "Search loaded logs"
 msgstr "Search loaded logs"
-
 
 msgid "Status of loaded logs"
 msgstr "Status of loaded logs"
 
-
 msgid "No matches in loaded logs. Clear the filters or load older logs."
 msgstr "No matches in loaded logs. Clear the filters or load older logs."
-
 
 msgid "Cannot start: virtual computer unavailable"
 msgstr "Cannot start: virtual computer unavailable"
 
-
 msgid "Waiting to start"
 msgstr "Waiting to start"
-
 
 msgid "Worker contact lost — checking recovery"
 msgstr "Worker contact lost — checking recovery"
 
-
 msgid "Worker connected · no recent output"
 msgstr "Worker connected · no recent output"
-
 
 msgid "In progress · worker status unavailable"
 msgstr "In progress · worker status unavailable"
 
-
 msgid "Elapsed"
 msgstr "Elapsed"
-
 
 msgid "Waiting"
 msgstr "Waiting"
 
-
 msgid "Not available"
 msgstr "Not available"
-
 
 msgid "No model has started. Configure a virtual computer to continue."
 msgstr "No model has started. Configure a virtual computer to continue."
 
-
 msgid "A long task is not stopped just because it has not produced new output."
 msgstr "A long task is not stopped just because it has not produced new output."
-
 
 msgid "Execution details"
 msgstr "Execution details"
 
-
 msgid "Last worker signal"
 msgstr "Last worker signal"
-
 
 msgid "Last output"
 msgstr "Last output"
 
-
 msgid "Worker lease valid until"
 msgstr "Worker lease valid until"
-
 
 msgid "View computer"
 msgstr "View computer"
 
-
 msgid "Waiting for your response"
 msgstr "Waiting for your response"
-
 
 msgid "This agent has no virtual computer. Open Computer settings to configure it."
 msgstr "This Mico has no virtual computer. Open Computer settings to configure it."
@@ -6874,7 +6814,6 @@ msgstr "Your chats stay saved. Tasks running on the server will continue while M
 msgid "Send your draft and attachments, finish any call or recording, and close edited forms before updating. If it still fails, try again when connected."
 msgstr "Send your draft and attachments, finish any call or recording, and close edited forms before updating. If it still fails, try again when connected."
 
-
 msgid "Retrying…"
 msgstr "Retrying…"
 
@@ -6902,7 +6841,6 @@ msgstr "Open project"
 msgid "Enter a local preview URL."
 msgstr "Enter a local preview URL."
 
-
 msgid "Credits"
 msgstr "Credits"
 
@@ -6912,26 +6850,20 @@ msgstr "Get Mycellios Desktop"
 msgid "Adding 10 USD gives you 10 credits. Spore is a separate token."
 msgstr "Adding 10 USD gives you 10 credits. Spore is a separate token."
 
-
 msgid "Credits are your internal Mycellios balance. Adding 10 USD gives you 10 credits. Spore is a separate token."
 msgstr "Credits are your internal Mycellios balance. Adding 10 USD gives you 10 credits. Spore is a separate token."
-
 
 msgid "Credits are added after the network verifies your work."
 msgstr "Credits are added after the network verifies your work."
 
-
 msgid "Share this computer’s resources and earn credits for verified work."
 msgstr "Share this computer’s resources and earn credits for verified work."
-
 
 msgid "Sign in again to see your credits."
 msgstr "Sign in again to see your credits."
 
-
 msgid "Last verified balance. Retrying automatically."
 msgstr "Last verified balance. Retrying automatically."
-
 
 msgid "Balance temporarily unavailable. Retrying automatically."
 msgstr "Balance temporarily unavailable. Retrying automatically."
@@ -6957,30 +6889,23 @@ msgstr "Link project on this computer"
 msgid "This project does not provide a Desktop development runner."
 msgstr "This project does not provide a Desktop development runner."
 
-
 msgid "Connected with your account"
 msgstr "Connected with your account"
-
 
 msgid "Could not connect Mycellios. Try again. No credits were spent."
 msgstr "Could not connect Mycellios. Try again. No credits were spent."
 
-
 msgid "Use your credits on the Mycellios network. Choose a model above. No API key needed."
 msgstr "Use your credits on the Mycellios network. Choose a model above. No API key needed."
-
 
 msgid "Retry connection"
 msgstr "Retry connection"
 
-
 msgid "Sign in with Mycellios to use your credits."
 msgstr "Sign in with Mycellios to use your credits."
 
-
 msgid "Update Desktop to link the agent and development window to the same project."
 msgstr "Update Desktop to link the agent and development window to the same project."
-
 
 msgid "Preparing development…"
 msgstr "Preparing development…"
@@ -6993,7 +6918,6 @@ msgstr "The first launch prepares the source and downloads development tools aut
 
 msgid "Could not prepare development. Check the connection and try again when the agent is idle."
 msgstr "Could not prepare development. Check the connection and try again when the agent is idle."
-
 
 msgid "Browser"
 msgstr "Browser"
@@ -7037,58 +6961,44 @@ msgstr "Could not select an element. Refresh the page and retry."
 msgid "Could not attach the preview. Remove an attachment from the chat draft and try again. Your comment and selection are still here."
 msgstr "Could not attach the preview. Remove an attachment from the chat draft and try again. Your comment and selection are still here."
 
-
 msgid "Run project"
 msgstr "Run project"
-
 
 msgid "Stop project"
 msgstr "Stop project"
 
-
 msgid "Run profile"
 msgstr "Run profile"
-
 
 msgid "Service logs"
 msgstr "Service logs"
 
-
 msgid "Preparing…"
 msgstr "Preparing…"
-
 
 msgid "Run"
 msgstr "Run"
 
-
 msgid "Preparing configuration"
 msgstr "Preparing configuration"
-
 
 msgid "Could not run the project."
 msgstr "Could not run the project."
 
-
 msgid "Could not stop the project."
 msgstr "Could not stop the project."
-
 
 msgid "No service output yet."
 msgstr "No service output yet."
 
-
 msgid "Open the project's agent chat first."
 msgstr "Open the project's agent chat first."
-
 
 msgid "The active chat changed."
 msgstr "The active chat changed."
 
-
 msgid "Stopped"
 msgstr "Stopped"
-
 
 msgid "Configuration was not prepared. Check the agent's reply."
 msgstr "Configuration was not prepared. Check the agent's reply."
@@ -7407,3 +7317,118 @@ msgstr "Task"
 #: src/components/MicoTaskTabs.tsx
 msgid "Could not create task. Try again."
 msgstr "Could not create task. Try again."
+
+
+msgid "Running tests…"
+msgstr "Running tests…"
+
+msgid "Reviewing changes…"
+msgstr "Reviewing changes…"
+
+msgid "Editing files…"
+msgstr "Editing files…"
+
+msgid "Reviewing files…"
+msgstr "Reviewing files…"
+
+msgid "Searching the web…"
+msgstr "Searching the web…"
+
+msgid "Working on the server…"
+msgstr "Working on the server…"
+
+msgid "Preparing an image…"
+msgstr "Preparing an image…"
+
+msgid "Managing a routine…"
+msgstr "Managing a routine…"
+
+msgid "Coordinating with another agent…"
+msgstr "Coordinating with another agent…"
+
+msgid "Building the project…"
+msgstr "Building the project…"
+
+msgid "Using a tool…"
+msgstr "Using a tool…"
+
+msgid "Show task activity"
+msgstr "Show task activity"
+
+msgid "Task activity"
+msgstr "Task activity"
+
+msgid "No steps reported yet."
+msgstr "No steps reported yet."
+
+msgid "Technical details"
+msgstr "Technical details"
+
+msgid "Running a command…"
+msgstr "Running a command…"
+
+msgid "Execution model"
+msgstr "Execution model"
+
+msgid "Model provider"
+msgstr "Model provider"
+
+msgid "Not reported yet"
+msgstr "Not reported yet"
+
+msgid "Previous models observed in this view"
+msgstr "Previous models observed in this view"
+
+msgid "Duration"
+msgstr "Duration"
+
+msgid "Searching conversation history…"
+msgstr "Searching conversation history…"
+
+msgid "Waiting for an activity update…"
+msgstr "Waiting for an activity update…"
+
+msgid "Waiting for result"
+msgstr "Waiting for result"
+
+msgid "Reported an error"
+msgstr "Reported an error"
+
+msgid "Waiting for input"
+msgstr "Waiting for input"
+
+msgid "Command output was not provided by the executor."
+msgstr "Command output was not provided by the executor."
+
+msgid "Only tool summaries are available for earlier activity; individual results were not reported to this view."
+msgstr "Only tool summaries are available for earlier activity; individual results were not reported to this view."
+
+msgid "No new activity for {0}. This does not confirm a failure; the executor has not reported a new step."
+msgstr "No new activity for {0}. This does not confirm a failure; the executor has not reported a new step."
+
+msgid "Receiving activity · task status not confirmed"
+msgstr "Receiving activity · task status not confirmed"
+
+msgid "Waiting for execution metadata. Reported activity does not confirm success or failure."
+msgstr "Waiting for execution metadata. Reported activity does not confirm success or failure."
+
+msgid "Conversation history search"
+msgstr "Conversation history search"
+
+msgid "Tests"
+msgstr "Tests"
+
+msgid "Files"
+msgstr "Files"
+
+msgid "A tool reported an error"
+msgstr "A tool reported an error"
+
+msgid "A tool is waiting for input"
+msgstr "A tool is waiting for input"
+
+msgid "Tool finished · waiting for an update"
+msgstr "Tool finished · waiting for an update"
+
+msgid "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
+msgstr "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."

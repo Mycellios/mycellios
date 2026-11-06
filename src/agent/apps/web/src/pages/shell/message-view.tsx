@@ -208,7 +208,7 @@ export const MessageView = memo(function MessageView({
           <div className="flex w-fit max-w-full justify-start [@media(hover:none)]:w-full">
             <div
               data-testid="message-bot-bubble"
-              className="max-w-full space-y-2.5 rounded-[20px] bg-muted px-[18px] py-3 text-body1 text-foreground"
+              className="rk-message-bubble max-w-full space-y-2.5 rounded-[20px] px-3.5 py-2.5 text-body1 text-foreground"
               dir="auto"
             >
               {visibleNarrationBlocks.map((block, i) => {
@@ -342,7 +342,7 @@ export const MessageView = memo(function MessageView({
               >
                 <div
                   data-testid="message-bot-bubble"
-                  className="max-w-full rounded-[20px] bg-muted px-[18px] py-3 text-body1 text-foreground"
+                  className="rk-message-bubble max-w-full rounded-[20px] px-3.5 py-2.5 text-body1 text-foreground"
                   dir="auto"
                 >
                   <ChatMarkdown streaming renderMention={renderMention}>{block.text}</ChatMarkdown>
@@ -460,12 +460,12 @@ export const MessageView = memo(function MessageView({
             return (
               <div
                 key={i}
-                className="relative flex w-fit max-w-full justify-end [@media(hover:none)]:w-full [@media(hover:none)]:flex-wrap"
+                className="relative flex w-fit max-w-full flex-wrap justify-end [@media(hover:none)]:w-full"
               >
                 <div
                   data-testid="message-user-bubble"
                   data-quote-message-id={quoteMessageId}
-                  className="max-w-full whitespace-pre-wrap wrap-anywhere rounded-[20px] bg-chat-user px-[18px] py-3 text-body1 text-chat-user-foreground"
+                  className="max-w-full whitespace-pre-wrap wrap-anywhere rounded-[20px] bg-chat-user px-3.5 py-2.5 text-body1 text-chat-user-foreground"
                   dir="auto"
                 >
                   <LinkifiedText>{block.text}</LinkifiedText>
@@ -478,11 +478,11 @@ export const MessageView = memo(function MessageView({
             return (
               <div
                 key={i}
-                className="relative flex w-fit max-w-full justify-start [@media(hover:none)]:w-full [@media(hover:none)]:flex-wrap"
+                className="relative flex w-fit max-w-full flex-wrap justify-start [@media(hover:none)]:w-full"
               >
                 <div
                   data-testid="message-bot-bubble"
-                  className="max-w-full rounded-[20px] bg-muted px-[18px] py-3 text-body1 text-foreground"
+                  className="rk-message-bubble max-w-full rounded-[20px] px-3.5 py-2.5 text-body1 text-foreground"
                   dir="auto"
                 >
                   <div data-quote-message-id={quoteMessageId}>

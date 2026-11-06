@@ -1,3 +1,4 @@
+import { routineCalendar } from "../routine-calendar.js";
 import { ORPCError } from "@orpc/server";
 import { routineJobKey, routineWakeupJob, runContinueJob } from "@rakazo/adapter-kit";
 import {
@@ -32,6 +33,7 @@ export function routinesRoutes(ctx: RouterContext) {
   const { deps, repos, announceRoutine, codexCatalog, agentSkills, authed } = ctx;
   return {
     routines: {
+      calendar: authed.routines.calendar.handler(({ context, input }) => routineCalendar(deps.prisma, context.actor, input)),
       history: authed.routines.history.handler(async ({ context, input }) =>
         listRoutineRuns(deps.prisma, context.actor, input.routineId, input.before),
       ),

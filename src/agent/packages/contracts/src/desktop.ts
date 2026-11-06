@@ -41,6 +41,14 @@ export interface RakazoDesktopOAuthCallback {
 }
 
 export interface RakazoDesktop {
+  localVoice?: {
+    status: () => Promise<{ ready: boolean; preparing: boolean; downloaded: number; total: number; error?: string }>;
+    prepare: () => Promise<void>;
+    transcribe: (samples: Float32Array) => Promise<{ text?: string }>;
+    speak: (input: { text: string; language: string; speed: number }) => Promise<{ samples?: Float32Array; sampleRate?: number }>;
+    stop: () => Promise<void>;
+  };
+
   appsStudio?: import("./app-studio.js").AppsStudioBridge;
   projectRunner?: ProjectRunnerBridge;
   /** Isolated native browser displayed inside the conversation's preview panel. */

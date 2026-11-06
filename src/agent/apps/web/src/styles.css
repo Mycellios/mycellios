@@ -100,6 +100,123 @@ body,
   -webkit-app-region: no-drag;
 }
 
+/* Shared web/Desktop workspace: page rail, chat list and compact title row. */
+.rk-workspace-rail { display: none; }
+.rk-sidebar-topbar { min-height: 51px; border-bottom: 1px solid var(--border); }
+.rk-rail-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 7px; flex-shrink: 0;
+  color: var(--muted-foreground); outline: none;
+}
+.rk-rail-button:hover, .rk-rail-button[aria-current="page"] { background: var(--sidebar-accent); color: var(--foreground); }
+.rk-rail-button:focus-visible { box-shadow: 0 0 0 2px var(--ring); }
+.rk-rail-pages { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.rk-workspace-rail > div:last-child { flex-shrink: 0; }
+.rk-rail-more-menu {
+  width: 200px;
+  max-width: calc(100vw - 16px);
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--glass-fill);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.rk-rail-more-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  border-radius: 7px;
+}
+.rk-rail-more-row:is(:hover, :focus-within, :has([data-highlighted])) { background: var(--accent); }
+.rk-rail-more-row > [role="menuitem"] {
+  min-width: 0;
+  min-height: 32px;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.rk-rail-more-row > [role="menuitem"] > span { overflow-wrap: anywhere; }
+.rk-rail-more-row > :is([role="menuitem"], [role="menuitemcheckbox"]):focus { background: transparent; }
+.rk-rail-more-row > .rk-rail-more-pin {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
+}
+.rk-rail-more-pin > [data-slot="dropdown-menu-checkbox-item-indicator"] { display: none; }
+.rk-rail-more-row:is([data-pinned], :hover, :focus-within) > .rk-rail-more-pin { opacity: 1; }
+.rk-rail-more-row[data-pinned] > .rk-rail-more-pin > svg { fill: currentColor; }
+.rk-rail-more-pin:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+@media (hover: none), (pointer: coarse) {
+  .rk-rail-more-row > .rk-rail-more-pin { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rk-rail-more-menu { animation: none; transition: none; }
+}
+.rk-chat-tools-panel { display: none; }
+.rk-routine-body { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.rk-routine-canvas { position: relative; flex: 1; min-width: 0; min-height: 240px; overflow: hidden; touch-action: none; background: var(--background); }
+.rk-routine-node { position: absolute; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); cursor: grab; user-select: none; outline: none; }
+.rk-routine-node:active { cursor: grabbing; }
+.rk-routine-node[data-selected] { border-color: var(--sidebar-border); }
+.rk-routine-node:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.rk-routine-port { position: absolute; top: 43px; width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); }
+.rk-routine-details { display: flex; flex-direction: column; flex-shrink: 0; min-height: 0; max-height: 45%; border-top: 1px solid var(--border); background: var(--background); }
+@media (min-width: 1000px) {
+  .rk-routine-body { flex-direction: row; }
+  .rk-routine-details { width: 320px; max-height: none; border-top: 0; border-inline-start: 1px solid var(--border); }
+}
+@media (min-width: 768px) {
+  .rk-workspace-rail {
+    display: flex; flex-direction: column; flex-shrink: 0; width: 52px;
+    background: var(--muted); border-inline-end: 1px solid var(--border);
+  }
+  [data-workspace-chrome="compact"] [data-slot="sidebar-container"] { inset-inline-start: 52px; }
+}
+@media (min-width: 1100px) {
+  .rk-chat-tools-panel {
+    display: flex; flex-direction: column; flex-shrink: 0;
+    width: clamp(220px, calc(100vw - var(--sidebar-width) - 52px - 424px), 380px);
+    border-inline-start: 1px solid var(--border); background: var(--background);
+  }
+}
+
+.rk-workflow-body { position: relative; display: flex; flex: 1; min-height: 0; min-width: 0; overflow: hidden; }
+.rk-workflow-canvas { position: relative; flex: 1; min-width: 0; overflow: hidden; touch-action: none; outline-offset: -3px; }
+.rk-workflow-canvas > svg:first-child { opacity: .25; }
+.rk-workflow-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding-bottom: 50px; font-size: 13px; }
+.rk-workflow-trigger-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; color: var(--primary); border: 1px solid var(--border); background: var(--card); }
+.rk-workflow-node { position: absolute; border: 1px solid var(--border); border-radius: 12px; background: var(--background); user-select: none; cursor: move; }
+.rk-workflow-node-selected { outline: 2px solid var(--primary); outline-offset: 2px; }
+.rk-workflow-node-note { background: var(--card); border-radius: 4px; }
+.rk-workflow-node-shape { border-radius: 50%; background: var(--card); padding: 20px; }
+.rk-workflow-node-text { border-color: transparent; background: transparent; }
+.rk-workflow-node-heading { display: flex; align-items: center; gap: 8px; padding: 12px; width: 100%; font-size: 12px; font-weight: 500; text-align: start; }
+.rk-workflow-port { position: absolute; top: 50%; width: 14px; height: 14px; border: 1px solid var(--muted-foreground); border-radius: 50%; background: var(--background); transform: translateY(-50%); cursor: crosshair; }
+.rk-workflow-port::after { content: ""; position: absolute; inset: -8px; }
+.rk-workflow-port-in { left: -8px; }
+.rk-workflow-port-out { right: -8px; }
+.rk-workflow-port-ready { background: var(--primary); border-color: var(--primary); }
+.rk-workflow-toolbar, .rk-workflow-zoom { position: absolute; bottom: 14px; display: flex; align-items: center; gap: 3px; padding: 5px; border: 1px solid var(--border); border-radius: 14px; background: var(--background); box-shadow: 0 2px 8px color-mix(in srgb, var(--foreground) 4%, transparent); }
+.rk-workflow-toolbar { left: 50%; transform: translateX(-50%); z-index: 4; }
+.rk-workflow-toolbar [aria-pressed=true] { background: var(--accent); }
+.rk-workflow-zoom { left: 12px; bottom: 70px; }
+.rk-workflow-add { display: flex; align-items: center; justify-content: center; gap: 5px; height: 32px; padding: 0 10px; border-radius: 9px; background: var(--primary); color: var(--primary-foreground); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.rk-workflow-add:disabled { opacity: .45; }
+.rk-workflow-minimap { position: absolute; bottom: 120px; left: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
+.rk-workflow-hint { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--background); font-size: 12px; }
+.rk-workflow-search { position: absolute; top: 12px; left: 12px; width: min(320px, calc(100% - 24px)); padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--background); }
+.rk-workflow-search input { padding: 6px; width: calc(100% - 36px); font-size: 13px; }
+.rk-workflow-inspector { display: flex; flex-direction: column; width: 300px; flex-shrink: 0; border-inline-start: 1px solid var(--border); background: var(--background); }
+.rk-workflow-input { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 8px; font-size: 13px; background: var(--background); }
+@media (min-width: 1150px) { .rk-workflow-zoom { bottom: 14px; } }
+@media (max-width: 767px) {
+  .rk-workflow-inspector { position: absolute; inset-inline: 8px; bottom: 70px; z-index: 5; width: auto; max-height: 55%; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 4px 20px color-mix(in srgb, var(--foreground) 9%, transparent); }
+  .rk-workflow-toolbar { gap: 0; padding: 4px; max-width: calc(100% - 12px); bottom: 10px; }
+  .rk-workflow-toolbar button { width: 30px; min-width: 30px; }
+  .rk-workflow-toolbar .rk-workflow-add { width: auto; padding: 0 8px; }
+  .rk-workflow-toolbar .rk-workflow-add span { display: none; }
+}
 @keyframes rkPulse {
   0%,
   100% {
@@ -109,3 +226,12 @@ body,
     opacity: 0.3;
   }
 }
+
+/* Title-bar controls remain clickable while the surrounding row drags the window. */
+.app-drag :is(button, a, input, select, textarea, [role="button"], [role="combobox"]) { -webkit-app-region: no-drag; }
+
+/* Original warm stone assistant cards; scoped workspace palettes never override chat. */
+.rk-message-bubble { background: var(--card); line-height: 1.5; }
+.rk-message-bubble .rk-chat-markdown strong { font-weight: 600; }
+
+.rk-workflow-input[data-slot="native-select-wrapper"] { padding: 0; border: 0; width: 100%; }

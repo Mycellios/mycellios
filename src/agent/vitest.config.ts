@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
+import { lingui } from "@lingui/vite-plugin";
 
 const chatRequire = createRequire(new URL("./packages/chat-ui/package.json", import.meta.url));
 const markdownSource = path.join(path.dirname(chatRequire.resolve(
@@ -9,6 +10,12 @@ const markdownSource = path.join(path.dirname(chatRequire.resolve(
 )), "src/index.tsx");
 
 export default defineConfig({
+  // Related-test discovery traverses the real renderer's lazy catalog imports.
+  // Compile those assets with the production loader instead of treating PO as JS.
+  plugins: [lingui({
+    cwd: fileURLToPath(new URL("./apps/web/", import.meta.url)),
+    configPath: fileURLToPath(new URL("./apps/web/lingui.config.ts", import.meta.url)),
+  })],
   // Offline tests receive explicit fixtures; never read a maintainer's .env.
   envDir: false,
   resolve: {

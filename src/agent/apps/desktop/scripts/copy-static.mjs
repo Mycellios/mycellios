@@ -1,7 +1,9 @@
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, writeFile, chmod } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 
 // tsc only emits the TypeScript sources; the preload bridges and the setup
 // window's static assets have to be copied into dist alongside them.
@@ -17,6 +19,25 @@ const dist = path.join(root, "dist");
 const webRequire = createRequire(path.join(root, "../web/package.json"));
 
 await mkdir(dist, { recursive: true });
+// Audio inference uses plain Node: Electron's V8 memory cage rejects the native
+// model library's external buffers. Package the build runtime, never a user's
+// PATH executable selected by the renderer. Platform builds must run natively.
+if (process.versions.electron) throw new Error("Desktop packaging needs standalone Node");
+const voiceNode = path.join(dist, process.platform === "win32" ? "voice-node.exe" : "voice-node");
+await copyFile(process.execPath, voiceNode);
+const voiceNodeHash = createHash("sha256");
+for await (const bytes of createReadStream(voiceNode)) voiceNodeHash.update(bytes);
+await writeFile(path.join(dist, "voice-node-runtime.json"), JSON.stringify({
+  platform: process.platform, arch: process.arch, version: process.version, sha256: voiceNodeHash.digest("hex"),
+}) + "\n");
+if (process.platform !== "win32") await chmod(voiceNode, 0o755);
+const nodeLicense = await fetch(`https://raw.githubusercontent.com/nodejs/node/${process.version}/LICENSE`, {signal:AbortSignal.timeout(30_000)});
+if (!nodeLicense.ok) throw new Error("Could not retain the Node runtime license");
+await writeFile(path.join(dist, "voice-node-LICENSE.txt"), await nodeLicense.text());
+await mkdir(path.join(dist, "assets"), { recursive: true });
+await Promise.all(["icon.ico", "icon.png", "icon-macos.png"].map((file) =>
+  copyFile(path.join(root, "assets", file), path.join(dist, "assets", file)),
+));
 await Promise.all([
   ...STATIC_FILES.map((file) => copyFile(path.join(root, "src", file), path.join(dist, file))),
   copyFile(TOKENS_FILE, path.join(dist, "tokens.css")),

@@ -662,6 +662,7 @@ export async function sendThreadMessage(
     taskInstructions?: string;
   },
   releaseTakeover?: (runId: string) => Promise<void>,
+  beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>,
 ) {
   if(input.taskInstructions){const ownTask=await deps.prisma.thread.findFirst({where:{id:target.threadId,taskBotId:target.kind==="bot"?target.botId:"",spaceId:actor.spaceId,userId:actor.userId}});if(!ownTask)throw new IsolationError();}
   const existing = await replayExistingSend(
@@ -681,6 +682,7 @@ export async function sendThreadMessage(
 
   const commit = () =>
     deps.prisma.$transaction(async (tx) => {
+      await beforeCommit?.(tx);
       let replyToMessageId: string | undefined;
       let replyQuote: string | undefined;
       let replyPreview: ReplyPreview | null | undefined;

@@ -1,3 +1,4 @@
+import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
 import type { AgentRunRequest, AgentRuntime } from "@rakazo/adapter-kit";
 import { createRunExecutor, createWebProvider, PiAgentRuntime } from "@rakazo/adapters";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -281,3 +282,11 @@ describe("Parallel through the ordinary bot caller", () => {
     expect(fixture.peer.fetch).not.toHaveBeenCalled();
   });
 });
+
+// These executor fixtures isolate post-admission behavior. Real concurrent SQL
+// admission is exercised by scripts/verify-workspace-sync-db.ts.
+vi.mock("@rakazo/db", async (load) => ({
+  ...await load<typeof import("@rakazo/db")>(),
+  claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
+}));

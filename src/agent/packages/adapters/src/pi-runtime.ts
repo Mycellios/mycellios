@@ -2377,6 +2377,7 @@ function builtinParameters(tool: ConnectorTool) {
     return Type.Object({
       command: Type.String(),
       cwd: Type.Optional(Type.String()),
+      timeout_ms: Type.Optional(Type.Integer({ minimum: 1000, maximum: 3600000 })),
     });
   }
   if (tool.name === "run_subagent") {

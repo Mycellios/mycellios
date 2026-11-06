@@ -51,8 +51,10 @@ describe("desktop preload bridge", () => {
     expect(bridge.platform).toBe("linux");
     expect(bridge.nativeWindowFrame).toBe(true);
     expect(Object.keys(bridge).sort()).toEqual([
+      "appsStudio",
       "badge",
       "computer",
+      "localVoice",
       "nativeWindowFrame",
       "oauth",
       "passkeys",
@@ -72,6 +74,17 @@ describe("desktop preload bridge", () => {
     expect(Object.keys(bridge.update).sort()).toEqual(["check", "download", "install", "state"]);
     expect(Object.keys(bridge.runtime!).sort()).toEqual(["enroll", "identify", "status"]);
 
+    expect(Object.keys(bridge.localVoice!).sort()).toEqual(["prepare", "speak", "status", "stop", "transcribe"]);
+    await bridge.localVoice!.status();
+    await bridge.localVoice!.prepare();
+    await bridge.localVoice!.transcribe(new Float32Array([0, 0.1]));
+    await bridge.localVoice!.speak({ text: "Hola", language: "es", speed: 1 });
+    await bridge.localVoice!.stop();
+    expect(invoke).toHaveBeenCalledWith("desktop.localVoice.status");
+    expect(invoke).toHaveBeenCalledWith("desktop.localVoice.prepare");
+    expect(invoke).toHaveBeenCalledWith("desktop.localVoice.speak", { text: "Hola", language: "es", speed: 1 });
+    expect(invoke).toHaveBeenCalledWith("desktop.localVoice.stop");
+
     expect(Object.keys(bridge.badge!)).toEqual(["set"]);
     await bridge.badge!.set(7);
     expect(invoke).toHaveBeenCalledWith("desktop.badge.set", 7);
@@ -88,6 +101,11 @@ describe("desktop preload bridge", () => {
     await bridge.update.download();
     await bridge.update.install();
     expect(invoke.mock.calls.map(([channel]) => channel)).toEqual([
+      "desktop.localVoice.status",
+      "desktop.localVoice.prepare",
+      "desktop.localVoice.transcribe",
+      "desktop.localVoice.speak",
+      "desktop.localVoice.stop",
       "desktop.badge.set",
       "desktop.oauth.open",
       "desktop.oauth.cancel",
