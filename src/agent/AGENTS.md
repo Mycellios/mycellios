@@ -50,6 +50,9 @@
   local-server JavaScript in runtime.asar and
   native packages at real paths, with root-scoped resolution in utility/Node
   children. Never expand the complete server at startup or drop offline features.
+  Windows passes a standalone builder config file: builder API overrides concatenate
+  resource arrays with package.json and would reintroduce the legacy loose tree.
+  Preserve base voice unpacking and check the actual packaged file count.
   Fast installation journals a same-volume installation snapshot, retains the old
   uninstaller, registration and shortcut recovery, and never moves userData.
   Qualify compact-resources, fast-install, the real local server and timed NSIS
