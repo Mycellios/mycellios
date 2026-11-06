@@ -25,6 +25,8 @@ export interface DesktopUpdateState {
   percent: number | null;
   message: string | null;
   checkedAt: string | null;
+  /** A user-requested restart waits without cancelling active or unsaved work. */
+  installPending?: boolean;
 }
 
 export interface RakazoDesktopUpdate {
@@ -33,6 +35,9 @@ export interface RakazoDesktopUpdate {
   download: () => Promise<DesktopUpdateState>;
   /** Quits and relaunches into the downloaded release; only useful once `phase` is `ready`. */
   install: () => Promise<DesktopUpdateState>;
+  cancelInstall?: () => Promise<DesktopUpdateState>;
+  /** Native request to verify renderer work is persisted before its normal quit. */
+  onPrepare?: (listener: () => boolean | Promise<boolean>) => () => void;
 }
 
 export interface RakazoDesktopOAuthCallback {

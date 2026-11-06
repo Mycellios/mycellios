@@ -1,5 +1,29 @@
 # AGENTS.md
 
+- Windows updates check the official HTTPS catalog and stage verified packages in
+  the background; installation still requires the owner's explicit restart action.
+  RAKAZO_DISABLE_AUTO_UPDATE=1 suppresses background requests. Keep the unsigned
+  automatic-install channel disabled. Bound and
+  verify catalog/payload bytes, platform, paths, versions and SHA-256; never accept
+  renderer-provided installer paths. Wait for native work and a nonce-bound current
+  main-frame acknowledgement, preserve stored text drafts and block in-memory work.
+  A pending restart is cancellable. The detached same-user helper waits for normal
+  exit, snapshots session/installation state, installs and reopens the same profile.
+  Never force-stop another process, use Restart Manager shutdown or clear user data.
+  Verify manual-update, desktop-update-work, composer-draft and preload tests plus
+  a fresh-profile native handoff before applying it to an installed profile.
+  Published Windows preview tags use the owned GitHub release's bounded
+  desktop-release.json; ignore draft, legacy and headless releases. Follow only
+  the owned GitHub asset URL to its exact release CDN, without credentials.
+- Windows release packaging embeds desktop-build.json with the committed revision,
+  tree and all three current build receipts. desktop-windows-release.yml builds
+  release branches/manual runs without publishing; only a matching Desktop tag
+  already integrated in main publishes the qualified package and its manifests.
+  Never replace an existing release. Use scripts/prepare-desktop-version.mjs for
+  a new version; keep the native runtime pin and other platform channels intact.
+  Verify desktop-release, published-desktop-release, manual-update and
+  prepare-desktop-version tests; a signed-out packaged startup does not qualify
+  account login, real video generation or physical multi-device inference.
 - Workspace navigation uses the single rail and per-account/Space pins. Marketplace
   reuses the existing connection and skill services; preserve multi-account editors.
   Inbox entries refer to ordinary Mico task threads through taskBotId and the

@@ -3,6 +3,7 @@ import type { DesktopUpdateState } from "@rakazo/contracts";
 import { Button, toast } from "@rakazo/ui-web";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";
+import { canRestartDesktop } from "../lib/desktop-update-work";
 
 function useDesktopUpdates() {
   const { t } = useLingui();
@@ -13,6 +14,7 @@ function useDesktopUpdates() {
   const [error, setError] = useState<string | null>(null);
   const pending = useRef(false);
   const revision = useRef(0);
+  useEffect(() => bridge?.onPrepare?.(canRestartDesktop), [bridge]);
 
   useEffect(() => {
     if (!bridge) return;
@@ -22,7 +24,7 @@ function useDesktopUpdates() {
       const started = revision.current;
       try {
         const next = await bridge!.state();
-        if (!stopped && started === revision.current && !pending.current) {
+        if (!stopped && started === revision.current) {
           setState((current) =>
             current &&
             Object.entries(next).every(
@@ -45,7 +47,7 @@ function useDesktopUpdates() {
     };
   }, [bridge]);
 
-  async function act(action: "check" | "install") {
+  async function act(action: "check" | "install" | "cancelInstall") {
     if (!bridge || pending.current) return;
     pending.current = true;
     revision.current++;
@@ -53,7 +55,8 @@ function useDesktopUpdates() {
     setError(null);
     if (action === "check") setConfirmedCheck(null);
     try {
-      const next = await bridge[action]();
+      const next = await bridge[action]?.();
+      if (!next) return;
       setState(next);
       if (
         action === "check" &&
@@ -127,7 +130,7 @@ function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) =>
     >
       <div className="flex items-center gap-2">
         <Button
-          disabled={busy}
+          disabled={busy || state.installPending}
           onClick={() => void act(state.phase === "ready" ? "install" : "check")}
         >
           {state.phase === "ready" ? (
@@ -136,11 +139,13 @@ function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) =>
             <Trans>Check for updates</Trans>
           )}
         </Button>
-        <Button variant="ghost" disabled={busy} onClick={() => onLater(state.availableVersion)}>
-          <Trans>Later</Trans>
+        <Button variant="ghost" disabled={busy} onClick={() => state.installPending ? void act("cancelInstall") : onLater(state.availableVersion)}>
+          {state.installPending ? <Trans>Cancel update</Trans> : <Trans>Later</Trans>}
         </Button>
       </div>
-      {error || state.message ? (
+      {state.installPending ? (
+        <p role="status" className="mt-2 text-sm"><Trans>Waiting for local tasks and unsaved work…</Trans></p>
+      ) : error || state.message ? (
         <p role="status" className="mt-2 text-sm">
           {error ?? state.message}
         </p>
@@ -153,8 +158,8 @@ function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) =>
 export function useSidebarUpdate() {
   const updates = useContext(UpdatesContext);
   return {
-    available: updates?.state?.phase === "ready",
-    busy: updates?.busy ?? false,
+    available: updates?.state?.phase === "ready" && !updates?.state?.installPending,
+    busy: (updates?.busy ?? false) || updates?.state?.installPending === true,
     state: updates?.state ?? null,
     install: () => {
       void updates?.act("install");
@@ -175,7 +180,7 @@ export function DesktopSidebarUpdate() {
   return (
     <div className="mx-2.5 mt-2 min-w-0 rounded-xl border border-border bg-sidebar-accent p-3">
       <p role="status" className="text-xs font-medium">
-        {ready ? <Trans>Restart to update</Trans> : <Trans>Downloading…</Trans>}
+        {state.installPending ? <Trans>Waiting for local tasks and unsaved work…</Trans> : ready ? <Trans>Restart to update</Trans> : <Trans>Downloading…</Trans>}
       </p>
       {ready ? (
         <Button
@@ -219,7 +224,7 @@ export function DesktopUpdateSection() {
         <span className="text-sm text-muted-foreground">v{state.currentVersion}</span>
         <Button
           variant="outline"
-          disabled={busy || downloading || state.phase === "checking"}
+          disabled={busy || state.installPending || downloading || state.phase === "checking"}
           onClick={() => void act(ready ? "install" : "check")}
         >
           {ready ? (
@@ -233,8 +238,14 @@ export function DesktopUpdateSection() {
           )}
         </Button>
       </div>
+      {state.installPending ? (
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span role="status" className="text-sm text-muted-foreground"><Trans>Waiting for local tasks and unsaved work…</Trans></span>
+          <Button variant="ghost" disabled={busy} onClick={() => void act("cancelInstall")}><Trans>Cancel update</Trans></Button>
+        </div>
+      ) : null}
       <p role="status" className="mt-2 text-sm text-muted-foreground">
-        {error ??
+        {state.installPending ? null : error ??
           state.message ??
           (downloading ? (
             `${state.percent ?? 0}%`

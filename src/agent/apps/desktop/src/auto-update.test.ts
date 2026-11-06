@@ -274,7 +274,7 @@ describe("DesktopUpdateController", () => {
 
     expect(fake.updater).toMatchObject({
       autoDownload: false,
-      autoInstallOnAppQuit: true,
+      autoInstallOnAppQuit: false,
       allowPrerelease: false,
       allowDowngrade: false,
       disableWebInstaller: true,
