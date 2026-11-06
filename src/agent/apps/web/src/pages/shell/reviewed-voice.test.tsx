@@ -66,3 +66,14 @@ it("does not send while stopping or when blocked", async () => {
   act(() => final(words)); act(() => root.render(<Harness blocked />));
   await act(async () => voice.send()); expect(send).not.toHaveBeenCalled();
 });
+it("lets the Android owner handle permission-dialog visibility without ending capture", () => {
+  window.MycelliosNative = { postMessage: vi.fn() };
+  const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  try {
+    act(() => voice.start()); visibility.mockReturnValue("hidden");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(dictation.submitHold).not.toHaveBeenCalled(); expect(voice.stage).toBe("listening");
+    act(() => watchers.forEach(cb => cb({ status: "idle", transcript: "kept" })));
+    expect(voice.stage).toBe("review"); expect(send).not.toHaveBeenCalled();
+  } finally { delete window.MycelliosNative; visibility.mockRestore(); }
+});

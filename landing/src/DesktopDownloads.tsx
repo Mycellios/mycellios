@@ -1,3 +1,4 @@
+import { AndroidDownload } from "./AndroidDownload";
 import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../../src/contracts/desktop-downloads";
@@ -32,6 +33,7 @@ export function DesktopDownloads() {
     <section aria-labelledby="desktop-title">
       <Heading as="h1" id="desktop-title">Mycellios Desktop</Heading>
       <Text className="desktop-intro">Your agents and projects, in one app.</Text>
+      <Link href="#android-title">Android app</Link>
       {failed ? <div role="alert"><Text>Downloads could not be checked. Please try again.</Text><Button onClick={() => setAttempt(v => v + 1)}>Try again</Button></div> : null}
       <div className="desktop-packages" aria-label="Desktop installers">
         {(["windows-x64", "macos-arm64", "macos-x64", "linux-x64", "fedora-x64"] as const).map(id => {
@@ -57,5 +59,6 @@ export function DesktopDownloads() {
       <div className="desktop-checksums"><Text><strong>Fedora</strong> · RPM · Version {FEDORA_DESKTOP_DOWNLOAD.version} · {Math.ceil(FEDORA_DESKTOP_DOWNLOAD.bytes / 1_000_000)} MB<code>{FEDORA_DESKTOP_DOWNLOAD.sha256}</code></Text><Link href="https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.9-fedora-preview">Fedora source code and build information</Link></div>
       <footer><Link href="/downloads?product=runtime">Standalone runtime</Link><Link href="https://github.com/Mycellios/mycellios">GitHub</Link></footer>
     </div></Disclosure>
+    <AndroidDownload />
   </div><MarketingFooter /></main>;
 }

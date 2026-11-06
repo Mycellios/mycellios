@@ -3,6 +3,7 @@ import { Button, Textarea } from "@rakazo/ui-web";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { dictation } from "../../lib/dictation";
 import { newClientId } from "../../lib/client-id";
+import { isAndroidHost } from "../../lib/android-host";
 
 type Stage = "closed" | "listening" | "stopping" | "review" | "sending";
 
@@ -67,7 +68,9 @@ export function useReviewedVoice({ scope, transcribe, blocked, onSend }: {
     void navigator.wakeLock?.request("screen").then(value => {
       if (disposed) void value.release(); else lock = value;
     }).catch(() => {});
-    const hidden = () => { if (document.visibilityState !== "visible") stop(); };
+    // Android owns foreground teardown and keeps a pending permission request alive.
+    // Its system permission dialog may hide the WebView without leaving the app.
+    const hidden = () => { if (!isAndroidHost() && document.visibilityState !== "visible") stop(); };
     document.addEventListener("visibilitychange", hidden);
     return () => { disposed = true; void lock?.release(); document.removeEventListener("visibilitychange", hidden); };
   }, [stage, stop]);

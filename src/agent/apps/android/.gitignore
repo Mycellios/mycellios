@@ -1,0 +1,9 @@
+.gradle/
+local.properties
+app/build/
+app/src/main/assets/web/
+app/src/main/assets/web-files.json
+app/src/main/res/drawable/ic_mycellios.png
+*.jks
+*.p12
+*.keystore

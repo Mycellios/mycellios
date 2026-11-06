@@ -1,3 +1,4 @@
+import { isAndroidHost } from "../../lib/android-host";
 import { useSpaceRpc, useBoundTaskThreadScope } from "../../lib/space-rpc";
 import { useLingui } from "@lingui/react/macro";
 import type { AgentSkillCatalogEntry, ThreadMessage } from "@rakazo/contracts";
@@ -180,7 +181,7 @@ export const Composer = memo(function Composer({
   });
   useVoiceShortcut({
     requested: voiceShortcutRequested,
-    ready: dictationTranscribe !== undefined,
+    ready: isAndroidHost() || dictationTranscribe !== undefined,
     blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length),
     scope: draftKey,
     consume: onVoiceShortcutConsumed,

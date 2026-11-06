@@ -45,3 +45,10 @@ it("cancels a pending launch when the owned view unmounts", () => {
 it("does nothing without the explicit shortcut request", () => {
   render({ ...props, requested: false }); act(() => vi.runAllTimers()); expect(start).not.toHaveBeenCalled();
 });
+
+it("accepts the official Android main-frame host without pretending it is a PWA", () => {
+  window.MycelliosNative = { postMessage: vi.fn() };
+  vi.mocked(window.matchMedia).mockReturnValue({ matches: false } as MediaQueryList);
+  try { render(); act(() => vi.runAllTimers()); expect(start).toHaveBeenCalledOnce(); }
+  finally { delete window.MycelliosNative; }
+});

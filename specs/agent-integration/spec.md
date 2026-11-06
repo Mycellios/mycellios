@@ -272,3 +272,20 @@ or replacement of the contribution ledger is part of this frontend deployment.
 Verify real account re-entry, owned native credit and AntSeed conversations on
 the published frontend; do not infer their success from a static build alone.
 The separate real-model long-context failure is not repaired by a web release.
+
+
+## Shared-web Android distribution
+
+The Android APK packages the existing `apps/web` build at the existing first-party
+HTTPS namespace. It owns only WebView navigation, foreground speech recognition,
+Android permissions, file selection and a Dictate launcher shortcut. Account, Space,
+Mico, model, conversation, draft and send behavior stay in the shared application.
+`com.mycellios.android` is the signed distribution identity; preserve the legacy
+Expo preview rather than replacing its different certificate or erasing its profile.
+The release signer stays outside Git, with a recoverable private backup. Versioned
+APK/source artifacts and their SHA-256/signing identity are published through an
+independent Android catalog; existing Desktop/runtime catalogs remain intact.
+Manual APK updates must preserve the same signer/package and increment versionCode.
+No Play Store publication or unattended installation is included. Verify the exact
+packaged candidate, native bridge boundaries, existing account login, physical
+shortcut from Home/another app, real speech and explicit review/send separately.
