@@ -1,3 +1,5 @@
+!define MUI_CUSTOMFUNCTION_ABORT MycelliosRollback
+
 !macro MycelliosInitHelper
   InitPluginsDir
   StrCpy $MycelliosPowerShell "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe"
@@ -17,6 +19,7 @@
   Function .onInstFailed
     Call MycelliosRollback
   FunctionEnd
+
 !macroend
 
 !macro customCheckAppRunning
@@ -51,4 +54,21 @@
     SetErrorLevel 2
     Abort
   ${EndIf}
+!macroend
+
+!macro MycelliosCheckUninstall
+  ${If} ${Errors}
+  ${OrIf} $R0 != 0
+    Call MycelliosRollback
+    SetErrorLevel 2
+    Quit
+  ${EndIf}
+!macroend
+
+!macro customUnInstallCheck
+  !insertmacro MycelliosCheckUninstall
+!macroend
+
+!macro customUnInstallCheckCurrentUser
+  !insertmacro MycelliosCheckUninstall
 !macroend
