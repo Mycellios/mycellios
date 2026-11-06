@@ -1,83 +1,83 @@
 {
- "name": "mycellios-agent",
- "private": true,
- "type": "module",
- "version": "0.1.0",
- "license": "Apache-2.0",
- "packageManager": "npm@10.9.8",
- "engines": {
- "node": "^22.22.2 || ^24.0.0 || >=26.0.0"
- },
- "scripts": {
- "apps:validate": "tsx scripts/apps/validate.ts",
- "codex:export": "node scripts/codex-export.mjs",
- "dev": "node scripts/dev.mjs",
- "dev:local:backend": "node scripts/project-local.mjs backend",
- "dev:local:web": "node scripts/project-local.mjs web",
- "build": "turbo build",
- "check": "turbo check",
- "lint": "biome check .",
- "format": "biome check --write .",
- "db:generate": "npm run generate --workspace @rakazo/db",
- "db:migrate": "npm run db:migrate --workspace @rakazo/api",
- "sandbox:build": "docker build -t rakazo/computer:local infra/sandboxes/computer",
- "sandbox:boat-snapshot": "tsx packages/adapters/src/cli/build-boat-snapshot.ts",
- "sandbox:e2b-template": "tsx packages/adapters/src/cli/build-e2b-template.ts",
- "test": "vitest run",
- "test:compose-smoke": "bash infra/compose/run-smokes.sh",
- "test:integration": "tsx packages/testkit/src/cli/harness.ts --integration",
- "test:e2e": "tsx packages/testkit/src/cli/harness.ts --e2e",
- "test:mobile-screenshots": "npm run generate --workspace @rakazo/db && tsx packages/testkit/src/cli/mobile-screenshots.ts",
- "ios:screenshots": "npm run generate --workspace @rakazo/db && tsx packages/testkit/src/cli/ios-app-screenshots.ts",
- "test:topology": "tsx packages/testkit/src/cli/topology.ts",
- "test:canary": "tsx packages/testkit/src/cli/canary.ts",
- "test:pi": "vitest run packages/testkit/src/model-emulator.test.ts packages/testkit/src/pi-offline.test.ts",
- "test:evals": "tsx packages/testkit/src/cli/evals.ts",
- "test:computer-replay": "tsx packages/testkit/src/cli/computer-replay.ts",
- "test:computer": "tsx packages/testkit/src/cli/computer.ts",
- "test:flows": "tsx packages/testkit/src/cli/flows.ts",
- "perf:desktop": "tsx packages/testkit/src/cli/desktop-performance.ts",
- "perf:compare": "tsx packages/testkit/src/cli/compare-performance.ts",
- "compose:up": "docker compose --env-file .env -f infra/compose/docker-compose.yml up --build",
- "compose:down": "docker compose --env-file .env -f infra/compose/docker-compose.yml down -v"
- },
- "devDependencies": {
- "@biomejs/biome": "2.5.15",
- "@types/node": "24.19.2",
- "cross-env": "10.1.0",
- "esbuild": "0.28.2",
- "tsx": "4.23.15",
- "turbo": "2.11.10",
- "typescript": "7.0.2",
- "vitest": "4.1.12"
- },
- "workspaces": [
- "apps/*",
- "packages/*",
- "infra/sandboxes/supervisor",
- "infra/updater"
- ],
- "overrides": {
- "e2b": {
- "undici8": "npm:undici@8.10.2"
- },
- "@better-auth/prisma-adapter": "1.7.12",
- "@better-auth/core": "1.7.12",
- "@better-auth/memory-adapter": "1.7.12",
- "react": "19.2.3",
- "@better-auth/kysely-adapter": "1.7.12",
- "@better-auth/mongo-adapter": "1.7.12",
- "dompurify@<3.4.17": "3.4.17",
- "@better-auth/telemetry": "1.7.12",
- "proxy-addr@<2.0.8": "2.0.8",
- "react-dom": "19.2.3",
- "@better-auth/drizzle-adapter": "1.7.12",
- "@better-fetch/fetch": "1.3.2",
- "hono": "4.13.14",
- "@tanstack/query-core": "5.104.5",
- "@tanstack/react-query": "5.104.5",
- "@vercel/cli-config": {
- "zod": "4.6.7"
- }
- }
+  "name": "mycellios-agent",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "packageManager": "npm@10.9.8",
+  "engines": {
+    "node": "^22.22.2 || ^24.0.0 || >=26.0.0"
+  },
+  "scripts": {
+    "apps:validate": "tsx scripts/apps/validate.ts",
+    "codex:export": "node scripts/codex-export.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:local:backend": "node scripts/project-local.mjs backend",
+    "dev:local:web": "node scripts/project-local.mjs web",
+    "build": "turbo build",
+    "check": "turbo check",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "db:generate": "npm run generate --workspace @rakazo/db",
+    "db:migrate": "npm run db:migrate --workspace @rakazo/api",
+    "sandbox:build": "docker build -t rakazo/computer:local infra/sandboxes/computer",
+    "sandbox:boat-snapshot": "tsx packages/adapters/src/cli/build-boat-snapshot.ts",
+    "sandbox:e2b-template": "tsx packages/adapters/src/cli/build-e2b-template.ts",
+    "test": "vitest run",
+    "test:compose-smoke": "bash infra/compose/run-smokes.sh",
+    "test:integration": "tsx packages/testkit/src/cli/harness.ts --integration",
+    "test:e2e": "tsx packages/testkit/src/cli/harness.ts --e2e",
+    "test:mobile-screenshots": "npm run generate --workspace @rakazo/db && tsx packages/testkit/src/cli/mobile-screenshots.ts",
+    "ios:screenshots": "npm run generate --workspace @rakazo/db && tsx packages/testkit/src/cli/ios-app-screenshots.ts",
+    "test:topology": "tsx packages/testkit/src/cli/topology.ts",
+    "test:canary": "tsx packages/testkit/src/cli/canary.ts",
+    "test:pi": "vitest run packages/testkit/src/model-emulator.test.ts packages/testkit/src/pi-offline.test.ts",
+    "test:evals": "tsx packages/testkit/src/cli/evals.ts",
+    "test:computer-replay": "tsx packages/testkit/src/cli/computer-replay.ts",
+    "test:computer": "tsx packages/testkit/src/cli/computer.ts",
+    "test:flows": "tsx packages/testkit/src/cli/flows.ts",
+    "perf:desktop": "tsx packages/testkit/src/cli/desktop-performance.ts",
+    "perf:compare": "tsx packages/testkit/src/cli/compare-performance.ts",
+    "compose:up": "docker compose --env-file .env -f infra/compose/docker-compose.yml up --build",
+    "compose:down": "docker compose --env-file .env -f infra/compose/docker-compose.yml down -v"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "24.19.2",
+    "cross-env": "10.1.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "turbo": "2.11.10",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "infra/sandboxes/supervisor",
+    "infra/updater"
+  ],
+  "overrides": {
+    "e2b": {
+      "undici8": "npm:undici@8.10.2"
+    },
+    "@better-auth/prisma-adapter": "1.7.12",
+    "@better-auth/core": "1.7.12",
+    "@better-auth/memory-adapter": "1.7.12",
+    "react": "19.2.3",
+    "@better-auth/kysely-adapter": "1.7.12",
+    "@better-auth/mongo-adapter": "1.7.12",
+    "dompurify@<3.4.17": "3.4.17",
+    "@better-auth/telemetry": "1.7.12",
+    "proxy-addr@<2.0.8": "2.0.8",
+    "react-dom": "19.2.3",
+    "@better-auth/drizzle-adapter": "1.7.12",
+    "@better-fetch/fetch": "1.3.2",
+    "hono": "4.13.14",
+    "@tanstack/query-core": "5.104.5",
+    "@tanstack/react-query": "5.104.5",
+    "@vercel/cli-config": {
+      "zod": "4.6.7"
+    }
+  }
 }
