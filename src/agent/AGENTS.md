@@ -1,5 +1,13 @@
 # AGENTS.md
 
+- The installed PWA Voice shortcut uses ?dictate=1 and the existing scoped chat
+  recorder. Consume each request once; start only in a visible standalone app
+  after voice configuration is known, without busy work, calls, drafts or files.
+  Never send on launch: shortcut dictation goes to an editable review with
+  Continue/Cancel/Send. Preserve text and the nonce on refused/uncertain sends.
+  Verify voice-shortcut, composer, HoldToTalk and PWA manifest tests; physical
+  microphone/gesture acceptance remains separate from synthetic browser tests.
+
 - Windows updates check the official HTTPS catalog and stage verified packages in
   the background; installation still requires the owner's explicit restart action.
   RAKAZO_DISABLE_AUTO_UPDATE=1 suppresses background requests. Keep the unsigned

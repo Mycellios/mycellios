@@ -418,11 +418,14 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   searchParamsRef.current = searchParams;
   /** Picking the thread for a bare or stale route keeps an overlay the URL asked for. */
   const redirectKeepingOverlay = useCallback(
-    (pathname: string) =>
-      navigate(
-        { pathname, search: shellOverlaySearch(searchParamsRef.current) },
+    (pathname: string) => {
+      const search = new URLSearchParams(shellOverlaySearch(searchParamsRef.current));
+      if (searchParamsRef.current.get("dictate") === "1") search.set("dictate", "1");
+      return navigate(
+        { pathname, search: search.toString() },
         { replace: true },
-      ),
+      );
+    },
     [navigate],
   );
   const queries = spaceQueries(userId ?? null, shellSpaceId, taskScope);
@@ -1437,7 +1440,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   useLayoutEffect(() => {
     if (routeChat) {
       redirectKeepingOverlay(
-        routeChat.groupId ? `/app/g/${routeChat.groupId}` : `/app/${routeChat.botId}`,
+        routeChat.groupId
+          ? searchParamsRef.current.get("dictate") === "1" && bots[0]
+            ? `/app/${bots[0].id}` : `/app/g/${routeChat.groupId}`
+          : `/app/${routeChat.botId}`,
       );
     }
     // Leaving for another page or space keeps the sidebar and open chat to reopen with.
@@ -4192,6 +4198,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               onStop={stopRun}
               onOpenVoice={!inGroup && active ? chatTools.onVoice : undefined}
               voiceConversationActive={Boolean(voiceConversation)}
+              voiceShortcutRequested={!inGroup && Boolean(active && activeSnapshot?.botId === active.id) && searchParams.get("dictate") === "1"}
+              onVoiceShortcutConsumed={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("dictate");
+                setSearchParams(next, { replace: true });
+              }}
               dictationTranscribe={voiceStatus ? Boolean(voiceStatus.transcribe) : undefined}
               artifactTarget={transcriptArtifactTarget}
               replyTarget={activeReplyTarget}
