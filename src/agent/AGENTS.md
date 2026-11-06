@@ -1,3 +1,13 @@
+- The distributable Android host lives in apps/android and packages apps/web unchanged.
+  Keep com.mycellios.android separate from the legacy Expo preview and use a durable
+  release signing key, never the preview/debug certificate. Native capabilities use
+  WebViewCompat messages with exact HTTPS origin, main-frame and packaged chat-route
+  checks; external pages receive no microphone bridge. Preserve shared reviewed voice
+  and Send nonces, foreground-only capture, permission denial and Recents replay guards.
+  Do not register a service worker or use web reload updates over packaged assets.
+  Build with scripts/build-android-release.sh and verify scoped web/Java tests, APK
+  signature, source seal, manual update continuity and physical Quick Tap separately.
+
 - Native Expo sign-in may share the configured HTTPS OIDC issuer origin with Agent.
   Its authorization proxy accepts only the configured issuer authorize path, client,
   callback, S256 challenge and live server-issued state/nonce. Preserve the upstream
@@ -335,7 +345,7 @@
   pinned headless runtime DEB. Reuse its service and identity; polkit elevation is
   only for explicit setup. The shared sidebar controls an account-owned native node
   through the linked SSO session. Pending commands are not confirmed contribution.
-  Visible internal balances are Credits (Créditos in Spanish), with 1 USD = 1 Credit on paid top-ups; Spore names the separate official token and Micos names the agents; retain historical ledger/API field names and never
+  Visible internal balances are Credits (CrÃ©ditos in Spanish), with 1 USD = 1 Credit on paid top-ups; Spore names the separate official token and Micos names the agents; retain historical ledger/API field names and never
   award a client-calculated balance for connection time.
   Web sidebar downloads target the Desktop product page, not a headless-runtime
   installer. Keep download and browser contribution links separate and preserve
@@ -678,7 +688,7 @@
 - PR descriptions say why the change exists, what changed, and how it was tested. Write Why as the product reason (what was wrong and what this changes); never "Elie wants" or a third-person briefing of a named person; the maintainer is the author.
 - Commit messages, PR descriptions, issues, and review replies are public too. Describe test results in words instead of pasting tool output. Never include business metrics such as analytics, traffic, click-through, conversion, signup, revenue, or star-growth numbers; give the product reason in words, even when data motivated the change. Never include anything that identifies a person, machine, or account: local paths, usernames, hostnames, signing identities, legal entity names, Apple Team IDs, API key IDs, issuer or tenant IDs, account emails, or the accounts, machines, and files that secret values came from. Naming the secrets a workflow reads is fine; use placeholders when a value must be shown.
 - For UI changes, link the CI E2E screenshot that shows the change on the PR; add the web test that opens that screen if it is missing. For native-only mobile UI that CI cannot capture, say so in the PR instead of linking an unrelated web screenshot.
-- UI system. Colors live in `@rakazo/ui-tokens` as semantic tokens (background, card, muted, border, primary, destructive, ...) with one TypeScript source that generates `tokens.css`; never hardcode a product hex or use `[var(--…)]` arbitrary values. Web and Electron use shadcn/ui on Base UI, vendored into `packages/ui-web` via `npm exec -- shadcn add` from the official registry only (third-party registries are a supply-chain risk); reuse those components before writing chrome by hand, and reuse `apps/web/src/components/ai/` for AI moments (loading, shimmer, success). The app is monochrome: primary is ink, status colors are destructive/success/warning, bots carry the only identity color. Mobile is native-first: Expo Router, Expo UI, native sheets, menus, alerts and pickers wherever one exists; custom surfaces (thread, composer, avatars, cards) use plain StyleSheet with the shared tokens through `apps/mobile/lib/appearance`, and system chrome stays PlatformColor via `lib/native`. Mobile may diverge from web when the native pattern is better.
+- UI system. Colors live in `@rakazo/ui-tokens` as semantic tokens (background, card, muted, border, primary, destructive, ...) with one TypeScript source that generates `tokens.css`; never hardcode a product hex or use `[var(--â€¦)]` arbitrary values. Web and Electron use shadcn/ui on Base UI, vendored into `packages/ui-web` via `npm exec -- shadcn add` from the official registry only (third-party registries are a supply-chain risk); reuse those components before writing chrome by hand, and reuse `apps/web/src/components/ai/` for AI moments (loading, shimmer, success). The app is monochrome: primary is ink, status colors are destructive/success/warning, bots carry the only identity color. Mobile is native-first: Expo Router, Expo UI, native sheets, menus, alerts and pickers wherever one exists; custom surfaces (thread, composer, avatars, cards) use plain StyleSheet with the shared tokens through `apps/mobile/lib/appearance`, and system chrome stays PlatformColor via `lib/native`. Mobile may diverge from web when the native pattern is better.
 - On mobile, use built-in native iOS controls (@expo/ui SwiftUI and Liquid Glass, native header items, context menus, alerts, pickers, and switches) wherever possible instead of custom React Native pills or buttons.
 
 - This Agent is now maintained inside Mycellios/mycellios under src/agent. The

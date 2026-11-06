@@ -1,3 +1,4 @@
+import { isAndroidHost } from "../../lib/android-host";
 import { useEffect } from "react";
 
 /** A visible installed-app shortcut is a capture request, never a message send. */
@@ -11,7 +12,7 @@ export function useVoiceShortcut({ requested, ready, blocked, scope, consume, st
     const timer = setTimeout(() => {
       consume?.();
       if (blocked || document.visibilityState !== "visible" ||
-          !window.matchMedia("(display-mode: standalone)").matches) return;
+          (!isAndroidHost() && !window.matchMedia("(display-mode: standalone)").matches)) return;
       start();
     }, 0);
     return () => clearTimeout(timer);
