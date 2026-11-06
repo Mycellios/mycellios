@@ -1310,6 +1310,10 @@ msgstr "ゆったり"
 msgid "Coming soon"
 msgstr "近日公開"
 
+#: src/pages/PluginsOverlay.tsx src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Apps"
+msgstr "Apps"
+
 #. js-lingui-explicit-id
 msgid "workspace.updatedReleaseNote"
 msgstr "A unified workspace for your apps, tasks, routines, calendar and usage."

@@ -8,6 +8,7 @@ test("temporary readiness failure offers Retry and never starts authorization", 
     if (request.url().includes("/connections/begin")) attempts.push(request.url());
   });
   await page.goto("/?unavailable=1");
+  await expect(page.getByRole("heading", { name: "Apps", exact: true })).toBeVisible();
   await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill("TikTok");
   await page.getByRole("button", { name: "Reintentar", exact: true }).click();
   await expect(page.getByRole("button", { name: "Agregar", exact: true })).toBeEnabled();
