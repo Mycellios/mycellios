@@ -269,6 +269,7 @@ import {
   acquireComputerExecutionLease,
   acquireDedicatedScreenLeaseFence,
   ComputerBusyError,
+  ComputerUpdatingError,
   holdComputerExecutionLeaseForTakeover,
   provisionComputer,
   releaseComputerExecutionLease,
@@ -426,7 +427,7 @@ import {
   secretPausedToolResult,
   tryCompleteConnectionWithCode,
 } from "./run-secret.js";
-import { restoreTurnCheckpoint, unresolvedTurnCheckpointCalls } from "./turn-checkpoint.js";
+import { interruptedTurnCheckpoint, restoreTurnCheckpoint, unresolvedTurnCheckpointCalls } from "./turn-checkpoint.js";
 
 export { selectRunConnections } from "./connection-context.js";
 
@@ -3842,6 +3843,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
       }
 
       let leaseValid = true;
+      let desktopUpdateRequested = false;
+      let desktopUpdateDispatched = false;
       let runCompleted = false;
       let lastLeaseCheckAt = 0;
       let retainComputerLease = false;
@@ -4057,6 +4060,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           runId,
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
+          onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },
           ...connectedContext(connectedPlugins),
           connectedProviders: connectedComposio.map((row) => row.provider),
         };
@@ -4809,6 +4813,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let unchangedVisualStreak: UnchangedVisualStreak = { count: 0 };
         let terminalCheckpointComplete = false;
         let approvalPausePending = false;
+        let restartPausePending = false;
+        let latestRestartCapture: (() => string) | undefined;
+        let restartPause: Promise<ApprovalPausedToolResult> | undefined;
         let approvalRequest: Promise<ApprovalPausedToolResult> | undefined;
         const pendingTurnCheckpoints = new Map<string, () => string>();
         const persistTurnCheckpoint = async (executionId?: string) => {
@@ -4979,6 +4986,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         let awaitingDelegatedWork = task.delegationState === "waiting";
         const pendingCommands = new Set<string>();
+        const restartingTurn = (() => {
+          try { return !!turnCheckpoint && restoreTurnCheckpoint(turnCheckpoint, {provider:runModelProvider,id:runModelId}).restartInterrupted === true; }
+          catch { return false; } // Keep the existing invalid/legacy checkpoint fallback.
+        })();
+        if (restartingTurn) {
+          const unresolved = await deps.prisma.externalEffect.findMany({where:{runId,spaceId:run.spaceId,kind:"shell",
+            OR:[{status:"executing"},{status:"uncertain"},{result:{path:["uncertain"],equals:true}},{result:{path:["running"],equals:true}}]},
+            select:{idempotencyKey:true},take:1001});
+          if (unresolved.length > 1000) throw new Error("Too many unresolved commands; inspect the existing work before continuing");
+          for (const effect of unresolved) pendingCommands.add(`${runId}:${effect.idempotencyKey}`);
+        }
         const dispatchTool = async (
           name: string,
           args: Record<string, unknown>,
@@ -4987,6 +5005,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           observer?: AgentToolExecutionObserver,
         ) => {
           context.signal.throwIfAborted();
+          if (restartingTurn && pendingCommands.size && name !== "command_status" && (!READ_ONLY_AGENT_TOOLS.has(name) || name === "run_subagent"))
+            return {error:"Inspect command_status for the interrupted commands before starting another action.",commandIds:[...pendingCommands]};
           if (awaitingDelegatedWork && name !== "work_status" && name !== "command_status")
             return { waitingForTasks: true, error: "This turn delegated its pending work. End the turn; child results will wake the parent. No further actions were executed." };
           if (handedOff) {
@@ -6483,7 +6503,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 ).slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS),
               });
               await finish({error:redactSecrets(error instanceof Error?error.message:'Command outcome unknown',runSecrets),
-                uncertain:true,commandId,code:null});
+                uncertain:!(error instanceof ComputerUpdatingError && !error.dispatched),commandId,code:null});
               throw error;
             }
           }
@@ -7983,12 +8003,33 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         };
         const applyTool = async (...params: Parameters<typeof dispatchTool>) => {
+          if (desktopUpdateRequested) return pauseForRestart();
           try {
-            return await dispatchOneTool(...params);
+            try {
+              const result = await dispatchOneTool(...params);
+              return desktopUpdateRequested ? await pauseForRestart() : result;
+            } catch (error) {
+              if (desktopUpdateRequested) return pauseForRestart();
+              throw error;
+            }
           } finally {
             if (toolResultTaintsRun(params[0])) runTainted = true;
           }
         };
+
+        const pauseForRestart = () => restartPause ??= (async (): Promise<ApprovalPausedToolResult> => {
+          restartPausePending = true;
+          const capture = [...pendingTurnCheckpoints.values()].at(-1) ?? latestRestartCapture;
+          if (capture) {
+            const saved = JSON.parse(capture());
+            saved.effectOccurrences = effectOccurrences;
+            await saveRunTurnCheckpoint(deps.prisma, run, workerId, fence, interruptedTurnCheckpoint(JSON.stringify(saved), !desktopUpdateRequested || desktopUpdateDispatched));
+          }
+          const released = await writeComputerRunRequeue(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover,
+            "Execution paused for a restart; pending actions must be inspected before retrying.");
+          if (released) await deps.jobs.enqueue({ ...runContinueJob(runId), availableAt: new Date(Date.now() + computerRetryDelay(fence)) }).catch(() => undefined);
+          return { kind: "agent_tool_result", content: [{ type: "text", text: "Waiting for the computer to reconnect." }], details: { desktopUpdate: "paused" }, terminate: true };
+        })();
 
         const pluginLine =
           connectedPlugins.length > 0
@@ -8390,7 +8431,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               resumeFromCheckpoint: takeoverResume?.checkpoint,
               turnCheckpoint,
               onCheckpoint: async (capture, executionId) => {
-                pendingTurnCheckpoints.set(executionId, capture);
+                const retained = restartingTurn ? () => {
+                  const saved = JSON.parse(capture());
+                  saved.restartInterrupted = true;
+                  return JSON.stringify(saved);
+                } : capture;
+                pendingTurnCheckpoints.set(executionId, retained);
+                latestRestartCapture = retained;
               },
               resumeToolResult: {
                 content: [{ type: "text", text: takeoverResume?.promptNote ?? taskPrompt }],
@@ -8464,7 +8511,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
             context,
           );
           for await (const event of withRuntimeCleanup(runtimeEvents, runAbortController)) {
-            if (approvalPausePending) return;
+            if (desktopUpdateRequested) { await pauseForRestart(); return; }
+            if (approvalPausePending || restartPausePending) return;
             if (!leaseValid) return;
             const now = Date.now();
             if (now - lastLeaseCheckAt >= 1_000) {
@@ -8813,7 +8861,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
           recordExplicitNoResponse(assistantTurnText);
           runComputer.throwIfFailed();
-          if (approvalPausePending || !leaseValid) return;
+          if (approvalPausePending || restartPausePending || !leaseValid) return;
           approvedEffectReplays.assertDrained();
           pendingProgress += progressRedactor.finish();
           await flushProgress();
@@ -9002,6 +9050,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             getLogger().error("history.compact enqueue failed", error);
           }
         } catch (caughtError) {
+          if (desktopUpdateRequested || deps.shutdownSignal?.aborted) { await pauseForRestart(); return; }
           let error = caughtError;
           // A refused account limit needs user/operator action, not setup-job retries.
           // Keep the provisioning error even if aborting the model masked it.

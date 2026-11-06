@@ -76,7 +76,7 @@ export interface HostComputerEnvironment {
 export type HostComputerFrame<T> =
   | { value: T }
   | { done: true }
-  | { error: string }
+  | { error: string; code?: "desktop_updating"; dispatched?: boolean }
   | { heartbeat: true };
 
 /** Leave time for the command timeout event and final response to cross the bridge. */

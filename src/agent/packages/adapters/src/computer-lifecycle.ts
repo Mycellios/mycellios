@@ -1,3 +1,4 @@
+import { ComputerBusyError } from "./computer-errors.js";
 import { mkdir } from "node:fs/promises";
 import type {
   AdapterContext,
@@ -143,12 +144,7 @@ async function hasLiveForeignRunLease(
   return live !== null;
 }
 
-export class ComputerBusyError extends Error {
-  constructor() {
-    super("Computer is busy");
-    this.name = "ComputerBusyError";
-  }
-}
+export { ComputerBusyError, ComputerUpdatingError } from "./computer-errors.js";
 
 export { toComputerRef } from "./computer-support.js";
 

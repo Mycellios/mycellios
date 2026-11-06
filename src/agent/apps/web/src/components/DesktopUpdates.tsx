@@ -47,7 +47,7 @@ function useDesktopUpdates() {
     };
   }, [bridge]);
 
-  async function act(action: "check" | "install" | "cancelInstall") {
+  async function act(action: "check" | "install" | "forceInstall" | "cancelInstall") {
     if (!bridge || pending.current) return;
     pending.current = true;
     revision.current++;
@@ -77,7 +77,7 @@ function useDesktopUpdates() {
       setBusy(false);
     }
   }
-  return { state, busy, error, act, confirmedCheck };
+  return { state, busy, error, act, confirmedCheck, forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
 }
 
 const UpdatesContext = createContext<ReturnType<typeof useDesktopUpdates> | null>(null);
@@ -118,11 +118,17 @@ export function DesktopUpdatesProvider({ children }: { children: ReactNode }) {
   return <UpdatesContext.Provider value={updates}>{children}</UpdatesContext.Provider>;
 }
 
+function PendingRestart({ state }: { state: DesktopUpdateState }) {
+  if (state.waitingFor === "unsaved_work") return <Trans>Save changes or finish the call to restart.</Trans>;
+  if (state.restartMode === "now") return <Trans>Saving work and restarting…</Trans>;
+  return <Trans>Waiting for local tasks and unsaved work…</Trans>;
+}
+
 function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) => void }) {
   const { t } = useLingui();
   const updates = useContext(UpdatesContext);
   if (!updates?.state) return null;
-  const { state, busy, error, act } = updates;
+  const { state, busy, error, act, forceAvailable } = updates;
   return (
     <aside
       aria-label={t`Desktop update`}
@@ -130,10 +136,10 @@ function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) =>
     >
       <div className="flex items-center gap-2">
         <Button
-          disabled={busy || state.installPending}
-          onClick={() => void act(state.phase === "ready" ? "install" : "check")}
+          disabled={busy || (state.installPending && (!forceAvailable || state.restartMode === "now"))}
+          onClick={() => void act(state.installPending && forceAvailable ? "forceInstall" : state.phase === "ready" ? "install" : "check")}
         >
-          {state.phase === "ready" ? (
+          {state.installPending && forceAvailable ? <Trans>Restart now</Trans> : state.phase === "ready" ? (
             <Trans>Restart to update</Trans>
           ) : (
             <Trans>Check for updates</Trans>
@@ -144,7 +150,7 @@ function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) =>
         </Button>
       </div>
       {state.installPending ? (
-        <p role="status" className="mt-2 text-sm"><Trans>Waiting for local tasks and unsaved work…</Trans></p>
+        <p role="status" className="mt-2 text-sm"><PendingRestart state={state} /></p>
       ) : error || state.message ? (
         <p role="status" className="mt-2 text-sm">
           {error ?? state.message}
@@ -158,11 +164,11 @@ function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) =>
 export function useSidebarUpdate() {
   const updates = useContext(UpdatesContext);
   return {
-    available: updates?.state?.phase === "ready" && !updates?.state?.installPending,
-    busy: (updates?.busy ?? false) || updates?.state?.installPending === true,
+    available: updates?.state?.phase === "ready",
+    busy: (updates?.busy ?? false) || (updates?.state?.installPending === true && (!updates?.forceAvailable || updates.state.restartMode === "now")),
     state: updates?.state ?? null,
     install: () => {
-      void updates?.act("install");
+      void updates?.act(updates.state?.installPending && updates.forceAvailable ? "forceInstall" : "install");
     },
   };
 }
@@ -180,7 +186,7 @@ export function DesktopSidebarUpdate() {
   return (
     <div className="mx-2.5 mt-2 min-w-0 rounded-xl border border-border bg-sidebar-accent p-3">
       <p role="status" className="text-xs font-medium">
-        {state.installPending ? <Trans>Waiting for local tasks and unsaved work…</Trans> : ready ? <Trans>Restart to update</Trans> : <Trans>Downloading…</Trans>}
+        {state.installPending ? <PendingRestart state={state} /> : ready ? <Trans>Restart to update</Trans> : <Trans>Downloading…</Trans>}
       </p>
       {ready ? (
         <Button
@@ -189,7 +195,7 @@ export function DesktopSidebarUpdate() {
           disabled={update.busy}
           onClick={update.install}
         >
-          <Trans>Restart to update</Trans>
+          {state.installPending && state.supportsForceRestart ? <Trans>Restart now</Trans> : <Trans>Restart to update</Trans>}
         </Button>
       ) : percent !== null ? (
         <div className="mt-2 flex items-center gap-2">
@@ -209,7 +215,7 @@ export function DesktopSidebarUpdate() {
 export function DesktopUpdateSection() {
   const updates = useContext(UpdatesContext);
   if (!updates?.state) return null;
-  const { state, busy, error, act, confirmedCheck } = updates;
+  const { state, busy, error, act, confirmedCheck, forceAvailable } = updates;
   const ready = state.phase === "ready";
   const downloading = state.phase === "available" || state.phase === "downloading";
   return (
@@ -224,10 +230,10 @@ export function DesktopUpdateSection() {
         <span className="text-sm text-muted-foreground">v{state.currentVersion}</span>
         <Button
           variant="outline"
-          disabled={busy || state.installPending || downloading || state.phase === "checking"}
-          onClick={() => void act(ready ? "install" : "check")}
+          disabled={busy || (state.installPending && (!forceAvailable || state.restartMode === "now")) || downloading || state.phase === "checking"}
+          onClick={() => void act(state.installPending && forceAvailable ? "forceInstall" : ready ? "install" : "check")}
         >
-          {ready ? (
+          {state.installPending && forceAvailable ? <Trans>Restart now</Trans> : ready ? (
             <Trans>Restart to update</Trans>
           ) : downloading ? (
             <Trans>Downloading…</Trans>
@@ -240,7 +246,7 @@ export function DesktopUpdateSection() {
       </div>
       {state.installPending ? (
         <div className="mt-2 flex items-center justify-between gap-3">
-          <span role="status" className="text-sm text-muted-foreground"><Trans>Waiting for local tasks and unsaved work…</Trans></span>
+          <span role="status" className="text-sm text-muted-foreground"><PendingRestart state={state} /></span>
           <Button variant="ghost" disabled={busy} onClick={() => void act("cancelInstall")}><Trans>Cancel update</Trans></Button>
         </div>
       ) : null}

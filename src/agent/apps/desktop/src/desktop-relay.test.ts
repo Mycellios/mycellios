@@ -170,3 +170,23 @@ it("re-registers account presence after an API restart without binding arbitrary
   client.stop();const count=registrations.length;await vi.advanceTimersByTimeAsync(6000);expect(registrations).toHaveLength(count);
  }finally{client.stop();}
 });
+
+it("restores every owned legacy Mico generation on the same PC after a planned update", async () => {
+  const identity={userId:"owner",spaceId:"space",connectionId:"session"},deviceId="planned-device";
+  const grants=new Map([['one','generation-one'],['two','generation-two']]);
+  const bindings:Array<{botId:string;deviceId:string;generation:string}>=[];
+  const client=new DesktopRelayClient({base:"https://example.test/agent",localUrl:"http://127.0.0.1:1234",localToken:"unused",revoked:vi.fn(),
+    restoreUpdate:async(id,botId)=>botId&&grants.has(botId)?{base:"https://example.test/agent",...id,deviceId,botId,generation:grants.get(botId)!}:undefined,
+    fetch:async(url,init)=>{
+      const action=url.split("/").at(-1);
+      if(action==="bind")bindings.push(JSON.parse(String(init?.body)));
+      return Response.json(action==="identity"?identity:action==="poll"?{identity,active:[],operations:[]}:{ok:true});
+    }});
+  try {
+    await client.bind("one");await client.bind("two");
+    expect(bindings).toEqual([{botId:"one",deviceId,generation:"generation-one"},{botId:"two",deviceId,generation:"generation-two"}]);
+    expect(client.resumeBindings()).toHaveLength(2);
+    await client.bind("two",true);
+    expect(bindings.at(-1)?.generation).not.toBe("generation-two");
+  } finally {client.stop();}
+});

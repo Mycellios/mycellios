@@ -90,7 +90,7 @@ jobs:
         working-directory: src/agent
         shell: pwsh
         run: |
-          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
+          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs
           exit $LASTEXITCODE

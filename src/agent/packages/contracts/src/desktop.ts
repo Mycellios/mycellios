@@ -27,6 +27,9 @@ export interface DesktopUpdateState {
   checkedAt: string | null;
   /** A user-requested restart waits without cancelling active or unsaved work. */
   installPending?: boolean;
+  supportsForceRestart?: boolean;
+  restartMode?: "whenIdle" | "now";
+  waitingFor?: "local_work" | "unsaved_work";
 }
 
 export interface RakazoDesktopUpdate {
@@ -36,6 +39,8 @@ export interface RakazoDesktopUpdate {
   /** Quits and relaunches into the downloaded release; only useful once `phase` is `ready`. */
   install: () => Promise<DesktopUpdateState>;
   cancelInstall?: () => Promise<DesktopUpdateState>;
+  /** Explicitly checkpoint local operations; renderer persistence still must succeed. */
+  forceInstall?: () => Promise<DesktopUpdateState>;
   /** Native request to verify renderer work is persisted before its normal quit. */
   onPrepare?: (listener: () => boolean | Promise<boolean>) => () => void;
 }

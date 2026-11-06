@@ -1,3 +1,4 @@
+import { ComputerUpdatingError } from "./computer-errors.js";
 import type {
   AdapterContext,
   CommandRequest,
@@ -61,6 +62,10 @@ export class HostComputerSandbox implements SandboxProvider {
     });
     if (!response.ok || !response.body) {
       await response.body?.cancel();
+      if (response.headers.get("x-mycellios-desktop-error") === "desktop_updating") {
+        context.onComputerUpdate?.(false);
+        throw new ComputerUpdatingError(false);
+      }
       throw new Error(
         response.headers.get("x-mycellios-desktop-error") === "desktop_disconnected"
           ? "The paired PC is disconnected. Start Mycellios Desktop on that computer."
@@ -97,7 +102,13 @@ export class HostComputerSandbox implements SandboxProvider {
             throw new Error("Local computer response is too large");
           const frame = JSON.parse(pending.slice(0, newline)) as HostComputerFrame<T>;
           pending = pending.slice(newline + 1);
-          if ("error" in frame) throw new Error(frame.error);
+          if ("error" in frame) {
+            if ("code" in frame && frame.code === "desktop_updating") {
+              context.onComputerUpdate?.(frame.dispatched !== false);
+              throw new ComputerUpdatingError(frame.dispatched !== false);
+            }
+            throw new Error(frame.error);
+          }
           if ("heartbeat" in frame) {
             newline = pending.indexOf("\n");
             continue;

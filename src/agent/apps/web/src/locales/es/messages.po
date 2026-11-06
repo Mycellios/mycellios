@@ -9085,6 +9085,15 @@ msgstr "Usa el botón más junto al mensaje para adjuntar archivos y abrir las h
 msgid "Desktop notifications"
 msgstr "Notificaciones del sistema"
 
+msgid "Restart now"
+msgstr "Reiniciar ahora"
+
+msgid "Save changes or finish the call to restart."
+msgstr "Guarda los cambios o termina la llamada para reiniciar."
+
+msgid "Saving work and restarting…"
+msgstr "Guardando el trabajo y reiniciando…"
+
 msgid "Voice message"
 msgstr "Mensaje de voz"
 

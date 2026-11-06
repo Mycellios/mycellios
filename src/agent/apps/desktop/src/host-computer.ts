@@ -73,6 +73,8 @@ export async function prepareHostComputer(userDataDir: string) {
     workspace: server.workspace,
     isEnabled: server.isEnabled,
     hasActiveWork: server.hasActiveWork,
+    prepareUpdate: server.prepareUpdate,
+    cancelUpdate: server.cancelUpdate,
     hasRememberedAccess(scope: string) {
       return accountGrantAllowed && /^[a-f0-9]{64}$/.test(scope) && rememberedAccount === scope;
     },

@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     download: () => ipcRenderer.invoke("desktop.update.download"),
     install: () => ipcRenderer.invoke("desktop.update.install"),
     cancelInstall: () => ipcRenderer.invoke("desktop.update.cancelInstall"),
+    forceInstall: () => ipcRenderer.invoke("desktop.update.forceInstall"),
     onPrepare: listener => {
       const handler = async (_event, nonce) => {
         if (typeof nonce !== "string" || !/^[a-f0-9]{32}$/.test(nonce)) return;

@@ -1,5 +1,6 @@
 import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
-import type { AgentRunModel } from "@rakazo/adapter-kit";
+import { ComputerUpdatingError } from "../../adapters/src/computer-errors.js";
+import type { AdapterContext, AgentRunModel } from "@rakazo/adapter-kit";
 import { APPROVED_ACTION_NOT_RUN_ERROR } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycle from "../../adapters/src/computer-lifecycle.js";
@@ -227,7 +228,7 @@ function fixture(
     return { continuationRunId: null };
   });
   const writes = vi.fn(async () => ({ ok: true }));
-  const reads = vi.fn(async (_computer: unknown, _path: string) =>
+  const reads = vi.fn(async (_computer: unknown, _path: string, _context?: AdapterContext) =>
     new TextEncoder().encode("unique-executor-evidence"),
   );
   const executor = createRunExecutor({
@@ -905,3 +906,45 @@ vi.mock("@rakazo/db", async (load) => ({
   claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
     prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
 }));
+
+it("queues the same run during a Desktop update and resumes its checkpoint without repeating the interrupted tool", async () => {
+  const model=await startModelEmulator({steps:[
+    {expect(){},response:{type:"tool",id:"interrupted-read",name:"read_file",arguments:{path:"evidence.txt"}}},
+    {expect(request){expect(request.messages.find(message=>message.tool_call_id==="interrupted-read")?.content).toContain("interrupted for a restart");},response:{type:"text",text:"Resumed using the retained evidence."}}
+  ]});
+  try {
+    const state=fixture(model.model,false,"read_file",false);
+    state.reads.mockImplementationOnce(async(_computer,_path,context)=>{context?.onComputerUpdate?.(true);throw new ComputerUpdatingError();});
+    await state.executor.continueRun(state.run.id,"fixture-worker");
+    expect(state.run.status).toBe("queued");
+    expect(state.finalizeRun).not.toHaveBeenCalled();
+    expect(state.effects.some(effect=>effect.kind==="runtime_checkpoint")).toBe(true);
+    await state.executor.continueRun(state.run.id,"fixture-worker");
+    model.assertComplete();
+    expect(state.run.status).toBe("completed");
+    expect(state.reads).toHaveBeenCalledTimes(1);
+  } finally {await model.close();}
+});
+
+it("refuses a new mutation while a restarted run still has an uncertain command receipt", async () => {
+  const model=await startModelEmulator({steps:[
+    {expect(){},response:{type:"tool",id:"interrupted-read",name:"read_file",arguments:{path:"evidence.txt"}}},
+    {expect(){},response:{type:"tool",id:"takeover",name:"request_takeover",arguments:{reason:"Inspect the interrupted command"}}},
+    {expect(){},response:{type:"tool",id:"overlap",name:"fixture_write",arguments:{content:"must-not-write"}}},
+    {expect(request){expect(request.messages.find(message=>message.tool_call_id==="overlap")?.content).toContain("Inspect command_status");},response:{type:"text",text:"The interrupted command needs a receipt check before more changes."}}
+  ]});
+  try {
+    const state=fixture(model.model,false,"fixture_write",false);
+    state.run.trigger="user";
+    state.reads.mockImplementationOnce(async(_computer,_path,context)=>{context?.onComputerUpdate?.(true);throw new ComputerUpdatingError();});
+    await state.executor.continueRun(state.run.id,"fixture-worker");
+    state.effects.push({id:"uncertain-shell",idempotencyKey:"owned-shell",runId:state.run.id,spaceId:state.run.spaceId,kind:"shell",status:"uncertain",result:{uncertain:true}});
+    await state.executor.continueRun(state.run.id,"fixture-worker");
+    expect(state.pauseRunForTakeover).toHaveBeenCalledOnce();
+    state.run.status="queued";state.run.checkpoint="takeover" as never;
+    await state.executor.continueRun(state.run.id,"fixture-worker");
+    model.assertComplete();
+    expect(state.writes).not.toHaveBeenCalled();
+    expect(state.effects.find(effect=>effect.id==="uncertain-shell")?.status).toBe("uncertain");
+  } finally {await model.close();}
+});

@@ -133,3 +133,17 @@ describe("official Windows manual releases", () => {
     expect(handoff).not.toHaveBeenCalled();
   });
 });
+
+it("explicit restart bypasses continuous native work but never bypasses saving renderer state", async () => {
+  let saved=false;
+  const {controller,handoff}=await fixture({busy:()=>true,prepare:async()=>saved});
+  await controller.check(true);
+  await controller.install();
+  expect(controller.state().installPending).toBe(true);
+  await controller.install(true);
+  await vi.waitFor(()=>expect(controller.state().waitingFor).toBe("unsaved_work"),{timeout:3000});
+  expect(handoff).not.toHaveBeenCalled();
+  saved=true;
+  await vi.waitFor(()=>expect(handoff).toHaveBeenCalledTimes(1),{timeout:5000});
+  expect(controller.state().restartMode).toBe("now");
+});

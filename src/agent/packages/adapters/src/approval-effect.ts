@@ -349,12 +349,12 @@ export function isToolPauseResult(result: unknown): result is ApprovalPausedTool
   if (record.kind !== "agent_tool_result") return false;
   const details = record.details;
   if (!details || typeof details !== "object") return false;
-  const pause = details as { approval?: unknown; secret?: unknown };
-  return pause.approval === "paused" || pause.secret === "paused";
+  const pause = details as { approval?: unknown; secret?: unknown; desktopUpdate?: unknown };
+  return pause.approval === "paused" || pause.secret === "paused" || pause.desktopUpdate === "paused";
 }
 
 export function isApprovalPausedResult(result: unknown): result is ApprovalPausedToolResult {
-  return isToolPauseResult(result);
+  return isToolPauseResult(result) && (result.details as { desktopUpdate?: unknown } | undefined)?.desktopUpdate !== "paused";
 }
 
 export type DuplicateEffectGate =

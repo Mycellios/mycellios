@@ -1,3 +1,4 @@
+import { interruptedTurnCheckpoint, unresolvedTurnCheckpointCalls } from "./turn-checkpoint.js";
 import type { Api, Message, Model } from "@earendil-works/pi-ai";
 import type { AgentRunRequest } from "@rakazo/adapter-kit";
 import { describe, expect, it } from "vitest";
@@ -181,4 +182,13 @@ describe("turn checkpoint", () => {
     expect(screenshots).toHaveLength(1);
     expect(screenshots[0]).toMatchObject({ toolCallId: "shot-2" });
   });
+});
+
+it("settles interrupted parallel calls as uncertain instead of replaying their actions", () => {
+  const blob=JSON.stringify({version:1,provider:"fixture",model:"fixture",systemPrompt:"task",pendingToolCallId:"one",executionMode:"parallel",messages:[
+    {role:"assistant",content:[{type:"toolCall",id:"one",name:"shell",arguments:{command:"effect"}},{type:"toolCall",id:"two",name:"write_file",arguments:{path:"file"}}],stopReason:"toolUse"}
+  ]});
+  const restored=restoreTurnCheckpoint(interruptedTurnCheckpoint(blob),{provider:"fixture",id:"fixture"});
+  expect(unresolvedTurnCheckpointCalls(restored.messages)).toEqual([]);
+  expect(restored.messages.filter(message=>message.role==="toolResult")).toHaveLength(2);
 });

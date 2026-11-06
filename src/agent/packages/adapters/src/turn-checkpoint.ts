@@ -5,6 +5,7 @@ import { withoutThinkingFrom } from "./thinking-signatures.js";
 /** Internal, versioned transcript; never a client event payload. */
 export interface TurnCheckpoint {
   version: 1;
+  restartInterrupted?: boolean;
   provider: string;
   model: string;
   systemPrompt: string;
@@ -19,6 +20,18 @@ export interface TurnCheckpoint {
 
 export function serializeTurnCheckpoint(checkpoint: TurnCheckpoint): string {
   return JSON.stringify(checkpoint);
+}
+
+/** A restart never replays an unacknowledged action, including a parallel tail. */
+export function interruptedTurnCheckpoint(blob: string, uncertain = true): string {
+  const raw = JSON.parse(blob) as TurnCheckpoint;
+  const saved = restoreTurnCheckpoint(blob, { provider: raw.provider, id: raw.model });
+  const calls = unresolvedTurnCheckpointCalls(saved.messages);
+  return serializeTurnCheckpoint({ ...saved, restartInterrupted: true, messages: [...saved.messages, ...calls.map(call => ({
+    role: "toolResult" as const, toolCallId: call.id, toolName: call.name,
+    content: [{ type: "text" as const, text: uncertain ? "Execution interrupted for a restart. The action may have completed. Inspect command_status and existing results before continuing; do not repeat an uncertain action." : "This action was not dispatched because the PC is restarting. Continue the original task after reconnecting." }],
+    isError: true, timestamp: Date.now(),
+  }))] });
 }
 
 export function restoreTurnCheckpoint(
