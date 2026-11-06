@@ -1,5 +1,34 @@
 # Development
 
+## Proportional remote delivery
+
+Remote CI is the primary validation route. Local checks provide optional early
+feedback; a local dependency installation or RAM queue must not block uploading
+an authorized working branch. Keep branches small, based on current main, and
+integrate frequently. Commit/push, merge and deployment retain their existing
+authorization and branch protections.
+
+`CI summary` in `.github/workflows/ci.yml` runs on pull requests, main pushes and
+merge groups. `scripts/ci-proportional.mjs` compares the actual candidate with its
+event base, installs only affected npm dependency graphs, checks types and runs
+related tests. Documentation-only edits do not install application dependencies.
+The revision-bound receipt records checks and omissions. Related tests may find
+no coverage; this is not a substitute for focused acceptance tests for auth,
+payments, database migrations, native hardware or release behavior.
+Python/C/C++/Rust edits require a dedicated focused validation job; the generic
+JavaScript/TypeScript gate fails rather than claiming those changes were checked.
+
+Full suites remain paused. The existing release route must build the exact
+integrated revision, retain an identifiable artifact and rollback, and verify
+production health. Reuse a verified artifact when that release route supports it;
+never describe a validation-only check as a build or deployment. Existing paused
+workflows are not reactivated by this change.
+
+On Windows, any checks actually run locally still use `compilar.ps1`. Remote
+offload uses its `-Remote` route; hosted CI jobs run directly on their runner.
+Avoid repeating the same successful check locally and remotely without a source
+change or a platform-specific reason.
+
 ## Private local Apps preview
 
 Apps is a Shell overlay, preserving the selected chat and composer. Video Studio

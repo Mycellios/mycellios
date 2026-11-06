@@ -58,6 +58,7 @@ __pycache__/
 .codex-runtime/
 .codex-tmp/
 .cache/
+.ci/
 storybook-static/
 updates/
 /src/graphify-out/
