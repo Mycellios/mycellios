@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, buildIdentity }) {
+export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity }) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid Desktop version');
   if (!/^[a-f0-9]{64}$/.test(runtimeSha256)) throw new Error('A pinned runtime hash is required');
   const info = await lstat(runtimeMsi);
@@ -29,9 +29,15 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       // Koffi 3 uses a platform optional package. Dependency collection can miss
       // it; its loader also supports this explicit unpacked resources location.
       { from: path.join(agentRoot, 'node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node'), to: 'koffi/win32_x64/koffi.node' },
-      { from: path.join(desktopRoot, 'local-server'), to: 'local-server', filter: ['**/*', '!node_modules{,/**/*}'] },
-      { from: path.join(desktopRoot, 'local-server/node_modules'), to: 'local-server/node_modules', filter: ['**/*', '!**/.bin{,/**/*}'] },
-      ...(development ? [{from:development.source,to:'development-source'}, {from:development.npm,to:'development-tools/npm'}] : []),
+      ...(compact ? [
+        {from:compact.server,to:'local-server'},
+        {from:compact.source,to:'development-source.asar'},
+        {from:compact.npm,to:'development-tools/npm.asar'},
+      ] : [
+        { from: path.join(desktopRoot, 'local-server'), to: 'local-server', filter: ['**/*', '!node_modules{,/**/*}'] },
+        { from: path.join(desktopRoot, 'local-server/node_modules'), to: 'local-server/node_modules', filter: ['**/*', '!**/.bin{,/**/*}'] },
+        ...(development ? [{from:development.source,to:'development-source'}, {from:development.npm,to:'development-tools/npm'}] : []),
+      ]),
       { from: path.join(repository, 'LICENSE'), to: 'licenses/Mycellios-GPL-3.0.txt' },
       { from: path.join(agentRoot, 'LICENSE'), to: 'licenses/Agent-upstream-Apache-2.0.txt' },
       { from: path.join(repository, 'THIRD_PARTY.md'), to: 'licenses/THIRD_PARTY.md' },
@@ -46,7 +52,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
     ],
     win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true },
     // The resource tree exceeds ZIP32's entry limit; nsisunz rejects ZIP64.
-    nsis: { useZip: false, oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
+    nsis: { include:path.join(desktopRoot,'assets/fast-install.nsh'),useZip: false, oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
     // This only writes standard updater metadata/block maps at build time.
     // The unsigned preview still installs through an explicit user action.
     publish: [{ provider: 'generic', url: 'https://www.mycellios.com/downloads/desktop/updates/windows' }],

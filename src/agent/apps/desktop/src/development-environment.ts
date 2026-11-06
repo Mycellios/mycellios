@@ -229,7 +229,7 @@ export async function developmentSourceCandidates(
   resources: string,
   userData: string,
 ) {
-  const candidates = [path.join(resources, "development-source")];
+  const candidates = [path.join(resources, "development-source.asar", "source"),path.join(resources, "development-source")];
   for (let current = path.resolve(appPath); ; current = path.dirname(current)) {
     try {
       const workspace = await agentWorkspace(current),

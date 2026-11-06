@@ -9,6 +9,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { localResourcePaths } from "./local-resource-paths.js";
 import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
@@ -1248,10 +1249,11 @@ app.whenReady().then(async () => {
   const nativeRoot = app.isPackaged
     ? path.join(process.resourcesPath, "local-server")
     : path.join(app.getAppPath(), "local-server");
+  const nativeResources = localResourcePaths(nativeRoot);
   // Existing Compose installations retain their database, ports, and service lifecycle.
   if (
     !existsSync(path.join(stackDir(userDataDir), ".env")) &&
-    existsSync(path.join(nativeRoot, "dist", "desktop-local-entry.js"))
+    existsSync(nativeResources.entry)
   ) {
     localStack = new LocalNativeStackController({
       dataDir: path.join(userDataDir, "local-data"),
@@ -1259,12 +1261,12 @@ app.whenReady().then(async () => {
       webRoot: app.isPackaged
         ? path.join(process.resourcesPath, "web")
         : path.resolve(app.getAppPath(), "../web/dist"),
-      migrationsRoot: nativeRoot,
+      migrationsRoot: nativeResources.migrationsRoot,
       localWebUrl: await readStackWebUrl(stackDir(userDataDir), LOCAL_WEB_URL),
       build: app.getVersion(),
       hostComputer: hostComputer?.connection,
       launch: (configFile) =>
-        utilityProcess.fork(path.join(nativeRoot, "dist", "desktop-local-entry.js"), [], {
+        utilityProcess.fork(nativeResources.entry, [], {
           env: {
             ...nativeEnvironment(),
             NODE_ENV: "production",

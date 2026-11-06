@@ -1,7 +1,7 @@
 {
   "name": "@rakazo/desktop",
   "productName": "Mycellios Desktop",
-  "version": "0.3.18",
+  "version": "0.3.19",
   "author": {
     "name": "Mycellios"
   },
@@ -30,6 +30,7 @@
     "sherpa-onnx-node": "2.0.1"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "@playwright/test": "1.64.1",
     "@rakazo/adapters": "*",
     "@rakazo/ui-tokens": "*",
