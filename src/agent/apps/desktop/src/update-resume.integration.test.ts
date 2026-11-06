@@ -59,3 +59,29 @@ it("interrupts an owned real command, reconnects the same run, and never starts 
     expect(await readFile(marker,"utf8")).toBe("x");
   } finally { native.stop();broker.close();await host.close();await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:100}); }
 },30000);
+
+it("signals a planned update to the embedded worker before interrupting its direct native command", async () => {
+  const profile=await realpath(await mkdtemp(path.join(os.tmpdir(),"desktop-update-direct-")));
+  const token="b2".repeat(32);
+  let host=await startHostComputerServer({root:profile,token,hostname:"127.0.0.1"});host.setEnabled(true);
+  const context:AdapterContext={operationId:"direct-run",traceId:"direct-run",runId:"direct-run",userId:"owner",spaceId:"space",botId:"mico",signal:new AbortController().signal};
+  let notified=false;context.onComputerUpdate=()=>{notified=true;};
+  const client=()=>new HostComputerSandbox(`http://127.0.0.1:${host.port}`,token);
+  try {
+    const computer=await client().provision({botId:"mico",homePath:"unused"},context);
+    const marker=path.join(host.workspace("mico"),"once.txt");
+    const command={commandId:"direct-once",argv:[process.execPath,"-e","require('node:fs').appendFileSync(process.argv[1],'x');console.log('ready');setInterval(()=>{},1000)",marker],timeoutMs:30000};
+    const stream=client().execute(computer,command,context)[Symbol.asyncIterator]();
+    expect((await stream.next()).value).toMatchObject({type:"stdout"});
+    const interrupted=stream.next().catch(error=>error);
+    await host.prepareUpdate();
+    expect(await interrupted).toBeInstanceOf(ComputerUpdatingError);
+    expect(notified).toBe(true);
+    await host.close();
+    host=await startHostComputerServer({root:profile,token,hostname:"127.0.0.1"});host.setEnabled(true);
+    await client().provision({botId:"mico",homePath:"unused"},context);
+    const result:unknown[]=[];for await(const event of client().execute(computer,command,context))result.push(event);
+    expect(result).toContainEqual({type:"exit",code:130});
+    expect(await readFile(marker,"utf8")).toBe("x");
+  } finally {await host.close();await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+},30000);

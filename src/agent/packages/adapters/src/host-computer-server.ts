@@ -42,6 +42,7 @@ export async function startHostComputerServer(options: {
     AbortController,
     { botId: string; runId?: string; method: string } | undefined
   >();
+  const updateNotices = new Map<AbortController, () => void>();
   const providers = new Map<string, DesktopSandboxProvider>();
   function providerFor(botId: string) {
     let provider = providers.get(botId);
@@ -86,7 +87,19 @@ export async function startHostComputerServer(options: {
     }
     const controller = new AbortController();
     active.set(controller, undefined);
-    controller.signal.addEventListener("abort", () => response.destroy(), { once: true });
+    const destroyResponse = () => response.destroy();
+    controller.signal.addEventListener("abort", destroyResponse, { once: true });
+    updateNotices.set(controller, () => {
+      // End a complete native frame before aborting work. Destroying the socket
+      // here would hide the planned interruption from the embedded worker.
+      controller.signal.removeEventListener("abort", destroyResponse);
+      if (!response.destroyed && !response.writableEnded) {
+        const dispatched = response.headersSent;
+        if (!dispatched) response.writeHead(503, {"x-mycellios-desktop-error":"desktop_updating"});
+        response.end(dispatched ? JSON.stringify({error:"The PC is updating; pending work will resume after reconnecting.",code:"desktop_updating",dispatched:true}) + "\n" : undefined);
+      }
+      controller.abort();
+    });
     const abort = () => controller.abort();
     response.once("close", abort);
     let heartbeat: NodeJS.Timeout | undefined;
@@ -103,6 +116,7 @@ export async function startHostComputerServer(options: {
         }
         chunks.push(chunk);
       }
+      if (controller.signal.aborted || response.writableEnded) return;
       const parsed = hostComputerRequest.safeParse(
         JSON.parse(Buffer.concat(chunks).toString("utf8")),
       );
@@ -173,11 +187,12 @@ export async function startHostComputerServer(options: {
         message = "computer file not found";
       }
       if (!response.headersSent) response.writeHead(400);
-      if (!response.destroyed) response.end(`${JSON.stringify({ error: message })}\n`);
+      if (!response.destroyed && !response.writableEnded) response.end(`${JSON.stringify({ error: message })}\n`);
     } finally {
       clearTimeout(timer);
       clearInterval(heartbeat);
       active.delete(controller);
+      updateNotices.delete(controller);
       response.removeListener("close", abort);
     }
   });
@@ -522,6 +537,8 @@ export async function startHostComputerServer(options: {
     isEnabled: () => enabled && !updating,
     async prepareUpdate() {
       updating = true;
+      for (const [controller, notice] of updateNotices)
+        if (active.get(controller)?.method !== "writeFile") notice();
       for (const provider of providers.values()) provider.cancelAllCommands();
       const deadline = Date.now() + 15_000;
       const settle = Promise.all([...providers.values()].map(provider => provider.settleCommands()));
