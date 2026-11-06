@@ -14,7 +14,7 @@ it("never presents a standalone runtime package as Mycellios Desktop", () => {
     title: "Downloads", publicLink: (path: string) => path, external: false,
   }));
   expect(html).toContain("Checking downloads");
-  expect(html).toContain('href="/agent/app"');
+  expect(html).toContain('href="https://www.mycellios.com/agent"');
   expect(html).toContain("Standalone runtime");
   expect(html).not.toContain('href="/downloads/windows"');
   expect(html).not.toContain('href="/downloads/linux"');

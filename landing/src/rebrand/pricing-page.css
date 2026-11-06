@@ -12,7 +12,7 @@
 .pricing-estimator { padding:26px; background:#f3f1ec; border-radius:16px; }
 .pricing-estimator > summary { display:flex; align-items:center; justify-content:space-between; gap:20px; min-height:44px; cursor:pointer; list-style:none; font-size:20px; font-weight:500; }
 .pricing-estimator > summary::-webkit-details-marker { display:none; }
-.pricing-estimator > p { margin:16px 0 35px; max-width:700px; color:#59635d; font-size:14px; line-height:1.65; }
+.pricing-estimator > .ui-disclosure-body > p { margin:16px 0 35px; max-width:700px; color:#59635d; font-size:14px; line-height:1.65; }
 .pricing-configuration { display:grid; gap:58px; }
 .pricing-configuration h2, .pricing-summary h2, .pricing-questions h2 { font-size:28px; font-weight:500; line-height:1.15; letter-spacing:-.03em; }
 .pricing-configuration section > p { margin:16px 0 24px; color:#59635d; font-size:15px; line-height:1.7; }
@@ -41,7 +41,8 @@
 .pricing-summary > a:last-child { justify-content:center; margin-top:17px; font-size:12px; text-decoration:underline; }
 .pricing-questions { max-width:760px; padding-block:100px; }
 .pricing-questions h2 { margin-bottom:30px; }
-.pricing-questions summary { min-height:64px; display:flex; align-items:center; font-size:16px; cursor:pointer; }
+.pricing-questions summary { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:16px; font-size:16px; cursor:pointer; list-style:none; }
+.pricing-questions summary::-webkit-details-marker { display:none; }
 .pricing-questions details p { color:#59635d; font-size:15px; line-height:1.7; padding-bottom:20px; }
 .pricing-questions details a { text-decoration:underline; }
 @media (max-width:1000px) { .pricing-layout { gap:35px; grid-template-columns:minmax(0,1fr) 280px; } .pricing-summary { padding:24px; } .pricing-available { align-items:flex-start; flex-direction:column; gap:24px; } .pricing-future .ui-card { padding:24px; } .pricing-future .pricing-soon { font-size:27px; } }

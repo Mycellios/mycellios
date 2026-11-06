@@ -1,12 +1,14 @@
-name: Deployment readiness (temporary fast mode)
+name: Proportional remote validation
 
 on:
+  pull_request:
+  merge_group:
   push:
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: deployment-ci-${{ github.sha }}
+  group: deployment-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -16,23 +18,26 @@ jobs:
   summary:
     name: CI summary
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 25
     steps:
-      - name: Record owner-selected fast readiness
-        env:
-          RELEASE_SHA: ${{ github.sha }}
-          RELEASE_BRANCH: ${{ github.ref_name }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          EVENT_NAME: ${{ github.event_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'Invalid source SHA'; exit 1; }
-          [ "$RELEASE_BRANCH" = "$DEFAULT_BRANCH" ] || { echo 'Readiness requires the actual default branch'; exit 1; }
-          case "$EVENT_NAME" in
-            push|workflow_dispatch) ;;
-            *) echo 'Unsupported readiness event'; exit 1 ;;
-          esac
-          message='Temporary fast mode: full tests, security scans and cross-platform CI packaging were NOT RUN. This job records source readiness only; it does not certify or perform a deployment. The requested release still needs its real build, artifact identity and health verification.'
-          printf '%s\nSource: %s\n' "$message" "$RELEASE_SHA"
-          printf '## Temporary fast readiness\n\n%s\n\nSource: `%s`.\n' "$message" "$RELEASE_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/agent/package-lock.json
+      - name: Validate changed surfaces remotely
+        run: node scripts/ci-proportional.mjs
+      - name: Preserve exact-revision validation receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proportional-validation-${{ github.sha }}
+          path: .ci/proportional-receipt.json
+          if-no-files-found: error
+          retention-days: 14

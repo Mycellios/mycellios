@@ -1,3 +1,4 @@
+import type { PrismaClient as AdmissionPrismaClient } from "@rakazo/db";
 import type { NotificationMessage } from "@rakazo/adapter-kit";
 import { ModelAccountError, SandboxRateLimitError, TransientModelError } from "@rakazo/adapter-kit";
 import type * as DbModule from "@rakazo/db";
@@ -16,6 +17,9 @@ vi.mock("./computer-lifecycle.js", async (importOriginal) => ({
 
 vi.mock("@rakazo/db", async (importOriginal) => ({
   ...(await importOriginal<typeof DbModule>()),
+  claimMicoRun: vi.fn(async (prisma: AdmissionPrismaClient, _run: unknown, where: unknown, data: unknown) =>
+    prisma.run.updateMany({ where, data } as Parameters<AdmissionPrismaClient["run"]["updateMany"]>[0])),
+
   countUnreadInboxChats: vi.fn(),
 }));
 

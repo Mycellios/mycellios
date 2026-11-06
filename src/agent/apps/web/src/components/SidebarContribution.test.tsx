@@ -34,7 +34,7 @@ it("does not start compute on mount; starts the existing identity only after a c
 it("offers browser contribution without leaving or starting the current chat", async () => {
   f.bridge.mockReturnValue(undefined);
   await rendered(async host => {
-    const contribute = host.querySelector<HTMLAnchorElement>('[aria-label="Contribute in browser"]')!;
+    const contribute = host.querySelector<HTMLAnchorElement>('[aria-label="Earn credits with your computer"]')!;
     expect(contribute.href).toBe("https://www.mycellios.com/browser/");
     expect(contribute.target).toBe("_blank"); expect(contribute.rel).toContain("noopener");
     expect(f.control).not.toHaveBeenCalled(); expect(f.enrollment).not.toHaveBeenCalled();
@@ -46,7 +46,7 @@ it("keeps browser contribution accessible in the collapsed sidebar", async () =>
   f.bridge.mockReturnValue(undefined);
   await rendered(async host => {
     expect(host.querySelectorAll("a[aria-label]")).toHaveLength(1);
-    expect(host.querySelector('[aria-label="Contribute in browser"]')?.getAttribute("title")).toBe("Contribute in browser");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.getAttribute("title")).toBe("Earn credits with your computer");
   }, true);
 });
 
@@ -89,7 +89,7 @@ it("verifies the existing installation before offering a separate start action",
     expect(f.enrollment).not.toHaveBeenCalled();
     expect(f.enroll).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Contribute compute");
+    expect(host.textContent).toContain("Earn credits with your computer");
     f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
@@ -103,7 +103,7 @@ it("keeps verification read-only when another process has already repaired the i
     await act(async () => host.querySelector("button")!.click());
     expect(f.identify).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Contribute compute");
+    expect(host.textContent).toContain("Earn credits with your computer");
   });
 });
 
@@ -126,7 +126,7 @@ it("refreshes a rejected command instead of replaying its effect", async () => {
     expect(host.querySelector("button")!.textContent).toContain("Retry");
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Contribute compute");
+    expect(host.textContent).toContain("Earn credits with your computer");
   });
 });
 it("keeps a newly enrolled contributor running instead of immediately pausing it", async () => {
@@ -183,6 +183,6 @@ it("never resumes a node when the user requested pause and it is already paused"
   await rendered(async host => {
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Contribute compute");
+    expect(host.textContent).toContain("Earn credits with your computer");
   });
 });

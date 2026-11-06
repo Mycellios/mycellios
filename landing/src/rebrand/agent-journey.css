@@ -11,9 +11,9 @@
 .agent-case-copy > p, .agent-case-fallback p { margin-top:22px; color:#62665d; font-size:19px; line-height:1.6; }
 .agent-case-choices { display:grid; gap:9px; margin-top:30px; }
 .agent-case-choice > .mico-avatar { width:40px; height:40px; flex:none; }
-.agent-case-choice > span { display:grid; gap:3px; flex:1; }
+.agent-case-choice > span:not(.mico-avatar) { display:grid; gap:3px; flex:1; }
 .agent-case-choice strong { font-size:17px; font-weight:500; }
-.agent-case-choice > span > span { color:#62665d; font-size:13px; line-height:1.5; }
+.agent-case-choice > span:not(.mico-avatar) > span { color:#62665d; font-size:13px; line-height:1.5; }
 .agent-case-choice > svg { opacity:0; transform:translateX(-4px); transition:opacity 180ms ease,transform 180ms ease; }
 .agent-case-choice[aria-pressed="true"] > svg, .agent-case-choice:hover > svg { opacity:1; transform:none; }
 .agent-case-open { display:inline-flex; align-items:center; gap:10px; min-height:44px; margin-top:22px; font-size:14px; }

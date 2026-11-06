@@ -1,3 +1,4 @@
+import { usageDashboard } from "../usage-dashboard.js";
 import { agentUsage } from "../agent-usage.js";
 import { agentCost } from "../agent-cost.js";
 import { taskCosts } from "../task-cost.js";
@@ -115,6 +116,7 @@ export function contentRoutes(ctx: RouterContext) {
       }),
     },
     usage: {
+      dashboard: authed.usage.dashboard.handler(({ context, input }) => usageDashboard(deps.prisma, context.actor, input)),
       agents: authed.usage.agents.handler(({ context }) => agentUsage(deps, context.actor)),
       agent: authed.usage.agent.handler(({ context, input }) =>
         agentCost(deps, context.actor, input.botId),

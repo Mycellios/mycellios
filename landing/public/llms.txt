@@ -16,6 +16,7 @@ The public network page reports a live snapshot when data is available. Compute 
 - [Compare](https://www.mycellios.com/compare): Original agent comparisons with product sources.
 - [Contribute compute](https://www.mycellios.com/earn): Learn about voluntary browser and native test-network participation.
 - [Downloads](https://www.mycellios.com/downloads): Check current native package availability.
+- [Changelog](https://www.mycellios.com/changelog): Dated Desktop and Agent updates with original publication sources.
 - [Browser worker](https://www.mycellios.com/browser/): Try the browser-based worker where supported.
 
 ## Documentation and evidence

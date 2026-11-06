@@ -7,10 +7,24 @@
   main-frame acknowledgement, preserve stored text drafts and block in-memory work.
   A pending restart is cancellable. The detached same-user helper waits for normal
   exit, snapshots session/installation state, installs and reopens the same profile.
-  Never force-stop another process or clear user data. Legacy bootstrap shutdown
-  uses Restart Manager flags zero, registered only to the exact app process.
+  Never force-stop another process, use Restart Manager shutdown or clear user data.
   Verify manual-update, desktop-update-work, composer-draft and preload tests plus
   a fresh-profile native handoff before applying it to an installed profile.
+- Workspace navigation uses the single rail and per-account/Space pins. Marketplace
+  reuses the existing connection and skill services; preserve multi-account editors.
+  Inbox entries refer to ordinary Mico task threads through taskBotId and the
+  mico-task key namespace, never a parallel execution engine. Keep ?task= for
+  owned task conversations and ?inbox= for the inbox selection. Archive and sends
+  share the exact thread lock; uncertain sends retain their original nonce.
+  Calendar and usage queries remain bounded and owner/Space scoped; unknown cost
+  stays unknown. Workflow condition branches retain the existing worker semantics.
+  Verify scripts/verify-workspace-sync-db.ts and verify-workspace-sync-ui.mjs;
+  the browser fixture uses synthetic RPCs and does not qualify real agent execution.
+- Continuous voice keeps its immutable Space/task client and stops its owned audio
+  resources on close. Native speech preparation is explicit and verifies pinned
+  files. Keep standalone Node, its license, optional native modules and Windows
+  Job ownership in packaging; never replace them with a renderer-selected runtime.
+  Browser tests do not qualify microphones, model inference or native installers.
 
 - Windows installers explicitly include Koffi's win32-x64 optional native module
   under resources/koffi/win32_x64. Preserve this loader-supported fallback even
@@ -75,6 +89,9 @@
 
 
 - Mico Work controls reuse revisioned delegation controls and durable teardown.
+  Keep command/workflow/delegation tools in the canonical built-in registry so
+  saved tool blocks remain enforceable. Pi shell parameters retain the declared
+  bounded timeout, including its description and validation.
   Pi concurrency is admitted atomically per Bot and serialized per thread; native
   engines remain single-turn. Private Pi tasks reserve the existing computer lease
   before computer/file/command tools, never share it between runs. Workflows reuse
@@ -577,6 +594,8 @@
   secret ownership checks; another provider's key must never reach Mycellios.
 - Offline Vitest runs disable Vite environment-file loading. Supply fixture
   configuration explicitly; never make tests depend on a maintainer's `.env`.
+  Keep the production Lingui catalog loader in Vitest: related-test discovery
+  traverses lazy PO imports. Verify catalog-asset-loader.test.ts when changing it.
   Linux lifecycle and publishing fixtures require Bash, Python 3, jq and procps
   (including the external `kill` command). Installer smoke fixtures also require
   curl, OpenSSL and the Docker CLI.

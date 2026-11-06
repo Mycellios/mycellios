@@ -81,7 +81,7 @@ it("explains a preflight block instead of a working animation", () => {
 it("keeps a long, silent run active and distinguishes worker contact from output", () => {
   mount(run);
   expect(node.querySelector("details")?.open).toBe(false);
-  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Waiting for an activity update…");
   expect(node.textContent).toContain("Worker connected · no recent output");
   expect(node.textContent).toContain("A long task is not stopped");
   expect(node.textContent).toContain("Last worker signal");
@@ -169,7 +169,7 @@ it("keeps commands and paths inside details and preserves the disclosure choice 
   expect(details.textContent).toContain(activity);
   const outside = node.cloneNode(true) as HTMLElement;
   outside.querySelector("details")!.remove();
-  expect(outside.textContent).toContain("Working");
+  expect(outside.textContent).toContain("No new activity");
   expect(outside.textContent).not.toContain("ssh");
   expect(outside.textContent).not.toContain("/srv/");
   details.open = true;

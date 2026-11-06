@@ -51,7 +51,7 @@ export function BotsSidebarLayout({
             {...handleProps}
             data-testid="bots-sidebar-edge"
             aria-label={t`Resize bots sidebar`}
-            style={{ insetInlineStart: width - 4 }}
+            style={{ insetInlineStart: width + 52 - 4 }}
             className={`absolute inset-y-0 z-50 m-0 hidden h-full w-2 border-0 cursor-col-resize touch-none select-none hover:bg-sidebar-border focus-visible:bg-sidebar-border focus-visible:outline-none md:block ${resizing ? "" : "transition-[inset-inline-start] duration-200 ease-out motion-reduce:transition-none"}`}
           />
         )}

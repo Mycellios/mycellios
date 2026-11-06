@@ -131,7 +131,7 @@ function describeRussianInterval(
 }
 
 /** Build the localized summary for any routine schedule preset. */
-function describeCronPresetLocalized(
+export function describeCronPresetLocalized(
   preset: CronPreset,
   locale: string,
 ): { lead: string; detail: string } {

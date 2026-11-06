@@ -59,11 +59,11 @@ describe("Landing", () => {
     expect(hero).toContain('aria-hidden="true"');
   });
 
-  it("keeps the retired blog out of header navigation", () => {
+  it("keeps Journal available through the shared Explore navigation", () => {
     const html = renderToStaticMarkup(<RebrandLanding />);
 
-    expect(html).not.toContain('href="/blog"');
-    expect(html).not.toContain(">Blog</a>");
+    expect(html).toContain('href="/blog"');
+    expect(html).toContain(">Journal</a>");
   });
 
   it("sends documentation links to the coordinator in dev and preview", async () => {
@@ -300,14 +300,15 @@ describe("Landing", () => {
     );
     const page = await read("./rebrand/RebrandLanding.tsx");
     const header = await read("./rebrand/MarketingHeader.tsx");
-    const css = await read("./rebrand/marketing-shell.css");
+    const css = await read("./ui/marketing-navigation.css");
+    const behavior = await read("./ui/marketing-navigation.js");
 
     expect(page).toContain('from "./MarketingHeader"');
-    expect(header).toContain('aria-controls="marketing-mobile-navigation"');
-    expect(header).toContain('aria-expanded={open}');
+    expect(header).toContain('className="marketing-mobile-menu"');
+    expect(header).toContain('<DisclosureSummary className="marketing-menu"');
     expect(header).toContain('aria-label="Mobile navigation"');
-    expect(header).toContain('event.key !== "Escape"');
-    expect(header).toContain("toggle.current?.focus()");
+    expect(behavior).toContain('event.key === "Escape"');
+    expect(behavior).toContain('querySelector("summary")?.focus()');
     expect(css).toContain("100svh");
     expect(css).toContain("env(safe-area-inset-bottom)");
   });

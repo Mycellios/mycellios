@@ -1,5 +1,9 @@
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
+import { AccountPlanLimitsSchema } from "./plan-limits.js";
+import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
+import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
+import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
 import { ProjectId, ProjectName, ProjectSummary } from "./projects.js";
 import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema } from "./workflows.js";
 import { ContributionEnrollmentSchema, ContributionNodeInput, ContributionStateSchema } from "./contribution.js";
@@ -303,6 +307,7 @@ export const appContract = {
     ),
   },
   models: {
+    planLimits: oc.input(z.object({ refresh: z.boolean().optional() }).optional()).output(AccountPlanLimitsSchema),
     contributionStatus: oc.input(ContributionNodeInput).output(ContributionStateSchema),
     contributionControl: oc.input(ContributionNodeInput.extend({ action: z.enum(["pause", "resume"]) })).output(ContributionStateSchema),
     contributionEnrollment: oc.output(ContributionEnrollmentSchema),
@@ -476,6 +481,13 @@ export const appContract = {
     list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
   },
   threads: {
+    sideQuestionAvailable: oc.input(threadTarget).output(z.object({ available: z.boolean() })),
+    sideQuestion: oc.input(threadTarget.safeExtend({
+      question: z.string().trim().min(1).max(8000),
+      earlier: z.array(z.object({ question: z.string().max(8000), answer: z.string().max(16000) })).max(8),
+      responseLocale: z.string().max(16).optional(),
+    })).output(z.object({ answer: z.string().max(16000) })),
+
     prepareProject: oc.input(z.object({
       botId: Id,
       taskThreadId: Id.optional(),
@@ -717,6 +729,7 @@ export const appContract = {
     stop: oc.input(z.object({ executionId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   routines: {
+    calendar: oc.input(RoutineCalendarInputSchema).output(RoutineCalendarSchema),
     list: oc.input(botId).output(z.array(RoutineSchema)),
     history: oc
       .input(z.object({ routineId: Id, before: RoutineRunCursorSchema.optional() }))
@@ -1147,6 +1160,7 @@ export const appContract = {
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   usage: {
+    dashboard: oc.input(UsageDashboardInputSchema).output(UsageDashboardSchema),
     agents: oc.output(AgentUsageReportSchema),
     agent: oc.input(botId).output(TaskCostSchema.omit({ runId: true }).extend({ botId: Id })),
     tasks: oc.input(z.object({ runIds: z.array(Id).max(100) })).output(z.array(TaskCostSchema)),
@@ -1175,6 +1189,18 @@ export const appContract = {
       // The longest origin: a scheme, a 253-character host name and a port.
       .input(z.object({ origin: z.string().max("https://".length + 253 + ":65535".length) }))
       .output(z.object({ icon: z.string().nullable(), retry: z.boolean().optional() })),
+  },
+  taskInbox: {
+    available: oc.output(z.object({ enabled: z.literal(true) })),
+    list: oc.output(z.array(InboxTaskSchema)),
+    start: oc.input(TaskInboxSendSchema.extend({ botId: Id })).output(InboxTaskSchema),
+    read: oc.input(z.object({ id: Id })).output(z.object({ item: InboxTaskSchema, thread: ThreadSnapshotSchema })),
+    messages: oc.input(z.object({ id: Id, before: z.number().int().nonnegative() })).output(ThreadMessagePageSchema),
+    send: oc.input(TaskInboxSendSchema.extend({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    markRead: oc.input(z.object({ id: Id, seq: z.number().int().min(-1) })).output(z.object({ ok: z.literal(true) })),
+    archive: oc.input(z.object({ id: Id, archived: z.boolean() })).output(z.object({ ok: z.literal(true) })),
+    stop: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    answer: oc.input(z.object({ id: Id, runId: Id, messageId: Id, answer: z.string().max(16000), username: z.string().min(1).max(512).optional(), dismiss: z.literal(true).optional() }).refine(value => value.dismiss ? value.answer === "" && !value.username : value.answer.length > 0)).output(z.object({ ok: z.literal(true) })),
   },
   tasks: {
     overview: oc.output(z.array(z.object({ taskId: Id, runId: Id.nullable(), botId: Id, name: z.string(),

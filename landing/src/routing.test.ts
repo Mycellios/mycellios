@@ -79,6 +79,7 @@ describe("panel information architecture", () => {
     expect(retiredMarketingDestination("/spore/data")).toBe("/stats");
     expect(retiredMarketingDestination("/spore")).toBeNull();
     expect(resolveLandingSurface("/pricing", "")).toBe("pricing");
+    expect(resolveLandingSurface("/changelog", "?product=desktop")).toBe("changelog");
     expect(resolveLandingSurface("/compare/chatgpt-dots", "")).toBe("compare");
   });
 

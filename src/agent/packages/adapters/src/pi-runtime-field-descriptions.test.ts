@@ -31,6 +31,12 @@ function validate(tool: (typeof builtinAgentTools)[number], args: Record<string,
 const spawnBot = builtinAgentTools.find((tool) => tool.name === "spawn_bot");
 
 describe("tool parameter descriptions reach the wire", () => {
+  it("preserves the shell deadline and its bounds through Pi", () => {
+    const shell = builtinAgentTools.find(tool => tool.name === "shell")!;
+    expect(wire(shell).properties.timeout_ms).toMatchObject({ type: "integer", minimum: 1000, maximum: 3600000, description: expect.any(String) });
+    for (const timeout_ms of [1000, 3600000]) expect(() => validate(shell, { command: "echo fixture", timeout_ms })).not.toThrow();
+    for (const timeout_ms of [999, 3600001]) expect(() => validate(shell, { command: "echo fixture", timeout_ms }), String(timeout_ms)).toThrow();
+  });
   it("keeps the description on every field type", () => {
     const tool = {
       name: "described",

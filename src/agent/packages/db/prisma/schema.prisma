@@ -22,6 +22,7 @@ model AiDataConsent {
 }
 
 model User {
+  inboxTasks InboxTask[]
   workflows Workflow[]
   workflowExecutions WorkflowExecution[]
   aiDataConsents AiDataConsent[]
@@ -260,6 +261,7 @@ model Member {
 }
 
 model Space {
+  inboxTasks InboxTask[]
   workflows Workflow[]
   workflowExecutions WorkflowExecution[]
   aiDataConsents              AiDataConsent[]
@@ -531,6 +533,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  inboxTasks InboxTask[]
   taskConcurrency Int @default(4)
   agentEngine String @default("pi")
   skillPins BotSkillPin[]
@@ -687,6 +690,7 @@ model DevelopmentProject {
 }
 
 model Thread {
+  inboxTask InboxTask?
   taskBotId String?
   taskBot Bot? @relation("MicoTaskThreads", fields: [taskBotId], references: [id], onDelete: Cascade)
   projectKey String?
@@ -2062,4 +2066,24 @@ model MessagingInstallSession {
   expiresAt DateTime
   @@index([expiresAt])
   @@map("messaging_install_sessions")
+}
+
+model InboxTask {
+ id String @id
+ spaceId String
+ space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+ userId String
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ botId String
+ bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+ threadId String @unique
+ thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+ clientNonce String
+ title String
+ readSeq Int @default(-1)
+ archivedAt DateTime?
+ createdAt DateTime @default(now())
+ @@unique([spaceId,userId,clientNonce])
+ @@index([spaceId,userId,createdAt], map: "task_inbox_owner_idx")
+ @@map("task_inbox")
 }

@@ -670,10 +670,9 @@ msgstr "其他助手"
 msgid "Answer"
 msgstr "回答"
 
-#: src/components/call/IncomingCall.tsx
-msgctxt "incoming call"
+#: src/components/AskCard.tsx
 msgid "Answer"
-msgstr ""
+msgstr "回答"
 
 #: src/components/AskCard.tsx
 msgid "Answered"
@@ -6124,37 +6123,30 @@ msgstr "使用此模型"
 msgid "Use your own key"
 msgstr "使用自己的密钥"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "赠送额度，与赚取的额度分开记录"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "模型在完成回复前达到了输出上限。"
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "屏幕未连接"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "屏幕连接已关闭。"
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "屏幕未响应。"
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "屏幕链接已过期。"
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx

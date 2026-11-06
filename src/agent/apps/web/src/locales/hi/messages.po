@@ -6124,37 +6124,30 @@ msgstr "यह मॉडल उपयोग करें"
 msgid "Use your own key"
 msgstr "अपनी कुंजी इस्तेमाल करें"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "अर्जित क्रेडिट से अलग प्रचार क्रेडिट"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "मॉडल अपना जवाब पूरा करने से पहले अपनी आउटपुट सीमा तक पहुँच गया।"
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "स्क्रीन कनेक्ट नहीं है"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "स्क्रीन का कनेक्शन बंद हो गया।"
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "स्क्रीन ने जवाब नहीं दिया।"
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "स्क्रीन लिंक की समय सीमा समाप्त हो गई।"
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx

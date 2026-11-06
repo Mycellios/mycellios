@@ -1094,4 +1094,6 @@ export const JA_MESSAGES: Record<string, string> = {
   "Link DMs": "DMを連携",
   "This integration needs server setup. Contact the administrator.":
     "この連携にはサーバー側の設定が必要です。管理者にお問い合わせください。",
+  "Open task": "タスクを開く",
+  "This task is available in the web app.": "このタスクはWebアプリで利用できます。",
 };

@@ -783,5 +783,4 @@ body:has(.net) { margin: 0; }
   .net-history-loading span { animation: none; }
   .net-globe { transition: none; }
 }
-.net .marketing-header { --marketing-ink:#f1efe8; --ui-accent:#e9ede4; --ui-on-accent:#172a20; --ui-accent-hover:#d7e0d1; }
 .net .marketing-mobile-nav { color:#16221b; }

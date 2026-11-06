@@ -81,7 +81,9 @@ it("opens a project and modifies it through the real native shell, with a real t
   })().catch(failReady);
   const previewUrl = await preview;
   expect(await (await fetch(previewUrl, { signal: AbortSignal.timeout(3000) })).text()).toBe("<h1>Mycellios local project</h1>");
-  await expect(server.selectProject("bot", project)).rejects.toThrow("current operation");
+  await expect(server.selectProject("bot", project)).rejects.toThrow();
+  expect(server.project("bot")?.path).toBe(project);
+  expect(await (await fetch(previewUrl, { signal: AbortSignal.timeout(3000) })).text()).toBe("<h1>Mycellios local project</h1>");
   const other = await client.provision({ botId: "other", homePath: "" }, context);
   expect((await client.environment(other, context)).projectPath).toBeUndefined();
   server.setEnabled(false);

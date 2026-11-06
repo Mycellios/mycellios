@@ -30,8 +30,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { ActiveBotGlyph } from "../../components/ai/CollaborationMarker";
-import { RunActivityStatus } from "../../components/RunActivityStatus";
+import { PendingRunActivity, RunActivityStatus } from "../../components/RunActivityStatus";
+import { RunExecutionDetails } from "../../components/RunExecutionDetails";
 import { VoiceChatCard } from "../../components/call/VoiceChatCard";
 import { AuthMushroom } from "../../components/AuthMushroom";
 import type { ArtifactTarget } from "../../lib/artifact-open";
@@ -48,8 +48,8 @@ import { useTaskCosts } from "./use-task-costs";
 
 export function bubbleFrameWidth(role: ThreadMessage["role"]) {
   return role === "user"
-    ? "max-w-[min(84%,calc(100%_-_8rem),39rem)] [@media(hover:none)]:max-w-[min(84%,39rem)]"
-    : "max-w-[min(88%,calc(100%_-_8rem),39rem)] [@media(hover:none)]:max-w-[min(88%,39rem)]";
+    ? "max-w-[min(84%,39rem)]"
+    : "max-w-[min(92%,42rem)]";
 }
 
 export const Transcript = memo(function Transcript({
@@ -68,6 +68,7 @@ export const Transcript = memo(function Transcript({
   running,
   workingBots,
   activeRun,
+  lastRun,
   missingComputer,
   userBubble,
   onCallBack,
@@ -109,6 +110,7 @@ export const Transcript = memo(function Transcript({
   running: boolean;
   workingBots: GroupAvatarMember[];
   activeRun?: Run;
+  lastRun?: Run | null;
   missingComputer?: boolean;
   /** Your bubbles take the bot's color in its own chat. */
   userBubble?: { background: string; foreground: string };
@@ -198,7 +200,6 @@ export const Transcript = memo(function Transcript({
   const taskCosts = useTaskCosts(shownMessages, running);
   const costMessageIds = taskCostMessageId(shownMessages);
   const unreadDividerId = unreadDividerMessageId(shownMessages, unreadAfterSeq, olderCursor);
-  const workingLabel = liveActivityLine(messages) ?? t`Working…`;
   const [quoteDraft, setQuoteDraft] = useState<{
     message: ThreadMessage;
     text: string;
@@ -438,7 +439,7 @@ export const Transcript = memo(function Transcript({
             following.current = false;
           }
         }}
-        className={`rk-scroll flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto scroll-pb-7 px-4 pb-12 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pb-13 ${headerTabs ? "scroll-pt-28 pt-32 md:pt-[132px]" : "scroll-pt-16 pt-20 md:pt-[84px]"}`}
+        className="rk-scroll flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto scroll-pt-5 scroll-pb-7 px-4 pt-5 pb-12 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pb-13"
         style={
           userBubble
             ? ({
@@ -494,7 +495,10 @@ export const Transcript = memo(function Transcript({
             );
           }
           const message = item.message;
-          if (!messageHasVisibleBlocks(message.blocks, showToolActivity)) return null;
+          const messageToolActivity = showToolActivity && !(running && activeRun &&
+            message.id.startsWith("progress:") &&
+            (message.id === `progress:${activeRun.id}` || message.runId === activeRun.id));
+          if (!messageHasVisibleBlocks(message.blocks, messageToolActivity)) return null;
           const peerReceipt = isPeerReceiptBlocks(message.blocks);
           const messageReactions = reactionView.reactions.get(message.id);
           return (
@@ -570,11 +574,18 @@ export const Transcript = memo(function Transcript({
                       onOpenComputer={onOpenComputer}
                       onOpenImportSetup={onOpenImportSetup}
                       onOpenImport={onOpenImport}
-                      showToolActivity={showToolActivity}
+                      showToolActivity={messageToolActivity}
                       onReply={onReply}
                       onMarkUnread={onMarkUnread}
                       onReact={onReact}
                     />
+                    {lastRun?.completedAt && message.runId === lastRun.id &&
+                    costMessageIds.get(lastRun.id) === message.id ? (
+                      <details className="mt-2 max-w-prose text-xs text-muted-foreground">
+                        <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{t`Execution details`}</summary>
+                        <div className="mt-2"><RunExecutionDetails run={lastRun} cost={taskCosts.get(lastRun.id)} /></div>
+                      </details>
+                    ) : null}
                     {showResponseCost &&
                     message.runId &&
                     costMessageIds.get(message.runId) === message.id &&
@@ -617,12 +628,13 @@ export const Transcript = memo(function Transcript({
               messages={messages}
               bots={workingBots}
               activity={liveActivityLine(messages) ?? undefined}
+              cost={taskCosts.get(activeRun.id)}
               missingComputer={missingComputer}
               onRefresh={onRefresh}
               onOpenComputer={() => onOpenComputer(activeRun.botId)}
             />
           ) : (
-            <ActiveBotGlyph bots={workingBots} label={workingLabel} />
+            <PendingRunActivity bots={workingBots} messages={messages} onRefresh={onRefresh} />
           )
         ) : null}
       </div>

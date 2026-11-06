@@ -1,0 +1,20 @@
+.mico-avatar.mico-avatar { position:relative; display:inline-grid; width:38px; height:38px; flex:none; gap:0; padding:0; margin-left:0; vertical-align:middle; }
+.mico-avatar > img { display:block; width:100%; height:100%; object-fit:contain; }
+.mico-avatar > .mico-face { position:absolute; display:flex; align-items:center; justify-content:space-between; left:32%; top:38%; width:36%; height:24%; padding-inline:6%; box-sizing:border-box; background:var(--mico-body); }
+.mico-face::before, .mico-face::after { content:""; display:block; width:24%; height:83%; border-radius:999px; background:#142019; transform-origin:center; translate:var(--mico-look-x,0px) var(--mico-look-y,0px); }
+.mico-avatar[data-mico="mico"] { --mico-body:#3ec5a8; }
+.mico-avatar[data-mico="mico"] > .mico-face { top:37%; height:20%; padding-inline:4%; }
+.mico-avatar[data-mico="mico"] > .mico-face::before, .mico-avatar[data-mico="mico"] > .mico-face::after { width:27%; height:28%; background:#fff; }
+.mico-avatar[data-mico="planning"] { --mico-body:#f2622a; }
+.mico-avatar[data-mico="research"] { --mico-body:#3b82f6; }
+.mico-avatar[data-mico="writing"] { --mico-body:#6a6bf5; }
+.mico-avatar:not([data-mico="mico"],[data-mico="planning"],[data-mico="research"],[data-mico="writing"]) > .mico-face { display:none; }
+@media (prefers-reduced-motion:no-preference) {
+  .mico-face::before, .mico-face::after { animation:mico-blink 7.2s infinite; animation-play-state:paused; }
+  [data-mico="research"] .mico-face::before, [data-mico="research"] .mico-face::after { animation-delay:-1.4s; }
+  [data-mico="writing"] .mico-face::before, [data-mico="writing"] .mico-face::after { animation-delay:-3.1s; }
+  [data-ambient-running="true"]:not([data-ambient-hidden="true"]) .mico-face::before,
+  [data-ambient-running="true"]:not([data-ambient-hidden="true"]) .mico-face::after,
+  [data-story-running="true"] .mico-face::before, [data-story-running="true"] .mico-face::after { animation-play-state:running; }
+}
+@keyframes mico-blink { 0%,91%,95%,100% { transform:scaleY(1); } 92.5%,93% { transform:scaleY(.12); } }

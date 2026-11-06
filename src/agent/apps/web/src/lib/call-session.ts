@@ -19,6 +19,7 @@ import { reportClientError } from "./monitoring";
 import { rpc } from "./rpc.js";
 import { isThreadSnapshotEvent, reduceThreadSnapshot } from "./thread-events.js";
 import { speaker } from "./tts.js";
+import { closeContinuousVoice } from "./continuous-voice-owner.js";
 import { errorText } from "./user-error";
 
 /** `ringing` until the call picks up; the rest describe the conversation. */
@@ -115,6 +116,7 @@ export function startCall(call: {
   /** The bot called and the user picked up: no ringing, and the bot speaks first. */
   answered?: { callId: string; opening: string };
 }): void {
+  closeContinuousVoice();
   endCall();
   callId = call.answered?.callId ?? randomId();
   transcribe = call.transcribe;

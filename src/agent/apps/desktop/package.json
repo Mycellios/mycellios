@@ -1,7 +1,7 @@
 {
   "name": "@rakazo/desktop",
   "productName": "Mycellios Desktop",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "author": {
     "name": "Mycellios"
   },
@@ -26,7 +26,8 @@
     "@rakazo/logging": "*",
     "@sentry/electron": "8.3.0",
     "electron-updater": "6.8.11",
-    "koffi": "3.3.4"
+    "koffi": "3.3.4",
+    "sherpa-onnx-node": "2.0.1"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",
@@ -137,6 +138,10 @@
       ]
     },
     "publish": [],
-    "artifactName": "Mycellios-Desktop-${version}-${os}-${arch}.${ext}"
+    "artifactName": "Mycellios-Desktop-${version}-${os}-${arch}.${ext}",
+    "asarUnpack": [
+      "**/node_modules/sherpa-onnx*/**",
+      "dist/voice-node*"
+    ]
   }
 }

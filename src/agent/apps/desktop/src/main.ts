@@ -1,3 +1,4 @@
+import { LocalVoice } from "./local-voice.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
 import { ManualUpdateController } from "./manual-update.js";
@@ -1380,6 +1381,26 @@ app.whenReady().then(async () => {
     const prefix = base.pathname.replace(/\/$/, "");
     return page.origin === base.origin && (page.pathname === prefix || page.pathname.startsWith(prefix + "/"));
   };
+  const localVoices = new Map<number, LocalVoice>();
+  const localVoice = (event: Electron.IpcMainInvokeEvent) => {
+    if (!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) throw new Error("Untrusted voice caller");
+    const win = windowFrom(event)!;
+    let voice = localVoices.get(win.id);
+    if (!voice) {
+      voice = new LocalVoice(path.join(app.getPath("userData"), "voice-models"), path.join(app.getAppPath(), "dist", process.platform === "win32" ? "voice-node.exe" : "voice-node"));
+      localVoices.set(win.id, voice);
+      win.once("closed", () => { void voice!.stop(); localVoices.delete(win.id); });
+    }
+    return voice;
+  };
+  ipcMain.handle("desktop.localVoice.status", event => localVoice(event).status());
+  ipcMain.handle("desktop.localVoice.prepare", event => localVoice(event).prepare());
+  ipcMain.handle("desktop.localVoice.transcribe", (event, samples: Float32Array) => localVoice(event).run({ samples }));
+  ipcMain.handle("desktop.localVoice.speak", (event, input: { text: string; language: string; speed: number }) => {
+    if (!input || typeof input.language !== "string" || !/^[a-z]{2}$/.test(input.language) || !Number.isFinite(input.speed)) throw new Error("Invalid voice input");
+    return localVoice(event).run({ text: input.text, language: input.language, speed: input.speed });
+  });
+  ipcMain.handle("desktop.localVoice.stop", event => localVoice(event).stop());
   const getCloudComputer = () => {
     if (!hostComputer || !mainWindow) throw new Error("Local computer unavailable");
     const base = projectServer();

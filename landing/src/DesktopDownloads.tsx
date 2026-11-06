@@ -3,6 +3,7 @@ import { Download } from "lucide-react";
 import { isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../../src/contracts/desktop-downloads";
 import { Button, Disclosure, DisclosureSummary, Heading, Link, Text } from "./ui/primitives";
 import { FEDORA_DESKTOP_DOWNLOAD } from "./desktop-fedora-download";
+import { MarketingHeader, MarketingFooter } from "./rebrand/MarketingHeader";
 import "./desktop-downloads.css";
 
 const platformLabel = (id: string) => id === "windows-x64" ? "Windows" : id === "macos-arm64" ? "Mac (Apple Silicon)" : id === "macos-x64" ? "Mac (Intel)" : id === "fedora-x64" ? "Fedora" : "Linux";
@@ -27,8 +28,7 @@ export function DesktopDownloads() {
   const versionLabel = catalog ? (versions.every(p => p.version === catalog.version)
     ? `Version ${catalog.version}` : versions.map(p => `${p.platform} ${p.version}`).join(" · ")) + " · Preview" : "Checking downloads…";
   const separateSources = catalog?.packages.some(p => p.source !== undefined);
-  return <main className="public-panel desktop-downloads">
-    <header><Link href="/" className="desktop-wordmark">Mycellios</Link><Link href="/agent/app">Use in your browser</Link></header>
+  return <main className="marketing-page desktop-download-page"><MarketingHeader /><div className="desktop-downloads">
     <section aria-labelledby="desktop-title">
       <Heading as="h1" id="desktop-title">Mycellios Desktop</Heading>
       <Text className="desktop-intro">Your agents and projects, in one app.</Text>
@@ -47,7 +47,7 @@ export function DesktopDownloads() {
       <Text className="desktop-version">{versionLabel}</Text>
       <Text className="desktop-notice">Preview. Windows and macOS may require approval before opening.</Text>
     </section>
-    <Disclosure className="desktop-details"><DisclosureSummary>Installation &amp; details</DisclosureSummary>
+    <Disclosure className="desktop-details ui-animated-disclosure"><DisclosureSummary>Installation &amp; details</DisclosureSummary><div className="ui-disclosure-body">
       <Text>Install the app and sign in with your Mycellios account. On Ubuntu / Debian, open the DEB with your software installer.</Text>
       <Text>On a Mac, choose the download for your processor, open the DMG and drag Mycellios Desktop to Applications. This preview is not notarized by Apple. If macOS blocks the first opening, review Mycellios Desktop in System Settings → Privacy &amp; Security and use Open Anyway for this app.</Text>
       <Text>On Fedora, open the RPM with your software installer or run <code>sudo dnf install ./{FEDORA_DESKTOP_DOWNLOAD.fileName}</code>.</Text>
@@ -56,6 +56,6 @@ export function DesktopDownloads() {
       {catalog ? <div className="desktop-checksums">{catalog.packages.map(p => <div key={p.id}><Text><strong>{platformLabel(p.id)}</strong> · {p.format} · {Math.ceil(p.bytes / 1_000_000)} MB<code>{p.sha256}</code></Text>{separateSources ? <Link href={(p.source ?? catalog.source).path}>{platformLabel(p.id)} source code and build information</Link> : null}</div>)}{!separateSources ? <Link href={catalog.source.path}>Source code and build information</Link> : null}</div> : null}
       <div className="desktop-checksums"><Text><strong>Fedora</strong> · RPM · Version {FEDORA_DESKTOP_DOWNLOAD.version} · {Math.ceil(FEDORA_DESKTOP_DOWNLOAD.bytes / 1_000_000)} MB<code>{FEDORA_DESKTOP_DOWNLOAD.sha256}</code></Text><Link href="https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.9-fedora-preview">Fedora source code and build information</Link></div>
       <footer><Link href="/downloads?product=runtime">Standalone runtime</Link><Link href="https://github.com/Mycellios/mycellios">GitHub</Link></footer>
-    </Disclosure>
-  </main>;
+    </div></Disclosure>
+  </div><MarketingFooter /></main>;
 }

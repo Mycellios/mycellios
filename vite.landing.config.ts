@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { resolve, sep } from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import { buildNativeSourceProvenance } from "./scripts/native-build-provenance.mjs";
+import { marketingNavigationAssets } from "./scripts/marketing-navigation-assets.mjs";
 
 /*
  * Where `node_modules` actually lives.
@@ -57,6 +58,8 @@ const apiTarget = process.env.MYCELLIOS_UI_API_TARGET?.trim()
 const identityTarget = process.env.MYCELLIOS_UI_IDENTITY_TARGET?.trim()
   || landingEnv.MYCELLIOS_UI_IDENTITY_TARGET?.trim()
   || "https://www.mycellios.com";
+const contentTarget = process.env.MYCELLIOS_UI_CONTENT_TARGET?.trim() || apiTarget;
+const contentProxy = () => ({ target: contentTarget, changeOrigin: true, secure: contentTarget.startsWith("https://") });
 const productionProxy = (websocket = false) => ({
   target: apiTarget,
   changeOrigin: true,
@@ -116,7 +119,7 @@ export default defineConfig({
   define: {
     __MYCELLIOS_BUILD_IDENTITY__: JSON.stringify(landingBuildIdentity),
   },
-  plugins: [react(), preloadHeroRenderer()],
+  plugins: [react(), preloadHeroRenderer(), marketingNavigationAssets(import.meta.dirname)],
   publicDir: "public",
   server: {
     host: LOCAL_UI_HOST,
@@ -132,11 +135,12 @@ export default defineConfig({
       // `/blog` is server-rendered by the coordinator. Without this explicit
       // proxy the Vite SPA fallback returns the landing document for the blog
       // route, which looks like an empty/broken page in the Dev Runner.
-      "^/blog(?:/|\\?|$)": productionProxy(),
+      "^/blog(?:/|\\?|$)": contentProxy(),
+      "/public/v1/journal": contentProxy(),
       // Documentation paths redirect from the coordinator to their canonical
       // sources; the SPA fallback would silently render the homepage instead.
       "/docs": productionProxy(),
-      "^/downloads/": productionProxy(),
+      "^/downloads/": { ...productionProxy(), bypass: (request) => /^\/downloads\/desktop\/?(?:\?|$)/.test(request.url ?? "") ? "/desktop-downloads.html" : undefined },
       "/public": productionProxy(),
       "/v1": productionProxy(),
     },
@@ -151,7 +155,8 @@ export default defineConfig({
       "/v1/auth": identityProxy(),
       "/mobile/v1": productionProxy(true),
       "/local": productionProxy(),
-      "^/blog(?:/|\\?|$)": productionProxy(),
+      "^/blog(?:/|\\?|$)": contentProxy(),
+      "/public/v1/journal": contentProxy(),
       "/docs": productionProxy(),
       "^/downloads/": productionProxy(),
       "/public": productionProxy(),

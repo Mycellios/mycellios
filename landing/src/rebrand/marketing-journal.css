@@ -1,0 +1,27 @@
+.marketing-journal { padding-block:75px; color:var(--assembly-ink); }
+.marketing-journal-heading { display:flex; gap:35px; justify-content:space-between; align-items:end; margin-bottom:35px; }
+.mycellios-reference .marketing-journal h2 { font-size:clamp(36px,4.3vw,58px); font-weight:500; line-height:1.04; letter-spacing:-.045em; }
+.marketing-journal-heading p { margin-top:22px; font-size:17px; color:var(--assembly-muted); line-height:1.6; }
+.marketing-journal a { display:inline-flex; align-items:center; gap:7px; min-height:44px; font-size:14px; }
+.marketing-journal-entries { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:32px; }
+.marketing-journal-entries .ui-card { min-width:0; padding:0; background:transparent; border:0; box-shadow:none; }
+.marketing-journal-entries article > a:has(img) { display:block; }
+.marketing-journal-entries img { display:block; width:100%; height:180px; object-fit:cover; border-radius:12px; margin-bottom:20px; }
+.marketing-journal-meta { display:flex; flex-wrap:wrap; gap:10px; color:var(--assembly-muted); font-size:11px; margin-bottom:13px; }
+.mycellios-reference .marketing-journal-entries h3 a { font-size:23px; line-height:1.2; letter-spacing:-.025em; font-weight:500; }
+.marketing-journal-entries p { font-size:14px; line-height:1.7; color:var(--assembly-muted); margin-top:14px; }
+.marketing-journal-entries article > a:last-child { margin-top:12px; }
+.marketing-journal-growing { display:flex; gap:22px; align-items:center; background:var(--assembly-stone); padding:30px; border-radius:16px; }
+.marketing-journal-growing > svg { flex:none; }
+.marketing-journal-growing > div { flex:1; }
+.mycellios-reference .marketing-journal-growing h3 { font-size:22px; letter-spacing:-.025em; font-weight:500; }
+.marketing-journal-growing p { max-width:620px; margin-top:9px; color:var(--assembly-muted); font-size:14px; line-height:1.7; }
+@media (max-width:760px) {
+  .marketing-journal { padding-block:55px; }
+  .marketing-journal-heading { display:block; margin-bottom:24px; }
+  .marketing-journal-heading > a { margin-top:14px; }
+  .marketing-journal-entries { grid-template-columns:1fr; gap:32px; }
+  .marketing-journal-growing { flex-wrap:wrap; align-items:start; padding:23px; gap:14px; }
+  .marketing-journal-growing > div { flex-basis:calc(100% - 50px); }
+  .marketing-journal-growing > a { margin-left:45px; }
+}

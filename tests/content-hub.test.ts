@@ -73,6 +73,34 @@ describe("Content Hub blog integration", () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
+  it("exposes bounded first-party article summaries without editorial bodies", async () => {
+    const app = Fastify();
+    apps.push(app);
+    const post = postFixture();
+    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(postsPage({ items: [post, postFixture({ slug: "../private" })] })));
+    await registerContentHubRoutes(app, { client: new ContentHubClient({ baseUrl: "https://content.example.com", fetch: request }) });
+    const response = await app.inject({ method: "GET", url: "/public/v1/journal" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().items).toHaveLength(1);
+    expect(response.json().items[0]).toMatchObject({ title: post.title, path: "/blog/research-note" });
+    expect(response.body).not.toContain("contentHtml");
+    expect(response.body).not.toContain("author");
+    expect(String(request.mock.calls[0]?.[0])).toContain("pageSize=3");
+    expect(response.headers["cache-control"]).toContain("max-age=60");
+  });
+
+  it("distinguishes an empty published journal from an unavailable connector", async () => {
+    const empty = Fastify(), unavailable = Fastify();
+    apps.push(empty, unavailable);
+    await registerContentHubRoutes(empty, { client: new ContentHubClient({ baseUrl: "https://content.example.com", fetch: vi.fn<typeof fetch>().mockResolvedValue(Response.json(postsPage())) }) });
+    await registerContentHubRoutes(unavailable, { client: null });
+    const emptyResponse = await empty.inject({ method: "GET", url: "/public/v1/journal" });
+    const unavailableResponse = await unavailable.inject({ method: "GET", url: "/public/v1/journal" });
+    expect(emptyResponse.json()).toEqual({ items: [], total: 0 });
+    expect(unavailableResponse.statusCode).toBe(503);
+    expect(unavailableResponse.headers["cache-control"]).toBe("no-store");
+  });
+
   it("keeps the empty blog message below the page heading", async () => {
     const app = Fastify();
     apps.push(app);
@@ -87,7 +115,7 @@ describe("Content Hub blog integration", () => {
     expect(listing.statusCode).toBe(200);
     expect(listing.body.match(/<h1>/g)).toHaveLength(1);
     expect(listing.body).toContain("<h1>Notes from the network.</h1>");
-    expect(listing.body).toContain("<h2>No articles yet</h2>");
+    expect(listing.body).toContain("<h2>Guides are coming soon</h2>");
   });
 
   it("server-renders list and article routes without trusting metadata as HTML", async () => {
@@ -121,16 +149,18 @@ describe("Content Hub blog integration", () => {
     const listing = await app.inject({ method: "GET", url: "/blog" });
     expect(listing.statusCode).toBe(200);
     expect(listing.headers["content-type"]).toContain("text/html");
-    expect(listing.body).toContain(`href="/blog.css?v=20260926b"`);
+    expect(listing.body).toContain(`href="/journal.css?v=20261104"`);
     expect(listing.body).toContain(`class="blog-feed"`);
-    expect(listing.body).toContain(`blog-header`);
-    expect(listing.body).toContain(`class="rb-header-inner rb-shell"`);
-    expect(listing.body).toContain(`class="blog-mobile-menu"`);
-    expect(listing.body).toContain(`<nav class="blog-mobile-nav" aria-label="Mobile navigation">`);
-    expect(listing.body).toContain(`href="/network?view=inference">Chat</a>`);
-    expect(listing.body).toContain(`href="/blog" aria-current="page">Blog</a>`);
-    expect(listing.body).toContain(`href="/dashboard">Login</a>`);
-    expect(listing.body).not.toContain(`href="/network?view=overview">Login</a>`);
+    expect(listing.body).toContain(`class="marketing-header"`);
+    expect(listing.body).toContain(`class="marketing-mobile-menu"`);
+    expect(listing.body).toContain(`class="marketing-mobile-nav" aria-label="Mobile navigation"`);
+    expect(listing.body).toContain(`href="/marketing-navigation.css?v=20261104"`);
+    expect(listing.body).toContain(`src="/marketing-navigation.js?v=20261104"`);
+    expect(listing.body).toContain(`href="https://www.mycellios.com/agent">Agent</a>`);
+    expect(listing.body).toContain(`href="/blog" aria-current="page">Journal</a>`);
+    expect(listing.body).toContain(`href="/dashboard">Stats</a>`);
+    expect(listing.body).not.toContain(`href="/create"`);
+    expect(listing.body).not.toContain(`>Login</a>`);
     expect(listing.body).toContain(`src="/assets/brand/favicon.png"`);
     expect(listing.body).toContain(`href="/assets/brand/favicon.png"`);
     expect(listing.body).toContain(`href="/assets/brand/app-icon.png"`);
@@ -265,7 +295,7 @@ describe("Content Hub blog integration", () => {
     });
     expect(dynamicSitemap.statusCode).toBe(200);
     expect(dynamicSitemap.headers["content-type"]).toContain("application/xml");
-    for (const path of ["/", "/network", "/create", "/earn", "/downloads", "/browser/", "/blog"]) {
+    for (const path of ["/", "/network", "/pricing", "/compare", "/spore/rewards", "/stats", "/earn", "/downloads", "/browser/", "/blog"]) {
       expect(dynamicSitemap.body).toContain(
         `<loc>https://www.mycellios.com${path}</loc>`,
       );

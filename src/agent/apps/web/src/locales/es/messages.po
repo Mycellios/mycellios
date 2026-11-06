@@ -2563,7 +2563,7 @@ msgstr ""
 #. js-lingui-explicit-id
 #: src/lib/model-catalog.ts
 msgid "Extra high"
-msgstr ""
+msgstr "Muy alto"
 
 #: src/components/CloudAgentCard.tsx
 msgid "failed"
@@ -2767,7 +2767,7 @@ msgstr "Ocultar la transcripción"
 #. js-lingui-explicit-id
 #: src/lib/model-catalog.ts
 msgid "High"
-msgstr ""
+msgstr "Alto"
 
 #: src/components/composer/HoldToTalk.tsx
 msgid "Hold to talk"
@@ -3138,7 +3138,7 @@ msgstr "Parece contener una clave"
 #. js-lingui-explicit-id
 #: src/lib/model-catalog.ts
 msgid "Low"
-msgstr ""
+msgstr "Bajo"
 
 #: src/pages/shell/bot-credentials.tsx
 msgid "Lowercase letters, numbers, hyphens and underscores, starting with a letter."
@@ -3194,7 +3194,7 @@ msgstr "Marcar como no leído"
 #. js-lingui-explicit-id
 #: src/lib/model-catalog.ts
 msgid "Max"
-msgstr ""
+msgstr "Máximo"
 
 #: src/pages/Artifacts.tsx
 msgid "Maximize"
@@ -3223,7 +3223,7 @@ msgstr "Servidores MCP"
 #. js-lingui-explicit-id
 #: src/lib/model-catalog.ts
 msgid "Medium"
-msgstr ""
+msgstr "Medio"
 
 #: src/lib/identity-display.ts
 msgid "Member"
@@ -3313,7 +3313,7 @@ msgstr "Falló el micrófono"
 #. js-lingui-explicit-id
 #: src/lib/model-catalog.ts
 msgid "Minimal"
-msgstr ""
+msgstr "Mínimo"
 
 #: src/pages/WindowChrome.tsx
 msgid "Minimize"
@@ -3407,7 +3407,7 @@ msgstr ""
 
 #: src/pages/shell/message-hover-actions.tsx
 msgid "More"
-msgstr ""
+msgstr "Más"
 
 #: src/components/ComputerMaintenanceActions.tsx
 msgid "More computer actions"
@@ -3482,7 +3482,7 @@ msgstr "Necesita toma de control"
 #: src/lib/roster-status.ts
 #: src/pages/shell/computer-overlay.tsx
 msgid "Needs you"
-msgstr ""
+msgstr "Te necesita"
 
 #: src/pages/shell/import-status.ts
 msgid "Needs: {names}"
@@ -6369,282 +6369,222 @@ msgstr "Tu respuesta"
 msgid "View question"
 msgstr "Ver pregunta"
 
-
 #: src/components/MycelliosCredits.tsx
 msgid "Promotional grant, separate from earned credits"
 msgstr "Saldo promocional, separado de los créditos ganados"
-
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
 msgid "The model hit its output limit before finishing its reply."
 msgstr "El modelo alcanzó su límite de salida antes de terminar la respuesta."
 
-
 #: src/pages/shell/use-computer.tsx
 msgid "Screen not connected"
 msgstr "Pantalla no conectada"
-
 
 #: src/lib/computer-screen.ts
 msgid "The screen connection closed."
 msgstr "La conexión con la pantalla se cerró."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen did not respond."
 msgstr "La pantalla no respondió."
 
-
 #: src/lib/computer-screen.ts
 msgid "The screen link expired."
 msgstr "El enlace de la pantalla caducó."
-
 
 #: src/pages/model-settings/compatible-model-fields.tsx
 #: src/pages/Onboarding.tsx
 msgid "Automatic"
 msgstr "Automático"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Agent"
 msgstr "Mico"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "All agents"
 msgstr "Todos los Micos"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Copy diagnostic details"
 msgstr "Copiar diagnóstico"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Could not copy details. Select the execution ID instead."
 msgstr "No se han podido copiar los detalles. Selecciona el ID de ejecución."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Could not refresh logs. Try again."
 msgstr "No se han podido actualizar los registros. Vuelve a intentarlo."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Diagnostic details"
 msgstr "Detalles de diagnóstico"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Error code"
 msgstr "Código de error"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution ID"
 msgstr "ID de ejecución"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution attempts"
 msgstr "Intentos de ejecución"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution failed. Copy the diagnostic details to report it."
 msgstr "La ejecución ha fallado. Copia los detalles de diagnóstico para comunicarlo."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Execution logs"
 msgstr "Registros de ejecución"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Finished"
 msgstr "Finalizada"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "First response"
 msgstr "Primera respuesta"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Load older logs"
 msgstr "Cargar registros anteriores"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Loading logs"
 msgstr "Cargando registros"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Logs"
 msgstr "Registros"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "No executions yet. Activity will appear here after you send a message."
 msgstr "Aún no hay ejecuciones. La actividad aparecerá aquí cuando envíes un mensaje."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "No virtual computer is assigned. This execution cannot start."
 msgstr "No hay ningún ordenador virtual asignado. Esta ejecución no puede comenzar."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Not recorded"
 msgstr "Sin registrar"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Recent attempts"
 msgstr "Intentos recientes"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Refresh logs"
 msgstr "Actualizar registros"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Refreshes every 15 seconds while active"
 msgstr "Se actualiza cada 15 segundos mientras hay actividad"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Showing the latest 10 attempts."
 msgstr "Se muestran los últimos 10 intentos."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Started"
 msgstr "Iniciada"
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The model is unavailable. Check Models in settings."
 msgstr "El modelo no está disponible. Revisa Modelos en los ajustes."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The model's context limit was reached."
 msgstr "Se ha alcanzado el límite de contexto del modelo."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The provider rejected the credential. Check Models in settings."
 msgstr "El proveedor ha rechazado la credencial. Revisa Modelos en los ajustes."
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "The provider's request limit was reached."
 msgstr "Se ha alcanzado el límite de solicitudes del proveedor."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Updated"
 msgstr "Actualizado"
-
 
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Virtual computers are unavailable on this server."
 msgstr "Los ordenadores virtuales no están disponibles en este servidor."
 
-
 #: src/pages/RunLogsSettingsPanel.tsx
 msgid "Worker claims"
 msgstr "Asignaciones del ejecutor"
 
-
 msgid "Developer mode"
 msgstr "Modo desarrollador"
-
 
 msgid "Show execution logs on this browser."
 msgstr "Mostrar los registros de ejecución en este navegador."
 
-
 msgid "Search loaded logs"
 msgstr "Buscar en los registros cargados"
-
 
 msgid "Status of loaded logs"
 msgstr "Estado de los registros cargados"
 
-
 msgid "No matches in loaded logs. Clear the filters or load older logs."
 msgstr "No hay coincidencias en los registros cargados. Quita los filtros o carga registros anteriores."
-
 
 msgid "Cannot start: virtual computer unavailable"
 msgstr "No puede empezar: ordenador virtual no disponible"
 
-
 msgid "Waiting to start"
 msgstr "Esperando para empezar"
-
 
 msgid "Worker contact lost — checking recovery"
 msgstr "Sin contacto con el ejecutor; comprobando recuperación"
 
-
 msgid "Worker connected · no recent output"
 msgstr "Ejecutor conectado · sin resultados recientes"
-
 
 msgid "In progress · worker status unavailable"
 msgstr "En curso · estado del ejecutor no disponible"
 
-
 msgid "Elapsed"
 msgstr "Tiempo transcurrido"
-
 
 msgid "Waiting"
 msgstr "En espera"
 
-
 msgid "Not available"
 msgstr "No disponible"
-
 
 msgid "No model has started. Configure a virtual computer to continue."
 msgstr "No ha empezado ningún modelo. Configura un ordenador virtual para continuar."
 
-
 msgid "A long task is not stopped just because it has not produced new output."
 msgstr "Una tarea larga no se detiene solo por no producir resultados nuevos."
-
 
 msgid "Execution details"
 msgstr "Detalles de ejecución"
 
-
 msgid "Last worker signal"
 msgstr "Último contacto del ejecutor"
-
 
 msgid "Last output"
 msgstr "Último resultado"
 
-
 msgid "Worker lease valid until"
 msgstr "Permiso de ejecución válido hasta"
-
 
 msgid "View computer"
 msgstr "Ver ordenador"
 
-
 msgid "Waiting for your response"
 msgstr "Esperando tu respuesta"
-
 
 msgid "This agent has no virtual computer. Open Computer settings to configure it."
 msgstr "Este Mico no tiene ordenador virtual. Abre los ajustes de Computadora para configurarlo."
@@ -6904,7 +6844,6 @@ msgstr "Tus chats se conservan. Las tareas en el servidor seguirán ejecutándos
 msgid "Send your draft and attachments, finish any call or recording, and close edited forms before updating. If it still fails, try again when connected."
 msgstr "Envía el borrador y los adjuntos, termina la llamada o grabación y cierra los formularios que estés editando antes de actualizar. Si sigue fallando, vuelve a intentarlo cuando tengas conexión."
 
-
 msgid "Retrying…"
 msgstr "Reintentando…"
 
@@ -6931,8 +6870,6 @@ msgstr "Abrir proyecto"
 #: src/components/LocalProject.tsx
 msgid "Enter a local preview URL."
 msgstr "Introduce la URL de una vista previa local."
-
-
 
 #: src/components/SidebarContribution.tsx
 msgid "Contribute compute"
@@ -6995,25 +6932,20 @@ msgstr "Descargar Mycellios Desktop"
 msgid "Contribute in browser"
 msgstr "Contribuir desde el navegador"
 
-
 msgid "Credits"
 msgstr "Créditos"
 
 msgid "Adding 10 USD gives you 10 credits. Spore is a separate token."
 msgstr "Al añadir 10 USD recibes 10 créditos. Spore es un token independiente."
 
-
 msgid "Credits are your internal Mycellios balance. Adding 10 USD gives you 10 credits. Spore is a separate token."
 msgstr "Los créditos son tu saldo interno de Mycellios. Al añadir 10 USD recibes 10 créditos. Spore es un token independiente."
-
 
 msgid "Sign in again to see your credits."
 msgstr "Vuelve a iniciar sesión para ver tus créditos."
 
-
 msgid "Last verified balance. Retrying automatically."
 msgstr "Último saldo verificado. Se volverá a consultar automáticamente."
-
 
 msgid "Balance temporarily unavailable. Retrying automatically."
 msgstr "Saldo no disponible temporalmente. Se volverá a consultar automáticamente."
@@ -7054,30 +6986,23 @@ msgstr "Vincular proyecto en este equipo"
 msgid "This project does not provide a Desktop development runner."
 msgstr "Este proyecto no incluye un script de desarrollo para Desktop."
 
-
 msgid "Connected with your account"
 msgstr "Conectado con tu cuenta"
-
 
 msgid "Could not connect Mycellios. Try again. No credits were spent."
 msgstr "No se ha podido conectar Mycellios. Vuelve a intentarlo. No se han gastado créditos."
 
-
 msgid "Use your credits on the Mycellios network. Choose a model above. No API key needed."
 msgstr "Usa tus créditos en la red Mycellios. Elige un modelo arriba. No necesitas una clave de API."
-
 
 msgid "Retry connection"
 msgstr "Reintentar conexión"
 
-
 msgid "Sign in with Mycellios to use your credits."
 msgstr "Inicia sesión con Mycellios para usar tus créditos."
 
-
 msgid "Update Desktop to link the agent and development window to the same project."
 msgstr "Actualiza Desktop para vincular el agente y la ventana de desarrollo al mismo proyecto."
-
 
 msgid "Preparing development…"
 msgstr "Preparando desarrollo…"
@@ -7090,7 +7015,6 @@ msgstr "El primer inicio prepara el código y descarga las herramientas de desar
 
 msgid "Could not prepare development. Check the connection and try again when the agent is idle."
 msgstr "No se pudo preparar desarrollo. Comprueba la conexión e inténtalo cuando el agente esté inactivo."
-
 
 msgid "Browser"
 msgstr "Navegador"
@@ -7188,63 +7112,47 @@ msgstr "No necesitas descargar nada de una tienda. Los Micos que trabajan en tu 
 msgid "About this update"
 msgstr "Sobre esta actualización"
 
-
 msgid "Download progress"
 msgstr "Progreso de descarga"
-
-
 
 msgid "Run project"
 msgstr "Ejecutar proyecto"
 
-
 msgid "Stop project"
 msgstr "Detener proyecto"
-
 
 msgid "Run profile"
 msgstr "Perfil de ejecución"
 
-
 msgid "Service logs"
 msgstr "Registros de servicios"
-
 
 msgid "Preparing…"
 msgstr "Preparando…"
 
-
 msgid "Run"
 msgstr "Ejecutar"
-
 
 msgid "Preparing configuration"
 msgstr "Preparando configuración"
 
-
 msgid "Could not run the project."
 msgstr "No se pudo ejecutar el proyecto."
-
 
 msgid "Could not stop the project."
 msgstr "No se pudo detener el proyecto."
 
-
 msgid "No service output yet."
 msgstr "Todavía no hay salida de los servicios."
-
 
 msgid "Open the project's agent chat first."
 msgstr "Abre primero el chat del agente del proyecto."
 
-
 msgid "The active chat changed."
 msgstr "El chat activo ha cambiado."
 
-
 msgid "Stopped"
 msgstr "Detenido"
-
 
 msgid "Configuration was not prepared. Open the details to see the result."
 msgstr "No se ha preparado la configuración. Abre los detalles para ver el resultado."
@@ -7460,7 +7368,6 @@ msgstr "Historial de versiones"
 msgid "Version saved for this agent"
 msgstr "Versión guardada para este agente"
 
-
 msgid "Sign in again to prepare this agent. Your message has been kept."
 msgstr "Vuelve a iniciar sesión para preparar este agente. Tu mensaje se ha conservado."
 
@@ -7479,10 +7386,8 @@ msgstr "El estado de la tarea ha cambiado. El chat se ha actualizado."
 msgid "This task cannot be retried. Continue in the chat."
 msgstr "Esta tarea no se puede reintentar. Continúa en el chat."
 
-
 msgid "Wait for the current task to finish before retrying."
 msgstr "Espera a que termine la tarea actual antes de reintentar."
-
 
 msgid "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
 msgstr "Esta petición se interrumpió después de producir resultados o acciones. Envía un nuevo mensaje para continuar; reintentarla podría repetir acciones."
@@ -7832,146 +7737,110 @@ msgstr "La app de escritorio puede preparar modelos locales desde el panel de vo
 msgid "Select a Mico chat to start a voice conversation. You can manage voice services below."
 msgstr "Selecciona el chat de un Mico para iniciar una conversación por voz. Abajo puedes gestionar los servicios de voz."
 
-
 msgid "New activity in Mycellios."
 msgstr "Nueva actividad en Mycellios."
-
 
 msgid "Workflows"
 msgstr "Workflows"
 
-
 msgid "Simultaneous tasks"
 msgstr "Tareas simultáneas"
-
 
 msgid "This runtime currently runs one task at a time."
 msgstr "Este motor ejecuta una tarea a la vez."
 
-
 msgid "Computer operations remain exclusive. Changing the limit does not stop active work."
 msgstr "Cada ordenador realiza una tarea a la vez. Cambiar el límite no detiene el trabajo en curso."
-
 
 msgid "No active work in this conversation. Earlier work remains in Activity."
 msgstr "No hay trabajo activo en esta conversación. Puedes consultar el anterior en Actividad."
 
-
 msgid "Recent delegated work"
 msgstr "Trabajo delegado reciente"
-
 
 msgid "Delegated task failed"
 msgstr "Ha fallado una tarea delegada"
 
-
 msgid "Open Mycellios to review the task."
 msgstr "Abre Mycellios para revisar la tarea."
-
 
 msgid "Could not load workflows"
 msgstr "No se pudieron cargar los workflows"
 
-
 msgid "Could not load executions"
 msgstr "No se pudieron cargar las ejecuciones"
-
 
 msgid "Save or discard your changes first."
 msgstr "Guarda o descarta los cambios primero."
 
-
 msgid "Could not save workflow"
 msgstr "No se pudo guardar el workflow"
-
 
 msgid "Could not start workflow"
 msgstr "No se pudo iniciar el workflow"
 
-
 msgid "Could not stop workflow"
 msgstr "No se pudo detener el workflow"
-
 
 msgid "Could not archive workflow"
 msgstr "No se pudo archivar el workflow"
 
-
 msgid "Workflow"
 msgstr "Workflow"
-
 
 msgid "New workflow"
 msgstr "Nuevo workflow"
 
-
 msgid "Workflow name"
 msgstr "Nombre del workflow"
-
 
 msgid "Archive workflow"
 msgstr "Archivar workflow"
 
-
 msgid "Workflow canvas"
 msgstr "Lienzo del workflow"
-
 
 msgid "Executions"
 msgstr "Ejecuciones"
 
-
 msgid "Step title"
 msgstr "Título del paso"
-
 
 msgid "Instruction or text"
 msgstr "Instrucción o texto"
 
-
 msgid "Edit step"
 msgstr "Editar paso"
-
 
 msgid "Compare with"
 msgstr "Comparar con"
 
-
 msgid "Connect to step"
 msgstr "Conectar con un paso"
-
 
 msgid "Remove step"
 msgstr "Eliminar paso"
 
-
 msgid "Scheduled execution"
 msgstr "Ejecución programada"
-
 
 msgid "Schedule disabled"
 msgstr "Programación desactivada"
 
-
 msgid "Schedule enabled"
 msgstr "Programación activada"
-
 
 msgid "Uses the selected Mico's existing model and permissions. Inputs from earlier steps are data, not new authorization."
 msgstr "Usa el modelo y los permisos del Mico seleccionado. Los resultados anteriores son datos, no una autorización nueva."
 
-
 msgid "Waiting for subtasks"
 msgstr "Esperando subtareas"
-
 
 msgid "Cancel task"
 msgstr "Cancelar tarea"
 
-
 msgid "Reassign task"
 msgstr "Reasignar tarea"
-
 
 msgid "The work changed or could not be updated. Refresh its status and try again."
 msgstr "El trabajo ha cambiado o no se pudo actualizar. Actualiza el estado e inténtalo de nuevo."
@@ -7981,3 +7850,1237 @@ msgstr "Cancelar actualización"
 
 msgid "Waiting for local tasks and unsaved work…"
 msgstr "Esperando a que terminen las tareas y se guarden los cambios…"
+
+#. placeholder {label}: navigation section
+#: src/pages/shell/workspace-rail.tsx
+msgid "Pin {label}"
+msgstr "Fijar {label}"
+
+msgid "Use AI for free by contributing"
+msgstr "Usa IA gratis contribuyendo"
+
+msgid "Add to message"
+msgstr "Añadir al mensaje"
+
+msgid "Attach image"
+msgstr "Adjuntar imagen"
+
+msgid "Use a skill"
+msgstr "Usar una habilidad"
+
+msgid "Add context"
+msgstr "Añadir contexto"
+
+msgid "Ask aside"
+msgstr "Pregunta aparte"
+
+msgid "Ask about this chat without interrupting its task. Answers stay here and use your configured model."
+msgstr "Pregunta sobre este chat sin interrumpir su tarea. Las respuestas quedan aquí y usan tu modelo configurado."
+
+msgid "This server does not support side questions yet."
+msgstr "Este servidor todavía no permite preguntas aparte."
+
+msgid "The answer could not be confirmed. Your question is kept; it has not been resent."
+msgstr "No se ha podido confirmar la respuesta. Tu pregunta se conserva y no se ha reenviado."
+
+msgid "Side question"
+msgstr "Pregunta aparte"
+
+msgid "What would you like to know?"
+msgstr "¿Qué quieres saber?"
+
+msgid "Answering…"
+msgstr "Respondiendo…"
+
+msgid "Choose a skill"
+msgstr "Elige una habilidad"
+
+msgid "Close skills"
+msgstr "Cerrar habilidades"
+
+msgid "No skills available for this Mico. Add them in chat settings."
+msgstr "Este Mico no tiene habilidades disponibles. Añádelas en los ajustes del chat."
+
+msgid "Mycellios community"
+msgstr "Comunidad de Mycellios"
+
+msgid "Make yourself at home."
+msgstr "Toma asiento."
+
+msgid "Dismiss community invitation"
+msgstr "Ocultar invitación a la comunidad"
+
+msgid "Share ideas and follow Mycellios on Discord and X."
+msgstr "Comparte ideas y sigue las novedades de Mycellios en Discord y X."
+
+msgid "Open Discord"
+msgstr "Abrir Discord"
+
+msgid "Follow Mycellios on X"
+msgstr "Seguir a Mycellios en X"
+
+msgid "Contribution is optional. Review this computer’s existing contribution setup in the dashboard."
+msgstr "La contribución es opcional. Revisa la configuración existente de este equipo en el panel."
+
+msgid "Configure contribution"
+msgstr "Configurar contribución"
+
+msgid "Contribution is optional. Share this computer’s resources to earn credits for verified work."
+msgstr "La contribución es opcional. Comparte recursos de tu equipo para recibir créditos por trabajo verificado."
+
+msgid "The contribution installation needs attention. Review the existing setup in the dashboard."
+msgstr "La instalación de contribución necesita revisión. Comprueba su configuración en el panel."
+
+msgid "Help run AI on Mycellios using your computer’s processing power. Earn credits for verified work."
+msgstr "Ayuda a ejecutar IA en Mycellios con la capacidad de cálculo de tu equipo. Recibe créditos por trabajo verificado."
+
+msgid "How does it work?"
+msgstr "¿Cómo funciona?"
+
+msgid "No install. Keep the contribution tab open."
+msgstr "Sin instalar. Mantén abierta la pestaña de contribución."
+
+msgid "Running tests…"
+msgstr "Ejecutando pruebas…"
+
+msgid "Reviewing changes…"
+msgstr "Revisando cambios…"
+
+msgid "Editing files…"
+msgstr "Editando archivos…"
+
+msgid "Reviewing files…"
+msgstr "Revisando archivos…"
+
+msgid "Searching the web…"
+msgstr "Buscando en la web…"
+
+msgid "Working on the server…"
+msgstr "Trabajando en el servidor…"
+
+msgid "Preparing an image…"
+msgstr "Preparando una imagen…"
+
+msgid "Managing a routine…"
+msgstr "Gestionando una rutina…"
+
+msgid "Coordinating with another agent…"
+msgstr "Coordinando con otro agente…"
+
+msgid "Building the project…"
+msgstr "Compilando el proyecto…"
+
+msgid "Using a tool…"
+msgstr "Usando una herramienta…"
+
+msgid "Show task activity"
+msgstr "Ver actividad de la tarea"
+
+msgid "Task activity"
+msgstr "Actividad de la tarea"
+
+msgid "No steps reported yet."
+msgstr "Todavía no se han comunicado pasos."
+
+msgid "Running a command…"
+msgstr "Ejecutando un comando…"
+
+msgid "Execution model"
+msgstr "Modelo de la ejecución"
+
+msgid "Model provider"
+msgstr "Proveedor del modelo"
+
+msgid "Not reported yet"
+msgstr "Todavía no comunicado"
+
+msgid "Previous models observed in this view"
+msgstr "Modelos anteriores observados en esta vista"
+
+msgid "Duration"
+msgstr "Duración"
+
+msgid "Searching conversation history…"
+msgstr "Buscando en el historial de conversaciones…"
+
+msgid "Waiting for an activity update…"
+msgstr "Esperando novedades de la ejecución…"
+
+msgid "Waiting for result"
+msgstr "Esperando resultado"
+
+msgid "Reported an error"
+msgstr "Ha informado de un error"
+
+msgid "Waiting for input"
+msgstr "Esperando respuesta"
+
+msgid "Command output was not provided by the executor."
+msgstr "El ejecutor no ha comunicado la salida del comando."
+
+msgid "Only tool summaries are available for earlier activity; individual results were not reported to this view."
+msgstr "De la actividad anterior solo hay resúmenes; esta vista no recibió sus resultados individuales."
+
+msgid "No new activity for {0}. This does not confirm a failure; the executor has not reported a new step."
+msgstr "Sin actividad nueva desde hace {0}. Esto no confirma un fallo; el ejecutor no ha comunicado otro paso."
+
+msgid "Receiving activity · task status not confirmed"
+msgstr "Recibiendo actividad · estado de la tarea sin confirmar"
+
+msgid "Waiting for execution metadata. Reported activity does not confirm success or failure."
+msgstr "Esperando los datos de la ejecución. La actividad recibida no confirma éxito ni fallo."
+
+msgid "Conversation history search"
+msgstr "Búsqueda en el historial de conversaciones"
+
+msgid "Tests"
+msgstr "Pruebas"
+
+msgid "Files"
+msgstr "Archivos"
+
+msgid "A tool reported an error"
+msgstr "Una herramienta ha informado de un error"
+
+msgid "A tool is waiting for input"
+msgstr "Una herramienta espera tu respuesta"
+
+msgid "Tool finished · waiting for an update"
+msgstr "Herramienta finalizada · esperando novedades"
+
+msgid "Working · last action finished"
+msgstr "Trabajando · última acción terminada"
+
+msgid "Total"
+msgstr "Total"
+
+msgid "Command time"
+msgstr "Tiempo del comando"
+
+msgid "Tool call"
+msgstr "Llamada de herramienta"
+
+msgid "Working directory"
+msgstr "Carpeta de trabajo"
+
+msgid "Exit code"
+msgstr "Código de salida"
+
+msgid "No output yet."
+msgstr "Todavía no hay salida."
+
+msgid "The command produced no text output."
+msgstr "El comando no produjo salida de texto."
+
+msgid "Only tool-call metadata is available; the command result has not been received."
+msgstr "Solo hay datos de la llamada; todavía no se ha recibido el resultado del comando."
+
+msgid "Total time also includes the time between actions."
+msgstr "El tiempo total también incluye las esperas entre acciones."
+
+msgid "Tool returned"
+msgstr "Llamada finalizada"
+
+msgid "Command duration unavailable: its start was not observed."
+msgstr "Duración del comando no disponible: no se registró su inicio."
+
+msgid "Showing the last 12000 characters of output."
+msgstr "Se muestran los últimos 12000 caracteres de la salida."
+
+msgid "Close voice"
+msgstr "Cerrar voz"
+
+msgid "Preparing local voice…"
+msgstr "Preparando voz local…"
+
+msgid "Speak now"
+msgstr "Habla ahora"
+
+msgid "Voice stopped. Your messages are kept. Retry when ready."
+msgstr "La voz se ha detenido. Tus mensajes se conservan. Puedes volver a iniciar."
+
+msgid "Prepare local voice"
+msgstr "Preparar voz local"
+
+msgid "Start talking"
+msgstr "Empezar a hablar"
+
+msgid "Playback speed"
+msgstr "Velocidad de reproducción"
+
+msgid "Mute microphone"
+msgstr "Silenciar micrófono"
+
+msgid "Interrupt reply"
+msgstr "Interrumpir respuesta"
+
+msgid "End voice conversation"
+msgstr "Terminar conversación por voz"
+
+msgid "Connect a transcription provider in Voice settings, or use local voice in Desktop."
+msgstr "Conecta un proveedor de transcripción en los ajustes de voz o usa la voz local en Desktop."
+
+msgid "Enter the requested secret on screen, then restart voice."
+msgstr "Introduce el dato confidencial en pantalla y después vuelve a iniciar la voz."
+
+msgid "Open files"
+msgstr "Abrir archivos"
+
+msgid "Chat tools"
+msgstr "Herramientas del chat"
+
+msgid "Help"
+msgstr "Ayuda"
+
+msgid "Space settings"
+msgstr "Ajustes del espacio"
+
+msgid "Connections"
+msgstr "Conexiones"
+
+msgid "Manage models"
+msgstr "Gestionar modelos"
+
+msgid "Switch workspace"
+msgstr "Cambiar de espacio"
+
+msgid "Workspace navigation"
+msgstr "Navegación del espacio"
+
+msgid "Agent settings"
+msgstr "Ajustes del Mico"
+
+msgid "Close tools"
+msgstr "Cerrar herramientas"
+
+msgid "Routine details"
+msgstr "Detalles de la rutina"
+
+msgid "Next run"
+msgstr "Próxima ejecución"
+
+msgid "Select to see execution"
+msgstr "Selecciona para ver la ejecución"
+
+msgid "Ask the agent to edit this routine"
+msgstr "Pedir al Mico que edite esta rutina"
+
+msgid "Zoom out"
+msgstr "Alejar"
+
+msgid "General model"
+msgstr "Modelo general"
+
+msgid "Back to chat"
+msgstr "Volver al chat"
+
+msgid "Resume routine"
+msgstr "Reanudar rutina"
+
+msgid "Routine diagram"
+msgstr "Diagrama de rutinas"
+
+msgid "Select routine"
+msgstr "Seleccionar rutina"
+
+msgid "Zoom in"
+msgstr "Acercar"
+
+msgid "Fit diagram"
+msgstr "Ajustar diagrama"
+
+msgid "I want to edit the routine “{0}”. Changes: "
+msgstr "Quiero editar la rutina «{0}». Cambios: "
+
+msgid "Pause routine"
+msgstr "Pausar rutina"
+
+msgid "No routines yet"
+msgstr "Todavía no hay rutinas"
+
+msgid "Routines unavailable"
+msgstr "Rutinas no disponibles"
+
+msgid "Last execution"
+msgstr "Última ejecución"
+
+msgid "Started by"
+msgstr "Iniciada por"
+
+msgid "One-time schedule"
+msgstr "Programación de una sola vez"
+
+msgid "Status unavailable"
+msgstr "Estado no disponible"
+
+msgid "Untitled workflow"
+msgstr "Flujo de trabajo sin título"
+
+msgid "Start with a trigger"
+msgstr "Empieza con un activador"
+
+msgid "Canvas tools"
+msgstr "Herramientas del lienzo"
+
+msgid "Add node"
+msgstr "Añadir nodo"
+
+msgid "Trigger"
+msgstr "Activador"
+
+msgid "Result"
+msgstr "Resultado"
+
+msgid "Note"
+msgstr "Nota"
+
+msgid "Text"
+msgstr "Texto"
+
+msgid "Drawing"
+msgstr "Dibujo"
+
+msgid "A workflow can have up to 60 items."
+msgstr "Un flujo puede tener hasta 60 elementos."
+
+msgid "Choose an instruction, Mico or result as the destination."
+msgstr "Elige unas instrucciones, un Mico o un resultado como destino."
+
+msgid "Connections cannot form a cycle."
+msgstr "Las conexiones no pueden formar un ciclo."
+
+msgid "Select connection"
+msgstr "Seleccionar conexión"
+
+msgid "Connect input"
+msgstr "Conectar entrada"
+
+msgid "Choose an output first, then this input"
+msgstr "Elige primero una salida y después esta entrada"
+
+msgid "Choose a Mico"
+msgstr "Elige un Mico"
+
+msgid "Manual trigger"
+msgstr "Activador manual"
+
+msgid "Connect output"
+msgstr "Conectar salida"
+
+msgid "Connect to another step"
+msgstr "Conectar a otro paso"
+
+msgid "Select the input of the next step"
+msgstr "Selecciona la entrada del siguiente paso"
+
+msgid "Cancel connection"
+msgstr "Cancelar conexión"
+
+msgid "Find a node"
+msgstr "Buscar un nodo"
+
+msgid "Find a node…"
+msgstr "Buscar un nodo…"
+
+msgid "Close search"
+msgstr "Cerrar búsqueda"
+
+msgid "Toggle minimap"
+msgstr "Mostrar minimapa"
+
+msgid "Fit diagram using minimap"
+msgstr "Ajustar diagrama desde el minimapa"
+
+msgid "Pan canvas"
+msgstr "Mover lienzo"
+
+msgid "Draw"
+msgstr "Dibujar"
+
+msgid "Add note"
+msgstr "Añadir nota"
+
+msgid "Add shape"
+msgstr "Añadir forma"
+
+msgid "Add text"
+msgstr "Añadir texto"
+
+msgid "Find node"
+msgstr "Buscar nodo"
+
+msgid "Node details"
+msgstr "Detalles del nodo"
+
+msgid "Close details"
+msgstr "Cerrar detalles"
+
+msgid "Activation"
+msgstr "Activación"
+
+msgid "Cron schedule"
+msgstr "Horario cron"
+
+msgid "For example: 0 9 * * 1-5 runs at 09:00, Monday to Friday. Activate the schedule in the header."
+msgstr "Por ejemplo: 0 9 * * 1-5 se ejecuta a las 09:00 de lunes a viernes. Activa el horario en la cabecera."
+
+msgid "Uses this Mico’s model, tools and permissions."
+msgstr "Usa el modelo, las herramientas y los permisos de este Mico."
+
+msgid "Connect to"
+msgstr "Conectar con"
+
+msgid "Choose a step"
+msgstr "Elige un paso"
+
+msgid "Redo"
+msgstr "Rehacer"
+
+msgid "Export workflow"
+msgstr "Exportar flujo"
+
+msgid "Restore server version"
+msgstr "Recuperar versión del servidor"
+
+msgid "Name this workflow…"
+msgstr "Nombre del flujo…"
+
+msgid "Local draft"
+msgstr "Borrador local"
+
+msgid "Save workflow"
+msgstr "Guardar flujo"
+
+msgid "Pause schedule"
+msgstr "Pausar horario"
+
+msgid "Activate schedule"
+msgstr "Activar horario"
+
+msgid "Execution history"
+msgstr "Historial de ejecución"
+
+msgid "This server needs the workflows update. You can edit and export a local draft."
+msgstr "Este servidor necesita la actualización de flujos. Puedes editar y exportar un borrador local."
+
+msgid "Execution status unavailable. Running is disabled until the connection returns."
+msgstr "No se puede comprobar el estado. Podrás ejecutar cuando se restablezca la conexión."
+
+msgid "Next execution"
+msgstr "Próxima ejecución"
+
+msgid "Navigate using minimap"
+msgstr "Navegar desde el minimapa"
+
+msgid "Tasks"
+msgstr "Tareas"
+
+msgid "Delegate the work."
+msgstr "Delega el trabajo."
+
+msgid "Come back and find an"
+msgstr "Vuelve y encuentra una"
+
+msgid "answer"
+msgstr "respuesta"
+
+msgid "Your agents work on tasks in parallel."
+msgstr "Tus agentes trabajan en tareas en paralelo."
+
+msgid "Every answer is waiting here."
+msgstr "Cada respuesta te espera aquí."
+
+msgid "What would you like done?"
+msgstr "¿Qué quieres que se haga?"
+
+msgid "Working"
+msgstr "Trabajando"
+
+msgid "Summarize the open hiring processes for the support position"
+msgstr "Resume los procesos de selección abiertos para el puesto de responsable de soporte"
+
+msgid "Reviewing applications"
+msgstr "Revisando candidaturas"
+
+msgid "Find recent papers about document retrieval"
+msgstr "Busca artículos recientes sobre recuperación en documentos"
+
+msgid "Searching arxiv.org"
+msgstr "Buscando en arxiv.org"
+
+msgid "Prepare the call notes with Northwind Traders"
+msgstr "Prepara las notas de la llamada con Northwind Traders"
+
+msgid "Preparing notes"
+msgstr "Preparando notas"
+
+msgid "Plan the next team offsite"
+msgstr "Planifica el próximo encuentro del equipo"
+
+msgid "Comparing options"
+msgstr "Comparando opciones"
+
+msgid "Review this paper and summarize its findings"
+msgstr "Revisa este artículo y resume sus conclusiones"
+
+msgid "Reading the paper"
+msgstr "Leyendo el artículo"
+
+msgid "Organize the contacts from the last meeting"
+msgstr "Organiza los contactos de la última reunión"
+
+msgid "Organizing contacts"
+msgstr "Organizando contactos"
+
+msgid "Assign task to Mico"
+msgstr "Asignar tarea a Mico"
+
+msgid "Dictate task"
+msgstr "Dictar tarea"
+
+msgid "Finish dictation"
+msgstr "Terminar dictado"
+
+msgid "Send task"
+msgstr "Enviar tarea"
+
+msgid "Task conversation"
+msgstr "Conversación de la tarea"
+
+msgid "Back to tasks"
+msgstr "Volver a tareas"
+
+msgid "Stop task"
+msgstr "Detener tarea"
+
+msgid "Restore task"
+msgstr "Restaurar tarea"
+
+msgid "Archive task"
+msgstr "Archivar tarea"
+
+msgid "Open task in chat"
+msgstr "Abrir tarea en el chat"
+
+msgid "Close task"
+msgstr "Cerrar tarea"
+
+msgid "Needs your answer"
+msgstr "Necesita tu respuesta"
+
+msgid "Reconnect this Mico’s model in Settings"
+msgstr "Reconecta el modelo de este Mico en Ajustes"
+
+msgid "New answers"
+msgstr "Respuestas nuevas"
+
+msgid "Read"
+msgstr "Leídas"
+
+msgid "Find tasks"
+msgstr "Buscar tareas"
+
+msgid "Find tasks…"
+msgstr "Buscar tareas…"
+
+msgid "Hide Micos"
+msgstr "Ocultar Micos"
+
+msgid "Show Micos"
+msgstr "Mostrar Micos"
+
+msgid "Confirm task"
+msgstr "Confirmar tarea"
+
+msgid "Task assigned"
+msgstr "Tarea asignada"
+
+msgid "This server needs the Tasks update. Your draft stays in this browser."
+msgstr "Este servidor necesita la actualización de Tareas. Tu borrador se guarda en este navegador."
+
+msgid "Loading tasks…"
+msgstr "Cargando tareas…"
+
+msgid "Show all archived tasks"
+msgstr "Ver todas las tareas archivadas"
+
+msgid "Remove the attachments before changing Mico."
+msgstr "Quita los adjuntos antes de cambiar de Mico."
+
+msgid "You can attach up to 10 files."
+msgstr "Puedes adjuntar hasta 10 archivos."
+
+msgid "This file is too large."
+msgstr "Este archivo es demasiado grande."
+
+msgid "Could not prepare local voice. Try again."
+msgstr "No se ha podido preparar la voz local. Reinténtalo."
+
+msgid "Prepare voice on this device without an API key."
+msgstr "Prepara la voz en este equipo sin una API key."
+
+msgid "Could not load tasks"
+msgstr "No se han podido cargar las tareas"
+
+msgid "Load older messages"
+msgstr "Cargar mensajes anteriores"
+
+msgid "Schedule"
+msgstr "Programación"
+
+msgid "Day"
+msgstr "Día"
+
+msgid "Week"
+msgstr "Semana"
+
+msgid "Month"
+msgstr "Mes"
+
+msgid "Times in {zone}"
+msgstr "Horas en {zone}"
+
+msgid "Previous day"
+msgstr "Día anterior"
+
+msgid "Previous week"
+msgstr "Semana anterior"
+
+msgid "Previous month"
+msgstr "Mes anterior"
+
+msgid "Next day"
+msgstr "Día siguiente"
+
+msgid "Next week"
+msgstr "Semana siguiente"
+
+msgid "Next month"
+msgstr "Mes siguiente"
+
+msgid "Calendar view"
+msgstr "Vista del calendario"
+
+msgid "Upcoming runs"
+msgstr "Próximas ejecuciones"
+
+msgid "No upcoming runs."
+msgstr "No hay ejecuciones próximas."
+
+msgid "No runs on this day."
+msgstr "No hay ejecuciones este día."
+
+msgid "Loading schedule…"
+msgstr "Cargando programación…"
+
+msgid "Could not load the schedule."
+msgstr "No se ha podido cargar la programación."
+
+msgid "Some occurrences could not be displayed. Choose a smaller range or review the routines."
+msgstr "No se han podido mostrar todas las ejecuciones. Elige un periodo más corto o revisa las rutinas."
+
+msgid "Give your Micos a schedule."
+msgstr "Dales una programación a tus Micos."
+
+msgid "Create a routine to see its upcoming runs here."
+msgstr "Crea una rutina para ver aquí sus próximas ejecuciones."
+
+msgid "Open Mico {0}"
+msgstr "Abrir Mico {0}"
+
+msgid "+{0} more"
+msgstr "+{0} más"
+
+msgid "Clocks change on {0}. Times follow {zone}."
+msgstr "El {0} cambia la hora. Los horarios siguen la zona {zone}."
+
+msgid "Scheduled"
+msgstr "Programada"
+
+msgid "Included Micos"
+msgstr "Micos incluidos"
+
+msgid "Deleted Mico"
+msgstr "Mico eliminado"
+
+msgid "Usage metric"
+msgstr "Métrica de uso"
+
+msgid "Usage period"
+msgstr "Periodo de uso"
+
+msgid "1 year"
+msgstr "1 año"
+
+msgid "{days} days"
+msgstr "{days} días"
+
+msgid "Refresh usage"
+msgstr "Actualizar datos de uso"
+
+msgid "Could not load usage data."
+msgstr "No se han podido cargar los datos de uso."
+
+msgid "Loading usage data…"
+msgstr "Cargando datos de uso…"
+
+msgid "No usage was recorded in this period."
+msgstr "No se registró uso en este periodo."
+
+msgid "Partial data: {0} unpriced calls, {1} incomplete token records, {2} runs without usage."
+msgstr "Datos parciales: {0} llamadas sin precio, {1} registros con tokens incompletos y {2} ejecuciones sin datos de uso."
+
+msgid "Some costs are still pending."
+msgstr "Algunos costes siguen pendientes."
+
+msgid "Usage summary"
+msgstr "Resumen de uso"
+
+msgid "1 session"
+msgstr "1 sesión"
+
+msgid "{0} sessions"
+msgstr "{0} sesiones"
+
+msgid "Known tokens excluding cache reads"
+msgstr "Tokens conocidos sin lecturas de caché"
+
+msgid "API estimate · USD"
+msgstr "Estimación de API · USD"
+
+msgid "Recorded and estimated cost · USD"
+msgstr "Coste registrado y estimado · USD"
+
+msgid "Recorded cost · USD"
+msgstr "Coste registrado · USD"
+
+msgid "{0} of known cost"
+msgstr "{0} del coste conocido"
+
+msgid "{0} of known tokens"
+msgstr "{0} de los tokens conocidos"
+
+msgid "{0} tokens"
+msgstr "{0} tokens"
+
+msgid "Daily trend"
+msgstr "Tendencia diaria"
+
+msgid "Daily cost"
+msgstr "Coste diario"
+
+msgid "Daily tokens"
+msgstr "Tokens diarios"
+
+msgid "View daily data"
+msgstr "Ver datos diarios"
+
+msgid "Totals"
+msgstr "Totales"
+
+msgid "Tokens excluding cache reads"
+msgstr "Tokens sin lecturas de caché"
+
+msgid "Tokens processed including cache reads"
+msgstr "Tokens procesados con lecturas de caché"
+
+msgid "Cached input"
+msgstr "Entrada en caché"
+
+msgid "Uncached input"
+msgstr "Entrada sin caché"
+
+msgid "Cache creation"
+msgstr "Creación de caché"
+
+msgid "User messages"
+msgstr "Mensajes del usuario"
+
+msgid "Assistant messages"
+msgstr "Mensajes del asistente"
+
+msgid "Usage breakdown"
+msgstr "Desglose de uso"
+
+msgid "Breakdown"
+msgstr "Desglose"
+
+msgid "Daily usage data"
+msgstr "Datos de uso diarios"
+
+msgid "Usage by model"
+msgstr "Uso por modelo"
+
+msgid "Share"
+msgstr "Proporción"
+
+msgid "Unknown model"
+msgstr "Modelo desconocido"
+
+msgid "Collection started {0} · Updated {1}"
+msgstr "Recopilación iniciada {0} · Actualizado {1}"
+
+msgid "Updated {0}"
+msgstr "Actualizado {0}"
+
+msgid "About these figures"
+msgstr "Acerca de estos datos"
+
+msgid "Confirmed charges"
+msgstr "Cargos confirmados"
+
+msgid "API estimates"
+msgstr "Estimaciones de API"
+
+msgid "{0} calls have no stored conversation link. Session counts may be incomplete."
+msgstr "Hay {0} llamadas sin una conversación conservada. El número de sesiones puede estar incompleto."
+
+msgid "Each model call is counted once. Recorded charges and API estimates are separate from your credit balance and subscriptions. Unknown prices and incomplete token counts stay unavailable; shares use known amounts only. Gas, tools and other external services are excluded."
+msgstr "Cada llamada al modelo se cuenta una sola vez. Los cargos registrados y las estimaciones de API son independientes de tu saldo de créditos y suscripciones. Los precios desconocidos y los tokens incompletos figuran como no disponibles; las proporciones usan solo importes conocidos. No incluye gas, herramientas ni otros servicios externos."
+
+msgid "Tokens exclude cache reads. Processed tokens include them. Cache creation includes its one-hour subset once, and reasoning tokens are already part of output. Sessions count distinct stored conversations; deleted run links can make that count incomplete."
+msgstr "Los tokens excluyen las lecturas de caché; los tokens procesados las incluyen. La creación de caché incluye una sola vez su parte de una hora, y los tokens de razonamiento ya forman parte de la salida. Las sesiones cuentan conversaciones distintas conservadas; los enlaces eliminados pueden dejar este recuento incompleto."
+
+msgid "Daily records follow the time zone shown here. Missing model usage leaves gaps in the chart instead of a zero."
+msgstr "Los registros diarios siguen la zona horaria indicada. Cuando faltan datos de uso, el gráfico muestra un hueco en lugar de un cero."
+
+msgid "Usage preferences"
+msgstr "Preferencias de uso"
+
+msgid "Inspect chart day"
+msgstr "Explorar día del gráfico"
+
+msgid "Daily cost in USD by provider"
+msgstr "Coste diario en USD por proveedor"
+
+msgid "Daily tokens excluding cache reads by provider"
+msgstr "Tokens diarios sin lecturas de caché por proveedor"
+
+msgid "Use the arrow keys to inspect days, or open the daily data table."
+msgstr "Usa las flechas para explorar los días o abre la tabla de datos diarios."
+
+msgid "Cost · USD"
+msgstr "Coste · USD"
+
+msgid "Unknown Mico"
+msgstr "Mico desconocido"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Connect the tools and services your Micos work with."
+msgstr "Conecta las herramientas y los servicios con los que trabajan tus Micos."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Add custom"
+msgstr "Añadir personalizada"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Programming"
+msgstr "Programación"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Design"
+msgstr "Diseño"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Data and analytics"
+msgstr "Datos y análisis"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Documents"
+msgstr "Documentos"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Productivity"
+msgstr "Productividad"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Other apps"
+msgstr "Otras apps"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Marketplace sections"
+msgstr "Secciones del Marketplace"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Instructions that teach a Mico a task or a tool."
+msgstr "Instrucciones que enseñan a un Mico una tarea o una herramienta."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Skill source"
+msgstr "Origen de las habilidades"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Mico source"
+msgstr "Origen de los Micos"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Catalog"
+msgstr "Catálogo"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Search skills"
+msgstr "Buscar habilidades"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Create skill"
+msgstr "Crear habilidad"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Your skills"
+msgstr "Tus habilidades"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "No skills match this view yet."
+msgstr "Todavía no hay habilidades en esta vista."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Add one below or create your own. Shared skills are available in this Space."
+msgstr "Añade una abajo o crea la tuya. Las habilidades compartidas están disponibles en este espacio."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Skills are shared in this Space. Version pins apply to the selected Mico."
+msgstr "Las habilidades se comparten en este espacio. Las versiones fijadas se aplican al Mico seleccionado."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Open skills in Marketplace"
+msgstr "Abrir habilidades en Marketplace"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Ready-to-use Micos with their own instructions and guides."
+msgstr "Micos listos para usar, con sus propias instrucciones y guías."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Search Micos"
+msgstr "Buscar Micos"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Create Mico"
+msgstr "Crear Mico"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "No Micos match this view."
+msgstr "No hay Micos que coincidan con esta vista."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Featured"
+msgstr "Destacados"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "View all"
+msgstr "Ver todo"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "{0} included guides"
+msgstr "{0} guías incluidas"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "The included guides become this Mico's instructions. Creating it does not start a task or connect an app."
+msgstr "Las guías incluidas se guardan como instrucciones de este Mico. Al crearlo no se inicia ninguna tarea ni se conecta una app."
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Add Mico"
+msgstr "Añadir Mico"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Could not create Mico"
+msgstr "No se pudo crear el Mico"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Could not save pin"
+msgstr "No se pudo guardar el pin"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Pin {0}"
+msgstr "Fijar {0}"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Unpin {0}"
+msgstr "Desfijar {0}"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "All entries"
+msgstr "Todas"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Personal entries"
+msgstr "Personales"
+
+#: src/components/ProviderQuota.tsx
+msgid "Subscription quota"
+msgstr "Cuota de suscripción"
+
+#: src/components/ProviderQuota.tsx
+msgid "Model accounts"
+msgstr "Cuentas de modelos"
+
+#: src/components/ProviderQuota.tsx
+msgid "Quota unavailable"
+msgstr "Cuota no disponible"
+
+#: src/components/ProviderQuota.tsx
+msgid "{0}% remaining"
+msgstr "{0}% disponible"
+
+#: src/components/ProviderQuota.tsx
+msgid "Refresh quota"
+msgstr "Actualizar cuota"
+
+#: src/components/ProviderQuota.tsx
+msgid "Quota settings"
+msgstr "Ajustes de cuota"
+
+#: src/components/ProviderQuota.tsx
+msgid "Refresh automatically"
+msgstr "Actualizar automáticamente"
+
+#: src/components/ProviderQuota.tsx
+msgid "Manage model accounts"
+msgstr "Gestionar cuentas de modelos"
+
+#: src/components/ProviderQuota.tsx
+msgid "View usage and costs"
+msgstr "Ver uso y costes"
+
+#: src/components/ProviderQuota.tsx
+msgid "Quota account"
+msgstr "Cuenta de la cuota"
+
+#: src/components/ProviderQuota.tsx
+msgid "Checking quota…"
+msgstr "Consultando cuota…"
+
+#: src/components/ProviderQuota.tsx
+msgid "Could not refresh quota. Try again."
+msgstr "No se ha podido actualizar la cuota. Vuelve a intentarlo."
+
+#: src/components/ProviderQuota.tsx
+msgid "Connect a model account to see its subscription quota."
+msgstr "Conecta una cuenta de modelos para consultar su cuota."
+
+#: src/components/ProviderQuota.tsx
+msgid "Reconnect this account in model settings."
+msgstr "Vuelve a conectar esta cuenta en los ajustes de modelos."
+
+#: src/components/ProviderQuota.tsx
+msgid "This connection does not report subscription quota."
+msgstr "Esta conexión no comunica una cuota de suscripción."
+
+#: src/components/ProviderQuota.tsx
+msgid "The provider has paused quota checks. Try again later."
+msgstr "El proveedor ha pausado las consultas de cuota. Inténtalo más tarde."
+
+#: src/components/ProviderQuota.tsx
+msgid "Quota is temporarily unavailable."
+msgstr "La cuota no está disponible temporalmente."
+
+#: src/components/ProviderQuota.tsx
+msgid "5 hours"
+msgstr "5 horas"
+
+#: src/components/ProviderQuota.tsx
+msgid "Weekly"
+msgstr "Semanal"
+
+#: src/components/ProviderQuota.tsx
+msgid "Session"
+msgstr "Sesión"
+
+#: src/components/ProviderQuota.tsx
+msgid "Awaiting refresh"
+msgstr "Pendiente de actualizar"
+
+#: src/components/ProviderQuota.tsx
+msgid "Waiting for the provider to report the reset."
+msgstr "Esperando a que el proveedor confirme la renovación."
+
+#: src/components/ProviderQuota.tsx
+msgid "Resets in {relative}"
+msgstr "Se renueva en {relative}"
+
+#: src/components/HelpMenu.tsx
+msgid "Help and resources"
+msgstr "Ayuda y recursos"
+
+#: src/components/HelpMenu.tsx
+msgid "Learn"
+msgstr "Aprender"
+
+#: src/components/HelpMenu.tsx
+msgid "Contact and community"
+msgstr "Contacto y comunidad"
+
+#: src/components/HelpMenu.tsx
+msgid "Quick guides"
+msgstr "Guías rápidas"
+
+#: src/components/HelpMenu.tsx
+msgid "Chats, apps, routines and model accounts"
+msgstr "Chats, apps, rutinas y cuentas de modelos"
+
+#: src/components/HelpMenu.tsx
+msgid "Opens in a new tab"
+msgstr "Se abre en una pestaña nueva"
+
+#: src/components/HelpMenu.tsx
+msgid "Send feedback"
+msgstr "Enviar comentarios"
+
+#: src/components/HelpMenu.tsx
+msgid "Opens your email app"
+msgstr "Se abre tu aplicación de correo"
+
+#: src/components/HelpMenu.tsx
+msgid "Source code"
+msgstr "Código fuente"
+
+#: src/components/HelpMenu.tsx
+msgid "Mycellios repository on GitHub"
+msgstr "Repositorio de Mycellios en GitHub"
+
+#: src/components/HelpMenu.tsx
+msgid "The essentials, without leaving your chat."
+msgstr "Lo esencial, sin salir de tu chat."
+
+#: src/components/HelpMenu.tsx
+msgid "Start a conversation"
+msgstr "Empezar una conversación"
+
+#: src/components/HelpMenu.tsx
+msgid "Choose a Mico from the sidebar, write what you need and send your message. Use a separate chat for each topic so its context stays clear."
+msgstr "Elige un Mico en la barra lateral, escribe lo que necesitas y envía tu mensaje. Usa un chat distinto para cada tema para mantener claro el contexto."
+
+#: src/components/HelpMenu.tsx
+msgid "Connect apps and add skills"
+msgstr "Conectar apps y añadir habilidades"
+
+#: src/components/HelpMenu.tsx
+msgid "Open Marketplace to connect your tools, add a Mico or install a skill. A skill gives your Mico instructions for a task; an app connects it to a service."
+msgstr "Abre Marketplace para conectar tus herramientas, añadir un Mico o instalar una habilidad. Una habilidad le da instrucciones para una tarea; una app lo conecta a un servicio."
+
+#: src/components/HelpMenu.tsx
+msgid "Tasks, routines and scheduling"
+msgstr "Tareas, rutinas y programación"
+
+#: src/components/HelpMenu.tsx
+msgid "Use Tasks to follow delegated work. Routines repeat an action or respond to a trigger; Schedule shows their planned runs and history. Open an item to see its details."
+msgstr "En Tareas puedes seguir el trabajo delegado. Las rutinas repiten una acción o responden a un activador; Programación muestra sus próximas ejecuciones y su historial. Abre un elemento para ver los detalles."
+
+#: src/components/HelpMenu.tsx
+msgid "Models, quota and costs"
+msgstr "Modelos, cuota y costes"
+
+#: src/components/HelpMenu.tsx
+msgid "Open Settings → Models to manage your model accounts. The quota ring shows the allowance reported by a subscription. Usage shows recorded consumption and costs; it is a separate report."
+msgstr "Abre Ajustes → Modelos para gestionar tus cuentas de modelos. El anillo de cuota muestra lo que comunica cada suscripción. Uso muestra el consumo y los costes registrados; es un informe distinto."
+
+#: src/components/HelpMenu.tsx
+msgid "Attachments and voice"
+msgstr "Adjuntos y voz"
+
+#: src/components/HelpMenu.tsx
+msgid "Use the plus button beside your message for attachments and chat tools. Open Voice for a spoken conversation. Voice availability depends on your browser or Desktop app and the configured speech engine."
+msgstr "Usa el botón más junto al mensaje para adjuntar archivos y abrir las herramientas del chat. Abre Voz para conversar hablando. Su disponibilidad depende del navegador o de la app de escritorio y del motor de voz configurado."
+
+#: src/pages/settings/SettingsOverlay.tsx
+msgid "Desktop notifications"
+msgstr "Notificaciones del sistema"

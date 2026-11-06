@@ -640,6 +640,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   reconciler?.start();
 
   const router = createRouter({
+    sideQuestions: { runtime, resolveModel: executor.resolveModel },
     analytics,
     cloudAgent,
     codexCatalog,
