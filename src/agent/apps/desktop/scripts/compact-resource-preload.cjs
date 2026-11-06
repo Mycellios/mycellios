@@ -9,6 +9,10 @@ const rootUrl = pathToFileURL(root + path.sep).href;
 const archiveUrl = pathToFileURL(archive + path.sep).href;
 const missing = new Set(['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND', 'ENOTDIR']);
 let resolvingCounterpart = false;
+let lastResolution = 'bootstrap';
+if(process.env.MYCELLIOS_LOCAL_SERVER_DIAGNOSTICS==='1') {
+  setInterval(()=>console.error(JSON.stringify({compactResolution:lastResolution})),5000).unref();
+}
 
 function counterpart(url) {
   if (url?.startsWith(archiveUrl)) return rootUrl + url.slice(archiveUrl.length);
@@ -18,6 +22,7 @@ function counterpart(url) {
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    lastResolution=specifier.startsWith('data:') ? '[inline module]' : specifier.slice(0,180);
     try { return nextResolve(specifier, context); }
     catch (error) {
       // Preserve exports/conditions errors and modules outside this resource root.

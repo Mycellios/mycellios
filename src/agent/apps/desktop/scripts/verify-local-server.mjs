@@ -100,6 +100,7 @@ Object.assign(env, {
   MEDIA_GENERATION_PROVIDER: "disabled",
   ANALYTICS_PROVIDER: "none",
   LOG_LEVEL: "info",
+  MYCELLIOS_LOCAL_SERVER_DIAGNOSTICS: "1",
 });
 const child = spawn(
   electron,

@@ -98,7 +98,9 @@ jobs:
         run: |
           npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs apps/desktop/scripts/compact-resources.test.mjs
+          node -e "require('electron')"
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs apps/desktop/scripts/compact-resources.test.mjs apps/desktop/scripts/windows-install-fixture.test.mjs
           exit $LASTEXITCODE
       - name: Compile all surfaces from this candidate
         working-directory: src/agent
@@ -153,6 +155,8 @@ jobs:
             ${{ env.DESKTOP_RELEASE_OUT }}/desktop-build.json
             ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/win-unpacked/resources/local-server/compact-resources.json
+            ${{ env.DESKTOP_RELEASE_OUT }}/*.exe
+            src/agent/apps/desktop/local-server/package-lock.json
           if-no-files-found: warn
           retention-days: 7
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
