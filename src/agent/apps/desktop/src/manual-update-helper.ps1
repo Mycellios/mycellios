@@ -50,30 +50,6 @@ try {
   if(!$old.Path.Equals($executable,[StringComparison]::OrdinalIgnoreCase)){throw 'The previous process identity changed'}
   $started=$old.StartTime.ToUniversalTime().ToFileTimeUtc()
   Progress 'waiting-for-app'
-  if($config.legacyShutdown -eq $true){
-   $commit=Get-Content -LiteralPath (Join-Path $job 'commit.json') -Raw -Encoding UTF8|ConvertFrom-Json
-   if($commit.approved -ne $true){throw 'The native install request was not committed'}
-   # Compatibility handoff for installed versions without the integrated helper.
-   # Register only the exact app process, never files or other applications.
-   Add-Type -TypeDefinition @'
-using System; using System.Text; using System.Runtime.InteropServices;
-public static class MycelliosRestartManager {
- [StructLayout(LayoutKind.Sequential)] public struct ProcessIdentity { public uint pid; public System.Runtime.InteropServices.ComTypes.FILETIME started; }
- [DllImport("rstrtmgr.dll",CharSet=CharSet.Unicode)] static extern int RmStartSession(out uint handle,int flags,StringBuilder key);
- [DllImport("rstrtmgr.dll",CharSet=CharSet.Unicode)] static extern int RmRegisterResources(uint handle,uint files,string[] fileNames,uint apps,ProcessIdentity[] processes,uint services,string[] serviceNames);
- [DllImport("rstrtmgr.dll")] static extern int RmShutdown(uint handle,uint flags,IntPtr callback);
- [DllImport("rstrtmgr.dll")] static extern int RmEndSession(uint handle);
- public static int Close(uint pid,long started) {
-  uint handle; int code=RmStartSession(out handle,0,new StringBuilder(33)); if(code!=0)return code;
-  try { var item=new ProcessIdentity {pid=pid,started=new System.Runtime.InteropServices.ComTypes.FILETIME {dwLowDateTime=(int)started,dwHighDateTime=(int)(started>>32)}};
-   code=RmRegisterResources(handle,0,null,1,new[]{item},0,null); return code==0 ? RmShutdown(handle,0,IntPtr.Zero) : code;
-  } finally {RmEndSession(handle);}
- }
-}
-'@
-   $closed=[MycelliosRestartManager]::Close([uint32]$config.oldPid,[long]$started)
-   if($closed -ne 0){throw 'Windows could not close the previous app gracefully; no forced shutdown was attempted'}
-  }
   $deadline=(Get-Date).AddMinutes(5)
   while($true){$current=Get-Process -Id $config.oldPid -ErrorAction SilentlyContinue;if(!$current -or $current.StartTime.ToUniversalTime().ToFileTimeUtc() -ne $started){break};if((Get-Date) -gt $deadline){throw 'The previous app has not finished saving; update was not applied'};Start-Sleep -Milliseconds 250}
  }
