@@ -585,7 +585,7 @@
 - Offline Vitest runs disable Vite environment-file loading. Supply fixture
   configuration explicitly; never make tests depend on a maintainer's `.env`.
   Keep the production Lingui catalog loader in Vitest: related-test discovery
-  traverses lazy PO imports. Verify catalog-import.test.ts when changing it.
+  traverses lazy PO imports. Verify catalog-asset-loader.test.ts when changing it.
   Linux lifecycle and publishing fixtures require Bash, Python 3, jq and procps
   (including the external `kill` command). Installer smoke fixtures also require
   curl, OpenSSL and the Docker CLI.
