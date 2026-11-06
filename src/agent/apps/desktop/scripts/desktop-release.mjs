@@ -66,7 +66,8 @@ export async function writeWindowsRelease(directory, identity, smoke) {
   const [major,minor,patch]=identity.version.split('.').map(Number);
   const requireInstallation=major>0 || minor>3 || (minor===3 && patch>=19);
   const installation=smoke.installation;
-  if(requireInstallation && (installation?.passed!==true || installation.version!==identity.version ||
+  const expedited=smoke.expedited===true && installation?.status==='not-run' && installation.reason==='operator-expedited-release' && installation.passed===false;
+  if(requireInstallation && !expedited && (installation?.passed!==true || installation.version!==identity.version ||
       installation.revision!==identity.revision || installation.installerSha256!==artifact.sha256 ||
       !['fresh','legacy-to-compact'].every(label=>installation.measurements?.some(m=>m.label===label && m.exitCode===0 && Number.isFinite(m.elapsedMs) && m.elapsedMs>0 && m.elapsedMs<60000 && m.draftsPreserved===5 && m.taskMarkersPreserved===5))))
     throw Error('Real Windows installation timing/preservation qualification is missing');
@@ -75,7 +76,7 @@ export async function writeWindowsRelease(directory, identity, smoke) {
     path: `/downloads/desktop/releases/${identity.version}/${fileName}`, bytes: artifact.bytes, sha256: artifact.sha256};
   const manifest = {...identity,
     schema: 'mycellios-desktop-release-package/1', tag: releaseTag(identity.version), artifact, blockmap,
-    catalogEntry: entry, qualifiedStartup: true, qualifiedInstallation:requireInstallation,
+    catalogEntry: entry, qualifiedStartup: true, qualifiedInstallation:requireInstallation && !expedited,expedited,
     ...(requireInstallation?{installation}:{}),signature: 'unsigned-preview'};
   const previous = await readFile(path.join(directory, 'desktop-release.json'), 'utf8').then(JSON.parse).catch(e => {
     if (e.code === 'ENOENT') return null;

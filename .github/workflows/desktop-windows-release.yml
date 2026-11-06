@@ -4,6 +4,11 @@ on:
     tags: ['desktop-v*.*.*-windows-preview']
     branches: ['codex/desktop-release-*']
   workflow_dispatch:
+    inputs:
+      expedited:
+        description: Operator-requested build and startup only; installer timing and optional tests NOT RUN
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -21,6 +26,7 @@ jobs:
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
+      DESKTOP_EXPEDITED_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.expedited && '1' || '0' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -93,6 +99,7 @@ jobs:
           if((Get-FileHash $msi).Hash.ToLowerInvariant() -ne 'c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc'){throw 'Runtime hash differs from the approved native release'}
           "DESKTOP_RUNTIME_MSI=$msi" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - name: Test update and native package boundaries
+        if: inputs.expedited != true
         working-directory: src/agent
         shell: pwsh
         run: |
@@ -122,6 +129,7 @@ jobs:
           & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
           exit $LASTEXITCODE
       - name: Qualify rollback helper
+        if: inputs.expedited != true
         working-directory: src/agent
         shell: pwsh
         run: |
@@ -129,13 +137,14 @@ jobs:
           node --test apps/desktop/scripts/fast-install.test.mjs
           exit $LASTEXITCODE
       - name: Qualify real compact local server
+        if: inputs.expedited != true
         working-directory: src/agent
         shell: pwsh
         run: |
           node apps/desktop/scripts/verify-local-server.mjs --server-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/local-server') --web-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/web')
           exit $LASTEXITCODE
       - name: Measure real installer and retained development tools
-        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.package.outcome == 'success' && inputs.expedited != true }}
         working-directory: src/agent
         shell: pwsh
         run: |

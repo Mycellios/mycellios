@@ -18,6 +18,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {fixtureTempRoot} from './fixture-profile.mjs';
 
 // Place the runtime outside the checkout so missing dependencies cannot resolve
 // from development node_modules. Hard links avoid copying large read-only binaries.
@@ -45,9 +46,11 @@ const serverRoot = options.get("--server-root") ?? join(desktop, "local-server")
 const webRoot = options.get("--web-root") ?? resolve(desktop, "../web/dist");
 const require = createRequire(join(desktop, "package.json"));
 const electron = require("electron");
-const profile = await mkdtemp(join(tmpdir(), "rakazo-electron-local-"));
+const profileBase=fixtureTempRoot();
+await mkdir(profileBase,{recursive:true});
+const profile = await mkdtemp(join(profileBase, "rakazo-electron-local-"));
 if (
-  !resolve(profile).startsWith(resolve(tmpdir()) + sep) ||
+  !resolve(profile).startsWith(resolve(profileBase) + sep) ||
   !profile.includes("rakazo-electron-local-")
 )
   throw new Error("Unexpected fixture cleanup path");

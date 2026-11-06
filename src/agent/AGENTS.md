@@ -56,6 +56,9 @@
   installer receipt; never promote an older tree over newer main changes.
   Never replace an existing release. Use scripts/prepare-desktop-version.mjs for
   a new version; keep the native runtime pin and other platform channels intact.
+  Operator-requested workflow_dispatch expedited releases retain the real build,
+  artifact identity and packaged-startup gate, but record optional tests/installer
+  timings as NOT RUN and qualifiedInstallation:false. Never claim a measured time.
   Verify desktop-release, published-desktop-release, manual-update and
   prepare-desktop-version tests; a signed-out packaged startup does not qualify
   account login, real video generation or physical multi-device inference.
