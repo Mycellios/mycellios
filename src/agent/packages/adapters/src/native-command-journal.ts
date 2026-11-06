@@ -37,6 +37,18 @@ export interface NativeCommandReceipt {
 }
 type Active = { done: Promise<void>; controller: AbortController; receipt: NativeCommandReceipt };
 
+/** Retry only an atomic receipt replacement held briefly by Windows file sharing. */
+export async function replaceNativeReceipt(temporary: string, target: string, replace = rename,
+  platform: NodeJS.Platform = process.platform, pause = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))) {
+  for (let attempt = 0; ; attempt++) {
+    try { await replace(temporary, target); return; }
+    catch (error) {
+      if (platform !== "win32" || attempt >= 5 || !["EPERM", "EACCES", "EBUSY"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+      await pause(20 * 2 ** attempt);
+    }
+  }
+}
+
 /** Native-only receipts. Reattaching observes an existing command; it never replays it. */
 export class NativeCommandJournal {
   private readonly host = randomUUID();
@@ -58,7 +70,7 @@ export class NativeCommandJournal {
     }
     const temporary = file + "." + randomUUID() + ".tmp";
     await writeFile(temporary, value, { flag: "wx", mode: 0o600 });
-    await rename(temporary, file);
+    await replaceNativeReceipt(temporary, file);
   }
   async read(id: string): Promise<NativeCommandReceipt | null> {
     try {
@@ -150,6 +162,8 @@ export class NativeCommandJournal {
       if (receipt.stderr.length > stderr) yield { type: "stderr", data: receipt.stderr.slice(stderr) };
       stdout = receipt.stdout.length; stderr = receipt.stderr.length;
       if (receipt.exitCode !== null) {
+        const completing = this.active.get(input.id);
+        if (completing) { await completing.done; continue; }
         if(receipt.outputTruncated){
           if(receipt.stdoutTail)yield {type:'stdout',data:'\n[output truncated; retained tail]\n'+receipt.stdoutTail};
           if(receipt.stderrTail)yield {type:'stderr',data:'\n[output truncated; retained tail]\n'+receipt.stderrTail};

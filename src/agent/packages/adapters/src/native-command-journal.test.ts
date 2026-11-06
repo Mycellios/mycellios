@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { ProcessEvent } from "@rakazo/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NativeCommandJournal } from "./native-command-journal.js";
+import { NativeCommandJournal, replaceNativeReceipt } from "./native-command-journal.js";
 
 const directories: string[] = [];
 afterEach(async () => { for (const directory of directories.splice(0)) await rm(directory, { recursive: true, force: true }); });
@@ -78,4 +78,18 @@ it("rechecks the terminal receipt when completion overtakes an observer's disk s
   const result=await collect(journal.execute({...base(),start:async function*(){starts++;await gate;yield {type:"exit" as const,code:7};}}));
   expect(raced).toBe(true);expect(starts).toBe(1);
   expect(result).toContainEqual({type:"exit",code:7});
+});
+
+it("retries only transient Windows atomic receipt replacements with a bounded budget",async()=>{
+  const transient=Object.assign(new Error("sharing"),{code:"EPERM"});
+  const replace=vi.fn<(...args:Parameters<typeof import("node:fs/promises").rename>)=>Promise<void>>()
+    .mockRejectedValueOnce(transient).mockResolvedValue(undefined),pause=vi.fn(async()=>{});
+  await replaceNativeReceipt("owned.tmp","owned.json",replace,"win32",pause);
+  expect(replace).toHaveBeenCalledTimes(2);expect(pause).toHaveBeenCalledWith(20);
+  const blocked=vi.fn(async()=>{throw transient;});
+  await expect(replaceNativeReceipt("owned.tmp","owned.json",blocked,"win32",pause)).rejects.toBe(transient);
+  expect(blocked).toHaveBeenCalledTimes(6);
+  const invalid=Object.assign(new Error("disk"),{code:"EIO"}),disk=vi.fn(async()=>{throw invalid;});
+  await expect(replaceNativeReceipt("owned.tmp","owned.json",disk,"win32",pause)).rejects.toBe(invalid);
+  expect(disk).toHaveBeenCalledOnce();
 });
