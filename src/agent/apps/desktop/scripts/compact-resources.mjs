@@ -69,6 +69,15 @@ export async function compactDirectory(source, destination) {
   await asar.createPackage(source,destination);
 }
 
+export async function verifyCompactServer(root) {
+  const receipt=JSON.parse(await readFile(path.join(root,'compact-resources.json'),'utf8'));
+  const files=await filesIn(root);
+  if(receipt.schema!=='mycellios-compact-resources/1' || files.length!==receipt.physicalFiles ||
+      files.length>3000 || files.includes('dist/desktop-local-entry.js'))
+    throw Error('Packaged compact server contains a duplicate or unexpected loose tree');
+  return receipt;
+}
+
 export async function stageCompactResources(desktopRoot, development, output) {
   const destination=path.join(output,'compact-resources');
   const server=path.join(destination,'local-server');

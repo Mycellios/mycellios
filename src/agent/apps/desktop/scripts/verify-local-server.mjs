@@ -99,7 +99,7 @@ Object.assign(env, {
   CLOUD_AGENT_PROVIDER: "emulator",
   MEDIA_GENERATION_PROVIDER: "disabled",
   ANALYTICS_PROVIDER: "none",
-  LOG_LEVEL: "off",
+  LOG_LEVEL: "info",
 });
 const child = spawn(
   electron,
