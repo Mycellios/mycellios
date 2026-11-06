@@ -46,6 +46,8 @@ import {
 } from "./composer-mentions";
 import { useComposerLayout } from "./use-composer-layout";
 import { SideQuestion } from "./side-question";
+import { useVoiceShortcut } from "./use-voice-shortcut";
+import { ReviewedVoice, useReviewedVoice } from "./reviewed-voice";
 
 const ATTACHMENT_ACCEPT = attachmentPickerAccept(navigator.userAgent);
 export const Composer = memo(function Composer({
@@ -85,6 +87,8 @@ export const Composer = memo(function Composer({
   onImportAgent,
   onOpenVoice,
   voiceConversationActive = false,
+  voiceShortcutRequested = false,
+  onVoiceShortcutConsumed,
 }: {
   activeName?: string;
   running: boolean;
@@ -124,6 +128,8 @@ export const Composer = memo(function Composer({
   onImportAgent?: (agent: AgentImportReader) => void;
   onOpenVoice?: () => void;
   voiceConversationActive?: boolean;
+  voiceShortcutRequested?: boolean;
+  onVoiceShortcutConsumed?: () => void;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
@@ -166,6 +172,19 @@ export const Composer = memo(function Composer({
         })
         .catch(() => setDraft((current) => (current ? `${current} ${text}` : text)));
     },
+  });
+  const reviewedVoice = useReviewedVoice({
+    scope: draftKey, transcribe: dictationTranscribe,
+    blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length || talk.recording),
+    onSend: (text, nonce) => onSend(text, [], nonce),
+  });
+  useVoiceShortcut({
+    requested: voiceShortcutRequested,
+    ready: dictationTranscribe !== undefined,
+    blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length),
+    scope: draftKey,
+    consume: onVoiceShortcutConsumed,
+    start: reviewedVoice.start,
   });
   const [selectedSkill, setSelectedSkill] = useState<AgentSkillCatalogEntry | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -545,6 +564,7 @@ export const Composer = memo(function Composer({
         draggingFiles ? "rounded-[14px] ring-2 ring-inset ring-ring" : ""
       }`}
     >
+      <ReviewedVoice voice={reviewedVoice} name={activeName} />
       <div role="status" data-testid="composer-announcement" className="sr-only">
         {replyAnnouncement}
       </div>
@@ -910,12 +930,12 @@ export const Composer = memo(function Composer({
           ) : running ? (
             <>
               {draft.trim().length === 0 ? (
-                <HoldToTalkControls talk={talk} disabled={disabled || onCall} />
+                <HoldToTalkControls talk={talk} disabled={disabled || onCall || reviewedVoice.stage !== "closed"} />
               ) : null}
               <Button
                 size="icon"
                 aria-label={t`Send`}
-                disabled={sending || !canSend || disabled}
+                disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
                 onClick={send}
                 className="size-8 shrink-0 rounded-full transition-transform active:scale-95 disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100"
               >
@@ -935,12 +955,12 @@ export const Composer = memo(function Composer({
           ) : (
             <>
               {draft.trim().length === 0 ? (
-                <HoldToTalkControls talk={talk} disabled={disabled || onCall} />
+                <HoldToTalkControls talk={talk} disabled={disabled || onCall || reviewedVoice.stage !== "closed"} />
               ) : null}
               <Button
                 size="icon"
                 aria-label={t`Send`}
-                disabled={sending || !canSend || disabled}
+                disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
                 onClick={send}
                 className="size-8 shrink-0 rounded-full transition-transform active:scale-95 disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100"
               >

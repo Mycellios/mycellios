@@ -9093,3 +9093,27 @@ msgstr "Guarda los cambios o termina la llamada para reiniciar."
 
 msgid "Saving work and restarting…"
 msgstr "Guardando el trabajo y reiniciando…"
+
+msgid "Voice message"
+msgstr "Mensaje de voz"
+
+msgid "Voice transcript"
+msgstr "Texto del dictado"
+
+msgid "Microphone level"
+msgstr "Nivel del micrófono"
+
+msgid "Review message"
+msgstr "Revisar mensaje"
+
+msgid "Review your message"
+msgstr "Revisa tu mensaje"
+
+msgid "Your words will appear here."
+msgstr "Tus palabras aparecerán aquí."
+
+msgid "Could not start the microphone. Try again."
+msgstr "No se ha podido iniciar el micrófono. Inténtalo de nuevo."
+
+msgid "Message not sent. Your text is kept here."
+msgstr "No se ha enviado el mensaje. Tu texto se conserva aquí."

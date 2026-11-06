@@ -23,6 +23,13 @@ export function webManifest(base = "/") {
     short_name: productBrand.shortName,
     description: "Think, create, and get things done with Mycellios Agent.",
     start_url: `${base}app`,
+    shortcuts: [{
+      name: "Voice message",
+      short_name: "Voice",
+      description: "Dictate a message to your Mico, then choose Send.",
+      url: `${base}app?dictate=1`,
+      icons,
+    }],
     scope: base,
     display: "standalone",
     background_color: webDarkTokens.background,
