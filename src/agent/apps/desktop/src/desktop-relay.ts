@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { UpdateResumeBinding } from "./update-resume.js";
 import type {
   DesktopExecutorOperation,
   DesktopExecutorPoll,
@@ -23,6 +24,8 @@ export class DesktopRelayClient {
   private accountGeneration?: string;
   private accountIdentity?: {userId:string;spaceId:string;connectionId:string};
   private intent=0;
+  private updating = false;
+  private updateNotices = new Map<string, () => Promise<void>>();
   constructor(
     private readonly options: {
       base: string;
@@ -32,6 +35,7 @@ export class DesktopRelayClient {
       revoked(): void;
       now?: () => number;
       deviceId?:string;
+      restoreUpdate?: (identity: {userId:string;spaceId:string;connectionId:string}, botId?: string) => Promise<UpdateResumeBinding | undefined>;
     },
   ) { if(options.deviceId)this.deviceId=options.deviceId; }
   private async post(action: string, input: unknown, signal?: AbortSignal) {
@@ -79,12 +83,14 @@ export class DesktopRelayClient {
   }
   async bind(botId: string, renew = false) {
     const intent=this.intent;
-    await this.identity();
+    const identity = await this.identity();
+    const restored = !renew && !this.grants.size ? await this.options.restoreUpdate?.(identity, botId) : undefined;
+    if (restored) this.deviceId = restored.deviceId;
     if(intent!==this.intent)throw Error("The local session changed");
     const existing = this.grants.get(botId);
     // Reassert the same grant after an API restart; never replay an operation.
     const generation =
-      existing && !renew ? existing.generation : this.accountGeneration ?? randomUUID();
+      existing && !renew ? existing.generation : restored?.generation ?? this.accountGeneration ?? randomUUID();
     await this.post("bind", {
       deviceId: this.deviceId,
       botId,
@@ -109,6 +115,12 @@ export class DesktopRelayClient {
     const identity=await this.identity();
     if(intent!==this.intent)throw Error("The local session changed");
     if(identity.userId!==expected.userId||identity.spaceId!==expected.spaceId||identity.connectionId!==expected.connectionId)throw Error("The account session changed");
+    const restored = !this.accountGeneration ? await this.options.restoreUpdate?.(identity) : undefined;
+    if (restored && (!this.options.deviceId || restored.deviceId === this.options.deviceId)) {
+      this.deviceId = restored.deviceId;
+      this.accountGeneration = restored.generation;
+    }
+    if (intent !== this.intent) throw Error("The local session changed");
     this.accountIdentity=identity;
     this.accountGeneration ??= randomUUID();
     // The first poll registers and checks the account before it can receive work.
@@ -127,6 +139,18 @@ export class DesktopRelayClient {
       (this.options.now ?? Date.now)() - this.lastContact < 40_000;
   }
   online() { return !this.stopped && this.lastContact>0 && (this.options.now??Date.now)()-this.lastContact<40_000; }
+  resumeBindings(): UpdateResumeBinding[] {
+    const identity = this.accountIdentity ?? (this.owner ? JSON.parse(this.owner) : undefined);
+    if (!identity) return [];
+    const binding = { base: this.options.base, ...identity, deviceId: this.deviceId };
+    return this.accountGeneration ? [{ ...binding, generation: this.accountGeneration }] :
+      [...this.grants].map(([botId, grant]) => ({ ...binding, generation: grant.generation, botId }));
+  }
+  async beginUpdate() {
+    this.updating = true;
+    await Promise.all([...this.updateNotices.values()].map(notice => notice()));
+  }
+  cancelUpdate() { this.updating = false; }
   busy() {
     return this.active.size > 0;
   }
@@ -224,31 +248,39 @@ export class DesktopRelayClient {
     }
   }
   private async execute(operation: DesktopExecutorOperation, controller: AbortController) {
-    let seq = 0;
-    const send = async (data: Uint8Array, done: boolean) => {
-      const body = {
-        deviceId: this.deviceId,
-        id: operation.id,
-        seq,
-        data: Buffer.from(data).toString("base64"),
-        done,
-      };
-      // Retry only result delivery, never the command. Broker deduplicates identical sequence/hash.
-      for (let attempt = 0; ; attempt++) {
-        try {
-          await this.post(
-            "result",
-            body,
-            AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
-          );
-          break;
-        } catch (error) {
-          if (attempt >= 1 || controller.signal.aborted || this.stopped) throw error;
+    let seq = 0, closed = false;
+    let delivery = Promise.resolve();
+    const send = (data: Uint8Array, done: boolean): Promise<void> => {
+      const next = delivery.then(async () => {
+        if (closed) return;
+        const body = {deviceId:this.deviceId,id:operation.id,seq,data:Buffer.from(data).toString("base64"),done};
+        for (let attempt = 0; ; attempt++) {
+          try { await this.post("result", body, AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])); break; }
+          catch (error) { if (attempt >= 1 || controller.signal.aborted || this.stopped) throw error; }
         }
-      }
-      seq++;
+        seq++;
+        closed = done;
+      });
+      delivery = next;
+      return next;
     };
+    // An interruption must not split an NDJSON frame already being forwarded.
+    let frames = Promise.resolve();
+    const forward = (data: Uint8Array, done: boolean) => {
+      frames = frames.then(async () => {
+        for (let offset = 0; offset < data.byteLength; offset += 128 * 1024)
+          await send(data.subarray(offset, offset + 128 * 1024), done && offset + 128 * 1024 >= data.byteLength);
+        if (!data.byteLength) await send(data, done);
+      });
+      return frames;
+    };
+    const interrupt = async (dispatched = true) => {
+      await forward(Buffer.from(JSON.stringify({error:"The PC is updating; pending work will resume after reconnecting.",code:"desktop_updating",dispatched}) + "\n"), true);
+      controller.abort();
+    };
+    this.updateNotices.set(operation.id, interrupt);
     try {
+      if (this.updating) { await interrupt(false); return; }
       const body = JSON.stringify(operation.request);
       if (Buffer.byteLength(body) > HOST_COMPUTER_MAX_BYTES) throw new Error("Request too large");
       const response = await fetch(`${this.options.localUrl}/computer`, {
@@ -261,17 +293,25 @@ export class DesktopRelayClient {
         redirect: "error",
         signal: controller.signal,
       });
+      if (response.headers.get("x-mycellios-desktop-error") === "desktop_updating") { await interrupt(false); return; }
       if (!response.ok || !response.body) throw new Error("Local computer unavailable");
       const reader = response.body.getReader();
+      let pending: Buffer = Buffer.alloc(0);
       try {
         for (;;) {
           const { value, done } = await reader.read();
           if (done) {
-            await send(new Uint8Array(), true);
+            if (pending.byteLength) throw Error("Incomplete native frame");
+            await forward(new Uint8Array(), true);
             break;
           }
-          for (let offset = 0; offset < value.byteLength; offset += 128 * 1024)
-            await send(value.subarray(offset, offset + 128 * 1024), false);
+          pending = Buffer.concat([pending, value]);
+          if (pending.byteLength > HOST_COMPUTER_MAX_BYTES) throw Error("Native frame exceeds its limit");
+          const end = pending.lastIndexOf(10);
+          if (end >= 0) {
+            await forward(pending.subarray(0, end + 1), false);
+            pending = pending.subarray(end + 1);
+          }
         }
       } finally {
         await reader.cancel().catch(() => undefined);
@@ -279,7 +319,7 @@ export class DesktopRelayClient {
       }
     } catch {
       controller.abort();
-      if (!this.stopped) {
+      if (!this.stopped && !closed) {
         try {
           await this.post("result", {
             deviceId: this.deviceId,
@@ -296,6 +336,6 @@ export class DesktopRelayClient {
           /* lease/dispatch deadline reports disconnected work */
         }
       }
-    }
+    } finally { this.updateNotices.delete(operation.id); }
   }
 }

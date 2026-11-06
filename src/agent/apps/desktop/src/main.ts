@@ -4,6 +4,7 @@ import { installAppsStudio } from "./apps-studio-ipc.js";
 import { ManualUpdateController } from "./manual-update.js";
 import { publishedWindowsRelease } from "./published-desktop-release.js";
 import { launchManualUpdate } from "./manual-update-handoff.js";
+import { saveUpdateResume, restoreUpdateBinding } from "./update-resume.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
@@ -152,19 +153,27 @@ const manualDesktopUpdater = process.platform === "win32" && process.arch === "x
       const reopen = new URL(win.webContents.getURL());
       reopen.search = "";
       reopen.hash = "";
-      accountComputer?.stop();
-      cloudComputer?.stop();
-      hostComputer?.activate(false);
       win.setEnabled(false);
       try {
         await win.webContents.session.cookies.flushStore();
         await win.webContents.session.flushStorageData();
+        await accountComputer?.freezeForUpdate();
+        await saveUpdateResume(app.getPath("userData"), app.getVersion(), release.version,
+          [...(accountComputer?.resumeBindings() ?? []), ...(cloudComputer?.resumeBindings() ?? [])]);
+        await Promise.all([accountComputer?.beginUpdate(), cloudComputer?.beginUpdate()]);
+        await hostComputer?.prepareUpdate();
+        accountComputer?.stop();
+        cloudComputer?.stop();
+        hostComputer?.activate(false);
         await launchManualUpdate({ profile: app.getPath("userData"), executable: process.execPath,
           oldPid: process.pid, installer: file, release, reopenUrl: reopen.href });
         quitting = true;
         app.quit();
       } catch (error) {
         if (!win.isDestroyed()) win.setEnabled(true);
+        hostComputer?.cancelUpdate();
+        cloudComputer?.cancelUpdate();
+        accountComputer?.cancelUpdate();
         accountComputer?.start();
         throw error;
       }
@@ -728,8 +737,8 @@ async function runMenuUpdateCheck() {
   }
 }
 
-async function installUpdate() {
-  if (manualDesktopUpdater) return manualDesktopUpdater.install();
+async function installUpdate(force = false) {
+  if (manualDesktopUpdater) return manualDesktopUpdater.install(force);
   if (desktopUpdater.state().phase !== "ready") return desktopUpdater.state();
   if (hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()) return {
     ...desktopUpdater.state(), message: "A local task is still running. Install the update when it finishes.",
@@ -1416,6 +1425,7 @@ app.whenReady().then(async () => {
     const owningWindow = mainWindow;
     cloudComputerBase = base;
     cloudComputer ??= new DesktopRelayClient({ base,
+        restoreUpdate: (identity, botId) => restoreUpdateBinding(userDataDir, app.getVersion(), base, identity, botId),
       fetch: async (url, init) => {
         const spaceId = await nativeProjectSpace(owningWindow);
         if(mainWindow !== owningWindow || projectServer() !== base)throw new Error("The server session changed.");
@@ -1429,7 +1439,7 @@ app.whenReady().then(async () => {
     return cloudComputer;
   };
   if(hostComputer) accountComputer = installAccountComputerBackground({
-    profile:userDataDir,host:hostComputer,
+    profile:userDataDir,host:hostComputer,nativeVersion:app.getVersion(),
     localUrl:hostComputer.connection.url.replace("host.docker.internal","127.0.0.1"),localToken:hostComputer.connection.token,
     consentScope:computerConsentScope,window:()=>mainWindow,changed:installApplicationMenu,
     context:async()=>{
@@ -1690,7 +1700,10 @@ app.whenReady().then(async () => {
   ipcMain.handle("desktop.update.download", (event) =>
     fromUpdateWindow(event) ? desktopUpdater.download() : desktopUpdater.state(),
   );
-  ipcMain.handle("desktop.update.install", (event) =>
+  ipcMain.handle("desktop.update.forceInstall", (event) =>
+      fromUpdateWindow(event) && manualDesktopUpdater ? installUpdate(true) : desktopUpdater.state(),
+    );
+    ipcMain.handle("desktop.update.install", (event) =>
     fromUpdateWindow(event) ? installUpdate() : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.setup.state", (event) => {

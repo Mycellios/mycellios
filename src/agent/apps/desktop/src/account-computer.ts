@@ -1,6 +1,7 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DesktopRelayClient } from "./desktop-relay.js";
+import { restoreUpdateBinding } from "./update-resume.js";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
 
 type Host = {
@@ -19,11 +20,13 @@ export class AccountComputerConnection {
   private timer?: ReturnType<typeof setTimeout>;
   private pending?: Promise<void>;
   private stopped = true;
+  private updating = false;
   private deviceId?: string;
   private defaultSpace?: string;
   constructor(
     private readonly options: {
       profile: string;
+      nativeVersion?: string;
       host: Host;
       localUrl: string;
       localToken: string;
@@ -42,6 +45,10 @@ export class AccountComputerConnection {
   online() {
     return [...this.clients.values()].some((c) => c.online());
   }
+  async freezeForUpdate() { this.updating = true; await this.pending; }
+  resumeBindings() { return [...this.clients.values()].flatMap(client => client.resumeBindings()); }
+  async beginUpdate() { await this.freezeForUpdate(); await Promise.all([...this.clients.values()].map(client => client.beginUpdate())); }
+  cancelUpdate() { this.updating = false; for (const client of this.clients.values()) client.cancelUpdate(); }
   busy() {
     return [...this.clients.values()].some((c) => c.busy());
   }
@@ -76,6 +83,7 @@ export class AccountComputerConnection {
     await client.bind(botId);
   }
   refresh() {
+    if (this.updating) return Promise.resolve();
     if (this.pending) return this.pending;
     this.pending = this.reconcile().finally(() => {
       this.pending = undefined;
@@ -175,6 +183,7 @@ export class AccountComputerConnection {
             localUrl: this.options.localUrl,
             localToken: this.options.localToken,
             deviceId: this.deviceId,
+            restoreUpdate: this.options.nativeVersion ? identity => restoreUpdateBinding(this.options.profile, this.options.nativeVersion!, context.base, identity) : undefined,
             revoked: () => {
               this.clients.get(spaceId)?.stop();
               this.clients.delete(spaceId);

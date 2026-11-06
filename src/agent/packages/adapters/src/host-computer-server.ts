@@ -24,6 +24,7 @@ export async function startHostComputerServer(options: {
 }) {
   if (!/^[a-f0-9]{64}$/.test(options.token)) throw new Error("Invalid local computer credential");
   let enabled = false;
+  let updating = false;
   // Only the native folder picker can grant projects; this map has no HTTP write method.
   const projects = new Map<string, string>();
   const taskProjects = new Map<string, { botId: string; key: string; active: boolean; allowPrimaryRun?: (runId: string) => Promise<boolean> }>();
@@ -64,6 +65,10 @@ export async function startHostComputerServer(options: {
       !timingSafeEqual(credential, secret)
     ) {
       response.writeHead(401).end();
+      return;
+    }
+    if (updating) {
+      response.writeHead(503, { "x-mycellios-desktop-error": "desktop_updating" }).end();
       return;
     }
     if (!enabled) {
@@ -514,7 +519,22 @@ export async function startHostComputerServer(options: {
           }
         : null;
     },
-    isEnabled: () => enabled,
+    isEnabled: () => enabled && !updating,
+    async prepareUpdate() {
+      updating = true;
+      for (const provider of providers.values()) provider.cancelAllCommands();
+      const deadline = Date.now() + 15_000;
+      const settle = Promise.all([...providers.values()].map(provider => provider.settleCommands()));
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([settle, new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error("Local commands are still stopping")), 15_000); })]);
+        while ([...active.values()].some(work => work?.method === "writeFile")) {
+          if (Date.now() >= deadline) throw new Error("A file write is still finishing");
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+      } finally { clearTimeout(timeout); }
+    },
+    cancelUpdate() { updating = false; },
     clearProjects() {
       for (const provider of providers.values()) provider.cancelAllCommands();
       taskProjects.clear();

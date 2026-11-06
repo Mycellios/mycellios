@@ -54,6 +54,13 @@ jobs:
           $out=Join-Path $env:RUNNER_TEMP desktop-release
           New-Item -ItemType Directory -Force $out | Out-Null
           "DESKTOP_RELEASE_OUT=$out" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Use an external canonical temporary directory
+        shell: pwsh
+        run: |
+          $temp=Join-Path $env:RUNNER_TEMP desktop-native-temporary
+          New-Item -ItemType Directory -Force $temp | Out-Null
+          "TEMP=$temp" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "TMP=$temp" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - name: Install the locked build inputs
         shell: pwsh
         run: |
@@ -86,7 +93,7 @@ jobs:
         working-directory: src/agent
         shell: pwsh
         run: |
-          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
+          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs
           exit $LASTEXITCODE

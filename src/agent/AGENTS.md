@@ -5,8 +5,13 @@
   RAKAZO_DISABLE_AUTO_UPDATE=1 suppresses background requests. Keep the unsigned
   automatic-install channel disabled. Bound and
   verify catalog/payload bytes, platform, paths, versions and SHA-256; never accept
-  renderer-provided installer paths. Wait for native work and a nonce-bound current
-  main-frame acknowledgement, preserve stored text drafts and block in-memory work.
+  renderer-provided installer paths. Normal updates may wait for native work; an
+  explicit Restart now checkpoints owned operations and queues the same fenced Run.
+  Always require the nonce-bound current main-frame acknowledgement, preserve
+  stored text drafts and block in-memory work. Keep unacknowledged calls resolved
+  as uncertain checkpoint results; reconcile their command receipts before mutation.
+  A planned restart may restore a relay generation only from bounded private
+  version/account/server/Space/session metadata after fresh identity and consent.
   A pending restart is cancellable. The detached same-user helper waits for normal
   exit, snapshots session/installation state, installs and reopens the same profile.
   Never force-stop another process, use Restart Manager shutdown or clear user data.

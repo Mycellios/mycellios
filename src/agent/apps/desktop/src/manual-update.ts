@@ -52,6 +52,7 @@ export class ManualUpdateController {
   private intent = 0;
   private committed = false;
   private checkRequested = false;
+  private force = false;
   constructor(private readonly options: {
     version: string; directory(): string;
     fetch?: typeof fetch;
@@ -62,7 +63,7 @@ export class ManualUpdateController {
     backgroundDownloads?: boolean;
     publishedRelease?: () => Promise<ManualRelease | null>;
   }) {
-    this.current = { phase: "idle", currentVersion: options.version, availableVersion: null,
+    this.current = { phase: "idle", supportsForceRestart: true, currentVersion: options.version, availableVersion: null,
       percent: null, message: null, checkedAt: null };
   }
   state() { return { ...this.current }; }
@@ -157,17 +158,24 @@ export class ManualUpdateController {
     }
     this.current = { ...this.current, phase: "ready", percent: 100, message: null };
   }
-  install(): Promise<DesktopUpdateState> {
+  install(force = false): Promise<DesktopUpdateState> {
+    if (force && this.current.phase === "ready" && this.current.installPending && !this.committed) {
+      this.force = true;
+      this.current = { ...this.current, restartMode: "now" };
+      return Promise.resolve(this.state());
+    }
     if (this.current.phase !== "ready" || this.current.installPending || !this.file || !this.release)
       return Promise.resolve(this.state());
-    this.current = { ...this.current, installPending: true, message: "Waiting for local tasks and unsaved work…" };
+    this.force = force;
+    this.current = { ...this.current, installPending: true, restartMode: force ? "now" : "whenIdle", waitingFor: "local_work", message: "Waiting for local tasks and unsaved work…" };
     void this.finishInstall(++this.intent);
     return Promise.resolve(this.state());
   }
   cancelInstall(): Promise<DesktopUpdateState> {
     if (this.committed) return Promise.resolve(this.state());
     ++this.intent;
-    this.current = { ...this.current, installPending: false, message: null };
+    this.force = false;
+    this.current = { ...this.current, installPending: false, restartMode: undefined, waitingFor: undefined, message: null };
     return Promise.resolve(this.state());
   }
   private async finishInstall(intent: number) {
@@ -175,13 +183,16 @@ export class ManualUpdateController {
       while (intent === this.intent) {
         // Waiting on an unsaved form must not reread a large installer every second.
         // The second acknowledgement below remains authoritative after hashing.
-        if (!this.options.busy() && await this.options.prepare() && !this.options.busy()) {
+        const canInterrupt = () => this.force || !this.options.busy();
+        this.current = { ...this.current, waitingFor: canInterrupt() ? "unsaved_work" : "local_work" };
+        if (canInterrupt() && await this.options.prepare() && canInterrupt()) {
           if (intent !== this.intent) return;
           try { await verifyManualInstaller(this.file!, this.release!); }
           catch (error) { this.file = null; throw error; }
           if (intent !== this.intent) return;
-          if (!this.options.busy() && await this.options.prepare() && !this.options.busy()) {
+          if (canInterrupt() && await this.options.prepare() && canInterrupt()) {
             if (intent !== this.intent) return;
+            this.current = { ...this.current, waitingFor: undefined };
             this.committed = true;
             await this.options.handoff(this.file!, this.release!);
             return;
