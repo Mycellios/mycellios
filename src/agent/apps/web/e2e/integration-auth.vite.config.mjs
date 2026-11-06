@@ -12,13 +12,20 @@ const fixture = fileURLToPath(new URL("./fixtures/integration-auth/", import.met
 function fixtureServer() {
   let connected = false;
   let externalConnected = false;
-  const catalog = ["twitter", "gmail"].map((slug) => ({
+  let readinessReads = 0;
+  const catalog = ["twitter", "gmail", "googlecontacts", "tiktok"].map((slug) => ({
     connectorId: "composio",
     slug,
-    name: slug === "twitter" ? "X (Twitter)" : "Gmail",
+    name: {
+      twitter: "X (Twitter)",
+      gmail: "Gmail",
+      googlecontacts: "Google Contacts",
+      tiktok: "TikTok",
+    }[slug],
     logo: null,
     connected: false,
     noAuth: false,
+    availability: ["googlecontacts", "tiktok"].includes(slug) ? "coming_soon" : "available",
   }));
   const connection = {
     id: "fixture-gmail",
@@ -59,6 +66,13 @@ function fixtureServer() {
     const accountMode = new URL(req.headers.referer ?? "http://localhost/").searchParams.has(
       "accounts",
     );
+    const params = new URL(req.headers.referer ?? "http://localhost/").searchParams;
+    const readiness =
+      params.has("unavailable") && name === "connections/catalog"
+        ? ++readinessReads === 1
+          ? "unknown"
+          : "available"
+        : null;
     const selectedConnection = external ? externalConnection : connection;
     const selectedConnected = external ? externalConnected : connected;
     if (name === "connections/complete" && external) externalConnected = true;
@@ -68,6 +82,8 @@ function fixtureServer() {
       "connections/list": selectedConnected ? [selectedConnection] : [],
       "connections/catalog": catalog.map((item) => ({
         ...item,
+        ...(readiness && item.slug === "tiktok" ? { availability: readiness } : {}),
+        ...(params.has("setup") && item.slug === "twitter" ? { availability: "coming_soon" } : {}),
         connected: accountMode
           ? item.slug === "twitter" && accountRows.some((row) => row.status === "connected")
           : item.slug === selectedConnection.provider && selectedConnected,

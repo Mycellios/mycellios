@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   catalogItemAccounts,
   connectCatalogItem,
+  isCatalogItemAvailable,
   isCatalogItemConnected,
   nextCatalogAccountLabel,
   waitForConnection,
@@ -22,6 +23,26 @@ function account(id: string, status: Connection["status"], provider = "gmail") {
 }
 
 describe("connection catalog", () => {
+  it.each(["coming_soon", "unknown"] as const)(
+    "does not open authorization for an integration that is %s",
+    async (availability) => {
+      const begin = vi.fn();
+      const openUrl = vi.fn();
+      const unavailable = { ...item, availability };
+      expect(isCatalogItemAvailable(unavailable)).toBe(false);
+      await expect(
+        connectCatalogItem(unavailable, [], {
+          begin,
+          openUrl,
+          complete: vi.fn(),
+          signal: new AbortController().signal,
+        }),
+      ).rejects.toThrow("not available");
+      expect(begin).not.toHaveBeenCalled();
+      expect(openUrl).not.toHaveBeenCalled();
+      expect(isCatalogItemAvailable(item)).toBe(true);
+    },
+  );
   it("counts only this app's live accounts", () => {
     const rows = [
       account("a", "connected"),

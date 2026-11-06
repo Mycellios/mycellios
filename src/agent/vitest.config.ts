@@ -4,6 +4,8 @@ import path from "node:path";
 import { defineConfig } from "vitest/config";
 
 const chatRequire = createRequire(new URL("./packages/chat-ui/package.json", import.meta.url));
+const webRequire = createRequire(new URL("./apps/web/package.json", import.meta.url));
+const { lingui } = await import(webRequire.resolve("@lingui/vite-plugin"));
 const markdownSource = path.join(path.dirname(chatRequire.resolve(
   "@ronradtke/react-native-markdown-display/package.json",
 )), "src/index.tsx");
@@ -11,6 +13,12 @@ const markdownSource = path.join(path.dirname(chatRequire.resolve(
 export default defineConfig({
   // Offline tests receive explicit fixtures; never read a maintainer's .env.
   envDir: false,
+  plugins: [
+    lingui({
+      configPath: fileURLToPath(new URL("./apps/web/lingui.config.ts", import.meta.url)),
+      failOnCompileError: true,
+    }),
+  ],
   resolve: {
     alias: [
       {

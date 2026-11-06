@@ -25,6 +25,59 @@ import {
 } from "./composio-connector.js";
 import { DestinationEmulator } from "./destination-emulator.js";
 
+describe("catalog connection availability", () => {
+  function fixture(list: ReturnType<typeof vi.fn>) {
+    const items = ["gmail", "tiktok", "public-feed"].map((slug) => ({
+      slug,
+      name: slug,
+      isNoAuth: slug === "public-feed",
+    }));
+    const session = {
+      sessionId: "fixture-availability",
+      toolkits: async (options?: { isConnected?: boolean }) => ({
+        items: options?.isConnected ? [] : items,
+      }),
+    };
+    return new ComposioConnector({
+      client: {
+        create: async () => session,
+        sessions: { use: async () => session },
+        authConfigs: { list },
+      } as never,
+    });
+  }
+  it("projects server readiness without hiding apps that the user has not authorized", async () => {
+    const list = vi
+      .fn()
+      .mockResolvedValue({
+        items: [
+          {
+            toolkit: { slug: "gmail" },
+            status: "ENABLED",
+            isEnabledForToolRouter: true,
+            isComposioManaged: true,
+            credentials: { secret: "private-fixture-value" },
+          },
+        ],
+      });
+    const items = await fixture(list).catalog({ userId: "fixture-user" } as AdapterContext);
+    expect(items.map((i) => [i.slug, i.connected, i.availability])).toEqual([
+      ["gmail", false, "available"],
+      ["tiktok", false, "coming_soon"],
+      ["public-feed", false, "available"],
+    ]);
+    expect(JSON.stringify(items)).not.toContain("private-fixture-value");
+  });
+  it("represents metadata outages as unknown, preserving the directory for retry", async () => {
+    const items = await fixture(
+      vi.fn().mockRejectedValue(new Error("private-fixture-error")),
+    ).catalog({ userId: "fixture-user" } as AdapterContext);
+    expect(items).toHaveLength(3);
+    expect(items.every((i) => i.availability === "unknown")).toBe(true);
+    expect(JSON.stringify(items)).not.toContain("private-fixture-error");
+  });
+});
+
 const composioSdkState = vi.hoisted(() => ({
   created: [] as Array<{ userId: string; config: Record<string, unknown> }>,
   directoryFails: false,
@@ -418,12 +471,10 @@ describe("composio tool mapping", () => {
         isComposioManaged: false,
       };
       const create = vi.fn();
-      const list = vi
-        .fn()
-        .mockResolvedValue({
-          items: state === "disabled" ? [config] : [config, { ...config, id: "auth-2" }],
-          nextCursor: null,
-        });
+      const list = vi.fn().mockResolvedValue({
+        items: state === "disabled" ? [config] : [config, { ...config, id: "auth-2" }],
+        nextCursor: null,
+      });
       const connector = new ComposioConnector({
         client: { create, authConfigs: { list } } as never,
       });

@@ -18,6 +18,7 @@ import {
   connectCatalogItem,
   filterConnectionCatalogItems,
   humanizeToolName,
+  isCatalogItemAvailable,
   isCatalogItemConnected,
 } from "@rakazo/core";
 import {
@@ -279,6 +280,7 @@ export function PluginsOverlay({
   }
 
   async function connect(item: ConnectionCatalogItem) {
+    if (!isCatalogItemAvailable(item)) return;
     connectionAttempt.current?.abort();
     const controller = new AbortController();
     connectionAttempt.current = controller;
@@ -519,13 +521,27 @@ export function PluginsOverlay({
         type="button"
         variant="secondary"
         size="sm"
-        disabled={connecting}
+        disabled={
+          connecting ||
+          (item.availability === "unknown"
+            ? integrations.isFetching
+            : !isCatalogItemAvailable(item))
+        }
         onClick={(event) => {
           event.stopPropagation();
-          void connect(item);
+          if (item.availability === "unknown") void integrations.refetch();
+          else void connect(item);
         }}
       >
-        {connecting ? <Trans>Adding…</Trans> : <Trans>Add</Trans>}
+        {item.availability === "coming_soon" ? (
+          <Trans id="integration.comingSoon">Coming soon</Trans>
+        ) : item.availability === "unknown" ? (
+          <Trans>Retry</Trans>
+        ) : connecting ? (
+          <Trans>Adding…</Trans>
+        ) : (
+          <Trans>Add</Trans>
+        )}
       </Button>
     );
   }
@@ -741,11 +757,28 @@ export function PluginsOverlay({
             variant="ghost"
             className="h-9 px-2 text-[14px] text-muted-foreground"
             size="sm"
-            disabled={connecting || uninstalling}
-            onClick={() => void connect(item)}
+            disabled={
+              connecting ||
+              uninstalling ||
+              (item.availability === "unknown"
+                ? integrations.isFetching
+                : !isCatalogItemAvailable(item))
+            }
+            onClick={() => {
+              if (item.availability === "unknown") void integrations.refetch();
+              else void connect(item);
+            }}
           >
-            <Plus />
-            {connecting ? <Trans>Adding…</Trans> : <Trans>Add another</Trans>}
+            {isCatalogItemAvailable(item) ? <Plus /> : null}
+            {item.availability === "coming_soon" ? (
+              <Trans id="integration.comingSoon">Coming soon</Trans>
+            ) : item.availability === "unknown" ? (
+              <Trans>Retry</Trans>
+            ) : connecting ? (
+              <Trans>Adding…</Trans>
+            ) : (
+              <Trans>Add another</Trans>
+            )}
           </Button>
         </section>
 

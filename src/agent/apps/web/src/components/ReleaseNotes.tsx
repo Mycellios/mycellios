@@ -93,11 +93,18 @@ export function ReleaseNotes({
           <section>
             <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
               <Trans>Improved</Trans>
-              <span className="rounded-full bg-primary/10 px-1.5 tabular-nums">1</span>
+              <span className="rounded-full bg-primary/10 px-1.5 tabular-nums">2</span>
             </h3>
             <ul className="list-disc space-y-3 ps-4 text-sm leading-relaxed marker:text-primary">
               <li>
-                <Trans>See which accounts are connected to each app.</Trans>
+                <Trans id="workspace.updatedReleaseNote">
+                  A unified workspace for your apps, tasks, routines, calendar and usage.
+                </Trans>
+              </li>
+              <li>
+                <Trans id="integration.availabilityReleaseNote">
+                  Connect available apps; integrations still being prepared show Coming soon.
+                </Trans>
               </li>
             </ul>
           </section>

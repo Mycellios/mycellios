@@ -1,5 +1,65 @@
 import { expect, test } from "@playwright/test";
 
+test("temporary readiness failure offers Retry and never starts authorization", async ({
+  page,
+}) => {
+  const attempts: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/connections/begin")) attempts.push(request.url());
+  });
+  await page.goto("/?unavailable=1");
+  await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill("TikTok");
+  await page.getByRole("button", { name: "Reintentar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Agregar", exact: true })).toBeEnabled();
+  expect(attempts).toEqual([]);
+});
+
+test("existing accounts remain manageable when another connection is Coming soon", async ({
+  page,
+}) => {
+  await page.goto("/?accounts=1&setup=1");
+  await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill("Twitter");
+  await page.getByRole("button", { name: "Agregado", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Coming soon", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Desconectar todo", exact: true })).toBeEnabled();
+  await expect(page.getByTestId("connection-accounts")).toContainText("@forest_fixture");
+});
+
+test("unconfigured integrations show Coming soon without starting authorization", async ({
+  page,
+}, testInfo) => {
+  const attempts: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/connections/begin")) attempts.push(request.url());
+  });
+  await page.goto("/");
+  for (const name of ["Google Contacts", "TikTok"]) {
+    await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill(name);
+    await expect(page.getByRole("button", { name: "Coming soon", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Agregar", exact: true })).toHaveCount(0);
+  }
+  expect(attempts).toEqual([]);
+  for (const width of [1440, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(async () => {
+        const bounds = await page.getByRole("dialog").boundingBox();
+        return Boolean(bounds && bounds.x >= 15 && bounds.x + bounds.width <= width - 15);
+      })
+      .toBe(true);
+    await expect(page.getByRole("button", { name: "Coming soon", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    await testInfo.attach(`integration-coming-soon-${width}`, {
+      body: await page.screenshot(),
+      contentType: "image/png",
+    });
+  }
+  await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill("Gmail");
+  await expect(page.getByRole("button", { name: "Agregar", exact: true })).toBeEnabled();
+});
+
 test("server setup is translated, bounded on small screens, and does not prevent another app connecting", async ({
   page,
 }, testInfo) => {

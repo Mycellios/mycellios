@@ -1310,6 +1310,18 @@ msgstr "ゆったり"
 msgid "Coming soon"
 msgstr "近日公開"
 
+#. js-lingui-explicit-id
+msgid "workspace.updatedReleaseNote"
+msgstr "A unified workspace for your apps, tasks, routines, calendar and usage."
+
+#. js-lingui-explicit-id
+msgid "integration.comingSoon"
+msgstr "Coming soon"
+
+#. js-lingui-explicit-id
+msgid "integration.availabilityReleaseNote"
+msgstr "Connect available apps; integrations still being prepared show Coming soon."
+
 #: src/pages/McpServersOverlay.tsx
 #: src/pages/RoutineEditor.tsx
 msgid "Command"

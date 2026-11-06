@@ -147,6 +147,41 @@ inference ran on PC-DANI. No production API/database, real customer account or
 public installer was used or changed. Native consent was preauthorized only in
 the isolated test profile, so its live permission dialog remains outside this
 qualification. No commit, push or deployment was performed.
+## Integration availability candidate
+
+The catalog distinguishes deployment authentication readiness from user consent.
+Enabled provider configurations permit normal connection, including user-entered
+API keys. Missing, disabled or ambiguous custom configurations show a disabled
+Coming soon action; a metadata outage offers Retry. Already connected accounts
+remain manageable. Safe readiness counts are cached within the credential-bound
+adapter for one minute, with complete bounded pagination and no credentials or
+configuration identifiers in client results. Older-server catalog payloads remain
+compatible. The guarded update announcement records the new UI edition.
+
+Before workspace reconciliation, local qualification passed 116 focused
+adapter/core/mobile/update tests and seven isolated browser cases. The browser
+fixture exercises the production integration
+overlay at desktop, tablet and phone sizes without production accounts, live OAuth
+or provider credentials. API/web and direct native-mobile TypeScript checks passed.
+The full mobile check is blocked by existing Expo patch-version expectations;
+dependencies were not changed. The root structure gate rejects the pre-existing
+documentation image directory introduced by the settings change; this candidate
+does not alter that gate or remove the image. Documentation, architecture,
+component-boundary and root type checks passed.
+
+An independent operator-only, read-only metadata audit exercised the pinned SDK
+and readiness reader against the configured provider. It did not authorize user
+accounts or execute application tools, and its private results are not fixtures.
+Selected provider application registration and real consent acceptance remain
+separate work. No new OAuth credentials, native installer or production release
+is claimed by this local candidate.
+
+The combined workspace/integration candidate retains the Marketplace account
+editor and adds a catalog-import regression using the shipped English/Spanish
+PO files. The shared Vitest setup now compiles those files with the existing
+web Lingui configuration instead of treating catalogs as JavaScript during
+related-test discovery. Exact-candidate remote checks and production promotion
+are independent of the earlier local qualification above.
 
 ## Mico task and routine isolation candidate
 

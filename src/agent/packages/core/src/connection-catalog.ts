@@ -1,6 +1,10 @@
 import type { Connection, ConnectionCatalogItem } from "@rakazo/contracts";
 import { abortableDelay } from "./async.js";
 
+export function isCatalogItemAvailable(item: ConnectionCatalogItem): boolean {
+  return item.availability === undefined || item.availability === "available";
+}
+
 type CatalogRef = Pick<ConnectionCatalogItem, "connectorId" | "slug">;
 
 export function catalogItemKey(item: CatalogRef) {
@@ -63,6 +67,7 @@ export async function connectCatalogItem(
   { status: "connected"; row?: Connection } | { status: "pending" } | { status: "aborted" }
 > {
   const stopped = () => deps.signal.aborted || deps.isCurrent?.() === false;
+  if (!isCatalogItemAvailable(item)) throw new Error("Integration is not available for connection");
   const started = await deps.begin({
     connectorId: item.connectorId,
     provider: item.slug,

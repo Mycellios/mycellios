@@ -157,6 +157,76 @@ async function render(node: ReactNode = <Integrations />) {
   await act(async () => root.render(node));
 }
 
+it("shows Coming soon for deployment setup while leaving enabled apps connectable", async () => {
+  state.rpc.mockImplementation((proc: string) =>
+    Promise.resolve(
+      proc === "connections/catalog"
+        ? [
+            { ...item, connected: false, availability: "coming_soon" },
+            {
+              ...item,
+              slug: "ready",
+              name: "Ready app",
+              connected: false,
+              availability: "available",
+            },
+          ]
+        : [],
+    ),
+  );
+  await render();
+  const comingSoon = [...container.querySelectorAll("button")].find(
+    (b) => b.textContent === "Coming soon",
+  );
+  expect(comingSoon?.disabled).toBe(true);
+  const add = [...container.querySelectorAll("button")].find((b) => b.textContent === "Add");
+  expect(add?.disabled).toBe(false);
+  await act(async () => comingSoon?.click());
+  expect(state.rpc.mock.calls.some(([proc]) => proc === "connections/begin")).toBe(false);
+});
+
+it("keeps existing accounts manageable when additional connections need setup", async () => {
+  state.rpc.mockImplementation((proc: string) =>
+    Promise.resolve(
+      proc === "connections/catalog"
+        ? [{ ...item, availability: "coming_soon" }]
+        : proc === "connections/list"
+          ? [account]
+          : [],
+    ),
+  );
+  await render();
+  const added = [...container.querySelectorAll("button")].find((b) => b.textContent === "Added");
+  expect(added?.disabled).toBe(false);
+  await act(async () => added?.click());
+  expect(
+    [...container.querySelectorAll("button")].find((b) => b.textContent === "Coming soon")
+      ?.disabled,
+  ).toBe(true);
+  expect(
+    [...container.querySelectorAll("button")].find((b) => b.textContent === "Remove")?.disabled,
+  ).toBe(false);
+});
+
+it("retries unknown readiness instead of starting authorization or advertising Coming soon", async () => {
+  let reads = 0;
+  state.rpc.mockImplementation((proc: string) =>
+    Promise.resolve(
+      proc === "connections/catalog"
+        ? [{ ...item, connected: false, availability: ++reads === 1 ? "unknown" : "available" }]
+        : [],
+    ),
+  );
+  await render();
+  const retry = [...container.querySelectorAll("button")].find((b) => b.textContent === "Retry");
+  expect(retry?.disabled).toBe(false);
+  await act(async () => retry?.click());
+  expect(
+    [...container.querySelectorAll("button")].some((b) => b.textContent === "Add" && !b.disabled),
+  ).toBe(true);
+  expect(state.rpc.mock.calls.some(([proc]) => proc === "connections/begin")).toBe(false);
+});
+
 it("keeps Search visible and shows rows on a cold load until the first success", async () => {
   await render();
   expect(container.querySelector('input[placeholder="Search apps"]')).not.toBeNull();
