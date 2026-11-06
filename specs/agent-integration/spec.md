@@ -272,3 +272,26 @@ or replacement of the contribution ledger is part of this frontend deployment.
 Verify real account re-entry, owned native credit and AntSeed conversations on
 the published frontend; do not infer their success from a static build alone.
 The separate real-model long-context failure is not repaired by a web release.
+
+### Integration connection availability
+
+The catalog separates deployment readiness from each user's connected accounts.
+Composio readiness uses enabled authentication configurations that permit Tool
+Router access; user-entered API keys remain a normal connection flow. Missing,
+disabled or ambiguous custom configurations produce `coming_soon`. No-auth
+toolkits remain available without a configuration, while an explicitly disabled
+configuration is respected. Never serialize credentials or configuration IDs.
+
+Safe readiness counts are cached for at most one minute within a credential-bound
+adapter, with coalesced reads and bounded complete pagination. Metadata failures
+produce `unknown`, not a false preparation status. Shared web/Desktop and native
+mobile controls render Coming soon disabled, or Retry for unknown readiness;
+existing accounts remain manageable. A shared connection-flow guard prevents
+authorization for unavailable catalog entries. Optional availability fields
+preserve compatibility with older servers and other integration providers.
+
+Qualification uses offline pagination/cache/credential-isolation and adapter/core
+tests, native-mobile component fixtures, and real browser fixtures at desktop,
+tablet and phone widths. These fixtures never register provider applications,
+connect real accounts or use production credentials. Provider setup and real
+consent acceptance are separate operator qualification.

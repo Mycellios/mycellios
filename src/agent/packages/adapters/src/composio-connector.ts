@@ -12,6 +12,7 @@ import type {
 } from "@rakazo/adapter-kit";
 import { INTEGRATION_AUTH_SETUP_REQUIRED } from "@rakazo/contracts";
 import { getLogger } from "@rakazo/logging";
+import { createComposioAuthReadiness, isComposioAuthReady } from "./composio-auth-readiness.js";
 import {
   composioToolkitDirectory,
   createToolkitDirectoryCache,
@@ -353,6 +354,9 @@ export class ComposioConnector implements ComposioProvider {
     this.directoryCache = options.client ? createToolkitDirectoryCache() : composioToolkitDirectory;
   }
   private readonly catalogSessions = new Map<string, string>();
+  private readonly authReadiness = createComposioAuthReadiness((params, options) =>
+    this.sdk().authConfigs!.list(params, options),
+  );
   private readonly executeSessions = new Map<string, { sessionId: string; key: string }>();
 
   describe() {
@@ -460,12 +464,26 @@ export class ComposioConnector implements ComposioProvider {
   }
 
   async catalog(context: AdapterContext, query?: string): Promise<ConnectorCatalogItem[]> {
-    const [directory, connected] = await Promise.all([
+    const [directory, connected, readiness] = await Promise.all([
       this.directory(),
       this.listConnectedSlugs(context.userId),
+      this.sdk().authConfigs ? this.authReadiness.get().catch(() => null) : undefined,
     ]);
     return filterCatalog(mergeCatalogWithConnected(directory, connected), query ?? "").map(
-      (item) => ({ ...item, connectorId: "composio" }),
+      (item) => ({
+        ...item,
+        connectorId: "composio",
+        ...(readiness === undefined
+          ? {}
+          : {
+              availability:
+                readiness === null
+                  ? ("unknown" as const)
+                  : isComposioAuthReady(readiness, item.slug, item.noAuth)
+                    ? ("available" as const)
+                    : ("coming_soon" as const),
+            }),
+      }),
     );
   }
 

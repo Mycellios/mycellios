@@ -14,6 +14,7 @@ import {
   EMPTY_PLUGIN_CATALOG_MESSAGE,
   filterConnectionCatalogItems,
   humanizeToolName,
+  isCatalogItemAvailable,
   isCatalogItemConnected,
 } from "@rakazo/core";
 import { useFocusEffect } from "expo-router";
@@ -392,6 +393,7 @@ export default function Integrations() {
   }
 
   async function connect(item: ConnectionCatalogItem) {
+    if (!isCatalogItemAvailable(item)) return;
     const isCurrent = captureConnectionScope();
     if (!isCurrent()) return;
     connectionAttempt.current?.abort();
@@ -585,11 +587,28 @@ export default function Integrations() {
     }
     return (
       <NativeActionButton
-        accessibilityLabel={t("Add {name}", { name: label })}
-        disabled={connecting}
+        accessibilityLabel={
+          item.availability === "coming_soon"
+            ? "Coming soon"
+            : item.availability === "unknown"
+              ? t("Retry")
+              : t("Add {name}", { name: label })
+        }
+        disabled={connecting || item.availability === "coming_soon"}
         fill={false}
-        label={connecting ? t("Working…") : t("Add")}
-        onPress={() => void connect(item)}
+        label={
+          item.availability === "coming_soon"
+            ? "Coming soon"
+            : item.availability === "unknown"
+              ? t("Retry")
+              : connecting
+                ? t("Working…")
+                : t("Add")
+        }
+        onPress={() => {
+          if (item.availability === "unknown") void retryRefresh();
+          else void connect(item);
+        }}
         prominence="secondary"
       />
     );
@@ -687,10 +706,27 @@ export default function Integrations() {
             </View>
           ))}
           <NativeActionButton
-            accessibilityLabel={t("Add another {name}", { name: item.name })}
-            disabled={connecting || uninstalling}
-            label={connecting ? t("Working…") : t("Add another")}
-            onPress={() => void connect(item)}
+            accessibilityLabel={
+              item.availability === "coming_soon"
+                ? "Coming soon"
+                : item.availability === "unknown"
+                  ? t("Retry")
+                  : t("Add another {name}", { name: item.name })
+            }
+            disabled={connecting || uninstalling || item.availability === "coming_soon"}
+            label={
+              item.availability === "coming_soon"
+                ? "Coming soon"
+                : item.availability === "unknown"
+                  ? t("Retry")
+                  : connecting
+                    ? t("Working…")
+                    : t("Add another")
+            }
+            onPress={() => {
+              if (item.availability === "unknown") void retryRefresh();
+              else void connect(item);
+            }}
             prominence="secondary"
           />
         </View>

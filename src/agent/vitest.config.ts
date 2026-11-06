@@ -1,10 +1,11 @@
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { defineConfig } from "vitest/config";
-import { lingui } from "@lingui/vite-plugin";
 
 const chatRequire = createRequire(new URL("./packages/chat-ui/package.json", import.meta.url));
+const webRequire = createRequire(new URL("./apps/web/package.json", import.meta.url));
+const { lingui } = await import(pathToFileURL(webRequire.resolve("@lingui/vite-plugin")).href);
 const markdownSource = path.join(path.dirname(chatRequire.resolve(
   "@ronradtke/react-native-markdown-display/package.json",
 )), "src/index.tsx");
@@ -15,6 +16,7 @@ export default defineConfig({
   plugins: [lingui({
     cwd: fileURLToPath(new URL("./apps/web/", import.meta.url)),
     configPath: fileURLToPath(new URL("./apps/web/lingui.config.ts", import.meta.url)),
+    failOnCompileError: true,
   })],
   // Offline tests receive explicit fixtures; never read a maintainer's .env.
   envDir: false,
