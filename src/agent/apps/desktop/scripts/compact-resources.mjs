@@ -74,7 +74,7 @@ export async function verifyCompactServer(root) {
   const files=await filesIn(root);
   if(receipt.schema!=='mycellios-compact-resources/1' || files.length!==receipt.physicalFiles ||
       files.length>3000 || files.includes('dist/desktop-local-entry.js'))
-    throw Error('Packaged compact server contains a duplicate or unexpected loose tree');
+    throw Error(`Packaged compact server contains a duplicate or unexpected loose tree (expected ${receipt.physicalFiles}, found ${files.length})`);
   return receipt;
 }
 

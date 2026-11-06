@@ -50,7 +50,10 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       // it; its loader also supports this explicit unpacked resources location.
       { from: path.join(agentRoot, 'node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node'), to: 'koffi/win32_x64/koffi.node' },
       ...(compact ? [
-        {from:compact.server,to:'local-server'},
+        {from:compact.server,to:'local-server',filter:['**/*','!node_modules{,/**/*}']},
+        // The builder always excludes a resource root's node_modules directory.
+        // Map this root explicitly; it contains native packages only.
+        {from:path.join(compact.server,'node_modules'),to:'local-server/node_modules',filter:['**/*']},
         {from:compact.source,to:'development-source.asar'},
         {from:compact.npm,to:'development-tools/npm.asar'},
       ] : [
