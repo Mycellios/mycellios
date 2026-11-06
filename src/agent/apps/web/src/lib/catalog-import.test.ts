@@ -6,7 +6,7 @@ import { messages as spanish } from "../locales/es/messages.po";
 
 it("compiles shipped PO catalogs during related-test discovery", () => {
   for (const [locale, messages] of [["en", english], ["es", spanish]] as const) {
-    const i18n = setupI18n({ locale, messages: messages as Messages });
+    const i18n = setupI18n({ locale, messages: { [locale]: messages as Messages } });
     expect(i18n._("integration.comingSoon")).toBe("Coming soon");
   }
 });
