@@ -5,6 +5,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {hashes} from './desktop-release.mjs';
+import {electronGuiEnvironment} from './electron-environment.mjs';
 const require=createRequire(import.meta.url),desktop=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 if(process.platform!=='win32'||process.env.GITHUB_ACTIONS!=='true'||!process.argv[2])throw Error('Use an isolated hosted Windows runner');
 const output=path.resolve(process.argv[2]),identity=JSON.parse(await fs.readFile(path.join(output,'desktop-build.json'),'utf8'));
@@ -26,7 +27,7 @@ const proofs=[];
 let ownsRegistration=false;
 async function preservation(mode,resources,label){
  const result=path.join(root,label+'.json');
- execFileSync(electron,[fixture,mode,mode==='archives'?path.join(root,'archive-profile'):profile,resources,result],{windowsHide:true,env:{...process.env,ELECTRON_RUN_AS_NODE:'',NODE_OPTIONS:''},timeout:60000,stdio:'pipe'});
+ execFileSync(electron,[fixture,mode,mode==='archives'?path.join(root,'archive-profile'):profile,resources,result],{windowsHide:true,env:electronGuiEnvironment(),timeout:60000,stdio:'pipe'});
  const proof=await json(result);assert.equal(proof.passed,true);return proof;
 }
 async function measure(installation,label){

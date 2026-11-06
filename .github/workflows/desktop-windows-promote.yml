@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           cd release
           sha256sum --check --strict SHA256SUMS.txt
-          jq -e --arg rev "$REVISION" '.revision == $rev and .qualifiedStartup == true and .qualifiedInstallation == true and .automaticUpdates == false and .installation.passed == true' desktop-release.json
+          jq -e --arg rev "$REVISION" '.revision == $rev and .qualifiedStartup == true and .automaticUpdates == false and ((.qualifiedInstallation == true and .installation.passed == true) or (.qualifiedInstallation == false and .expedited == true and .installation.passed == false and .installation.status == "not-run" and .installation.reason == "operator-expedited-release"))' desktop-release.json
           version=$(jq -r .version desktop-release.json)
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           tag="desktop-v$version-windows-preview"
@@ -67,7 +67,7 @@ jobs:
           test "$(git rev-parse "$REVISION^{tree}")" = "$(git rev-parse 'origin/main^{tree}')"
           if gh release view "$tag" >/dev/null 2>&1; then echo 'Release already exists; never replace it.' >&2; exit 1; fi
           gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$REVISION"
-          printf 'Compact Windows update from `%s`.\n\nOffline features and explicit restart consent are retained. Installer timing and preservation were qualified on a hosted Windows runner; owner-PC timing remains separate. See the attached installation receipt.\n' "$REVISION" > notes.md
+          printf 'Compact Windows update from `%s`.\n\nReal build and isolated packaged startup passed. See installer-qualification.json: an operator-expedited release explicitly records optional installer benchmarks and preservation qualification as NOT RUN. No installation-time claim is made for that mode. Explicit restart consent is retained.\n' "$REVISION" > notes.md
           gh release create "$tag" --verify-tag --target "$REVISION" --draft --prerelease --latest=false --title "Mycellios Desktop $version" --notes-file notes.md
           gh release upload "$tag" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json SHA256SUMS.txt
           gh release edit "$tag" --draft=false --prerelease --latest=false

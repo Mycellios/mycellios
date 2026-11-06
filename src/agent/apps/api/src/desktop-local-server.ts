@@ -102,6 +102,11 @@ async function runFile(
 
 /** Uses PostgreSQL's existing schema and RLS; no lossy conversion to a second database engine. */
 export async function startDesktopLocalServer(config: DesktopLocalConfig) {
+  const diagnostic = (phase: string) => {
+    if (process.env.MYCELLIOS_LOCAL_SERVER_DIAGNOSTICS === "1")
+      console.log(JSON.stringify({ localServerPhase: phase }));
+  };
+  diagnostic("configuration");
   if (!/^[a-f0-9]{64}$/.test(config.token)) throw new Error("Invalid local server token");
   if (config.projectPreview) {
     const origin = new URL(config.projectPreview.webOrigin);
@@ -176,8 +181,11 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
   try {
     if (recovering && existsSync(join(databaseDir, "postmaster.pid")))
       await postgresControl("-m", "fast", "-w", "stop").catch(() => undefined);
+    diagnostic("database-initialize");
     if (!existsSync(join(databaseDir, "PG_VERSION"))) await postgres.initialise();
+    diagnostic("database-start");
     await postgres.start();
+    diagnostic("database-connect");
     const client = postgres.getPgClient("postgres", "127.0.0.1");
     await client.connect();
     try {
@@ -197,6 +205,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     };
     const require = createRequire(import.meta.url);
     const prismaCli = join(dirname(require.resolve("prisma/package.json")), "build", "index.js");
+    diagnostic("schema-migrations");
     await runFile(
       process.execPath,
       [
@@ -208,6 +217,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
       ],
       { env, cwd: config.migrationsRoot },
     );
+    diagnostic("job-migrations");
     await migrateJobQueue(migrationUrl);
     await provisionRuntimeRole(migrationUrl, runtimeUrl);
     const origin = `http://127.0.0.1:${config.port}`;
@@ -237,6 +247,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
           }
         : {}),
     });
+    diagnostic("application-create");
     const { app, stop, prisma } = await createApp(
       config.projectPreview ? {} : { realtime: new InMemoryRealtimeFanout() },
     );
@@ -261,6 +272,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     };
+    diagnostic("ready");
     return { origin, close, prisma };
   } catch (error) {
     await close();

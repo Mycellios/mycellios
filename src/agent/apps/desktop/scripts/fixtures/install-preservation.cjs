@@ -3,6 +3,8 @@ const fs=require('node:fs/promises'),path=require('node:path');
 const {execFile}=require('node:child_process');
 const [mode,profile,resources,result]=process.argv.slice(2);
 app.setPath('userData',profile);app.disableHardwareAcceleration();
+// Keep the fixture alive until its receipt has reached disk after window.destroy().
+app.on('window-all-closed',()=>{});
 const timeout=setTimeout(()=>app.exit(1),45000);
 app.whenReady().then(async()=>{
   const proof={mode};
