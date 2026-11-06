@@ -83,7 +83,7 @@ describe("desktop preload bridge", () => {
       "state",
       "toggleMaximize",
     ]);
-    expect(Object.keys(bridge.update).sort()).toEqual(["cancelInstall", "check", "download", "install", "onPrepare", "state"]);
+    expect(Object.keys(bridge.update).sort()).toEqual(["cancelInstall", "check", "download", "forceInstall", "install", "onPrepare", "state"]);
     expect(Object.keys(bridge.runtime!).sort()).toEqual(["enroll", "identify", "status"]);
 
     expect(Object.keys(bridge.localVoice!).sort()).toEqual(["prepare", "speak", "status", "stop", "transcribe"]);
@@ -112,6 +112,7 @@ describe("desktop preload bridge", () => {
     await bridge.update.check();
     await bridge.update.download();
     await bridge.update.install();
+    await bridge.update.forceInstall?.();
     expect(invoke.mock.calls.map(([channel]) => channel)).toEqual([
       "desktop.localVoice.status",
       "desktop.localVoice.prepare",
@@ -130,6 +131,7 @@ describe("desktop preload bridge", () => {
       "desktop.update.check",
       "desktop.update.download",
       "desktop.update.install",
+      "desktop.update.forceInstall",
     ]);
   });
 

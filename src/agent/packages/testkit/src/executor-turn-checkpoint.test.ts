@@ -925,3 +925,21 @@ it("queues the same run during a Desktop update and resumes its checkpoint witho
     expect(state.reads).toHaveBeenCalledTimes(1);
   } finally {await model.close();}
 });
+
+it("refuses a new mutation while a restarted run still has an uncertain command receipt", async () => {
+  const model=await startModelEmulator({steps:[
+    {expect(){},response:{type:"tool",id:"interrupted-read",name:"read_file",arguments:{path:"evidence.txt"}}},
+    {expect(){},response:{type:"tool",id:"overlap",name:"fixture_write",arguments:{content:"must-not-write"}}},
+    {expect(request){expect(request.messages.find(message=>message.tool_call_id==="overlap")?.content).toContain("Inspect command_status");},response:{type:"text",text:"The interrupted command needs a receipt check before more changes."}}
+  ]});
+  try {
+    const state=fixture(model.model,false,"fixture_write",false);
+    state.reads.mockImplementationOnce(async(_computer,_path,context)=>{context?.onComputerUpdate?.(true);throw new ComputerUpdatingError();});
+    await state.executor.continueRun(state.run.id,"fixture-worker");
+    state.effects.push({id:"uncertain-shell",idempotencyKey:"owned-shell",runId:state.run.id,spaceId:state.run.spaceId,kind:"shell",status:"uncertain",result:{uncertain:true}});
+    await state.executor.continueRun(state.run.id,"fixture-worker");
+    model.assertComplete();
+    expect(state.writes).not.toHaveBeenCalled();
+    expect(state.effects.find(effect=>effect.id==="uncertain-shell")?.status).toBe("uncertain");
+  } finally {await model.close();}
+});

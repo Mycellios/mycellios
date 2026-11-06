@@ -5005,7 +5005,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           observer?: AgentToolExecutionObserver,
         ) => {
           context.signal.throwIfAborted();
-          if (restartingTurn && pendingCommands.size && name !== "command_status" && !READ_ONLY_AGENT_TOOLS.has(name))
+          if (restartingTurn && pendingCommands.size && name !== "command_status" && (!READ_ONLY_AGENT_TOOLS.has(name) || name === "run_subagent"))
             return {error:"Inspect command_status for the interrupted commands before starting another action.",commandIds:[...pendingCommands]};
           if (awaitingDelegatedWork && name !== "work_status" && name !== "command_status")
             return { waitingForTasks: true, error: "This turn delegated its pending work. End the turn; child results will wake the parent. No further actions were executed." };
@@ -8003,6 +8003,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         };
         const applyTool = async (...params: Parameters<typeof dispatchTool>) => {
+          if (desktopUpdateRequested) return pauseForRestart();
           try {
             try {
               const result = await dispatchOneTool(...params);
