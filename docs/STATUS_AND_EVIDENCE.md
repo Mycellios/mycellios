@@ -1,28 +1,40 @@
 # Status and evidence
 
-## Agent workspace production and Windows Desktop 0.3.16 — 2026-11-06
+## Agent production and Windows Desktop 0.3.18 - 2026-11-06
 
-Production web, API and worker now run the workspace release from main
-`7687f4cda40af5e99218b5bacdbc7938e71a06b2`, tree
-`69151bef605c710e3f500e632d6df8f685367d04`. The equivalent reviewed build
-candidate is `21cac3c0c542b6a811abcab711bfae789b55781a`. Public build
-`20261106143633` passes readiness and anonymous browser checks, including an
-interactive sign-in control. The additive task-inbox migration is applied;
-a database backup, prior services and the prior downloads container are retained.
+[Desktop 0.3.18](https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.18-windows-preview)
+is published in all three official desktop catalogs. Production web, API and worker
+serve main `a3171d9f348874eaba65d7a9747b42e7e69fa7b9`, tree
+`ae6c938c028e83d23ee80eebed564dd4fabacaf6`. The qualified build candidate
+`d2d170075fe2d8689db03a80e9e73b1ef9a004e6` has the identical integrated tree.
+Public web build `20261106172524` passes readiness and an anonymous
+browser check with a working sign-in control. Prior services, downloads and a
+database backup are retained; this release adds no database migration.
 
-[Windows Desktop 0.3.16](https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.16-windows-preview)
-is published in the official desktop catalog. Its native Windows build passes
-upgrade-continuity, preload, local-voice rejection and real process-ownership
-checks, release-continuity packaging, archive integrity and isolated-profile
-startup with the Apps/project bridge and unconsented Apps refusal. Installer
-SHA-256 is `0d2b264f15c647f0166c1522af893ab2ccd759a0c88aeee11fa99b4490925129`.
-The complete public installer and source downloads match their recorded hashes.
-Updates remain manual and unsigned; other platform descriptors are unchanged.
+Windows checks and stages verified updates in the background. Installation still
+requires explicit confirmation; the unsigned automatic-install channel stays disabled.
+Restart now can checkpoint and requeue the same owned Run without waiting for all
+native tasks to finish. Saved drafts and fresh owner/session-bound PC grants survive;
+uncertain commands require receipt inspection before further mutations. Both direct
+and relayed native interruption/reconnect tests retain a real command's receipt
+without executing it twice. Windows receipt replacement retries transient sharing
+locks within a fixed budget and reports completion only after persistence.
 
-Qualification did not install into the user's existing profile, authenticate a
-real account, run real microphone/model inference, validate live OAuth/provider
-quota or execute full suites. The independent connection-readiness PR is outside
-this release. Pre-release fixture evidence follows below.
+[Proportional CI](https://github.com/Mycellios/mycellios/actions/runs/42261241991),
+[Windows/workspace acceptance](https://github.com/Mycellios/mycellios/actions/runs/42261241999),
+and the [Windows package/startup qualification](https://github.com/Mycellios/mycellios/actions/runs/42261233374)
+passed. The unchanged journal implementation also passed 1,000 concurrent synthetic
+Windows admissions in [the isolated probe](https://github.com/Mycellios/mycellios/actions/runs/42257229307).
+The public installer and source were downloaded completely and match their hashes;
+both catalog and published-release selection offer 0.3.18. Installer SHA-256:
+`7fef0fcca53bcb24e883058826d9aff95b31450ecfd21a7a0aeb9fa88e432797`.
+Other platform descriptors and previous packages are preserved. Manu's pending
+integration PR remains separate from this release.
+
+Qualification did not update the user's existing installed profile, authenticate a
+real account, run physical microphone/model inference, validate live OAuth/provider
+quota or execute the full suites. A legacy installed updater may still require an
+initial official installer before the new native restart control is available.
 
 ## Agent workspace reconciliation â€” source candidate, 2026-11-06
 
@@ -31,8 +43,8 @@ source: rail/pins, unified Marketplace, routine diagram, workflow canvas, task
 inbox, schedule and usage. Existing project conversations, Mico task ownership,
 searchable settings, private Apps admission and released Video Studio remain.
 Inbox metadata refers to the existing task threads and execution services. Chat
-cards retain the paper/stone palette. This source state is not a deployment or
-a new installed Desktop version.
+cards retain the paper/stone palette. Production and Desktop qualification is recorded above; the fixture checks below
+do not by themselves establish deployment or installation.
 
 Remote Linux qualification passed incremental web/API/worker/Desktop types,
 focused tests, web/API builds and an isolated PostgreSQL acceptance: additive
