@@ -83,10 +83,18 @@ These rules apply to the complete repository.
   public marketplace or arbitrary app executor. Preserve native account/Space/PC
   admission and revision-bound review; qualify the real local artifacts separately.
 
-- During Daniel's temporary fast-delivery mode, `.github/workflows/ci.yml`
-  records source readiness without waiting for full test/security/platform jobs.
-  Its summary must say they were NOT RUN and must not claim deployment success.
-  Real release builds, artifact identity and health verification remain required.
+- Remote CI is the primary validation route; local validation is optional for fast
+  feedback and never a prerequisite for uploading an authorized working branch.
+  Choose local or remote once; do not wait for PC RAM or duplicate successful
+  checks on the identical candidate. Keep branches small and integrate frequently.
+  `.github/workflows/ci.yml` checks the actual PR/merge-group candidate and changed
+  surfaces through `scripts/ci-proportional.mjs`, with locked npm installs only in
+  affected dependency graphs, types and related tests. It retains `CI summary`.
+  Full suites remain paused. The receipt lists actual checks and NOT RUN items;
+  related-test discovery is not proof of complete behavioral coverage. Security,
+  auth, billing, migrations, dependencies and native changes retain focused gates.
+  Real release builds, artifact identity, rollback and health checks remain required;
+  this workflow does not deploy or replace the existing release policy.
   Verify workflow changes with `node --test scripts/ci-fast-delivery.test.mjs`
   through the shared queue; do not re-enable the paused full suites implicitly.
 
