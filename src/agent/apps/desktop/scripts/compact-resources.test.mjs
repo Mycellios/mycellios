@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createRequire} from 'node:module';
 import {spawn} from 'node:child_process';
-import {compactServer} from './compact-resources.mjs';
+import {compactServer,verifyCompactServer} from './compact-resources.mjs';
 const require=createRequire(import.meta.url),asar=require('@electron/asar');
 
 async function fixture() {
@@ -37,6 +37,10 @@ test('keeps every JavaScript/license byte and external native package without a 
     assert.deepEqual(await readFile(path.join(f.target,'node_modules/native-shim/vendor/native.exe')),Buffer.from([1,2,3]));
     await assert.rejects(access(path.join(f.target,'node_modules/plain-js')));
     assert.equal(await readFile(path.join(f.target,'prisma/schema.prisma'),'utf8'),'// preserved migration schema');
+    assert.deepEqual(await verifyCompactServer(f.target),f.receipt);
+    await mkdir(path.join(f.target,'dist'));
+    await writeFile(path.join(f.target,'dist/desktop-local-entry.js'),'Unexpected legacy duplicate');
+    await assert.rejects(verifyCompactServer(f.target),/duplicate or unexpected/);
   }finally{await rm(f.root,{recursive:true,force:true});}
 });
 

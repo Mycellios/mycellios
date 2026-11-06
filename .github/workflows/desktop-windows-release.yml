@@ -111,22 +111,50 @@ jobs:
           npm run build:local-server --workspace @rakazo/desktop
           exit $LASTEXITCODE
       - name: Package and qualify the immutable installer
+        id: package
         working-directory: src/agent
         shell: pwsh
         run: |
           node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc --out $env:DESKTOP_RELEASE_OUT
           if($LASTEXITCODE){exit $LASTEXITCODE}
           & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
-          if($LASTEXITCODE){exit $LASTEXITCODE}
+          exit $LASTEXITCODE
+      - name: Qualify rollback helper
+        working-directory: src/agent
+        shell: pwsh
+        run: |
           $env:MYCELLIOS_TEST_INSTALLED_EXE=Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/Mycellios Desktop.exe'
           node --test apps/desktop/scripts/fast-install.test.mjs
-          if($LASTEXITCODE){exit $LASTEXITCODE}
+          exit $LASTEXITCODE
+      - name: Qualify real compact local server
+        working-directory: src/agent
+        shell: pwsh
+        run: |
           node apps/desktop/scripts/verify-local-server.mjs --server-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/local-server') --web-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/web')
-          if($LASTEXITCODE){exit $LASTEXITCODE}
+          exit $LASTEXITCODE
+      - name: Measure real installer and retained development tools
+        if: ${{ !cancelled() && steps.package.outcome == 'success' }}
+        working-directory: src/agent
+        shell: pwsh
+        run: |
           node apps/desktop/scripts/qualify-windows-install.mjs $env:DESKTOP_RELEASE_OUT
-          if($LASTEXITCODE){exit $LASTEXITCODE}
+          exit $LASTEXITCODE
+      - name: Qualify packaged startup and bind all receipts
+        working-directory: src/agent
+        shell: pwsh
+        run: |
           node apps/desktop/scripts/qualify-windows-release.mjs $env:DESKTOP_RELEASE_OUT
           exit $LASTEXITCODE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: failure()
+        with:
+          name: desktop-windows-diagnostics-${{ steps.identity.outputs.revision }}
+          path: |
+            ${{ env.DESKTOP_RELEASE_OUT }}/desktop-build.json
+            ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
+            ${{ env.DESKTOP_RELEASE_OUT }}/win-unpacked/resources/local-server/compact-resources.json
+          if-no-files-found: warn
+          retention-days: 7
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: desktop-windows-${{ steps.identity.outputs.revision }}

@@ -9,6 +9,7 @@ let restarts = 0;
 let savedCookie = "";
 let savedSkillId = "";
 const timer = setTimeout(() => {
+  console.log(JSON.stringify({phase:"timeout",ready:false}));
   child?.kill();
   app.exit(1);
 }, 180000);
@@ -19,7 +20,8 @@ app
       env: { ...process.env, RAKAZO_LOCAL_SERVER_CONFIG: configFile },
       stdio: "pipe",
     });
-    child.stdout?.resume();
+    let output = "";
+    child.stdout?.on("data", (data) => { output = (output + data).slice(-4000); });
     let errors = "";
     child.stderr?.on("data", (data) => {
       errors = (errors + data).slice(-6000);
@@ -117,10 +119,7 @@ app
         );
         app.quit();
       } else {
-        const detail =
-          errors
-            .split("\n")
-            .find((line) => /^(Error|TypeError|ReferenceError|SyntaxError)/.test(line)) ?? "";
+        const detail = errors.slice(-2000) + "\n" + output.slice(-2000);
         console.log(
           JSON.stringify({
             phase: "server-exit",
@@ -128,7 +127,7 @@ app
             detail: detail
               .replace(/postgres(?:ql)?:\/\/\S+/g, "[fixture-db]")
               .replace(/\b[a-f0-9]{64}\b/g, "[fixture-secret]")
-              .slice(0, 400),
+              .slice(-4000),
           }),
         );
         app.exit(1);

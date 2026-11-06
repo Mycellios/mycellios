@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 import { withWindowsCopyRetry } from './windows-copy-retry.mjs';
 import { stageDevelopmentResources } from './development-resources.mjs';
-import { stageCompactResources } from './compact-resources.mjs';
-import { prepareWindowsInstaller } from './windows-installer.mjs';
+import { stageCompactResources, verifyCompactServer } from './compact-resources.mjs';
+import { prepareWindowsInstaller, writeStandaloneWindowsConfig } from './windows-installer.mjs';
 import { writeBuildIdentity } from './desktop-release.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,8 +18,10 @@ const buildIdentity = await writeBuildIdentity(root, output);
 const development = await stageDevelopmentResources(root);
 const compact = await stageCompactResources(root, development, output);
 const config = await prepareWindowsInstaller({ desktopRoot: root, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity });
+const configFile = await writeStandaloneWindowsConfig(root,config,output);
 await withWindowsCopyRetry(async () => {
   const { Arch, build, Platform } = await import('electron-builder');
-  await build({ targets: Platform.WINDOWS.createTarget('nsis', Arch.x64), projectDir: root, config, publish: 'never' });
+  await build({ targets: Platform.WINDOWS.createTarget('nsis', Arch.x64), projectDir: root, config:configFile, publish: 'never' });
 });
+console.log(JSON.stringify({compactServer:await verifyCompactServer(path.join(output,'win-unpacked/resources/local-server'))}));
 

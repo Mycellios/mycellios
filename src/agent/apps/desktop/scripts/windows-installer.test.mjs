@@ -4,7 +4,9 @@ import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { prepareWindowsInstaller } from './windows-installer.mjs';
+import { prepareWindowsInstaller,writeStandaloneWindowsConfig } from './windows-installer.mjs';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
 
 test('bundles the verified runtime without accounts or shared-node uninstall actions', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'mycellios-installer-'));
@@ -36,5 +38,22 @@ test('bundles the verified runtime without accounts or shared-node uninstall act
     assert.equal(/enrollmentToken|apiKey|password|\.env/.test(text), false);
     await assert.rejects(prepareWindowsInstaller({ desktopRoot: root, runtimeMsi, runtimeSha256: '0'.repeat(64), output: path.join(root, 'out'), version: '0.3.5' }), /hash mismatch/);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('actual builder config keeps voice settings without merging the legacy resource arrays',async()=>{
+  const root=await mkdtemp(path.join(tmpdir(),'mycellios-builder-config-'));
+  try{
+    const legacy={from:'legacy-server',to:'local-server'};
+    const compact={from:'compact-server',to:'local-server'};
+    const voice=['**/node_modules/sherpa-onnx*/**','dist/voice-node*'];
+    await writeFile(path.join(root,'package.json'),JSON.stringify({name:'fixture',version:'0.3.19',build:{extraResources:[legacy],asarUnpack:voice,win:{verifyUpdateCodeSignature:true}}}));
+    const file=await writeStandaloneWindowsConfig(root,{extraResources:[compact],win:{target:'nsis'}},root);
+    const {getConfig}=require('app-builder-lib/out/util/config/config.js');
+    const effective=await getConfig(root,file,null);
+    assert.deepEqual(effective.extraResources,[compact]);
+    assert.deepEqual(effective.asarUnpack,voice);
+    assert.equal(effective.win.verifyUpdateCodeSignature,true);
+    assert.equal(effective.win.target,'nsis');
+  }finally{await rm(root,{recursive:true,force:true});}
 });
 
