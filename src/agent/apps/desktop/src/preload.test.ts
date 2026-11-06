@@ -4,11 +4,12 @@ import vm from "node:vm";
 import type { RakazoDesktop, RakazoSetup } from "@rakazo/contracts";
 import { describe, expect, it, vi } from "vitest";
 
-function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: unknown } = {}) {
+function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: unknown; send?: unknown } = {}) {
   const invoke =
     (ipc.invoke as ReturnType<typeof vi.fn>) ?? vi.fn(async (channel: string) => ({ channel }));
   const on = (ipc.on as ReturnType<typeof vi.fn>) ?? vi.fn();
   const off = (ipc.off as ReturnType<typeof vi.fn>) ?? vi.fn();
+  const send = (ipc.send as ReturnType<typeof vi.fn>) ?? vi.fn();
   const exposeInMainWorld = vi.fn();
   const source = readFileSync(path.join(import.meta.dirname, file), "utf8");
 
@@ -16,14 +17,25 @@ function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: u
     process: { platform: "linux" },
     require(moduleName: string) {
       if (moduleName !== "electron") throw new Error(`Unexpected preload import: ${moduleName}`);
-      return { contextBridge: { exposeInMainWorld }, ipcRenderer: { invoke, on, off } };
+      return { contextBridge: { exposeInMainWorld }, ipcRenderer: { invoke, on, off, send } };
     },
   });
 
-  return { invoke, on, off, exposeInMainWorld };
+  return { invoke, on, off, send, exposeInMainWorld };
 }
 
 describe("desktop preload bridge", () => {
+  it("acknowledges only bounded native update requests without exposing IPC events", async () => {
+    const { on, off, send, exposeInMainWorld } = runPreload("preload.cjs");
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    const listener = vi.fn(() => true), unsubscribe = bridge.update.onPrepare!(listener);
+    const handler = on.mock.calls.find(([channel]) => channel === "desktop.update.prepare")![1];
+    await handler({ privateEvent: true }, "invalid"); expect(send).not.toHaveBeenCalled();
+    await handler({ privateEvent: true }, "a".repeat(32));
+    expect(listener).toHaveBeenCalledWith();
+    expect(send).toHaveBeenCalledWith("desktop.update.prepared", { nonce: "a".repeat(32), ready: true });
+    unsubscribe(); expect(off).toHaveBeenCalledWith("desktop.update.prepare", handler);
+  });
   it("exposes a bounded preview bridge without the Mycellios development launcher", async () => {
     const { invoke, on, off, exposeInMainWorld } = runPreload("preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
@@ -51,6 +63,7 @@ describe("desktop preload bridge", () => {
     expect(bridge.platform).toBe("linux");
     expect(bridge.nativeWindowFrame).toBe(true);
     expect(Object.keys(bridge).sort()).toEqual([
+      "appsStudio",
       "badge",
       "computer",
       "nativeWindowFrame",
@@ -69,7 +82,7 @@ describe("desktop preload bridge", () => {
       "state",
       "toggleMaximize",
     ]);
-    expect(Object.keys(bridge.update).sort()).toEqual(["check", "download", "install", "state"]);
+    expect(Object.keys(bridge.update).sort()).toEqual(["cancelInstall", "check", "download", "install", "onPrepare", "state"]);
     expect(Object.keys(bridge.runtime!).sort()).toEqual(["enroll", "identify", "status"]);
 
     expect(Object.keys(bridge.badge!)).toEqual(["set"]);

@@ -4,6 +4,7 @@ export const COMPOSER_DRAFT_STORAGE_PREFIX = "rakazo.composerDraft.";
 
 type ComposerDraftSubmission = { text: string };
 const pendingSubmissions = new Map<string, ComposerDraftSubmission>();
+const failedDraftWrites = new Map<string, string>();
 const acceptedListeners = new Map<string, Set<(text: string) => void>>();
 
 export function beginComposerDraftSubmission(
@@ -40,7 +41,7 @@ export function setComposerUnsavedWork(pending: boolean): void {
 
 /** A send waiting for its answer, or attachments that only exist in memory. */
 export function composerHoldsUnsavedWork(): boolean {
-  return pendingSubmissions.size > 0 || unsavedWork;
+  return pendingSubmissions.size > 0 || unsavedWork || failedDraftWrites.size > 0;
 }
 
 /** Unsaved composer work, or saved text in any composer that has not been sent. */
@@ -107,11 +108,28 @@ export function writeComposerDraft(
   storage: DraftStorage | null = getLocalStorage(),
 ): void {
   pendingSubmissions.delete(threadKey);
-  if (!storage || !threadKey) return;
+  if (!threadKey) return;
+  if (!storage) { failedDraftWrites.set(threadKey, draft); return; }
   try {
     if (draft.length === 0) storage.removeItem(composerDraftStorageKey(threadKey));
     else storage.setItem(composerDraftStorageKey(threadKey), draft);
+    failedDraftWrites.delete(threadKey);
   } catch {
     // Quota or private-mode failures: the draft still lives in memory.
+    failedDraftWrites.set(threadKey, draft);
   }
+}
+
+/** Retry only failed persistence; never settle or resend an in-flight submission. */
+export function flushComposerDrafts(): boolean {
+  const storage = getLocalStorage();
+  if (!storage) return false;
+  for (const [key, value] of failedDraftWrites) {
+    try {
+      if (value) storage.setItem(composerDraftStorageKey(key), value);
+      else storage.removeItem(composerDraftStorageKey(key));
+      failedDraftWrites.delete(key);
+    } catch { return false; }
+  }
+  return true;
 }

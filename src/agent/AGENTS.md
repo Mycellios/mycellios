@@ -1,5 +1,17 @@
 # AGENTS.md
 
+- Windows manual updates use the official HTTPS download catalog after an explicit
+  user action; keep the unsigned automatic-install channel disabled. Bound and
+  verify catalog/payload bytes, platform, paths, versions and SHA-256; never accept
+  renderer-provided installer paths. Wait for native work and a nonce-bound current
+  main-frame acknowledgement, preserve stored text drafts and block in-memory work.
+  A pending restart is cancellable. The detached same-user helper waits for normal
+  exit, snapshots session/installation state, installs and reopens the same profile.
+  Never force-stop another process or clear user data. Legacy bootstrap shutdown
+  uses Restart Manager flags zero, registered only to the exact app process.
+  Verify manual-update, desktop-update-work, composer-draft and preload tests plus
+  a fresh-profile native handoff before applying it to an installed profile.
+
 - Windows installers explicitly include Koffi's win32-x64 optional native module
   under resources/koffi/win32_x64. Preserve this loader-supported fallback even
   when dependency collection misses optional packages. Use the native 7z NSIS

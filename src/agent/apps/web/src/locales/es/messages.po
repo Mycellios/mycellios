@@ -7975,3 +7975,9 @@ msgstr "Reasignar tarea"
 
 msgid "The work changed or could not be updated. Refresh its status and try again."
 msgstr "El trabajo ha cambiado o no se pudo actualizar. Actualiza el estado e inténtalo de nuevo."
+
+msgid "Cancel update"
+msgstr "Cancelar actualización"
+
+msgid "Waiting for local tasks and unsaved work…"
+msgstr "Esperando a que terminen las tareas y se guarden los cambios…"
