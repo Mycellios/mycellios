@@ -872,7 +872,7 @@ export function PluginsOverlay({
       <div id="integration-list" hidden={loading} className="rk-market-app-list">
         {catalogError || loadError ? (
           <div className="mb-4 flex items-center gap-3">
-            <p className="text-sm text-destructive">{catalogError ?? loadError}</p>
+            <p role="alert" className="text-sm text-destructive">{catalogError ?? loadError}</p>
             {!catalogLoaded || (loadError && !catalogError) ? (
               <Button variant="outline" size="sm" onClick={() => void integrations.refetch()}>
                 <Trans>Retry</Trans>

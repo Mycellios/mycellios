@@ -43,7 +43,7 @@ test("unconfigured integrations show Coming soon without starting authorization"
     await page.setViewportSize({ width, height: 900 });
     await expect
       .poll(async () => {
-        const bounds = await page.getByRole("dialog").boundingBox();
+        const bounds = await page.getByTestId("marketplace-workspace").boundingBox();
         return Boolean(bounds && bounds.x >= 15 && bounds.x + bounds.width <= width - 15);
       })
       .toBe(true);
@@ -75,11 +75,11 @@ test("server setup is translated, bounded on small screens, and does not prevent
     await expect(alert).toBeVisible();
     await expect
       .poll(async () => {
-        const bounds = await page.getByRole("dialog").boundingBox();
+        const bounds = await page.getByTestId("marketplace-workspace").boundingBox();
         return Boolean(bounds && bounds.x >= 15 && bounds.x + bounds.width <= width - 15);
       })
       .toBe(true);
-    const geometry = await page.getByRole("dialog").boundingBox();
+    const geometry = await page.getByTestId("marketplace-workspace").boundingBox();
     expect(geometry?.x).toBeGreaterThanOrEqual(15);
     expect(geometry!.x + geometry!.width).toBeLessThanOrEqual(width - 15);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
@@ -101,8 +101,8 @@ test("old API provider dumps never reach the screen", async ({ page }, testInfo)
   await page.getByRole("textbox", { name: "Buscar apps", exact: true }).fill("Twitter");
   await page.getByRole("button", { name: "Agregar", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("No se pudo conectar");
-  await expect(page.getByRole("dialog")).not.toContainText("private-request");
-  await expect(page.getByRole("dialog")).not.toContainText("ToolRouter");
+  await expect(page.getByTestId("marketplace-workspace")).not.toContainText("private-request");
+  await expect(page.getByTestId("marketplace-workspace")).not.toContainText("ToolRouter");
   await testInfo.attach("legacy-integration-error", {
     body: await page.screenshot(),
     contentType: "image/png",
@@ -147,11 +147,8 @@ test("account details identify each account and separate pending authorizations"
   const accounts = page.getByTestId("connection-accounts");
   await expect(accounts).toContainText("@forest_fixture");
   await expect(accounts).toContainText("@mycelium_team");
-  expect(
-    await page
-      .getByRole("dialog")
-      .evaluate((element) => Number.parseFloat(getComputedStyle(element).borderTopLeftRadius)),
-  ).toBeGreaterThan(8);
+  await expect(page.getByTestId("marketplace-workspace")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(accounts).not.toContainText("Autorización pendiente");
   await expect(page.getByTestId("pending-connections")).toContainText("1 conexión pendiente");
   await expect(page.getByRole("button", { name: "Desconectar todo", exact: true })).toBeVisible();
@@ -169,12 +166,11 @@ test("account details identify each account and separate pending authorizations"
     await expect(accounts).toBeVisible();
     await expect
       .poll(async () => {
-        const bounds = await page.getByRole("dialog").boundingBox();
+        const bounds = await page.getByTestId("marketplace-workspace").boundingBox();
         return Boolean(bounds && bounds.x >= 15 && bounds.x + bounds.width <= width - 15);
       })
       .toBe(true);
-    const geometry = await page.getByRole("dialog").boundingBox();
-    expect(geometry?.height).toBeLessThan(650);
+    const geometry = await page.getByTestId("marketplace-workspace").boundingBox();
     expect(geometry?.x).toBeGreaterThanOrEqual(15);
     expect(geometry!.x + geometry!.width).toBeLessThanOrEqual(width - 15);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
