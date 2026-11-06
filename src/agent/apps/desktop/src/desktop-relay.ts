@@ -84,10 +84,12 @@ export class DesktopRelayClient {
   async bind(botId: string, renew = false) {
     const intent=this.intent;
     const identity = await this.identity();
-    const restored = !renew && !this.grants.size ? await this.options.restoreUpdate?.(identity, botId) : undefined;
-    if (restored) this.deviceId = restored.deviceId;
-    if(intent!==this.intent)throw Error("The local session changed");
     const existing = this.grants.get(botId);
+    const planned = !renew && !existing ? await this.options.restoreUpdate?.(identity, botId) : undefined;
+    if(intent!==this.intent)throw Error("The local session changed");
+    const restored = planned && (!this.options.deviceId || planned.deviceId === this.options.deviceId) &&
+      (!this.grants.size || planned.deviceId === this.deviceId) ? planned : undefined;
+    if (restored) this.deviceId = restored.deviceId;
     // Reassert the same grant after an API restart; never replay an operation.
     const generation =
       existing && !renew ? existing.generation : restored?.generation ?? this.accountGeneration ?? randomUUID();
