@@ -8431,8 +8431,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               resumeFromCheckpoint: takeoverResume?.checkpoint,
               turnCheckpoint,
               onCheckpoint: async (capture, executionId) => {
-                pendingTurnCheckpoints.set(executionId, capture);
-                latestRestartCapture = capture;
+                const retained = restartingTurn ? () => {
+                  const saved = JSON.parse(capture());
+                  saved.restartInterrupted = true;
+                  return JSON.stringify(saved);
+                } : capture;
+                pendingTurnCheckpoints.set(executionId, retained);
+                latestRestartCapture = retained;
               },
               resumeToolResult: {
                 content: [{ type: "text", text: takeoverResume?.promptNote ?? taskPrompt }],
