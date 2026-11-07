@@ -10,13 +10,14 @@ import { BOT_ID_ATTEMPTS, chooseBotAvatar, chooseMicoAvatar, pickLeastUsed } fro
 
 it("assigns every branded shape and palette combination before repeating", () => {
   const existing = [{ color: "#123456::shape_0" }, { color: "data:image/png;base64,abc" }];
-  const colors = Array.from({ length: 144 }, () => {
+  const combinations = MICO_AVATAR_SHAPES.length * MICO_AVATAR_PALETTES.length;
+  const colors = Array.from({ length: combinations }, () => {
     const { color } = chooseMicoAvatar(existing);
     existing.push({ color });
     return color;
   });
   expect(colors[0]).toBe(micoAvatarValue(MICO_AVATAR_SHAPES[0].index, MICO_AVATAR_PALETTES[0].color));
-  expect(new Set(colors).size).toBe(144);
+  expect(new Set(colors).size).toBe(combinations);
   expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[0])).size).toBe(12);
   expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[1])).size).toBe(12);
   const next = chooseMicoAvatar(existing);

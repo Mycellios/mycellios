@@ -244,12 +244,11 @@ it("offers current network models for one Mico and enables its choice without ch
     provider: "openai-compatible", providerName: "Mycellios", id: "qwen3-8b", label: "Qwen3 8B", billing: "Uses your credits",
   }]);
   await render();
-  await vi.waitFor(() => expect(container.querySelector('[id$="-model"]')?.textContent).toContain("qwen3-8b"));
-  const select = container.querySelector<HTMLSelectElement>('[id$="-model"]')!;
-  await act(async () => {
-    select.value = "openai-compatible::qwen3-8b";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await act(async () => container.querySelector<HTMLButtonElement>('button[id$="-model"]')!.click());
+  const model = () => [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+    .find((option) => /qwen3[- ]8b/i.test(option.textContent ?? ""));
+  await vi.waitFor(() => expect(model()).toBeDefined());
+  await act(async () => model()!.click());
   await clickSave();
   expect(rpc.models.connect).toHaveBeenCalledWith(expect.objectContaining({ credentialId: "network-key", enabledModelIds: ["old-chat", "qwen3-8b"], makeDefault: false }));
   expect(onSave.mock.lastCall?.[0]).toMatchObject({ modelProvider: "openai-compatible", modelId: "qwen3-8b" });
@@ -317,13 +316,14 @@ describe("BotSettings model choices", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    const model = container.querySelector('[id$="-model"]');
-    if (!(model instanceof HTMLSelectElement)) throw new Error("Missing model select");
-    const values = [...model.options].map((option) => option.value);
-    expect(values).toContain("deepseek::deepseek-flash");
-    expect(values).toContain("deepseek::deepseek-v4-pro");
-    expect(values).not.toContain("deepseek::DeepSeek-V4.1-Flash");
-    expect(values.some((value) => value.includes("DeepSeek"))).toBe(false);
+    await act(async () => container.querySelector<HTMLButtonElement>('button[id$="-model"]')!.click());
+    const options = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+    expect(options.some((option) => option.textContent?.includes("DeepSeek V4 Pro"))).toBe(true);
+    const flash = options.find((option) => option.textContent?.includes("DeepSeek V4.1 Flash"));
+    expect(flash).toBeDefined();
+    await act(async () => flash!.click());
+    await clickSave();
+    expect(onSave.mock.lastCall?.[0]).toMatchObject({ modelProvider: "deepseek", modelId: "deepseek-flash" });
   });
 });
 
@@ -367,8 +367,7 @@ describe("BotSettings thinking options", () => {
       await Promise.resolve();
     });
     const [model, thinking] = [...container.querySelectorAll('[id$="-model"], [id$="-thinking"]')];
-    if (!(model instanceof HTMLSelectElement)) throw new Error("Missing model select");
-    expect(model.value).toBe("openai-compatible::beta");
+    expect(model?.textContent).toContain("beta");
     if (!(thinking instanceof HTMLSelectElement)) throw new Error("Missing thinking select");
     expect([...thinking.options].map((option) => option.value)).toEqual(["", "low", "high"]);
   });
