@@ -2,7 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { isDesktopDownloadCatalog } from "../../src/contracts/desktop-downloads";
 import { DesktopDownloads } from "./DesktopDownloads";
-import { FEDORA_DESKTOP_DOWNLOAD } from "./desktop-fedora-download";
 
 const catalog = () => ({
   schema: "mycellios-desktop-downloads/1", version: "0.3.9", runtimeVersion: "0.2.95",
@@ -20,14 +19,10 @@ describe("Desktop downloads", () => {
     expect(html).toContain('Download for Mac (Intel)');expect(html).toContain('Download for Mac (Apple Silicon)');expect(html).toContain('macOS 13 or later');
     expect(html).not.toContain('Intel Macs are not supported');
   });
-  it("exposes the published Fedora RPM independently of the legacy catalog", () => {
+  it("waits for the release catalog before offering the Fedora download", () => {
     const html = renderToStaticMarkup(<DesktopDownloads />);
-    expect(html).toContain(`href="${FEDORA_DESKTOP_DOWNLOAD.path}"`);
-    expect(html).toContain('aria-label="Download for Fedora"');
-    expect(html).not.toContain("Download RPM");
-    expect(html).toContain(`sudo dnf install ./${FEDORA_DESKTOP_DOWNLOAD.fileName}`);
-    expect(html).toContain(FEDORA_DESKTOP_DOWNLOAD.sha256);
-    expect(FEDORA_DESKTOP_DOWNLOAD.path).toBe(`https://github.com/Mycellios/mycellios/releases/download/desktop-v${FEDORA_DESKTOP_DOWNLOAD.version}-fedora-preview/${FEDORA_DESKTOP_DOWNLOAD.fileName}`);
+    expect(html).toMatch(/<button(?=[^>]*disabled)(?=[^>]*aria-label="Download for Fedora")/);
+    expect(html).not.toContain("dnf install");
   });
 
   it("retains the existing two-package catalog contract", () => {

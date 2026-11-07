@@ -15,6 +15,16 @@ export interface DesktopDownloadCatalog {
     version?: string;
     source?: { path: string; sha256: string };
   }>;
+  fedora?: {
+    id: "fedora-x64";
+    format: "RPM";
+    fileName: string;
+    path: string;
+    sha256: string;
+    bytes: number;
+    version: string;
+    source: { path: string; sha256: string };
+  };
   source: { path: string; sha256: string };
 }
 
@@ -31,6 +41,18 @@ export function isDesktopDownloadCatalog(value: unknown): value is DesktopDownlo
     const source = value as Record<string, unknown>;
     return safePath(source.path, release) && typeof source.sha256 === "string" && /^[a-f0-9]{64}$/.test(source.sha256);
   };
+  const safeInstaller = (p: Record<string, unknown>, extension: string, release: string) =>
+    typeof p.fileName === "string" && p.fileName.endsWith(extension)
+    && safePath(p.path, release) && (p.path as string).endsWith("/" + p.fileName)
+    && typeof p.sha256 === "string" && /^[a-f0-9]{64}$/.test(p.sha256)
+    && typeof p.bytes === "number" && Number.isSafeInteger(p.bytes) && p.bytes > 0;
+  if (c.fedora !== undefined) {
+    if (!c.fedora || typeof c.fedora !== "object") return false;
+    const fedora = c.fedora as Record<string, unknown>;
+    if (fedora.id !== "fedora-x64" || fedora.format !== "RPM"
+      || typeof fedora.version !== "string" || !/^\d+\.\d+\.\d+$/.test(fedora.version)
+      || !safeInstaller(fedora, ".rpm", fedora.version) || !safeSource(fedora.source, fedora.version)) return false;
+  }
   const ids = new Set<string>();
   for (const item of c.packages) {
     if (!item || typeof item !== "object") return false;
@@ -40,10 +62,7 @@ export function isDesktopDownloadCatalog(value: unknown): value is DesktopDownlo
       || (p.source !== undefined && !safeSource(p.source, release))
       || (release !== version && !safeSource(p.source, release))) return false;
     const extension = p.id === "windows-x64" && p.format === "EXE" ? ".exe" : p.id === "linux-x64" && p.format === "DEB" ? ".deb" : ["macos-arm64","macos-x64"].includes(String(p.id)) && p.format === "DMG" ? ".dmg" : null;
-    if (!extension || ids.has(String(p.id)) || typeof p.fileName !== "string" || !p.fileName.endsWith(extension)
-      || !safePath(p.path, release) || !(p.path as string).endsWith("/" + p.fileName)
-      || typeof p.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(p.sha256)
-      || typeof p.bytes !== "number" || !Number.isSafeInteger(p.bytes) || p.bytes <= 0) return false;
+    if (!extension || ids.has(String(p.id)) || !safeInstaller(p, extension, release)) return false;
     ids.add(String(p.id));
   }
   if (!ids.has("windows-x64") || !ids.has("linux-x64")) return false;
