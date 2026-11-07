@@ -7433,24 +7433,38 @@ msgstr "Tool finished · waiting for an update"
 msgid "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
 msgstr "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "Desktop could not confirm the result. Review what it already did before continuing."
 msgstr "Desktop could not confirm the result. Review what it already did before continuing."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "Mycellios encountered an internal error."
 msgstr "Mycellios encountered an internal error."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} could not complete the request. The cause is unknown."
 msgstr "{provider} could not complete the request. The cause is unknown."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} reached its usage quota."
 msgstr "{provider} reached its usage quota."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} returned a server error."
 msgstr "{provider} returned a server error."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} is temporarily unavailable."
 msgstr "{provider} is temporarily unavailable."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "The model hit its output limit before writing a response."
 msgstr "The model hit its output limit before writing a response."
 

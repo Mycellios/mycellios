@@ -9124,24 +9124,38 @@ msgstr "No se ha podido iniciar el micrófono. Inténtalo de nuevo."
 msgid "Message not sent. Your text is kept here."
 msgstr "No se ha enviado el mensaje. Tu texto se conserva aquí."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "Desktop could not confirm the result. Review what it already did before continuing."
 msgstr "No se pudo confirmar el resultado en tu PC. Revisa qué se hizo antes de continuar."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "Mycellios encountered an internal error."
 msgstr "Se produjo un error interno en Mycellios."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} could not complete the request. The cause is unknown."
 msgstr "{provider} no pudo completar la solicitud. No se pudo identificar la causa."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} reached its usage quota."
 msgstr "{provider} agotó su cuota de uso."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} returned a server error."
 msgstr "{provider} devolvió un error de servidor."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "{provider} is temporarily unavailable."
 msgstr "{provider} no está disponible temporalmente."
 
+#. js-lingui-explicit-id
+#: src/lib/run-error.ts
 msgid "The model hit its output limit before writing a response."
 msgstr "El modelo agotó sus tokens de salida antes de generar una respuesta."
 
