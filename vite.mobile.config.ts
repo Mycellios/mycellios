@@ -25,15 +25,15 @@ function mobileAssets(): Plugin {
         fileName: "manifest.webmanifest",
         source: JSON.stringify(
           {
-            name: "mycellios browser worker",
-            short_name: "mycellios",
+            name: "Mycellios Browser Contribution",
+            short_name: "Mycellios",
             description: "Contribute verified compute power from a desktop, tablet, or phone browser.",
             start_url: "./",
             scope: "./",
             display: "standalone",
             orientation: "portrait",
-            background_color: "#11172f",
-            theme_color: "#11172f",
+            background_color: "#f8f5f0",
+            theme_color: "#f8f5f0",
             icons: [
               {
                 src: "./mycellios-app-icon-v2.png",
