@@ -34,3 +34,16 @@ it("retains the qualified optional Apple Silicon package with the required legac
  expect(isDesktopDownloadCatalog({...c,packages:[c.packages[0],mac]})).toBe(false);
  expect(isDesktopDownloadCatalog({...c,packages:[...c.packages,{...mac,format:"EXE"}]})).toBe(false);
 });
+
+it("accepts a Fedora release independently of the legacy package list", () => {
+  const c = catalog();
+  const fedora = {
+    id: "fedora-x64", format: "RPM", version: "0.3.21", fileName: "desktop.rpm",
+    path: "/downloads/desktop/releases/0.3.21/desktop.rpm", bytes: 42, sha256: "e".repeat(64),
+    source: { path: "/downloads/desktop/releases/0.3.21/source.tar.gz", sha256: "f".repeat(64) },
+  };
+  expect(isDesktopDownloadCatalog({ ...c, fedora })).toBe(true);
+  expect(isDesktopDownloadCatalog({ ...c, fedora: { ...fedora, path: "https://other.example/desktop.rpm" } })).toBe(false);
+  expect(isDesktopDownloadCatalog({ ...c, fedora: { ...fedora, version: c.version } })).toBe(false);
+  expect(isDesktopDownloadCatalog({ ...c, fedora: { ...fedora, source: c.source } })).toBe(false);
+});

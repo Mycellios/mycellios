@@ -9,6 +9,8 @@ export function planChecks(files) {
   const root = files.some(f => !visual(f) && /^(src\/(?!agent\/)|landing\/|mobile\/|tests\/|scripts\/.*\.ts$|tsconfig|vite\.|vitest\.|package(?:-lock)?\.json$)/.test(f))
     || files.some(f => /^scripts\/.*\.test\.[cm]?js$/.test(f) && f !== 'scripts/ci-fast-delivery.test.mjs');
   const agent = files.some(f => f.startsWith('src/agent/') && !visual(f));
+  const desktopDownloadBrowserTest = 'scripts/desktop-macos/download-page.test.mjs';
+  const desktopDownloads = files.some(f => ['landing/src/DesktopDownloads.tsx', 'src/contracts/desktop-downloads.ts', desktopDownloadBrowserTest].includes(f));
   const commands = [];
   const agentScriptTests = [];
   const add = (cwd, bin, args, label) => commands.push({ cwd, bin, args, label });
@@ -16,7 +18,7 @@ export function planChecks(files) {
   if (root || agent) add('.', 'npm', ['install', '--global', 'npm@10.9.8', '--no-audit', '--no-fund'], 'pinned npm toolchain');
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);
-    if (/\.test\.[cm]js$/.test(file) && file !== 'scripts/ci-fast-delivery.test.mjs') {
+    if (/\.test\.[cm]js$/.test(file) && file !== 'scripts/ci-fast-delivery.test.mjs' && file !== desktopDownloadBrowserTest) {
       if (file.startsWith('src/agent/')) agentScriptTests.push(file);
       else add('.', 'node', ['--test', file], `test: ${file}`);
     }
@@ -32,6 +34,12 @@ export function planChecks(files) {
     const tests = code.filter(f => /^(tests\/|landing\/)/.test(f) && /\.test\.[jt]sx?$/.test(f));
     if (tests.length) add('.', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...tests, '--maxWorkers', '2', '--no-file-parallelism'], 'root changed tests');
     if (related.length) add('.', 'node', ['node_modules/vitest/vitest.mjs', 'related', ...related, '--run', '--passWithNoTests', '--maxWorkers', '2', '--no-file-parallelism'], 'root affected tests');
+    if (desktopDownloads) {
+      add('.', 'node', ['scripts/build-desktop-downloads.mjs'], 'Desktop downloads page build');
+      add('.', 'npm', ['ci', '--prefix', 'scripts/desktop-macos', '--ignore-scripts', '--no-audit', '--no-fund'], 'Desktop browser fixture dependencies');
+      add('.', 'node', ['scripts/desktop-macos/node_modules/@playwright/test/cli.js', 'install', 'chromium', '--only-shell'], 'Desktop browser fixture Chromium');
+      add('.', 'node', ['--test', desktopDownloadBrowserTest], 'Desktop downloads browser fixture');
+    }
   }
   if (agent) {
     add('src/agent', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'Agent locked dependencies');
