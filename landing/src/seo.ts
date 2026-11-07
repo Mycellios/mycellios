@@ -165,7 +165,7 @@ export const SEO_PAGES = {
     },
   },
   "/browser/": {
-    title: "Browser worker for desktop, tablet, and phone | mycellios",
+    title: "Browser contribution | Mycellios",
     description:
       "Connect a desktop, tablet, or phone browser to mycellios and contribute voluntary, measurable compute that you can pause anytime.",
     canonicalPath: "/browser/",
@@ -184,7 +184,7 @@ export const SEO_PAGES = {
     structuredData: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
-      name: "mycellios browser worker",
+      name: "Mycellios Browser Contribution",
       applicationCategory: "DeveloperApplication",
       operatingSystem: "Any compatible desktop, tablet, or phone browser",
       description:
