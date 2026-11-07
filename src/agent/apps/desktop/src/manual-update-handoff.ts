@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, open, readFile } from "node:fs/promises";
 import path from "node:path";
 import { writePrivateFile } from "./setup-store.js";
 import type { ManualRelease } from "./manual-update.js";
@@ -26,21 +26,33 @@ export async function launchManualUpdate(options: {
     installer: options.installer, version: options.release.version, sha256: options.release.sha256,
     bytes: options.release.bytes, reopenUrl: options.reopenUrl }));
   const executable = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-  const child = spawn(executable, ["-NoProfile", "-NonInteractive", "-File", helper, "-ConfigFile", config], {
-    detached: true, windowsHide: true, stdio: "ignore",
-  });
+  // Detached PowerShell 5.1 can exit before running the script. A hidden
+  // launcher starts the actual helper outside Electron's direct-child job.
+  const output = await open(path.join(directory, "launcher.log"), "wx", 0o600);
+  const child = (() => {
+    try {
+      return spawn(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper, "-ConfigFile", config, "-Launch"], {
+        windowsHide: true, stdio: ["ignore", output.fd, output.fd],
+      });
+    } finally {
+      void output.close().catch(() => undefined);
+    }
+  })();
   await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
   child.unref();
   // A successful spawn is not a successful handoff: wait for the exact worker's acknowledgement.
-  const deadline = Date.now() + 15_000;
+  // Antivirus scanning and hashing the staged installer can exceed 15 seconds.
+  const deadline = Date.now() + 45_000;
   while (Date.now() < deadline) {
-    try {
-      const phase = manualUpdatePhase(await readFile(path.join(directory, "progress.json"), "utf8"));
-      if (phase === "waiting-for-app") {
-        await writePrivateFile(path.join(directory, "commit.json"), JSON.stringify({ approved: true }));
-        return;
-      }
-    } catch { /* The helper has not opened its receipt yet. */ }
+    const phase = await readFile(path.join(directory, "progress.json"), "utf8")
+      .then(manualUpdatePhase).catch(() => null);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw Error(`The update helper exited before handoff (${child.exitCode ?? child.signalCode})`);
+    }
+    if (phase === "waiting-for-app") {
+      await writePrivateFile(path.join(directory, "commit.json"), JSON.stringify({ approved: true }));
+      return;
+    }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   throw Error("The update helper did not acknowledge the handoff");

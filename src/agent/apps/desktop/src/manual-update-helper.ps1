@@ -1,15 +1,19 @@
-param([Parameter(Mandatory=$true)][string]$ConfigFile)
+param([Parameter(Mandatory=$true)][string]$ConfigFile,[switch]$Launch)
 $ErrorActionPreference='Stop'
 $job=[IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ConfigFile))
+if($Launch){
+ # PowerShell 5.1 needs a console to initialize. The hidden launcher starts
+ # another process so the update worker outlives Electron's direct-child job.
+ $argsForWorker=@('-NoLogo','-NoProfile','-NonInteractive','-File',('"' + $PSCommandPath + '"'),'-ConfigFile',('"' + $ConfigFile + '"'))
+ $worker=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsForWorker -WindowStyle Hidden -RedirectStandardOutput (Join-Path $job 'helper.log') -RedirectStandardError (Join-Path $job 'helper-error.log') -PassThru
+ $worker.WaitForExit()
+ exit $worker.ExitCode
+}
 $result=Join-Path $job 'result.json'
-$config=Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8|ConvertFrom-Json
-$profile=[IO.Path]::GetFullPath($config.profile)
-$executable=[IO.Path]::GetFullPath($config.executable)
-$installation=[IO.Path]::GetDirectoryName($executable)
-$installer=[IO.Path]::GetFullPath($config.installer)
 $backup=Join-Path $job 'backup'
 $phase='preflight'
 $installerLock=$null
+$canReopen=$false
 function Progress([string]$value){$script:phase=$value;@{phase=$value}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8}
 function Copy-Safe([string]$source,[string]$destination,[string[]]$exclude=@()){
  $arguments=@($source,$destination,'/E','/COPY:DAT','/DCOPY:DAT','/XJ','/R:1','/W:1','/NFL','/NDL','/NP','/NJH','/NJS')
@@ -40,6 +44,11 @@ function Reopen {
  Start-Process -FilePath $executable -WindowStyle Hidden | Out-Null
 }
 try {
+ $config=Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8|ConvertFrom-Json
+ $profile=[IO.Path]::GetFullPath($config.profile)
+ $executable=[IO.Path]::GetFullPath($config.executable)
+ $installation=[IO.Path]::GetDirectoryName($executable)
+ $installer=[IO.Path]::GetFullPath($config.installer)
  if($config.schema -ne 'mycellios-manual-update/1' -or $config.version -notmatch '^\d{1,6}\.\d{1,6}\.\d{1,6}$' -or $config.sha256 -notmatch '^[a-f0-9]{64}$'){throw 'Invalid native update request'}
  if([IO.Path]::GetFileName($executable) -ne 'Mycellios Desktop.exe' -or $profile.Length -lt 10 -or !$job.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Invalid update scope'}
  if(!$installer.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($installer) -ne ('Mycellios-Desktop-'+$config.version+'-windows-x64-pilot.exe')){throw 'Invalid installer scope'}
@@ -57,6 +66,7 @@ try {
  while((Installed-Process).Count){if((Get-Date) -gt $childrenDeadline){throw 'Another instance is using this installation'};Start-Sleep -Milliseconds 250}
  $commit=Get-Content -LiteralPath (Join-Path $job 'commit.json') -Raw -Encoding UTF8|ConvertFrom-Json
  if($commit.approved -ne $true){throw 'The native install request was not committed'}
+ $canReopen=$true
  Progress 'backing-up'
  if(Test-Path -LiteralPath $backup){throw 'A previous backup already exists for this request'}
  New-Item -ItemType Directory -Path $backup | Out-Null
@@ -89,7 +99,7 @@ try {
  $failedPhase=$phase
  if($phase -eq 'installing' -and (Test-Path -LiteralPath (Join-Path $backup 'installation')) -and !(Installed-Process).Count){
   try {Copy-Safe (Join-Path $backup 'installation') $installation;Reopen}catch{}
- } elseif((Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
+ } elseif($canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
  @{installed=$false;phase=$failedPhase;error=$_.Exception.Message;backup=$backup}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8
  exit 1
 } finally {if($installerLock){$installerLock.Dispose()}}

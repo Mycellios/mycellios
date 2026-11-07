@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { afterEach, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ allowed: true, online: true, changed: () => {}, stopped: 0 }));
+const state = vi.hoisted(() => ({ allowed: true, changed: () => {}, stopped: 0 }));
 vi.mock("./account-computer.js", () => ({
   AccountComputerConnection: class {
     constructor(options: any) {
@@ -8,9 +8,6 @@ vi.mock("./account-computer.js", () => ({
     }
     hasConsent() {
       return state.allowed;
-    }
-    online() {
-      return state.online;
     }
     start() {
       state.changed();
@@ -32,14 +29,7 @@ vi.mock("electron", async () => {
     setLoginItemSettings: vi.fn(),
     quit: vi.fn(),
   });
-  class Tray extends EventEmitter {
-    destroyed = false;
-    isDestroyed = () => this.destroyed;
-    setToolTip = vi.fn(() => { if (this.destroyed) throw new Error("Tray is destroyed"); });
-    setContextMenu = vi.fn();
-    destroy = vi.fn(() => { this.destroyed = true; });
-  }
-  return { app, Tray, Menu: { buildFromTemplate: vi.fn((x) => x) } };
+  return { app };
 });
 import { app } from "electron";
 import { installAccountComputerBackground } from "./account-computer-background.js";
@@ -52,7 +42,6 @@ afterEach(() => {
 it("keeps a consented window and its draft alive in the background, with explicit quit and revocation", async () => {
   vi.useFakeTimers();
   state.allowed = true;
-  state.online = true;
   state.stopped = 0;
   const window = Object.assign(new EventEmitter(), {
     hide: vi.fn(),
@@ -72,6 +61,7 @@ it("keeps a consented window and its draft alive in the background, with explici
   window.emit("close", close);
   expect(close.preventDefault).toHaveBeenCalledOnce();
   expect(window.hide).toHaveBeenCalledOnce();
+  expect(app.getFileIcon).not.toHaveBeenCalled();
   if (process.platform === "win32")
     expect(app.setLoginItemSettings).toHaveBeenLastCalledWith({
       openAtLogin: true,
@@ -95,7 +85,7 @@ it("keeps a consented window and its draft alive in the background, with explici
   expect(state.stopped).toBeGreaterThan(0);
 });
 
-it("ignores synchronous and late connection changes after the tray has shut down", async () => {
+it("ignores synchronous and late connection changes during app shutdown", async () => {
   vi.useFakeTimers();
   const changed = vi.fn();
   const service = installAccountComputerBackground({
