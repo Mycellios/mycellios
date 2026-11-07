@@ -17,6 +17,15 @@ async function git(cwd: string, ...args: string[]) {
 }
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
+export async function isGitProjectRoot(directory: string) {
+  try {
+    return await git(directory, "rev-parse", "--show-toplevel").then(realpath) === directory &&
+      Boolean(await git(directory, "rev-parse", "--verify", "HEAD"));
+  } catch {
+    return false;
+  }
+}
+
 /** Native-only, owner-scoped repository choices. No path is accepted from IPC. */
 export class ProjectWorkspaces {
   private pending = new Map<string, Promise<string | null>>();
@@ -67,18 +76,27 @@ export class ProjectWorkspaces {
     const legacy = path.join(directory, digest(threadId));
     const home = await readPrivateFile(legacy + ".json", 16384) ? legacy : path.join(directory, digest(threadId).slice(0, 32));
     const receipt = home + ".json";
+    const branch = "mycellios/task-" + digest([scope, projectId, threadId]).slice(0, 32);
     const existing = await readPrivateFile(receipt, 16384);
     if (!existing) {
       if (await stat(home).then(() => true, e => { if (e.code === "ENOENT") return false; throw e; }))
         throw new Error("An unverified conversation folder already exists. Choose a new conversation.");
       await validate();
-      await git(source, "worktree", "add", "--detach", home, "HEAD");
-      await writePrivateFile(receipt, JSON.stringify({ common, threadId }));
+      await git(source, "worktree", "add", "--no-track", "-b", branch, home, "HEAD");
+      await writePrivateFile(receipt, JSON.stringify({ common, threadId, branch }));
     } else {
-      const row = JSON.parse(existing) as { common: string; threadId: string };
+      const row = JSON.parse(existing) as { common: string; threadId: string; branch?: string };
       const actual = await realpath(await git(home, "rev-parse", "--path-format=absolute", "--git-common-dir"));
       if (row.threadId !== threadId || row.common !== common || actual !== common)
         throw new Error("The conversation worktree no longer matches this project.");
+      // Older receipts were created detached. Give that HEAD a name without
+      // replacing its commits, index or files, and leave later checkouts alone.
+      if (row.branch === undefined) {
+        await validate();
+        const current = await git(home, "branch", "--show-current");
+        if (!current) await git(home, "switch", "--no-track", "-c", branch);
+        await writePrivateFile(receipt, JSON.stringify({ ...row, branch: current || branch }));
+      }
     }
     await validate();
     return realpath(home);

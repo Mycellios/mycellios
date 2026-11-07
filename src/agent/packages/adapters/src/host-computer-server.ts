@@ -52,7 +52,7 @@ export async function startHostComputerServer(options: {
     if (!provider) {
       provider = new DesktopSandboxProvider({
         root: options.root,
-        hostRoots: projects.has(botId) ? [projects.get(botId)!] : [homedir()],
+        hostRoots: () => [projects.get(botId) ?? homedir()],
         maxFileBytes: HOST_COMPUTER_MAX_FILE_BYTES,
       });
       providers.set(botId, provider);
@@ -278,10 +278,11 @@ export async function startHostComputerServer(options: {
     async function fileTarget(value: string) {
       const project = projects.get(input.botId);
       const portable = value.replaceAll("\\", "/");
+      const mounted = portable.replace(/^\/(?!\/)/, "");
       if (
         !project ||
         (!projectGuards.has(input.botId) &&
-          !(portable === "project" || portable.startsWith("project/")))
+          !(mounted === "project" || mounted.startsWith("project/")))
       )
         return { provider, computer, path: value, project: false };
       if ((await realpath(project)) !== project)
@@ -290,7 +291,7 @@ export async function startHostComputerServer(options: {
         provider: new DesktopSandboxProvider({ maxFileBytes: HOST_COMPUTER_MAX_FILE_BYTES }),
         computer: { ...computer, id: `project-${computer.id}`, providerRef: project },
         path:
-          portable === "project" ? "" : portable.startsWith("project/") ? portable.slice(8) : value,
+          mounted === "project" ? "" : mounted.startsWith("project/") ? mounted.slice(8) : value,
         project: true,
       };
     }
@@ -518,21 +519,18 @@ export async function startHostComputerServer(options: {
       },
     ) {
       if (!enabled) throw new Error("Local computer access is disabled");
-      if (providers.get(botId)?.hasActiveCommands()) throw new Error("Finish the active local task before changing its project");
       if (!botId || botId.length > 256) throw new Error("Invalid agent");
-      if ([...active.values()].some((work) => work?.botId === botId))
-        throw new Error("Wait for this agent's current operation to finish");
       const directory = await realpath(folder);
       if (!(await stat(directory)).isDirectory()) throw new Error("Choose a project folder");
       const root = path.parse(directory).root;
       if (directory === root || directory === homedir())
         throw new Error("Choose a project folder, rather than your entire computer");
       if (!enabled) throw new Error("Local computer access is disabled");
+      if (providers.get(botId)?.hasActiveCommands() || [...active.values()].some((work) => work?.botId === botId))
+        throw new Error("Wait for this agent's current operation to finish");
       projects.set(botId, directory);
       if (guard) projectGuards.set(botId, guard);
       else projectGuards.delete(botId);
-      providers.get(botId)?.cancelAllCommands();
-      providers.delete(botId);
       return { name: path.basename(directory), path: directory };
     },
     project: (botId: string) => {

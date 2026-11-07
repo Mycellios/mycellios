@@ -59,9 +59,34 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole("button", { name: "Personal assistant", exact: true }).click();
   assert.equal(await page.locator("textarea").inputValue(), "");
+  assert.equal(await page.getByRole("button", { name: "Add folder" }).count(), 0);
+  await page.addInitScript(() => {
+    let folder = null;
+    window.rakazoDesktop = { computer: {
+      projectAvailable: async () => true, requestAccess: async () => true, project: async () => folder,
+      chooseProject: async () => folder = sessionStorage.getItem("repository")
+        ? { name: "Example app", path: "C:\\Example app", repositoryId: "11111111-1111-4111-8111-111111111111" }
+        : { name: "Documents", path: "C:\\Documents" },
+    } };
+  });
+  await page.reload();
+  await page.locator('button[title="Add folder"]').click();
+  await page.getByRole("button", { name: "Add folder", exact: true }).last().click();
+  await page.getByText("Documents", { exact: true }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "New task in a branch" }).count(), 0);
+  await page.screenshot({ path: path.join(output, "mico-local-folder.png"), animations: "disabled" });
+  await page.evaluate(() => sessionStorage.setItem("repository", "1"));
+  await page.reload();
+  await page.locator('button[title="Add folder"]').click();
+  await page.getByRole("button", { name: "Add folder", exact: true }).last().click();
+  await page.getByRole("button", { name: "New task in a branch" }).click();
+  await page.getByRole("textbox", { name: "New task in a branch" }).fill("Fix checkout");
+  await page.screenshot({ path: path.join(output, "mico-branch-task.png"), animations: "disabled" });
+  await page.getByRole("button", { name: "Create task", exact: true }).click();
+  await page.getByTestId("active-conversation").filter({ hasText: "Fix checkout" }).waitFor();
   assert.deepEqual(errors, []);
   const result = { passed: true, fixtureOnly: true, productionAccess: false, screenshots: output,
-    checks: ["projects hidden before creation", "create project", "two conversations on one existing Mico", "switch conversations", "draft separation", "return to ordinary chat", "desktop/mobile overflow", "light/dark", "no browser errors"] };
+    checks: ["projects hidden before creation", "create project", "two conversations on one existing Mico", "switch conversations", "draft separation", "return to ordinary chat", "desktop/mobile overflow", "light/dark", "native-only folder action", "plain folder", "branch task from attached repository", "no browser errors"] };
   await writeFile(path.join(output, "result.json"), JSON.stringify(result, null, 2)); console.log(JSON.stringify(result, null, 2));
   }
 } finally { await browser?.close(); await server.close(); }

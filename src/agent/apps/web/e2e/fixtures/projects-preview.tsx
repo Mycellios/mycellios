@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import type { ProjectSummary } from "@rakazo/contracts";
 import type { RpcClient } from "../../src/lib/rpc";
 import { SidebarProjects } from "../../src/components/SidebarProjects";
+import { LocalProject } from "../../src/components/LocalProject";
 import { Composer } from "../../src/pages/shell/composer";
 import { Menu } from "lucide-react";
 import "../../src/styles.css";
@@ -19,7 +20,10 @@ function Preview() {
   const [chat, select] = useState(""), [mobileOpen, setMobileOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rpc = { development: {
-    saveProject: async (input: { id: string; name: string }) => { saved.push({ ...input, conversations: [] }); return { id: input.id }; },
+    saveProject: async (input: { id: string; name: string }) => {
+      if (!saved.some(project => project.id === input.id)) saved.push({ ...input, conversations: [] });
+      return { id: input.id };
+    },
     open: async (input: { botId: string; title: string; taskKey: string; projectKey: string }) => {
       const project = saved.find(p => `project:${p.id}` === input.projectKey)!;
       project.conversations.push({ botId: input.botId, title: input.title, threadId: input.taskKey, unread: false });
@@ -34,7 +38,9 @@ function Preview() {
       <div className="p-2 text-sm text-muted-foreground">Micos</div><button onClick={() => select("")} className="w-full rounded-lg p-2 text-start text-sm">Personal assistant</button>
     </aside>
     <section className="flex min-w-0 flex-1 flex-col">
-      <header className="flex min-w-0 items-center gap-2 border-b border-border p-4 text-sm"><button className="min-[600px]:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(!mobileOpen)}><Menu size={18} /></button><span className="truncate" data-testid="active-conversation">{projects.flatMap(p => p.conversations).find(c => c.threadId === chat)?.title ?? "Personal assistant"}</span></header>
+      <header className="flex min-w-0 items-center gap-2 border-b border-border p-4 text-sm"><button className="min-[600px]:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(!mobileOpen)}><Menu size={18} /></button><span className="truncate" data-testid="active-conversation">{projects.flatMap(p => p.conversations).find(c => c.threadId === chat)?.title ?? "Personal assistant"}</span>
+        <LocalProject botId="developer" rpc={rpc} onTask={id => { setProjects([...saved]); select(id); }} />
+      </header>
       <div className="flex-1 p-4 text-sm text-muted-foreground">Local UI fixture · no model or production connection</div>
       <Composer key={chat} draftKey={chat ? `bot:developer:task:${chat}` : "bot:personal"} activeName="Developer" artifactTarget={{ botId: "developer" }}
         running={false} sending={false} pendingAttachments={[]} attachmentNotice={null} sendError={null} runError={null} runErrorId={null}

@@ -169,7 +169,7 @@ export class DesktopSandboxProvider implements SandboxProvider {
   }
 
   constructor(
-    private readonly opts: { root?: string; hostRoots?: string[]; maxFileBytes?: number } = {},
+    private readonly opts: { root?: string; hostRoots?: string[] | (() => string[]); maxFileBytes?: number } = {},
   ) {}
 
   describe() {
@@ -502,7 +502,8 @@ export class DesktopSandboxProvider implements SandboxProvider {
   }
 
   private allowedRoots(home: string) {
-    return [home, ...(this.opts.hostRoots ?? [])];
+    const { hostRoots } = this.opts;
+    return [home, ...((typeof hostRoots === "function" ? hostRoots() : hostRoots) ?? [])];
   }
 }
 

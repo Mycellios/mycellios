@@ -18,6 +18,7 @@ import {
   removeComputerWorkspaceDirectories,
 } from "./computer-workspace.js";
 import { win32NtRelativeAvailable } from "./desktop-sandbox-win32-path.js";
+import { resolveBotWorkspacePath } from "./computer-support.js";
 import { LocalAgentHomeStore } from "./home.js";
 import { hostComputerDeadlineMs } from "./host-computer-protocol.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
@@ -288,6 +289,25 @@ describe("native host computer transport", () => {
     await allStarted;
     await client.cancelRunWork(computer, "computer-id", "saturated-run", context);
     expect((await settled).every((result) => result.status === "rejected")).toBe(true);
+  });
+
+  it("opens a plain selected folder for file tools and native commands without Git", async () => {
+    const folder = path.join(root, "My documents");
+    await mkdir(folder);
+    await writeFile(path.join(folder, "notes.txt"), "original");
+    const other = await client.provision({ botId: "other-mico", homePath: "" }, context);
+    await server.selectProject(computer.botId, folder);
+    expect(await client.environment(computer, context)).toMatchObject({ projectPath: folder, projectRoot: false });
+    expect(await client.environment(other, context)).not.toHaveProperty("projectPath");
+    const teamPath = resolveBotWorkspacePath("team", computer.botId, "/project/notes.txt");
+    expect(Buffer.from(await client.readFile(computer, teamPath, context)).toString()).toBe("original");
+    await client.writeFile(computer, { path: "/project/notes.txt", content: Buffer.from("updated") }, context);
+    expect(await readFile(path.join(folder, "notes.txt"), "utf8")).toBe("updated");
+    const events = await collect(client.execute(computer, {
+      env: nodeEnv, argv: [process.execPath, "-e", "console.log(require('fs').readFileSync('notes.txt', 'utf8'))"],
+    }, context));
+    expect(events).toContainEqual(expect.objectContaining({ type: "stdout", data: expect.stringContaining("updated") }));
+    expect(events).toContainEqual({ type: "exit", code: 0 });
   });
 
   it("round trips portable files and never treats an opaque reference as a host path", async () => {

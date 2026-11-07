@@ -11,7 +11,7 @@ import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { localResourcePaths } from "./local-resource-paths.js";
 import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
-import type { DesktopReachability, DesktopSetup } from "@rakazo/contracts";
+import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell, utilityProcess } from "electron";
@@ -85,7 +85,8 @@ import { installProjectBrowser } from "./project-browser.js";
 import { installProjectRunner } from "./project-runner-ipc.js";
 import { nativePreviewContext, nativeProjectSpace } from "./project-session.js";
 import { installProjectConversations } from "./project-conversations-ipc.js";
-import { assertProjectGrant } from "./project-grant.js";
+import { assertProjectGrant, attachedRepositoryId } from "./project-grant.js";
+import { isGitProjectRoot } from "./project-workspaces.js";
 import {
   browserWindowOptions,
   developmentIconFile,
@@ -1610,11 +1611,40 @@ app.whenReady().then(async () => {
     // requestAccess/connect still authenticate and enforce the actual grant.
     return isCloudComputerRequest(event) && hostComputer !== undefined;
   });
+  const attachedFolders = new Map<string, { scope: string; folder: DesktopMicoFolder }>();
+  async function micoFolderScope(event: Electron.IpcMainInvokeEvent, botId: string) {
+    const managed = isManagedComputerRequest(event);
+    const window = mainWindow, base = projectServer();
+    if (!window || !base || (!managed && !isCloudComputerRequest(event)) || !hostComputer?.isEnabled())
+      throw new Error("Allow local computer access first.");
+    const url = event.senderFrame!.url;
+    const [owner, spaceId] = await nativePreviewContext(window);
+    const response = await window.webContents.session.fetch(`${base}/rpc/bots/get`, {
+      method: "POST", credentials: "include", redirect: "error", bypassCustomProtocolHandlers: true,
+      headers: { "content-type": "application/json", origin: new URL(base).origin,
+        ...(spaceId ? { "x-rakazo-space-id": spaceId } : {}) },
+      body: JSON.stringify({ json: { botId } }), signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) throw new Error("Open this Mico in its Space first.");
+    const { json: bot } = await response.json() as { json?: { id?: string; spaceId?: string } };
+    const identity = managed ? null : await getCloudComputer().identity();
+    if (!owner || bot?.id !== botId || !bot.spaceId ||
+      (identity && (JSON.stringify(identity) !== cloudComputerOwner || identity.userId !== owner || identity.spaceId !== bot.spaceId)) ||
+      (managed && !await localStack.matchesDesiredStack()) ||
+      mainWindow !== window || window.isDestroyed() || projectServer() !== base || !hostComputer.isEnabled() ||
+      window.webContents.getURL() !== url || JSON.stringify(await nativePreviewContext(window)) !== JSON.stringify([owner, spaceId]))
+      throw new Error("The application session changed.");
+    return JSON.stringify([base, owner, bot.spaceId]);
+  }
   ipcMain.handle("desktop.computer.project", async (event, botId: unknown) => {
-    if ((!isManagedComputerRequest(event) && !isCloudComputerRequest(event)) || !hostComputer?.isEnabled() || typeof botId !== "string")
+    if ((!isManagedComputerRequest(event) && !isCloudComputerRequest(event)) || !hostComputer?.isEnabled() ||
+      typeof botId !== "string" || !/^[a-zA-Z0-9_-]{1,256}$/.test(botId))
       return null;
-    if (isCloudComputerRequest(event) && (!cloudComputerOwner || JSON.stringify(await getCloudComputer().identity()) !== cloudComputerOwner)) return null;
-    return hostComputer.project(botId);
+    const project = hostComputer.project(botId);
+    if (!project) return null;
+    const scope = await micoFolderScope(event, botId);
+    const attached = attachedFolders.get(botId);
+    return attached?.scope === scope && attached.folder.path === project.path ? attached.folder : project;
   });
   ipcMain.handle("desktop.computer.connected", async (event, botId: unknown) => {
     if (typeof botId !== "string" || !botId || botId.length > 256 || !hostComputer?.isEnabled()) return false;
@@ -1629,20 +1659,30 @@ app.whenReady().then(async () => {
     await connectLocalComputer(botId);
   });
   ipcMain.handle("desktop.computer.chooseProject", async (event, botId: unknown) => {
-    if (!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) throw new Error("Open the configured application first.");
-    if(typeof botId!=="string" || !hostComputer?.isEnabled())throw new Error("Enable local computer access first.");
-    const selected=await dialog.showOpenDialog(mainWindow!,{title:"Open project",properties:["openDirectory"]});
-    if(selected.canceled || !selected.filePaths[0])return null;
-    if(isCloudComputerRequest(event)) {
-      const client=getCloudComputer();if(JSON.stringify(await client.identity())!==cloudComputerOwner)throw new Error("The account changed.");
-      assertProjectGrant(hostComputer.project(botId),await realpath(selected.filePaths[0]));
-      const project=await hostComputer.selectProject(botId,selected.filePaths[0]);await connectLocalComputer(botId);return project;
-    }
-    if(!isManagedComputerRequest(event) || !await localStack.matchesDesiredStack())throw new Error("The local session changed.");
-    return hostComputer.selectProject(botId,selected.filePaths[0]);
+    if (typeof botId !== "string" || !/^[a-zA-Z0-9_-]{1,256}$/.test(botId) || !hostComputer)
+      throw new Error("Invalid agent.");
+    const url = event.senderFrame?.url;
+    const scope = await micoFolderScope(event, botId);
+    const selected = await dialog.showOpenDialog(mainWindow!, { properties: ["openDirectory", "createDirectory"] });
+    if (selected.canceled || !selected.filePaths[0]) return null;
+    const folder = await realpath(selected.filePaths[0]);
+    const repositoryId = await isGitProjectRoot(folder)
+      ? attachedRepositoryId(hostComputer.connection.token, scope, botId, folder) : undefined;
+    if (isCloudComputerRequest(event)) await connectLocalComputer(botId);
+    if (event.senderFrame?.url !== url || await micoFolderScope(event, botId) !== scope)
+      throw new Error("The folder account changed.");
+    if (isCloudComputerRequest(event)) assertProjectGrant(hostComputer.project(botId), folder);
+    const project = { ...await hostComputer.selectProject(botId, folder), repositoryId };
+    attachedFolders.set(botId, { scope, folder: project });
+    return project;
   });
   if (hostComputer) projectConversations = installProjectConversations({
     storage: path.join(userDataDir, "project-conversations"), host: hostComputer,
+    attachedRepository: (scope, botId, projectId) => {
+      const attached = attachedFolders.get(botId);
+      if (attached?.scope === scope && attached.folder.repositoryId === projectId &&
+        hostComputer?.project(botId)?.path === attached.folder.path) return attached.folder.path;
+    },
     context: async event => {
       if ((!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) || !hostComputer?.isEnabled() || !mainWindow)
         throw new Error("Connect Desktop before opening a project conversation.");
@@ -1658,9 +1698,11 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle("desktop.computer.revokeAccess", async (event) => {
     if (isCloudComputerRequest(event)) {
+      attachedFolders.clear();
       cloudComputerOwner = undefined; const revoked=hostComputer?.revoke(); await accountComputer?.revoke(); await cloudComputer?.revoke(); await revoked; installApplicationMenu(); return;
     }
     if (isManagedComputerRequest(event)) {
+      attachedFolders.clear();
       try {
         await persistHostChoice("docker");
       } finally {

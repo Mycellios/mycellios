@@ -7473,3 +7473,23 @@ msgstr "Change model"
 
 msgid "This changes the model for this Mico. Your message stays in the chat."
 msgstr "This changes the model for this Mico. Your message stays in the chat."
+
+#: src/components/LocalProject.tsx
+msgid "Add folder"
+msgstr "Add folder"
+
+#: src/components/LocalProject.tsx
+msgid "Local folder"
+msgstr "Local folder"
+
+#: src/components/LocalProject.tsx
+msgid "New task in a branch"
+msgstr "New task in a branch"
+
+#: src/components/LocalProject.tsx
+msgid "Create task"
+msgstr "Create task"
+
+#: src/components/LocalProject.tsx
+msgid "Available to this Mico on this PC."
+msgstr "Available to this Mico on this PC."
