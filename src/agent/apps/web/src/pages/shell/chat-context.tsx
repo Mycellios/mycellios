@@ -63,7 +63,7 @@ export function TimeSeparator({ createdAt, locale }: { createdAt: string; locale
   return (
     <h3
       data-testid="time-separator"
-      className="my-3 select-none text-center text-xs font-normal text-muted-foreground"
+      className="my-1.5 select-none text-center text-xs font-normal text-muted-foreground md:my-3"
     >
       {formatTimeSeparator(createdAt, locale, { today: t`Today`, yesterday: t`Yesterday` })}
     </h3>

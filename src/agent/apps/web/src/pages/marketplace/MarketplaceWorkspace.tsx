@@ -5,6 +5,7 @@ import { ArrowLeft, Blocks, BookOpen, Bot as BotIcon, LayoutGrid, Monitor, Searc
 import { useState } from "react";
 import type { connectedAppMarks } from "../../lib/connected-apps";
 import { VideoStudioSample } from "../../components/VideoStudioSample";
+import { desktopBridge } from "../../lib/desktop";
 import { PluginsOverlay } from "../PluginsOverlay";
 import { AgentsMarketplace } from "./AgentsMarketplace";
 import { matches, type MarketplaceTab } from "./catalog";
@@ -109,6 +110,7 @@ function MycelliosAppsCatalog({ onOpenStudio }: { onOpenStudio: () => void }) {
   const [query, setQuery] = useState("");
   const title = "Estudio de vídeos";
   const description = "Crea vídeos verticales con narración en tu PC.";
+  const canCreate = Boolean(desktopBridge()?.appsStudio);
 
   return (
     <>
@@ -136,8 +138,9 @@ function MycelliosAppsCatalog({ onOpenStudio }: { onOpenStudio: () => void }) {
                   <h3 className="text-base font-semibold">{title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{description}</p>
                 </div>
-                <Button variant="secondary" aria-label="Abrir Estudio de vídeos" onClick={onOpenStudio}>
-                  {t`Open`}
+                <Button variant="secondary" className="min-h-11 md:min-h-0"
+                  aria-label={canCreate ? "Abrir Estudio de vídeos" : "Ver Estudio de vídeos"} onClick={onOpenStudio}>
+                  {canCreate ? t`Open` : t`View details`}
                 </Button>
               </div>
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

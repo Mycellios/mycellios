@@ -9,6 +9,7 @@ import { ReviewWorkspacePanel } from "./ReviewWorkspacePanel";
 const native = vi.hoisted(() => ({ changed: null as any }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (parts: TemplateStringsArray,...values:unknown[]) => parts.reduce((text,part,index)=>text+(index?String(values[index-1]):"")+part,"") }) }));
 vi.mock("@rakazo/chat-ui/web", () => ({ ChatMarkdown: ({children}:{children:ReactNode}) => <>{children}</> }));
+vi.mock("@rakazo/ui-web/hooks/use-mobile", () => ({ useIsMobile: () => false }));
 vi.mock("../pages/ResizableSidePanel", () => ({ ResizableSidePanel: ({open,children}:{open:boolean;children:ReactNode}) => open ? <aside>{children}</aside> : null }));
 vi.mock("./ReviewPdfViewer", () => ({ ReviewPdfViewer: () => null }));
 vi.mock("./NativeProjectPreview", async original => {

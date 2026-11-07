@@ -1,5 +1,5 @@
 import { I18nProvider } from "@lingui/react";
-import type { MessageBlock, ThreadMessage } from "@rakazo/contracts";
+import type { MessageBlock, Run, ThreadMessage } from "@rakazo/contracts";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
@@ -16,6 +16,7 @@ import { FixtureTranscript } from "./thread-fixture";
 const params = new URLSearchParams(location.search);
 const view = params.get("view") === "settings" ? "settings" : "thread";
 const live = params.get("phase") === "live";
+const withRun = live && params.has("run");
 
 const USER_TEXT = "Find a free slot on Tuesday.";
 const REPLY_TEXT = "Tuesday at 2 pm is free.";
@@ -37,6 +38,14 @@ const stepsBlock: MessageBlock = {
 };
 
 const createdAt = "2026-08-16T00:00:01.000Z";
+const observedAt = new Date().toISOString();
+const activeRun: Run | undefined = withRun ? {
+  id: "run-1", botId: "bot-1", threadId: "thread-1", taskId: "task-1",
+  status: "running", trigger: "user", routineId: null,
+  modelProvider: "fixture", modelId: "fixture-model", error: null,
+  createdAt: observedAt, startedAt: observedAt, completedAt: null, updatedAt: observedAt,
+  observedAt, leaseExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+} : undefined;
 
 // A live run that has only called tools so far, or the finished reply with its tool card.
 const messages: ThreadMessage[] = [
@@ -46,7 +55,7 @@ const messages: ThreadMessage[] = [
     seq: 1,
     role: "user",
     blocks: [{ kind: "text", text: USER_TEXT }],
-    createdAt,
+    createdAt: withRun ? observedAt : createdAt,
   },
   {
     id: live ? "progress:run-1" : "bot-reply",
@@ -56,14 +65,14 @@ const messages: ThreadMessage[] = [
     blocks: live ? [stepsBlock] : [stepsBlock, { kind: "text", text: REPLY_TEXT }],
     botId: "bot-1",
     runId: "run-1",
-    createdAt,
+    createdAt: withRun ? observedAt : createdAt,
   },
 ];
 
 function ThreadFixture() {
   const showToolActivity = useSyncExternalStore(subscribeToolActivity, getToolActivityEnabled);
   return (
-    <FixtureTranscript messages={messages} running={live} showToolActivity={showToolActivity} />
+    <FixtureTranscript messages={messages} running={live} showToolActivity={showToolActivity} activeRun={activeRun} />
   );
 }
 

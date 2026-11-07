@@ -424,57 +424,58 @@ test("reply preview jumps to parent outside the loaded page", async ({ page }) =
 test.describe("touch message actions", () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
-  test("More exposes actions without simulated hover", async ({ page }, testInfo) => {
+  async function holdMessage(page: Page, bubble: Locator) {
+    await bubble.scrollIntoViewIfNeeded();
+    const bounds = (await bubble.boundingBox())!;
+    const session = await page.context().newCDPSession(page);
+    try {
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }],
+      });
+      await expect(page.getByRole("dialog", { name: "Message actions" })).toBeVisible();
+    } finally {
+      await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await session.detach();
+    }
+    return page.getByRole("dialog", { name: "Message actions" });
+  }
+
+  test("mobile messages stay compact and open actions only on hold", async ({ page }, testInfo) => {
+    await page.goto("/e2e/fixtures/tool-activity.html?phase=done");
+    const user = page.getByTestId("message-user-bubble");
+    const bot = page.getByTestId("message-bot-bubble");
+    await expect(bot).toBeVisible();
+    await expect(page.getByTestId("message-hover-rail")).toHaveCount(0);
+    await expectNoTouchSideGutter(user.locator("xpath=ancestor::*[@data-testid='message-bubble-frame']"));
+    const first = (await user.boundingBox())!;
+    const second = (await bot.boundingBox())!;
+    expect(second.y - first.y - first.height).toBeLessThan(16);
+    await bot.tap();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await captureScreenshot(page, testInfo, "mobile-compact-transcript");
+    const actions = await holdMessage(page, bot);
+    await expect(actions.getByRole("button", { name: "Reply" })).toBeVisible();
+    await expect(actions.getByRole("button", { name: "Copy" })).toBeVisible();
+    await expect(actions.getByRole("group", { name: "Reactions" })).toBeVisible();
+    await captureScreenshot(page, testInfo, "mobile-message-actions");
+    await actions.getByRole("button", { name: "Close" }).tap();
+    await expect(actions).toHaveCount(0);
+  });
+
+  test("touch actions can react and reply to a saved message", async ({ page }) => {
     await signup(page, `touch-actions-${Date.now()}@rakazo.test`, "password12", "Touch Actions");
     await completeOnboarding(page);
-    expect(
-      await page.evaluate(() => matchMedia("(hover: hover) and (pointer: fine)").matches),
-    ).toBe(false);
-    await expect(page.getByText("What do you want me on first?", { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
     await page.getByRole("button", { name: /Day-to-day work/ }).click();
-    const botText = page.getByText(/Got it\./);
-    await expect(botText).toBeVisible({ timeout: 20_000 });
-    const row = page
-      .getByTestId("transcript")
-      .locator("[data-message-id]")
-      .filter({ has: botText })
-      .first();
-    const rail = row.getByTestId("message-hover-rail");
-    await expect(rail).toHaveCSS("opacity", "1");
-    await expect(rail.getByRole("button", { name: "Reply", exact: true })).toBeVisible();
-    // Touch puts the action row in-flow under the bubble, not beside it.
-    const botBubble = row.getByTestId("message-bot-bubble").first();
-    const bubbleBox = await botBubble.boundingBox();
-    const railBox = await rail.boundingBox();
-    expect(bubbleBox).not.toBeNull();
-    expect(railBox).not.toBeNull();
-    expect(railBox!.y).toBeGreaterThanOrEqual(bubbleBox!.y + bubbleBox!.height - 1);
-    expect(railBox!.x - bubbleBox!.x).toBeLessThan(8);
-    await expectNoTouchSideGutter(row.getByTestId("message-bubble-frame"));
-    await captureScreenshot(page, testInfo, "message-actions-touch-row");
-    await rail.getByRole("button", { name: "React", exact: true }).tap();
-    await expect(page.getByRole("button", { name: "🎉", exact: true })).toBeVisible();
-    await captureScreenshot(page, testInfo, "message-reaction-picker-touch");
-    await page.getByRole("button", { name: "🎉", exact: true }).tap();
+    const row = page.getByTestId("transcript").locator("[data-message-id]")
+      .filter({ hasText: /Got it\./ }).first();
+    const bubble = row.getByTestId("message-bot-bubble").first();
+    await expect(bubble).toBeVisible({ timeout: 20_000 });
+    const actions = await holdMessage(page, bubble);
+    await actions.getByRole("button", { name: "🎉", exact: true }).tap();
     await expect(row.getByTestId("message-reactions")).toHaveText("🎉");
-    await rail.getByRole("button", { name: "React", exact: true }).tap();
-    await page.getByRole("button", { name: "🎉", exact: true }).tap();
-    await expect(row.getByTestId("message-reactions")).toHaveText("🎉 2");
-    await rail.getByRole("button", { name: "More" }).tap();
-    await expect(page.getByRole("menuitem", { name: "Copy" })).toBeVisible();
-    await expect(page.getByRole("menu")).toBeVisible();
-    await expect(page.getByRole("menu").locator("time")).toHaveCount(0);
-    await captureScreenshot(page, testInfo, "message-actions-touch-menu");
-    await page.keyboard.press("Escape");
-    const composer = page.getByRole("combobox", { name: /^Message/ });
-    await sendComposerMessage(page, composer, `touch-width-${Date.now()}`);
-    const userRow = page.locator("[data-message-id]").filter({ hasText: "touch-width-" }).first();
-    await expect(userRow).toBeVisible({ timeout: 20_000 });
-    await expectNoTouchSideGutter(userRow.getByTestId("message-bubble-frame"));
-    await rail.scrollIntoViewIfNeeded();
-    await rail.getByRole("button", { name: "Reply", exact: true }).tap();
+    await holdMessage(page, bubble);
+    await actions.getByRole("button", { name: "Reply", exact: true }).tap();
     await expect(page.getByRole("button", { name: "Cancel reply" })).toBeVisible();
   });
 });

@@ -3,7 +3,7 @@ import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from 
 import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey, resolveSelectableModelId } from "@rakazo/core";
 import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner } from "@rakazo/ui-web";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Cpu } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { useSpaceQueries } from "../../lib/query";
@@ -15,12 +15,13 @@ const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
 export type ChatModelPatch = Pick<Bot, "modelProvider" | "modelId" | "thinkingLevel">;
 
-export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, recovery = false }: {
+export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, recovery = false, inMenu = false }: {
   bot: Bot;
   me: Me | null | undefined;
   onSave: (patch: ChatModelPatch) => Promise<void>;
   onConnections: () => void;
   recovery?: boolean;
+  inMenu?: boolean;
 }) {
   const { t } = useLingui();
   const id = useId();
@@ -67,10 +68,12 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   return (
     <div className={recovery ? "ml-2 inline-flex" : "app-no-drag flex min-w-0 items-center gap-0.5"} data-testid={recovery ? "composer-error-model" : "chat-header-model"}>
       <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setError(null); } }}>
-        <PopoverTrigger type="button" aria-label={recovery ? label : t`Model`} className={recovery
+        <PopoverTrigger type="button" data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
           ? "inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:text-foreground"
           : "app-no-drag flex h-8 min-w-0 max-w-52 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"}>
-          <span className="truncate">{label}</span><ChevronDown size={12} className="shrink-0" />
+          {inMenu ? <><Cpu aria-hidden /><span>{t`Model`}</span><span className="ms-auto min-w-0 truncate text-xs text-muted-foreground">{label}</span></> : (
+            <><span className="truncate">{label}</span><ChevronDown size={12} className="shrink-0" /></>
+          )}
         </PopoverTrigger>
         {open ? <PopoverContent align="end" className="app-no-drag w-80 max-w-[calc(100vw-24px)] gap-3 p-3">
           {recovery ? <label htmlFor={`${id}-model`} className="text-xs font-medium">{t`Model`}</label> : <span className="text-xs font-medium">{t`Model`}</span>}

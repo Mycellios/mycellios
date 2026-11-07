@@ -17,8 +17,9 @@ import {
 } from "@rakazo/core";
 import type { GroupAvatarMember } from "@rakazo/ui-web";
 import { Button, cn, Spinner } from "@rakazo/ui-web";
+import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
 import { ArrowDown } from "lucide-react";
-import type { CSSProperties, RefObject } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
 import {
   Fragment,
   memo,
@@ -41,6 +42,7 @@ import { transcriptIsNearEnd, transcriptMovedDown } from "../../lib/transcript-s
 import { TimeSeparator, UnreadDivider } from "./chat-context";
 import type { ImportSetupTarget } from "./import-setup-card";
 import { MessageView } from "./message-view";
+import { MessageTouchActions } from "./message-hover-actions";
 import { QuoteSelectionButton } from "./quote-selection-button";
 import { getResponseCostVisible, subscribeResponseCost } from "../../lib/response-cost-preference";
 import { TaskCostFooter } from "./task-cost-footer";
@@ -144,6 +146,8 @@ export const Transcript = memo(function Transcript({
   onOpenImport?: () => void;
 }) {
   const { t } = useLingui();
+  const compactMessages = useIsMobile();
+  const contentRef = useRef<HTMLDivElement>(null);
   const [atEnd, setAtEnd] = useState(true);
   const following = useRef(true);
   const autoScrolling = useRef(false);
@@ -188,17 +192,19 @@ export const Transcript = memo(function Transcript({
     () => projectMessageReactions(mentionView.visibleMessages),
     [mentionView],
   );
-  const shownMessages = reactionView.visibleMessages.filter((message) =>
-    messageHasVisibleBlocks(message.blocks, showToolActivity),
+  const shownMessages = useMemo(
+    () => reactionView.visibleMessages.filter(message => messageHasVisibleBlocks(message.blocks, showToolActivity)),
+    [reactionView.visibleMessages, showToolActivity],
   );
-  const separatorIds = timeSeparatorIds(shownMessages);
+  const separatorIds = useMemo(() => timeSeparatorIds(shownMessages), [shownMessages]);
+  const threadItems = useMemo(() => groupVoiceChats(reactionView.visibleMessages), [reactionView.visibleMessages]);
   const showResponseCost = useSyncExternalStore(
     subscribeResponseCost,
     getResponseCostVisible,
     () => false,
   );
   const taskCosts = useTaskCosts(shownMessages, running);
-  const costMessageIds = taskCostMessageId(shownMessages);
+  const costMessageIds = useMemo(() => taskCostMessageId(shownMessages), [shownMessages]);
   const unreadDividerId = unreadDividerMessageId(shownMessages, unreadAfterSeq, olderCursor);
   const [quoteDraft, setQuoteDraft] = useState<{
     message: ThreadMessage;
@@ -286,14 +292,20 @@ export const Transcript = memo(function Transcript({
       window.removeEventListener("blur", onWindowBlur);
     };
   }, [evaluateSelection]);
-  const snapToEnd = useCallback(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-    following.current = true;
-    autoScrolling.current = false;
-    setAtEnd(true);
-    element.scrollTo({ top: element.scrollHeight, behavior: "auto" });
+  const jumpScrolling = useRef(false);
+  const followGeometry = useCallback(() => {
+    const viewport = scrollRef.current;
+    if (!viewport || !following.current || autoScrolling.current || jumpScrolling.current) return;
+    const bottom = viewport.scrollHeight - viewport.clientHeight;
+    if (bottom - viewport.scrollTop > 1) viewport.scrollTop = bottom;
   }, [scrollRef]);
+
+  const settleLatest = useCallback(() => {
+    if (!autoScrolling.current) return;
+    autoScrolling.current = false;
+    window.clearTimeout(autoScrollTimer.current);
+    followGeometry();
+  }, [followGeometry]);
 
   const jumpToLatest = useCallback(() => {
     const element = scrollRef.current;
@@ -307,17 +319,10 @@ export const Transcript = memo(function Transcript({
       behavior: reducedMotion ? "auto" : "smooth",
     });
     window.clearTimeout(autoScrollTimer.current);
-    // Fallback only: onScroll clears autoScrolling once near-end is reached.
-    autoScrollTimer.current = window.setTimeout(
-      () => {
-        autoScrolling.current = false;
-      },
-      reducedMotion ? 0 : 2_000,
-    );
-  }, [scrollRef]);
+    if (!reducedMotion) autoScrollTimer.current = window.setTimeout(settleLatest, 2_000);
+  }, [scrollRef, settleLatest]);
 
   const scrolledJump = useRef<number | null>(null);
-  const jumpScrolling = useRef(false);
   const jumpScrollTimer = useRef<number | undefined>(undefined);
   const endJumpScroll = useCallback(() => {
     jumpScrolling.current = false;
@@ -360,9 +365,38 @@ export const Transcript = memo(function Transcript({
     onScrollRequestHandled();
   }, [messages, scrollRequest, scrollRef, endJumpScroll, onScrollRequestHandled]);
 
+  // Follow actual geometry changes, including keyboard resize and late media,
+  // instead of forcing a layout on every streaming commit.
   useLayoutEffect(() => {
-    if (following.current) snapToEnd();
-  }, [messages, running, snapToEnd, showResponseCost, taskCosts]);
+    const viewport = scrollRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+    followGeometry();
+    const observer = new ResizeObserver(followGeometry);
+    observer.observe(content);
+    observer.observe(viewport);
+    viewport.addEventListener("scrollend", settleLatest);
+    return () => {
+      observer.disconnect();
+      viewport.removeEventListener("scrollend", settleLatest);
+    };
+  }, [scrollRef, followGeometry, settleLatest]);
+
+  const previousTail = useRef<ThreadMessage | undefined>(undefined);
+  const tail = shownMessages.findLast(message => !message.id.startsWith("progress:"));
+  useLayoutEffect(() => {
+    const previous = previousTail.current;
+    previousTail.current = tail;
+    if (!previous || !tail || tail.seq <= previous.seq || !following.current ||
+        jumpScrolling.current || document.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const row = contentRef.current?.querySelector(
+      `[data-message-id="${CSS.escape(tail.id)}"]`,
+    );
+    row?.animate(
+      [{ opacity: 0.55, transform: "translateY(5px)" }, { opacity: 1, transform: "translateY(0)" }],
+      { duration: 175, easing: "cubic-bezier(.22,1,.36,1)" },
+    );
+  }, [tail]);
 
   useLayoutEffect(() => {
     const button = jumpButtonRef.current;
@@ -373,7 +407,7 @@ export const Transcript = memo(function Transcript({
 
   const loadOlder = useCallback(() => {
     const wasFollowing = following.current;
-    // Prepend must not race the messages-driven snap-to-end follow path.
+    // Prepend must not race the end-follow observer.
     following.current = false;
     autoScrolling.current = false;
     const pending = onLoadOlder();
@@ -403,13 +437,8 @@ export const Transcript = memo(function Transcript({
         data-testid="transcript"
         onPointerDown={(event) => {
           lastScrollTop.current = event.currentTarget.scrollTop;
+          if (autoScrolling.current) following.current = false;
           autoScrolling.current = false;
-          following.current = false;
-        }}
-        onTouchStart={(event) => {
-          lastScrollTop.current = event.currentTarget.scrollTop;
-          autoScrolling.current = false;
-          following.current = false;
         }}
         onWheel={(event) => {
           if (event.deltaY < 0) {
@@ -425,21 +454,17 @@ export const Transcript = memo(function Transcript({
           );
           lastScrollTop.current = event.currentTarget.scrollTop;
           const nearEnd = transcriptIsNearEnd(event.currentTarget);
-          setAtEnd(nearEnd);
+          if (atEnd !== nearEnd) setAtEnd(nearEnd);
           // A jump scroll owns the viewport until its animation settles; its
           // own near-end crossings must not re-arm tail-following.
           if (jumpScrolling.current) return;
           if (nearEnd) {
             if (scrolledDown) following.current = true;
-            if (autoScrolling.current) {
-              autoScrolling.current = false;
-              window.clearTimeout(autoScrollTimer.current);
-            }
           } else if (!autoScrolling.current) {
             following.current = false;
           }
         }}
-        className="rk-scroll flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto scroll-pt-5 scroll-pb-7 px-4 pt-5 pb-12 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pb-13"
+        className="rk-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-pt-5 scroll-pb-7"
         style={
           userBubble
             ? ({
@@ -449,6 +474,7 @@ export const Transcript = memo(function Transcript({
             : undefined
         }
       >
+        <div ref={contentRef} className="flex min-h-full min-w-0 flex-col gap-1.5 px-3 pt-3 pb-8 md:gap-2 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pt-5 md:pb-13">
         {olderCursor != null ? (
           <Button
             variant="ghost"
@@ -469,7 +495,7 @@ export const Transcript = memo(function Transcript({
             <p className="text-sm leading-relaxed text-muted-foreground">{t`Start with a question, an idea, or something you want to get done.`}</p>
           </div>
         ) : null}
-        {groupVoiceChats(reactionView.visibleMessages).map((item) => {
+        {threadItems.map((item) => {
           if (item.kind === "voiceChat") {
             return (
               <div key={item.key}>
@@ -501,6 +527,12 @@ export const Transcript = memo(function Transcript({
           if (!messageHasVisibleBlocks(message.blocks, messageToolActivity)) return null;
           const peerReceipt = isPeerReceiptBlocks(message.blocks);
           const messageReactions = reactionView.reactions.get(message.id);
+          const wrapMessage = (content: ReactNode) =>
+            compactMessages && !peerReceipt && !message.id.startsWith("progress:") &&
+            message.blocks.some((block) => block.kind === "text" || block.kind === "file" || block.kind === "image" || block.kind === "ask")
+              ? <MessageTouchActions message={message} onReply={onReply} onMarkUnread={onMarkUnread}
+                  markedUnread={message.id === markedUnreadMessageId} onReact={onReact}>{content}</MessageTouchActions>
+              : content;
           return (
             <Fragment key={message.id}>
               {separatorIds.has(message.id) ? (
@@ -532,7 +564,7 @@ export const Transcript = memo(function Transcript({
                           : `relative ${message.blocks.some((block) => block.kind === "app_connect") ? "w-full" : "w-fit"} min-w-0 ${bubbleFrameWidth(message.role)}`
                     }
                   >
-                    <MessageView
+                    {wrapMessage(<MessageView
                       artifactTarget={artifactTarget}
                       message={message}
                       markedUnread={message.id === markedUnreadMessageId}
@@ -570,15 +602,16 @@ export const Transcript = memo(function Transcript({
                       onAddRoutine={onAddRoutine}
                       voiceReady={voiceReady}
                       speaking={speakingMessageId === message.id}
-                      onSpeak={() => onSpeak(message)}
+                      onSpeak={onSpeak}
                       onOpenComputer={onOpenComputer}
                       onOpenImportSetup={onOpenImportSetup}
                       onOpenImport={onOpenImport}
                       showToolActivity={messageToolActivity}
+                      hideHoverActions={compactMessages}
                       onReply={onReply}
                       onMarkUnread={onMarkUnread}
                       onReact={onReact}
-                    />
+                    />)}
                     {lastRun?.completedAt && message.runId === lastRun.id &&
                     costMessageIds.get(lastRun.id) === message.id ? (
                       <details className="mt-2 max-w-prose text-xs text-muted-foreground">
@@ -637,6 +670,7 @@ export const Transcript = memo(function Transcript({
             <PendingRunActivity bots={workingBots} messages={messages} onRefresh={onRefresh} />
           )
         ) : null}
+        </div>
       </div>
       {quoteDraft ? (
         <QuoteSelectionButton

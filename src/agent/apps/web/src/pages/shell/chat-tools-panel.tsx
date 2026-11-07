@@ -1,6 +1,8 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@rakazo/ui-web";
-import { AudioLines, FolderOpen, Monitor, PanelRightOpen, Settings, X } from "lucide-react";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import { AudioLines, Ellipsis, FolderOpen, Monitor, PanelRightOpen, Settings, X } from "lucide-react";
+
+import { type ReactNode, useState } from "react";
 
 export type ChatToolsActions = {
   onBrowser: () => void;
@@ -20,6 +22,49 @@ export function ChatToolsMenu(props: ChatToolsActions) {
       {props.onVoice ? <DropdownMenuItem onClick={props.onVoice}><AudioLines size={15} />{t`Open voice`}</DropdownMenuItem> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
+}
+
+export function MobileChatActions({ children, label, onDismiss }: {
+  children: (close: () => void) => ReactNode;
+  label?: string;
+  onDismiss?: () => void;
+}) {
+  const { t } = useLingui();
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={next => { setOpen(next); if (!next) onDismiss?.(); }}>
+      <PopoverTrigger
+        render={<Button variant="floating" size="icon-lg" className="size-12 shrink-0 rounded-full" />}
+        aria-label={label ?? t`Chat tools`}
+      >
+        <Ellipsis className="size-6" aria-hidden />
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="max-h-[min(70dvh,var(--available-height))] w-72 max-w-[calc(100vw-24px)] gap-0.5 overflow-y-auto p-1.5 [&_[data-mobile-chat-action]]:h-12 [&_[data-mobile-chat-action]]:w-full [&_[data-mobile-chat-action]]:max-w-none [&_[data-mobile-chat-action]]:justify-start [&_[data-mobile-chat-action]]:gap-3 [&_[data-mobile-chat-action]]:rounded-md [&_[data-mobile-chat-action]]:px-3 [&_[data-mobile-chat-action]]:text-sm [&_[data-mobile-chat-action]>svg]:size-5"
+      >
+        {children(() => { setOpen(false); onDismiss?.(); })}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function MobileChatToolLinks({ onFiles, onSettings, onVoice, close }: Omit<ChatToolsActions, "onBrowser"> & { close: () => void }) {
+  const { t } = useLingui();
+  const links = [
+    { label: t`Open files`, icon: FolderOpen, action: onFiles },
+    { label: t`Agent settings`, icon: Settings, action: onSettings },
+    ...(onVoice ? [{ label: t`Open voice`, icon: AudioLines, action: onVoice }] : []),
+  ];
+  return (
+    <div className="mt-1 border-t border-border pt-1">
+      {links.map(({ label, icon: Icon, action }) => (
+        <Button key={label} variant="ghost" data-mobile-chat-action onClick={() => { close(); action(); }}>
+          <Icon aria-hidden />{label}
+        </Button>
+      ))}
+    </div>
+  );
 }
 
 export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClose }: ChatToolsActions & {

@@ -42,7 +42,7 @@
   after voice configuration is known, without busy work, calls, drafts or files.
   Never send on launch: shortcut dictation goes to an editable review with
   Continue/Cancel/Send. Preserve text and the nonce on refused/uncertain sends.
-  Verify voice-shortcut, composer, HoldToTalk and PWA manifest tests; physical
+  Verify voice-shortcut, composer, dictation and PWA manifest tests; physical
   microphone/gesture acceptance remains separate from synthetic browser tests.
 
 - Windows updates check the official HTTPS catalog and stage verified packages in
@@ -705,9 +705,13 @@
   the application. Keep the archive-policy fixtures passing, reject unsupported
   encodings, and retain the third-party `node_modules` exclusion. The check also
   rejects secrets deleted by later layers because they remain recoverable.
-- Web dictation and calls prefer the configured transcription provider when
-  available. Keep browser speech as the unconfigured path, and retain cancellation
-  isolation between recordings. Verify dictation, hold-to-talk and call-session tests.
+- Inline dictation uses the platform's interim speech results when available,
+  falling back to the configured recorder when the browser cannot stream.
+  Keep calls and note recording on their configured transcription paths and
+  fence capture by composer scope. Inline dictation appends to the editable
+  draft. A voice note attaches playable audio through the existing upload
+  path. Both require Send.
+  Verify dictation, composer, voice.spec.ts and call-session tests as applicable.
   Composer dictation is independent of the deployment's phone-call capability;
   disabling calls must not hide or disable the microphone in text chats.
 
@@ -763,6 +767,10 @@
   The web iframe fallback requires a cooperating page for cross-origin element
   selection. Desktop uses its isolated native inspector instead. Never proxy
   arbitrary sites or disable their framing restrictions to imitate a desktop browser.
+  On mobile web and PWA, the chat opens the same review workspace full width.
+  Keep the conversation mounted, put browser navigation in the bottom toolbar,
+  and hide address, tabs and review tools until requested. The web history covers
+  addresses opened from the toolbar. Desktop uses native page history.
 
 - Native Desktop admission binds the owned computer before sending a turn. Generic
   project workflow is added using expectedInstructions conflict checks, retaining
@@ -772,8 +780,21 @@
 
 - Running-chat status shows a brief health label and elapsed time. Tool activity
   labels can contain commands and paths, so render them only inside the closed
-  execution-details disclosure. Preserve actionable blocked/waiting states and
-  keep observation independent from cancellation/retry. Verify RunActivityStatus.test.tsx.
+  execution-details disclosure. On narrow screens, keep a single activity row
+  and open the timeline in a sheet on demand, even when auto-expand is enabled.
+  Preserve actionable blocked/waiting states and keep observation independent
+  from cancellation/retry. Verify RunActivityStatus.test.tsx and the mobile
+  activity sheet case in tool-activity.spec.ts.
+
+- Narrow chat transcripts keep message actions in a sheet opened by holding a
+  message, with a focusable trigger for assistive input. Keep scroll, links and
+  desktop hover actions usable. Verify message-hover-actions.spec.ts.
+- Narrow workspace navigation fills the viewport and keeps search at the bottom.
+  Keep account tools behind the overflow and folder expansion scoped to the
+  mobile layout. Verify mobile-sidebar-swipe.spec.ts.
+- The transcript follows geometry changes only while the reader is at the end.
+  Preserve history and explicit reply jumps, and animate only newly appended
+  messages when motion is enabled. Verify chat-progress-messages.spec.ts.
 
 - Explicit initial computer assignment may ignore only the automatic
   created/waiting_input introduction on an unoccupied team placeholder or idle

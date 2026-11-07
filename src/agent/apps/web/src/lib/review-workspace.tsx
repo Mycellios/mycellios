@@ -9,6 +9,7 @@ export type ReviewDocument = {
   bytes?: Uint8Array;
   artifact?: { target: ArtifactTarget; id: string };
   url?: string;
+  navigation?: { urls: string[]; index: number };
 };
 export type ReviewSelection = {
   text?: string;
@@ -97,7 +98,7 @@ type ReviewState = {
   show: () => void;
   hide: () => void;
   add: (document: ReviewDocument) => void;
-  update: (id: string, patch: Pick<ReviewDocument, "name" | "url">) => void;
+  update: (id: string, patch: Pick<ReviewDocument, "name" | "url" | "navigation">) => void;
   select: (id: string) => void;
   remove: (id: string) => void;
   comment: (text: string, attachment?: File, documentId?: string) => number;

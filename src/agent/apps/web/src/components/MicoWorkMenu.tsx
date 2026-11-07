@@ -22,11 +22,13 @@ export function MicoWorkMenu({
   userId,
   threadId,
   onOpenTask,
+  inMenu = false,
 }: {
   botId: string;
   runId?: string;
   userId?: string;
   threadId?: string;
+  inMenu?: boolean;
   onOpenTask: (task: Overview[number]) => void;
 }) {
   const rpc = useSpaceRpc();
@@ -131,11 +133,12 @@ export function MicoWorkMenu({
     >
       <PopoverTrigger
         render={
-          <Button size="icon-sm" variant="ghost" className="relative shrink-0"
+          <Button size="icon-sm" variant="ghost" className="relative shrink-0" data-mobile-chat-action={inMenu || undefined}
             aria-label={failed ? t`Task failed` : t`Work`} title={failed ? t`Task failed` : t`Work`} />
         }
       >
         <Activity size={15} aria-hidden="true" />
+        {inMenu ? (failed ? t`Task failed` : t`Work`) : null}
         {failed || activeCount ? <span aria-hidden="true"
           className={`absolute end-0.5 top-0.5 size-1.5 rounded-full ${failed ? "bg-destructive" : "bg-foreground"}`} /> : null}
       </PopoverTrigger>

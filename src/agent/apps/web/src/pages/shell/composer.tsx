@@ -1,7 +1,7 @@
 import { isAndroidHost } from "../../lib/android-host";
 import { useSpaceRpc, useBoundTaskThreadScope } from "../../lib/space-rpc";
 import { useLingui } from "@lingui/react/macro";
-import type { AgentSkillCatalogEntry, ThreadMessage } from "@rakazo/contracts";
+import { ATTACHMENT_MAX_COUNT, isAttachmentAudioMimeType, type AgentSkillCatalogEntry, type ThreadMessage } from "@rakazo/contracts";
 import type { AgentImportReader, ComposerMention, SlashActionId } from "@rakazo/core";
 import {
   clampMentionHighlightIndex,
@@ -13,14 +13,16 @@ import {
   truncateSlashDescription,
 } from "@rakazo/core";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
-import { ArrowUp, AudioLines, Box, FilePlus, ImagePlus, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, X } from "lucide-react";
+import { ArrowUp, AudioLines, Box, FilePlus, ImagePlus, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, Trash2, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent, ReactNode, RefObject } from "react";
-import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  HoldToTalkControls,
-  HoldToTalkStrip,
-  useHoldToTalk,
-} from "../../components/composer/HoldToTalk";
+  appendSpeech,
+  ComposerVoiceButton,
+  ComposerVoiceStrip,
+  DraftAudioPreview,
+  useComposerVoice,
+} from "../../components/composer/ComposerVoice";
 import { captureDrop, droppedAgent, mightBeAgent } from "../../lib/agent-drop";
 import type { ArtifactTarget } from "../../lib/artifact-open";
 import { attachmentPickerAccept } from "../../lib/attachment-picker-accept";
@@ -116,7 +118,7 @@ export const Composer = memo(function Composer({
   onRemoveAttachment: (attachment: PendingAttachment) => void;
   onSend: (text: string, mentions: ComposerMention[], clientNonce: string) => Promise<boolean>;
   onStop: () => Promise<void>;
-  /** Hold-to-talk falls back to the voice provider's transcription; undefined while unknown. */
+  /** Whether the configured voice provider transcribes audio. Undefined while unknown. */
   dictationTranscribe?: boolean;
   artifactTarget: ArtifactTarget;
   replyTarget?: ThreadMessage | null;
@@ -166,27 +168,27 @@ export const Composer = memo(function Composer({
   });
   const phoneCall = useCallSession();
   const onCall = phoneCall !== null || voiceConversationActive;
-  const talk = useHoldToTalk({
+  const voice = useComposerVoice({
+    scope: draftKey,
     transcribe: dictationTranscribe,
-    disabled: disabled || onCall,
-    onText: (text) => {
-      // A refused send keeps the words: they land in the field to edit or retry.
-      void onSend(text, [], newClientId())
-        .then((accepted) => {
-          if (accepted === false) setDraft((current) => (current ? `${current} ${text}` : text));
-        })
-        .catch(() => setDraft((current) => (current ? `${current} ${text}` : text)));
+    blocked: Boolean(disabled || onCall || sending),
+    onText: words => updateDraft(appendSpeech(draft, words)),
+    onAudio: file => {
+      const accepted = onAttachmentPick([file]);
+      if (accepted) markEdited();
+      return accepted;
     },
   });
+  const voiceDraft = appendSpeech(draft, voice.preview);
   const reviewedVoice = useReviewedVoice({
     scope: draftKey, transcribe: dictationTranscribe,
-    blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length || talk.recording),
+    blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length || voice.state),
     onSend: (text, nonce) => onSend(text, [], nonce),
   });
   useVoiceShortcut({
     requested: voiceShortcutRequested,
     ready: isAndroidHost() || dictationTranscribe !== undefined,
-    blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length),
+    blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length || voice.state),
     scope: draftKey,
     consume: onVoiceShortcutConsumed,
     start: reviewedVoice.start,
@@ -227,7 +229,12 @@ export const Composer = memo(function Composer({
     composerBarRef,
     composerFieldRef,
     expanded,
-  } = useComposerLayout(draft, selectedSkill !== null || selectedMentions.length > 0);
+  } = useComposerLayout(voiceDraft, selectedSkill !== null || selectedMentions.length > 0 || voice.state !== null);
+  const recordingVoice = voice.state?.phase === "recording";
+  useLayoutEffect(() => {
+    const field = textareaRef.current;
+    if (recordingVoice && voice.preview && field) field.scrollTop = field.scrollHeight;
+  }, [recordingVoice, textareaRef, voice.preview]);
   const [replyAnnouncement, setReplyAnnouncement] = useState("");
   // What the live region currently holds — a send disarming the reply clears
   // "reply" text, while an explicit cancel must keep "Reply cancelled".
@@ -400,7 +407,7 @@ export const Composer = memo(function Composer({
     (skillPickerOnly || slashSkillOptions.length > 0 || slashActionOptions.length > 0);
 
   async function send() {
-    if (!canSend || sending || disabled) return;
+    if (!canSend || sending || disabled || voice.state || reviewedVoice.stage !== "closed") return;
     const revision = editRevision.current;
     const clientNonce = retryNonce.current ?? newClientId();
     retryNonce.current = null;
@@ -640,14 +647,15 @@ export const Composer = memo(function Composer({
           {attachmentNotice}
         </div>
       ) : null}
+      {voice.error ? <p role="alert" className="mb-2 px-3 text-sm text-destructive">{voice.error}</p> : null}
       {pendingAttachments.length ? (
         <div className="mb-3 flex flex-wrap gap-2">
           {pendingAttachments.map((attachment) => (
             <div
               key={attachment.id}
-              className="flex items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 text-[13px] text-foreground/75"
+              className={`flex min-w-0 items-center gap-2 rounded-full border border-border bg-muted px-3 py-1.5 text-[13px] text-foreground/75 ${isAttachmentAudioMimeType(attachment.file.type) ? "w-full" : ""}`}
             >
-              {attachment.previewUrl ? (
+              {isAttachmentAudioMimeType(attachment.file.type) ? <DraftAudioPreview file={attachment.file} /> : attachment.previewUrl ? (
                 <img
                   src={attachment.previewUrl}
                   alt={attachment.file.name}
@@ -656,7 +664,7 @@ export const Composer = memo(function Composer({
               ) : (
                 <Paperclip size={14} strokeWidth={1.8} />
               )}
-              <span className="max-w-[180px] truncate" dir="auto">
+              <span className={isAttachmentAudioMimeType(attachment.file.type) ? "sr-only" : "max-w-[180px] truncate"} dir="auto">
                 {attachment.file.name}
               </span>
               <button
@@ -767,7 +775,7 @@ export const Composer = memo(function Composer({
         ref={composerBarRef}
         data-testid="composer-bar"
         data-expanded={expanded}
-        className={`grid grid-cols-[auto_minmax(0,1fr)_auto] content-end items-center rounded-[26px] border border-border bg-background pe-2.5 ps-3 transition-colors focus-within:border-input ${
+        className={`grid grid-cols-[auto_minmax(0,1fr)_auto] content-end items-center rounded-[26px] border border-border pe-2.5 ps-3 transition-colors focus-within:border-input ${voice.state ? "bg-muted/70" : "bg-background"} ${
           expanded ? "gap-x-2 gap-y-2 pb-[9px] pt-3" : "gap-x-3.5 py-[9px]"
         }`}
       >
@@ -779,7 +787,10 @@ export const Composer = memo(function Composer({
           className="hidden"
           onChange={(event) => pickAttachments(event.target.files)}
         />
-        <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+        {voice.state ? (
+          <Button type="button" variant="ghost" size="icon" className="col-start-1 row-start-2 size-11 rounded-full text-muted-foreground"
+            aria-label={t`Discard recording`} onClick={voice.cancel}><Trash2 size={17} aria-hidden /></Button>
+        ) : <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
         <DropdownMenuTrigger
           render={<Button variant="ghost" size="icon" />}
           ref={attachButtonRef}
@@ -811,11 +822,17 @@ export const Composer = memo(function Composer({
           <DropdownMenuItem className="min-h-10 gap-2.5" disabled={!sideQuestionBotId} onClick={() => { setAddMenuOpen(false); setSideQuestionOpen(true); }}>
             <MessageCircleQuestion aria-hidden="true" />{t`Ask aside`}
           </DropdownMenuItem>
+          <DropdownMenuItem className="min-h-11 gap-2.5"
+            disabled={disabled || onCall || sending || voice.state !== null || reviewedVoice.stage !== "closed" ||
+              pendingAttachments.length >= ATTACHMENT_MAX_COUNT || typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia}
+            onClick={() => { setAddMenuOpen(false); voice.start(true); }}>
+            <AudioLines aria-hidden="true" />{t`Record voice message`}
+          </DropdownMenuItem>
           <DropdownMenuItem className="min-h-10 gap-2.5" disabled={!onOpenVoice || onCall || !sideQuestionBotId} onClick={() => { setAddMenuOpen(false); onOpenVoice?.(); }}>
             <AudioLines aria-hidden="true" />{t`Voice`}
           </DropdownMenuItem>
         </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu>}
         <div
           ref={composerFieldRef}
           className={`flex min-w-0 flex-wrap items-end gap-1.5 ${
@@ -854,14 +871,18 @@ export const Composer = memo(function Composer({
               }}
             />
           ))}
-          <HoldToTalkStrip talk={talk} />
           <textarea
             ref={textareaRef}
-            hidden={talk.recording !== null}
-            value={draft}
+            value={voiceDraft}
+            readOnly={voice.state !== null}
             onChange={(event) => updateDraft(event.target.value)}
             onPaste={handlePaste}
             onKeyDown={(event) => {
+              if (voice.state) {
+                if (event.key === "Escape") voice.finish();
+                if (event.key === "Escape" || event.key === "Enter") event.preventDefault();
+                return;
+              }
               if (
                 event.key === "Backspace" &&
                 draft.length === 0 &&
@@ -906,7 +927,9 @@ export const Composer = memo(function Composer({
             }}
             disabled={disabled}
             placeholder={
-              showComposerPlaceholder
+              voice.state
+                ? voice.transcriptAfterStop ? t`Text appears when you stop recording` : t`Listening…`
+                : showComposerPlaceholder
                 ? activeName
                   ? t`Message ${activeName}`
                   : t`Message…`
@@ -926,55 +949,35 @@ export const Composer = memo(function Composer({
             className="rk-scroll max-h-25 min-h-[24px] min-w-[8rem] flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-body1 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-40"
           />
         </div>
+        {voice.state ? <div className="col-start-2 row-start-2 min-w-0"><ComposerVoiceStrip voice={voice} /></div> : null}
         <div
           ref={composerActionsRef}
           className={`col-start-3 flex shrink-0 items-center gap-2 justify-self-end ${
             expanded ? "row-start-2" : ""
           }`}
         >
-          {talk.recording?.locked ? (
-            <HoldToTalkControls talk={talk} />
-          ) : running ? (
-            <>
-              {draft.trim().length === 0 ? (
-                <HoldToTalkControls talk={talk} disabled={disabled || onCall || reviewedVoice.stage !== "closed"} />
-              ) : null}
-              <Button
-                size="icon"
-                aria-label={t`Send`}
-                disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
-                onClick={send}
-                className="size-8 shrink-0 rounded-full transition-transform active:scale-95 disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100"
-              >
-                <ArrowUp size={16} strokeWidth={2.2} />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label={t`Stop`}
-                disabled={sending}
-                onClick={() => void onStop()}
-                className="size-8 rounded-full border border-border bg-muted text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <Square size={11} strokeWidth={0} fill="currentColor" />
-              </Button>
-            </>
-          ) : (
-            <>
-              {draft.trim().length === 0 ? (
-                <HoldToTalkControls talk={talk} disabled={disabled || onCall || reviewedVoice.stage !== "closed"} />
-              ) : null}
-              <Button
-                size="icon"
-                aria-label={t`Send`}
-                disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
-                onClick={send}
-                className="size-8 shrink-0 rounded-full transition-transform active:scale-95 disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100"
-              >
-                <ArrowUp size={16} strokeWidth={2.2} />
-              </Button>
-            </>
-          )}
+          <ComposerVoiceButton voice={voice} disabled={disabled || sending || onCall || reviewedVoice.stage !== "closed"} />
+          <Button
+              size="icon"
+              aria-label={t`Send`}
+              disabled={Boolean(voice.state) || sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
+              onClick={send}
+              className={`shrink-0 rounded-full transition-transform active:scale-95 disabled:opacity-100 ${voice.state ? "size-10 disabled:bg-status-working/25 disabled:text-status-working" : "size-8 disabled:bg-primary-disabled disabled:text-foreground/30"}`}
+            >
+              <ArrowUp size={16} strokeWidth={2.2} />
+          </Button>
+          {running ? (
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label={t`Stop`}
+              disabled={sending}
+              onClick={() => void onStop()}
+              className="size-8 rounded-full border border-border bg-muted text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Square size={11} strokeWidth={0} fill="currentColor" />
+            </Button>
+          ) : null}
         </div>
       </div>
       {sideQuestionBotId ? <SideQuestion key={`${sideQuestionBotId}:${taskScope?.taskThreadId ?? ""}`} rpc={rpc} taskThreadId={taskScope?.taskThreadId} botId={sideQuestionBotId} open={sideQuestionOpen} onOpenChange={setSideQuestionOpen} /> : null}

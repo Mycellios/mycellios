@@ -74,6 +74,9 @@ import {
 import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
+  ArrowLeft,
+  Bell,
+  Globe,
   Menu,
   Monitor,
   Phone,
@@ -111,6 +114,8 @@ import { PasskeyOffer } from "../components/PasskeyOffer";
 import { notificationPreferences } from "../lib/notification-preferences";
 import { ReleaseNotes } from "../components/ReleaseNotes";
 import { SidebarFooter } from "../components/SidebarFooter";
+import { DesktopSidebarUpdate } from "../components/DesktopUpdates";
+import { WebUpdateSlot } from "../components/web-update-slot";
 import type { ActivityListFilters } from "../lib/activity-list-filters";
 import { emptyActivityFilters } from "../lib/activity-list-filters";
 import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
@@ -213,7 +218,7 @@ import { marketplaceTab, type MarketplaceTab } from "./marketplace/catalog";
 import { WorkspaceRail } from "./shell/workspace-rail";
 import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
-import { ChatToolsPanel, ChatToolsMenu } from "./shell/chat-tools-panel";
+import { ChatToolsPanel, ChatToolsMenu, MobileChatActions, MobileChatToolLinks } from "./shell/chat-tools-panel";
 import { VoiceConversation } from "../components/call/VoiceConversation";
 import { ProviderQuota } from "../components/ProviderQuota";
 import { HelpMenu } from "../components/HelpMenu";
@@ -247,7 +252,6 @@ import {
   userHoldsComputerControl,
 } from "../lib/thread-events";
 import { getToolActivityEnabled, subscribeToolActivity } from "../lib/tool-activity-preference";
-import { transcriptCanSnapAfterFrame, transcriptIsNearEnd } from "../lib/transcript-scroll";
 import { speaker } from "../lib/tts";
 import { useDesktopBadge } from "../lib/use-desktop-badge";
 import { errorText } from "../lib/user-error";
@@ -444,7 +448,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const [spaces, setSpaces] = useState<Space[]>(seed?.spaces ?? []);
   const [archivedBots, setArchivedBots] = useState<Bot[]>(seed?.archivedBots ?? []);
   const [archivedGroups, setArchivedGroups] = useState<Group[]>(seed?.archivedGroups ?? []);
-  const { collapsedSidebarSections, toggleSidebarSection } = useSidebarExpansion(userId);
   useEffect(() => {
     setBotsSidebarCollapsed(readBotsSidebarCollapsed(userId));
   }, [userId]);
@@ -656,6 +659,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const focusPromptAbortRef = useRef<AbortController | null>(null);
   const focusPromptBotIdRef = useRef<string | null>(null);
   const isMobileSidebar = useIsMobile();
+  const mobileBrowserTrigger = useRef<HTMLButtonElement>(null);
+  const { collapsedSidebarSections, toggleSidebarSection } = useSidebarExpansion(userId, isMobileSidebar);
   const miniSidebar = botsSidebarCollapsed && !isMobileSidebar;
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
   const [createBotOpen, setCreateBotOpen] = useState(false);
@@ -1246,21 +1251,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     [navigate],
   );
 
-  function snapTranscriptToEndAfterFrame() {
-    const queuedElement = messageScroll.current;
-    if (!queuedElement) return;
-    const queuedScrollTop = queuedElement.scrollTop;
-    window.requestAnimationFrame(() => {
-      const element = messageScroll.current;
-      if (transcriptCanSnapAfterFrame(element, queuedElement, queuedScrollTop)) {
-        queuedElement.scrollTop = queuedElement.scrollHeight;
-      }
-    });
-  }
-
   async function refreshGroupThread(id: string, signal?: AbortSignal) {
-    const scrollElement = messageScroll.current;
-    const stickToEnd = !scrollElement || transcriptIsNearEnd(scrollElement);
     markOnce("rk:renderer:thread-request-start");
     const request = ++groupRefreshEpoch.current;
     const snap = await rpc.threads.get({ groupId: id }, signal ? { signal } : undefined);
@@ -1276,20 +1267,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     if (!computerOpenRef.current) commitComputer(null);
     setRoutines([]);
     setRoutinesBotId(null);
-    // Keep the search-jump viewport; expandedHistoryThread merge still accepts live messages.
-    if (
-      stickToEnd &&
-      (!scrollElement || transcriptIsNearEnd(scrollElement)) &&
-      expandedHistoryThread.current !== snap.threadId
-    ) {
-      snapTranscriptToEndAfterFrame();
-    }
     return snap;
   }
 
   async function refreshThread(id: string, signal?: AbortSignal) {
-    const scrollElement = messageScroll.current;
-    const stickToEnd = !scrollElement || transcriptIsNearEnd(scrollElement);
     markOnce("rk:renderer:thread-request-start");
     const epoch = historyEpoch.current;
     const request = ++threadRefreshEpoch.current;
@@ -1313,13 +1294,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     commitSnapshot(reconciled.snapshot);
     commitComputer(reconciled.computer);
     cacheComputerFor(id, { computer: reconciled.computer });
-    if (
-      stickToEnd &&
-      (!scrollElement || transcriptIsNearEnd(scrollElement)) &&
-      expandedHistoryThread.current !== snap.threadId
-    ) {
-      snapTranscriptToEndAfterFrame();
-    }
     void Promise.all([
       // Runs after routine changes too, so an older read in flight is not reused.
       fetchFresh(queryClient, queries.routines.list.queryOptions({ input: { botId: id } })).catch(
@@ -1392,8 +1366,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     )
       return;
     pinnedAroundRef.current = null;
-    const scrollElement = messageScroll.current;
-    const previousHeight = scrollElement?.scrollHeight ?? 0;
     const epoch = historyEpoch.current;
     const before = snapshot.olderCursor;
     setLoadingOlder(true);
@@ -1408,11 +1380,18 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         activeGroupId.current !== targetGroupId
       )
         return;
+      const viewport = messageScroll.current;
+      const previousHeight = viewport?.scrollHeight ?? 0;
+      const previousTop = viewport?.scrollTop ?? 0;
       expandedHistoryThread.current = page.threadId;
       updateSnapshot((prev) => prependThreadMessagePage(prev, page));
       window.requestAnimationFrame(() => {
-        const element = messageScroll.current;
-        if (element) element.scrollTop += element.scrollHeight - previousHeight;
+        if (!viewport || viewport !== messageScroll.current || epoch !== historyEpoch.current) return;
+        // Some browsers already anchor the visible row when history is inserted.
+        // Use the old absolute position so the height delta is never added twice.
+        if (Math.abs(viewport.scrollTop - previousTop) <= 1) {
+          viewport.scrollTop = previousTop + viewport.scrollHeight - previousHeight;
+        }
       });
     } finally {
       setLoadingOlder(false);
@@ -3610,6 +3589,219 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     }
   };
   const openRosterChat = (spaceId: string, path: string) => openSpaceChat(spaceId, routineView && /^\/app\/[^/]+$/.test(path) ? `${path}?view=routines` : path);
+  const renderTaskTabs = (close?: () => void) => (
+    <>
+    {active && !inGroup && !activeProject ? <MicoTaskTabs
+      inMenu={isMobileSidebar}
+      key={JSON.stringify([userId, shellSpaceId, active.id])}
+      scope={JSON.stringify([userId, shellSpaceId, active.id])}
+      botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc}
+      onSelect={threadId => {
+        close?.();
+        const next = new URLSearchParams(searchParamsRef.current);
+        next.delete("m");
+        if (threadId) next.set("task", threadId); else next.delete("task");
+        navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: next.toString() });
+      }}
+    /> : null}
+    </>
+  );
+  const renderHeaderActions = (close?: () => void) => (
+    <>
+    {active && !inGroup && !activeProject ? <>
+      <MicoWorkMenu key={active.id} inMenu={isMobileSidebar} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
+        onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} />
+      <LocalProject key={JSON.stringify([userId, shellSpaceId, active.id])} botId={active.id} rpc={rpc} inMenu={isMobileSidebar}
+        onTask={threadId => {
+          close?.();
+          projectCollection.refresh();
+          navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: `task=${encodeURIComponent(threadId)}` });
+        }} />
+    </> : null}
+    {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} inMenu={isMobileSidebar} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
+    {!inGroup && active && !taskScope ? (
+      <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
+        <Button
+          variant={isMobileSidebar ? "ghost" : "floating"}
+          data-mobile-chat-action={isMobileSidebar || undefined}
+          size="icon-lg"
+          data-testid="call-button"
+          aria-label={call?.botId === active.id ? t`Open call` : t`Call`}
+          onClick={() => {
+            close?.();
+            if (call?.botId === active.id) {
+              setCallMinimized(false);
+              return;
+            }
+            if (bootstrapMe?.phoneCallsEnabled) callBot(active);
+            else chatTools.onVoice?.();
+          }}
+          data-active={call?.botId === active.id ? "" : undefined}
+          className="app-no-drag"
+        >
+          <Phone strokeWidth={1.6} className="size-[17px]" aria-hidden />
+          {isMobileSidebar ? (call?.botId === active.id ? t`Open call` : t`Call`) : null}
+        </Button>
+      </IconTooltip>
+    ) : null}
+    {!taskScope ? <InviteFriends inMenu={isMobileSidebar} /> : null}
+    {!isMobileSidebar && (active || activeGroup) && <><IconTooltip label={t`Chat tools`}><Button variant="ghost" size="icon-sm" aria-label={t`Chat tools`} aria-expanded={chatToolsOpen} onClick={() => setChatToolsOpen(open => !open)} className="app-no-drag hidden min-[1100px]:inline-flex"><PanelRightOpen size={17}/></Button></IconTooltip><ChatToolsMenu {...chatTools} /></>}
+    {!inGroup && active ? (
+      <IconTooltip label={t`Agent computer`}>
+        <Button
+          variant={isMobileSidebar ? "ghost" : "floating"}
+          data-mobile-chat-action={isMobileSidebar || undefined}
+          size="icon-lg"
+          aria-label={t`Agent computer`}
+          aria-pressed={panel === "computer"}
+          onClick={() => {
+            close?.();
+            const next = panel === "computer" ? null : "computer";
+            setPanel(next);
+            if (next === "computer" && active) {
+              // Refresh run/computer so Take control isn't stuck on a stale busyBotName.
+              void refreshThread(active.id).catch(() => undefined);
+            }
+          }}
+          className="app-no-drag"
+        >
+          <Monitor strokeWidth={1.6} className="size-[18px]" aria-hidden />
+          {isMobileSidebar ? t`Agent computer` : null}
+        </Button>
+      </IconTooltip>
+    ) : null}
+    </>
+  );
+  const sidebarSearch = miniSidebar || !(isMobileSidebar || activityMode || searchOpen || query) ? null : (
+    <InputGroup
+      data-testid="sidebar-search"
+      className={isMobileSidebar
+        ? "mx-4 mb-[max(1rem,env(safe-area-inset-bottom))] mt-2 min-h-12 w-auto shrink-0 rounded-full border border-border bg-card text-muted-foreground"
+        : "mx-2.5 mb-3 w-auto rounded-xl bg-card dark:bg-input border border-border text-muted-foreground focus-within:border-ring"}
+    >
+      <InputGroupAddon>
+        <Search size={16} strokeWidth={1.8} aria-hidden="true" />
+      </InputGroupAddon>
+      <InputGroupInput
+        value={activityMode ? activityFilters.query : query}
+        onChange={(e) => {
+          if (activityMode) setActivityFilters({ ...activityFilters, query: e.target.value });
+          else setQuery(e.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          if (activityMode) {
+            setActivityFilters({ ...activityFilters, query: "" });
+            return;
+          }
+          setQuery("");
+          setSearchOpen(false);
+        }}
+        placeholder={activityMode ? t`Search runs` : t`Search`}
+        aria-label={activityMode ? t`Search runs` : t`Search`}
+        autoComplete="off"
+        name="sidebar-search"
+      />
+      {activityMode ? (
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-sm"
+            aria-label={t`Filters`}
+            aria-expanded={activityFiltersExpanded}
+            aria-controls={activityFiltersId}
+            onClick={() => setActivityFiltersExpanded((expanded) => !expanded)}
+            className="relative rounded-lg"
+          >
+            <SlidersHorizontal size={16} aria-hidden="true" />
+            {activityFilterCount > 0 ? (
+              <span
+                data-testid="activity-filter-indicator"
+                aria-hidden="true"
+                className="absolute end-1 top-1 size-1.5 rounded-full bg-primary"
+              />
+            ) : null}
+          </InputGroupButton>
+        </InputGroupAddon>
+      ) : null}
+    </InputGroup>
+  );
+  const sidebarFooter = (close?: () => void) => (
+    <SidebarFooter
+      onWhatsNew={() => { close?.(); setReleaseNotesOpen(true); }}
+      showUpdates={!isMobileSidebar}
+      mini={miniSidebar}
+      logos={footerLogos}
+      name={userName}
+      initials={initials}
+      image={session.data?.user.image}
+      email={session.data?.user.email}
+      open={menuOpen}
+      onOpenChange={(open) => {
+        setMenuOpen(open);
+        if (!open) setLogOutError(null);
+      }}
+      onIntegrations={() => {
+        close?.();
+        setMenuOpen(false);
+        setOverlay({ kind: "integrations" });
+      }}
+      onBoard={
+        bootstrapMe?.ticketBoardEnabled
+          ? () => {
+              close?.();
+              setMenuOpen(false);
+              setMobileSidebarOpen(false);
+              navigate("/app/board");
+            }
+          : undefined
+      }
+      onArtifacts={() => {
+        close?.();
+        setMenuOpen(false);
+        setMobileSidebarOpen(false);
+        navigate("/app/artifacts");
+      }}
+      onSettings={() => {
+        close?.();
+        setMenuOpen(false);
+        openSettings("general");
+      }}
+      onUsage={() => {
+        close?.();
+        setMenuOpen(false);
+        openSettings("usage");
+      }}
+      onLogOut={() => {
+        setLogOutError(null);
+        void logOut();
+      }}
+      signingOut={signingOut}
+      logOutError={logOutError}
+    />
+  );
+  const sidebarCredits = (
+    <div className="mx-3 mt-1 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border px-1 py-2">
+      <MycelliosCredits key={userId} ownerId={userId ?? ""} />
+      <SidebarContribution />
+    </div>
+  );
+  const mobileRosterMenu = (
+    <MobileChatActions label={t`More`} onDismiss={() => setMenuOpen(false)}>
+      {close => (
+        <>
+          {appsEnabled ? <Button variant="ghost" data-mobile-chat-action onClick={() => { close(); openApps(); }}><LayoutGrid />Apps</Button> : null}
+          <Button variant="ghost" data-mobile-chat-action aria-pressed={activityMode} onClick={() => { close(); toggleActivityMode(); }}>
+            <Bell />{t`Activity`}
+          </Button>
+          <ProviderQuota scope={JSON.stringify([userId, currentSpaceId])} onModels={() => { close(); openSettings("models"); }} onUsage={() => { close(); showUsage(); }} compact={false} />
+          <HelpMenu compact={false} onWhatsNew={() => { close(); setReleaseNotesOpen(true); }} />
+          <PasskeyOffer />
+          {sidebarCredits}
+          {sidebarFooter(close)}
+        </>
+      )}
+    </MobileChatActions>
+  );
   const shell = (
     <>
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
@@ -3683,17 +3875,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       {bootstrapMe !== undefined ? (
         <HostComputerPrompt initialMe={bootstrapMe ?? undefined} onMeUpdated={setBootstrapMe} />
       ) : null}
-      <button
-        type="button"
-        aria-label={t`Close navigation`}
-        aria-hidden={mobileSidebarOpen ? undefined : true}
-        inert={mobileSidebarOpen ? undefined : true}
-        tabIndex={mobileSidebarOpen ? undefined : -1}
-        onClick={() => setMobileSidebarOpen(false)}
-        className={`absolute inset-y-0 end-0 start-[min(calc(100%-48px),316px)] z-30 bg-overlay transition-opacity duration-150 ease-out motion-reduce:transition-none md:hidden ${
-          mobileSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-      />
       <WorkspaceRail
         apps={appsOpen}
         onApps={appsEnabled ? openApps : undefined}
@@ -3726,11 +3907,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         data-space-switch="sidebar"
         inert={isMobileSidebar && !mobileSidebarOpen ? true : undefined}
         aria-hidden={isMobileSidebar && !mobileSidebarOpen ? true : undefined}
-        data-bots-sidebar-density={botsSidebarDensity}
-        data-collapsed={botsSidebarCollapsed ? "true" : "false"}
+        data-bots-sidebar-density={isMobileSidebar ? "comfortable" : botsSidebarDensity}
+        data-collapsed={miniSidebar ? "true" : "false"}
         className={
           isMobileSidebar
-            ? `absolute inset-y-0 start-0 z-40 flex w-[calc(100%-48px)] max-w-[316px] shrink-0 flex-col border-e border-sidebar-border bg-sidebar transition-transform duration-200 ease-out motion-reduce:transition-none ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full"}`
+            ? `absolute inset-0 z-40 flex w-full max-w-none shrink-0 flex-col bg-background transition-transform duration-200 ease-out motion-reduce:transition-none ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full"}`
             : "h-full overflow-hidden border-sidebar-border"
         }
       >
@@ -3740,6 +3921,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           history={chatHistory} onRoutines={showRoutines} onWorkflows={showWorkflows}
           onTasks={showTasks} onSchedule={showSchedule} onUsage={showUsage}
           mini={miniSidebar}
+          mobileMenu={isMobileSidebar ? mobileRosterMenu : undefined}
           createMenuOpen={createMenuOpen}
           setCreateMenuOpen={setCreateMenuOpen}
           activityMode={activityMode}
@@ -3749,7 +3931,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           }}
           searchOpen={searchOpen && !miniSidebar}
           onSearch={
-            activityMode && !miniSidebar
+            isMobileSidebar || (activityMode && !miniSidebar)
               ? undefined
               : () => {
                   if (searchOpen && !miniSidebar) {
@@ -3775,63 +3957,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           setCreateBotOpen={setCreateBotOpen}
           onCreateProject={() => { setBotsSidebarCollapsedPref(false); setQuery(""); setSearchOpen(false); if (activityMode) toggleActivityMode(); setCreatingProject(true); }}
         />
-        {appsEnabled && isMobileSidebar ? (
-          <Button variant="ghost" aria-pressed={appsOpen} className="mx-3 mb-3 justify-start px-3" onClick={openApps}>
-            <LayoutGrid size={16} aria-hidden="true" />Apps
-          </Button>
-        ) : null}
-        {miniSidebar || !(activityMode || searchOpen || query) ? null : (
-          <InputGroup
-            data-testid="sidebar-search"
-            className="mx-2.5 mb-3 w-auto rounded-xl bg-card dark:bg-input border border-border text-muted-foreground focus-within:border-ring"
-          >
-            <InputGroupAddon>
-              <Search size={16} strokeWidth={1.8} aria-hidden="true" />
-            </InputGroupAddon>
-            <InputGroupInput
-              value={activityMode ? activityFilters.query : query}
-              onChange={(e) => {
-                if (activityMode) setActivityFilters({ ...activityFilters, query: e.target.value });
-                else setQuery(e.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Escape") return;
-                if (activityMode) {
-                  setActivityFilters({ ...activityFilters, query: "" });
-                  return;
-                }
-                setQuery("");
-                setSearchOpen(false);
-              }}
-              placeholder={activityMode ? t`Search runs` : t`Search`}
-              aria-label={activityMode ? t`Search runs` : t`Search`}
-              autoComplete="off"
-              name="sidebar-search"
-            />
-            {activityMode ? (
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton
-                  size="icon-sm"
-                  aria-label={t`Filters`}
-                  aria-expanded={activityFiltersExpanded}
-                  aria-controls={activityFiltersId}
-                  onClick={() => setActivityFiltersExpanded((expanded) => !expanded)}
-                  className="relative rounded-lg"
-                >
-                  <SlidersHorizontal size={16} aria-hidden="true" />
-                  {activityFilterCount > 0 ? (
-                    <span
-                      data-testid="activity-filter-indicator"
-                      aria-hidden="true"
-                      className="absolute end-1 top-1 size-1.5 rounded-full bg-primary"
-                    />
-                  ) : null}
-                </InputGroupButton>
-              </InputGroupAddon>
-            ) : null}
-          </InputGroup>
-        )}
-        <div className="rk-scroll scroll-fade-y scroll-fade-12 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-2.5">
+        {!isMobileSidebar ? sidebarSearch : null}
+        <div className={`rk-scroll flex min-h-0 flex-1 flex-col overflow-y-auto ${isMobileSidebar ? "gap-3 px-4 pb-4" : "scroll-fade-y scroll-fade-12 gap-0.5 px-2.5 pb-2.5"}`}>
           {showSpaceSearch && !miniSidebar ? (
             <SpaceSearchResults
               hits={searchHits}
@@ -3858,6 +3985,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 onSelect={(botId, threadId) => { setMobileSidebarOpen(false); navigate(`/app/${encodeURIComponent(botId)}?task=${encodeURIComponent(threadId)}`); }} /> : null}
               <SidebarRoster
                 mini={miniSidebar}
+                mobile={isMobileSidebar}
+                activeSpaceId={currentSpaceId}
                 sidebarGroups={sidebarGroups}
                 collapsedSidebarSections={collapsedSidebarSections}
                 bootstrapMe={bootstrapMe}
@@ -3901,69 +4030,18 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             />
           </div>
         </div>
-        <div className={miniSidebar ? "hidden" : "contents"}>
-          <PasskeyOffer />
-        </div>
-        {isMobileSidebar ? <><ProviderQuota scope={JSON.stringify([userId,currentSpaceId])} onModels={() => openSettings("models")} onUsage={showUsage} compact={false} /><HelpMenu compact={false} onWhatsNew={() => setReleaseNotesOpen(true)} /></> : null}
-        {miniSidebar ? <SidebarContribution mini /> : (
-          <div className="mx-3 mt-1 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border px-1 py-2">
-            <MycelliosCredits key={userId} ownerId={userId ?? ""} />
-            <SidebarContribution />
-          </div>
-        )}
-        <SidebarFooter
-          onWhatsNew={() => setReleaseNotesOpen(true)}
-          mini={miniSidebar}
-          logos={footerLogos}
-          name={userName}
-          initials={initials}
-          image={session.data?.user.image}
-          email={session.data?.user.email}
-          open={menuOpen}
-          onOpenChange={(open) => {
-            setMenuOpen(open);
-            if (!open) setLogOutError(null);
-          }}
-          onIntegrations={() => {
-            setMenuOpen(false);
-            setOverlay({ kind: "integrations" });
-          }}
-          onBoard={
-            bootstrapMe?.ticketBoardEnabled
-              ? () => {
-                  setMenuOpen(false);
-                  setMobileSidebarOpen(false);
-                  navigate("/app/board");
-                }
-              : undefined
-          }
-          onArtifacts={() => {
-            setMenuOpen(false);
-            setMobileSidebarOpen(false);
-            navigate("/app/artifacts");
-          }}
-          onSettings={() => {
-            setMenuOpen(false);
-            openSettings("general");
-          }}
-          onUsage={() => {
-            setMenuOpen(false);
-            openSettings("usage");
-          }}
-          onLogOut={() => {
-            setLogOutError(null);
-            void logOut();
-          }}
-          signingOut={signingOut}
-          logOutError={logOutError}
-        />
+        {!isMobileSidebar ? <>
+          <div className={miniSidebar ? "hidden" : "contents"}><PasskeyOffer /></div>
+          {miniSidebar ? <SidebarContribution mini /> : sidebarCredits}
+        </> : mobileSidebarOpen ? <><WebUpdateSlot /><DesktopSidebarUpdate /></> : null}
+        {isMobileSidebar ? sidebarSearch : sidebarFooter()}
       </Sidebar> : null}
 
       {/* Keep the composer's z-index inside the chat so phone overlays like the side panel cover it. */}
       <main
         data-space-switch="main"
-        aria-hidden={mobileSidebarOpen || undefined}
-        inert={mobileSidebarOpen}
+        aria-hidden={(mobileSidebarOpen || (isMobileSidebar && reviewWorkspace?.open)) || undefined}
+        inert={mobileSidebarOpen || (isMobileSidebar && reviewWorkspace?.open)}
         className="isolate flex min-w-0 flex-1 flex-col bg-background"
       >
         {/* Inside main so the composer and its menus stay above it. */}
@@ -3991,16 +4069,16 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         /> : <>
         {/* The header floats so the transcript scrolls under its buttons. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <div data-testid="conversation-header" className={`${desktopBridge() ? "app-drag" : ""} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 [&_button]:pointer-events-auto`}>
+          <div data-testid="conversation-header" className={`${desktopBridge() ? "app-drag" : ""} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
             <div className="flex items-center">
               <Button
                 variant="floating"
                 size="icon-lg"
                 aria-label={t`Open navigation`}
                 onClick={() => setMobileSidebarOpen(true)}
-                className="app-no-drag md:hidden"
+                className="app-no-drag size-12 shrink-0 rounded-full md:hidden"
               >
-                <Menu strokeWidth={1.7} className="size-[19px]" />
+                {active || activeGroup ? <ArrowLeft className="size-6" /> : <Menu strokeWidth={1.7} className="size-6" />}
               </Button>
             </div>
             <Button
@@ -4017,8 +4095,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 } else setPanel(inGroup ? "group-settings" : "settings");
               }}
               className={active && !inGroup && !activeProject
-                ? "app-no-drag h-7 min-w-0 max-w-[32%] gap-1.5 rounded-md px-1.5"
-                : "app-no-drag h-8 min-w-0 max-w-[40%] gap-2 rounded-md px-1.5"}
+                ? "app-no-drag h-7 min-w-0 max-w-[32%] gap-1.5 rounded-md px-1.5 max-md:h-12 max-md:max-w-[calc(100%-112px)] max-md:rounded-full max-md:px-3"
+                : "app-no-drag h-8 min-w-0 max-w-[40%] gap-2 rounded-md px-1.5 max-md:h-12 max-md:max-w-[calc(100%-112px)] max-md:rounded-full max-md:px-3"}
             >
               {inGroup ? (
                 <GroupAvatar
@@ -4029,7 +4107,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 <BotAvatar
                   color={active.color}
                   identity={active.id}
-                  size={22}
+                  size={isMobileSidebar ? 28 : 22}
                   status={active.status}
                 />
               ) : null}
@@ -4041,74 +4119,32 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 </span>
               </span>
             </Button>
-            {active && !inGroup && !activeProject ? <MicoTaskTabs
-              key={JSON.stringify([userId, shellSpaceId, active.id])}
-              scope={JSON.stringify([userId, shellSpaceId, active.id])}
-              botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc}
-              onSelect={threadId => {
-                const next = new URLSearchParams(searchParamsRef.current);
-                next.delete("m");
-                if (threadId) next.set("task", threadId); else next.delete("task");
-                navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: next.toString() });
-              }}
-            /> : null}
-            <div className="app-no-drag ms-auto flex min-w-0 items-center gap-1">
-              {active && !inGroup && !activeProject ? <>
-                <MicoWorkMenu key={active.id} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
-                  onOpenTask={task => navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" })} />
-                <LocalProject key={JSON.stringify([userId, shellSpaceId, active.id])} botId={active.id} rpc={rpc}
-                  onTask={threadId => {
-                    projectCollection.refresh();
-                    navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: `task=${encodeURIComponent(threadId)}` });
-                  }} />
-              </> : null}
-              {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
-              {!inGroup && active && !taskScope ? (
-                <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
-                  <Button
-                    variant="floating"
-                    size="icon-lg"
-                    data-testid="call-button"
-                    aria-label={call?.botId === active.id ? t`Open call` : t`Call`}
-                    onClick={() => {
-                      if (call?.botId === active.id) {
-                        setCallMinimized(false);
-                        return;
-                      }
-                      if (bootstrapMe?.phoneCallsEnabled) callBot(active);
-                      else chatTools.onVoice?.();
-                    }}
-                    data-active={call?.botId === active.id ? "" : undefined}
-                    className="app-no-drag"
-                  >
-                    <Phone strokeWidth={1.6} className="size-[17px]" />
+            {isMobileSidebar ? (active || activeGroup) && (
+              <div className="ms-auto flex shrink-0 gap-1.5">
+                {reviewWorkspace && (
+                  <Button ref={mobileBrowserTrigger} variant="floating" size="icon-lg" className="size-12 shrink-0 rounded-full"
+                    aria-label={t`Open browser`} onClick={chatTools.onBrowser}>
+                    <Globe className="size-6" aria-hidden />
                   </Button>
-                </IconTooltip>
-              ) : null}
-              {!taskScope ? <InviteFriends /> : null}
-              {(active || activeGroup) && <><IconTooltip label={t`Chat tools`}><Button variant="ghost" size="icon-sm" aria-label={t`Chat tools`} aria-expanded={chatToolsOpen} onClick={() => setChatToolsOpen(open => !open)} className="app-no-drag hidden min-[1100px]:inline-flex"><PanelRightOpen size={17}/></Button></IconTooltip><ChatToolsMenu {...chatTools} /></>}
-              {!inGroup && active ? (
-                <IconTooltip label={t`Agent computer`}>
-                  <Button
-                    variant="floating"
-                    size="icon-lg"
-                    aria-label={t`Agent computer`}
-                    aria-pressed={panel === "computer"}
-                    onClick={() => {
-                      const next = panel === "computer" ? null : "computer";
-                      setPanel(next);
-                      if (next === "computer" && active) {
-                        // Refresh run/computer so Take control isn't stuck on a stale busyBotName.
-                        void refreshThread(active.id).catch(() => undefined);
-                      }
-                    }}
-                    className="app-no-drag"
-                  >
-                    <Monitor strokeWidth={1.6} className="size-[18px]" />
-                  </Button>
-                </IconTooltip>
-              ) : null}
-            </div>
+                )}
+                <MobileChatActions>
+                  {close => (
+                    <>
+                      {renderTaskTabs(close)}
+                      {renderHeaderActions(close)}
+                      <MobileChatToolLinks {...chatTools} close={close} />
+                    </>
+                  )}
+                </MobileChatActions>
+              </div>
+            ) : (
+              <>
+                {renderTaskTabs()}
+                <div className="app-no-drag ms-auto flex min-w-0 items-center gap-1">
+                  {renderHeaderActions()}
+                </div>
+              </>
+            )}
           </div>
           {!active && !activeGroup && initialBotsLoaded ? (
             <div className="grid flex-1 place-items-center">
@@ -4326,7 +4362,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onAnswered={(botId) => navigate(`/app/${botId}`)}
       />
 
-      <ReviewWorkspacePanel botId={inGroup ? undefined : active?.id} taskThreadId={taskScope?.taskThreadId} prepareProject={async (prompt, id) => {
+      <ReviewWorkspacePanel agentName={inGroup ? activeGroup?.name : active?.name}
+        agentAvatar={isMobileSidebar && (inGroup
+          ? <GroupAvatar members={activeSnapshot?.members ?? activeGroup?.members ?? []} size={24} />
+          : active && <BotAvatar color={active.color} identity={active.id} size={24} status={active.status} />)}
+        onReturnToChat={() => requestAnimationFrame(() => mobileBrowserTrigger.current?.focus({ preventScroll: true }))}
+        botId={inGroup ? undefined : active?.id} taskThreadId={taskScope?.taskThreadId} prepareProject={async (prompt, id) => {
         const botId = active?.id;
         if (!botId || activeBotId.current !== botId || activeGroupId.current) throw new Error(t`Open the project's agent chat first.`);
         // Project conversations already have an admitted native worktree. Never

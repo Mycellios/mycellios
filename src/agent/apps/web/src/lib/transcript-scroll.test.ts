@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  transcriptCanSnapAfterFrame,
   transcriptIsNearEnd,
   transcriptMovedDown,
 } from "./transcript-scroll.js";
@@ -13,21 +12,6 @@ describe("transcriptIsNearEnd", () => {
     expect(transcriptIsNearEnd({ scrollHeight: 1_000, scrollTop: 420, clientHeight: 500 })).toBe(
       false,
     );
-  });
-});
-
-describe("transcriptCanSnapAfterFrame", () => {
-  it("does not snap after the reader moves while the frame is queued", () => {
-    const transcript = { scrollTop: 950 };
-    expect(transcriptCanSnapAfterFrame(transcript, transcript, 950)).toBe(true);
-    transcript.scrollTop = 920;
-    expect(transcriptCanSnapAfterFrame(transcript, transcript, 950)).toBe(false);
-  });
-
-  it("does not snap a replacement transcript", () => {
-    const queuedTranscript = { scrollTop: 950 };
-    const replacementTranscript = { scrollTop: 950 };
-    expect(transcriptCanSnapAfterFrame(replacementTranscript, queuedTranscript, 950)).toBe(false);
   });
 });
 

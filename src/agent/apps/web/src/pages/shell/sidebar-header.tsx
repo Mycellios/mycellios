@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import type { Bot, Space } from "@rakazo/contracts";
 import { Badge, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings, Workflow } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { desktopBridge } from "../../lib/desktop";
 import type { Panel } from "../../lib/right-panel-state";
@@ -53,6 +53,7 @@ export function SidebarHeader({
   onTasks,
   onSchedule,
   onUsage,
+  mobileMenu,
 }: {
   mini?: boolean;
   searchOpen?: boolean;
@@ -79,21 +80,29 @@ export function SidebarHeader({
   onTasks?: () => void;
   onSchedule?: () => void;
   onUsage?: () => void;
+  mobileMenu?: ReactNode;
 }) {
   const { t } = useLingui();
   const hasWindowChrome = Boolean(desktopBridge());
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const toggleLabel = mini ? t`Show bots` : t`Minimize bots`;
+  const mobile = mobileMenu != null;
+  const spaceName = spaces.find(space => space.id === spaceId)?.name;
   return (
     <div
       data-testid="sidebar-topbar"
-      className={`${hasWindowChrome ? "app-drag" : ""} rk-sidebar-topbar flex shrink-0 items-center gap-1 ${mini ? "flex-col px-1 py-2" : "px-2"} ${hasWindowChrome && desktopBridge()?.platform !== "win32" ? mini ? "pt-14" : "ps-12" : ""}`}
+      className={mobile
+        ? "flex shrink-0 flex-wrap items-center gap-2 px-5 pt-3 pb-1"
+        : `${hasWindowChrome ? "app-drag" : ""} rk-sidebar-topbar flex shrink-0 items-center gap-1 ${mini ? "flex-col px-1 py-2" : "px-2"} ${hasWindowChrome && desktopBridge()?.platform !== "win32" ? mini ? "pt-14" : "ps-12" : ""}`}
     >
-      {!mini ? <Popover open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
-        <PopoverTrigger className="app-no-drag flex h-8 min-w-0 items-center gap-2 rounded-md px-1.5 text-sm font-medium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring" aria-label={t`Switch workspace`}>
-          <span className="truncate">{spaces.find(space => space.id === spaceId)?.name ?? "Mycellios"}</span><ChevronsUpDown size={12} className="shrink-0 text-muted-foreground" />
+      {mobile ? <Button variant="floating" size="icon-lg" className="size-12 rounded-full" aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><PanelLeftClose size={22} /></Button> : null}
+      {!mini ? <div className={mobile ? "order-last min-w-0 basis-full" : "contents"}>
+        {mobile ? <div className="mt-2 flex items-center gap-2"><h1 className="text-3xl font-semibold tracking-tight">Mycellios</h1><Badge variant="outline" className="text-[10px] text-muted-foreground">Beta</Badge></div> : null}
+        <Popover open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
+        <PopoverTrigger className={`app-no-drag flex min-w-0 max-w-full items-center gap-2 rounded-md text-sm font-medium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "min-h-11 text-muted-foreground" : "h-8 px-1.5"}`} aria-label={t`Switch workspace`}>
+          <span className="truncate">{spaceName ?? "Mycellios"}</span><ChevronsUpDown size={mobile ? 15 : 12} className="shrink-0 text-muted-foreground" />
         </PopoverTrigger>
-        {workspaceOpen ? <PopoverContent align="start" className="app-no-drag w-64 gap-1 p-1">
+        {workspaceOpen ? <PopoverContent align="start" className={`app-no-drag max-h-[var(--available-height)] w-64 gap-1 overflow-y-auto p-1 ${mobile ? "[&_button]:min-h-11" : ""}`}>
           {spaces.map(space => <Button key={space.id} variant="ghost" className="justify-start" aria-current={space.id === spaceId ? "true" : undefined} onClick={() => { setWorkspaceOpen(false); const first = space.bots[0]; const group = space.groups[0]; onSpace(space.id, first ? `/app/${first.id}` : group ? `/app/g/${group.id}` : "/onboarding"); }}>{space.name}</Button>)}
           <div className="my-1 border-t border-border" />
           {onRoutines ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onRoutines(); }}><Workflow size={15} />{t`Routines`}</Button> : null}
@@ -104,8 +113,8 @@ export function SidebarHeader({
           <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); onSpaceSettings(); }}><Settings size={15} />{t`Space settings`}</Button>
           <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setNewSpaceOpen(true); }}><Plus size={15} />{t`New space`}</Button>
         </PopoverContent> : null}
-      </Popover> : null}
-      {!mini ? <Badge variant="outline" className="h-4 px-1.5 text-[10px] text-muted-foreground">Beta</Badge> : null}
+      </Popover></div> : null}
+      {!mini && !mobile ? <Badge variant="outline" className="h-4 px-1.5 text-[10px] text-muted-foreground">Beta</Badge> : null}
       <div className={`relative flex shrink-0 items-center gap-0.5 ${mini ? "flex-col" : "ms-auto"}`}>
         {!mini ? <div className="hidden items-center md:flex">
           <IconTooltip label={t`Back`}><Button variant="ghost" size="icon-sm" className="app-no-drag size-7" aria-label={t`Back`} disabled={!history.canBack} onClick={history.back}><ArrowLeft size={15} /></Button></IconTooltip>
@@ -126,7 +135,7 @@ export function SidebarHeader({
             </Button>
           </IconTooltip>
         ) : null}
-        <IconTooltip label={t`Activity`}>
+        {!mobile ? <IconTooltip label={t`Activity`}>
           <Button
             variant="ghost"
             size="icon-sm"
@@ -147,7 +156,7 @@ export function SidebarHeader({
               aria-hidden="true"
             />
           </Button>
-        </IconTooltip>
+        </IconTooltip> : null}
         <IconTooltip label={toggleLabel}>
           <Button
             variant="ghost"
@@ -167,11 +176,11 @@ export function SidebarHeader({
         <Popover open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
           <IconTooltip label={t`Create`}>
             <PopoverTrigger
-              className="app-no-drag flex size-7 items-center justify-center rounded-full text-muted-foreground/70 outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring"
+              className={`app-no-drag flex items-center justify-center rounded-full outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "size-12 bg-muted text-foreground" : "size-7 text-muted-foreground/70"}`}
               aria-label={t`Create`}
               data-testid="create-menu-trigger"
             >
-              <Plus size={15} strokeWidth={1.8} aria-hidden="true" />
+              <Plus size={mobile ? 22 : 15} strokeWidth={1.8} aria-hidden="true" />
             </PopoverTrigger>
           </IconTooltip>
           {/* Unmount with the state change so the panel it opens never coexists with the menu. */}
@@ -207,6 +216,7 @@ export function SidebarHeader({
             </PopoverContent>
           ) : null}
         </Popover>
+        {mobileMenu}
       </div>
     </div>
   );

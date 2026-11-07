@@ -431,10 +431,12 @@ test("sign-in, spawn, and stop work in the shell", async ({ page }, testInfo) =>
   await expect(page.getByRole("button", { name: "Send", exact: true })).toBeVisible();
   const holdToTalk = page
     .getByTestId("composer-bar")
-    .getByRole("button", { name: "Hold to talk", exact: true });
+    .getByRole("button", { name: "Dictate message", exact: true });
   await expect(holdToTalk).toBeVisible();
   await composer.fill("Use the newer report and keep the answer short.");
-  await expect(holdToTalk).toHaveCount(0);
+  await expect(holdToTalk).toBeVisible();
+  await composer.press("Tab");
+  await expect(holdToTalk).toBeFocused();
   await composer.press("Tab");
   await expect(page.getByRole("button", { name: "Send", exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
