@@ -7432,3 +7432,30 @@ msgstr "Tool finished · waiting for an update"
 
 msgid "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
 msgstr "This request stopped after producing results or actions. Send a new message to continue; retrying it could repeat actions."
+
+msgid "Desktop could not confirm the result. Review what it already did before continuing."
+msgstr "Desktop could not confirm the result. Review what it already did before continuing."
+
+msgid "Mycellios encountered an internal error."
+msgstr "Mycellios encountered an internal error."
+
+msgid "{provider} could not complete the request. The cause is unknown."
+msgstr "{provider} could not complete the request. The cause is unknown."
+
+msgid "{provider} reached its usage quota."
+msgstr "{provider} reached its usage quota."
+
+msgid "{provider} returned a server error."
+msgstr "{provider} returned a server error."
+
+msgid "{provider} is temporarily unavailable."
+msgstr "{provider} is temporarily unavailable."
+
+msgid "The model hit its output limit before writing a response."
+msgstr "The model hit its output limit before writing a response."
+
+msgid "Change model"
+msgstr "Change model"
+
+msgid "This changes the model for this Mico. Your message stays in the chat."
+msgstr "This changes the model for this Mico. Your message stays in the chat."
