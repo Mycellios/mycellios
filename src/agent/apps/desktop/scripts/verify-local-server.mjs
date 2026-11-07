@@ -94,6 +94,8 @@ const env = Object.fromEntries(
     "TEMP",
     "TMP",
     "PATHEXT",
+    "DISPLAY",
+    "XAUTHORITY",
   ].flatMap((k) => (process.env[k] ? [[k, process.env[k]]] : [])),
 );
 Object.assign(env, {
@@ -119,7 +121,10 @@ let stdout = "";
 child.stdout.on("data", (data) => {
   stdout = (stdout + data).slice(-4000);
 });
-child.stderr.resume();
+let stderr = "";
+child.stderr.on("data", (data) => {
+  stderr = (stderr + data).slice(-4000);
+});
 const timer = setTimeout(() => {
   if (process.platform === "win32")
     execFile(
@@ -136,7 +141,7 @@ try {
     child.once("close", r);
   });
   if (code !== 0 || !stdout.includes('"electronUtility":true'))
-    throw new Error(`Electron local server verification failed: ${stdout.trim()}`);
+    throw new Error(`Electron local server verification failed: ${[stdout.trim(), stderr.trim()].filter(Boolean).join("\n")}`);
   console.log(stdout.trim());
   console.log(JSON.stringify({ portableProfileCopy: true }));
 } finally {

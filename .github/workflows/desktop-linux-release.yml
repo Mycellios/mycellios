@@ -46,11 +46,16 @@ jobs:
           npm run build --workspace @rakazo/desktop
           npm run build:local-server --workspace @rakazo/desktop
           npm exec --workspace @rakazo/desktop -- node scripts/package-linux.mjs --runtime "$RUNNER_TEMP/runtime.deb" --sha256 fff304aa909775d0098e5837a3cbdb986a87cdfefa0ffcb4cedfb4d67f8d6d09 --out "$RUNNER_TEMP/desktop-release"
-          node apps/desktop/scripts/verify-local-server.mjs --server-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/local-server" --web-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/web"
+          electron_bin="$(node -p 'require("electron")')"
+          sudo chown root:root "$(dirname "$electron_bin")/chrome-sandbox"
+          sudo chmod 4755 "$(dirname "$electron_bin")/chrome-sandbox"
+          xvfb-run -a node apps/desktop/scripts/verify-local-server.mjs --server-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/local-server" --web-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/web"
       - name: Launch the packaged app with an isolated profile
         working-directory: src/agent
         run: |
           set -euo pipefail
+          sudo chown root:root "$RUNNER_TEMP/desktop-release/linux-unpacked/chrome-sandbox"
+          sudo chmod 4755 "$RUNNER_TEMP/desktop-release/linux-unpacked/chrome-sandbox"
           xvfb-run -a node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
           import { mkdtemp } from 'node:fs/promises';
