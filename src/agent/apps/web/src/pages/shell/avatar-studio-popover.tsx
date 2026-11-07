@@ -41,32 +41,32 @@ export function BotLookPicker({
   const parsed = parseBotAvatar(value);
   const activeShape = micoAvatarShape(parsed.shapeIndex);
   const shapeLabels = {
-    mushroom: t`Mushroom`,
-    fox: t`Fox`,
-    hedgehog: t`Hedgehog`,
-    frog: t`Frog`,
-    moth: t`Moth`,
-    snail: t`Snail`,
-    owl: t`Owl`,
-    turtle: t`Turtle`,
-    axolotl: t`Axolotl`,
-    crab: t`Crab`,
-    fish: t`Fish`,
-    octopus: t`Octopus`,
+    mushroom: t({ id: "Mushroom", message: "Mushroom" }),
+    fox: t({ id: "Fox", message: "Fox" }),
+    hedgehog: t({ id: "Hedgehog", message: "Hedgehog" }),
+    frog: t({ id: "Frog", message: "Frog" }),
+    moth: t({ id: "Moth", message: "Moth" }),
+    snail: t({ id: "Snail", message: "Snail" }),
+    owl: t({ id: "Owl", message: "Owl" }),
+    turtle: t({ id: "Turtle", message: "Turtle" }),
+    axolotl: t({ id: "Axolotl", message: "Axolotl" }),
+    crab: t({ id: "Crab", message: "Crab" }),
+    fish: t({ id: "Fish", message: "Fish" }),
+    octopus: t({ id: "Octopus", message: "Octopus" }),
   };
   const paletteLabels = {
-    violet: t`Violet`,
-    tangerine: t`Tangerine`,
-    honey: t`Honey`,
-    lime: t`Lime`,
-    indigo: t`Indigo`,
-    turquoise: t`Turquoise`,
-    raspberry: t`Raspberry`,
-    mint: t`Mint`,
-    lavender: t`Lavender`,
-    coral: t`Coral`,
-    sky: t`Sky blue`,
-    slate: t`Slate`,
+    violet: t({ id: "Violet", message: "Violet" }),
+    tangerine: t({ id: "Tangerine", message: "Tangerine" }),
+    honey: t({ id: "Honey", message: "Honey" }),
+    lime: t({ id: "Lime", message: "Lime" }),
+    indigo: t({ id: "Indigo", message: "Indigo" }),
+    turquoise: t({ id: "Turquoise", message: "Turquoise" }),
+    raspberry: t({ id: "Raspberry", message: "Raspberry" }),
+    mint: t({ id: "Mint", message: "Mint" }),
+    lavender: t({ id: "Lavender", message: "Lavender" }),
+    coral: t({ id: "Coral", message: "Coral" }),
+    sky: t({ id: "Sky blue", message: "Sky blue" }),
+    slate: t({ id: "Slate", message: "Slate" }),
   };
 
   return (
@@ -273,7 +273,7 @@ export function AvatarStudioPopover({
             <div className="flex items-center justify-between border-b border-border pb-1">
               <TabsList className="rounded-full">
                 <TabsTrigger value="bot" className="rounded-full px-3 text-xs">
-                  <Trans>Bot</Trans>
+                  <Trans id="Bot">Mico</Trans>
                 </TabsTrigger>
                 <TabsTrigger value="upload" className="rounded-full px-3 text-xs">
                   <Trans>Upload</Trans>

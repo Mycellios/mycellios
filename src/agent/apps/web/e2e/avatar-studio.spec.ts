@@ -16,7 +16,7 @@ test("bot settings save the avatar shape and palette across reloads", async ({ p
   const studio = page.getByTestId("avatar-studio");
   await expect(studio).toBeVisible();
   await expect(studio.getByText("Avatar Studio", { exact: true })).toBeVisible();
-  await expect(studio.getByRole("tab", { name: "Bot", exact: true })).toBeVisible();
+  await expect(studio.getByRole("tab", { name: "Mico", exact: true })).toBeVisible();
   await expect(studio.getByRole("tab", { name: "Upload", exact: true })).toBeVisible();
   await expect(studio.getByTestId("avatar-studio-bot-tab")).toBeVisible();
 
