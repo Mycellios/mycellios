@@ -46,13 +46,12 @@ in Ask, or in Auto when `RAKAZO_AUTO_REVIEW=1` is set and an approval model is a
 person can allow or block single tools and sites in every mode, and a space can customize its
 approvals apart from the account.
 
-In **Settings → Models → Approval model**, each user can select a model
-from an existing connection and add ordered backups, independently of their main model. Personal
-connections use their own credentials; hosted calls follow the same Rakazo credit rules as chat.
-Backups are tried only when a checker fails. An explicit ask, including an uncertain decision,
-still requires a person.
+Existing approval model choices and ordered backups remain active in their account or Space.
+Without a saved choice, review follows the effective main model when available, otherwise the
+deployment checker. Backups are tried only when a checker fails. An explicit ask, including an
+uncertain decision, still requires a person.
 
-The deployment checker remains the default when no approval model is selected. For OpenRouter
+To configure the deployment checker with OpenRouter
 Jev, set `RAKAZO_AUTO_REVIEW_PROVIDER=openrouter` and
 `RAKAZO_AUTO_REVIEW_MODEL=typesafe/jev-1.14`; it uses `OPENROUTER_API_KEY` and the Decisions API.
 TypeSafe direct remains available through `RAKAZO_AUTO_REVIEW_PROVIDER=jev` and

@@ -9,31 +9,48 @@ function isFamiliarApp(item: ConnectionCatalogItem) {
   );
 }
 
-/** Connected apps, or familiar artwork-first suggestions from the loaded catalog. */
+const shortcutApps = ["gmail", "github", "google-calendar"];
+
+function shortcutRank(item: ConnectionCatalogItem) {
+  const rank = shortcutApps.findIndex(
+    (id) =>
+      item.slug.toLowerCase() === id ||
+      item.name.toLowerCase() === id ||
+      matchFeaturedConnectorId(item.slug) === id ||
+      matchFeaturedConnectorId(item.name) === id,
+  );
+  return rank === -1 ? shortcutApps.length : rank;
+}
+
+/** Decorative suggestions for the connection shortcut, drawn from the available catalog. */
 export function connectedAppMarks(
   catalog: readonly ConnectionCatalogItem[],
   connections: readonly Connection[],
 ) {
-  const connected = catalog.filter(
-    (item) =>
-      item.connected ||
-      connections.some(
-        (row) =>
-          row.status === "connected" &&
-          row.connectorId === item.connectorId &&
-          row.provider.toLowerCase() === item.slug.toLowerCase(),
-      ),
+  const connected = new Set(
+    catalog.filter(
+      (item) =>
+        item.connected ||
+        connections.some(
+          (row) =>
+            row.status === "connected" &&
+            row.connectorId === item.connectorId &&
+            row.provider.toLowerCase() === item.slug.toLowerCase(),
+        ),
+    ),
   );
-  const apps = [...(connected.length ? connected : catalog)]
+  const apps = [...catalog]
     .sort(
       (a, b) =>
+        shortcutRank(a) - shortcutRank(b) ||
+        Number(connected.has(b)) - Number(connected.has(a)) ||
         Number(Boolean(b.logo)) - Number(Boolean(a.logo)) ||
-        (connected.length ? 0 : Number(isFamiliarApp(b)) - Number(isFamiliarApp(a))),
+        Number(isFamiliarApp(b)) - Number(isFamiliarApp(a)),
     )
     .filter((item, index, apps) => apps.findIndex((app) => app.name === item.name) === index);
   const initials = new Set<string>();
   const preferred = apps.filter((app) => {
-    if (app.logo) return true;
+    if (app.logo || shortcutRank(app) < shortcutApps.length) return true;
     const initial = app.name[0]?.toUpperCase() ?? "";
     if (initials.has(initial)) return false;
     initials.add(initial);

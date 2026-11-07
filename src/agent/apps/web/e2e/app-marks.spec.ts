@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { completeOnboarding, signup } from "./helpers";
 
 // Cached public catalog artwork keeps visual coverage offline and repeatable.
-const apps = ["gmail", "notion", "github"];
+const apps = ["gmail", "github", "notion"];
 const catalogApps = ["gmail", "obscure-app", "notion", "github"];
 test.use({ deviceScaleFactor: 3 });
 

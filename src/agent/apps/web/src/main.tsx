@@ -17,6 +17,7 @@ import { reportCaughtReactError } from "./lib/monitoring";
 import { markAfterPaint, markOnce } from "./lib/performance";
 import { installPreloadRecovery } from "./lib/preload-recovery";
 import { queryClient } from "./lib/query";
+import { applyInterfaceSize } from "./lib/interface-size";
 import { applyUiAppearance, watchSystemAppearance } from "./lib/ui-appearance";
 import { resolveUiLocale } from "./lib/ui-locale";
 import { registerServiceWorker } from "./pwa/register";
@@ -28,6 +29,7 @@ installAndroidHost();
 if (!isAndroidHost()) { clientUpdates().install(); registerServiceWorker(); }
 applyUiDirection(resolveUiLocale());
 applyUiAppearance();
+applyInterfaceSize();
 
 function PerformanceProbe() {
   useLayoutEffect(() => {

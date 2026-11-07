@@ -93,7 +93,7 @@ describe("CreateBotDialog", () => {
     await click(button("Turquoise"));
     await typeName("Scout");
     await click(button("Create"));
-    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_1001" });
+    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_2033" });
   });
 
   it("shows the error and stays open when creating fails", async () => {
@@ -137,13 +137,35 @@ describe("Mico avatar settings", () => {
     await renderStudio("#8650DF::shape_1000");
     await click(button("Customize bot avatar"));
     expect(button("Mushroom").getAttribute("aria-pressed")).toBe("true");
-    expect(button("Violet").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Original colors").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Velvety").getAttribute("aria-pressed")).toBe("true");
 
     await click(button("Mint"));
-    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_1000");
-    await renderStudio("#67B793::shape_1000");
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2001");
+    await renderStudio(onChange.mock.lastCall![0]);
     await click(button("Octopus"));
-    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_1011");
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2353");
     expect(button("Upload").getAttribute("role")).toBe("tab");
+
+    await renderStudio(onChange.mock.lastCall![0]);
+    await click(button("Star"));
+    await renderStudio(onChange.mock.lastCall![0]);
+    await click(button("Flat"));
+    await renderStudio(onChange.mock.lastCall![0]);
+    await click(button("Wine"));
+    await renderStudio(onChange.mock.lastCall![0]);
+    expect(button("Octopus").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Wine").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Star").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Flat").getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector('[data-mico-avatar="flat"]')).not.toBeNull();
+    await click(button("Velvety"));
+    await renderStudio(onChange.mock.lastCall![0]);
+    expect(document.querySelector('[data-mico-avatar="plush"] image')).not.toBeNull();
+    await click(button("Original colors"));
+    await renderStudio(onChange.mock.lastCall![0]);
+    expect(button("Star").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Octopus").getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector('[data-mico-avatar="plush"] image')?.getAttribute("filter")).toBeNull();
   });
 });

@@ -90,9 +90,8 @@ export class ManualUpdateController {
       this.current = { ...this.current, phase: this.release ? "available" : "idle",
         availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString() };
       if (this.release) await this.runDownload();
-      if (this.state().phase === "error" && !this.checkRequested) this.current = previous;
     } catch {
-      if (this.checkRequested) this.fail();
+      if (this.checkRequested || this.current.availableVersion) this.fail();
       else this.current = previous;
     }
     return this.state();

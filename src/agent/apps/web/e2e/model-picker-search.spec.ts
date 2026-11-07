@@ -1,84 +1,44 @@
 import { expect, test } from "@playwright/test";
-import {
-  captureScreenshot,
-  completeOnboarding,
-  openModelConnection,
-  openUserSettings,
-  signup,
-} from "./helpers";
+import type { Bot, ModelRoleSettings } from "@rakazo/contracts";
+import { activeBotId, captureScreenshot, completeOnboarding, openUserSettings, rpc, signup } from "./helpers";
 
-test("model dropdown search and provider group headers", async ({ page }, testInfo) => {
+test("models are searched and selected directly in the Mico header", async ({ page }, testInfo) => {
   const stamp = Date.now();
-  const userName = `Model picker ${stamp}`;
-  await signup(page, `model-picker-${stamp}@rakazo.test`, "password12", userName);
+  await signup(page, `model-picker-${stamp}@rakazo.test`, "password12", `Model picker ${stamp}`);
   await completeOnboarding(page);
+  const botId = activeBotId(page);
+  const original = await rpc<ModelRoleSettings>(page, "models/role", { role: "main" });
+  await rpc(page, "models/connect", {
+    provider: "openrouter",
+    apiKey: "fake-picker-api-key",
+    makeDefault: false,
+  });
 
   await openUserSettings(page, "models");
+  await expect(page.getByTestId("model-providers")).toBeVisible();
+  await expect(page.getByTestId("model-role-main")).toHaveCount(0);
+  await expect(page.getByRole("searchbox", { name: "Search providers" })).toBeVisible();
+  await page.goto(`/app/${botId}`);
 
-  // OpenRouter has many models so group headers and search are obvious. Connecting it
-  // reopens the main model's picker on its models.
-  const dialog = await openModelConnection(page, "OpenRouter");
-  await dialog.getByLabel("API key").fill("fake-picker-api-key");
-  await dialog.getByRole("button", { name: "Connect API key", exact: true }).click();
-  await expect(dialog).toBeHidden();
+  const header = page.getByTestId("chat-header-model").getByRole("button", { name: "Model", exact: true });
+  await header.click();
+  const search = page.getByRole("combobox", { name: "Search models" });
+  await expect(search).toBeVisible();
+  await expect(page.getByRole("group", { name: /OpenRouter/ }).first()).toBeVisible();
+  await search.fill("claude");
+  const options = page.locator('[data-slot="command-list"]').getByRole("option");
+  await expect(options.first()).toBeVisible();
+  expect((await options.allTextContents()).every((text) => /claude/i.test(text))).toBe(true);
+  await captureScreenshot(page, testInfo, "mico-model-picker-filtered");
+  await search.press("Enter");
+  await expect(search).toBeHidden();
+  await expect.poll(async () =>
+    (await rpc<Bot[]>(page, "bots/list", {})).find((bot) => bot.id === botId)?.modelProvider,
+  ).toBe("openrouter");
+  expect(await rpc<ModelRoleSettings>(page, "models/role", { role: "main" })).toEqual(original);
 
-  const modelSearch = page.getByRole("combobox", { name: "Search models" });
-  const modelOptions = page.getByRole("listbox", { name: "Model options" });
-  await expect(modelSearch).toBeVisible();
-  await expect(modelSearch).toHaveAttribute("placeholder", "Search");
-  await expect(modelSearch).toHaveValue("OpenRouter");
-  await expect(modelOptions).toBeVisible();
-  await expect(
-    modelOptions.locator("[cmdk-group-heading]", { hasText: /^OpenRouter$/ }),
-  ).toBeVisible();
-
-  await captureScreenshot(page, testInfo, "model-picker-dropdown-groups");
-
-  await modelSearch.fill("claude");
-  const optionTexts = await modelOptions.getByRole("option").allTextContents();
-  expect(optionTexts.length).toBeGreaterThan(0);
-  expect(optionTexts.every((text) => /claude/i.test(text))).toBe(true);
-  await expect(page.getByText("No matching models")).toBeHidden();
-
-  await captureScreenshot(page, testInfo, "model-picker-dropdown-filtered");
-
-  const firstActive = await modelSearch.getAttribute("aria-activedescendant");
-  expect(firstActive).toBeTruthy();
-  await modelSearch.press("ArrowDown");
-  await expect(modelSearch).toBeFocused();
-  const afterDown = await modelSearch.getAttribute("aria-activedescendant");
-  expect(afterDown).toBeTruthy();
-  expect(afterDown).not.toBe(firstActive);
-
-  await modelSearch.press("Home");
-  await expect(modelSearch).toBeFocused();
-  await expect(modelSearch).toHaveAttribute("aria-activedescendant", firstActive!);
-
-  await modelSearch.press("End");
-  await expect(modelSearch).toBeFocused();
-  const afterEnd = await modelSearch.getAttribute("aria-activedescendant");
-  expect(afterEnd).toBeTruthy();
-  expect(afterEnd).not.toBe(firstActive);
-
-  await modelSearch.press("ArrowUp");
-  await expect(modelSearch).toBeFocused();
-  const afterUp = await modelSearch.getAttribute("aria-activedescendant");
-  expect(afterUp).toBeTruthy();
-  expect(afterUp).not.toBe(afterEnd);
-
-  // Models come before providers that still need connecting, so the first match is a model.
-  await modelSearch.press("Home");
-  const first = page.locator(`[id="${firstActive}"]`);
-  const selectedLabel = ((await first.locator("span").first().textContent()) ?? "").trim();
-  expect(selectedLabel.length).toBeGreaterThan(0);
-  await modelSearch.press("Enter");
-  await expect(modelSearch).toBeHidden();
-  const primary = page.getByTestId("model-role-main").getByTestId("model-role-row-1");
-  await expect(primary).toContainText(selectedLabel);
-
-  await primary.getByRole("button", { name: /^Change / }).click();
-  await expect(modelSearch).toBeVisible();
-  await modelSearch.fill("no-model-matches-this");
+  await header.click();
+  await search.fill("no-model-matches-this");
   await expect(page.getByText("No matching models")).toBeVisible();
-  await expect(modelOptions.getByRole("option")).toHaveCount(0);
+  await expect(options).toHaveCount(0);
 });

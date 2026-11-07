@@ -582,6 +582,7 @@ export function SettingsOverlay({
                 {section === "models" ? (
                   <ModelSettingsOverlay
                     embedded
+                    providersOnly
                     scope="account"
                     onClose={requestClose}
                     onFormStateChange={setFormState}

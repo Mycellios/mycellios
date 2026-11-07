@@ -14,6 +14,7 @@ import {
   CalendarClock,
   ChartArea,
   FolderOpen,
+  LayoutGrid,
   ListTodo,
   MoreHorizontal,
   Pin,
@@ -42,6 +43,8 @@ type WorkspaceRailProps = {
   activity: boolean;
   usage?: boolean;
   marketplace?: boolean;
+  apps?: boolean;
+  onApps?: () => void;
   schedule?: boolean;
   onSchedule?: () => void;
   tasks?: boolean;
@@ -191,12 +194,26 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             size="icon"
             className="app-no-drag rk-rail-button"
             aria-label={t`Micos`}
-            aria-current={pages.some((page) => page.current) ? undefined : "page"}
+            aria-current={(props.onApps && props.apps) || pages.some((page) => page.current) ? undefined : "page"}
             onClick={props.onChats}
           >
             <Bot size={19} strokeWidth={1.6} aria-hidden="true" />
           </Button>
         </IconTooltip>
+        {props.onApps ? (
+          <IconTooltip label={t`Apps`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="app-no-drag rk-rail-button"
+              aria-label={t`Apps`}
+              aria-current={props.apps ? "page" : undefined}
+              onClick={props.onApps}
+            >
+              <LayoutGrid size={19} strokeWidth={1.6} aria-hidden="true" />
+            </Button>
+          </IconTooltip>
+        ) : null}
         {pages
           .filter((page) => pins.includes(page.id))
           .map(({ id, label, icon: Icon, action, current }) => (

@@ -1,8 +1,8 @@
 export const CATEGORIES = ["code", "design", "data", "documents", "productivity", "other"] as const;
 export type Category = (typeof CATEGORIES)[number];
-export type MarketplaceTab = "apps" | "agents" | "skills";
+export type MarketplaceTab = "apps" | "agents" | "skills" | "mycellios-apps";
 export function marketplaceTab(value: string | null): MarketplaceTab {
-  return value === "agents" || value === "skills" ? value : "apps";
+  return value === "agents" || value === "skills" || value === "mycellios-apps" ? value : "apps";
 }
 export function matches(query: string, ...values: string[]) {
   const normalize = (value: string) =>

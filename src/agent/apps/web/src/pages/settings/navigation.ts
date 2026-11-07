@@ -12,11 +12,11 @@ export function settingsMatch(item: { label: string; keywords?: string }, query:
 }
 export const settingsKeywords: Record<string, string> = {
   general:
-    "appearance theme language timezone sidebar density developer enter stream tool images general apariencia tema idioma zona horaria densidad desarrollar teclado respuestas herramientas imágenes",
+    "appearance theme language timezone sidebar density developer enter shortcut interface size agent steps stream tool images general apariencia tema idioma zona horaria densidad desarrollar teclado atajo tamaño interfaz pasos agente respuestas herramientas imágenes",
   profile:
     "profile account name email password passkeys sso security delete perfil cuenta nombre correo contraseña seguridad eliminar",
   notifications:
-    "notifications alerts permission previews sound notificaciones avisos alertas permisos vista previa",
+    "notifications alerts permission previews sound notificaciones avisos alertas permisos vista previa sonido",
   agents: "agents micos skills marketplace bots instrucciones habilidades",
   models:
     "models providers accounts api key oauth defaults backup reasoning tokens modelos proveedores cuentas claves predeterminado respaldo razonamiento límites",

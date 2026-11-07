@@ -13,9 +13,9 @@ it("persists only this member's device policy and broadcasts changes locally and
   const stopOne = subscribeNotifications("one", one),
     stopTwo = subscribeNotifications("two", two);
   try {
-    saveNotificationPreferences("one", { enabled: false, preview: false });
-    expect(notificationPreferences("one")).toEqual({ enabled: false, preview: false });
-    expect(notificationPreferences("two")).toEqual({ enabled: true, preview: true });
+    saveNotificationPreferences("one", { enabled: false, preview: false, sound: false });
+    expect(notificationPreferences("one")).toEqual({ enabled: false, preview: false, sound: false });
+    expect(notificationPreferences("two")).toEqual({ enabled: true, preview: true, sound: true });
     expect(one).toHaveBeenCalledTimes(1);
     expect(two).not.toHaveBeenCalled();
     window.dispatchEvent(new StorageEvent("storage", { key: "mycellios:notifications:v1:two" }));

@@ -73,6 +73,60 @@ body,
   }
 }
 
+/* Reveal the new palette from the same edge as the Mycellios spore. */
+@property --rk-theme-reach {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+html[data-theme-sweep="light"] { --rk-theme-origin: 0%; --rk-spore-offset: -10px; }
+html[data-theme-sweep="dark"] { --rk-theme-origin: 100%; --rk-spore-offset: 10px; }
+
+.rk-theme-sweep-mark {
+  position: fixed;
+  inset-inline-start: calc(50% - 30px);
+  inset-block-start: clamp(24px, 10dvh, 90px);
+  z-index: 1;
+  width: 60px;
+  height: 60px;
+  pointer-events: none;
+  view-transition-name: rk-theme-spore;
+}
+html[data-theme-sweep="dark"] .rk-theme-sweep-mark {
+  inset-block: auto clamp(24px, 10dvh, 90px);
+}
+
+html[data-theme-sweep]::view-transition-group(root),
+html[data-theme-sweep]::view-transition-group(rk-theme-spore),
+html[data-theme-sweep]::view-transition-old(root) {
+  animation: none;
+}
+html[data-theme-sweep]::view-transition-old(root),
+html[data-theme-sweep]::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+html[data-theme-sweep]::view-transition-new(root) {
+  mask-image: radial-gradient(
+    ellipse 125% 145% at 50% var(--rk-theme-origin),
+    black calc(var(--rk-theme-reach) - 12%),
+    transparent var(--rk-theme-reach)
+  );
+  animation: rk-theme-reveal 560ms cubic-bezier(0.23, 0.68, 0.32, 1) both;
+}
+html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
+  mix-blend-mode: normal;
+  animation: rk-theme-spore 560ms ease-out both;
+}
+@keyframes rk-theme-reveal {
+  from { --rk-theme-reach: 0%; }
+  to { --rk-theme-reach: 115%; }
+}
+@keyframes rk-theme-spore {
+  0% { opacity: 0; transform: translateY(var(--rk-spore-offset)) scale(0.88); }
+  25% { opacity: 1; }
+  75%, 100% { opacity: 0; transform: translateY(0) scale(1.12); }
+}
+
 .rk-scroll::-webkit-scrollbar {
   width: 6px;
 }

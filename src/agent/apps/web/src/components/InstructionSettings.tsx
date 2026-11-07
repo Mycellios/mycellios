@@ -99,7 +99,7 @@ export function InstructionSettings({ bot }: { bot: Bot }) {
       </div>
       <Textarea
         id={`${id}-instructions`}
-        className="font-normal min-h-20 resize-none field-sizing-content text-foreground rounded-xl border-transparent bg-muted/50 p-4 shadow-none"
+        className="min-h-52 max-h-[55dvh] resize-y overflow-y-auto rounded-xl border-transparent bg-muted/50 p-4 font-normal text-foreground shadow-none"
         value={instructions}
         maxLength={BOT_INSTRUCTIONS_MAX_LENGTH}
         disabled={pending}

@@ -52,21 +52,33 @@ it("uses familiar app artwork before arbitrary catalog suggestions", () => {
     "Notion",
   ]);
   expect(items[1]!.name).toBe("Obscure App");
-  expect(
-    connectedAppMarks(
-      items.map((item) => ({ ...item, connected: item.slug === "obscure-app" })),
-      [],
-    ).map((app) => app.name),
-  ).toEqual(["Obscure App"]);
 });
 
-it("shows connected apps instead of suggestions and returns suggestions after disconnect", () => {
+it("keeps the featured trio when only X is connected", () => {
+  const items = [
+    { slug: "twitter", name: "X", connected: true },
+    { slug: "googlecalendar", name: "Google Calendar", connected: false },
+    { slug: "github", name: "GitHub", connected: false },
+    { slug: "gmail", name: "Gmail", connected: false },
+  ].map((item) => ({ ...catalog[0]!, ...item }));
+  expect(connectedAppMarks(items, []).map((app) => app.name)).toEqual([
+    "Gmail",
+    "GitHub",
+    "Google Calendar",
+  ]);
+});
+
+it("fills unused featured slots with connected apps and catalog suggestions", () => {
   expect(
     connectedAppMarks(
       catalog.map((item, index) => ({ ...item, connected: index === 1 })),
       [],
     ),
-  ).toEqual([{ name: "Beta", logo: null }]);
+  ).toEqual([
+    { name: "Beta", logo: null },
+    { name: "Delta", logo: "https://example.test/delta.svg" },
+    { name: "Alpha", logo: null },
+  ]);
   expect(connectedAppMarks(catalog, [])).toHaveLength(3);
   expect(connectedAppMarks([], [])).toEqual([]);
 });

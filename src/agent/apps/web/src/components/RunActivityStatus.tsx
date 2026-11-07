@@ -4,7 +4,8 @@ import { lastRunOutput, runHealth } from "@rakazo/core/run-health";
 import { observedTools } from "@rakazo/core";
 import { Button, GroupAvatar } from "@rakazo/ui-web";
 import type { GroupAvatarMember } from "@rakazo/ui-web";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-activity-preference";
 import { ChevronDown } from "lucide-react";
 import { activityKind } from "../lib/activity-kind";
 import { RunExecutionDetails } from "./RunExecutionDetails";
@@ -65,6 +66,7 @@ export function RunActivityStatus({
 }) {
   const { t, i18n } = useLingui();
   const [now, setNow] = useState(Date.now);
+  const expanded = useSyncExternalStore(subscribeToolActivity, getToolActivityExpanded, () => false);
   const refresh = useRef(onRefresh);
   refresh.current = onRefresh;
   const observation = useRef({ stamp: run.observedAt, receivedAt: Date.now() });
@@ -185,7 +187,7 @@ export function RunActivityStatus({
     <div className="flex min-w-0 items-start gap-2.5 px-1 py-2" data-testid="run-activity-status">
       <GroupAvatar members={bots} size={28} />
       <div className="min-w-0 max-w-full space-y-1 text-sm text-muted-foreground">
-        <details key={run.id} className="group/activity">
+        <details key={run.id} open={expanded} className="group/activity">
           <summary className="flex w-fit max-w-full cursor-pointer list-none items-baseline gap-2 rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden" aria-label={t`Show task activity`}>
             <span role="status" className={settledTool?.outcome === "error" && health.state === "running" ? "break-words text-destructive" : "break-words text-foreground"} aria-live="polite">{primaryLabel}</span>
             {health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{t`Total`} {duration(health.elapsedMs)}</span> : null}

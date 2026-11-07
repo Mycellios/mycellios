@@ -1,4 +1,27 @@
-import { micoAvatarPalette, micoAvatarShape } from "@rakazo/contracts";
+import {
+  MICO_AVATAR_SHAPES,
+  micoAvatarPalette,
+  micoAvatarShape,
+  micoAvatarValue,
+  parseBotAvatarValue,
+} from "@rakazo/contracts";
+import { avatarIdentitySeed } from "./avatar-shape.js";
+import { resolvePersonaColorDef } from "./bot-avatar-colors.js";
+
+/** Display legacy avatars with the current collection while preserving stored choices. */
+export function currentMicoAvatarValue(value: string, identity?: string): string {
+  const parsed = parseBotAvatarValue(value);
+  if (parsed.kind === "image" || (parsed.kind === "shape" && micoAvatarShape(parsed.shapeIndex))) {
+    return value;
+  }
+  const seed = identity || value || "mico";
+  const index = parsed.kind === "shape"
+    ? parsed.shapeIndex
+    : avatarIdentitySeed(seed) % MICO_AVATAR_SHAPES.length;
+  const shape = MICO_AVATAR_SHAPES[index] ?? MICO_AVATAR_SHAPES[0];
+  const color = resolvePersonaColorDef(seed, parsed.kind === "other" ? undefined : parsed.color).hex;
+  return micoAvatarValue(shape.index, color);
+}
 
 type Tone = "body" | "accent" | "deep" | "shine";
 type MicoArt = {

@@ -87,7 +87,9 @@ and set explicit computer memory, CPU and concurrency limits. Persist agent home
 across stop/start. Screen and terminal access must retain their control leases and
 revocable capabilities; provisioning a host does not bypass those checks.
 
-Enable `PHONE_CALLS_ENABLED=true` to expose the voice controls. In the existing
+The Call button in a direct Mico chat opens the voice conversation when the
+server's call feature is off. Enable `PHONE_CALLS_ENABLED=true` on the API and
+worker to use the existing call flow and incoming calls. In the existing
 OpenAI-compatible voice connection, configure a server that implements speech
 and transcription, its model identifiers, and a voice matching the language.
 When that connection supports transcription, dictation and calls prefer it over

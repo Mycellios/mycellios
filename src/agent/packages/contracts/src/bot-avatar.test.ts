@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   BOT_AVATAR_VALUE_MAX_LENGTH,
   BotAvatarValueSchema,
+  MICO_AVATAR_EYE_COUNT,
+  MICO_AVATAR_PALETTES,
+  MICO_AVATAR_SHAPES,
   isBotAvatarValue,
+  micoAvatarDetails,
+  micoAvatarValue,
   parseBotAvatarValue,
   UpdateBotInput,
   withMicoAvatarPalette,
@@ -38,7 +43,10 @@ describe("bot avatar values", () => {
     expect(parseBotAvatarValue(mintFox)).toEqual({
       kind: "shape", color: "#67B793", shapeIndex: 1001,
     });
-    expect(withMicoAvatarShape(mintFox, 1011)).toBe("#67B793::shape_1011");
+    expect(parseBotAvatarValue(withMicoAvatarShape(mintFox, 1011))).toEqual({
+      kind: "shape", color: "#67B793", shapeIndex: 1011,
+    });
+    expect(micoAvatarDetails(mintFox)).toEqual({ eyes: 0, finish: "plush", original: false });
     expect(UpdateBotInput.safeParse({ botId: "bot-1", color: mintFox }).success).toBe(true);
     expect(parseBotAvatarValue("#8B5CF6::shape_9")).toMatchObject({ shapeIndex: 1 });
   });
@@ -61,5 +69,30 @@ describe("bot avatar values", () => {
     ).toBe(false);
     expect(UpdateBotInput.safeParse({ botId: "bot-1", color: "gray" }).success).toBe(false);
     expect(UpdateBotInput.safeParse({ botId: "bot-1", name: "Atlas" }).success).toBe(true);
+  });
+
+  it("round-trips every look through the existing update contract", () => {
+    const values = new Set<string>();
+    for (const { index } of MICO_AVATAR_SHAPES) {
+      for (const { color } of MICO_AVATAR_PALETTES) {
+        for (let eyes = 0; eyes < MICO_AVATAR_EYE_COUNT; eyes++) {
+          for (const finish of ["flat", "plush"] as const) {
+            const value = micoAvatarValue(index, color, { eyes, finish, original: false });
+            const saved = UpdateBotInput.parse({ botId: "bot-1", color: value }).color!;
+            values.add(saved);
+            expect(parseBotAvatarValue(saved)).toEqual({ kind: "shape", color, shapeIndex: index });
+            expect(micoAvatarDetails(saved)).toEqual({ eyes, finish, original: false });
+          }
+        }
+      }
+    }
+    expect(values.size).toBe(6528);
+  });
+
+  it("preserves custom eyes and finish with original colors", () => {
+    const original = micoAvatarValue(1011, "#8650DF", { eyes: 15, finish: "flat", original: true });
+    expect(parseBotAvatarValue(original)).toMatchObject({ shapeIndex: 1011 });
+    expect(micoAvatarDetails(original)).toEqual({ eyes: 15, finish: "flat", original: true });
+    expect(micoAvatarDetails("#8650DF::shape_1011")).toEqual({ eyes: 0, finish: "plush", original: true });
   });
 });

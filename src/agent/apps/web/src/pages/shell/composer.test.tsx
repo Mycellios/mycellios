@@ -3,7 +3,7 @@
 import { i18n } from "@lingui/core";
 import type { AgentSkillCatalogEntry, Bot, ThreadMessage } from "@rakazo/contracts";
 import type { ComposerMention } from "@rakazo/core";
-import { MODEL_REQUIRED_SEND_ERROR, modelOptionKey } from "@rakazo/core";
+import { MODEL_REQUIRED_SEND_ERROR } from "@rakazo/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps, ReactNode } from "react";
 import { act, createRef } from "react";
@@ -163,6 +163,48 @@ it("retries the failed run without sending or clearing the draft", () => {
   expect(retry).toHaveBeenCalledTimes(1);
 });
 
+it("keeps the header and recovery model in sync with the current account settings", async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
+  const queries = spaceQueries(null, null);
+  const me = {
+    userId: "user-1",
+    spaceId: "space-1",
+    needsModel: true,
+    defaultProvider: "openai-compatible",
+    defaultModel: "internal-reserve",
+  } as NonNullable<ComponentProps<typeof ChatHeaderModel>["me"]>;
+  client.setQueryData(queries.me.queryKey(), me);
+  client.setQueryData(queries.models.credentials.queryKey(), []);
+  client.setQueryData(queries.models.list.queryKey(), []);
+  const pickerProps = {
+    bot: { modelProvider: null, modelId: null, thinkingLevel: null } as Bot,
+    me,
+    onSave: vi.fn(async () => {}),
+    onConnections: () => {},
+  };
+  renderComposer(async () => true, {
+    runError: "Desktop execution interrupted; check existing results before retrying",
+    runErrorModelAction: (
+      <QueryClientProvider client={client}>
+        <ChatHeaderModel {...pickerProps} />
+        <ChatHeaderModel {...pickerProps} recovery />
+      </QueryClientProvider>
+    ),
+  });
+  const header = container!.querySelector<HTMLButtonElement>('[aria-label="Model"]')!;
+  expect(header.textContent).toBe("Choose a model");
+
+  await act(async () => {
+    client.setQueryData(queries.me.queryKey(), { ...me, needsModel: false, defaultModel: "saved-model" });
+  });
+  await vi.waitFor(() => expect(header.textContent).toBe("saved-model"));
+  const recovery = container!.querySelector<HTMLButtonElement>('[aria-label="Change model"]')!;
+  await act(async () => recovery.click());
+  expect(document.querySelector('[data-slot="popover-content"] [data-slot="select-trigger"]')?.textContent)
+    .toBe("Use general model · saved-model");
+  expect(pickerProps.onSave).not.toHaveBeenCalled();
+});
+
 it("changes model from a Desktop failure without replaying the turn or clearing the draft", async () => {
   const changeModel = vi.fn(async () => {});
   const send = vi.fn(async () => true);
@@ -197,12 +239,12 @@ it("changes model from a Desktop failure without replaying the turn or clearing 
   expect(container!.querySelector('[data-testid="composer-error-retry"]')).toBeNull();
   const trigger = container!.querySelector<HTMLButtonElement>('[aria-label="Change model"]')!;
   await act(async () => trigger.click());
-  const select = document.querySelector<HTMLSelectElement>('[data-slot="popover-content"] select');
-  expect(select).not.toBeNull();
-  await act(async () => {
-    select!.value = modelOptionKey("openai-compatible", "alternative");
-    select!.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  const select = document.querySelector<HTMLButtonElement>('[data-slot="select-trigger"]')!;
+  await act(async () => select.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+    .find((entry) => entry.textContent?.includes("alternative"));
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
   expect(changeModel).toHaveBeenCalledExactlyOnceWith({
     modelProvider: "openai-compatible", modelId: "alternative", thinkingLevel: null,
   });
@@ -282,6 +324,19 @@ it.each([
 
   rerenderComposer({ sendError: "Could not send the message." });
   expect(container?.querySelector('[data-testid="composer-error-action"]')).toBeNull();
+});
+
+it("offers the chat model picker without duplicate connection advice or details", () => {
+  renderComposer(async () => true, {
+    runError: "Connect a model in Settings before running bots.",
+    runErrorId: "failed-run",
+    runErrorModelAction: <button type="button">Change model</button>,
+  });
+  const alert = container?.querySelector('[data-testid="composer-error"]');
+  expect(alert?.textContent).toContain("No model was available for this Mico.");
+  expect(alert?.textContent).toContain("Change model");
+  expect(alert?.querySelector('[data-testid="composer-error-action"]')).toBeNull();
+  expect(alert?.querySelector("details")).toBeNull();
 });
 
 it.each([MODEL_REQUIRED_SEND_ERROR, `  ${MODEL_REQUIRED_SEND_ERROR}  `])(

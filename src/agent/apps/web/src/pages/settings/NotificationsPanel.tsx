@@ -111,6 +111,17 @@ export function NotificationsPanel({
           <p className="text-xs text-muted-foreground">{t`Hide previews to keep message content out of system notifications.`}</p>
         </SettingsRow>
         <SettingsRow
+          label={<Label htmlFor={`${id}-sound`}>{t`Notification sound`}</Label>}
+          control={
+            <Switch
+              id={`${id}-sound`}
+              checked={value.sound}
+              disabled={!value.enabled}
+              onCheckedChange={(sound) => save({ sound })}
+            />
+          }
+        />
+        <SettingsRow
           label={t`System permission`}
           control={
             permission === "default" ? (
@@ -152,6 +163,7 @@ export function NotificationsPanel({
                     const test = new Notification("Mycellios", {
                       body: t`Notifications are working on this device.`,
                       tag: "mycellios-settings-test",
+                      ...(!value.sound ? { silent: true } : {}),
                     });
                     setTimeout(() => test.close(), 5000);
                     setError("");

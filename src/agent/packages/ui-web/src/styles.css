@@ -153,6 +153,54 @@
   opacity: 1;
 }
 
+[data-mico-avatar] .rakazo-bot-avatar-ring {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rakazo-mico-gaze {
+    transform-box: view-box;
+    transition: transform 170ms ease-out;
+  }
+
+  .rakazo-mico-eye {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  [data-mico-avatar][data-working="true"] .rakazo-mico-eye {
+    animation: rakazo-mico-blink 3.2s ease-in-out infinite;
+  }
+
+  [data-mico-avatar-hover]:focus-visible .rakazo-mico-gaze {
+    transform: translate(3%, -1.5%);
+  }
+
+  [data-mico-avatar-hover]:focus-visible .rakazo-mico-eye {
+    animation: rakazo-mico-greet 420ms ease-in-out;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :is([data-mico-avatar-hover], [data-mico-avatar]):hover .rakazo-mico-gaze {
+      transform: translate(3%, -1.5%);
+    }
+
+    :is([data-mico-avatar-hover], [data-mico-avatar]):hover .rakazo-mico-eye {
+      animation: rakazo-mico-greet 420ms ease-in-out;
+    }
+  }
+
+  @keyframes rakazo-mico-greet {
+    0%, 100% { transform: scaleY(1); }
+    38% { transform: scaleY(0.12); }
+  }
+
+  @keyframes rakazo-mico-blink {
+    0%, 40%, 48%, 100% { transform: scaleY(1); }
+    44% { transform: scaleY(0.12); }
+  }
+}
+
 @keyframes rakazo-avatar-breathe {
   0%,
   100% {

@@ -10,6 +10,7 @@ export {
   resolvePersonaColorDef,
   Wordmark,
 } from "./bot-avatar.js";
+export { MicoEyePreview } from "./bot-avatar.js";
 export * from "./components/ui/alert-dialog.js";
 export * from "./components/ui/badge.js";
 export * from "./components/ui/button.js";

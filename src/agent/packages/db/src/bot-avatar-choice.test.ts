@@ -1,4 +1,4 @@
-import { BOT_COLORS } from "@rakazo/contracts";
+import { BOT_COLORS, MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
 import {
   ORGANIC_AVATAR_FAMILY_COUNT,
   ORGANIC_AVATAR_HEART_FAMILY,
@@ -9,14 +9,15 @@ import { describe, expect, it } from "vitest";
 import { BOT_ID_ATTEMPTS, chooseBotAvatar, chooseMicoAvatar, pickLeastUsed } from "./bot-avatar-choice.js";
 
 it("assigns every branded shape and palette combination before repeating", () => {
-  const existing = [{ color: "#8650DF::shape_0" }, { color: "data:image/png;base64,abc" }];
-  const colors = Array.from({ length: 144 }, () => {
+  const existing = [{ color: "#123456::shape_0" }, { color: "data:image/png;base64,abc" }];
+  const combinations = MICO_AVATAR_SHAPES.length * MICO_AVATAR_PALETTES.length;
+  const colors = Array.from({ length: combinations }, () => {
     const { color } = chooseMicoAvatar(existing);
     existing.push({ color });
     return color;
   });
-  expect(colors[0]).toBe("#8650DF::shape_1000");
-  expect(new Set(colors).size).toBe(144);
+  expect(colors[0]).toBe(micoAvatarValue(MICO_AVATAR_SHAPES[0].index, MICO_AVATAR_PALETTES[0].color));
+  expect(new Set(colors).size).toBe(combinations);
   expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[0])).size).toBe(12);
   expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[1])).size).toBe(12);
   const next = chooseMicoAvatar(existing);

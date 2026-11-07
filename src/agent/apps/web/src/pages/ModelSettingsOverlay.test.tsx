@@ -298,6 +298,7 @@ async function renderSettings(
   embedded = true,
   queryClient = testQueryClient(),
   scope: "account" | "space" = "account",
+  providersOnly = false,
 ) {
   const container = document.createElement("div");
   document.body.append(container);
@@ -305,7 +306,7 @@ async function renderSettings(
   await act(async () => {
     root.render(
       <QueryClientProvider client={queryClient}>
-        <ModelSettingsOverlay embedded={embedded} scope={scope} onClose={() => undefined} />
+        <ModelSettingsOverlay embedded={embedded} providersOnly={providersOnly} scope={scope} onClose={() => undefined} />
       </QueryClientProvider>,
     );
   });
@@ -494,9 +495,7 @@ it("labels the empty main slot by what runs there", async () => {
     expect(section("main").querySelector('[data-testid="model-role-default"]')?.textContent).toBe(
       "Choose a model",
     );
-    expect(
-      section("approval").querySelector('[data-testid="model-role-default"]')?.textContent,
-    ).toBe("Use main model");
+    expect(view.container.querySelector('[data-testid="model-role-approval"]')).toBeNull();
   } finally {
     await view.unmount();
   }
@@ -594,6 +593,17 @@ it("connects a provider from the empty main slot without choosing its model", as
   }
 });
 
+it("shows providers without loading or editing account model roles", async () => {
+  const view = await renderSettings(true, testQueryClient(), "account", true);
+  try {
+    expect(view.container.querySelector('[data-testid="model-providers"]')).not.toBeNull();
+    expect(view.container.querySelector('[data-testid="model-role-main"]')).toBeNull();
+    expect(models.role).not.toHaveBeenCalled();
+  } finally {
+    await view.unmount();
+  }
+});
+
 it("keeps a Space role unchanged when connecting a provider", async () => {
   vi.mocked(rpc.me).mockResolvedValue({
     ...account("deepseek", "deepseek-chat"),
@@ -602,7 +612,11 @@ it("keeps a Space role unchanged when connecting a provider", async () => {
   const view = await renderSettings(true, testQueryClient(), "space");
   try {
     expect(view.container.querySelector('[data-testid="model-role-main"]')).not.toBeNull();
-    expect(view.container.querySelector('[data-testid="model-role-approval"]')).not.toBeNull();
+    expect(view.container.querySelector('[data-testid="model-role-approval"]')).toBeNull();
+    expect(models.role).not.toHaveBeenCalledWith(
+      expect.objectContaining({ role: "approval" }),
+      expect.anything(),
+    );
     // Connections are the account's, so a Space does not list or add them.
     expect(view.container.querySelector('[data-testid="model-providers"]')).toBeNull();
     expect(models.role).toHaveBeenCalledWith(

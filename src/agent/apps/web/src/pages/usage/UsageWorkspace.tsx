@@ -41,6 +41,7 @@ export function UsageWorkspace({
   bots,
   spaces,
   spaceId,
+  initialBotId,
   onSpace,
   onExit,
   onPreferences,
@@ -50,6 +51,7 @@ export function UsageWorkspace({
   bots: Bot[];
   spaces: Space[];
   spaceId: string | null;
+  initialBotId?: string;
   onSpace: (id: string, path: string) => void;
   onExit: () => void;
   onPreferences: () => void;
@@ -67,11 +69,11 @@ export function UsageWorkspace({
         ["cost", "tokens"].includes(saved.metric) &&
         [7, 30, 90, 365].includes(saved.period)
       )
-        return saved;
+        return { ...saved, bot: initialBotId ?? saved.bot };
     } catch {
       /* Start with the complete 30-day report. */
     }
-    return { bot: "all", metric: "cost", period: 30 };
+    return { bot: initialBotId ?? "all", metric: "cost", period: 30 };
   });
   const [report, setReport] = useState<UsageDashboard | null>(null),
     [error, setError] = useState(""),
@@ -83,12 +85,13 @@ export function UsageWorkspace({
   const [breakdown, setBreakdown] = useState<Breakdown>("agent");
   const table = useRef<HTMLTableElement>(null);
   useEffect(() => {
+    if (initialBotId) return;
     try {
       localStorage.setItem(key, JSON.stringify(filter));
     } catch {
       /* Filters still work without browser storage. */
     }
-  }, [filter, key]);
+  }, [filter, initialBotId, key]);
   useEffect(() => {
     let live = true,
       timer: ReturnType<typeof setTimeout>;

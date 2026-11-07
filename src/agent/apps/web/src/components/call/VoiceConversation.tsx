@@ -146,7 +146,7 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
   }
   const needsModels = Boolean(native && !model?.ready);
   const canStart = native ? model?.ready : (transcribe || webSpeechAvailable());
-  return <aside role="dialog" aria-label={t`Voice conversation`} className="fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-border bg-background px-6 pb-8 pt-16 md:w-[400px]">
+  return <aside role="dialog" data-continuous-voice aria-label={t`Voice conversation`} className="fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-border bg-background px-6 pb-8 pt-16 md:w-[400px]">
     <header className="flex items-center justify-between"><span className="text-sm font-medium">{bot.name}</span><Button variant="ghost" size="icon" aria-label={t`Close voice`} onClick={onClose}><X /></Button></header>
     <p aria-live="polite" className="mt-2 text-center text-sm text-muted-foreground">{phase === "listening" ? t`Listening` : phase === "speaking" ? t`Speaking` : phase === "thinking" ? t`Thinking` : phase === "preparing" ? t`Preparing local voice…` : t`Voice`}</p>
     <div className="flex flex-1 flex-col items-center justify-center gap-8">

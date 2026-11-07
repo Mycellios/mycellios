@@ -5,3 +5,4 @@ export function registerContinuousVoiceCloser(next: () => void) {
   return () => { if (close === next) close = undefined; };
 }
 export function closeContinuousVoice() { const previous = close; close = undefined; previous?.(); }
+export function hasContinuousVoice() { return close !== undefined; }

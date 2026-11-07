@@ -32,6 +32,7 @@ export function ProvidersSection({
   panel,
   panelAt,
   primary,
+  showDirectory = false,
 }: {
   credentials: ModelCredential[];
   /** Every provider that can be connected, connected ones included. */
@@ -47,15 +48,37 @@ export function ProvidersSection({
   panelAt?: string | null;
   /** Built-in account provider, ahead of optional external connections. */
   primary?: ReactNode;
+  showDirectory?: boolean;
 }) {
+  const { t } = useLingui();
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLocaleLowerCase();
+  const matches = (name: string) => !showDirectory || name.toLocaleLowerCase().includes(needle);
+  const connectedIds = new Set(credentials.map((credential) => credential.provider));
+  const available = showDirectory ? providers.filter((provider) =>
+    matches(provider.name) && (provider.baseUrl || !connectedIds.has(provider.id)),
+  ) : [];
   return (
     <section className="mb-8" data-testid="model-providers">
-      <h3 className="mb-2.5 text-[15px] font-medium text-foreground">
-        <Trans>Providers</Trans>
-      </h3>
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[15px] font-medium text-foreground">
+          {showDirectory ? t`Connected providers` : t`Providers`}
+        </h3>
+        {showDirectory ? (
+          <Input
+            type="search"
+            className="w-full sm:w-52"
+            aria-label={t`Search providers`}
+            placeholder={t`Search providers`}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        ) : null}
+      </div>
       <ul className="divide-y divide-border rounded-xl border border-border">
-        {primary}
-        {[...credentials]
+        {matches("Mycellios") ? primary : null}
+        {credentials
+          .filter((credential) => matches(nameOf(credential)) || panelAt === credential.id)
           // Saving a key reorders the account's connections; this list stays put.
           .sort((left, right) => nameOf(left).localeCompare(nameOf(right)))
           .map((credential) => (
@@ -82,6 +105,28 @@ export function ProvidersSection({
         </li>
       </ul>
       {panelAt === "add" ? panel : null}
+      {showDirectory ? (
+        <div className="mt-6">
+          <h3 className="mb-2.5 text-[15px] font-medium text-foreground">{t`Other providers`}</h3>
+          {available.length ? (
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+              {available.map((provider) => (
+                <li key={`${provider.id}:${provider.baseUrl ?? ""}`}>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    className="flex min-h-[48px] w-full items-center justify-between gap-2 px-3 text-start text-sm hover:bg-accent/50 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
+                    onClick={() => onAdd(provider)}
+                  >
+                    {provider.name}
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-muted-foreground">{t`No results`}</p>}
+        </div>
+      ) : null}
     </section>
   );
 }

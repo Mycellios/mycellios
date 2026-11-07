@@ -43,6 +43,7 @@ import {
   subscribeComposerEnterToSend,
 } from "../lib/composer-enter-to-send-pref";
 import { getActiveUiLocale, setUiLocale } from "../lib/i18n";
+import { getInterfaceSize, INTERFACE_SIZES, setInterfaceSize } from "../lib/interface-size";
 import { localTimezone, sameTimeZone, timezoneOptions } from "../lib/local-timezone";
 import { usePasskeysSupported } from "../lib/passkeys";
 import {
@@ -56,6 +57,7 @@ import {
 import {
   getToolActivityPreference,
   setToolActivityPreference,
+  subscribeToolActivity,
 } from "../lib/tool-activity-preference";
 import type { AppearancePreference } from "../lib/ui-appearance";
 import { getUiAppearancePreference, setUiAppearance } from "../lib/ui-appearance";
@@ -146,8 +148,12 @@ export function GeneralSettingsPanels({
     () => getResponseStreamingPreference() === "on",
   );
   const streamRepliesId = useId();
-  const [showToolActivity, setShowToolActivity] = useState(
-    () => getToolActivityPreference() === "on",
+  const [interfaceSize, updateInterfaceSize] = useState(getInterfaceSize);
+  const interfaceSizeId = useId();
+  const toolActivity = useSyncExternalStore(
+    subscribeToolActivity,
+    getToolActivityPreference,
+    () => "off" as const,
   );
   const showToolActivityId = useId();
   const enterToSend = useSyncExternalStore(
@@ -339,6 +345,20 @@ export function GeneralSettingsPanels({
           label={<Trans>Language</Trans>}
           control={<UiLocalePicker value={locale} onChange={chooseLocale} />}
         />
+        <SettingsRow
+          label={<Label htmlFor={interfaceSizeId}>{t`Interface size`}</Label>}
+          control={
+            <OptionSelect
+              id={interfaceSizeId}
+              value={interfaceSize}
+              options={INTERFACE_SIZES.map((value) => ({ value, label: `${value} %` }))}
+              onValueChange={(value) => {
+                updateInterfaceSize(value);
+                setInterfaceSize(value);
+              }}
+            />
+          }
+        />
         {onTimezoneChange ? (
           <div data-testid="timezone-settings">
             <SettingsRow
@@ -416,18 +436,17 @@ export function GeneralSettingsPanels({
             </p>
           </SettingsRow>
           <SettingsRow
-            label={
-              <Label htmlFor={enterToSendId} className="text-[14px] font-normal text-foreground">
-                <Trans>Send with Enter</Trans>
-              </Label>
-            }
-            help={{ label: t`Send with Enter`, description: t`When enabled, Enter sends your message and Shift+Enter starts a new line. When disabled, use the send button.` }}
+            label={<Label htmlFor={enterToSendId}>{t`Send shortcut`}</Label>}
             control={
-              <Switch
+              <OptionSelect
                 id={enterToSendId}
-                data-testid="composer-enter-to-send-toggle"
-                checked={enterToSend}
-                onCheckedChange={(checked) => setComposerEnterToSend(checked)}
+                data-testid="composer-send-shortcut"
+                value={enterToSend ? "enter" : "modified"}
+                options={[
+                  { value: "enter", label: t`Enter to send` },
+                  { value: "modified", label: t`Ctrl/⌘ + Enter to send` },
+                ]}
+                onValueChange={(value) => setComposerEnterToSend(value === "enter")}
               />
             }
           />
@@ -451,24 +470,25 @@ export function GeneralSettingsPanels({
             }
           />
           <SettingsRow
-            label={
-              <Label
-                htmlFor={showToolActivityId}
-                className="text-[14px] font-normal text-foreground"
-              >
-                <Trans>Show tool activity</Trans>
-              </Label>
-            }
+            label={<Label htmlFor={showToolActivityId}>{t`Show tool activity`}</Label>}
             help={{ label: t`Show tool activity`, description: t`Shows the steps taken with tools, such as searching the web or reading a file. Hiding this activity does not stop the tools from running.` }}
             control={
               <Switch
                 id={showToolActivityId}
                 data-testid="tool-activity-toggle"
-                checked={showToolActivity}
-                onCheckedChange={(checked) => {
-                  setShowToolActivity(checked);
-                  setToolActivityPreference(checked ? "on" : "off");
-                }}
+                checked={toolActivity !== "off"}
+                onCheckedChange={(checked) => setToolActivityPreference(checked ? "on" : "off")}
+              />
+            }
+          />
+          <SettingsRow
+            label={<Label htmlFor={`${showToolActivityId}-expanded`}>{t`Expand agent steps by default`}</Label>}
+            control={
+              <Switch
+                id={`${showToolActivityId}-expanded`}
+                checked={toolActivity === "expanded"}
+                disabled={toolActivity === "off"}
+                onCheckedChange={(checked) => setToolActivityPreference(checked ? "expanded" : "on")}
               />
             }
           />

@@ -48,7 +48,7 @@ import type { RouterDeps } from "../router.js";
 import { createRoutineAnnouncer } from "../routines.js";
 import { procedureSecurityEvent } from "../security-audit.js";
 import { createTaughtSkillsService } from "../taught-skills.js";
-import { meDto } from "./shared.js";
+import { meDto, modelSetup } from "./shared.js";
 
 /**
  * Runs an authenticated procedure with row-level security scoped to the actor's
@@ -204,6 +204,10 @@ export function createRouterContext(deps: RouterDeps) {
     actor: Actor,
     scope?: SettingsScope,
   ): Promise<ModelRoleView> => {
+    if (role === "main") {
+      const deployment = settings.primary ? null : (await modelSetup(deps, actor)).deployment;
+      return { ...settings, deploymentPrimary: deployment };
+    }
     const defaults = {
       settings: await deps.prisma.deploymentSettings.findUnique({ where: { id: "default" } }),
       // Only a model the deployment can run stands in for the member's choice.

@@ -47,6 +47,9 @@
 
 - Windows updates check the official HTTPS catalog and stage verified packages in
   the background; installation still requires the owner's explicit restart action.
+  The renderer covers the app window once a release is known and renderer work is
+  safe. A call may continue until the owner chooses to end it and restart.
+  Keep an explicit retry and official download link for failed updates.
   RAKAZO_DISABLE_AUTO_UPDATE=1 suppresses background requests. Keep the unsigned
   automatic-install channel disabled. Bound and
   verify catalog/payload bytes, platform, paths, versions and SHA-256; never accept
@@ -134,8 +137,8 @@
   Isolated RAKAZO_PERFORMANCE_USER_DATA qualification profiles never write the
   installed application's Windows startup preferences.
 
-- Apps opens beside the existing chat through the Shell overlay; preserve its
-  draft and scope. The private Video Studio v1 definition is in Desktop assets,
+- Apps opens its catalog in Marketplace and launches Video Studio through the
+  Shell overlay. Preserve the chat draft and scope. The private Video Studio v1 definition is in Desktop assets,
   with a fixed native driver and owner/Space/device-private projects. No app HTML,
   executable commands or paths are accepted from the renderer. Keep script/media
   revisions, review binding, actual artifact checks and existing PC consent.
@@ -404,12 +407,14 @@
   authentication failures. Keep prompts and tool payloads out of this view.
 
 - An unset approval model follows the effective main model and its connection in
-  the same account/Space scope. Keep explicit approval choices intact; the web
-  approval section lives under the single Advanced group at the bottom of model
-  settings, retaining its explanation next to the title inside that group.
+  the same account/Space scope. Preserve existing explicit approval choices and
+  the server-side review policy. Settings > Models exposes chat models and
+  providers, while Settings > Approvals owns the permission rules.
 
-- Each agent has a visible model picker outside Advanced. A blank choice inherits
-  the general model; a specific choice updates only that bot, never Space defaults.
+- Each Mico has a searchable model picker in the chat header. Account Settings
+  > Models manages provider connections. Preserve saved account and Space model
+  defaults and fallbacks. A specific choice updates only that Mico and can run
+  with its own connection even if the account has no general model.
 - Provider forms manage connections and keys; model selection belongs to the role
   picker. Connecting a provider never changes a role. Discover compatible catalogs
   using the owned saved credential; enable a newly chosen model before saving its
@@ -876,6 +881,18 @@
 
 - Namespaced web routing accepts both the bare entry and its trailing-slash form;
   keep asset URLs namespaced and preserve deep links. Verify app-path.test.ts.
+
+- Mico avatar preferences persist together in the existing `bots.color` shape
+  encoding. Keep the reserved appearance slots stable and preserve legacy
+  shapes and uploaded images. The web avatar defaults to velvet with the
+  original artwork colors. Store explicit tints separately from original
+  colors. Animate only the eyes and honor reduced motion. Verify bot-avatar
+  and create-bot-dialog tests.
+
+- Keep the Mico settings overview compact. Open instructions, memory, computer,
+  permissions and advanced controls in separate views within the same panel.
+  Keep instruction drafts and their conflict baseline across that navigation.
+  Verify bot-panel and InstructionSettings tests.
 
 - Composer retry re-reads the owned thread and targets only the saved failed user
   run. Never offer it for introductions or copy text/files to replay a request.

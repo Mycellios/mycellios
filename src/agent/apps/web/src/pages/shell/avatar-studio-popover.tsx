@@ -3,13 +3,17 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import {
   MICO_AVATAR_PALETTES,
   MICO_AVATAR_SHAPES,
+  micoAvatarDetails,
   micoAvatarShape,
+  micoAvatarValue,
   withMicoAvatarPalette,
   withMicoAvatarShape,
 } from "@rakazo/contracts";
+import { currentMicoAvatarValue } from "@rakazo/core";
 import {
   BotAvatar,
   BotShapePreview,
+  MicoEyePreview,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -30,16 +34,25 @@ import { useRef, useState } from "react";
 
 export function BotLookPicker({
   value,
+  identity,
   onAutomatic,
   onChange,
 }: {
   value: string;
+  identity?: string;
   onAutomatic?: () => void;
   onChange: (value: string) => void;
 }) {
   const { t } = useLingui();
   const parsed = parseBotAvatar(value);
-  const activeShape = micoAvatarShape(parsed.shapeIndex);
+  const details = micoAvatarDetails(value);
+  const displayedValue = currentMicoAvatarValue(value, identity);
+  const displayed = parseBotAvatar(displayedValue);
+  const activeShape = micoAvatarShape(identity ? displayed.shapeIndex : parsed.shapeIndex);
+  const choiceValue = identity ? displayedValue : value;
+  function updateDetails(next: typeof details) {
+    onChange(micoAvatarValue(displayed.shapeIndex ?? MICO_AVATAR_SHAPES[0].index, displayed.color, next));
+  }
   const shapeLabels = {
     mushroom: t({ id: "Mushroom", message: "Mushroom" }),
     fox: t({ id: "Fox", message: "Fox" }),
@@ -67,7 +80,18 @@ export function BotLookPicker({
     coral: t({ id: "Coral", message: "Coral" }),
     sky: t({ id: "Sky blue", message: "Sky blue" }),
     slate: t({ id: "Slate", message: "Slate" }),
+    red: t`Red`,
+    navy: t`Navy blue`,
+    sand: t`Sand`,
+    wine: t`Wine`,
+    gray: t`Gray`,
   };
+  const eyeLabels = [
+    t`Calm`, t`Alert`, t`Curious`, t`Surprised`,
+    t`Happy`, t`Laughing`, t`Sleepy`, t`Dreamy`,
+    t`Shy`, t`Proud`, t`Mischievous`, t`Skeptical`,
+    t`Sad`, t`Angry`, t`Confused`, t`Star`,
+  ];
 
   return (
     <div className="space-y-4">
@@ -91,7 +115,7 @@ export function BotLookPicker({
         </div>
         <div className="grid grid-cols-6 place-items-center gap-y-2 max-[359px]:grid-cols-4">
           {MICO_AVATAR_SHAPES.map(({ id, index }) => {
-            const next = withMicoAvatarShape(value, index);
+            const next = withMicoAvatarShape(choiceValue, index);
             return (
               <BotShapePreview
                 key={id}
@@ -107,17 +131,26 @@ export function BotLookPicker({
       </div>
 
       <div className="border-t border-border pt-2">
-        <div className="mb-1 text-xs font-medium text-muted-foreground">
-          <Trans>Color</Trans>
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground"><Trans>Color</Trans></span>
+          <Button
+            type="button"
+            size="sm"
+            variant={details.original && !parsed.isImage ? "secondary" : "ghost"}
+            aria-pressed={details.original && !parsed.isImage}
+            onClick={() => updateDetails({ ...details, original: true })}
+          >
+            <Trans>Original colors</Trans>
+          </Button>
         </div>
         <div className="grid grid-cols-6 place-items-center gap-y-1 max-[359px]:grid-cols-4">
           {MICO_AVATAR_PALETTES.map(({ id, color }) => {
-            const selected = Boolean(activeShape) && parsed.color.toUpperCase() === color;
+            const selected = !details.original && Boolean(activeShape) && displayed.color.toUpperCase() === color;
             return (
               <button
                 key={id}
                 type="button"
-                onClick={() => onChange(withMicoAvatarPalette(value, color))}
+                onClick={() => onChange(withMicoAvatarPalette(choiceValue, color))}
                 aria-label={paletteLabels[id]}
                 title={paletteLabels[id]}
                 aria-pressed={selected}
@@ -136,6 +169,43 @@ export function BotLookPicker({
           })}
         </div>
       </div>
+
+      <fieldset className="min-w-0 border-t border-border pt-2">
+        <legend className="pr-2 text-xs font-medium text-muted-foreground"><Trans>Eyes</Trans></legend>
+        <div className="grid grid-cols-8 place-items-center gap-y-1 max-[359px]:grid-cols-4">
+          {eyeLabels.map((label, eyes) => (
+            <button
+              key={eyes}
+              type="button"
+              aria-label={label}
+              aria-pressed={details.eyes === eyes && !parsed.isImage}
+              title={label}
+              className="grid size-9 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-secondary aria-pressed:bg-secondary aria-pressed:text-foreground aria-pressed:ring-1 aria-pressed:ring-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => updateDetails({ ...details, eyes })}
+            >
+              <MicoEyePreview eyes={eyes} />
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="min-w-0 border-t border-border pt-2">
+        <legend className="pr-2 text-xs font-medium text-muted-foreground"><Trans>Finish</Trans></legend>
+        <div className="flex gap-2">
+          {(["flat", "plush"] as const).map((finish) => (
+            <Button
+              key={finish}
+              type="button"
+              size="sm"
+              variant={details.finish === finish && !parsed.isImage ? "secondary" : "ghost"}
+              aria-pressed={details.finish === finish && !parsed.isImage}
+              onClick={() => updateDetails({ ...details, finish })}
+            >
+              {finish === "flat" ? <Trans>Flat</Trans> : <Trans>Velvety</Trans>}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
     </div>
   );
 }
@@ -226,7 +296,7 @@ export function AvatarStudioPopover({
         type="button"
         disabled={disabled}
         onClick={() => setOpen(true)}
-        className="group relative cursor-pointer rounded-2xl outline-none transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-ring"
+        className="group relative cursor-pointer rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={t`Customize bot avatar`}
         data-testid="avatar-studio-trigger"
       >
@@ -247,7 +317,7 @@ export function AvatarStudioPopover({
               <Trans>Avatar Studio</Trans>
             </DialogTitle>
             <DialogDescription className="sr-only">
-              <Trans>Choose a bot shape, color, or upload an image</Trans>
+              <Trans>Choose a shape, color, eyes and finish, or upload an image</Trans>
             </DialogDescription>
             <Button
               variant="ghost"
@@ -292,7 +362,7 @@ export function AvatarStudioPopover({
             </div>
 
             <TabsContent value="bot" className="pt-1" data-testid="avatar-studio-bot-tab">
-              <BotLookPicker value={value} onChange={onChange} />
+              <BotLookPicker value={value} identity={identity} onChange={onChange} />
             </TabsContent>
             <TabsContent value="upload">
               <button
