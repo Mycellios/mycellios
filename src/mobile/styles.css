@@ -1,7 +1,29 @@
 :root {
-  color-scheme: dark;
-  background: #11172f;
+  color-scheme: light;
+  background: var(--agent-bg, #f8f5f0);
   font-synthesis: none;
+}
+
+:root:has(.public-panel.theme-dark) {
+  color-scheme: dark;
+  background: var(--dark-canvas);
+}
+
+:root[data-mycellios-design="agent"] .public-panel :is(.contribute-browser-icon, .contribute-native-summary-icon) {
+  color: var(--agent-fg);
+  background: var(--agent-muted-surface);
+  border-color: var(--agent-line);
+}
+
+:root[data-mycellios-design="agent"] .public-panel .contribute-levels button {
+  color: var(--agent-muted);
+  background: transparent;
+}
+
+:root[data-mycellios-design="agent"] .public-panel .contribute-levels button:is(.active, :hover:not(:disabled)) {
+  color: var(--agent-fg);
+  background: var(--agent-sidebar-accent);
+  border-color: var(--agent-line);
 }
 
 html,
@@ -16,7 +38,6 @@ body,
 body {
   min-height: 100vh;
   overflow: hidden;
-  background: #11172f;
 }
 
 button,
