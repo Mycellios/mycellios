@@ -18,12 +18,14 @@ export type ComputerKeyInput = {
   /** The bot owner's user id. A team computer is shared only by one user's bots in a space. */
   userId: string;
   botId?: string;
+  cloudFallback?: boolean;
 };
 
 export function computerScopeKey(input: ComputerKeyInput) {
-  if (input.mode === "team") return `team:${input.spaceId}:${input.userId}`;
+  const owner = `${input.spaceId}:${input.userId}`;
+  if (input.mode === "team") return `${input.cloudFallback ? "cloud:" : ""}team:${owner}`;
   if (!input.botId) throw new Error("Dedicated computers require a bot id");
-  return `bot:${input.botId}`;
+  return input.cloudFallback ? `cloud:bot:${owner}:${input.botId}` : `bot:${input.botId}`;
 }
 
 /**
@@ -33,6 +35,10 @@ export function computerScopeKey(input: ComputerKeyInput) {
  * value in SQL. Team computers created before the per-user split keep `team-<spaceId>`.
  */
 export function computerHomeKey(input: ComputerKeyInput) {
+  if (input.cloudFallback) {
+    const digest = createHash("sha256").update(computerScopeKey(input)).digest("hex").slice(0, 32);
+    return `cloud-${digest}`;
+  }
   if (input.mode === "team") {
     const digest = createHash("sha256")
       .update(`${input.spaceId}:${input.userId}`)
@@ -99,11 +105,16 @@ async function countInUseComputersForUser(
     prisma.computer.count({
       where: {
         userId,
-        bots: {
-          some: excludeBotId
-            ? { archivedAt: null, id: { not: excludeBotId } }
-            : { archivedAt: null },
-        },
+        OR: [
+          {
+            bots: {
+              some: excludeBotId
+                ? { archivedAt: null, id: { not: excludeBotId } }
+                : { archivedAt: null },
+            },
+          },
+          { cloudRuns: { some: { bot: { archivedAt: null } } } },
+        ],
       },
     });
   // The quota is per person, so it counts the computers of all their Spaces.
@@ -200,13 +211,7 @@ export async function expireComputerExecutionLeases(
 
 function upsertComputerRecord(
   prisma: ComputerDb,
-  input: {
-    mode: ComputerMode;
-    spaceId: string;
-    userId: string;
-    botId?: string;
-    kind: string;
-  },
+  input: ComputerKeyInput & { kind: string },
   scopeKey: string,
 ) {
   return prisma.computer.upsert({
@@ -225,13 +230,7 @@ function upsertComputerRecord(
 
 async function ensureComputerRecordWithQuota(
   tx: ComputerTx,
-  input: {
-    mode: ComputerMode;
-    spaceId: string;
-    userId: string;
-    botId?: string;
-    kind: string;
-  },
+  input: ComputerKeyInput & { kind: string },
   limit: number,
   scopeKey: string,
 ) {
@@ -252,7 +251,7 @@ async function ensureComputerRecordWithQuota(
     // bot to the new dedicated one; setBotComputer switches the same way).
     // References from other active bots still count: a team computer another
     // live bot keeps using stays in-use after the re-link.
-    const inUse = await countInUseComputersForUser(tx, input.userId, input.botId);
+    const inUse = await countInUseComputersForUser(tx, input.userId, input.cloudFallback ? undefined : input.botId);
     // The new row itself will be referenced by this bot after the link, so
     // the post-transaction set is one more than the remaining live set.
     if (inUse + 1 > limit) throw new ComputerLimitError(limit);
@@ -266,13 +265,7 @@ function isTransactionClient(prisma: ComputerClient): prisma is ComputerTx {
 
 export async function ensureComputerRecord(
   prisma: ComputerClient,
-  input: {
-    mode: ComputerMode;
-    spaceId: string;
-    userId: string;
-    botId?: string;
-    kind: string;
-  },
+  input: ComputerKeyInput & { kind: string },
 ) {
   const limit = resolveMaxComputersPerUser();
   const scopeKey = computerScopeKey(input);

@@ -1,6 +1,7 @@
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
-import { claimMicoRun, isOwnedWorkflowThread } from "@rakazo/db";
+import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
+import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread } from "@rakazo/db";
 import { randomUUID } from "node:crypto";
 import type {
   AdapterContext,
@@ -3740,12 +3741,26 @@ export function createRunExecutor(deps: ExecutorDeps) {
           computer: { select: { id: true, kind: true, scope: true, providerRef: true, homeKey: true } },
         },
       });
-      if (!leaseTarget.computerId) {
-        // A deleted/unlinked computer needs user action, not an unbounded queue retry.
+      if (leaseTarget.computerSwitching) {
+        await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
+        return;
+      }
+      const cloudSelection = await selectOfflineCloudWorkspace(
+        deps.prisma, deps.sandbox, run, leaseTarget.computer, { workerId, fence },
+      ).catch((error: unknown) => {
+        if (error instanceof ComputerLimitError) return error;
+        throw error;
+      });
+      const cloudLimitReached = cloudSelection instanceof ComputerLimitError;
+      const cloudComputer = cloudLimitReached ? undefined : cloudSelection;
+      const assignedComputerId = cloudComputer?.id ?? leaseTarget.computerId;
+      if (!assignedComputerId || cloudLimitReached) {
+        // An unavailable assignment or exhausted quota must settle instead of retrying.
+        const error = cloudLimitReached ? cloudSelection.message : "Bot has no computer";
         // Recheck ownership before recording an attempt; never settle a stolen lease.
         const claimed = await deps.prisma.run.updateMany({
           where: { id: runId, status: "running", leaseOwner: workerId, leaseFence: fence },
-          data: { error: "Bot has no computer" },
+          data: { error },
         });
         if (claimed.count !== 1) return;
         const failedAttempt = await deps.prisma.attempt.create({
@@ -3757,12 +3772,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         });
         await failRunBeforeTurn(
           deps, run, bot?.name ?? "", { attemptId: failedAttempt.id, workerId, fence },
-          "Bot has no computer",
+          error,
         );
-        return;
-      }
-      if (leaseTarget.computerSwitching) {
-        await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
       }
       if (takeoverResume) {
@@ -3779,11 +3790,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
       }
       let computerLease: ComputerExecutionLease | null = null;
-      const projectLeaseKey = leaseTarget.computer
+      const projectLeaseKey = !cloudComputer && leaseTarget.computer
         ? await projectExecutionLeaseKey(deps.prisma, deps.sandbox, run, leaseTarget.computer)
         : undefined;
       const isolatedProjectRun = Boolean(projectLeaseKey);
-      const assignedComputerId = leaseTarget.computerId;
       const privateLane = !isolatedProjectRun && leaseTarget.agentEngine === "pi" && Boolean(await deps.prisma.thread.findFirst({
         where: { id: run.threadId, taskBotId: run.botId, spaceId: run.spaceId, userId: run.userId }, select: { id: true },
       }));
@@ -3798,13 +3808,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: projectLeaseKey ?? run.botId,
           resumeHeldLease,
         });
-        if (!computerLease && leaseTarget.computer?.scope === "dedicated") {
+        if (!computerLease && (cloudComputer ?? leaseTarget.computer)?.scope === "dedicated") {
           computerLease = await acquireDedicatedScreenLeaseFence(deps.prisma, {
             computerId: assignedComputerId,
             runId,
             botId: run.botId,
             workerId,
             runFence: fence,
+            cloudWorkspace: !!cloudComputer,
           });
         }
         })();
@@ -4058,6 +4069,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           userId: run.userId,
           botId: bot.id,
           runId,
+          cloudWorkspace: cloudComputer ? { workerId, runFence: fence } : undefined,
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },
@@ -4297,8 +4309,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           });
         }
 
-        if (!bot.computer) throw new Error("Bot has no computer");
-        const storedComputer = bot.computer;
+        const storedComputer = cloudComputer ?? bot.computer;
+        if (!storedComputer) throw new Error("Bot has no computer");
         const computerMode = executionWorkspaceMode(parseComputerMode(storedComputer.scope), context.projectSessionId);
         const artifacts = deps.artifacts;
         const recentFilesInput = {
@@ -4466,6 +4478,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const pageBrowserAllowed =
           !routineConversation && !isolatedProjectRun && graphical && browser.describe().capabilities.page && !heldForTakeover;
         const disabledBuiltinTools = disabledBuiltinToolSet(bot.disabledBuiltinTools);
+        // The normal user takeover panel controls the assigned computer, not the
+        // separate server workspace. Keep that control off this run.
+        if (cloudComputer) disabledBuiltinTools.add("request_takeover");
         const workflowToolsAllowed = ownerStartedRun && !thread.groupId && /\b(workflows?|flujos?)\b/i.test(task.prompt);
         if (!workflowToolsAllowed) for (const name of WORKFLOW_TOOL_NAMES) disabledBuiltinTools.add(name);
         if (thread.taskBotId) disabledBuiltinTools.add("call_user");
