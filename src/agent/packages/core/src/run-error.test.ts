@@ -391,12 +391,21 @@ describe("normalizeRunError", () => {
       });
     });
 
-    it("treats a request over the plan's token window as too long", () => {
+    it("explains the plan limit and offers model recovery for an oversized request", () => {
       expect(
         normalizeRunError(
           '413: {"message":"Request too large for model `example/model` on tokens per minute (TPM): Limit 8000, Requested 9000."}',
         ),
-      ).toMatchObject({ kind: "context" });
+      ).toMatchObject({ kind: "context", recovery: "model" });
+      expect(
+        normalizeRunError(
+          "[groq/openai/gpt-oss-20b] [413]: Request too large for model `openai/gpt-oss-20b` on tokens per minute (TPM): Limit 8000, Requested 19074, please reduce your message size.",
+        ),
+      ).toMatchObject({
+        kind: "context",
+        recovery: "model",
+        summary: "Groq rejected this request because it exceeds the plan's tokens-per-minute limit. Choose another model.",
+      });
     });
 
     it.each([

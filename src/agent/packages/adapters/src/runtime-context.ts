@@ -15,6 +15,7 @@ import {
 } from "./context-selection.js";
 import { modelContextForAdmission } from "./model-context.js";
 import { LIVE_COMPACTION_PREFIX } from "./context-compaction.js";
+import { groqInitialRequestWindow } from "./groq-request-budget.js";
 import { effectiveOutputReserve, resolveCompletionMaxTokens } from "./pi-runtime-limits.js";
 import { withoutThinkingFrom } from "./thinking-signatures.js";
 
@@ -156,8 +157,15 @@ export function createRuntimeContextPolicy(
   let decision: RuntimeContextDecision | undefined;
   let metadataPresent = false;
   let warnedOutputClamp = false;
+  function contextWindowFor(model: Model<Api>): number {
+    const configured = request.model.contextWindow ?? model.contextWindow;
+    // A saved context size must not undo the effective Groq transport budget.
+    return groqInitialRequestWindow(model.provider, model.id) === undefined
+      ? configured
+      : Math.min(configured, model.contextWindow);
+  }
   function outputReserve(model: Model<Api>): number {
-    const contextWindow = request.model.contextWindow ?? model.contextWindow;
+    const contextWindow = contextWindowFor(model);
     const configuredMaxTokens = resolveCompletionMaxTokens(
       model.maxTokens,
       request.model.maxTokens,
@@ -248,7 +256,7 @@ export function createRuntimeContextPolicy(
   function rebuild(
     source: Context,
     model: Model<Api>,
-    modelWindow = request.model.contextWindow ?? model.contextWindow,
+    modelWindow = contextWindowFor(model),
   ): Prepared {
     const ctx = pruned(source);
     const standaloneHistoryFallback =
@@ -599,7 +607,7 @@ export function createRuntimeContextPolicy(
   }
   /** A rebuild that leaves part of the window free, or none when the run needs all of it. */
   function rebuildWithHeadroom(ctx: Context, model: Model<Api>): Prepared | undefined {
-    const window = request.model.contextWindow ?? model.contextWindow;
+    const window = contextWindowFor(model);
     const reserve = outputReserve(model);
     try {
       return rebuild(ctx, model, reserve + Math.floor((window - reserve) * (1 - REBUILD_HEADROOM)));
@@ -640,8 +648,7 @@ export function createRuntimeContextPolicy(
           : undefined;
       let append = false;
       if (previous && appended) {
-        const available =
-          (request.model.contextWindow ?? model.contextWindow) - outputReserve(model);
+        const available = contextWindowFor(model) - outputReserve(model);
         const imageLimit = normalizedImageLimit(request.model.maxImagesPerPrompt);
         const overTokens = (size: Size) => size.tokens > available;
         const overImages = (size: Size) => imageLimit !== undefined && size.images > imageLimit;
