@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@rakazo/adapter-kit";
+import { isUncertainDesktopRun } from "@rakazo/core";
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
 import { startHostComputerServer } from "./host-computer-server.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
@@ -72,6 +73,23 @@ it("never replays or falls back after dispatch or a truncated native stream", as
   const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
   await expect(async () => { for await (const _ of runtime.run(request(), context)) {} }).rejects.toThrow("disconnected");
   expect(transport).toHaveBeenCalledTimes(1); expect(fallback.run).not.toHaveBeenCalled();
+});
+
+it("distinguishes a lost Desktop transport from a returned provider failure", async () => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const providerFailure = '429: {"error":{"code":"quota_exhausted"}}';
+  const transport = vi.fn()
+    .mockRejectedValueOnce(new Error("fetch failed"))
+    .mockResolvedValueOnce(new Response(JSON.stringify({
+      value: { kind: "failure", value: { kind: "error", value: ["ModelAccountError", providerFailure] } },
+    }) + "\n"));
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
+  const run = async () => { for await (const _ of runtime.run(request(), context)) {} };
+  const disconnected = await run().catch((error: Error) => error);
+  expect(disconnected).toBeInstanceOf(Error);
+  expect(isUncertainDesktopRun(disconnected?.message)).toBe(true);
+  await expect(run()).rejects.toMatchObject({ name: "ModelAccountError", message: providerFailure });
+  expect(fallback.run).not.toHaveBeenCalled();
 });
 
 it("preserves binary input and opaque marker-looking objects without interpreting them as callbacks", () => {

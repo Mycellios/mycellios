@@ -14,7 +14,7 @@ import {
 } from "@rakazo/core";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
 import { ArrowUp, AudioLines, Box, FilePlus, ImagePlus, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, X } from "lucide-react";
-import type { ClipboardEvent, DragEvent, RefObject } from "react";
+import type { ClipboardEvent, DragEvent, ReactNode, RefObject } from "react";
 import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   HoldToTalkControls,
@@ -64,6 +64,8 @@ export const Composer = memo(function Composer({
   onOpenComputerSettings,
   runError,
   runErrorId,
+  runErrorProviderLabel,
+  runErrorModelAction,
   onRunErrorPresented,
   onDismissError,
   onRetryError,
@@ -102,6 +104,8 @@ export const Composer = memo(function Composer({
   onOpenComputerSettings?: () => void;
   runError: string | null;
   runErrorId: string | null;
+  runErrorProviderLabel?: string;
+  runErrorModelAction?: ReactNode;
   onRunErrorPresented: (runId: string) => void;
   onDismissError: () => void;
   onRetryError?: () => void;
@@ -573,6 +577,8 @@ export const Composer = memo(function Composer({
         sendError={sendError}
         runError={runError}
         runErrorId={runErrorId}
+        runErrorProviderLabel={runErrorProviderLabel}
+        runErrorModelAction={runErrorModelAction}
         onRunErrorPresented={onRunErrorPresented}
         onOpenModels={onOpenModels}
         onOpenConnections={onOpenConnections}

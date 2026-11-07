@@ -157,8 +157,7 @@ export function parseModelFallbackFailure(
 }
 
 /**
- * Whose problem a failed run is. Every kind except "output" is the user's provider account,
- * key, plan or model choice; "output" is a model that returned nothing usable.
+ * Known causes of failed runs, including failures outside the model provider.
  */
 export type RunErrorKind =
   | "key"
@@ -169,7 +168,34 @@ export type RunErrorKind =
   | "access"
   | "model"
   | "context"
-  | "output";
+  | "output"
+  | "quota"
+  | "interrupted";
+
+export const DESKTOP_RUN_INTERRUPTED_ERROR =
+  "Desktop execution interrupted; check existing results before retrying";
+
+const UNCERTAIN_DESKTOP_RUN = new Set([
+  DESKTOP_RUN_INTERRUPTED_ERROR,
+  "Desktop execution disconnected; check existing results before retrying",
+  "Desktop runtime disconnected; check existing results before retrying",
+  "Desktop agent did not finish; check existing results before retrying",
+  "Desktop operation interrupted. Check results before retrying.",
+  "Desktop executor unavailable; check the PC connection before retrying",
+  "Desktop runtime disconnected",
+  "Desktop run already active",
+  "This local run already started. Check existing results before retrying.",
+  "This Desktop run was already dispatched. Check existing results before retrying.",
+  "The account model stream was interrupted. Check existing results before retrying.",
+]);
+
+/** A Desktop dispatch with an uncertain outcome may have acted without reporting the result. */
+export function isUncertainDesktopRun(details: string | null | undefined): boolean {
+  if (!details) return false;
+  const fallback = parseModelFallbackFailure(details.trim());
+  return UNCERTAIN_DESKTOP_RUN.has((fallback?.primaryError ?? details).trim()) ||
+    (fallback?.backups.some(backup => UNCERTAIN_DESKTOP_RUN.has(backup.reason.trim())) ?? false);
+}
 
 /**
  * Fixed failure strings from the model runtime's stop-reason mapping (including a stop reason
@@ -204,6 +230,7 @@ export function normalizeRunError(
   translate: RunErrorTranslator = english,
   locale = "en-US",
   now = Date.now(),
+  providerLabel?: string,
 ): {
   summary: string;
   details: string;
@@ -213,6 +240,16 @@ export function normalizeRunError(
   period?: "none" | "daily" | "weekly" | "monthly";
 } {
   const trimmed = details.trim();
+  if (UNCERTAIN_DESKTOP_RUN.has(trimmed)) {
+    return {
+      summary: translate("Desktop could not confirm the result. Review what it already did before continuing."),
+      details,
+      kind: "interrupted",
+    };
+  }
+  if (trimmed === INTERNAL_RUN_ERROR) {
+    return { summary: translate("Mycellios encountered an internal error."), details };
+  }
   if (trimmed === "Bot has no computer")
     return {
       summary: translate(
@@ -272,9 +309,9 @@ export function normalizeRunError(
         ? { summary: translate(trimmed), details, recovery: "connection" }
         : { summary: details, details };
   }
-  if (trimmed === MODEL_OUTPUT_CUT_ERROR) {
+  if (trimmed === MODEL_OUTPUT_CUT_ERROR || trimmed === MODEL_OUTPUT_LIMIT_ERROR) {
     return {
-      summary: translate(MODEL_OUTPUT_CUT_ERROR),
+      summary: translate(trimmed),
       details,
       recovery: "model",
       kind: "output",
@@ -291,7 +328,7 @@ export function normalizeRunError(
   if (MALFORMED_KEY_HEADER.test(trimmed)) {
     return {
       summary: translate("{provider} rejected the API key. Check your connection settings.", {
-        provider: translate("Your model provider"),
+        provider: providerLabel ?? translate("Your model provider"),
       }),
       details,
       recovery: "connection",
@@ -315,24 +352,29 @@ export function normalizeRunError(
     ),
   ].join(" ");
   const status =
-    [prefix?.[1], prefix?.[2], record.status, record.code, payload.code, payload.httpCode]
+    [prefix?.[1], prefix?.[2], record.status, record.statusCode, record.code, payload.status, payload.statusCode, payload.code, payload.httpCode]
       .map(Number)
       .find((value) => Number.isInteger(value) && value >= 100 && value <= 599) ??
     // Bedrock names its modeled exception instead of reporting the HTTP status.
     (/^AccessDeniedException\b/.test(trimmed) ? 403 : undefined);
-  const provider = /\bopenrouter\b|openrouter_/i.test(signals)
+  const provider = providerLabel ?? (/\bopenrouter\b|openrouter_/i.test(signals)
     ? translate("Your OpenRouter")
     : /\bopenai\b|openai_/i.test(signals)
       ? translate("Your OpenAI")
       : /\banthropic\b|anthropic_/i.test(signals)
         ? translate("Your Anthropic")
-        : translate("Your model provider");
+        : translate("Your model provider"));
 
   let resetAt: number | undefined;
   let kind: RunErrorKind | undefined;
   let period: "none" | "daily" | "weekly" | "monthly" | undefined;
   let recovery: "connection" | "model" | undefined;
-  let summary = translate("The model provider returned an error.");
+  let summary = providerLabel
+    ? translate("{provider} could not complete the request. The cause is unknown.", { provider })
+    : translate("The model provider returned an error.");
+  const shortRateWindow = /\bper[ -](?:second|minute|hour)\b|\b(?:rpm|tpm)\b/i.test(signals);
+  const usageQuota = !shortRateWindow &&
+    /\b(?:quota[_ -](?:exceeded|exhausted)|(?:daily|weekly|monthly|usage|request) quota)\b/i.test(signals);
   const financialQuota =
     /insufficient[_ ](?:quota|balance)|credits?|funds|spend|budget|billing|openrouter_key_limit/i.test(
       signals,
@@ -342,12 +384,13 @@ export function normalizeRunError(
       /rate[_ -]limit|too many requests|resource[_ ]?exhausted|request limit reached/i.test(
         signals,
       )) &&
-    !financialQuota
+    !financialQuota &&
+    !usageQuota
   ) {
     kind = "rate";
     summary = translate("{provider} is rate limiting requests. Try again shortly.", { provider });
   } else if (
-    status === 402 ||
+    status === 402 || usageQuota ||
     /\b(?:daily|weekly|monthly|usage)[\s\S]{0,30}limit|\b(?:quota|insufficient[_ ](?:quota|credits?|funds|balance)|credit[_ ]balance|(?:no|out of|more) credits?)\b|(?:key|credit|spend|spending|budget|billing)[\s\S]{0,40}(?:limit|exceed|exhaust|insufficient)|(?:limit|insufficient)[\s\S]{0,30}(?:credit|spend|budget)/i.test(
       signals,
     )
@@ -374,11 +417,15 @@ export function normalizeRunError(
       ? "key"
       : /credit|insufficient_quota/i.test(signals)
         ? "credit"
-        : "spending";
+        : usageQuota && !financialQuota
+          ? "quota"
+          : "spending";
     // A capped key is fixed by connecting another; an account out of money or quota is not, but
     // another model keeps the user going.
     recovery = kind === "key" ? "connection" : "model";
-    summary = translate(RUN_ERROR_LIMIT_MESSAGES[kind][period], { provider });
+    summary = kind === "quota"
+      ? translate("{provider} reached its usage quota.", { provider })
+      : translate(RUN_ERROR_LIMIT_MESSAGES[kind][period], { provider });
     const reset =
       message.match(
         /\bresets?(?:\s+at|\s+on)?\s*[:=]?\s*(\d{4}-\d{2}-\d{2}(?:T[\d:.]+Z)?)/i,
@@ -455,12 +502,12 @@ export function normalizeRunError(
     kind = "model";
     summary = translate("{provider} can't run this model.", { provider });
   } else if (
-    status === 502 ||
-    status === 503 ||
     status === 529 ||
-    /overload|over capacity|temporarily unavailable|service unavailable/i.test(signals)
+    /overload|over capacity|experiencing high demand/i.test(signals)
   ) {
     summary = translate("{provider} is overloaded right now. Try again in a moment.", { provider });
+  } else if (status === 503 || /temporarily unavailable|service unavailable/i.test(signals)) {
+    summary = translate("{provider} is temporarily unavailable.", { provider });
   } else if (
     // The provider SDKs report a refused or unresolvable host as a bare "Connection error.".
     /^connection error\.?$/i.test(message.trim()) ||
@@ -478,13 +525,14 @@ export function normalizeRunError(
   ) {
     summary = translate("{provider} took too long to respond. Try again.", { provider });
   } else if (
-    trimmed === MODEL_OUTPUT_LIMIT_ERROR ||
     MODEL_OUTPUT_FAILURE.test(trimmed) ||
     MODEL_OUTPUT_FAILURE.test(message)
   ) {
     recovery = "model";
     kind = "output";
     summary = translate("The model returned an unusable response. Try again.");
+  } else if (status !== undefined && status >= 500) {
+    summary = translate("{provider} returned a server error.", { provider });
   }
   return {
     summary,

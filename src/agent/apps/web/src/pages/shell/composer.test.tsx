@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 import { i18n } from "@lingui/core";
-import type { AgentSkillCatalogEntry, ThreadMessage } from "@rakazo/contracts";
+import type { AgentSkillCatalogEntry, Bot, ThreadMessage } from "@rakazo/contracts";
 import type { ComposerMention } from "@rakazo/core";
-import { MODEL_REQUIRED_SEND_ERROR } from "@rakazo/core";
+import { MODEL_REQUIRED_SEND_ERROR, modelOptionKey } from "@rakazo/core";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ComponentProps, ReactNode } from "react";
 import { act, createRef } from "react";
 import type { Root } from "react-dom/client";
@@ -17,7 +18,9 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 import { dictation } from "../../lib/dictation";
+import { spaceQueries } from "../../lib/query";
 import { Composer } from "./composer";
+import { ChatHeaderModel } from "./chat-header-model";
 import { ReviewWorkspaceProvider, useReviewWorkspace } from "../../lib/review-workspace";
 
 let root: Root | null = null;
@@ -27,6 +30,7 @@ let composerProps: ComponentProps<typeof Composer>;
 beforeEach(() => {
   i18n.load("en", {});
   i18n.activate("en");
+  document.elementFromPoint ??= () => null;
 });
 
 afterEach(() => {
@@ -157,6 +161,55 @@ it("retries the failed run without sending or clearing the draft", () => {
   expect(button.textContent).toBe("Retrying…");
   act(() => button.click());
   expect(retry).toHaveBeenCalledTimes(1);
+});
+
+it("changes model from a Desktop failure without replaying the turn or clearing the draft", async () => {
+  const changeModel = vi.fn(async () => {});
+  const send = vi.fn(async () => true);
+  const retry = vi.fn();
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
+  const queries = spaceQueries(null, null);
+  client.setQueryData(queries.models.credentials.queryKey(), [
+    { id: "omniroute", provider: "openai-compatible", label: "OmniRoute", hasKey: true, isDefault: false, modelId: "alternative" },
+  ]);
+  client.setQueryData(queries.models.list.queryKey(), []);
+  const textarea = renderComposer(send, {
+    runError: "Desktop execution interrupted; check existing results before retrying",
+    runErrorId: "original-run",
+    onRetryError: retry,
+    runErrorModelAction: (
+      <QueryClientProvider client={client}>
+        <ChatHeaderModel
+          recovery
+          bot={{ modelProvider: null, modelId: null, thinkingLevel: null } as Bot}
+          me={null}
+          onSave={changeModel}
+          onConnections={() => {}}
+        />
+      </QueryClientProvider>
+    ),
+  });
+  const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+  act(() => {
+    setValue.call(textarea, "Unsent follow-up");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  expect(container!.querySelector('[data-testid="composer-error-retry"]')).toBeNull();
+  const trigger = container!.querySelector<HTMLButtonElement>('[aria-label="Change model"]')!;
+  await act(async () => trigger.click());
+  const select = document.querySelector<HTMLSelectElement>('[data-slot="popover-content"] select');
+  expect(select).not.toBeNull();
+  await act(async () => {
+    select!.value = modelOptionKey("openai-compatible", "alternative");
+    select!.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  expect(changeModel).toHaveBeenCalledExactlyOnceWith({
+    modelProvider: "openai-compatible", modelId: "alternative", thinkingLevel: null,
+  });
+  expect(container!.querySelector('[data-testid="composer-error"]')).not.toBeNull();
+  expect(textarea.value).toBe("Unsent follow-up");
+  expect(send).not.toHaveBeenCalled();
+  expect(retry).not.toHaveBeenCalled();
 });
 
 it("shows a readable run error with raw details, while preserving send errors", () => {

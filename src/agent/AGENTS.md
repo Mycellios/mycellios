@@ -863,4 +863,6 @@
 - Composer retry re-reads the owned thread and targets only the saved failed user
   run. Never offer it for introductions or copy text/files to replay a request.
   Keep API effect fences and chat/Space/unmount guards; reconcile known conflicts
-  without another POST. Verify web/API retry-thread-run and composer tests.
+  without another POST. An uncertain Desktop dispatch cannot be replayed even
+  when no effects were recorded. The model picker in the error notice changes
+  only the Mico's model settings. Verify web/API retry-thread-run and composer tests.
