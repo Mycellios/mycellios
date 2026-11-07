@@ -46,7 +46,9 @@ jobs:
           npm run build --workspace @rakazo/desktop
           npm run build:local-server --workspace @rakazo/desktop
           npm exec --workspace @rakazo/desktop -- node scripts/package-linux.mjs --runtime "$RUNNER_TEMP/runtime.deb" --sha256 fff304aa909775d0098e5837a3cbdb986a87cdfefa0ffcb4cedfb4d67f8d6d09 --out "$RUNNER_TEMP/desktop-release"
+          node -e 'require("electron")'
           electron_bin="$(node -p 'require("electron")')"
+          test -x "$electron_bin"
           sudo chown root:root "$(dirname "$electron_bin")/chrome-sandbox"
           sudo chmod 4755 "$(dirname "$electron_bin")/chrome-sandbox"
           xvfb-run -a node apps/desktop/scripts/verify-local-server.mjs --server-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/local-server" --web-root "$RUNNER_TEMP/desktop-release/linux-unpacked/resources/web"
