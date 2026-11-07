@@ -4,16 +4,22 @@ import type { RunErrorTranslator } from "@rakazo/core";
 /** Static descriptors keep shared run-error messages in Lingui extraction. */
 export const translateRunError: RunErrorTranslator = (message, values) => {
   switch (message) {
-    case "The execution computer service is not configured on this server. Your model connection is not the cause.":
+    case "This task needs a workspace. Cloud workspaces are not available here yet.":
       return i18n._({
-        id: "The execution computer service is not configured on this server. Your model connection is not the cause.",
-        message: "The execution computer service is not configured on this server. Your model connection is not the cause.",
+        id: "This task needs a workspace. Cloud workspaces are not available here yet.",
+        message: "This task needs a workspace. Cloud workspaces are not available here yet.",
         values,
       });
-    case "This agent has no virtual computer. Open Computer settings to configure it.":
+    case "This Mico needs a workspace to run this task.":
       return i18n._({
-        id: "This agent has no virtual computer. Open Computer settings to configure it.",
-        message: "This agent has no virtual computer. Open Computer settings to configure it.",
+        id: "This Mico needs a workspace to run this task.",
+        message: "This Mico needs a workspace to run this task.",
+        values,
+      });
+    case "Open this chat in Mycellios Desktop on the PC with the project, then retry.":
+      return i18n._({
+        id: "Open this chat in Mycellios Desktop on the PC with the project, then retry.",
+        message: "Open this chat in Mycellios Desktop on the PC with the project, then retry.",
         values,
       });
     case "Your OpenRouter":

@@ -41,15 +41,23 @@ it("runs the engine on Desktop while awaiting account callbacks, checkpoints and
   expect(fallback.run).not.toHaveBeenCalled();
 });
 
-it("keeps old clients on their existing runtime, but never silently substitutes cloud for a remembered offline PC", async () => {
+it("runs new turns in cloud when Desktop is offline and preserves bound work", async () => {
   const fallback = { describe, abort: vi.fn(), run: vi.fn(async function* () { yield { type: "done" as const }; }) };
   const transport = vi.fn();
   const old = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: false, preferred: false }) });
   for await (const _ of old.run(request(), context)) {}
   expect(fallback.run).toHaveBeenCalledTimes(1);
   const offline = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: false, preferred: true }) });
-  await expect(async () => { for await (const _ of offline.run(request(), context)) {} }).rejects.toThrow("offline");
-  expect(fallback.run).toHaveBeenCalledTimes(1); expect(transport).not.toHaveBeenCalled();
+  for await (const _ of offline.run(request(), context)) {}
+  expect(fallback.run).toHaveBeenCalledTimes(2);
+  for (const [input, scope] of [
+    [request(), { ...context, projectSessionId: "project" }],
+    [{ ...request(), resumeFromCheckpoint: "checkpoint" }, context],
+  ] as const) {
+    await expect(async () => { for await (const _ of offline.run(input, scope)) {} }).rejects.toThrow("bound");
+  }
+  expect(fallback.run).toHaveBeenCalledTimes(2);
+  expect(transport).not.toHaveBeenCalled();
 });
 
 it("never replays or falls back after dispatch or a truncated native stream", async () => {

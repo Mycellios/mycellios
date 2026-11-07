@@ -6586,8 +6586,8 @@ msgstr "Ver ordenador"
 msgid "Waiting for your response"
 msgstr "Esperando tu respuesta"
 
-msgid "This agent has no virtual computer. Open Computer settings to configure it."
-msgstr "Este Mico no tiene ordenador virtual. Abre los ajustes de Computadora para configurarlo."
+msgid "This Mico needs a workspace to run this task."
+msgstr "Este Mico necesita un espacio de trabajo para esta tarea."
 
 msgid "Update ready"
 msgstr "Actualización lista"
@@ -6778,8 +6778,14 @@ msgstr "No se pudo mostrar esta página del PDF."
 msgid "Local files stay in this browser until you send them. Adding a comment includes the file in your chat draft."
 msgstr "Los archivos locales se quedan en este navegador hasta que los envíes. Al añadir un comentario se adjunta el archivo al borrador del chat."
 
-msgid "The execution computer service is not configured on this server. Your model connection is not the cause."
-msgstr "Este servidor no tiene configurado el servicio de ordenadores de ejecución. No es un problema de tu conexión al modelo."
+msgid "This task needs a workspace. Cloud workspaces are not available here yet."
+msgstr "Esta tarea necesita un espacio de trabajo. Aquí aún no está disponible el trabajo en la nube."
+
+msgid "Open this chat in Mycellios Desktop on the PC with the project, then retry."
+msgstr "Abre este chat en Mycellios Desktop en el ordenador donde tienes el proyecto y vuelve a intentarlo."
+
+msgid "View workspace options"
+msgstr "Ver opciones de trabajo"
 
 msgid "Computer settings"
 msgstr "Configuración del ordenador"

@@ -545,6 +545,7 @@ export function ComputerSettingsPanel({
       </h3>
       <SettingsRow label={t`Current environment`} control={<span className="text-sm text-muted-foreground">{sandboxProvider ?? t`Not reported`}</span>}><p className="text-xs text-muted-foreground">{t`Manage each Mico's computer access from its chat tools. Approval rules control which actions need your confirmation.`}</p></SettingsRow>
       <ComputersUnavailableHint
+        showTechnicalDetails
         className="mt-3 text-[13px] leading-relaxed text-muted-foreground"
         sandboxProvider={sandboxProvider}
         onRecovered={onSandboxProviderChange}

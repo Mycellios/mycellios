@@ -24,8 +24,14 @@ export class DesktopAgentRuntime implements AgentRuntime {
     if (request.usageOperationKind === "setup" && !request.tools.length || request.script) { yield* this.options.fallback.run(request, context); return; }
     const route = await this.options.select(context);
     if (!route.available) {
-      if (route.preferred) throw Error("Your Desktop executor is offline. Open Mycellios Desktop on your PC; this run was not started elsewhere.");
-      yield* this.options.fallback.run(request, context); return;
+      if (route.preferred && (context.projectSessionId || request.resumeFromCheckpoint || request.resumeToolResult)) {
+        throw Error("This task is bound to your Desktop. Reconnect the PC to resume it.");
+      }
+      const cloudRequest = route.preferred
+        ? { ...request, instructions: `${request.instructions}\nDesktop is offline. This turn runs on the server. Use only available tools and workspaces. Explain any specific dependency on local files or devices.` }
+        : request;
+      yield* this.options.fallback.run(cloudRequest, context);
+      return;
     }
     if (this.active.has(request.runId)) throw Error("Desktop run already active");
     const controller = new AbortController(), sessionId = randomUUID();

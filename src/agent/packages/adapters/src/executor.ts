@@ -9716,7 +9716,7 @@ export function persistentComputerInstruction(options: {
   disabled?: ReadonlySet<string>;
 }): string {
   if (options.computerAvailable === false) {
-    return "No execution computer is configured. Answer questions and recommendations directly from the conversation when possible, and use available connected tools for app data. Do not claim filesystem, shell or browser access. If the requested work requires a computer, explain that limitation without retrying computer tools.";
+    return "No execution workspace is available for this turn. Use the conversation and connected tools to make useful progress, including reading repositories through an available GitHub connection. Do not claim you edited or tested files without evidence. If a dependency blocks the task, explain the specific missing access in plain language and give one next step. Ask for the repository link if the project is unclear. Ask to open Mycellios Desktop only when the required files or device are on the user's PC. Avoid server setup instructions in chat.";
   }
   if (options.heldForTakeover) return DESKTOP_HELD_FOR_TAKEOVER_MESSAGE;
   const disabled = options.disabled;

@@ -178,16 +178,18 @@ it("shows a readable run error with raw details, while preserving send errors", 
   expect(error?.querySelector("details")).toBeNull();
 });
 
-it("offers computer settings instead of model changes for disabled execution services", () => {
+it("offers one workspace action when cloud workspaces are unavailable", () => {
   const computer = vi.fn(); const model = vi.fn();
   renderComposer(async () => true, {
     runError: "Computers unavailable. Set SANDBOX_PROVIDER=docker with SANDBOX_SUPERVISOR_TOKEN",
     runErrorId: "no-computer-service",
     onOpenComputerSettings: computer,
     onOpenModels: model,
+    onRetryError: vi.fn(),
   });
   const alert = container!.querySelector('[data-testid="composer-error"]')!;
-  expect(alert.textContent).toContain("Your model connection is not the cause.");
+  expect(alert.textContent).toContain("Cloud workspaces are not available here yet.");
+  expect(alert.querySelector('[data-testid="composer-error-retry"]')).toBeNull();
   expect(alert.querySelector("details")?.open).toBe(false);
   act(() => alert.querySelector<HTMLButtonElement>('[data-testid="composer-error-action"]')!.click());
   expect(computer).toHaveBeenCalledTimes(1);
