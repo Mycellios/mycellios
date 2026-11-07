@@ -5,6 +5,8 @@ import {
   isBotAvatarValue,
   parseBotAvatarValue,
   UpdateBotInput,
+  withMicoAvatarPalette,
+  withMicoAvatarShape,
 } from "./index.js";
 
 describe("bot avatar values", () => {
@@ -27,6 +29,18 @@ describe("bot avatar values", () => {
       raw: "https://evil.example/track.png",
     });
     expect(isBotAvatarValue("https://evil.example/track.png")).toBe(false);
+  });
+
+  it("round-trips the branded shape and lets each choice change independently", () => {
+    const fox = withMicoAvatarShape("", 1001);
+    expect(fox).toBe("#ED802C::shape_1001");
+    const mintFox = withMicoAvatarPalette(fox, "#67B793");
+    expect(parseBotAvatarValue(mintFox)).toEqual({
+      kind: "shape", color: "#67B793", shapeIndex: 1001,
+    });
+    expect(withMicoAvatarShape(mintFox, 1011)).toBe("#67B793::shape_1011");
+    expect(UpdateBotInput.safeParse({ botId: "bot-1", color: mintFox }).success).toBe(true);
+    expect(parseBotAvatarValue("#8B5CF6::shape_9")).toMatchObject({ shapeIndex: 1 });
   });
 
   it("accepts persisted writes and rejects oversized or remote values", () => {

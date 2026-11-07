@@ -1,3 +1,4 @@
+import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -12,6 +13,17 @@ import {
 } from "./bot-avatar.js";
 
 describe("BotAvatar", () => {
+  it("draws all twelve branded shapes with their own silhouettes and palette accents", () => {
+    const silhouettes = MICO_AVATAR_SHAPES.map(({ index }, slot) => {
+      const palette = MICO_AVATAR_PALETTES[slot]!;
+      const html = renderToString(<BotAvatar color={micoAvatarValue(index, palette.color)} size={26} />);
+      expect(html).toContain('viewBox="0 0 64 64"');
+      expect(html).toContain(`fill="${palette.color}"`);
+      expect(html).toContain(`fill="${palette.accent}"`);
+      return html.match(/<path d="([^"]+)"/)?.[1];
+    });
+    expect(new Set(silhouettes).size).toBe(12);
+  });
   it("renders distinct SVG gradient IDs for concurrent working avatars", () => {
     const html = renderToString(
       <div>

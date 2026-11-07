@@ -1,6 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
-import { organicAvatarFamily } from "@rakazo/core";
 import {
   BOT_AVATAR_COLORS,
   BotAvatar,
@@ -76,8 +75,6 @@ export function AgentsMarketplace({
         notifyOnFinish: true,
         computerMode: "team",
         spawnKey: `marketplace:${nonce}`,
-        color: look(template).color,
-        avatarFamily: organicAvatarFamily(look(template).identity),
       });
       nonces.current.delete(key);
       try {

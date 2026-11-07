@@ -9167,3 +9167,123 @@ msgstr "Cambiar modelo"
 
 msgid "This changes the model for this Mico. Your message stays in the chat."
 msgstr "El cambio se aplica a este Mico. Tu mensaje sigue en el chat."
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Mushroom"
+msgstr "Seta"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Fox"
+msgstr "Zorro"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Hedgehog"
+msgstr "Erizo"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Frog"
+msgstr "Rana"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Moth"
+msgstr "Polilla"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Snail"
+msgstr "Caracol"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Owl"
+msgstr "Búho"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Turtle"
+msgstr "Tortuga"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Axolotl"
+msgstr "Ajolote"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Crab"
+msgstr "Cangrejo"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Fish"
+msgstr "Pez"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Octopus"
+msgstr "Pulpo"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Violet"
+msgstr "Violeta"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Tangerine"
+msgstr "Mandarina"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Honey"
+msgstr "Miel"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Lime"
+msgstr "Lima"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Indigo"
+msgstr "Índigo"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Turquoise"
+msgstr "Turquesa"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Raspberry"
+msgstr "Frambuesa"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Mint"
+msgstr "Menta"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Lavender"
+msgstr "Lavanda"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Coral"
+msgstr "Coral"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Sky blue"
+msgstr "Azul cielo"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Slate"
+msgstr "Pizarra"
