@@ -1,4 +1,4 @@
-import { BOT_COLORS } from "@rakazo/contracts";
+import { BOT_COLORS, MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
 import {
   ORGANIC_AVATAR_FAMILY_COUNT,
   ORGANIC_AVATAR_HEART_FAMILY,
@@ -15,7 +15,7 @@ it("assigns every branded shape and palette combination before repeating", () =>
     existing.push({ color });
     return color;
   });
-  expect(colors[0]).toBe("#8650DF::shape_1000");
+  expect(colors[0]).toBe(micoAvatarValue(MICO_AVATAR_SHAPES[0].index, MICO_AVATAR_PALETTES[0].color));
   expect(new Set(colors).size).toBe(144);
   expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[0])).size).toBe(12);
   expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[1])).size).toBe(12);

@@ -152,6 +152,12 @@ async function submitToolName(input: HTMLSelectElement, value: string) {
   await flush();
 }
 
+async function openSettingsPage(page: "advanced" | "permissions") {
+  const button = container.querySelector<HTMLButtonElement>(`[data-settings-page="${page}"]`)!;
+  await act(async () => button.click());
+  await flush();
+}
+
 async function renderSettings(onSave: (patch: SavePatch) => Promise<void>, currentBot = bot, expandAdvanced = true) {
   await act(async () => {
     root.render(
@@ -168,31 +174,25 @@ async function renderSettings(onSave: (patch: SavePatch) => Promise<void>, curre
     );
   });
   await flush();
-  if (expandAdvanced) {
-    const advanced = container.querySelector<HTMLButtonElement>('[data-testid="bot-settings-advanced"] button[aria-expanded]')!;
-    if (advanced.getAttribute("aria-expanded") === "false") await act(async () => advanced.click());
-    await flush();
-  }
+  if (expandAdvanced && !container.querySelector('[data-testid="bot-settings-tools"]'))
+    await openSettingsPage("advanced");
 }
 
 describe("BotSettings help", () => {
   it("shows the management subtitle without changing the management switch", async () => {
     const onSave = vi.fn<(patch: SavePatch) => Promise<void>>(async () => undefined);
     await renderSettings(onSave, { ...bot, fleetManagement: false });
-    const advanced = container.querySelector<HTMLButtonElement>(
-      '[data-testid="bot-settings-advanced"] button[aria-expanded]',
-    );
-
-    expect(advanced?.getAttribute("aria-expanded")).toBe("true");
-    const label = [...container.querySelectorAll("label")].find(
-      (entry) => entry.textContent === "Manage the bots it creates",
-    );
-    const toggle = document.getElementById(label?.htmlFor ?? "");
     const speechToggle = container.querySelector<HTMLButtonElement>('[id$="-auto-speak"]');
     const speechRow = speechToggle?.closest("label");
     expect(speechRow?.htmlFor).toBe(speechToggle?.id);
     expect(speechRow?.firstElementChild?.textContent).toBe("Read replies aloud");
     expect(speechRow?.lastElementChild).toBe(speechToggle);
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
+    await openSettingsPage("permissions");
+    const label = [...container.querySelectorAll("label")].find(
+      (entry) => entry.textContent === "Manage the bots it creates",
+    );
+    const toggle = document.getElementById(label?.htmlFor ?? "");
     expect(toggle?.getAttribute("aria-checked")).toBe("false");
     expect(container.textContent).toContain("Can edit and organise bots it creates");
     expect(container.querySelector('[aria-label="About Manage the bots it creates"]')).toBeNull();
@@ -206,7 +206,7 @@ describe("BotSettings help", () => {
 describe("BotSettings disabled tools", () => {
   it("omits the disabled-tool list from an unrelated save", async () => {
     const onSave = vi.fn<(patch: SavePatch) => Promise<void>>(async () => undefined);
-    await renderSettings(onSave);
+    await renderSettings(onSave, bot, false);
 
     const save = [...container.querySelectorAll("button")].find(
       (button) => button.getAttribute("role") === "switch" && button.id.endsWith("-notify-finish"),
@@ -453,7 +453,7 @@ describe("BotSettings disabled tools", () => {
 
 it("omits projected identity values on unrelated saves but commits explicit inline edits", async () => {
   const onSave = vi.fn<(patch: SavePatch) => Promise<void>>(async () => undefined);
-  await renderSettings(onSave, { ...bot, name: "Бот", title: "" });
+  await renderSettings(onSave, { ...bot, name: "Бот", title: "" }, false);
   await act(async () =>
     container.querySelector<HTMLButtonElement>('[id$="-notify-finish"]')!.click(),
   );
@@ -489,26 +489,20 @@ it("uses section headings without repeating notification or model row labels", a
   expect(model?.className).toBe("sr-only");
 });
 
-it("keeps Advanced initially folded and exposes its expanded state", async () => {
+it("opens Advanced as a separate page and returns to the overview", async () => {
   await renderSettings(vi.fn(async () => undefined), bot, false);
-  const trigger = container.querySelector<HTMLButtonElement>(
-    '[data-testid="bot-settings-advanced"] button[aria-expanded]',
-  )!;
-  expect(trigger.className).toContain("text-xs font-medium text-muted-foreground");
-  expect(trigger.className).not.toMatch(/bg-muted|rounded-xl|px-4|text-sm/);
-  expect(trigger.querySelector("svg")?.getAttribute("class")).toContain(
-    "group-aria-expanded:rotate-0",
-  );
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
-  await act(async () => trigger.click());
-  expect(trigger.getAttribute("aria-expanded")).toBe("true");
-  await act(async () => trigger.click());
-  expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  expect(container.querySelector('[data-testid="bot-settings-tools"]')).toBeNull();
+  await openSettingsPage("advanced");
+  expect(container.querySelector("h2")?.textContent).toBe("Advanced");
+  expect(container.querySelector('[data-testid="bot-settings-tools"]')).not.toBeNull();
+  await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
+  expect(container.querySelector('[data-testid="bot-settings-tools"]')).toBeNull();
 });
 
 it("keeps cross-space communication off until explicitly enabled", async () => {
   const onSave = vi.fn<(patch: SavePatch) => Promise<void>>(async () => undefined);
-  await renderSettings(onSave);
+  await renderSettings(onSave, bot, false);
+  await openSettingsPage("permissions");
   const toggle = container.querySelector<HTMLButtonElement>('[id$="-cross-space"]');
   expect(toggle?.getAttribute("aria-checked")).toBe("false");
   await act(async () => toggle?.click());
