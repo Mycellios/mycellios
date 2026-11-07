@@ -1,4 +1,4 @@
-import { createORPCClient } from "@orpc/client";
+import { createORPCClient, RECURSIVE_CLIENT_UNWRAP_KEYS } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
 import type { AppContract, ProductEvent } from "@rakazo/contracts";
@@ -138,6 +138,10 @@ export function leaveUnavailableSpace(spaceId: string): Promise<void> {
 }
 
 export type RpcClient = ContractRouterClient<AppContract, RpcClientContext>;
+
+// React's development performance track reads function names from changed props.
+// Keep that read on the callable itself rather than treating it as an RPC path.
+if (import.meta.env.DEV) RECURSIVE_CLIENT_UNWRAP_KEYS.add("name");
 
 const displayLink = {
   call: async (...args: Parameters<typeof link.call>) => {

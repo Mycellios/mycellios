@@ -38,7 +38,7 @@ import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { ErrorBoundary, SectionLoadFailed } from "../../components/ErrorBoundary";
 import { InstructionSettings } from "../../components/InstructionSettings";
 import { botProfilePatch } from "../../lib/bot-profile-patch";
-import { thinkingLevelLabel } from "../../lib/model-catalog";
+import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { lazyComponent } from "../../lib/preload-recovery";
 import { useSpaceQueries } from "../../lib/query";
 import { errorText } from "../../lib/user-error";
@@ -311,26 +311,20 @@ export function BotSettings({
     ? modelOptionKey(selectedModel.provider, selectedModel.modelId)
     : "";
 
-  const defaultEntry = me?.defaultModel
-    ? catalogEntry(catalog, me.defaultProvider, me.defaultModel)
-    : undefined;
+  const general = generalChatModel(me, catalog);
+  const inheritLabel = t`Use general model`;
   const modelChoices = chatModelChoices(
     connectedOptions,
     selectedModelKey,
-    t`Use general model`,
-    defaultEntry?.images,
+    general ? `${inheritLabel} · ${general.label}` : inheritLabel,
+    general?.entry?.images,
   );
 
-  const effectiveProvider = selectedModel?.provider ?? me?.defaultProvider ?? null;
-  const effectiveModelId = selectedModel?.modelId ?? me?.defaultModel ?? null;
-  const effectiveEntry =
-    effectiveProvider && effectiveModelId
-      ? catalog.find(
-          (entry) =>
-            entry.provider === effectiveProvider &&
-            resolveSelectableModelId(catalog, entry.provider, entry.id) === effectiveModelId,
-        )
-      : undefined;
+  const effectiveProvider = selectedModel?.provider ?? general?.provider ?? null;
+  const effectiveModelId = selectedModel?.modelId ?? general?.modelId ?? null;
+  const effectiveEntry = effectiveProvider && effectiveModelId
+    ? selectableCatalogEntry(catalog, effectiveProvider, effectiveModelId)
+    : undefined;
   const effectiveCredential = credentialForModel(credentials, effectiveProvider, effectiveModelId);
   const thinkingOptions = (
     effectiveCredential?.thinkingLevels ??
@@ -934,15 +928,6 @@ const NO_CATALOG: ModelCatalogEntry[] = [];
 
 function sameStringList(left: readonly string[], right: readonly string[]) {
   return left.length === right.length && left.every((entry, index) => entry === right[index]);
-}
-
-function catalogEntry(
-  catalog: ModelCatalogEntry[],
-  provider: string | null | undefined,
-  modelId: string,
-) {
-  if (!provider) return undefined;
-  return catalog.find((entry) => entry.provider === provider && entry.id === modelId);
 }
 
 function InlineProfileField({

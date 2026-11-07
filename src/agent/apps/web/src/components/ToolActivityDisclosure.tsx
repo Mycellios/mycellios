@@ -6,7 +6,8 @@ import {
   CollapsibleTrigger,
 } from "@rakazo/ui-web/components/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
+import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-activity-preference";
 import { formatToolActivityDuration, toolStepCount } from "../lib/tool-activity-view";
 
 type ToolStep = Extract<ThreadMessage["blocks"][number], { kind: "steps" }>["steps"][number];
@@ -62,7 +63,7 @@ export function ToolSteps({
 
 /**
  * Tool activity stays folded until requested. Manual toggles survive new steps;
- * finishing folds it again so the reply keeps the visual focus.
+ * finishing reapplies the saved default so the reply keeps the chosen level of detail.
  */
 export function ToolActivityDisclosure({
   live,
@@ -75,12 +76,13 @@ export function ToolActivityDisclosure({
   durationMs?: number;
   children: ReactNode;
 }) {
+  const expanded = useSyncExternalStore(subscribeToolActivity, getToolActivityExpanded, () => false);
   const duration = formatToolActivityDuration(durationMs);
   const toolCount = stepCount;
   return (
     <Collapsible
-      key={live ? "working" : "actions"}
-      defaultOpen={false}
+      key={`${live ? "working" : "actions"}-${expanded}`}
+      defaultOpen={expanded}
       data-testid="tool-activity"
       data-live={live || undefined}
       className="group"

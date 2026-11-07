@@ -44,6 +44,7 @@ import { useModelSettings } from "./model-settings/use-model-settings";
 export function ModelSettingsOverlay({
   onClose,
   embedded = false,
+  providersOnly = false,
   scope,
   onFormStateChange,
   onRequestLeave,
@@ -51,6 +52,7 @@ export function ModelSettingsOverlay({
   onClose: () => void;
   /** Render the content only, inside the shared Settings shell's scroller. */
   embedded?: boolean;
+  providersOnly?: boolean;
   /**
    * The account's models, or the bound Space's own when it overrides them. Connections are
    * account-wide, so a Space shows only its role lists.
@@ -341,7 +343,7 @@ export function ModelSettingsOverlay({
       ) : null}
       {me ? (
         <>
-          <ModelRoleSettings
+          {providersOnly ? null : <ModelRoleSettings
             userId={me.userId}
             spaceId={me.spaceId}
             scope={scope}
@@ -357,8 +359,8 @@ export function ModelSettingsOverlay({
             panel={connectionAt === "main" ? panelFor(true) : null}
             thinking
             onChanged={() => void refresh()}
-          />
-          {me.needsModel ? null : (
+          />}
+          {providersOnly || me.needsModel ? null : (
             <SpaceBotsModelNotice
               refreshKey={`${me.spaceId}:${me.defaultProvider ?? ""}:${me.defaultModel ?? ""}`}
             />
@@ -375,6 +377,7 @@ export function ModelSettingsOverlay({
                 />
               }
               providers={allProviders}
+              showDirectory={providersOnly}
               name={connectionName}
               disabled={busy}
               onAdd={(next) => openConnection(next, null, null, "providers:add")}
@@ -396,33 +399,6 @@ export function ModelSettingsOverlay({
               panelAt={connectionAt?.slice("providers:".length) ?? null}
             />
           )}
-          <details
-            className="mt-8 rounded-xl border border-border"
-            open={connectionAt === "approval" || undefined}
-          >
-            <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Trans>Advanced</Trans>
-            </summary>
-            <div className="px-4 pb-4 pt-1">
-              <ModelRoleSettings
-                userId={me.userId}
-                spaceId={me.spaceId}
-                scope={scope}
-                credentials={credentials}
-                modelRole="approval"
-                advancedApproval
-                title={t`Approval model`}
-                defaultLabel={t`Use main model`}
-                providers={providers}
-                providerLabel={providerLabel}
-                onConnect={(next, intent) => openConnection(next, intent, null, "approval")}
-                onManage={(id, credentialId) =>
-                  openConnection({ id, name: id }, null, credentialId, "approval")
-                }
-                panel={connectionAt === "approval" ? panelFor(true) : null}
-              />
-            </div>
-          </details>
         </>
       ) : loading ? (
         <Spinner aria-label={t`Loading model catalog…`} />

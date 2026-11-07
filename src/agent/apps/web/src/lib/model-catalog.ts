@@ -1,7 +1,7 @@
 import { i18n } from "@lingui/core";
-import type { ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
+import type { Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
 import type { ConnectedModelChoice } from "@rakazo/core";
-import { connectedModelChoices } from "@rakazo/core";
+import { connectedModelChoices, resolveSelectableModelId } from "@rakazo/core";
 
 export { modelOptionKey, parseModelOptionKey } from "@rakazo/core";
 
@@ -11,6 +11,25 @@ export function connectedModelOptions(
   catalog: ModelCatalogEntry[],
 ): ConnectedModelChoice[] {
   return connectedModelChoices(credentials, catalog);
+}
+
+export function selectableCatalogEntry(
+  catalog: ModelCatalogEntry[],
+  provider: string,
+  modelId: string,
+) {
+  const id = resolveSelectableModelId(catalog, provider, modelId);
+  return catalog.find((entry) => entry.provider === provider && entry.id === id)
+    ?? catalog.find((entry) =>
+      entry.provider === provider && resolveSelectableModelId(catalog, provider, entry.id) === id,
+    );
+}
+
+export function generalChatModel(me: Me | null | undefined, catalog: ModelCatalogEntry[]) {
+  if (!me || me.needsModel || !me.defaultProvider || !me.defaultModel) return null;
+  const { defaultProvider: provider, defaultModel: modelId } = me;
+  const entry = selectableCatalogEntry(catalog, provider, modelId);
+  return { provider, modelId, entry, label: entry?.label ?? modelId };
 }
 
 export function thinkingLevelLabel(level: ThinkingLevel) {

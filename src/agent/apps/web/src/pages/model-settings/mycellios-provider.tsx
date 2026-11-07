@@ -38,7 +38,7 @@ export function MycelliosProvider({
       </div>
       <p className="mt-1 text-[13.5px] text-muted-foreground">
         <Trans>
-          Use your credits on the Mycellios network. Choose a model above. No API key needed.
+          Use your credits on the Mycellios network. Choose a model in your Mico chat. No API key needed.
         </Trans>
       </p>
       {!connected ? (

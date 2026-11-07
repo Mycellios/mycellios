@@ -54,7 +54,7 @@ import {
   computerContext,
   HEARTBEAT_MS,
   isUniqueViolation,
-  modelSetup,
+  threadNeedsModel,
   SESSION_RECHECK_MS,
   THREAD_MESSAGE_PAGE_SIZE,
 } from "./shared.js";
@@ -90,7 +90,7 @@ export function threadsRoutes(ctx: RouterContext) {
         });
         if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
         const nativeEngine = "agentEngine" in target.bot && ["codex", "claude", "acp"].includes(String(target.bot.agentEngine));
-        if (!nativeEngine && (await modelSetup(deps, context.actor)).needsModel)
+        if (!nativeEngine && await threadNeedsModel(deps, context.actor, target.bot))
           throw new ORPCError("BAD_REQUEST", { message: MODEL_REQUIRED_SEND_ERROR });
         await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
         await admitMicoTaskComputer(deps.sandbox,context.actor,target);
@@ -207,7 +207,7 @@ export function threadsRoutes(ctx: RouterContext) {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         await admitMicoTaskComputer(deps.sandbox,context.actor,target);
         if ((target.kind !== "bot" || !target.bot.agentEngine || target.bot.agentEngine === "pi") &&
-          (await modelSetup(deps, context.actor)).needsModel) {
+          await threadNeedsModel(deps, context.actor, target.kind === "bot" ? target.bot : undefined)) {
           throw new ORPCError("BAD_REQUEST", { message: MODEL_REQUIRED_SEND_ERROR });
         }
         if (target.kind === "bot") {
@@ -242,7 +242,7 @@ export function threadsRoutes(ctx: RouterContext) {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         // Without a model or while teaching, the reaction is still saved; it just starts no turn.
         const mayStartTurn =
-          !(await modelSetup(deps, context.actor)).needsModel &&
+          !(await threadNeedsModel(deps, context.actor, target.kind === "bot" ? target.bot : undefined)) &&
           (target.kind !== "bot" ||
             (await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId).then(
               () => true,

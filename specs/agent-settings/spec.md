@@ -73,3 +73,27 @@ References inspected:
 
 Production promotion retains the current skill editor. Marketplace and continuous
 voice UI are separate local candidates; their entry controls are capability-gated.
+
+## OpenBot settings comparison
+
+Reference snapshot: [OpenBot source](https://github.com/nightly-labs/openbot/tree/2bfce4ac53466bff1cb9802f3891765fecd156a2).
+Its PolyForm Noncommercial license makes it a behavioral reference. Implement
+equivalent controls through Mycellios-owned components and services.
+
+| OpenBot menu | Mycellios coverage and follow-up |
+| --- | --- |
+| General | Theme, language, density, timezone, streaming, image privacy and developer mode already exist. Added device interface size, explicit send shortcut and opt-in default expansion of tool steps. Compact message actions, chat and logo colors, external-link destination, transparent window, independent startup/background policy, quick server reconnect, wake and battery policy, workspace restoration, quit behavior and telemetry consent need separate implementation and qualification. |
+| Agents | Canonical Mico and shared skill editors remain. Account defaults with per-Mico inheritance for automations, creating chats, acknowledgement and busy-message handling need separate authorization and orchestration work. Automation limits and plan-start policy also need server enforcement. |
+| Profile | Keep name, password, passkeys and account security. Profile sharing and device session list/revocation need a Mycellios account contract, with separate treatment for managed SSO sessions. |
+| Notifications | Keep permission, message previews and per-Mico controls. Added silent system reply notifications and aligned the device test with that preference. Distinct task-completion sounds, interaction feedback and account-wide sound policy are pending. |
+| Voice | Keep existing transcription and speech connections, samples and host-gated conversation entry. Local model management, language overrides, speech speed and automatic reading defaults, live Codex voice and a voice server need capability checks against Mycellios providers. |
+| Computer use | Keep the environment and existing permission controls. OpenBot's driver setup and OS permission checks require a Mycellios-specific installer/bridge and physical tests per platform. |
+| Billing | Keep the existing Credits balance, payment and usage surfaces. Hosted-server subscriptions, payment management per server and OpenBot licensing have different ownership and billing semantics. |
+| Mobile connection | Keep same-account connection, link copying and platform install guidance. Paired device inventory, disconnect, rotating pairing links and route selection require an authenticated, revocable pairing protocol. |
+| Updates | Keep installed-version and release checks and the existing verified package workflow. Automatic installation, remote restarts and deployment track controls require signed release and updater qualification. |
+| Dock, Dynamic Island and hosted surfaces | The reference has capability-gated menus. These need platform or hosting integrations before adding Settings entries. |
+
+Models, Approvals, Space, Memory, Usage and Logs remain Mycellios settings
+with their existing scope and ownership. The new size and conversation options
+are device preferences. Notification sound follows the OS/browser policy;
+turning it off requests a silent system notification for both replies and tests.

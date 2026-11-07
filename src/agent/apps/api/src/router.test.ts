@@ -31,6 +31,7 @@ import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mainRole, withModelRoles } from "../../../packages/adapters/src/testing/model-roles.js";
 import type { RouterDeps } from "./router.js";
+import { threadNeedsModel } from "./routes/shared.js";
 import {
   botIntroPrompt,
   createRouter as createRouterWith,
@@ -561,6 +562,7 @@ describe("model setup gate", () => {
     deploymentModelConfigured?: boolean;
     deploymentModelHostCredentials?: boolean;
     deploymentModelCredentialCipher?: string;
+    modelCredentialConnected?: boolean;
   }) {
     const prisma = {
       bot: { findFirst: vi.fn().mockResolvedValue({
@@ -575,6 +577,12 @@ describe("model setup gate", () => {
         }),
       },
       userModelPreference: { findFirst: vi.fn().mockResolvedValue(null) },
+      userModelCredential: { findFirst: vi.fn().mockResolvedValue(
+        options.modelCredentialConnected ? {
+          id: "connection-1", provider: "openrouter", userId: "user-1",
+          secretId: "secret-1", label: "OpenRouter", updatedAt: new Date(0),
+        } : null,
+      ) },
       deploymentSettings: {
         findUnique: vi
           .fn()
@@ -607,7 +615,7 @@ describe("model setup gate", () => {
       email: "user@rakazo.test",
       isDeploymentOwner: true,
     } satisfies Actor;
-    return { actor, handler: new RPCHandler(createRouter(deps)) };
+    return { actor, deps, handler: new RPCHandler(createRouter(deps)) };
   }
 
   async function call(handler: RPCHandler<never>, actor: Actor, path: string, body: unknown) {
@@ -651,6 +659,13 @@ describe("model setup gate", () => {
     });
   });
 
+  it.each([true, false])("checks a Mico's connection when the account has no main model (%s)", async (connected) => {
+    const { deps, actor } = modelGateDeps({ agentRuntime: "pi", modelCredentialConnected: connected });
+    const bot = { modelProvider: "openrouter", modelId: "test-model" };
+    await expect(threadNeedsModel(deps, actor)).resolves.toBe(true);
+    await expect(threadNeedsModel(deps, actor, bot)).resolves.toBe(!connected);
+  });
+
   it("does not require a model credential for the scripted test runtime", async () => {
     const { actor, handler } = modelGateDeps({ agentRuntime: "scripted" });
 
@@ -682,7 +697,12 @@ describe("model setup gate", () => {
     });
     const response = await call(handler, actor, "me", null);
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ json: expect.objectContaining({ needsModel: true }) });
+    await expect(response.json()).resolves.toEqual({
+      json: expect.objectContaining({ needsModel: true, defaultProvider: null, defaultModel: null }),
+    });
+    const role = await call(handler, actor, "models/role", { role: "main" });
+    expect(role.status).toBe(200);
+    expect((await role.json()).json).toMatchObject({ primary: null, deploymentPrimary: null });
   });
 
   it("names the provider the deployment default runs on with host credentials", async () => {

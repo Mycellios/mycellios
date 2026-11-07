@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Space } from "@rakazo/contracts";
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import { Badge, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
@@ -87,7 +87,7 @@ export function SidebarHeader({
   return (
     <div
       data-testid="sidebar-topbar"
-      className={`${hasWindowChrome ? "app-drag" : ""} rk-sidebar-topbar flex shrink-0 items-center gap-1 ${mini ? "flex-col px-1 py-2" : "justify-between px-2"} ${hasWindowChrome && desktopBridge()?.platform !== "win32" ? mini ? "pt-14" : "ps-12" : ""}`}
+      className={`${hasWindowChrome ? "app-drag" : ""} rk-sidebar-topbar flex shrink-0 items-center gap-1 ${mini ? "flex-col px-1 py-2" : "px-2"} ${hasWindowChrome && desktopBridge()?.platform !== "win32" ? mini ? "pt-14" : "ps-12" : ""}`}
     >
       {!mini ? <Popover open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
         <PopoverTrigger className="app-no-drag flex h-8 min-w-0 items-center gap-2 rounded-md px-1.5 text-sm font-medium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring" aria-label={t`Switch workspace`}>
@@ -105,7 +105,8 @@ export function SidebarHeader({
           <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setNewSpaceOpen(true); }}><Plus size={15} />{t`New space`}</Button>
         </PopoverContent> : null}
       </Popover> : null}
-      <div className={`relative flex shrink-0 items-center gap-0.5 ${mini ? "flex-col" : ""}`}>
+      {!mini ? <Badge variant="outline" className="h-4 px-1.5 text-[10px] text-muted-foreground">Beta</Badge> : null}
+      <div className={`relative flex shrink-0 items-center gap-0.5 ${mini ? "flex-col" : "ms-auto"}`}>
         {!mini ? <div className="hidden items-center md:flex">
           <IconTooltip label={t`Back`}><Button variant="ghost" size="icon-sm" className="app-no-drag size-7" aria-label={t`Back`} disabled={!history.canBack} onClick={history.back}><ArrowLeft size={15} /></Button></IconTooltip>
           <IconTooltip label={t`Forward`}><Button variant="ghost" size="icon-sm" className="app-no-drag size-7" aria-label={t`Forward`} disabled={!history.canForward} onClick={history.forward}><ArrowRight size={15} /></Button></IconTooltip>

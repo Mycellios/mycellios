@@ -1,11 +1,11 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
 import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey, resolveSelectableModelId } from "@rakazo/core";
-import { Button, NativeSelect, NativeSelectOption, Popover, PopoverContent, PopoverTrigger, Spinner } from "@rakazo/ui-web";
+import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner } from "@rakazo/ui-web";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { useId, useRef, useState } from "react";
-import { thinkingLevelLabel } from "../../lib/model-catalog";
+import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "../../lib/model-catalog";
 import { useSpaceQueries } from "../../lib/query";
 import { errorText } from "../../lib/user-error";
 import { useCompatibleRoleCatalog } from "../model-settings/use-compatible-role-catalog";
@@ -15,7 +15,7 @@ const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
 export type ChatModelPatch = Pick<Bot, "modelProvider" | "modelId" | "thinkingLevel">;
 
-export function ChatHeaderModel({ bot, me, onSave, onConnections, recovery = false }: {
+export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, recovery = false }: {
   bot: Bot;
   me: Me | null | undefined;
   onSave: (patch: ChatModelPatch) => Promise<void>;
@@ -29,20 +29,32 @@ export function ChatHeaderModel({ bot, me, onSave, onConnections, recovery = fal
   const busy = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const queries = useSpaceQueries();
+  const meQuery = useQuery({ ...queries.me.queryOptions(), enabled: Boolean(initialMe) });
+  const me = meQuery.data ?? initialMe;
   const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), enabled: open });
   const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), enabled: open });
   const credentials = credentialsQuery.data ?? EMPTY_CREDENTIALS;
   const catalog = catalogQuery.data ?? EMPTY_CATALOG;
   const network = useCompatibleRoleCatalog(credentials, me?.userId ?? "", me?.spaceId ?? "", open && Boolean(me), true);
-  const provider = bot.modelProvider ?? me?.defaultProvider;
-  const model = bot.modelId ?? me?.defaultModel;
-  const effectiveId = provider && model ? resolveSelectableModelId(catalog, provider, model) : model;
-  const entry = catalog.find(item => item.provider === provider && resolveSelectableModelId(catalog, item.provider, item.id) === effectiveId);
+  const general = generalChatModel(me, catalog);
+  const override = bot.modelProvider && bot.modelId
+    ? { provider: bot.modelProvider, modelId: bot.modelId }
+    : null;
+  const provider = override?.provider ?? general?.provider;
+  const model = override?.modelId ?? general?.modelId;
+  const effectiveId = provider && model ? resolveSelectableModelId(catalog, provider, model) : null;
+  const entry = provider && model ? selectableCatalogEntry(catalog, provider, model) : undefined;
   const credential = credentialForModel(credentials, provider ?? null, effectiveId ?? null);
   const levels = (credential?.thinkingLevels ?? entry?.thinkingLevels ?? []).filter(level => level !== "off");
   const value = bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, resolveSelectableModelId(catalog, bot.modelProvider, bot.modelId)) : "";
-  const choices = chatModelChoices(connectedModelChoices(network.credentials, catalog), value, t`Use general model`, entry?.images);
-  const label = recovery ? t`Change model` : entry?.label ?? model ?? t`Model`;
+  const inheritLabel = t`Use general model`;
+  const choices = chatModelChoices(
+    connectedModelChoices(network.credentials, catalog),
+    value,
+    general ? `${inheritLabel} · ${general.label}` : inheritLabel,
+    general?.entry?.images,
+  ).filter((choice) => choice.key || general || !me?.needsModel);
+  const label = recovery ? t`Change model` : entry?.label ?? model ?? (me?.needsModel ? t`Choose a model` : t`Model`);
   const queryError = credentialsQuery.error ?? catalogQuery.error;
 
   async function save(patch: ChatModelPatch) {
@@ -61,20 +73,27 @@ export function ChatHeaderModel({ bot, me, onSave, onConnections, recovery = fal
           <span className="truncate">{label}</span><ChevronDown size={12} className="shrink-0" />
         </PopoverTrigger>
         {open ? <PopoverContent align="end" className="app-no-drag w-80 max-w-[calc(100vw-24px)] gap-3 p-3">
-          <label htmlFor={`${id}-model`} className="text-xs font-medium">{t`Model`}</label>
+          {recovery ? <label htmlFor={`${id}-model`} className="text-xs font-medium">{t`Model`}</label> : <span className="text-xs font-medium">{t`Model`}</span>}
           {recovery ? <p className="text-xs text-muted-foreground">{t`This changes the model for this Mico. Your message stays in the chat.`}</p> : null}
           {credentialsQuery.isPending || catalogQuery.isPending ? <Spinner className="size-4" /> : queryError ? <p role="alert" className="text-xs text-destructive">{errorText(queryError)}</p> :
             <fieldset disabled={saving} className="min-w-0 [&>div]:mt-0 [&>button]:mt-0">
-              <ChatModelPicker id={`${id}-model`} choices={choices} value={value} onChange={key => {
+              <ChatModelPicker id={`${id}-model`} choices={choices} value={value} inline={!recovery} onChange={key => {
                 const selected = key ? parseModelOptionKey(key) : null;
                 void save({ modelProvider: selected?.provider ?? null, modelId: selected?.modelId ?? null, thinkingLevel: null });
               }} />
             </fieldset>}
           {!recovery && levels.length ? <label className="flex items-center justify-between gap-3 text-xs">{t`Thinking`}
-            <NativeSelect aria-label={t`Thinking`} value={bot.thinkingLevel ?? ""} disabled={saving} onChange={event => void save({ modelProvider: bot.modelProvider, modelId: bot.modelId, thinkingLevel: (event.target.value || null) as ThinkingLevel | null })}>
-              <NativeSelectOption value="">{t`Default`}</NativeSelectOption>
-              {levels.map(level => <NativeSelectOption key={level} value={level}>{thinkingLevelLabel(level)}</NativeSelectOption>)}
-            </NativeSelect>
+            <OptionSelect
+              aria-label={t`Thinking`}
+              className="w-32"
+              value={bot.thinkingLevel ?? ""}
+              disabled={saving}
+              options={[
+                { value: "", label: t`Default` },
+                ...levels.map((level) => ({ value: level, label: thinkingLevelLabel(level) })),
+              ]}
+              onValueChange={(value) => void save({ modelProvider: bot.modelProvider, modelId: bot.modelId, thinkingLevel: (value || null) as ThinkingLevel | null })}
+            />
           </label> : null}
           {saving ? <Spinner className="size-4" /> : null}
           {error ? <p role="alert" className="text-xs text-destructive">{error}</p> : null}

@@ -376,7 +376,7 @@ describe("activity mark", () => {
     const shown = () => container.querySelector("[data-fill]")?.getAttribute("data-fill");
     expect(shown()).toBe("#286fc3");
     act(() => vi.advanceTimersByTime(2000));
-    expect(shown()).toBe("#FF781C");
+    expect(shown()).toBe("#ffcea2");
   });
 
   it("stops cycling members and pulsing photo dots on a covered screen, and resumes on return", () => {

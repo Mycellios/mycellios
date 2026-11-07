@@ -1,4 +1,4 @@
-export type ToolActivityPreference = "on" | "off";
+export type ToolActivityPreference = "on" | "off" | "expanded";
 
 export const TOOL_ACTIVITY_STORAGE_KEY = "rakazo.showToolActivity";
 
@@ -31,15 +31,16 @@ function notify() {
   for (const listener of listeners) listener();
 }
 
-/** Only a saved "on" shows tool cards. Missing or unreadable storage stays off so chats stay clean. */
+/** Missing or unreadable storage stays off so chats stay clean. */
 export function normalizeToolActivityPreference(
   raw: string | null | undefined,
 ): ToolActivityPreference {
-  return raw?.trim().toLowerCase() === "on" ? "on" : "off";
+  const value = raw?.trim().toLowerCase();
+  return value === "on" || value === "expanded" ? value : "off";
 }
 
 export function toolActivityEnabled(preference: ToolActivityPreference = "off"): boolean {
-  return preference === "on";
+  return preference !== "off";
 }
 
 export function resolveToolActivityPreference(
@@ -70,6 +71,10 @@ export function getToolActivityPreference(): ToolActivityPreference {
 
 export function getToolActivityEnabled(): boolean {
   return toolActivityEnabled(getToolActivityPreference());
+}
+
+export function getToolActivityExpanded(): boolean {
+  return getToolActivityPreference() === "expanded";
 }
 
 export function setToolActivityPreference(

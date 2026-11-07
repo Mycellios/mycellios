@@ -12,7 +12,7 @@ async function pickModel(page: Page, search: string, label: string) {
     .click();
 }
 
-test("approval models reuse connections and persist independent fallbacks", async ({
+test("main model settings preserve the saved approval role", async ({
   page,
 }, testInfo) => {
   test.setTimeout(45_000);
@@ -30,30 +30,18 @@ test("approval models reuse connections and persist independent fallbacks", asyn
     apiKey: "fake-role-api-key",
     modelId: main.id,
   });
-  const original = await rpc<ModelRoleSettings>(page, "models/role", { role: "main" });
+  await rpc(page, "models/setRole", {
+    role: "approval",
+    primary: { provider: "openrouter", modelId: "typesafe/jev-1.14" },
+    backups: [{ provider: "openrouter", modelId: main.id }],
+  });
+  const approval = await rpc<ModelRoleSettings>(page, "models/role", { role: "approval" });
+  expect(approval.primary?.modelId).toBe("typesafe/jev-1.14");
+  expect(approval.backups).toHaveLength(1);
   await page.reload();
   await openUserSettings(page, "models");
+  await expect(page.getByTestId("model-role-approval")).toHaveCount(0);
 
-  const approval = page.getByTestId("model-role-approval");
-  // The empty first row names the deployment's own approval model.
-  await expect(approval.getByTestId("model-role-default")).toContainText("OpenRouter");
-  await approval.getByRole("button", { name: "Change Approval model", exact: true }).click();
-  await pickModel(page, "Jev 1.14", "Jev 1.14");
-  await expect(approval.getByTestId("model-role-row-1")).toContainText("Jev 1.14");
-  await expect
-    .poll(
-      async () =>
-        (await rpc<ModelRoleSettings>(page, "models/role", { role: "approval" })).primary?.modelId,
-    )
-    .toBe("typesafe/jev-1.14");
-  await approval.getByRole("button", { name: "Add fallback", exact: true }).click();
-  await pickModel(page, main.label, main.label);
-  await expect(approval.getByTestId("model-role-row-2")).toContainText(main.label);
-  expect(await rpc<ModelRoleSettings>(page, "models/role", { role: "main" })).toEqual(original);
-  await approval.scrollIntoViewIfNeeded();
-  await captureScreenshot(page, testInfo, "approval-model-with-backup");
-
-  // The main list takes its own fallback without touching the approval list.
   const mainList = page.getByTestId("model-role-main");
   await expect(mainList.getByTestId("model-role-row-1")).toContainText(main.label);
   await mainList.getByRole("button", { name: "Add fallback", exact: true }).click();
@@ -66,12 +54,7 @@ test("approval models reuse connections and persist independent fallbacks", asyn
   await captureScreenshot(page, testInfo, "model-settings-roles");
 
   await page.reload();
-  await expect(
-    page.getByTestId("model-role-approval").getByTestId("model-role-row-1"),
-  ).toContainText("Jev 1.14");
-  await expect(
-    page.getByTestId("model-role-approval").getByTestId("model-role-row-2"),
-  ).toContainText(main.label);
+  expect(await rpc<ModelRoleSettings>(page, "models/role", { role: "approval" })).toEqual(approval);
   await expect(page.getByTestId("model-role-main").getByTestId("model-role-row-2")).toContainText(
     fallback.label,
   );

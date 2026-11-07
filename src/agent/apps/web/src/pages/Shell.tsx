@@ -1110,17 +1110,19 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const deliverBrowserNotification = useCallback((pending: PendingBrowserNotification): boolean => {
     const currentBot = botsRef.current.find((bot) => bot.id === pending.botId);
     if (!currentBot || typeof Notification === "undefined") return true;
+    const preferences = notificationPreferences(userId ?? "");
     const result = deliverNativeBrowserNotification(
       pending.event,
       currentBot.name || pending.botName,
       {
-        enabled: notificationPreferences(userId ?? "").enabled && (pending.groupNotification || currentBot.notifyOnFinish),
-        preview: notificationPreferences(userId ?? "").preview,
+        enabled: preferences.enabled && (pending.groupNotification || currentBot.notifyOnFinish),
+        preview: preferences.preview,
         pageVisible: document.visibilityState === "visible",
         windowFocused: document.hasFocus(),
         permission: Notification.permission,
         notifiedEventIds: notifiedBrowserEvents.current,
-        show: (title, body, tag) => new Notification(title, { body, tag }),
+        show: (title, body, tag) =>
+          new Notification(title, { body, tag, ...(!preferences.sound ? { silent: true } : {}) }),
       },
     );
     return result !== "pending";
@@ -4061,7 +4063,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   }} />
               </> : null}
               {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
-              {bootstrapMe?.phoneCallsEnabled && !inGroup && active && !taskScope ? (
+              {!inGroup && active && !taskScope ? (
                 <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
                   <Button
                     variant="floating"
@@ -4073,7 +4075,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                         setCallMinimized(false);
                         return;
                       }
-                      callBot(active);
+                      if (bootstrapMe?.phoneCallsEnabled) callBot(active);
+                      else chatTools.onVoice?.();
                     }}
                     data-active={call?.botId === active.id ? "" : undefined}
                     className="app-no-drag"

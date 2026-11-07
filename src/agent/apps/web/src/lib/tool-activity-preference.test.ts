@@ -12,6 +12,7 @@ describe("tool activity preference", () => {
     expect(normalizeToolActivityPreference("on")).toBe("on");
     expect(normalizeToolActivityPreference("ON")).toBe("on");
     expect(normalizeToolActivityPreference(" on ")).toBe("on");
+    expect(normalizeToolActivityPreference("expanded")).toBe("expanded");
     expect(normalizeToolActivityPreference("off")).toBe("off");
     expect(normalizeToolActivityPreference("OFF")).toBe("off");
     expect(normalizeToolActivityPreference(null)).toBe("off");

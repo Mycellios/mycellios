@@ -82,9 +82,15 @@ describe("ChatModelPicker", () => {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
-  it("keeps the native select for a short list", () => {
-    render(choices(9), "");
-    expect(container.querySelector("select")?.options).toHaveLength(10);
+  it("uses the themed menu for a short list and preserves the inherited option", async () => {
+    render(choices(9), "openrouter::vendor/model-1");
+    const trigger = container.querySelector<HTMLButtonElement>("button#model")!;
+    expect(trigger.textContent).toBe("Model 1 (OpenRouter)");
+    await act(async () => trigger.click());
+    expect(options()).toHaveLength(10);
+    expect(options()[1]?.getAttribute("aria-selected")).toBe("true");
+    await act(async () => (options()[0] as HTMLElement).click());
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("");
   });
 
   it("marks a short list's selected model when it cannot read images", () => {
@@ -92,7 +98,7 @@ describe("ChatModelPicker", () => {
       index === 1 ? { ...choice, images: false } : { ...choice, images: true },
     );
     render(list, "openrouter::vendor/model-1");
-    const select = container.querySelector("select")!;
+    const select = container.querySelector("button#model")!;
     const hint = () => document.getElementById(select.getAttribute("aria-describedby") ?? "");
     expect(container.querySelector('[title="Can\'t read images"]')).not.toBeNull();
     expect(hint()?.textContent).toBe("Can't read images");

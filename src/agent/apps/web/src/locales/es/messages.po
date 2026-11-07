@@ -7059,8 +7059,8 @@ msgstr "Conectado con tu cuenta"
 msgid "Could not connect Mycellios. Try again. No credits were spent."
 msgstr "No se ha podido conectar Mycellios. Vuelve a intentarlo. No se han gastado créditos."
 
-msgid "Use your credits on the Mycellios network. Choose a model above. No API key needed."
-msgstr "Usa tus créditos en la red Mycellios. Elige un modelo arriba. No necesitas una clave de API."
+msgid "Use your credits on the Mycellios network. Choose a model in your Mico chat. No API key needed."
+msgstr "Usa tus créditos en la red Mycellios. Elige un modelo en el chat de tu Mico. No necesitas una clave de API."
 
 msgid "Retry connection"
 msgstr "Reintentar conexión"
@@ -9447,3 +9447,27 @@ msgstr "Crear tarea"
 #: src/components/LocalProject.tsx
 msgid "Available to this Mico on this PC."
 msgstr "Disponible para este Mico en este PC."
+
+msgid "Interface size"
+msgstr "Tamaño de la interfaz"
+
+msgid "Send shortcut"
+msgstr "Atajo para enviar"
+
+msgid "Enter to send"
+msgstr "Enter para enviar"
+
+msgid "Ctrl/⌘ + Enter to send"
+msgstr "Ctrl/⌘ + Enter para enviar"
+
+msgid "Expand agent steps by default"
+msgstr "Desplegar los pasos del agente por defecto"
+
+msgid "Notification sound"
+msgstr "Sonido de notificaciones"
+
+msgid "Connected providers"
+msgstr "Proveedores conectados"
+
+msgid "Other providers"
+msgstr "Otros proveedores"

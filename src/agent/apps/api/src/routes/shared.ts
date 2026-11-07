@@ -1,12 +1,13 @@
 import type { AdapterContext } from "@rakazo/adapter-kit";
 import {
   deploymentModelRole,
+  findConnectedModelCredential,
   hasHostedModelCredits,
   hostCredentialSource,
   resolveMemberMainModel,
 } from "@rakazo/adapters";
 import type { Actor, Me } from "@rakazo/contracts";
-import { attachmentMaxBytes, canonicalPiProviderId } from "@rakazo/contracts";
+import { attachmentMaxBytes, canonicalPiProviderId, usableModelId } from "@rakazo/contracts";
 import type { RouterDeps } from "../router.js";
 
 export function computerContext(actor: Actor, botId: string, operationId: string): AdapterContext {
@@ -44,11 +45,12 @@ export async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
     spaceId: actor.spaceId,
     isDeploymentOwner: false,
     needsModel: setup.needsModel,
-    defaultProvider: canonicalPiProviderId(setup.model?.provider ?? deps.env.defaultProvider),
-    defaultModel: setup.model?.modelId ?? deps.env.defaultModel,
+    defaultProvider: setup.model ? canonicalPiProviderId(setup.model.provider) : null,
+    defaultModel: setup.model?.modelId ?? null,
     // Set only while the active default is the deployment's own, running on host credentials.
     ...hostCredentials(
-      !setup.main &&
+      Boolean(setup.deployment) &&
+        !setup.main &&
         !setup.settings?.defaultModelProvider &&
         Boolean(deps.env.deploymentModelHostCredentials),
       deps.env.defaultProvider,
@@ -63,6 +65,24 @@ export async function meDto(deps: RouterDeps, actor: Actor): Promise<Me> {
     // Only billing deployments ask; self-hosted installs never see the survey.
     needsSignupSurvey: Boolean(deps.billing) && !user.signupSurvey,
   };
+}
+
+/** A direct Mico can use its own connection without an account-level model. */
+export async function threadNeedsModel(
+  deps: RouterDeps,
+  actor: Actor,
+  bot?: { modelProvider?: string | null; modelId?: string | null },
+): Promise<boolean> {
+  if (!(await modelSetup(deps, actor)).needsModel) return false;
+  const provider = bot?.modelProvider && canonicalPiProviderId(bot.modelProvider);
+  const modelId = usableModelId(bot?.modelId);
+  if (!provider || !modelId) return true;
+  if (
+    deps.billing?.modelCreditsEnabled &&
+    provider === canonicalPiProviderId(deps.env.defaultProvider) &&
+    (await hasHostedModelCredits(deps.prisma, actor, provider))
+  ) return false;
+  return !(await findConnectedModelCredential(deps.prisma, deps.secrets, actor, provider, modelId));
 }
 
 function computerHostFor(
@@ -95,16 +115,19 @@ export async function modelSetup(deps: RouterDeps, actor: Actor) {
     !deps.env.mycelliosSso &&
     Boolean(deps.env.deploymentModelConfigured) &&
     (!funding?.creditPurchasesEnabled || funding.funding === "credits");
+  const deployment =
+    hasDeployment || deps.env.agentRuntime === "scripted"
+      ? deploymentModelRole("main", {
+          settings,
+          deployment: { provider: deps.env.defaultProvider, model: deps.env.defaultModel },
+        }).primary
+      : null;
   return {
     main,
-    model:
-      main ??
-      deploymentModelRole("main", {
-        settings,
-        deployment: { provider: deps.env.defaultProvider, model: deps.env.defaultModel },
-      }).primary,
+    deployment,
+    model: main ?? deployment,
     settings,
-    needsModel: deps.env.agentRuntime !== "scripted" && !main && !hasDeployment,
+    needsModel: deps.env.agentRuntime !== "scripted" && !main && !deployment,
   };
 }
 

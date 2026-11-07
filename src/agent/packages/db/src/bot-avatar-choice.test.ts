@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { BOT_ID_ATTEMPTS, chooseBotAvatar, chooseMicoAvatar, pickLeastUsed } from "./bot-avatar-choice.js";
 
 it("assigns every branded shape and palette combination before repeating", () => {
-  const existing = [{ color: "#8650DF::shape_0" }, { color: "data:image/png;base64,abc" }];
+  const existing = [{ color: "#123456::shape_0" }, { color: "data:image/png;base64,abc" }];
   const colors = Array.from({ length: 144 }, () => {
     const { color } = chooseMicoAvatar(existing);
     existing.push({ color });

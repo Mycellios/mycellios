@@ -407,12 +407,14 @@
   authentication failures. Keep prompts and tool payloads out of this view.
 
 - An unset approval model follows the effective main model and its connection in
-  the same account/Space scope. Keep explicit approval choices intact; the web
-  approval section lives under the single Advanced group at the bottom of model
-  settings, retaining its explanation next to the title inside that group.
+  the same account/Space scope. Preserve existing explicit approval choices and
+  the server-side review policy. Settings > Models exposes chat models and
+  providers, while Settings > Approvals owns the permission rules.
 
-- Each agent has a visible model picker outside Advanced. A blank choice inherits
-  the general model; a specific choice updates only that bot, never Space defaults.
+- Each Mico has a searchable model picker in the chat header. Account Settings
+  > Models manages provider connections. Preserve saved account and Space model
+  defaults and fallbacks. A specific choice updates only that Mico and can run
+  with its own connection even if the account has no general model.
 - Provider forms manage connections and keys; model selection belongs to the role
   picker. Connecting a provider never changes a role. Discover compatible catalogs
   using the owned saved credential; enable a newly chosen model before saving its

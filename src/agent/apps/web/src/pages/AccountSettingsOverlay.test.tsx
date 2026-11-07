@@ -72,8 +72,16 @@ vi.mock("@rakazo/ui-web", async (importOriginal) => ({
   ToggleGroupItem: ({ children }: { children?: ReactNode }) => (
     <button type="button">{children}</button>
   ),
-  OptionSelect: ({ "data-testid": testId }: { "data-testid"?: string }) => (
-    <div data-testid={testId} />
+  OptionSelect: ({ id, value, options, onValueChange, "data-testid": testId }: {
+    id?: string;
+    value: string | null;
+    options: { value: string; label: string }[];
+    onValueChange: (value: string) => void;
+    "data-testid"?: string;
+  }) => (
+    <select id={id} value={value ?? ""} data-testid={testId} onChange={(event) => onValueChange(event.target.value)}>
+      {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+    </select>
   ),
   cn: (...values: unknown[]) => values.filter(Boolean).join(" "),
 }));
@@ -283,20 +291,18 @@ it("updates the Enter preference from Settings and reflects external changes", a
     await act(async () => {
       root.render(<GeneralSettingsPanels name="Test" />);
     });
-    const toggle = container.querySelector<HTMLButtonElement>(
-      '[data-testid="composer-enter-to-send-toggle"]',
-    );
-    if (!toggle) throw new Error("Missing Enter preference");
-    expect(container.querySelector(`label[for="${toggle.id}"]`)?.textContent).toBe(
-      "Send with Enter",
-    );
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
-    await act(async () => toggle.click());
+    const select = container.querySelector<HTMLSelectElement>('[data-testid="composer-send-shortcut"]')!;
+    expect(container.querySelector(`label[for="${select.id}"]`)?.textContent).toBe("Send shortcut");
+    expect(select.value).toBe("enter");
+    await act(async () => {
+      select.value = "modified";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
     expect(getComposerEnterToSend()).toBe(false);
     expect(localStorage.getItem(COMPOSER_ENTER_TO_SEND_STORAGE_KEY)).toBe("0");
-    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(select.value).toBe("modified");
     await act(async () => setComposerEnterToSend(true));
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(select.value).toBe("enter");
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
