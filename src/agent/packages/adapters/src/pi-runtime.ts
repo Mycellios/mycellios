@@ -75,7 +75,7 @@ import { createContextCompactor, isContextOverflow } from "./context-compaction.
 import { ModelImageLimitError, pruneForRebuild } from "./context-pruning.js";
 import { estimateContextTokens, shortenToolResultText } from "./context-selection.js";
 import { DEFAULT_OPENROUTER_MODEL_ID } from "./deployment-model.js";
-import { groqRequestContextWindow } from "./groq-request-budget.js";
+import { groqInitialRequestWindow, groqRequestContextWindow } from "./groq-request-budget.js";
 import { estimateModelContextTokens, modelContextForAdmission } from "./model-context.js";
 import { IMAGE_RETURNING_COMPUTER_TOOLS } from "./model-vision.js";
 import {
@@ -1226,6 +1226,13 @@ function configuredOpenRouterModel(
   };
 }
 
+function modelWithProviderRequestBudget(model: Model<Api>): Model<Api> {
+  const window = groqInitialRequestWindow(model.provider, model.id);
+  if (window === undefined) return model;
+  const contextWindow = Math.min(window, model.contextWindow);
+  return { ...model, contextWindow, maxTokens: effectiveOutputReserve(contextWindow, model.maxTokens) };
+}
+
 export function resolveRuntimeModel(modelConfig: AgentRunRequest["model"]): {
   provider: string;
   modelId: string;
@@ -1236,7 +1243,7 @@ export function resolveRuntimeModel(modelConfig: AgentRunRequest["model"]): {
   credentials: PiRuntimeCredentialStore | undefined;
 } {
   if (modelConfig.desktopTransport) {
-    const model = modelConfig.desktopTransport.model as unknown as Model<Api>;
+    const model = modelWithProviderRequestBudget(modelConfig.desktopTransport.model as unknown as Model<Api>);
     return { provider: model.provider, modelId: model.id, models: desktopModelCatalog(catalogModels(), modelConfig), model, apiKey: "account-scoped-transport", credentials: undefined };
   }
   const provider = canonicalPiProviderId(
@@ -1278,7 +1285,7 @@ export function resolveRuntimeModel(modelConfig: AgentRunRequest["model"]): {
         // another provider would ship our key to a vendor it was not issued for.
         (modelConfig.apiKey ??
         (provider === "openrouter" ? process.env.OPENROUTER_API_KEY : undefined));
-  return { provider, modelId, models, model, apiKey, credentials };
+  return { provider, modelId, models, model: model && modelWithProviderRequestBudget(model), apiKey, credentials };
 }
 
 function credentialStoreForRequest(

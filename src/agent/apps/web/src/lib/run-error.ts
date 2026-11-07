@@ -62,6 +62,12 @@ export const translateRunError: RunErrorTranslator = (message, values) => {
         message: "The model provider returned an error.",
         values,
       });
+    case "{provider} rejected this request because it exceeds the plan's tokens-per-minute limit. Choose another model.":
+      return i18n._({
+        id: "{provider} rejected this request because it exceeds the plan's tokens-per-minute limit. Choose another model.",
+        message: "{provider} rejected this request because it exceeds the plan's tokens-per-minute limit. Choose another model.",
+        values,
+      });
     case "{provider} is rate limiting requests. Try again shortly.":
       return i18n._({
         id: "{provider} is rate limiting requests. Try again shortly.",

@@ -5156,6 +5156,9 @@ msgstr "esta computadora"
 msgid "The request did not fit the model's context. Retry or choose a model with a larger context."
 msgstr "La petición no cabe en el contexto del modelo. Reintenta o elige un modelo con más capacidad."
 
+msgid "{provider} rejected this request because it exceeds the plan's tokens-per-minute limit. Choose another model."
+msgstr "{provider} rechazó la petición porque supera el límite de tokens por minuto del plan. Elige otro modelo."
+
 #. placeholder {0}: pendingDelete.versionCount
 #: src/pages/Artifacts.tsx
 msgid "This deletes all {0} versions of this artifact. This can't be undone."
