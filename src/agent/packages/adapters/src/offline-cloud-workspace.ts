@@ -15,7 +15,7 @@ type Assignment = { id: string; scope: string; kind: string } | null;
 
 export async function selectOfflineCloudWorkspace(
   prisma: PrismaClient,
-  sandbox: SandboxProvider,
+  sandbox: SandboxProvider | undefined,
   run: Run,
   assignment: Assignment,
   lease: { workerId: string; fence: number },
@@ -28,9 +28,9 @@ export async function selectOfflineCloudWorkspace(
   }
 
   // A new message may choose a different host. An interrupted run must keep its host.
-  if (run.startedAt || run.checkpoint || (assignment && assignment.kind !== "desktop")) return;
+  if (!sandbox?.provisionKind || run.startedAt || run.checkpoint || (assignment && assignment.kind !== "desktop")) return;
   const provider = sandbox.describe().id;
-  if (!sandbox.provisionKind || provider === "none" || provider === "desktop") return;
+  if (provider === "none" || provider === "desktop") return;
   const context: AdapterContext = {
     operationId: run.id, traceId: run.id, runId: run.id, spaceId, userId, botId,
     signal: AbortSignal.timeout(5_000),

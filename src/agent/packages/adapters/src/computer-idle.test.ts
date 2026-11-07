@@ -643,7 +643,13 @@ describe("maximum active lifetime", () => {
 
       expect(harness.prisma.run.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { bot: { computerId: harness.computer.id }, status: "waiting_takeover" },
+          where: {
+            OR: [
+              { cloudComputerId: harness.computer.id },
+              { cloudComputerId: null, bot: { computerId: harness.computer.id } },
+            ],
+            status: "waiting_takeover",
+          },
         }),
       );
       expect(harness.sandbox.stop).not.toHaveBeenCalled();
