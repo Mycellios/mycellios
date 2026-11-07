@@ -2,7 +2,6 @@ name: Desktop Linux release package
 on:
   push:
     branches: ['codex/desktop-linux-release-*']
-    paths: ['.github/workflows/desktop-linux-release.yml']
   workflow_dispatch:
 permissions:
   contents: read
