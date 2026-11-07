@@ -81,6 +81,8 @@
   uninstaller, registration and shortcut recovery, and never moves userData.
   Qualify compact-resources, fast-install, the real local server and timed NSIS
   legacy upgrades; report hosted timing separately from physical-PC acceptance.
+  Windows local PostgreSQL uses bounded pg_ctl readiness and exit status with
+  ignored process pipes. Keep the profile lock if shutdown fails.
   desktop-windows-release.yml builds
   release branches/manual runs without publishing. A matching integrated Desktop
   tag can publish, or desktop-windows-promote.yml can promote an already-qualified

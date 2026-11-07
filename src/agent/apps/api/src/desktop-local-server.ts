@@ -1,5 +1,6 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -138,6 +139,8 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     recovering = true;
   }
   const databaseDir = join(config.dataDir, "postgres");
+  const postmasterFile = join(databaseDir, "postmaster.pid");
+  const postgresFlags = ["-h", "127.0.0.1", "-c", "max_connections=30", "-c", "shared_buffers=32MB"];
   const postgresControl = async (...args: string[]) => {
     const require = createRequire(import.meta.resolve("embedded-postgres"));
     const binaries = (await import(
@@ -147,7 +150,15 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
         ),
       ).href
     )) as { pg_ctl: string };
-    await runFile(binaries.pg_ctl, ["-D", databaseDir, ...args]);
+    const command = ["-D", databaseDir, ...args];
+    if (process.platform === "win32") {
+      // A Windows server can inherit the controller's pipes after pg_ctl has exited.
+      const child = spawn(binaries.pg_ctl, command, { windowsHide: true, stdio: "ignore" });
+      const [code] = await once(child, "exit");
+      if (code !== 0) throw new Error(`Local PostgreSQL control failed (exit ${code ?? "unknown"})`);
+    } else {
+      await runFile(binaries.pg_ctl, command);
+    }
   };
   const postgres = new EmbeddedPostgres({
     databaseDir,
@@ -160,7 +171,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     onLog: () => undefined,
     onError: () => undefined,
     initdbFlags: ["--encoding=UTF8", "--locale=C"],
-    postgresFlags: ["-h", "127.0.0.1", "-c", "max_connections=30", "-c", "shared_buffers=32MB"],
+    postgresFlags,
   });
   let stopApp: (() => Promise<void>) | undefined;
   let closeHttp: (() => Promise<void>) | undefined;
@@ -170,21 +181,33 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     stopped = true;
     await closeHttp?.().catch(() => undefined);
     await stopApp?.().catch(() => undefined);
-    // pg_ctl requests an orderly checkpoint on Windows too; the package's Windows stop force-kills.
-    try {
-      await postgresControl("-m", "fast", "-w", "stop");
-    } catch {
-      await postgres.stop();
+    // Keep the profile lock if its Windows cluster cannot be stopped.
+    if (process.platform === "win32") {
+      if (existsSync(postmasterFile)) await postgresControl("-m", "fast", "-w", "-t", "60", "stop");
+    } else {
+      try {
+        await postgresControl("-m", "fast", "-w", "stop");
+      } catch {
+        await postgres.stop();
+      }
     }
     await rm(lockFile, { force: true });
   };
   try {
-    if (recovering && existsSync(join(databaseDir, "postmaster.pid")))
+    if (recovering && existsSync(postmasterFile))
       await postgresControl("-m", "fast", "-w", "stop").catch(() => undefined);
     diagnostic("database-initialize");
     if (!existsSync(join(databaseDir, "PG_VERSION"))) await postgres.initialise();
     diagnostic("database-start");
-    await postgres.start();
+    if (process.platform === "win32") {
+      // pg_ctl observes server readiness independently of the native log stream.
+      await postgresControl(
+        "-w", "-t", "60", "-l", join(databaseDir, "server.log"),
+        "-o", ["-p", String(databasePort), ...postgresFlags].join(" "), "start",
+      );
+    } else {
+      await postgres.start();
+    }
     diagnostic("database-connect");
     const client = postgres.getPgClient("postgres", "127.0.0.1");
     await client.connect();
@@ -275,7 +298,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     diagnostic("ready");
     return { origin, close, prisma };
   } catch (error) {
-    await close();
+    await close().catch(() => diagnostic("database-cleanup-failed"));
     throw error;
   }
 }
