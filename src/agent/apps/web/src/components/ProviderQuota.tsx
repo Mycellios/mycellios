@@ -119,12 +119,10 @@ function QuotaContent({
       /* Session preferences still work. */
     }
   }
-  const accounts = data?.accounts ?? [];
+  const accounts = data?.accounts.filter((row) => row.status !== "unsupported") ?? [];
   const account =
     accounts.find((row) => row.credentialId === preferences.accountId) ??
-    accounts.find(
-      (row) => row.authKind === "oauth" && ["openai-codex", "anthropic"].includes(row.provider),
-    ) ??
+    accounts.find((row) => ringWindows(row, now).length > 0) ??
     accounts[0];
   const windows = !error ? ringWindows(account, now) : [];
   const remaining = windows.length ? Math.min(...windows.map(remainingQuota)) : null;
@@ -151,6 +149,7 @@ function QuotaContent({
     >
       <PopoverTrigger
         data-testid="provider-quota-trigger"
+        openOnHover={compact}
         aria-label={`${t`Subscription quota`}: ${name} · ${summary}`}
         title={`${name} · ${summary}`}
         className={`app-no-drag relative flex shrink-0 items-center rounded-lg outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${compact ? "size-10 justify-center" : "mx-3 gap-2 px-2 py-1.5 text-sm"}`}
@@ -210,7 +209,7 @@ function QuotaContent({
         data-testid="provider-quota-panel"
       >
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-          <PopoverTitle>{t`Subscription quota`}</PopoverTitle>
+          <PopoverTitle className="flex items-center gap-2"><Gauge size={16} aria-hidden="true" />{t`Usage`}</PopoverTitle>
           <div className="flex gap-1">
             <Button
               variant="ghost"
@@ -247,134 +246,80 @@ function QuotaContent({
             </DropdownMenu>
           </div>
         </div>
-        <div className="space-y-4 px-4 py-3">
-          {accounts.length ? (
-            <div className="space-y-1">
-              <label
-                htmlFor={`quota-account-${compact ? "rail" : "mobile"}`}
-                className="text-xs text-muted-foreground"
-              >{t`Account`}</label>
-              <select
-                id={`quota-account-${compact ? "rail" : "mobile"}`}
-                aria-label={t`Quota account`}
-                value={account?.credentialId ?? ""}
-                onChange={(event) => save({ ...preferences, accountId: event.target.value })}
-                className="h-9 w-full rounded-md border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {accounts.map((row) => (
-                  <option key={row.credentialId} value={row.credentialId}>
-                    {providerName(row.provider)} · {row.label}
-                  </option>
-                ))}
-              </select>
-              {account?.plan ? (
-                <p className="text-xs capitalize text-muted-foreground">{account.plan}</p>
-              ) : null}
-            </div>
-          ) : null}
+        <div className="space-y-3 px-4 py-3">
           {busy && !data ? (
             <p role="status" className="text-sm text-muted-foreground">{t`Checking quota…`}</p>
           ) : error ? (
-            <p
-              role="status"
-              className="text-sm text-muted-foreground"
-            >{t`Could not refresh quota. Try again.`}</p>
-          ) : !account ? (
-            <p className="text-sm text-muted-foreground">{t`Connect a model account to see its subscription quota.`}</p>
-          ) : account.status !== "available" ? (
-            <p role="status" className="text-sm leading-relaxed text-muted-foreground">
-              {account.status === "reconnect"
-                ? t`Reconnect this account in model settings.`
-                : account.status === "unsupported"
-                  ? t`This connection does not report subscription quota.`
-                  : account.status === "rate_limited"
-                    ? t`The provider has paused quota checks. Try again later.`
-                    : t`Quota is temporarily unavailable.`}
+            <p role="status" className="text-sm text-muted-foreground">{t`Could not refresh quota. Try again.`}</p>
+          ) : !accounts.length ? (
+            <p className="text-sm text-muted-foreground">
+              {data?.accounts.length
+                ? t`This connection does not report subscription quota.`
+                : t`Connect a model account to see its subscription quota.`}
             </p>
           ) : (
-            <div className="space-y-4">
-              {account.windows.map((window) => {
-                const fresh = freshQuota(account, now) && usableWindow(window, now);
-                const value = remainingQuota(window);
-                const label =
-                  window.durationMinutes === 300
-                    ? t`5 hours`
-                    : window.durationMinutes === 10080
-                      ? t`Weekly`
-                      : window.label === "Session"
-                        ? t`Session`
-                        : window.label;
-                const date = window.resetsAt ? new Date(window.resetsAt) : null;
-                const minutes = date ? Math.max(0, Math.ceil((date.getTime() - now) / 60000)) : 0;
-                const relative =
-                  minutes >= 60
-                    ? `${Math.floor(minutes / 60)} h ${minutes % 60} min`
-                    : `${minutes} min`;
-                return (
-                  <div key={window.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span>
-                        {window.model ? `${window.model} · ` : ""}
-                        {label}
-                      </span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {fresh ? t`${Math.round(value)}% remaining` : t`Awaiting refresh`}
-                      </span>
-                    </div>
-                    <div
-                      role="progressbar"
-                      aria-label={`${window.model ?? name} · ${label}`}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={fresh ? Math.round(value) : undefined}
-                      aria-valuetext={
-                        fresh ? t`${Math.round(value)}% remaining` : t`Awaiting refresh`
-                      }
-                      className="h-1.5 overflow-hidden rounded-full bg-muted"
-                    >
-                      <div
-                        style={{
-                          width: fresh ? `${value}%` : "0%",
-                          backgroundColor: quotaColor(value),
-                        }}
-                        className="h-full rounded-full"
-                      />
-                    </div>
-                    {date ? (
-                      <p
-                        title={new Intl.DateTimeFormat(i18n.locale, {
-                          dateStyle: "full",
-                          timeStyle: "short",
-                        }).format(date)}
-                        className="text-xs text-muted-foreground"
-                      >
-                        {date.getTime() <= now
-                          ? t`Waiting for the provider to report the reset.`
-                          : t`Resets in ${relative}`}{" "}
-                        <span>
-                          ·{" "}
-                          {new Intl.DateTimeFormat(i18n.locale, {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }).format(date)}
-                        </span>
-                      </p>
+            accounts.map((row) => {
+              const provider = providerName(row.provider);
+              const icon = row.provider === "openai-codex" ? "openai" : row.provider === "anthropic" ? "anthropic" : null;
+              return (
+                <section key={row.credentialId} className="space-y-2 border-b border-border pb-3 last:border-0 last:pb-0">
+                  <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                    {icon ? <img src={appPath(`/providers/${icon}.svg`)} alt="" className="size-4 shrink-0 dark:invert" /> : null}
+                    <span className="truncate">{provider}</span>
+                    {row.label !== row.provider && row.label !== provider ? (
+                      <span className="truncate text-xs font-normal text-muted-foreground">{row.label}</span>
                     ) : null}
-                  </div>
-                );
-              })}
-            </div>
+                  </h3>
+                  {row.status !== "available" ? (
+                    <p className="text-xs text-muted-foreground">
+                      {row.status === "reconnect"
+                        ? t`Reconnect this account in model settings.`
+                        : row.status === "rate_limited"
+                          ? t`The provider has paused quota checks. Try again later.`
+                          : t`Quota is temporarily unavailable.`}
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {row.windows.map((window) => {
+                        const fresh = freshQuota(row, now) && usableWindow(window, now);
+                        const value = remainingQuota(window);
+                        const label = window.durationMinutes === 300 ? t`5 hours`
+                          : window.durationMinutes === 10080 ? t`Weekly`
+                            : window.label === "Session" ? t`Session` : window.label;
+                        const windowName = window.model ? `${window.model} · ${label}` : label;
+                        const date = window.resetsAt ? new Date(window.resetsAt) : null;
+                        const minutes = date ? Math.max(0, Math.ceil((date.getTime() - now) / 60_000)) : 0;
+                        const remainingTime = minutes >= 1440 ? `${Math.floor(minutes / 1440)} d ${Math.floor(minutes % 1440 / 60)} h`
+                          : minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+                        return (
+                          <li key={window.id} className="flex min-w-0 items-center gap-2 text-xs tabular-nums text-muted-foreground">
+                            <span title={windowName} className="min-w-0 max-w-[40%] truncate">{windowName}</span>
+                            <div
+                              role="progressbar"
+                              aria-label={`${provider} · ${windowName}`}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-valuenow={fresh ? Math.round(value) : undefined}
+                              aria-valuetext={fresh ? t`${Math.round(value)}% remaining` : t`Awaiting refresh`}
+                              className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+                            >
+                              {fresh ? <div style={{ width: `${value}%`, backgroundColor: quotaColor(value) }} className="h-full rounded-full" /> : null}
+                            </div>
+                            {fresh ? <span className="shrink-0 font-semibold" style={{ color: quotaColor(value) }}>{Math.round(value)}%</span> : <span>{t`Awaiting refresh`}</span>}
+                            {fresh && date ? (
+                              <time dateTime={date.toISOString()} title={new Intl.DateTimeFormat(i18n.locale, { dateStyle: "full", timeStyle: "short" }).format(date)} className="shrink-0">
+                                {remainingTime}
+                              </time>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+              );
+            })
           )}
-          {account?.measuredAt && !error ? (
-            <p className="text-[11px] text-muted-foreground">
-              {t`Updated`}{" "}
-              {new Intl.DateTimeFormat(i18n.locale, { hour: "2-digit", minute: "2-digit" }).format(
-                new Date(account.measuredAt),
-              )}
-            </p>
-          ) : null}
         </div>
         <div className="grid gap-1 border-t p-2">
           <Button variant="ghost" className="justify-start gap-2" onClick={() => action(onModels)}>
