@@ -27,6 +27,9 @@
   Before dispatch, a fresh turn can run in the cloud if Desktop is offline.
   Preserve local project and checkpoint bindings; a tool result payload alone
   does not indicate checkpoint recovery.
+  Automatic server workspaces use separate home keys, preserve Team/dedicated
+  isolation and pin the selected workspace to the run. Keep Bot.computerId and
+  native project paths out of cloud provisioning.
   Keep callback/agent/command admission lanes bounded and native long polls
   authenticated again before delivery. The additive desktop_execution migration
   remembers the choice across API restarts; it does not move account data.

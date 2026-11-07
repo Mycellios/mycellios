@@ -575,7 +575,7 @@ function findActiveRun(
 ) {
   return prisma.run.findFirst({
     where: {
-      bot: { computerId },
+      OR: [{ cloudComputerId: computerId }, { cloudComputerId: null, bot: { computerId } }],
       status: { in: statuses as (typeof ACTIVE_RUN_STATUSES)[number][] },
       ...(liveLeaseOnly ? { leaseExpiresAt: { gt: new Date(Date.now()) } } : {}),
     },
@@ -586,7 +586,10 @@ function findActiveRun(
 /** When the newest takeover request of a run still waiting on this computer stops holding it. */
 async function takeoverGraceEndsAt(prisma: PrismaClient, computerId: string): Promise<Date | null> {
   const waiting = await prisma.run.findMany({
-    where: { bot: { computerId }, status: "waiting_takeover" },
+    where: {
+      OR: [{ cloudComputerId: computerId }, { cloudComputerId: null, bot: { computerId } }],
+      status: "waiting_takeover",
+    },
     select: { id: true },
   });
   if (waiting.length === 0) return null;

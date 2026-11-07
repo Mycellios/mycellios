@@ -16,6 +16,12 @@ const { developmentRoutes } = await import("../apps/api/src/routes/development.j
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");
 const { routineCalendar } = await import("../apps/api/src/routine-calendar.js");
 const { usageDashboard } = await import("../apps/api/src/usage-dashboard.js");
+const { selectOfflineCloudWorkspace } = await import("../packages/adapters/src/offline-cloud-workspace.js");
+const { acquireDedicatedScreenLeaseFence, provisionComputer, releaseComputerExecutionLease } =
+  await import("../packages/adapters/src/computer-lifecycle.js");
+const { FakeSandboxProvider } = await import("../packages/adapters/src/fake-sandbox.js");
+const { HostAwareSandbox } = await import("../packages/adapters/src/host-aware-sandbox.js");
+const { LocalAgentHomeStore } = await import("../packages/adapters/src/home.js");
 const socket = createServer();
 await new Promise<void>(resolve => socket.listen(0, "127.0.0.1", resolve));
 const port = (socket.address() as { port: number }).port;
@@ -43,6 +49,14 @@ try {
     const ownership = await readFile("packages/db/prisma/migrations/20261103170000_mico_project_conversations/migration.sql", "utf8");
     await sql.query(ownership.split("ALTER TABLE \"threads\" ADD CONSTRAINT \"threads_owner_chk\"")[1]!.split(";")[0]!.replace(/^/, 'ALTER TABLE "threads" ADD CONSTRAINT "threads_owner_chk"') + ";");
     await sql.query(ownership.split('ALTER TABLE "threads" ADD CONSTRAINT "threads_task_project_chk"')[1]!.replace(/^/, 'ALTER TABLE "threads" ADD CONSTRAINT "threads_task_project_chk"'));
+    await sql.query('ALTER TABLE "runs" DROP COLUMN "cloudComputerId"');
+    for (const migration of [
+      "20261107160000_offline_mico_workspace",
+      "20261107160100_offline_mico_workspace_index",
+      "20261107160200_offline_mico_workspace_validate",
+    ]) {
+      await sql.query(await readFile(`packages/db/prisma/migrations/${migration}/migration.sql`, "utf8"));
+    }
   } finally { await sql.end(); }
   checks.push("additive inbox migration with the published thread owner constraints");
   db = createDb(url, { encryptContent: false, applicationName: "synthetic-workspace-sync" });
@@ -87,6 +101,50 @@ try {
   await system.bot.update({ where: { id: bot.id }, data: { agentEngine: "pi", taskConcurrency: 2 } });
   assert.equal((await claim(waiting)).count, 1);
   checks.push("real concurrent PostgreSQL admission retains the native single slot, owner fence and explicit Pi concurrency");
+  const local = await system.computer.create({
+    data: { ...actor, scope: "dedicated", scopeKey: `bot:${bot.id}`, homeKey: bot.id, kind: "desktop" },
+  });
+  await system.bot.update({ where: { id: bot.id }, data: { computerId: local.id } });
+  const offlineRun = await system.run.update({
+    where: { id: waiting.id },
+    data: { status: "running", leaseOwner: "synthetic-worker", leaseFence: 1, leaseExpiresAt: new Date(Date.now() + 60_000) },
+  });
+  const isolated = new FakeSandboxProvider();
+  let pcOnline = false;
+  const sandbox = new HostAwareSandbox(isolated, new FakeSandboxProvider(), async () => pcOnline);
+  const workerLease = { workerId: "synthetic-worker", fence: 1 };
+  const select = () => selectOfflineCloudWorkspace(prisma, sandbox, offlineRun, local, workerLease);
+  await assert.rejects(runAsTenant(actor, () =>
+    selectOfflineCloudWorkspace(prisma, sandbox, offlineRun, local, { ...workerLease, fence: 0 })));
+  assert.equal(await system.computer.count({ where: { scopeKey: { startsWith: "cloud:" } } }), 0);
+  const cloud = await runAsTenant(actor, select);
+  assert.ok(cloud);
+  assert.notEqual(cloud.homeKey, local.homeKey);
+  const persisted = await system.run.findUniqueOrThrow({ where: { id: offlineRun.id } });
+  pcOnline = true;
+  assert.equal((await runAsTenant(actor, () =>
+    selectOfflineCloudWorkspace(prisma, sandbox, persisted, local, workerLease)))?.id, cloud.id);
+  await assert.rejects(runAsTenant(actor, () => selectOfflineCloudWorkspace(
+    prisma, sandbox, { ...persisted, userId: "other-user" }, local, workerLease,
+  )));
+  const cloudFence = await runAsTenant(actor, () => acquireDedicatedScreenLeaseFence(prisma, {
+    computerId: cloud.id, botId: bot.id, runId: offlineRun.id, workerId: workerLease.workerId,
+    runFence: workerLease.fence, cloudWorkspace: true,
+  }));
+  const ref = await runAsTenant(actor, () => provisionComputer({
+    prisma, sandbox, home: new LocalAgentHomeStore(path.join(directory, "homes")),
+    jobs: { ...jobs, cancel: async () => undefined, close: async () => undefined },
+    events: deps.events,
+  }, cloud.id, {
+    ...actor, operationId: offlineRun.id, traceId: offlineRun.id, runId: offlineRun.id, botId: bot.id,
+    cloudWorkspace: { workerId: workerLease.workerId, runFence: workerLease.fence },
+    signal: AbortSignal.timeout(10_000),
+  }, "bot"));
+  assert.equal(ref.providerRef, `fake-${cloud.homeKey}`);
+  assert.equal((await system.bot.findUniqueOrThrow({ where: { id: bot.id } })).computerId, local.id);
+  assert.deepEqual(await system.computer.findUniqueOrThrow({ where: { id: local.id } }), local);
+  await runAsTenant(actor, () => releaseComputerExecutionLease(prisma, cloudFence));
+  checks.push("real offline workspace migration, worker fencing, owner isolation and separate provisioning after Desktop reconnects");
   await assert.rejects(call("archive", { id: first.id, archived: true }));
   await system.run.updateMany({ where: { threadId: first.threadId }, data: { status: "completed", completedAt: new Date() } });
   await call("archive", { id: first.id, archived: true });

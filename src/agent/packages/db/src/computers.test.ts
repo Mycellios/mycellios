@@ -102,8 +102,8 @@ function fakeSerializingPrisma(initialInUse = 0) {
             const row = rows.get(args.where.scopeKey);
             return row ? { id: row.id } : null;
           }),
-          count: vi.fn(async (args: { where: { bots?: { some?: { id?: { not?: string } } } } }) => {
-            const excludeBot = args.where.bots?.some?.id?.not;
+          count: vi.fn(async (args: { where: { OR: Array<{ bots?: { some?: { id?: { not?: string } } } }> } }) => {
+            const excludeBot = args.where.OR.find((condition) => condition.bots)?.bots?.some?.id?.not;
             let used = 0;
             for (const bots of refs.values()) {
               if (excludeBot) {

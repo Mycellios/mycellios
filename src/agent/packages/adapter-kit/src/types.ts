@@ -13,6 +13,8 @@ export interface AdapterContext {
   runId?: string;
   /** Owned independent Mico task conversation. */
   projectSessionId?: string;
+  /** Server-selected workspace for this run, including after Desktop reconnects. */
+  cloudWorkspace?: { workerId: string; runFence: number };
   /** Opaque fence for releasing a graphical screen without tearing down its replacement. */
   screenLeaseId?: string;
   /** Retain a completed run's screen for reuse by this bot. */
