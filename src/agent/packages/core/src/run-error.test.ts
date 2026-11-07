@@ -4,6 +4,7 @@ import {
   APPROVED_ACTION_NOT_RUN_ERROR,
   HOSTED_MODEL_CREDITS_REQUIRED_ERROR,
   isModelRequiredSendError,
+  isUncertainDesktopRun,
   MISSING_MODEL_RUN_ERROR,
   MISSING_TOOL_FINAL_RESPONSE_ERROR,
   MODEL_CONTEXT_TOO_SMALL_ERROR,
@@ -96,9 +97,11 @@ describe("normalizeRunError", () => {
     ['404: {"message":"Route not found"}', "Your model provider can't run this model."],
     [
       "500: {malformed https://example.test/keys/fake-key-id",
-      "The model provider returned an error.",
+      "Your model provider returned a server error.",
     ],
     ["Something unexpected happened", "The model provider returned an error."],
+    ["Internal server error", "Mycellios encountered an internal error."],
+    ['{"error":{"statusCode":500}}', "Your model provider returned a server error."],
     [
       "Provider diagnostic: manage https://example.test/keys/fake-key-id; trace fake-trace",
       "The model provider returned an error.",
@@ -135,6 +138,29 @@ describe("normalizeRunError", () => {
         '429: {"error":{"type":"rate_limit_error","code":"insufficient_quota","message":"Insufficient quota"}}',
       ).summary,
     ).toBe("Your model provider reached its credit limit.");
+  });
+
+  it("identifies an external connection's reported quota and leaves ambiguous failures unknown", () => {
+    expect(normalizeRunError('429: {"error":{"code":"quota_exhausted"}}', undefined, "en", undefined, "OmniRoute")).toMatchObject({
+      summary: "OmniRoute reached its usage quota.",
+      kind: "quota",
+      recovery: "model",
+    });
+    expect(normalizeRunError("Unknown error", undefined, "en", undefined, "OmniRoute").summary)
+      .toBe("OmniRoute could not complete the request. The cause is unknown.");
+  });
+
+  it("identifies uncertain Desktop execution even without a provider diagnosis", () => {
+    const details = "Desktop execution interrupted; check existing results before retrying";
+    expect(isUncertainDesktopRun(details)).toBe(true);
+    expect(isUncertainDesktopRun(modelFallbackFailure("503: unavailable", [
+      { provider: "external", modelId: "alternative", status: "failed", reason: details },
+    ]))).toBe(true);
+    expect(normalizeRunError(details, undefined, "en", undefined, "OmniRoute")).toEqual({
+      summary: "Desktop could not confirm the result. Review what it already did before continuing.",
+      kind: "interrupted",
+      details,
+    });
   });
 
   it("translates templates and formats reset dates in the selected locale", () => {
@@ -187,12 +213,12 @@ describe("normalizeRunError", () => {
         '{"error":{"type":"overloaded_error","message":"Overloaded","metadata":{"provider":"Anthropic"}}}',
         "Your Anthropic is overloaded right now. Try again in a moment.",
       ],
-      ['503: {"message":"Service Unavailable"}', overloaded],
-      ["502 Bad Gateway", overloaded],
-      ["503 provider unavailable", overloaded],
+      ['503: {"message":"Service Unavailable"}', "Your model provider is temporarily unavailable."],
+      ["502 Bad Gateway", "Your model provider returned a server error."],
+      ["503 provider unavailable", "Your model provider is temporarily unavailable."],
       [
         '502: {"message":"Gateway error","metadata":{"provider":"OpenAI"}}',
-        "Your OpenAI is overloaded right now. Try again in a moment.",
+        "Your OpenAI returned a server error.",
       ],
       ["Codex error: Our servers are currently overloaded. Please try again later.", overloaded],
       [
@@ -384,11 +410,18 @@ describe("normalizeRunError", () => {
       "Failed to parse tool call arguments as JSON",
       '400: {"message":"Failed to parse tool call arguments as JSON","code":"tool_use_failed"}',
       "Tool call validation failed: attempted to call tool 'commentary' which was not in request.tools",
-      MODEL_OUTPUT_LIMIT_ERROR,
     ])("calls unusable model output what it is: %s", (details) => {
       expect(normalizeRunError(details)).toEqual({
         summary: "The model returned an unusable response. Try again.",
         details,
+        kind: "output",
+        recovery: "model",
+      });
+    });
+
+    it("identifies an exhausted output token limit before any reply", () => {
+      expect(normalizeRunError(MODEL_OUTPUT_LIMIT_ERROR)).toMatchObject({
+        summary: MODEL_OUTPUT_LIMIT_ERROR,
         kind: "output",
         recovery: "model",
       });

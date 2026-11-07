@@ -1,10 +1,12 @@
 import type { ThreadSnapshot } from "@rakazo/contracts";
+import { isUncertainDesktopRun } from "@rakazo/core";
 import { isUnsafeRunRetry } from "./retry-error";
 
 /** The API remains authoritative about recorded effects and original-message ownership. */
 export function canRetryThreadRun(snapshot: ThreadSnapshot | null, runId?: string): boolean {
   const run = snapshot?.run;
   if (!snapshot || !run || (runId && run.id !== runId) || run.status !== "failed" || run.trigger !== "user") return false;
+  if (isUncertainDesktopRun(run.error)) return false;
   return !snapshot.messages.some(message =>
     message.runId === run.id && message.role === "bot" && !message.id.startsWith("progress:"),
   );

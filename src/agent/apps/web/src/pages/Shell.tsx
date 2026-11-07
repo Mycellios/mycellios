@@ -210,7 +210,7 @@ import { MarketplaceWorkspace } from "./marketplace/MarketplaceWorkspace";
 import { marketplaceTab, type MarketplaceTab } from "./marketplace/catalog";
 import { WorkspaceRail } from "./shell/workspace-rail";
 import { useChatHistory } from "./shell/use-chat-history";
-import { ChatHeaderModel } from "./shell/chat-header-model";
+import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
 import { ChatToolsPanel, ChatToolsMenu } from "./shell/chat-tools-panel";
 import { VoiceConversation } from "../components/call/VoiceConversation";
 import { ProviderQuota } from "../components/ProviderQuota";
@@ -2253,6 +2253,30 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const runError = threadRunError(activeSnapshot, dismissedRunErrorIds);
   const displayedRunError = !sendError ? runError : null;
   const displayedRunErrorId = displayedRunError ? (activeSnapshot?.run?.id ?? null) : null;
+  const failedRun = displayedRunErrorId ? activeSnapshot?.run : null;
+  const ownedFailedRun = failedRun && (!failedRun.userId || failedRun.userId === userId) &&
+    (!taskScope || failedRun.threadId === taskScope.taskThreadId);
+  const failedBot = ownedFailedRun
+    ? (inGroup ? bots.find(bot => bot.id === failedRun.botId) : active?.id === failedRun.botId ? active : undefined)
+    : undefined;
+  const canChangeFailedModel = failedBot && (!failedBot.agentEngine || failedBot.agentEngine === "pi");
+  const failedRunCredentials = useQuery({
+    ...queries.models.credentials.queryOptions(),
+    enabled: Boolean(canChangeFailedModel && failedRun?.modelProvider && failedRun.modelId),
+  });
+  const matchingConnections = failedRun && failedBot
+    ? failedRunCredentials.data?.filter(credential =>
+        credential.provider === failedRun.modelProvider &&
+        (credential.modelId === failedRun.modelId ||
+          (failedRun.modelId && credential.enabledModelIds?.includes(failedRun.modelId))),
+      )
+    : undefined;
+  const failedProviderLabel = matchingConnections?.length === 1 ? matchingConnections[0]?.label : undefined;
+  async function saveChatModel(botId: string, patch: ChatModelPatch) {
+    const updated = await rpc.bots.update({ botId, ...patch });
+    setBots(current => current.map(bot => bot.id === updated.id ? updated : bot));
+    await refreshBots().catch(() => undefined);
+  }
   const handleRunErrorPresented = useCallback((runId: string) => {
     rememberSeenRunErrorId(runId);
   }, []);
@@ -3312,8 +3336,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         setUnretryableRunIds(current => new Set(current).add(runId));
       }
       if (outcome === "unsafe") {
-        rememberSeenRunErrorId(runId);
-        setDismissedRunErrorIds(current => new Set(current).add(runId));
+        toast.info(unsafeRunRetryText());
+        return;
       }
       if (outcome === "retried") {
         setSendError(null);
@@ -3324,9 +3348,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         setSendError(null);
         toast.info(t`The task state changed. The chat has been refreshed.`);
       } else {
-        setSendError(outcome === "unsafe"
-          ? unsafeRunRetryText()
-          : t`Wait for the current task to finish before retrying.`);
+        setSendError(t`Wait for the current task to finish before retrying.`);
       }
     } catch (error) {
       if (isCurrent()) setSendError(errorText(error, t`Could not continue`));
@@ -3976,11 +3998,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               </span>
             </Button>
             <div className="app-no-drag ms-auto flex min-w-0 items-center gap-1">
-              {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={async patch => {
-                const updated = await rpc.bots.update({ botId: active.id, ...patch });
-                setBots(current => current.map(bot => bot.id === updated.id ? updated : bot));
-                await refreshBots().catch(() => undefined);
-              }} /> : null}
+              {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
               {bootstrapMe?.phoneCallsEnabled && !inGroup && active && !taskScope ? (
                 <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
                   <Button
@@ -4188,9 +4206,20 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               onOpenComputerSettings={() => openSettings("computer")}
               runError={displayedRunError}
               runErrorId={displayedRunErrorId}
+              runErrorProviderLabel={failedProviderLabel}
+              runErrorModelAction={canChangeFailedModel ? (
+                <ChatHeaderModel
+                  key={displayedRunErrorId}
+                  recovery
+                  bot={failedBot}
+                  me={bootstrapMe}
+                  onConnections={() => openSettings("models")}
+                  onSave={patch => saveChatModel(failedBot.id, patch)}
+                />
+              ) : undefined}
               onRunErrorPresented={handleRunErrorPresented}
               onDismissError={dismissComposerError}
-              onRetryError={displayedRunErrorId && !unretryableRunIds.has(displayedRunErrorId) && canRetryThreadRun(activeSnapshot) ? () => void retryFailedRun() : undefined}
+              onRetryError={failedBot && displayedRunErrorId && !unretryableRunIds.has(displayedRunErrorId) && canRetryThreadRun(activeSnapshot, displayedRunErrorId) ? () => void retryFailedRun() : undefined}
               retrying={retryingRunId === displayedRunErrorId && retryingRunId !== null}
               sending={sending}
               fileInputRef={fileInputRef}

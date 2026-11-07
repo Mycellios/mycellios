@@ -170,7 +170,7 @@ test("a model too small for required instructions offers a model change", async 
     { timeout: 30_000 },
   );
   await expect(error).not.toContainText("Start a new chat");
-  await expect(error.getByTestId("composer-error-action")).toHaveText("Choose a model");
+  await expect(error.getByRole("button", { name: "Change model" })).toBeVisible();
   await captureScreenshot(page, testInfo, "required-context-model-recovery");
 });
 
@@ -184,11 +184,12 @@ test("a provider out of credits offers another model", async ({ page }, testInfo
   await expect(error).toContainText("Your model provider reached its credit limit.", {
     timeout: 30_000,
   });
-  const action = error.getByTestId("composer-error-action");
-  await expect(action).toHaveText("Choose a model");
+  const action = error.getByRole("button", { name: "Change model" });
+  await expect(action).toBeVisible();
   await captureScreenshot(page, testInfo, "credit-limit-model-recovery");
   await action.click();
-  await expect(page.getByTestId("bot-settings")).toBeVisible();
+  await expect(page.getByText("This changes the model for this Mico. Your message stays in the chat.")).toBeVisible();
+  await expect(page.getByTestId("transcript").getByText("fail this run out of credits", { exact: true })).toHaveCount(1);
 });
 
 test("a rejected key opens the model connections", async ({ page }, testInfo) => {

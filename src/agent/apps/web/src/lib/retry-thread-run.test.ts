@@ -30,6 +30,14 @@ it("refreshes before retrying the same original turn, without creating a message
   expect(f.retry).toHaveBeenCalledTimes(1);
   expect(f.refresh.mock.invocationCallOrder[0]).toBeLessThan(f.retry.mock.invocationCallOrder[0]!);
 });
+it("does not post a retry after an unconfirmed Desktop dispatch", async () => {
+  const value = snapshot();
+  value.run!.error = "Desktop execution interrupted; check existing results before retrying";
+  const f = fixture(value);
+  expect(canRetryThreadRun(value)).toBe(false);
+  await expect(retryOriginalThreadRun(f)).resolves.toBe("changed");
+  expect(f.retry).not.toHaveBeenCalled();
+});
 it.each(["queued", "running", "waiting_input", "completed", "cancelled"])("does not replay a stale failure that is now %s", async status => {
   const f = fixture(snapshot(status));
   await expect(retryOriginalThreadRun(f)).resolves.toBe("changed");

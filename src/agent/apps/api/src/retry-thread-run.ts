@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import type { Actor } from "@rakazo/contracts";
-import { QUEUE_HOLDING_RUN_STATUSES } from "@rakazo/core";
+import { isUncertainDesktopRun, QUEUE_HOLDING_RUN_STATUSES } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { withSerializableRetry } from "./serializable-retry.js";
 import type { ThreadTarget } from "./thread-target.js";
@@ -30,7 +30,7 @@ export async function retryThreadRun(
     // Terminal cleanup may have removed a checkpoint. Restarting such a turn could replay
     // completed actions; do not guess that an effect was harmless or idempotent.
     const recordedOutput = await tx.message.count({ where: { runId: run.id, role: "bot" } });
-    if (run._count.effects > 0 || run.firstResponseAt || recordedOutput > 0) {
+    if (run._count.effects > 0 || run.firstResponseAt || recordedOutput > 0 || isUncertainDesktopRun(run.error)) {
       throw new ORPCError("CONFLICT", {
         message: "This request already produced output or actions. Continue in the chat to avoid repeating them.",
       });
