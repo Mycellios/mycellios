@@ -39,6 +39,7 @@ describe("retry original failed turn", () => {
   it.each([
     { status: "completed" }, { status: "cancelled" }, { sourceMessageId: null },
     { _count: { effects: 1 } }, { firstResponseAt: new Date() },
+    { error: "Desktop execution interrupted; check existing results before retrying" },
   ])("refuses unsafe or terminal replay: %j", async (state) => {
     const { prisma, tx } = fixture(state);
     await expect(retryThreadRun(prisma, actor, target, "run")).rejects.toMatchObject({ code: "CONFLICT" });

@@ -2,7 +2,7 @@ import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
 import { isModelRequiredSendError, normalizeRunError } from "@rakazo/core";
 import { X } from "lucide-react";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useEffect, useRef } from "react";
 import { translateRunError } from "../../lib/run-error";
 
@@ -10,6 +10,8 @@ export function ComposerError({
   sendError,
   runError,
   runErrorId,
+  runErrorProviderLabel,
+  runErrorModelAction,
   onRunErrorPresented,
   onOpenModels,
   onOpenConnections,
@@ -22,6 +24,8 @@ export function ComposerError({
   sendError: string | null;
   runError: string | null;
   runErrorId: string | null;
+  runErrorProviderLabel?: string;
+  runErrorModelAction?: ReactNode;
   onRunErrorPresented: (runId: string) => void;
   onOpenModels: () => void;
   onOpenConnections: () => void;
@@ -68,12 +72,12 @@ export function ComposerError({
     };
   }, [onRunErrorPresented, runError, runErrorId]);
   const normalizedRunError = runError
-    ? normalizeRunError(runError, translateRunError, i18n.locale || "en")
+    ? normalizeRunError(runError, translateRunError, i18n.locale || "en", undefined, runErrorProviderLabel)
     : null;
-  // The one action that fixes the failure; a transient one already says to try again.
   const recovery = sendError ? undefined : normalizedRunError?.recovery;
+  const modelAction = !sendError && runError && recovery !== "computer" ? runErrorModelAction : null;
   const recoveryAction =
-    recovery === "model"
+    recovery === "model" && !modelAction
       ? { label: t`Choose a model`, onClick: onOpenModels }
       : recovery === "connection"
         ? {
@@ -117,7 +121,8 @@ export function ComposerError({
             </button>
           </>
         ) : null}
-        {!(recovery === "computer" && recoveryAction) && !sendError && runError && runErrorId && onRetryError ? (
+        {modelAction}
+        {normalizedRunError?.kind !== "interrupted" && !(recovery === "computer" && recoveryAction) && !sendError && runError && runErrorId && onRetryError ? (
           <button
             type="button"
             data-testid="composer-error-retry"

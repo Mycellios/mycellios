@@ -4,6 +4,20 @@ import type { RunErrorTranslator } from "@rakazo/core";
 /** Static descriptors keep shared run-error messages in Lingui extraction. */
 export const translateRunError: RunErrorTranslator = (message, values) => {
   switch (message) {
+    case "Mycellios encountered an internal error.":
+      return i18n._({ id: "Mycellios encountered an internal error.", message: "Mycellios encountered an internal error.", values });
+    case "Desktop could not confirm the result. Review what it already did before continuing.":
+      return i18n._({ id: "Desktop could not confirm the result. Review what it already did before continuing.", message: "Desktop could not confirm the result. Review what it already did before continuing.", values });
+    case "{provider} could not complete the request. The cause is unknown.":
+      return i18n._({ id: "{provider} could not complete the request. The cause is unknown.", message: "{provider} could not complete the request. The cause is unknown.", values });
+    case "{provider} reached its usage quota.":
+      return i18n._({ id: "{provider} reached its usage quota.", message: "{provider} reached its usage quota.", values });
+    case "{provider} returned a server error.":
+      return i18n._({ id: "{provider} returned a server error.", message: "{provider} returned a server error.", values });
+    case "{provider} is temporarily unavailable.":
+      return i18n._({ id: "{provider} is temporarily unavailable.", message: "{provider} is temporarily unavailable.", values });
+    case "The model hit its output limit before writing a response.":
+      return i18n._({ id: "The model hit its output limit before writing a response.", message: "The model hit its output limit before writing a response.", values });
     case "This task needs a workspace. Cloud workspaces are not available here yet.":
       return i18n._({
         id: "This task needs a workspace. Cloud workspaces are not available here yet.",

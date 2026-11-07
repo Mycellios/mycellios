@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@rakazo/adapter-kit";
+import { DESKTOP_RUN_INTERRUPTED_ERROR, isUncertainDesktopRun } from "@rakazo/core";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
 import { desktopAgentFrames } from "./desktop-agent-stream.js";
 import type { DesktopAgentFrame } from "./desktop-agent-host.js";
@@ -68,8 +69,11 @@ export class DesktopAgentRuntime implements AgentRuntime {
     const callbacks = new Set<Promise<void>>();
     let completed = false;
     let nativeUsage = false;
+    let dispatched = false;
+    let receivedFailure = false;
     try {
       const wire = encodeRequest();
+      dispatched = true;
       const response = await this.options.transport({ method: "agentRun", botId: request.botId, runId: request.runId, sessionId, request: wire, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
       // No fallback after dispatch: a lost response can conceal real local effects.
       for await (const raw of desktopAgentFrames(response, signal)) {
@@ -78,7 +82,11 @@ export class DesktopAgentRuntime implements AgentRuntime {
         if (frame.kind === "rpc") {
           const task = rpc.accept(frame.message).catch(error => { callbackError = error; controller.abort(); }).finally(() => callbacks.delete(task));
           callbacks.add(task);
-        } else if (frame.kind === "failure") throw rpc.decode(frame.value);
+        } else if (frame.kind === "failure") {
+          const failure = rpc.decode(frame.value);
+          receivedFailure = true;
+          throw failure;
+        }
         else if (frame.kind === "event") {
           const event = rpc.decode(frame.value) as AgentRuntimeEvent;
           if (!event || typeof event.type !== "string" || completed) throw Error("Invalid Desktop agent event");
@@ -97,7 +105,17 @@ export class DesktopAgentRuntime implements AgentRuntime {
       await Promise.all(callbacks);
       for (const usage of trustedUsage.splice(0)) yield usage;
       if (!completed) throw Error("Desktop agent did not finish; check existing results before retrying");
-    } catch (error) { const failure = callbackError ?? error; if (failure instanceof ComputerUpdatingError) context.onComputerUpdate?.(failure.dispatched); throw failure; }
+    } catch (error) {
+      const failure = callbackError ?? error;
+      if (failure instanceof ComputerUpdatingError) {
+        context.onComputerUpdate?.(failure.dispatched);
+      } else if (dispatched && (!receivedFailure || callbackError) && !context.signal.aborted &&
+        !(failure instanceof Error && isUncertainDesktopRun(failure.message))) {
+        // An unconfirmed transport or protocol failure can hide local side effects.
+        throw Error(DESKTOP_RUN_INTERRUPTED_ERROR, { cause: failure });
+      }
+      throw failure;
+    }
     finally { controller.abort(); for (const cancel of cleanup) cancel(); cleanup.clear(); rpc.close(); await Promise.allSettled(callbacks); this.active.delete(request.runId); }
   }
 }
