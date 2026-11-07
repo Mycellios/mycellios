@@ -24,6 +24,9 @@
   Keep approval judges on the server and preserve Team/task computer assignments.
   Native run receipts are account/server scoped and forbid replay after restarts.
   Disconnects must not silently substitute a cloud run for an admitted local run.
+  Before dispatch, a fresh turn can run in the cloud if Desktop is offline.
+  Preserve local project and checkpoint bindings; a tool result payload alone
+  does not indicate checkpoint recovery.
   Keep callback/agent/command admission lanes bounded and native long polls
   authenticated again before delivery. The additive desktop_execution migration
   remembers the choice across API restarts; it does not move account data.

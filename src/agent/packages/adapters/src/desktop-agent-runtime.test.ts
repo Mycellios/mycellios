@@ -49,11 +49,17 @@ it("runs new turns in cloud when Desktop is offline and preserves bound work", a
   for await (const _ of old.run(request(), context)) {}
   expect(fallback.run).toHaveBeenCalledTimes(1);
   const offline = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: false, preferred: true }) });
-  for await (const _ of offline.run(request(), context)) {}
+  const fresh = { ...request(), resumeToolResult: { content: [{ type: "text" as const, text: "hello" }] } };
+  for await (const _ of offline.run(fresh, context)) {}
   expect(fallback.run).toHaveBeenCalledTimes(2);
+  expect(fallback.run).toHaveBeenLastCalledWith(
+    expect.objectContaining({ instructions: expect.stringContaining("This turn runs on the server") }),
+    context,
+  );
   for (const [input, scope] of [
     [request(), { ...context, projectSessionId: "project" }],
     [{ ...request(), resumeFromCheckpoint: "checkpoint" }, context],
+    [{ ...fresh, turnCheckpoint: "durable-checkpoint" }, context],
   ] as const) {
     await expect(async () => { for await (const _ of offline.run(input, scope)) {} }).rejects.toThrow("bound");
   }

@@ -25,7 +25,9 @@ export class DesktopAgentRuntime implements AgentRuntime {
     if (request.usageOperationKind === "setup" && !request.tools.length || request.script) { yield* this.options.fallback.run(request, context); return; }
     const route = await this.options.select(context);
     if (!route.available) {
-      if (route.preferred && (context.projectSessionId || request.resumeFromCheckpoint || request.resumeToolResult)) {
+      // The executor also supplies resumeToolResult on fresh turns. Only an
+      // actual checkpoint or project binding requires the original Desktop.
+      if (route.preferred && (context.projectSessionId || request.resumeFromCheckpoint || request.turnCheckpoint)) {
         throw Error("This task is bound to your Desktop. Reconnect the PC to resume it.");
       }
       const cloudRequest = route.preferred
