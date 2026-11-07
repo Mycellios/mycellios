@@ -57,11 +57,13 @@
   as uncertain checkpoint results; reconcile their command receipts before mutation.
   A planned restart may restore a relay generation only from bounded private
   version/account/server/Space/session metadata after fresh identity and consent.
-  A pending restart is cancellable. The detached same-user helper waits for normal
+  A pending restart is cancellable. The hidden same-user helper waits for normal
   exit, snapshots session/installation state, installs and reopens the same profile.
   Never force-stop another process, use Restart Manager shutdown or clear user data.
   Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
-  actual Windows PowerShell encoding in manual-update-helper tests.
+  actual Windows PowerShell encoding in manual-update-helper tests. Start the
+  worker through a hidden non-detached launcher so it survives Desktop's exit.
+  Keep private logs and leave Desktop open until the worker acknowledges.
   Verify manual-update, desktop-update-work, composer-draft and preload tests plus
   a fresh-profile native handoff before applying it to an installed profile.
   Published Windows preview tags use the owned GitHub release's bounded
@@ -126,10 +128,9 @@
   projects remain private and it does not admit arbitrary app bundles. Operators
   can disable it with VITE_MYCELLIOS_VIDEO_STUDIO=0 (web build) and
   MYCELLIOS_VIDEO_STUDIO=0 (native launch). Keep both existing admission guards.
-- Account-PC shutdown ignores late status callbacks after quitting and clears the
-  tray reference before destruction. Verify account-computer-background tests;
-  repeated stop and pending refresh completion must not touch a destroyed Tray
-  or rewrite Windows startup preferences during shutdown.
+- Account-PC shutdown ignores late status callbacks after quitting. Verify
+  account-computer-background tests; repeated stop and pending refresh completion
+  must not rewrite Windows startup preferences during shutdown.
   Isolated RAKAZO_PERFORMANCE_USER_DATA qualification profiles never write the
   installed application's Windows startup preferences.
 
@@ -813,8 +814,9 @@
   physical-device, session/generation and offline-expiry fences and never replay
   uncertain commands. Saved Team/dedicated workspace policies remain unchanged.
   With remembered consent, closing Desktop hides its window and retains drafts;
-  packaged Windows login startup restores the connection. Explicit tray Quit
-  disconnects; revocation disables host access and background login startup.
+  packaged Windows login startup restores the connection. Desktop has no tray
+  icon. Launching it again reveals the existing window and File → Quit disconnects.
+  Revocation disables host access and background login startup.
   Verify account-computer.test.ts, account-computer-background.test.ts and the
   native/API/broker desktop-relay tests, plus upgrade-continuity.test.ts.
   Native ES module bundles retain the existing createRequire banner for CommonJS
