@@ -186,10 +186,11 @@ Interactive sign-in and real network enrollment require separate user testing.
 The separate `/downloads/desktop` page is built from
 `landing/src/DesktopDownloads.tsx` with `node scripts/build-desktop-downloads.mjs`
 into `build/desktop-downloads/web`. Preserve the EXE/DEB catalog and existing
-immutable files when publishing this static surface. The Fedora row uses the
-qualified GitHub preview asset pinned in `landing/src/desktop-fedora-download.ts`;
-its version, size and SHA-256 must match the published release. Do not append
-RPMs to the legacy two-package catalog: older page versions reject unknown entries.
+immutable files when publishing this static surface. The Fedora card reads the
+optional `fedora` entry from the `macos-all` catalog. Publish the verified
+`*.rpm.catalog.json` entry emitted by the RPM builder alongside the RPM and its
+source archive. The page reads the current entry on load. Keep the legacy package
+arrays and default catalog compatible with earlier desktop clients.
 Run `npx vitest run landing/src/desktop-downloads.test.tsx` and
 `npm run landing:typecheck` when changing this page.
 

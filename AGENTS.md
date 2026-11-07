@@ -160,7 +160,9 @@ These rules apply to the complete repository.
   headless runtime catalog and platform routes. Preview upgrades are manual
   while Windows packages are unsigned; never enable unsigned automatic installs.
   The isolated page build uses `node scripts/build-desktop-downloads.mjs` and the
-  same `DesktopDownloads` component as the main downloads screen.
+  same `DesktopDownloads` component as the main downloads screen. Publish the
+  verified RPM builder's catalog entry as `fedora` in the `macos-all` response.
+  Keep it separate from legacy package arrays and retain immutable release files.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   pinned published native baseline, source provenance, explicit runtime pairing

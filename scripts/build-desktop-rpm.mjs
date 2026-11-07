@@ -190,7 +190,20 @@ export async function buildDesktopRpm({ release, deb, source, outputDirectory, i
   await copyFile(join(work, "RPMS/x86_64", `mycellios-desktop-${release.version}-${rpmRelease}.x86_64.rpm`), rpm);
   const metadata = run("rpm", ["-qp", "--qf", "%{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}", rpm]);
   if (metadata !== `mycellios-desktop|${release.version}|${rpmRelease}|x86_64`) throw new Error("desktop_rpm_output_metadata_mismatch");
-  await writeFile(`${rpm}.sha256`, `${await sha256(rpm)}  ${basename(rpm)}\n`);
+  const digest = await sha256(rpm);
+  const fileName = basename(rpm);
+  const catalogEntry = {
+    id: "fedora-x64",
+    format: "RPM",
+    version: release.version,
+    fileName,
+    path: new URL(fileName, release.desktop.url).pathname,
+    bytes: (await lstat(rpm)).size,
+    sha256: digest,
+    source: { path: new URL(release.source.url).pathname, sha256: release.source.sha256 },
+  };
+  await writeFile(`${rpm}.sha256`, `${digest}  ${fileName}\n`);
+  await writeFile(`${rpm}.catalog.json`, `${JSON.stringify(catalogEntry, null, 2)}\n`);
   await writeFile(`${rpm}.provenance.json`, `${JSON.stringify(provenance, null, 2)}\n`);
   console.log(`RPM: ${rpm}`);
   return { rpm, root, provenance };
