@@ -1,5 +1,12 @@
 import { randomInt } from "node:crypto";
-import { BOT_COLORS, parseBotAvatarValue } from "@rakazo/contracts";
+import {
+  BOT_COLORS,
+  MICO_AVATAR_PALETTES,
+  MICO_AVATAR_SHAPES,
+  micoAvatarShape,
+  micoAvatarValue,
+  parseBotAvatarValue,
+} from "@rakazo/contracts";
 import {
   ORGANIC_AVATAR_HEART_FAMILY,
   ORGANIC_AVATAR_LOOKS,
@@ -36,6 +43,30 @@ function cuidShapedId(random: Random, now: number): string {
   let suffix = "";
   for (let index = 0; index < 16; index++) suffix += Math.floor(random() * 36).toString(36);
   return `c${now.toString(36).padStart(8, "0").slice(-8)}${suffix}`;
+}
+
+// Rotate the palette after each pass so every set of twelve uses every shape
+// and every color once, starting with the brand's original pairings.
+const micoCombinations = MICO_AVATAR_PALETTES.flatMap((_, offset) =>
+  MICO_AVATAR_SHAPES.map(({ index }, slot) =>
+    micoAvatarValue(index, MICO_AVATAR_PALETTES[(slot + offset) % MICO_AVATAR_PALETTES.length]!.color),
+  ),
+);
+
+export function chooseMicoAvatar(existing: readonly { color: string }[]): { id: string; color: string } {
+  const counts = new Map<string, number>();
+  for (const bot of existing) {
+    const avatar = parseBotAvatarValue(bot.color);
+    if (avatar.kind !== "shape" || !micoAvatarShape(avatar.shapeIndex)) continue;
+    const value = micoAvatarValue(avatar.shapeIndex, avatar.color.toUpperCase());
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  let color = micoCombinations[0]!;
+  for (const combination of micoCombinations) {
+    if ((counts.get(combination) ?? 0) < (counts.get(color) ?? 0)) color = combination;
+    if (!counts.has(color)) break;
+  }
+  return { id: cuidShapedId(cryptoRandom, Date.now()), color };
 }
 
 /** An id on the look the user's bots use least, never a heart. */

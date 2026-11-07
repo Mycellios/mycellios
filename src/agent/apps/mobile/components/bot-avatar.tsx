@@ -14,6 +14,8 @@ import {
   avatarThinkingDot,
   avatarWorkingDot,
   isRunWorking,
+  MICO_AVATAR_VIEWBOX,
+  micoAvatarArt,
   organicAvatarPath,
   SHIPPED_BOT_AVATAR_CENTER,
   SHIPPED_BOT_AVATAR_VIEWBOX,
@@ -158,6 +160,7 @@ export const BotAvatar = memo(function BotAvatar({
   const poke = usePoke(life, pokeable && clock === "running");
   const bodyStyle = useBodyStyle(life, size);
   const fillColor = parsed.kind === "shape" || parsed.kind === "color" ? parsed.color : color;
+  const mico = parsed.kind === "shape" ? micoAvatarArt(parsed.shapeIndex, parsed.color) : undefined;
   const picture =
     parsed.kind === "image" && parsed.imageUrl ? (
       <View
@@ -172,6 +175,8 @@ export const BotAvatar = memo(function BotAvatar({
       >
         <Image source={{ uri: parsed.imageUrl }} style={{ width: size, height: size }} />
       </View>
+    ) : mico ? (
+      <MicoAvatar art={mico} size={size} life={life} bodyStyle={bodyStyle} />
     ) : parsed.kind === "shape" ? (
       <ShippedShapeAvatar
         color={parsed.color}
@@ -290,6 +295,45 @@ function Dot({
 }
 
 type BodyStyle = ReturnType<typeof useAnimatedStyle>;
+
+function MicoAvatar({
+  art,
+  size,
+  life,
+  bodyStyle,
+}: {
+  art: NonNullable<ReturnType<typeof micoAvatarArt>>;
+  size: number;
+  life: AvatarLife;
+  bodyStyle: BodyStyle;
+}) {
+  const [left, right, y] = art.eyes;
+  const eyeProps = (x: number, glint: boolean) => () => {
+    "worklet";
+    const state = eyeState(life);
+    const scale = 64 / AVATAR_MOTION_UNITS;
+    return {
+      cx: x + state.x * scale - (glint ? 0.65 : 0),
+      cy: y + state.y * scale - (glint ? 1.2 * state.lid : 0),
+      ry: state.hidden ? 0 : (glint ? 1 : 3.65) * state.lid,
+    };
+  };
+  const leftEye = useAnimatedProps(eyeProps(left, false));
+  const rightEye = useAnimatedProps(eyeProps(right, false));
+  const leftGlint = useAnimatedProps(eyeProps(left, true));
+  const rightGlint = useAnimatedProps(eyeProps(right, true));
+  return (
+    <Animated.View style={[{ width: size, height: size }, bodyStyle]}>
+      <Svg width={size} height={size} viewBox={MICO_AVATAR_VIEWBOX}>
+        {art.layers.map(([tone, path]) => <Path key={path} d={path} fill={art.fills[tone]} />)}
+        <AnimatedEllipse animatedProps={leftEye} rx={2.75} fill="#251C2C" />
+        <AnimatedEllipse animatedProps={rightEye} rx={2.75} fill="#251C2C" />
+        <AnimatedEllipse animatedProps={leftGlint} rx={0.85} fill="#FFF1DD" />
+        <AnimatedEllipse animatedProps={rightGlint} rx={0.85} fill="#FFF1DD" />
+      </Svg>
+    </Animated.View>
+  );
+}
 
 function ShippedShapeAvatar({
   color,

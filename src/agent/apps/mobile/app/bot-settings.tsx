@@ -1,11 +1,15 @@
 import type { ComputerMode, ThinkingLevel } from "@rakazo/contracts";
 import {
-  BOT_AVATAR_SHAPE_COUNT,
   BOT_COLORS,
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
   BOT_NAME_MAX_LENGTH,
   BOT_TITLE_MAX_LENGTH,
+  MICO_AVATAR_PALETTES,
+  MICO_AVATAR_SHAPES,
+  micoAvatarShape,
+  withMicoAvatarPalette,
+  withMicoAvatarShape,
 } from "@rakazo/contracts";
 import {
   credentialForModel,
@@ -48,8 +52,6 @@ import {
   avatarColor,
   avatarShape,
   isAvatarPhoto,
-  withAvatarColor,
-  withAvatarShape,
 } from "../lib/bot-avatar-edit";
 import { deviceVoices, setVoiceForBot, voiceForBot, voiceLabel } from "../lib/bot-voices";
 import { chatModelPickerChoices } from "../lib/chat-model";
@@ -856,6 +858,9 @@ export default function BotSettingsScreen() {
             style={{ backgroundColor: tokens.background }}
           >
             <NativeActionButton label={t("Done")} onPress={() => setAvatarOpen(false)} />
+            <View style={{ alignItems: "center" }}>
+              <BotAvatar color={color} identity={bot?.id} size={78} />
+            </View>
             {bot && isAvatarPhoto(color) ? (
               <Pressable
                 accessibilityRole="button"
@@ -876,25 +881,30 @@ export default function BotSettingsScreen() {
               contentContainerStyle={{ gap: 10, paddingVertical: 8, paddingHorizontal: 4 }}
               accessibilityRole="radiogroup"
             >
-              {BOT_COLORS.map((option, index) => (
-                <Pressable
-                  key={option}
-                  accessibilityRole="radio"
-                  accessibilityLabel={t("Color {number}", { number: index + 1 })}
-                  accessibilityState={{ checked: avatarColor(color) === option }}
-                  onPress={() => setColor((current) => withAvatarColor(current, option))}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: option,
-                    borderWidth: 3,
-                    borderColor: avatarColor(color) === option ? tokens.foreground : "transparent",
-                  }}
-                />
-              ))}
+              {MICO_AVATAR_PALETTES.map(({ id, color: option }, index) => {
+                const selected =
+                  Boolean(micoAvatarShape(avatarShape(color) ?? undefined)) &&
+                  avatarColor(color).toUpperCase() === option;
+                return (
+                  <Pressable
+                    key={id}
+                    accessibilityRole="radio"
+                    accessibilityLabel={t("Color {number}", { number: index + 1 })}
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => setColor((current) => withMicoAvatarPalette(current, option))}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: option,
+                      borderWidth: 3,
+                      borderColor: selected ? tokens.foreground : "transparent",
+                    }}
+                  />
+                );
+              })}
             </ScrollView>
-            {bot && !isAvatarPhoto(color) ? (
+            {bot ? (
               <>
                 <Text style={{ color: tokens.mutedForeground, marginTop: 16, fontSize: 14 }}>
                   {t("Shape")}
@@ -919,13 +929,13 @@ export default function BotSettingsScreen() {
                   >
                     <BotAvatar color={avatarColor(color)} identity={bot.id} size={36} />
                   </Pressable>
-                  {Array.from({ length: BOT_AVATAR_SHAPE_COUNT }, (_, shape) => (
+                  {MICO_AVATAR_SHAPES.map(({ id, index: shape }, index) => (
                     <Pressable
-                      key={shape}
+                      key={id}
                       accessibilityRole="radio"
-                      accessibilityLabel={t("Shape {number}", { number: shape + 1 })}
+                      accessibilityLabel={t("Shape {number}", { number: index + 1 })}
                       accessibilityState={{ checked: avatarShape(color) === shape }}
-                      onPress={() => setColor((current) => withAvatarShape(current, shape))}
+                      onPress={() => setColor((current) => withMicoAvatarShape(current, shape))}
                       style={{
                         padding: 4,
                         borderRadius: 14,
@@ -935,7 +945,7 @@ export default function BotSettingsScreen() {
                       }}
                     >
                       <BotAvatar
-                        color={withAvatarShape(color, shape)}
+                        color={withMicoAvatarShape(color, shape)}
                         identity={bot.id}
                         size={36}
                       />

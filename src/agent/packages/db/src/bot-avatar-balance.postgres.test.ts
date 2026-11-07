@@ -1,5 +1,4 @@
-import { BOT_COLORS } from "@rakazo/contracts";
-import { ORGANIC_AVATAR_HEART_FAMILY, organicAvatarFamily, organicAvatarLook } from "@rakazo/core";
+import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "./client.js";
 import { createDb } from "./client.js";
@@ -77,17 +76,10 @@ describePostgres("new bot avatars (PostgreSQL)", () => {
       return bots;
     });
 
-    const all = [...before, ...created];
-    const lookOf = (id: string) => organicAvatarLook(organicAvatarFamily(id));
-    // Eight automatic looks: the heart is excluded and the two round families share a look.
-    const firstEight = all.slice(0, 8);
-    expect(new Set(firstEight.map((bot) => lookOf(bot.id))).size).toBe(firstEight.length);
-    expect(
-      created.every((bot) => organicAvatarFamily(bot.id) !== ORGANIC_AVATAR_HEART_FAMILY),
-    ).toBe(true);
-    // The starter bot counts too: the first seven bots share no colour.
-    const firstColors = all.slice(0, BOT_COLORS.length).map((bot) => bot.color);
-    expect(new Set(firstColors).size).toBe(firstColors.length);
+    const expected = MICO_AVATAR_SHAPES.map(({ index }, slot) =>
+      micoAvatarValue(index, MICO_AVATAR_PALETTES[slot]!.color),
+    ).filter((value) => !before.some((bot) => bot.color === value));
+    expect(created.map((bot) => bot.color)).toEqual(expected.slice(0, created.length));
     expect(created.every((bot) => /^c[a-z0-9]{24}$/.test(bot.id))).toBe(true);
 
     // Existing bots keep their id and colour.
@@ -111,33 +103,24 @@ describePostgres("new bot avatars (PostgreSQL)", () => {
         ),
       ),
     );
-    expect(new Set(created.map((bot) => organicAvatarLook(organicAvatarFamily(bot.id)))).size).toBe(
-      8,
-    );
-    expect(
-      created.every((bot) => organicAvatarFamily(bot.id) !== ORGANIC_AVATAR_HEART_FAMILY),
-    ).toBe(true);
+    expect(new Set(created.map((bot) => bot.color)).size).toBe(8);
+    expect(created.map((bot) => bot.color)).toContain("#8650DF::shape_1000");
   });
 
   it("keeps a colour the caller chose and skips archived bots", async () => {
     const repos = createRepos(prisma);
     const system = asSystem(prisma);
-    const live = await system.bot.findMany({
-      where: { spaceId: owner.spaceId, userId: owner.userId, archivedAt: null },
-      select: { id: true },
-    });
-    // Archive every bot but one; the next bot then avoids only that one's family.
-    const [kept, ...rest] = live;
     await system.bot.updateMany({
-      where: { id: { in: rest.map((bot) => bot.id) } },
+      where: { spaceId: owner.spaceId, userId: owner.userId, color: "#8650DF::shape_1000" },
       data: { archivedAt: new Date() },
     });
     const next = await runAsTenant(owner, () =>
       repos.createBot(actor(), { ...botInput("Picked"), color: "#123456" }),
     );
     expect(next.color).toBe("#123456");
-    expect(organicAvatarLook(organicAvatarFamily(next.id))).not.toBe(
-      organicAvatarLook(organicAvatarFamily(kept!.id)),
+    const automatic = await runAsTenant(owner, () =>
+      repos.createBot(actor(), botInput("Automatic")),
     );
+    expect(automatic.color).toBe("#8650DF::shape_1000");
   });
 });

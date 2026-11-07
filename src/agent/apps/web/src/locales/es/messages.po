@@ -9164,3 +9164,99 @@ msgstr "Cambiar modelo"
 
 msgid "This changes the model for this Mico. Your message stays in the chat."
 msgstr "El cambio se aplica a este Mico. Tu mensaje sigue en el chat."
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Mushroom"
+msgstr "Seta"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Fox"
+msgstr "Zorro"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Hedgehog"
+msgstr "Erizo"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Frog"
+msgstr "Rana"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Moth"
+msgstr "Polilla"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Snail"
+msgstr "Caracol"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Owl"
+msgstr "Búho"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Turtle"
+msgstr "Tortuga"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Axolotl"
+msgstr "Ajolote"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Crab"
+msgstr "Cangrejo"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Fish"
+msgstr "Pez"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Octopus"
+msgstr "Pulpo"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Violet"
+msgstr "Violeta"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Tangerine"
+msgstr "Mandarina"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Honey"
+msgstr "Miel"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Lime"
+msgstr "Lima"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Indigo"
+msgstr "Índigo"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Turquoise"
+msgstr "Turquesa"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Raspberry"
+msgstr "Frambuesa"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Mint"
+msgstr "Menta"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Lavender"
+msgstr "Lavanda"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Coral"
+msgstr "Coral"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Sky blue"
+msgstr "Azul cielo"
+
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Slate"
+msgstr "Pizarra"
