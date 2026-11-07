@@ -4197,6 +4197,6 @@ describe("computer-unavailable chat", () => {
       "computer_observe", "computer_act", "open_path", "launch_app", "request_takeover", "browser_navigate", "browser_snapshot", "browser_act"])
       expect(names).not.toContain(name);
     expect(persistentComputerInstruction({ computerAvailable: false, heldForTakeover: false,
-      graphical: false, graphicalToolsAllowed: false })).toContain("No execution computer is configured");
+      graphical: false, graphicalToolsAllowed: false })).toContain("No execution workspace is available for this turn");
   });
 });

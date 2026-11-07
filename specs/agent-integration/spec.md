@@ -25,6 +25,11 @@ in cloud after a timeout, connection loss, Stop or update. Version the capabilit
 bound frames/callbacks and preserve cancellation, completion and uncertain-effect
 semantics. Startup must not silently swallow an unavailable native executor.
 
+If Desktop is already offline before dispatch, a fresh turn may use the cloud
+runtime. Project sessions and checkpoint continuations retain their Desktop
+binding. Server-side repository work requires a separately provisioned sandbox
+and scoped repository access. A cloud model connection alone provides neither.
+
 Qualification requires callback/accounting/credential and cancellation tests,
 old-client compatibility, remote and native builds, and a real existing-account
 turn initiated outside Desktop. A synthetic runtime is not physical acceptance.
