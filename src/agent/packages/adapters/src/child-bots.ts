@@ -391,16 +391,13 @@ export async function destroyBot(
   },
 ) {
   await deps.messagingInstallations?.removeForBot(bot);
-  const [dedicated, activeRuns, routines] = await Promise.all([
+  const dedicatedKey = { mode: "dedicated" as const, spaceId: bot.spaceId, userId: bot.userId, botId: bot.id };
+  const [dedicated, cloudDedicated, activeRuns, routines] = await Promise.all([
     deps.prisma.computer.findUnique({
-      where: {
-        scopeKey: computerScopeKey({
-          mode: "dedicated",
-          spaceId: bot.spaceId,
-          userId: bot.userId,
-          botId: bot.id,
-        }),
-      },
+      where: { scopeKey: computerScopeKey(dedicatedKey) },
+    }),
+    deps.prisma.computer.findUnique({
+      where: { scopeKey: computerScopeKey({ ...dedicatedKey, cloudFallback: true }) },
     }),
     deps.prisma.run.findMany({
       where: { botId: bot.id, status: { in: [...ACTIVE_RUN_STATUSES] } },
@@ -421,8 +418,10 @@ export async function destroyBot(
   const sharedComputer = await releaseTeamComputerScreen(deps, bot, dedicated?.id, context, {
     cancelRunWork: true,
   });
-  if (dedicated?.providerRef) {
-    const destroyed = deps.sandbox.destroy(toComputerRef(dedicated), context);
+  const dedicatedComputers = [dedicated, cloudDedicated].filter((computer) => computer !== null);
+  for (const computer of dedicatedComputers) {
+    if (!computer.providerRef) continue;
+    const destroyed = deps.sandbox.destroy(toComputerRef(computer), context);
     await (options.strictTeardown ? destroyed : destroyed.catch(() => undefined));
   }
   // Keep the bot deletion transaction from committing if raw transcript cleanup fails.
@@ -479,7 +478,9 @@ export async function destroyBot(
           where: { id: webhookSecretId, kind: "webhook", spaceId: bot.spaceId },
         });
       }
-      if (dedicated) await tx.computer.delete({ where: { id: dedicated.id } });
+      for (const computer of dedicatedComputers) {
+        await tx.computer.delete({ where: { id: computer.id } });
+      }
       return {
         artifactKeys: [
           ...botArtifacts.map((artifact) => artifact.storageKey),
@@ -512,9 +513,9 @@ export async function destroyBot(
         .catch(() => undefined);
     }),
   );
-  if (dedicated) {
-    await recordComputerRunEnd(deps.prisma, { id: dedicated.id }, "deleted");
-    await removeAgentHome(deps.home, dedicated.homeKey, deps.dataDir).catch(() => undefined);
+  for (const computer of dedicatedComputers) {
+    await recordComputerRunEnd(deps.prisma, { id: computer.id }, "deleted");
+    await removeAgentHome(deps.home, computer.homeKey, deps.dataDir).catch(() => undefined);
   }
   await removeTeamBrowserProfile(deps, bot.id, sharedComputer, context);
   await removeTeamBotWorkspace(deps, bot, context).catch((error) => {
@@ -779,16 +780,22 @@ async function removeTeamBotWorkspace(
   // a folder there. The space's Team Computer from before each person got their own still holds
   // the folders and browser profiles of every member's bots from then. Any other team computer
   // in the space drops them on boot (botDeletion).
-  const [own, legacy] = await Promise.all([
+  const teamKey = { mode: "team" as const, spaceId: bot.spaceId, userId: bot.userId };
+  const [own, cloud, legacy] = await Promise.all([
     deps.prisma.computer.findUnique({
-      where: {
-        scopeKey: computerScopeKey({ mode: "team", spaceId: bot.spaceId, userId: bot.userId }),
-      },
+      where: { scopeKey: computerScopeKey(teamKey) },
+    }),
+    deps.prisma.computer.findUnique({
+      where: { scopeKey: computerScopeKey({ ...teamKey, cloudFallback: true }) },
     }),
     deps.prisma.computer.findUnique({ where: { homeKey: legacyTeamHomeKey(bot.spaceId) } }),
   ]);
   const profile = teamBrowserProfileName(bot.id);
   if (own) await removeBotFolders(deps, bot.id, own, [["bots", bot.id]], context);
+  if (cloud) {
+    await removeTeamBrowserProfile(deps, bot.id, cloud, context);
+    await removeBotFolders(deps, bot.id, cloud, [["bots", bot.id]], context);
+  }
   if (legacy && legacy.id !== own?.id && legacy.scope === "team") {
     await removeBotFolders(
       deps,

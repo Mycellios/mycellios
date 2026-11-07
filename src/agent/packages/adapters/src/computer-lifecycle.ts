@@ -165,6 +165,23 @@ export async function provisionComputer(
   const started = performance.now();
   const log = getLogger().child({ "computer.id": computerId, "run.id": context.runId });
   let existing = await deps.prisma.computer.findUniqueOrThrow({ where: { id: computerId } });
+  const cloudWorkspace = existing.scopeKey?.startsWith("cloud:");
+  if (cloudWorkspace && (!context.cloudWorkspace || !context.runId || !context.botId ||
+    existing.spaceId !== context.spaceId || existing.userId !== context.userId)) {
+    throw new Error("The server workspace is not assigned to this run");
+  }
+  const assignment = () => cloudWorkspace
+    ? {
+        cloudRuns: {
+          some: {
+            id: context.runId!, botId: context.botId!, spaceId: context.spaceId, userId: context.userId,
+            status: "running", leaseExpiresAt: { gt: new Date() },
+            leaseOwner: context.cloudWorkspace!.workerId, leaseFence: context.cloudWorkspace!.runFence,
+            bot: { archivedAt: null, computerSwitching: false },
+          },
+        },
+      }
+    : context.botId ? { bots: { some: { id: context.botId, archivedAt: null } } } : {};
   if (existing.maintenanceId && existing.maintenanceId !== context.operationId)
     throw new ComputerBusyError();
   if (existing.controlLeaseId && !hasActiveComputerControl(existing)) {
@@ -192,7 +209,7 @@ export async function provisionComputer(
           kind: existing.kind,
           screenGeneration: existing.screenGeneration,
           maintenanceId: existing.maintenanceId ?? null,
-          ...(context.botId ? { bots: { some: { id: context.botId, archivedAt: null } } } : {}),
+          ...assignment(),
         },
         // A row activated by an older release has no clock yet; start it now.
         data: { updatedAt: new Date(), runningSince },
@@ -319,7 +336,7 @@ export async function provisionComputer(
       id: computerId,
       ...claimWhere,
       maintenanceId: existing.maintenanceId ?? null,
-      ...(context.botId ? { bots: { some: { id: context.botId, archivedAt: null } } } : {}),
+      ...assignment(),
     },
     data: { state: "booting", updatedAt: claimStamp },
   });
@@ -386,7 +403,7 @@ export async function provisionComputer(
         updatedAt: claimStamp,
         ...previousRef,
         maintenanceId: existing.maintenanceId ?? null,
-        ...(context.botId ? { bots: { some: { id: context.botId, archivedAt: null } } } : {}),
+        ...assignment(),
       },
       data: {
         state: "running",
@@ -533,6 +550,7 @@ export async function acquireDedicatedScreenLeaseFence(
     botId: string;
     workerId: string;
     runFence: number;
+    cloudWorkspace?: boolean;
   },
 ): Promise<ComputerExecutionLease> {
   return prisma.$transaction(async (tx) => {
@@ -540,7 +558,8 @@ export async function acquireDedicatedScreenLeaseFence(
     const assignedBot = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM bots
       WHERE id = ${input.botId}
-        AND "computerId" = ${input.computerId}
+        AND (${input.cloudWorkspace === true} OR "computerId" = ${input.computerId})
+        AND "archivedAt" IS NULL
         AND "computerSwitching" = false
       FOR UPDATE SKIP LOCKED`;
     if (assignedBot.length !== 1) throw new ComputerBusyError();
@@ -558,6 +577,7 @@ export async function acquireDedicatedScreenLeaseFence(
         AND status = 'running'
         AND "leaseOwner" = ${input.workerId}
         AND "leaseFence" = ${input.runFence}
+        AND (NOT ${input.cloudWorkspace === true} OR "cloudComputerId" = ${input.computerId})
         AND "leaseExpiresAt" > ${new Date()}
       FOR UPDATE SKIP LOCKED`;
     if (currentRun.length !== 1) throw new ComputerBusyError();

@@ -23,6 +23,13 @@ export class DesktopAgentRuntime implements AgentRuntime {
     // The approval judge is a server authority, not another Desktop task waiting for
     // a runtime slot held by the very operation it is deciding whether to admit.
     if (request.usageOperationKind === "setup" && !request.tools.length || request.script) { yield* this.options.fallback.run(request, context); return; }
+    if (context.cloudWorkspace) {
+      yield* this.options.fallback.run({
+        ...request,
+        instructions: `${request.instructions}\nThis turn uses a server workspace separate from Desktop. For work that requires files only on the PC, explain which files are needed.`,
+      }, context);
+      return;
+    }
     const route = await this.options.select(context);
     if (!route.available) {
       // The executor also supplies resumeToolResult on fresh turns. Only an

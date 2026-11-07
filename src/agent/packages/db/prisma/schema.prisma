@@ -838,6 +838,9 @@ model Run {
   bot                  Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   threadId             String
   thread               Thread            @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  /// An offline turn stays with its own server workspace across retries.
+  cloudComputerId      String?
+  cloudComputer        Computer?         @relation("CloudComputerRuns", fields: [cloudComputerId], references: [id], onDelete: SetNull)
   taskId               String
   task                 Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
   userId               String
@@ -889,6 +892,7 @@ model Run {
   @@index([taskId])
   @@index([sourceMessageId])
   @@index([threadId, status, createdAt])
+  @@index([cloudComputerId, status])
   @@index([routineId])
   @@map("runs")
 }
@@ -1317,6 +1321,7 @@ model Computer {
   updatedAt               DateTime                 @updatedAt
   bots                    Bot[]
   executionLeases         ComputerExecutionLease[]
+  cloudRuns               Run[]                    @relation("CloudComputerRuns")
   maintenanceId           String?
   updates                 ComputerUpdate[]
 

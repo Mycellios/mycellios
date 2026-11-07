@@ -25,10 +25,13 @@ in cloud after a timeout, connection loss, Stop or update. Version the capabilit
 bound frames/callbacks and preserve cancellation, completion and uncertain-effect
 semantics. Startup must not silently swallow an unavailable native executor.
 
-If Desktop is already offline before dispatch, a fresh turn may use the cloud
-runtime. Project sessions and checkpoint continuations retain their Desktop
-binding. Server-side repository work requires a separately provisioned sandbox
-and scoped repository access. A cloud model connection alone provides neither.
+If Desktop is offline before dispatch, a new turn on a Desktop-assigned Mico can
+use a persistent server workspace when a sandbox provider is configured. Create
+it on demand, under a separate home key for the same owner, Space and Team or
+dedicated mode. Persist the choice on the run so a Desktop reconnection cannot
+change its host. Project sessions and interrupted local runs retain their local
+binding. Server work uses only server files and the repository access available
+to that account. It does not copy a local project or replace its assignment.
 
 Qualification requires callback/accounting/credential and cancellation tests,
 old-client compatibility, remote and native builds, and a real existing-account

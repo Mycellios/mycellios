@@ -75,6 +75,22 @@ it("never replays or falls back after dispatch or a truncated native stream", as
   expect(transport).toHaveBeenCalledTimes(1); expect(fallback.run).not.toHaveBeenCalled();
 });
 
+it("continues a pinned cloud turn without probing a reconnected Desktop", async () => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn(async function* () { yield { type: "done" as const }; }) };
+  const select = vi.fn();
+  const transport = vi.fn();
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select });
+  const input = { ...request(), turnCheckpoint: "server-checkpoint" };
+  const cloudWorkspace = { workerId: "worker", runFence: 3 };
+  for await (const _ of runtime.run(input, { ...context, cloudWorkspace })) {}
+  expect(fallback.run).toHaveBeenCalledWith(
+    expect.objectContaining({ turnCheckpoint: "server-checkpoint" }),
+    expect.objectContaining({ cloudWorkspace }),
+  );
+  expect(select).not.toHaveBeenCalled();
+  expect(transport).not.toHaveBeenCalled();
+});
+
 it("distinguishes a lost Desktop transport from a returned provider failure", async () => {
   const fallback = { describe, abort: vi.fn(), run: vi.fn() };
   const providerFailure = '429: {"error":{"code":"quota_exhausted"}}';
