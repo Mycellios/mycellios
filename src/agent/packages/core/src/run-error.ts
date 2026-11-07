@@ -277,7 +277,7 @@ export function normalizeRunError(
   }
   // "429: {...}", "429 {...}", or the model runtime's "<provider> API error (429): {...}".
   const prefix = trimmed.match(
-    /^(?:[^\n():]{1,60} API error \((\d{3})\):\s*|(\d{3})(?:\s*:\s*|\s+))/,
+    /^(?:[^\n():]{1,60} API error \((\d{3})\):\s*|(\d{3})(?:\s*:\s*|\s+)|\[([a-z0-9_-]+)\/[^\]\n]{1,180}\]\s+\[(\d{3})\]:\s*)/i,
   );
   const body = trimmed.slice(prefix?.[0].length ?? 0);
   const record = asRecord(parseJson(body));
@@ -352,12 +352,14 @@ export function normalizeRunError(
     ),
   ].join(" ");
   const status =
-    [prefix?.[1], prefix?.[2], record.status, record.statusCode, record.code, payload.status, payload.statusCode, payload.code, payload.httpCode]
+    [prefix?.[1], prefix?.[2], prefix?.[4], record.status, record.statusCode, record.code, payload.status, payload.statusCode, payload.code, payload.httpCode]
       .map(Number)
       .find((value) => Number.isInteger(value) && value >= 100 && value <= 599) ??
     // Bedrock names its modeled exception instead of reporting the HTTP status.
     (/^AccessDeniedException\b/.test(trimmed) ? 403 : undefined);
-  const provider = providerLabel ?? (/\bopenrouter\b|openrouter_/i.test(signals)
+  const provider = providerLabel ?? (prefix?.[3]?.toLowerCase() === "groq"
+    ? "Groq"
+    : /\bopenrouter\b|openrouter_/i.test(signals)
     ? translate("Your OpenRouter")
     : /\bopenai\b|openai_/i.test(signals)
       ? translate("Your OpenAI")
@@ -379,7 +381,11 @@ export function normalizeRunError(
     /insufficient[_ ](?:quota|balance)|credits?|funds|spend|budget|billing|openrouter_key_limit/i.test(
       signals,
     );
-  if (
+  if (status === 413 && shortRateWindow && /\brequest too large\b/i.test(message)) {
+    kind = "context";
+    recovery = "model";
+    summary = translate("{provider} rejected this request because it exceeds the plan's tokens-per-minute limit. Choose another model.", { provider });
+  } else if (
     (status === 429 ||
       /rate[_ -]limit|too many requests|resource[_ ]?exhausted|request limit reached/i.test(
         signals,

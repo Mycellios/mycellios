@@ -619,6 +619,10 @@
   a bounded usable output floor and charge against the same limit actually sent.
   Saved limits and tool permissions stay authoritative. Verify `model-context`
   and `pi-usage` tests when changing that boundary.
+- Direct Groq GPT-OSS runs use the published free-tier TPM as a conservative
+  per-request ceiling when the key's tier is unknown. Apply it before compaction
+  and admission, including Desktop's account transport; preserve smaller saved
+  limits. A verified lower 413 ceiling stays local to the current run.
 - In-run history compaction uses the effective transport/model budget before main
   admission. Summarize only historical data with the same owned connection, no
   tools, bounded chunks/calls/time and separately attributed compaction usage.

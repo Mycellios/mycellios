@@ -1,5 +1,18 @@
 import { expect, it } from "vitest";
-import { groqRequestContextWindow } from "./groq-request-budget.js";
+import { groqInitialRequestWindow, groqRequestContextWindow } from "./groq-request-budget.js";
+
+it("applies the baseline only to the directly connected Groq GPT-OSS models", () => {
+  expect(groqInitialRequestWindow("groq", "openai/gpt-oss-20b")).toBe(6800);
+  expect(groqInitialRequestWindow("groq", "openai/gpt-oss-120b")).toBe(6800);
+  expect(groqInitialRequestWindow("openrouter", "openai/gpt-oss-20b")).toBeUndefined();
+  expect(groqInitialRequestWindow("groq", "other-model")).toBeUndefined();
+});
+
+it("accepts Groq's plain 413 but does not treat temporary 429s as request ceilings", () => {
+  const details = "Request too large for model `openai/gpt-oss-20b` in organization `fixture` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 19074, please reduce your message size.";
+  expect(groqRequestContextWindow("groq", `413: ${details}`, 131072)).toBe(6800);
+  expect(groqRequestContextWindow("groq", `429: ${details}`, 131072)).toBeUndefined();
+});
 
 const error = (limit = 6000, requested = 7000) =>
   `413: ${JSON.stringify({ code: "rate_limit_exceeded", type: "tokens", message: `Request too large on tokens per minute (TPM): Limit ${limit}, Requested ${requested}, please reduce your message size.` })}`;
