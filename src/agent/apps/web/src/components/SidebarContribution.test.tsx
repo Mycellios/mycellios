@@ -35,7 +35,7 @@ it("offers browser contribution without leaving or starting the current chat", a
   f.bridge.mockReturnValue(undefined);
   await rendered(async host => {
     const contribute = host.querySelector<HTMLAnchorElement>('[aria-label="Earn credits with your computer"]')!;
-    expect(contribute.href).toBe("https://www.mycellios.com/browser/");
+    expect(contribute.href).toBe("https://www.mycellios.com/browser/index.html");
     expect(contribute.target).toBe("_blank"); expect(contribute.rel).toContain("noopener");
     expect(f.control).not.toHaveBeenCalled(); expect(f.enrollment).not.toHaveBeenCalled();
     expect(f.native).not.toHaveBeenCalled();
@@ -89,7 +89,7 @@ it("verifies the existing installation before offering a separate start action",
     expect(f.enrollment).not.toHaveBeenCalled();
     expect(f.enroll).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Earn credits with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
     f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
@@ -103,7 +103,7 @@ it("keeps verification read-only when another process has already repaired the i
     await act(async () => host.querySelector("button")!.click());
     expect(f.identify).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Earn credits with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
   });
 });
 
@@ -126,7 +126,7 @@ it("refreshes a rejected command instead of replaying its effect", async () => {
     expect(host.querySelector("button")!.textContent).toContain("Retry");
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Earn credits with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
   });
 });
 it("keeps a newly enrolled contributor running instead of immediately pausing it", async () => {
@@ -183,6 +183,6 @@ it("never resumes a node when the user requested pause and it is already paused"
   await rendered(async host => {
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Earn credits with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
   });
 });

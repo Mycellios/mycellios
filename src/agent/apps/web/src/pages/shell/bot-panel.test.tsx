@@ -179,12 +179,12 @@ async function render(
   await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
 }
 
+async function openSettingsPage(page: string) {
+  await act(async () => container.querySelector<HTMLButtonElement>(`[data-settings-page="${page}"]`)!.click());
+}
+
 async function expandAdvanced() {
-  await act(async () =>
-    container
-      .querySelector<HTMLButtonElement>('[data-testid="bot-settings-advanced"] button')!
-      .click(),
-  );
+  await openSettingsPage("advanced");
 }
 
 function descriptionField(): HTMLTextAreaElement {
@@ -262,67 +262,27 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it("shows the main sections and keeps only rare controls in Advanced", async () => {
-  vi.mocked(rpc.voice.voices).mockResolvedValueOnce([
-    { id: "fixture-voice", label: "Fixture voice" },
-  ]);
+it("opens settings subpages and returns focus to the overview row", async () => {
   await render("Billing", {}, true);
-  expect(container.querySelector('[data-testid="bot-profile-header"]')?.textContent).toContain(
-    "Ada",
-  );
-  expect(container.querySelector('input[aria-label="Name"]')).toBeNull();
-  expect(container.querySelector('[id$="-description"]')).toBeNull();
-  expect(container.querySelector('[id$="-disabled-tools"]')).toBeNull();
-  expect(
-    [...container.querySelectorAll("button")].some((button) => button.textContent === "Save"),
-  ).toBe(false);
-  const advanced = container.querySelector<HTMLElement>('[data-testid="bot-settings-advanced"]')!;
-  expect(advanced.querySelector("button[aria-expanded]")?.getAttribute("aria-expanded")).toBe(
-    "false",
-  );
+  expect(container.querySelector('[data-testid="bot-profile-header"]')?.textContent).toContain("Ada");
   expect(container.querySelector('[id$="-model"]')).not.toBeNull();
-  expect(container.querySelector('[id$="-thinking"]')).toBeNull();
-  expect(container.querySelector('[id$="-auto-speak"]')).toBeNull();
-  expect(container.querySelector('textarea[id$="-instructions"]')).not.toBeNull();
-  await act(async () =>
-    advanced.querySelector<HTMLButtonElement>("button[aria-expanded]")?.click(),
-  );
-  expect(
-    container
-      .querySelector('[id$="-disabled-tools"]')
-      ?.closest("section")
-      ?.getAttribute("data-testid"),
-  ).toBe("bot-settings-tools");
-  const labels = {
-    model: "Model",
-    computer: "Computer",
-    memoryScope: "Memory scope",
-    voice: "Voice",
-    readAloud: "Read replies aloud",
-    fleetManagement: "Manage the bots it creates",
-  };
-  const controls = [...advanced.querySelectorAll("h3, span, label, div")].flatMap((node) =>
-    Object.entries(labels)
-      .filter(([, label]) =>
-        [...node.childNodes].some(
-          (child) => child.nodeType === Node.TEXT_NODE && child.textContent === label,
-        ),
-      )
-      .map(([key]) => key),
-  );
-  expect([...new Set(controls)]).toEqual([
-    "computer",
-    "memoryScope",
-    "voice",
-    "readAloud",
-    "fleetManagement",
-  ]);
-  await act(async () =>
-    advanced.querySelector<HTMLButtonElement>("button[aria-expanded]")?.click(),
-  );
-  expect(advanced.querySelector("button[aria-expanded]")?.getAttribute("aria-expanded")).toBe(
-    "false",
-  );
+  expect(container.querySelector('textarea[id$="-instructions"]')?.closest("[hidden]")).not.toBeNull();
+  await openSettingsPage("instructions");
+  expect(container.querySelector('textarea[id$="-instructions"]')?.closest("[hidden]")).toBeNull();
+  expect(document.activeElement?.textContent).toBe("Instructions");
+  await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
+  expect(document.activeElement?.getAttribute("data-settings-page")).toBe("instructions");
+
+  await openSettingsPage("computer");
+  expect(container.textContent).toContain("Memory scope");
+  await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
+  await openSettingsPage("permissions");
+  expect(container.querySelector('[id$="-fleet-management"]')).not.toBeNull();
+  await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
+  await expandAdvanced();
+  expect(container.querySelector('[id$="-disabled-tools"]')).not.toBeNull();
+  expect(container.querySelector('[id$="-auto-speak"]')).not.toBeNull();
+  expect(container.querySelector('[id$="-model"]')?.closest("[hidden]")).not.toBeNull();
 });
 
 describe("BotSettings model choices", () => {
@@ -357,11 +317,6 @@ describe("BotSettings model choices", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    await act(async () =>
-      container
-        .querySelector<HTMLButtonElement>('[data-testid="bot-settings-advanced"] button')!
-        .click(),
-    );
     const model = container.querySelector('[id$="-model"]');
     if (!(model instanceof HTMLSelectElement)) throw new Error("Missing model select");
     const values = [...model.options].map((option) => option.value);
@@ -411,11 +366,6 @@ describe("BotSettings thinking options", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    await act(async () =>
-      container
-        .querySelector<HTMLButtonElement>('[data-testid="bot-settings-advanced"] button')!
-        .click(),
-    );
     const [model, thinking] = [...container.querySelectorAll('[id$="-model"], [id$="-thinking"]')];
     if (!(model instanceof HTMLSelectElement)) throw new Error("Missing model select");
     expect(model.value).toBe("openai-compatible::beta");
@@ -434,7 +384,7 @@ describe("BotSettings bot management saves", () => {
 
   it("restores the toggle when the immediate save fails", async () => {
     await render();
-    await expandAdvanced();
+    await openSettingsPage("permissions");
     onSave.mockRejectedValueOnce(new Error("offline"));
     const toggle = container.querySelector<HTMLButtonElement>('button[id$="-fleet-management"]');
     if (!toggle) throw new Error("Missing switch");
@@ -446,7 +396,7 @@ describe("BotSettings bot management saves", () => {
 
   it.each([false, true])("saves only the bot management toggle from %s", async (enabled) => {
     await render("Billing", { fleetManagement: enabled });
-    await expandAdvanced();
+    await openSettingsPage("permissions");
     const toggle = container.querySelector<HTMLButtonElement>('button[id$="-fleet-management"]');
     if (!toggle) throw new Error("Missing switch");
     await act(async () => {
@@ -650,11 +600,7 @@ it("uses the empty label placeholder and cancels an inline name edit", async () 
 
 it("focuses the visible model control without opening Advanced for a model deep link", async () => {
   await render("", {}, false, 1);
-  expect(
-    container
-      .querySelector('[data-testid="bot-settings-advanced"] button[aria-expanded]')
-      ?.getAttribute("aria-expanded"),
-  ).toBe("false");
+  expect(container.querySelector('[aria-label="Back"]')).toBeNull();
   expect(document.activeElement?.id.endsWith("-model")).toBe(true);
 });
 
@@ -744,12 +690,9 @@ describe("BotSettings cached data", () => {
 it("keeps the per-agent model picker visible outside advanced settings", async () => {
   await render();
   const section = container.querySelector('[data-testid="bot-model-settings"]');
-  const advanced = container.querySelector('[data-testid="bot-settings-advanced"]');
+
   expect(section).not.toBeNull();
   expect(section?.textContent).toContain("Model for this agent");
   expect(section?.querySelector('[id$="-model"]')).not.toBeNull();
-  expect(advanced?.contains(section)).toBe(false);
-  expect(advanced?.querySelector("button[aria-expanded]")?.getAttribute("aria-expanded")).toBe(
-    "false",
-  );
+  expect(section?.closest("[hidden]")).toBeNull();
 });

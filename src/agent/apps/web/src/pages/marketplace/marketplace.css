@@ -362,6 +362,7 @@
   }
   .rk-market-nav nav {
     flex-direction: row;
+    flex-wrap: wrap;
     gap: 4px;
   }
   .rk-market-nav :where(nav) button {

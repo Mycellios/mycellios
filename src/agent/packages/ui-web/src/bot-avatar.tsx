@@ -1,10 +1,11 @@
-import { micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
+import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
 import type { BotColorDef } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
   avatarIdentitySeed,
   BOT_AVATAR_COLORS,
   BOT_COLOR_LIST,
+  currentMicoAvatarValue,
   DEFAULT_BOT_AVATAR_COLOR,
   MICO_AVATAR_VIEWBOX,
   micoAvatarArt,
@@ -20,6 +21,7 @@ import { tokens } from "@rakazo/ui-tokens";
 import type { CSSProperties } from "react";
 import { memo, useId, useMemo, useSyncExternalStore } from "react";
 import { cn } from "./lib/utils.js";
+import { MICO_EYE_PATHS, MICO_PLUSH_CROPS } from "./mico-avatar-sprites.js";
 import "./styles.css";
 
 export type { BotColorDef };
@@ -82,7 +84,7 @@ export const BotAvatar = memo(function BotAvatar({
   const id = useId().replace(/[^a-zA-Z0-9-_]/g, "");
   const isWorking = ACTIVE_RUN_STATUSES.some((s) => s === status);
 
-  const parsed = useMemo(() => parseBotAvatar(color, identity), [color, identity]);
+  const parsed = useMemo(() => parseBotAvatar(currentMicoAvatarValue(color, identity)), [color, identity]);
   const effectiveId = identity || parsed.color || "agent";
 
   const colorDef = useMemo(
@@ -139,7 +141,11 @@ export const BotAvatar = memo(function BotAvatar({
     );
   }
 
-  const mico = micoAvatarArt(parsed.shapeIndex, parsed.color);
+  const look = micoAvatarDetails(color);
+  const shapeOrdinal = MICO_AVATAR_SHAPES.findIndex(({ index }) => index === parsed.shapeIndex);
+  const flatColor = look.original ? MICO_AVATAR_PALETTES[shapeOrdinal]?.color : parsed.color;
+  const mico = micoAvatarArt(parsed.shapeIndex, flatColor ?? parsed.color);
+  const plush = look.finish === "plush" ? MICO_PLUSH_CROPS[shapeOrdinal] : undefined;
   return (
     <div
       className={cn(
@@ -151,6 +157,7 @@ export const BotAvatar = memo(function BotAvatar({
         height: size,
       }}
       data-working={isWorking}
+      data-mico-avatar={mico ? look.finish : undefined}
     >
       <svg
         className="rakazo-bot-avatar-ring absolute pointer-events-none"
@@ -183,13 +190,14 @@ export const BotAvatar = memo(function BotAvatar({
         </defs>
       </svg>
       <svg
-        viewBox={mico ? MICO_AVATAR_VIEWBOX : VIEWBOX}
+        viewBox={plush?.[0] ?? (mico ? MICO_AVATAR_VIEWBOX : VIEWBOX)}
         aria-hidden="true"
         className={cn(
-          "overflow-visible transition-transform duration-300",
-          isWorking
+          plush ? "overflow-hidden" : "overflow-visible",
+          !mico && "transition-transform duration-300",
+          !mico && (isWorking
             ? "animate-pulse scale-[1.04] motion-reduce:animate-none"
-            : "hover:scale-[1.03] motion-reduce:hover:scale-100",
+            : "hover:scale-[1.03] motion-reduce:hover:scale-100"),
         )}
         // Inline size so a parent's icon sizing (Button sizes bare SVGs) cannot shrink it.
         style={{
@@ -202,17 +210,26 @@ export const BotAvatar = memo(function BotAvatar({
               : "drop-shadow(0 2px 4px rgba(0,0,0,0.45))",
         }}
       >
-        {mico ? (
+        {plush && mico ? (
+          <>
+            <MicoPlushBody id={id} tint={look.original ? undefined : mico.fills.body} firstSheet={shapeOrdinal < 5} />
+            <MicoEyes
+              eyes={look.eyes}
+              positions={[plush[1], plush[2]]}
+              scale={1.9}
+              plush
+            />
+          </>
+        ) : mico ? (
           <>
             {mico.layers.map(([tone, path]) => (
               <path key={path} d={path} fill={mico.fills[tone]} />
             ))}
-            {mico.eyes.slice(0, 2).map((x) => (
-              <g key={x}>
-                <ellipse cx={x} cy={mico.eyes[2]} rx={2.75} ry={3.65} fill="#251C2C" />
-                <ellipse cx={x - 0.65} cy={mico.eyes[2] - 1.2} rx={0.85} ry={1} fill="#FFF1DD" />
-              </g>
-            ))}
+            <MicoEyes
+              eyes={look.eyes}
+              positions={[[mico.eyes[0], mico.eyes[2]], [mico.eyes[1], mico.eyes[2]]]}
+              scale={0.24}
+            />
           </>
         ) : (
           <>
@@ -235,6 +252,66 @@ export const BotAvatar = memo(function BotAvatar({
     </div>
   );
 });
+
+const plushSheets = {
+  first: new URL("./assets/micos-terciopelo-base.png", import.meta.url).href,
+  second: new URL("./assets/micos-terciopelo-coleccion.png", import.meta.url).href,
+};
+
+function MicoPlushBody({ id, tint, firstSheet }: { id: string; tint?: string; firstSheet: boolean }) {
+  const filterId = `${id}-plush`;
+  const tables = tint && [1, 3, 5].map((offset) => {
+    const value = Number.parseInt(tint.slice(offset, offset + 2), 16) / 255;
+    return [0, 0.16 * value, 0.52 * value, 0.94 * value, 0.43 + 0.57 * value, 1].join(" ");
+  });
+  return (
+    <>
+      {tables && <defs>
+        <filter id={filterId} colorInterpolationFilters="sRGB">
+          <feColorMatrix type="saturate" values="0" />
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues={tables[0]} />
+            <feFuncG type="table" tableValues={tables[1]} />
+            <feFuncB type="table" tableValues={tables[2]} />
+          </feComponentTransfer>
+        </filter>
+      </defs>}
+      <image
+        href={firstSheet ? plushSheets.first : plushSheets.second}
+        width={firstSheet ? 2048 : 1774}
+        height={firstSheet ? 683 : 887}
+        filter={tables ? `url(#${filterId})` : undefined}
+      />
+    </>
+  );
+}
+
+function MicoEyes({ eyes, positions, scale, plush = false }: {
+  eyes: number;
+  positions: readonly (readonly [number, number])[];
+  scale: number;
+  plush?: boolean;
+}) {
+  return (
+    <g className="rakazo-mico-gaze" fill={plush ? "#30201e" : "#251c2c"} stroke={plush ? "#f9ead288" : undefined}>
+      {positions.map(([x, y], index) => (
+        <g key={x} transform={`translate(${x} ${y}) scale(${index ? -scale : scale} ${scale})`}>
+          <path className="rakazo-mico-eye" d={MICO_EYE_PATHS[eyes] ?? MICO_EYE_PATHS[0]} />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+export function MicoEyePreview({ eyes }: { eyes: number }) {
+  const path = MICO_EYE_PATHS[eyes] ?? MICO_EYE_PATHS[0];
+  return (
+    <svg viewBox="0 0 64 32" className="h-4 w-8" aria-hidden="true" fill="currentColor">
+      <path transform="translate(19 16) scale(.72)" d={path} />
+      <path transform="translate(45 16) scale(-.72 .72)" d={path} />
+    </svg>
+  );
+}
 
 function OrganicAvatar({
   color,
@@ -358,7 +435,7 @@ export function BotShapePreview({
       title={label}
       aria-pressed={selected ?? false}
       className={cn(
-        "relative flex size-11 cursor-pointer items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover motion-safe:transition-transform motion-safe:hover:scale-105 motion-safe:active:scale-95",
+        "relative flex size-11 cursor-pointer items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
         selected
           ? "ring-2 ring-primary ring-offset-2 ring-offset-popover bg-white/10"
           : "hover:bg-white/5",

@@ -8,6 +8,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { DesktopUpdatesProvider } from "./DesktopUpdates";
 import { SidebarFooter, sidebarMarkCount } from "./SidebarFooter";
 
+// Exercise the sidebar fallback while unsaved work delays the full-window gate.
+vi.mock("../lib/desktop-update-work", () => ({
+  canRestartDesktop: () => false, canShowDesktopUpdate: () => false, desktopUpdateHasCall: () => false,
+}));
+
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({
     t: (strings: TemplateStringsArray, ...values: unknown[]) =>
@@ -160,6 +165,7 @@ it("opens integrations and keeps the existing account actions and links", async 
     "Artifacts",
     "Settings",
     "Mycellios on your phone",
+    "Get Mycellios Desktop",
     "What's new",
     "Log out",
   ]);
@@ -198,7 +204,7 @@ it("falls back when app artwork fails and accepts replacement artwork", async ()
   expect(pill.querySelector("img")?.src).toBe("https://example.test/new-slack.svg");
 });
 it.each(["throw", "state"] as const)(
-  "reveals a %s install failure after Later",
+  "shows a %s install failure while unsaved work delays the update screen",
   async (failure) => {
     const install = bridge("ready");
     if (failure === "throw") install.mockRejectedValueOnce(new Error("offline"));
@@ -209,25 +215,16 @@ it.each(["throw", "state"] as const)(
         message: "Update could not be installed",
       });
     await render();
-    // The notice is a toast, which mounts and leaves on the toaster's own timers.
-    const notice = () => document.querySelector('[aria-label="Desktop update"]');
-    const later = () =>
-      [...notice()!.querySelectorAll("button")].find((button) => button.textContent === "Later")!;
-    await vi.waitFor(() => expect(notice()).not.toBeNull());
-    await act(async () => later().click());
-    await vi.waitFor(() => expect(notice()).toBeNull());
     await act(async () =>
       document.querySelector<HTMLButtonElement>('[aria-label="Install update"]')!.click(),
     );
     await vi.waitFor(() =>
-      expect(notice()?.querySelector('[role="status"]')?.textContent).toBe(
+      expect(host.textContent).toContain(
         failure === "throw"
           ? "Could not complete the update. Try again."
           : "Update could not be installed",
       ),
     );
-    await act(async () => later().click());
-    await vi.waitFor(() => expect(notice()).toBeNull());
   },
 );
 

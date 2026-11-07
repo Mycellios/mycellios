@@ -36,7 +36,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { IconTooltip } from "../components/IconTooltip";
 import { PdfViewer } from "../components/PdfViewer";
 import { SandboxedHtmlViewer } from "../components/SandboxedHtmlViewer";
@@ -92,7 +92,8 @@ export function ArtifactsPage() {
   const { artifactId } = useParams<{ artifactId?: string }>();
   const navigate = useNavigate();
   const { t } = useLingui();
-  const [activeBotId, setActiveBotId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [activeBotId, setActiveBotId] = useState(() => searchParams.get("bot") || null);
   const [viewMode, setViewMode] = useState<ViewMode>(readViewMode);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

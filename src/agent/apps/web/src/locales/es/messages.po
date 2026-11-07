@@ -1425,6 +1425,10 @@ msgstr "Conectar un modelo"
 msgid "Connect a model in Settings before running bots."
 msgstr "Conecta un modelo en Configuración antes de ejecutar Micos."
 
+#: src/pages/shell/composer-error.tsx
+msgid "No model was available for this Mico."
+msgstr "No había un modelo disponible para este Mico."
+
 #: src/pages/model-settings/connection-controls.tsx
 msgid "Connect API key"
 msgstr "Conectar clave de API"
@@ -1611,7 +1615,7 @@ msgstr "No se pudo completar OAuth"
 
 #: src/components/DesktopUpdates.tsx
 msgid "Could not complete the update. Try again."
-msgstr ""
+msgstr "No se pudo completar la actualización. Vuelve a intentarlo."
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/PluginsOverlay.tsx
@@ -3834,6 +3838,15 @@ msgid "Organization API key"
 msgstr "Clave de API de organización"
 
 #: src/pages/shell/chat-context.tsx
+msgid "Original colors"
+msgstr "Colores originales"
+
+msgid "Context"
+msgstr "Contexto"
+
+msgid "Rules"
+msgstr "Reglas"
+
 msgid "Original message unavailable"
 msgstr "Mensaje original no disponible"
 
@@ -4363,7 +4376,7 @@ msgstr "Cambiar tamaño del panel"
 
 #: src/components/DesktopUpdates.tsx
 msgid "Restart to update"
-msgstr ""
+msgstr "Reiniciar para actualizar"
 
 #: src/components/InstructionSettings.tsx
 #: src/pages/shell/archived-chats.tsx
@@ -4725,7 +4738,7 @@ msgstr "Mostrar Micos"
 
 #: src/pages/Shell.tsx
 msgid "Show computer"
-msgstr ""
+msgstr "Mostrar computadora"
 
 #: src/pages/Artifacts.tsx
 msgid "Show list"
@@ -5680,7 +5693,7 @@ msgstr ""
 
 #: src/components/SignupSurvey.tsx
 msgid "Work"
-msgstr ""
+msgstr "Actividad"
 
 #: src/pages/shell/agent-import.tsx
 msgid "Working instructions"
@@ -6595,6 +6608,39 @@ msgstr "Este Mico necesita un espacio de trabajo para esta tarea."
 msgid "Update ready"
 msgstr "Actualización lista"
 
+msgid "Preparing to restart"
+msgstr "Preparando el reinicio"
+
+msgid "Could not complete the update"
+msgstr "No se pudo completar la actualización"
+
+msgid "Update available"
+msgstr "Actualización disponible"
+
+msgid "Updating Mycellios"
+msgstr "Actualizando Mycellios"
+
+msgid "Restart to finish installing the update."
+msgstr "Reinicia para terminar de instalar la actualización."
+
+msgid "Your call will end when you restart."
+msgstr "La llamada terminará al reiniciar."
+
+msgid "End call and restart"
+msgstr "Finalizar llamada y reiniciar"
+
+msgid "End call"
+msgstr "Finalizar llamada"
+
+msgid "Mycellios will save your work before restarting."
+msgstr "Mycellios guardará tu trabajo antes de reiniciar."
+
+msgid "Download update"
+msgstr "Descargar actualización"
+
+msgid "Download the latest version"
+msgstr "Descargar la última versión"
+
 msgid "Refresh Mycellios to use the latest version. Your saved chats will stay here."
 msgstr "Actualiza Mycellios para usar la nueva versión. Tus chats guardados seguirán aquí."
 
@@ -6943,6 +6989,18 @@ msgstr "Contribuir desde el navegador"
 
 msgid "Credits"
 msgstr "Créditos"
+
+msgid "Earn credits"
+msgstr "Ganar créditos"
+
+msgid "Earn credits with your computer"
+msgstr "Ganar créditos con tu equipo"
+
+msgid "Earn with your computer"
+msgstr "Ganar con tu equipo"
+
+msgid "Promo"
+msgstr "Promoción"
 
 msgid "Adding 10 USD gives you 10 credits. Spore is a separate token."
 msgstr "Al añadir 10 USD recibes 10 créditos. Spore es un token independiente."
@@ -7459,7 +7517,11 @@ msgstr "Tareas del Mico"
 
 #: src/components/MicoTaskTabs.tsx
 msgid "Main chat"
-msgstr "Principal"
+msgstr "Chat principal"
+
+#: src/components/MicoTaskTabs.tsx
+msgid "Close tab"
+msgstr "Cerrar pestaña"
 
 #: src/components/MicoTaskTabs.tsx
 msgid "New task"
@@ -9287,6 +9349,84 @@ msgstr "Azul cielo"
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Slate"
 msgstr "Pizarra"
+
+msgid "Red"
+msgstr "Rojo"
+
+msgid "Navy blue"
+msgstr "Azul marino"
+
+msgid "Sand"
+msgstr "Arena"
+
+msgid "Wine"
+msgstr "Vino"
+
+msgid "Gray"
+msgstr "Gris"
+
+msgid "Calm"
+msgstr "Serenos"
+
+msgid "Alert"
+msgstr "Atentos"
+
+msgid "Curious"
+msgstr "Curiosos"
+
+msgid "Surprised"
+msgstr "Sorprendidos"
+
+msgid "Happy"
+msgstr "Felices"
+
+msgid "Laughing"
+msgstr "Risueños"
+
+msgid "Sleepy"
+msgstr "Dormidos"
+
+msgid "Dreamy"
+msgstr "Soñadores"
+
+msgid "Shy"
+msgstr "Tímidos"
+
+msgid "Proud"
+msgstr "Orgullosos"
+
+msgid "Mischievous"
+msgstr "Traviesos"
+
+msgid "Skeptical"
+msgstr "Escépticos"
+
+msgid "Sad"
+msgstr "Tristes"
+
+msgid "Angry"
+msgstr "Enfadados"
+
+msgid "Confused"
+msgstr "Confundidos"
+
+msgid "Star"
+msgstr "Estrella"
+
+msgid "Eyes"
+msgstr "Ojos"
+
+msgid "Finish"
+msgstr "Acabado"
+
+msgid "Flat"
+msgstr "Plano"
+
+msgid "Velvety"
+msgstr "Aterciopelado"
+
+msgid "Choose a shape, color, eyes and finish, or upload an image"
+msgstr "Elige la forma, el color, los ojos y el acabado, o sube una imagen"
 
 #: src/components/LocalProject.tsx
 msgid "Add folder"

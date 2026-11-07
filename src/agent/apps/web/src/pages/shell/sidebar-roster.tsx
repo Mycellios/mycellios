@@ -302,7 +302,7 @@ export function SidebarRoster({
                     <BotAvatar
                       color={item.chat.color}
                       identity={item.chat.id}
-                      size={mini ? 40 : compact ? 28 : 38}
+                      size={mini ? 46 : compact ? 38 : 52}
                       status={item.chat.status}
                     />
                   ) : (
@@ -319,6 +319,7 @@ export function SidebarRoster({
                   <ContextMenuTrigger
                     render={<button type="button" />}
                     draggable={item.kind === "bot"}
+                    data-mico-avatar-hover=""
                     data-roster-bot-id={item.kind === "bot" ? item.chat.id : undefined}
                     data-roster-unread={item.chat.unread ? "true" : undefined}
                     data-roster-error={rowError && (compact || mini) ? "true" : undefined}
@@ -391,7 +392,7 @@ export function SidebarRoster({
                         ? "mx-auto size-12 justify-center rounded-xl"
                         : compact
                           ? "w-full min-h-11 gap-2 rounded-xl px-2.5 py-1.5"
-                          : "w-full gap-3 rounded-xl px-2.5 py-[10px]"
+                          : "w-full min-h-[66px] gap-3 rounded-xl px-2.5 py-[7px]"
                     } text-start ${
                       item.kind === "bot" ? "cursor-grab active:cursor-grabbing" : ""
                     } ${
@@ -473,13 +474,6 @@ export function SidebarRoster({
                             ) : null}
                           </div>
                         </div>
-                        {!compact && item.kind === "bot" && item.chat.title ? (
-                          <div className="mt-1 flex">
-                            <span className="max-w-full truncate rounded-md border border-border bg-muted px-2 py-0.5 text-[11px] font-normal text-muted-foreground">
-                              {item.chat.title}
-                            </span>
-                          </div>
-                        ) : null}
                         {compact ? (
                           compactStatusLabel ? (
                             <div
@@ -507,7 +501,7 @@ export function SidebarRoster({
                           <div
                             dir="auto"
                             data-roster-preview={!workStatusLabel ? "true" : undefined}
-                            className={`mt-1 line-clamp-2 text-label break-words whitespace-normal ${
+                            className={`mt-1 truncate text-label ${
                               workStatusLabel
                                 ? "font-semibold text-status-working"
                                 : item.chat.unread

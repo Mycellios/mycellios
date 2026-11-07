@@ -157,6 +157,14 @@ export function HelpMenu({
             </DropdownMenuItem>
             <DropdownMenuItem
               className={row}
+              render={<a href={productBrand.communityXUrl} target="_blank" rel="noopener noreferrer" />}
+            >
+              <MessagesSquare className="mt-0.5 size-4 shrink-0" />
+              <span className={copy}>{t`Follow Mycellios on X`}</span>
+              <ArrowUpRight className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className={row}
               render={<a href="mailto:hello@mycellios.com?subject=Mycellios%20feedback" />}
             >
               <Mail className="mt-0.5 size-4 shrink-0" />

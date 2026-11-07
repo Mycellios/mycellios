@@ -56,10 +56,12 @@ function installedMobile() {
 /** A dismissible invitation, separate from native Desktop downloads and updates. */
 export function MobileInstallOffer({
   mini = false,
+  showOffer = true,
   open,
   onOpenChange,
 }: {
   mini?: boolean;
+  showOffer?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -103,7 +105,8 @@ export function MobileInstallOffer({
   }
   return (
     <>
-      {!hidden &&
+      {showOffer &&
+        !hidden &&
         !installed &&
         (mini ? (
           <div className="shrink-0 px-1 pt-1">

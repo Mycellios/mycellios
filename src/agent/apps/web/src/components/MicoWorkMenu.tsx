@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@rakazo/ui-web";
+import { Activity } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 import { notificationPreferences } from "../lib/notification-preferences";
@@ -119,6 +120,7 @@ export function MicoWorkMenu({
       current = false;
     };
   }, [open, botId, rpc]);
+  const activeCount = work.filter((row) => ["running", "queued", "leased"].includes(row.status)).length;
   return (
     <Popover
       open={open}
@@ -129,11 +131,13 @@ export function MicoWorkMenu({
     >
       <PopoverTrigger
         render={
-          <Button size="sm" variant="ghost" className={failed ? "text-destructive" : undefined} />
+          <Button size="icon-sm" variant="ghost" className="relative shrink-0"
+            aria-label={failed ? t`Task failed` : t`Work`} title={failed ? t`Task failed` : t`Work`} />
         }
       >
-        {failed ? <Trans>Task failed</Trans> : <Trans>Work</Trans>}{" "}
-        {work.filter((row) => ["running", "queued", "leased"].includes(row.status)).length || ""}
+        <Activity size={15} aria-hidden="true" />
+        {failed || activeCount ? <span aria-hidden="true"
+          className={`absolute end-0.5 top-0.5 size-1.5 rounded-full ${failed ? "bg-destructive" : "bg-foreground"}`} /> : null}
       </PopoverTrigger>
       <PopoverContent
         align="end"

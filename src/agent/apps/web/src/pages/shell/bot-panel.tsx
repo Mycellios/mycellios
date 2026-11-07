@@ -31,13 +31,8 @@ import {
   Textarea,
   Toggle,
 } from "@rakazo/ui-web";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@rakazo/ui-web/components/ui/collapsible";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Download, Settings, X } from "lucide-react";
+import { ArrowLeft, BookOpen, CalendarClock, ChevronRight, Download, FileText, Folder, Gauge, Monitor, Puzzle, Settings, ShieldCheck, SlidersHorizontal, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { ErrorBoundary, SectionLoadFailed } from "../../components/ErrorBoundary";
@@ -65,6 +60,7 @@ const KnowledgeSection = lazyComponent(() =>
 );
 
 const rowLabelClass = "text-sm text-foreground";
+type BotSettingsPage = "instructions" | "memory" | "skills" | "computer" | "permissions" | "advanced";
 
 /** The advanced fields one Save sends, in the order their saved snapshot keeps them. */
 function advancedValues(bot: Bot) {
@@ -113,10 +109,16 @@ export function BotSettings({
   onUndoImport,
   focusModel = 0,
   onOpenConnections,
+  onOpenFiles,
+  onOpenRoutines,
+  onOpenUsage,
 }: {
   bot: Bot;
   focusModel?: number;
   onOpenConnections?: () => void;
+  onOpenFiles?: () => void;
+  onOpenRoutines?: () => void;
+  onOpenUsage?: () => void;
   /** Unused: the skill sections read and save the shared cached skill list. */
   onSkillsChange?: (skills: AgentSkillCatalogEntry[]) => void;
   memoryProviderConfigured: boolean;
@@ -146,14 +148,28 @@ export function BotSettings({
 }) {
   const { t } = useLingui();
   const ids = useId();
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [page, setPage] = useState<BotSettingsPage | null>(null);
+  const overviewRef = useRef<HTMLDivElement>(null);
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousPage = useRef<BotSettingsPage | null>(null);
+  const requestedModel = useRef(0);
   const modelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (focusModel) {
+    if (focusModel && requestedModel.current !== focusModel) {
+      if (page) {
+        setPage(null);
+        return;
+      }
+      requestedModel.current = focusModel;
       modelRef.current?.scrollIntoView?.({ block: "nearest" });
       modelRef.current?.querySelector<HTMLElement>('[id$="-model"]')?.focus();
+    } else if (page) {
+      pageHeadingRef.current?.focus();
+    } else if (previousPage.current) {
+      overviewRef.current?.querySelector<HTMLElement>(`[data-settings-page="${previousPage.current}"]`)?.focus();
     }
-  }, [focusModel]);
+    previousPage.current = page;
+  }, [focusModel, page]);
   const [name, setName] = useState(bot.name);
   const [title, setTitle] = useState(bot.title);
   const savedNameRef = useRef(bot.name);
@@ -508,356 +524,389 @@ export function BotSettings({
     return saveQueueRef.current;
   }
 
+
+  const pageTitles = {
+    instructions: t`Instructions`,
+    memory: t`Memory`,
+    skills: t`Skills`,
+    computer: t`Computer`,
+    permissions: t`Permissions`,
+    advanced: t`Advanced`,
+  };
+  const computerLabel = computerMode === "team" ? t`Team` : t`Private`;
+
   return (
     <div data-testid="bot-settings">
-      <div
-        data-testid="bot-profile-header"
-        className="flex flex-col items-center pb-6 pt-2 text-center"
-      >
-        <div className="flex justify-center pb-4">
-          <AvatarStudioPopover
-            value={color}
-            identity={bot.id}
-            status={bot.status}
-            size={76}
-            onChange={(newColor) => {
-              setColor(newColor);
-              void enqueueSave({ color: newColor });
-            }}
-          />
-        </div>
-        <InlineProfileField
-          label={t`Name`}
-          editLabel={t`Edit name`}
-          value={name}
-          maxLength={BOT_NAME_MAX_LENGTH}
-          className="text-xl font-semibold"
-          onCommit={(value) => {
-            if (!value.trim()) return;
-            setName(value.trim());
-            void enqueueSave({ name: value });
-          }}
-        />
-        <InlineProfileField
-          label={t`Title`}
-          editLabel={t`Edit label`}
-          placeholder={t`Add a label`}
-          value={title}
-          maxLength={BOT_TITLE_MAX_LENGTH}
-          className="mt-1 text-sm text-muted-foreground"
-          onCommit={(value) => {
-            setTitle(value.trim());
-            void enqueueSave({ title: value });
-          }}
-        />
-      </div>
-      <InstructionSettings key={bot.id} bot={bot} />
-      <section className="mt-6">
-        <h3 className="mb-2 text-xs font-medium text-muted-foreground">
-          <Trans>Notifications</Trans>
-        </h3>
-        <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-4">
-          <div>
-            <label
-              htmlFor={`${ids}-notify-finish`}
-              id={`${ids}-notify-finish-label`}
-              className="text-sm"
-            >
-              <Trans>When it finishes or needs input</Trans>
-            </label>
-          </div>
-          <Switch
-            id={`${ids}-notify-finish`}
-            checked={notifyOnFinish}
-            aria-labelledby={`${ids}-notify-finish-label`}
-            onCheckedChange={(checked) => {
-              setNotifyOnFinish(checked);
-              void enqueueSave({ notifyOnFinish: checked });
-            }}
-          />
-        </div>
-      </section>
-      <ErrorBoundary fallback={<SectionLoadFailed />}>
-        <Suspense fallback={null}>
-          <ScratchpadSection botId={bot.id} />
-        </Suspense>
-      </ErrorBoundary>
-      <ErrorBoundary fallback={<SectionLoadFailed />}>
-        <Suspense fallback={null}>
-          <KnowledgeSection botId={bot.id} />
-        </Suspense>
-      </ErrorBoundary>
-      {!bot.agentEngine || bot.agentEngine === "pi" ? (
-        <section ref={modelRef} className="mt-6" data-testid="bot-model-settings">
-          <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground pe-1">
-            <Trans>Model for this agent</Trans>
-            {onOpenConnections ? (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={t`Model connections`}
-                onClick={onOpenConnections}
-              >
-                <Settings className="size-4" />
-              </Button>
-            ) : null}
-          </div>
-          <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-            <Trans>
-              Only affects this agent. Choose the space default to use the general model.
-            </Trans>
-          </p>
-          <div className="rounded-xl bg-muted/50 p-4 space-y-3">
-            <div className="flex min-h-11 items-center justify-between gap-3">
-              <label htmlFor={`${ids}-model`} className="sr-only">
-                <Trans>Model</Trans>
-              </label>
-              <div className="min-w-0 w-full [&>div]:mt-0 [&>button]:mt-0">
-                <ChatModelPicker
-                  id={`${ids}-model`}
-                  choices={modelChoices}
-                  value={selectedModelKey}
-                  onChange={(key) => {
-                    setModelKey(key);
-                    setThinkingLevel("");
-                  }}
-                />
-              </div>
-            </div>
-            {thinkingOptions.length ? (
-              <label
-                htmlFor={`${ids}-thinking`}
-                className="flex min-h-11 items-center justify-between gap-3 text-sm text-foreground"
-              >
-                <Trans>Thinking</Trans>
-                <NativeSelect
-                  id={`${ids}-thinking`}
-                  className="max-w-2/3"
-                  value={thinkingLevel}
-                  onChange={(event) => setThinkingLevel(event.target.value)}
-                >
-                  <NativeSelectOption value="">
-                    {t`Default (${thinkingLevelLabel(defaultThinkingLevel)})`}
-                  </NativeSelectOption>
-                  {thinkingOptions.map((level) => (
-                    <NativeSelectOption key={level} value={level}>
-                      {thinkingLevelLabel(level)}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </label>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-      <Collapsible
-        open={advancedOpen}
-        onOpenChange={setAdvancedOpen}
-        data-testid="bot-settings-advanced"
-        className="mt-6"
-      >
-        <h3 className="mb-0 text-xs font-medium text-muted-foreground">
-          <CollapsibleTrigger className="group flex w-full cursor-pointer min-h-11 items-center justify-between gap-2 text-xs font-medium text-muted-foreground text-start outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
-            <Trans>Advanced</Trans>
-            <ChevronDown
-              aria-hidden="true"
-              className="size-4 text-muted-foreground transition-transform -rotate-90 group-aria-expanded:rotate-0 motion-reduce:transition-none"
+      <div ref={overviewRef} hidden={page !== null}>
+        <div
+          data-testid="bot-profile-header"
+          className="flex flex-col items-center pb-6 pt-2 text-center"
+        >
+          <div className="flex justify-center pb-4">
+            <AvatarStudioPopover
+              value={color}
+              identity={bot.id}
+              status={bot.status}
+              size={76}
+              onChange={(newColor) => {
+                setColor(newColor);
+                void enqueueSave({ color: newColor });
+              }}
             />
-          </CollapsibleTrigger>
-        </h3>
-        <CollapsibleContent>
-          <div className="space-y-6 pt-6">
-            <AgentEngineSettings bot={bot} onSave={onSave} />
-            <SettingsGroup label={t`Computer`}>
-              <ComputerModePicker value={computerMode} onChange={setComputerMode} />
-              {memoryProviderConfigured ? (
-                <div className="mt-4 text-sm text-foreground">
-                  <Trans>Memory scope</Trans>
-                  <div className="mt-2 flex gap-2">
-                    {(
-                      [
-                        { value: null, label: t`Inherit default` },
-                        { value: "isolated" as const, label: t`Isolated` },
-                        { value: "shared" as const, label: t`Shared` },
-                      ] satisfies Array<{ value: "isolated" | "shared" | null; label: string }>
-                    ).map((option) => (
-                      <Toggle
-                        key={option.label}
-                        variant="outline"
-                        size="sm"
-                        pressed={memoryScope === option.value}
-                        onPressedChange={(pressed) => {
-                          if (pressed) setMemoryScope(option.value);
-                        }}
-                        className="flex-1 aria-pressed:border-foreground/40 aria-pressed:text-foreground"
-                      >
-                        {option.label}
-                      </Toggle>
-                    ))}
-                  </div>
-                </div>
+          </div>
+          <InlineProfileField
+            label={t`Name`}
+            editLabel={t`Edit name`}
+            value={name}
+            maxLength={BOT_NAME_MAX_LENGTH}
+            className="text-xl font-semibold"
+            onCommit={(value) => {
+              if (!value.trim()) return;
+              setName(value.trim());
+              void enqueueSave({ name: value });
+            }}
+          />
+          <InlineProfileField
+            label={t`Title`}
+            editLabel={t`Edit label`}
+            placeholder={t`Add a label`}
+            value={title}
+            maxLength={BOT_TITLE_MAX_LENGTH}
+            className="mt-1 text-sm text-muted-foreground"
+            onCommit={(value) => {
+              setTitle(value.trim());
+              void enqueueSave({ title: value });
+            }}
+          />
+        </div>
+        {!bot.agentEngine || bot.agentEngine === "pi" ? (
+          <section ref={modelRef} className="mt-6" data-testid="bot-model-settings">
+            <div className="mb-2 flex items-center justify-between text-xs font-medium text-muted-foreground pe-1">
+              <Trans>Model for this agent</Trans>
+              {onOpenConnections ? (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={t`Model connections`}
+                  onClick={onOpenConnections}
+                >
+                  <Settings className="size-4" />
+                </Button>
               ) : null}
-            </SettingsGroup>
-            <SettingsGroup label={t`Voice`}>
-              <label
-                htmlFor={`${ids}-auto-speak`}
-                className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm text-foreground"
-              >
-                <span className={rowLabelClass}>
-                  <Trans>Read replies aloud</Trans>
-                </span>
-                <Switch
-                  id={`${ids}-auto-speak`}
-                  checked={autoSpeak}
-                  onCheckedChange={(checked) => setAutoSpeak(checked)}
-                />
-              </label>
-              {voices?.length ? (
+            </div>
+            <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+              <Trans>
+                Only affects this agent. Choose the space default to use the general model.
+              </Trans>
+            </p>
+            <div className="rounded-xl bg-muted/50 p-4 space-y-3">
+              <div className="flex min-h-11 items-center justify-between gap-3">
+                <label htmlFor={`${ids}-model`} className="sr-only">
+                  <Trans>Model</Trans>
+                </label>
+                <div className="min-w-0 w-full [&>div]:mt-0 [&>button]:mt-0">
+                  <ChatModelPicker
+                    id={`${ids}-model`}
+                    choices={modelChoices}
+                    value={selectedModelKey}
+                    onChange={(key) => {
+                      setModelKey(key);
+                      setThinkingLevel("");
+                    }}
+                  />
+                </div>
+              </div>
+              {thinkingOptions.length ? (
                 <label
-                  htmlFor={`${ids}-voice`}
+                  htmlFor={`${ids}-thinking`}
                   className="flex min-h-11 items-center justify-between gap-3 text-sm text-foreground"
                 >
-                  <Trans>Voice</Trans>
+                  <Trans>Thinking</Trans>
                   <NativeSelect
-                    id={`${ids}-voice`}
+                    id={`${ids}-thinking`}
                     className="max-w-2/3"
-                    value={voiceId}
-                    onChange={(event) => setVoiceId(event.target.value)}
+                    value={thinkingLevel}
+                    onChange={(event) => setThinkingLevel(event.target.value)}
                   >
-                    <NativeSelectOption value="">{t`Account default`}</NativeSelectOption>
-                    {voices.map((voice) => (
-                      <NativeSelectOption key={voice.id} value={voice.id}>
-                        {voice.label}
+                    <NativeSelectOption value="">
+                      {t`Default (${thinkingLevelLabel(defaultThinkingLevel)})`}
+                    </NativeSelectOption>
+                    {thinkingOptions.map((level) => (
+                      <NativeSelectOption key={level} value={level}>
+                        {thinkingLevelLabel(level)}
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>
                 </label>
               ) : null}
-            </SettingsGroup>
-            <SettingsGroup label={t`Permissions`}>
-              <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
-                <label htmlFor={`${ids}-cross-space`} className={rowLabelClass}>
-                  <Trans>Allow cross-space bot communication</Trans>
-                </label>
-                <Switch
-                  id={`${ids}-cross-space`}
-                  checked={crossSpaceCommunication}
-                  disabled={saving}
-                  onCheckedChange={(checked) => {
-                    setCrossSpaceCommunication(checked);
-                    void enqueueSave({ crossSpaceCommunication: checked });
-                  }}
-                />
-              </div>
-              <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
-                <div>
-                  <label htmlFor={`${ids}-fleet-management`} className={rowLabelClass}>
-                    <Trans>Manage the bots it creates</Trans>
-                  </label>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    <Trans>Can edit and organise bots it creates</Trans>
-                  </p>
-                </div>
-                <Switch
-                  id={`${ids}-fleet-management`}
-                  checked={fleetManagement}
-                  disabled={saving}
-                  onCheckedChange={(checked) => {
-                    setFleetManagement(checked);
-                    void enqueueSave({ fleetManagement: checked });
-                  }}
-                />
-              </div>
-            </SettingsGroup>
-            <SettingsGroup label={t`Description`}>
-              <label htmlFor={`${ids}-description`} className="block text-xs text-muted-foreground">
-                <Trans>How other bots see it</Trans>
-                <Textarea
-                  id={`${ids}-description`}
-                  aria-label={t`Description`}
-                  value={description}
-                  maxLength={BOT_DESCRIPTION_MAX_LENGTH}
-                  onChange={(e) => setDescription(e.target.value)}
-                  onBlur={() => void enqueueSave()}
-                  placeholder={t`What this bot is for`}
-                  rows={2}
-                  className="mt-2 min-h-16 resize-none field-sizing-content border-0 bg-transparent p-0 text-foreground shadow-none"
-                />
-              </label>
-            </SettingsGroup>
-            <SettingsGroup label={t`Tools`}>
-              <section data-testid="bot-settings-tools">
-                <div className="space-y-4 [&>*]:mt-0">
-                  <div>
-                    <NativeSelect
-                      id={`${ids}-disabled-tools`}
-                      aria-label={t`Disable a tool`}
-                      value=""
-                      onChange={(event) => disableBuiltinTool(event.target.value)}
-                      className="w-full"
-                    >
-                      <NativeSelectOption value="">{t`Disable a tool`}</NativeSelectOption>
-                      {BUILTIN_TOOL_NAMES.filter(
-                        (name) => !disabledBuiltinTools.includes(name),
-                      ).map((name) => (
-                        <NativeSelectOption key={name} value={name}>
-                          {humanizeTool(name)}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                  {disabledBuiltinTools.map((toolName) => (
-                    <div
-                      key={toolName}
-                      className="flex min-h-11 items-center justify-between gap-3 text-sm"
-                    >
-                      <span>{humanizeTool(toolName)}</span>
-                      <Button
-                        id={`${ids}-disabled-${toolName}`}
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={t`Enable ${humanizeTool(toolName)}`}
-                        title={t`Enable ${humanizeTool(toolName)}`}
-                        onClick={() => {
-                          const next = disabledBuiltinTools.filter((entry) => entry !== toolName);
-                          setDisabledBuiltinTools(next);
-                          void enqueueSave({ disabledBuiltinTools: next });
-                        }}
-                      >
-                        <X className="size-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </SettingsGroup>
-            <BotCredentialsSection botId={bot.id} />
-            <ErrorBoundary fallback={<SectionLoadFailed />}>
-              <Suspense fallback={null}>
-                <KnowledgeSection botId={bot.id} skillsOnly />
-              </Suspense>
-            </ErrorBoundary>
-            <div className="overflow-hidden rounded-xl bg-muted/50 px-4">
-              <button
-                type="button"
-                className="flex min-h-12 w-full items-center justify-between text-sm"
-                onClick={() => void onExport()}
-              >
-                <Trans>Export</Trans>
-                <Download className="size-4 text-muted-foreground" />
-              </button>
-              <button
-                type="button"
-                className="min-h-12 w-full border-t border-border text-start text-sm text-destructive"
-                onClick={onClear}
-              >
-                <Trans>Clear conversation</Trans>
-              </button>
-              {onUndoImport ? <AgentImportUndo botId={bot.id} onUndone={onUndoImport} /> : null}
             </div>
+          </section>
+        ) : null}
+        <SettingsLinks label={t`Context`}>
+          <SettingsLink page="instructions" icon={FileText} label={t`Instructions`} onClick={() => setPage("instructions")} />
+          <SettingsLink page="memory" icon={BookOpen} label={t`Memory`} onClick={() => setPage("memory")} />
+          <SettingsLink page="skills" icon={Puzzle} label={t`Skills`} onClick={() => setPage("skills")} />
+          {onOpenFiles ? <SettingsLink icon={Folder} label={t`Files`} onClick={onOpenFiles} /> : null}
+          {onOpenRoutines ? <SettingsLink icon={CalendarClock} label={t`Routines`} onClick={onOpenRoutines} /> : null}
+          {onOpenUsage ? <SettingsLink icon={Gauge} label={t`Usage`} onClick={onOpenUsage} /> : null}
+        </SettingsLinks>
+        <SettingsLinks label={t`Rules`}>
+          <SettingsLink page="computer" icon={Monitor} label={t`Computer`} detail={computerLabel} onClick={() => setPage("computer")} />
+          <SettingsLink page="permissions" icon={ShieldCheck} label={t`Permissions`} onClick={() => setPage("permissions")} />
+          <SettingsLink page="advanced" icon={SlidersHorizontal} label={t`Advanced`} onClick={() => setPage("advanced")} />
+        </SettingsLinks>
+        <section className="mt-6">
+          <h3 className="mb-2 text-xs font-medium text-muted-foreground">
+            <Trans>Notifications</Trans>
+          </h3>
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/50 p-4">
+            <div>
+              <label
+                htmlFor={`${ids}-notify-finish`}
+                id={`${ids}-notify-finish-label`}
+                className="text-sm"
+              >
+                <Trans>When it finishes or needs input</Trans>
+              </label>
+            </div>
+            <Switch
+              id={`${ids}-notify-finish`}
+              checked={notifyOnFinish}
+              aria-labelledby={`${ids}-notify-finish-label`}
+              onCheckedChange={(checked) => {
+                setNotifyOnFinish(checked);
+                void enqueueSave({ notifyOnFinish: checked });
+              }}
+            />
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        </section>
+      </div>
+
+      {page ? (
+        <div className="mb-5 flex items-center gap-2 border-b border-border pb-3">
+          <Button variant="ghost" size="icon-sm" aria-label={t`Back`} onClick={() => setPage(null)}>
+            <ArrowLeft className="size-4" aria-hidden="true" />
+          </Button>
+          <h2 ref={pageHeadingRef} tabIndex={-1} className="text-sm font-semibold outline-none">
+            {pageTitles[page]}
+          </h2>
+        </div>
+      ) : null}
+      <div hidden={page !== "instructions"}>
+        <InstructionSettings key={bot.id} bot={bot} />
+      </div>
+      {page === "memory" ? (
+        <div className="space-y-5 [&>section]:mt-0">
+          <ErrorBoundary fallback={<SectionLoadFailed />}>
+            <Suspense fallback={null}>
+              <ScratchpadSection botId={bot.id} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<SectionLoadFailed />}>
+            <Suspense fallback={null}>
+              <KnowledgeSection botId={bot.id} />
+            </Suspense>
+          </ErrorBoundary>
+        </div>
+      ) : null}
+      {page === "skills" ? (
+        <ErrorBoundary fallback={<SectionLoadFailed />}>
+          <Suspense fallback={null}>
+            <KnowledgeSection botId={bot.id} skillsOnly />
+          </Suspense>
+        </ErrorBoundary>
+      ) : null}
+      {page === "computer" ? (
+        <SettingsGroup label={t`Computer`}>
+          <ComputerModePicker value={computerMode} onChange={setComputerMode} />
+          {memoryProviderConfigured ? (
+            <div className="mt-4 text-sm text-foreground">
+              <Trans>Memory scope</Trans>
+              <div className="mt-2 flex gap-2">
+                {(
+                  [
+                    { value: null, label: t`Inherit default` },
+                    { value: "isolated" as const, label: t`Isolated` },
+                    { value: "shared" as const, label: t`Shared` },
+                  ] satisfies Array<{ value: "isolated" | "shared" | null; label: string }>
+                ).map((option) => (
+                  <Toggle
+                    key={option.label}
+                    variant="outline"
+                    size="sm"
+                    pressed={memoryScope === option.value}
+                    onPressedChange={(pressed) => {
+                      if (pressed) setMemoryScope(option.value);
+                    }}
+                    className="flex-1 aria-pressed:border-foreground/40 aria-pressed:text-foreground"
+                  >
+                    {option.label}
+                  </Toggle>
+                ))}
+              </div>
+            </div>
+              ) : null}
+            </SettingsGroup>
+      ) : null}
+      {page === "permissions" ? (
+        <SettingsGroup label={t`Permissions`}>
+          <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
+            <label htmlFor={`${ids}-cross-space`} className={rowLabelClass}>
+              <Trans>Allow cross-space bot communication</Trans>
+            </label>
+            <Switch
+              id={`${ids}-cross-space`}
+              checked={crossSpaceCommunication}
+              disabled={saving}
+              onCheckedChange={(checked) => {
+                setCrossSpaceCommunication(checked);
+                void enqueueSave({ crossSpaceCommunication: checked });
+              }}
+            />
+          </div>
+          <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
+            <div>
+              <label htmlFor={`${ids}-fleet-management`} className={rowLabelClass}>
+                <Trans>Manage the bots it creates</Trans>
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                <Trans>Can edit and organise bots it creates</Trans>
+              </p>
+            </div>
+            <Switch
+              id={`${ids}-fleet-management`}
+              checked={fleetManagement}
+              disabled={saving}
+              onCheckedChange={(checked) => {
+                setFleetManagement(checked);
+                void enqueueSave({ fleetManagement: checked });
+              }}
+            />
+          </div>
+        </SettingsGroup>
+      ) : null}
+      {page === "advanced" ? (
+        <div className="space-y-5">
+          <AgentEngineSettings bot={bot} onSave={onSave} />
+          <SettingsGroup label={t`Voice`}>
+            <label
+              htmlFor={`${ids}-auto-speak`}
+              className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm text-foreground"
+            >
+              <span className={rowLabelClass}>
+                <Trans>Read replies aloud</Trans>
+              </span>
+              <Switch
+                id={`${ids}-auto-speak`}
+                checked={autoSpeak}
+                onCheckedChange={(checked) => setAutoSpeak(checked)}
+              />
+            </label>
+            {voices?.length ? (
+              <label
+                htmlFor={`${ids}-voice`}
+                className="flex min-h-11 items-center justify-between gap-3 text-sm text-foreground"
+              >
+                <Trans>Voice</Trans>
+                <NativeSelect
+                  id={`${ids}-voice`}
+                  className="max-w-2/3"
+                  value={voiceId}
+                  onChange={(event) => setVoiceId(event.target.value)}
+                >
+                  <NativeSelectOption value="">{t`Account default`}</NativeSelectOption>
+                  {voices.map((voice) => (
+                    <NativeSelectOption key={voice.id} value={voice.id}>
+                      {voice.label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </label>
+            ) : null}
+          </SettingsGroup>
+          <SettingsGroup label={t`Description`}>
+            <label htmlFor={`${ids}-description`} className="block text-xs text-muted-foreground">
+              <Trans>How other bots see it</Trans>
+              <Textarea
+                id={`${ids}-description`}
+                aria-label={t`Description`}
+                value={description}
+                maxLength={BOT_DESCRIPTION_MAX_LENGTH}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={() => void enqueueSave()}
+                placeholder={t`What this bot is for`}
+                rows={2}
+                className="mt-2 min-h-16 resize-none field-sizing-content border-0 bg-transparent p-0 text-foreground shadow-none"
+              />
+            </label>
+          </SettingsGroup>
+          <SettingsGroup label={t`Tools`}>
+            <section data-testid="bot-settings-tools">
+              <div className="space-y-4 [&>*]:mt-0">
+                <div>
+                  <NativeSelect
+                    id={`${ids}-disabled-tools`}
+                    aria-label={t`Disable a tool`}
+                    value=""
+                    onChange={(event) => disableBuiltinTool(event.target.value)}
+                    className="w-full"
+                  >
+                    <NativeSelectOption value="">{t`Disable a tool`}</NativeSelectOption>
+                    {BUILTIN_TOOL_NAMES.filter(
+                      (name) => !disabledBuiltinTools.includes(name),
+                    ).map((name) => (
+                      <NativeSelectOption key={name} value={name}>
+                        {humanizeTool(name)}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </div>
+                {disabledBuiltinTools.map((toolName) => (
+                  <div
+                    key={toolName}
+                    className="flex min-h-11 items-center justify-between gap-3 text-sm"
+                  >
+                    <span>{humanizeTool(toolName)}</span>
+                    <Button
+                      id={`${ids}-disabled-${toolName}`}
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t`Enable ${humanizeTool(toolName)}`}
+                      title={t`Enable ${humanizeTool(toolName)}`}
+                      onClick={() => {
+                        const next = disabledBuiltinTools.filter((entry) => entry !== toolName);
+                        setDisabledBuiltinTools(next);
+                        void enqueueSave({ disabledBuiltinTools: next });
+                      }}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </SettingsGroup>
+          <BotCredentialsSection botId={bot.id} />
+          <div className="overflow-hidden rounded-xl bg-muted/50 px-4">
+            <button
+              type="button"
+              className="flex min-h-12 w-full items-center justify-between text-sm"
+              onClick={() => void onExport()}
+            >
+              <Trans>Export</Trans>
+              <Download className="size-4 text-muted-foreground" />
+            </button>
+            <button
+              type="button"
+              className="min-h-12 w-full border-t border-border text-start text-sm text-destructive"
+              onClick={onClear}
+            >
+              <Trans>Clear conversation</Trans>
+            </button>
+            {onUndoImport ? <AgentImportUndo botId={bot.id} onUndone={onUndoImport} /> : null}
+          </div>
+        </div>
+      ) : null}
       {error ? <p className="mt-2 text-[13px] text-destructive">{error}</p> : null}
       {dirty ? (
         <Button
@@ -965,6 +1014,44 @@ function SettingsGroup({ label, children }: { label: string; children: ReactNode
     </section>
   );
 }
+
+function SettingsLinks({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section className="mt-5">
+      <h3 className="mb-2 text-xs font-medium text-muted-foreground">{label}</h3>
+      <div className="divide-y divide-border overflow-hidden rounded-xl bg-muted/50">{children}</div>
+    </section>
+  );
+}
+
+function SettingsLink({
+  page,
+  icon: Icon,
+  label,
+  detail,
+  onClick,
+}: {
+  page?: BotSettingsPage;
+  icon: typeof FileText;
+  label: string;
+  detail?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-settings-page={page}
+      className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-start text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      onClick={onClick}
+    >
+      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="min-w-0 flex-1">{label}</span>
+      {detail ? <span className="text-xs text-muted-foreground">{detail}</span> : null}
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground rtl:rotate-180" aria-hidden="true" />
+    </button>
+  );
+}
+
 function humanizeTool(name: string) {
   const words = name.replaceAll("_", " ");
   return words.charAt(0).toUpperCase() + words.slice(1);

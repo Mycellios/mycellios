@@ -9,7 +9,7 @@ import {
   Input,
   Textarea,
 } from "@rakazo/ui-web";
-import { ArrowLeft, Film, X, Monitor, Check, LoaderCircle } from "lucide-react";
+import { X, Monitor, Check, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
   StudioProject,
@@ -19,8 +19,32 @@ import type {
 } from "../../../../packages/contracts/src/app-studio.js";
 import { desktopBridge } from "../lib/desktop";
 import { videoStudioFrames } from "../lib/video-studio-frames";
+import { VideoStudioSample } from "../components/VideoStudioSample";
 
-const steps = ["Idea", "Guion", "Voz e imágenes", "Revisión", "Vídeo"];
+const steps = ["Idea", "Guion", "Voz y escenas", "Revisión", "MP4"];
+
+function StudioSteps({ current, complete }: { current: number; complete: boolean }) {
+  return (
+    <ol className="mb-6 flex flex-wrap gap-x-5 gap-y-3 border-b border-border pb-4" aria-label="Pasos del estudio">
+      {steps.map((step, index) => {
+        const done = index < current || complete;
+        const active = index === current && !complete;
+        return (
+          <li
+            key={step}
+            aria-current={active ? "step" : undefined}
+            className={`flex items-center gap-2 text-xs ${active ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+          >
+            <span className={`grid size-6 place-items-center rounded-full ${active ? "bg-foreground text-background" : done ? "bg-success/10 text-success" : "bg-muted"}`}>
+              {done ? <Check size={14} aria-label="Completado" /> : index + 1}
+            </span>
+            {step}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 const progress = (p: StudioProject) =>
   p.result
     ? 4
@@ -42,7 +66,6 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
   const bridge = desktopBridge()?.appsStudio;
   const [projects, setProjects] = useState<StudioProject[]>([]);
   const [selected, setSelected] = useState<StudioProject | null>(null);
-  const [studio, setStudio] = useState(false);
   const [topic, setTopic] = useState("");
   const [scenes, setScenes] = useState<VideoScene[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -102,7 +125,6 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
     setSelected(p);
     setScenes(p.scenes);
     setDirty(false);
-    setStudio(true);
     setError(p.lastError ?? "");
     setAudio([]);
     setVideo("");
@@ -162,32 +184,15 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
       <DialogContent
         data-apps-studio="true"
         showCloseButton={false}
-        className="flex h-[min(860px,calc(100dvh-8rem))] max-h-[calc(100dvh-8rem)] w-[calc(100dvw-2rem)] max-w-5xl sm:max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0"
+        className={`flex w-[calc(100dvw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-5xl ${selected ? "h-[min(860px,calc(100dvh-2rem))]" : ""}`}
       >
         <DialogHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
-          <div className="flex items-center gap-3">
-            {studio ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Volver a Apps"
-                disabled={blocked || dirty}
-                onClick={() => {
-                  setStudio(false);
-                  setSelected(null);
-                  setError("");
-                }}
-              >
-                <ArrowLeft size={18} />
-              </Button>
-            ) : null}
-            <DialogTitle>{studio ? "Estudio de vídeos" : "Apps"}</DialogTitle>
-          </div>
-          <Button variant="ghost" size="icon-sm" aria-label="Cerrar Apps" onClick={close}>
+          <DialogTitle>Estudio de vídeos</DialogTitle>
+          <Button variant="ghost" size="icon-sm" aria-label="Cerrar estudio" onClick={close}>
             <X size={18} />
           </Button>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto p-5 sm:p-8">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
           {error ? (
             <p
               role="alert"
@@ -196,38 +201,13 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
               {error}
             </p>
           ) : null}
-          {!studio ? (
-            <>
-              <p className="mb-6 max-w-xl text-muted-foreground">
-                Herramientas dentro de Mycellios. Un flujo fijo, proyectos guardados y tu misma
-                cuenta.
-              </p>
-              <Card className="max-w-xl">
-                <CardContent className="p-6">
-                  <Film size={28} className="mb-5 text-muted-foreground" />
-                  <h2 className="text-xl font-semibold">Estudio de vídeos</h2>
-                  <p className="mb-5 mt-2 text-sm text-muted-foreground">
-                    De una idea a un vídeo vertical narrado. Revisa seis escenas, escucha la voz y
-                    descarga el MP4.
-                  </p>
-                  <p className="mb-5 text-xs text-muted-foreground">
-                    Mycellios · v1.0.0 · Privada · En este PC
-                  </p>
-                  <Button onClick={() => setStudio(true)}>Abrir estudio</Button>
-                </CardContent>
-              </Card>
-              <p className="mt-6 text-sm text-muted-foreground">
-                Las apps públicas, los votos y compartir proyectos llegarán cuando esté conectado el
-                catálogo del servidor.
-              </p>
-            </>
-          ) : !selected ? (
-            <div className="grid gap-8 md:grid-cols-2">
+          <StudioSteps current={panel} complete={Boolean(selected?.result) && !dirty} />
+          {!selected ? (
+            <div className="grid items-start gap-6 md:grid-cols-2 md:gap-8">
               <section>
-                <h2 className="mb-2 text-2xl font-semibold">¿Qué quieres contar?</h2>
-                <p className="mb-6 text-sm text-muted-foreground">
-                  Guion asistido por Codex, narración de Windows y composición tipográfica. Formato
-                  vertical 720 × 1280.
+                <h2 className="mb-2 text-2xl font-semibold">De una idea a un vídeo</h2>
+                <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
+                  Escribe un tema, prepara el guion y revisa las escenas con voz antes de descargar tu vídeo.
                 </p>
                 <form
                   onSubmit={(event) => {
@@ -252,70 +232,91 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
                     onChange={(e) => setTopic(e.target.value)}
                     placeholder="Por ejemplo, tres formas de ahorrar agua en casa"
                   />
-                  <div className="my-5 rounded-xl bg-card p-4 text-sm">
-                    <p className="flex items-center gap-2 font-medium">
-                      <Monitor size={16} /> En este PC
+                  {!bridge ? (
+                    <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+                      <Monitor size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                      Abre el Estudio en Mycellios Desktop para crear vídeos en tu PC.
                     </p>
-                    <p className="mt-2 text-muted-foreground">
-                      Los archivos se guardan en este equipo. El guion se envía a tu sesión de
-                      Codex. No se usan Créditos de Mycellios; se aplican los límites de tu
-                      proveedor.
-                    </p>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Cloud no está conectado en esta versión. No se cambia de destino
-                      automáticamente.
-                    </p>
-                  </div>
-                  <Button type="submit" disabled={!bridge || blocked || topic.trim().length < 3}>
+                  ) : null}
+                  <Button className="mt-4" type="submit" disabled={!bridge || blocked || topic.trim().length < 3}>
                     Crear proyecto
                   </Button>
+                  <details className="mt-4 text-xs leading-relaxed text-muted-foreground">
+                    <summary className="cursor-pointer">Cómo se ejecuta en tu PC</summary>
+                    <p className="mt-2">
+                      Los proyectos se guardan en este equipo. Puedes usar tu sesión de Codex para el
+                      guion y las voces de Windows para narrarlo. Se aplican los límites de tu
+                      proveedor de Codex. El estudio funciona sin créditos de Mycellios y requiere el PC.
+                    </p>
+                  </details>
                 </form>
               </section>
-              <section>
-                <h2 className="mb-4 text-sm font-semibold">Tus proyectos en este PC</h2>
-                {!projects.length ? (
-                  <p className="text-sm text-muted-foreground">
-                    Tu primer proyecto aparecerá aquí.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {projects.map((p) => (
-                      <Button
-                        key={p.id}
-                        variant="ghost"
-                        className="h-auto w-full justify-start whitespace-normal rounded-xl border border-border p-4 text-start"
-                        onClick={() => select(p)}
-                      >
-                        <span>
-                          <span className="block font-medium">{p.topic}</span>
-                          <span className="mt-1 block text-xs text-muted-foreground">
-                            {p.result ? "Vídeo listo" : steps[progress(p)]} · revisión {p.revision}
+              <div>
+                <VideoStudioSample />
+                {projects.length ? (
+                  <section className="mt-5">
+                    <h2 className="mb-3 text-sm font-semibold">Tus proyectos en este PC</h2>
+                    <div className="space-y-2">
+                      {projects.map((p) => (
+                        <Button
+                          key={p.id}
+                          variant="ghost"
+                          className="h-auto w-full justify-start whitespace-normal rounded-xl border border-border p-4 text-start"
+                          onClick={() => select(p)}
+                        >
+                          <span>
+                            <span className="block font-medium">{p.topic}</span>
+                            <span className="mt-1 block text-xs text-muted-foreground">
+                              {p.result ? "Vídeo listo" : steps[progress(p)]} · revisión {p.revision}
+                            </span>
                           </span>
-                        </span>
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </section>
+                        </Button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </div>
             </div>
           ) : (
             <>
-              <div className="mb-7 flex flex-wrap gap-x-5 gap-y-2" aria-label="Pasos del estudio">
-                {steps.map((step, i) => (
-                  <span
-                    key={step}
-                    aria-current={i === panel ? "step" : undefined}
-                    className={`flex items-center gap-2 text-sm ${i === panel ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-                  >
-                    {i < panel ? <Check size={14} /> : <span>{i + 1}.</span>}
-                    {step}
-                  </span>
-                ))}
-              </div>
               <h2 className="mb-2 text-xl font-semibold">{selected.topic}</h2>
               <p className="mb-6 text-xs text-muted-foreground">
                 Guardado en este PC · versión fija 1.0.0 · revisión {selected.revision}
               </p>
+              {selected.result && !dirty ? (
+                <section className="mb-6 max-w-xl rounded-xl bg-success/10 p-4">
+                  <h3 className="mb-3 font-semibold">Tu MP4 está listo</h3>
+                  {video ? (
+                    <>
+                      <video controls src={video} className="max-h-96 w-full rounded-xl bg-black" />
+                      <a
+                        href={video}
+                        download="mycellios-video.mp4"
+                        className="mt-3 inline-block underline underline-offset-4"
+                      >
+                        Descargar MP4
+                      </a>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      disabled={blocked}
+                      onClick={() =>
+                        void perform("Abriendo vídeo…", async () => {
+                          const url = await artifactUrl(selected, "video");
+                          if (alive.current) setVideo(url);
+                        })
+                      }
+                    >
+                      Abrir vídeo guardado
+                    </Button>
+                  )}
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    {selected.result.duration.toFixed(1)} s · 720 × 1280 · imagen y audio
+                    comprobados. No se ha publicado en redes.
+                  </p>
+                </section>
+              ) : null}
               {!selected.scenes.length ? (
                 <div className="max-w-lg">
                   <p className="mb-5 text-sm text-muted-foreground">
@@ -527,40 +528,6 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
                     </section>
                   ) : null}
                 </>
-              ) : null}
-              {selected.result && !dirty ? (
-                <section className="mt-7 max-w-xl">
-                  <h3 className="mb-3 font-semibold">Vídeo listo</h3>
-                  {video ? (
-                    <>
-                      <video controls src={video} className="max-h-96 w-full rounded-xl bg-black" />
-                      <a
-                        href={video}
-                        download="mycellios-video.mp4"
-                        className="mt-3 inline-block underline underline-offset-4"
-                      >
-                        Descargar MP4
-                      </a>
-                    </>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      disabled={blocked}
-                      onClick={() =>
-                        void perform("Abriendo vídeo…", async () => {
-                          const url = await artifactUrl(selected, "video");
-                          if (alive.current) setVideo(url);
-                        })
-                      }
-                    >
-                      Abrir vídeo guardado
-                    </Button>
-                  )}
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {selected.result.duration.toFixed(1)} s · 720 × 1280 · imagen y audio
-                    comprobados. No se ha publicado en redes.
-                  </p>
-                </section>
               ) : null}
               <details className="mt-7 text-xs text-muted-foreground">
                 <summary className="cursor-pointer">Detalles del proyecto</summary>

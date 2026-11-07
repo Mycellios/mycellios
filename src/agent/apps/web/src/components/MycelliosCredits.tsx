@@ -99,21 +99,21 @@ export function MycelliosCredits({ ownerId }: { ownerId: string }) {
   return (
     <div
       data-testid="mycellios-micos"
-      className="flex min-w-0 shrink-0 items-center justify-between gap-3 px-5 py-2 text-xs text-muted-foreground"
+      className="flex min-w-0 flex-col gap-0.5 text-xs leading-tight text-muted-foreground"
       aria-live="polite"
       aria-busy={loading}
       data-balance-status={loading ? "loading" : unavailable ? (account ? "stale" : "unavailable") : account ? "ready" : "unavailable"}
       title={accessDenied ? t`Sign in again to see your credits.` : unavailable ? (account ? t`Last verified balance. Retrying automatically.` : t`Balance temporarily unavailable. Retrying automatically.`) : (!loading && !account) ? t`Unavailable` : t`Credits are your internal Mycellios balance. Adding 10 USD gives you 10 credits. Spore is a separate token.`}
     >
-      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <span>
         {account?.environment === "sandbox" ? t`Test credits` : t`Credits`}
       </span>
-      <span className="flex min-w-0 flex-col items-end gap-0.5 text-right">
-        <span className="min-w-0 break-all font-medium tabular-nums text-foreground">
+      <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+        <span className="min-w-0 break-all text-sm font-semibold tabular-nums text-foreground">
           {loading ? "…" : balance == null ? "—" : new Intl.NumberFormat(i18n.locale, { maximumFractionDigits: 6 }).format(balance / CREDIT_MICROUNITS)}
         </span>
         {unavailable && !accessDenied && <span className="text-[10px] leading-tight text-muted-foreground">{account ? t`Refreshing…` : t`Retrying…`}</span>}
-        {hasPromotion && <span className="text-[10px] leading-tight text-success" title={t`Promotional grant, separate from earned credits`}>Promo</span>}
+        {hasPromotion && <span className="text-[10px] leading-tight text-muted-foreground" title={t`Promotional grant, separate from earned credits`}>{t`Promo`}</span>}
       </span>
     </div>
   );

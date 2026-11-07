@@ -284,6 +284,19 @@ it.each([
   expect(container?.querySelector('[data-testid="composer-error-action"]')).toBeNull();
 });
 
+it("offers the chat model picker without duplicate connection advice or details", () => {
+  renderComposer(async () => true, {
+    runError: "Connect a model in Settings before running bots.",
+    runErrorId: "failed-run",
+    runErrorModelAction: <button type="button">Change model</button>,
+  });
+  const alert = container?.querySelector('[data-testid="composer-error"]');
+  expect(alert?.textContent).toContain("No model was available for this Mico.");
+  expect(alert?.textContent).toContain("Change model");
+  expect(alert?.querySelector('[data-testid="composer-error-action"]')).toBeNull();
+  expect(alert?.querySelector("details")).toBeNull();
+});
+
 it.each([MODEL_REQUIRED_SEND_ERROR, `  ${MODEL_REQUIRED_SEND_ERROR}  `])(
   "links the missing-model send error to model settings: %s",
   (sendError) => {

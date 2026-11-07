@@ -1,4 +1,3 @@
-import { CommunityInvitation } from "./CommunityInvitation";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { AppMarkStack, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import {
@@ -95,12 +94,10 @@ export function SidebarFooter({
   }, [mini]);
   return (
     <>
-      <MobileInstallOffer mini={mini} open={mobileHelpOpen} onOpenChange={setMobileHelpOpen} />
+      <MobileInstallOffer showOffer={false} open={mobileHelpOpen} onOpenChange={setMobileHelpOpen} />
       {!onWhatsNew ? <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} /> : null}
       {!mini && <WebUpdateSlot />}
       {!mini && <DesktopSidebarUpdate />}
-      <DesktopDownloadLink mini={mini} />
-      <CommunityInvitation mini={mini} />
       <div
         data-testid="sidebar-footer"
         className={`flex shrink-0 items-center gap-2 bg-transparent ${mini ? "flex-col px-1 py-2" : "px-2.5 py-3"}`}
@@ -196,6 +193,7 @@ export function SidebarFooter({
                 <Smartphone className="text-muted-foreground" strokeWidth={1.75} />
                 <Trans>Mycellios on your phone</Trans>
               </Button>
+              <DesktopDownloadLink inAccountMenu />
               <Button
                 variant="ghost"
                 className="h-9 w-full justify-start gap-2.5 font-normal"

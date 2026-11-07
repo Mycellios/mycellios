@@ -1,6 +1,6 @@
 import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
-import { isModelRequiredSendError, normalizeRunError } from "@rakazo/core";
+import { MISSING_MODEL_RUN_ERROR, isModelRequiredSendError, normalizeRunError } from "@rakazo/core";
 import { X } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
 import { useEffect, useRef } from "react";
@@ -75,11 +75,12 @@ export function ComposerError({
     ? normalizeRunError(runError, translateRunError, i18n.locale || "en", undefined, runErrorProviderLabel)
     : null;
   const recovery = sendError ? undefined : normalizedRunError?.recovery;
+  const missingModel = !sendError && runError?.trim() === MISSING_MODEL_RUN_ERROR;
   const modelAction = !sendError && runError && recovery !== "computer" ? runErrorModelAction : null;
   const recoveryAction =
     recovery === "model" && !modelAction
       ? { label: t`Choose a model`, onClick: onOpenModels }
-      : recovery === "connection"
+      : recovery === "connection" && !(missingModel && modelAction)
         ? {
             label: normalizedRunError?.kind === "auth" ? t`Replace key` : t`Connect a model`,
             onClick: onOpenConnections,
@@ -106,7 +107,7 @@ export function ComposerError({
             {sendError}
           </button>
         ) : (
-          (sendError ?? normalizedRunError?.summary ?? null)
+          (sendError ?? (missingModel ? t`No model was available for this Mico.` : normalizedRunError?.summary) ?? null)
         )}
         {recoveryAction ? (
           <>
@@ -133,7 +134,7 @@ export function ComposerError({
             {retrying ? t`Retrying…` : t`Retry`}
           </button>
         ) : null}
-        {!sendError && runError ? (
+        {!sendError && runError && !missingModel ? (
           <details key={runError} className="mt-1">
             <summary className="w-fit cursor-pointer">{t`Details`}</summary>
             <pre className="mt-2 whitespace-pre-wrap break-words text-xs">

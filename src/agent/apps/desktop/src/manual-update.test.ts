@@ -55,9 +55,9 @@ describe("official Windows manual releases", () => {
     expect(request).toHaveBeenCalledTimes(2);
     expect(handoff).not.toHaveBeenCalled();
   });
-  it("keeps a failed background transfer quiet and permits a later explicit retry", async () => {
+  it("keeps a verified update available for recovery after a failed transfer", async () => {
     const { controller, request, handoff } = await fixture({ backgroundDownloads: true, body: bytes.subarray(0, 3) });
-    expect(await controller.check(false)).toMatchObject({ phase: "idle", message: null });
+    expect(await controller.check(false)).toMatchObject({ phase: "error", availableVersion: "0.3.15" });
     expect(handoff).not.toHaveBeenCalled();
     expect(await controller.check(true)).toMatchObject({ phase: "error" });
     expect(request).toHaveBeenCalledTimes(4);

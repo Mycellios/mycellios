@@ -32,7 +32,38 @@ export const MICO_AVATAR_PALETTES = [
   { id: "coral", color: "#EB6A61", accent: "#FFCEAC" },
   { id: "sky", color: "#52A5D8", accent: "#C7EAFF" },
   { id: "slate", color: "#60748C", accent: "#C6DCE7" },
+  { id: "red", color: "#C94A51", accent: "#FFD0BB" },
+  { id: "navy", color: "#3D4C9E", accent: "#C8D5FF" },
+  { id: "sand", color: "#D6B98C", accent: "#FFF0CE" },
+  { id: "wine", color: "#A8324E", accent: "#F6BDC9" },
+  { id: "gray", color: "#97979E", accent: "#E6E2ED" },
 ] as const;
+
+export const MICO_AVATAR_EYE_COUNT = 16;
+const MICO_LOOK_START = 2000;
+const MICO_LOOK_STRIDE = MICO_AVATAR_EYE_COUNT * 2;
+const MICO_ORIGINAL_LOOK_START = 2400;
+const MICO_LOOK_SLOTS = MICO_AVATAR_SHAPES.length * MICO_LOOK_STRIDE;
+
+type MicoAvatarDetails = { eyes: number; finish: "flat" | "plush"; original: boolean };
+
+function micoLookSlot(shapeIndex: number, start: number): number | undefined {
+  const slot = shapeIndex - start;
+  return Number.isInteger(slot) && slot >= 0 && slot < MICO_LOOK_SLOTS ? slot : undefined;
+}
+
+// Keep the existing wire format so old APIs can store the complete look.
+export function micoAvatarDetails(value: string): MicoAvatarDetails {
+  const shapeIndex = Number(/::shape_(\d+)$/.exec(value)?.[1]);
+  const tinted = micoLookSlot(shapeIndex, MICO_LOOK_START);
+  const slot = tinted ?? micoLookSlot(shapeIndex, MICO_ORIGINAL_LOOK_START);
+  if (slot === undefined) return { eyes: 0, finish: "plush", original: true };
+  return {
+    eyes: Math.floor((slot % MICO_LOOK_STRIDE) / 2),
+    finish: slot % 2 ? "plush" : "flat",
+    original: tinted === undefined,
+  };
+}
 
 export function micoAvatarShape(shapeIndex: number | undefined) {
   return MICO_AVATAR_SHAPES.find((shape) => shape.index === shapeIndex);
@@ -43,24 +74,34 @@ export function micoAvatarPalette(color: string) {
   return MICO_AVATAR_PALETTES.find((palette) => palette.color === hex);
 }
 
-export function micoAvatarValue(shapeIndex: number, color: string): string {
+export function micoAvatarValue(shapeIndex: number, color: string, details?: MicoAvatarDetails): string {
+  const ordinal = MICO_AVATAR_SHAPES.findIndex((shape) => shape.index === shapeIndex);
+  if (details && ordinal >= 0 && (!details.original || details.eyes !== 0 || details.finish === "flat")) {
+    const start = details.original ? MICO_ORIGINAL_LOOK_START : MICO_LOOK_START;
+    const slot = start + ordinal * MICO_LOOK_STRIDE + details.eyes * 2
+      + Number(details.finish === "plush");
+    return `${color}::shape_${slot}`;
+  }
   return `${color}::shape_${shapeIndex}`;
 }
 
 /** Selecting a new shape keeps the palette, or starts with that shape's brand pairing. */
 export function withMicoAvatarShape(value: string, shapeIndex: number): string {
   const current = parseBotAvatarValue(value);
-  const palette = current.kind === "shape" && micoAvatarShape(current.shapeIndex)
-    ? micoAvatarPalette(current.color)
+  const color = current.kind === "shape" && micoAvatarShape(current.shapeIndex)
+    ? current.color
     : undefined;
   const defaultPalette = MICO_AVATAR_PALETTES[shapeIndex - MICO_AVATAR_SHAPES[0].index];
-  return micoAvatarValue(shapeIndex, (palette ?? defaultPalette ?? MICO_AVATAR_PALETTES[0]).color);
+  return micoAvatarValue(shapeIndex, color ?? (defaultPalette ?? MICO_AVATAR_PALETTES[0]).color, micoAvatarDetails(value));
 }
 
 export function withMicoAvatarPalette(value: string, color: string): string {
   const current = parseBotAvatarValue(value);
   const shape = current.kind === "shape" ? micoAvatarShape(current.shapeIndex) : undefined;
-  return micoAvatarValue((shape ?? MICO_AVATAR_SHAPES[0]).index, color);
+  return micoAvatarValue((shape ?? MICO_AVATAR_SHAPES[0]).index, color, {
+    ...micoAvatarDetails(value),
+    original: false,
+  });
 }
 
 /**
@@ -88,7 +129,9 @@ export function parseBotAvatarValue(raw: string): ParsedBotAvatar {
     const color = parts[0] || "#F97316";
     const rawShape = parts[1] ?? "0";
     const parsedShape = /^\d+$/.test(rawShape) ? Number(rawShape) : 0;
-    const shapeIndex = micoAvatarShape(parsedShape)?.index ??
+    const slot = micoLookSlot(parsedShape, MICO_LOOK_START) ?? micoLookSlot(parsedShape, MICO_ORIGINAL_LOOK_START);
+    const lookShape = slot === undefined ? undefined : MICO_AVATAR_SHAPES[Math.floor(slot / MICO_LOOK_STRIDE)];
+    const shapeIndex = micoAvatarShape(parsedShape)?.index ?? lookShape?.index ??
       (Number.isSafeInteger(parsedShape) ? parsedShape % BOT_AVATAR_SHAPE_COUNT : 0);
     return { kind: "shape", color, shapeIndex };
   }

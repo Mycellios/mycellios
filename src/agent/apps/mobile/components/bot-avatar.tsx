@@ -13,6 +13,7 @@ import {
   avatarSchedulePose,
   avatarThinkingDot,
   avatarWorkingDot,
+  currentMicoAvatarValue,
   isRunWorking,
   MICO_AVATAR_VIEWBOX,
   micoAvatarArt,
@@ -143,7 +144,7 @@ export const BotAvatar = memo(function BotAvatar({
   const isWorking = isRunWorking(status) && !composing && motion !== "running";
   // The ring sits outside the disc, so the disc keeps its place.
   const dot = avatarWorkingDot(size);
-  const parsed = mobileBotAvatarPresentation(color);
+  const parsed = mobileBotAvatarPresentation(currentMicoAvatarValue(color, identity));
   const onScreen = useAvatarOnScreen();
   const reducedMotion = useReducedMotion();
   const settling = useSettling(state);

@@ -1,9 +1,14 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { DesktopUpdateState } from "@rakazo/contracts";
-import { Button, toast } from "@rakazo/ui-web";
+import { productBrand, type DesktopUpdateState } from "@rakazo/contracts";
+import { Button } from "@rakazo/ui-web";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";
-import { canRestartDesktop } from "../lib/desktop-update-work";
+import { canRestartDesktop, canShowDesktopUpdate, desktopUpdateHasCall, endDesktopUpdateCall } from "../lib/desktop-update-work";
+import { appPath } from "../lib/app-path";
+
+function updateRequiresAttention(state: DesktopUpdateState | null) {
+  return Boolean(state?.availableVersion && ["available", "downloading", "ready", "checking", "error"].includes(state.phase));
+}
 
 function useDesktopUpdates() {
   const { t } = useLingui();
@@ -12,6 +17,8 @@ function useDesktopUpdates() {
   const [busy, setBusy] = useState(false);
   const [confirmedCheck, setConfirmedCheck] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [safeToInterrupt, setSafeToInterrupt] = useState(false);
+  const [callActive, setCallActive] = useState(false);
   const pending = useRef(false);
   const revision = useRef(0);
   useEffect(() => bridge?.onPrepare?.(canRestartDesktop), [bridge]);
@@ -25,6 +32,8 @@ function useDesktopUpdates() {
       try {
         const next = await bridge!.state();
         if (!stopped && started === revision.current) {
+          setSafeToInterrupt(updateRequiresAttention(next) && canShowDesktopUpdate());
+          setCallActive(desktopUpdateHasCall());
           setState((current) =>
             current &&
             Object.entries(next).every(
@@ -47,7 +56,7 @@ function useDesktopUpdates() {
     };
   }, [bridge]);
 
-  async function act(action: "check" | "install" | "forceInstall" | "cancelInstall") {
+  async function act(action: "check" | "download" | "install" | "forceInstall" | "cancelInstall") {
     if (!bridge || pending.current) return;
     pending.current = true;
     revision.current++;
@@ -58,6 +67,8 @@ function useDesktopUpdates() {
       const next = await bridge[action]?.();
       if (!next) return;
       setState(next);
+      setSafeToInterrupt(updateRequiresAttention(next) && canShowDesktopUpdate());
+      setCallActive(desktopUpdateHasCall());
       if (
         action === "check" &&
         next.phase === "idle" &&
@@ -65,9 +76,6 @@ function useDesktopUpdates() {
         next.checkedAt !== state?.checkedAt
       ) {
         setConfirmedCheck(next.checkedAt);
-      }
-      if (next.phase === "error" || action === "install") {
-        setError(next.message);
       }
     } catch {
       setError(t`Could not complete the update. Try again.`);
@@ -77,45 +85,21 @@ function useDesktopUpdates() {
       setBusy(false);
     }
   }
-  return { state, busy, error, act, confirmedCheck, forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
+  return { state, busy, error, act, confirmedCheck, safeToInterrupt, callActive, forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
 }
 
 const UpdatesContext = createContext<ReturnType<typeof useDesktopUpdates> | null>(null);
 
-const DESKTOP_UPDATE_TOAST = "desktop-update";
-
 export function DesktopUpdatesProvider({ children }: { children: ReactNode }) {
   const updates = useDesktopUpdates();
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  const { state, error } = updates;
-  useEffect(() => {
-    if (error) setDismissed(null);
-  }, [error]);
-  const prompt = Boolean(
-    state &&
-      (state.phase === "ready" || (error && state.availableVersion)) &&
-      dismissed !== state.availableVersion,
+  return (
+    <UpdatesContext.Provider value={updates}>
+      {children}
+      {updates.state && updates.safeToInterrupt && updateRequiresAttention(updates.state) && (
+        <DesktopUpdateGate {...updates} state={updates.state} />
+      )}
+    </UpdatesContext.Provider>
   );
-  // Keep the toast up while a retry runs, so a quick failure reuses it instead of racing
-  // its dismissal.
-  const [shown, setShown] = useState(false);
-  const visible = prompt || (shown && updates.busy);
-  useEffect(() => {
-    setShown(visible);
-  }, [visible]);
-  useEffect(() => {
-    if (!visible) return;
-    // The app's Toaster renders inside this provider, so the toast reads live state from context.
-    toast.custom(() => <DesktopUpdatePrompt onLater={setDismissed} />, {
-      id: DESKTOP_UPDATE_TOAST,
-      duration: Number.POSITIVE_INFINITY,
-      dismissible: false,
-    });
-    return () => {
-      toast.dismiss(DESKTOP_UPDATE_TOAST);
-    };
-  }, [visible]);
-  return <UpdatesContext.Provider value={updates}>{children}</UpdatesContext.Provider>;
 }
 
 function PendingRestart({ state }: { state: DesktopUpdateState }) {
@@ -124,39 +108,105 @@ function PendingRestart({ state }: { state: DesktopUpdateState }) {
   return <Trans>Waiting for local tasks and unsaved work…</Trans>;
 }
 
-function DesktopUpdatePrompt({ onLater }: { onLater: (version: string | null) => void }) {
+function DesktopUpdateGate({
+  state, busy, error, act, forceAvailable, callActive,
+}: ReturnType<typeof useDesktopUpdates> & { state: DesktopUpdateState }) {
   const { t } = useLingui();
-  const updates = useContext(UpdatesContext);
-  if (!updates?.state) return null;
-  const { state, busy, error, act, forceAvailable } = updates;
+  const dialog = useRef<HTMLDialogElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const element = dialog.current!;
+    const preventDismiss = (event: Event) => event.preventDefault();
+    element.setAttribute("closedby", "none");
+    element.addEventListener("cancel", preventDismiss);
+    element.showModal();
+    heading.current?.focus();
+    return () => {
+      element.removeEventListener("cancel", preventDismiss);
+      element.close();
+    };
+  }, []);
+  const ready = state.phase === "ready";
+  const rawMessage = state.installPending ? null : error ?? state.message;
+  const message = rawMessage === "Could not complete the update. Try again."
+    ? t`Could not complete the update. Try again.` : rawMessage;
+  const failed = state.phase === "error" || Boolean(message);
+  const canForce = state.installPending && forceAvailable && state.waitingFor === "local_work" && state.restartMode !== "now";
+  const canAct = canForce || (!state.installPending && (ready || failed || state.phase === "available"));
+  function restart() {
+    if (desktopUpdateHasCall()) endDesktopUpdateCall();
+    void act(forceAvailable ? "forceInstall" : "install");
+  }
+  const percent = ready ? 100 :
+    typeof state.percent === "number" && Number.isFinite(state.percent)
+      ? Math.max(0, Math.min(100, Math.round(state.percent))) : undefined;
   return (
-    <aside
-      aria-label={t`Desktop update`}
-      className="w-full rounded-xl border border-border bg-card p-3 text-card-foreground shadow-lg"
+    <dialog
+      ref={dialog}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="desktop-update-heading"
+      aria-describedby="desktop-update-description"
+      data-desktop-update-gate
+      className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none overflow-auto border-0 bg-background p-0 text-foreground backdrop:bg-background"
     >
-      <div className="flex items-center gap-2">
-        <Button
-          disabled={busy || (state.installPending && (!forceAvailable || state.restartMode === "now"))}
-          onClick={() => void act(state.installPending && forceAvailable ? "forceInstall" : state.phase === "ready" ? "install" : "check")}
-        >
-          {state.installPending && forceAvailable ? <Trans>Restart now</Trans> : state.phase === "ready" ? (
-            <Trans>Restart to update</Trans>
-          ) : (
-            <Trans>Check for updates</Trans>
+      <div className="grid min-h-full place-items-center px-6 py-12">
+        <div className="flex w-full max-w-sm flex-col items-center text-center">
+          <img src={appPath("/mycellios/app-icon-v2-192.png")} alt="" width={64} height={64} className="mb-8 size-16" />
+          <h1 id="desktop-update-heading" ref={heading} tabIndex={-1} className="text-heading2 font-medium outline-none">
+            {state.installPending ? <Trans>Preparing to restart</Trans>
+              : failed ? <Trans>Could not complete the update</Trans>
+              : ready ? <Trans>Update ready</Trans>
+              : state.phase === "available" ? <Trans>Update available</Trans>
+              : <Trans>Updating Mycellios</Trans>}
+          </h1>
+          <p id="desktop-update-description" role="status" className="mt-2 text-sm text-muted-foreground">
+            {state.installPending ? <PendingRestart state={state} /> : message ??
+              (ready && callActive ? <Trans>Your call will end when you restart.</Trans>
+                : ready ? <Trans>Restart to finish installing the update.</Trans>
+                : <Trans>Mycellios will save your work before restarting.</Trans>)}
+          </p>
+          {!failed && (
+            <progress
+              aria-label={t`Download progress`}
+              max={100}
+              value={percent}
+              className="mt-6 h-2 w-full max-w-60 overflow-hidden rounded-full accent-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-primary"
+            />
           )}
-        </Button>
-        <Button variant="ghost" disabled={busy} onClick={() => state.installPending ? void act("cancelInstall") : onLater(state.availableVersion)}>
-          {state.installPending ? <Trans>Cancel update</Trans> : <Trans>Later</Trans>}
-        </Button>
+          <p className="mt-3 text-xs tabular-nums text-muted-foreground">
+            {!ready && !failed && percent !== undefined ? `${percent}%` : `Mycellios ${state.availableVersion}`}
+          </p>
+          {canAct && (
+            <Button
+              className="mt-6 rounded-full"
+              disabled={busy}
+              onClick={() => {
+                if (canForce || ready) restart();
+                else void act(failed ? "check" : "download");
+              }}
+            >
+              {ready && callActive ? <Trans>End call and restart</Trans>
+                : canForce ? <Trans>Restart now</Trans> : failed ? <Trans>Try again</Trans>
+                : ready ? <Trans>Restart to update</Trans> : <Trans>Download update</Trans>}
+            </Button>
+          )}
+          {callActive && !ready && (
+            <Button variant="ghost" className="mt-4" onClick={endDesktopUpdateCall}>
+              <Trans>End call</Trans>
+            </Button>
+          )}
+          <a
+            href={new URL("/downloads/desktop", productBrand.apiBaseUrl).href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            <Trans>Download the latest version</Trans>
+          </a>
+        </div>
       </div>
-      {state.installPending ? (
-        <p role="status" className="mt-2 text-sm"><PendingRestart state={state} /></p>
-      ) : error || state.message ? (
-        <p role="status" className="mt-2 text-sm">
-          {error ?? state.message}
-        </p>
-      ) : null}
-    </aside>
+    </dialog>
   );
 }
 
@@ -167,6 +217,7 @@ export function useSidebarUpdate() {
     available: updates?.state?.phase === "ready",
     busy: (updates?.busy ?? false) || (updates?.state?.installPending === true && (!updates?.forceAvailable || updates.state.restartMode === "now")),
     state: updates?.state ?? null,
+    error: updates?.error ?? updates?.state?.message ?? null,
     install: () => {
       void updates?.act(updates.state?.installPending && updates.forceAvailable ? "forceInstall" : "install");
     },
@@ -177,7 +228,7 @@ export function DesktopSidebarUpdate() {
   const { t } = useLingui();
   const update = useSidebarUpdate();
   const state = update.state;
-  if (!state || !["available", "downloading", "ready"].includes(state.phase)) return null;
+  if (!state || !updateRequiresAttention(state)) return null;
   const ready = state.phase === "ready";
   const percent =
     typeof state.percent === "number" && Number.isFinite(state.percent)
@@ -186,7 +237,8 @@ export function DesktopSidebarUpdate() {
   return (
     <div className="mx-2.5 mt-2 min-w-0 rounded-xl border border-border bg-sidebar-accent p-3">
       <p role="status" className="text-xs font-medium">
-        {state.installPending ? <PendingRestart state={state} /> : ready ? <Trans>Restart to update</Trans> : <Trans>Downloading…</Trans>}
+        {state.installPending ? <PendingRestart state={state} /> : update.error ??
+          (ready ? <Trans>Restart to update</Trans> : <Trans>Downloading…</Trans>)}
       </p>
       {ready ? (
         <Button
