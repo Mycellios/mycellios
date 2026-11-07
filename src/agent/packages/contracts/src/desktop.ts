@@ -2,6 +2,8 @@ import type { DesktopRuntimeBridge } from "../../../../contracts/desktop-runtime
 import type { ProjectRunnerBridge } from "../../../../contracts/project-runner.js";
 export type { ProjectRunState, ProjectRunConfig, ProjectRunnerBridge } from "../../../../contracts/project-runner.js";
 
+export type DesktopMicoFolder = { name: string; path: string; repositoryId?: string };
+
 /**
  * `unsupported` covers an unpackaged build and a repository with no published releases, which is
  * the normal state for a fork. It is not an error the user needs to act on. Automatic checks stay
@@ -94,9 +96,9 @@ export interface RakazoDesktop {
     /** Bind this Mico to its native workspace without opening a folder chooser. */
     connect?: (botId: string) => Promise<void>;
     connected?: (botId: string) => Promise<boolean>;
-    chooseProject?: (botId: string) => Promise<{ name: string; path: string } | null>;
+    chooseProject?: (botId: string) => Promise<DesktopMicoFolder | null>;
     prepareTask?: (request: { botId: string; taskThreadId: string }) => Promise<void>;
-    project?: (botId: string) => Promise<{ name: string; path: string } | null>;
+    project?: (botId: string) => Promise<DesktopMicoFolder | null>;
     projectAvailable?: () => Promise<boolean>;
     onConfigure: (listener: () => void) => () => void;
   };

@@ -200,6 +200,7 @@ import { clearSpaceSelection, createSpaceRpc, selectedSpaceId, selectSpace } fro
 import { SpaceRpcProvider, useSpaceRpc } from "../lib/space-rpc";
 import type { TaskThreadScope } from "../lib/task-thread-scope";
 import { MicoTaskTabs } from "../components/MicoTaskTabs";
+import { LocalProject } from "../components/LocalProject";
 import { MicoWorkMenu } from "../components/MicoWorkMenu";
 import { WorkflowWorkspace } from "./workflows/WorkflowWorkspace";
 import { RoutineWorkspace } from "./routines/RoutineWorkspace";
@@ -4048,7 +4049,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             <MicoTaskTabs key={active.id} botId={active.id} taskThreadId={taskScope?.taskThreadId} rpc={rpc}
               actions={<><MicoWorkMenu key={active.id} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
                 onOpenTask={task => navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" })} />
-                <Button size="sm" variant="ghost" onClick={showWorkflows}><Trans>Workflows</Trans></Button></>}
+                <Button size="sm" variant="ghost" onClick={showWorkflows}><Trans>Workflows</Trans></Button>
+                <LocalProject key={JSON.stringify([userId, shellSpaceId, active.id])} botId={active.id} rpc={rpc}
+                  onTask={threadId => {
+                    projectCollection.refresh();
+                    navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: `task=${encodeURIComponent(threadId)}` });
+                  }} /></>}
               onSelect={threadId => {
               const next = new URLSearchParams(searchParamsRef.current);
               next.delete("m");

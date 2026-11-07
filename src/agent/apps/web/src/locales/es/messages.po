@@ -9287,3 +9287,23 @@ msgstr "Azul cielo"
 #: src/pages/shell/avatar-studio-popover.tsx
 msgid "Slate"
 msgstr "Pizarra"
+
+#: src/components/LocalProject.tsx
+msgid "Add folder"
+msgstr "Añadir carpeta"
+
+#: src/components/LocalProject.tsx
+msgid "Local folder"
+msgstr "Carpeta local"
+
+#: src/components/LocalProject.tsx
+msgid "New task in a branch"
+msgstr "Nueva tarea en rama"
+
+#: src/components/LocalProject.tsx
+msgid "Create task"
+msgstr "Crear tarea"
+
+#: src/components/LocalProject.tsx
+msgid "Available to this Mico on this PC."
+msgstr "Disponible para este Mico en este PC."

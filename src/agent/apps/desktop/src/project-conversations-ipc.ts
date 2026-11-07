@@ -6,6 +6,7 @@ import { ProjectWorkspaces } from "./project-workspaces.js";
 export function installProjectConversations(options: {
   storage: string;
   host: Awaited<ReturnType<typeof prepareHostComputer>>;
+  attachedRepository?(scope: string, botId: string, projectId: string): string | undefined;
   context(event: IpcMainInvokeEvent): Promise<{
     window: BrowserWindow; base: string; spaceId: string | null; validate(): Promise<void>;
   }>;
@@ -53,6 +54,8 @@ export function installProjectConversations(options: {
         throw new Error("The project account changed.");
     };
     const folder = await workspaces.prepare(scope, project.projectId, thread, async () => {
+      const attached = options.attachedRepository?.(scope, bot, project.projectId);
+      if (attached) return attached;
       const selected = await dialog.showOpenDialog(context.window, { title: `Open project · ${project.name}`, properties: ["openDirectory"] });
       return selected.canceled ? null : selected.filePaths[0] ?? null;
     }, validate);

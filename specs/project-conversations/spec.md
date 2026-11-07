@@ -15,8 +15,13 @@ panel and composer remain shared. No new editor or terminal is introduced here.
 - Persist project names and conversation ownership in the authenticated owner/Space.
   Native repository paths never enter the cloud metadata or renderer requests.
 - Reuse task threads, model selection, scoped drafts, events and run controls.
+- Desktop Micos can open an ordinary local directory for direct file and command
+  work. A Git root with an initial commit also offers a branch task. It uses the
+  selected repository on the same Desktop without opening a second picker.
+  Ordinary folder grants last for the native session. Repository bindings are
+  stored on the device once a task is prepared.
 - Explicit native folder selection registers a Git repository once per account,
-  server and project. Each conversation gets its own detached Git worktree.
+  server and project. Each conversation gets its own named branch and worktree.
   Existing files, dirty changes and the source branch are never reset or copied.
 - Distinct worktrees can execute concurrently; a project binding never permits
   unscoped operations or access from another Mico/account/thread. Old native builds

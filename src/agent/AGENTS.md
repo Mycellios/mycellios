@@ -283,6 +283,12 @@
   do not require folder selection to enable shell/file tools. Existing projects can
   be addressed with the shell's cwd/native paths under the existing access policy.
   The optional picker changes the project file-tool mount; it is not onboarding.
+  The Mico's Add folder action uses that native picker for ordinary directories.
+  An attached Git root with HEAD can create tasks through the existing development
+  project API and worktree admission. Match the native attachment by server, owner,
+  Space, Mico and project ID. Keep ordinary folder grants session-scoped and send
+  only the project name and opaque ID as metadata. Verify LocalProject, host-computer,
+  project-conversations-ipc and project-workspaces together.
   Browser Play/Stop uses the native project runner and portable `.mycellios/run.json`
   service profiles. Only first-time/invalid configuration is prepared by the chat's
   agent through an idempotent auxiliary `project_prepare` run, never a synthetic

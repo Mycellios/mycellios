@@ -5,11 +5,11 @@ vi.mock("./project-workspaces.js", () => ({ ProjectWorkspaces: class { prepare(.
 import { installProjectConversations } from "./project-conversations-ipc.js";
 const project = { projectId: "11111111-1111-4111-8111-111111111111", name: "Fixture", userId: "owner", spaceId: "space" };
 beforeEach(() => { f.prepare.mockReset(); f.choose.mockReset(); });
-function fixture() {
+function fixture(attachedRepository?: (scope: string, botId: string, projectId: string) => string | undefined) {
   const fetch = vi.fn(async () => Response.json({ json: project }));
   const validate = vi.fn(async () => {}), bindTaskProject = vi.fn(async () => () => {});
   const context = vi.fn(async () => ({ window: { webContents: { session: { fetch } } }, base: "https://example.invalid/agent", spaceId: "space", validate }));
-  installProjectConversations({ storage: "/fixture", host: { isEnabled: () => true, bindTaskProject }, context } as never);
+  installProjectConversations({ storage: "/fixture", host: { isEnabled: () => true, bindTaskProject }, context, attachedRepository } as never);
   return { fetch, validate, context, bindTaskProject };
 }
 it("binds only the API-confirmed project and never accepts renderer-supplied paths", async () => {
@@ -30,6 +30,18 @@ it("does not select folders or bind ordinary Mico tasks", async () => {
   const state = fixture(); state.fetch.mockResolvedValue(Response.json({ json: null }));
   await f.handler({}, { botId: "mico", taskThreadId: "thread" });
   expect(f.prepare).not.toHaveBeenCalled(); expect(state.bindTaskProject).not.toHaveBeenCalled();
+});
+it("uses the attached repository for this exact owned project without opening another picker", async () => {
+  const attached = vi.fn(() => "/native/repository");
+  const state = fixture(attached);
+  f.prepare.mockImplementation(async (_scope, _projectId, _thread, choose) => {
+    expect(await choose()).toBe("/native/repository");
+    return "/native/worktree";
+  });
+  await f.handler({}, { botId: "mico", taskThreadId: "thread" });
+  expect(attached).toHaveBeenCalledWith(JSON.stringify(["https://example.invalid/agent", "owner", "space"]), "mico", project.projectId);
+  expect(f.choose).not.toHaveBeenCalled();
+  expect(state.bindTaskProject).toHaveBeenCalledOnce();
 });
 it("refuses preview frames and unavailable ownership before touching local files", async () => {
   const state = fixture(); state.context.mockRejectedValue(Error("untrusted frame"));

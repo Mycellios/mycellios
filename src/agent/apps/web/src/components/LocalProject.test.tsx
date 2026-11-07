@@ -2,127 +2,89 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { RpcClient } from "../lib/rpc";
+import { LocalProject } from "./LocalProject";
 
-const { computer, add } = vi.hoisted(() => ({
-  computer: {
-    projectAvailable: vi.fn(),
-    project: vi.fn(),
-    chooseProject: vi.fn(),
-    requestAccess: vi.fn(),
-    connect: vi.fn(),
-    connected: vi.fn(),
-  },
-  add: vi.fn(),
-}));
+const { computer } = vi.hoisted(() => ({ computer: {
+  projectAvailable: vi.fn(), project: vi.fn(), requestAccess: vi.fn(), chooseProject: vi.fn(),
+} }));
 vi.mock("../lib/desktop", () => ({ desktopBridge: () => ({ computer }) }));
-vi.mock("../lib/review-workspace", () => ({ useReviewWorkspace: () => ({ add }) }));
 vi.mock("@lingui/react/macro", () => ({
+  Trans: ({ children }: { children: string }) => children,
   useLingui: () => ({ t: (parts: TemplateStringsArray) => parts.join("") }),
 }));
 
-import { LocalProject } from "./LocalProject";
-
-vi.mock("../lib/rpc", () => ({ rpc: { bots: { setComputer: vi.fn(async () => {}) } } }));
+const documents = { name: "Documents", path: "C:\\Documents" };
+const repository = { name: "Example", path: "C:\\Example", repositoryId: "11111111-1111-4111-8111-111111111111" };
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
+const saveProject = vi.fn(), open = vi.fn(), onTask = vi.fn();
+const rpc = { development: { saveProject, open } } as unknown as RpcClient;
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.clearAllMocks();
   computer.projectAvailable.mockResolvedValue(true);
   computer.project.mockResolvedValue(null);
   computer.requestAccess.mockResolvedValue(true);
-  computer.connect.mockResolvedValue(undefined);
-  computer.connected.mockResolvedValue(false);
-  computer.chooseProject.mockResolvedValue({ name: "Example", path: "C:\\Example" });
+  computer.chooseProject.mockResolvedValue(documents);
+  saveProject.mockResolvedValue({ id: repository.repositoryId });
+  open.mockResolvedValue({ threadId: "branch-chat" });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
 });
 afterEach(async () => {
-  await act(async () => root.unmount());
+  await act(() => root.unmount());
   host.remove();
+  vi.unstubAllGlobals();
 });
-it("stays hidden for hosted and browser sessions", async () => {
+
+const render = () => act(() => root.render(<LocalProject botId="mico" rpc={rpc} onTask={onTask} />));
+const button = (name: string) => [...document.querySelectorAll("button")].find(element => element.textContent === name)!;
+const show = () => act(() => host.querySelector("button")!.click());
+
+it("stays hidden when the native picker is unavailable", async () => {
   computer.projectAvailable.mockResolvedValue(false);
-  await act(async () => root.render(<LocalProject botId="bot" onOpened={async () => {}} />));
-  expect(host.textContent).toBe("");
+  await render();
+  expect(host.querySelector("button")).toBeNull();
   expect(computer.project).not.toHaveBeenCalled();
 });
-it("selects natively and assigns the agent's dedicated computer before showing the project", async () => {
-  const opened = vi.fn(async () => {});
-  await act(async () => root.render(<LocalProject botId="bot" onOpened={opened} />));
-  await act(async () =>
-    [...host.querySelectorAll<HTMLButtonElement>("button")]
-      .find((b) => b.textContent === "Open project")!
-      .click(),
-  );
-  expect(computer.chooseProject).toHaveBeenCalledWith("bot");
-  expect(opened).toHaveBeenCalledOnce();
-  expect(host.textContent).toContain("Example");
+
+it("opens a normal folder for this Mico without creating a project or sending a message", async () => {
+  await render();
+  await show();
+  await act(() => button("Add folder").click());
+  expect(computer.requestAccess).toHaveBeenCalledOnce();
+  expect(computer.chooseProject).toHaveBeenCalledWith("mico");
+  expect(document.body.textContent).toContain("Documents");
+  expect(button("New task in a branch")).toBeUndefined();
+  expect(saveProject).not.toHaveBeenCalled();
+  expect(open).not.toHaveBeenCalled();
 });
-it("does not select or modify settings after local access is denied", async () => {
+
+it("does not open the picker when local access is denied", async () => {
   computer.requestAccess.mockResolvedValue(false);
-  const opened = vi.fn();
-  await act(async () => root.render(<LocalProject botId="bot" onOpened={opened} />));
-  await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
+  await render();
+  await show();
+  await act(() => button("Add folder").click());
   expect(computer.chooseProject).not.toHaveBeenCalled();
-  expect(opened).not.toHaveBeenCalled();
-  expect(computer.connect).not.toHaveBeenCalled();
 });
-it("connects the owned native computer without opening a folder chooser", async () => {
-  const opened = vi.fn(async () => {});
-  await act(async () => root.render(<LocalProject botId="bot" onOpened={opened} />));
-  expect(host.querySelector("details")!.open).toBe(false);
-  computer.connected.mockResolvedValue(true);
-  await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
-  expect(computer.connect).toHaveBeenCalledWith("bot");
-  expect(computer.chooseProject).not.toHaveBeenCalled();
-  expect(opened).toHaveBeenCalledOnce();
-  expect(host.querySelector('[role="status"]')!.textContent).toBe("Connected");
-});
-it("never reports connected when binding or dedicated assignment fails", async () => {
-  computer.connect.mockRejectedValue(new Error("Desktop disconnected"));
-  const opened = vi.fn();
-  await act(async () => root.render(<LocalProject botId="bot" onOpened={opened} />));
-  await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
-  expect(opened).not.toHaveBeenCalled();
-  expect(host.querySelector('[role="status"]')).toBeNull();
-  expect(host.querySelector('[role="alert"]')!.textContent).toContain("Desktop disconnected");
-});
-it("retains folder selection for older native releases", async () => {
-  const connect = computer.connect,
-    connected = computer.connected;
-  Object.assign(computer, { connect: undefined, connected: undefined });
-  try {
-    await act(async () => root.render(<LocalProject botId="bot" onOpened={async () => {}} />));
-    expect(host.textContent).not.toContain("Use this computer");
-    expect(host.querySelector("details")!.open).toBe(true);
-    await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
-    expect(computer.chooseProject).toHaveBeenCalledWith("bot");
-  } finally {
-    Object.assign(computer, { connect, connected });
-  }
-});
-it("opens a loopback preview in the existing side panel, without sending a chat message", async () => {
-  computer.project.mockResolvedValue({ name: "Example", path: "C:\\Example" });
-  await act(async () => root.render(<LocalProject botId="bot" onOpened={async () => {}} />));
-  const input = host.querySelector<HTMLInputElement>("input")!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(
-      input,
-      "http://127.0.0.1:4321",
-    );
+
+it("opens a branch task on the same Mico using an opaque repository ID", async () => {
+  computer.project.mockResolvedValue(repository);
+  await render();
+  await show();
+  await act(() => button("New task in a branch").click());
+  const input = document.querySelector<HTMLInputElement>("input")!;
+  await act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Improve login");
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await act(async () =>
-    host
-      .querySelector("form")!
-      .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })),
-  );
-  expect(add).toHaveBeenCalledWith({
-    id: "project:bot",
-    name: "Example",
-    mimeType: "text/html",
-    url: "http://127.0.0.1:4321/",
-  });
+  await act(() => document.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(saveProject).toHaveBeenCalledWith({ id: repository.repositoryId, name: "Example" });
+  expect(open).toHaveBeenCalledWith({ botId: "mico", title: "Improve login", projectKey: `project:${repository.repositoryId}`,
+    taskKey: expect.stringMatching(/^project-task:/) });
+  expect(onTask).toHaveBeenCalledWith("branch-chat");
+  expect(computer.chooseProject).not.toHaveBeenCalled();
 });
