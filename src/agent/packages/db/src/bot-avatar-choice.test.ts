@@ -6,7 +6,23 @@ import {
   organicAvatarLook,
 } from "@rakazo/core";
 import { describe, expect, it } from "vitest";
-import { BOT_ID_ATTEMPTS, chooseBotAvatar, pickLeastUsed } from "./bot-avatar-choice.js";
+import { BOT_ID_ATTEMPTS, chooseBotAvatar, chooseMicoAvatar, pickLeastUsed } from "./bot-avatar-choice.js";
+
+it("assigns every branded shape and palette combination before repeating", () => {
+  const existing = [{ color: "#8650DF::shape_0" }, { color: "data:image/png;base64,abc" }];
+  const colors = Array.from({ length: 144 }, () => {
+    const { color } = chooseMicoAvatar(existing);
+    existing.push({ color });
+    return color;
+  });
+  expect(colors[0]).toBe("#8650DF::shape_1000");
+  expect(new Set(colors).size).toBe(144);
+  expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[0])).size).toBe(12);
+  expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[1])).size).toBe(12);
+  const next = chooseMicoAvatar(existing);
+  expect(next.color).toBe(colors[0]);
+  expect(chooseMicoAvatar([...existing, next]).color).toBe(colors[1]);
+});
 
 /** A repeatable stand-in for Math.random. */
 function seeded(seed: number) {

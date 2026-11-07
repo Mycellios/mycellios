@@ -1,12 +1,10 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { BOT_NAME_MAX_LENGTH } from "@rakazo/contracts";
 import {
-  ORGANIC_AVATAR_LOOKS,
-  organicAvatarFamily,
-  organicAvatarSampleIdentity,
-} from "@rakazo/core";
+  BOT_NAME_MAX_LENGTH,
+  MICO_AVATAR_SHAPES,
+  withMicoAvatarShape,
+} from "@rakazo/contracts";
 import {
-  BOT_AVATAR_COLORS,
   BotAvatar,
   Button,
   Dialog,
@@ -15,24 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-  parseBotAvatar,
 } from "@rakazo/ui-web";
 import { useRef, useState } from "react";
 import { errorText } from "../../lib/user-error";
 import { BotLookPicker } from "./avatar-studio-popover";
 
-/** One preview identity per organic look, so the dialog can show a body before the bot has an id. */
-const ORGANIC_IDENTITIES = ORGANIC_AVATAR_LOOKS.map(organicAvatarSampleIdentity);
-
-function pick<T>(options: readonly T[]): T {
-  return options[Math.floor(Math.random() * options.length)]!;
-}
+const automaticPreview = withMicoAvatarShape("", MICO_AVATAR_SHAPES[0].index);
 
 export interface CreateBotDialogInput {
   name: string;
-  color: string;
-  /** The organic family the preview drew; omitted when a studio shape is picked. */
-  avatarFamily?: number;
+  color?: string;
 }
 
 /** Mounted only while open; the parent unmounts it from `onCancel` or after `onCreate`. */
@@ -48,10 +38,7 @@ export function CreateBotDialog({
   const { t } = useLingui();
   const nameRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
-  const [look, setLook] = useState(() => ({
-    value: pick(BOT_AVATAR_COLORS),
-    identity: pick(ORGANIC_IDENTITIES),
-  }));
+  const [look, setLook] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const trimmed = name.trim();
@@ -60,12 +47,10 @@ export function CreateBotDialog({
     if (!trimmed || submitting) return;
     setError(null);
     setSubmitting(true);
-    const organic = parseBotAvatar(look.value).shapeIndex === undefined;
     try {
       await onCreate({
         name: trimmed,
-        color: look.value,
-        ...(organic ? { avatarFamily: organicAvatarFamily(look.identity) } : {}),
+        ...(look ? { color: look } : {}),
       });
     } catch (err) {
       setError(errorText(err, t`Could not create bot`));
@@ -100,7 +85,7 @@ export function CreateBotDialog({
             </DialogTitle>
           </DialogHeader>
           <div className="flex justify-center py-2">
-            <BotAvatar color={look.value} identity={look.identity} size={96} />
+            <BotAvatar color={look || automaticPreview} size={96} />
           </div>
           <Input
             ref={nameRef}
@@ -117,12 +102,9 @@ export function CreateBotDialog({
             </p>
           ) : null}
           <BotLookPicker
-            value={look.value}
-            identity={look.identity}
-            organicIdentities={ORGANIC_IDENTITIES}
-            onChange={(value, identity) =>
-              setLook((current) => ({ value, identity: identity ?? current.identity }))
-            }
+            value={look}
+            onAutomatic={() => setLook("")}
+            onChange={setLook}
           />
           <DialogFooter>
             {onImport ? (

@@ -1,3 +1,4 @@
+import { micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
 import type { BotColorDef } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
@@ -5,6 +6,8 @@ import {
   BOT_AVATAR_COLORS,
   BOT_COLOR_LIST,
   DEFAULT_BOT_AVATAR_COLOR,
+  MICO_AVATAR_VIEWBOX,
+  micoAvatarArt,
   organicAvatarPath,
   resolvePersonaColorDef,
   SHIPPED_BOT_AVATAR_CENTER,
@@ -45,19 +48,10 @@ export function parseBotAvatar(
   if (!rawColor) return { color: "#F97316", isImage: false };
   // Only data: image URLs are rendered. Arbitrary http(s)/blob values in `color`
   // must not become <img src> (SSRF / tracking when other members view the bot).
-  if (rawColor.startsWith("data:image/")) {
-    return { color: "#F97316", isImage: true, imageUrl: rawColor };
-  }
-  if (rawColor.includes("::shape_")) {
-    const parts = rawColor.split("::shape_");
-    const rawShapeIdx = parts[1] ?? "0";
-    const parsedShapeIdx = /^\d+$/.test(rawShapeIdx) ? Number(rawShapeIdx) : 0;
-    const shapeIdx = Number.isSafeInteger(parsedShapeIdx) ? parsedShapeIdx : 0;
-    return {
-      color: parts[0] || "#F97316",
-      shapeIndex: shapeIdx % SHIPPED_SHAPE_KEYS.length,
-      isImage: false,
-    };
+  const parsed = parseBotAvatarValue(rawColor);
+  if (parsed.kind === "image") return { color: "#F97316", isImage: true, imageUrl: parsed.imageUrl };
+  if (parsed.kind === "shape") {
+    return { color: parsed.color, shapeIndex: parsed.shapeIndex, isImage: false };
   }
   return { color: rawColor, isImage: false };
 }
@@ -145,6 +139,7 @@ export const BotAvatar = memo(function BotAvatar({
     );
   }
 
+  const mico = micoAvatarArt(parsed.shapeIndex, parsed.color);
   return (
     <div
       className={cn(
@@ -188,7 +183,7 @@ export const BotAvatar = memo(function BotAvatar({
         </defs>
       </svg>
       <svg
-        viewBox={VIEWBOX}
+        viewBox={mico ? MICO_AVATAR_VIEWBOX : VIEWBOX}
         aria-hidden="true"
         className={cn(
           "overflow-visible transition-transform duration-300",
@@ -202,22 +197,40 @@ export const BotAvatar = memo(function BotAvatar({
           height: size,
           filter: isWorking
             ? `drop-shadow(0 0 8px ${colorDef.light}) drop-shadow(0 0 2px #ffffff)`
-            : "drop-shadow(0 2px 4px rgba(0,0,0,0.45))",
+            : mico
+              ? "drop-shadow(0 1px 1.5px rgba(32,24,28,0.22))"
+              : "drop-shadow(0 2px 4px rgba(0,0,0,0.45))",
         }}
       >
-        <defs>
-          <linearGradient id={`bot-ink-${id}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={colorDef.light} />
-            <stop offset="100%" stopColor={colorDef.dark} />
-          </linearGradient>
-        </defs>
-        <g>
-          <path d={shippedBotAvatarShapePath(parsed.shapeIndex)} fill={`url(#bot-ink-${id})`} />
-          <g fill={colorDef.eyeColor} className="bot-character-eyes">
-            <ellipse cx={CENTER - 29} cy={CENTER - 8} rx={10} ry={7} />
-            <ellipse cx={CENTER + 29} cy={CENTER - 8} rx={10} ry={7} />
-          </g>
-        </g>
+        {mico ? (
+          <>
+            {mico.layers.map(([tone, path]) => (
+              <path key={path} d={path} fill={mico.fills[tone]} />
+            ))}
+            {mico.eyes.slice(0, 2).map((x) => (
+              <g key={x}>
+                <ellipse cx={x} cy={mico.eyes[2]} rx={2.75} ry={3.65} fill="#251C2C" />
+                <ellipse cx={x - 0.65} cy={mico.eyes[2] - 1.2} rx={0.85} ry={1} fill="#FFF1DD" />
+              </g>
+            ))}
+          </>
+        ) : (
+          <>
+            <defs>
+              <linearGradient id={`bot-ink-${id}`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor={colorDef.light} />
+                <stop offset="100%" stopColor={colorDef.dark} />
+              </linearGradient>
+            </defs>
+            <g>
+              <path d={shippedBotAvatarShapePath(parsed.shapeIndex)} fill={`url(#bot-ink-${id})`} />
+              <g fill={colorDef.eyeColor} className="bot-character-eyes">
+                <ellipse cx={CENTER - 29} cy={CENTER - 8} rx={10} ry={7} />
+                <ellipse cx={CENTER + 29} cy={CENTER - 8} rx={10} ry={7} />
+              </g>
+            </g>
+          </>
+        )}
       </svg>
     </div>
   );
@@ -335,21 +348,25 @@ export function BotShapePreview({
       ? undefined
       : (SHIPPED_SHAPE_KEYS[shapeIndex % SHIPPED_SHAPE_KEYS.length] ?? "hex");
   const colorDef = resolvePersonaColorDef("preview", color);
+  const mico = micoAvatarShape(shapeIndex);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={label ?? key}
+      aria-label={label ?? mico?.id ?? key}
+      title={label}
       aria-pressed={selected ?? false}
       className={cn(
-        "relative flex size-11 items-center justify-center rounded-xl transition-transform hover:scale-105 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
+        "relative flex size-11 cursor-pointer items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover motion-safe:transition-transform motion-safe:hover:scale-105 motion-safe:active:scale-95",
         selected
           ? "ring-2 ring-primary ring-offset-2 ring-offset-popover bg-white/10"
           : "hover:bg-white/5",
       )}
     >
-      {shapeIndex === undefined ? (
+      {mico ? (
+        <BotAvatar color={micoAvatarValue(mico.index, color)} size={34} />
+      ) : shapeIndex === undefined ? (
         <BotAvatar color={color} identity={identity} size={32} />
       ) : (
         <svg viewBox={VIEWBOX} className="size-8 overflow-visible" aria-hidden="true">

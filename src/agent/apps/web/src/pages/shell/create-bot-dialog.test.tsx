@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import { ORGANIC_AVATAR_LOOKS } from "@rakazo/core";
 import type { ReactNode } from "react";
 import { act } from "react";
 import type { Root } from "react-dom/client";
@@ -9,11 +8,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CreateBotDialogInput } from "./create-bot-dialog";
 
 vi.mock("@lingui/react/macro", () => {
-  const t = (parts: TemplateStringsArray, ...values: unknown[]) =>
-    parts.reduce((text, part, index) => `${text}${index > 0 ? values[index - 1] : ""}${part}`, "");
+  const t = (parts: TemplateStringsArray | { message: string }, ...values: unknown[]) =>
+    "message" in parts
+      ? parts.message
+      : parts.reduce((text, part, index) => `${text}${index > 0 ? values[index - 1] : ""}${part}`, "");
   return { useLingui: () => ({ t }), Trans: ({ children }: { children: ReactNode }) => children };
 });
 
+import { AvatarStudioPopover } from "./avatar-studio-popover";
 import { CreateBotDialog } from "./create-bot-dialog";
 
 let container: HTMLDivElement;
@@ -76,31 +78,22 @@ describe("CreateBotDialog", () => {
     expect(button("Create").disabled).toBe(false);
   });
 
-  it("sends the organic family the preview draws", async () => {
+  it("lets the server assign an unused avatar by default", async () => {
     const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
     await render(onCreate);
-    await click(button("Shape 2"));
-    await click(button("Color #10B981"));
-    const preview = document.querySelector(".rakazo-organic-avatar");
-    const family = Number(preview?.getAttribute("data-shape-family"));
     await typeName("Scout");
     await click(button("Create"));
-    expect(onCreate).toHaveBeenCalledWith({
-      name: "Scout",
-      color: "#10B981",
-      avatarFamily: family,
-    });
-    expect(family).toBe(ORGANIC_AVATAR_LOOKS[1]);
+    expect(onCreate).toHaveBeenCalledWith({ name: "Scout" });
   });
 
-  it("sends a studio shape without an organic family", async () => {
+  it("sends a custom shape and palette together", async () => {
     const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
     await render(onCreate);
-    await click(button("Color #F97316"));
-    await click(button("wedge"));
+    await click(button("Fox"));
+    await click(button("Turquoise"));
     await typeName("Scout");
     await click(button("Create"));
-    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#F97316::shape_1" });
+    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_1001" });
   });
 
   it("shows the error and stays open when creating fails", async () => {
@@ -133,5 +126,24 @@ describe("importing instead", () => {
     });
     await act(async () => button("Import").click());
     expect(onImport).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Mico avatar settings", () => {
+  it("changes shape and palette separately and keeps the upload option available", async () => {
+    const onChange = vi.fn();
+    const renderStudio = (value: string) =>
+      act(async () => root.render(<AvatarStudioPopover value={value} onChange={onChange} />));
+    await renderStudio("#8650DF::shape_1000");
+    await click(button("Customize bot avatar"));
+    expect(button("Mushroom").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Violet").getAttribute("aria-pressed")).toBe("true");
+
+    await click(button("Mint"));
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_1000");
+    await renderStudio("#67B793::shape_1000");
+    await click(button("Octopus"));
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_1011");
+    expect(button("Upload").getAttribute("role")).toBe("tab");
   });
 });

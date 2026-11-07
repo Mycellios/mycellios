@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { organicAvatarFamily } from "@rakazo/core";
 import { captureScreenshot, completeOnboarding, createBotFromPicker, rpc, signup } from "./helpers";
 
 test("create opens dialog, then empty chat; picker lists bots; sidebar collapses", async ({
@@ -44,10 +43,10 @@ test("create opens dialog, then empty chat; picker lists bots; sidebar collapses
   await expect(create).toBeDisabled();
 
   await name.fill("New Bot");
-  const wedge = createDialog.getByRole("button", { name: "wedge", exact: true });
-  await wedge.click();
-  await createDialog.getByRole("button", { name: "Color #10B981", exact: true }).click();
-  await expect(wedge).toHaveAttribute("aria-pressed", "true");
+  const fox = createDialog.getByRole("button", { name: "Fox", exact: true });
+  await fox.click();
+  await createDialog.getByRole("button", { name: "Mint", exact: true }).click();
+  await expect(fox).toHaveAttribute("aria-pressed", "true");
   await captureScreenshot(page, testInfo, "create-bot-dialog");
 
   const created = page.waitForResponse(
@@ -65,7 +64,7 @@ test("create opens dialog, then empty chat; picker lists bots; sidebar collapses
     {},
   );
   expect(afterCreate.find((bot) => bot.id === newBotId)).toMatchObject({
-    color: "#10B981::shape_1",
+    color: "#67B793::shape_1001",
     computerMode: "team",
   });
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "closed");
@@ -116,19 +115,23 @@ test("create opens dialog, then empty chat; picker lists bots; sidebar collapses
   await page.keyboard.press("Escape");
   await expect(picker).toHaveCount(0);
 
-  // An organic body picked in the dialog is the body the new bot gets.
+  // Automatic creation chooses a combination unused by the other bots.
   await page.getByTestId("create-menu-trigger").click();
   await picker.getByTestId("create-new-bot").click();
   await expect(createDialog).toBeVisible();
-  await createDialog.getByRole("button", { name: "Shape 3", exact: true }).click();
-  const family = Number(
-    await createDialog.locator(".rakazo-organic-avatar").first().getAttribute("data-shape-family"),
+  await expect(createDialog.getByRole("button", { name: "Automatic", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
-  await createDialog.getByPlaceholder("Name your Bot").fill("Organic Bot");
+  await createDialog.getByPlaceholder("Name your Bot").fill("Automatic Bot");
   await createDialog.getByRole("button", { name: "Create", exact: true }).click();
   await expect(createDialog).toBeHidden();
-  await expect(page.getByPlaceholder("Message Organic Bot")).toBeVisible();
-  expect(organicAvatarFamily(page.url().split("/").pop()!)).toBe(family);
+  await expect(page.getByPlaceholder("Message Automatic Bot")).toBeVisible();
+  const automaticId = page.url().split("/").pop()!;
+  const bots = await rpc<Array<{ id: string; color: string }>>(page, "bots/list", {});
+  const automatic = bots.find((bot) => bot.id === automaticId);
+  expect(automatic?.color).toMatch(/^#[0-9A-F]{6}::shape_10(?:0\d|1[01])$/);
+  expect(bots.filter((bot) => bot.color === automatic?.color)).toHaveLength(1);
 });
 
 test("a stale roster refresh started before creation keeps the new bot selected", async ({
