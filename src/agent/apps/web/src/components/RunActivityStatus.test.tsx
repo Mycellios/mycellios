@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Run } from "@rakazo/contracts";
+vi.mock("@rakazo/ui-web/hooks/use-mobile", () => ({ useIsMobile: () => false }));
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (s: TemplateStringsArray, ...values: unknown[]) => s.reduce((text, part, index) => text + part + (values[index] ?? ""), ""), i18n: { locale: "en" } }),
 }));

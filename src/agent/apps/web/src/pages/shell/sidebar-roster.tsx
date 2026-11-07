@@ -57,6 +57,8 @@ export function SidebarRoster({
   activeSnapshot,
   botMenuContent,
   mini = false,
+  mobile = false,
+  activeSpaceId,
 }: {
   sidebarGroups: ReturnType<
     typeof sidebarGroupsForSpaces<Space["bots"][number], Space["groups"][number]>
@@ -89,12 +91,19 @@ export function SidebarRoster({
   activeSnapshot: ThreadSnapshot | null;
   botMenuContent: ReactNode;
   mini?: boolean;
+  mobile?: boolean;
+  activeSpaceId?: string | null;
 }) {
   const { t } = useLingui();
   return (
     <>
       {sidebarGroups.map((group, groupIndex) => {
         const collapsed = Boolean(group.title) && collapsedSidebarSections.has(group.key);
+        const currentMobileSpace = mobile && group.spaceId === activeSpaceId;
+        const title = currentMobileSpace
+          ? group.subtitle ?? (group.title === group.spaceName && !group.emptySpaceId ? t`Micos` : group.title)
+          : group.title;
+        const subtitle = currentMobileSpace ? undefined : group.subtitle;
         const groupBotIds = group.bots.flatMap((item) =>
           item.kind === "bot" ? [item.chat.id] : [],
         );
@@ -155,7 +164,7 @@ export function SidebarRoster({
                       render={
                         group.emptySpaceId ? <button type="button" /> : <CollapsibleTrigger />
                       }
-                      className={`flex min-w-0 items-center justify-between gap-2 rounded-lg px-2.5 py-1 text-[11px] font-semibold tracking-wider uppercase text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring ${hasSpaceActions ? "col-start-1 row-start-1 w-full" : "flex-1"}`}
+                      className={`flex min-w-0 items-center gap-2 rounded-lg px-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring ${mobile ? "min-h-11 justify-start text-sm font-medium text-muted-foreground" : "justify-between py-1 text-[11px] font-semibold tracking-wider uppercase text-foreground"} ${hasSpaceActions ? "col-start-1 row-start-1 w-full" : "flex-1"}`}
                       onClick={() => {
                         if (group.emptySpaceId) {
                           openSpaceChat(group.emptySpaceId, "/onboarding");
@@ -177,22 +186,22 @@ export function SidebarRoster({
                       }
                       aria-label={
                         group.emptySpaceId
-                          ? t`Open ${headerName(group)}`
+                          ? t`Open ${headerName({ title, subtitle })}`
                           : collapsed
-                            ? t`Expand ${headerName(group)}`
-                            : t`Collapse ${headerName(group)}`
+                            ? t`Expand ${headerName({ title, subtitle })}`
+                            : t`Collapse ${headerName({ title, subtitle })}`
                       }
                     >
                       <span
                         className={`flex min-w-0 items-center gap-1.5 truncate ${hasSpaceActions ? "pe-7" : ""}`}
                       >
-                        {group.showLock ? (
+                        {group.showLock && !currentMobileSpace ? (
                           <Lock size={11} strokeWidth={2} aria-hidden="true" />
                         ) : null}
-                        <span className="truncate">{group.title}</span>
-                        {group.subtitle ? (
+                        <span className="truncate">{title}</span>
+                        {subtitle ? (
                           <span className="ms-0.5 truncate text-muted-foreground">
-                            {group.subtitle}
+                            {subtitle}
                           </span>
                         ) : null}
                       </span>
@@ -239,7 +248,7 @@ export function SidebarRoster({
                     size="icon-sm"
                     className={
                       group.title
-                        ? `col-start-1 row-start-1 justify-self-end self-center ${group.emptySpaceId ? "" : "me-6"}`
+                        ? `col-start-1 row-start-1 justify-self-end self-center ${mobile ? "size-11" : group.emptySpaceId ? "" : "me-6"}`
                         : undefined
                     }
                     aria-label={t`Actions for ${group.spaceName}`}
@@ -258,11 +267,14 @@ export function SidebarRoster({
               </div>
             ) : null}
             <CollapsibleContent className="flex flex-col gap-0.5">
+              {mobile && group.sectionId && group.bots.length === 0 ? (
+                <p className="px-2.5 pb-2 text-sm text-muted-foreground">{t`No chats in this folder`}</p>
+              ) : null}
               {group.bots.map((item) => {
                 const selected =
                   (item.kind === "bot" && !inGroup && active?.id === item.chat.id) ||
                   (item.kind === "group" && inGroup && activeGroup?.id === item.chat.id);
-                const compact = botsSidebarDensity === "compact";
+                const compact = !mobile && botsSidebarDensity === "compact";
                 const workStatusLabel =
                   item.kind === "bot" ? rosterWorkStatusLabel(item.chat.status) : null;
                 const rowError =
@@ -392,6 +404,7 @@ export function SidebarRoster({
                         ? "mx-auto size-12 justify-center rounded-xl"
                         : compact
                           ? "w-full min-h-11 gap-2 rounded-xl px-2.5 py-1.5"
+                          : mobile ? "w-full min-h-[68px] gap-3 rounded-xl px-2.5 py-2"
                           : "w-full min-h-[66px] gap-3 rounded-xl px-2.5 py-[7px]"
                     } text-start ${
                       item.kind === "bot" ? "cursor-grab active:cursor-grabbing" : ""
@@ -444,8 +457,8 @@ export function SidebarRoster({
                             <span
                               dir="auto"
                               data-roster-bot-name={item.kind === "bot" ? "" : undefined}
-                              className={`min-w-0 truncate text-body2 text-foreground ${
-                                item.chat.unread ? "font-semibold" : "font-medium"
+                              className={`min-w-0 truncate text-foreground ${mobile ? "text-base" : "text-body2"} ${
+                                mobile || item.chat.unread ? "font-semibold" : "font-medium"
                               }`}
                             >
                               {item.chat.name}
@@ -460,7 +473,7 @@ export function SidebarRoster({
                             {!compact ? (
                               <span
                                 data-roster-time
-                                className="text-label text-faint-foreground tabular-nums"
+                                className={`tabular-nums ${mobile ? "text-xs text-muted-foreground" : "text-label text-faint-foreground"}`}
                               >
                                 {formatRosterTime(item.chat.updatedAt)}
                               </span>
@@ -501,7 +514,7 @@ export function SidebarRoster({
                           <div
                             dir="auto"
                             data-roster-preview={!workStatusLabel ? "true" : undefined}
-                            className={`mt-1 truncate text-label ${
+                            className={`truncate ${mobile ? "mt-0.5 text-sm" : "mt-1 text-label"} ${
                               workStatusLabel
                                 ? "font-semibold text-status-working"
                                 : item.chat.unread

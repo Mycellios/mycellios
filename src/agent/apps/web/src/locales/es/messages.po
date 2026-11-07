@@ -19,6 +19,33 @@ msgstr "Las herramientas del ordenador no están disponibles. Puedes seguir conv
 msgid "Technical details"
 msgstr "Detalles técnicos"
 
+msgid "Message actions"
+msgstr "Acciones del mensaje"
+
+msgid "No chats in this folder"
+msgstr "No hay chats en esta carpeta"
+
+msgid "Dictate message"
+msgstr "Dictar mensaje"
+
+msgid "Stop recording"
+msgstr "Detener grabación"
+
+msgid "Record voice message"
+msgstr "Grabar nota de voz"
+
+msgid "Could not attach the recording."
+msgstr "No se pudo adjuntar la grabación."
+
+msgid "Could not prepare the recording."
+msgstr "No se pudo preparar la grabación."
+
+msgid "No speech was detected."
+msgstr "No se detectó voz."
+
+msgid "Text appears when you stop recording"
+msgstr "El texto aparecerá al detener la grabación"
+
 #: src/pages/shell/sidebar-roster.tsx
 msgid " (unread)"
 msgstr " (sin leer)"
@@ -8244,6 +8271,30 @@ msgstr "Modelo general"
 
 msgid "Back to chat"
 msgstr "Volver al chat"
+
+msgid "Browser options"
+msgstr "Opciones del navegador"
+
+msgid "Browser controls"
+msgstr "Controles del navegador"
+
+msgid "Browser help"
+msgstr "Ayuda del navegador"
+
+msgid "Use the keyboard button to enter an address and the tab counter to switch pages. If a page blocks previews, open it in your browser from Options."
+msgstr "Toca el teclado para escribir una dirección y el contador para cambiar de pestaña. Si una página bloquea la vista previa, ábrela en tu navegador desde Opciones."
+
+msgid "Open in browser"
+msgstr "Abrir en el navegador"
+
+msgid "View details"
+msgstr "Ver detalles"
+
+msgid "This page must open in your browser."
+msgstr "Abre esta página en tu navegador."
+
+msgid "Enter a page address to open it."
+msgstr "Escribe una dirección para abrir la página."
 
 msgid "Resume routine"
 msgstr "Reanudar rutina"

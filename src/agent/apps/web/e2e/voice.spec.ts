@@ -2,8 +2,73 @@ import { expect, test } from "@playwright/test";
 import { captureScreenshot, completeOnboarding, openUserSettings, rpc, signup } from "./helpers";
 
 test.use({
-  launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+  launchOptions: {
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,
+    args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+  },
   permissions: ["microphone"],
+});
+
+test("mobile dictation displays interim words, survives a pause and waits for Send", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/e2e/fixtures/voice-composer.html?simulated&live");
+  const draft = page.getByRole("combobox", { name: "Message Chief" });
+  await draft.fill("Draft:");
+  await page.getByRole("button", { name: "Dictate message" }).click();
+  await page.getByRole("button", { name: "First words" }).click();
+  await expect(draft).toHaveValue("Draft: first guess");
+  await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Correct words" }).click();
+  await expect(draft).toHaveValue("Draft: first phrase");
+  await page.getByRole("button", { name: "Pause recognizer" }).click();
+  await page.getByRole("button", { name: "More words" }).click();
+  await expect(draft).toHaveValue("Draft: first phrase second phrase");
+  await captureScreenshot(page, testInfo, "mobile-live-transcript");
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  await expect(draft).toHaveValue("Draft: first phrase second phrase final words");
+  await expect(draft).toBeEditable();
+  await expect(page.getByTestId("sent-voice")).toBeEmpty();
+});
+
+test("mobile voice composer keeps editable dictation and playable audio until Send", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "SpeechRecognition", { value: undefined });
+    Object.defineProperty(window, "webkitSpeechRecognition", { value: undefined });
+  });
+  const transcriptions: string[] = [];
+  await page.route("**/api/voice/transcribe", route => {
+    const body = route.request().postDataJSON();
+    expect(body.audioBase64.length).toBeGreaterThan(10);
+    transcriptions.push(body.mimeType);
+    return route.fulfill({ json: { text: "voice words" } });
+  });
+  await page.goto("/e2e/fixtures/voice-composer.html");
+  const draft = page.getByRole("combobox", { name: "Message Chief" });
+  const sent = page.getByTestId("sent-voice");
+  await draft.fill("Existing draft");
+  await page.getByRole("button", { name: "Dictate message" }).click();
+  await expect(page.getByTestId("composer-voice-strip")).toBeVisible();
+  await captureScreenshot(page, testInfo, "inline-dictation-mobile");
+  await expect(page.getByTestId("composer-voice-strip")).toContainText("0:01");
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  await expect(draft).toHaveValue("Existing draft voice words");
+  await expect(sent).toBeEmpty();
+
+  await page.getByRole("button", { name: "Add to message" }).click();
+  await page.getByRole("menuitem", { name: "Record voice message" }).click();
+  await expect(page.getByTestId("composer-voice-strip")).toBeVisible();
+  // The fake microphone must produce at least one media packet.
+  await expect(page.getByTestId("composer-voice-strip")).toContainText("0:01");
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  await expect(page.locator("audio")).toHaveAttribute("src", /^blob:/);
+  await expect.poll(() => page.locator("audio").evaluate(audio => (audio as HTMLAudioElement).readyState)).toBeGreaterThan(0);
+  await expect(draft).toHaveValue("Existing draft voice words voice words");
+  await expect(sent).toBeEmpty();
+  await draft.fill("Edited transcript");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(sent).toHaveText(/^Edited transcript \| audio\/(mp4|ogg|wav)$/);
+  expect(transcriptions).toHaveLength(2);
 });
 
 test("voice settings hide self-hosted speech when the deployment omits it", async ({
@@ -38,7 +103,7 @@ test("voice settings connect a key, speak a reply, and open a call", async ({ pa
   await completeOnboarding(page);
 
   await expect(
-    page.getByTestId("composer-bar").getByRole("button", { name: "Hold to talk", exact: true }),
+    page.getByTestId("composer-bar").getByRole("button", { name: "Dictate message", exact: true }),
   ).toHaveCount(1);
   await expect(page.getByTestId("call-button")).toHaveAccessibleName("Call");
   await captureScreenshot(page, testInfo, "voice-composer");
@@ -133,19 +198,12 @@ test("voice settings connect a key, speak a reply, and open a call", async ({ pa
 
   // The out-of-credit toast sits over the mic; let it close so the press reaches the mic.
   await expect(page.getByText("Your voice provider is out of credit.")).toHaveCount(0);
-  const mic = page.getByRole("button", { name: "Hold to talk", exact: true });
-  await mic.hover();
-  const micBounds = await mic.boundingBox();
-  if (!micBounds) throw new Error("Missing composer microphone");
-  await page.mouse.move(micBounds.x + micBounds.width / 2, micBounds.y + micBounds.height / 2);
-  await page.mouse.down();
-  await expect(page.getByTestId("hold-to-talk-strip")).toBeVisible();
+  const mic = page.getByRole("button", { name: "Dictate message", exact: true });
+  await mic.click();
+  await expect(page.getByTestId("composer-voice-strip")).toBeVisible();
   await captureScreenshot(page, testInfo, "composer-mic-dictation");
-  // Lock and discard so the screenshot's recording never sends a chat message.
-  await page.mouse.move(micBounds.x + micBounds.width / 2, micBounds.y - 100);
-  await page.mouse.up();
   await page.getByRole("button", { name: "Discard recording" }).click();
-  await expect(page.getByTestId("hold-to-talk-strip")).toHaveCount(0);
+  await expect(page.getByTestId("composer-voice-strip")).toHaveCount(0);
 
   await openUserSettings(page, "voice");
   const settings = page.getByTestId("voice-settings");

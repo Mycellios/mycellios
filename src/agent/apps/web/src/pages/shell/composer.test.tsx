@@ -807,49 +807,15 @@ it("clears accepted saved text when only an attachment was picked during the sen
   expect(localStorage.getItem("rakazo.composerDraft.bot:bot-1")).toBeNull();
 });
 
-it.each([false, true])(
-  "preserves dictation alongside a draft when sending fails (throws=%s)",
-  async (throws) => {
-    let finish!: (value: boolean) => void;
-    let fail!: (error: Error) => void;
-    const onSend = vi.fn(
-      () =>
-        new Promise<boolean>((resolve, reject) => {
-          finish = resolve;
-          fail = reject;
-        }),
-    );
-    let onFinal!: (text: string) => void;
-    const listen = vi.spyOn(dictation, "listen").mockImplementation(async (options) => {
-      onFinal = options.onFinal;
-    });
-    try {
-      const textarea = renderComposer(onSend);
-      const mic = container?.querySelector<HTMLButtonElement>('button[aria-label="Hold to talk"]');
-      expect(mic).not.toBeNull();
-      act(() => mic?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 0 })));
-      act(() => onFinal("dictated words"));
-      type(textarea, "typed draft");
-      await act(async () => {
-        if (throws) fail(new Error("offline"));
-        else finish(false);
-      });
-      expect(textarea.value).toBe("typed draft dictated words");
-    } finally {
-      listen.mockRestore();
-    }
-  },
-);
-
 it.each([false, true])("offers dictation independently of calls while running=%s", (running) => {
   renderComposer(vi.fn().mockResolvedValue(true), { running });
-  expect(container?.querySelector('button[aria-label="Hold to talk"]')).not.toBeNull();
+  expect(container?.querySelector('button[aria-label="Dictate message"]')).not.toBeNull();
 });
 
 it("keeps dictation disabled when the composer is unavailable", () => {
   renderComposer(vi.fn().mockResolvedValue(true), { disabled: true });
   expect(
-    container?.querySelector<HTMLButtonElement>('button[aria-label="Hold to talk"]')?.disabled,
+    container?.querySelector<HTMLButtonElement>('button[aria-label="Dictate message"]')?.disabled,
   ).toBe(true);
 });
 

@@ -81,7 +81,7 @@ export function ResizableSidePanel({
       data-panel={panel}
       data-overlay={overlay || undefined}
       style={{ "--panel-width": `${width}px` } as CSSProperties}
-      className={`absolute inset-y-0 end-0 z-20 flex min-h-0 shrink-0 flex-col overflow-hidden bg-background ${overlay ? "md:absolute" : "md:relative"} ${dragging ? "" : "transition-[width] duration-150 ease-out"} ${open ? "w-full max-w-[384px] border-s border-sidebar-border md:w-(--panel-width) md:max-w-none" : "pointer-events-none w-0"}`}
+      className={`absolute inset-y-0 end-0 z-20 flex min-h-0 shrink-0 flex-col overflow-hidden bg-background ${overlay ? "md:absolute" : "md:relative"} ${dragging ? "" : panel === "review" ? "md:motion-safe:transition-[width] md:duration-150 md:ease-out" : "transition-[width] duration-150 ease-out"} ${open ? `w-full ${panel === "review" ? "md:border-s" : "max-w-[384px] border-s"} border-sidebar-border md:w-(--panel-width) md:max-w-none` : "pointer-events-none w-0"}`}
     >
       {open ? (
         <hr

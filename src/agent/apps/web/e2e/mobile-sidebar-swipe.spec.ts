@@ -79,7 +79,20 @@ test("swiping inward from the mobile edge opens the bots sidebar", async ({ page
   await swipe(page, [16, 420], [92, 426]);
   await expect(closeNavigation).toBeVisible();
   await expect(edge).toHaveCount(0);
-  await expect(page.getByTestId("bots-sidebar")).toContainText("Chief");
+  const roster = page.getByTestId("bots-sidebar");
+  await expect(roster).toContainText("Chief");
+  await expect(roster.getByRole("heading", { name: "Mycellios" })).toBeVisible();
+  await expect(roster.getByRole("textbox", { name: "Search", exact: true })).toBeInViewport();
+  await expect(roster.getByTestId("help-menu-trigger")).toHaveCount(0);
+  await expect.poll(() => roster.evaluate(element => {
+    const { left, right } = element.getBoundingClientRect();
+    return Math.abs(left) < 1 && Math.abs(right - innerWidth) < 1;
+  })).toBe(true);
+  const more = roster.getByRole("button", { name: "More", exact: true });
+  await more.click();
+  await expect(page.getByTestId("help-menu-trigger")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("help-menu-trigger")).toHaveCount(0);
   await captureScreenshot(page, testInfo, "mobile-sidebar-edge-swipe-open");
 
   // Right-to-left layouts swipe in from the other edge.

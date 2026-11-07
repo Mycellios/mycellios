@@ -11,6 +11,28 @@ const viewports = [
   { name: "mobile-390x844", width: 390, height: 844 },
 ];
 
+test("mobile live run opens a separate activity sheet even with auto-expand enabled", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(key => localStorage.setItem(key, "expanded"), STORAGE_KEY);
+  await page.goto(`${fixture}?view=thread&phase=live&run`);
+  const row = page.getByTestId("run-activity-status");
+  const trigger = row.getByRole("button", { name: "Show task activity" });
+  await expect(trigger).toBeVisible();
+  await expect(row).not.toContainText(/Total|fixture-model|Technical details/);
+  await expect(page.getByRole("dialog", { name: "Task activity" })).toHaveCount(0);
+  await captureScreenshot(page, testInfo, "mobile-live-status-row");
+  await trigger.click();
+  const sheet = page.getByRole("dialog", { name: "Task activity" });
+  await expect(sheet.getByRole("list", { name: "Task activity" })).toBeVisible();
+  await expect(sheet.getByRole("list", { name: "Task activity" })).toContainText("×8");
+  await expect(sheet.getByText("fixture-model")).toBeHidden();
+  await sheet.getByText("Technical details", { exact: true }).click();
+  await expect(sheet.getByText("fixture-model")).toBeVisible();
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(trigger).toBeFocused();
+  await expect(sheet).toHaveCount(0);
+});
+
 async function openThread(page: Page, phase: "live" | "done") {
   await page.goto(`${fixture}?view=thread&phase=${phase}`);
   await expect(page.getByTestId("message-user-bubble")).toBeVisible();

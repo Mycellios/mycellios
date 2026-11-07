@@ -9,7 +9,7 @@ import {
   Input,
   Textarea,
 } from "@rakazo/ui-web";
-import { X, Monitor, Check, LoaderCircle } from "lucide-react";
+import { X, Check, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
   StudioProject,
@@ -20,6 +20,7 @@ import type {
 import { desktopBridge } from "../lib/desktop";
 import { videoStudioFrames } from "../lib/video-studio-frames";
 import { VideoStudioSample } from "../components/VideoStudioSample";
+import { DesktopDownloadLink } from "../components/DesktopDownloadLink";
 
 const steps = ["Idea", "Guion", "Voz y escenas", "Revisión", "MP4"];
 
@@ -184,11 +185,11 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
       <DialogContent
         data-apps-studio="true"
         showCloseButton={false}
-        className={`flex w-[calc(100dvw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-5xl ${selected ? "h-[min(860px,calc(100dvh-2rem))]" : ""}`}
+        className={`flex max-h-[calc(100dvh-2rem)] w-[calc(100dvw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-5xl ${selected ? "h-[min(860px,calc(100dvh-2rem))]" : ""}`}
       >
         <DialogHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
           <DialogTitle>Estudio de vídeos</DialogTitle>
-          <Button variant="ghost" size="icon-sm" aria-label="Cerrar estudio" onClick={close}>
+          <Button variant="ghost" size="icon-sm" className="size-11 md:size-7" aria-label="Cerrar estudio" onClick={close}>
             <X size={18} />
           </Button>
         </DialogHeader>
@@ -201,8 +202,20 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
               {error}
             </p>
           ) : null}
-          <StudioSteps current={panel} complete={Boolean(selected?.result) && !dirty} />
-          {!selected ? (
+          {bridge && <StudioSteps current={panel} complete={Boolean(selected?.result) && !dirty} />}
+          {!bridge ? (
+            <div className="grid items-start gap-6 md:grid-cols-2">
+              <section>
+                <h2 className="text-xl font-semibold">Vídeos verticales con narración</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Escribe una idea, revisa el guion y escucha la narración antes de exportar el MP4.
+                  Para crear y guardar vídeos, abre el Estudio en Mycellios Desktop en tu PC Windows.
+                </p>
+                <div className="mt-3"><DesktopDownloadLink inAccountMenu /></div>
+              </section>
+              <VideoStudioSample />
+            </div>
+          ) : !selected ? (
             <div className="grid items-start gap-6 md:grid-cols-2 md:gap-8">
               <section>
                 <h2 className="mb-2 text-2xl font-semibold">De una idea a un vídeo</h2>
@@ -232,13 +245,7 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
                     onChange={(e) => setTopic(e.target.value)}
                     placeholder="Por ejemplo, tres formas de ahorrar agua en casa"
                   />
-                  {!bridge ? (
-                    <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
-                      <Monitor size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-                      Abre el Estudio en Mycellios Desktop para crear vídeos en tu PC.
-                    </p>
-                  ) : null}
-                  <Button className="mt-4" type="submit" disabled={!bridge || blocked || topic.trim().length < 3}>
+                  <Button className="mt-4" type="submit" disabled={blocked || topic.trim().length < 3}>
                     Crear proyecto
                   </Button>
                   <details className="mt-4 text-xs leading-relaxed text-muted-foreground">

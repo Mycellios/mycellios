@@ -6,8 +6,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { desktopBridge } from "../lib/desktop";
 import type { RpcClient } from "../lib/rpc";
 
-export function LocalProject({ botId, rpc, onTask }: {
+export function LocalProject({ botId, rpc, onTask, inMenu = false }: {
   botId: string;
+  inMenu?: boolean;
   rpc: RpcClient;
   onTask(threadId: string): void;
 }) {
@@ -87,8 +88,9 @@ export function LocalProject({ botId, rpc, onTask }: {
 
   return <Popover open={open} onOpenChange={value => { if (!busy) setOpen(value); }}>
     <PopoverTrigger render={<Button variant="ghost" size="icon-sm" aria-label={folder ? t`Local folder` : t`Add folder`}
-      title={folder?.name ?? t`Add folder`} />}>
+      title={folder?.name ?? t`Add folder`} data-mobile-chat-action={inMenu || undefined} />}>
       {folder ? <FolderOpen size={16} aria-hidden="true" /> : <FolderPlus size={16} aria-hidden="true" />}
+      {inMenu ? (folder ? t`Local folder` : t`Add folder`) : null}
     </PopoverTrigger>
     <PopoverContent align="end" className="w-72 max-w-[calc(100vw-2rem)] space-y-3">
       {folder ? <p className="truncate text-sm font-medium" title={folder.path}>{folder.name}</p> : null}

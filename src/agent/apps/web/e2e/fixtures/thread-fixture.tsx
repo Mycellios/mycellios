@@ -1,4 +1,4 @@
-import type { ProductEvent, ThreadMessage, ThreadSnapshot } from "@rakazo/contracts";
+import type { ProductEvent, Run, ThreadMessage, ThreadSnapshot } from "@rakazo/contracts";
 import { foldPeerReplies } from "@rakazo/core";
 import { DEFAULT_BOT_AVATAR_COLOR } from "@rakazo/ui-web";
 import type { ReactNode } from "react";
@@ -48,11 +48,13 @@ export function FixtureTranscript({
   messages,
   running,
   showToolActivity,
+  activeRun,
   header,
 }: {
   messages: readonly ThreadMessage[];
   running: boolean;
   showToolActivity: boolean;
+  activeRun?: Run;
   header?: ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -76,6 +78,7 @@ export function FixtureTranscript({
         answerableAskIds={NO_IDS}
         dismissableAskIds={NO_IDS}
         running={running}
+        activeRun={activeRun}
         workingBots={running ? [BOT] : []}
         onLoadOlder={noop}
         onOpenBot={noop}

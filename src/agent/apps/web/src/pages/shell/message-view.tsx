@@ -5,7 +5,7 @@ import type { ChildBotBlock } from "@rakazo/core";
 import { isPeerReceiptBlocks, isSecretAskBlock, isToolActivityBlock } from "@rakazo/core";
 import { BotAvatar, Button, cn, resolvePersonaColorDef } from "@rakazo/ui-web";
 import { UserRound } from "lucide-react";
-import { memo, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { ArtifactFileCard } from "../../components/ArtifactFileCard";
 import { AskCard } from "../../components/AskCard";
 import { CollaborationMarker } from "../../components/ai/CollaborationMarker";
@@ -63,6 +63,7 @@ export const MessageView = memo(function MessageView({
   onOpenImportSetup,
   onOpenImport,
   showToolActivity,
+  hideHoverActions = false,
   onReply,
   onMarkUnread,
   markedUnread = false,
@@ -94,13 +95,14 @@ export const MessageView = memo(function MessageView({
   onAddRoutine: (name: string, prompt: string) => void;
   voiceReady: boolean;
   speaking: boolean;
-  onSpeak: () => void;
+  onSpeak: (message: ThreadMessage) => void;
   onOpenComputer: (botId?: string) => void;
   /** Opens where an imported item's setup is finished. */
   onOpenImportSetup?: (target: ImportSetupTarget) => void;
   /** Opens the agent importer (from Chief's first-run focus card). */
   onOpenImport?: () => void;
   showToolActivity: boolean;
+  hideHoverActions?: boolean;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread: (message: ThreadMessage) => void;
   markedUnread?: boolean;
@@ -127,12 +129,12 @@ export const MessageView = memo(function MessageView({
     [message.blocks, mentions],
   );
   const visibleNarrationBlocks = renderableMessageBlocks(blocks, showToolActivity);
-  const renderMention = (id: string) => {
+  const renderMention = useCallback((id: string) => {
     const block = mentions?.find((bot) => bot.botId === id);
     return block ? (
       <BotMention block={block} color={peerBot(id)?.color} onOpenBot={onOpenBot} />
     ) : undefined;
-  };
+  }, [mentions, onOpenBot, peerBot]);
 
   const replyBotId = message.replyPreview?.botId ?? replyParent?.botId;
   const speakerBot = message.botId ? peerBot?.(message.botId) : undefined;
@@ -178,7 +180,7 @@ export const MessageView = memo(function MessageView({
     textAnchorIndex === -1
       ? message.blocks.findIndex((block) => block.kind === "ask")
       : textAnchorIndex;
-  const hoverActions = isPeerReceiptBlocks(message.blocks) ? null : (
+  const hoverActions = hideHoverActions || isPeerReceiptBlocks(message.blocks) ? null : (
     <MessageHoverActions
       message={message}
       side={message.role === "user" ? "start" : "end"}

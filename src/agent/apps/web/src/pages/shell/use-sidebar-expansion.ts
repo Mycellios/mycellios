@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
-function collapsedSidebarSectionsStorageKey(userId: string | null | undefined): string | null {
+function collapsedSidebarSectionsStorageKey(userId: string | null | undefined, mobile: boolean): string | null {
   if (!userId) return null;
-  return `rakazo:collapsed-sidebar-sections:${userId}`;
+  return `rakazo:collapsed-sidebar-sections:${mobile ? "mobile:" : ""}${userId}`;
 }
 
 function readCollapsedIdSet(storageKey: string | null): Set<string> {
@@ -36,23 +36,20 @@ function toggleCollapsedIdSet(
   return next;
 }
 
-function readCollapsedSidebarSections(userId: string | null | undefined): Set<string> {
-  return readCollapsedIdSet(collapsedSidebarSectionsStorageKey(userId));
-}
-
-export function useSidebarExpansion(userId: string | null | undefined) {
+export function useSidebarExpansion(userId: string | null | undefined, mobile = false) {
+  const storageKey = collapsedSidebarSectionsStorageKey(userId, mobile);
   const [collapsedSidebarSections, setCollapsedSidebarSections] = useState(() => new Set<string>());
 
   useEffect(() => {
-    setCollapsedSidebarSections(readCollapsedSidebarSections(userId));
-  }, [userId]);
+    setCollapsedSidebarSections(readCollapsedIdSet(storageKey));
+  }, [storageKey]);
   const toggleSidebarSection = useCallback(
     (key: string) => {
       setCollapsedSidebarSections((previous) =>
-        toggleCollapsedIdSet(previous, key, collapsedSidebarSectionsStorageKey(userId)),
+        toggleCollapsedIdSet(previous, key, storageKey),
       );
     },
-    [userId],
+    [storageKey],
   );
   return {
     collapsedSidebarSections,

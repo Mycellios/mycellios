@@ -43,6 +43,39 @@ function stubRecorderFallback(fetchMock: ReturnType<typeof vi.fn>) {
 }
 
 describe("Dictation recorder fallback", () => {
+  it("prefers live interim words in the composer and waits for the final browser result", async () => {
+    const fetchMock = vi.fn();
+    stubRecorderFallback(fetchMock);
+    let speech!: Recognition;
+    class Recognition {
+      start = vi.fn();
+      abort = vi.fn();
+      onresult?: ((event: { resultIndex: number; results: { transcript: string }[][] }) => void) | null;
+      onend?: (() => void) | null;
+      constructor() { speech = this; }
+      say(transcript: string) { this.onresult?.({ resultIndex: 0, results: [[{ transcript }]] }); }
+      stop() { this.say("second final"); this.onend?.(); }
+    }
+    vi.stubGlobal("window", { SpeechRecognition: Recognition });
+    const onFinal = vi.fn();
+    const dictation = new Dictation();
+    await dictation.listen({
+      mode: "hold", transcribe: true, preferServer: true, liveTranscript: true, waitForSpeechEnd: true, onFinal,
+    });
+    speech.say("first draft");
+    expect(dictation.state.transcript).toBe("first draft");
+    speech.say("first");
+    speech.onend?.();
+    expect(speech.start).toHaveBeenCalledTimes(2);
+    speech.say("second");
+    expect(dictation.state.transcript).toBe("first second");
+    expect(onFinal).not.toHaveBeenCalled();
+    dictation.submitHold();
+    expect(onFinal).toHaveBeenCalledExactlyOnceWith("first second final");
+    expect(speech.start).toHaveBeenCalledTimes(2);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("uses the configured recorder on desktop and can restart after cancellation", async () => {
     const fetchMock = vi.fn(async () => Response.json({ text: "fresh recording" }));
     stubRecorderFallback(fetchMock);

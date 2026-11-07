@@ -12,6 +12,7 @@ export type DictationSnapshot = {
   transcript: string;
   error?: string;
   level?: number;
+  transcriptAfterStop?: boolean;
 };
 
 type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
@@ -188,6 +189,11 @@ export class Dictation {
   private vadTimer: ReturnType<typeof setInterval> | undefined;
   private onFinal: ((text: string) => void) | null = null;
   private onSpeechStart: (() => void) | undefined;
+  private onRecording: ((audio: Blob) => void) | undefined;
+  private skipRecordingTranscription = false;
+  private waitForSpeechEnd = false;
+  private finishingSpeech = false;
+  private reportBufferedTranscript = false;
   private recordingLimit?: ReturnType<typeof setTimeout>;
 
   subscribe(fn: (s: DictationSnapshot) => void): () => void {
@@ -200,6 +206,10 @@ export class Dictation {
 
   get state(): DictationSnapshot {
     return this.snapshot;
+  }
+
+  owns(onFinal: (text: string) => void): boolean {
+    return this.onFinal === onFinal;
   }
 
   private set(next: DictationSnapshot) {
@@ -243,6 +253,11 @@ export class Dictation {
     }
     this.chunks = [];
     this.onFinal = null;
+    this.onRecording = undefined;
+    this.skipRecordingTranscription = false;
+    this.waitForSpeechEnd = false;
+    this.finishingSpeech = false;
+    this.reportBufferedTranscript = false;
     if (this.snapshot.status !== "idle" || this.snapshot.error) this.set(IDLE);
   }
 
@@ -254,14 +269,25 @@ export class Dictation {
     endpointMs?: number;
     onFinal: (text: string) => void;
     onSpeechStart?: () => void;
+    onRecording?: (audio: Blob) => void;
+    waitForSpeechEnd?: boolean;
+    liveTranscript?: boolean;
   }): Promise<void> {
     this.stop("replace");
     const mine = this.token;
     const spaceId = opts.spaceId !== undefined ? opts.spaceId : selectedSpaceId();
     this.onFinal = opts.onFinal;
     this.onSpeechStart = opts.onSpeechStart;
+    this.onRecording = opts.onRecording;
+    this.skipRecordingTranscription = Boolean(opts.onRecording && opts.transcribe === false);
+    this.waitForSpeechEnd = opts.waitForSpeechEnd === true;
+    this.reportBufferedTranscript = Boolean(opts.liveTranscript || opts.onRecording);
     this.set({ status: "listening", transcript: "" });
     const transcribe = Boolean(opts.transcribe);
+    if (opts.onRecording) {
+      await this.listenRecorder(mine, "hold", ENDPOINT_SILENCE_MS, spaceId);
+      return;
+    }
     if (isAndroidHost()) {
       this.nativeCapture = startAndroidDictation({
         transcript: text => { if (this.token === mine) this.set({ status: "listening", transcript: text }); },
@@ -277,7 +303,8 @@ export class Dictation {
     }
     // An unknown capability is not a refusal: a device whose browser cannot hold the
     // microphone open goes to the server even before the voice status has loaded.
-    if ((opts.preferServer || prefersServerDictation()) && opts.transcribe !== false) {
+    const liveTranscript = opts.liveTranscript === true && webSpeechAvailable();
+    if (!liveTranscript && (opts.preferServer || prefersServerDictation()) && opts.transcribe !== false) {
       await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
       return;
     }
@@ -288,6 +315,7 @@ export class Dictation {
         mine,
         transcribe,
         spaceId,
+        liveTranscript,
       );
       return;
     }
@@ -308,6 +336,7 @@ export class Dictation {
     mine: number,
     transcribe: boolean,
     spaceId: string | null,
+    liveTranscript = false,
   ) {
     const Ctor = speechRecognitionCtor();
     if (!Ctor) return;
@@ -349,7 +378,7 @@ export class Dictation {
     };
     rec.onerror = (event) => {
       if (!live || this.token !== mine) return;
-      if (event.error === "aborted" || event.error === "no-speech") return;
+      if (event.error === "aborted" || event.error === "no-speech" || this.finishingSpeech) return;
       if (webSpeechNeedsServerFallback(event.error, transcribe)) {
         live = false;
         this.fallbackToServer(rec, mine, mode, endpointMs, spaceId);
@@ -366,7 +395,7 @@ export class Dictation {
     rec.onend = () => {
       if (!live || this.token !== mine) return;
       if (this.snapshot.status !== "listening") return;
-      if (mode === "hold") {
+      if (mode === "hold" && (!liveTranscript || this.finishingSpeech)) {
         this.finish(this.snapshot.transcript, mine);
         return;
       }
@@ -396,7 +425,9 @@ export class Dictation {
           sessionHeardSpeech = false;
           rec.start();
         } catch {
-          this.set({ ...IDLE, error: "Dictation ended unexpectedly." });
+          live = false;
+          this.releaseRecognition(rec);
+          this.failListening(mine, "Dictation ended unexpectedly.", true);
         }
       };
       if (shortSessions >= RESTART_BACKOFF_AFTER) {
@@ -460,6 +491,9 @@ export class Dictation {
     endpointMs: number,
     spaceId: string | null,
   ) {
+    if (mode === "hold" && this.reportBufferedTranscript && !this.skipRecordingTranscription) {
+      this.set({ ...this.snapshot, transcriptAfterStop: true });
+    }
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -481,7 +515,10 @@ export class Dictation {
     }
     let media: MediaRecorder | undefined;
     try {
-      media = new MediaRecorder(stream);
+      const mimeType = this.onRecording
+        ? ["audio/mp4", "audio/ogg"].find(type => MediaRecorder.isTypeSupported?.(type))
+        : undefined;
+      media = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       this.media = media;
       this.chunks = [];
       media.ondataavailable = (event) => {
@@ -495,7 +532,14 @@ export class Dictation {
         this.stopVad();
         void this.transcribeChunks(mine, spaceId);
       };
+      media.onerror = () => {
+        for (const track of stream.getTracks()) track.stop();
+        if (this.token !== mine) return;
+        const prefix = this.snapshot.transcript;
+        this.finish(prefix, mine, "Could not record audio.");
+      };
       media.start(mode === "endpoint" ? 250 : undefined);
+      if (mode === "hold" && (this.onRecording || this.onSpeechStart)) this.armSilence(stream, mine, null);
       this.recordingLimit = setTimeout(() => { if (this.token === mine && media && media.state !== "inactive") media.stop(); }, 60_000);
     } catch (error) {
       if (media) {
@@ -513,7 +557,7 @@ export class Dictation {
   private armSilence(
     stream: MediaStream,
     mine: number,
-    endpointMs: number,
+    endpointMs: number | null,
     alreadyHeard = false,
   ): boolean {
     const Ctor = audioContextCtor();
@@ -541,6 +585,7 @@ export class Dictation {
         }
         const rms = Math.sqrt(sum / data.length);
         this.set({ ...this.snapshot, level: Math.min(1, rms * 8) });
+        if (endpointMs === null) return;
         if (rms > SILENCE_RMS) {
           if (++speechTicks === 4) this.onSpeechStart?.();
           heardSpeech = true;
@@ -607,6 +652,11 @@ export class Dictation {
         return;
       }
       this.finish(prefix, mine);
+      return;
+    }
+    this.onRecording?.(blob);
+    if (this.skipRecordingTranscription) {
+      this.finish(this.snapshot.transcript, mine);
       return;
     }
     this.set({ status: "transcribing", transcript: this.snapshot.transcript });
@@ -692,6 +742,14 @@ export class Dictation {
     if (this.media && this.media.state !== "inactive") {
       this.media.stop();
       return;
+    }
+    if (this.recognition && this.waitForSpeechEnd) {
+      this.waitForSpeechEnd = false;
+      this.finishingSpeech = true;
+      clearTimeout(this.restartTimer);
+      const mine = this.token;
+      this.recordingLimit = setTimeout(() => this.finish(this.snapshot.transcript, mine), 1500);
+      try { this.recognition.stop(); return; } catch { /* Keep the last result if stop fails. */ }
     }
     this.finish(this.snapshot.transcript, this.token);
   }
