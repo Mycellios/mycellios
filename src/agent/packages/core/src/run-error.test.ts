@@ -21,15 +21,22 @@ describe("normalizeRunError", () => {
     "Computers unavailable: SANDBOX_PROVIDER requires a token.",
   ])("identifies disabled execution services without blaming the model: %s", details => {
     expect(normalizeRunError(details)).toEqual({
-      summary: "The execution computer service is not configured on this server. Your model connection is not the cause.",
+      summary: "This task needs a workspace. Cloud workspaces are not available here yet.",
       details,
       recovery: "computer",
     });
   });
   it("names missing computer configuration instead of blaming the model", () => {
     expect(normalizeRunError("Bot has no computer").summary).toBe(
-      "This agent has no virtual computer. Open Computer settings to configure it.",
+      "This Mico needs a workspace to run this task.",
     );
+  });
+  it("tells users where to reopen a task tied to a PC", () => {
+    const details = "This task is bound to your Desktop. Reconnect the PC to resume it.";
+    expect(normalizeRunError(details)).toEqual({
+      summary: "Open this chat in Mycellios Desktop on the PC with the project, then retry.",
+      details,
+    });
   });
   beforeEach(() => {
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-01T00:00:00Z"));

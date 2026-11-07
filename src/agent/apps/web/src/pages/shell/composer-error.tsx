@@ -81,7 +81,7 @@ export function ComposerError({
             onClick: onOpenConnections,
           }
         : recovery === "computer" && onOpenComputerSettings
-          ? { label: t`Computer settings`, onClick: onOpenComputerSettings }
+          ? { label: t`View workspace options`, onClick: onOpenComputerSettings }
           : null;
 
   return sendError || runError ? (
@@ -117,7 +117,7 @@ export function ComposerError({
             </button>
           </>
         ) : null}
-        {!sendError && runError && runErrorId && onRetryError ? (
+        {!(recovery === "computer" && recoveryAction) && !sendError && runError && runErrorId && onRetryError ? (
           <button
             type="button"
             data-testid="composer-error-retry"

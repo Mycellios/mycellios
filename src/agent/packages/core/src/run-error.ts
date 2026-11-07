@@ -216,17 +216,28 @@ export function normalizeRunError(
   if (trimmed === "Bot has no computer")
     return {
       summary: translate(
-        "This agent has no virtual computer. Open Computer settings to configure it.",
+        "This Mico needs a workspace to run this task.",
       ),
       details,
       recovery: "computer",
     };
   if (/^Computers unavailable[.:]/.test(trimmed))
     return {
-      summary: translate("The execution computer service is not configured on this server. Your model connection is not the cause."),
+      summary: translate("This task needs a workspace. Cloud workspaces are not available here yet."),
       details,
       recovery: "computer",
     };
+  if (
+    trimmed === "This task is bound to your Desktop. Reconnect the PC to resume it." ||
+    trimmed === "The selected local computer is disconnected. Reconnect Desktop before continuing this project." ||
+    trimmed === "Connect this Mico task to its local project on the current PC before editing. No other computer workspace will be used." ||
+    trimmed === "The isolated project connection changed. Reopen this conversation on the linked PC before continuing."
+  ) {
+    return {
+      summary: translate("Open this chat in Mycellios Desktop on the PC with the project, then retry."),
+      details,
+    };
+  }
   // "429: {...}", "429 {...}", or the model runtime's "<provider> API error (429): {...}".
   const prefix = trimmed.match(
     /^(?:[^\n():]{1,60} API error \((\d{3})\):\s*|(\d{3})(?:\s*:\s*|\s+))/,

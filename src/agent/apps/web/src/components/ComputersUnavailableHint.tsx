@@ -25,6 +25,8 @@ type ComputersUnavailableHintProps = {
   onRecoveryDismissed?: () => void;
   /** When false, hides Check again (e.g. inline preview without actions). */
   showRetry?: boolean;
+  /** Server setup instructions belong in settings, away from the chat. */
+  showTechnicalDetails?: boolean;
 };
 
 export function ComputersUnavailableHint({
@@ -34,6 +36,7 @@ export function ComputersUnavailableHint({
   onRecovered,
   onRecoveryDismissed,
   showRetry = true,
+  showTechnicalDetails = false,
 }: ComputersUnavailableHintProps) {
   const { t } = useLingui();
   const [provider, setProvider] = useState(initialProvider);
@@ -114,7 +117,7 @@ export function ComputersUnavailableHint({
           <p className="text-[13px] leading-relaxed text-muted-foreground">
             <Trans>Computer tools are unavailable. Chat and connected apps still work.</Trans>
           </p>
-          <Disclosure className="mt-3 min-w-0" summaryClassName="text-[13px] text-muted-foreground" summary={t`Technical details`}>
+          {showTechnicalDetails ? <Disclosure className="mt-3 min-w-0" summaryClassName="text-[13px] text-muted-foreground" summary={t`Technical details`}>
             <div className="space-y-3 pt-3 [overflow-wrap:anywhere]">
               <UnavailableCopy kind={kind} failureMessage={failureMessage} />
               {showRetry ? (
@@ -123,13 +126,13 @@ export function ComputersUnavailableHint({
                 </Button>
               ) : null}
             </div>
-          </Disclosure>
+          </Disclosure> : null}
         </>
       ) : null}
 
       {showRetry && (unavailable || phase === "failure") ? (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
+          {!onOpenComputerSettings || phase === "failure" ? <Button
             type="button"
             variant="secondary"
             size="sm"
@@ -137,8 +140,8 @@ export function ComputersUnavailableHint({
             onClick={() => void handleCheckAgain()}
           >
             {phase === "loading" ? <Trans>Checking…</Trans> : <Trans>Check again</Trans>}
-          </Button>
-          {onOpenComputerSettings ? (
+          </Button> : null}
+          {onOpenComputerSettings && phase !== "failure" ? (
             <Button type="button" variant="outline" size="sm" onClick={onOpenComputerSettings}>
               <Trans>Open computer settings</Trans>
             </Button>
