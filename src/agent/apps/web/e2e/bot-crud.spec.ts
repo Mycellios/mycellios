@@ -87,7 +87,7 @@ test("bot creation, editing, and deletion persist", async ({ page }, testInfo) =
   const studio = page.getByTestId("avatar-studio");
   await expect(studio).toBeVisible();
   await expect(studio.getByTestId("avatar-studio-bot-tab")).toBeVisible();
-  await studio.getByRole("button", { name: "Color #EAB308" }).click();
+  await studio.getByRole("button", { name: "Honey", exact: true }).click();
   await studio.getByRole("button", { name: "Done", exact: true }).click();
   await expect(studio).toBeHidden();
   await expect(botList.getByRole("button", { name: /^Researcher/ })).toBeVisible();
@@ -107,7 +107,10 @@ test("bot creation, editing, and deletion persist", async ({ page }, testInfo) =
   const settings = page.getByTestId("bot-settings");
   await settings.getByTestId("avatar-studio-trigger").click();
   await expect(studio).toBeVisible();
-  await expect(studio.getByRole("button", { name: "Color #EAB308" })).toHaveClass(/ring-2/);
+  await expect(studio.getByRole("button", { name: "Honey", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await studio.getByRole("button", { name: "Done", exact: true }).click();
   await settings.getByRole("button", { name: "Advanced", exact: true }).click();
   const modelSelect = settings.getByRole("combobox", { name: "Model", exact: true });

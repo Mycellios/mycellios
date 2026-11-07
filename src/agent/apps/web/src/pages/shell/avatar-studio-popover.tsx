@@ -1,11 +1,15 @@
 import { t } from "@lingui/core/macro";
-import { Trans } from "@lingui/react/macro";
-import { SHIPPED_BOT_AVATAR_SHAPE_KEYS } from "@rakazo/core";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
-  BOT_AVATAR_COLORS,
+  MICO_AVATAR_PALETTES,
+  MICO_AVATAR_SHAPES,
+  micoAvatarShape,
+  withMicoAvatarPalette,
+  withMicoAvatarShape,
+} from "@rakazo/contracts";
+import {
   BotAvatar,
   BotShapePreview,
-  DEFAULT_BOT_AVATAR_COLOR,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -24,106 +28,110 @@ import { Check, Pencil, Upload, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent } from "react";
 import { useRef, useState } from "react";
 
-/**
- * The shape grid and color row for a bot's look. With `organicIdentities`, the grid also offers
- * the organic body each identity draws (for a bot that has no id yet); without them, "Default"
- * restores the bot's own organic body.
- */
 export function BotLookPicker({
   value,
-  identity,
-  organicIdentities,
+  onAutomatic,
   onChange,
 }: {
   value: string;
-  identity?: string;
-  organicIdentities?: readonly string[];
-  onChange: (value: string, identity?: string) => void;
+  onAutomatic?: () => void;
+  onChange: (value: string) => void;
 }) {
+  const { t } = useLingui();
   const parsed = parseBotAvatar(value);
-  const currentColor = parsed.color || DEFAULT_BOT_AVATAR_COLOR;
-  const isDefaultLook = !parsed.isImage && parsed.shapeIndex === undefined;
-
-  function selectColor(color: string) {
-    onChange(parsed.shapeIndex === undefined ? color : `${color}::shape_${parsed.shapeIndex}`);
-  }
+  const activeShape = micoAvatarShape(parsed.shapeIndex);
+  const shapeLabels = {
+    mushroom: t({ id: "Mushroom", message: "Mushroom" }),
+    fox: t({ id: "Fox", message: "Fox" }),
+    hedgehog: t({ id: "Hedgehog", message: "Hedgehog" }),
+    frog: t({ id: "Frog", message: "Frog" }),
+    moth: t({ id: "Moth", message: "Moth" }),
+    snail: t({ id: "Snail", message: "Snail" }),
+    owl: t({ id: "Owl", message: "Owl" }),
+    turtle: t({ id: "Turtle", message: "Turtle" }),
+    axolotl: t({ id: "Axolotl", message: "Axolotl" }),
+    crab: t({ id: "Crab", message: "Crab" }),
+    fish: t({ id: "Fish", message: "Fish" }),
+    octopus: t({ id: "Octopus", message: "Octopus" }),
+  };
+  const paletteLabels = {
+    violet: t({ id: "Violet", message: "Violet" }),
+    tangerine: t({ id: "Tangerine", message: "Tangerine" }),
+    honey: t({ id: "Honey", message: "Honey" }),
+    lime: t({ id: "Lime", message: "Lime" }),
+    indigo: t({ id: "Indigo", message: "Indigo" }),
+    turquoise: t({ id: "Turquoise", message: "Turquoise" }),
+    raspberry: t({ id: "Raspberry", message: "Raspberry" }),
+    mint: t({ id: "Mint", message: "Mint" }),
+    lavender: t({ id: "Lavender", message: "Lavender" }),
+    coral: t({ id: "Coral", message: "Coral" }),
+    sky: t({ id: "Sky blue", message: "Sky blue" }),
+    slate: t({ id: "Slate", message: "Slate" }),
+  };
 
   return (
     <div className="space-y-4">
       <div>
-        {organicIdentities ? null : (
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-              <Trans>Shape</Trans>
-            </div>
+        <div className="mb-2 flex min-h-8 items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">
+            <Trans>Shape</Trans>
+          </span>
+          {onAutomatic ? (
             <Button
               variant="ghost"
               size="sm"
               type="button"
-              data-testid="avatar-studio-default"
-              aria-pressed={isDefaultLook}
-              onClick={() => {
-                const next = defaultBotAvatarValue(value);
-                if (next !== value) onChange(next);
-              }}
-              className={`px-3 py-1 text-xs font-medium transition-colors ${
-                isDefaultLook
-                  ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              aria-pressed={!value}
+              onClick={onAutomatic}
+              className={!value ? "bg-secondary text-foreground" : "text-muted-foreground"}
             >
-              <Trans>Default</Trans>
+              <Trans>Automatic</Trans>
             </Button>
-          </div>
-        )}
-        <div
-          className={`grid place-items-center gap-2 ${organicIdentities ? "grid-cols-4 sm:grid-cols-8 sm:gap-1" : "grid-cols-4"}`}
-        >
-          {organicIdentities?.map((organicIdentity, index) => (
-            <BotShapePreview
-              key={organicIdentity}
-              identity={organicIdentity}
-              label={t`Shape ${index + 1}`}
-              color={currentColor}
-              selected={isDefaultLook && identity === organicIdentity}
-              onClick={() => onChange(currentColor, organicIdentity)}
-            />
-          ))}
-          {SHIPPED_BOT_AVATAR_SHAPE_KEYS.map((key, shapeIndex) => (
-            <BotShapePreview
-              key={key}
-              shapeIndex={shapeIndex}
-              color={currentColor}
-              selected={!parsed.isImage && parsed.shapeIndex === shapeIndex}
-              onClick={() => onChange(`${currentColor}::shape_${shapeIndex}`)}
-            />
-          ))}
+          ) : null}
+        </div>
+        <div className="grid grid-cols-6 place-items-center gap-y-2 max-[359px]:grid-cols-4">
+          {MICO_AVATAR_SHAPES.map(({ id, index }) => {
+            const next = withMicoAvatarShape(value, index);
+            return (
+              <BotShapePreview
+                key={id}
+                shapeIndex={index}
+                label={shapeLabels[id]}
+                color={parseBotAvatar(next).color}
+                selected={activeShape?.index === index}
+                onClick={() => onChange(next)}
+              />
+            );
+          })}
         </div>
       </div>
 
       <div className="border-t border-border pt-2">
-        {organicIdentities ? null : (
-          <div className="mb-2 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-            <Trans>Color</Trans>
-          </div>
-        )}
-        <div className="grid grid-cols-6 place-items-center gap-2">
-          {BOT_AVATAR_COLORS.map((color) => {
-            const selected = currentColor.toLowerCase() === color.toLowerCase() && !parsed.isImage;
+        <div className="mb-1 text-xs font-medium text-muted-foreground">
+          <Trans>Color</Trans>
+        </div>
+        <div className="grid grid-cols-6 place-items-center gap-y-1 max-[359px]:grid-cols-4">
+          {MICO_AVATAR_PALETTES.map(({ id, color }) => {
+            const selected = Boolean(activeShape) && parsed.color.toUpperCase() === color;
             return (
               <button
-                key={color}
+                key={id}
                 type="button"
-                onClick={() => selectColor(color)}
-                aria-label={t`Color ${color}`}
+                onClick={() => onChange(withMicoAvatarPalette(value, color))}
+                aria-label={paletteLabels[id]}
+                title={paletteLabels[id]}
                 aria-pressed={selected}
-                className={`size-6 rounded-full border transition-transform hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-ring ${
-                  selected
-                    ? "scale-105 border-transparent ring-2 ring-foreground ring-offset-2 ring-offset-popover"
-                    : "border-border"
-                }`}
-                style={{ backgroundColor: color }}
-              />
+                className="grid size-10 cursor-pointer place-items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span
+                  className={`size-6 rounded-full border ${
+                    selected
+                      ? "border-transparent ring-2 ring-foreground ring-offset-2 ring-offset-popover"
+                      : "border-border"
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              </button>
             );
           })}
         </div>
@@ -231,7 +239,7 @@ export function AvatarStudioPopover({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          className="w-[360px] max-w-full gap-4 rounded-3xl p-5 sm:max-w-[360px]"
+          className="max-h-[calc(100dvh-2rem)] w-[360px] max-w-[calc(100%-2rem)] gap-4 overflow-y-auto rounded-3xl p-5 sm:max-w-[360px]"
           data-testid="avatar-studio"
         >
           <DialogHeader className="flex-row items-center justify-between space-y-0">
@@ -265,7 +273,7 @@ export function AvatarStudioPopover({
             <div className="flex items-center justify-between border-b border-border pb-1">
               <TabsList className="rounded-full">
                 <TabsTrigger value="bot" className="rounded-full px-3 text-xs">
-                  <Trans>Bot</Trans>
+                  <Trans id="Bot">Mico</Trans>
                 </TabsTrigger>
                 <TabsTrigger value="upload" className="rounded-full px-3 text-xs">
                   <Trans>Upload</Trans>

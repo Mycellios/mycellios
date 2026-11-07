@@ -12,7 +12,7 @@ import {
   ringingCall,
   userVisibleMessages,
 } from "@rakazo/core";
-import { chooseBotAvatar } from "./bot-avatar-choice.js";
+import { chooseBotAvatar, chooseMicoAvatar } from "./bot-avatar-choice.js";
 import type { Prisma, PrismaClient } from "./client.js";
 import type { ComputerMode } from "./computers.js";
 import { ensureComputerRecord, parseComputerMode } from "./computers.js";
@@ -568,14 +568,13 @@ export function createRepos(
             _max: { position: true },
           });
           // Read under the creation lock so two bots made at once still differ.
-          const avatar = chooseBotAvatar(
-            await tx.bot.findMany({
-              where: { spaceId: actor.spaceId, userId: actor.userId, archivedAt: null },
-              select: { id: true, color: true },
-            }),
-            input.color,
-            { family: input.avatarFamily },
-          );
+          const existing = await tx.bot.findMany({
+            where: { spaceId: actor.spaceId, userId: actor.userId, archivedAt: null },
+            select: { id: true, color: true },
+          });
+          const avatar = input.color === undefined && input.avatarFamily === undefined
+            ? chooseMicoAvatar(existing)
+            : chooseBotAvatar(existing, input.color, { family: input.avatarFamily });
           const teamComputer = await ensureComputerRecord(tx, {
             mode: "team",
             spaceId: actor.spaceId,
