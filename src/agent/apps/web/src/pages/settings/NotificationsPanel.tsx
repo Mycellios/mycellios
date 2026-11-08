@@ -4,7 +4,7 @@ import { Button, Label, Switch } from "@rakazo/ui-web";
 import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { rpc } from "../../lib/rpc";
-import { disableWebPush, enableWebPush, notificationClientId, pushSupported } from "../../lib/web-push";
+import { enableWebPush, notificationClientId, pushSupported } from "../../lib/web-push";
 import { requestBrowserNotificationPermission, showSystemNotification } from "../../lib/browser-notifications";
 import {
   notificationPreferences,
@@ -52,26 +52,13 @@ export function NotificationsPanel({
   useEffect(() => {
     if (!scope || !pushSupported()) return;
     let cancelled = false;
-    void rpc.notifications.webStatus({ clientId: notificationClientId() })
+    const refresh = () => void rpc.notifications.webStatus({ clientId: notificationClientId() })
       .then((state) => { if (!cancelled && state.configured) setPush(state); })
       .catch(() => undefined);
-    return () => { cancelled = true; };
+    refresh();
+    window.addEventListener("mycellios:notifications-changed", refresh);
+    return () => { cancelled = true; window.removeEventListener("mycellios:notifications-changed", refresh); };
   }, [scope]);
-  async function togglePush() {
-    if (!push?.publicKey) return;
-    setBusy("push");
-    setError("");
-    try {
-      if (push.registered) await disableWebPush();
-      else await enableWebPush(push.publicKey, scope);
-      setPush({ ...push, registered: !push.registered });
-      setPermission(Notification.permission);
-    } catch {
-      setError(t`Could not change background notifications. Check your notification permission and try again.`);
-    } finally {
-      setBusy(null);
-    }
-  }
   async function savePushSettings(patch: Partial<NotificationSettings>) {
     if (!push || busy) return;
     setBusy("push-settings");
@@ -109,6 +96,9 @@ export function NotificationsPanel({
     try {
       const next = await requestBrowserNotificationPermission();
       setPermission(next ?? "unsupported");
+      if (next === "granted" && push?.publicKey) {
+        await enableWebPush(push.publicKey, scope);
+      }
     } catch {
       setError(t`Could not enable notifications.`);
     } finally {
@@ -145,13 +135,6 @@ export function NotificationsPanel({
   return (
     <div className="space-y-6">
       <SettingsGroup title={t`This device`}>
-        {push?.publicKey && <SettingsRow
-          label={t`Notifications when Mycellios is closed`}
-          control={<Button variant="outline" size="sm" disabled={busy !== null}
-            onClick={() => void togglePush()}>{push.registered ? t`Disable` : t`Enable`}</Button>}
-        >
-          <p className="text-xs text-muted-foreground">{t`Receive alerts on this device even when Mycellios is closed. They open the corresponding chat.`}</p>
-        </SettingsRow>}
         {push?.registered && <SettingsRow
           label={<Label htmlFor={`${id}-push-attention`}>{t`Push alerts only when I’m needed`}</Label>}
           control={<Switch id={`${id}-push-attention`} checked={push.settings.level === "needs_me"}
@@ -170,7 +153,9 @@ export function NotificationsPanel({
             />
           }
         >
-          <p className="text-xs text-muted-foreground">{t`Notify you about Mico replies while this app is open in the background.`}</p>
+          <p className="text-xs text-muted-foreground">{push?.publicKey
+            ? t`Receive alerts on this device even when Mycellios is closed. They open the corresponding chat.`
+            : t`Notify you about Mico replies while this app is open in the background.`}</p>
         </SettingsRow>
         <SettingsRow
           label={<Label htmlFor={`${id}-attention`}>{t`Only when I’m needed`}</Label>}
