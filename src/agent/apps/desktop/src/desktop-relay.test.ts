@@ -1,5 +1,12 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { DesktopRelayClient } from "./desktop-relay.js";
+import { DesktopRelayClient, missingOperationAction } from "./desktop-relay.js";
+
+it("forgets a settled delivery and still aborts an unsettled orphan", () => {
+  const settled = new Set(["done"]);
+  expect(missingOperationAction("done", ["done"], settled)).toBe("keep");
+  expect(missingOperationAction("done", [], settled)).toBe("forget");
+  expect(missingOperationAction("orphan", [], settled)).toBe("abort");
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

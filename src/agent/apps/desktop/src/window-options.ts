@@ -1,5 +1,4 @@
 export const DEFAULT_WARM_WINDOW_TTL_MS = 15 * 60_000;
-export const WINDOWS_TITLEBAR_HEIGHT = 51;
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export function warmWindowTtlMs(value: string | undefined) {
@@ -19,10 +18,10 @@ function windowChrome(platform: NodeJS.Platform) {
     backgroundColor: "#202023",
     show: true,
     autoHideMenuBar: true,
-    // Windows/Linux controls live in the trusted host strip, not in the remote page.
-    frame: mac,
-    titleBarStyle: mac ? ("hiddenInset" as const) : platform === "win32" ? ("hidden" as const) : undefined,
-    titleBarOverlay: platform === "win32" ? { color: "#00000000", symbolColor: "#1e2a22", height: WINDOWS_TITLEBAR_HEIGHT } : undefined,
+    // Windows and Linux use the standard OS title bar, above the page.
+    // macOS keeps inset traffic lights over the page.
+    frame: true,
+    titleBarStyle: mac ? ("hiddenInset" as const) : undefined,
     trafficLightPosition: mac ? { x: 16, y: 16 } : undefined,
   };
 }

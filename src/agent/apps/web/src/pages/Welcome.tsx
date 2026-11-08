@@ -2,13 +2,14 @@ import { Trans } from "@lingui/react/macro";
 import { Button } from "@rakazo/ui-web";
 import { Link, useNavigate } from "react-router-dom";
 import { Mico, MycelliosWordmark } from "../components/MycelliosBrand";
+import { desktopDragClass } from "../lib/desktop";
 import { WindowChrome } from "./WindowChrome";
 
 export function WelcomePage() {
   const navigate = useNavigate();
   return (
     <div className="flex min-h-full flex-col bg-background" data-rakazo-surface="welcome">
-      <header className="app-drag flex items-center justify-between gap-4 px-6 py-5 sm:px-10">
+      <header className={`${desktopDragClass()} flex items-center justify-between gap-4 px-6 py-5 sm:px-10`}>
         <MycelliosWordmark />
         <WindowChrome />
       </header>

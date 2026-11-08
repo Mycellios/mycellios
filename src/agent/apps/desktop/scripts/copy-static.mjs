@@ -7,7 +7,7 @@ import { createReadStream } from "node:fs";
 
 // tsc only emits the TypeScript sources; the preload bridges and the setup
 // window's static assets have to be copied into dist alongside them.
-const STATIC_FILES = ["preload.cjs", "setup-preload.cjs", "setup.html", "setup.css", "setup.js", "window-chrome.html", "window-native-chrome.html", "window-chrome.css", "window-chrome-preload.cjs"];
+const STATIC_FILES = ["preload.cjs", "setup-preload.cjs", "setup.html", "setup.css", "setup.js"];
 const TOKENS_FILE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../../packages/ui-tokens/src/tokens.css",
