@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { MICO_AVATAR_SHAPES } from "@rakazo/contracts";
 import { describe, expect, it } from "vitest";
 import { parsePushPayload, pushChatUrl, pushNotification } from "./push-worker.js";
 import { notificationTarget } from "./notification-target.js";
@@ -37,6 +39,10 @@ describe("Web Push navigation", () => {
       actions: [{ action: "open-chat", title: "Abrir chat" }],
       data: { url: scope + "app/jarvis?noticeSpace=space", botId: "jarvis" },
     });
+  });
+  it.each(MICO_AVATAR_SHAPES)("accepts the bundled $id artwork", ({ id }) => {
+    expect(parsePushPayload({ ...payload, avatar: id }, now)?.avatar).toBe(id);
+    expect(existsSync(new URL(`../../public/mycellios/notification-micos/${id}.png`, import.meta.url))).toBe(true);
   });
   it("shows the Mico on opt-in previews using only bundled artwork", () => {
     const preview = { ...payload, title: "Jarvis", body: "Draft ready", kind: "completion", preview: true };

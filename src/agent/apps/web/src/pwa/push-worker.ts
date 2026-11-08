@@ -1,5 +1,9 @@
 /// <reference lib="webworker" />
-import { MICO_AVATAR_SHAPES } from "@rakazo/contracts";
+// Keep the classic worker self-contained and only allow artwork bundled with it.
+const NOTIFICATION_AVATARS = new Set([
+  "axolotl", "crab", "fish", "fox", "frog", "hedgehog",
+  "moth", "mushroom", "octopus", "owl", "snail", "turtle",
+]);
 
 const NOTICE_COPY = {
   en: {
@@ -52,7 +56,7 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
     p.body.length > 200 ||
     (p.kind !== undefined && (typeof p.kind !== "string" || !Object.hasOwn(NOTICE_COPY.en, p.kind))) ||
     (p.preview !== undefined && typeof p.preview !== "boolean") ||
-    (p.avatar !== undefined && !MICO_AVATAR_SHAPES.some(shape => shape.id === p.avatar)) ||
+    (p.avatar !== undefined && !NOTIFICATION_AVATARS.has(p.avatar)) ||
     p.tag !== `mycellios:${p.threadId}` ||
     !Number.isFinite(p.expiresAt) ||
     p.expiresAt <= now ||
@@ -65,7 +69,7 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
 export function pushNotification(p: PushPayload, scopeUrl: string, language: string) {
   const spanish = /^es(?:-|$)/i.test(language);
   const copy = p.kind ? NOTICE_COPY[spanish ? "es" : "en"][p.kind] : undefined;
-  const avatar = p.preview && MICO_AVATAR_SHAPES.some(shape => shape.id === p.avatar) ? p.avatar : undefined;
+  const avatar = p.preview && p.avatar && NOTIFICATION_AVATARS.has(p.avatar) ? p.avatar : undefined;
   return {
     title: copy && !p.preview ? copy[0] : p.title,
     options: {
