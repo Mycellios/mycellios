@@ -5,7 +5,7 @@ export function WindowChrome() {
   const { t } = useLingui();
   const desktop = desktopBridge();
   const kind = windowChromeKind(desktop);
-  if (kind === "native") return <div className="h-3 w-[72px] shrink-0" data-window-chrome-slot aria-hidden="true" />;
+  if (kind === "native") return null;
   if (kind === "spacer") {
     return <div className="h-3 w-[72px]" aria-hidden="true" />;
   }

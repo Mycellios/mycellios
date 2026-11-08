@@ -3,6 +3,7 @@ import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMe
 import { AudioLines, Ellipsis, FolderOpen, Monitor, PanelRightOpen, Settings, X } from "lucide-react";
 
 import { type ReactNode, useState } from "react";
+import { desktopDragClass } from "../../lib/desktop";
 
 export type ChatToolsActions = {
   onBrowser: () => void;
@@ -79,7 +80,7 @@ export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClos
   ];
   return (
     <aside data-testid="chat-tools-panel" className="rk-chat-tools-panel" aria-label={t`Chat tools`}>
-      <div className="app-drag flex h-[51px] shrink-0 items-center justify-end px-2">
+      <div className={`${desktopDragClass()} flex h-[51px] shrink-0 items-center justify-end px-2`}>
         <Button variant="ghost" size="icon-sm" className="app-no-drag" aria-label={t`Close tools`} onClick={onClose}><X size={15} /></Button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 px-6 pb-[51px]">

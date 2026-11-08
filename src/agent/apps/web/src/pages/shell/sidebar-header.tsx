@@ -4,7 +4,7 @@ import { Badge, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/
 import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
-import { desktopBridge } from "../../lib/desktop";
+import { desktopHidesTitleBar } from "../../lib/desktop";
 import type { Panel } from "../../lib/right-panel-state";
 import { BotCreatePicker } from "./bot-picker";
 import { isCreateMenuHotkey } from "./command-palette-hotkey";
@@ -81,7 +81,7 @@ export function SidebarHeader({
   mobileMenu?: ReactNode;
 }) {
   const { t } = useLingui();
-  const hasWindowChrome = Boolean(desktopBridge());
+  const hiddenTitleBar = desktopHidesTitleBar();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const toggleLabel = mini ? t`Show bots` : t`Minimize bots`;
   const mobile = mobileMenu != null;
@@ -91,7 +91,7 @@ export function SidebarHeader({
       data-testid="sidebar-topbar"
       className={mobile
         ? "flex shrink-0 flex-wrap items-center gap-2 px-5 pt-3 pb-1"
-        : `${hasWindowChrome ? "app-drag" : ""} rk-sidebar-topbar flex shrink-0 items-center gap-1 ${mini ? "flex-col px-1 py-2" : "px-2"} ${hasWindowChrome && desktopBridge()?.platform !== "win32" ? mini ? "pt-14" : "ps-12" : ""}`}
+        : `${hiddenTitleBar ? "app-drag" : ""} rk-sidebar-topbar flex shrink-0 items-center gap-1 ${mini ? "flex-col px-1 py-2" : "px-2"} ${hiddenTitleBar ? (mini ? "pt-14" : "ps-12") : ""}`}
     >
       {mobile ? <Button variant="floating" size="icon-lg" className="size-12 rounded-full" aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><PanelLeftClose size={22} /></Button> : null}
       {!mini ? <div className={mobile ? "order-last min-w-0 basis-full" : "contents"}>

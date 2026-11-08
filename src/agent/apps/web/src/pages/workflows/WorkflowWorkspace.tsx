@@ -20,7 +20,7 @@ import {
   Square,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { desktopBridge } from "../../lib/desktop";
+import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
 import type { RpcClient } from "../../lib/rpc";
 import { useWorkflows } from "./use-workflows";
 import { WorkflowCanvas } from "./WorkflowCanvas";
@@ -80,12 +80,8 @@ export function WorkflowWorkspace({
     >
       <header
         data-testid="conversation-header"
-        className={`${desktopBridge() ? "app-drag" : ""} rk-workflow-header flex h-[51px] min-w-0 shrink-0 items-center gap-2 border-b border-border px-3`}
-        style={
-          desktopBridge() && desktopBridge()?.platform !== "win32"
-            ? { paddingInlineStart: 48 }
-            : undefined
-        }
+        className={`${desktopDragClass()} rk-workflow-header flex h-[51px] min-w-0 shrink-0 items-center gap-2 border-b border-border px-3`}
+        style={desktopHidesTitleBar() ? { paddingInlineStart: 48 } : undefined}
       >
         <div className="app-no-drag hidden w-60 shrink-0 md:block">
           <DropdownMenu>

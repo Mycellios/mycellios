@@ -126,7 +126,7 @@ import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
 import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
-import { desktopBridge } from "../lib/desktop";
+import { desktopBridge, desktopDragClass } from "../lib/desktop";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
@@ -4206,7 +4206,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         /> : <>
         {/* The header floats so the transcript scrolls under its buttons. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <div data-testid="conversation-header" className={`${desktopBridge() ? "app-drag" : ""} ${desktopBridge()?.platform === "win32" ? "app-windows-caption-safe" : ""} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
+          <div data-testid="conversation-header" className={`${desktopDragClass()} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
             <div className="flex items-center">
               <Button
                 variant="floating"
