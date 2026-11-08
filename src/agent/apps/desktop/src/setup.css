@@ -41,21 +41,16 @@ body {
 
 .titlebar {
   min-height: 56px;
-  -webkit-app-region: drag;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px 10px 104px;
+  padding: 10px 16px;
   flex: none;
 }
 
 html[data-platform="darwin"] .titlebar {
+  -webkit-app-region: drag;
   padding-left: 88px;
-}
-
-/* Windows owns the caption buttons; keep page controls out of their hit region. */
-html[data-platform="win32"] .titlebar {
-  padding-left: 16px;
 }
 
 html[data-platform="win32"] .titlebar-quit {

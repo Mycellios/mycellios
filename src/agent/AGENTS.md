@@ -397,16 +397,13 @@
   activate automatic unsigned updates or treat a same-profile install as clean-OS proof.
 
 - First-party Mycellios sign-in uses the normal same-window OIDC redirect on web
-  and Desktop. Windows owns a separate caption row above the entire renderer
-  view, with transparent native titleBarOverlay controls and a sandboxed drag
-  region outside their hit area. Keep the page viewport below that row on every
-  route, including fixed panels and dialogs. Size both views on resize, maximize
-  and restore. Fullscreen gives the row back to the page. Avoid page selectors
-  or web padding to reserve space for native controls.
-  Linux uses the local host-owned three-color control strip
-  across navigation, including login and renderer failures, without the OS title bar.
-  Keep it in its own sandboxed view, restrict its IPC to its owning window and three
-  caption actions, and dispose its renderer on close. The legacy nativeWindowFrame
+  and Desktop. Windows and Linux use the standard native OS title bar, the same
+  way OpenBot does: the BrowserWindow keeps `frame: true` and does not set
+  `titleBarStyle` or `titleBarOverlay`. Caption controls sit in that bar above
+  the page. Do not install a host caption strip, a transparent overlay, or page
+  padding and drag regions that reserve space for those controls.
+  macOS keeps `titleBarStyle: "hiddenInset"` and traffic lights over the page,
+  with drag regions only on that platform. The legacy nativeWindowFrame
   capability means controls are host-owned; hide duplicate in-page controls only
   when the bridge advertises it. Older frameless builds retain their page controls.
   Sign-in proceeds without an intermediate login launcher or popup. Keep the persistent

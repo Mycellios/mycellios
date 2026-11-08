@@ -5,7 +5,7 @@ import { ArrowLeft, Blocks, BookOpen, Bot as BotIcon, LayoutGrid, Monitor, Searc
 import { useState } from "react";
 import type { connectedAppMarks } from "../../lib/connected-apps";
 import { VideoStudioSample } from "../../components/VideoStudioSample";
-import { desktopBridge } from "../../lib/desktop";
+import { desktopBridge, desktopDragClass } from "../../lib/desktop";
 import { PluginsOverlay } from "../PluginsOverlay";
 import { AgentsMarketplace } from "./AgentsMarketplace";
 import { matches, type MarketplaceTab } from "./catalog";
@@ -38,7 +38,7 @@ export function MarketplaceWorkspace(props: {
   ];
   return (
     <section className="rk-marketplace" data-testid="marketplace-workspace">
-      <header className="rk-market-topbar app-drag" data-testid="conversation-header">
+      <header className={`rk-market-topbar ${desktopDragClass()}`} data-testid="conversation-header">
         <Button
           variant="ghost"
           size="icon-sm"

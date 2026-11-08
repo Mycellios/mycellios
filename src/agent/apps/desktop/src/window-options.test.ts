@@ -15,19 +15,15 @@ describe("desktop window chrome", () => {
     expect(opts.trafficLightPosition).toEqual({ x: 16, y: 16 });
   });
 
-  it("uses the persistent custom host strip on Windows and Linux", () => {
-    for (const platform of ["linux"] as const) {
+  it("uses the standard native title bar on Windows and Linux", () => {
+    for (const platform of ["win32", "linux"] as const) {
       const opts = browserWindowOptions(platform);
-      expect(opts.frame).toBe(false);
+      expect(opts.frame).toBe(true);
       expect(opts.titleBarStyle).toBeUndefined();
+      expect(opts.trafficLightPosition).toBeUndefined();
+      expect(opts).not.toHaveProperty("titleBarOverlay");
     }
   });
-});
-
-it("integrates native Windows caption controls", () => {
-  const opts=browserWindowOptions("win32");
-  expect(opts.frame).toBe(false); expect(opts.titleBarStyle).toBe("hidden");
-  expect(opts.titleBarOverlay).toMatchObject({height:51});
 });
 describe("setup window chrome", () => {
   it("matches the app window chrome so first run looks like the product", () => {
@@ -36,6 +32,8 @@ describe("setup window chrome", () => {
       const app = browserWindowOptions(platform);
       expect(setup.frame).toBe(app.frame);
       expect(setup.titleBarStyle).toBe(app.titleBarStyle);
+      expect(setup.trafficLightPosition).toEqual(app.trafficLightPosition);
+      expect(setup).not.toHaveProperty("titleBarOverlay");
       expect(setup.backgroundColor).toBe(app.backgroundColor);
     }
   });
