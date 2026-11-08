@@ -7544,3 +7544,11 @@ msgstr "This connection returned no models in its catalog."
 
 msgid "This model is already enabled on another connection. Use it from that connection."
 msgstr "This model is already enabled on another connection. Use it from that connection."
+
+#: src/pages/Auth.tsx
+msgid "Signing in…"
+msgstr "Signing in…"
+
+#: src/pages/Auth.tsx
+msgid "This is taking a while."
+msgstr "This is taking a while."

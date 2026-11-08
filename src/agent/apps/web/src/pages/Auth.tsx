@@ -1,5 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { SPORE_WELCOME_REWARD } from "@rakazo/contracts";
+import { productBrand, SPORE_WELCOME_REWARD } from "@rakazo/contracts";
 import {
   credentialIssue,
   MAX_PASSWORD_LENGTH,
@@ -10,8 +10,9 @@ import { Button, Input, InputOTP, InputOTPGroup, InputOTPSlot, Label } from "@ra
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthMushroom } from "../components/AuthMushroom";
+import { BrandLaunch } from "../components/BrandLaunch";
 import { PasskeySignIn } from "../components/PasskeySignIn";
-import { PageLoading } from "../components/PageLoading";
+import { appPath } from "../lib/app-path";
 import { authClient } from "../lib/auth";
 import type { AuthCapabilities } from "../lib/auth-capabilities";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
@@ -240,7 +241,19 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
   }
 
   if (reset?.mycelliosAccount && !reset.passwordAuth && reset.sso?.availability === "available" && !error) {
-    return <PageLoading data-rakazo-surface="welcome" />;
+    return (
+      <BrandLaunch
+        surface="welcome"
+        busy
+        pending
+        markSrc={appPath(productBrand.mascotPath)}
+        wordSrc={appPath(productBrand.markPath)}
+        status={t`Signing in…`}
+        slowHint={t`This is taking a while.`}
+        retryLabel={t`Retry`}
+        onRetry={() => void signInWithSso()}
+      />
+    );
   }
 
   return (

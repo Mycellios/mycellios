@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import loginMark from "../../public/mycellios/app-icon-v2-192.png";
+import mico from "../../public/mycellios/mico.png";
+import wordmark from "../../public/mycellios/mark.png";
+import { BrandLaunch } from "../components/BrandLaunch";
 import { resolveUiLocale } from "../lib/ui-locale";
+import { launchText } from "./launch-copy";
 import type { AuthSession, PublicAuthConfig } from "./auth";
 import {
   AuthServiceError,
@@ -29,6 +33,7 @@ export function OAuthConsent() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [resume, setResume] = useState(0);
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [confirmationRequired, setConfirmationRequired] = useState(false);
   const [locale] = useState(() => resolveUiLocale());
@@ -86,7 +91,7 @@ export function OAuthConsent() {
     return () => {
       active = false;
     };
-  }, [config, session, clients]);
+  }, [config, session, clients, resume]);
 
   async function decide(action: "approve" | "deny") {
     if (!config || !session || !details) return;
@@ -108,6 +113,42 @@ export function OAuthConsent() {
     }
   }
 
+  const signingIn = Boolean(config && session && !details && !error);
+  const loading = !config && !error;
+  const blocked = Boolean(error && (!config || (session && !details)));
+  if (signingIn || loading || blocked) {
+    return (
+      <BrandLaunch
+        documentFrame
+        wordAsLink
+        busy
+        pending={signingIn || loading}
+        attempt={attempt + resume}
+        locale={locale}
+        markSrc={mico}
+        wordSrc={wordmark}
+        status={error ? undefined : signingIn ? launchText(locale, "signingIn") : launchText(locale, "loading")}
+        alert={error || undefined}
+        slowHint={launchText(locale, "slow")}
+        retryLabel={
+          error && session ? text("Sign in again", "Volver a entrar") : launchText(locale, "retry")
+        }
+        retryHref={error && session ? "/agent/sign-in" : undefined}
+        onRetry={
+          error && session
+            ? undefined
+            : () => {
+                setError("");
+                if (session) setResume((value) => value + 1);
+                else setAttempt((value) => value + 1);
+              }
+        }
+      />
+    );
+  }
+
+  if (!config) return null;
+
   return (
     <main className="oauth-consent" lang={locale === "es" ? "es" : "en"}>
       <section>
@@ -119,11 +160,9 @@ export function OAuthConsent() {
         <h1>
           {details
             ? text("Authorize access", "Autorizar acceso")
-            : session && !error
-              ? text("Signing in…", "Entrando…")
-              : mode === "sign-up"
-                ? text("Create your account", "Crear tu cuenta")
-                : text("Sign in", "Iniciar sesión")}
+            : mode === "sign-up"
+              ? text("Create your account", "Crear tu cuenta")
+              : text("Sign in", "Iniciar sesión")}
         </h1>
         </header>
         {error ? <p role="alert">{error}</p> : null}
@@ -132,21 +171,7 @@ export function OAuthConsent() {
             {text("Sign in again", "Volver a entrar")}
           </a>
         ) : null}
-        {!config ? (
-          error ? (
-            <button
-              type="button"
-              onClick={() => {
-                setError("");
-                setAttempt((n) => n + 1);
-              }}
-            >
-              {text("Try again", "Reintentar")}
-            </button>
-          ) : (
-            <p role="status">{text("Loading…", "Cargando…")}</p>
-          )
-        ) : !session ? (
+        {!session ? (
           <>
             {mode === "sign-up" ? (
               <p className="login-description">
@@ -289,8 +314,6 @@ export function OAuthConsent() {
               {text("Cancel", "Cancelar")}
             </button>
           </>
-        ) : !error ? (
-          <p role="status">{text("One moment…", "Un momento…")}</p>
         ) : null}
       </section>
     </main>

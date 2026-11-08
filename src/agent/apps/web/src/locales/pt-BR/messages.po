@@ -6377,3 +6377,11 @@ msgstr "{pendingCount, plural, one {# conexão pendente} other {# conexões pend
 #: src/components/ReleaseNotes.tsx
 msgid "See which accounts are connected to each app."
 msgstr "Veja quais contas estão conectadas a cada aplicativo."
+
+#: src/pages/Auth.tsx
+msgid "Signing in…"
+msgstr "Entrando…"
+
+#: src/pages/Auth.tsx
+msgid "This is taking a while."
+msgstr "Está demorando um pouco."
