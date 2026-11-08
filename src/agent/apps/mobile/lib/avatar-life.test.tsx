@@ -374,9 +374,9 @@ describe("activity mark", () => {
   it("shows each working member of a group in turn, every 2 s", () => {
     render(<ActivityMark bots={bots} atBottom />);
     const shown = () => container.querySelector("[data-fill]")?.getAttribute("data-fill");
-    expect(shown()).toBe("#286fc3");
+    expect(shown()).toBe("#2A92FE");
     act(() => vi.advanceTimersByTime(2000));
-    expect(shown()).toBe("#ffcea2");
+    expect(shown()).toBe("#FF781C");
   });
 
   it("stops cycling members and pulsing photo dots on a covered screen, and resumes on return", () => {
