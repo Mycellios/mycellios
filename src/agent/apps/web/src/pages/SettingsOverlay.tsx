@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import { spaceLabel } from "../lib/space-label";
 import type { Bot, SpaceMemoryConfig } from "@rakazo/contracts";
 import {
   AlertDialog,
@@ -480,7 +481,7 @@ export function SettingsOverlay({
                     className="w-56 max-w-full"
                     data-testid="settings-space"
                     aria-label={t`Space`}
-                    options={spaces.map((option) => ({ value: option.id, label: option.name }))}
+                    options={spaces.map((option) => ({ value: option.id, label: spaceLabel(option.name) }))}
                     value={space.id}
                     disabled={panelBusy}
                     onValueChange={(next) => {
@@ -492,7 +493,7 @@ export function SettingsOverlay({
                     data-testid="settings-space"
                     className="break-words text-sm text-muted-foreground"
                   >
-                    {space.name}
+                    {spaceLabel(space.name)}
                   </p>
                 ) : null}
               </div>

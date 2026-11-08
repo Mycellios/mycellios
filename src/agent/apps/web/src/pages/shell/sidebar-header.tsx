@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelL
 import { useEffect, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { desktopHidesTitleBar } from "../../lib/desktop";
+import { spaceLabel } from "../../lib/space-label";
 import type { Panel } from "../../lib/right-panel-state";
 import { BotCreatePicker } from "./bot-picker";
 import { isCreateMenuHotkey } from "./command-palette-hotkey";
@@ -85,7 +86,8 @@ export function SidebarHeader({
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const toggleLabel = mini ? t`Show bots` : t`Minimize bots`;
   const mobile = mobileMenu != null;
-  const spaceName = spaces.find(space => space.id === spaceId)?.name;
+  const currentSpace = spaces.find(space => space.id === spaceId);
+  const spaceName = currentSpace ? spaceLabel(currentSpace.name) : null;
   return (
     <div
       data-testid="sidebar-topbar"
@@ -111,7 +113,7 @@ export function SidebarHeader({
           <span className="truncate">{spaceName ?? "Mycellios"}</span><ChevronsUpDown size={mobile ? 15 : 12} className="shrink-0 text-muted-foreground" />
         </PopoverTrigger>
         {workspaceOpen ? <PopoverContent align="start" className={`app-no-drag max-h-[var(--available-height)] w-64 gap-1 overflow-y-auto p-1 ${mobile ? "[&_button]:min-h-11" : ""}`}>
-          {spaces.map(space => <Button key={space.id} variant="ghost" className="justify-start" aria-current={space.id === spaceId ? "true" : undefined} onClick={() => { setWorkspaceOpen(false); const first = space.bots[0]; const group = space.groups[0]; onSpace(space.id, first ? `/app/${first.id}` : group ? `/app/g/${group.id}` : "/onboarding"); }}>{space.name}</Button>)}
+          {spaces.map(space => <Button key={space.id} variant="ghost" className="justify-start" aria-current={space.id === spaceId ? "true" : undefined} onClick={() => { setWorkspaceOpen(false); const first = space.bots[0]; const group = space.groups[0]; onSpace(space.id, first ? `/app/${first.id}` : group ? `/app/g/${group.id}` : "/onboarding"); }}>{spaceLabel(space.name)}</Button>)}
           <div className="my-1 border-t border-border" />
           {spaceId ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); onSpaceSettings(); }}><Settings size={15} />{t`Space settings`}</Button> : null}
           {onRoutines ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onRoutines(); }}><Workflow size={15} />{t`Routines`}</Button> : null}

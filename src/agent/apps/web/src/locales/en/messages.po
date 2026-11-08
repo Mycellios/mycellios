@@ -7545,6 +7545,2218 @@ msgstr "This connection returned no models in its catalog."
 msgid "This model is already enabled on another connection. Use it from that connection."
 msgstr "This model is already enabled on another connection. Use it from that connection."
 
+#: pages/usage/UsageWorkspace.tsx
+msgid "1 session"
+msgstr "1 session"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "1 year"
+msgstr "1 year"
+
+#: components/ProviderQuota.tsx
+msgid "5 hours"
+msgstr "5 hours"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "A server administrator must configure this agent engine before it can be used."
+msgstr "A server administrator must configure this agent engine before it can be used."
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "A workflow can have up to 60 items."
+msgstr "A workflow can have up to 60 items."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "About these figures"
+msgstr "About these figures"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "ACP Registry"
+msgstr "ACP Registry"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Across all your spaces. Trial rewards have no monetary value and are not on-chain."
+msgstr "Across all your spaces. Trial rewards have no monetary value and are not on-chain."
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Activate schedule"
+msgstr "Activate schedule"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Activation"
+msgstr "Activation"
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Add connection"
+msgstr "Add connection"
+
+#: pages/shell/composer.tsx
+msgid "Add context"
+msgstr "Add context"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Add key"
+msgstr "Add key"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Add node"
+msgstr "Add node"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Add note"
+msgstr "Add note"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Add shape"
+msgstr "Add shape"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Add text"
+msgstr "Add text"
+
+#: pages/shell/composer.tsx
+msgid "Add to message"
+msgstr "Add to message"
+
+#: pages/shell/chat-tools-panel.tsx
+msgid "Agent settings"
+msgstr "Agent settings"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Alert"
+msgstr "Alert"
+
+#: pages/marketplace/AgentsMarketplace.tsx
+msgid "All entries"
+msgstr "All entries"
+
+#: pages/Artifacts.tsx
+msgid "All file types"
+msgstr "All file types"
+
+#: components/PushPermissionPrompt.tsx
+msgid "Allow notifications"
+msgstr "Allow notifications"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Allow notifications in your browser or system settings, then return here."
+msgstr "Allow notifications in your browser or system settings, then return here."
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Allowed"
+msgstr "Allowed"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Angry"
+msgstr "Angry"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "answer"
+msgstr "answer"
+
+#: pages/shell/side-question.tsx
+msgid "Answering…"
+msgstr "Answering…"
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "AntSeed gateway"
+msgstr "AntSeed gateway"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "API estimate · USD"
+msgstr "API estimate · USD"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "API estimates"
+msgstr "API estimates"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Applies to all devices where you enabled closed-app notifications."
+msgstr "Applies to all devices where you enabled closed-app notifications."
+
+#: pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Apps"
+msgstr "Apps"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Archive task"
+msgstr "Archive task"
+
+#: pages/shell/side-question.tsx
+msgid "Ask about this chat without interrupting its task. Answers stay here and use your configured model."
+msgstr "Ask about this chat without interrupting its task. Answers stay here and use your configured model."
+
+#: pages/shell/composer.tsx
+msgid "Ask aside"
+msgstr "Ask aside"
+
+#: pages/routines/RoutineCanvas.tsx
+msgid "Ask the agent to edit this routine"
+msgstr "Ask the agent to edit this routine"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "Assign task to Mico"
+msgstr "Assign task to Mico"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Assistant messages"
+msgstr "Assistant messages"
+
+#: pages/shell/composer.tsx
+msgid "Attach image"
+msgstr "Attach image"
+
+#: components/HelpMenu.tsx
+msgid "Attachments and voice"
+msgstr "Attachments and voice"
+
+#: pages/Artifacts.tsx
+msgid "Audio and video"
+msgstr "Audio and video"
+
+#: pages/SpaceSettingOverrides.tsx
+msgid "Available in each Mico’s Agent engine settings."
+msgstr "Available in each Mico’s Agent engine settings."
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Available on this server"
+msgstr "Available on this server"
+
+#: components/ProviderQuota.tsx
+msgid "Awaiting refresh"
+msgstr "Awaiting refresh"
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "Back to chat"
+msgstr "Back to chat"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Back to tasks"
+msgstr "Back to tasks"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Branch"
+msgstr "Branch"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Breakdown"
+msgstr "Breakdown"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Browse ACP Registry"
+msgstr "Browse ACP Registry"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Browse agent engines compatible with the Agent Client Protocol."
+msgstr "Browse agent engines compatible with the Agent Client Protocol."
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "Browser controls"
+msgstr "Browser controls"
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "Browser help"
+msgstr "Browser help"
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "Browser options"
+msgstr "Browser options"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Built-in agent engine"
+msgstr "Built-in agent engine"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Cache creation"
+msgstr "Cache creation"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Cached input"
+msgstr "Cached input"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Calendar view"
+msgstr "Calendar view"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Calm"
+msgstr "Calm"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Cancel connection"
+msgstr "Cancel connection"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "Cancel recording"
+msgstr "Cancel recording"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Canvas tools"
+msgstr "Canvas tools"
+
+#: pages/marketplace/AgentsMarketplace.tsx
+msgid "Catalog"
+msgstr "Catalog"
+
+#: pages/Shell.tsx
+msgid "Chat tools"
+msgstr "Chat tools"
+
+#: components/HelpMenu.tsx
+msgid "Chats, apps, routines and model accounts"
+msgstr "Chats, apps, routines and model accounts"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Check availability"
+msgstr "Check availability"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Check the same message"
+msgstr "Check the same message"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Check web updates"
+msgstr "Check web updates"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Checking availability…"
+msgstr "Checking availability…"
+
+#: components/RunActivityStatus.tsx
+msgid "Checking email…"
+msgstr "Checking email…"
+
+#: components/ProviderQuota.tsx
+msgid "Checking quota…"
+msgstr "Checking quota…"
+
+#: components/RunActivityStatus.tsx
+msgid "Checking the calendar…"
+msgstr "Checking the calendar…"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "Choose a Mico"
+msgstr "Choose a Mico"
+
+#: components/HelpMenu.tsx
+msgid "Choose a Mico from the sidebar, write what you need and send your message. Use a separate chat for each topic so its context stays clear."
+msgstr "Choose a Mico from the sidebar, write what you need and send your message. Use a separate chat for each topic so its context stays clear."
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Choose a model in your Mico’s model picker."
+msgstr "Choose a model in your Mico’s model picker."
+
+#: pages/shell/composer.tsx
+msgid "Choose a skill"
+msgstr "Choose a skill"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Choose a step"
+msgstr "Choose a step"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Choose an instruction, condition, Mico or result as the destination."
+msgstr "Choose an instruction, condition, Mico or result as the destination."
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Choose an output first, then this input"
+msgstr "Choose an output first, then this input"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Choose OpenCode in the Mico’s Agent engine settings."
+msgstr "Choose OpenCode in the Mico’s Agent engine settings."
+
+#: pages/SettingsOverlay.tsx
+msgid "Clear settings search"
+msgstr "Clear settings search"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Close details"
+msgstr "Close details"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Close search"
+msgstr "Close search"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Close settings and use the update prompt. Your unfinished work remains protected."
+msgstr "Close settings and use the update prompt. Your unfinished work remains protected."
+
+#: pages/shell/composer.tsx
+msgid "Close skills"
+msgstr "Close skills"
+
+#: components/MicoTaskTabs.tsx
+msgid "Close tab"
+msgstr "Close tab"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Close task"
+msgstr "Close task"
+
+#: pages/shell/chat-tools-panel.tsx
+msgid "Close tools"
+msgstr "Close tools"
+
+#: components/call/VoiceConversation.tsx
+msgid "Close voice"
+msgstr "Close voice"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Come back and find an"
+msgstr "Come back and find an"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Compare with"
+msgstr "Compare with"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Comparing options"
+msgstr "Comparing options"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Condition"
+msgstr "Condition"
+
+#: components/ProjectRunControls.tsx
+msgid "Configuration was not prepared. Open the details to see the result."
+msgstr "Configuration was not prepared. Open the details to see the result."
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Confirm task"
+msgstr "Confirm task"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Confirmed charges"
+msgstr "Confirmed charges"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Confused"
+msgstr "Confused"
+
+#: components/ProviderQuota.tsx
+msgid "Connect a model account to see its subscription quota."
+msgstr "Connect a model account to see its subscription quota."
+
+#: components/call/VoiceConversation.tsx
+msgid "Connect a transcription provider in Voice settings, or use local voice in Desktop."
+msgstr "Connect a transcription provider in Voice settings, or use local voice in Desktop."
+
+#: components/HelpMenu.tsx
+msgid "Connect apps and add skills"
+msgstr "Connect apps and add skills"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Connect input"
+msgstr "Connect input"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Connect output"
+msgstr "Connect output"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Connect to"
+msgstr "Connect to"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Connect to another step"
+msgstr "Connect to another step"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Connect to step"
+msgstr "Connect to step"
+
+#: pages/model-settings/providers-section.tsx
+msgid "Connect your own model endpoint"
+msgstr "Connect your own model endpoint"
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Connections"
+msgstr "Connections"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Connections cannot form a cycle."
+msgstr "Connections cannot form a cycle."
+
+#: components/HelpMenu.tsx
+msgid "Contact and community"
+msgstr "Contact and community"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Contains"
+msgstr "Contains"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Content"
+msgstr "Content"
+
+#: pages/shell/bot-panel.tsx
+msgid "Context"
+msgstr "Context"
+
+#: components/SidebarProjects.tsx
+msgid "Conversation title"
+msgstr "Conversation title"
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Copy link"
+msgstr "Copy link"
+
+#: components/MobileInstallOffer.tsx
+msgid "Copy mobile link"
+msgstr "Copy mobile link"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Cost · USD"
+msgstr "Cost · USD"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Could not archive workflow"
+msgstr "Could not archive workflow"
+
+#: components/composer/ComposerVoice.tsx
+msgid "Could not attach the recording."
+msgstr "Could not attach the recording."
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Could not check for updates. Try again."
+msgstr "Could not check for updates. Try again."
+
+#: components/call/VoiceConversation.tsx
+msgid "Could not check local voice. Try again."
+msgstr "Could not check local voice. Try again."
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Could not check the server’s agent engines."
+msgstr "Could not check the server’s agent engines."
+
+#: components/MobileInstallOffer.tsx
+msgid "Could not copy. Open the link above or type it on your phone."
+msgstr "Could not copy. Open the link above or type it on your phone."
+
+#: pages/marketplace/AgentsMarketplace.tsx
+msgid "Could not create Mico"
+msgstr "Could not create Mico"
+
+#: components/SidebarProjects.tsx
+msgid "Could not create the conversation. Try again."
+msgstr "Could not create the conversation. Try again."
+
+#: pages/Artifacts.tsx
+msgid "Could not delete this file."
+msgstr "Could not delete this file."
+
+#: components/PushPermissionPrompt.tsx
+msgid "Could not enable notifications."
+msgstr "Could not enable notifications."
+
+#: components/call/VoiceConversation.tsx
+msgid "Could not follow the Mico’s response. Check the chat."
+msgstr "Could not follow the Mico’s response. Check the chat."
+
+#: pages/SpaceSettingOverrides.tsx
+msgid "Could not install OpenCode. Try again."
+msgstr "Could not install OpenCode. Try again."
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Could not load executions"
+msgstr "Could not load executions"
+
+#: pages/SettingsOverlay.tsx
+msgid "Could not load Micos."
+msgstr "Could not load Micos."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Could not load Spore rewards."
+msgstr "Could not load Spore rewards."
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Could not load tasks"
+msgstr "Could not load tasks"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Could not load the ACP Registry."
+msgstr "Could not load the ACP Registry."
+
+#: pages/Artifacts.tsx
+msgid "Could not load the library."
+msgstr "Could not load the library."
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Could not load the schedule."
+msgstr "Could not load the schedule."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Could not load usage data."
+msgstr "Could not load usage data."
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Could not load workflows"
+msgstr "Could not load workflows"
+
+#: components/call/VoiceConversation.tsx
+msgid "Could not open this chat for voice. Try again."
+msgstr "Could not open this chat for voice. Try again."
+
+#: components/call/VoiceConversation.tsx
+msgid "Could not play the reply. You can read it in the chat."
+msgstr "Could not play the reply. You can read it in the chat."
+
+#: components/call/VoiceConversation.tsx
+msgid "Could not prepare local voice. Try again."
+msgstr "Could not prepare local voice. Try again."
+
+#: components/composer/ComposerVoice.tsx
+msgid "Could not prepare the recording."
+msgstr "Could not prepare the recording."
+
+#: lib/native-computer-workspace.ts
+msgid "Could not prepare this agent. Your message has been kept."
+msgstr "Could not prepare this agent. Your message has been kept."
+
+#: components/ProviderQuota.tsx
+msgid "Could not refresh quota. Try again."
+msgstr "Could not refresh quota. Try again."
+
+#: pages/marketplace/AgentsMarketplace.tsx
+msgid "Could not save pin"
+msgstr "Could not save pin"
+
+#: components/SidebarProjects.tsx
+msgid "Could not save the project. Try again."
+msgstr "Could not save the project. Try again."
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Could not save this preference."
+msgstr "Could not save this preference."
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Could not save workflow"
+msgstr "Could not save workflow"
+
+#: components/call/VoiceConversation.tsx
+msgid "Could not send your voice message. Check the chat before trying again."
+msgstr "Could not send your voice message. Check the chat before trying again."
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Could not show the test notification."
+msgstr "Could not show the test notification."
+
+#: components/composer/ComposerVoice.tsx
+msgid "Could not start the microphone. Try again."
+msgstr "Could not start the microphone. Try again."
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Could not start workflow"
+msgstr "Could not start workflow"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Could not stop workflow"
+msgstr "Could not stop workflow"
+
+#: components/call/VoiceConversation.tsx
+msgid "Could not use the microphone. Check its permission and try again."
+msgstr "Could not use the microphone. Check its permission and try again."
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Create a routine to see its upcoming runs here."
+msgstr "Create a routine to see its upcoming runs here."
+
+#: pages/marketplace/SkillsMarketplace.tsx
+msgid "Create skill"
+msgstr "Create skill"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Cron schedule"
+msgstr "Cron schedule"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Curious"
+msgstr "Curious"
+
+#: pages/AccountSettingsOverlay.tsx
+msgid "Current environment"
+msgstr "Current environment"
+
+#: pages/ModelSettingsOverlay.tsx
+msgid "Custom provider"
+msgstr "Custom provider"
+
+#: pages/usage/UsageChart.tsx
+msgid "Daily cost"
+msgstr "Daily cost"
+
+#: pages/usage/UsageChart.tsx
+msgid "Daily cost in USD by provider"
+msgstr "Daily cost in USD by provider"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Daily records follow the time zone shown here. Missing model usage leaves gaps in the chart instead of a zero."
+msgstr "Daily records follow the time zone shown here. Missing model usage leaves gaps in the chart instead of a zero."
+
+#: pages/usage/UsageChart.tsx
+msgid "Daily tokens"
+msgstr "Daily tokens"
+
+#: pages/usage/UsageChart.tsx
+msgid "Daily tokens excluding cache reads by provider"
+msgstr "Daily tokens excluding cache reads by provider"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Daily trend"
+msgstr "Daily trend"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Daily usage data"
+msgstr "Daily usage data"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Date"
+msgstr "Date"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Day"
+msgstr "Day"
+
+#: pages/ModelSettingsOverlay.tsx
+msgid "Default provider"
+msgstr "Default provider"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Delegate the work."
+msgstr "Delegate the work."
+
+#: components/MicoWorkMenu.tsx
+msgid "Delegated task failed"
+msgstr "Delegated task failed"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Deleted"
+msgstr "Deleted"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Deleted Mico"
+msgstr "Deleted Mico"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Desktop app updates are managed in the installed app."
+msgstr "Desktop app updates are managed in the installed app."
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Desktop can prepare local speech models in the voice panel. Browser speech depends on your device. The services below are optional alternatives."
+msgstr "Desktop can prepare local speech models in the voice panel. Browser speech depends on your device. The services below are optional alternatives."
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Desktop updates follow the policy of your installed package. Manual installations use the published downloads."
+msgstr "Desktop updates follow the policy of your installed package. Manual installations use the published downloads."
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Development preview"
+msgstr "Development preview"
+
+#: components/composer/ComposerVoice.tsx
+msgid "Dictate message"
+msgstr "Dictate message"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "Dictate task"
+msgstr "Dictate task"
+
+#: pages/SettingsOverlay.tsx
+msgid "Discard changes"
+msgstr "Discard changes"
+
+#: pages/SettingsOverlay.tsx
+msgid "Discard unsaved changes?"
+msgstr "Discard unsaved changes?"
+
+#: components/MobileInstallOffer.tsx
+msgid "Dismiss mobile invitation"
+msgstr "Dismiss mobile invitation"
+
+#: pages/Artifacts.tsx
+msgid "Documents"
+msgstr "Documents"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Download available"
+msgstr "Download available"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Download Mycellios Desktop"
+msgstr "Download Mycellios Desktop"
+
+#: pages/SpaceSettingOverrides.tsx
+msgid "Download OpenCode to use it on this server."
+msgstr "Download OpenCode to use it on this server."
+
+#: components/DesktopUpdates.tsx
+msgid "Download progress"
+msgstr "Download progress"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Draw"
+msgstr "Draw"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Drawing"
+msgstr "Drawing"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Dreamy"
+msgstr "Dreamy"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Each model call is counted once. Recorded charges and API estimates are separate from your credit balance and subscriptions. Unknown prices and incomplete token counts stay unavailable; shares use known amounts only. Gas, tools and other external services are excluded."
+msgstr "Each model call is counted once. Recorded charges and API estimates are separate from your credit balance and subscriptions. Unknown prices and incomplete token counts stay unavailable; shares use known amounts only. Gas, tools and other external services are excluded."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Earn 1 Spore for every million tokens processed."
+msgstr "Earn 1 Spore for every million tokens processed."
+
+#: components/SidebarContribution.tsx
+msgid "Earn credits with your computer"
+msgstr "Earn credits with your computer"
+
+#: components/SidebarContribution.tsx
+msgid "Earn with your computer"
+msgstr "Earn with your computer"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Edit step"
+msgstr "Edit step"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Enable notifications"
+msgstr "Enable notifications"
+
+#: components/PushPermissionPrompt.tsx
+msgid "Enabling…"
+msgstr "Enabling…"
+
+#: components/call/VoiceConversation.tsx
+msgid "End voice conversation"
+msgstr "End voice conversation"
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "Enter a page address to open it."
+msgstr "Enter a page address to open it."
+
+#: components/call/VoiceConversation.tsx
+msgid "Enter the requested secret on screen, then restart voice."
+msgstr "Enter the requested secret on screen, then restart voice."
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Equals"
+msgstr "Equals"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Every answer is waiting here."
+msgstr "Every answer is waiting here."
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Example tasks — these are not running."
+msgstr "Example tasks — these are not running."
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Execution history"
+msgstr "Execution history"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Execution status unavailable. Running is disabled until the connection returns."
+msgstr "Execution status unavailable. Running is disabled until the connection returns."
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Executions"
+msgstr "Executions"
+
+#: components/RunActivityStatus.tsx
+msgid "Exit code"
+msgstr "Exit code"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Export workflow"
+msgstr "Export workflow"
+
+#: pages/Artifacts.tsx
+msgid "File type"
+msgstr "File type"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Find a node"
+msgstr "Find a node"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Find a node…"
+msgstr "Find a node…"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Find node"
+msgstr "Find node"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Find Ollama and LM Studio on the computer running this server. Use Custom provider for other addresses."
+msgstr "Find Ollama and LM Studio on the computer running this server. Use Custom provider for other addresses."
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Find recent papers about document retrieval"
+msgstr "Find recent papers about document retrieval"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Find tasks"
+msgstr "Find tasks"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Find tasks…"
+msgstr "Find tasks…"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "Finish dictation"
+msgstr "Finish dictation"
+
+#: pages/routines/RoutineCanvas.tsx
+msgid "Fit diagram"
+msgstr "Fit diagram"
+
+#: components/HelpMenu.tsx
+msgid "Follow Mycellios on X"
+msgstr "Follow Mycellios on X"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "For example: 0 9 * * 1-5 runs at 09:00, Monday to Friday. Activate the schedule in the header."
+msgstr "For example: 0 9 * * 1-5 runs at 09:00, Monday to Friday. Activate the schedule in the header."
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Found on this server"
+msgstr "Found on this server"
+
+#: components/DesktopUpdates.tsx
+msgid "Free at least 6 GB of disk space before restarting to update."
+msgstr "Free at least 6 GB of disk space before restarting to update."
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Gateway guide"
+msgstr "Gateway guide"
+
+#: pages/routines/RoutineCanvas.tsx
+msgid "General model"
+msgstr "General model"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Get notified when a Mico needs your answer or approval."
+msgstr "Get notified when a Mico needs your answer or approval."
+
+#: components/PushPermissionPrompt.tsx
+msgid "Get notified when your Mico replies"
+msgstr "Get notified when your Mico replies"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Give your Micos a schedule."
+msgstr "Give your Micos a schedule."
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Gray"
+msgstr "Gray"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Happy"
+msgstr "Happy"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Has content"
+msgstr "Has content"
+
+#: components/HelpMenu.tsx
+msgid "Help"
+msgstr "Help"
+
+#: components/HelpMenu.tsx
+msgid "Help and resources"
+msgstr "Help and resources"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Hide Micos"
+msgstr "Hide Micos"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Hide previews to keep message content out of system notifications."
+msgstr "Hide previews to keep message content out of system notifications."
+
+#: pages/settings/CompanionPanels.tsx
+msgid "How to install"
+msgstr "How to install"
+
+#: pages/Artifacts.tsx
+msgid "Images"
+msgstr "Images"
+
+#: pages/ModelRoleSettings.tsx
+msgid "In Auto mode, this model checks that actions match what you asked for. For example, searching for flights can continue, but buying a ticket should ask for permission. These checks can use additional tokens."
+msgstr "In Auto mode, this model checks that actions match what you asked for. For example, searching for flights can continue, but buying a ticket should ask for permission. These checks can use additional tokens."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Included Micos"
+msgstr "Included Micos"
+
+#: pages/usage/UsageChart.tsx
+msgid "Inspect chart day"
+msgstr "Inspect chart day"
+
+#: components/call/VoiceConversation.tsx
+msgid "Interrupt reply"
+msgstr "Interrupt reply"
+
+#: pages/SettingsOverlay.tsx
+msgid "Keep editing"
+msgstr "Keep editing"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Known tokens excluding cache reads"
+msgstr "Known tokens excluding cache reads"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Last execution"
+msgstr "Last execution"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Laughing"
+msgstr "Laughing"
+
+#: components/HelpMenu.tsx
+msgid "Learn"
+msgstr "Learn"
+
+#: pages/Shell.tsx
+msgid "Library"
+msgstr "Library"
+
+#: pages/Artifacts.tsx
+msgid "Library view"
+msgstr "Library view"
+
+#: components/MobileInstallOffer.tsx
+msgid "Link copied"
+msgstr "Link copied"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Load older messages"
+msgstr "Load older messages"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Loading schedule…"
+msgstr "Loading schedule…"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Loading Spore rewards…"
+msgstr "Loading Spore rewards…"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Loading tasks…"
+msgstr "Loading tasks…"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Loading usage data…"
+msgstr "Loading usage data…"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Local discovery"
+msgstr "Local discovery"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Local draft"
+msgstr "Local draft"
+
+#: pages/TaskControls.tsx
+msgid "Main task"
+msgstr "Main task"
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Manage connection"
+msgstr "Manage connection"
+
+#: pages/AccountSettingsOverlay.tsx
+msgid "Manage each Mico's computer access from its chat tools. Approval rules control which actions need your confirmation."
+msgstr "Manage each Mico's computer access from its chat tools. Approval rules control which actions need your confirmation."
+
+#: components/ProviderQuota.tsx
+msgid "Manage model accounts"
+msgstr "Manage model accounts"
+
+#: pages/shell/chat-header-model.tsx
+msgid "Manage models"
+msgstr "Manage models"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Manual trigger"
+msgstr "Manual trigger"
+
+#: pages/shell/workspace-rail.tsx
+msgid "Marketplace"
+msgstr "Marketplace"
+
+#: pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Marketplace sections"
+msgstr "Marketplace sections"
+
+#: pages/shell/message-hover-actions.tsx
+msgid "Message actions"
+msgstr "Message actions"
+
+#: pages/shell/reviewed-voice.tsx
+msgid "Message not sent. Your text is kept here."
+msgstr "Message not sent. Your text is kept here."
+
+#: components/SidebarProjects.tsx
+msgid "Mico"
+msgstr "Mico"
+
+#: pages/marketplace/AgentsMarketplace.tsx
+msgid "Mico source"
+msgstr "Mico source"
+
+#: pages/SettingsOverlay.tsx
+msgid "Micos"
+msgstr "Micos"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Micos in this space"
+msgstr "Micos in this space"
+
+#: pages/shell/reviewed-voice.tsx
+msgid "Microphone level"
+msgstr "Microphone level"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Mischievous"
+msgstr "Mischievous"
+
+#: pages/SettingsOverlay.tsx
+msgid "Mobile connection"
+msgstr "Mobile connection"
+
+#: components/ProviderQuota.tsx
+msgid "Model accounts"
+msgstr "Model accounts"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Model API connections"
+msgstr "Model API connections"
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Model provider through your AntSeed gateway"
+msgstr "Model provider through your AntSeed gateway"
+
+#: components/HelpMenu.tsx
+msgid "Models, quota and costs"
+msgstr "Models, quota and costs"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Month"
+msgstr "Month"
+
+#: components/call/VoiceConversation.tsx
+msgid "Mute microphone"
+msgstr "Mute microphone"
+
+#: components/MobileInstallOffer.tsx
+msgid "Mycellios for mobile"
+msgstr "Mycellios for mobile"
+
+#: components/MobileInstallOffer.tsx
+msgid "Mycellios on your phone"
+msgstr "Mycellios on your phone"
+
+#: components/HelpMenu.tsx
+msgid "Mycellios repository on GitHub"
+msgstr "Mycellios repository on GitHub"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Mycellios updates"
+msgstr "Mycellios updates"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Name this workflow…"
+msgstr "Name this workflow…"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Navigate using minimap"
+msgstr "Navigate using minimap"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Navy blue"
+msgstr "Navy blue"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Needs your answer"
+msgstr "Needs your answer"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "New answers"
+msgstr "New answers"
+
+#: components/SidebarProjects.tsx
+msgid "New project"
+msgstr "New project"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "New workflow"
+msgstr "New workflow"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Next day"
+msgstr "Next day"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Next execution"
+msgstr "Next execution"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Next month"
+msgstr "Next month"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Next run"
+msgstr "Next run"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Next week"
+msgstr "Next week"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "No"
+msgstr "No"
+
+#: pages/shell/sidebar-roster.tsx
+msgid "No chats in this folder"
+msgstr "No chats in this folder"
+
+#: pages/settings/CompanionPanels.tsx
+msgid "No Micos in this space."
+msgstr "No Micos in this space."
+
+#: pages/shell/composer-error.tsx
+msgid "No model was available for this Mico."
+msgstr "No model was available for this Mico."
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "No native agents found on this server."
+msgstr "No native agents found on this server."
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "No routines yet"
+msgstr "No routines yet"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "No runs on this day."
+msgstr "No runs on this day."
+
+#: pages/SettingsOverlay.tsx
+msgid "No settings found."
+msgstr "No settings found."
+
+#: pages/shell/composer.tsx
+msgid "No skills available for this Mico. Add them in chat settings."
+msgstr "No skills available for this Mico. Add them in chat settings."
+
+#: components/composer/ComposerVoice.tsx
+msgid "No speech was detected."
+msgstr "No speech was detected."
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "No upcoming runs."
+msgstr "No upcoming runs."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "No usage was recorded in this period."
+msgstr "No usage was recorded in this period."
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Node details"
+msgstr "Node details"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Not installed"
+msgstr "Not installed"
+
+#: pages/AccountSettingsOverlay.tsx
+msgid "Not reported"
+msgstr "Not reported"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Not supported"
+msgstr "Not supported"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Note"
+msgstr "Note"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Notifications are working on this device."
+msgstr "Notifications are working on this device."
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Notify you about Mico replies while this app is open in the background."
+msgstr "Notify you about Mico replies while this app is open in the background."
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "One-time schedule"
+msgstr "One-time schedule"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Only when I’m needed"
+msgstr "Only when I’m needed"
+
+#: components/DesktopDevelopment.tsx
+msgid "Open development"
+msgstr "Open development"
+
+#: components/HelpMenu.tsx
+msgid "Open Discord"
+msgstr "Open Discord"
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "Open in browser"
+msgstr "Open in browser"
+
+#: pages/shell/chat-tools-panel.tsx
+msgid "Open library"
+msgstr "Open library"
+
+#: components/HelpMenu.tsx
+msgid "Open Marketplace to connect your tools, add a Mico or install a skill. A skill gives your Mico instructions for a task; an app connects it to a service."
+msgstr "Open Marketplace to connect your tools, add a Mico or install a skill. A skill gives your Mico instructions for a task; an app connects it to a service."
+
+#: components/MicoWorkMenu.tsx
+msgid "Open Mycellios to review the task."
+msgstr "Open Mycellios to review the task."
+
+#: components/HelpMenu.tsx
+msgid "Open Settings → Models to manage your model accounts. The quota ring shows the allowance reported by a subscription. Usage shows recorded consumption and costs; it is a separate report."
+msgstr "Open Settings → Models to manage your model accounts. The quota ring shows the allowance reported by a subscription. Usage shows recorded consumption and costs; it is a separate report."
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Open task in chat"
+msgstr "Open task in chat"
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Open the chat to edit this Mico's instructions, tools and routine settings."
+msgstr "Open the chat to edit this Mico's instructions, tools and routine settings."
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Open voice"
+msgstr "Open voice"
+
+#: pages/SpaceSettingOverrides.tsx
+msgid "OpenCode is unavailable for this space."
+msgstr "OpenCode is unavailable for this space."
+
+#: components/HelpMenu.tsx
+msgid "Opens in a new tab"
+msgstr "Opens in a new tab"
+
+#: components/HelpMenu.tsx
+msgid "Opens your email app"
+msgstr "Opens your email app"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Organize the contacts from the last meeting"
+msgstr "Organize the contacts from the last meeting"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Organizing contacts"
+msgstr "Organizing contacts"
+
+#: components/RunActivityStatus.tsx
+msgid "Organizing the task…"
+msgstr "Organizing the task…"
+
+#: pages/Artifacts.tsx
+msgid "Other files"
+msgstr "Other files"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Pan canvas"
+msgstr "Pan canvas"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Pause for 1 hour"
+msgstr "Pause for 1 hour"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Pause notifications"
+msgstr "Pause notifications"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Pause routine"
+msgstr "Pause routine"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Pause schedule"
+msgstr "Pause schedule"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Permission is requested only when you choose to enable notifications."
+msgstr "Permission is requested only when you choose to enable notifications."
+
+#: pages/marketplace/AgentsMarketplace.tsx
+msgid "Personal entries"
+msgstr "Personal entries"
+
+#: components/MobileInstallOffer.tsx
+msgid "Phone type"
+msgstr "Phone type"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Plan the next team offsite"
+msgstr "Plan the next team offsite"
+
+#: components/call/VoiceConversation.tsx
+msgid "Playback speed"
+msgstr "Playback speed"
+
+#: components/call/VoiceConversation.tsx
+msgid "Prepare local voice"
+msgstr "Prepare local voice"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Prepare the call notes with Northwind Traders"
+msgstr "Prepare the call notes with Northwind Traders"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "Prepare voice on this device without an API key."
+msgstr "Prepare voice on this device without an API key."
+
+#: components/call/VoiceConversation.tsx
+msgid "Preparing local voice…"
+msgstr "Preparing local voice…"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Preparing notes"
+msgstr "Preparing notes"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Previous day"
+msgstr "Previous day"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Previous month"
+msgstr "Previous month"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Previous week"
+msgstr "Previous week"
+
+#: pages/SettingsOverlay.tsx
+msgid "Profile and security"
+msgstr "Profile and security"
+
+#: components/SidebarProjects.tsx
+msgid "Project name"
+msgstr "Project name"
+
+#: components/SidebarProjects.tsx
+msgid "Projects"
+msgstr "Projects"
+
+#: components/MycelliosCredits.tsx
+msgid "Promo"
+msgstr "Promo"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Proud"
+msgstr "Proud"
+
+#: components/HelpMenu.tsx
+msgid "Published releases on GitHub"
+msgstr "Published releases on GitHub"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Push alerts only when I’m needed"
+msgstr "Push alerts only when I’m needed"
+
+#: components/HelpMenu.tsx
+msgid "Quick guides"
+msgstr "Quick guides"
+
+#: components/ProviderQuota.tsx
+msgid "Quota is temporarily unavailable."
+msgstr "Quota is temporarily unavailable."
+
+#: components/ProviderQuota.tsx
+msgid "Quota settings"
+msgstr "Quota settings"
+
+#: components/ProviderQuota.tsx
+msgid "Quota unavailable"
+msgstr "Quota unavailable"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Read"
+msgstr "Read"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Reading the paper"
+msgstr "Reading the paper"
+
+#: pages/TaskControls.tsx
+msgid "Reassign task"
+msgstr "Reassign task"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Receive alerts on this device even when Mycellios is closed. They open the corresponding chat."
+msgstr "Receive alerts on this device even when Mycellios is closed. They open the corresponding chat."
+
+#: components/ProviderQuota.tsx
+msgid "Reconnect this account in model settings."
+msgstr "Reconnect this account in model settings."
+
+#: pages/shell/composer.tsx
+msgid "Record voice message"
+msgstr "Record voice message"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Recorded and estimated cost · USD"
+msgstr "Recorded and estimated cost · USD"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Recorded cost · USD"
+msgstr "Recorded cost · USD"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Red"
+msgstr "Red"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Redo"
+msgstr "Redo"
+
+#: components/ProviderQuota.tsx
+msgid "Refresh automatically"
+msgstr "Refresh automatically"
+
+#: components/ProviderQuota.tsx
+msgid "Refresh quota"
+msgstr "Refresh quota"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Refresh usage"
+msgstr "Refresh usage"
+
+#: components/HelpMenu.tsx
+msgid "Release notes"
+msgstr "Release notes"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Remove attachment"
+msgstr "Remove attachment"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Remove the attachments before changing Mico."
+msgstr "Remove the attachments before changing Mico."
+
+#: components/PushPermissionPrompt.tsx
+msgid "Reply notifications"
+msgstr "Reply notifications"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Restore server version"
+msgstr "Restore server version"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Restore task"
+msgstr "Restore task"
+
+#: pages/TaskControls.tsx
+msgid "Result"
+msgstr "Result"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Resume notifications"
+msgstr "Resume notifications"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Resume routine"
+msgstr "Resume routine"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Return to app"
+msgstr "Return to app"
+
+#: pages/shell/reviewed-voice.tsx
+msgid "Review message"
+msgstr "Review message"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Review this paper and summarize its findings"
+msgstr "Review this paper and summarize its findings"
+
+#: pages/shell/reviewed-voice.tsx
+msgid "Review your message"
+msgstr "Review your message"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Reviewing applications"
+msgstr "Reviewing applications"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Routine details"
+msgstr "Routine details"
+
+#: pages/routines/RoutineCanvas.tsx
+msgid "Routine diagram"
+msgstr "Routine diagram"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Routines unavailable"
+msgstr "Routines unavailable"
+
+#: pages/shell/bot-panel.tsx
+msgid "Rules"
+msgstr "Rules"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Runtime"
+msgstr "Runtime"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Sad"
+msgstr "Sad"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Sand"
+msgstr "Sand"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Save or discard your changes first."
+msgstr "Save or discard your changes first."
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Save workflow"
+msgstr "Save workflow"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Scan again"
+msgstr "Scan again"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Schedule"
+msgstr "Schedule"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Scheduled"
+msgstr "Scheduled"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Scheduled execution"
+msgstr "Scheduled execution"
+
+#: pages/marketplace/AgentsMarketplace.tsx
+msgid "Search Micos"
+msgstr "Search Micos"
+
+#: pages/SettingsOverlay.tsx
+msgid "Search settings"
+msgstr "Search settings"
+
+#: pages/SettingsOverlay.tsx
+msgid "Search settings…"
+msgstr "Search settings…"
+
+#: pages/marketplace/SkillsMarketplace.tsx
+msgid "Search skills"
+msgstr "Search skills"
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "Search the ACP Registry"
+msgstr "Search the ACP Registry"
+
+#: pages/Artifacts.tsx
+msgid "Search the library"
+msgstr "Search the library"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Searching arxiv.org"
+msgstr "Searching arxiv.org"
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Select a Mico chat to start a voice conversation. You can manage voice services below."
+msgstr "Select a Mico chat to start a voice conversation. You can manage voice services below."
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Select connection"
+msgstr "Select connection"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Select routine"
+msgstr "Select routine"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Select the input of the next step"
+msgstr "Select the input of the next step"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Select to see execution"
+msgstr "Select to see execution"
+
+#: components/HelpMenu.tsx
+msgid "Send feedback"
+msgstr "Send feedback"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "Send task"
+msgstr "Send task"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Send test"
+msgstr "Send test"
+
+#: components/ProviderQuota.tsx
+msgid "Session"
+msgstr "Session"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Share"
+msgstr "Share"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Show all archived tasks"
+msgstr "Show all archived tasks"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Show less"
+msgstr "Show less"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Show message previews"
+msgstr "Show message previews"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Show Micos"
+msgstr "Show Micos"
+
+#: components/RunActivityStatus.tsx
+msgid "Showing the last 12000 characters of output."
+msgstr "Showing the last 12000 characters of output."
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Shy"
+msgstr "Shy"
+
+#: pages/shell/side-question.tsx
+msgid "Side question"
+msgstr "Side question"
+
+#: lib/native-computer-workspace.ts
+msgid "Sign in again to prepare this agent. Your message has been kept."
+msgstr "Sign in again to prepare this agent. Your message has been kept."
+
+#: components/MicoWorkMenu.tsx
+msgid "Simultaneous tasks"
+msgstr "Simultaneous tasks"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Skeptical"
+msgstr "Skeptical"
+
+#: pages/marketplace/SkillsMarketplace.tsx
+msgid "Skill source"
+msgstr "Skill source"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Sleepy"
+msgstr "Sleepy"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Some costs are still pending."
+msgstr "Some costs are still pending."
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Some occurrences could not be displayed. Choose a smaller range or review the routines."
+msgstr "Some occurrences could not be displayed. Choose a smaller range or review the routines."
+
+#: components/HelpMenu.tsx
+msgid "Source code"
+msgstr "Source code"
+
+#: pages/SettingsOverlay.tsx
+msgid "Space settings"
+msgstr "Space settings"
+
+#: components/call/VoiceConversation.tsx
+msgid "Speak now"
+msgstr "Speak now"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Star"
+msgstr "Star"
+
+#: components/HelpMenu.tsx
+msgid "Start a conversation"
+msgstr "Start a conversation"
+
+#: components/call/VoiceConversation.tsx
+msgid "Start talking"
+msgstr "Start talking"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Start with a trigger"
+msgstr "Start with a trigger"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Started by"
+msgstr "Started by"
+
+#: pages/routines/RoutineWorkspace.tsx
+msgid "Status unavailable"
+msgstr "Status unavailable"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Step"
+msgstr "Step"
+
+#: components/composer/ComposerVoice.tsx
+msgid "Stop recording"
+msgstr "Stop recording"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Stop task"
+msgstr "Stop task"
+
+#: pages/TaskControls.tsx
+msgid "Stopping"
+msgstr "Stopping"
+
+#: components/ProviderQuota.tsx
+msgid "Subscription quota"
+msgstr "Subscription quota"
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Summarize the open hiring processes for the support position"
+msgstr "Summarize the open hiring processes for the support position"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Surprised"
+msgstr "Surprised"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Switch workspace"
+msgstr "Switch workspace"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "System permission"
+msgstr "System permission"
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Talk with your Mico"
+msgstr "Talk with your Mico"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Task assigned"
+msgstr "Task assigned"
+
+#: pages/tasks/TaskDetail.tsx
+msgid "Task conversation"
+msgstr "Task conversation"
+
+#: components/MicoWorkMenu.tsx
+msgid "Task failed"
+msgstr "Task failed"
+
+#: components/MicoWorkMenu.tsx
+msgid "Tasks"
+msgstr "Tasks"
+
+#: components/HelpMenu.tsx
+msgid "Tasks, routines and scheduling"
+msgstr "Tasks, routines and scheduling"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Test notification"
+msgstr "Test notification"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "Test notification sent."
+msgstr "Test notification sent."
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Text"
+msgstr "Text"
+
+#: pages/shell/composer.tsx
+msgid "Text appears when you stop recording"
+msgstr "Text appears when you stop recording"
+
+#: pages/shell/side-question.tsx
+msgid "The answer could not be confirmed. Your question is kept; it has not been resent."
+msgstr "The answer could not be confirmed. Your question is kept; it has not been resent."
+
+#: components/HelpMenu.tsx
+msgid "The essentials, without leaving your chat."
+msgstr "The essentials, without leaving your chat."
+
+#: components/call/VoiceConversation.tsx
+msgid "The Mico stopped responding. Check the chat."
+msgstr "The Mico stopped responding. Check the chat."
+
+#: components/ProviderQuota.tsx
+msgid "The provider has paused quota checks. Try again later."
+msgstr "The provider has paused quota checks. Try again later."
+
+#: pages/model-settings/provider-runtime.tsx
+msgid "The server administrator manages custom ACP agents in the host configuration."
+msgstr "The server administrator manages custom ACP agents in the host configuration."
+
+#: pages/Shell.tsx
+msgid "The task state changed. The chat has been refreshed."
+msgstr "The task state changed. The chat has been refreshed."
+
+#: pages/TaskControls.tsx
+msgid "The work changed or could not be updated. Refresh its status and try again."
+msgstr "The work changed or could not be updated. Refresh its status and try again."
+
+#: lib/native-computer-workspace.ts
+msgid "This account cannot prepare this agent. Your message has been kept."
+msgstr "This account cannot prepare this agent. Your message has been kept."
+
+#: lib/native-computer-workspace.ts
+msgid "This agent changed while preparing it. Try again; your message has been kept."
+msgstr "This agent changed while preparing it. Try again; your message has been kept."
+
+#: pages/tasks/TaskDetail.tsx
+msgid "This browser cannot preserve the message receipt. Retry when storage is available."
+msgstr "This browser cannot preserve the message receipt. Retry when storage is available."
+
+#: components/ProviderQuota.tsx
+msgid "This connection does not report subscription quota."
+msgstr "This connection does not report subscription quota."
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "This device"
+msgstr "This device"
+
+#: pages/settings/NotificationsPanel.tsx
+msgid "This environment does not support system notifications."
+msgstr "This environment does not support system notifications."
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "This file is too large."
+msgstr "This file is too large."
+
+#: pages/tasks/TaskDetail.tsx
+msgid "This message is awaiting confirmation."
+msgstr "This message is awaiting confirmation."
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "This page must open in your browser."
+msgstr "This page must open in your browser."
+
+#: pages/shell/side-question.tsx
+msgid "This server does not support side questions yet."
+msgstr "This server does not support side questions yet."
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "This server needs the Tasks update. Your draft stays in this browser."
+msgstr "This server needs the Tasks update. Your draft stays in this browser."
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "This server needs the workflows update. You can edit and export a local draft."
+msgstr "This server needs the workflows update. You can edit and export a local draft."
+
+#: pages/Shell.tsx
+msgid "This task cannot be retried. Continue in the chat."
+msgstr "This task cannot be retried. Continue in the chat."
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Time zone"
+msgstr "Time zone"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Toggle minimap"
+msgstr "Toggle minimap"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Tokens exclude cache reads. Processed tokens include them. Cache creation includes its one-hour subset once, and reasoning tokens are already part of output. Sessions count distinct stored conversations; deleted run links can make that count incomplete."
+msgstr "Tokens exclude cache reads. Processed tokens include them. Cache creation includes its one-hour subset once, and reasoning tokens are already part of output. Sessions count distinct stored conversations; deleted run links can make that count incomplete."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Tokens excluding cache reads"
+msgstr "Tokens excluding cache reads"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Tokens processed including cache reads"
+msgstr "Tokens processed including cache reads"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Totals"
+msgstr "Totals"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Trial Spore"
+msgstr "Trial Spore"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Trigger"
+msgstr "Trigger"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Uncached input"
+msgstr "Uncached input"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Unknown Mico"
+msgstr "Unknown Mico"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Unknown model"
+msgstr "Unknown model"
+
+#: components/SidebarProjects.tsx
+msgid "Unread"
+msgstr "Unread"
+
+#: pages/workflows/WorkflowWorkspace.tsx
+msgid "Untitled workflow"
+msgstr "Untitled workflow"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Upcoming runs"
+msgstr "Upcoming runs"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Update available"
+msgstr "Update available"
+
+#: components/ProjectRunControls.tsx
+msgid "Update Desktop before running this project."
+msgstr "Update Desktop before running this project."
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "Uploading…"
+msgstr "Uploading…"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Usage breakdown"
+msgstr "Usage breakdown"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Usage by model"
+msgstr "Usage by model"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Usage metric"
+msgstr "Usage metric"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Usage period"
+msgstr "Usage period"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Usage preferences"
+msgstr "Usage preferences"
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "Usage summary"
+msgstr "Usage summary"
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Use"
+msgstr "Use"
+
+#: pages/shell/composer.tsx
+msgid "Use a skill"
+msgstr "Use a skill"
+
+#: components/HelpMenu.tsx
+msgid "Use Tasks to follow delegated work. Routines repeat an action or respond to a trigger; Schedule shows their planned runs and history. Open an item to see its details."
+msgstr "Use Tasks to follow delegated work. Routines repeat an action or respond to a trigger; Schedule shows their planned runs and history. Open an item to see its details."
+
+#: pages/usage/UsageChart.tsx
+msgid "Use the arrow keys to inspect days, or open the daily data table."
+msgstr "Use the arrow keys to inspect days, or open the daily data table."
+
+#: components/ReviewWorkspacePanel.tsx
+msgid "Use the keyboard button to enter an address and the tab counter to switch pages. If a page blocks previews, open it in your browser from Options."
+msgstr "Use the keyboard button to enter an address and the tab counter to switch pages. If a page blocks previews, open it in your browser from Options."
+
+#: components/HelpMenu.tsx
+msgid "Use the plus button beside your message for attachments and chat tools. Open Voice for a spoken conversation. Voice availability depends on your browser or Desktop app and the configured speech engine."
+msgstr "Use the plus button beside your message for attachments and chat tools. Open Voice for a spoken conversation. Voice availability depends on your browser or Desktop app and the configured speech engine."
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Use your existing account"
+msgstr "Use your existing account"
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Use your own gateway URL and API key."
+msgstr "Use your own gateway URL and API key."
+
+#: pages/ModelRoleSettings.tsx
+msgid "Used by new Micos and Micos that follow the general model."
+msgstr "Used by new Micos and Micos that follow the general model."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "User messages"
+msgstr "User messages"
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Uses OpenCode in an isolated profile without your local sign-in."
+msgstr "Uses OpenCode in an isolated profile without your local sign-in."
+
+#: pages/ModelRoleSettings.tsx
+msgid "Uses the main model automatically"
+msgstr "Uses the main model automatically"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Uses this Mico’s model, tools and permissions."
+msgstr "Uses this Mico’s model, tools and permissions."
+
+#: pages/usage/UsageWorkspace.tsx
+msgid "View daily data"
+msgstr "View daily data"
+
+#: pages/marketplace/MarketplaceWorkspace.tsx
+msgid "View details"
+msgstr "View details"
+
+#: components/ProviderQuota.tsx
+msgid "View usage and costs"
+msgstr "View usage and costs"
+
+#: pages/shell/composer-error.tsx
+msgid "View workspace options"
+msgstr "View workspace options"
+
+#: components/call/VoiceConversation.tsx
+msgid "Voice conversation"
+msgstr "Voice conversation"
+
+#: components/composer/ComposerVoice.tsx
+msgid "Voice message"
+msgstr "Voice message"
+
+#: components/call/VoiceConversation.tsx
+msgid "Voice settings"
+msgstr "Voice settings"
+
+#: pages/shell/reviewed-voice.tsx
+msgid "Voice transcript"
+msgstr "Voice transcript"
+
+#: pages/Shell.tsx
+msgid "Wait for the current task to finish before retrying."
+msgstr "Wait for the current task to finish before retrying."
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Web app version"
+msgstr "Web app version"
+
+#: pages/settings/UpdatesPanel.tsx
+msgid "Web updates are delivered by the server. They wait while you have drafts, attachments, calls or settings open."
+msgstr "Web updates are delivered by the server. They wait while you have drafts, attachments, calls or settings open."
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Week"
+msgstr "Week"
+
+#: components/ProviderQuota.tsx
+msgid "Weekly"
+msgstr "Weekly"
+
+#: components/SidebarProjects.tsx
+msgid "What do you want to work on?"
+msgstr "What do you want to work on?"
+
+#: pages/tasks/TaskComposer.tsx
+msgid "What would you like done?"
+msgstr "What would you like done?"
+
+#: pages/shell/side-question.tsx
+msgid "What would you like to know?"
+msgstr "What would you like to know?"
+
+#: components/HelpMenu.tsx
+msgid "What's new"
+msgstr "What's new"
+
+#: pages/shell/avatar-studio-popover.tsx
+msgid "Wine"
+msgstr "Wine"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Workflow"
+msgstr "Workflow"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Workflow canvas"
+msgstr "Workflow canvas"
+
+#: pages/WorkflowWorkspace.tsx
+msgid "Workflow name"
+msgstr "Workflow name"
+
+#: pages/shell/sidebar-header.tsx
+msgid "Workflows"
+msgstr "Workflows"
+
+#: pages/schedule/ScheduleWorkspace.tsx
+msgid "Working"
+msgstr "Working"
+
+#: components/RunActivityStatus.tsx
+msgid "Working directory"
+msgstr "Working directory"
+
+#: pages/shell/workspace-rail.tsx
+msgid "Workspace navigation"
+msgstr "Workspace navigation"
+
+#: pages/workflows/WorkflowCanvas.tsx
+msgid "Yes"
+msgstr "Yes"
+
+#: pages/tasks/TasksWorkspace.tsx
+msgid "You can attach up to 10 files."
+msgstr "You can attach up to 10 files."
+
+#: components/PushPermissionPrompt.tsx
+msgid "You’ll get an alert even when Mycellios is closed."
+msgstr "You’ll get an alert even when Mycellios is closed."
+
+#: pages/tasks/TaskEmpty.tsx
+msgid "Your agents work on tasks in parallel."
+msgstr "Your agents work on tasks in parallel."
+
+#: pages/model-settings/antseed-provider.tsx
+msgid "Your AntSeed gateway manages its own balance and spending limits."
+msgstr "Your AntSeed gateway manages its own balance and spending limits."
+
+#: pages/SettingsOverlay.tsx
+msgid "Your changes have not been saved. Stay here to save them, or discard them to continue."
+msgstr "Your changes have not been saved. Stay here to save them, or discard them to continue."
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Your chats and Micos follow your account. Open this link on iPhone or Android and add Mycellios to your Home Screen."
+msgstr "Your chats and Micos follow your account. Open this link on iPhone or Android and add Mycellios to your Home Screen."
+
+#: pages/settings/CompanionPanels.tsx
+msgid "Your Micos"
+msgstr "Your Micos"
+
+#: pages/shell/reviewed-voice.tsx
+msgid "Your words will appear here."
+msgstr "Your words will appear here."
+
+#: pages/model-settings/open-code-provider.tsx
+msgid "Zen and Go use separate API credentials for model requests."
+msgstr "Zen and Go use separate API credentials for model requests."
+
+#: pages/routines/RoutineCanvas.tsx
+msgid "Zoom in"
+msgstr "Zoom in"
+
+#: pages/routines/RoutineCanvas.tsx
+msgid "Zoom out"
+msgstr "Zoom out"
+
 #: src/pages/Auth.tsx
 msgid "Signing in…"
 msgstr "Signing in…"

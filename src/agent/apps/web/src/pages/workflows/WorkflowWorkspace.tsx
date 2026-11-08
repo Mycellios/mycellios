@@ -1,12 +1,13 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Space } from "@rakazo/contracts";
-import { Input,
+import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Input,
 } from "@rakazo/ui-web";
 import {
   ArrowLeft,
@@ -22,6 +23,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
 import type { RpcClient } from "../../lib/rpc";
+import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
 import { useWorkflows } from "./use-workflows";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 
@@ -89,9 +91,7 @@ export function WorkflowWorkspace({
               className="flex max-w-full items-center gap-2 rounded px-2 py-1.5 text-sm font-medium hover:bg-accent"
               aria-label={t`Switch workspace`}
             >
-              <span className="truncate">
-                {spaces.find((space) => space.id === spaceId)?.name ?? "Mycellios"}
-              </span>
+              <span className="truncate">{selectedSpaceLabel(spaces, spaceId)}</span>
               <ChevronDown size={13} className="shrink-0" />
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -111,7 +111,7 @@ export function WorkflowWorkspace({
                     );
                   }}
                 >
-                  {space.name}
+                  {spaceLabel(space.name)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

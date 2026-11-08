@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
 import { localTimezone } from "../../lib/local-timezone";
 import type { RpcClient } from "../../lib/rpc";
+import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
 import { errorText } from "../../lib/user-error";
 import { routineDiagramSummary } from "../routines/routine-summary";
 import {
@@ -290,7 +291,7 @@ export function ScheduleWorkspace({
             className="app-no-drag rk-schedule-space"
             aria-label={t`Switch workspace`}
           >
-            <span>{spaces.find((space) => space.id === spaceId)?.name ?? "Mycellios"}</span>
+            <span>{selectedSpaceLabel(spaces, spaceId)}</span>
             <ChevronsUpDown size={11} />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -304,7 +305,7 @@ export function ScheduleWorkspace({
                   )
                 }
               >
-                {space.name}
+                {spaceLabel(space.name)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

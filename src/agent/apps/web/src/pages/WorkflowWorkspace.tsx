@@ -1,6 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Workflow, WorkflowExecution, WorkflowGraph, WorkflowNode } from "@rakazo/contracts";
 import { workflowPlan } from "@rakazo/contracts";
+import { userFacingLabel } from "@rakazo/core";
 import {
   Button,
   Dialog,
@@ -246,7 +247,10 @@ export function WorkflowWorkspace({
         else onClose();
       }}
     >
-      <DialogContent style={{ width: "min(1400px, 96vw)", maxWidth: "none" }} className="flex max-h-[94dvh] flex-col overflow-hidden">
+      <DialogContent
+        style={{ width: "min(1400px, 96vw)", maxWidth: "none" }}
+        className="flex max-h-[94dvh] flex-col overflow-hidden"
+      >
         <DialogTitle>
           <Trans>Workflows</Trans>
         </DialogTitle>
@@ -329,7 +333,7 @@ export function WorkflowWorkspace({
                 disabled={busy || dirty || !saved || running}
                 onClick={() => void execute(node.id)}
               >
-                <Trans>Run</Trans>: {node.title || node.id}
+                <Trans>Run</Trans>: {userFacingLabel({ title: node.title }, t`Step`)}
               </Button>
             ))}
         </div>
@@ -630,7 +634,7 @@ export function WorkflowWorkspace({
                     )
                     .map((node) => (
                       <NativeSelectOption key={node.id} value={node.id}>
-                        {node.title || node.id}
+                        {userFacingLabel({ title: node.title }, t`Step`)}
                       </NativeSelectOption>
                     ))}
                 </NativeSelect>

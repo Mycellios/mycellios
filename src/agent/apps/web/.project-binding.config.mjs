@@ -1738,7 +1738,7 @@ var vite_config_default = defineConfig(({ command, mode }) => {
         }
       },
       react(),
-      babel({ plugins: ["@lingui/babel-plugin-lingui-macro"] }),
+      babel({ plugins: [["@lingui/babel-plugin-lingui-macro", { descriptorFields: "message" }]] }),
       lingui(),
       tailwindcss(),
       rakazoPwa(buildId, deploymentBase),

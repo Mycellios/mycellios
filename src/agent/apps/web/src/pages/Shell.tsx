@@ -1982,6 +1982,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       sidebarGroupsForSpaces(sidebarSpaces, miniSidebar ? "" : query, {
         pinned: t`Pinned`,
         unassigned: t`Unassigned`,
+        space: t`Space`,
       }),
     [sidebarSpaces, query, miniSidebar, t],
   );

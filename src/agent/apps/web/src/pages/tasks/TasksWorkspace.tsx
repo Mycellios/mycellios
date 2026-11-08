@@ -1,15 +1,16 @@
-import { botColors } from "@rakazo/ui-tokens";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, InboxTask, Space } from "@rakazo/contracts";
 import { ATTACHMENT_MAX_BYTES } from "@rakazo/contracts";
 import { validateAttachmentMimeType } from "@rakazo/core";
-import { Input,
+import { botColors } from "@rakazo/ui-tokens";
+import {
   BotAvatar,
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  Input,
 } from "@rakazo/ui-web";
 import {
   ArrowLeft,
@@ -27,6 +28,7 @@ import { useEffect, useState } from "react";
 import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
 import { readFileAsBase64 } from "../../lib/pending-attachments";
 import type { RpcClient } from "../../lib/rpc";
+import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
 import { errorText } from "../../lib/user-error";
 import { TaskAgentSelect, TaskComposer } from "./TaskComposer";
 import { TaskDetail } from "./TaskDetail";
@@ -135,7 +137,7 @@ export function TasksWorkspace({
             aria-label={t`Switch workspace`}
             className="app-no-drag rk-tasks-space"
           >
-            <span>{spaces.find((space) => space.id === spaceId)?.name ?? "Mycellios"}</span>
+            <span>{selectedSpaceLabel(spaces, spaceId)}</span>
             <ChevronDown size={11} />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -147,7 +149,7 @@ export function TasksWorkspace({
                   onSpace(space.id, first ? `/app/${first.id}?view=tasks` : "/onboarding");
                 }}
               >
-                {space.name}
+                {spaceLabel(space.name)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

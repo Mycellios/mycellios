@@ -1,7 +1,30 @@
+import type { I18n } from "@lingui/core";
 import { i18n } from "@lingui/core";
 import { applyUiDirection } from "./apply-ui-direction";
 import { importChunk } from "./preload-recovery";
 import { persistUiLocale, resolveUiLocale, type UiLocale } from "./ui-locale";
+import { visibleText } from "./visible-text";
+
+const guardedTranslations = new WeakSet<I18n>();
+
+export function installVisibleText(target: I18n = i18n): void {
+  if (guardedTranslations.has(target)) return;
+  guardedTranslations.add(target);
+  const translate = target._.bind(target);
+  const guarded = ((
+    id: string | { id: string; message?: string },
+    values?: Record<string, unknown>,
+    options?: { message?: string },
+  ): string => {
+    const rendered = translate(id as never, values as never, options as never);
+    if (typeof id === "string") return visibleText(rendered, { id, message: options?.message });
+    return visibleText(rendered, id);
+  }) as I18n["_"];
+  target._ = guarded;
+  target.t = guarded;
+}
+
+installVisibleText();
 
 export { i18n };
 

@@ -1,3 +1,4 @@
+import "./lib/i18n";
 import { installAndroidHost, isAndroidHost } from "./lib/android-host";
 import "./monitoring-bootstrap";
 import "./lib/native-pc-bootstrap";

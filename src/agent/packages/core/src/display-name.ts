@@ -24,6 +24,15 @@ export function displayName(name: string | null | undefined, fallback: string): 
   return trimmed && /[\p{L}\p{N}]/u.test(trimmed) && !isOpaqueName(trimmed) ? trimmed : fallback;
 }
 
+export type UserFacingName = {
+  name?: string | null;
+  title?: string | null;
+};
+
+export function userFacingLabel(record: UserFacingName, fallback: string): string {
+  return displayName(record.name ?? record.title, fallback);
+}
+
 export function accountDisplay(
   account: { name?: string | null; email?: string | null; image?: string | null },
   fallback: string,

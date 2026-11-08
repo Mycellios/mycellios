@@ -15,7 +15,7 @@ export default defineConfig({
     { find: /^\.\.\/lib\/(?:rpc|desktop)$/, replacement: `${fixture}state.ts` },
     ...await workspaceViteAliases(agent),
   ] },
-  plugins: [react(), babel({ plugins: ["@lingui/babel-plugin-lingui-macro"] }), lingui(), tailwindcss()],
+  plugins: [react(), babel({ plugins: [["@lingui/babel-plugin-lingui-macro", { descriptorFields: "message" }]] }), lingui(), tailwindcss()],
   build: { outDir: fileURLToPath(new URL("../.contribution-preview/", import.meta.url)), emptyOutDir: true },
   preview: { host: "127.0.0.1", port: 4196, strictPort: true },
 });
