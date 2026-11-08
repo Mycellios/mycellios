@@ -27,30 +27,28 @@ export async function rpc<T>(page: Page, procedure: string, body: unknown): Prom
   return parsed.json as T;
 }
 
+export async function showFocusCard(page: Page) {
+  await rpc(page, "onboarding/promptFocus", { botId: activeBotId(page) });
+}
+
 export async function completeOnboarding(page: Page, testInfo?: TestInfo) {
   await page.waitForURL(/\/(onboarding|app)/, { timeout: 20_000 });
-  // Optional Server integrations step (needsSetup). Skip when shown, then the
-  // The default companion is created automatically, without a profile form.
   const integrations = page.getByRole("heading", { name: "Server integrations", exact: true });
-  const companion = page.getByText(productBrand.companionName).first();
-  await integrations.or(companion).or(page.getByText("Opening chat…")).waitFor({ timeout: 20_000 });
-  if ((await companion.isVisible().catch(() => false)) && page.url().includes("/app")) {
-    if (testInfo) {
-      await captureScreenshot(page, testInfo, "03-create-first-bot");
-      await captureScreenshot(page, testInfo, "06-onboarding-complete");
-    }
-    return;
-  }
+  const firstMico = page.getByTestId("first-mico-setup");
+  const companion = page.getByRole("combobox", { name: `Message ${productBrand.companionName}`, exact: true });
+  await integrations.or(firstMico).or(companion).waitFor({ timeout: 20_000 });
   if (await integrations.isVisible().catch(() => false)) {
     if (testInfo) await captureScreenshot(page, testInfo, "02-connect-apps");
     await page.getByRole("button", { name: "Skip", exact: true }).click();
   }
-  await page.waitForURL(/\/app\//, { timeout: 20_000 });
-  await expect(page.getByText(productBrand.companionName).first()).toBeVisible();
-  if (testInfo) {
-    await captureScreenshot(page, testInfo, "03-create-first-bot");
-    await captureScreenshot(page, testInfo, "06-onboarding-complete");
+  await firstMico.or(companion).waitFor({ timeout: 20_000 });
+  if (await firstMico.isVisible()) {
+    if (testInfo) await captureScreenshot(page, testInfo, "03-create-first-bot");
+    await firstMico.getByRole("button", { name: "Create Mico", exact: true }).click();
   }
+  await page.waitForURL(/\/app\//, { timeout: 20_000 });
+  await expect(companion).toBeVisible();
+  if (testInfo) await captureScreenshot(page, testInfo, "06-onboarding-complete");
 }
 
 /**

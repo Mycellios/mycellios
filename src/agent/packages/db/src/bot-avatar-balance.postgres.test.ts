@@ -1,4 +1,4 @@
-import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
+import { MICO_AVATAR_DEFAULT_SHAPES, MICO_PRIMARY_AVATAR, micoAvatarValue } from "@rakazo/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "./client.js";
 import { createDb } from "./client.js";
@@ -76,9 +76,10 @@ describePostgres("new bot avatars (PostgreSQL)", () => {
       return bots;
     });
 
-    const expected = MICO_AVATAR_SHAPES.map(({ index }, slot) =>
-      micoAvatarValue(index, MICO_AVATAR_PALETTES[slot]!.color),
-    ).filter((value) => !before.some((bot) => bot.color === value));
+    const expected = [
+      ...(before.length === 0 ? [MICO_PRIMARY_AVATAR] : []),
+      ...MICO_AVATAR_DEFAULT_SHAPES.map(({ index, originalColor }) => micoAvatarValue(index, originalColor)),
+    ].filter((value) => !before.some((bot) => bot.color === value));
     expect(created.map((bot) => bot.color)).toEqual(expected.slice(0, created.length));
     expect(created.every((bot) => /^c[a-z0-9]{24}$/.test(bot.id))).toBe(true);
 
@@ -104,14 +105,15 @@ describePostgres("new bot avatars (PostgreSQL)", () => {
       ),
     );
     expect(new Set(created.map((bot) => bot.color)).size).toBe(8);
-    expect(created.map((bot) => bot.color)).toContain("#8650DF::shape_1000");
+    expect(created.map((bot) => bot.color)).toContain(MICO_PRIMARY_AVATAR);
+    expect(created.map((bot) => bot.color)).toContain("#D47046::shape_1001");
   });
 
   it("keeps a colour the caller chose and skips archived bots", async () => {
     const repos = createRepos(prisma);
     const system = asSystem(prisma);
     await system.bot.updateMany({
-      where: { spaceId: owner.spaceId, userId: owner.userId, color: "#8650DF::shape_1000" },
+      where: { spaceId: owner.spaceId, userId: owner.userId, color: "#D47046::shape_1001" },
       data: { archivedAt: new Date() },
     });
     const next = await runAsTenant(owner, () =>
@@ -121,6 +123,6 @@ describePostgres("new bot avatars (PostgreSQL)", () => {
     const automatic = await runAsTenant(owner, () =>
       repos.createBot(actor(), botInput("Automatic")),
     );
-    expect(automatic.color).toBe("#8650DF::shape_1000");
+    expect(automatic.color).toBe("#D47046::shape_1001");
   });
 });

@@ -21,7 +21,7 @@ import {
   validateBotModelChange,
 } from "@rakazo/adapters";
 import type { Actor, Bot, BotSecretMetadata } from "@rakazo/contracts";
-import { BotSecretAuth } from "@rakazo/contracts";
+import { BotSecretAuth, FIRST_MICO_SPAWN_KEY } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES, displayName } from "@rakazo/core";
 import type { Prisma } from "@rakazo/db";
 import {
@@ -131,7 +131,15 @@ export function botIntroPrompt(input: {
   userName: string;
   spaceName: string | null;
   disabledBuiltinTools: readonly string[];
+  firstMico?: boolean;
 }): string {
+  if (input.firstMico) {
+    return [
+      responseLanguageInstruction(input.responseLocale),
+      "Greet the user briefly. If your profile describes a role, say in one sentence what you can help with.",
+      "Do not ask onboarding questions, use tools, or change your profile.",
+    ].filter(Boolean).join("\n");
+  }
   const canAsk = !input.disabledBuiltinTools.includes("ask_user");
   const canUpdate = !input.disabledBuiltinTools.includes("update_bot");
   const options =
@@ -161,8 +169,7 @@ export function botIntroPrompt(input: {
 }
 
 /**
- * Creating a bot asks only for a name and a look, so the bot finds out what it
- * is for itself. Queue one hidden-prompt turn (like a routine or skill test
+ * Queue one hidden-prompt turn (like a routine or skill test
  * run) that greets the user and asks. The executor limits the "created"
  * trigger to that question and the bot's own profile (see executor.ts), and
  * answering resumes the run as the user's turn.
@@ -174,7 +181,9 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
   // extra automatic run there competes with whatever response a test or eval
   // harness queued next, for a bot it doesn't otherwise get to opt out of.
   if (deps.env.agentRuntime === "scripted") return;
-  if ((await modelSetup(deps, actor)).needsModel) return;
+  const hasNativeEngine = bot.agentEngine && bot.agentEngine !== "pi";
+  if (!hasNativeEngine && !(bot.modelProvider && bot.modelId) && (await modelSetup(deps, actor)).needsModel) return;
+  const firstMico = bot.spawnKey === FIRST_MICO_SPAWN_KEY;
   const [user, space] = await Promise.all([
     deps.prisma.user.findUnique({ where: { id: actor.userId }, select: { name: true } }),
     deps.prisma.space.findUnique({
@@ -187,11 +196,14 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
     userName: displayName(user?.name, ""),
     spaceName: space && !space.isDefault ? space.name.trim() || null : null,
     disabledBuiltinTools: bot.disabledBuiltinTools ?? [],
+    firstMico,
   });
   const run = await deps.prisma.$transaction(async (tx) => {
     // An idempotent create (spawnKey) returns the bot it already made; it gets one intro.
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${threadId} FOR UPDATE`;
     if (await tx.run.findFirst({ where: { botId: bot.id }, select: { id: true } })) return null;
+    // An import racing a first-Mico create may own the same idempotency key.
+    if (firstMico && await tx.agentImport.findFirst({ where: { botId: bot.id }, select: { id: true } })) return null;
     const task = await tx.task.create({
       data: {
         spaceId: actor.spaceId,
@@ -218,6 +230,16 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
   if (run) await deps.jobs.enqueue(runContinueJob(run.id));
 }
 
+async function requireNativeEngine(deps: RouterDeps, actor: Actor, engine: string) {
+  if (!(await nativeHostAccess(deps.dataDir, actor))) throw new ORPCError("FORBIDDEN");
+  const engines = await discoverNativeEngines(deps.dataDir);
+  if (!engines.some((candidate) => candidate.id === engine && candidate.available)) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Install and sign in to this agent on the server computer first.",
+    });
+  }
+}
+
 export function botsRoutes(ctx: RouterContext) {
   const { deps, repos, botModelValidation, removeBot, agentImportServices, groupRepos, authed } =
     ctx;
@@ -233,9 +255,29 @@ export function botsRoutes(ctx: RouterContext) {
         return found;
       }),
       create: authed.bots.create.handler(async ({ context, input }) => {
+        const { model, ...profile } = input;
+        if (profile.agentEngine) {
+          if (model) throw new ORPCError("BAD_REQUEST", { message: "Choose a model or an installed agent." });
+          await requireNativeEngine(deps, context.actor, profile.agentEngine);
+        }
+        if (model) {
+          const result = await validateBotModelChange(botModelValidation(context.actor), {
+            userId: context.actor.userId,
+            spaceId: context.actor.spaceId,
+            provider: model.provider,
+            model: model.modelId,
+            thinkingLevel: model.thinkingLevel,
+          });
+          if (!result.ok) throw new ORPCError("BAD_REQUEST", { message: result.error });
+        }
         let bot: Bot;
         try {
-          bot = await repos.createBot(context.actor, input);
+          bot = await repos.createBot(context.actor, {
+            ...profile,
+            modelProvider: model?.provider,
+            modelId: model?.modelId,
+            thinkingLevel: model?.thinkingLevel,
+          });
         } catch (error) {
           throw mapSpaceLifecycleError(error);
         }
@@ -335,14 +377,7 @@ export function botsRoutes(ctx: RouterContext) {
         });
         if (!modelChange.ok) throw new ORPCError("BAD_REQUEST", { message: modelChange.error });
         if (input.agentEngine && input.agentEngine !== "pi") {
-          if (!(await nativeHostAccess(deps.dataDir, context.actor)))
-            throw new ORPCError("FORBIDDEN");
-          const engines = await discoverNativeEngines(deps.dataDir);
-          if (!engines.some((engine) => engine.id === input.agentEngine && engine.available)) {
-            throw new ORPCError("BAD_REQUEST", {
-              message: "Install and sign in to this agent on the server computer first.",
-            });
-          }
+          await requireNativeEngine(deps, context.actor, input.agentEngine);
         }
         const thinkingLevel = input.thinkingLevel;
         if (!existing.thread) throw new IsolationError();

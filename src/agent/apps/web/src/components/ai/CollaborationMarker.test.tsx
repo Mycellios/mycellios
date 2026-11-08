@@ -19,7 +19,7 @@ describe("collaboration transcript markers", () => {
     expect(html).toContain('class="flex justify-start"');
     expect(html).toContain('class="inline-flex max-w-full');
     expect(html).toContain('class="truncate"');
-    expect(html).toContain('data-mico-avatar="plush"');
+    expect(html).toContain('data-mico-avatar="flat"');
     expect(html).toContain("Message from Research");
     expect(html).not.toContain("{peer}");
   });

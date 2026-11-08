@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { MICO_AVATAR_SHAPES } from "@rakazo/contracts";
+import { MICO_AVATAR_DEFAULT_SHAPES, MICO_AVATAR_SHAPES } from "@rakazo/contracts";
 import { avatarIdentitySeed, micoAvatarArt } from "@rakazo/core";
 import type { ReactNode } from "react";
 import { act, createElement } from "react";
@@ -84,10 +84,10 @@ describe("BotAvatar", () => {
 
   it("draws a plain-colour bot with a current mascot for its identity", () => {
     const view = render("#3EC5A8");
-    const shape = MICO_AVATAR_SHAPES[avatarIdentitySeed("bot-1") % MICO_AVATAR_SHAPES.length]!;
-    expect(bodies(view)).toEqual(micoAvatarArt(shape.index, "#3EC5A8")!.layers.map(([, path]) => path));
+    const shape = MICO_AVATAR_DEFAULT_SHAPES[avatarIdentitySeed("bot-1") % MICO_AVATAR_DEFAULT_SHAPES.length]!;
+    expect(bodies(view)[0]).toBe(micoAvatarArt(shape.index, "#3EC5A8")!.path);
     expect(view.querySelector("img")).toBeNull();
-    expect(view.querySelector("ellipse")).not.toBeNull();
+    expect(view.querySelector("rect")).not.toBeNull();
   });
 
   it("keeps a picture", () => {
@@ -98,6 +98,6 @@ describe("BotAvatar", () => {
 
   it("replaces a legacy shape with its matching current mascot", () => {
     const view = render("#8B5CF6::shape_3");
-    expect(bodies(view)).toEqual(micoAvatarArt(MICO_AVATAR_SHAPES[3].index, "#8B5CF6")!.layers.map(([, path]) => path));
+    expect(bodies(view)).toEqual([micoAvatarArt(MICO_AVATAR_SHAPES[3].index, "#8B5CF6")!.path]);
   });
 });

@@ -1,16 +1,4 @@
 .rk-task-shell {
-  --background: var(--workspace-background);
-  --foreground: var(--workspace-foreground);
-  --card: var(--workspace-card);
-  --border: var(--workspace-border);
-  --sidebar: var(--workspace-sidebar);
-  --sidebar-accent: var(--workspace-sidebar-accent);
-  --sidebar-border: var(--workspace-sidebar-border);
-  --muted-foreground: var(--workspace-muted-foreground);
-  --primary: var(--workspace-primary);
-  --primary-foreground: var(--workspace-primary-foreground);
-  --accent: var(--workspace-accent);
-  --accent-foreground: var(--workspace-accent-foreground);
   --task-blue: var(--workspace-task-blue);
   background: var(--sidebar);
 }

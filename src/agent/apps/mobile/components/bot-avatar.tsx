@@ -1,3 +1,4 @@
+import { micoAvatarDetails, micoAvatarShape } from "@rakazo/contracts";
 import type { AvatarMotionMode } from "@rakazo/core";
 import {
   AVATAR_LID_CLOSE,
@@ -15,6 +16,7 @@ import {
   avatarWorkingDot,
   currentMicoAvatarValue,
   isRunWorking,
+  MICO_AVATAR_EYE_COLOR,
   MICO_AVATAR_VIEWBOX,
   micoAvatarArt,
   organicAvatarPath,
@@ -144,7 +146,8 @@ export const BotAvatar = memo(function BotAvatar({
   const isWorking = isRunWorking(status) && !composing && motion !== "running";
   // The ring sits outside the disc, so the disc keeps its place.
   const dot = avatarWorkingDot(size);
-  const parsed = mobileBotAvatarPresentation(currentMicoAvatarValue(color, identity));
+  const displayedValue = currentMicoAvatarValue(color, identity);
+  const parsed = mobileBotAvatarPresentation(displayedValue);
   const onScreen = useAvatarOnScreen();
   const reducedMotion = useReducedMotion();
   const settling = useSettling(state);
@@ -161,7 +164,14 @@ export const BotAvatar = memo(function BotAvatar({
   const poke = usePoke(life, pokeable && clock === "running");
   const bodyStyle = useBodyStyle(life, size);
   const fillColor = parsed.kind === "shape" || parsed.kind === "color" ? parsed.color : color;
-  const mico = parsed.kind === "shape" ? micoAvatarArt(parsed.shapeIndex, parsed.color) : undefined;
+  const mico = parsed.kind === "shape"
+    ? micoAvatarArt(
+        parsed.shapeIndex,
+        micoAvatarDetails(displayedValue).original
+          ? micoAvatarShape(parsed.shapeIndex)?.originalColor ?? parsed.color
+          : parsed.color,
+      )
+    : undefined;
   const picture =
     parsed.kind === "image" && parsed.imageUrl ? (
       <View
@@ -200,7 +210,7 @@ export const BotAvatar = memo(function BotAvatar({
     <View style={{ width: size, height: size }}>
       {picture}
       {parsed.kind !== "image" && clock !== "still" ? (
-        <ThinkingDots color={fillColor} size={size} life={life} />
+        <ThinkingDots color={mico?.color ?? fillColor} size={size} life={life} />
       ) : null}
       {isWorking ? (
         <View
@@ -308,31 +318,39 @@ function MicoAvatar({
   life: AvatarLife;
   bodyStyle: BodyStyle;
 }) {
-  const [left, right, y] = art.eyes;
-  const eyeProps = (x: number, glint: boolean) => () => {
-    "worklet";
-    const state = eyeState(life);
-    const scale = 64 / AVATAR_MOTION_UNITS;
-    return {
-      cx: x + state.x * scale - (glint ? 0.65 : 0),
-      cy: y + state.y * scale - (glint ? 1.2 * state.lid : 0),
-      ry: state.hidden ? 0 : (glint ? 1 : 3.65) * state.lid,
-    };
-  };
-  const leftEye = useAnimatedProps(eyeProps(left, false));
-  const rightEye = useAnimatedProps(eyeProps(right, false));
-  const leftGlint = useAnimatedProps(eyeProps(left, true));
-  const rightGlint = useAnimatedProps(eyeProps(right, true));
   return (
     <Animated.View style={[{ width: size, height: size }, bodyStyle]}>
       <Svg width={size} height={size} viewBox={MICO_AVATAR_VIEWBOX}>
-        {art.layers.map(([tone, path]) => <Path key={path} d={path} fill={art.fills[tone]} />)}
-        <AnimatedEllipse animatedProps={leftEye} rx={2.75} fill="#251C2C" />
-        <AnimatedEllipse animatedProps={rightEye} rx={2.75} fill="#251C2C" />
-        <AnimatedEllipse animatedProps={leftGlint} rx={0.85} fill="#FFF1DD" />
-        <AnimatedEllipse animatedProps={rightGlint} rx={0.85} fill="#FFF1DD" />
+        <Path d={art.path} fill={art.color} />
+        {art.nose && <Path d={art.nose} fill={MICO_AVATAR_EYE_COLOR} />}
+        {art.eyes.map(([x, y, width, height]) => (
+          <MicoCapsuleEye key={x} x={x} y={y} width={width} height={height} color={art.eyeColor} life={life} />
+        ))}
       </Svg>
     </Animated.View>
+  );
+}
+
+function MicoCapsuleEye({ x, y, width, height, color, life }: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  life: AvatarLife;
+}) {
+  const props = useAnimatedProps(() => {
+    const state = eyeState(life);
+    const scale = 64 / AVATAR_MOTION_UNITS * 0.45;
+    const visibleHeight = state.hidden ? 0 : height * state.lid;
+    return {
+      x: x + state.x * scale,
+      y: y + state.y * scale + (height - visibleHeight) / 2,
+      height: visibleHeight,
+    };
+  });
+  return (
+    <AnimatedRect x={x} y={y} width={width} height={height} rx={width / 2} fill={color} animatedProps={props} />
   );
 }
 

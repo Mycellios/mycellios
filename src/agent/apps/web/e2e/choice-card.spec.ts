@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { activeBotId, captureScreenshot, completeOnboarding, rpc, signup } from "./helpers";
+import { activeBotId, captureScreenshot, completeOnboarding, rpc, showFocusCard, signup } from "./helpers";
 
 test("onboarding choices show borderless rows in both themes", async ({ page }, testInfo) => {
   await signup(page, `onboarding-rows-${Date.now()}@rakazo.test`, "password12", "Sample");
   await completeOnboarding(page);
+  await showFocusCard(page);
   const question = page.getByText("What do you want me on first?", { exact: true });
   await expect(question).toBeVisible();
   const card = question.locator("xpath=ancestor::div[contains(@class,'bg-card')][1]");

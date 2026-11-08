@@ -28,5 +28,9 @@ createRoot(document.getElementById("root")!).render(
       />
       <span>Idle</span>
     </div>
+    <div className="avatar-example">
+      <BotAvatar color="#D47046::shape_1001" identity="working-fox" size={120} status="running" className="avatar-animal" />
+      <span>Working animal</span>
+    </div>
   </>,
 );

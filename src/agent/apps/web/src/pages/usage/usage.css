@@ -1,9 +1,3 @@
-.rk-usage-shell {
-  --muted-foreground: var(--workspace-muted-foreground);
-}
-.dark .rk-usage-shell {
-  --muted-foreground: var(--workspace-muted-foreground);
-}
 .rk-usage-shell .rk-workspace-rail > div:first-child {
   height: 36px;
 }

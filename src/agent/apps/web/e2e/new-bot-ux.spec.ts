@@ -21,7 +21,7 @@ test("create opens dialog, then empty chat; picker lists bots; sidebar collapses
   await expect(picker).toBeVisible();
   await expect(picker.getByPlaceholder("Search")).toBeVisible();
   await expect(picker.getByTestId("create-new-bot")).toBeVisible();
-  await expect(picker.getByText("Chief", { exact: true })).toBeVisible();
+  await expect(picker.getByText("Mico", { exact: true })).toBeVisible();
   await captureScreenshot(page, testInfo, "plus-picker-bots");
 
   await picker.getByPlaceholder("Search").focus();
@@ -139,7 +139,7 @@ test("a stale roster refresh started before creation keeps the new bot selected"
 }, testInfo) => {
   await signup(page, `stale-create-${Date.now()}@rakazo.test`, "password12", "Stale Create");
   await completeOnboarding(page);
-  await expect(page.getByPlaceholder("Message Chief")).toBeVisible();
+  await expect(page.getByPlaceholder("Message Mico")).toBeVisible();
 
   let markReady!: () => void;
   let releaseList!: () => void;
@@ -203,8 +203,7 @@ test("later bot waits before showing the focus card; sending cancels it", async 
   const stamp = Date.now();
   await signup(page, `focus-delay-${stamp}@rakazo.test`, "password12", "Focus Delay");
   await completeOnboarding(page);
-  // First bot from onboarding shows the focus card immediately.
-  await expect(page.getByText("What do you want me on first?", { exact: true })).toBeVisible();
+  await expect(page.getByText("What do you want me on first?", { exact: true })).toHaveCount(0);
 
   await page.clock.install();
   await createBotFromPicker(page);

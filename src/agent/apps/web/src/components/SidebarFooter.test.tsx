@@ -162,7 +162,7 @@ it("opens integrations and keeps the existing account actions and links", async 
   expect([...menu.querySelectorAll("button, a")].map((row) => row.textContent)).toEqual([
     "Usage",
     "Board",
-    "Artifacts",
+    "Library",
     "Settings",
     "Mycellios on your phone",
     "Get Mycellios Desktop",

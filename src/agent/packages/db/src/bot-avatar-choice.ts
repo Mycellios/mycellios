@@ -2,7 +2,9 @@ import { randomInt } from "node:crypto";
 import {
   BOT_COLORS,
   MICO_AVATAR_PALETTES,
-  MICO_AVATAR_SHAPES,
+  MICO_AVATAR_DEFAULT_SHAPES,
+  MICO_PRIMARY_AVATAR,
+  micoAvatarDetails,
   micoAvatarShape,
   micoAvatarValue,
   parseBotAvatarValue,
@@ -45,28 +47,43 @@ function cuidShapedId(random: Random, now: number): string {
   return `c${now.toString(36).padStart(8, "0").slice(-8)}${suffix}`;
 }
 
-// Rotate the palette after each pass so every set of twelve uses every shape
-// and every color once, starting with the brand's original pairings.
-const micoCombinations = MICO_AVATAR_PALETTES.flatMap((_, offset) =>
-  MICO_AVATAR_SHAPES.map(({ index }, slot) =>
-    micoAvatarValue(index, MICO_AVATAR_PALETTES[(slot + offset) % MICO_AVATAR_PALETTES.length]!.color),
+// Give every animal its approved color first, then rotate through the palette.
+const micoCombinations = [
+  ...MICO_AVATAR_DEFAULT_SHAPES.map(({ index, originalColor }) => {
+    const key = micoAvatarValue(index, originalColor);
+    return { key, value: key };
+  }),
+  ...MICO_AVATAR_PALETTES.flatMap((_, offset) =>
+    MICO_AVATAR_DEFAULT_SHAPES.map(({ index }, slot) => {
+      const { color } = MICO_AVATAR_PALETTES[(slot + offset) % MICO_AVATAR_PALETTES.length]!;
+      return {
+        key: micoAvatarValue(index, color),
+        value: micoAvatarValue(index, color, { eyes: 0, finish: "flat", original: false }),
+      };
+    }),
   ),
-);
+];
 
 export function chooseMicoAvatar(existing: readonly { color: string }[]): { id: string; color: string } {
+  const id = cuidShapedId(cryptoRandom, Date.now());
+  if (existing.length === 0) return { id, color: MICO_PRIMARY_AVATAR };
+
   const counts = new Map<string, number>();
   for (const bot of existing) {
     const avatar = parseBotAvatarValue(bot.color);
-    if (avatar.kind !== "shape" || !micoAvatarShape(avatar.shapeIndex)) continue;
-    const value = micoAvatarValue(avatar.shapeIndex, avatar.color.toUpperCase());
-    counts.set(value, (counts.get(value) ?? 0) + 1);
+    if (avatar.kind !== "shape") continue;
+    const shape = micoAvatarShape(avatar.shapeIndex);
+    if (!shape) continue;
+    const color = micoAvatarDetails(bot.color).original ? shape.originalColor : avatar.color.toUpperCase();
+    const key = micoAvatarValue(shape.index, color);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
   }
-  let color = micoCombinations[0]!;
+  let choice = micoCombinations[0]!;
   for (const combination of micoCombinations) {
-    if ((counts.get(combination) ?? 0) < (counts.get(color) ?? 0)) color = combination;
-    if (!counts.has(color)) break;
+    if ((counts.get(combination.key) ?? 0) < (counts.get(choice.key) ?? 0)) choice = combination;
+    if (!counts.has(choice.key)) break;
   }
-  return { id: cuidShapedId(cryptoRandom, Date.now()), color };
+  return { id, color: choice.value };
 }
 
 /** An id on the look the user's bots use least, never a heart. */

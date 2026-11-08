@@ -2,6 +2,7 @@ import { copyFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 import { MICO_AVATAR_SHAPES } from "../../contracts/src/bot-avatar.ts";
+import { micoAvatarArt } from "../../core/src/mico-avatar-art.ts";
 import { MICO_EYE_PATHS, MICO_PLUSH_CROPS } from "../../ui-web/src/mico-avatar-sprites.ts";
 
 const root = new URL("../../../", import.meta.url);
@@ -52,8 +53,24 @@ function isolateMascot(pixels: Buffer) {
 await mkdir(path(`${target}/notification-micos`), { recursive: true });
 await copyFile(path("apps/mobile/assets/notification-icon.png"), path(`${target}/notification-badge.png`));
 
-await Promise.all(MICO_AVATAR_SHAPES.map(async ({ id }, index) => {
-  const [bounds, leftEye, rightEye] = MICO_PLUSH_CROPS[index]!;
+await Promise.all(MICO_AVATAR_SHAPES.map(async (shape, index) => {
+  const { id } = shape;
+  const destination = path(`${target}/notification-micos/${id}.png`);
+  const atlasCrop = MICO_PLUSH_CROPS[index];
+  if (!atlasCrop) {
+    const art = micoAvatarArt(shape.index, shape.originalColor);
+    if (!art) throw new Error(`Missing notification artwork for ${id}`);
+    const eyes = art.eyes.map(([x, y, w, h]) =>
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${w / 2}"/>`).join("");
+    const nose = art.nose ? `<path d="${art.nose}"/>` : "";
+    const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="-4 -4 72 72">
+      <path d="${art.path}" fill="${art.color}"/>
+      <g fill="${art.eyeColor}">${eyes}${nose}</g>
+    </svg>`);
+    await sharp(svg).png().toFile(destination);
+    return;
+  }
+  const [bounds, leftEye, rightEye] = atlasCrop;
   const [left, top, size] = bounds.split(" ").map(Number) as [number, number, number];
   const sheet = index < 5 ? "base" : "coleccion";
   const crop = await sharp(path(`packages/ui-web/src/assets/micos-terciopelo-${sheet}.png`))
@@ -67,5 +84,5 @@ await Promise.all(MICO_AVATAR_SHAPES.map(async ({ id }, index) => {
   const face = await sharp(crop).composite([{ input: eyes }]).png().toBuffer();
   const pixels = await sharp(face).resize(iconSize, iconSize).ensureAlpha().raw().toBuffer();
   await sharp(isolateMascot(pixels), { raw: { width: iconSize, height: iconSize, channels: 4 } })
-    .png().toFile(path(`${target}/notification-micos/${id}.png`));
+    .png().toFile(destination);
 }));

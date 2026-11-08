@@ -5,19 +5,26 @@ export const BOT_AVATAR_SHAPE_COUNT = 8;
 
 // Keep the legacy shape slots and their modulo behavior for stored avatars.
 export const MICO_AVATAR_SHAPES = [
-  { id: "mushroom", index: 1000 },
-  { id: "fox", index: 1001 },
-  { id: "hedgehog", index: 1002 },
-  { id: "frog", index: 1003 },
-  { id: "moth", index: 1004 },
-  { id: "snail", index: 1005 },
-  { id: "owl", index: 1006 },
-  { id: "turtle", index: 1007 },
-  { id: "axolotl", index: 1008 },
-  { id: "crab", index: 1009 },
-  { id: "fish", index: 1010 },
-  { id: "octopus", index: 1011 },
+  { id: "mushroom", index: 1000, originalColor: "#3F9F78" },
+  { id: "fox", index: 1001, originalColor: "#D47046" },
+  { id: "hedgehog", index: 1002, originalColor: "#BC8B32" },
+  { id: "frog", index: 1003, originalColor: "#829B36" },
+  { id: "moth", index: 1004, originalColor: "#5C84CC" },
+  { id: "snail", index: 1005, originalColor: "#C55480" },
+  { id: "owl", index: 1006, originalColor: "#CE5181" },
+  { id: "turtle", index: 1007, originalColor: "#3F9F78" },
+  { id: "axolotl", index: 1008, originalColor: "#B679BC" },
+  { id: "crab", index: 1009, originalColor: "#EB6A61" },
+  { id: "fish", index: 1010, originalColor: "#2E97AD" },
+  { id: "octopus", index: 1011, originalColor: "#8F6BC7" },
+  { id: "raven", index: 1012, originalColor: "#7D859A" },
+  { id: "hare", index: 1013, originalColor: "#D77C77" },
+  { id: "otter", index: 1014, originalColor: "#A67A51" },
 ] as const;
+
+export const MICO_AVATAR_DEFAULT_SHAPES = MICO_AVATAR_SHAPES.filter(
+  ({ id }) => id !== "mushroom" && id !== "owl" && id !== "crab",
+);
 
 export const MICO_AVATAR_PALETTES = [
   { id: "violet", color: "#8650DF", accent: "#FFD6AC" },
@@ -41,28 +48,52 @@ export const MICO_AVATAR_PALETTES = [
 
 export const MICO_AVATAR_EYE_COUNT = 16;
 const MICO_LOOK_START = 2000;
-const MICO_LOOK_STRIDE = MICO_AVATAR_EYE_COUNT * 2;
 const MICO_ORIGINAL_LOOK_START = 2400;
-const MICO_LOOK_SLOTS = MICO_AVATAR_SHAPES.length * MICO_LOOK_STRIDE;
+const MICO_LOOK_STRIDE = MICO_AVATAR_EYE_COUNT * 2;
+const MICO_LEGACY_LOOK_SHAPES = 12;
+const MICO_LEGACY_LOOK_SLOTS = MICO_LEGACY_LOOK_SHAPES * MICO_LOOK_STRIDE;
+const MICO_EXTRA_LOOK_START = 2800;
 
 type MicoAvatarDetails = { eyes: number; finish: "flat" | "plush"; original: boolean };
 
-function micoLookSlot(shapeIndex: number, start: number): number | undefined {
+function micoLookSlot(shapeIndex: number, start: number, length: number): number | undefined {
   const slot = shapeIndex - start;
-  return Number.isInteger(slot) && slot >= 0 && slot < MICO_LOOK_SLOTS ? slot : undefined;
+  return Number.isInteger(slot) && slot >= 0 && slot < length ? slot : undefined;
 }
 
-// Keep the existing wire format so old APIs can store the complete look.
+// The original two ranges stay frozen. Additional shapes only support the flat finish.
+function decodeMicoLook(shapeIndex: number): (MicoAvatarDetails & { ordinal: number }) | undefined {
+  const tinted = micoLookSlot(shapeIndex, MICO_LOOK_START, MICO_LEGACY_LOOK_SLOTS);
+  const legacy = tinted ?? micoLookSlot(shapeIndex, MICO_ORIGINAL_LOOK_START, MICO_LEGACY_LOOK_SLOTS);
+  if (legacy !== undefined) {
+    return {
+      ordinal: Math.floor(legacy / MICO_LOOK_STRIDE),
+      eyes: Math.floor((legacy % MICO_LOOK_STRIDE) / 2),
+      finish: legacy % 2 ? "plush" : "flat",
+      original: tinted === undefined,
+    };
+  }
+  const extra = micoLookSlot(
+    shapeIndex,
+    MICO_EXTRA_LOOK_START,
+    (MICO_AVATAR_SHAPES.length - MICO_LEGACY_LOOK_SHAPES) * MICO_LOOK_STRIDE,
+  );
+  if (extra === undefined) return undefined;
+  return {
+    ordinal: MICO_LEGACY_LOOK_SHAPES + Math.floor(extra / MICO_LOOK_STRIDE),
+    eyes: extra % MICO_AVATAR_EYE_COUNT,
+    finish: "flat",
+    original: extra % MICO_LOOK_STRIDE >= MICO_AVATAR_EYE_COUNT,
+  };
+}
+
+// Keep the existing wire format so older APIs can store the complete look.
 export function micoAvatarDetails(value: string): MicoAvatarDetails {
   const shapeIndex = Number(/::shape_(\d+)$/.exec(value)?.[1]);
-  const tinted = micoLookSlot(shapeIndex, MICO_LOOK_START);
-  const slot = tinted ?? micoLookSlot(shapeIndex, MICO_ORIGINAL_LOOK_START);
-  if (slot === undefined) return { eyes: 0, finish: "plush", original: true };
-  return {
-    eyes: Math.floor((slot % MICO_LOOK_STRIDE) / 2),
-    finish: slot % 2 ? "plush" : "flat",
-    original: tinted === undefined,
-  };
+  const look = decodeMicoLook(shapeIndex);
+  return look
+    ? { eyes: look.eyes, finish: look.finish, original: look.original }
+    : { eyes: 0, finish: "flat", original: true };
 }
 
 export function micoAvatarShape(shapeIndex: number | undefined) {
@@ -76,14 +107,22 @@ export function micoAvatarPalette(color: string) {
 
 export function micoAvatarValue(shapeIndex: number, color: string, details?: MicoAvatarDetails): string {
   const ordinal = MICO_AVATAR_SHAPES.findIndex((shape) => shape.index === shapeIndex);
-  if (details && ordinal >= 0 && (!details.original || details.eyes !== 0 || details.finish === "flat")) {
-    const start = details.original ? MICO_ORIGINAL_LOOK_START : MICO_LOOK_START;
-    const slot = start + ordinal * MICO_LOOK_STRIDE + details.eyes * 2
-      + Number(details.finish === "plush");
+  if (!details || ordinal < 0) return `${color}::shape_${shapeIndex}`;
+  const eyes = Number.isInteger(details.eyes) && details.eyes >= 0 && details.eyes < MICO_AVATAR_EYE_COUNT
+    ? details.eyes
+    : 0;
+  if (ordinal >= MICO_LEGACY_LOOK_SHAPES) {
+    const slot = MICO_EXTRA_LOOK_START + (ordinal - MICO_LEGACY_LOOK_SHAPES) * MICO_LOOK_STRIDE +
+      eyes + (details.original ? MICO_AVATAR_EYE_COUNT : 0);
     return `${color}::shape_${slot}`;
   }
-  return `${color}::shape_${shapeIndex}`;
+  const start = details.original ? MICO_ORIGINAL_LOOK_START : MICO_LOOK_START;
+  const slot = start + ordinal * MICO_LOOK_STRIDE + eyes * 2 + Number(details.finish === "plush");
+  return `${color}::shape_${slot}`;
 }
+
+const primaryMicoShape = MICO_AVATAR_SHAPES[0];
+export const MICO_PRIMARY_AVATAR = micoAvatarValue(primaryMicoShape.index, primaryMicoShape.originalColor);
 
 /** Selecting a new shape keeps the palette, or starts with that shape's brand pairing. */
 export function withMicoAvatarShape(value: string, shapeIndex: number): string {
@@ -91,14 +130,14 @@ export function withMicoAvatarShape(value: string, shapeIndex: number): string {
   const color = current.kind === "shape" && micoAvatarShape(current.shapeIndex)
     ? current.color
     : undefined;
-  const defaultPalette = MICO_AVATAR_PALETTES[shapeIndex - MICO_AVATAR_SHAPES[0].index];
-  return micoAvatarValue(shapeIndex, color ?? (defaultPalette ?? MICO_AVATAR_PALETTES[0]).color, micoAvatarDetails(value));
+  const originalColor = micoAvatarShape(shapeIndex)?.originalColor ?? MICO_AVATAR_DEFAULT_SHAPES[0]!.originalColor;
+  return micoAvatarValue(shapeIndex, color ?? originalColor, micoAvatarDetails(value));
 }
 
 export function withMicoAvatarPalette(value: string, color: string): string {
   const current = parseBotAvatarValue(value);
   const shape = current.kind === "shape" ? micoAvatarShape(current.shapeIndex) : undefined;
-  return micoAvatarValue((shape ?? MICO_AVATAR_SHAPES[0]).index, color, {
+  return micoAvatarValue((shape ?? MICO_AVATAR_DEFAULT_SHAPES[0]!).index, color, {
     ...micoAvatarDetails(value),
     original: false,
   });
@@ -129,8 +168,8 @@ export function parseBotAvatarValue(raw: string): ParsedBotAvatar {
     const color = parts[0] || "#F97316";
     const rawShape = parts[1] ?? "0";
     const parsedShape = /^\d+$/.test(rawShape) ? Number(rawShape) : 0;
-    const slot = micoLookSlot(parsedShape, MICO_LOOK_START) ?? micoLookSlot(parsedShape, MICO_ORIGINAL_LOOK_START);
-    const lookShape = slot === undefined ? undefined : MICO_AVATAR_SHAPES[Math.floor(slot / MICO_LOOK_STRIDE)];
+    const look = decodeMicoLook(parsedShape);
+    const lookShape = look && MICO_AVATAR_SHAPES[look.ordinal];
     const shapeIndex = micoAvatarShape(parsedShape)?.index ?? lookShape?.index ??
       (Number.isSafeInteger(parsedShape) ? parsedShape % BOT_AVATAR_SHAPE_COUNT : 0);
     return { kind: "shape", color, shapeIndex };

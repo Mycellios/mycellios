@@ -17,7 +17,7 @@ export function ChatToolsMenu(props: ChatToolsActions) {
     <DropdownMenuTrigger aria-label={t`Chat tools`} className="app-no-drag inline-flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring min-[1100px]:hidden"><PanelRightOpen size={17} /></DropdownMenuTrigger>
     <DropdownMenuContent align="end">
       <DropdownMenuItem onClick={props.onBrowser}><Monitor size={15} />{t`Open browser`}</DropdownMenuItem>
-      <DropdownMenuItem onClick={props.onFiles}><FolderOpen size={15} />{t`Open files`}</DropdownMenuItem>
+      <DropdownMenuItem onClick={props.onFiles}><FolderOpen size={15} />{t`Open library`}</DropdownMenuItem>
       <DropdownMenuItem onClick={props.onSettings}><Settings size={15} />{t`Agent settings`}</DropdownMenuItem>
       {props.onVoice ? <DropdownMenuItem onClick={props.onVoice}><AudioLines size={15} />{t`Open voice`}</DropdownMenuItem> : null}
     </DropdownMenuContent>
@@ -52,7 +52,7 @@ export function MobileChatActions({ children, label, onDismiss }: {
 export function MobileChatToolLinks({ onFiles, onSettings, onVoice, close }: Omit<ChatToolsActions, "onBrowser"> & { close: () => void }) {
   const { t } = useLingui();
   const links = [
-    { label: t`Open files`, icon: FolderOpen, action: onFiles },
+    { label: t`Open library`, icon: FolderOpen, action: onFiles },
     { label: t`Agent settings`, icon: Settings, action: onSettings },
     ...(onVoice ? [{ label: t`Open voice`, icon: AudioLines, action: onVoice }] : []),
   ];
@@ -73,7 +73,7 @@ export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClos
   const { t } = useLingui();
   const actions = [
     { label: t`Open browser`, icon: Monitor, onClick: onBrowser },
-    { label: t`Open files`, icon: FolderOpen, onClick: onFiles },
+    { label: t`Open library`, icon: FolderOpen, onClick: onFiles },
     { label: t`Agent settings`, icon: Settings, onClick: onSettings },
     ...(onVoice ? [{ label: t`Open voice`, icon: AudioLines, onClick: onVoice }] : []),
   ];

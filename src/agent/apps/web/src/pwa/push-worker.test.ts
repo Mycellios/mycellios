@@ -44,6 +44,14 @@ describe("Web Push navigation", () => {
     expect(parsePushPayload({ ...payload, avatar: id }, now)?.avatar).toBe(id);
     expect(existsSync(new URL(`../../public/mycellios/notification-micos/${id}.png`, import.meta.url))).toBe(true);
   });
+  it("uses extended bundled artwork on new workers and keeps private previews generic", () => {
+    const parsed = parsePushPayload({ ...payload, preview: true, avatarArt: "otter" }, now)!;
+    expect(pushNotification(parsed, scope, "en-US").options.icon)
+      .toBe(scope + "mycellios/notification-micos/otter.png");
+    expect(pushNotification({ ...parsed, preview: false }, scope, "en-US").options.icon)
+      .toBe(scope + "mycellios/notification-micos/mushroom.png");
+    expect(parsePushPayload({ ...payload, avatarArt: "https://external.test/track" }, now)).toBeNull();
+  });
   it("shows the Mico on opt-in previews using only bundled artwork", () => {
     const preview = { ...payload, title: "Jarvis", body: "Draft ready", kind: "completion", preview: true };
     const parsed = parsePushPayload({ ...preview, avatar: "fox" }, now)!;

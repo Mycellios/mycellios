@@ -103,6 +103,8 @@
   account login, real video generation or physical multi-device inference.
 - Workspace navigation uses the single rail and per-account/Space pins. Marketplace
   reuses the existing connection and skill services; preserve multi-account editors.
+  Library shows chat attachments and Mico outputs from the existing artifact index.
+  Preserve Space scoping, artifact deep links, version history and previews.
   Inbox entries refer to ordinary Mico task threads through taskBotId and the
   mico-task key namespace, never a parallel execution engine. Keep ?task= for
   owned task conversations and ?inbox= for the inbox selection. Archive and sends
@@ -217,7 +219,9 @@
   Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.
-  The push worker uses event-specific copy and bundled notification artwork. When
+  The push worker uses event-specific copy and bundled notification artwork. Put
+  later icons in avatarArt so installed workers with the original allowlist
+  still deliver the notice with the generic mushroom. When
   previews are off it displays a generic mascot and hides conversation identity.
   Regenerate the small PNGs with `node packages/ui-tokens/scripts/export-notification-art.ts`.
   Qualify delivery and the destination on an installed PWA on a physical phone.
@@ -577,6 +581,8 @@
   bootstrap and React resolution aligned, and preserve explicit dark or system choices.
 - The web fork uses the Mycellios forest/paper palette; this supersedes the
   upstream monochrome appearance rule below. Preserve semantic status colors.
+  Marketplace, Tasks, Schedule and Usage inherit the same semantic surfaces
+  as chat. Keep page-specific accents separate from the shared surfaces.
 - Keep horizontal scrolling inside wide code/table blocks, never on the whole
   transcript. Bound message wrappers and reserve the hover-action gutter, including
   credential requests; verify the complete chat with mouse, touch and focused inputs.
@@ -928,10 +934,22 @@
 
 - Mico avatar preferences persist together in the existing `bots.color` shape
   encoding. Keep the reserved appearance slots stable and preserve legacy
-  shapes and uploaded images. The web avatar defaults to velvet with the
-  original artwork colors. Store explicit tints separately from original
-  colors. Animate only the eyes and honor reduced motion. Verify bot-avatar
-  and create-bot-dialog tests.
+  shapes and uploaded images. The default collection uses solid animal
+  silhouettes and capsule eyes based on the loader. Choose light or dark eyes
+  by contrast against the silhouette's fill. Keep explicit web velvet
+  choices and the original-color option. Animate the eyes in web previews and
+  honor reduced motion. Verify bot-avatar and create-bot-dialog tests.
+  New Mico opens with the green brand mushroom, which also starts the automatic
+  avatar assignment in an empty space. Later Micos use the animal rotation.
+
+- Mico creation lets users enter the purpose and optionally choose a connected
+  model. Validate and persist the model before the intro can be queued. Keep
+  appearance options available in the compact creation form and Avatar Studio.
+  After account/model setup, an empty space shows the first-Mico form in
+  Conversations. Create only on submit with the Space-scoped first-Mico key
+  and queue a brief greeting on the configured model or admitted engine.
+  Suggestions fill the editable name, purpose and avatar in both creation
+  layouts, preserving the selected model and waiting for explicit submission.
 
 - Keep the Mico settings overview compact. Open instructions, memory, computer,
   permissions and advanced controls in separate views within the same panel.

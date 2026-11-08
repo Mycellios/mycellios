@@ -75,3 +75,22 @@ test("photo avatar animations stay still when reduced motion is enabled", async 
   expect(first[1]?.animationName).toBe("none");
   expect(second).toEqual(first);
 });
+
+test("the flat animal looks around and blinks without moving its silhouette", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/e2e/fixtures/avatar-motion.html");
+  const avatar = page.locator(".avatar-animal");
+  const body = avatar.locator(".rakazo-mico-body");
+  const gaze = avatar.locator(".rakazo-mico-gaze");
+  const eye = avatar.locator(".rakazo-mico-eye").first();
+  await expect(avatar).toHaveAttribute("data-mico-avatar", "flat");
+  await expect(avatar).toHaveCSS("filter", "none");
+  await expect(body).toHaveCSS("filter", /^drop-shadow\(/);
+  await expect(body).toHaveCSS("animation-name", "none");
+  await expect(gaze).toHaveCSS("filter", "none");
+  await expect(gaze).toHaveCSS("animation-name", "rakazo-mico-look");
+  await expect(eye).toHaveCSS("animation-name", "rakazo-mico-blink");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(gaze).toHaveCSS("animation-name", "none");
+  await expect(eye).toHaveCSS("animation-name", "none");
+});

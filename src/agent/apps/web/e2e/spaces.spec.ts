@@ -10,7 +10,7 @@ test("the only space is named in the sidebar and chat creation requires approval
 
   const sidebar = page.locator("aside").first();
   await expect(sidebar.getByText("Personal", { exact: true })).toBeVisible();
-  await expect(sidebar.getByRole("button", { name: /^Chief/ })).toHaveCount(1);
+  await expect(sidebar.getByRole("button", { name: /^Mico/ })).toHaveCount(1);
   await sidebar.getByRole("button", { name: "Actions for Personal" }).click();
   await expect(page.getByRole("menuitem", { name: "Delete space" })).toHaveCount(0);
   await page.getByRole("menuitem", { name: "Settings" }).click();
@@ -33,7 +33,7 @@ test("the only space is named in the sidebar and chat creation requires approval
   await captureScreenshot(page, testInfo, "new-space-dialog");
   await dialog.getByRole("button", { name: "Cancel" }).click();
 
-  const composer = page.getByRole("combobox", { name: "Message Chief" });
+  const composer = page.getByRole("combobox", { name: "Message Mico" });
   await composer.fill("Create a space named Customer support");
   await composer.press("Enter");
   await expect(page.getByRole("button", { name: "Create space", exact: true })).toBeVisible({
@@ -66,7 +66,7 @@ test("the only space is named in the sidebar and chat creation requires approval
 
   await expect(sidebar.getByText("Personal", { exact: true })).toBeVisible();
   await expect(sidebar.getByText("Customer support", { exact: true })).toBeVisible();
-  await expect(sidebar.getByRole("button", { name: /^Chief/ })).toHaveCount(2);
+  await expect(sidebar.getByRole("button", { name: /^Mico/ })).toHaveCount(2);
   await captureScreenshot(page, testInfo, "spaces-sidebar");
 
   const personalSpace = sidebar
@@ -75,7 +75,7 @@ test("the only space is named in the sidebar and chat creation requires approval
   const personalSpaceGroup = await personalSpace.getAttribute("data-sidebar-group");
   const personalSpaceId = personalSpaceGroup?.split(":")[1];
   expect(personalSpaceId).toBeTruthy();
-  await personalSpace.getByRole("button", { name: /^Chief/ }).click();
+  await personalSpace.getByRole("button", { name: /^Mico/ }).click();
   await page.waitForURL(/\/app\/[^/]+$/);
   await expect
     .poll(() => page.evaluate(() => window.localStorage.getItem("rakazo:space-id")))
@@ -83,7 +83,7 @@ test("the only space is named in the sidebar and chat creation requires approval
   await expect(sidebar.getByText("Customer support", { exact: true })).toBeVisible();
 });
 
-test("a new space auto-completes onboarding, is renamed in its settings, and is deleted with its bots", async ({
+test("a new space offers first Mico creation, is renamed in its settings, and is deleted with its bots", async ({
   page,
 }, testInfo) => {
   const stamp = Date.now();
@@ -96,15 +96,15 @@ test("a new space auto-completes onboarding, is renamed in its settings, and is 
   await dialog.getByLabel("Name").fill("Typo space");
   await dialog.getByRole("button", { name: "Create space", exact: true }).click();
 
-  // Model is already connected, so onboarding skips the form and lands in Chief.
+  // Model is already connected; create the first Mico in the new space.
   await completeOnboarding(page);
   await expect(page).toHaveURL(/\/app\//);
   await expect(sidebar.getByText("Typo space", { exact: true })).toBeVisible();
   const occupied = sidebar
     .locator('[data-sidebar-group^="space:"]')
     .filter({ hasText: "Typo space" });
-  await expect(occupied.getByRole("button", { name: /^Chief/ })).toBeVisible();
-  await expect(sidebar.getByRole("button", { name: /^Chief/ })).toHaveCount(2);
+  await expect(occupied.getByRole("button", { name: /^Mico/ })).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: /^Mico/ })).toHaveCount(2);
   await captureScreenshot(page, testInfo, "new-space-after-onboarding");
 
   // The space menu's Settings opens the Space section, where it is renamed in place.
@@ -134,7 +134,7 @@ test("a new space auto-completes onboarding, is renamed in its settings, and is 
   await deleteSpaceDialog.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(sidebar.getByText("Temporary", { exact: true })).toHaveCount(0);
   await expect(page).not.toHaveURL(/\/onboarding/);
-  await expect(sidebar.getByRole("button", { name: /^Chief/ })).toHaveCount(1);
+  await expect(sidebar.getByRole("button", { name: /^Mico/ })).toHaveCount(1);
   await page.reload();
   await expect(sidebar.getByText("Temporary", { exact: true })).toHaveCount(0);
 
@@ -142,7 +142,7 @@ test("a new space auto-completes onboarding, is renamed in its settings, and is 
   await page.goto("/onboarding");
   await page.waitForURL(/\/app/);
   await expect(page).not.toHaveURL(/\/onboarding/);
-  await expect(sidebar.getByRole("button", { name: /^Chief/ })).toHaveCount(1);
+  await expect(sidebar.getByRole("button", { name: /^Mico/ })).toHaveCount(1);
 });
 
 test("deleting the last bot in a space stays in the app after first use", async ({ page }) => {
@@ -169,10 +169,10 @@ test("deleting the last bot in a space stays in the app after first use", async 
   const sideBot = sidebar
     .locator('[data-sidebar-group^="space:"]')
     .filter({ hasText: "Side" })
-    .getByRole("button", { name: /^Chief/ });
+    .getByRole("button", { name: /^Mico/ });
   await sideBot.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete" }).click();
-  const deleteDialog = page.getByRole("alertdialog", { name: /Delete Chief/ });
+  const deleteDialog = page.getByRole("alertdialog", { name: /Delete Mico/ });
   await expect(deleteDialog).toBeVisible();
   await deleteDialog.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(sideBot).toHaveCount(0);
@@ -181,7 +181,7 @@ test("deleting the last bot in a space stays in the app after first use", async 
   await expect(page).not.toHaveURL(/\/onboarding/);
   await expect(sidebar.getByRole("button", { name: "Open Side" })).toBeVisible();
   await expect(
-    page.locator("main").getByRole("button", { name: "New bot", exact: true }),
+    page.getByTestId("first-mico-setup"),
   ).toBeVisible();
 
   await sidebar.getByRole("button", { name: "Actions for Side" }).click();
@@ -192,7 +192,7 @@ test("deleting the last bot in a space stays in the app after first use", async 
     .click();
   await expect(sidebar.getByText("Side", { exact: true })).toHaveCount(0);
   await sidebar.getByRole("button", { name: /^Archived/ }).click();
-  await expect(sidebar.getByText("Chief", { exact: true })).toBeVisible();
+  await expect(sidebar.getByText("Mico", { exact: true })).toBeVisible();
 });
 
 test("a space's menu opens its settings in place, and settings can switch space", async ({

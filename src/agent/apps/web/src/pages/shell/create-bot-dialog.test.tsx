@@ -5,6 +5,7 @@ import { act } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { productBrand } from "@rakazo/contracts";
 import type { CreateBotDialogInput } from "./create-bot-dialog";
 
 vi.mock("@lingui/react/macro", () => {
@@ -68,6 +69,18 @@ async function click(element: HTMLElement) {
 }
 
 describe("CreateBotDialog", () => {
+  it("shows the inline first-Mico form and creates only after confirmation", async () => {
+    const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
+    await act(async () => root.render(<CreateBotDialog inline onCreate={onCreate} />));
+    const setup = document.querySelector('[data-testid="first-mico-setup"]');
+    expect(setup?.querySelector("input")?.value).toBe(productBrand.companionName);
+    expect(setup?.querySelector('[data-mascot="mushroom"]')).not.toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(onCreate).not.toHaveBeenCalled();
+    await click(button("Create Mico"));
+    expect(onCreate).toHaveBeenCalledExactlyOnceWith({ name: productBrand.companionName });
+  });
+
   it("creates only once the name is not blank", async () => {
     const onCreate = vi.fn(async () => undefined);
     await render(onCreate);
@@ -81,9 +94,36 @@ describe("CreateBotDialog", () => {
   it("lets the server assign an unused avatar by default", async () => {
     const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
     await render(onCreate);
+    expect(document.querySelector('[data-mascot="mushroom"]')).not.toBeNull();
     await typeName("Scout");
     await click(button("Create"));
     expect(onCreate).toHaveBeenCalledWith({ name: "Scout" });
+  });
+
+  it("uses the mushroom when choosing a color before a shape", async () => {
+    const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
+    await render(onCreate);
+    await click(button("Turquoise"));
+    await typeName("Scout");
+    await click(button("Create"));
+    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_2000" });
+  });
+
+  it("saves the purpose as instructions when creating the Mico", async () => {
+    const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
+    await render(onCreate);
+    await typeName("Scout");
+    const purpose = document.querySelector("textarea")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(purpose, "  Plan trips  ");
+      purpose.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("Create"));
+    expect(onCreate).toHaveBeenCalledWith({
+      name: "Scout",
+      description: "Plan trips",
+      instructions: "Plan trips",
+    });
   });
 
   it("sends a custom shape and palette together", async () => {
@@ -93,7 +133,30 @@ describe("CreateBotDialog", () => {
     await click(button("Turquoise"));
     await typeName("Scout");
     await click(button("Create"));
-    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_2033" });
+    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_2032" });
+  });
+
+  it.each([true, false])("uses a suggestion as an editable draft (inline: %s)", async (inline) => {
+    const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
+    await act(async () => root.render(<CreateBotDialog inline={inline} onCreate={onCreate} />));
+
+    const suggestion = button("Trip planner");
+    await click(suggestion);
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(suggestion.getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector<HTMLInputElement>('input[placeholder="Name your Bot"]')?.value).toBe("Trip planner");
+
+    await typeName("Train planner");
+    expect(suggestion.getAttribute("aria-pressed")).toBe("false");
+    await click(button(inline ? "Create Mico" : "Create"));
+
+    const purpose = "Compare routes, accommodation and budgets, and build practical itineraries for my trips.";
+    expect(onCreate).toHaveBeenCalledExactlyOnceWith({
+      name: "Train planner",
+      color: "#5C84CC::shape_1004",
+      description: purpose,
+      instructions: purpose,
+    });
   });
 
   it("shows the error and stays open when creating fails", async () => {
@@ -138,14 +201,21 @@ describe("Mico avatar settings", () => {
     await click(button("Customize bot avatar"));
     expect(button("Mushroom").getAttribute("aria-pressed")).toBe("true");
     expect(button("Original colors").getAttribute("aria-pressed")).toBe("true");
-    expect(button("Velvety").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Flat").getAttribute("aria-pressed")).toBe("true");
 
     await click(button("Mint"));
-    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2001");
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2000");
     await renderStudio(onChange.mock.lastCall![0]);
     await click(button("Octopus"));
-    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2353");
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2352");
     expect(button("Upload").getAttribute("role")).toBe("tab");
+    await renderStudio(onChange.mock.lastCall![0]);
+    await click(button("Hare"));
+    await renderStudio(onChange.mock.lastCall![0]);
+    expect(button("Hare").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Mint").getAttribute("aria-pressed")).toBe("true");
+    expect((button("Velvety") as HTMLButtonElement).disabled).toBe(true);
+    await click(button("Octopus"));
 
     await renderStudio(onChange.mock.lastCall![0]);
     await click(button("Star"));

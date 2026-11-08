@@ -157,6 +157,14 @@
   animation: none;
 }
 
+[data-mico-avatar="flat"] {
+  overflow: visible;
+}
+
+.rakazo-mico-body {
+  filter: drop-shadow(0 1.5px 1.5px rgb(0 0 0 / 0.28));
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .rakazo-mico-gaze {
     transform-box: view-box;
@@ -166,6 +174,14 @@
   .rakazo-mico-eye {
     transform-box: fill-box;
     transform-origin: center;
+  }
+
+  [data-mico-avatar="flat"]:where([data-mico-idle]) .rakazo-mico-eye {
+    animation: rakazo-mico-blink 7s ease-in-out var(--mico-blink-delay) infinite;
+  }
+
+  [data-mico-avatar="flat"][data-working="true"] .rakazo-mico-gaze {
+    animation: rakazo-mico-look 3.2s ease-in-out infinite;
   }
 
   [data-mico-avatar][data-working="true"] .rakazo-mico-eye {
@@ -188,6 +204,12 @@
     :is([data-mico-avatar-hover], [data-mico-avatar]):hover .rakazo-mico-eye {
       animation: rakazo-mico-greet 420ms ease-in-out;
     }
+  }
+
+  @keyframes rakazo-mico-look {
+    0%, 100% { transform: translateX(0); }
+    26%, 44% { transform: translate(2%, -1%); }
+    65%, 78% { transform: translate(-1.5%, 0); }
   }
 
   @keyframes rakazo-mico-greet {

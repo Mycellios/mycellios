@@ -1,8 +1,10 @@
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
+  MICO_AVATAR_DEFAULT_SHAPES,
   MICO_AVATAR_PALETTES,
   MICO_AVATAR_SHAPES,
+  MICO_PRIMARY_AVATAR,
   micoAvatarDetails,
   micoAvatarShape,
   micoAvatarValue,
@@ -28,30 +30,33 @@ import {
   TabsTrigger,
 } from "@rakazo/ui-web";
 import { Button } from "@rakazo/ui-web/components/ui/button";
-import { Check, Pencil, Upload, X } from "lucide-react";
+import { Check, ChevronDown, Pencil, Upload, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent } from "react";
 import { useRef, useState } from "react";
 
 export function BotLookPicker({
   value,
   identity,
+  compact = false,
   onAutomatic,
   onChange,
 }: {
   value: string;
   identity?: string;
+  compact?: boolean;
   onAutomatic?: () => void;
   onChange: (value: string) => void;
 }) {
   const { t } = useLingui();
   const parsed = parseBotAvatar(value);
-  const details = micoAvatarDetails(value);
-  const displayedValue = currentMicoAvatarValue(value, identity);
+  const pickerValue = compact ? value || MICO_PRIMARY_AVATAR : value;
+  const displayedValue = currentMicoAvatarValue(pickerValue, identity);
+  const details = micoAvatarDetails(identity ? displayedValue : value);
   const displayed = parseBotAvatar(displayedValue);
   const activeShape = micoAvatarShape(identity ? displayed.shapeIndex : parsed.shapeIndex);
   const choiceValue = identity ? displayedValue : value;
   function updateDetails(next: typeof details) {
-    onChange(micoAvatarValue(displayed.shapeIndex ?? MICO_AVATAR_SHAPES[0].index, displayed.color, next));
+    onChange(micoAvatarValue(displayed.shapeIndex ?? MICO_AVATAR_DEFAULT_SHAPES[0]!.index, displayed.color, next));
   }
   const shapeLabels = {
     mushroom: t({ id: "Mushroom", message: "Mushroom" }),
@@ -66,6 +71,9 @@ export function BotLookPicker({
     crab: t({ id: "Crab", message: "Crab" }),
     fish: t({ id: "Fish", message: "Fish" }),
     octopus: t({ id: "Octopus", message: "Octopus" }),
+    raven: t({ id: "Raven", message: "Raven" }),
+    hare: t({ id: "Hare", message: "Hare" }),
+    otter: t({ id: "Otter", message: "Otter" }),
   };
   const paletteLabels = {
     violet: t({ id: "Violet", message: "Violet" }),
@@ -93,10 +101,9 @@ export function BotLookPicker({
     t`Sad`, t`Angry`, t`Confused`, t`Star`,
   ];
 
-  return (
-    <div className="space-y-4">
-      <div>
-        <div className="mb-2 flex min-h-8 items-center justify-between">
+  const shapes = (
+      <div role="group" aria-label={t`Shape`}>
+        <div className={compact ? "flex items-center justify-between" : "mb-2 flex min-h-8 items-center justify-between"}>
           <span className="text-xs font-medium text-muted-foreground">
             <Trans>Shape</Trans>
           </span>
@@ -113,15 +120,18 @@ export function BotLookPicker({
             </Button>
           ) : null}
         </div>
-        <div className="grid grid-cols-6 place-items-center gap-y-2 max-[359px]:grid-cols-4">
-          {MICO_AVATAR_SHAPES.map(({ id, index }) => {
+        <div className={compact
+          ? "mx-auto flex max-w-72 flex-wrap justify-center gap-y-1 sm:max-w-none"
+          : "grid grid-cols-6 place-items-center gap-y-2 max-[359px]:grid-cols-4"}>
+          {MICO_AVATAR_SHAPES.map(({ id, index, originalColor }) => {
             const next = withMicoAvatarShape(choiceValue, index);
             return (
               <BotShapePreview
                 key={id}
                 shapeIndex={index}
                 label={shapeLabels[id]}
-                color={parseBotAvatar(next).color}
+                compact={compact}
+                color={micoAvatarDetails(next).original ? originalColor : parseBotAvatar(next).color}
                 selected={activeShape?.index === index}
                 onClick={() => onChange(next)}
               />
@@ -129,8 +139,10 @@ export function BotLookPicker({
           })}
         </div>
       </div>
+  );
 
-      <div className="border-t border-border pt-2">
+  const palettes = (
+      <div role="group" aria-label={t`Color`} className={compact ? undefined : "border-t border-border pt-2"}>
         <div className="mb-1 flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground"><Trans>Color</Trans></span>
           <Button
@@ -143,21 +155,23 @@ export function BotLookPicker({
             <Trans>Original colors</Trans>
           </Button>
         </div>
-        <div className="grid grid-cols-6 place-items-center gap-y-1 max-[359px]:grid-cols-4">
+        <div className={compact
+          ? "mx-auto flex max-w-72 flex-wrap justify-center"
+          : "grid grid-cols-6 place-items-center gap-y-1 max-[359px]:grid-cols-4"}>
           {MICO_AVATAR_PALETTES.map(({ id, color }) => {
             const selected = !details.original && Boolean(activeShape) && displayed.color.toUpperCase() === color;
             return (
               <button
                 key={id}
                 type="button"
-                onClick={() => onChange(withMicoAvatarPalette(choiceValue, color))}
+                onClick={() => onChange(withMicoAvatarPalette(choiceValue || pickerValue, color))}
                 aria-label={paletteLabels[id]}
                 title={paletteLabels[id]}
                 aria-pressed={selected}
-                className="grid size-10 cursor-pointer place-items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={`grid ${compact ? "size-8" : "size-10"} cursor-pointer place-items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
               >
                 <span
-                  className={`size-6 rounded-full border ${
+                  className={`${compact ? "size-5" : "size-6"} rounded-full border ${
                     selected
                       ? "border-transparent ring-2 ring-foreground ring-offset-2 ring-offset-popover"
                       : "border-border"
@@ -169,7 +183,10 @@ export function BotLookPicker({
           })}
         </div>
       </div>
+  );
 
+  const detailsFields = (
+    <>
       <fieldset className="min-w-0 border-t border-border pt-2">
         <legend className="pr-2 text-xs font-medium text-muted-foreground"><Trans>Eyes</Trans></legend>
         <div className="grid grid-cols-8 place-items-center gap-y-1 max-[359px]:grid-cols-4">
@@ -196,6 +213,7 @@ export function BotLookPicker({
             <Button
               key={finish}
               type="button"
+              disabled={finish === "plush" && activeShape !== undefined && activeShape.index >= 1012}
               size="sm"
               variant={details.finish === finish && !parsed.isImage ? "secondary" : "ghost"}
               aria-pressed={details.finish === finish && !parsed.isImage}
@@ -206,6 +224,21 @@ export function BotLookPicker({
           ))}
         </div>
       </fieldset>
+    </>
+  );
+
+  return (
+    <div className={compact ? "space-y-1" : "space-y-4"}>
+      {compact ? <>{palettes}{shapes}</> : <>{shapes}{palettes}</>}
+      {compact ? (
+        <details className="group">
+          <summary className="flex min-h-8 w-fit cursor-pointer list-none items-center gap-1.5 rounded-md px-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            <ChevronDown size={14} className="-rotate-90 group-open:rotate-0" aria-hidden />
+            <Trans id="create-mico.avatar-options">More avatar options</Trans>
+          </summary>
+          <div className="space-y-3 pb-1">{detailsFields}</div>
+        </details>
+      ) : detailsFields}
     </div>
   );
 }
@@ -405,7 +438,7 @@ export function AvatarStudioPopover({
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="border-border sm:justify-end">
+          <DialogFooter className="-mx-5 -mb-5 border-border px-5 sm:justify-end">
             <Button variant="secondary" size="sm" type="button" onClick={() => setOpen(false)}>
               <Check size={14} />
               <Trans>Done</Trans>

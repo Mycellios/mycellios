@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import webpush from "web-push";
 import { WebPushService } from "./web-push.js";
 import type { VapidConfig } from "./web-push.js";
-import type { WebPushSubscription } from "@rakazo/contracts";
+import { micoAvatarValue, type WebPushSubscription } from "@rakazo/contracts";
 import type { AdapterContext, JobPublisher, NotificationMessage } from "@rakazo/adapter-kit";
 
 // This suite can only touch the task's disposable, loopback database.
@@ -241,7 +241,20 @@ suite("Web Push on isolated PostgreSQL", () => {
     await service.deliver(row!.id);
     expect(sender).not.toHaveBeenCalled();
   });
+  it("keeps new avatar artwork out of the field used by older installed workers", async () => {
+    await db.pool.query("UPDATE bots SET color=$1 WHERE id='bot'", [micoAvatarValue(1012, "#7D859A")]);
+    await service.saveSettings("alice", { level: "all", previews: true, mutedUntil: null, bots: {} });
+    await register();
+    await service.enqueue(message, context);
+    await due();
+    const [row] = await pending();
+    await service.deliver(row!.id);
+    const payload = JSON.parse(sender.mock.calls[0]![1] as string);
+    expect(payload.avatarArt).toBe("raven");
+    expect(payload).not.toHaveProperty("avatar");
+  });
   it("turning previews off while queued removes previously enabled content", async () => {
+    await db.pool.query("UPDATE bots SET color=$1 WHERE id='bot'", [micoAvatarValue(1012, "#7D859A")]);
     await service.saveSettings("alice", {
       level: "all",
       previews: true,
@@ -259,10 +272,12 @@ suite("Web Push on isolated PostgreSQL", () => {
       bots: {},
     });
     await service.deliver(row!.id);
-    expect(JSON.parse(sender.mock.calls[0]![1] as string)).toMatchObject({
+    const payload = JSON.parse(sender.mock.calls[0]![1] as string);
+    expect(payload).toMatchObject({
       title: "Mycellios",
       body: "Your Mico needs your answer.",
     });
+    expect(payload).not.toHaveProperty("avatarArt");
   });
   it("executor cleanup does not invalidate an unanswered question", async () => {
     await register(); await service.enqueue(message, context); await due(); const [row] = await pending();
