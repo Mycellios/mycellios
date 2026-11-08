@@ -51,6 +51,7 @@ import {
   UsageSettingsPanel,
 } from "./AccountSettingsOverlay";
 import { BillingSettingsPanel } from "./BillingSettingsPanel";
+import { desktopBridge } from "../lib/desktop";
 import { MemorySettingsOverlay } from "./MemorySettingsOverlay";
 import { McpServersOverlay } from "./McpServersOverlay";
 import { ModelSettingsOverlay } from "./ModelSettingsOverlay";
@@ -469,7 +470,7 @@ export function SettingsOverlay({
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div
               data-testid="settings-header"
-              className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 pb-5 pt-6 sm:px-8 sm:pt-7"
+              className={`flex shrink-0 items-start justify-between gap-4 border-b border-border px-6 pb-5 pt-6 sm:px-8 sm:pt-7 ${desktopBridge()?.platform === "win32" ? "app-windows-caption-safe" : ""}`}
             >
               <div className="flex min-w-0 flex-col gap-2">
                 <DialogTitle className="text-heading2 font-medium text-foreground">
