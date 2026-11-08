@@ -3,6 +3,7 @@
 const NOTIFICATION_AVATARS = new Set([
   "axolotl", "crab", "fish", "fox", "frog", "hedgehog",
   "moth", "mushroom", "octopus", "owl", "snail", "turtle",
+  "raven", "hare", "otter",
 ]);
 
 const NOTICE_COPY = {
@@ -30,6 +31,7 @@ type PushPayload = {
   kind?: keyof typeof NOTICE_COPY.en;
   preview?: boolean;
   avatar?: string;
+  avatarArt?: string;
   botId: string;
   threadId: string;
   spaceId: string;
@@ -56,7 +58,7 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
     p.body.length > 200 ||
     (p.kind !== undefined && (typeof p.kind !== "string" || !Object.hasOwn(NOTICE_COPY.en, p.kind))) ||
     (p.preview !== undefined && typeof p.preview !== "boolean") ||
-    (p.avatar !== undefined && !NOTIFICATION_AVATARS.has(p.avatar)) ||
+    [p.avatar, p.avatarArt].some((art) => art !== undefined && !NOTIFICATION_AVATARS.has(art)) ||
     p.tag !== `mycellios:${p.threadId}` ||
     !Number.isFinite(p.expiresAt) ||
     p.expiresAt <= now ||
@@ -69,7 +71,8 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
 export function pushNotification(p: PushPayload, scopeUrl: string, language: string) {
   const spanish = /^es(?:-|$)/i.test(language);
   const copy = p.kind ? NOTICE_COPY[spanish ? "es" : "en"][p.kind] : undefined;
-  const avatar = p.preview && p.avatar && NOTIFICATION_AVATARS.has(p.avatar) ? p.avatar : undefined;
+  const art = p.avatarArt ?? p.avatar;
+  const avatar = p.preview && art && NOTIFICATION_AVATARS.has(art) ? art : undefined;
   return {
     title: copy && !p.preview ? copy[0] : p.title,
     options: {

@@ -271,7 +271,12 @@ export class WebPushService {
       const eventKey = event.id;
       const name = run.thread.group?.name ?? run.bot.name;
       const appearance = parseBotAvatarValue(currentMicoAvatarValue(run.bot.color, message.botId));
-      const avatar = appearance.kind === "shape" ? micoAvatarShape(appearance.shapeIndex)?.id : undefined;
+      const art = settings.previews && !message.groupId && appearance.kind === "shape"
+        ? micoAvatarShape(appearance.shapeIndex)
+        : undefined;
+      // Original installed workers validate avatar against their fixed 12-icon list.
+      // They ignore avatarArt and render the mushroom fallback for later shapes.
+      const legacyArt = art && art.index < 1012;
       const devices = await this.db.$queryRaw<
         Device[]
       >`SELECT * FROM web_push_devices WHERE "userId" = ${context.userId}`;
@@ -284,7 +289,8 @@ export class WebPushService {
           ...privateNotification({ ...message, title: name }, settings.previews),
           kind: message.kind,
           preview: settings.previews,
-          avatar: settings.previews && !message.groupId ? avatar : undefined,
+          avatar: legacyArt ? art.id : undefined,
+          avatarArt: art && !legacyArt ? art.id : undefined,
           botId: message.botId,
           threadId: message.threadId,
           spaceId: context.spaceId,
@@ -399,6 +405,7 @@ export class WebPushService {
           kind: row.kind,
           preview: currentSettings.previews && saved.preview !== false,
           avatar: currentSettings.previews && saved.preview === true ? saved.avatar : undefined,
+          avatarArt: currentSettings.previews && saved.preview === true ? saved.avatarArt : undefined,
         });
         // Standard encrypted Web Push. Provider errors are never logged with endpoint/payload.
         await this.sender(subscription, payload, this.config!);

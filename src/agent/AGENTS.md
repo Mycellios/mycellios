@@ -219,7 +219,9 @@
   Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.
-  The push worker uses event-specific copy and bundled notification artwork. When
+  The push worker uses event-specific copy and bundled notification artwork. Put
+  later icons in avatarArt so installed workers with the original allowlist
+  still deliver the notice with the generic mushroom. When
   previews are off it displays a generic mascot and hides conversation identity.
   Regenerate the small PNGs with `node packages/ui-tokens/scripts/export-notification-art.ts`.
   Qualify delivery and the destination on an installed PWA on a physical phone.
