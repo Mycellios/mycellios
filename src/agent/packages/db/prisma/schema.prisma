@@ -1455,6 +1455,7 @@ model UsageRecord {
   createdAt          DateTime @default(now())
 
   @@index([spaceId, userId, createdAt])
+  @@index([userId])
   @@map("usage_records")
 }
 

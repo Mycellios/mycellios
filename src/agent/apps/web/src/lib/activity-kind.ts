@@ -2,6 +2,9 @@
 export function activityKind(value: string) {
   const text = value.toLowerCase();
   if (/\b(search[_ ]history|search[_ ]memory|history[_ ]search)\b/.test(text)) return "history";
+  if (/\b(task[_ ]catalog|scratchpad|work[_ ]status)\b/.test(text)) return "planning";
+  if (/(?:^|[_\s-])calendar(?:$|[_\s-])/.test(text)) return "calendar";
+  if (/(?:^|[_\s-])(?:mail|email|inbox)(?:$|[_\s-])/.test(text)) return "mail";
   if (/\b(vitest|pytest|jest|run tests|npm (?:run )?test|node --test|dotnet test)\b/.test(text)) return "tests";
   if (/\b(git (?:status|diff|log)|review changes)\b/.test(text)) return "changes";
   if (/\b(apply[_ -]?patch|write[_ -]?file|edit[_ -]?file|set-content|editing)\b/.test(text)) return "editing";

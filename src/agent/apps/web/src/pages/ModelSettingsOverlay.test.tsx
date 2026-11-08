@@ -32,10 +32,13 @@ const models = vi.hoisted(() => ({
   finishOAuth: vi.fn(),
   submitOAuthCode: vi.fn(),
 }));
+const engines = vi.hoisted(() => ({ list: vi.fn(async () => [{ id: "pi", name: "Pi", available: true }]),
+  registry: vi.fn(async () => [{ id: "opencode", name: "OpenCode", version: "1.0.0" }]) }));
 
 vi.mock("../lib/rpc", () => {
   const rpc = {
     models,
+    engines,
     bots: { list: vi.fn(async () => []), update: vi.fn() },
     me: vi.fn(),
   };
@@ -593,12 +596,42 @@ it("connects a provider from the empty main slot without choosing its model", as
   }
 });
 
-it("shows providers without loading or editing account model roles", async () => {
+it("shows a compact account default above the providers without changing it on load", async () => {
   const view = await renderSettings(true, testQueryClient(), "account", true);
   try {
     expect(view.container.querySelector('[data-testid="model-providers"]')).not.toBeNull();
+    expect(view.container.querySelector('[data-testid="default-provider"]')).not.toBeNull();
     expect(view.container.querySelector('[data-testid="model-role-main"]')).toBeNull();
-    expect(models.role).not.toHaveBeenCalled();
+    expect(models.role).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "main", scope: "account" }), expect.anything(),
+    );
+    expect(models.setRole).not.toHaveBeenCalled();
+    expect(view.container.textContent).toContain("DeepSeek");
+    expect(view.container.textContent).toContain("Pi");
+    expect(engines.registry).not.toHaveBeenCalled();
+    const registryForm = view.container.querySelector('[data-testid="provider-discovery"] form')!;
+    await act(async () => {
+      registryForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await vi.waitFor(() => expect(registryForm.parentElement?.textContent).toContain("1.0.0"));
+    expect(engines.registry).toHaveBeenCalledOnce();
+  } finally {
+    await view.unmount();
+  }
+});
+
+it("keeps built-in OpenCode visible without host access and shows its own details", async () => {
+  const view = await renderSettings(true, testQueryClient(), "account", true);
+  try {
+    const row = view.container.querySelector('[data-testid="opencode-provider"]')!;
+    await click(row.querySelector("button") ?? undefined);
+    const detail = view.container.querySelector('[data-testid="opencode-provider-detail"]')!;
+    expect(detail.textContent).toContain("OpenCode is unavailable for this space.");
+    expect(detail.textContent).not.toContain("Download OpenCode");
+    expect(models.setRole).not.toHaveBeenCalled();
+    await click(detail.querySelector("button") ?? undefined);
+    expect(view.container.querySelector('[data-testid="opencode-provider-detail"]')).toBeNull();
+    expect(view.container.querySelector('[data-testid="opencode-provider"]')).toBe(row);
   } finally {
     await view.unmount();
   }
@@ -793,6 +826,45 @@ it("keeps Mycellios selected while opening an independent AntSeed connection", a
     expect(section("main").querySelector('[data-testid="model-role-row-1"]')?.textContent)
       .toContain(native.modelId);
     expect(models.connect).not.toHaveBeenCalled();
+    expect(models.setRole).not.toHaveBeenCalled();
+  } finally { await view.unmount(); }
+});
+
+it("opens the built-in AntSeed detail, lists its gateway models, and preserves the account default", async () => {
+  const gateway = { ...compatibleEntry, provider: "antseed", providerName: "AntSeed" };
+  const credential = {
+    ...compatibleCredential,
+    id: "antseed-connection",
+    provider: "antseed",
+    label: "AntSeed",
+    baseUrl: "https://antseed.example.test/v1",
+    modelId: "saved-antseed-model",
+    enabledModelIds: ["saved-antseed-model"],
+    hasKey: true,
+  };
+  models.list.mockResolvedValue([deepseekEntry, gateway]);
+  models.credentials.mockResolvedValue([deepseekCredential, credential]);
+  models.probeOpenAiCompatible.mockResolvedValue({ models: ["saved-antseed-model", "another-antseed-model"] });
+  const view = await renderSettings(true, testQueryClient(), "account", true);
+  try {
+    const row = view.container.querySelector('[data-testid="antseed-provider"]')!;
+    expect(row.textContent).toContain("Connected");
+    await click(row.querySelector("button"));
+    const detail = view.container.querySelector('[data-testid="antseed-provider-detail"]') as HTMLElement;
+    expect(detail.textContent).toContain("antseed.example.test");
+    await click(buttons(detail, "Manage connection")[0]);
+    await vi.waitFor(() => expect(detail.textContent).toContain("another-antseed-model"));
+    expect(models.probeOpenAiCompatible).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "antseed", credentialId: credential.id,
+    }));
+    expect(models.connect).not.toHaveBeenCalled();
+    expect(models.setRole).not.toHaveBeenCalled();
+    const modelRow = [...detail.querySelectorAll("label")].find((label) => label.textContent === "another-antseed-model");
+    await click(modelRow?.querySelector('[role="checkbox"]'));
+    await click(buttons(detail, "Save")[0]);
+    expect(models.connect).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "antseed", credentialId: credential.id, enabledModelIds: ["another-antseed-model"], makeDefault: false,
+    }));
     expect(models.setRole).not.toHaveBeenCalled();
   } finally { await view.unmount(); }
 });

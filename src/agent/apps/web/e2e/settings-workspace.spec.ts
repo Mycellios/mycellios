@@ -1,7 +1,7 @@
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { expect, test } from "@playwright/test";
-import { activeBotId, completeOnboarding, rpc, signup } from "./helpers";
+import { activeBotId, completeOnboarding, openUserSettings, rpc, signup } from "./helpers";
 
 test("unified settings persist real local changes, guard drafts and keep every supported section reachable", async ({
   page,
@@ -105,6 +105,13 @@ test("unified settings persist real local changes, guard drafts and keep every s
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     const settings = page.getByTestId("user-settings");
     const nav = page.getByTestId("settings-nav");
+    const desktopViewport = page.viewportSize()!;
+    for (const viewport of [desktopViewport, { width: 390, height: 700 }]) {
+      await page.setViewportSize(viewport);
+      await expect.poll(() => settings.boundingBox()).toEqual({ x: 0, y: 0, ...viewport });
+      await expect(settings.getByRole("button", { name: "Close user settings" })).toBeInViewport();
+    }
+    await page.setViewportSize(desktopViewport);
     for (const section of [
       "general",
       "profile",
@@ -113,8 +120,6 @@ test("unified settings persist real local changes, guard drafts and keep every s
       "notifications",
       "voice",
       "confirmations",
-      "space",
-      "memory",
       "usage",
       "computer",
       "mobile",
@@ -151,19 +156,19 @@ test("unified settings persist real local changes, guard drafts and keep every s
         return rows[0]?.maxTokens;
       })
       .toBe(4096);
-    await page.getByTestId("settings-nav-memory").click();
+    await openUserSettings(page, "memory");
     await settings.getByRole("button", { name: "Connect memory provider", exact: true }).click();
     await page
       .getByTestId("memory-settings")
       .getByRole("textbox")
       .first()
       .fill("pending-memory-draft");
-    await page.getByTestId("settings-nav-general").click();
+    await page.getByTestId("settings-nav-space").click();
     await page
       .getByRole("alertdialog")
       .getByRole("button", { name: "Discard changes", exact: true })
       .click();
-    await page.getByTestId("settings-nav-voice").click();
+    await openUserSettings(page, "voice");
     await settings.getByLabel("API key", { exact: true }).fill("pending-voice-key-not-submitted");
     await page.getByTestId("settings-nav-general").click();
     await page

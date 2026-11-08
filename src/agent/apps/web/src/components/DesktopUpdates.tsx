@@ -6,6 +6,8 @@ import { desktopBridge } from "../lib/desktop";
 import { canRestartDesktop, canShowDesktopUpdate, desktopUpdateHasCall, endDesktopUpdateCall } from "../lib/desktop-update-work";
 import { appPath } from "../lib/app-path";
 
+const UPDATE_DISK_SPACE_MESSAGE = "Free at least 6 GB of disk space before restarting to update.";
+
 function updateRequiresAttention(state: DesktopUpdateState | null) {
   return Boolean(state?.availableVersion && ["available", "downloading", "ready", "checking", "error"].includes(state.phase));
 }
@@ -85,18 +87,25 @@ function useDesktopUpdates() {
       setBusy(false);
     }
   }
-  return { state, busy, error, act, confirmedCheck, safeToInterrupt, callActive, forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
+  const message = error ?? (
+    state?.message === UPDATE_DISK_SPACE_MESSAGE
+      ? t`Free at least 6 GB of disk space before restarting to update.`
+      : state?.message ?? null
+  );
+  return { state, busy, message, act, confirmedCheck, safeToInterrupt, callActive, forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
 }
 
 const UpdatesContext = createContext<ReturnType<typeof useDesktopUpdates> | null>(null);
 
 export function DesktopUpdatesProvider({ children }: { children: ReactNode }) {
   const updates = useDesktopUpdates();
+  const [deferredVersion, setDeferredVersion] = useState<string | null>(null);
   return (
     <UpdatesContext.Provider value={updates}>
       {children}
-      {updates.state && updates.safeToInterrupt && updateRequiresAttention(updates.state) && (
-        <DesktopUpdateGate {...updates} state={updates.state} />
+      {updates.state && updates.safeToInterrupt && updateRequiresAttention(updates.state) &&
+        updates.state.availableVersion !== deferredVersion && (
+        <DesktopUpdateGate {...updates} state={updates.state} onDefer={setDeferredVersion} />
       )}
     </UpdatesContext.Provider>
   );
@@ -109,8 +118,8 @@ function PendingRestart({ state }: { state: DesktopUpdateState }) {
 }
 
 function DesktopUpdateGate({
-  state, busy, error, act, forceAvailable, callActive,
-}: ReturnType<typeof useDesktopUpdates> & { state: DesktopUpdateState }) {
+  state, busy, message: updateMessage, act, forceAvailable, callActive, onDefer,
+}: ReturnType<typeof useDesktopUpdates> & { state: DesktopUpdateState; onDefer: (version: string) => void }) {
   const { t } = useLingui();
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -127,7 +136,7 @@ function DesktopUpdateGate({
     };
   }, []);
   const ready = state.phase === "ready";
-  const rawMessage = state.installPending ? null : error ?? state.message;
+  const rawMessage = state.installPending ? null : updateMessage;
   const message = rawMessage === "Could not complete the update. Try again."
     ? t`Could not complete the update. Try again.` : rawMessage;
   const failed = state.phase === "error" || Boolean(message);
@@ -196,6 +205,11 @@ function DesktopUpdateGate({
               <Trans>End call</Trans>
             </Button>
           )}
+          {!state.installPending && state.message === UPDATE_DISK_SPACE_MESSAGE && state.availableVersion && (
+            <Button variant="ghost" className="mt-4" onClick={() => onDefer(state.availableVersion!)}>
+              <Trans>Later</Trans>
+            </Button>
+          )}
           <a
             href={new URL("/downloads/desktop", productBrand.apiBaseUrl).href}
             target="_blank"
@@ -217,7 +231,7 @@ export function useSidebarUpdate() {
     available: updates?.state?.phase === "ready",
     busy: (updates?.busy ?? false) || (updates?.state?.installPending === true && (!updates?.forceAvailable || updates.state.restartMode === "now")),
     state: updates?.state ?? null,
-    error: updates?.error ?? updates?.state?.message ?? null,
+    error: updates?.message ?? null,
     install: () => {
       void updates?.act(updates.state?.installPending && updates.forceAvailable ? "forceInstall" : "install");
     },
@@ -267,7 +281,7 @@ export function DesktopSidebarUpdate() {
 export function DesktopUpdateSection() {
   const updates = useContext(UpdatesContext);
   if (!updates?.state) return null;
-  const { state, busy, error, act, confirmedCheck, forceAvailable } = updates;
+  const { state, busy, message, act, confirmedCheck, forceAvailable } = updates;
   const ready = state.phase === "ready";
   const downloading = state.phase === "available" || state.phase === "downloading";
   return (
@@ -303,8 +317,7 @@ export function DesktopUpdateSection() {
         </div>
       ) : null}
       <p role="status" className="mt-2 text-sm text-muted-foreground">
-        {state.installPending ? null : error ??
-          state.message ??
+        {state.installPending ? null : message ??
           (downloading ? (
             `${state.percent ?? 0}%`
           ) : state.phase === "idle" && confirmedCheck && state.checkedAt === confirmedCheck ? (

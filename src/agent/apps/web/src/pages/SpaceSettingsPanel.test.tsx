@@ -42,9 +42,6 @@ vi.mock("@rakazo/ui-web", () => {
   };
 });
 
-vi.mock("./SpaceSettingOverrides", () => ({
-  SpaceSettingOverrides: () => <div data-testid="space-setting-overrides" />,
-}));
 
 import { SpaceSettingsPanel } from "./SpaceSettingsPanel";
 
@@ -60,7 +57,6 @@ async function render(props: Partial<Props>) {
         space={{ id: "space-a", name: "Support", canRename: true, canDelete: true, botCount: 0 }}
         onRename={async () => undefined}
         onDelete={async () => undefined}
-        onClose={() => undefined}
         {...props}
       />,
     );
@@ -144,8 +140,6 @@ describe("SpaceSettingsPanel", () => {
       space: { id: "space-a", name: "Personal", canRename: false, canDelete: false },
     });
     expect(container.textContent).toContain("Personal");
-    // Every member can still customize their own settings for the space.
-    expect(container.querySelector('[data-testid="space-setting-overrides"]')).not.toBeNull();
     expect(button("Rename space")).toBeUndefined();
     expect(button("Delete space")).toBeUndefined();
   });

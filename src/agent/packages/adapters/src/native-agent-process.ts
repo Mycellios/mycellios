@@ -48,7 +48,7 @@ export function nativeEnvironment(source = process.env): NodeJS.ProcessEnv {
 }
 
 export function findNativeCommand(
-  name: "codex" | "claude",
+  name: "codex" | "claude" | "opencode",
   env = process.env,
 ): NativeCommand | null {
   const paths = (env.PATH ?? env.Path ?? "").split(delimiter).filter(isAbsolute);
@@ -56,10 +56,23 @@ export function findNativeCommand(
   if (home) paths.push(join(home, ".local", "bin"));
   for (const dir of paths) {
     const file = join(dir, process.platform === "win32" ? `${name}.exe` : name);
-    if (nativeCommandAvailable({ command: file })) return { command: file };
+    if (nativeCommandAvailable({ command: file })) {
+      return name === "opencode" ? { command: file, args: ["acp"] } : { command: file };
+    }
   }
   // npm's Windows .cmd shim cannot be executed without a shell. Run its fixed JS entry instead.
   if (process.platform === "win32" && env.APPDATA) {
+    if (name === "opencode") {
+      const packages = join(env.APPDATA, "npm", "node_modules");
+      const arch = process.arch;
+      if (arch !== "x64" && arch !== "arm64") return null;
+      const binary = join("opencode-windows-" + arch, "bin", "opencode.exe");
+      for (const root of [join(packages, "opencode-ai", "node_modules"), packages]) {
+        const command = { command: join(root, binary), args: ["acp"] };
+        if (nativeCommandAvailable(command)) return command;
+      }
+      return null;
+    }
     const file = join(
       env.APPDATA,
       "npm",
@@ -133,12 +146,13 @@ export class NativeAgentProcess {
     cwd: string,
     onMessage: (message: WireMessage) => void,
     onFailure: (error: Error) => void,
+    isolatedEnvironment?: NodeJS.ProcessEnv,
   ) {
     if (!isAbsolute(command.command))
       throw new Error("A native agent command must be an absolute path");
     this.child = spawn(command.command, [...(command.args ?? []), ...args], {
       cwd,
-      env: { ...nativeEnvironment(), ELECTRON_RUN_AS_NODE: "1" },
+      env: { ...nativeEnvironment(), ELECTRON_RUN_AS_NODE: "1", ...isolatedEnvironment },
       stdio: "pipe",
       windowsHide: true,
       detached: process.platform !== "win32",

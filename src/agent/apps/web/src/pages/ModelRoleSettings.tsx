@@ -31,7 +31,7 @@ import {
   Spinner,
 } from "@rakazo/ui-web";
 import { useQueryClient } from "@tanstack/react-query";
-import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronsUpDown, GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { InfoTooltip } from "../components/InfoTooltip";
@@ -58,6 +58,7 @@ type Props = {
   modelRole?: ModelRole;
   /** Keep the approval override out of the ordinary model setup. */
   advancedApproval?: boolean;
+  compactPrimary?: boolean;
   title: string;
   /** What runs when the first slot is empty. */
   defaultLabel: string;
@@ -91,6 +92,7 @@ export function ModelRoleSettings({
   credentials,
   modelRole: role = "main",
   advancedApproval = false,
+  compactPrimary = false,
   title,
   defaultLabel,
   providers,
@@ -296,6 +298,38 @@ export function ModelRoleSettings({
       {sub ? <span className="truncate text-[13px] text-muted-foreground">{sub}</span> : null}
     </button>
   );
+
+  if (compactPrimary) {
+    const current = primary ?? deployment;
+    return (
+      <section className="mb-6" data-testid="default-provider">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 p-4">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium">{title}</h3>
+            <p className="text-sm text-muted-foreground">{t`Used by new Micos and Micos that follow the general model.`}</p>
+          </div>
+          <RoleModelPicker
+            {...catalogProps}
+            trigger={<Button variant="outline" size="sm" className="max-w-full gap-2">
+              <span className="truncate">{current ? providerName(current) : defaultLabel}</span>
+              <ChevronsUpDown aria-hidden className="shrink-0 text-muted-foreground" />
+            </Button>}
+            label={t`Change ${title}`}
+            options={options}
+            providers={providers}
+            disabled={busy}
+            onPick={(option) => { if (option) void setPrimary(choiceOf(option)); }}
+            onConnect={connectFor("primary")}
+            reopen={reopenFor("primary")}
+            onReopened={() => setReopen(null)}
+          />
+        </div>
+        {current ? <p className="mt-2 text-xs text-muted-foreground">{modelLabel(current)}</p> : null}
+        {selectionError || state.error ? <p role="alert" className="mt-2 text-sm text-destructive">{selectionError ?? state.error}</p> : null}
+        {panel}
+      </section>
+    );
+  }
 
   return (
     <section className={advancedApproval ? "mb-0" : "mb-8"} data-testid={`model-role-${role}`}>

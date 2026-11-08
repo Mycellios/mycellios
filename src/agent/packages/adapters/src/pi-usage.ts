@@ -19,7 +19,8 @@ import { Agent } from "undici";
 import { getLogger } from "@rakazo/logging";
 import { antseedCostObserver } from "./antseed-cost.js";
 import { withChatCompletionsCompatibility } from "./chat-completions-compat.js";
-import type { ContextBudget } from "./context-selection.js";
+import { isContextOverflow } from "./context-compaction.js";
+import { ContextBudgetError, type ContextBudget } from "./context-selection.js";
 import { withGoogleToolHistory } from "./google-tool-history.js";
 import { estimateModelContextTokens, prepareModelContextBudget } from "./model-context.js";
 import { openRouterInferenceFetch } from "./openrouter-usage.js";
@@ -375,6 +376,13 @@ export function observedPiStream(
       let partialMessage: AssistantMessage | undefined;
       let providerError: unknown;
       let providerThrew = false;
+      let logProviderOverflow: ((message: string | undefined) => void) | undefined;
+      const contextLog = {
+        runId: attribution.runId,
+        provider: model.provider,
+        model: model.id,
+        operationKind: attribution.operationKind,
+      };
       try {
         // A tool-budget or cancellation stop can reach Pi's next-turn hook after
         // aborting. It is not a model invocation and must not create unknown usage.
@@ -392,6 +400,17 @@ export function observedPiStream(
           prepared.maxTokens === undefined
             ? options
             : { ...options, maxTokens: prepared.maxTokens };
+        logProviderOverflow = (message) => {
+          if (!isContextOverflow(message)) return;
+          logProviderOverflow = undefined;
+          getLogger().warn("model.context_rejected", {
+            ...contextLog,
+            source: "provider",
+            contextWindow: model.contextWindow,
+            outputReserve: effectiveOptions?.maxTokens ?? model.maxTokens,
+            estimatedInput: estimateModelContextTokens(preparedContext, hooks?.imageTokens),
+          });
+        };
         recordPiTelemetryContent(span, "pi.ai.prompt", preparedContext);
         const inputTokensEstimate = observer
           ? estimateModelContextTokens(preparedContext, hooks?.imageTokens)
@@ -513,6 +532,7 @@ export function observedPiStream(
           }
           if (event.type === "done" || event.type === "error") {
             const message = event.type === "done" ? event.message : event.error;
+            if (event.type === "error") logProviderOverflow?.(message.errorMessage);
             normalized = await withAntseedCost(normalizePiUsage(message.usage, model, reported));
             span?.setAttributes({
               "pi.ai.response.stop_reason": message.stopReason,
@@ -551,6 +571,18 @@ export function observedPiStream(
         stream.end(await upstream.result());
       } catch (error) {
         span?.setStatus({ status: "error" });
+        if (!started && error instanceof ContextBudgetError) {
+          getLogger().warn("model.context_rejected", {
+            ...contextLog,
+            source: "local-admission",
+            contextWindow: error.budget?.contextWindow ?? model.contextWindow,
+            outputReserve: error.budget?.outputReserve,
+            estimatedInput: error.estimatedTokens,
+            availableInput: error.availableTokens,
+          });
+        } else if (started) {
+          logProviderOverflow?.(error instanceof Error ? error.message : undefined);
+        }
         let terminalError = error;
         if (started && normalized === null) {
           try {

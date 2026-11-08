@@ -2,7 +2,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Field, FieldLabel, Input } from "@rakazo/ui-web";
 import { useId, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRows";
-import { SpaceSettingOverrides } from "./SpaceSettingOverrides";
 import type { SettingsSpace } from "./shell/dialogs";
 import { DeleteSpaceDialog } from "./shell/dialogs";
 
@@ -14,14 +13,10 @@ export function SpaceSettingsPanel({
   space,
   onRename,
   onDelete,
-  onClose,
-  onBusyChange,
 }: {
   space: SettingsSpace;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
-  onClose: () => void;
-  onBusyChange?: (busy: boolean) => void;
 }) {
   const { t } = useLingui();
   const nameId = useId();
@@ -130,7 +125,6 @@ export function SpaceSettingsPanel({
           />
         )}
       </SettingsGroup>
-      <SpaceSettingOverrides onClose={onClose} onBusyChange={onBusyChange} />
       {space.canDelete ? (
         <Button
           variant="destructive"

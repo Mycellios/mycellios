@@ -21,8 +21,10 @@ export const MODEL_CONTEXT_TOO_SMALL_ERROR =
 /** A run that starts with no model the user can reach. */
 export const MISSING_MODEL_RUN_ERROR = "Connect a model in Settings before running bots.";
 
-/** A deployment model run while the organization has not chosen Rakazo credits. */
+/** A deployment model run while the organization has not chosen Mycellios credits. */
 export const HOSTED_MODEL_CREDITS_REQUIRED_ERROR =
+  "Connect your own API key in Models or choose Mycellios credits in Billing.";
+const LEGACY_HOSTED_MODEL_CREDITS_ERROR =
   "Connect your own API key in Models or choose Rakazo credits in Billing.";
 
 /** The API rejects a send with this message until the user can reach a model. */
@@ -239,6 +241,9 @@ export function normalizeRunError(
   kind?: RunErrorKind;
   period?: "none" | "daily" | "weekly" | "monthly";
 } {
+  if (details.trim() === LEGACY_HOSTED_MODEL_CREDITS_ERROR) {
+    details = HOSTED_MODEL_CREDITS_REQUIRED_ERROR;
+  }
   const trimmed = details.trim();
   if (UNCERTAIN_DESKTOP_RUN.has(trimmed)) {
     return {
@@ -283,6 +288,17 @@ export function normalizeRunError(
   const record = asRecord(parseJson(body));
   const fallback = parseModelFallbackFailure(trimmed);
   if (fallback) {
+    const diagnostics = [
+      fallback.primaryError,
+      ...fallback.backups.map((item) => `${item.provider} ${item.modelId}: ${item.reason}`),
+    ].join("\n");
+    // An uncertain dispatch anywhere in the chain takes precedence over model recovery.
+    if (isUncertainDesktopRun(trimmed)) {
+      return {
+        ...normalizeRunError(DESKTOP_RUN_INTERRUPTED_ERROR, translate, locale, now),
+        details: diagnostics,
+      };
+    }
     const primary = normalizeRunError(fallback.primaryError, translate, locale, now);
     const failed = fallback.backups.some((item) => item.status === "failed");
     const skipped = fallback.backups.some((item) => item.status === "skipped");
@@ -295,10 +311,7 @@ export function normalizeRunError(
       ...primary,
       summary: translate(message, { summary: primary.summary }),
       // One diagnostic line per model instead of the persisted JSON envelope.
-      details: [
-        fallback.primaryError,
-        ...fallback.backups.map((item) => `${item.provider} ${item.modelId}: ${item.reason}`),
-      ].join("\n"),
+      details: diagnostics,
     };
   }
   // Preserve only known recovery advice: provider diagnostics can also be plain text.

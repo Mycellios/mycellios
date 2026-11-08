@@ -58,7 +58,6 @@ import type { ModelBackupOutcome } from "@rakazo/core";
 import {
   abortableDelay,
   MISSING_TOOL_FINAL_RESPONSE_ERROR,
-  MODEL_CONTEXT_TOO_SMALL_ERROR,
   MODEL_OUTPUT_CUT_ERROR,
   MODEL_OUTPUT_LIMIT_ERROR,
   modelFallbackFailure,
@@ -1342,13 +1341,14 @@ function runtimeToolsForInitialState(
   getAgent: () => Agent | undefined,
 ): AgentTool[] {
   const allTools = toAgentTools(definitions, host);
-  if (allTools.length === 0) return allTools;
-  const available = model.contextWindow - model.maxTokens;
+  // The canonical admission check can shrink an output reservation. Keep
+  // mandatory tools here and let that check reject them only if they still fail.
+  if (definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length <= 1) return allTools;
+  const available = model.contextWindow - resolveCompletionMaxTokens(
+    model.maxTokens, host.activeModel.config.maxTokens, undefined, model.reasoning, model.contextWindow,
+  );
   if (estimateContextTokens(systemPrompt) + estimateContextTokens(allTools) <= available)
     return allTools;
-  // Paging cannot make a single oversized required schema usable. Preserve
-  // fail-before-spend admission for that case rather than hiding its failure.
-  if (definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length <= 1) throw new Error(MODEL_CONTEXT_TOO_SMALL_ERROR);
   const named = namedAgentTools(definitions);
   const wireNames = new Map(named.map(({ tool, name }) => [tool, name]));
   const originalsByWire = new Map(named.map(({ tool, name }) => [name, tool]));
@@ -1377,7 +1377,11 @@ function runtimeToolsForInitialState(
       accept: (tools) => {
         const currentModel = getAgent()?.state.model ?? host.model;
         const fixed = estimateContextTokens(systemPrompt) + estimateContextTokens(bind(tools));
-        if (fixed + 1024 > currentModel.contextWindow - currentModel.maxTokens)
+        const reserve = resolveCompletionMaxTokens(
+          currentModel.maxTokens, host.activeModel.config.maxTokens, undefined,
+          currentModel.reasoning, currentModel.contextWindow,
+        );
+        if (fixed + 1024 > currentModel.contextWindow - reserve)
           throw new Error("This tool schema needs a model with a larger context window.");
       },
     },

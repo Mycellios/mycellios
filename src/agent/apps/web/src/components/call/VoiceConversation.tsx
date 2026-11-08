@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { isEchoOfSpeech, isSecretAskBlock, speakable, speechFromBlocks, toUtterances } from "@rakazo/core";
+import { isEchoOfSpeech, isRunWorking, isSecretAskBlock, normalizeRunError, speakable, speechFromBlocks, toUtterances } from "@rakazo/core";
 import { BotAvatar, Button } from "@rakazo/ui-web";
 import { Mic, MicOff, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -8,17 +8,20 @@ import type { RpcClient } from "../../lib/rpc";
 import { browserSpeechAvailable, speaker } from "../../lib/tts";
 import { registerContinuousVoiceCloser } from "../../lib/continuous-voice-owner";
 import { endCall } from "../../lib/call-session";
+import { isAndroidHost } from "../../lib/android-host";
+import { translateRunError } from "../../lib/run-error";
+import { errorText } from "../../lib/user-error";
 
-export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe, onClose, onSettings }: {
+export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe, voiceReady, onClose, onSettings }: {
   rpc: RpcClient; spaceId?: string | null; taskThreadId?: string;
-  bot: { id: string; name: string; color: string }; transcribe?: boolean;
+  bot: { id: string; name: string; color: string }; transcribe?: boolean; voiceReady?: boolean;
   onClose: () => void; onSettings: () => void;
 }) {
   const { t, i18n } = useLingui();
   const target = { botId: bot.id, taskThreadId };
   const [phase, setPhase] = useState("ready");
   const [caption, setCaption] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [level, setLevel] = useState(0);
   const [speed, setSpeed] = useState(1);
@@ -29,6 +32,7 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
   const spoken = useRef("");
   const seen = useRef(new Set<string>());
   const native = window.rakazoDesktop?.localVoice;
+  const canCapture = Boolean(transcribe || isAndroidHost() || webSpeechAvailable());
   const refresh = async () => { if (native) { const status = await native.status(); if (alive.current) setModel(status); } };
   useEffect(() => {
     alive.current = true;
@@ -37,10 +41,10 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
     void (async () => {
       try {
         if (native) { const status = await native.status(); if (!mounted) return; setModel(status); if (status.ready) await start(); }
-        else if (transcribe || webSpeechAvailable()) await start();
-      } catch { if (mounted) setError(true); }
+        else if (canCapture) await start();
+      } catch { if (mounted) setError(t`Could not check local voice. Try again.`); }
     })();
-    const stop = dictation.subscribe(s => { if (!alive.current) return; setLevel(s.level ?? 0); if (s.transcript) setCaption(s.transcript); if (s.error) {enabled.current = false; silence(); setError(true); setPhase("ready");} });
+    const stop = dictation.subscribe(s => { if (!alive.current) return; setLevel(s.level ?? 0); if (s.transcript) setCaption(s.transcript); if (s.error && enabled.current) stopWithError(errorText(s.error, t`Could not use the microphone. Check its permission and try again.`)); });
     const stopSpeaker = speaker.subscribe(s => {
       if (!alive.current || s.botId !== bot.id) return;
       if (s.level !== undefined) setLevel(s.level);
@@ -58,13 +62,19 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
   function silence() {
     generation.current++; dictation.stop("cancel"); speaker.stop(); void output.current?.close().catch(() => {}); output.current = null; void native?.stop().catch(() => {}); setLevel(0);
   }
+  function stopWithError(message: string) {
+    enabled.current = false;
+    silence();
+    setError(message);
+    setPhase("ready");
+  }
   async function listen(background = false) {
     if (!alive.current || !enabled.current || mute.current) return;
-    if (!background) setPhase("listening"); setError(false);
+    if (!background) setPhase("listening"); setError(null);
     try { await dictation.listen({ spaceId, mode: "endpoint", transcribe, preferServer: transcribe,
       onSpeechStart: () => { if (!background) return; generation.current++; speaker.stop(); void output.current?.close().catch(() => {}); output.current = null; void native?.stop().catch(() => {}); setPhase("listening"); },
       onFinal: text => { if (background) { generation.current++; speaker.stop(); void output.current?.close().catch(() => {}); output.current = null; } void send(text); } }); }
-    catch { if (alive.current) { enabled.current = false; silence(); setError(true); setPhase("ready"); } }
+    catch { if (alive.current && enabled.current) stopWithError(t`Could not use the microphone. Check its permission and try again.`); }
   }
   async function speak(text: string, own: number) {
     if (!alive.current || own !== generation.current) return;
@@ -82,15 +92,13 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
         const buffer = ctx.createBuffer(1, audio.samples.length, audio.sampleRate); buffer.copyToChannel(new Float32Array(audio.samples), 0);
         const source = ctx.createBufferSource(), analyser = ctx.createAnalyser(); source.buffer = buffer; source.connect(analyser); analyser.connect(ctx.destination);
         setPhase("speaking"); setCaption(part);
-        void listen(true);
         const samples = new Uint8Array(analyser.fftSize);
         const timer = setInterval(() => { analyser.getByteTimeDomainData(samples); setLevel(Math.min(1, Math.sqrt(samples.reduce((n,x) => n + ((x-128)/128)**2, 0)/samples.length)*6)); }, 80);
         await new Promise<void>(resolve => { source.onended = () => resolve(); ctx.onstatechange = () => { if (ctx.state === "closed") resolve(); }; source.start(); });
         clearInterval(timer); if (ctx.state !== "closed") await ctx.close();
       }
     } else {
-      void listen(true);
-      const failure = await speaker.speak(speakable(text), { browser: !transcribe && browserSpeechAvailable(), botId: bot.id, spaceId, speed: rate.current });
+      const failure = await speaker.speak(speakable(text), { browser: !voiceReady && browserSpeechAvailable(), botId: bot.id, spaceId, speed: rate.current });
       if (failure) throw new Error(failure);
     }
   }
@@ -99,53 +107,74 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
     if (isEchoOfSpeech(text, spoken.current)) { void listen(); return; }
     const own = ++generation.current;
     setCaption(text); setPhase("thinking");
+    let failureMessage = t`Could not send your voice message. Check the chat before trying again.`;
     try {
       const before = await rpc.threads.get(target, { signal: abort.current.signal });
       if (!alive.current || own !== generation.current) return;
       before.messages.forEach(m => seen.current.add(m.id));
-      await rpc.threads.send({ ...target, text, clientNonce: crypto.randomUUID() }, { signal: abort.current.signal });
+      const sent = await rpc.threads.send({ ...target, text, clientNonce: crypto.randomUUID() }, { signal: abort.current.signal });
       if (!alive.current || own !== generation.current) return;
+      const runIds = new Set([sent.runId, ...(sent.runIds ?? [])]);
+      failureMessage = t`Could not follow the Mico’s response. Check the chat.`;
+      const deadline = Date.now() + 5 * 60_000;
       void listen(true);
-      while (alive.current && own === generation.current) {
+      while (alive.current && own === generation.current && Date.now() < deadline) {
         const snapshot = await rpc.threads.get(target, { signal: abort.current.signal });
         if (!alive.current || own !== generation.current) return;
-        if (snapshot.run?.status === "failed") throw new Error("Chat run failed");
-        if (snapshot.messages.some(m => m.blocks.some(b => b.kind === "ask" && b.status !== "answered" && isSecretAskBlock(b)))) {
+        const matchesRun = (run: { id: string; taskId: string }) =>
+          runIds.has(run.id) || run.taskId === sent.taskId;
+        const run = snapshot.run && matchesRun(snapshot.run) ? snapshot.run : null;
+        const activeRuns = snapshot.activeRuns?.filter(matchesRun) ?? [];
+        if (run?.status === "failed" || run?.status === "cancelled") {
+          stopWithError(run.error
+            ? normalizeRunError(run.error, translateRunError, i18n.locale).summary
+            : t`The Mico stopped responding. Check the chat.`);
+          return;
+        }
+        for (const active of activeRuns) runIds.add(active.id);
+        if (run) runIds.add(run.id);
+        const messages = snapshot.messages.filter(m =>
+          m.role === "bot" && !seen.current.has(m.id) && m.runId && runIds.has(m.runId),
+        );
+        if (messages.some(m => m.blocks.some(b => b.kind === "ask" && b.status !== "answered" && isSecretAskBlock(b)))) {
           silence(); enabled.current = false; setPhase("ready"); setCaption(t`Enter the requested secret on screen, then restart voice.`); return;
         }
-        if (snapshot.run?.status === "waiting_input" || (!snapshot.activeRuns?.length && !["running", "queued", "leased"].includes(snapshot.run?.status ?? ""))) {
-          const messages = snapshot.messages.filter(m => m.role === "bot" && !seen.current.has(m.id));
-          snapshot.messages.forEach(m => seen.current.add(m.id));
+        const waitingForInput = run?.status === "waiting_input" || activeRuns.some(active => active.status === "waiting_input");
+        const stillWorking = isRunWorking(run?.status) || activeRuns.some(active => isRunWorking(active.status));
+        if (snapshot.cursor >= sent.seq && (waitingForInput || (!stillWorking && (run?.status === "completed" || messages.length)))) {
+          messages.forEach(m => seen.current.add(m.id));
           const text = messages.map(m => speechFromBlocks(m.blocks)).filter(Boolean).join("\n\n");
+          failureMessage = t`Could not play the reply. You can read it in the chat.`;
           if (text) await speak(text, own);
           if (own === generation.current) { setCaption(""); setLevel(0); await listen(); }
           return;
         }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-    } catch { if (alive.current && own === generation.current) { enabled.current = false; silence(); setError(true); setPhase("ready"); } }
+      if (alive.current && own === generation.current) stopWithError(failureMessage);
+    } catch { if (alive.current && own === generation.current) stopWithError(failureMessage); }
   }
   async function start() {
     if (!alive.current) return;
     const own = ++generation.current;
-    setError(false); setPhase("starting"); endCall();
+    setError(null); setPhase("starting"); endCall();
     try {
       const snapshot = await rpc.threads.get(target, { signal: abort.current.signal });
       if (!alive.current || own !== generation.current) return;
       snapshot.messages.forEach(m => seen.current.add(m.id));
       enabled.current = true; await listen();
-    } catch { if (alive.current && own === generation.current) { setError(true); setPhase("ready"); } }
+    } catch { if (alive.current && own === generation.current) stopWithError(t`Could not open this chat for voice. Try again.`); }
   }
   async function prepare() {
     if (!native) return;
-    setPhase("preparing"); setError(false);
+    setPhase("preparing"); setError(null);
     const poll = setInterval(() => void refresh().catch(() => {}), 1000);
     try { await native.prepare(); await refresh(); if (alive.current) await start(); }
-    catch { if (alive.current) { setError(true); setPhase("ready"); } }
+    catch { if (alive.current) stopWithError(t`Could not prepare local voice. Try again.`); }
     finally { clearInterval(poll); }
   }
   const needsModels = Boolean(native && !model?.ready);
-  const canStart = native ? model?.ready : (transcribe || webSpeechAvailable());
+  const canStart = native ? model?.ready : canCapture;
   return <aside role="dialog" data-continuous-voice aria-label={t`Voice conversation`} className="fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-border bg-background px-6 pb-8 pt-16 md:w-[400px]">
     <header className="flex items-center justify-between"><span className="text-sm font-medium">{bot.name}</span><Button variant="ghost" size="icon" aria-label={t`Close voice`} onClick={onClose}><X /></Button></header>
     <p aria-live="polite" className="mt-2 text-center text-sm text-muted-foreground">{phase === "listening" ? t`Listening` : phase === "speaking" ? t`Speaking` : phase === "thinking" ? t`Thinking` : phase === "preparing" ? t`Preparing local voice…` : t`Voice`}</p>
@@ -153,7 +182,7 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
       <div style={{ transform: `scale(${1 + level * .12})` }}><BotAvatar identity={bot.id} color={bot.color} size={112} /></div>
       <div className="flex h-6 items-center gap-1" aria-hidden="true">{Array.from({length: 24}, (_, i) => <span key={i} className="w-0.5 rounded-full bg-muted-foreground" style={{ height: 2 + level * 24 * (1 - Math.abs(i-11.5)/24) }} />)}</div>
       <p className="max-h-40 overflow-y-auto text-center text-sm text-muted-foreground" dir="auto">{caption || (phase === "listening" ? t`Speak now` : "")}</p>
-      {error ? <p role="alert" className="text-sm text-destructive">{t`Voice stopped. Your messages are kept. Retry when ready.`}</p> : null}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {needsModels ? <Button disabled={phase === "preparing"} onClick={() => void prepare()}>{phase === "preparing" ? `${Math.round((model?.downloaded ?? 0)/1024/1024)} / ${Math.round((model?.total ?? 0)/1024/1024)} MB` : t`Prepare local voice`}</Button> : phase === "ready" ? <Button disabled={!canStart} onClick={() => void start()}>{t`Start talking`}</Button> : null}
       {needsModels ? <p className="text-xs text-muted-foreground">Parakeet · Supertonic 3</p> : null}
       {!canStart && !needsModels ? <p className="text-center text-sm text-muted-foreground">{t`Connect a transcription provider in Voice settings, or use local voice in Desktop.`}</p> : null}

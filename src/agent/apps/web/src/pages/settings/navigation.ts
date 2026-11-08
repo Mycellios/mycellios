@@ -24,6 +24,10 @@ export const settingsKeywords: Record<string, string> = {
   confirmations:
     "approvals permissions rules tools safety aprobaciones confirmaciones permisos reglas herramientas",
   space: "space members invite rename delete espacio miembros invitar nombre eliminar",
+  "space-providers": "providers models api keys proveedores modelos claves",
+  "space-voice": "voice speech audio voz habla transcripción",
+  "space-approvals": "permissions confirmations permisos reglas confirmaciones",
+  "space-mcp": "mcp servers integrations tools servidores integraciones herramientas",
   memory: "memory providers knowledge memoria conocimiento proveedores",
   usage: "usage cost tokens balance uso costes consumo créditos saldo",
   computer:

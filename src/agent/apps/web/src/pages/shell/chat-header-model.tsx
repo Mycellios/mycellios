@@ -170,7 +170,11 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
           : "app-no-drag w-[364px] max-w-[calc(100vw-24px)] max-h-(--available-height) gap-0 overflow-y-auto p-0"}>
           {recovery ? <label htmlFor={`${id}-model`} className="text-xs font-medium">{t`Model`}</label> : null}
           {recovery ? <p className="text-xs text-muted-foreground">{t`This changes the model for this Mico. Your message stays in the chat.`}</p> : null}
-          {credentialsQuery.isPending || catalogQuery.isPending ? <Spinner className="size-4" /> : queryError ? <p role="alert" className="text-xs text-destructive">{errorText(queryError)}</p> :
+          {credentialsQuery.isPending || catalogQuery.isPending ? (
+            <div className="grid min-h-28 place-items-center">
+              <Spinner aria-label={t`Loading models…`} className="text-muted-foreground" />
+            </div>
+          ) : queryError ? <p role="alert" className="text-xs text-destructive">{errorText(queryError)}</p> :
             <fieldset disabled={saving} className="min-w-0 [&>div]:mt-0 [&>button]:mt-0">
               {explorer && me ? <ChatModelCatalog source={explorer} userId={me.userId} spaceId={me.spaceId}
                 onBack={() => { setExploring(null); setError(null); }} onPick={pickCatalog} /> : <ChatModelPicker
@@ -202,7 +206,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
               onValueChange={(value) => void save(() => onSave({ modelProvider: bot.modelProvider, modelId: bot.modelId, thinkingLevel: (value || null) as ThinkingLevel | null }))}
             />
           </label> : null}
-          {saving ? <Spinner className="size-4" /> : null}
+          {saving ? <Spinner aria-label={t`Saving…`} className="mx-auto my-2 text-muted-foreground" /> : null}
           {error ? <p role="alert" className="p-2 text-xs text-destructive">{error}</p> : null}
           {explorer ? null : recovery || !sources.size ? (
             <Button variant="ghost" size="sm" onClick={() => { setOpen(false); onConnections(); }}>{t`Manage models`}</Button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CREDIT_MICROUNITS, CREDIT_USD_PARITY, usdCentsToCreditMicrounits } from "./credit-units";
+import { CREDIT_MICROUNITS, CREDIT_USD_PARITY, usdCentsToCreditMicrounits } from "./credit-units.js";
 
 describe("internal credit denomination", () => {
   it("gives ten credits for ten USD and preserves sub-cent balances", () => {

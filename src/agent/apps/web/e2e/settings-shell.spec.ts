@@ -164,7 +164,7 @@ test("settings shell is two-pane and deep-links Models Memory Voice Usage", asyn
   await expect(settings.getByTestId("model-role-approval")).toHaveCount(0);
   await captureScreenshot(page, testInfo, "settings-shell-models");
 
-  await settings.getByTestId("settings-nav-memory").click();
+  await openUserSettings(page, "memory");
   await expect(settings).toHaveAttribute("data-settings-section", "memory");
   await expect(settings.getByTestId("memory-settings")).toBeVisible();
   const memory = settings.getByTestId("memory-settings");
@@ -176,7 +176,7 @@ test("settings shell is two-pane and deep-links Models Memory Voice Usage", asyn
   await expect(memory.getByRole("button", { name: "Recall only" })).toBeVisible();
   await captureScreenshot(page, testInfo, "settings-shell-memory-serenity");
 
-  await settings.getByTestId("settings-nav-voice").click();
+  await openUserSettings(page, "voice");
   await expect(settings).toHaveAttribute("data-settings-section", "voice");
   await expect(settings.getByTestId("voice-settings")).toBeVisible();
   await captureScreenshot(page, testInfo, "settings-shell-voice");
@@ -213,7 +213,7 @@ test("Honcho memory settings empty and filled", async ({ page }, testInfo) => {
   await userPeer.fill("bot-123");
   await expect(userPeer).toHaveAttribute("aria-invalid", "true");
   await expect(
-    memory.getByText("rakazo-shared and IDs starting with bot- are reserved for Rakazo."),
+    memory.getByText("rakazo-shared and IDs starting with bot- are reserved for Mycellios."),
   ).toBeVisible();
   await expect(memory.getByRole("button", { name: "Connect", exact: true })).toBeDisabled();
   await captureScreenshot(page, testInfo, "memory-honcho-user-peer-reserved");

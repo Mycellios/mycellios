@@ -3643,6 +3643,28 @@ describe("integration setup authorization", () => {
 });
 
 describe("server operation authorization", () => {
+  it.each([
+    { spaceId: "other-space", allowOpenCodeInstall: true },
+    { spaceId: "allowed-space", allowOpenCodeInstall: false },
+  ])("rejects an OpenCode install without both grants ($spaceId, $allowOpenCodeInstall)", async ({ spaceId, allowOpenCodeInstall }) => {
+    const dataDir = await mkdtemp(path.join(tmpdir(), "mycellios-opencode-auth-"));
+    try {
+      await writeFile(path.join(dataDir, "native-agents.json"), JSON.stringify({
+        allowOpenCodeInstall,
+        authorizedScopes: [{ userId: "user", spaceId: "allowed-space" }],
+      }));
+      const client = createRouterClient(
+        createRouter({ dataDir, prisma: {}, env: { webOrigin: "https://example.test" } } as unknown as RouterDeps),
+        { context: { actor: { userId: "user", spaceId, email: "user@example.test" } } as never },
+      );
+      await expect(client.engines.installOpenCode()).rejects.toMatchObject({ code: "FORBIDDEN" });
+      const engines = await client.engines.list();
+      expect(engines.find((engine) => engine.id === "opencode")?.canInstall).toBeFalsy();
+    } finally {
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it.each([false, true])(
     "rejects server administration even with legacy owner flag %s",
     async (isDeploymentOwner) => {

@@ -24,7 +24,7 @@ import {
   Waypoints,
   Workflow,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { MycelliosWordmark } from "../../components/MycelliosBrand";
 import { desktopBridge, windowChromeKind } from "../../lib/desktop";
@@ -63,6 +63,7 @@ type WorkspaceRailProps = {
   onModels?: () => void;
   onWhatsNew?: () => void;
   onBoard?: () => void;
+  accountControls?: ReactNode;
 };
 
 export function WorkspaceRail(props: WorkspaceRailProps) {
@@ -288,24 +289,6 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
                 </div>
               </div>
             ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={props.onSettings}>
-              <Settings size={16} />
-              {t`Settings`}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              render={<a href="https://discord.com/" target="_blank" rel="noopener noreferrer" />}
-            >
-              Discord
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              render={
-                <a href="https://x.com/mycellios" target="_blank" rel="noopener noreferrer" />
-              }
-            >
-              X
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -337,6 +320,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             <Settings size={19} strokeWidth={1.6} />
           </Button>
         </IconTooltip>
+        {props.accountControls}
       </div>
     </nav>
   );

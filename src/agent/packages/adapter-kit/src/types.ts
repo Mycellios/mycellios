@@ -489,7 +489,7 @@ export interface AgentRunRequest {
   /** Request metadata only; never grants new permissions or replays tools. */
   workState?: unknown;
   saveWorkState?: (state: unknown) => Promise<void>;
-  agentEngine?: "pi" | "codex" | "claude" | "acp";
+  agentEngine?: "pi" | "codex" | "claude" | "acp" | "opencode";
   /** Awaited producer-side accounting, independent of event-consumer cancellation. */
   onUsage?: (event: Extract<AgentRuntimeEvent, { type: "usage" }>) => void | Promise<void>;
   contextStrategy?: AgentContextStrategy;

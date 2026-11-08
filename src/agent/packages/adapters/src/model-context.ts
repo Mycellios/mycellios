@@ -15,14 +15,20 @@ export function prepareModelContextBudget(
   prepare?: (context: Context, model: Model<Api>) => Context,
 ): { context: Context; maxTokens?: number } {
   if (!prepare) return { context };
+  const cap = Math.min(
+    maxTokens ?? model.maxTokens,
+    model.maxTokens,
+    Math.max(1, Math.floor(model.contextWindow / 4)),
+  );
+  const admissionModel = Number.isSafeInteger(cap) && cap >= 1 && cap < model.maxTokens
+    ? { ...model, maxTokens: cap }
+    : model;
   try {
-    return { context: prepare(context, model) };
+    const prepared = prepare(context, admissionModel);
+    return Number.isSafeInteger(cap) && cap >= 1 && cap !== (maxTokens ?? model.maxTokens)
+      ? { context: prepared, maxTokens: cap }
+      : { context: prepared };
   } catch (error) {
-    const cap = Math.min(
-      maxTokens ?? model.maxTokens,
-      model.maxTokens,
-      Math.max(1, Math.floor(model.contextWindow / 4)),
-    );
     if (
       !(error instanceof ContextBudgetError) ||
       model.reasoning ||

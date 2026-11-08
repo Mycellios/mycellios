@@ -5,17 +5,21 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, expect, it, vi } from "vitest";
+import { SpaceRpcProvider } from "../lib/space-rpc";
 import { McpServersOverlay } from "./McpServersOverlay";
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), test: vi.fn(), update: vi.fn() }));
 const access = vi.hoisted(() => ({ all: vi.fn(), replace: vi.fn(), bots: vi.fn() }));
+const boundTest = vi.hoisted(() => vi.fn());
 const api = vi.hoisted(() => ({
   mcp: { servers: mocks, assignments: { all: access.all, replace: access.replace } },
   bots: { list: access.bots },
 }));
 vi.mock("../lib/rpc", () => ({
   rpc: api,
-  rpcForSpace: () => api,
+  rpcForSpace: (spaceId: string) => spaceId === "edited-space"
+    ? { ...api, mcp: { ...api.mcp, servers: { ...mocks, test: boundTest } } }
+    : api,
   createSpaceRpc: () => api,
   selectedSpaceId: () => null,
 }));
@@ -101,6 +105,33 @@ function server(id: string, status = "unknown") {
     enabled: true,
   } as McpServer;
 }
+
+it("runs embedded MCP actions in the edited space", async () => {
+  const endpoint = server("edited-space-server");
+  mocks.list.mockResolvedValue([endpoint]);
+  mocks.test.mockClear();
+  boundTest.mockResolvedValue(endpoint);
+  const host = document.createElement("div");
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(
+      <QueryClientProvider client={client}>
+        <SpaceRpcProvider spaceId="edited-space">
+          <McpServersOverlay embedded onClose={() => {}} />
+        </SpaceRpcProvider>
+      </QueryClientProvider>,
+    ));
+    await vi.waitFor(() => expect(host.textContent).toContain("Test connection"));
+    const button = [...host.querySelectorAll("button")].find(
+      (candidate) => candidate.textContent?.includes("Test connection"),
+    );
+    await act(async () => button?.click());
+    expect(boundTest).toHaveBeenCalledWith({ id: endpoint.id });
+    expect(mocks.test).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
 
 it("keeps each concurrent connection test busy until its own request finishes", async () => {
   const servers = ["one", "two"].map(

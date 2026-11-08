@@ -443,7 +443,7 @@ export function createRuntimeContextPolicy(
         (message as Message & OriginalMetadata).rakazoHistory &&
         !(message as Message & OriginalMetadata).rakazoMessageId &&
         (text(message).startsWith(LIVE_COMPACTION_PREFIX) ||
-          text(message).startsWith("Rakazo-owned compacted context through message sequence ") ||
+          /^(?:Mycellios|Rakazo)-owned compacted context through message sequence /.test(text(message)) ||
           text(message).startsWith(
             "Memory recalled from earlier conversations that fell outside the visible history.",
           )),

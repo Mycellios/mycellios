@@ -1,5 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { MAX_MODEL_CONNECTION_LABEL } from "@rakazo/contracts";
+import { ANTSEED_PROVIDER_ID, MAX_MODEL_CONNECTION_LABEL, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
+import { matchesSearchQuery } from "@rakazo/core";
 import {
   Button,
   Command,
@@ -13,13 +14,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@rakazo/ui-web";
-import { ChevronRight, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronRight, Network, Plug, Plus, Search, SlidersHorizontal, SquareTerminal, Terminal } from "lucide-react";
+import type { ReactNode, Ref } from "react";
 import { useId, useRef, useState } from "react";
 import type { ModelCredential } from "../../lib/model-auth";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import { errorText } from "../../lib/user-error";
 import type { ConnectableProvider } from "./role-model-picker";
+import type { ProviderIntegration } from "./provider-detail";
+import type { ProviderRuntime } from "./provider-runtime";
+
+const providerKey = (provider: ConnectableProvider) => `${provider.id}:${provider.baseUrl ?? ""}`;
+const rowClass = "flex min-h-14 w-full items-center gap-3 px-3 py-2 text-start hover:bg-accent/50 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:opacity-50";
 
 /** Every connection the member has, with the way to add another, even for a connected provider. */
 export function ProvidersSection({
@@ -29,10 +35,16 @@ export function ProvidersSection({
   disabled,
   onAdd,
   onOpen,
+  onClose,
   panel,
   panelAt,
   primary,
+  primaryConnected = false,
   showDirectory = false,
+  runtimes = [],
+  runtimeDetails,
+  onOpenIntegration,
+  integrationTriggers,
 }: {
   credentials: ModelCredential[];
   /** Every provider that can be connected, connected ones included. */
@@ -40,24 +52,80 @@ export function ProvidersSection({
   /** A connection's name, such as "OpenAI" or "OpenAI (Work)". */
   name: (credential: ModelCredential) => string;
   disabled?: boolean;
-  onAdd: (provider: ConnectableProvider) => void;
+  onAdd: (provider: ConnectableProvider, directoryKey?: string) => void;
   onOpen: (credential: ModelCredential) => void;
+  onClose?: () => void;
   /** The connection form, shown under the connection it belongs to or after the list. */
   panel?: ReactNode;
   /** The connection id the form belongs to, or "add" for a new one. */
   panelAt?: string | null;
   /** Built-in account provider, ahead of optional external connections. */
   primary?: ReactNode;
+  primaryConnected?: boolean;
   showDirectory?: boolean;
+  runtimes?: readonly ProviderRuntime[];
+  runtimeDetails?: (runtime: ProviderRuntime) => ReactNode;
+  onOpenIntegration?: (id: ProviderIntegration) => void;
+  integrationTriggers?: Partial<Record<ProviderIntegration, Ref<HTMLButtonElement>>>;
 }) {
   const { t } = useLingui();
   const [query, setQuery] = useState("");
-  const needle = query.trim().toLocaleLowerCase();
-  const matches = (name: string) => !showDirectory || name.toLocaleLowerCase().includes(needle);
+  const [openRuntime, setOpenRuntime] = useState<string | null>(null);
+  const matches = (...labels: string[]) => !showDirectory || !query.trim() || matchesSearchQuery(query, ...labels);
+  const isCustom = (provider: ConnectableProvider) => provider.id === OPENAI_COMPATIBLE_PROVIDER_ID && !provider.baseUrl;
+  const antseedCredentials = credentials.filter((credential) => credential.provider === ANTSEED_PROVIDER_ID);
+  const antseedConnected = antseedCredentials.some((credential) => credential.hasKey);
+  const genericCredentials = onOpenIntegration ? credentials.filter((credential) => credential.provider !== ANTSEED_PROVIDER_ID) : credentials;
   const connectedIds = new Set(credentials.map((credential) => credential.provider));
   const available = showDirectory ? providers.filter((provider) =>
-    matches(provider.name) && (provider.baseUrl || !connectedIds.has(provider.id)),
+    (!onOpenIntegration || provider.id !== ANTSEED_PROVIDER_ID) &&
+    (matches(provider.name, provider.id, isCustom(provider) ? t`Custom provider` : "") || panelAt === `new:${providerKey(provider)}`) &&
+    (provider.baseUrl || isCustom(provider) || !connectedIds.has(provider.id)),
   ) : [];
+  const visibleCredentials = genericCredentials.filter((credential) => matches(nameOf(credential), credential.provider) || panelAt === credential.id);
+  const visibleRuntimes = runtimes.filter((runtime) =>
+    (!onOpenIntegration || runtime.id !== "opencode") && matches(runtime.name, runtime.id),
+  );
+  const openCode = runtimes.find((runtime) => runtime.id === "opencode");
+  const integrationRow = (id: ProviderIntegration, name: string, status: string, icon: ReactNode) => (
+    <li data-testid={`${id}-provider`}>
+      <button ref={integrationTriggers?.[id]} type="button" className={rowClass} disabled={disabled} onClick={() => onOpenIntegration?.(id)}>
+        {icon}
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">{name}</span>
+          <span className="block text-xs text-muted-foreground">{status}</span>
+        </span>
+        <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground rtl:rotate-180" />
+      </button>
+    </li>
+  );
+  const openCodeRow = onOpenIntegration && matches("OpenCode") ? integrationRow(
+    "opencode", "OpenCode",
+    openCode?.available ? t`Available on this server` : openCode?.canInstall ? t`Download available` : t`Built-in agent engine`,
+    <SquareTerminal aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
+  ) : null;
+  const antseedRow = onOpenIntegration && matches("AntSeed", ...antseedCredentials.map(nameOf)) ? integrationRow(
+    "antseed", "AntSeed", antseedConnected ? t`Connected` : t`Not connected`,
+    <Network aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
+  ) : null;
+  const showPrimary = Boolean(primary && matches("Mycellios"));
+  function runtimeRow(runtime: ProviderRuntime) {
+    const expanded = openRuntime === runtime.id;
+    return <li key={runtime.id}>
+      <button type="button" className={rowClass} aria-expanded={expanded} disabled={disabled}
+        onClick={() => setOpenRuntime(expanded ? null : runtime.id)}>
+        <Terminal className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium">{runtime.name}</span>
+          <span className="block text-xs text-muted-foreground">
+            {runtime.available ? t`Available on this server` : runtime.canInstall ? t`Download available` : t`Not installed`}
+          </span>
+        </span>
+        <ChevronRight aria-hidden className={`size-4 shrink-0 text-muted-foreground ${expanded ? "rotate-90" : "rtl:rotate-180"}`} />
+      </button>
+      {expanded ? <div className="px-3 pb-3">{runtimeDetails?.(runtime)}</div> : null}
+    </li>;
+  }
   return (
     <section className="mb-8" data-testid="model-providers">
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -65,20 +133,21 @@ export function ProvidersSection({
           {showDirectory ? t`Connected providers` : t`Providers`}
         </h3>
         {showDirectory ? (
+          <div className="relative w-full sm:w-52">
+          <Search className="pointer-events-none absolute start-2.5 top-2 size-4 text-muted-foreground" aria-hidden />
           <Input
             type="search"
-            className="w-full sm:w-52"
+            className="w-full ps-8"
             aria-label={t`Search providers`}
             placeholder={t`Search providers`}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-          />
+          /></div>
         ) : null}
       </div>
       <ul className="divide-y divide-border rounded-xl border border-border">
-        {matches("Mycellios") ? primary : null}
-        {credentials
-          .filter((credential) => matches(nameOf(credential)) || panelAt === credential.id)
+        {showPrimary && (!showDirectory || primaryConnected) ? primary : null}
+        {visibleCredentials
           // Saving a key reorders the account's connections; this list stays put.
           .sort((left, right) => nameOf(left).localeCompare(nameOf(right)))
           .map((credential) => (
@@ -87,10 +156,13 @@ export function ProvidersSection({
                 type="button"
                 disabled={disabled}
                 onClick={() => onOpen(credential)}
-                className="flex min-h-[52px] w-full items-center gap-2.5 py-2 ps-3 pe-3 text-start outline-none first:rounded-t-xl hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+                aria-expanded={panelAt === credential.id}
+                className={rowClass}
               >
-                <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">
-                  {nameOf(credential)}
+                <Plug className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{nameOf(credential)}</span>
+                  {showDirectory ? <span className="block text-xs text-muted-foreground">{t`Connected`}</span> : null}
                 </span>
                 <ChevronRight
                   className={`size-4 shrink-0 text-muted-foreground transition-transform ${panelAt === credential.id ? "rotate-90" : ""}`}
@@ -100,29 +172,51 @@ export function ProvidersSection({
               {panelAt === credential.id ? <div className="px-3 pb-3">{panel}</div> : null}
             </li>
           ))}
-        <li>
+        {openCode?.available ? openCodeRow : null}
+        {antseedConnected ? antseedRow : null}
+        {visibleRuntimes.filter((runtime) => runtime.available).map(runtimeRow)}
+        {!showDirectory || !query.trim() ? <li>
           <AddProvider providers={providers} disabled={disabled} onPick={onAdd} />
-        </li>
+        </li> : null}
+        {showDirectory && !(showPrimary && primaryConnected) && !(openCodeRow && openCode?.available) &&
+          !(antseedRow && antseedConnected) &&
+          !visibleCredentials.length && !visibleRuntimes.some((runtime) => runtime.available) ?
+          <li className="px-3 py-2 text-sm text-muted-foreground">{t`No results`}</li> : null}
       </ul>
       {panelAt === "add" ? panel : null}
       {showDirectory ? (
         <div className="mt-6">
           <h3 className="mb-2.5 text-[15px] font-medium text-foreground">{t`Other providers`}</h3>
-          {available.length ? (
+          {available.length || (showPrimary && !primaryConnected) || (openCodeRow && !openCode?.available) ||
+            (antseedRow && !antseedConnected) || visibleRuntimes.some((runtime) => !runtime.available) ? (
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
-              {available.map((provider) => (
-                <li key={`${provider.id}:${provider.baseUrl ?? ""}`}>
+              {showPrimary && !primaryConnected ? primary : null}
+              {!openCode?.available ? openCodeRow : null}
+              {!antseedConnected ? antseedRow : null}
+              {visibleRuntimes.filter((runtime) => !runtime.available).map(runtimeRow)}
+              {available.map((provider) => {
+                const key = providerKey(provider);
+                const expanded = panelAt === `new:${key}`;
+                const custom = isCustom(provider);
+                const Icon = custom ? SlidersHorizontal : Plug;
+                return <li key={key}>
                   <button
                     type="button"
                     disabled={disabled}
-                    className="flex min-h-[48px] w-full items-center justify-between gap-2 px-3 text-start text-sm hover:bg-accent/50 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
-                    onClick={() => onAdd(provider)}
+                    aria-expanded={expanded}
+                    className={rowClass}
+                    onClick={() => expanded ? onClose?.() : onAdd(provider, key)}
                   >
-                    {provider.name}
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{custom ? t`Custom provider` : provider.name}</span>
+                      <span className="block text-xs text-muted-foreground">{custom ? t`Connect your own model endpoint` : t`Not connected`}</span>
+                    </span>
+                    <ChevronRight className={`size-4 shrink-0 text-muted-foreground ${expanded ? "rotate-90" : "rtl:rotate-180"}`} aria-hidden />
                   </button>
-                </li>
-              ))}
+                  {expanded ? <div className="px-3 pb-3">{panel}</div> : null}
+                </li>;
+              })}
             </ul>
           ) : <p className="text-sm text-muted-foreground">{t`No results`}</p>}
         </div>

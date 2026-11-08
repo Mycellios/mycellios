@@ -675,10 +675,6 @@ msgstr "Siempre permitido"
 msgid "An API key is stored for this provider, not a subscription sign-in."
 msgstr "Hay una clave de API guardada para este proveedor, no un inicio de sesión por suscripción."
 
-#: src/pages/memory-providers/HonchoSettingsForm.tsx
-msgid "An existing Honcho peer to read from. Rakazo never writes to it."
-msgstr "Un peer existente de Honcho del que leer. Rakazo nunca escribe en él."
-
 #: src/lib/agent-import-errors.ts
 msgid "An imported API key could not be checked. Try again."
 msgstr "No se pudo comprobar una clave de API importada. Vuelve a intentarlo."
@@ -1210,7 +1206,7 @@ msgid "Choose folder"
 msgstr "Elegir carpeta"
 
 #: src/components/ModelCredits.tsx
-msgid "Choose how to use Rakazo"
+msgid "Choose how to use Mycellios"
 msgstr ""
 
 #: src/lib/localized-provider-hint.ts
@@ -1498,8 +1494,8 @@ msgstr "Conectar Treg"
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
-msgid "Connect your own API key in Models or choose Rakazo credits in Billing."
-msgstr "Conecta tu propia clave de API en Modelos o elige créditos de Rakazo en Facturación."
+msgid "Connect your own API key in Models or choose Mycellios credits in Billing."
+msgstr "Conecta tu propia clave de API en Modelos o elige créditos de Mycellios en Facturación."
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/McpOAuthCallback.tsx
@@ -1643,6 +1639,10 @@ msgstr "No se pudo completar OAuth"
 #: src/components/DesktopUpdates.tsx
 msgid "Could not complete the update. Try again."
 msgstr "No se pudo completar la actualización. Vuelve a intentarlo."
+
+#: src/components/DesktopUpdates.tsx
+msgid "Free at least 6 GB of disk space before restarting to update."
+msgstr "Libera al menos 6 GB de espacio en disco antes de reiniciar para actualizar."
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/PluginsOverlay.tsx
@@ -2085,8 +2085,8 @@ msgid "Create space"
 msgstr "Crear space"
 
 #: src/pages/Auth.tsx
-msgid "Create your Rakazo"
-msgstr "Crea tu Rakazo"
+msgid "Create your Mycellios"
+msgstr "Crea tu Mycellios"
 
 #: src/components/AskCard.tsx
 msgid "Created"
@@ -2836,10 +2836,6 @@ msgstr "Cómo lo ven otros Micos"
 #: src/components/teach/SkillDraftCard.tsx
 msgid "How to check"
 msgstr "Cómo comprobar"
-
-#: src/components/SignupSurvey.tsx
-msgid "How will you use Rakazo?"
-msgstr ""
 
 #: src/pages/shell/computer-release-actions.tsx
 msgid "I’m done"
@@ -3696,8 +3692,8 @@ msgid "Not imported"
 msgstr "No importado"
 
 #: src/pages/shell/import-status.ts
-msgid "Not in Rakazo's catalog"
-msgstr "No está en el catálogo de Rakazo"
+msgid "Not in Mycellios's catalog"
+msgstr "No está en el catálogo de Mycellios"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Not in the plugin catalog"
@@ -3709,12 +3705,12 @@ msgstr "Ahora no"
 
 #: src/pages/shell/agent-import.tsx
 #: src/pages/shell/import-status.ts
-msgid "Not supported in Rakazo"
-msgstr "No compatible con Rakazo"
+msgid "Not supported in Mycellios"
+msgstr "No compatible con Mycellios"
 
 #: src/pages/shell/agent-import.tsx
-msgid "Not used by Rakazo"
-msgstr "Rakazo no lo usa"
+msgid "Not used by Mycellios"
+msgstr "Mycellios no lo usa"
 
 #: src/components/McpServerHealthLine.tsx
 msgid "Not working"
@@ -3942,8 +3938,8 @@ msgid "Paste a replacement key"
 msgstr "Pega una clave de reemplazo"
 
 #: src/pages/model-settings/compatible-model-fields.tsx
-msgid "Paste the OpenAI-compatible address from your server. Rakazo adds /v1 if needed."
-msgstr "Pega la dirección compatible con OpenAI de tu servidor. Rakazo agrega /v1 si es necesario."
+msgid "Paste the OpenAI-compatible address from your server. Mycellios adds /v1 if needed."
+msgstr "Pega la dirección compatible con OpenAI de tu servidor. Mycellios agrega /v1 si es necesario."
 
 #: src/pages/shell/agent-import.tsx
 msgid "Paste the reply"
@@ -4085,13 +4081,8 @@ msgstr "Solicitud de incorporación"
 msgid "Queued"
 msgstr "En cola"
 
-#: src/components/ModelCredits.tsx
-#: src/pages/Onboarding.tsx
-msgid "Rakazo credits"
-msgstr ""
-
 #: src/pages/memory-providers/HonchoSettingsForm.tsx
-msgid "rakazo-shared and IDs starting with bot- are reserved for Rakazo."
+msgid "rakazo-shared and IDs starting with bot- are reserved for Mycellios."
 msgstr ""
 
 #: src/pages/shell/message-hover-actions.tsx
@@ -4448,10 +4439,6 @@ msgstr "Reintentar pantalla"
 #: src/components/call/CallCard.tsx
 msgid "Return to call with {0}"
 msgstr "Volver a la llamada con {0}"
-
-#: src/pages/McpOAuthCallback.tsx
-msgid "Return to Rakazo"
-msgstr "Volver a Rakazo"
 
 #: src/lib/model-connection-preflight.ts
 msgid "Review provider settings and test again."
@@ -4821,10 +4808,6 @@ msgstr "Vuelve a iniciar sesión"
 #: src/pages/Onboarding.tsx
 msgid "Sign in at <0>{0}</0>, then paste the code here."
 msgstr "Inicia sesión en <0>{0}</0> y pega el código aquí."
-
-#: src/pages/Auth.tsx
-msgid "Sign in to Rakazo"
-msgstr "Inicia sesión en Rakazo"
 
 #: src/lib/user-error.ts
 msgid "Sign in to your existing account to link SSO"
@@ -5266,8 +5249,8 @@ msgid "This server is already connected. Disconnect it first to authorize again.
 msgstr "Este servidor ya está conectado. Desconéctalo primero para autorizarlo de nuevo."
 
 #: src/pages/model-settings/connection-controls.tsx
-msgid "This subscription sign-in is not available in Rakazo yet. Use a deployment credential or choose another provider."
-msgstr "Este inicio de sesión por suscripción aún no está disponible en Rakazo. Usa una credencial de despliegue o elige otro proveedor."
+msgid "This subscription sign-in is not available in Mycellios yet. Use a deployment credential or choose another provider."
+msgstr "Este inicio de sesión por suscripción aún no está disponible en Mycellios. Usa una credencial de despliegue o elige otro proveedor."
 
 #: src/pages/Artifacts.tsx
 msgid "This week"
@@ -5546,7 +5529,7 @@ msgid "Use Protected input for passwords."
 msgstr ""
 
 #: src/components/ModelCredits.tsx
-msgid "Use Rakazo credits"
+msgid "Use Mycellios credits"
 msgstr ""
 
 #: src/pages/model-settings/space-bots-model.tsx
@@ -5646,16 +5629,12 @@ msgstr ""
 msgid "Weekdays"
 msgstr "Días laborables"
 
-#: src/components/SignupSurvey.tsx
-msgid "Welcome to Rakazo"
-msgstr ""
-
 #: src/pages/shell/dialogs.tsx
 msgid "What about its memories?"
 msgstr "¿Qué hay de sus memorias?"
 
 #: src/components/SignupSurvey.tsx
-msgid "What do you most want Rakazo to help with?"
+msgid "What do you most want Mycellios to help with?"
 msgstr ""
 
 #: src/pages/shell/message-cards.tsx
@@ -9782,3 +9761,186 @@ msgstr "Esta conexión no devolvió modelos en su catálogo."
 
 msgid "This model is already enabled on another connection. Use it from that connection."
 msgstr "Este modelo ya está habilitado en otra conexión. Selecciónalo desde allí."
+
+msgid "Available in each Mico’s Agent engine settings."
+msgstr "Disponible en los ajustes del motor de cada Mico."
+
+msgid "Uses OpenCode in an isolated profile without your local sign-in."
+msgstr "Usa OpenCode en un perfil aislado, sin usar la sesión de este equipo."
+
+msgid "Version {0} · Downloaded by Mycellios"
+msgstr "Versión {0} · Descargada por Mycellios"
+
+msgid "Could not install OpenCode. Try again."
+msgstr "No se pudo instalar OpenCode. Inténtalo de nuevo."
+
+msgid "Download OpenCode to use it on this server."
+msgstr "Descarga OpenCode para usarlo en este servidor."
+
+msgid "OpenCode is unavailable for this space."
+msgstr "OpenCode no está disponible en este espacio."
+
+msgid "Create your account and get {SPORE_WELCOME_REWARD} trial Spore with no monetary value."
+msgstr "Crea tu cuenta y recibe {SPORE_WELCOME_REWARD} Spore de prueba sin valor monetario."
+
+msgid "Trial Spore"
+msgstr "Spore de prueba"
+
+msgid "{0} welcome Spore · {1} earned from usage"
+msgstr "{0} Spore de bienvenida · {1} ganados por uso"
+
+msgid "{0} / {1} tokens toward the next Spore"
+msgstr "{0} / {1} tokens para el siguiente Spore"
+
+msgid "Could not load Spore rewards."
+msgstr "No se pudieron cargar las recompensas Spore."
+
+msgid "Loading Spore rewards…"
+msgstr "Cargando recompensas Spore…"
+
+msgid "Earn 1 Spore for every million tokens processed."
+msgstr "Gana 1 Spore por cada millón de tokens procesados."
+
+msgid "Across all your spaces. Trial rewards have no monetary value and are not on-chain."
+msgstr "Cuenta el uso de todos tus espacios. Las recompensas de prueba no tienen valor monetario ni están en blockchain."
+
+msgid "Could not check local voice. Try again."
+msgstr "No se pudo comprobar la voz local. Inténtalo de nuevo."
+
+msgid "Could not use the microphone. Check its permission and try again."
+msgstr "No se pudo usar el micrófono. Revisa su permiso e inténtalo de nuevo."
+
+msgid "Could not send your voice message. Check the chat before trying again."
+msgstr "No se pudo confirmar el envío del mensaje de voz. Revisa el chat antes de volver a intentarlo."
+
+msgid "Could not follow the Mico’s response. Check the chat."
+msgstr "No se pudo seguir la respuesta del Mico. Revisa el chat."
+
+msgid "The Mico stopped responding. Check the chat."
+msgstr "El Mico dejó de responder. Revisa el chat."
+
+msgid "Could not play the reply. You can read it in the chat."
+msgstr "No se pudo reproducir la respuesta. Puedes leerla en el chat."
+
+msgid "Could not open this chat for voice. Try again."
+msgstr "No se pudo abrir este chat para usar la voz. Inténtalo de nuevo."
+
+msgid "Default provider"
+msgstr "Proveedor predeterminado"
+
+msgid "Used by new Micos and Micos that follow the general model."
+msgstr "Lo usan los Micos nuevos y los que siguen el modelo general."
+
+msgid "Available on this server"
+msgstr "Disponible en este servidor"
+
+msgid "Download available"
+msgstr "Descarga disponible"
+
+msgid "Not installed"
+msgstr "Sin instalar"
+
+msgid "Custom provider"
+msgstr "Proveedor personalizado"
+
+msgid "Connect your own model endpoint"
+msgstr "Conecta tu propio servidor de modelos"
+
+msgid "A server administrator must configure this agent engine before it can be used."
+msgstr "Un administrador del servidor debe configurar este motor antes de usarlo."
+
+msgid "Found on this server"
+msgstr "Encontrado en este servidor"
+
+msgid "Scan again"
+msgstr "Buscar de nuevo"
+
+msgid "Could not check the server’s agent engines."
+msgstr "No se pudieron comprobar los motores del servidor."
+
+msgid "No native agents found on this server."
+msgstr "No se encontraron agentes nativos en este servidor."
+
+msgid "The server administrator manages custom ACP agents in the host configuration."
+msgstr "El administrador gestiona los agentes ACP personalizados en la configuración del servidor."
+
+msgid "ACP Registry"
+msgstr "Registro ACP"
+
+msgid "Browse agent engines compatible with the Agent Client Protocol."
+msgstr "Explora motores de agentes compatibles con el protocolo ACP."
+
+msgid "Search the ACP Registry"
+msgstr "Buscar en el Registro ACP"
+
+msgid "Could not load the ACP Registry."
+msgstr "No se pudo cargar el Registro ACP."
+
+msgid "Browse ACP Registry"
+msgstr "Abrir el Registro ACP"
+
+msgid "Local discovery"
+msgstr "Detección local"
+
+msgid "Find Ollama and LM Studio on the computer running this server. Use Custom provider for other addresses."
+msgstr "Busca Ollama y LM Studio en el equipo que ejecuta este servidor. Para otras direcciones, usa Proveedor personalizado."
+
+msgid "Built-in agent engine"
+msgstr "Motor de agente incluido"
+
+msgid "Checking availability…"
+msgstr "Comprobando disponibilidad…"
+
+msgid "Runtime"
+msgstr "Entorno de ejecución"
+
+msgid "Check availability"
+msgstr "Comprobar disponibilidad"
+
+msgid "Use"
+msgstr "Uso"
+
+msgid "Choose OpenCode in the Mico’s Agent engine settings."
+msgstr "Elige OpenCode en los ajustes del motor de cada Mico."
+
+msgid "Model API connections"
+msgstr "Conexiones API de modelos"
+
+msgid "Zen and Go use separate API credentials for model requests."
+msgstr "Zen y Go usan credenciales API independientes para las peticiones de modelos."
+
+msgid "Add key"
+msgstr "Añadir clave"
+
+msgid "Model provider through your AntSeed gateway"
+msgstr "Proveedor de modelos a través de tu gateway AntSeed"
+
+msgid "{modelCount} models enabled"
+msgstr "{modelCount} modelos habilitados"
+
+msgid "AntSeed gateway"
+msgstr "Gateway de AntSeed"
+
+msgid "Use your own gateway URL and API key."
+msgstr "Usa la URL y la clave API de tu propio gateway."
+
+msgid "Add connection"
+msgstr "Añadir conexión"
+
+msgid "Choose a model in your Mico’s model picker."
+msgstr "Elige un modelo en el selector de tu Mico."
+
+msgid "Your AntSeed gateway manages its own balance and spending limits."
+msgstr "Tu gateway AntSeed gestiona su saldo y sus límites de gasto."
+
+msgid "Gateway guide"
+msgstr "Guía del gateway"
+
+msgid "Organizing the task…"
+msgstr "Organizando la tarea…"
+
+msgid "Checking the calendar…"
+msgstr "Consultando el calendario…"
+
+msgid "Checking email…"
+msgstr "Consultando el correo…"

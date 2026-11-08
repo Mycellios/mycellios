@@ -11,7 +11,29 @@ const viewports = [
   { name: "mobile-390x844", width: 390, height: 844 },
 ];
 
+test("desktop live activity expands to steps before execution details", async ({ page }, testInfo) => {
+  await page.route("**/rpc/**", (route) => route.abort());
+  await page.goto(`${fixture}?view=thread&phase=live&run`);
+  const row = page.getByTestId("run-activity-status");
+  await row.getByLabel("Show task activity").click();
+  const steps = row.getByRole("list", { name: "Task activity" });
+  await expect(steps).toBeVisible();
+  await expect(steps.getByRole("listitem")).toHaveCount(2);
+  await expect(steps).toContainText("×8");
+  await expect(steps).toContainText("Checking the calendar");
+  await expect(steps).toContainText("Reported an error");
+  await expect(steps).not.toContainText(/Open calendar|234ms|git status|fixture-model/);
+  await expect(row.getByText("fixture-model", { exact: true })).toBeHidden();
+  await expect(row).not.toContainText(/Last worker signal|Worker lease valid until|Not reported yet/);
+  await captureScreenshot(page, testInfo, "desktop-live-activity");
+  await row.getByText("Technical details", { exact: true }).click();
+  await expect(row.getByText("fixture-model", { exact: true })).toBeVisible();
+  await row.getByText("shell", { exact: true }).click();
+  await expect(row.getByText("git status", { exact: true })).toBeVisible();
+});
+
 test("mobile live run opens a separate activity sheet even with auto-expand enabled", async ({ page }, testInfo) => {
+  await page.route("**/rpc/**", (route) => route.abort());
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(key => localStorage.setItem(key, "expanded"), STORAGE_KEY);
   await page.goto(`${fixture}?view=thread&phase=live&run`);

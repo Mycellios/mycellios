@@ -186,7 +186,7 @@ it("keeps the header and recovery model in sync with the current account setting
     onConnections: () => {},
   };
   renderComposer(async () => true, {
-    runError: "Desktop execution interrupted; check existing results before retrying",
+    runError: "Connect a model in Settings before running bots.",
     runErrorModelAction: (
       <QueryClientProvider client={client}>
         <ChatHeaderModel {...pickerProps} />
@@ -257,31 +257,14 @@ it.each([false, true])("enables only the chosen catalog model, using it only whe
   }
 });
 
-it("changes model from a Desktop failure without replaying the turn or clearing the draft", async () => {
-  const changeModel = vi.fn(async () => {});
+it("keeps the draft and hides model changes and replay for an uncertain Desktop run", () => {
   const send = vi.fn(async () => true);
   const retry = vi.fn();
-  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
-  const queries = spaceQueries(null, null);
-  client.setQueryData(queries.models.credentials.queryKey(), [
-    { id: "omniroute", provider: "openai-compatible", label: "OmniRoute", hasKey: true, isDefault: false, modelId: "alternative" },
-  ]);
-  client.setQueryData(queries.models.list.queryKey(), []);
   const textarea = renderComposer(send, {
     runError: "Desktop execution interrupted; check existing results before retrying",
     runErrorId: "original-run",
     onRetryError: retry,
-    runErrorModelAction: (
-      <QueryClientProvider client={client}>
-        <ChatHeaderModel
-          recovery
-          bot={{ modelProvider: null, modelId: null, thinkingLevel: null } as Bot}
-          me={null}
-          onSave={changeModel}
-          onConnections={() => {}}
-        />
-      </QueryClientProvider>
-    ),
+    runErrorModelAction: <button type="button">Change model</button>,
   });
   const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
   act(() => {
@@ -289,18 +272,7 @@ it("changes model from a Desktop failure without replaying the turn or clearing 
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   });
   expect(container!.querySelector('[data-testid="composer-error-retry"]')).toBeNull();
-  const trigger = container!.querySelector<HTMLButtonElement>('[aria-label="Change model"]')!;
-  await act(async () => trigger.click());
-  const select = document.querySelector<HTMLButtonElement>('[data-slot="select-trigger"]')!;
-  await act(async () => select.click());
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')]
-    .find((entry) => entry.textContent?.includes("alternative"));
-  expect(option).toBeDefined();
-  await act(async () => option!.click());
-  expect(changeModel).toHaveBeenCalledExactlyOnceWith({
-    modelProvider: "openai-compatible", modelId: "alternative", thinkingLevel: null,
-  });
-  expect(container!.querySelector('[data-testid="composer-error"]')).not.toBeNull();
+  expect(container!.querySelector('[data-testid="composer-error"]')?.textContent).not.toContain("Change model");
   expect(textarea.value).toBe("Unsent follow-up");
   expect(send).not.toHaveBeenCalled();
   expect(retry).not.toHaveBeenCalled();

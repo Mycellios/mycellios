@@ -34,6 +34,10 @@ const STEP_LABELS = [
 const stepsBlock: MessageBlock = {
   kind: "steps",
   steps: STEP_LABELS.map((label) => ({ label, count: 1 })),
+  ...(withRun ? { tools: [
+    ...STEP_LABELS.map((detail, index) => ({ id: `calendar:${index}`, name: "calendar", detail, outcome: "succeeded" as const, durationMs: 234 })),
+    { id: "shell:failure", name: "shell", command: "git status", cwd: "/fixture/project", outcome: "error" as const, error: "Fixture error", durationMs: 370 },
+  ] } : {}),
   ...(live ? {} : { durationMs: 12_400 }),
 };
 

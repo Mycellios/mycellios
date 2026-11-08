@@ -1,5 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot, Space, UsageDashboard, UsageDashboardTotals } from "@rakazo/contracts";
+import { TOKENS_PER_TRIAL_SPORE, type Bot, type Space, type UsageDashboard, type UsageDashboardTotals } from "@rakazo/contracts";
+import { useQuery } from "@tanstack/react-query";
 import { NativeSelectOption, NativeSelect,
   BotAvatar,
   Button,
@@ -60,6 +61,11 @@ export function UsageWorkspace({
     locale = i18n.locale || "en",
     zone = localTimezone();
   const key = `mycellios:usage:${scope}`;
+  const rewards = useQuery({
+    queryKey: ["spore-rewards", scope],
+    queryFn: ({ signal }) => client.usage.sporeRewards(undefined, { signal }),
+    refetchInterval: 60_000,
+  });
   const [filter, setFilter] = useState<Filter>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(key) ?? "null");
@@ -323,7 +329,10 @@ export function UsageWorkspace({
             size="icon-sm"
             aria-label={t`Refresh usage`}
             disabled={loading}
-            onClick={() => refresh((value) => value + 1)}
+            onClick={() => {
+              refresh((value) => value + 1);
+              void rewards.refetch();
+            }}
           >
             <RefreshCw
               size={15}
@@ -333,6 +342,26 @@ export function UsageWorkspace({
         </div>
       </header>
       <div className="rk-usage-content rk-scroll">
+        <section className="mb-4 space-y-2 rounded-xl border border-border bg-card p-4" aria-label={t`Trial Spore`}>
+          <h2 className="text-sm font-semibold">{t`Trial Spore`}</h2>
+          {rewards.data ? (
+            <>
+              <p className="text-2xl font-semibold tabular-nums">{exact(rewards.data.welcome + rewards.data.earned)} Spore</p>
+              <p className="text-sm text-muted-foreground">
+                {t`${exact(rewards.data.welcome)} welcome Spore · ${exact(rewards.data.earned)} earned from usage`}
+              </p>
+              <p className="text-sm tabular-nums text-muted-foreground">
+                {t`${exact(rewards.data.progressTokens)} / ${exact(TOKENS_PER_TRIAL_SPORE)} tokens toward the next Spore`}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground" role="status">
+              {rewards.isError ? t`Could not load Spore rewards.` : t`Loading Spore rewards…`}
+            </p>
+          )}
+          <p className="text-sm text-muted-foreground">{t`Earn 1 Spore for every million tokens processed.`}</p>
+          <p className="text-sm text-muted-foreground">{t`Across all your spaces. Trial rewards have no monetary value and are not on-chain.`}</p>
+        </section>
         {error ? (
           <p className="rk-usage-notice text-destructive" role="alert">
             {t`Could not load usage data.`} {error}

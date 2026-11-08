@@ -34,7 +34,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { McpServerHealthLine } from "../components/McpServerHealthLine";
 import { connectMcpOauth, MCP_OAUTH_CHANNEL, mcpOAuthRedirectUri } from "../lib/mcp-connect";
 import { fetchFresh, useSpaceQueries, writeSaved } from "../lib/query";
-import { rpc } from "../lib/rpc";
+import { useSpaceRpc } from "../lib/space-rpc";
 import { errorText } from "../lib/user-error";
 
 /** How often the list is re-read while a server installs its package or is being tested. */
@@ -42,7 +42,7 @@ const INSTALL_POLL_MS = 2500;
 
 type EnvRow = { id: number; name: string; value: string; file: boolean };
 
-/** How an env value asks Rakazo to inject the granted OAuth access token. */
+/** How an env value asks Mycellios to inject the granted OAuth access token. */
 const oauthEnvReference = "{{oauth.access_token}}";
 
 let nextEnvRowId = 0;
@@ -75,12 +75,15 @@ function oauthActionLabel(server: McpServer, pending: boolean): string {
 export function McpServersOverlay({
   onClose,
   editServerId,
+  embedded = false,
 }: {
   onClose: () => void;
   /** Opens with this server's form, as an import's setup checklist does. */
   editServerId?: string;
+  embedded?: boolean;
 }) {
   const { t } = useLingui();
+  const rpc = useSpaceRpc();
   const [editing, setEditing] = useState<McpServer | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [selectedBotIds, setSelectedBotIds] = useState<string[]>([]);
@@ -343,7 +346,7 @@ export function McpServersOverlay({
     setError(null);
     setOauthPending(server.id);
     try {
-      const result = await connectMcpOauth(server.id);
+      const result = await connectMcpOauth(server.id, rpc);
       if (result !== "cancelled") setOauthPending(null);
       await refresh();
       if (result === "connected") return;
@@ -437,27 +440,8 @@ export function McpServersOverlay({
     }
   }
 
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent
-        showCloseButton={false}
-        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100dvw-2rem)] max-w-[960px] flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 sm:max-w-[960px]"
-      >
-        <DialogHeader className="flex-row items-center justify-between border-b border-border px-6 py-5">
-          <DialogTitle className="text-heading2 text-foreground">
-            <Trans>MCP servers</Trans>
-          </DialogTitle>
-          <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t`Close MCP servers`} />}
-          >
-            <X />
-          </DialogClose>
-        </DialogHeader>
+  const content = (
+    <>
         {shownError ? (
           <p
             role="alert"
@@ -466,7 +450,7 @@ export function McpServersOverlay({
             {shownError}
           </p>
         ) : null}
-        <div className="rk-scroll grid min-h-0 grid-cols-1 gap-5 overflow-y-auto p-6 lg:grid-cols-2">
+        <div className={`grid min-h-0 grid-cols-1 gap-5 lg:grid-cols-2 ${embedded ? "" : "rk-scroll overflow-y-auto p-6"}`}>
           <Card className="self-start">
             <CardHeader>
               <CardTitle>{editing ? editing.name : <Trans>Add server</Trans>}</CardTitle>
@@ -946,6 +930,24 @@ export function McpServersOverlay({
             </div>
           </div>
         </div>
+    </>
+  );
+  if (embedded) return content;
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[calc(100dvh-2rem)] w-[calc(100dvw-2rem)] max-w-[960px] flex-col gap-0 overflow-hidden rounded-2xl bg-card p-0 sm:max-w-[960px]"
+      >
+        <DialogHeader className="flex-row items-center justify-between border-b border-border px-6 py-5">
+          <DialogTitle className="text-heading2 text-foreground">
+            <Trans>MCP servers</Trans>
+          </DialogTitle>
+          <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label={t`Close MCP servers`} />}>
+            <X />
+          </DialogClose>
+        </DialogHeader>
+        {content}
       </DialogContent>
     </Dialog>
   );

@@ -8,7 +8,7 @@ const catalogApps = ["gmail", "obscure-app", "notion", "github"];
 test.use({ deviceScaleFactor: 3 });
 
 for (const theme of ["light", "dark"]) {
-  test(`familiar app suggestions share a plate and separating ring in ${theme}`, async ({
+  test(`familiar app suggestions are visible in the workspace rail in ${theme}`, async ({
     page,
   }, testInfo) => {
     await page.addInitScript((theme) => localStorage.setItem("rakazo.uiAppearance", theme), theme);
@@ -41,7 +41,7 @@ for (const theme of ["light", "dark"]) {
     );
     await signup(page, `app-marks-${theme}-${Date.now()}@rakazo.test`, "password12", "Demo User");
     await completeOnboarding(page);
-    const footer = page.getByTestId("sidebar-footer");
+    const footer = page.getByTestId("workspace-rail").getByTestId("sidebar-footer");
     const pill = footer.getByRole("button", { name: "Connect apps", exact: true });
     const tiles = pill.locator('span[aria-hidden="true"] > span');
     await expect(tiles).toHaveCount(3);
@@ -59,16 +59,6 @@ for (const theme of ["light", "dark"]) {
     for (const hover of [false, true]) {
       if (hover) await pill.hover();
       else await page.mouse.move(1000, 400);
-      // Button colors transition after pointer/theme changes; compare the settled surface.
-      await expect
-        .poll(() =>
-          pill.evaluate((el) => {
-            const tile = el.querySelector('span[aria-hidden="true"] > span')!;
-            return getComputedStyle(tile).boxShadow.includes(getComputedStyle(el).backgroundColor);
-          }),
-        )
-        .toBe(true);
-      const background = await pill.evaluate((el) => getComputedStyle(el).backgroundColor);
       const boxes = await tiles.evaluateAll((els) =>
         els.map((el) => {
           const style = getComputedStyle(el);
@@ -79,23 +69,17 @@ for (const theme of ["light", "dark"]) {
             width: box.width,
             height: box.height,
             background: style.backgroundColor,
-            shadow: style.boxShadow,
-            padding: style.padding,
-            zIndex: style.zIndex,
           };
         }),
       );
       for (const [index, box] of boxes.entries()) {
         expect(box).toMatchObject({
-          width: 24,
-          height: 24,
+          width: 21,
+          height: 21,
           background: "rgb(255, 255, 255)",
-          padding: "4px",
-          zIndex: String(index),
         });
-        expect(box.shadow).toContain(background);
-        expect(box.y).toBe(boxes[0]!.y);
-        if (index) expect(box.x - boxes[index - 1]!.x).toBe(22);
+        expect(box.x).toBe(boxes[0]!.x);
+        if (index) expect(box.y).toBeGreaterThan(boxes[index - 1]!.y + box.height);
       }
       const path = testInfo.outputPath(`app-marks-${theme}${hover ? "-hover" : ""}.png`);
       await footer.screenshot({ path, animations: "disabled" });

@@ -1,6 +1,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { SettingsScope } from "@rakazo/contracts";
 import {
+  ANTSEED_PROVIDER_ID,
   compatibleConnectionName,
   connectionDisplayName,
   DEFAULT_MODEL_CONTEXT_WINDOW,
@@ -34,8 +35,13 @@ import type { ModelCredential } from "../lib/model-auth";
 import type { ModelRoleConnectIntent } from "./ModelRoleSettings";
 import { ModelRoleSettings } from "./ModelRoleSettings";
 import { CompatibleModelFields } from "./model-settings/compatible-model-fields";
+import { AntSeedProvider } from "./model-settings/antseed-provider";
 import { CompatibleKeyControls, ConnectionControls } from "./model-settings/connection-controls";
-import { MycelliosProvider } from "./model-settings/mycellios-provider";
+import { savedModelIds } from "./model-settings/enable-compatible-model";
+import { isMycelliosProviderConnected, MycelliosProvider } from "./model-settings/mycellios-provider";
+import { OpenCodeProvider } from "./model-settings/open-code-provider";
+import type { ProviderIntegration } from "./model-settings/provider-detail";
+import { ProviderDiscovery, ProviderRuntimeDetails, useProviderRuntimes } from "./model-settings/provider-runtime";
 import { ConnectionNameField, ProvidersSection } from "./model-settings/providers-section";
 import type { ConnectableProvider } from "./model-settings/role-model-picker";
 import { SpaceBotsModelNotice } from "./model-settings/space-bots-model";
@@ -63,6 +69,7 @@ export function ModelSettingsOverlay({
 }) {
   const { t } = useLingui();
   const model = useModelSettings(onClose, scope);
+  const host = useProviderRuntimes(providersOnly && scope === "account");
   const {
     baseUrl,
     busy,
@@ -99,8 +106,21 @@ export function ModelSettingsOverlay({
   // Where the connection form opens: under a role's list, under a provider row, or at the
   // end of Providers when adding one. The rest of the page stays where it was.
   const [connectionAt, setConnectionAt] = useState<string | null>(null);
+  const [integration, setIntegration] = useState<ProviderIntegration | null>(null);
+  const openCodeTrigger = useRef<HTMLButtonElement>(null);
+  const antseedTrigger = useRef<HTMLButtonElement>(null);
+  const restoreIntegrationFocus = useRef<ProviderIntegration | null>(null);
+  useEffect(() => {
+    if (integration || !restoreIntegrationFocus.current) return;
+    const trigger = restoreIntegrationFocus.current === "opencode" ? openCodeTrigger : antseedTrigger;
+    restoreIntegrationFocus.current = null;
+    trigger.current?.focus();
+  }, [integration]);
   const panelRef = useRef<HTMLDivElement>(null);
   const formBusy = pending !== null || model.preflightTesting || model.probing;
+  const antseedModelsDirty = connectionAt === "antseed:connection" && credential &&
+    JSON.stringify([...new Set([model.modelId, ...model.enabledModelIds].filter(Boolean))].sort()) !==
+    JSON.stringify(savedModelIds(credential).sort());
   const compatibleDirty = Boolean(
     connectionAt &&
       isOpenAiCompatible &&
@@ -109,7 +129,8 @@ export function ModelSettingsOverlay({
         model.maxTokens.trim() !== String(credential.maxTokens ?? "") ||
         model.contextWindow.trim() !==
           String(credential.contextWindow ?? DEFAULT_MODEL_CONTEXT_WINDOW) ||
-        model.modelId !== (credential.modelId ?? "")),
+        model.modelId !== (credential.modelId ?? "") ||
+        antseedModelsDirty),
   );
   const formDirty = Boolean(
     connectionAt &&
@@ -178,6 +199,7 @@ export function ModelSettingsOverlay({
     intent: ModelRoleConnectIntent | null,
     credentialId: string | null,
     at: string,
+    discoveredModel?: string,
   ) {
     if (
       credentialId &&
@@ -189,16 +211,21 @@ export function ModelSettingsOverlay({
         ?.scrollIntoView?.({ block: "nearest" });
       return;
     }
-    model.chooseProvider(next.id, next.baseUrl, credentialId);
-    intentRef.current = {
-      makeDefault: intent?.makeDefault ?? false,
-      onConnected: async (choice) => {
-        setConnectionAt(null);
-        intentRef.current = null;
-        await intent?.onConnected(choice);
-      },
+    const open = () => {
+      model.chooseProvider(next.id, next.baseUrl, credentialId);
+      if (discoveredModel) model.stageCompatibleModelId(discoveredModel);
+      intentRef.current = {
+        makeDefault: intent?.makeDefault ?? false,
+        onConnected: async (choice) => {
+          setConnectionAt(null);
+          intentRef.current = null;
+          await intent?.onConnected(choice);
+        },
+      };
+      setConnectionAt(at);
     };
-    setConnectionAt(at);
+    if (connectionAt && onRequestLeave && (formDirty || formBusy)) onRequestLeave(open);
+    else open();
   }
 
   function closeConnection() {
@@ -214,6 +241,19 @@ export function ModelSettingsOverlay({
     cancelOAuthAttempt();
     intentRef.current = null;
     setConnectionAt(null);
+  }
+
+  function navigateIntegration(next: ProviderIntegration | null) {
+    const navigate = () => {
+      cancelOAuthAttempt();
+      model.updateApiKey("");
+      intentRef.current = null;
+      setConnectionAt(null);
+      restoreIntegrationFocus.current = next ? null : integration;
+      setIntegration(next);
+    };
+    if (connectionAt && onRequestLeave && (formDirty || formBusy)) onRequestLeave(navigate);
+    else navigate();
   }
 
   const disconnectButton = connected ? (
@@ -232,7 +272,7 @@ export function ModelSettingsOverlay({
   const connection = selected ? (
     isOpenAiCompatible ? (
       <>
-        <CompatibleModelFields {...model} connectionOnly />
+        <CompatibleModelFields {...model} connectionOnly={connectionAt !== "antseed:connection"} />
         <CompatibleKeyControls {...model} />
         {disconnectButton}
       </>
@@ -343,12 +383,36 @@ export function ModelSettingsOverlay({
       ) : null}
       {me ? (
         <>
-          {providersOnly ? null : <ModelRoleSettings
+          {integration === "opencode" ? (
+            <OpenCodeProvider
+              host={host}
+              connections={allProviders
+                .filter((entry) => entry.id === "opencode" || entry.id === "opencode-go")
+                .map((entry) => ({ ...entry, credentialId: credentialByProvider.get(entry.id)?.id }))}
+              disabled={busy}
+              onManage={(entry) => openConnection(entry, null, entry.credentialId ?? null, "opencode:connection")}
+              connectionPanel={connectionAt === "opencode:connection" ? panelFor(true) : null}
+              onBack={() => navigateIntegration(null)}
+            />
+          ) : null}
+          {integration === "antseed" ? (
+            <AntSeedProvider
+              credentials={credentials.filter((entry) => entry.provider === ANTSEED_PROVIDER_ID)}
+              nameOf={connectionName}
+              disabled={busy}
+              onManage={(entry) => openConnection({ id: ANTSEED_PROVIDER_ID, name: "AntSeed" }, null, entry?.id ?? null, "antseed:connection")}
+              connectionPanel={connectionAt === "antseed:connection" ? panelFor(true) : null}
+              onBack={() => navigateIntegration(null)}
+            />
+          ) : null}
+          <div hidden={integration !== null}>
+          <ModelRoleSettings
             userId={me.userId}
             spaceId={me.spaceId}
             scope={scope}
             credentials={credentials}
-            title={t`Main model`}
+            compactPrimary={providersOnly}
+            title={providersOnly ? t`Default provider` : t`Main model`}
             defaultLabel={t`Choose a model`}
             providers={providers}
             providerLabel={providerLabel}
@@ -359,7 +423,7 @@ export function ModelSettingsOverlay({
             panel={connectionAt === "main" ? panelFor(true) : null}
             thinking
             onChanged={() => void refresh()}
-          />}
+          />
           {providersOnly || me.needsModel ? null : (
             <SpaceBotsModelNotice
               refreshKey={`${me.spaceId}:${me.defaultProvider ?? ""}:${me.defaultModel ?? ""}`}
@@ -368,9 +432,11 @@ export function ModelSettingsOverlay({
           {scope === "space" ? null : (
             <ProvidersSection
               credentials={credentials.filter((entry) => !isMycelliosBaseUrl(entry.baseUrl))}
+              primaryConnected={isMycelliosProviderConnected(mycelliosCredential)}
               primary={
                 <MycelliosProvider
                   credential={mycelliosCredential}
+                  directory={providersOnly}
                   onConnected={async () => {
                     await refresh();
                   }}
@@ -380,7 +446,15 @@ export function ModelSettingsOverlay({
               showDirectory={providersOnly}
               name={connectionName}
               disabled={busy}
-              onAdd={(next) => openConnection(next, null, null, "providers:add")}
+              runtimes={providersOnly ? host.engines.data : undefined}
+              onOpenIntegration={providersOnly ? navigateIntegration : undefined}
+              integrationTriggers={{ opencode: openCodeTrigger, antseed: antseedTrigger }}
+              runtimeDetails={(runtime) => <ProviderRuntimeDetails runtime={runtime} />}
+              onAdd={(next, directoryKey) => {
+                if (providersOnly && next.id === ANTSEED_PROVIDER_ID) navigateIntegration("antseed");
+                else openConnection(next, null, null, directoryKey ? `providers:new:${directoryKey}` : "providers:add");
+              }}
+              onClose={closeConnection}
               onOpen={(entry) =>
                 connectionAt === `providers:${entry.id}`
                   ? closeConnection()
@@ -393,12 +467,19 @@ export function ModelSettingsOverlay({
               }
               panel={
                 connectionAt?.startsWith("providers:")
-                  ? panelFor(connectionAt === "providers:add")
+                  ? panelFor(connectionAt === "providers:add" || connectionAt.startsWith("providers:new:"))
                   : null
               }
               panelAt={connectionAt?.slice("providers:".length) ?? null}
             />
           )}
+          {providersOnly && scope === "account" ? (
+            <ProviderDiscovery host={host} disabled={busy} onSelect={(url, id) => openConnection(
+              { id: OPENAI_COMPATIBLE_PROVIDER_ID, name: t`Custom provider`, baseUrl: url }, null, null, "discovered", id,
+            )} />
+          ) : null}
+          {connectionAt === "discovered" ? panelFor(true) : null}
+          </div>
         </>
       ) : loading ? (
         <Spinner aria-label={t`Loading model catalog…`} />
@@ -441,7 +522,7 @@ export function ModelSettingsOverlay({
 
   if (embedded) {
     return (
-      <div data-testid="model-settings" className="max-w-[600px]">
+      <div data-testid="model-settings" className={providersOnly ? "mx-auto w-full max-w-[720px]" : "max-w-[600px]"}>
         {content}
       </div>
     );

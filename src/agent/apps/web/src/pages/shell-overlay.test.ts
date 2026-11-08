@@ -63,6 +63,8 @@ describe("withShellOverlay", () => {
   });
 
   it("writes the settings section and space", () => {
+    const mcp = { kind: "settings", section: "space-mcp", spaceId: "sp_1" } as const;
+    expect(read(write("?m=msg_1", mcp))).toEqual(mcp);
     expect(write("", { kind: "settings", section: "models", spaceId: "sp_1" })).toBe(
       "?settings=models&space=sp_1",
     );

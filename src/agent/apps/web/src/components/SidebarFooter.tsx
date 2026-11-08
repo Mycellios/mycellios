@@ -23,6 +23,7 @@ import { ReleaseNotes } from "./ReleaseNotes";
 type Props = {
   onWhatsNew?: () => void;
   mini?: boolean;
+  rail?: boolean;
   showUpdates?: boolean;
   name: string;
   initials: string | null;
@@ -49,6 +50,7 @@ export function sidebarMarkCount(availableWidth: number) {
 export function SidebarFooter({
   onWhatsNew,
   mini = false,
+  rail = false,
   showUpdates = true,
   name,
   initials,
@@ -93,7 +95,7 @@ export function SidebarFooter({
     observer.observe(label);
     measure();
     return () => observer.disconnect();
-  }, [mini]);
+  }, [mini, rail]);
   return (
     <>
       <MobileInstallOffer showOffer={false} open={mobileHelpOpen} onOpenChange={setMobileHelpOpen} />
@@ -102,8 +104,22 @@ export function SidebarFooter({
       {!mini && showUpdates && <DesktopSidebarUpdate />}
       <div
         data-testid="sidebar-footer"
-        className={`flex shrink-0 items-center gap-2 bg-transparent ${mini ? "flex-col px-1 py-2" : "px-2.5 py-3"}`}
+        className={`flex shrink-0 items-center bg-transparent ${rail ? "flex-col gap-1" : mini ? "flex-col gap-2 px-1 py-2" : "gap-2 px-2.5 py-3"}`}
       >
+        {rail ? (
+          <IconTooltip label={t`Connect apps`} side="inline-end">
+            <Button
+              variant="ghost"
+              aria-label={t`Connect apps`}
+              onClick={onIntegrations}
+              className="app-no-drag h-auto min-h-9 w-9 flex-col gap-1.5 rounded-md px-0 py-1.5"
+            >
+              {logos.length ? logos.slice(0, 3).map((mark) => (
+                <AppMarkStack key={mark.name} marks={[mark]} size={21} ringClassName="ring-transparent" />
+              )) : <Plug size={19} aria-hidden="true" />}
+            </Button>
+          </IconTooltip>
+        ) : null}
         <Popover open={open} onOpenChange={onOpenChange}>
           <PopoverTrigger
             data-testid="user-menu-trigger"
@@ -125,9 +141,9 @@ export function SidebarFooter({
           </PopoverTrigger>
           {open ? (
             <PopoverContent
-              side="top"
+              side={rail ? "inline-end" : "top"}
               sideOffset={8}
-              align="start"
+              align={rail ? "end" : "start"}
               className="max-h-(--available-height) w-[295px] max-w-[calc(100vw-69px)] gap-0 overflow-y-auto p-1 *:shrink-0 data-closed:animate-none"
             >
               <div
@@ -139,7 +155,7 @@ export function SidebarFooter({
                   <p className="truncate text-xs text-muted-foreground">{email}</p>
                 ) : null}
               </div>
-              {mini ? (
+              {mini && !rail ? (
                 <Button
                   variant="ghost"
                   className="h-9 w-full justify-start gap-2.5 font-normal"
@@ -225,7 +241,7 @@ export function SidebarFooter({
             </PopoverContent>
           ) : null}
         </Popover>
-        {!mini ? (
+        {!mini && !rail ? (
           <Button
             variant="outline"
             ref={pillRef}

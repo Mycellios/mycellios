@@ -8,8 +8,6 @@ async function captureSidebarSearchSelected(
   name: string,
 ) {
   const aside = page.locator("aside").first();
-  const trigger = aside.getByTestId("sidebar-search-trigger");
-  if ((await trigger.getAttribute("aria-pressed")) !== "true") await trigger.click();
   const search = aside.getByTestId("sidebar-search");
   const selected = aside.getByRole("button", { name: /^Chief/ }).first();
   await expect(search).toBeVisible();
@@ -101,25 +99,14 @@ test("account settings appearance control switches to light mode", async ({ page
   await captureSidebarSearchSelected(page, testInfo, "sidebar-search-selected-dark");
 });
 
-test("sidebar footer opens integrations and the account menu", async ({ page }, testInfo) => {
+test("workspace rail opens integrations and the account menu", async ({ page }, testInfo) => {
   await signup(page, `footer-web-${Date.now()}@rakazo.test`, "password12", "Footer Demo");
   await completeOnboarding(page);
-  const footer = page.getByTestId("sidebar-footer");
+  const footer = page.getByTestId("workspace-rail").getByTestId("sidebar-footer");
   await expect(footer).toBeVisible();
-  await page.getByTestId("sidebar-search-trigger").click();
-  const searchBox = await page.getByTestId("sidebar-search").boundingBox();
-  const avatarBox = await page.getByTestId("user-menu-trigger").boundingBox();
-  const pillBox = await footer
-    .getByRole("button", { name: "Connect apps", exact: true })
-    .boundingBox();
-  expect(searchBox).toBeTruthy();
-  expect(avatarBox).toBeTruthy();
-  expect(pillBox).toBeTruthy();
-  if (searchBox && avatarBox && pillBox) {
-    expect(avatarBox.x).toBe(searchBox.x);
-    expect(pillBox.x + pillBox.width).toBe(searchBox.x + searchBox.width);
-    expect(pillBox.height).toBe(avatarBox.height);
-  }
+  const chatSidebar = page.getByTestId("bots-sidebar");
+  await expect(chatSidebar.getByTestId("sidebar-footer")).toHaveCount(0);
+  await expect(chatSidebar.getByTestId("mycellios-micos")).toBeVisible();
   await expect(footer.getByRole("button", { name: "Install update", exact: true })).toHaveCount(0);
   await footer.getByRole("button", { name: "Connect apps", exact: true }).click();
   await expect(page.getByRole("button", { name: "Close integrations", exact: true })).toBeVisible();

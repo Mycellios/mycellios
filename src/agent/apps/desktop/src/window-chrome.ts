@@ -1,20 +1,11 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { type BrowserWindow, View, WebContentsView } from "electron";
+import { WINDOWS_TITLEBAR_HEIGHT } from "./window-options.js";
 
 export const WINDOW_CHROME_HEIGHT = 28;
 export const WINDOW_CHROME_WIDTH = 88;
-const WINDOWS_CAPTION_BUTTONS_WIDTH = 138;
-
-function hasStandaloneCaption(url: string) {
-  try {
-    const { pathname } = new URL(url);
-    return pathname === "/oauth/consent" ||
-      /^\/(?:agent\/)?(?:sign-in|sign-up|forgot-password|reset-password|onboarding)(?:\/|$)/.test(pathname);
-  } catch {
-    return false;
-  }
-}
+const WINDOWS_CAPTION_BUTTONS_WIDTH = 162;
 
 /** The page may navigate or crash without removing the window controls. */
 export function installWindowChrome(win: BrowserWindow, platform: NodeJS.Platform) {
@@ -71,11 +62,15 @@ export function installWindowChrome(win: BrowserWindow, platform: NodeJS.Platfor
   void strip.webContents.loadFile(document);
 }
 
-/** Native Windows caption: never replace or reposition BrowserWindow's own content view. */
+/** Keep all renderer content, including fixed overlays, outside the native caption. */
 function installNativeWindowsChrome(win: BrowserWindow) {
+  const page = win.contentView;
+  const container = new View();
+  win.setContentView(container);
+  container.addChildView(page);
   const strip = new WebContentsView({webPreferences:{partition:"mycellios-native-caption",sandbox:true,contextIsolation:true,nodeIntegration:false}});
   strip.setBackgroundColor("#00000000");
-  win.contentView.addChildView(strip);
+  container.addChildView(strip);
   strip.webContents.setWindowOpenHandler(()=>({action:"deny"}));
   strip.webContents.session.setPermissionCheckHandler(()=>false);
   strip.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
@@ -83,13 +78,10 @@ function installNativeWindowsChrome(win: BrowserWindow) {
   const layout=()=>{
     if(win.isDestroyed()) return;
     const {width,height}=win.getContentBounds();
-    // Authentication pages have no draggable app header. Keep this transparent
-    // native-owned hit region across their empty caption row, clear of OS buttons.
-    const dragWidth = hasStandaloneCaption(win.webContents.getURL())
-      ? Math.max(0, width - WINDOWS_CAPTION_BUTTONS_WIDTH)
-      : Math.min(width, WINDOW_CHROME_WIDTH);
-    strip.setVisible(!win.isFullScreen());
-    strip.setBounds({x:0,y:0,width:dragWidth,height:Math.min(height,51)});
+    const captionHeight = win.isFullScreen() ? 0 : Math.min(height, WINDOWS_TITLEBAR_HEIGHT);
+    strip.setVisible(captionHeight > 0);
+    strip.setBounds({ x: 0, y: 0, width: Math.max(0, width - WINDOWS_CAPTION_BUTTONS_WIDTH), height: captionHeight });
+    page.setBounds({ x: 0, y: captionHeight, width, height: height - captionHeight });
   };
   const syncSurface = async () => {
     if (win.isDestroyed()) return;
@@ -111,37 +103,25 @@ function installNativeWindowsChrome(win: BrowserWindow) {
       if (!win.isDestroyed() && /^rgb\([\d.,\s]+\)$/.test(color)) {
         const rgb = color.match(/[\d.]+/g)!.map(Number);
         win.setBackgroundColor(color);
-        win.setTitleBarOverlay({color: "#00000000", symbolColor: rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>140 ? "#1e2a22" : "#ffffff", height:51});
+        win.setTitleBarOverlay({color: "#00000000", symbolColor: rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722>140 ? "#1e2a22" : "#ffffff", height:WINDOWS_TITLEBAR_HEIGHT});
       }
     } catch { /* Keep the current surface while navigating or after a renderer failure. */ }
   };
 
-  const reserveCaption = () => {
-    if (win.isDestroyed()) return;
-    // The right panel reaches the window edge independently of the chat header.
-    // Reserve the caption row on the panel itself, outside its scrolling content.
-    void win.webContents.insertCSS(`
-      main[data-space-switch="main"] .pointer-events-none.absolute.inset-x-0.top-0.grid {
-        padding-inline-end: 162px !important; background: transparent; border-bottom: 0;
-      }
-      aside[data-testid="side-panel"] {
-        box-sizing: border-box;
-        padding-top: 51px;
-      }
-    `).catch(()=>{});
-  };
-  win.webContents.on("dom-ready",reserveCaption);
-  win.webContents.on("did-navigate",layout);
-  win.webContents.on("did-navigate-in-page",layout);
   win.webContents.on("dom-ready",syncSurface); win.webContents.on("did-finish-load",syncSurface);
-  win.on("resize",layout); win.on("enter-full-screen",layout); win.on("leave-full-screen",layout);
+  win.on("resize", layout);
+  win.on("maximize", layout);
+  win.on("unmaximize", layout);
+  win.on("enter-full-screen", layout);
+  win.on("leave-full-screen", layout);
   const contents = win.webContents;
   win.once("closed",()=>{
-    contents.removeListener("dom-ready",reserveCaption);
-    contents.removeListener("did-navigate",layout);
-    contents.removeListener("did-navigate-in-page",layout);
     contents.removeListener("dom-ready",syncSurface); contents.removeListener("did-finish-load",syncSurface);
-    win.removeListener("resize",layout);win.removeListener("enter-full-screen",layout);win.removeListener("leave-full-screen",layout);
+    win.removeListener("resize", layout);
+    win.removeListener("maximize", layout);
+    win.removeListener("unmaximize", layout);
+    win.removeListener("enter-full-screen", layout);
+    win.removeListener("leave-full-screen", layout);
     if(!strip.webContents.isDestroyed())strip.webContents.close();
   });
   layout();

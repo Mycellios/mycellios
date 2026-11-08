@@ -13,8 +13,8 @@ test("opens the Library from the account menu and rail, and previews an existing
 
   const sidebar = page.getByTestId("bots-sidebar");
   await expect(sidebar).toBeVisible();
-  await expect(sidebar.getByRole("button", { name: "Connect apps" })).toBeVisible();
   const rail = page.getByTestId("workspace-rail");
+  await expect(rail.getByRole("button", { name: "Connect apps" })).toBeVisible();
   await page.getByTestId("user-menu-trigger").click();
   const artifactsItem = page.getByRole("dialog").getByRole("button", { name: "Library", exact: true });
   const settingsItem = page.getByRole("button", { name: "Settings", exact: true });

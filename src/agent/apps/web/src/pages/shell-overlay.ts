@@ -5,6 +5,10 @@ const SETTINGS_SECTIONS = [
   "agents",
   "mobile",
   "space",
+  "space-providers",
+  "space-voice",
+  "space-approvals",
+  "space-mcp",
   "models",
   "memory",
   "voice",
@@ -17,6 +21,15 @@ const SETTINGS_SECTIONS = [
 ] as const;
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
+
+export const spaceSettingsSections: ReadonlySet<SettingsSection> = new Set([
+  "space",
+  "space-providers",
+  "space-voice",
+  "space-approvals",
+  "space-mcp",
+  "memory",
+]);
 
 /** The shell overlay a URL opens; the URL is its only source of truth so links and reloads keep it. */
 export type ShellOverlay =

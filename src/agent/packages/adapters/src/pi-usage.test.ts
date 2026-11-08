@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import type { Api, Context, Model } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type { AgentRuntimeEvent, AgentUsage } from "@rakazo/adapter-kit";
+import { createLogger, createTestSink, getLogger, installLogger } from "@rakazo/logging";
 import { Agent } from "undici";
 import { ContextBudgetError } from "./context-selection.js";
 import { describe, expect, it, vi } from "vitest";
@@ -475,6 +476,45 @@ describe("Pi usage accounting", () => {
     expect(fetcher).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
   });
+  it.each(["local-admission", "provider"] as const)(
+    "records only safe sizing diagnostics for a context rejection at %s",
+    async (source) => {
+      const previous = getLogger();
+      const sink = createTestSink();
+      installLogger(createLogger({ service: "test", sinks: [sink] }));
+      try {
+        const fetcher = vi.fn(async () => Response.json(
+          { error: { message: "maximum context length exceeded: confidential provider detail" } },
+          { status: 400 },
+        ));
+        const stream = observedPiStream(
+          builtinModels(),
+          model,
+          { systemPrompt: "confidential instructions", messages: [] },
+          { apiKey: "fixture", fetch: fetcher },
+          vi.fn(),
+          undefined,
+          { operationKind: "answer", runId: "context-test" },
+          source === "local-admission" ? {
+            prepareContext: () => {
+              throw new ContextBudgetError(4200, 3840, true, { contextWindow: 4096, outputReserve: 256 });
+            },
+          } : undefined,
+        );
+        for await (const _ of stream) { /* wait for the terminal diagnostic */ }
+        const events = sink.events.filter(event => event.message === "model.context_rejected");
+        expect(events).toHaveLength(1);
+        expect(events[0]).toMatchObject({
+          source, runId: "context-test", contextWindow: 4096, outputReserve: 256,
+          estimatedInput: source === "local-admission" ? 4200 : expect.any(Number),
+        });
+        expect(JSON.stringify(events)).not.toContain("confidential");
+        expect(fetcher).toHaveBeenCalledTimes(source === "provider" ? 1 : 0);
+      } finally {
+        installLogger(previous);
+      }
+    },
+  );
   it("does not count an already-aborted next turn as a model call", async () => {
     const beforeCall = vi.fn();
     const afterCall = vi.fn();

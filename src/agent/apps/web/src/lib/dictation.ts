@@ -296,8 +296,10 @@ export class Dictation {
       });
       return;
     }
-    if (typeof window !== "undefined" && window.rakazoDesktop?.localVoice && (await window.rakazoDesktop.localVoice.status()).ready) {
-      if (this.token !== mine) return;
+    const native = typeof window !== "undefined" ? window.rakazoDesktop?.localVoice : undefined;
+    const nativeStatus = native ? await native.status().catch(() => null) : null;
+    if (this.token !== mine) return;
+    if (nativeStatus?.ready) {
       await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
       return;
     }
@@ -668,7 +670,9 @@ export class Dictation {
     );
     try {
       const native = typeof window !== "undefined" ? window.rakazoDesktop?.localVoice : undefined;
-      if (native && (await native.status()).ready) {
+      const nativeStatus = native ? await native.status().catch(() => null) : null;
+      if (this.token !== mine) return;
+      if (native && nativeStatus?.ready) {
         const context = new AudioContext();
         try {
           const decoded = await context.decodeAudioData(await blob.arrayBuffer());

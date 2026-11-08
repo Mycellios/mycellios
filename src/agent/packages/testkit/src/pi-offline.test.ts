@@ -271,6 +271,24 @@ describe("real Pi against an offline model HTTP endpoint", () => {
     server.assertComplete();
   });
 
+  it("admits a required tool when the actual output cap leaves room", async () => {
+    const server = await startModelEmulator({
+      steps: [{
+        expect(request) {
+          expect(request.tools?.some(tool => tool.function.name === writeTool.name)).toBe(true);
+          expect(request.max_tokens ?? request.max_completion_tokens).toBe(2048);
+          expect(JSON.stringify(request.messages.at(-1)?.content)).toContain("Say hello.");
+        },
+        response: { type: "text", text: "Done." },
+      }],
+    });
+    cleanups.push(() => server.close());
+    await collect(new PiAgentRuntime().run(
+      runRequest({ ...server.model, contextWindow: 8192, maxTokens: 8192 }, { prompt: "Say hello." }),
+    ));
+    server.assertComplete();
+  });
+
   it.each([
     {
       name: "live request",

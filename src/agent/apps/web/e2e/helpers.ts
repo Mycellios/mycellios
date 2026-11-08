@@ -182,7 +182,7 @@ export async function createBotFromPicker(
   await expect(page.getByTestId("side-panel")).toHaveAttribute("data-panel", "closed");
 }
 
-/** Open the user Settings overlay, optionally switching to a sidebar section. */
+/** Open Settings, optionally selecting a section in the account or space menu. */
 export async function openUserSettings(
   page: Page,
   section?:
@@ -195,10 +195,23 @@ export async function openUserSettings(
     | "billing"
     | "updates",
 ) {
+  const scope = section === "memory" ? "space" : "account";
+  const current = page.getByTestId("user-settings");
+  if ((await current.count()) && (await current.getAttribute("data-settings-scope")) !== scope) {
+    await current.getByRole("button", { name: /^Close .*settings$/ }).click();
+    const discard = page.getByRole("alertdialog").getByRole("button", { name: "Discard changes" });
+    if (await discard.isVisible()) await discard.click();
+    await expect(current).toHaveCount(0);
+  }
   // A reload keeps settings open because the URL holds them; closing clears the URL at once.
   if (!new URL(page.url()).searchParams.has("settings")) {
-    await page.getByTestId("user-menu-trigger").click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    if (scope === "space") {
+      await page.getByRole("button", { name: "Switch workspace" }).click();
+      await page.getByRole("button", { name: "Space settings", exact: true }).click();
+    } else {
+      await page.getByTestId("user-menu-trigger").click();
+      await page.getByRole("button", { name: "Settings", exact: true }).click();
+    }
   }
   const settings = page.getByTestId("user-settings");
   await expect(settings).toBeVisible();

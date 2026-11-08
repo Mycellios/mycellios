@@ -1,7 +1,7 @@
 import type { DesktopUpdateState } from "@rakazo/contracts";
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { lstat, mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, rename, rm, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import type { ReadableStream } from "node:stream/web";
@@ -11,6 +11,17 @@ import { fetchDesktopArtifact } from "./published-desktop-release.js";
 const ORIGIN = "https://www.mycellios.com";
 const MAX_BYTES = 2_000_000_000;
 const VERSION = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
+const MIN_INSTALL_BYTES = 6 * 1024 ** 3;
+
+export class ManualUpdateDiskSpaceError extends Error {
+  constructor() { super("Free at least 6 GB of disk space before restarting to update."); }
+}
+
+export async function requireManualUpdateSpace(profile: string, executable: string): Promise<void> {
+  const volumes = await Promise.all([statfs(profile), statfs(path.dirname(executable))]);
+  if (volumes.some(volume => volume.bavail * volume.bsize < MIN_INSTALL_BYTES)) throw new ManualUpdateDiskSpaceError();
+}
+
 export type ManualRelease = { version: string; url: string; fileName: string; sha256: string; bytes: number };
 export function newerRelease(candidate: string, current: string): boolean {
   if (!VERSION.test(candidate) || !VERSION.test(current)) return false;
@@ -67,10 +78,10 @@ export class ManualUpdateController {
       percent: null, message: null, checkedAt: null };
   }
   state() { return { ...this.current }; }
-  private fail() { this.committed = false; this.current = { ...this.current, phase: this.file ? "ready" : "error",
-    installPending: false, message: "Could not complete the update. Try again." }; }
+  private fail(error?: unknown) { this.committed = false; this.current = { ...this.current, phase: this.file ? "ready" : "error",
+    installPending: false, message: error instanceof ManualUpdateDiskSpaceError ? error.message : "Could not complete the update. Try again." }; }
   check(userInitiated: boolean): Promise<DesktopUpdateState> {
-    if ((!userInitiated && !this.options.backgroundDownloads) || this.current.installPending || this.current.phase === "ready") return Promise.resolve(this.state());
+    if ((!userInitiated && !this.options.backgroundDownloads) || this.current.installPending) return Promise.resolve(this.state());
     if (userInitiated) this.checkRequested = true;
     if (this.operation) return this.operation;
     this.operation = this.runCheck().finally(() => { this.operation = null; this.checkRequested = false; });
@@ -78,19 +89,25 @@ export class ManualUpdateController {
   }
   private async runCheck() {
     const previous = this.state();
-    this.current = { ...this.current, phase: "checking", message: null };
+    const staged = this.file ? this.release : null;
+    if (!staged) this.current = { ...this.current, phase: "checking", message: null };
     try {
       const feeds = [this.catalogRelease()];
       if (this.options.publishedRelease) feeds.push(Promise.resolve().then(() => this.options.publishedRelease!()));
       const results = await Promise.allSettled(feeds);
+      if (this.current.installPending) return this.state();
       const available = results.flatMap(r => r.status === "fulfilled" ? [r.value] : []);
       if (!available.length) throw Error("Release feeds unavailable");
-      this.release = available.reduce<ManualRelease | null>((latest, r) =>
+      const release = available.reduce<ManualRelease | null>((latest, r) =>
         r && newerRelease(r.version, latest?.version ?? this.options.version) ? r : latest, null);
+      if (staged && (!release || !newerRelease(release.version, staged.version))) return this.state();
+      this.file = null;
+      this.release = release;
       this.current = { ...this.current, phase: this.release ? "available" : "idle",
         availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString() };
       if (this.release) await this.runDownload();
     } catch {
+      if (staged && this.file) return this.state();
       if (this.checkRequested || this.current.availableVersion) this.fail();
       else this.current = previous;
     }
@@ -199,6 +216,6 @@ export class ManualUpdateController {
         }
         await (this.options.pause ?? (ms => new Promise(resolve => setTimeout(resolve, ms))))(1_000);
       }
-    } catch { if (intent === this.intent) this.fail(); }
+    } catch (error) { if (intent === this.intent) this.fail(error); }
   }
 }

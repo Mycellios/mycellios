@@ -50,6 +50,16 @@ describe("model context budget", () => {
     expect(prepared).toEqual({ context, maxTokens: 752 });
     expect(smallModel.maxTokens).toBe(1024);
   });
+  it("uses the output ceiling of the current attempt in the first admission check", () => {
+    const context: Context = { messages: [] };
+    const prepare = (ctx: Context, candidate: Model<Api>) => {
+      if (candidate.maxTokens > 512) throw new ContextBudgetError(5600, 5120);
+      return ctx;
+    };
+    expect(prepareModelContextBudget(context, smallModel, 512, prepare)).toEqual({ context });
+    expect(prepareModelContextBudget(context, { ...smallModel, maxTokens: 6144 }, undefined, ctx => ctx))
+      .toEqual({ context, maxTokens: 1536 });
+  });
   it("does not shrink reasoning, overfull input, small limits or unrelated failures", () => {
     const context: Context = { messages: [] };
     for (const [m, cap, error] of [

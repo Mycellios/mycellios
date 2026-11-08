@@ -472,7 +472,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     setBotsSidebarCollapsed(readBotsSidebarCollapsed(userId));
   }, [userId]);
   const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchHits, setSearchHits] = useState<SearchHit[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [snapshot, setSnapshot] = useState<ThreadSnapshot | null>(null);
@@ -2188,7 +2187,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
 
   async function jumpToSearchHit(hit: SearchHit) {
     setQuery("");
-    setSearchOpen(false);
     setSearchHits([]);
     const params = new URLSearchParams();
     if (hit.messageId) params.set("m", hit.messageId);
@@ -3813,12 +3811,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     ) : null}
     </>
   );
-  const sidebarSearch = miniSidebar || !(isMobileSidebar || activityMode || searchOpen || query) ? null : (
+  const sidebarSearch = miniSidebar ? null : (
     <InputGroup
       data-testid="sidebar-search"
       className={isMobileSidebar
         ? "mx-4 mb-[max(1rem,env(safe-area-inset-bottom))] mt-2 min-h-12 w-auto shrink-0 rounded-full border border-border bg-card text-muted-foreground"
-        : "mx-2.5 mb-3 w-auto rounded-xl bg-card dark:bg-input border border-border text-muted-foreground focus-within:border-ring"}
+        : "mx-2.5 my-2.5 h-8 w-auto shrink-0 rounded-md border-border bg-muted text-muted-foreground"}
     >
       <InputGroupAddon>
         <Search size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -3836,7 +3834,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             return;
           }
           setQuery("");
-          setSearchOpen(false);
         }}
         placeholder={activityMode ? t`Search runs` : t`Search`}
         aria-label={activityMode ? t`Search runs` : t`Search`}
@@ -3866,11 +3863,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       ) : null}
     </InputGroup>
   );
-  const sidebarFooter = (close?: () => void) => (
+  const sidebarFooter = (close?: () => void, rail = false) => (
     <SidebarFooter
       onWhatsNew={() => { close?.(); setReleaseNotesOpen(true); }}
-      showUpdates={!isMobileSidebar}
+      showUpdates={false}
       mini={miniSidebar}
+      rail={rail}
       logos={footerLogos}
       name={userName}
       initials={initials}
@@ -4043,6 +4041,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onModels={isMobileSidebar ? undefined : () => openSettings("models")}
         onWhatsNew={() => setReleaseNotesOpen(true)}
         onBoard={bootstrapMe?.ticketBoardEnabled ? () => navigate("/app/board") : undefined}
+        accountControls={!isMobileSidebar ? sidebarFooter(undefined, true) : undefined}
       />
       {(!libraryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen ? <Sidebar
         collapsible={isMobileSidebar ? "none" : "icon"}
@@ -4073,18 +4072,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             if (miniSidebar) setBotsSidebarCollapsedPref(false);
             toggleActivityMode();
           }}
-          searchOpen={searchOpen && !miniSidebar}
           onSearch={
-            isMobileSidebar || (activityMode && !miniSidebar)
+            isMobileSidebar || !miniSidebar
               ? undefined
               : () => {
-                  if (searchOpen && !miniSidebar) {
-                    setQuery("");
-                    setSearchOpen(false);
-                    return;
-                  }
-                  if (miniSidebar) setBotsSidebarCollapsedPref(false);
-                  setSearchOpen(true);
+                  setBotsSidebarCollapsedPref(false);
                   requestAnimationFrame(() =>
                     document
                       .querySelector<HTMLInputElement>('input[name="sidebar-search"]')
@@ -4099,7 +4091,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           navigate={navigate}
           setNewSpaceOpen={setNewSpaceOpen}
           setCreateBotOpen={setCreateBotOpen}
-          onCreateProject={() => { setBotsSidebarCollapsedPref(false); setQuery(""); setSearchOpen(false); if (activityMode) toggleActivityMode(); setCreatingProject(true); }}
+          onCreateProject={() => { setBotsSidebarCollapsedPref(false); setQuery(""); if (activityMode) toggleActivityMode(); setCreatingProject(true); }}
         />
         {!isMobileSidebar ? sidebarSearch : null}
         <div className={`rk-scroll flex min-h-0 flex-1 flex-col overflow-y-auto ${isMobileSidebar ? "gap-3 px-4 pb-4" : "scroll-fade-y scroll-fade-12 gap-0.5 px-2.5 pb-2.5"}`}>
@@ -4176,9 +4168,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         </div>
         {!isMobileSidebar ? <>
           <div className={miniSidebar ? "hidden" : "contents"}><PasskeyOffer /></div>
+          {!miniSidebar ? <><WebUpdateSlot /><DesktopSidebarUpdate /></> : null}
           {miniSidebar ? <SidebarContribution mini /> : sidebarCredits}
         </> : mobileSidebarOpen ? <><WebUpdateSlot /><DesktopSidebarUpdate /></> : null}
-        {isMobileSidebar ? sidebarSearch : sidebarFooter()}
+        {isMobileSidebar ? sidebarSearch : null}
       </Sidebar> : null}
 
       {/* Keep the composer's z-index inside the chat so phone overlays like the side panel cover it. */}
@@ -4507,7 +4500,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         </>}
       </main>
 
-      {voiceConversation ? <VoiceConversation key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
+      {voiceConversation ? <VoiceConversation key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
       {!libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && chatToolsOpen && !voiceConversation && !panel && !reviewWorkspace?.open ? <ChatToolsPanel {...chatTools} onClose={() => setChatToolsOpen(false)} /> : null}
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall

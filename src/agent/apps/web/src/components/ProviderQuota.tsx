@@ -139,19 +139,35 @@ function QuotaContent({
     setOpen(false);
     callback();
   };
+  const openSummary = () => {
+    setOpen(true);
+    void load();
+  };
   return (
     <Popover
       open={open}
-      onOpenChange={(value) => {
-        setOpen(value);
-        if (value) void load();
+      onOpenChange={(value, details) => {
+        // The rail button navigates on activation. Only the preview uses the popover.
+        if (compact && details.reason === "trigger-press") {
+          details.cancel();
+          return;
+        }
+        if (value) openSummary();
+        else setOpen(false);
       }}
     >
       <PopoverTrigger
         data-testid="provider-quota-trigger"
         openOnHover={compact}
-        aria-label={`${t`Subscription quota`}: ${name} · ${summary}`}
-        title={`${name} · ${summary}`}
+        onClick={compact ? () => action(onUsage) : undefined}
+        onKeyDown={compact ? (event) => {
+          if (event.key !== "ArrowDown") return;
+          event.preventDefault();
+          openSummary();
+        } : undefined}
+        aria-keyshortcuts={compact ? "ArrowDown" : undefined}
+        aria-label={compact ? t`Usage` : `${t`Subscription quota`}: ${name} · ${summary}`}
+        title={compact ? undefined : `${name} · ${summary}`}
         className={`app-no-drag relative flex shrink-0 items-center rounded-lg outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${compact ? "size-10 justify-center" : "mx-3 gap-2 px-2 py-1.5 text-sm"}`}
       >
         <span className="relative grid size-[34px] shrink-0 place-items-center">
@@ -201,7 +217,7 @@ function QuotaContent({
         ) : null}
       </PopoverTrigger>
       <PopoverContent
-        side={compact ? "right" : "top"}
+        side={compact ? "inline-end" : "top"}
         align="end"
         sideOffset={8}
         collisionAvoidance={{ side: "shift", align: "shift", fallbackAxisSide: "none" }}

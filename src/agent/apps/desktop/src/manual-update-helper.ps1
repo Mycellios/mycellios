@@ -14,34 +14,65 @@ $backup=Join-Path $job 'backup'
 $phase='preflight'
 $installerLock=$null
 $canReopen=$false
+$verifiedVersion=$null
 function Progress([string]$value){$script:phase=$value;@{phase=$value}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8}
+function Write-Result($receipt){
+ $temporary=$result+'.tmp'
+ $receipt|ConvertTo-Json|Set-Content -LiteralPath $temporary -Encoding UTF8
+ [IO.File]::Move($temporary,$result)
+}
 function Copy-Safe([string]$source,[string]$destination,[string[]]$exclude=@()){
  $arguments=@($source,$destination,'/E','/COPY:DAT','/DCOPY:DAT','/XJ','/R:1','/W:1','/NFL','/NDL','/NP','/NJH','/NJS')
  if($exclude.Count){$arguments+=@('/XD');$arguments+=$exclude}
  & robocopy @arguments >> (Join-Path $job 'copy.log')
  if($LASTEXITCODE -ge 8){throw 'Could not make a recoverable backup'}
 }
+function Get-Sha256([IO.Stream]$stream) {
+ $algorithm=[Security.Cryptography.SHA256]::Create()
+ try {return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-','').ToLowerInvariant()}
+ finally {$algorithm.Dispose()}
+}
 function Installer-Valid {
  $file=Get-Item -LiteralPath $installer
  if(($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -or $file.Length -ne $config.bytes){throw 'Installer size or location changed'}
- $algorithm=[Security.Cryptography.SHA256]::Create()
- try {$installerLock.Position=0;$digest=([BitConverter]::ToString($algorithm.ComputeHash($installerLock))).Replace('-','').ToLowerInvariant();$installerLock.Position=0}finally{$algorithm.Dispose()}
+ $installerLock.Position=0
+ $digest=Get-Sha256 $installerLock
+ $installerLock.Position=0
  if($digest -ne $config.sha256){throw 'Installer checksum changed'}
 }
 function Draft-Stores {
  $folders=@((Join-Path $profile 'Local Storage'),(Join-Path $profile 'Session Storage'),(Join-Path $profile 'IndexedDB'),(Join-Path $profile 'WebStorage'))
  if(Test-Path -LiteralPath (Join-Path $profile 'Partitions')){foreach($partition in Get-ChildItem -LiteralPath (Join-Path $profile 'Partitions') -Directory){foreach($name in @('Local Storage','Session Storage','IndexedDB','WebStorage')){$folders+=Join-Path $partition.FullName $name}}}
  $entries=@{}
- foreach($folder in $folders){if(Test-Path -LiteralPath $folder){foreach($file in Get-ChildItem -LiteralPath $folder -File -Recurse){$entries[$file.FullName.Substring($profile.Length+1)]=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash}}}
+ foreach($folder in $folders){
+  if(!(Test-Path -LiteralPath $folder)){continue}
+  foreach($file in Get-ChildItem -LiteralPath $folder -File -Recurse){
+   $stream=[IO.File]::OpenRead($file.FullName)
+   try {$entries[$file.FullName.Substring($profile.Length+1)]=Get-Sha256 $stream}
+   finally {$stream.Dispose()}
+  }
+ }
  return $entries
 }
 function Installed-Process {
  return ,@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -and $_.ExecutablePath.Equals($executable,[StringComparison]::OrdinalIgnoreCase)})
 }
-function Reopen {
+function Reopen([switch]$Confirm) {
  if($config.reopen -eq $false){return}
  if($config.reopenUrl){$url=[Uri]$config.reopenUrl;if($url.Scheme -notin @('http','https') -or $url.UserInfo){throw 'Invalid saved app location'};$env:RAKAZO_WEB_URL=$url.AbsoluteUri}
- Start-Process -FilePath $executable -WindowStyle Hidden | Out-Null
+ if(!$Confirm){Start-Process -FilePath $executable -WindowStyle Hidden | Out-Null;return}
+ $app=Start-Process -FilePath $executable -ArgumentList ('--manual-update-job='+[IO.Path]::GetFileName($job)) -WindowStyle Hidden -PassThru
+ $launch=Join-Path $job 'launch.json'
+ $deadline=(Get-Date).AddMinutes(2)
+ do {
+  if(Test-Path -LiteralPath $launch){
+   $receipt=Get-Content -LiteralPath $launch -Raw -Encoding UTF8|ConvertFrom-Json
+   if($receipt.version -eq $config.version -and $receipt.pid -eq $app.Id -and !$app.HasExited){return}
+  }
+  if($app.HasExited){throw 'The installed app exited before confirming startup'}
+  Start-Sleep -Milliseconds 250
+ } while((Get-Date) -lt $deadline)
+ throw 'The installed app did not confirm startup'
 }
 try {
  $config=Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8|ConvertFrom-Json
@@ -68,12 +99,14 @@ try {
  if($commit.approved -ne $true){throw 'The native install request was not committed'}
  $canReopen=$true
  Progress 'backing-up'
+ foreach($location in @($installation,$profile)){
+  if((Get-PSDrive -Name ([IO.Path]::GetPathRoot($location).Substring(0,1))).Free -lt 6GB){throw 'Not enough free space for a recoverable update'}
+ }
  if(Test-Path -LiteralPath $backup){throw 'A previous backup already exists for this request'}
  New-Item -ItemType Directory -Path $backup | Out-Null
  $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
  & icacls $backup '/inheritance:r' '/grant:r' "*${sid}:(OI)(CI)F" '*S-1-5-18:(OI)(CI)F' >> (Join-Path $job 'copy.log')
  if($LASTEXITCODE -ne 0){throw 'Could not protect the private backup'}
- if((Get-PSDrive -Name ([IO.Path]::GetPathRoot($installation).Substring(0,1))).Free -lt 6GB){throw 'Not enough free space for a recoverable update'}
  Copy-Safe $installation (Join-Path $backup 'installation')
  $excluded=@('Cache','Code Cache','GPUCache','DawnGraphiteCache','DawnWebGPUCache','GPUPersistentCache','GrShaderCache','ShaderCache')
  $excluded+=@('updates','computers','local-data','local-web','apps-local-backups','upgrade-backups')|ForEach-Object {Join-Path $profile $_}
@@ -83,7 +116,15 @@ try {
  Installer-Valid
  if((Installed-Process).Count){throw 'The previous application reopened before installation'}
  Progress 'installing'
- $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Hidden -PassThru -Wait
+ # Wait for NSIS itself. Start-Process -Wait waits for its whole process tree,
+ # which can keep the helper in "installing" after the installer has exited.
+ $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Hidden -PassThru
+ if(!$setup.WaitForExit(600000)){
+  # An installer still running may own files. Leave it and its recovery data alone.
+  $canReopen=$false
+  Progress 'installer-timeout'
+  throw 'The installer is still running after ten minutes'
+ }
  if($setup.ExitCode -ne 0){throw 'The installer did not finish successfully'}
  if((Installed-Process).Count){throw 'Unexpected app startup during installation; saved state must be inspected'}
  $version=([Version](Get-Item -LiteralPath $executable).VersionInfo.ProductVersion).ToString(3)
@@ -91,15 +132,16 @@ try {
  $after=Draft-Stores
  if($drafts.Count -ne $after.Count){throw 'Saved draft stores changed during installation'}
  foreach($entry in $drafts.GetEnumerator()){if($after[$entry.Key] -ne $entry.Value){throw 'Saved draft stores changed during installation'}}
+ $verifiedVersion=$version
  Progress 'reopening'
- Reopen
- @{installed=$true;version=$version;draftStoresPreserved=$true;draftStoreFiles=$drafts.Count;backup=$backup;reopened=($config.reopen -ne $false)}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8
+ Reopen -Confirm
+ Write-Result @{installed=$true;version=$version;draftStoresPreserved=$true;draftStoreFiles=$drafts.Count;backup=$backup;reopened=($config.reopen -ne $false)}
  exit 0
 } catch {
  $failedPhase=$phase
  if($phase -eq 'installing' -and (Test-Path -LiteralPath (Join-Path $backup 'installation')) -and !(Installed-Process).Count){
   try {Copy-Safe (Join-Path $backup 'installation') $installation;Reopen}catch{}
- } elseif($canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
- @{installed=$false;phase=$failedPhase;error=$_.Exception.Message;backup=$backup}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8
+ } elseif(!$verifiedVersion -and $canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
+ Write-Result @{installed=($null -ne $verifiedVersion);version=$verifiedVersion;reopened=$false;phase=$failedPhase;error=$_.Exception.Message;backup=$backup}
  exit 1
 } finally {if($installerLock){$installerLock.Dispose()}}

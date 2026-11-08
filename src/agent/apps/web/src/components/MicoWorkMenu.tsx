@@ -5,9 +5,10 @@ import {
   NativeSelectOption,
   Popover,
   PopoverContent,
+  PopoverTitle,
   PopoverTrigger,
 } from "@rakazo/ui-web";
-import { Activity } from "lucide-react";
+import { ListTodo } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { RpcClient } from "../lib/rpc";
 import { notificationPreferences } from "../lib/notification-preferences";
@@ -123,6 +124,8 @@ export function MicoWorkMenu({
     };
   }, [open, botId, rpc]);
   const activeCount = work.filter((row) => ["running", "queued", "leased"].includes(row.status)).length;
+  const label = t`Tasks`;
+  const triggerLabel = failed ? `${label} · ${t`Task failed`}` : label;
   return (
     <Popover
       open={open}
@@ -133,53 +136,21 @@ export function MicoWorkMenu({
     >
       <PopoverTrigger
         render={
-          <Button size="icon-sm" variant="ghost" className="relative shrink-0" data-mobile-chat-action={inMenu || undefined}
-            aria-label={failed ? t`Task failed` : t`Work`} title={failed ? t`Task failed` : t`Work`} />
+          <Button size="icon-sm" variant="ghost" className="relative shrink-0 text-muted-foreground hover:text-foreground" data-mobile-chat-action={inMenu || undefined}
+            aria-label={triggerLabel} title={triggerLabel} />
         }
       >
-        <Activity size={15} aria-hidden="true" />
-        {inMenu ? (failed ? t`Task failed` : t`Work`) : null}
+        <ListTodo size={15} aria-hidden="true" />
+        {inMenu ? label : null}
         {failed || activeCount ? <span aria-hidden="true"
-          className={`absolute end-0.5 top-0.5 size-1.5 rounded-full ${failed ? "bg-destructive" : "bg-foreground"}`} /> : null}
+          className={`absolute end-0.5 top-0.5 size-1.5 rounded-full ${failed ? "bg-destructive" : "bg-muted-foreground"}`} /> : null}
       </PopoverTrigger>
       <PopoverContent
         align="end"
         className="max-h-[70dvh] w-[440px] max-w-[calc(100vw-2rem)] overflow-y-auto"
       >
+        <PopoverTitle>{label}</PopoverTitle>
         <div className="space-y-3">
-          <label className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <Trans>Simultaneous tasks</Trans>
-            <NativeSelect
-              aria-label={t`Simultaneous tasks`}
-              value={policy?.limit ?? 1}
-              disabled={!policy || busy}
-              onChange={(event) => {
-                setBusy(true);
-                setError("");
-                void rpc.tasks
-                  .concurrency({ botId, limit: Number(event.target.value) })
-                  .then(setPolicy)
-                  .catch(() => setError(t`Could not update task`))
-                  .finally(() => setBusy(false));
-              }}
-            >
-              {[1, 2, 3, 4].map((value) => (
-                <NativeSelectOption key={value} value={value}>
-                  {value}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </label>
-          {policy && policy.effectiveLimit !== policy.limit ? (
-            <p className="text-xs text-muted-foreground">
-              <Trans>This runtime currently runs one task at a time.</Trans>
-            </p>
-          ) : null}
-          <p className="text-xs text-muted-foreground">
-            <Trans>
-              Computer operations remain exclusive. Changing the limit does not stop active work.
-            </Trans>
-          </p>
           {runId ? (
             <TaskControls key={runId} runId={runId} autoOpen />
           ) : (
@@ -209,6 +180,39 @@ export function MicoWorkMenu({
               ))}
             </div>
           ) : null}
+          <details className="border-t pt-2">
+            <summary className="w-fit cursor-pointer rounded-sm py-1 text-xs text-muted-foreground focus-visible:outline focus-visible:outline-ring">
+              <Trans>Simultaneous tasks</Trans>
+            </summary>
+            <div className="mt-2 space-y-2">
+              <NativeSelect
+                aria-label={t`Simultaneous tasks`}
+                value={policy?.limit ?? 1}
+                disabled={!policy || busy}
+                onChange={(event) => {
+                  setBusy(true);
+                  setError("");
+                  void rpc.tasks
+                    .concurrency({ botId, limit: Number(event.target.value) })
+                    .then(setPolicy)
+                    .catch(() => setError(t`Could not update task`))
+                    .finally(() => setBusy(false));
+                }}
+              >
+                {[1, 2, 3, 4].map((value) => (
+                  <NativeSelectOption key={value} value={value}>{value}</NativeSelectOption>
+                ))}
+              </NativeSelect>
+              {policy && policy.effectiveLimit !== policy.limit ? (
+                <p className="text-xs text-muted-foreground">
+                  <Trans>This runtime currently runs one task at a time.</Trans>
+                </p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                <Trans>Computer operations remain exclusive. Changing the limit does not stop active work.</Trans>
+              </p>
+            </div>
+          </details>
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
