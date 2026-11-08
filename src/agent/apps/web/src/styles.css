@@ -290,7 +290,7 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
 /* Title-bar controls remain clickable while the surrounding row drags the window. */
 .app-drag :is(button, a, input, select, textarea, [role="button"], [role="combobox"]) { -webkit-app-region: no-drag; }
 
-/* Original warm stone assistant cards; scoped workspace palettes never override chat. */
+/* Assistant bubbles share the workspace card color. */
 .rk-message-bubble { background: var(--card); line-height: 1.5; }
 .rk-message-bubble .rk-chat-markdown strong { font-weight: 600; }
 

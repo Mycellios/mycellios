@@ -368,6 +368,8 @@ export const BOT_NAME_MAX_LENGTH = 80;
 export const BOT_TITLE_MAX_LENGTH = 500;
 export const BOT_DESCRIPTION_MAX_LENGTH = 4000;
 export const BOT_INSTRUCTIONS_MAX_LENGTH = 20000;
+export const FIRST_MICO_SPAWN_KEY = "onboarding:first";
+export const NativeBotEngineSchema = z.enum(["codex", "claude", "acp"]);
 
 export const CreateBotInput = z.object({
   name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH),
@@ -380,6 +382,12 @@ export const CreateBotInput = z.object({
   /** Organic body family (0-9) to draw the new bot with; the server picks an id that hashes to it. */
   avatarFamily: z.number().int().min(0).max(9).optional(),
   computerMode: ComputerModeSchema.default("team"),
+  agentEngine: NativeBotEngineSchema.optional(),
+  model: z.object({
+    provider: z.string().trim().min(1).max(80),
+    modelId: z.string().trim().min(1).max(200),
+    thinkingLevel: ThinkingLevelSchema.optional(),
+  }).optional(),
   /** Idempotency key within a space (unique with spaceId). */
   spawnKey: z.string().trim().min(1).max(120).optional(),
 });

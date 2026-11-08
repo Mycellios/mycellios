@@ -44,6 +44,7 @@ vi.mock("@rakazo/ui-web", () => {
     BotAvatar: () => <span />,
     Spinner: (props: ComponentProps<"svg">) => <svg role="status" {...props} />,
     Button: (props: ComponentProps<"button">) => <button {...props} />,
+    Input: (props: ComponentProps<"input">) => <input {...props} />,
     NativeSelect: (props: ComponentProps<"select">) => <select {...props} />,
     NativeSelectOption: (props: ComponentProps<"option">) => <option {...props} />,
     parseBotAvatar: () => ({ color: undefined }),
@@ -111,7 +112,7 @@ async function renderArtifacts() {
   };
 }
 
-it("opens the Artifacts screen and lists what listSpace returns", async () => {
+it("opens the legacy route as the Library and lists existing files", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   api.listSpace.mockResolvedValue({
     items: [artifact("Q3 Content Calendar", "artifact-1")],
@@ -119,9 +120,11 @@ it("opens the Artifacts screen and lists what listSpace returns", async () => {
   });
   const page = await renderArtifacts();
   try {
-    expect(page.container.textContent).toContain("Artifacts");
+    expect(page.container.querySelector("h1")?.textContent).toBe("Library");
+    expect(page.container.querySelector('input[aria-label="Search the library"]')).not.toBeNull();
     expect(page.container.textContent).toContain("Q3 Content Calendar");
-    expect(page.container.querySelector("a[href='/app']")?.textContent).toContain("Bots");
+    expect(page.container.querySelector("a[href='/app']")?.textContent).toContain("Micos");
+    expect(page.container.querySelector("a[href='/app/artifacts/artifact-1']")).not.toBeNull();
     expect(page.container.querySelector("[data-testid='app-rail']")).toBeNull();
   } finally {
     await page.cleanup();
@@ -140,13 +143,6 @@ it("keeps loading later pages when search hides the current snapshot", async () 
   const page = await renderArtifacts();
   try {
     expect(page.container.textContent).toContain("Alpha notes");
-    const filters = [...page.container.querySelectorAll("button")].find((button) =>
-      button.textContent?.includes("Filters"),
-    );
-    expect(filters).toBeTruthy();
-    await act(async () => {
-      filters?.click();
-    });
     await act(async () => {
       typeSearch(page.container, "Beta");
     });

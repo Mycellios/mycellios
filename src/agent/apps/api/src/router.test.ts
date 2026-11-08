@@ -659,6 +659,18 @@ describe("model setup gate", () => {
     });
   });
 
+  it("rejects creating a Mico with a disconnected model before inserting it", async () => {
+    const { actor, handler } = modelGateDeps({ agentRuntime: "pi" });
+    const response = await call(handler, actor, "bots/create", {
+      name: "Scout",
+      model: { provider: "openrouter", modelId: "test-model", thinkingLevel: "medium" },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      json: { code: "BAD_REQUEST", message: "Connect that model provider first" },
+    });
+  });
+
   it.each([true, false])("checks a Mico's connection when the account has no main model (%s)", async (connected) => {
     const { deps, actor } = modelGateDeps({ agentRuntime: "pi", modelCredentialConnected: connected });
     const bot = { modelProvider: "openrouter", modelId: "test-model" };
@@ -4833,7 +4845,7 @@ describe("bot intro run", () => {
   const bot = { id: "bot-1", threadId: "thread-1" } as unknown as Bot;
 
   function introDeps(
-    options: { agentRuntime?: string; hasCredential?: boolean; existingRun?: boolean } = {},
+    options: { agentRuntime?: string; hasCredential?: boolean; existingRun?: boolean; imported?: boolean } = {},
   ) {
     let calls = 0;
     const create = vi.fn(({ data }: { data: object }) => {
@@ -4844,6 +4856,7 @@ describe("bot intro run", () => {
     const tx = {
       $queryRaw: vi.fn().mockResolvedValue([]),
       task: { create },
+      agentImport: { findFirst: vi.fn().mockResolvedValue(options.imported ? { id: "import-1" } : null) },
       run: {
         create,
         findFirst: vi.fn().mockResolvedValue(options.existingRun ? { id: "run-0" } : null),
@@ -4946,6 +4959,14 @@ describe("bot intro run", () => {
     expect(enqueue).not.toHaveBeenCalled();
   });
 
+  it("queues the intro with a pinned model even without a general model", async () => {
+    const { enqueue, deps } = introDeps({ hasCredential: false });
+    await enqueueBotIntroRun(deps, actor, { ...bot, modelProvider: "test", modelId: "model-1" });
+    expect(enqueue).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ payload: { runId: "record-2" } }),
+    );
+  });
+
   it("does not queue a second intro when an idempotent create returns an existing bot", async () => {
     const { create, enqueue, deps } = introDeps({ existingRun: true });
 
@@ -4962,6 +4983,21 @@ describe("bot intro run", () => {
     expect(prompt([])).toContain("update_bot");
     expect(prompt(["ask_user", "update_bot"])).not.toContain("ask_user");
     expect(prompt(["ask_user", "update_bot"])).not.toContain("update_bot");
+  });
+
+  it("asks the first Mico for a short greeting instead of a focus card", async () => {
+    const { create, deps } = introDeps();
+    await enqueueBotIntroRun(deps, actor, { ...bot, spawnKey: "onboarding:first" });
+    const [taskCall] = create.mock.calls as Array<[{ data: { prompt?: string } }]>;
+    expect(taskCall?.[0].data.prompt).toContain("Greet the user briefly");
+    expect(taskCall?.[0].data.prompt).not.toContain("ask_user");
+  });
+
+  it("keeps an imported first Mico inert when creation reuses its key", async () => {
+    const { create, enqueue, deps } = introDeps({ imported: true });
+    await enqueueBotIntroRun(deps, actor, { ...bot, spawnKey: "onboarding:first" });
+    expect(create).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
   });
 });
 

@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, type Route, test } from "@playwright/test";
-import { activeBotId, captureScreenshot, completeOnboarding, signup } from "./helpers";
+import { activeBotId, captureScreenshot, completeOnboarding, showFocusCard, signup } from "./helpers";
 
 /** Submit from the Send control so an in-flight prior send cannot swallow Enter. */
 async function sendComposerMessage(page: Page, composer: Locator, text: string) {
@@ -78,8 +78,8 @@ test("message hover shows beside-bubble actions; reply links to parent", async (
 
   const transcript = page.getByTestId("transcript");
 
-  // Empty start: no Fresh-start greeting. Answer the focus card so a plain
-  // bot text bubble exists for hover layout checks.
+  // Seed a focus card so a plain bot text bubble exists for hover layout checks.
+  await showFocusCard(page);
   await expect(page.getByText("What do you want me on first?", { exact: true })).toBeVisible({
     timeout: 20_000,
   });
@@ -466,6 +466,7 @@ test.describe("touch message actions", () => {
   test("touch actions can react and reply to a saved message", async ({ page }) => {
     await signup(page, `touch-actions-${Date.now()}@rakazo.test`, "password12", "Touch Actions");
     await completeOnboarding(page);
+    await showFocusCard(page);
     await page.getByRole("button", { name: /Day-to-day work/ }).click();
     const row = page.getByTestId("transcript").locator("[data-message-id]")
       .filter({ hasText: /Got it\./ }).first();
@@ -483,6 +484,7 @@ test.describe("touch message actions", () => {
 test("a reaction receipt refreshes live work and exposes Stop", async ({ page }, testInfo) => {
   await signup(page, `reaction-work-${Date.now()}@rakazo.test`, "password12", "Reaction Work");
   await completeOnboarding(page);
+  await showFocusCard(page);
   await expect(page.getByText("What do you want me on first?", { exact: true })).toBeVisible({
     timeout: 20_000,
   });

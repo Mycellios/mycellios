@@ -1,4 +1,4 @@
-import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
+import { MICO_AVATAR_SHAPES, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
 import type { BotColorDef } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
@@ -7,6 +7,7 @@ import {
   BOT_COLOR_LIST,
   currentMicoAvatarValue,
   DEFAULT_BOT_AVATAR_COLOR,
+  MICO_AVATAR_EYE_COLOR,
   MICO_AVATAR_VIEWBOX,
   micoAvatarArt,
   organicAvatarPath,
@@ -84,7 +85,8 @@ export const BotAvatar = memo(function BotAvatar({
   const id = useId().replace(/[^a-zA-Z0-9-_]/g, "");
   const isWorking = ACTIVE_RUN_STATUSES.some((s) => s === status);
 
-  const parsed = useMemo(() => parseBotAvatar(currentMicoAvatarValue(color, identity)), [color, identity]);
+  const displayedValue = useMemo(() => currentMicoAvatarValue(color, identity), [color, identity]);
+  const parsed = useMemo(() => parseBotAvatar(displayedValue), [displayedValue]);
   const effectiveId = identity || parsed.color || "agent";
 
   const colorDef = useMemo(
@@ -141,11 +143,46 @@ export const BotAvatar = memo(function BotAvatar({
     );
   }
 
-  const look = micoAvatarDetails(color);
+  const look = micoAvatarDetails(displayedValue);
+  const shape = micoAvatarShape(parsed.shapeIndex);
   const shapeOrdinal = MICO_AVATAR_SHAPES.findIndex(({ index }) => index === parsed.shapeIndex);
-  const flatColor = look.original ? MICO_AVATAR_PALETTES[shapeOrdinal]?.color : parsed.color;
-  const mico = micoAvatarArt(parsed.shapeIndex, flatColor ?? parsed.color);
+  const mico = micoAvatarArt(parsed.shapeIndex, look.original ? shape?.originalColor ?? parsed.color : parsed.color);
   const plush = look.finish === "plush" ? MICO_PLUSH_CROPS[shapeOrdinal] : undefined;
+  if (mico && !plush) {
+    return (
+      <svg
+        className={cn("rakazo-bot-avatar shrink-0 select-none", className)}
+        viewBox={MICO_AVATAR_VIEWBOX}
+        aria-hidden="true"
+        data-working={isWorking}
+        data-mico-avatar="flat"
+        data-mico-shape={shape?.id}
+        data-mico-idle={identity ? "" : undefined}
+        style={{
+          width: size,
+          height: size,
+          "--mico-blink-delay": `-${(avatarIdentitySeed(effectiveId) % 7000) / 1000}s`,
+        } as CSSProperties}
+      >
+        <path d={mico.path} fill={mico.color} className="rakazo-mico-body" />
+        {mico.nose && <path d={mico.nose} fill={MICO_AVATAR_EYE_COLOR} />}
+        {look.eyes === 0 ? (
+          <g className="rakazo-mico-gaze" fill={mico.eyeColor}>
+            {mico.eyes.map(([x, y, width, height]) => (
+              <rect key={x} className="rakazo-mico-eye" x={x} y={y} width={width} height={height} rx={width / 2} />
+            ))}
+          </g>
+        ) : (
+          <MicoEyes
+            eyes={look.eyes}
+            positions={mico.eyes.map(([x, y, width, height]) => [x + width / 2, y + height / 2] as const)}
+            scale={0.24}
+            color={mico.eyeColor}
+          />
+        )}
+      </svg>
+    );
+  }
   return (
     <div
       className={cn(
@@ -157,7 +194,7 @@ export const BotAvatar = memo(function BotAvatar({
         height: size,
       }}
       data-working={isWorking}
-      data-mico-avatar={mico ? look.finish : undefined}
+      data-mico-avatar={plush ? "plush" : undefined}
     >
       <svg
         className="rakazo-bot-avatar-ring absolute pointer-events-none"
@@ -212,23 +249,13 @@ export const BotAvatar = memo(function BotAvatar({
       >
         {plush && mico ? (
           <>
-            <MicoPlushBody id={id} tint={look.original ? undefined : mico.fills.body} firstSheet={shapeOrdinal < 5} />
+            <MicoPlushBody id={id} tint={look.original ? undefined : mico.color} firstSheet={shapeOrdinal < 5} />
             <MicoEyes
               eyes={look.eyes}
               positions={[plush[1], plush[2]]}
               scale={1.9}
+              color="#30201e"
               plush
-            />
-          </>
-        ) : mico ? (
-          <>
-            {mico.layers.map(([tone, path]) => (
-              <path key={path} d={path} fill={mico.fills[tone]} />
-            ))}
-            <MicoEyes
-              eyes={look.eyes}
-              positions={[[mico.eyes[0], mico.eyes[2]], [mico.eyes[1], mico.eyes[2]]]}
-              scale={0.24}
             />
           </>
         ) : (
@@ -286,14 +313,15 @@ function MicoPlushBody({ id, tint, firstSheet }: { id: string; tint?: string; fi
   );
 }
 
-function MicoEyes({ eyes, positions, scale, plush = false }: {
+function MicoEyes({ eyes, positions, scale, color, plush = false }: {
   eyes: number;
   positions: readonly (readonly [number, number])[];
   scale: number;
+  color: string;
   plush?: boolean;
 }) {
   return (
-    <g className="rakazo-mico-gaze" fill={plush ? "#30201e" : "#251c2c"} stroke={plush ? "#f9ead288" : undefined}>
+    <g className="rakazo-mico-gaze" fill={color} stroke={plush ? "#f9ead288" : undefined}>
       {positions.map(([x, y], index) => (
         <g key={x} transform={`translate(${x} ${y}) scale(${index ? -scale : scale} ${scale})`}>
           <path className="rakazo-mico-eye" d={MICO_EYE_PATHS[eyes] ?? MICO_EYE_PATHS[0]} />
@@ -410,6 +438,7 @@ export function BotShapePreview({
   label,
   color,
   selected,
+  compact = false,
   onClick,
 }: {
   /** An Avatar Studio shape; omit it to draw the organic body `identity` gets. */
@@ -418,6 +447,7 @@ export function BotShapePreview({
   label?: string;
   color: string;
   selected?: boolean;
+  compact?: boolean;
   onClick?: () => void;
 }) {
   const key =
@@ -435,14 +465,15 @@ export function BotShapePreview({
       title={label}
       aria-pressed={selected ?? false}
       className={cn(
-        "relative flex size-11 cursor-pointer items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
+        "relative flex cursor-pointer items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
+        compact ? "size-8 rounded-lg sm:size-[26px]" : "size-11",
         selected
-          ? "ring-2 ring-primary ring-offset-2 ring-offset-popover bg-white/10"
+          ? cn("ring-2 ring-primary bg-white/10", compact ? "ring-inset" : "ring-offset-2 ring-offset-popover")
           : "hover:bg-white/5",
       )}
     >
       {mico ? (
-        <BotAvatar color={micoAvatarValue(mico.index, color)} size={34} />
+        <BotAvatar color={micoAvatarValue(mico.index, color, { eyes: 0, finish: "flat", original: false })} size={compact ? 22 : 34} />
       ) : shapeIndex === undefined ? (
         <BotAvatar color={color} identity={identity} size={32} />
       ) : (

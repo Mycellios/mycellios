@@ -10,7 +10,7 @@ export const RAIL_PAGES = [
   "board",
 ] as const;
 export type RailPage = (typeof RAIL_PAGES)[number];
-export const DEFAULT_RAIL_PINS: readonly RailPage[] = RAIL_PAGES.slice(0, 5);
+export const DEFAULT_RAIL_PINS: readonly RailPage[] = [...RAIL_PAGES.slice(0, 5), "files"];
 
 export function railPinsKey(scope: string) {
   return `mycellios:workspace-rail-pins:v1:${scope}`;

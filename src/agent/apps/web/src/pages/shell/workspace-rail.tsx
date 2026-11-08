@@ -13,7 +13,7 @@ import {
   Bot,
   CalendarClock,
   ChartArea,
-  FolderOpen,
+  Archive,
   LayoutGrid,
   ListTodo,
   MoreHorizontal,
@@ -41,6 +41,7 @@ import { HelpMenu } from "../../components/HelpMenu";
 type WorkspaceRailProps = {
   scope: string;
   activity: boolean;
+  library?: boolean;
   usage?: boolean;
   marketplace?: boolean;
   apps?: boolean;
@@ -144,7 +145,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
       current: props.activity,
       extra: true,
     },
-    { id: "files", label: t`Files`, icon: FolderOpen, action: props.onArtifacts, extra: true },
+    { id: "files", label: t`Library`, icon: Archive, action: props.onArtifacts, current: props.library, extra: true },
     {
       id: "marketplace",
       label: t`Marketplace`,

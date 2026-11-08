@@ -1,8 +1,8 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { AppMarkStack, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import {
+  Archive,
   Download,
-  FolderOpen,
   Gauge,
   Sparkles,
   LogOut,
@@ -172,8 +172,8 @@ export function SidebarFooter({
                 className="h-9 w-full justify-start gap-2.5 font-normal"
                 onClick={onArtifacts}
               >
-                <FolderOpen className="text-muted-foreground" strokeWidth={1.75} />
-                <Trans>Artifacts</Trans>
+                <Archive className="text-muted-foreground" strokeWidth={1.75} />
+                <Trans>Library</Trans>
               </Button>
               <Button
                 variant="ghost"

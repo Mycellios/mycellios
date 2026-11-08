@@ -625,7 +625,7 @@ msgstr "Todos los estados"
 
 #: src/pages/Artifacts.tsx
 msgid "All time"
-msgstr ""
+msgstr "Cualquier fecha"
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Allow"
@@ -1082,7 +1082,7 @@ msgstr "Cancelado"
 
 #: src/pages/Artifacts.tsx
 msgid "Card view"
-msgstr ""
+msgstr "Vista de cuadrícula"
 
 #: src/pages/ModelRoleSettings.tsx
 msgid "Change {name}"
@@ -2648,7 +2648,7 @@ msgstr "Filtrar Micos"
 
 #: src/pages/Artifacts.tsx
 msgid "Filter by date"
-msgstr ""
+msgstr "Filtrar por fecha"
 
 #: src/pages/Artifacts.tsx
 #: src/pages/Shell.tsx
@@ -3084,7 +3084,7 @@ msgstr "Vincular SSO"
 
 #: src/pages/Artifacts.tsx
 msgid "List view"
-msgstr ""
+msgstr "Vista de lista"
 
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Listen"
@@ -5227,7 +5227,7 @@ msgstr "La ventana de contexto de este modelo es demasiado pequeña. Elige otro 
 
 #: src/pages/Artifacts.tsx
 msgid "This month"
-msgstr ""
+msgstr "Este mes"
 
 #: src/components/AccountAccess.tsx
 msgid "This permanently deletes your account and data."
@@ -5271,7 +5271,7 @@ msgstr "Este inicio de sesión por suscripción aún no está disponible en Raka
 
 #: src/pages/Artifacts.tsx
 msgid "This week"
-msgstr ""
+msgstr "Esta semana"
 
 #: src/pages/RoutineSchedule.tsx
 msgid "Time of day"
@@ -9567,3 +9567,170 @@ msgstr "Proveedores conectados"
 
 msgid "Other providers"
 msgstr "Otros proveedores"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Raven"
+msgstr "Cuervo"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Hare"
+msgstr "Liebre"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "Otter"
+msgstr "Nutria"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/avatar-studio-popover.tsx
+msgid "create-mico.avatar-options"
+msgstr "Más opciones del avatar"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/create-bot-dialog.tsx
+msgid "create-mico.purpose"
+msgstr "¿En qué debe ayudar este Mico?"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/create-bot-dialog.tsx
+msgid "create-mico.purpose-placeholder"
+msgstr "Planificar viajes, comparar opciones o ayudarte con el trabajo diario."
+
+#. js-lingui-explicit-id
+#: src/pages/shell/create-bot-dialog.tsx
+msgid "first-mico.title"
+msgstr "Crea tu primer Mico"
+
+#. js-lingui-explicit-id
+#: src/pages/shell/create-bot-dialog.tsx
+msgid "first-mico.create"
+msgstr "Crear Mico"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.heading"
+msgstr "Sugerencias"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.email.name"
+msgstr "Asistente de correo"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.email.summary"
+msgstr "Redacta respuestas y detecta seguimientos pendientes."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.email.purpose"
+msgstr "Ayúdame a revisar mi correo, redactar respuestas y detectar mensajes que necesitan seguimiento."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.travel.name"
+msgstr "Planificador de viajes"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.travel.summary"
+msgstr "Compara opciones y crea itinerarios prácticos."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.travel.purpose"
+msgstr "Compara rutas, alojamientos y presupuestos, y prepara itinerarios prácticos para mis viajes."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.organize.name"
+msgstr "Organizador personal"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.organize.summary"
+msgstr "Convierte notas, recados y tareas en un plan sencillo."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.organize.purpose"
+msgstr "Organiza mis notas, recados y tareas en un plan claro con prioridades."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.shopping.name"
+msgstr "Asistente de compras"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.shopping.summary"
+msgstr "Compara precios y encuentra opciones que encajen."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.shopping.purpose"
+msgstr "Compara precios, características y condiciones antes de recomendarme una compra."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.writing.name"
+msgstr "Asistente de escritura"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.writing.summary"
+msgstr "Estructura, redacta y revisa tus textos."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.writing.purpose"
+msgstr "Ayúdame a estructurar, redactar y revisar textos claros con un tono adecuado para cada público."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.learning.name"
+msgstr "Guía de aprendizaje"
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.learning.summary"
+msgstr "Entiende temas nuevos y practica a tu ritmo."
+
+#. js-lingui-explicit-id
+msgid "mico-suggestion.learning.purpose"
+msgstr "Explícame temas nuevos paso a paso y prepara ejercicios breves adaptados a mi nivel."
+
+msgid "Library"
+msgstr "Biblioteca"
+
+msgid "Open library"
+msgstr "Abrir biblioteca"
+
+msgid "Search the library"
+msgstr "Buscar en la biblioteca"
+
+msgid "Library view"
+msgstr "Vista de biblioteca"
+
+msgid "No files yet"
+msgstr "Todavía no hay archivos"
+
+msgid "Files you attach in chat and files your Micos share appear here."
+msgstr "Aquí aparecen los archivos que adjuntas en el chat y los que comparten tus Micos."
+
+msgid "No files match your search."
+msgstr "No hay archivos que coincidan con tu búsqueda."
+
+msgid "No matching files on this page."
+msgstr "No hay archivos que coincidan en esta página."
+
+msgid "Clear filters"
+msgstr "Borrar filtros"
+
+msgid "Could not load the library."
+msgstr "No se pudo cargar la biblioteca."
+
+msgid "File type"
+msgstr "Tipo de archivo"
+
+msgid "All file types"
+msgstr "Todos los tipos de archivo"
+
+msgid "Images"
+msgstr "Imágenes"
+
+msgid "Audio and video"
+msgstr "Audio y vídeo"
+
+msgid "Other files"
+msgstr "Otros archivos"
+
+msgid "Could not delete this file."
+msgstr "No se pudo eliminar este archivo."
+
+msgid "This deletes all {0} versions of this file. This can't be undone."
+msgstr "Esto elimina las {0} versiones de este archivo. Esta acción es irreversible."

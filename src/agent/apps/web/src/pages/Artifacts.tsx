@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
   BotAvatar,
   Button,
+  Input,
   NativeSelect,
   NativeSelectOption,
   parseBotAvatar,
@@ -31,11 +32,12 @@ import {
   List,
   Lock,
   Maximize2,
+  Menu,
   Minimize2,
   Search,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { IconTooltip } from "../components/IconTooltip";
 import { PdfViewer } from "../components/PdfViewer";
@@ -45,15 +47,17 @@ import { takeInitialBootstrap } from "../lib/bootstrap";
 import { desktopBridge } from "../lib/desktop";
 import { useSpaceQueries, writeSaved } from "../lib/query";
 import { formatRelativeTime } from "../lib/relative-time";
-import { rpc } from "../lib/rpc";
+import { useSpaceRpc } from "../lib/space-rpc";
 import { useObjectUrl } from "../lib/use-object-url";
 import { errorText } from "../lib/user-error";
 import { WindowChrome } from "./WindowChrome";
 
 type ViewMode = "grid" | "list";
 type DateFilter = "all" | "today" | "week" | "month";
+type FileFilter = "all" | "images" | "documents" | "media" | "other";
 const VIEW_MODE_STORAGE_KEY = "rakazo:artifacts-view-mode";
 const LIST_PAGE_SIZE = 60;
+const GRID_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
 
 type ArtifactSummary = Artifact & { versionCount: number };
 
@@ -75,6 +79,29 @@ function writeViewMode(mode: ViewMode): void {
   }
 }
 
+function fileCategory(mimeType: string): Exclude<FileFilter, "all"> {
+  if (isAttachmentImageMimeType(mimeType)) return "images";
+  if (mimeType.startsWith("audio/") || mimeType.startsWith("video/")) return "media";
+  if (mimeType.startsWith("text/") || /pdf|office|opendocument|msword|ms-excel|ms-powerpoint/.test(mimeType)) return "documents";
+  return "other";
+}
+
+function libraryFileHref(params: URLSearchParams, artifactId?: string) {
+  if (params.get("view") === "library") {
+    const next = new URLSearchParams(params);
+    if (artifactId) next.set("file", artifactId);
+    else next.delete("file");
+    return `?${next}`;
+  }
+  const path = artifactId ? `/app/artifacts/${encodeURIComponent(artifactId)}` : "/app/artifacts";
+  return params.size ? `${path}?${params}` : path;
+}
+
+function LibraryFileLink({ artifactId, ...props }: Omit<ComponentProps<typeof Link>, "to"> & { artifactId: string }) {
+  const [params] = useSearchParams();
+  return <Link to={libraryFileHref(params, artifactId)} {...props} />;
+}
+
 function matchesCalendarDateFilter(iso: string, filter: DateFilter, now: Date): boolean {
   if (filter === "all") return true;
   const date = new Date(iso);
@@ -88,30 +115,44 @@ function matchesCalendarDateFilter(iso: string, filter: DateFilter, now: Date): 
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
 }
 
-export function ArtifactsPage() {
-  const { artifactId } = useParams<{ artifactId?: string }>();
+export function ArtifactsPage({ onOpenNavigation, workspaceBots }: {
+  onOpenNavigation?: () => void;
+  workspaceBots?: readonly Bot[];
+} = {}) {
+  const { artifactId: routeId } = useParams<{ artifactId?: string }>();
   const navigate = useNavigate();
   const { t } = useLingui();
-  const [searchParams] = useSearchParams();
-  const [activeBotId, setActiveBotId] = useState(() => searchParams.get("bot") || null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const embedded = Boolean(onOpenNavigation);
+  const artifactId = routeId ?? (embedded ? searchParams.get("file") ?? undefined : undefined);
+  const botParam = embedded ? "libraryBot" : "bot";
+  const activeBotId = searchParams.get(botParam) || null;
+  function setActiveBotId(id: string | null) {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set(botParam, id);
+    else next.delete(botParam);
+    setSearchParams(next, { replace: true });
+  }
   const [viewMode, setViewMode] = useState<ViewMode>(readViewMode);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [fileFilter, setFileFilter] = useState<FileFilter>("all");
   const [maximized, setMaximized] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ArtifactSummary | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const queries = useSpaceQueries();
+  const rpc = useSpaceRpc();
   const queryClient = useQueryClient();
-  // The space's bootstrap is where the shell keeps what it last loaded, bots included.
-  const bots =
-    useQuery({
-      queryKey: queries.bootstrap.queryKey({ input: {} }),
-      queryFn: () => takeInitialBootstrap(),
-      select: (bootstrap) => bootstrap.bots,
-    }).data ?? NO_BOTS;
+  const standaloneBots = useQuery({
+    queryKey: queries.bootstrap.queryKey({ input: {} }),
+    queryFn: () => takeInitialBootstrap(),
+    enabled: !workspaceBots,
+    select: (bootstrap) => bootstrap.bots,
+  }).data;
+  const bots = workspaceBots ?? standaloneBots ?? NO_BOTS;
   const listingOptions = queries.artifacts.listSpace.infiniteOptions({
     input: (cursor: string | undefined) => ({
       botId: activeBotId ?? undefined,
@@ -129,11 +170,11 @@ export function ArtifactsPage() {
   const nextCursor = listing.data?.pages.at(-1)?.nextCursor ?? null;
   const loadingMore = listing.isFetchingNextPage;
   const loadError =
-    listing.error && !listing.data ? errorText(listing.error, t`Could not load artifacts.`) : null;
+    listing.error && !listing.data ? errorText(listing.error, t`Could not load the library.`) : null;
   // A failed refresh over the cached list is still said; a failed next page keeps Load more.
   const refreshError =
     listing.data && listing.isRefetchError
-      ? errorText(listing.error, t`Could not load artifacts.`)
+      ? errorText(listing.error, t`Could not load the library.`)
       : null;
 
   function loadMore() {
@@ -153,20 +194,28 @@ export function ArtifactsPage() {
     const query = searchQuery.trim().toLowerCase();
     return items.filter((item) => {
       if (!matchesCalendarDateFilter(item.createdAt, dateFilter, now)) return false;
+      if (fileFilter !== "all" && fileCategory(item.mimeType) !== fileFilter) return false;
       if (!query) return true;
       return (
         item.name.toLowerCase().includes(query) ||
         (item.description?.toLowerCase().includes(query) ?? false)
       );
     });
-  }, [items, searchQuery, dateFilter]);
+  }, [items, searchQuery, dateFilter, fileFilter]);
 
-  const clientFilterActive = searchQuery.trim().length > 0 || dateFilter !== "all";
+  const clientFilterActive = searchQuery.trim().length > 0 || dateFilter !== "all" || fileFilter !== "all";
   const autoFetchedCursorRef = useRef<string | null>(null);
 
   useEffect(() => {
     autoFetchedCursorRef.current = null;
-  }, [searchQuery, dateFilter, activeBotId]);
+  }, [searchQuery, dateFilter, fileFilter, activeBotId]);
+
+  function clearFilters() {
+    setSearchQuery("");
+    setDateFilter("all");
+    setFileFilter("all");
+    if (activeBotId) setActiveBotId(null);
+  }
 
   // Search and date filters only see loaded pages, so keep paging until something matches.
   useEffect(() => {
@@ -200,46 +249,57 @@ export function ArtifactsPage() {
         queryKey: queries.artifacts.listSpace.key(),
         refetchType: "none",
       });
-      if (artifactId === pendingDelete.id) navigate("/app/artifacts");
+      if (artifactId === pendingDelete.id) navigate(libraryFileHref(searchParams));
       setPendingDelete(null);
     } catch (error) {
-      setDeleteError(errorText(error, t`Could not delete this artifact.`));
+      setDeleteError(errorText(error, t`Could not delete this file.`));
     } finally {
       setDeleteBusy(false);
     }
   }
 
   return (
-    <div className="flex h-full min-w-0 flex-col bg-background text-foreground/90">
-      <header className="app-drag border-b border-border px-4 py-4 md:px-6">
-        {/* Wraps so window controls and the way back stay on screen with Filters. */}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <div className="flex items-center gap-2">
-            {/* This route is the window's leading edge, so Electron window controls sit in the header. */}
-            {desktopBridge() ? <WindowChrome /> : null}
-            <Link
-              to="/app"
-              className="app-no-drag flex shrink-0 items-center gap-0.5 rounded-lg py-1 pe-1.5 text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            >
-              <ChevronLeft size={16} strokeWidth={1.9} aria-hidden="true" />
-              <Trans>Bots</Trans>
-            </Link>
-            <h1 className="text-heading2 font-semibold">
-              <Trans>Artifacts</Trans>
-            </h1>
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground" data-testid="file-library">
+      <header className="app-drag px-4 py-4 md:px-8 md:pt-7">
+        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
+          <div className="flex min-w-0 items-center gap-2">
+            {embedded ? (
+              <Button type="button" variant="ghost" size="icon" aria-label={t`Open navigation`} onClick={onOpenNavigation} className="app-no-drag md:hidden">
+                <Menu aria-hidden />
+              </Button>
+            ) : (
+              <>
+                {desktopBridge() ? <WindowChrome /> : null}
+                <Link
+                  to="/app"
+                  className="app-no-drag flex shrink-0 items-center gap-0.5 rounded-lg py-1 pe-1.5 text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                >
+                  <ChevronLeft size={16} strokeWidth={1.9} aria-hidden="true" />
+                  <Trans>Micos</Trans>
+                </Link>
+              </>
+            )}
+            {artifactId ? (
+              <Link to={libraryFileHref(searchParams)} className="app-no-drag inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
+                <ChevronLeft size={16} aria-hidden />
+                <Trans>Library</Trans>
+              </Link>
+            ) : <h1 className="text-heading2 font-semibold"><Trans>Library</Trans></h1>}
           </div>
-          <div className="app-no-drag flex shrink-0 items-center gap-2">
-            <Button
-              variant={filtersOpen ? "default" : "outline"}
-              size="sm"
-              aria-pressed={filtersOpen}
-              onClick={() => setFiltersOpen((open) => !open)}
-            >
-              <Filter strokeWidth={1.9} />
-              <Trans>Filters</Trans>
-            </Button>
-            {!artifactId ? (
+          {!artifactId ? (
+            <div className="app-no-drag flex min-w-0 flex-wrap items-center gap-2 max-sm:w-full">
+              <Button
+                type="button"
+                variant={filtersOpen || activeBotId || dateFilter !== "all" || fileFilter !== "all" ? "secondary" : "outline"}
+                size="sm"
+                aria-expanded={filtersOpen}
+                onClick={() => setFiltersOpen((open) => !open)}
+              >
+                <Filter strokeWidth={1.9} />
+                <Trans>Filters</Trans>
+              </Button>
               <ToggleGroup
+                aria-label={t`Library view`}
                 value={[viewMode]}
                 onValueChange={([next]) => {
                   if (next) setMode(next as ViewMode);
@@ -267,26 +327,40 @@ export function ArtifactsPage() {
                   </ToggleGroupItem>
                 </IconTooltip>
               </ToggleGroup>
-            ) : null}
-          </div>
+              <div className="relative min-w-36 flex-1 sm:w-64">
+                <Search
+                  size={14}
+                  strokeWidth={1.9}
+                  className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  type="search"
+                  aria-label={t`Search the library`}
+                  placeholder={t`Search the library`}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="ps-8"
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        {filtersOpen ? (
+        {filtersOpen && !artifactId ? (
           <div className="app-no-drag mt-3 flex flex-wrap items-center gap-2">
-            <div className="relative w-full max-w-[260px]">
-              <Search
-                size={14}
-                strokeWidth={1.9}
-                className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder={t`Search artifacts…`}
-                className="w-full rounded-lg border border-border bg-background py-1.5 ps-8 pe-3 text-[13px] outline-none focus:border-ring"
-              />
-            </div>
+            <NativeSelect
+              aria-label={t`File type`}
+              className="w-auto text-[13px]"
+              value={fileFilter}
+              onChange={(event) => setFileFilter(event.target.value as FileFilter)}
+            >
+              <NativeSelectOption value="all">{t`All file types`}</NativeSelectOption>
+              <NativeSelectOption value="images">{t`Images`}</NativeSelectOption>
+              <NativeSelectOption value="documents">{t`Documents`}</NativeSelectOption>
+              <NativeSelectOption value="media">{t`Audio and video`}</NativeSelectOption>
+              <NativeSelectOption value="other">{t`Other files`}</NativeSelectOption>
+            </NativeSelect>
             <NativeSelect
               aria-label={t`Filter by date`}
               className="w-auto text-[13px]"
@@ -345,6 +419,8 @@ export function ArtifactsPage() {
             items={filteredItems}
             loadError={loadError}
             viewMode={viewMode}
+            filtered={clientFilterActive || Boolean(activeBotId)}
+            onClearFilters={clearFilters}
             botsById={botsById}
             onRequestDelete={setPendingDelete}
             nextCursor={nextCursor}
@@ -369,7 +445,7 @@ export function ArtifactsPage() {
               <AlertDialogDescription>
                 {pendingDelete.versionCount > 1 ? (
                   <Trans>
-                    This deletes all {pendingDelete.versionCount} versions of this artifact. This
+                    This deletes all {pendingDelete.versionCount} versions of this file. This
                     can't be undone.
                   </Trans>
                 ) : (
@@ -401,6 +477,8 @@ function BrowsingPane({
   items,
   loadError,
   viewMode,
+  filtered,
+  onClearFilters,
   botsById,
   onRequestDelete,
   nextCursor,
@@ -410,6 +488,8 @@ function BrowsingPane({
   items: ArtifactSummary[] | null;
   loadError: string | null;
   viewMode: ViewMode;
+  filtered: boolean;
+  onClearFilters: () => void;
   botsById: Map<string, Bot>;
   onRequestDelete: (artifact: ArtifactSummary) => void;
   nextCursor: string | null;
@@ -426,7 +506,9 @@ function BrowsingPane({
   if (items.length === 0) {
     return (
       <EmptyArtifacts
-        className="grid flex-1 place-items-center text-sm text-muted-foreground/80"
+        className="flex flex-1 flex-col items-center px-6 pt-7 text-center text-sm text-muted-foreground"
+        filtered={filtered}
+        onClearFilters={onClearFilters}
         nextCursor={nextCursor}
         loadingMore={loadingMore}
         onLoadMore={onLoadMore}
@@ -434,9 +516,9 @@ function BrowsingPane({
     );
   }
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+    <div className="rk-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-5 md:px-8">
       {viewMode === "grid" ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-3">
           {items.map((item) => (
             <ArtifactCard
               key={item.id}
@@ -482,11 +564,15 @@ function LoadMoreButton({ loading, onClick }: { loading: boolean; onClick: () =>
 
 function EmptyArtifacts({
   className,
+  filtered = false,
+  onClearFilters,
   nextCursor,
   loadingMore,
   onLoadMore,
 }: {
   className: string;
+  filtered?: boolean;
+  onClearFilters?: () => void;
   nextCursor: string | null;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -494,7 +580,21 @@ function EmptyArtifacts({
   if (!nextCursor) {
     return (
       <div className={className}>
-        <Trans>No artifacts found.</Trans>
+        {filtered ? (
+          <>
+            <p className="font-medium text-foreground"><Trans>No files match your search.</Trans></p>
+            {onClearFilters ? (
+              <Button type="button" variant="text" className="mt-2" onClick={onClearFilters}>
+                <Trans>Clear filters</Trans>
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <p className="font-medium text-foreground"><Trans>No files yet</Trans></p>
+            <p className="mt-2 max-w-[21rem]"><Trans>Files you attach in chat and files your Micos share appear here.</Trans></p>
+          </>
+        )}
       </div>
     );
   }
@@ -505,7 +605,7 @@ function EmptyArtifacts({
           {loadingMore ? (
             <Spinner aria-label={t`Loading…`} />
           ) : (
-            <Trans>No matching artifacts on this page.</Trans>
+            <Trans>No matching files on this page.</Trans>
           )}
         </span>
         <LoadMoreButton loading={loadingMore} onClick={onLoadMore} />
@@ -534,7 +634,7 @@ function IndexPane({
   onLoadMore: () => void;
 }) {
   return (
-    <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-e border-border">
+    <aside className="hidden w-[320px] shrink-0 flex-col overflow-y-auto border-e border-border lg:flex">
       {items === null ? (
         <div className="grid flex-1 place-items-center p-6 text-center text-sm text-muted-foreground/80">
           {loadError ?? <Spinner aria-label={t`Loading…`} />}
@@ -634,9 +734,9 @@ function ArtifactCard({
   const { t } = useLingui();
   return (
     <div className="group relative">
-      <Link
-        to={`/app/artifacts/${artifact.id}`}
-        className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4 text-foreground hover:bg-accent/40"
+      <LibraryFileLink
+        artifactId={artifact.id}
+        className="flex flex-col gap-3 rounded-xl border border-border p-3 text-foreground hover:bg-accent/40"
       >
         <div className="flex items-start justify-between">
           <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-accent text-accent-foreground">
@@ -653,6 +753,9 @@ function ArtifactCard({
             </span>
           </div>
         </div>
+        {isAttachmentImageMimeType(artifact.mimeType) && artifact.size <= GRID_IMAGE_MAX_BYTES ? (
+          <ArtifactThumbnail key={artifact.version} artifact={artifact} />
+        ) : null}
         <div className="min-w-0">
           <div className="truncate text-[15px] font-semibold">{artifact.name}</div>
           {artifact.description ? (
@@ -661,7 +764,7 @@ function ArtifactCard({
             </div>
           ) : null}
         </div>
-        <div className="mt-auto flex items-center gap-2 text-[12px] text-muted-foreground">
+        <div className="mt-auto flex min-h-6 items-center gap-2 pe-8 text-[12px] text-muted-foreground">
           {bot ? (
             <>
               <BotAvatar color={bot.color} identity={bot.id} size={20} status={bot.status} />
@@ -672,7 +775,7 @@ function ArtifactCard({
           )}
           <span className="shrink-0">{formatRelativeTime(artifact.createdAt)}</span>
         </div>
-      </Link>
+      </LibraryFileLink>
       <IconTooltip label={t`Delete ${artifact.name}`}>
         <Button
           variant="ghost"
@@ -692,6 +795,49 @@ function ArtifactCard({
   );
 }
 
+function ArtifactThumbnail({ artifact }: { artifact: ArtifactSummary }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  const queries = useSpaceQueries();
+  const versions = useQuery(queries.artifacts.listVersions.queryOptions({
+    input: visible && artifact.versionCount > 1 ? { familyId: artifact.id } : skipToken,
+  })).data;
+  const versionId = artifact.versionCount > 1 ? versions?.[0]?.id : artifact.id;
+  const image = useQuery(queries.artifacts.getById.queryOptions({
+    input: visible && versionId ? { artifactId: versionId } : skipToken,
+  })).data;
+  const bytes = useMemo(
+    () => image && image.size <= GRID_IMAGE_MAX_BYTES && isAttachmentImageMimeType(image.mimeType)
+      ? decodeArtifactBase64(image.contentBase64)
+      : null,
+    [image],
+  );
+
+  useEffect(() => {
+    if (!ref.current || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return;
+      setVisible(true);
+      observer.disconnect();
+    });
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="grid aspect-video place-items-center overflow-hidden rounded-lg bg-muted text-muted-foreground">
+      {bytes && image ? (
+        <ArtifactThumbnailImage bytes={bytes} mimeType={image.mimeType} />
+      ) : <ArtifactMimeIcon mimeType={artifact.mimeType} />}
+    </div>
+  );
+}
+
+function ArtifactThumbnailImage({ bytes, mimeType }: { bytes: Uint8Array; mimeType: string }) {
+  const url = useObjectUrl(bytes, mimeType);
+  return url ? <img src={url} alt="" className="size-full min-h-0 object-contain" /> : null;
+}
+
 function ArtifactRow({
   artifact,
   bot,
@@ -706,7 +852,7 @@ function ArtifactRow({
   const { t } = useLingui();
   return (
     <div className={`group relative ${active ? "bg-accent/60" : "hover:bg-accent/40"}`}>
-      <Link to={`/app/artifacts/${artifact.id}`} className="flex flex-col gap-1 px-4 py-3 pe-10">
+      <LibraryFileLink artifactId={artifact.id} className="flex flex-col gap-1 px-4 py-3 pe-10" aria-current={active ? "page" : undefined}>
         <div className="flex items-center gap-2">
           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[7px] bg-accent text-accent-foreground">
             <ArtifactMimeIcon mimeType={artifact.mimeType} small />
@@ -732,7 +878,7 @@ function ArtifactRow({
           ) : null}
           <span>{formatRelativeTime(artifact.createdAt)}</span>
         </div>
-      </Link>
+      </LibraryFileLink>
       <IconTooltip label={t`Delete ${artifact.name}`}>
         <Button
           variant="ghost"
@@ -827,7 +973,7 @@ function PreviewPane({
       : artifactQuery.error
         ? {
             status: "error",
-            message: errorText(artifactQuery.error, t`Could not load this artifact.`),
+            message: errorText(artifactQuery.error, t`Could not load this file.`),
           }
         : { status: "loading" };
 

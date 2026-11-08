@@ -160,18 +160,6 @@ export type WebColorTokens = ColorTokens & {
   skillDesign: string;
   skillCode: string;
   workspaceTaskBlue: string;
-  workspaceAccentForeground: string;
-  workspaceAccent: string;
-  workspacePrimaryForeground: string;
-  workspacePrimary: string;
-  workspaceMutedForeground: string;
-  workspaceSidebarBorder: string;
-  workspaceSidebarAccent: string;
-  workspaceSidebar: string;
-  workspaceBorder: string;
-  workspaceCard: string;
-  workspaceForeground: string;
-  workspaceBackground: string;
 
   primaryHover: string;
   primaryDisabled: string;
@@ -182,18 +170,6 @@ export type WebColorTokens = ColorTokens & {
  * Workspace accents and pointer interaction states are web-only additions.
  */
 export const webDarkOverrides = {
-  workspaceBackground: darkTokens.background,
-  workspaceForeground: darkTokens.foreground,
-  workspaceCard: darkTokens.card,
-  workspaceBorder: darkTokens.border,
-  workspaceSidebar: darkTokens.sidebar,
-  workspaceSidebarAccent: darkTokens.sidebarAccent,
-  workspaceSidebarBorder: darkTokens.sidebarBorder,
-  workspaceMutedForeground: darkTokens.mutedForeground,
-  workspacePrimary: darkTokens.primary,
-  workspacePrimaryForeground: darkTokens.primaryForeground,
-  workspaceAccent: darkTokens.accent,
-  workspaceAccentForeground: darkTokens.accentForeground,
   workspaceTaskBlue: "#6ba9ff",
   skillCode: "#2465a7",
   skillDesign: "#b93e80",
@@ -207,18 +183,6 @@ export const webDarkOverrides = {
 } as const satisfies Partial<WebColorTokens>;
 
 export const webLightOverrides = {
-  workspaceBackground: "#f5f5f7",
-  workspaceForeground: "#19191b",
-  workspaceCard: "#fff",
-  workspaceBorder: "#e7e7eb",
-  workspaceSidebar: "#e8e8ed",
-  workspaceSidebarAccent: "#dadade",
-  workspaceSidebarBorder: "#e1e1e5",
-  workspaceMutedForeground: "#737378",
-  workspacePrimary: "#18181b",
-  workspacePrimaryForeground: "#fff",
-  workspaceAccent: "#e9e9ed",
-  workspaceAccentForeground: "#19191b",
   workspaceTaskBlue: "#006ad4",
   skillCode: "#2465a7",
   skillDesign: "#b93e80",

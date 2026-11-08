@@ -2,7 +2,8 @@ import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } 
 import { PushPermissionPrompt } from "../components/PushPermissionPrompt";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { LayoutGrid } from "lucide-react";
+import { Archive, LayoutGrid } from "lucide-react";
+import { ArtifactsPage } from "./Artifacts";
 import type {
   AgentSkillCatalogEntry,
   AppBootstrap,
@@ -25,7 +26,7 @@ import type {
   ThreadSnapshot,
   VoiceStatus,
 } from "@rakazo/contracts";
-import { ATTACHMENT_MAX_COUNT, attachmentMaxBytes, attachmentSizeLabel, videoStudioEnabled } from "@rakazo/contracts";
+import { ATTACHMENT_MAX_COUNT, attachmentMaxBytes, attachmentSizeLabel, FIRST_MICO_SPAWN_KEY, MICO_PRIMARY_AVATAR, NativeBotEngineSchema, videoStudioEnabled } from "@rakazo/contracts";
 import type { AgentImportReader, ComposerMention, ReadBoundary } from "@rakazo/core";
 import {
   accountDisplay,
@@ -101,7 +102,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ComputerMaintenanceActions } from "../components/ComputerMaintenanceActions";
 import { computersAreUnavailable } from "../components/ComputersUnavailableHint";
 import { ComputerUpdateProgress } from "../components/ComputerUpdateProgress";
@@ -387,6 +388,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const { t, i18n } = useLingui();
   const reviewWorkspace = useReviewWorkspace();
   const { botId, groupId } = useParams();
+  const firstMicoEngine = NativeBotEngineSchema.safeParse(useLocation().state?.firstMicoEngine).data;
   const [shellSpaceId] = useState(() => initialSpaceId ?? selectedSpaceId());
   const rpc = useSpaceRpc();
   const session = authClient.useSession();
@@ -439,6 +441,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const redirectKeepingOverlay = useCallback(
     (pathname: string) => {
       const search = new URLSearchParams(shellOverlaySearch(searchParamsRef.current));
+      if (searchParamsRef.current.get("view") === "library") {
+        for (const key of ["view", "file", "libraryBot"]) {
+          const value = searchParamsRef.current.get(key);
+          if (value) search.set(key, value);
+        }
+      }
       if (searchParamsRef.current.get("dictate") === "1") search.set("dictate", "1");
       return navigate(
         { pathname, search: search.toString() },
@@ -1305,20 +1313,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         setSpaces(navigation.spaces);
         setInitialBotsLoaded(true);
         botsRefreshApplied.current = request;
-        if (
-          includeArchived &&
-          list.length === 0 &&
-          archived?.length === 0 &&
-          groupList.length === 0 &&
-          archivedGroupList?.length === 0 &&
-          !navigation.spaces.some((space) => space.hasContent)
-        ) {
-          // Only the very first bot everywhere needs onboarding. An empty
-          // current space with content elsewhere stays in the app so the
-          // space can be switched to or deleted instead of trapping the user.
-          navigate("/onboarding", { replace: true });
-          return;
-        }
         const currentGroupId = routeGroupId.current;
         if (currentGroupId) {
           if (!groupList.some((group) => group.id === currentGroupId)) {
@@ -1587,6 +1581,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           return;
         }
         if (
+          (bootstrap.me.needsSignupSurvey || (bootstrap.me.needsModel && !firstMicoEngine)) &&
           bootstrap.bots.length === 0 &&
           bootstrap.archivedBots.length === 0 &&
           groupList.length === 0 &&
@@ -3032,9 +3027,17 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     setPanel(null);
   }
 
-  async function createBot(input: CreateBotDialogInput) {
+  async function createBot(input: CreateBotDialogInput, first = false) {
     const isFirstBot = botsRef.current.length === 0;
-    const bot = await rpc.bots.create({ ...input, notifyOnFinish: true });
+    const bot = await rpc.bots.create({
+      ...input,
+      notifyOnFinish: true,
+      ...(first ? {
+        color: input.color ?? MICO_PRIMARY_AVATAR,
+        spawnKey: FIRST_MICO_SPAWN_KEY,
+        agentEngine: firstMicoEngine,
+      } : {}),
+    });
     // A roster requested before creation may omit this bot and redirect its new chat.
     botsRefreshEpoch.current += 1;
     setBots((current) =>
@@ -3046,6 +3049,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     // Register cancellation before awaiting start so leaving the bot during
     // startup cannot miss the abort and still schedule a late focus card.
     cancelFocusPrompt();
+    if (first || input.instructions) return;
     const controller = new AbortController();
     focusPromptAbortRef.current = controller;
     focusPromptBotIdRef.current = bot.id;
@@ -3618,11 +3622,35 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   ) : null;
   const chatTools = {
     onBrowser: () => { setVoiceConversation(null); setPanel(null); reviewWorkspace?.show(); },
-    onFiles: () => navigate("/app/artifacts"),
+    onFiles: () => showLibrary(),
     onSettings: () => { setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(inGroup ? "group-settings" : "settings"); },
     onVoice: !inGroup && active ? () => { reviewWorkspace?.hide(); setPanel(null); setVoiceConversation({ id: active.id, name: active.name, color: active.color }); } : undefined,
   };
   const marketplaceView = searchParams.get("view") === "marketplace" || overlay?.kind === "integrations";
+  const libraryView = searchParams.get("view") === "library";
+  function showLibrary(botId?: string) {
+    if (activityMode) toggleActivityMode();
+    setVoiceConversation(null);
+    reviewWorkspace?.hide();
+    setPanel(null);
+    setComputerOpen(false);
+    setMobileSidebarOpen(false);
+    const next = withShellOverlay(searchParams, null);
+    next.set("view", "library");
+    next.delete("task");
+    next.delete("file");
+    if (botId) next.set("libraryBot", botId);
+    else next.delete("libraryBot");
+    setSearchParams(next);
+  }
+  const firstMicoSetup = initialBotsLoaded && Boolean(bootstrapMe) &&
+    bots.length === 0 && groups.length === 0 && archivedBots.length === 0 && archivedGroups.length === 0;
+  function openBotImport(fromDialog: boolean) {
+    setCreateBotOpen(false);
+    setDroppedAgent(null);
+    setImportFromDialog(fromDialog);
+    setPanel("import-agent");
+  }
   const appsEnabled = videoStudioEnabled(import.meta.env.VITE_MYCELLIOS_VIDEO_STUDIO);
   const requestedMarketplaceTab = marketplaceTab(searchParams.get("market"));
   const activeMarketplaceTab = !appsEnabled && requestedMarketplaceTab === "mycellios-apps"
@@ -3662,6 +3690,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const routineView = searchParams.get("view") === "routines";
   const exitRoutineView = () => {
     const next = new URLSearchParams(searchParams); next.delete("view"); next.delete("flow"); next.delete("task"); next.delete("usageBot");
+    next.delete("file"); next.delete("libraryBot");
     setSearchParams(next); setPanel(null);
   };
   const showRoutines = () => {
@@ -3846,8 +3875,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       onArtifacts={() => {
         close?.();
         setMenuOpen(false);
-        setMobileSidebarOpen(false);
-        navigate("/app/artifacts");
+        showLibrary();
       }}
       onSettings={() => {
         close?.();
@@ -3878,6 +3906,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       {close => (
         <>
           {appsEnabled ? <Button variant="ghost" data-mobile-chat-action onClick={() => { close(); openApps(); }}><LayoutGrid />Apps</Button> : null}
+          <Button variant="ghost" data-mobile-chat-action onClick={() => { close(); showLibrary(); }}>
+            <Archive />{t`Library`}
+          </Button>
           <Button variant="ghost" data-mobile-chat-action aria-pressed={activityMode} onClick={() => { close(); toggleActivityMode(); }}>
             <Bell />{t`Activity`}
           </Button>
@@ -3907,7 +3938,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         reviewWorkspace.add({ id: crypto.randomUUID(), url: destination, name: new URL(destination).host, mimeType: "text/uri-list" });
       }}
       onPreviewCollapsedChange={setBotsSidebarCollapsed}
-      computerOpen={computerOpen || marketplaceView || workflowView || scheduleView || usageView || (taskView && !taskAgentsOpen)}
+      computerOpen={computerOpen || libraryView || marketplaceView || workflowView || scheduleView || usageView || (taskView && !taskAgentsOpen)}
       data-workspace-chrome="compact"
       data-task-desktop={Boolean(desktopBridge())}
       data-testid="shell-root"
@@ -3965,6 +3996,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       ) : null}
       <WorkspaceRail
         apps={appsOpen}
+        library={libraryView}
         onApps={appsEnabled ? openApps : undefined}
         marketplace={marketplaceView && !appsOpen}
         scope={JSON.stringify([userId, currentSpaceId])}
@@ -3980,7 +4012,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onRoutines={showRoutines}
         onChats={() => { exitRoutineView(); if (activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); }}
         onActivity={() => { exitRoutineView(); if (!activityMode) toggleActivityMode(); setBotsSidebarCollapsedPref(false); }}
-        onArtifacts={() => navigate("/app/artifacts")}
+        onArtifacts={() => showLibrary()}
         onIntegrations={() => setOverlay({ kind: "integrations" })}
         onUsage={showUsage}
         onSettings={() => openSettings("general")}
@@ -3988,7 +4020,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onWhatsNew={() => setReleaseNotesOpen(true)}
         onBoard={bootstrapMe?.ticketBoardEnabled ? () => navigate("/app/board") : undefined}
       />
-      {(!marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen ? <Sidebar
+      {(!libraryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen ? <Sidebar
         collapsible={isMobileSidebar ? "none" : "icon"}
         side={document.documentElement.dir === "rtl" ? "right" : "left"}
         data-testid="bots-sidebar"
@@ -4141,7 +4173,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           />
         ) : null}
         <CallReturnBar />
-        {marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onOpenBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onOpenBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /> : routineView && active && !inGroup ? <RoutineWorkspace
+        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onOpenBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onOpenBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /> : routineView && active && !inGroup ? <RoutineWorkspace
           key={JSON.stringify([userId, currentSpaceId, active.id])}
           bot={active}
           client={rpc}
@@ -4169,7 +4201,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 {active || activeGroup ? <ArrowLeft className="size-6" /> : <Menu strokeWidth={1.7} className="size-6" />}
               </Button>
             </div>
-            <Button
+            {firstMicoSetup ? <span className="text-sm font-medium"><Trans>New bot</Trans></span> : <Button
               variant={active && !inGroup && !activeProject ? (!taskScope ? "secondary" : "ghost") : "floating"}
               data-testid="bot-settings-trigger"
               aria-label={taskScope && !activeProject && !inGroup ? t`Main chat` : undefined}
@@ -4206,7 +4238,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                     : (activeProject ? `${activeProject.name} · ${activeProject.conversations.find(chat => chat.threadId === taskScope?.taskThreadId)?.title ?? active?.name}` : active?.name ?? t`Select a bot`)}
                 </span>
               </span>
-            </Button>
+            </Button>}
             {isMobileSidebar ? (active || activeGroup) && (
               <div className="ms-auto flex shrink-0 gap-1.5">
                 {reviewWorkspace && (
@@ -4234,7 +4266,14 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               </>
             )}
           </div>
-          {!active && !activeGroup && initialBotsLoaded ? (
+          {firstMicoSetup ? (
+            <CreateBotDialog
+              inline
+              me={firstMicoEngine ? null : bootstrapMe}
+              onCreate={(input) => createBot(input, true)}
+              onImport={() => openBotImport(false)}
+            />
+          ) : !active && !activeGroup && initialBotsLoaded ? (
             <div className="grid flex-1 place-items-center">
               <Button onClick={() => setCreateBotOpen(true)}>
                 <Plus size={16} aria-hidden="true" />
@@ -4445,7 +4484,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       </main>
 
       {voiceConversation ? <VoiceConversation key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
-      {!marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && chatToolsOpen && !voiceConversation && !panel && !reviewWorkspace?.open ? <ChatToolsPanel {...chatTools} onClose={() => setChatToolsOpen(false)} /> : null}
+      {!libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && chatToolsOpen && !voiceConversation && !panel && !reviewWorkspace?.open ? <ChatToolsPanel {...chatTools} onClose={() => setChatToolsOpen(false)} /> : null}
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall
         bots={bootstrapMe?.phoneCallsEnabled ? bots : []}
@@ -4598,6 +4637,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             {panel === "import-agent" ? (
               <AgentImportForm
                 bots={bots.filter((bot) => !bot.archivedAt)}
+                createBot={firstMicoSetup
+                  ? (input) => rpc.bots.importCreate({ ...input, spawnKey: FIRST_MICO_SPAWN_KEY })
+                  : undefined}
                 initialSource={droppedAgent ?? undefined}
                 onBack={() => {
                   setDroppedAgent(null);
@@ -4623,7 +4665,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 bot={active}
                 focusModel={modelFocusRequest}
                 onOpenConnections={() => openSettings("models")}
-                onOpenFiles={() => navigate(`/app/artifacts?bot=${encodeURIComponent(active.id)}`)}
+                onOpenFiles={() => showLibrary(active.id)}
                 onOpenRoutines={showRoutines}
                 onOpenUsage={() => openUsage(active.id)}
                 memoryProviderConfigured={memoryProviderConfig != null}
@@ -4824,14 +4866,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
 
         {createBotOpen ? (
           <CreateBotDialog
+            me={firstMicoSetup && firstMicoEngine ? null : bootstrapMe}
             onCancel={() => setCreateBotOpen(false)}
-            onCreate={createBot}
-            onImport={() => {
-              setCreateBotOpen(false);
-              setDroppedAgent(null);
-              setImportFromDialog(true);
-              setPanel("import-agent");
-            }}
+            onCreate={(input) => createBot(input, firstMicoSetup)}
+            onImport={() => openBotImport(true)}
           />
         ) : null}
 
@@ -4846,7 +4884,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 await refreshBots();
                 return;
               }
-              window.location.assign(appPath("/onboarding"));
+              window.location.assign(appPath("/app"));
             }}
           />
         ) : null}

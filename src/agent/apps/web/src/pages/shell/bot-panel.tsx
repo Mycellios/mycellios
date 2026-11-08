@@ -640,7 +640,7 @@ export function BotSettings({
           <SettingsLink page="instructions" icon={FileText} label={t`Instructions`} onClick={() => setPage("instructions")} />
           <SettingsLink page="memory" icon={BookOpen} label={t`Memory`} onClick={() => setPage("memory")} />
           <SettingsLink page="skills" icon={Puzzle} label={t`Skills`} onClick={() => setPage("skills")} />
-          {onOpenFiles ? <SettingsLink icon={Folder} label={t`Files`} onClick={onOpenFiles} /> : null}
+          {onOpenFiles ? <SettingsLink icon={Folder} label={t`Library`} onClick={onOpenFiles} /> : null}
           {onOpenRoutines ? <SettingsLink icon={CalendarClock} label={t`Routines`} onClick={onOpenRoutines} /> : null}
           {onOpenUsage ? <SettingsLink icon={Gauge} label={t`Usage`} onClick={onOpenUsage} /> : null}
         </SettingsLinks>

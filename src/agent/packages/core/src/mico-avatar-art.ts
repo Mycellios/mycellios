@@ -1,180 +1,108 @@
 import {
+  MICO_AVATAR_DEFAULT_SHAPES,
   MICO_AVATAR_SHAPES,
-  micoAvatarPalette,
   micoAvatarShape,
   micoAvatarValue,
   parseBotAvatarValue,
 } from "@rakazo/contracts";
 import { avatarIdentitySeed } from "./avatar-shape.js";
-import { resolvePersonaColorDef } from "./bot-avatar-colors.js";
+import { contrastRatio, resolvePersonaColorDef } from "./bot-avatar-colors.js";
 
-/** Display legacy avatars with the current collection while preserving stored choices. */
+/** Display legacy avatars with the current collection without rewriting their stored value. */
 export function currentMicoAvatarValue(value: string, identity?: string): string {
   const parsed = parseBotAvatarValue(value);
   if (parsed.kind === "image" || (parsed.kind === "shape" && micoAvatarShape(parsed.shapeIndex))) {
     return value;
   }
   const seed = identity || value || "mico";
-  const index = parsed.kind === "shape"
-    ? parsed.shapeIndex
-    : avatarIdentitySeed(seed) % MICO_AVATAR_SHAPES.length;
-  const shape = MICO_AVATAR_SHAPES[index] ?? MICO_AVATAR_SHAPES[0];
+  const fallback = MICO_AVATAR_DEFAULT_SHAPES[avatarIdentitySeed(seed) % MICO_AVATAR_DEFAULT_SHAPES.length]!;
+  const shape = parsed.kind === "shape" ? MICO_AVATAR_SHAPES[parsed.shapeIndex] ?? fallback : fallback;
   const color = resolvePersonaColorDef(seed, parsed.kind === "other" ? undefined : parsed.color).hex;
-  return micoAvatarValue(shape.index, color);
+  return micoAvatarValue(shape.index, color, { eyes: 0, finish: "flat", original: false });
 }
 
-type Tone = "body" | "accent" | "deep" | "shine";
 type MicoArt = {
-  layers: readonly (readonly [Tone, string])[];
-  eyes: readonly [left: number, right: number, y: number];
+  path: string;
+  eyes: readonly (readonly [x: number, y: number, width: number, height: number])[];
+  nose?: string;
 };
 
 export const MICO_AVATAR_VIEWBOX = "0 0 64 64";
+export const MICO_AVATAR_EYE_COLOR = "#1D2B23";
 
-// Flat layers give the silhouettes depth without gradients or filters at icon size.
+// Solid silhouettes and capsule eyes follow the Mycellios loading mark.
 const art: Record<NonNullable<ReturnType<typeof micoAvatarShape>>["id"], MicoArt> = {
   mushroom: {
-    layers: [
-      ["accent", "M22 29h20l6 15c4 11-4 15-16 15s-20-4-16-15z"],
-      ["deep", "M23 31h18l5 9c-8 4-20 4-28 0z"],
-      ["deep", "M5 34C5 18 17 7 32 7s27 11 27 27c0 8-54 8-54 0Z"],
-      ["body", "M5 32C6 16 18 6 32 6s26 10 27 26c0 4-54 4-54 0Z"],
-      ["shine", "M12 25c4-10 13-16 22-15 3 0 3 3 0 4-8 2-13 5-19 12-2 2-4 1-3-1Z"],
-    ],
-    eyes: [27, 37, 47],
-  },
-  fox: {
-    layers: [
-      ["deep", "M10 37C7 29 8 17 10 10c1-4 5-5 8-2l12 11h4L46 8c3-3 7-2 8 2 2 7 3 19 0 27l-9 13H19Z"],
-      ["accent", "M14 14c0-2 2-2 3-1l11 10-14 4zm36 0v13l-14-4 11-10c1-1 3-1 3 1Z"],
-      ["body", "M32 17c13 0 24 9 25 20 0 8-8 11-16 16-5 4-13 4-18 0C15 48 7 45 7 37c1-11 12-20 25-20Z"],
-      ["accent", "M7 37c10-2 17 2 25 12 8-10 15-14 25-12 0 8-8 11-16 16-5 4-13 4-18 0C15 48 7 45 7 37Z"],
-      ["shine", "M15 29c4-6 10-8 16-8 2 0 3 2 0 3-7 1-10 3-14 7-2 2-4 0-2-2Z"],
-    ],
-    eyes: [23, 41, 34],
-  },
-  hedgehog: {
-    layers: [
-      ["deep", "M8 41C2 35 5 27 10 25c-1-7 4-12 11-11 4-8 18-8 22 0 7-1 12 4 11 11 5 2 8 10 2 16 1 11-9 16-24 16S7 52 8 41Z"],
-      ["body", "M8 38c-4-6 0-12 5-13-1-7 5-10 10-9 4-7 14-7 18 0 5-1 11 2 10 9 5 1 9 7 5 13 2 9-9 15-24 15S6 47 8 38Z"],
-      ["shine", "M14 26c1-5 5-7 10-7 3-5 7-6 10-5 3 1 2 3 0 3-6 1-7 4-9 5-3 0-6 1-8 5-2 3-4 1-3-1Z"],
-      ["accent", "M13 42c0-6 5-9 11-9 4-7 12-7 16 0 6 0 11 3 11 9 0 10-9 15-19 15s-19-5-19-15Z"],
-    ],
-    eyes: [25, 39, 41],
-  },
-  frog: {
-    layers: [
-      ["deep", "M7 44c0-8 3-12 6-15-2-9 4-16 11-16 4 0 7 3 8 6 1-3 4-6 8-6 7 0 13 7 11 16 3 3 6 7 6 15 0 10-10 14-25 14S7 54 7 44Z"],
-      ["body", "M7 41c0-6 3-11 6-14-1-8 4-15 11-15 4 0 7 3 8 6 1-3 4-6 8-6 7 0 12 7 11 15 3 3 6 8 6 14 0 9-10 13-25 13S7 50 7 41Z"],
-      ["shine", "M17 24c0-5 3-8 7-8 2 0 3 2 1 3-3 1-4 2-5 5-1 3-4 2-3 0Z"],
-      ["accent", "M12 43c3-3 9-1 20-1s17-2 20 1c-2 7-9 11-20 11s-18-4-20-11Z"],
-    ],
-    eyes: [23, 41, 27],
-  },
-  moth: {
-    layers: [
-      ["deep", "M32 30C23 16 9 12 6 23c-4 10 2 24 8 26 3 9 13 11 18 3 5 8 15 6 18-3 6-2 12-16 8-26-3-11-17-7-26 7Z"],
-      ["body", "M32 31C22 15 8 13 6 24c-2 9 4 22 11 24 3 6 9 7 15 1 6 6 12 5 15-1 7-2 13-15 11-24-2-11-16-9-26 7Z"],
-      ["shine", "M10 27c-1-6 4-9 9-6l5 4c1 2-1 3-2 2-5-3-8-3-9 1-1 2-3 1-3-1Z"],
-      ["deep", "M25 31c1-7-1-13-5-16-4-3 0-8 4-5 5 4 7 11 8 15 1-4 3-11 8-15 4-3 8 2 4 5-4 3-6 9-5 16Z"],
-      ["accent", "M19 43c0-9 5-15 13-15s13 6 13 15-5 13-13 13-13-4-13-13Z"],
-    ],
-    eyes: [27, 37, 42],
-  },
-  snail: {
-    layers: [
-      ["deep", "M8 37c0-13 8-23 20-23 13 0 21 9 21 22s-7 20-21 20S8 50 8 37Z"],
-      ["body", "M8 35c0-13 8-23 20-23 13 0 21 9 21 22s-7 20-21 20S8 48 8 35Z"],
-      ["shine", "M15 31c2-10 9-15 17-14 11 1 14 16 6 21-7 5-16-3-11-9 3-4 9-1 7 3-1 2-3 0-3 1 2 4 8 0 5-5-5-8-15-2-15 6-1 4-7 3-6-3Z"],
-      ["accent", "M6 48c3-6 16-3 25-4 2-6 4-9 8-11l-2-8c-1-4 4-6 6-2l4 8h3l4-8c2-4 7-2 6 2l-3 11c3 3 5 7 4 12-1 7-11 9-28 9C16 57 2 56 6 48Z"],
-    ],
-    eyes: [44, 53, 41],
+    path: "M26 30h12l3 21c.5 3.5-2 6-5.5 6h-7c-3.5 0-6-2.5-5.5-6l3-21ZM6 28C7 16 18 7 32 7s25 9 26 21c.3 4-2.5 7-6.5 7h-39C8.5 35 5.7 32 6 28Z",
+    eyes: [[26, 40, 3.5, 8], [34.5, 40, 3.5, 8]],
   },
   owl: {
-    layers: [
-      ["deep", "M10 16c-1-5 3-7 7-4l8 5c5-2 9-2 14 0l8-5c4-3 8-1 7 4l-2 12c4 7 5 14 2 20-3 7-12 10-22 10s-19-3-22-10c-3-6-2-13 2-20Z"],
-      ["body", "M10 14c0-4 3-5 7-2l8 5c5-2 9-2 14 0l8-5c4-3 7-2 7 2l-2 12c4 7 5 14 2 20-3 7-12 10-22 10s-19-3-22-10c-3-6-2-13 2-20Z"],
-      ["shine", "M13 15c0-2 2-2 3-1l8 6c-4 0-7 2-9 4Z"],
-      ["accent", "M14 36c0-7 4-12 10-12 4 0 6 2 8 5 2-3 4-5 8-5 6 0 10 5 10 12 0 9-6 14-18 14s-18-5-18-14Z"],
-      ["deep", "M29 39c1-2 5-2 6 0l-2 4c-1 1-1 1-2 0Z"],
-    ],
-    eyes: [23, 41, 35],
-  },
-  turtle: {
-    layers: [
-      ["deep", "M10 43C10 26 17 14 31 14s22 10 22 25c0 9-11 13-22 13S10 51 10 43Z"],
-      ["body", "M10 40C10 24 18 13 31 13s22 10 22 25c0 7-11 11-22 11s-21-1-21-9Z"],
-      ["shine", "M15 31c2-9 10-15 18-14 3 0 3 3 0 4-6 1-10 4-14 11-2 3-5 2-4-1Z"],
-      ["accent", "M7 46c2-4 7-5 11-2l3 2h16c-2-4-2-9 0-13 3-6 12-8 18-4 6 3 8 11 5 17-2 6-8 8-16 7-3 6-9 6-13 1h-9c-5 5-13 4-14-1-4-1-5-5-1-7Z"],
-    ],
-    eyes: [43, 54, 39],
-  },
-  axolotl: {
-    layers: [
-      ["deep", "M18 31 9 18c-3-5-8-1-5 4l7 11-6-3c-5-2-7 4-2 6l8 4-5 2c-5 2-2 7 2 6l13-5zm28 0 9-13c3-5 8-1 5 4l-7 11 6-3c5-2 7 4 2 6l-8 4 5 2c5 2 2 7-2 6l-13-5Z"],
-      ["deep", "M11 37c0-14 9-22 21-22s21 8 21 22c0 13-9 19-21 19s-21-6-21-19Z"],
-      ["body", "M11 35c0-14 9-22 21-22s21 8 21 22c0 12-9 18-21 18s-21-6-21-18Z"],
-      ["shine", "M17 29c1-6 8-12 15-12 4 0 4 3 1 4-7 1-10 4-13 9-2 3-4 2-3-1Z"],
-      ["accent", "M19 44c4-4 22-4 26 0-1 5-6 9-13 9s-12-4-13-9Z"],
-    ],
-    eyes: [23, 41, 34],
+    path: "M10 16c-1-5 3-7 7-4l8 5c5-2 9-2 14 0l8-5c4-3 8-1 7 4l-2 12c4 7 5 14 2 20-3 7-12 10-22 10s-19-3-22-10c-3-6-2-13 2-20Z",
+    eyes: [[21, 31, 4, 8], [39, 31, 4, 8]],
   },
   crab: {
-    layers: [
-      ["deep", "M18 37 8 41c-5 2-3 7 1 6l10-4-7 8c-3 4 1 8 5 5l10-10h10l10 10c4 3 8-1 5-5l-7-8 10 4c4 1 6-4 1-6l-10-4Z"],
-      ["body", "M14 39C3 38 1 28 5 18c2-5 7-5 7 0v6l6-5c4-2 6 1 5 5-1 7-3 11-9 15zm36 0c11-1 13-11 9-21-2-5-7-5-7 0v6l-6-5c-4-2-6 1-5 5 1 7 3 11 9 15Z"],
-      ["deep", "M12 43c0-11 8-20 20-20s20 9 20 20-9 15-20 15-20-4-20-15Z"],
-      ["body", "M12 41c0-11 8-20 20-20s20 9 20 20-9 15-20 15-20-4-20-15Z"],
-      ["shine", "M17 36c2-7 8-11 15-11 3 0 3 3 1 4-6 1-10 4-13 9-2 3-4 1-3-2Z"],
-      ["accent", "M21 48c4-3 18-3 22 0-2 4-6 6-11 6s-9-2-11-6Z"],
-    ],
-    eyes: [25, 39, 39],
+    path: "M18 37 8 41c-5 2-3 7 1 6l10-4-7 8c-3 4 1 8 5 5l10-10h10l10 10c4 3 8-1 5-5l-7-8 10 4c4 1 6-4 1-6l-10-4Z",
+    eyes: [[22, 32, 4, 8], [38, 32, 4, 8]],
+  },
+  fox: {
+    path: "M7 30 9 10Q9 7 12 9L25 19Q33 17 39 19L52 9Q55 7 55 11L57 30C59 43 51 47 44 50L35 57Q32 59 28 56L19 50C11 47 5 42 7 30Z",
+    eyes: [[22, 31, 4, 8], [38, 31, 4, 8]],
+  },
+  turtle: {
+    path: "M6 38C6 25 15 15 27 15c10 0 18 5 22 15 1-4 3-6 7-6 5 0 7 4 6 8-1 6-5 9-12 10l-2 7c-1 4-8 5-10 1l-2-6H22l-2 6c-2 4-10 3-11-1L7 44Q2 45 3 42Z",
+    eyes: [[54, 29, 3.3, 6.2]],
+  },
+  hedgehog: {
+    path: "M6 44 4 36q-1-3 2-4l4-1-2-6q-1-3 2-3l6 1 1-8q0-3 3-2l6 3 4-7q2-2 4 0l4 7 7-3q3-1 3 2l1 8q5 2 8 8l5 4q2 3-1 6l-8 3-3 7q-1 4-6 4H18C11 55 7 51 6 44Z",
+    eyes: [[45, 32, 3.4, 7]],
+  },
+  snail: {
+    path: "M10 43C1 34 6 17 17 13 30 8 44 16 44 30l3-9-2-7c-2-5 5-7 6-3l3 8 4-7c2-4 8-1 5 3l-5 8c6 5 6 14 2 20-5 7-11 10-23 10H9q-6 0-6-4t7-6Z",
+    eyes: [[51, 28, 3.2, 7], [57, 28, 3.2, 7]],
   },
   fish: {
-    layers: [
-      ["deep", "M40 29c6-4 12-11 18-12 3 0 4 2 3 6l-3 9 3 9c1 4 0 6-3 6-6-1-12-8-18-12ZM21 17c4-9 14-11 19-6l-4 10z"],
-      ["body", "M3 33C3 20 15 13 28 13s23 8 23 20-10 21-23 21S3 46 3 33Z"],
-      ["accent", "M5 39c8 2 13 3 22 3s14-1 22-3c-3 9-11 15-21 15S8 49 5 39Z"],
-      ["deep", "M34 36c6-4 11-3 11 0s-5 8-10 9c-5 1-6-6-1-9Z"],
-      ["shine", "M9 28c3-7 10-11 18-11 3 0 4 3 0 4-6 1-11 3-15 8-2 3-4 1-3-1Z"],
-    ],
-    eyes: [14, 25, 33],
+    path: "M16 24c5-8 13-11 22-10l5-5q3-2 4 1l2 8 10 10c5 5 5 10 0 15-6 7-13 9-22 9-11 0-18-4-23-10l-8 5q-5 3-4-3l2-11-2-11q-1-6 4-3Z",
+    eyes: [[48, 30, 3.8, 8]],
+  },
+  axolotl: {
+    path: "M16 21Q8 11 6 15t4 10Q2 21 1 26t8 9Q1 34 2 39t11 4c4 7 11 11 19 11s15-4 19-11q10 1 11-4t-7-4q9-4 8-9t-9-1q6-6 4-10t-10 6C39 16 25 16 16 21Z",
+    eyes: [[23, 32, 4, 8], [37, 32, 4, 8]],
   },
   octopus: {
-    layers: [
-      ["deep", "M6 47c4-5 6-9 6-16 0-13 8-22 20-22s20 9 20 22c0 7 2 11 6 16 4 7-4 12-9 7-2 6-9 7-13 2-2 5-6 5-8 0-4 5-11 4-13-2-5 5-13 0-9-7Z"],
-      ["body", "M6 45c4-5 6-9 6-16C12 16 20 8 32 8s20 8 20 21c0 7 2 11 6 16 4 7-4 12-9 7-2 6-9 7-13 2-2 5-6 5-8 0-4 5-11 4-13-2-5 5-13 0-9-7Z"],
-      ["shine", "M17 27c1-9 8-15 17-15 3 0 3 3 0 4-7 2-11 5-14 12-1 3-4 2-3-1Z"],
-      ["accent", "M15 48c3-3 5-1 5 2-1 3-6 2-5-2zm10 2c2-3 5-2 5 1 0 4-6 3-5-1zm10 1c0-3 3-4 5-1 1 4-5 5-5 1zm10-1c0-3 2-5 5-2 1 4-4 5-5 2Z"],
-    ],
-    eyes: [24, 40, 37],
+    path: "M12 35C7 22 17 8 32 8s25 14 20 27c6 2 10 6 10 11 0 7-9 10-14 5-2 7-11 8-16 3-5 5-14 4-16-3C11 56 2 53 2 46c0-5 4-9 10-11Z",
+    eyes: [[23, 27, 4, 8], [37, 27, 4, 8]],
+  },
+  frog: {
+    path: "M8 30C3 22 7 13 15 12c6-1 10 3 12 7h10c2-4 6-8 12-7 8 1 12 10 7 18 4 4 6 9 5 14-2 8-11 12-29 12S5 52 3 44c-1-5 1-10 5-14Z",
+    eyes: [[15, 21, 4, 8], [45, 21, 4, 8]],
+  },
+  moth: {
+    path: "M26 19c-4-6-9-7-12-8-5-1-4-6 0-6 6 0 12 5 16 11h4c4-6 10-11 16-11 4 0 5 5 0 6-3 1-8 2-12 8 13 5 23 16 24 24 2 10-9 12-17 7-2 8-10 10-13 3-3 7-11 5-13-3-8 5-19 3-17-7 1-8 11-19 24-24Z",
+    eyes: [[26, 24, 3.1, 6.8], [35, 24, 3.1, 6.8]],
+  },
+  raven: {
+    path: "M9 41c2-8 6-13 10-16C20 14 29 8 40 10c6 0 10 3 14 8 6 2 10 6 9 13l-11-3c-1 14-9 20-23 20L8 55q-5 1-4-3Z",
+    eyes: [[43, 19, 3.4, 7]],
+  },
+  hare: {
+    path: "M13 38c-5-6-8-20-6-27 1-5 6-6 10-2 5 5 9 16 10 21l7-1c0-10 2-22 7-25 4-3 8-1 9 4 2 8-1 18-4 25 8 5 12 12 8 18-3 6-12 9-22 9-16 0-27-10-19-22Z",
+    eyes: [[25, 40, 4, 8], [39, 40, 4, 8]],
+  },
+  otter: {
+    path: "M10 24c-5-4-3-12 3-13 4-1 7 1 9 3 7-3 13-3 20 0 2-2 5-4 9-3 6 1 8 9 3 13 4 5 7 11 6 17-1 10-11 16-28 16S5 51 4 41c-1-6 2-12 6-17Z",
+    eyes: [[18, 29, 4, 8], [42, 29, 4, 8]],
+    nose: "M28 37q4-2 8 0 1 1-1 3l-2 2q-1 1-2 0l-2-2q-2-2-1-3Z",
   },
 };
-
-function mixHex(hex: string, target: string, weight: number): string {
-  const short = /^#[\da-f]{3}$/i.test(hex);
-  const full = /^#[\da-f]{6}$/i.test(hex);
-  const color = short
-    ? [...hex.slice(1)].map((digit) => digit.repeat(2)).join("")
-    : full ? hex.slice(1) : "8650DF";
-  return "#" + [0, 2, 4].map((offset) => {
-    const base = Number.parseInt(color.slice(offset, offset + 2), 16);
-    const end = Number.parseInt(target.slice(offset, offset + 2), 16);
-    return Math.round(base + (end - base) * weight).toString(16).padStart(2, "0");
-  }).join("");
-}
 
 export function micoAvatarArt(shapeIndex: number, color: string) {
   const shape = micoAvatarShape(shapeIndex);
   if (!shape) return undefined;
-  const palette = micoAvatarPalette(color);
-  return {
-    ...art[shape.id],
-    fills: {
-      body: palette?.color ?? mixHex(color, "FFFFFF", 0),
-      accent: palette?.accent ?? mixHex(color, "FFF0D6", 0.72),
-      deep: mixHex(color, "241A32", 0.29),
-      shine: mixHex(color, "FFF6E8", 0.36),
-    },
-  };
+  const fill = resolvePersonaColorDef(shape.id, color).hex;
+  const white = "#FFFFFF";
+  const eyeColor =
+    contrastRatio(fill, white) > contrastRatio(fill, MICO_AVATAR_EYE_COLOR)
+      ? white
+      : MICO_AVATAR_EYE_COLOR;
+  return { ...art[shape.id], color: fill, eyeColor };
 }

@@ -5,6 +5,7 @@ import {
   CLOUDFLARE_AI_GATEWAY_PROVIDER_ID,
   cloudflareModelRouting,
   DEFAULT_MODEL_CONTEXT_WINDOW,
+  FIRST_MICO_SPAWN_KEY,
   isCloudflareModelProvider,
   isMycelliosBaseUrl,
   isOllamaCloudBaseUrl,
@@ -92,60 +93,22 @@ function providerOptionValue(provider: string, auth?: ProviderAuth): string {
   return auth ? `${provider}:${auth}` : provider;
 }
 const FIRST_BOT_NAME = productBrand.companionName;
-const FIRST_BOT_SPAWN_KEY = "onboarding:first";
 const FIRST_BOT_LOCK = "rakazo:onboarding-first-bot";
-
-/** Survives StrictMode remounts; concurrent first-bot creates share one in-flight attempt. */
-let firstBotEnsure: Promise<{ id: string }> | null = null;
 
 function findFirstBot(
   bots: Array<{ id: string; name: string; spawnKey: string | null }>,
 ): { id: string } | undefined {
-  const bySpawnKey = bots.find((bot) => bot.spawnKey === FIRST_BOT_SPAWN_KEY);
+  const bySpawnKey = bots.find((bot) => bot.spawnKey === FIRST_MICO_SPAWN_KEY);
   if (bySpawnKey) return { id: bySpawnKey.id };
   // Legacy first-run Chief created before spawnKey was set.
   const byName = bots.find((bot) => bot.name === FIRST_BOT_NAME);
   return byName ? { id: byName.id } : undefined;
 }
 
-async function createOrReuseFirstBot(): Promise<{ id: string }> {
-  const existing = await rpc.bots.list();
-  const reuse = findFirstBot(existing);
-  if (reuse) return reuse;
-  try {
-    const created = await rpc.bots.create({
-      name: FIRST_BOT_NAME,
-      title: "",
-      description: "",
-      instructions: "",
-      notifyOnFinish: true,
-      spawnKey: FIRST_BOT_SPAWN_KEY,
-    });
-    return { id: created.id };
-  } catch (error) {
-    // Another tab won the unique (spaceId, spawnKey) race; reuse that bot only.
-    const afterConflict = await rpc.bots.list();
-    const winner = afterConflict.find((bot) => bot.spawnKey === FIRST_BOT_SPAWN_KEY);
-    if (winner) return { id: winner.id };
-    throw error;
-  }
-}
-
 async function withFirstBotLock<T>(run: () => Promise<T>): Promise<T> {
   const locks = globalThis.navigator?.locks;
   if (!locks?.request) return run();
   return locks.request(FIRST_BOT_LOCK, run);
-}
-
-async function ensureFirstBot(): Promise<{ id: string }> {
-  if (firstBotEnsure) return firstBotEnsure;
-  // Web Lock serializes cross-tab creates; module promise covers same-tab StrictMode.
-  // spawnKey makes create idempotent when locks are unavailable.
-  // Clear after settle so a later empty-space visit re-lists instead of reusing a deleted id.
-  firstBotEnsure = withFirstBotLock(createOrReuseFirstBot).finally(() => {
-    firstBotEnsure = null;
-  });
-  return firstBotEnsure;
 }
 
 export function OnboardingPage() {
@@ -155,9 +118,8 @@ export function OnboardingPage() {
   // The URL holds the survey and model steps, so /onboarding/survey and /onboarding/model open directly.
   const { step: routeStep } = useParams();
   const linkedStep = routeStep === "survey" || routeStep === "model" ? routeStep : undefined;
-  const [creatingBot, setCreatingBot] = useState(false);
   const [surveyDone, setSurveyDone] = useState(false);
-  const step = creatingBot ? "bot" : surveyDone ? "loading" : (linkedStep ?? "loading");
+  const step = surveyDone ? "loading" : (linkedStep ?? "loading");
   const [billingEnabled, setBillingEnabled] = useState(false);
   // The step after the survey; null until me loads.
   const [afterSurvey, setAfterSurvey] = useState<"model" | "bot" | null>(null);
@@ -187,7 +149,6 @@ export function OnboardingPage() {
   const [{ models: probeModels, probing }, setProbe] = useState(initialModelProbeState);
   const [modelProbe] = useState(() => createModelProbe(setProbe));
   const resetOpenAiCompatibleProbe = modelProbe.reset;
-  const createStartedRef = useRef(false);
   // An imported agent replaces Chief as the first bot.
   const [importing, setImporting] = useState(false);
   const importedBotRef = useRef<{ id: string } | null>(null);
@@ -249,8 +210,8 @@ export function OnboardingPage() {
   }, [surveyDone, afterSurvey]);
 
   function goTo(next: "survey" | "model" | "bot") {
-    if (next === "bot") setCreatingBot(true);
-    navigate(next === "bot" ? "/onboarding" : `/onboarding/${next}`, { replace: true });
+    const imported = importedBotRef.current;
+    navigate(next === "bot" ? (imported ? `/app/${imported.id}` : "/app") : `/onboarding/${next}`, { replace: true });
   }
 
   const providers = useMemo(() => {
@@ -574,35 +535,6 @@ export function OnboardingPage() {
     });
   }
 
-  async function createFirstBot() {
-    if (createStartedRef.current) return;
-    createStartedRef.current = true;
-    setError(null);
-    try {
-      const imported = importedBotRef.current;
-      const bot = imported ?? (await ensureFirstBot());
-      // Onboarding continues conversationally in the thread: greeting first,
-      // then the focus choice (immediate for the first bot), which an imported
-      // bot already answered.
-      const started = await rpc.onboarding
-        .start({ botId: bot.id })
-        .then(() => true)
-        .catch(() => false);
-      if (started && !imported) {
-        await rpc.onboarding.promptFocus({ botId: bot.id }).catch(() => undefined);
-      }
-      navigate(`/app/${bot.id}`);
-    } catch (err) {
-      createStartedRef.current = false;
-      setError(errorText(err, t`Could not create your bot`));
-    }
-  }
-
-  useEffect(() => {
-    if (step !== "bot" || notImported) return;
-    void createFirstBot();
-  }, [step]);
-
   const compatibleKeyField = (
     <CompatibleKeyField
       required={provider === ANTSEED_PROVIDER_ID}
@@ -629,8 +561,7 @@ export function OnboardingPage() {
       />
     </CompatibleKeyField>
   );
-  // Loading, and creating the first bot, both wait on one spinner until the chat opens.
-  if (step === "loading" || (step === "bot" && !error)) return <PageLoading />;
+  if (step === "loading") return <PageLoading />;
 
   return (
     <div className="min-h-full bg-background px-6 py-12">
@@ -662,7 +593,7 @@ export function OnboardingPage() {
             firstBot={{
               lock: withFirstBotLock,
               existing: async () => findFirstBot(await rpc.bots.list()),
-              spawnKey: FIRST_BOT_SPAWN_KEY,
+              spawnKey: FIRST_MICO_SPAWN_KEY,
             }}
             onBack={() => setImporting(false)}
             onDone={(bot, imported) => {
@@ -700,9 +631,7 @@ export function OnboardingPage() {
             {!isMycellios || advancedSetup ? (
               <InstalledAgentOnboarding
                 onSelect={async (agentEngine) => {
-                  const bot = await ensureFirstBot();
-                  await rpc.bots.update({ botId: bot.id, agentEngine });
-                  navigate(`/app/${bot.id}`);
+                  navigate("/app", { replace: true, state: { firstMicoEngine: agentEngine } });
                 }}
               />
             ) : null}
@@ -1365,14 +1294,6 @@ export function OnboardingPage() {
                 </div>
               </div>
             )}
-          </div>
-        ) : null}
-        {step === "bot" ? (
-          <div>
-            <p className="text-sm text-destructive">{error}</p>
-            <Button className="mt-4" onClick={() => void createFirstBot()}>
-              <Trans>Try again</Trans>
-            </Button>
           </div>
         ) : null}
       </div>

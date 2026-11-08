@@ -1,6 +1,3 @@
-.rk-schedule-shell {
-  --muted-foreground: var(--workspace-muted-foreground);
-}
 .rk-schedule-shell .rk-workspace-rail > div:first-child {
   height: 34px;
 }
@@ -416,9 +413,6 @@
 .rk-schedule-day[data-outside="true"] .rk-schedule-day-number {
   color: var(--muted-foreground);
   font-weight: 400;
-}
-.dark .rk-schedule-shell {
-  --muted-foreground: var(--workspace-muted-foreground);
 }
 .dark .rk-schedule-day[aria-current="date"] {
   border-color: var(--task-blue);
