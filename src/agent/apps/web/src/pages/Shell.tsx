@@ -1,4 +1,5 @@
-import { useWebPushPresence, usesServerPush } from "../lib/web-push";
+import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
+import { PushPermissionPrompt } from "../components/PushPermissionPrompt";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { LayoutGrid } from "lucide-react";
@@ -390,7 +391,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const rpc = useSpaceRpc();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
-  useWebPushPresence(userId);
+  const pushPublicKey = useWebPushPresence(userId);
   const chatHistory = useChatHistory();
   const [taskAgentsOpen, setTaskAgentsOpen] = useState(false);
   const [chatToolsOpen, setChatToolsOpen] = useState(false);
@@ -2679,7 +2680,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       const groupTarget = plan.rerouteGroupId ?? initialGroupTarget;
       const botTarget = reroutedToGroup ? undefined : initialBotTarget;
       if (
-        plan.shouldSend && notificationPreferences(userId ?? "").enabled &&
+        plan.shouldSend && !(pushPublicKey && isInstalledWebApp() && pushSupported()) &&
+        notificationPreferences(userId ?? "").enabled &&
         (groupTarget || botsRef.current.find((bot) => bot.id === botTarget)?.notifyOnFinish)
       ) {
         const permissionRequest = requestBrowserNotificationPermission();
@@ -2820,6 +2822,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       taskScope,
       clearReply,
       flushPendingBrowserNotifications,
+      pushPublicKey,
       navigate,
       pendingAttachments,
       sending,
@@ -4345,6 +4348,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         {active || activeGroup ? (
           // Let messages continue behind the composer's rounded top corners.
           <div className="pointer-events-none relative z-30 -mt-7">
+            {isMobileSidebar && !mobileSidebarOpen && !panel && !overlay && !recordingSkill && userId && pushPublicKey && (
+              <PushPermissionPrompt key={userId} accountId={userId} publicKey={pushPublicKey} />
+            )}
             {recordingSkill ? (
               <div className="pointer-events-auto bg-background px-6 pb-2 text-center text-[13px] text-destructive">
                 <Trans>Teaching in progress. Stop teaching before sending a new message.</Trans>
