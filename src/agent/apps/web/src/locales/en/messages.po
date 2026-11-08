@@ -7517,3 +7517,48 @@ msgstr "Connected providers"
 
 msgid "Other providers"
 msgstr "Other providers"
+
+msgid "Change general model"
+msgstr "Change general model"
+
+msgid "Choose the general model"
+msgstr "Choose the general model"
+
+msgid "For Micos using the general model"
+msgstr "For Micos using the general model"
+
+msgid "Provider for this Mico"
+msgstr "Provider for this Mico"
+
+msgid "Explore catalog"
+msgstr "Explore catalog"
+
+msgid "Model catalog"
+msgstr "Model catalog"
+
+msgid "Search catalog"
+msgstr "Search catalog"
+
+msgid "Could not load the catalog."
+msgstr "Could not load the catalog."
+
+msgid "Enabled"
+msgstr "Enabled"
+
+msgid "Enable"
+msgstr "Enable"
+
+msgid "Enable and use"
+msgstr "Enable and use"
+
+msgid "Use model"
+msgstr "Use model"
+
+msgid "This connection has changed. Open the catalog again."
+msgstr "This connection has changed. Open the catalog again."
+
+msgid "This connection returned no models in its catalog."
+msgstr "This connection returned no models in its catalog."
+
+msgid "This model is already enabled on another connection. Use it from that connection."
+msgstr "This model is already enabled on another connection. Use it from that connection."

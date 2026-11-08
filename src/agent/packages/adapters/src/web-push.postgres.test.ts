@@ -46,6 +46,8 @@ suite("Web Push on isolated PostgreSQL", () => {
       CREATE TABLE IF NOT EXISTS "user" (id text PRIMARY KEY);
       CREATE TABLE IF NOT EXISTS "session" (id text PRIMARY KEY, "userId" text, "expiresAt" timestamptz);
       CREATE TABLE IF NOT EXISTS bots (id text PRIMARY KEY, "userId" text, name text, "notifyOnFinish" boolean, "archivedAt" timestamptz);
+      ALTER TABLE bots ADD COLUMN IF NOT EXISTS color text NOT NULL DEFAULT '#8654e6';
+      CREATE TABLE IF NOT EXISTS chat_groups (id text PRIMARY KEY, name text NOT NULL);
       CREATE TABLE IF NOT EXISTS spaces (id text PRIMARY KEY, "organizationId" text);
       CREATE TABLE IF NOT EXISTS space_members (id text PRIMARY KEY, "spaceId" text, "organizationId" text, "userId" text);
       CREATE TABLE IF NOT EXISTS threads (id text PRIMARY KEY, unread boolean);
@@ -67,7 +69,7 @@ suite("Web Push on isolated PostgreSQL", () => {
     await db.pool.query(`TRUNCATE web_push_deliveries, web_push_devices, web_push_settings, web_push_presence, "user", "session", bots, spaces, space_members, threads, events, runs CASCADE;
       INSERT INTO "user" VALUES ('alice'), ('bob');
       INSERT INTO "session" VALUES ('session-a','alice',now()+interval '1 hour'),('session-b','bob',now()+interval '1 hour');
-      INSERT INTO bots VALUES ('bot','alice','Mico',true,null), ('foreign','bob','Other',true,null);
+      INSERT INTO bots (id, "userId", name, "notifyOnFinish", "archivedAt") VALUES ('bot','alice','Mico',true,null), ('foreign','bob','Other',true,null);
       INSERT INTO spaces VALUES ('space','org');
       INSERT INTO space_members VALUES ('member','space','org','alice');
       INSERT INTO threads VALUES ('thread',true,null);

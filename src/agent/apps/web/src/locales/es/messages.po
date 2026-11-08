@@ -9734,3 +9734,48 @@ msgstr "No se pudo eliminar este archivo."
 
 msgid "This deletes all {0} versions of this file. This can't be undone."
 msgstr "Esto elimina las {0} versiones de este archivo. Esta acción es irreversible."
+
+msgid "Change general model"
+msgstr "Cambiar modelo general"
+
+msgid "Choose the general model"
+msgstr "Elige el modelo general"
+
+msgid "For Micos using the general model"
+msgstr "Para los Micos que usan el modelo general"
+
+msgid "Provider for this Mico"
+msgstr "Proveedor de este Mico"
+
+msgid "Explore catalog"
+msgstr "Explorar catálogo"
+
+msgid "Model catalog"
+msgstr "Catálogo de modelos"
+
+msgid "Search catalog"
+msgstr "Buscar en el catálogo"
+
+msgid "Could not load the catalog."
+msgstr "No se pudo cargar el catálogo."
+
+msgid "Enabled"
+msgstr "Habilitado"
+
+msgid "Enable"
+msgstr "Habilitar"
+
+msgid "Enable and use"
+msgstr "Habilitar y usar"
+
+msgid "Use model"
+msgstr "Usar modelo"
+
+msgid "This connection has changed. Open the catalog again."
+msgstr "Esta conexión ha cambiado. Vuelve a abrir el catálogo."
+
+msgid "This connection returned no models in its catalog."
+msgstr "Esta conexión no devolvió modelos en su catálogo."
+
+msgid "This model is already enabled on another connection. Use it from that connection."
+msgstr "Este modelo ya está habilitado en otra conexión. Selecciónalo desde allí."

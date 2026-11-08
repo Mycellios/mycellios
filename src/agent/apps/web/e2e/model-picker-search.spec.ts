@@ -24,13 +24,16 @@ test("models are searched and selected directly in the Mico header", async ({ pa
   await header.click();
   const search = page.getByRole("combobox", { name: "Search models" });
   await expect(search).toBeVisible();
-  await expect(page.getByRole("group", { name: /OpenRouter/ }).first()).toBeVisible();
-  await search.fill("claude");
-  const options = page.locator('[data-slot="command-list"]').getByRole("option");
-  await expect(options.first()).toBeVisible();
-  expect((await options.allTextContents()).every((text) => /claude/i.test(text))).toBe(true);
+  await page.getByRole("group", { name: "Providers", exact: true }).getByRole("button", { name: "OpenRouter", exact: true }).click();
+  await expect(page.getByRole("button", { name: "OpenRouter", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Explore catalog" }).click();
+  await page.getByRole("textbox", { name: "Search catalog" }).fill("claude");
+  const catalogModels = page.getByRole("group", { name: "Model catalog" }).getByRole("button", { name: /claude/i });
+  await expect(catalogModels.first()).toBeVisible();
   await captureScreenshot(page, testInfo, "mico-model-picker-filtered");
-  await search.press("Enter");
+  await catalogModels.first().click();
+  await page.getByRole("button", { name: "Use model", exact: true }).click();
+  const options = page.locator('[data-slot="command-list"]').getByRole("option");
   await expect(search).toBeHidden();
   await expect.poll(async () =>
     (await rpc<Bot[]>(page, "bots/list", {})).find((bot) => bot.id === botId)?.modelProvider,
@@ -41,4 +44,14 @@ test("models are searched and selected directly in the Mico header", async ({ pa
   await search.fill("no-model-matches-this");
   await expect(page.getByText("No matching models")).toBeVisible();
   await expect(options).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Change general model" }).click();
+  await page.getByRole("group", { name: "Providers", exact: true }).getByRole("button", { name: "OpenRouter", exact: true }).click();
+  await search.fill("claude");
+  await expect(options.first()).toBeVisible();
+  await search.press("Enter");
+  await expect(search).toBeHidden();
+  expect((await rpc<ModelRoleSettings>(page, "models/role", { role: "main" })).primary?.provider).toBe("openrouter");
+  const bot = (await rpc<Bot[]>(page, "bots/list", {})).find((entry) => entry.id === botId);
+  expect(bot?.modelProvider).toBe("openrouter");
 });
