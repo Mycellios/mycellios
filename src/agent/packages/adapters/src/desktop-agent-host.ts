@@ -41,7 +41,21 @@ export class DesktopAgentHost {
     const abort = () => { controller.abort(); queue.end(); void this.runtime.abort(runId); };
     signal.addEventListener("abort", abort, { once: true });
     const work = (async () => {
-      try { for await (const event of this.runtime.run(request, { ...context, signal })) { if (signal.aborted) break; push({ kind: "event", value: rpc.encode(event) }); } }
+      try {
+        for await (const event of this.runtime.run(request, { ...context, signal })) {
+          if (signal.aborted) break;
+          push({ kind: "event", value: rpc.encode(event) });
+        }
+        // Void observers can still have callbacks in flight after the engine returns.
+        // Keep the session addressable until their replies arrive.
+        if (!signal.aborted) {
+          try {
+            await rpc.drainOutgoing(AbortSignal.any([signal, AbortSignal.timeout(30_000)]));
+          } catch {
+            if (!signal.aborted) throw Error("Desktop execution interrupted; check existing results before retrying");
+          }
+        }
+      }
       catch (error) { if (!signal.aborted) { try { push({ kind: "failure", value: rpc.encode(error instanceof Error ? error : Error("Desktop agent failed")) }); } catch { queue.fail(Error("Desktop agent buffer unavailable")); } } }
       finally { queue.end(); }
     })();

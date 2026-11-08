@@ -23,6 +23,8 @@
   an owned inference stream to Desktop, never keys, OAuth material or endpoints.
   Keep approval judges on the server and preserve Team/task computer assignments.
   Native run receipts are account/server scoped and forbid replay after restarts.
+  Keep the native session open for outstanding callback replies after the engine
+  ends. Report completion only after the complete stream and acknowledgements.
   Disconnects must not silently substitute a cloud run for an admitted local run.
   Before dispatch, a fresh turn can run in the cloud if Desktop is offline.
   Preserve local project and checkpoint bindings; a tool result payload alone
@@ -667,6 +669,9 @@
 - In-run history compaction uses the effective transport/model budget before main
   admission. Summarize only historical data with the same owned connection, no
   tools, bounded chunks/calls/time and separately attributed compaction usage.
+  Plan summaries with the same bounded reply headroom as admission. Skip
+  summarization when the current message and required instructions leave no
+  room for a useful summary. Verify context-compaction and pi-compaction-offline.
   Active summaries may exceed the connection timeout; retain the independent
   provider idle watchdog and caller cancellation under the summary deadline.
   One empty-summary recovery may halve that chunk on the same owned connection;

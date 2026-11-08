@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { withAbort } from "./web-ssrf.js";
 import { ModelAccountError, ModelOutputError, TransientModelError } from "@rakazo/adapter-kit";
 
 /** Ephemeral callbacks only. No executable code, paths, stack traces or credentials are logged. */
@@ -16,6 +17,7 @@ export class DesktopAgentRpc {
   private targets = new Map<string, (...args: unknown[]) => unknown>();
   private pending = new Map<string, { resolve(value: unknown): void; reject(error: unknown): void }>();
   private received = new Map<string, { fingerprint: string; result: Promise<AgentRpcMessage> }>();
+  private outgoing = new Set<Promise<unknown>>();
   private closed = false;
   constructor(private readonly send: (message: AgentRpcMessage) => Promise<void> | void) {}
 
@@ -96,7 +98,9 @@ export class DesktopAgentRpc {
     });
     // Some observer callbacks intentionally return void; still keep rejected cancellation
     // observable to awaiters without making those fire-and-forget observers unhandled.
-    void promise.catch(() => undefined);
+    this.outgoing.add(promise);
+    const settled = () => { this.outgoing.delete(promise); };
+    void promise.then(settled, settled);
     return promise;
   }
 
@@ -132,6 +136,12 @@ export class DesktopAgentRpc {
     }
     const result = await prior.result;
     if (!this.closed) await this.send(result);
+  }
+
+  async drainOutgoing(signal: AbortSignal) {
+    while (this.outgoing.size) {
+      await withAbort(Promise.allSettled(this.outgoing), signal);
+    }
   }
 
   close() {

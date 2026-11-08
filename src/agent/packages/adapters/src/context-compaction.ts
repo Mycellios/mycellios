@@ -3,6 +3,7 @@ import type { Api, Context, Message, Model } from "@earendil-works/pi-ai";
 import { escapePromptData } from "@rakazo/core";
 import { estimateContextTokens, estimateTextTokens } from "./context-selection.js";
 import type { ContextBudget } from "./context-selection.js";
+import { CONTEXT_ADMISSION_HEADROOM, MIN_REDUCED_OUTPUT_TOKENS } from "./model-context.js";
 import { effectiveOutputReserve } from "./pi-runtime-limits.js";
 import { withoutThinkingFrom } from "./thinking-signatures.js";
 
@@ -108,7 +109,14 @@ export function createContextCompactor(options: {
       const full = estimateContextTokens(ctx, options.imageTokens);
       // Summarizing history cannot make mandatory instructions or the live request smaller.
       const immutable = ctx.messages.filter((message) => !history.includes(message));
-      if (fixed + estimateContextTokens(immutable, options.imageTokens) >= available) {
+      const required = fixed + estimateContextTokens(immutable, options.imageTokens);
+      // Admission can reduce the reply reserve when thinking is off. Consider
+      // that room for a summary, but keep the same safety margin as admission.
+      const maxInput = !model.reasoning && reserve > MIN_REDUCED_OUTPUT_TOKENS
+        ? Math.max(available, model.contextWindow - MIN_REDUCED_OUTPUT_TOKENS - CONTEXT_ADMISSION_HEADROOM)
+        : available;
+      const summaryOverhead = 160;
+      if (maxInput - required < 128 + summaryOverhead) {
         eligible = false;
         return ctx;
       }
@@ -119,13 +127,14 @@ export function createContextCompactor(options: {
           model.maxTokens,
           maxTokens ?? model.maxTokens,
           model.contextWindow / 12,
+          maxInput - required - summaryOverhead,
         ),
       );
       // Exhausting the call budget must not disable an already cached summary
       // on the next tool step. New summary work is bounded inside the loop.
       if (output < 128) return ctx;
       let count = Math.max(1, history.length - (forced ? 0 : 2));
-      const summaryAllowance = output + 160;
+      const summaryAllowance = output + summaryOverhead;
       while (
         count < history.length &&
         fixed +
@@ -134,7 +143,7 @@ export function createContextCompactor(options: {
             ctx.messages.filter((message) => !history.slice(0, count).includes(message)),
             options.imageTokens,
           ) >
-          available * 0.7
+          maxInput * 0.7
       )
         count++;
       const selected = history.slice(0, count);

@@ -4,6 +4,7 @@ import { isUncertainDesktopRun } from "@rakazo/core";
 import { DesktopAgentRuntime } from "./desktop-agent-runtime.js";
 import { startHostComputerServer } from "./host-computer-server.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
+import type { HostComputerRequest } from "./host-computer-protocol.js";
 import { desktopAgentFrames } from "./desktop-agent-stream.js";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
@@ -39,6 +40,49 @@ it("runs the engine on Desktop while awaiting account callbacks, checkpoints and
   const events: AgentRuntimeEvent[] = []; for await (const event of runtime.run(input, context)) events.push(event);
   expect(events).toEqual([{ type: "text", text: "OK" }, { type: "done" }]);
   expect(observed).toEqual(["desktop-engine", "checkpoint", "shell:0"]);
+  expect(fallback.run).not.toHaveBeenCalled();
+});
+
+it("keeps the Desktop session open for an observer reply after the engine returns", async () => {
+  const token = "d".repeat(64);
+  const engine: AgentRuntime = {
+    describe, abort: vi.fn(),
+    async *run(input) {
+      void input.onUsage!({ type: "usage", provider: "fixture", model: "fixture", inputTokens: 1, outputTokens: 1, costUsd: null });
+      yield { type: "done", text: "Completed" };
+    },
+  };
+  const host = await startHostComputerServer({ root: tmpdir(), token, hostname: "127.0.0.1", agentRuntime: engine });
+  hosts.push(host);
+  host.setEnabled(true);
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const transport = vi.fn(async (input: HostComputerRequest, ctx: AdapterContext) => {
+    if (input.method === "agentMessage") await new Promise(resolve => setTimeout(resolve, 50));
+    return fetch(`http://127.0.0.1:${host.port}/computer`, {
+      method: "POST", headers: { authorization: `Bearer ${token}` },
+      body: JSON.stringify(input), signal: ctx.signal,
+    });
+  });
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
+  const events: AgentRuntimeEvent[] = [];
+  for await (const event of runtime.run(request(), context)) events.push(event);
+  expect(events).toEqual([{ type: "done", text: "Completed" }]);
+  expect(transport.mock.calls.map(([input]) => input.method)).toEqual(["agentRun", "agentMessage"]);
+  expect(fallback.run).not.toHaveBeenCalled();
+});
+
+it("does not publish a completion if the Desktop stream loses its terminal frame", async () => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const transport = vi.fn(async () => new Response(JSON.stringify({
+    value: { kind: "event", value: { kind: "object", value: [["type", "done"], ["text", "Unconfirmed"]] } },
+  }) + "\n"));
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
+  const events: AgentRuntimeEvent[] = [];
+  await expect(async () => {
+    for await (const event of runtime.run(request(), context)) events.push(event);
+  }).rejects.toThrow("disconnected");
+  expect(events).toEqual([]);
+  expect(transport).toHaveBeenCalledTimes(1);
   expect(fallback.run).not.toHaveBeenCalled();
 });
 
