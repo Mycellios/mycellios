@@ -1,8 +1,9 @@
 import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
+import { getLogger } from "@rakazo/logging";
 import { ComputerUpdatingError } from "./computer-errors.js";
 
 /** A complete native stream is required; EOF is never a successful run or callback. */
-export async function* desktopAgentFrames(response: Response, signal: AbortSignal): AsyncIterable<unknown> {
+export async function* desktopAgentFrames(response: Response, signal: AbortSignal, phase: "callback" | "run" = "run"): AsyncIterable<unknown> {
   if (!response.ok || !response.body) { await response.body?.cancel(); if (response.headers.get("x-mycellios-desktop-error") === "desktop_updating") throw new ComputerUpdatingError(false); throw Error("Desktop executor unavailable; check the PC connection before retrying"); }
   const reader = response.body.getReader(), decoder = new TextDecoder();
   let pending = "", done = false;
@@ -21,7 +22,15 @@ export async function* desktopAgentFrames(response: Response, signal: AbortSigna
         if (!line) continue;
         const frame = JSON.parse(line) as { value?: unknown; done?: boolean; heartbeat?: boolean; error?: string; code?: string; dispatched?: boolean };
         if (done) throw Error("Data after Desktop runtime completion");
-        if (frame.error) { if (frame.code === "desktop_updating") throw new ComputerUpdatingError(frame.dispatched !== false); throw Error("Desktop execution interrupted; check existing results before retrying"); }
+        if (frame.error) {
+          if (frame.code === "desktop_updating") throw new ComputerUpdatingError(frame.dispatched !== false);
+          const reason = frame.error === "Desktop delivery was interrupted. Check results before retrying." ? "delivery_lost"
+            : frame.error === "Desktop operation interrupted. Check results before retrying." ? "native_transport_interrupted"
+            : frame.code === "desktop_session_missing" ? "native_session_missing"
+            : frame.error === "Local computer operation failed" ? "native_host_failure" : "relay_stream_failure";
+          getLogger().warn("desktop.relay.stream_interrupted", { "desktop.phase": phase, "desktop.reason": reason });
+          throw Error("Desktop execution interrupted; check existing results before retrying");
+        }
         if (frame.done === true) { done = true; continue; }
         if (frame.heartbeat === true) continue;
         if (!Object.hasOwn(frame, "value")) throw Error("Invalid Desktop runtime frame");

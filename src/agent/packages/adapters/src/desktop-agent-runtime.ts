@@ -51,7 +51,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
     let callbackError: unknown;
     const rpc = new DesktopAgentRpc(async message => {
       const response = await this.options.transport({ method: "agentMessage", botId: request.botId, runId: request.runId, sessionId, message, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
-      for await (const _ of desktopAgentFrames(response, signal)) { /* consume the complete acknowledgement */ }
+      for await (const _ of desktopAgentFrames(response, signal, "callback")) { /* consume the complete acknowledgement */ }
     });
     const capture = request.onCheckpoint;
     const cleanup = new Set<() => void>();

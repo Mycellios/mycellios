@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AdapterContext } from "@rakazo/adapter-kit";
+import { getLogger } from "@rakazo/logging";
 import type { DesktopExecutorBinding, DesktopExecutorOwner, DesktopExecutorPoll } from "../../../../contracts/desktop-executor.js";
 import { HOST_COMPUTER_MAX_BYTES, hostComputerDeadlineMs, hostComputerRequest, type HostComputerRequest } from "./host-computer-protocol.js";
 
@@ -9,6 +10,9 @@ const MAX_WAITING_OPERATIONS = 32;
 const MAX_BOT_OPERATIONS = 8;
 const MAX_REQUEST_BUFFER = MAX_OPERATIONS * HOST_COMPUTER_MAX_BYTES;
 const MAX_STREAM_BUFFER = 2 * 1024 * 1024;
+const LOST_DELIVERY = Buffer.from(JSON.stringify({
+  error: "Desktop delivery was interrupted. Check results before retrying.",
+}) + "\n").toString("base64");
 
 export class DesktopRelayError extends Error {
   constructor(readonly code: "desktop_disconnected" | "desktop_busy" | "desktop_connection_changed" | "desktop_request_too_large", message: string, readonly status: 409 | 429 | 413 = 409) {
@@ -19,6 +23,7 @@ export class DesktopRelayError extends Error {
 type Binding = DesktopExecutorBinding & DesktopExecutorOwner & { seen: number };
 type Operation = {
   id: string; binding: Binding; request: HostComputerRequest; claimed: boolean;
+  method: HostComputerRequest["method"]; runId?: string;
   controller: ReadableStreamDefaultController<Uint8Array>; timer: ReturnType<typeof setTimeout>;
   seq: number; digest: string; closed: boolean; requestBytes: number; dispose(): void;
 };
@@ -44,6 +49,7 @@ export class DesktopRelayBroker {
   private runs = new Map<string, { generation: string; until: number; agentSession?: string }>();
   private sweep: ReturnType<typeof setInterval>;
   private waiting = new Map<string, Set<() => void>>();
+  private polling = new Set<string>();
   private pollKey(owner: DesktopExecutorOwner, deviceId: string) { return JSON.stringify([owner.userId, owner.spaceId, owner.sessionId, deviceId]); }
   private wake(owner: DesktopExecutorOwner, deviceId: string) { for (const finish of this.waiting.get(this.pollKey(owner, deviceId)) ?? []) finish(); }
   constructor(private readonly now = Date.now) {
@@ -118,6 +124,9 @@ export class DesktopRelayBroker {
     for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Project access was revoked.");
   }
   poll(owner: DesktopExecutorOwner, deviceId: string): DesktopExecutorPoll {
+    return this.pollState(owner, deviceId, true);
+  }
+  private pollState(owner: DesktopExecutorOwner, deviceId: string, claim: boolean, verifiedBots?: ReadonlySet<string>): DesktopExecutorPoll {
     this.expire();
     for (const binding of this.bindings.values()) if (sameOwner(owner, binding) && binding.deviceId === deviceId) binding.seen = this.now();
     const current = [...this.operations.values()].filter(op => sameOwner(owner, op.binding) && op.binding.deviceId === deviceId && !op.closed);
@@ -126,33 +135,50 @@ export class DesktopRelayBroker {
     const claimed = { control: 0, agent: 0, computer: 0 };
     for (const op of this.operations.values()) if (op.claimed && !op.closed) claimed[lane(op)]++;
     const pending: Operation[] = [];
+    const perBinding = new Map<Binding, Record<ReturnType<typeof lane>, number>>();
+    for (const op of current) {
+      if (!op.claimed) continue;
+      const slots = perBinding.get(op.binding) ?? { control: 0, agent: 0, computer: 0 };
+      slots[lane(op)]++;
+      perBinding.set(op.binding, slots);
+    }
     for (const op of current) {
       const group = lane(op);
-      if (op.claimed || claimed[group] >= limits[group]) continue;
-      if (current.filter(other => other.claimed && other.binding === op.binding && lane(other) === group).length >= 2) continue;
-      // Queue before admission; claim exactly once only when an execution slot exists.
-      op.claimed = true;
+      if (op.claimed || (verifiedBots && !verifiedBots.has(op.binding.botId)) || claimed[group] >= limits[group]) continue;
+      const slots = perBinding.get(op.binding) ?? { control: 0, agent: 0, computer: 0 };
+      if (slots[group] >= 2) continue;
+      if (claim) op.claimed = true;
       claimed[group]++;
+      slots[group]++;
+      perBinding.set(op.binding, slots);
       pending.push(op);
     }
     // Never advertise queued work as delivered: native recovery treats missing delivered
     // operation IDs as uncertain work and must not execute them again.
     return { bindings:[...this.bindings.values()].filter(b=>sameOwner(owner,b)&&b.deviceId===deviceId).map(b=>({deviceId,botId:b.botId,generation:b.generation})), operations: pending.map(op => ({ id: op.id, binding: { deviceId, botId: op.binding.botId, generation: op.binding.generation }, request: op.request })), active: current.filter(op => op.claimed).map(op => op.id) };
   }
-  async waitPoll(owner: DesktopExecutorOwner, deviceId: string, signal: AbortSignal, wait?: boolean, active: string[] = []): Promise<DesktopExecutorPoll> {
-    const state = this.poll(owner, deviceId);
-    if (!wait || state.operations.length || active.some(id => !state.active.includes(id)) || signal.aborted) return state;
-    const account = this.accounts.get(JSON.stringify([owner.userId,owner.spaceId]));
-    if (!(account && sameOwner(owner,account) && account.deviceId === deviceId) && !this.ownedBindings(owner,deviceId).length) throw Error("Desktop device is not connected");
+  async waitPoll(owner: DesktopExecutorOwner, deviceId: string, signal: AbortSignal, wait?: boolean, active: string[] = [], authorize?: () => Promise<ReadonlySet<string> | void>): Promise<DesktopExecutorPoll> {
     const id = this.pollKey(owner, deviceId);
-    if (this.waiting.has(id) || this.waiting.size >= 128) throw Error("Desktop poll is already pending");
-    await new Promise<void>(resolve => {
-      const finish = () => { clearTimeout(timer); signal.removeEventListener("abort", finish); this.waiting.delete(id); resolve(); };
-      const timer = setTimeout(finish, 15_000); timer.unref();
-      this.waiting.set(id, new Set([finish])); signal.addEventListener("abort", finish, {once:true});
-      if (signal.aborted) finish();
-    });
-    return this.poll(owner, deviceId);
+    if (this.polling.has(id) || this.polling.size >= 128) throw Error("Desktop poll is already pending");
+    this.polling.add(id);
+    try {
+      signal.throwIfAborted();
+      const state = this.pollState(owner, deviceId, false);
+      if (wait && !state.operations.length && active.every(id => state.active.includes(id))) {
+        const account = this.accounts.get(JSON.stringify([owner.userId,owner.spaceId]));
+        if (!(account && sameOwner(owner,account) && account.deviceId === deviceId) && !this.ownedBindings(owner,deviceId).length) throw Error("Desktop device is not connected");
+        await new Promise<void>(resolve => {
+          const finish = () => { clearTimeout(timer); signal.removeEventListener("abort", finish); this.waiting.delete(id); resolve(); };
+          const timer = setTimeout(finish, 15_000); timer.unref();
+          this.waiting.set(id, new Set([finish])); signal.addEventListener("abort", finish, {once:true});
+          if (signal.aborted) finish();
+        });
+      }
+      const verifiedBots = authorize && !signal.aborted ? await authorize() : undefined;
+      if (signal.aborted) return { ...state, operations: [] };
+      // Only the response that can deliver the batch gets to claim it.
+      return this.pollState(owner, deviceId, true, verifiedBots ?? undefined);
+    } finally { this.polling.delete(id); }
   }
   dispatch(input: HostComputerRequest, context: AdapterContext): Response {
     this.expire();
@@ -182,7 +208,7 @@ export class DesktopRelayBroker {
       start: controller => {
         const timer = setTimeout(() => this.fail(op, op.claimed ? "Desktop command timed out. Check results before retrying." : "The PC request timed out before dispatch. No command was started."), hostComputerDeadlineMs(input));
         timer.unref();
-        op = { id, binding, request: input, requestBytes, claimed: false, controller, timer, seq: -1, digest: "", closed: false,
+        op = { id, binding, request: input, method: input.method, runId: input.runId, requestBytes, claimed: false, controller, timer, seq: -1, digest: "", closed: false,
           dispose: () => { clearTimeout(timer); context.signal.removeEventListener("abort", abort); } };
         this.operations.set(id, op);
         this.wake(binding, binding.deviceId);
@@ -198,7 +224,15 @@ export class DesktopRelayBroker {
     if (!op || !sameOwner(owner, op.binding) || op.binding.deviceId !== deviceId) throw new Error("Operation unavailable");
     const digest = createHash("sha256").update(data).update(String(done)).digest("hex");
     if (seq === op.seq && digest === op.digest) return; // Lost acknowledgement, not re-execution.
-    if (op.closed || !op.claimed || !Number.isSafeInteger(seq) || seq !== op.seq + 1 || data.length > 350_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) throw new Error("Invalid Desktop result");
+    // Desktop 0.3.24 can report an orphan from a poll snapshot taken just
+    // before this operation finished. It must not lose the rest of that batch.
+    const lostDelivery = seq === 0 && done && data === LOST_DELIVERY;
+    if (op.closed && lostDelivery) return;
+    if (op.closed || !op.claimed || !Number.isSafeInteger(seq) || seq !== op.seq + 1 || data.length > 350_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(data)) {
+      this.logFailure(op, op.closed ? "result_after_close" : !op.claimed ? "result_before_dispatch" : "invalid_result_sequence_or_frame");
+      throw new Error("Invalid Desktop result");
+    }
+    if (lostDelivery) this.logFailure(op, "delivery_lost");
     const bytes = Buffer.from(data, "base64");
     if ((op.controller.desiredSize ?? 0) < bytes.length) { this.fail(op, "Desktop result exceeded its buffer"); throw new Error("Slow consumer"); }
     op.controller.enqueue(bytes);
@@ -213,9 +247,17 @@ export class DesktopRelayBroker {
   }
   private fail(op: Operation, message: string) {
     if (!op || op.closed) return;
+    // All messages passed by the broker are static and contain no request data.
+    this.logFailure(op, message);
     op.closed = true; op.dispose(); this.operations.delete(op.id);
     this.wake(op.binding, op.binding.deviceId);
     try { op.controller.enqueue(new TextEncoder().encode(JSON.stringify({ error: message }) + "\n")); op.controller.close(); } catch { /* consumer already gone */ }
+  }
+  private logFailure(op: Operation, reason: string) {
+    getLogger().warn("desktop.relay.operation_failed", {
+      "desktop.operation.id": op.id, "desktop.method": op.method, "run.id": op.runId,
+      "desktop.reason": reason, "desktop.claimed": op.claimed, "desktop.last_sequence": op.seq,
+    });
   }
   close() {
     for (const callbacks of this.waiting.values()) for (const finish of callbacks) finish();

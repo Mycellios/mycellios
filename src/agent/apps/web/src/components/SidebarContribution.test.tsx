@@ -107,6 +107,22 @@ it("keeps verification read-only when another process has already repaired the i
   });
 });
 
+it("offers browser contribution when the protected installation is missing its runtime", async () => {
+  f.native.mockResolvedValue({ supported: true, enrolled: true, installed: false, nodeId: null });
+  await rendered(async host => {
+    const browser = host.querySelector<HTMLAnchorElement>('a[aria-label="Contribute in browser"]');
+    expect(browser?.href).toBe("https://www.mycellios.com/browser/index.html");
+    expect(browser?.target).toBe("_blank");
+    expect(host.textContent).toContain("The local contribution runtime is missing.");
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.querySelector("button")).toBeNull();
+    expect(f.status).not.toHaveBeenCalled();
+    expect(f.identify).not.toHaveBeenCalled();
+    expect(f.enrollment).not.toHaveBeenCalled();
+    expect(f.control).not.toHaveBeenCalled();
+  });
+});
+
 it("retries a failed observation without starting or enrolling compute", async () => {
   f.status.mockRejectedValueOnce(new Error("Offline"));
   await rendered(async host => {
