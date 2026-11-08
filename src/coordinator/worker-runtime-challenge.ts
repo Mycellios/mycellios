@@ -15,7 +15,7 @@ export function runtimeChallengeIdentity(
   if (
     acceleration?.state === "gpu-ready"
     && acceleration.backend
-    && acceleration.backend !== "cpu" && acceleration.backend !== "directml"
+    && acceleration.backend !== "cpu"
     && acceleration.deviceName
     && executor.computeMode !== "cpu-only"
   ) {
@@ -23,7 +23,7 @@ export function runtimeChallengeIdentity(
       nodeId: executor.nodeId,
       backend: acceleration.backend,
       deviceName: acceleration.deviceName,
-      precision: "float16",
+      precision: acceleration.backend === "directml" ? "float32" : "float16",
     };
   }
   if (

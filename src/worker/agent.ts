@@ -1083,7 +1083,9 @@ export class WorkerAgent {
       if (!measured) return undefined;
       const profile = runtimePerformanceProfileSchema.parse(measured);
       const expectedBackend = this.options.verifiedGpuRuntime?.backend ?? "cpu";
-      const expectedPrecision = expectedBackend === "cpu" ? "float32" : "float16";
+      const expectedPrecision = expectedBackend === "cpu" || expectedBackend === "directml"
+        ? "float32"
+        : "float16";
       if (profile.backend !== expectedBackend) {
         throw new Error("runtime_performance_profile_backend_does_not_match_capacity");
       }
