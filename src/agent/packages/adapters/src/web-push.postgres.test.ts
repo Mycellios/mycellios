@@ -29,9 +29,8 @@ suite("Web Push on isolated PostgreSQL", () => {
     keys: { p256dh: pair.publicKey, auth: Buffer.alloc(16).toString("base64url") },
   });
   const clientId = randomUUID();
-  const context = { userId: "alice", spaceId: "space" } as AdapterContext;
+  const context = { userId: "alice", spaceId: "space", runId: "run" } as AdapterContext;
   const message: NotificationMessage = {
-    runId: "run",
     kind: "help",
     title: "Private question",
     body: "private content",

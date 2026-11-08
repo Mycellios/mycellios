@@ -9470,7 +9470,6 @@ async function notifyRun(
     .send(
       {
         ...message,
-        runId: run.id,
         ...(notice.groupId ? { groupId: notice.groupId } : {}),
         ...(notice.taskThreadId ? { taskThreadId: notice.taskThreadId } : {}),
         ...(badge === undefined ? {} : { badge }),
@@ -9478,6 +9477,7 @@ async function notifyRun(
       {
         operationId: "notify",
         traceId: run.botId,
+        runId: run.id,
         spaceId: run.spaceId,
         userId: run.userId,
         botId: run.botId,

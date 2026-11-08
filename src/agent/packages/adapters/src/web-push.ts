@@ -244,13 +244,14 @@ export class WebPushService {
 
   /** Existing executor notices cover completed/failed runs, questions, approvals and takeovers. */
   async enqueue(message: NotificationMessage, context: AdapterContext) {
-    if (!this.config || !message.runId) return 0;
+    const runId = context.runId;
+    if (!this.config || !runId) return 0;
     const settings = await this.settings(context.userId);
     if (!notificationAllowed(settings, message.botId, message.kind)) return 0;
     return system(async () => {
       const run = await this.db.run.findFirst({
         where: {
-          id: message.runId,
+          id: runId,
           userId: context.userId,
           spaceId: context.spaceId,
           botId: message.botId,
@@ -259,7 +260,7 @@ export class WebPushService {
         select: { updatedAt: true },
       });
       if (!run) return 0;
-      const event = await this.notificationEvent(message.runId!, message.kind);
+      const event = await this.notificationEvent(runId, message.kind);
       if (!event || event.createdAt.getTime() < Date.now() - 300_000) return 0;
       const expiresAt = event.createdAt.getTime() + 300_000;
       const eventKey = event.id;
@@ -284,7 +285,7 @@ export class WebPushService {
         const ciphertext = await this.seal(JSON.stringify(payload), id, context.userId);
         await this.db.$executeRaw`INSERT INTO web_push_deliveries
           (id, "deviceId", "eventKey", ciphertext, "spaceId", "botId", "runId", kind, "eventId", "dueAt", "expiresAt")
-          VALUES (${id}, ${device.id}, ${eventKey}, ${ciphertext}, ${context.spaceId}, ${message.botId}, ${message.runId}, ${message.kind}, ${event.id}, ${new Date(Date.now() + 3_000)}, ${new Date(expiresAt)})
+          VALUES (${id}, ${device.id}, ${eventKey}, ${ciphertext}, ${context.spaceId}, ${message.botId}, ${runId}, ${message.kind}, ${event.id}, ${new Date(Date.now() + 3_000)}, ${new Date(expiresAt)})
           ON CONFLICT ("deviceId", "eventKey") DO NOTHING`;
       }
       await this.drain();

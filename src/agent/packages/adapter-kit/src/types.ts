@@ -773,8 +773,6 @@ export interface ArtifactPut {
 }
 
 export interface NotificationMessage {
-  /** Durable run ownership and notification deduplication; never a command to replay. */
-  runId?: string;
   kind: "completion" | "failure" | "help" | "takeover";
   title: string;
   body: string;
