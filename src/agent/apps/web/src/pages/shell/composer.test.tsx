@@ -19,6 +19,8 @@ vi.mock("@lingui/react/macro", () => {
 
 import { dictation } from "../../lib/dictation";
 import { spaceQueries } from "../../lib/query";
+import type { RpcClient } from "../../lib/rpc";
+import { SpaceRpcProvider } from "../../lib/space-rpc";
 import { Composer } from "./composer";
 import { ChatHeaderModel } from "./chat-header-model";
 import { ReviewWorkspaceProvider, useReviewWorkspace } from "../../lib/review-workspace";
@@ -31,6 +33,7 @@ beforeEach(() => {
   i18n.load("en", {});
   i18n.activate("en");
   document.elementFromPoint ??= () => null;
+  Element.prototype.scrollIntoView ??= () => undefined;
 });
 
 afterEach(() => {
@@ -203,6 +206,55 @@ it("keeps the header and recovery model in sync with the current account setting
   expect(document.querySelector('[data-slot="popover-content"] [data-slot="select-trigger"]')?.textContent)
     .toBe("Use general model · saved-model");
   expect(pickerProps.onSave).not.toHaveBeenCalled();
+});
+
+it.each([false, true])("enables only the chosen catalog model, using it only when requested (%s)", async (useModel) => {
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
+  const queries = spaceQueries(null, null);
+  const me = { userId: "user-1", spaceId: "space-1", needsModel: true } as NonNullable<ComponentProps<typeof ChatHeaderModel>["me"]>;
+  const credential = {
+    id: "omni", provider: "openai-compatible", label: "OpenAI-compatible",
+    baseUrl: "https://omniroute.example/v1", modelId: "existing-model",
+    enabledModelIds: ["existing-model"], hasKey: true, isDefault: false,
+  };
+  client.setQueryData(queries.me.queryKey(), me);
+  client.setQueryData(queries.models.credentials.queryKey(), [credential]);
+  client.setQueryData(queries.models.list.queryKey(), []);
+  const probe = vi.fn(async () => ({ models: ["existing-model", "new-model", "another-model"] }));
+  const connect = vi.fn(async () => ({ ...credential, enabledModelIds: ["existing-model", "new-model"] }));
+  const rpc = { models: { probeOpenAiCompatible: probe, connect, credentials: async () => [credential] } } as unknown as RpcClient;
+  const onSave = vi.fn(async () => {});
+  renderComposer(async () => true, {
+    runError: "Fixture",
+    runErrorModelAction: (
+      <QueryClientProvider client={client}>
+        <SpaceRpcProvider spaceId={null} client={rpc}>
+          <ChatHeaderModel bot={{ modelProvider: null, modelId: null, thinkingLevel: null } as Bot}
+            me={me} onSave={onSave} onConnections={() => {}} />
+        </SpaceRpcProvider>
+      </QueryClientProvider>
+    ),
+  });
+  const click = async (label: string) => {
+    const button = [...document.querySelectorAll("button")].find(node => node.textContent?.trim() === label || node.getAttribute("aria-label") === label);
+    expect(button).toBeDefined();
+    await act(async () => button!.click());
+  };
+  await click("Model");
+  expect(probe).not.toHaveBeenCalled();
+  await click("Explore catalog");
+  await vi.waitFor(() => expect(document.body.textContent).toContain("new-model"));
+  await click("new-model");
+  await click(useModel ? "Enable and use" : "Enable");
+  expect(connect).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+    credentialId: "omni", modelId: "existing-model", enabledModelIds: ["existing-model", "new-model"], makeDefault: false,
+  }), { context: { spaceId: "space-1" } });
+  if (useModel) {
+    expect(onSave).toHaveBeenCalledExactlyOnceWith({ modelProvider: "openai-compatible", modelId: "new-model", thinkingLevel: null });
+  } else {
+    expect(onSave).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="option"][aria-label="new-model (OmniRoute)"]')).not.toBeNull();
+  }
 });
 
 it("changes model from a Desktop failure without replaying the turn or clearing the draft", async () => {

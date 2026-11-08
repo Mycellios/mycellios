@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePushPayload, pushChatUrl } from "./push-worker.js";
+import { parsePushPayload, pushChatUrl, pushNotification } from "./push-worker.js";
 import { notificationTarget } from "./notification-target.js";
 
 const origin = "https://www.mycellios.com";
@@ -24,5 +24,26 @@ describe("Web Push navigation", () => {
       .toBe(scope + "app/g/team?noticeSpace=space");
     expect(parsePushPayload({ ...payload, botId: "../account" }, now)).toBeNull();
     expect(parsePushPayload(payload, now + 1001)).toBeNull();
+  });
+  it("shows the event and a generic mascot when previews are off, even with private metadata", () => {
+    const parsed = parsePushPayload({
+      ...payload, title: "Private name", body: "Private answer", kind: "help", preview: false, avatar: "fox",
+    }, now)!;
+    const notice = pushNotification(parsed, scope, "es-ES");
+    expect(notice.title).toBe("Tu Mico espera una respuesta");
+    expect(notice.options).toMatchObject({
+      body: "Abre el chat para responder.",
+      icon: scope + "mycellios/notification-micos/mushroom.png",
+      actions: [{ action: "open-chat", title: "Abrir chat" }],
+      data: { url: scope + "app/jarvis?noticeSpace=space", botId: "jarvis" },
+    });
+  });
+  it("shows the Mico on opt-in previews using only bundled artwork", () => {
+    const preview = { ...payload, title: "Jarvis", body: "Draft ready", kind: "completion", preview: true };
+    const parsed = parsePushPayload({ ...preview, avatar: "fox" }, now)!;
+    expect(pushNotification(parsed, scope, "en-US")).toMatchObject({
+      title: "Jarvis", options: { body: "Draft ready", icon: scope + "mycellios/notification-micos/fox.png" },
+    });
+    expect(parsePushPayload({ ...preview, avatar: "https://external.test/track" }, now)).toBeNull();
   });
 });

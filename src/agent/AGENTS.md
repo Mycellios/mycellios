@@ -208,6 +208,8 @@
   Open web clients deliver via the active service worker where available, or the
   desktop Notification API otherwise. Suppress notices while a same-account tab is
   focused. Click destinations must stay inside the deployed app and the target Space.
+  A focused conversation plays a short cue after a persisted reply completes.
+  Honor the device sound, mute and attention settings and the Mico's preference.
   Off-thread activity checks are scoped to the current Space and run only while away.
   Closed or suspended clients enroll in Web Push with existing OS permission and
   the device's reply-notification setting. Never prompt outside the user's gesture.
@@ -215,6 +217,9 @@
   Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.
+  The push worker uses event-specific copy and bundled notification artwork. When
+  previews are off it displays a generic mascot and hides conversation identity.
+  Regenerate the small PNGs with `node packages/ui-tokens/scripts/export-notification-art.ts`.
   Qualify delivery and the destination on an installed PWA on a physical phone.
   Web update checks share the existing guarded tracker; they never deploy servers
   or reload through open settings/drafts/calls. Desktop uses the installed package's
@@ -425,7 +430,14 @@
 - Each Mico has a searchable model picker in the chat header. Account Settings
   > Models manages provider connections. Preserve saved account and Space model
   defaults and fallbacks. A specific choice updates only that Mico and can run
-  with its own connection even if the account has no general model.
+  with its own connection even if the account has no general model. The header
+  can also change the general model in the effective account/Space scope.
+  If its primary slot is empty, chat may start on the first saved backup with
+  an owned connection. Preserve the backup order and the existing funding checks.
+  Keep the chat picker compact by connection. Fetch compatible server catalogs
+  on demand with the saved credential, and add only the model explicitly enabled.
+  A native provider whose connection already grants catalog access can select
+  its models directly. Keep enabling a model separate from selecting it.
 - Provider forms manage connections and keys; model selection belongs to the role
   picker. Connecting a provider never changes a role. Discover compatible catalogs
   using the owned saved credential; enable a newly chosen model before saving its

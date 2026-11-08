@@ -12,7 +12,6 @@ import {
   canonicalPiProviderId,
   connectedBackupOptions,
   isOpenAiCompatibleProvider,
-  MAX_ENABLED_MODEL_IDS,
   MAX_MODEL_BACKUPS,
   modelRoleChoiceKey,
 } from "@rakazo/contracts";
@@ -42,6 +41,7 @@ import { useSpaceRpc } from "../lib/space-rpc";
 import type { ConnectableProvider, RoleModelOption } from "./model-settings/role-model-picker";
 import { RoleModelPicker } from "./model-settings/role-model-picker";
 import { useCompatibleRoleCatalog } from "./model-settings/use-compatible-role-catalog";
+import { enableCompatibleModel } from "./model-settings/enable-compatible-model";
 
 export type ModelRoleConnectIntent = {
   /** Connecting from a role picker keeps this false until a model is explicitly chosen. */
@@ -216,20 +216,10 @@ export function ModelRoleSettings({
   async function prepareChoice(choice: ModelRoleChoice) {
     const connection = connectionFor(choice);
     if (!connection || !isOpenAiCompatibleProvider(connection.provider)) return;
-    const enabled = [...new Set([connection.modelId ?? "", ...(connection.enabledModelIds ?? [])])].filter(Boolean);
-    if (enabled.includes(choice.modelId)) return;
-    if (enabled.length >= MAX_ENABLED_MODEL_IDS) throw new Error(t`This connection has reached its enabled model limit.`);
     // Enable only the model explicitly chosen above, retaining the saved key,
     // endpoint, capabilities and current main model. Compatible catalogs can
     // be larger than the connection's bounded enabled-model list.
-    await rpc.models.connect({
-      provider: connection.provider,
-      credentialId: connection.id,
-      baseUrl: connection.baseUrl,
-      modelId: connection.modelId || choice.modelId,
-      enabledModelIds: [...enabled, choice.modelId],
-      makeDefault: false,
-    }, { context: { spaceId } });
+    await enableCompatibleModel(rpc, spaceId, connection, choice.modelId, t`This connection has reached its enabled model limit.`);
   }
   async function pickAndSave(choice: ModelRoleChoice | null, update: (current: ModelRoleSettingsValue) => Partial<ModelRoleSettingsValue>) {
     setSelectionError(null);

@@ -1,0 +1,56 @@
+import type { ProductEvent } from "@rakazo/contracts";
+
+const DURATION = 0.2;
+let audioContext: AudioContext | undefined;
+
+/** Open the shared audio output on a gesture so mobile browsers allow later playback. */
+export function unlockReplySound(): void {
+  try {
+    const Context = globalThis.AudioContext ??
+      (globalThis as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Context) return;
+    if (!audioContext || audioContext.state === "closed") audioContext = new Context();
+    if (audioContext.state !== "running") void audioContext.resume().catch(() => undefined);
+  } catch {
+    // Audio may be unavailable on this device.
+  }
+}
+
+export function playReplySound(): void {
+  const context = audioContext;
+  if (!context || context.state !== "running") return;
+  try {
+    const start = context.currentTime;
+    const tone = context.createOscillator();
+    const volume = context.createGain();
+    tone.frequency.setValueAtTime(440, start);
+    tone.frequency.exponentialRampToValueAtTime(185, start + 0.15);
+    volume.gain.setValueAtTime(0.001, start);
+    volume.gain.linearRampToValueAtTime(0.13, start + 0.012);
+    volume.gain.exponentialRampToValueAtTime(0.001, start + DURATION);
+    tone.connect(volume).connect(context.destination);
+    tone.onended = () => { tone.disconnect(); volume.disconnect(); };
+    tone.start(start);
+    tone.stop(start + DURATION);
+  } catch {
+    // Losing the audio output cannot interrupt a chat update.
+  }
+}
+
+/** A persisted reply and its terminal event arrive separately on the live stream. */
+export function createReplySoundGate() {
+  const replies = new Set<string>();
+  return (
+    event: Pick<ProductEvent, "type" | "runId" | "threadId" | "seq" | "payload">,
+    threadId: string | undefined,
+    initialCursor: number,
+  ): boolean => {
+    if (!event.runId || event.threadId !== threadId || event.seq <= initialCursor) return false;
+    if (event.type === "thread.message.created" && event.payload.role === "bot") {
+      replies.add(event.runId);
+      if (replies.size > 100) replies.delete(replies.values().next().value!);
+    }
+    if (event.type === "run.failed" || event.type === "run.cancelled") replies.delete(event.runId);
+    return event.type === "run.completed" && replies.delete(event.runId);
+  };
+}
