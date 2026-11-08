@@ -7731,6 +7731,21 @@ msgstr "Las notificaciones funcionan en este dispositivo."
 msgid "Test notification sent."
 msgstr "Notificación de prueba enviada."
 
+msgid "Notifications when Mycellios is closed"
+msgstr "Notificaciones con Mycellios cerrado"
+
+msgid "Receive alerts on this device even when Mycellios is closed. They open the corresponding chat."
+msgstr "Recibe avisos en este dispositivo aunque Mycellios esté cerrado. Al pulsarlos se abre el chat correspondiente."
+
+msgid "Could not change background notifications. Check your notification permission and try again."
+msgstr "No se han podido cambiar los avisos en segundo plano. Revisa el permiso de notificaciones y vuelve a intentarlo."
+
+msgid "Push alerts only when I’m needed"
+msgstr "Avisos con la app cerrada solo cuando me necesiten"
+
+msgid "Applies to all devices where you enabled closed-app notifications."
+msgstr "Se aplica a todos los dispositivos donde hayas activado estos avisos."
+
 #: src/pages/settings/SettingsOverlay.tsx
 msgid "Could not show the test notification."
 msgstr "No se ha podido mostrar la notificación de prueba."
@@ -7822,6 +7837,24 @@ msgstr "Habla con tu Mico"
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "Reply notifications"
 msgstr "Notificaciones de respuestas"
+
+msgid "Only when I’m needed"
+msgstr "Solo cuando me necesiten"
+
+msgid "Get notified when a Mico needs your answer or approval."
+msgstr "Recibe un aviso cuando un Mico necesite tu respuesta o aprobación."
+
+msgid "Your attention is needed."
+msgstr "Un Mico necesita tu atención."
+
+msgid "Pause notifications"
+msgstr "Pausar notificaciones"
+
+msgid "Pause for 1 hour"
+msgstr "Pausar 1 hora"
+
+msgid "Resume notifications"
+msgstr "Reanudar notificaciones"
 
 #: src/pages/SettingsOverlay.tsx
 msgid "Could not load Micos."

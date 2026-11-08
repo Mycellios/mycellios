@@ -24,7 +24,7 @@ class FakeCache {
 
 let network: (request: Request) => Promise<Response>;
 
-function setup(options: { precache?: string[]; windows?: number } = {}) {
+function setup(options: { precache?: string[]; windows?: number; clientUrls?: string[] } = {}) {
   const stores = new Map<string, FakeCache>();
   const listeners = new Map<string, (event: unknown) => void>();
   const waiting = new EventTarget() as EventTarget & { postMessage: ReturnType<typeof vi.fn> };
@@ -37,10 +37,15 @@ function setup(options: { precache?: string[]; windows?: number } = {}) {
     keys: async () => [...stores.keys()],
     delete: async (name: string) => stores.delete(name),
   };
+  const windows = (options.clientUrls ?? Array.from({ length: options.windows ?? 1 }, () => ORIGIN))
+    .map(url => ({ url, focus: vi.fn() }));
   const scope = {
     location: { origin: ORIGIN },
     caches: caches as unknown as CacheStorage,
-    clients: { matchAll: async () => Array.from({ length: options.windows ?? 1 }) },
+    clients: {
+      matchAll: async () => windows,
+      openWindow: vi.fn(async () => undefined),
+    },
     registration: { waiting: null as typeof waiting | null },
     skipWaiting: vi.fn(async () => undefined),
     fetch: (request: Request) => network(request),
@@ -71,6 +76,7 @@ function setup(options: { precache?: string[]; windows?: number } = {}) {
     stores,
     scope,
     waiting,
+    windows,
     dispatch,
     fetch: (path: string, mode?: RequestMode, method?: string) =>
       dispatch("fetch", { request: request(path, mode, method) }),
@@ -82,6 +88,28 @@ afterEach(() => {
 });
 
 describe("service worker", () => {
+  it("opens only a valid Mycellios chat when a notification is tapped", async () => {
+    const sw = setup({ precache: ["/agent/"] });
+    const close = vi.fn();
+    for (const url of ["https://other.test/agent/app/mico", "/agent/api/auth", "/app/mico",
+      "/agent/app/mico?next=https://other.test", "/agent/app/mico?task=a&task=b"]) {
+      await sw.dispatch("notificationclick", { notification: { data: { url }, close } });
+    }
+    expect(sw.scope.clients.openWindow).not.toHaveBeenCalled();
+    await sw.dispatch("notificationclick", { notification: {
+      data: { url: "/agent/app/mico?noticeSpace=space&task=task" }, close,
+    } });
+    expect(sw.scope.clients.openWindow).toHaveBeenCalledExactlyOnceWith(
+      `${ORIGIN}/agent/app/mico?noticeSpace=space&task=task`,
+    );
+    expect(close).toHaveBeenCalledTimes(6);
+    const openChat = setup({ precache: ["/agent/"], clientUrls: [`${ORIGIN}/agent/app/g/team`] });
+    await openChat.dispatch("notificationclick", { notification: {
+      data: { url: "/agent/app/g/team" }, close,
+    } });
+    expect(openChat.windows[0]?.focus).toHaveBeenCalledOnce();
+    expect(openChat.scope.clients.openWindow).not.toHaveBeenCalled();
+  });
   it("never handles live data, auth callbacks or the screen proxy", async () => {
     network = vi.fn(async () => new Response("live"));
     const sw = setup();

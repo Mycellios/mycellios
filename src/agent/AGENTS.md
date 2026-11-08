@@ -205,6 +205,14 @@
   connection editors or cross a Space boundary with the current Space's client.
   Reply-notification preferences are local per user/device; per-Mico switches save
   through the owned Space RPC. Hidden previews never reveal reply text or names.
+  Open web clients deliver via the active service worker where available, or the
+  desktop Notification API otherwise. Suppress notices while a same-account tab is
+  focused. Click destinations must stay inside the deployed app and the target Space.
+  Off-thread activity checks are scoped to the current Space and run only while away.
+  Closed or suspended clients use separately enabled Web Push, backed by encrypted,
+  session-bound subscriptions and a durable outbox. Configure the same stable VAPID
+  identity on API and worker. Never record subscription endpoints or payloads in logs.
+  Qualify delivery and the destination on an installed PWA on a physical phone.
   Web update checks share the existing guarded tracker; they never deploy servers
   or reload through open settings/drafts/calls. Desktop uses the installed package's
   real updater policy; do not fabricate channel/automatic-install permissions.

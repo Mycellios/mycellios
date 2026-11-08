@@ -1,3 +1,5 @@
+import { notificationTarget } from "./notification-target.js";
+
 export const SKIP_WAITING = "rakazo:skip-waiting";
 export const CACHE_PREFIX = "rakazo-shell-";
 
@@ -12,11 +14,16 @@ type FetchEvent = ExtendableEvent & {
   respondWith(response: Promise<Response>): void;
 };
 type MessageEvent = ExtendableEvent & { data: unknown };
+type NotificationClickEvent = ExtendableEvent & { notification: Pick<Notification, "data" | "close"> };
+type NotificationClient = { url: string; focus(): Promise<unknown> };
 
 export type ServiceWorkerScope = {
   location: { origin: string };
   caches: CacheStorage;
-  clients: { matchAll(options: { type: "window" }): Promise<readonly unknown[]> };
+  clients: {
+    matchAll(options: { type: "window"; includeUncontrolled?: boolean }): Promise<readonly NotificationClient[]>;
+    openWindow(url: string): Promise<unknown>;
+  };
   registration: {
     waiting: Pick<ServiceWorker, "postMessage" | "addEventListener" | "removeEventListener"> | null;
   };
@@ -25,6 +32,7 @@ export type ServiceWorkerScope = {
   addEventListener(type: "install" | "activate", listener: (event: ExtendableEvent) => void): void;
   addEventListener(type: "fetch", listener: (event: FetchEvent) => void): void;
   addEventListener(type: "message", listener: (event: MessageEvent) => void): void;
+  addEventListener(type: "notificationclick", listener: (event: NotificationClickEvent) => void): void;
 };
 
 export function bypassesServiceWorker(pathname: string): boolean {
@@ -41,6 +49,7 @@ export function installServiceWorker(
   scope: ServiceWorkerScope,
   precache: readonly string[],
   cacheName: string,
+  boundPushAccount?: () => Promise<string | undefined>,
 ): void {
   const precached = new Set(precache);
   const shellPath = precache.find((path) => path.endsWith("/")) ?? "/";
@@ -83,6 +92,20 @@ export function installServiceWorker(
 
   scope.addEventListener("message", (event) => {
     if (event.data === SKIP_WAITING) event.waitUntil(scope.skipWaiting());
+  });
+
+  scope.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    const url = notificationTarget(event.notification.data?.url, scope.location.origin, prefix);
+    if (!url) return;
+    event.waitUntil((async () => {
+      const account = event.notification.data?.pushAccountId;
+      if (account && account !== await boundPushAccount?.()) return;
+      const windows = await scope.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const existing = windows.find((client) => client.url === url);
+      if (existing) await existing.focus();
+      else await scope.clients.openWindow(url);
+    })());
   });
 
   scope.addEventListener("fetch", (event) => {

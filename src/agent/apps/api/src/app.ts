@@ -1,3 +1,4 @@
+import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import type {
@@ -472,13 +473,15 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
           }),
         }));
   const pushTokens = new PrismaPushTokenStore(prisma, env.encryptionKey);
-  const notifications =
+  const nativeNotifications =
     notificationsOverride ??
     new ExpoPushProvider(pushTokens, {
       sessionExpiresAt: (sessionId) => pushSessionExpiresAt(prisma, sessionId),
       jobs,
       accessToken: env.expoAccessToken,
     });
+  const webPush = new WebPushService(prisma, env.encryptionKey, jobs, webPushConfig(process.env));
+  const notifications = webPush.config ? notificationChannels(nativeNotifications, webPush) : nativeNotifications;
   const auth = createAuth(prisma, {
     sessionDurationSeconds: env.authSessionDurationSeconds,
     analytics,
@@ -524,11 +527,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     },
     // The session change already happened, so a registration cleanup failure must not fail sign-out.
     afterDeleteSession: async (session) => {
+      if (webPush.config) await webPush.endSession(session.userId, session.id).catch(() => getLogger().warn('Web Push session cleanup pending'));
       await pushTokens
         .endSession(session.userId, session.id)
         .catch((error) => getLogger().error("push token removal failed", error));
     },
     afterReplaceSession: async (previous, session) => {
+      if (webPush.config) await webPush.endSession(session.userId, previous.id, session.id).catch(() => getLogger().warn("Web Push session cleanup pending"));
       await pushTokens
         .endSession(session.userId, previous.id, session.id)
         .catch((error) => getLogger().error("push token session update failed", error));
@@ -608,7 +613,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     events,
     workerId: "api",
     runtime,
-    notifications: notifications instanceof ExpoPushProvider ? notifications : undefined,
+    notifications: nativeNotifications instanceof ExpoPushProvider ? nativeNotifications : undefined,
+    webPush,
     secretStore: secrets,
     memoryProviders,
     deploymentModelKey: env.deploymentModelKey,
@@ -617,6 +623,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     cloudAgent,
   });
   if (inMemoryJobs) {
+    webPush.start();
     await inMemoryJobs.start(jobHandlers);
   }
   const reconciler = inMemoryJobs
@@ -624,7 +631,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         prisma,
         jobs,
         events,
-        notifications,
+        notifications: nativeNotifications,
         reconcileModelCredits: createModelCreditReconciler({
           prisma,
           lookup: deploymentModelUsageLookup(),
@@ -646,6 +653,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     codexCatalog,
     prisma,
     pushTokens,
+    webPush,
     events,
     ticketChanges,
     boardEvents,
@@ -1308,6 +1316,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       // on waitForComputerReady for the full boot-wait window during shared Postgres journeys.
       auth.disposeOidcDiscovery();
       shutdown.abort();
+      webPush.stop();
       oauthLogins.abortAll();
       messagingStopped = true;
       clearMessagingRetryDelay?.();

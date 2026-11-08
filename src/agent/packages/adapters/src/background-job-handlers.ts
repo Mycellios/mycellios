@@ -1,3 +1,4 @@
+import type { WebPushService } from "./web-push.js";
 import type {
   AgentHomeStore,
   AgentRuntime,
@@ -65,6 +66,7 @@ export function createBackgroundJobHandlers(deps: {
   messaging?: MessagingSurface;
   cloudAgent?: CloudAgentConnection | null;
   notifications?: ExpoPushProvider;
+  webPush?: WebPushService;
 }): BackgroundJobHandlers {
   const messagingDeps = deps.messaging
     ? {
@@ -176,6 +178,7 @@ export function createBackgroundJobHandlers(deps: {
       );
     }),
     // A receipt belongs to a device's push token, not to a Space.
+    "webpush.deliver": async ({ id }) => { await deps.webPush?.deliver(id); },
     "push.receipt": async (payload) => {
       await runAsSystem("check a push receipt", () => deps.notifications?.checkReceipt(payload));
     },

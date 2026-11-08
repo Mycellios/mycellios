@@ -1,9 +1,11 @@
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot, NotificationSettings } from "@rakazo/contracts";
 import { Button, Label, Switch } from "@rakazo/ui-web";
 import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
-import { requestBrowserNotificationPermission } from "../../lib/browser-notifications";
+import { rpc } from "../../lib/rpc";
+import { disableWebPush, enableWebPush, notificationClientId, pushSupported } from "../../lib/web-push";
+import { requestBrowserNotificationPermission, showSystemNotification } from "../../lib/browser-notifications";
 import {
   notificationPreferences,
   notificationSnapshot,
@@ -30,6 +32,15 @@ export function NotificationsPanel({
     () => "",
   );
   const value = notificationPreferences(scope);
+  const [now, setNow] = useState(Date.now);
+  const paused = value.mutedUntil > now;
+  useEffect(() => {
+    if (!paused) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.min(
+      Math.max(0, value.mutedUntil - Date.now()) + 1, 3_600_001,
+    ));
+    return () => window.clearTimeout(timer);
+  }, [paused, value.mutedUntil]);
   const supported = typeof Notification !== "undefined";
   const [permission, setPermission] = useState(() =>
     supported ? Notification.permission : "unsupported",
@@ -37,6 +48,43 @@ export function NotificationsPanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [push, setPush] = useState<{ publicKey: string | null; registered: boolean; settings: NotificationSettings }>();
+  useEffect(() => {
+    if (!scope || !pushSupported()) return;
+    let cancelled = false;
+    void rpc.notifications.webStatus({ clientId: notificationClientId() })
+      .then((state) => { if (!cancelled && state.configured) setPush(state); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [scope]);
+  async function togglePush() {
+    if (!push?.publicKey) return;
+    setBusy("push");
+    setError("");
+    try {
+      if (push.registered) await disableWebPush();
+      else await enableWebPush(push.publicKey, scope);
+      setPush({ ...push, registered: !push.registered });
+      setPermission(Notification.permission);
+    } catch {
+      setError(t`Could not change background notifications. Check your notification permission and try again.`);
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function savePushSettings(patch: Partial<NotificationSettings>) {
+    if (!push || busy) return;
+    setBusy("push-settings");
+    setError("");
+    try {
+      const settings = await rpc.notifications.saveSettings({ ...push.settings, ...patch });
+      setPush({ ...push, settings });
+    } catch {
+      setError(t`Could not save this preference.`);
+    } finally {
+      setBusy(null);
+    }
+  }
   useEffect(() => {
     onBusyChange?.(busy !== null);
   }, [busy, onBusyChange]);
@@ -80,9 +128,37 @@ export function NotificationsPanel({
       setBusy(null);
     }
   }
+  async function sendTest() {
+    setBusy("test");
+    setMessage("");
+    setError("");
+    try {
+      await showSystemNotification("Mycellios", t`Notifications are working on this device.`,
+        "mycellios-settings-test", "/app", value.sound);
+      setMessage(t`Test notification sent.`);
+    } catch {
+      setError(t`Could not show the test notification.`);
+    } finally {
+      setBusy(null);
+    }
+  }
   return (
     <div className="space-y-6">
       <SettingsGroup title={t`This device`}>
+        {push?.publicKey && <SettingsRow
+          label={t`Notifications when Mycellios is closed`}
+          control={<Button variant="outline" size="sm" disabled={busy !== null}
+            onClick={() => void togglePush()}>{push.registered ? t`Disable` : t`Enable`}</Button>}
+        >
+          <p className="text-xs text-muted-foreground">{t`Receive alerts on this device even when Mycellios is closed. They open the corresponding chat.`}</p>
+        </SettingsRow>}
+        {push?.registered && <SettingsRow
+          label={<Label htmlFor={`${id}-push-attention`}>{t`Push alerts only when I’m needed`}</Label>}
+          control={<Switch id={`${id}-push-attention`} checked={push.settings.level === "needs_me"}
+            disabled={busy !== null} onCheckedChange={(on) => void savePushSettings({ level: on ? "needs_me" : "all" })} />}
+        >
+          <p className="text-xs text-muted-foreground">{t`Applies to all devices where you enabled closed-app notifications.`}</p>
+        </SettingsRow>}
         <SettingsRow
           label={<Label htmlFor={`${id}-enabled`}>{t`Reply notifications`}</Label>}
           control={
@@ -96,6 +172,21 @@ export function NotificationsPanel({
         >
           <p className="text-xs text-muted-foreground">{t`Notify you about Mico replies while this app is open in the background.`}</p>
         </SettingsRow>
+        <SettingsRow
+          label={<Label htmlFor={`${id}-attention`}>{t`Only when I’m needed`}</Label>}
+          control={<Switch id={`${id}-attention`} checked={value.attentionOnly}
+            disabled={!value.enabled} onCheckedChange={(attentionOnly) => save({ attentionOnly })} />}
+        >
+          <p className="text-xs text-muted-foreground">{t`Get notified when a Mico needs your answer or approval.`}</p>
+        </SettingsRow>
+        <SettingsRow
+          label={t`Pause notifications`}
+          control={<Button variant="outline" size="sm" disabled={!value.enabled}
+            onClick={() => {
+              setNow(Date.now());
+              save({ mutedUntil: paused ? 0 : Date.now() + 3_600_000 });
+            }}>{paused ? t`Resume notifications` : t`Pause for 1 hour`}</Button>}
+        />
         <SettingsRow
           label={<Label htmlFor={`${id}-preview`}>{t`Show message previews`}</Label>}
           control={
@@ -157,21 +248,8 @@ export function NotificationsPanel({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={!value.enabled}
-                onClick={() => {
-                  try {
-                    const test = new Notification("Mycellios", {
-                      body: t`Notifications are working on this device.`,
-                      tag: "mycellios-settings-test",
-                      ...(!value.sound ? { silent: true } : {}),
-                    });
-                    setTimeout(() => test.close(), 5000);
-                    setError("");
-                    setMessage(t`Test notification sent.`);
-                  } catch {
-                    setError(t`Could not show the test notification.`);
-                  }
-                }}
+                disabled={!value.enabled || busy !== null}
+                onClick={() => void sendTest()}
               >{t`Send test`}</Button>
             }
           />

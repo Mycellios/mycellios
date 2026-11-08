@@ -9434,6 +9434,7 @@ async function failRunBeforeTurn(
 async function notifyRun(
   deps: ExecutorDeps,
   run: {
+    id?: string;
     spaceId: string;
     userId: string;
     botId: string;
@@ -9476,6 +9477,7 @@ async function notifyRun(
       {
         operationId: "notify",
         traceId: run.botId,
+        runId: run.id,
         spaceId: run.spaceId,
         userId: run.userId,
         botId: run.botId,

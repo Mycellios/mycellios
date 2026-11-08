@@ -414,6 +414,8 @@ export interface RealtimeFanout {
 }
 
 export interface NotificationProvider {
+  hasPushRecipient?(userId: string): Promise<boolean>;
+  deliver?(message: NotificationMessage, context: AdapterContext): Promise<"delivered" | "undeliverable">;
   describe(): AdapterDescriptor<{ push: boolean; email: boolean }>;
   send(message: NotificationMessage, context: AdapterContext): Promise<void>;
 }
