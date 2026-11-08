@@ -396,3 +396,28 @@ it("leaves the password form unchanged without email codes", async () => {
   expect(host.querySelector<HTMLInputElement>('input[type="password"]')!.required).toBe(true);
   expect(host.querySelector('button[type="submit"]')!.textContent).toBe("Sign in");
 });
+
+it("keeps first-party sign-in on the shared launch screen and retries if it stalls", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    vi.mocked(fetchAuthCapabilities).mockResolvedValue({
+      ...capabilities,
+      passwordAuth: false,
+      mycelliosAccount: true,
+      sso: { name: "Mycellios", availability: "available" },
+    });
+    vi.mocked(authClient.signIn.social).mockReturnValue(new Promise(() => undefined));
+    await render();
+    expect(host.querySelector(".brand-launch-mark.is-busy")).not.toBeNull();
+    expect(host.querySelector(".brand-launch-status")?.textContent).toBe("Signing in…");
+    expect(host.textContent).not.toContain("Continue with Mycellios");
+    await act(async () => {
+      vi.advanceTimersByTime(8000);
+    });
+    expect(host.textContent).toContain("This is taking a while.");
+    await act(async () => button("Retry").click());
+    expect(authClient.signIn.social).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});

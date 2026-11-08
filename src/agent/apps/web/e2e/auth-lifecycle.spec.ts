@@ -25,8 +25,8 @@ test("sign-up stays blank until session and sign-in options are ready", async ({
   });
 
   await page.goto("/sign-up");
-  await expect(page.locator('[data-rakazo-app-state="session-pending"]')).toBeVisible();
-  await expect(page.locator("#root")).toHaveText("");
+  await expect(page.locator('[data-rakazo-app-state="session-pending"] .brand-launch-mark')).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Create your Mycellios" })).toHaveCount(0);
   await captureScreenshot(page, testInfo, "signup-session-pending");
 
   const capabilitiesRequested = page.waitForRequest("**/api/auth/capabilities");

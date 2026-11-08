@@ -193,3 +193,54 @@ it("respects the saved Spanish choice", async () => {
   await click("Crear cuenta");
   expect(host.querySelector("h1")?.textContent).toBe("Crear tu cuenta");
 });
+
+it("shows a centered sign-in transition instead of a plain waiting page", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    vi.mocked(restoreAuthSession).mockResolvedValue(session);
+    vi.mocked(getOAuthAuthorization).mockReturnValue(new Promise(() => undefined));
+    await act(async () => root.render(<OAuthConsent />));
+    const launch = host.querySelector(".brand-launch");
+    expect(launch).not.toBeNull();
+    expect(launch?.querySelector(".brand-launch-mark.is-busy")).not.toBeNull();
+    expect(launch?.querySelector(".brand-launch-wordmark")?.textContent).toContain("Mycellios");
+    expect(host.querySelector(".brand-launch-status")?.textContent).toBe("Signing in…");
+    expect(host.textContent).not.toContain("One moment");
+    expect(host.textContent).not.toContain("This is taking a while.");
+    await act(async () => {
+      vi.advanceTimersByTime(8000);
+    });
+    expect(host.textContent).toContain("This is taking a while.");
+    const retry = [...host.querySelectorAll("button")].find((button) => button.textContent === "Retry");
+    expect(retry).toBeDefined();
+    await act(async () => retry!.click());
+    expect(getOAuthAuthorization).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it.each([
+  ["es", "Entrando…"],
+  ["fr", "Connexion…"],
+  ["ja", "サインインしています…"],
+] as const)("uses the saved %s locale on the sign-in transition", async (locale, status) => {
+  localStorage.setItem("rakazo.uiLocale", locale);
+  vi.mocked(restoreAuthSession).mockResolvedValue(session);
+  vi.mocked(getOAuthAuthorization).mockReturnValue(new Promise(() => undefined));
+  await act(async () => root.render(<OAuthConsent />));
+  expect(host.querySelector(".brand-launch")?.getAttribute("lang")).toBe(locale);
+  expect(host.querySelector(".brand-launch-status")?.textContent).toBe(status);
+});
+
+it("keeps a failed sign-in load on the same transition with retry", async () => {
+  vi.mocked(loadAuthConfig).mockRejectedValue(new Error("private server detail"));
+  await act(async () => root.render(<OAuthConsent />));
+  expect(host.querySelector(".brand-launch [role='alert']")?.textContent).toContain(
+    "Could not load sign-in",
+  );
+  expect(host.textContent).not.toContain("private server detail");
+  const retry = [...host.querySelectorAll("button")].find((button) => button.textContent === "Retry");
+  await act(async () => retry!.click());
+  expect(loadAuthConfig).toHaveBeenCalledTimes(2);
+});

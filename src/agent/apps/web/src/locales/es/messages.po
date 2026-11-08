@@ -9944,3 +9944,11 @@ msgstr "Consultando el calendario…"
 
 msgid "Checking email…"
 msgstr "Consultando el correo…"
+
+#: src/pages/Auth.tsx
+msgid "Signing in…"
+msgstr "Entrando…"
+
+#: src/pages/Auth.tsx
+msgid "This is taking a while."
+msgstr "Está tardando un poco."

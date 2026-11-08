@@ -6378,3 +6378,11 @@ msgstr "{pendingCount, plural, one {# लंबित कनेक्शन} oth
 #: src/components/ReleaseNotes.tsx
 msgid "See which accounts are connected to each app."
 msgstr "देखें कि हर ऐप से कौन से खाते जुड़े हैं।"
+
+#: src/pages/Auth.tsx
+msgid "Signing in…"
+msgstr "साइन इन हो रहा है…"
+
+#: src/pages/Auth.tsx
+msgid "This is taking a while."
+msgstr "थोड़ा समय लग रहा है."

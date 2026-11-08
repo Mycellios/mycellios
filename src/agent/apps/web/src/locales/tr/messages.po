@@ -6377,3 +6377,11 @@ msgstr "{pendingCount, plural, other {# bekleyen bağlantı}}"
 #: src/components/ReleaseNotes.tsx
 msgid "See which accounts are connected to each app."
 msgstr "Her uygulamaya hangi hesapların bağlı olduğunu görün."
+
+#: src/pages/Auth.tsx
+msgid "Signing in…"
+msgstr "Giriş yapılıyor…"
+
+#: src/pages/Auth.tsx
+msgid "This is taking a while."
+msgstr "Biraz uzun sürüyor."

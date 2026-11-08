@@ -1,0 +1,255 @@
+.brand-launch {
+  --brand-mark: 160px;
+  --brand-launch-anchor: 30%;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--mycellios-font-family), ui-sans-serif, system-ui, sans-serif;
+}
+
+.brand-launch-document {
+  min-height: 100dvh;
+}
+
+.brand-launch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 72px;
+  padding: 20px 24px;
+}
+
+.brand-launch-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.brand-launch-wordmark img {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  object-fit: contain;
+}
+
+.brand-launch-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.brand-launch-name {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.brand-launch-agent {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.brand-launch-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: var(--brand-launch-anchor) auto minmax(0, 1fr);
+  justify-items: center;
+  overflow: auto;
+  padding: 0 24px 32px;
+}
+
+.brand-launch-hero {
+  grid-row: 2;
+}
+
+.brand-launch-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--brand-mark);
+  height: var(--brand-mark);
+}
+
+.brand-launch-mark picture,
+.brand-launch-mark img {
+  display: block;
+  width: var(--brand-mark);
+  height: var(--brand-mark);
+  object-fit: contain;
+  user-select: none;
+}
+
+.brand-launch-plate,
+.brand-launch-ring {
+  position: absolute;
+  pointer-events: none;
+}
+
+.brand-launch-plate {
+  inset: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.brand-launch-ring {
+  inset: -16px;
+  color: var(--success);
+}
+
+.brand-launch-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.brand-launch-copy {
+  grid-row: 3;
+  align-self: start;
+  width: min(100% - 48px, 36rem);
+  margin-top: 20px;
+  text-align: center;
+}
+
+.brand-launch-copy > * {
+  margin-inline: auto;
+}
+
+.brand-launch-status,
+.brand-launch-hint,
+.brand-launch-alert {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.brand-launch-status,
+.brand-launch-hint {
+  color: var(--muted-foreground);
+}
+
+.brand-launch-hint {
+  margin-top: 10px;
+  max-width: 22rem;
+}
+
+.brand-launch-alert {
+  color: var(--destructive);
+  max-width: 24rem;
+}
+
+.brand-launch-retry {
+  margin-top: 16px;
+  min-height: 44px;
+  padding: 0 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.brand-launch-retry:focus-visible,
+.brand-launch-wordmark:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@media (min-width: 640px) {
+  .brand-launch {
+    --brand-mark: 192px;
+  }
+
+  .brand-launch-bar {
+    padding-right: 40px;
+    padding-left: 40px;
+  }
+}
+
+@media (max-height: 640px) {
+  .brand-launch {
+    --brand-launch-anchor: 12%;
+    --brand-mark: 128px;
+  }
+
+  .brand-launch-bar {
+    min-height: 56px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand-launch-stage {
+    animation: brand-launch-in 360ms ease-out both;
+  }
+
+  .brand-launch-ring {
+    animation: brand-launch-spin 8s linear infinite;
+  }
+
+  .brand-launch-mark.is-busy img {
+    animation: brand-launch-float 3.6s ease-in-out infinite;
+  }
+
+  .brand-launch-hint,
+  .brand-launch-retry {
+    animation: brand-launch-in 240ms ease-out both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-launch-stage,
+  .brand-launch-ring,
+  .brand-launch-mark img,
+  .brand-launch-hint,
+  .brand-launch-retry {
+    animation: none;
+  }
+}
+
+@keyframes brand-launch-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes brand-launch-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes brand-launch-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

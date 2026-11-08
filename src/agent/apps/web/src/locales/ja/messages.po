@@ -6378,3 +6378,11 @@ msgstr "{pendingCount, plural, other {認証待ちの接続 # 件}}"
 #: src/components/ReleaseNotes.tsx
 msgid "See which accounts are connected to each app."
 msgstr "各アプリに接続されているアカウントを確認できます。"
+
+#: src/pages/Auth.tsx
+msgid "Signing in…"
+msgstr "サインインしています…"
+
+#: src/pages/Auth.tsx
+msgid "This is taking a while."
+msgstr "少し時間がかかっています。"
