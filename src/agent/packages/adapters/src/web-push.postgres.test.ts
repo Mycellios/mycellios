@@ -10,7 +10,9 @@ import type { AdapterContext, JobPublisher, NotificationMessage } from "@rakazo/
 
 // This suite can only touch the task's disposable, loopback database.
 const connection = process.env.WEB_PUSH_TEST_DATABASE;
-const suite = connection?.includes("127.0.0.1:55448/notifications")
+const database = connection ? new URL(connection) : undefined;
+const suite = database?.protocol === "postgresql:" && database.hostname === "127.0.0.1" &&
+  database.port === "55448" && database.pathname === "/notifications"
   ? describe.sequential
   : describe.skip;
 suite("Web Push on isolated PostgreSQL", () => {

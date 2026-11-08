@@ -102,7 +102,7 @@ export function usesServerPush() {
 
 export function useWebPushPresence(userId?: string) {
   useEffect(() => {
-    if (!userId || !pushSupported()) return;
+    if (!userId) return;
     const owner = localStorage.getItem(OWNER_KEY);
     if (owner && owner !== userId) void clearWebPushBinding().catch(() => undefined);
     let disposed = false;
@@ -118,7 +118,7 @@ export function useWebPushPresence(userId?: string) {
         const state = await rpc.notifications.webStatus({ clientId });
         if (disposed) return;
         configured = state.configured;
-        serverDelivery = configured && state.registered && Notification.permission === "granted"
+        serverDelivery = configured && state.registered && pushSupported() && Notification.permission === "granted"
           && localStorage.getItem(OWNER_KEY) === userId;
         heartbeat();
       } catch { /* Older API: retain local delivery. */ }
