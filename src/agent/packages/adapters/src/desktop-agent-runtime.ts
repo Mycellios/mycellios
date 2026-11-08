@@ -67,7 +67,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
       ...(capture ? { onCheckpoint: (blob: string, id: string) => capture(() => blob, id) } : {}),
     });
     const callbacks = new Set<Promise<void>>();
-    let completed = false;
+    let completion: Extract<AgentRuntimeEvent, { type: "done" }> | undefined;
     let nativeUsage = false;
     let dispatched = false;
     let receivedFailure = false;
@@ -89,7 +89,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
         }
         else if (frame.kind === "event") {
           const event = rpc.decode(frame.value) as AgentRuntimeEvent;
-          if (!event || typeof event.type !== "string" || completed) throw Error("Invalid Desktop agent event");
+          if (!event || typeof event.type !== "string" || completion) throw Error("Invalid Desktop agent event");
           if (event.type === "usage") {
             if (request.agentEngine && request.agentEngine !== "pi" && !nativeUsage) {
               nativeUsage = true;
@@ -98,13 +98,16 @@ export class DesktopAgentRuntime implements AgentRuntime {
             }
             continue; // Untrusted host token/cost numbers are never billed.
           }
-          if (event.type === "done") completed = true;
-          yield event;
+          if (event.type === "done") completion = event;
+          else yield event;
         } else throw Error("Invalid Desktop agent stream");
       }
       await Promise.all(callbacks);
+      if (callbackError) throw callbackError;
+      signal.throwIfAborted();
       for (const usage of trustedUsage.splice(0)) yield usage;
-      if (!completed) throw Error("Desktop agent did not finish; check existing results before retrying");
+      if (!completion) throw Error("Desktop agent did not finish; check existing results before retrying");
+      yield completion;
     } catch (error) {
       const failure = callbackError ?? error;
       if (failure instanceof ComputerUpdatingError) {

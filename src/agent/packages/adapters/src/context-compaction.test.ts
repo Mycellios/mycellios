@@ -105,6 +105,27 @@ describe("automatic in-run context compaction", () => {
     expect(summarize).not.toHaveBeenCalled();
   });
 
+  it("compacts with a smaller reply reserve only when the required input and summary can fit", async () => {
+    const { compactor, summarize } = compact();
+    const ctx = {
+      ...context(old("Prior destination was Japan. ".repeat(230)), current),
+      systemPrompt: "a".repeat(10_600),
+    };
+    const required = estimateContextTokens(ctx.systemPrompt) +
+      estimateContextTokens([]) + estimateContextTokens([current]);
+    expect(required).toBeGreaterThan(model.contextWindow - model.maxTokens);
+    expect(await compactor.prepare(ctx, { ...model, reasoning: true })).toBe(ctx);
+    expect(await compactor.prepare({ ...ctx, systemPrompt: "a".repeat(13_000) }, model))
+      .toMatchObject({ messages: ctx.messages });
+    expect(summarize).not.toHaveBeenCalled();
+
+    const result = await compactor.prepare(ctx, model);
+    expect(result.systemPrompt).toBe(ctx.systemPrompt);
+    expect(result.messages.at(-1)).toBe(current);
+    expect(result.messages[0]?.content).toContain(LIVE_COMPACTION_PREFIX);
+    expect(summarize).toHaveBeenCalled();
+  });
+
   it("preserves current image bytes, steering and completed tool protocol without exposing old image bytes to summarization", async () => {
     const summarize = vi.fn(
       async () => "Earlier attachment was provided; its original remains in chat.",

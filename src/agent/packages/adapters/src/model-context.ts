@@ -4,6 +4,9 @@ import { isOpenAiCompatibleProvider } from "@rakazo/contracts";
 import type { ContextBudget } from "./context-selection.js";
 import { ContextBudgetError, estimateContextTokens } from "./context-selection.js";
 
+export const MIN_REDUCED_OUTPUT_TOKENS = 256;
+export const CONTEXT_ADMISSION_HEADROOM = 128;
+
 /** A configured output limit is a ceiling. Preserve required input before spend. */
 export function prepareModelContextBudget(
   context: Context,
@@ -24,12 +27,13 @@ export function prepareModelContextBudget(
       !(error instanceof ContextBudgetError) ||
       model.reasoning ||
       !Number.isSafeInteger(cap) ||
-      cap <= 256
+      cap <= MIN_REDUCED_OUTPUT_TOKENS
     )
       throw error;
     const excess = error.estimatedTokens - error.availableTokens;
-    const reduced = Math.floor(cap - excess - 128);
-    if (!Number.isSafeInteger(reduced) || reduced < 256 || reduced >= cap) throw error;
+    const reduced = Math.floor(cap - excess - CONTEXT_ADMISSION_HEADROOM);
+    if (!Number.isSafeInteger(reduced) || reduced < MIN_REDUCED_OUTPUT_TOKENS || reduced >= cap)
+      throw error;
     // Retry only local admission. No input, tool permissions or saved settings
     // are changed, and no provider request or credit hold has happened yet.
     return { context: prepare(context, { ...model, maxTokens: reduced }), maxTokens: reduced };
