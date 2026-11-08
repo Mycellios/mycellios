@@ -8,6 +8,7 @@ import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@raka
 import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-activity-preference";
+import { liveThreadDisconnected, subscribeLiveThreadConnection } from "../lib/live-thread-connection";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { activityKind } from "../lib/activity-kind";
 import { RunExecutionDetails } from "./RunExecutionDetails";
@@ -234,12 +235,18 @@ export function RunActivityStatus({
   })) : toolSteps, describe);
   const runningTool = toolEvents.findLast(tool => tool.outcome === "running");
   const settledTool = runningTool ? undefined : toolEvents.at(-1);
-  const primaryLabel = health.state === "quiet" ? t`Waiting for an activity update…`
+  const updatesStopped = useSyncExternalStore(subscribeLiveThreadConnection, liveThreadDisconnected, () => false);
+  const liveUpdatesStopped = updatesStopped && (health.state === "running" || health.state === "quiet" || health.state === "unknown" || health.state === "recovering");
+  const primaryLabel = liveUpdatesStopped
+    ? t`Live updates stopped. The task was not cancelled.`
+    : health.state === "quiet" ? t`Waiting for an activity update…`
     : health.state === "running" && runningTool ? describe(activityOf(runningTool))
     : health.state === "running" && settledTool?.outcome === "paused" ? t`A tool is waiting for input`
     : health.state === "running" && showActivity && (scopedActivity || !settledTool) ? describe(scopedActivity || latestActivity)
     : labels[health.state];
-  const status = <span role="status" className="break-words text-foreground">{primaryLabel}</span>;
+  const status = liveUpdatesStopped
+    ? <span role="alert" className="break-words text-destructive">{primaryLabel}</span>
+    : <span role="status" className="break-words text-foreground">{primaryLabel}</span>;
   const elapsed = health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{duration(health.elapsedMs)}</span> : null;
   const hasDetails = Boolean(visibleSteps.length || showActivity);
   const hasExecutionDetails = Boolean(run.modelId || run.modelProvider || (cost?.runId === run.id));

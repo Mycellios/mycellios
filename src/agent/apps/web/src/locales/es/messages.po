@@ -5711,6 +5711,10 @@ msgstr "Instrucciones de trabajo"
 msgid "Working…"
 msgstr "Trabajando…"
 
+#: src/components/RunActivityStatus.tsx
+msgid "Live updates stopped. The task was not cancelled."
+msgstr "Se interrumpieron las actualizaciones en vivo. La tarea no se canceló."
+
 #: src/pages/memory-providers/HonchoSettingsForm.tsx
 msgid "Workspace"
 msgstr ""
