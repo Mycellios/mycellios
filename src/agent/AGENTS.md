@@ -209,7 +209,9 @@
   desktop Notification API otherwise. Suppress notices while a same-account tab is
   focused. Click destinations must stay inside the deployed app and the target Space.
   Off-thread activity checks are scoped to the current Space and run only while away.
-  Closed or suspended clients use separately enabled Web Push, backed by encrypted,
+  Closed or suspended clients enroll in Web Push with existing OS permission and
+  the device's reply-notification setting. Never prompt outside the user's gesture.
+  Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.
   Qualify delivery and the destination on an installed PWA on a physical phone.

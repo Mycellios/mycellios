@@ -1,6 +1,8 @@
 # Notifications for the installed web app
 
-The installed Mycellios web app can opt a device in from notification settings.
+The installed Mycellios web app enrolls automatically when the device already
+allows Mycellios notifications and reply notifications are enabled. A device that
+has not granted permission uses the single system notification prompt.
 The existing open-tab and native app channels remain available. iOS requires
 installing the PWA on the Home Screen and accepting its notification permission.
 

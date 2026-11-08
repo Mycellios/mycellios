@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { notificationPreferences, subscribeNotifications } from "./notification-preferences";
 import { rpc } from "./rpc";
 
 const CLIENT_KEY = "mycellios:notification-device";
@@ -57,14 +58,12 @@ function bindAccount(worker: ServiceWorker, accountId: string) {
     }
   });
 }
-export async function enableWebPush(publicKey: string, accountId: string) {
+async function registerWebPush(publicKey: string, accountId: string) {
   if (!pushSupported())
     throw new Error(
       "Install Mycellios on your Home Screen to enable notifications on iPhone or iPad.",
     );
-  // Must happen directly inside the click gesture, before RPC or Service Worker awaits.
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted")
+  if (Notification.permission !== "granted")
     throw new Error("Allow notifications in your browser settings, then try again.");
   const worker = await registration();
   const clientId = notificationClientId();
@@ -89,6 +88,7 @@ export async function enableWebPush(publicKey: string, accountId: string) {
   });
   try {
     await bindAccount(worker.active!, accountId);
+    if (!notificationPreferences(accountId).enabled) throw new Error("Notifications are disabled on this device.");
     await rpc.notifications.webRegister({
       clientId,
       subscription: subscription.toJSON() as {
@@ -96,6 +96,10 @@ export async function enableWebPush(publicKey: string, accountId: string) {
         keys: { p256dh: string; auth: string };
       },
     });
+    if (!notificationPreferences(accountId).enabled) {
+      await disableWebPush();
+      return;
+    }
     localStorage.setItem(OWNER_KEY, accountId);
     window.dispatchEvent(new Event("mycellios:notifications-changed"));
   } catch (error) {
@@ -104,9 +108,8 @@ export async function enableWebPush(publicKey: string, accountId: string) {
     throw error;
   }
 }
-export async function disableWebPush() {
-  await rpc.notifications.webUnregister({ clientId: notificationClientId() });
-  await clearWebPushBinding();
+async function disableWebPush() {
+  await Promise.all([rpc.notifications.webUnregister({ clientId: notificationClientId() }), clearWebPushBinding()]);
   window.dispatchEvent(new Event("mycellios:notifications-changed"));
 }
 
@@ -121,11 +124,33 @@ export function usesServerPush() {
   return serverDelivery;
 }
 
+const registrations = new Map<string, Promise<void>>();
+export function enableWebPush(publicKey: string, accountId: string) {
+  const running = registrations.get(accountId);
+  if (running) return running;
+  const next = registerWebPush(publicKey, accountId).finally(() => registrations.delete(accountId));
+  registrations.set(accountId, next);
+  return next;
+}
+
+export function pushEnrollmentAction(input: {
+  publicKey: string | null;
+  enabled: boolean;
+  permission: NotificationPermission;
+  registered: boolean;
+  bound: boolean;
+}) {
+  if (!input.publicKey) return null;
+  if (!input.enabled || input.permission !== "granted") return input.registered || input.bound ? "remove" : null;
+  if (!input.registered || !input.bound) return "register";
+  return null;
+}
+
 export function useWebPushPresence(userId?: string) {
   useEffect(() => {
     if (!userId) return;
     const owner = localStorage.getItem(OWNER_KEY);
-    if (owner && owner !== userId) void clearWebPushBinding().catch(() => undefined);
+    const clearPreviousOwner = owner && owner !== userId ? clearWebPushBinding().catch(() => undefined) : undefined;
     let disposed = false;
     let configured = false;
     const clientId = notificationClientId();
@@ -136,12 +161,21 @@ export function useWebPushPresence(userId?: string) {
     };
     const refresh = async () => {
       try {
+        await clearPreviousOwner;
+        if (disposed) return;
         const state = await rpc.notifications.webStatus({ clientId });
         if (disposed) return;
         configured = state.configured;
-        serverDelivery = configured && state.registered && pushSupported() && Notification.permission === "granted"
-          && localStorage.getItem(OWNER_KEY) === userId;
+        const supported = pushSupported();
+        const bound = localStorage.getItem(OWNER_KEY) === userId;
+        const enabled = notificationPreferences(userId).enabled;
+        serverDelivery = configured && state.registered && supported && Notification.permission === "granted" && enabled && bound;
         heartbeat();
+        if (!supported) return;
+        const action = pushEnrollmentAction({ publicKey: state.publicKey, enabled, permission: Notification.permission,
+          registered: state.registered, bound });
+        if (action === "remove") await disableWebPush();
+        if (action === "register" && state.publicKey) await enableWebPush(state.publicKey, userId);
       } catch { /* Older API: retain local delivery. */ }
     };
     void refresh();
@@ -150,6 +184,8 @@ export function useWebPushPresence(userId?: string) {
     window.addEventListener("blur", heartbeat);
     document.addEventListener("visibilitychange", heartbeat);
     window.addEventListener("mycellios:notifications-changed", refresh);
+    navigator.serviceWorker?.addEventListener("controllerchange", refresh);
+    const unsubscribe = subscribeNotifications(userId, refresh);
     return () => {
       disposed = true;
       serverDelivery = false;
@@ -158,6 +194,8 @@ export function useWebPushPresence(userId?: string) {
       window.removeEventListener("blur", heartbeat);
       document.removeEventListener("visibilitychange", heartbeat);
       window.removeEventListener("mycellios:notifications-changed", refresh);
+      navigator.serviceWorker?.removeEventListener("controllerchange", refresh);
+      unsubscribe();
       if (configured)
         void rpc.notifications.webPresence({ clientId, focused: false }).catch(() => undefined);
     };
