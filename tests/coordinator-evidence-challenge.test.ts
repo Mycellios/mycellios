@@ -81,8 +81,20 @@ describe("coordinator evidence authority", () => {
     (await hub.close());
   });
 
-  it("publishes a runtime profile only after the directed current-session challenge", async () => {
+  it.each([
+    { backend: "cuda", deviceName: "NVIDIA Test GPU", vendor: "nvidia", precision: "float16" },
+    { backend: "directml", deviceName: "Intel Iris Xe", vendor: "intel", precision: "float32" },
+  ] as const)("verifies the $backend runtime profile against the current session", async ({
+    backend, deviceName, vendor, precision,
+  }) => {
     const capabilities = executorCapabilities();
+    Object.assign(capabilities.gpus[0]!, { vendor, model: deviceName });
+    Object.assign(capabilities.distributedExecutor!.acceleration!, {
+      backend,
+      deviceName,
+      gpuVendor: vendor,
+      gpuModel: deviceName,
+    });
     const worker = storedWorker(capabilities);
     const { hub, socket, state, current } = (await harness(worker));
     await issueChallenges(hub, state, capabilities);
@@ -90,11 +102,12 @@ describe("coordinator evidence authority", () => {
       (message) => message.type === "evidence.challenge"
         && (message.payload as { kind?: string }).kind === "runtime-performance",
     )!.payload as Record<string, unknown>;
+    expect(challenge).toMatchObject({ backend, deviceName, precision });
     const profile = sealRuntimePerformanceProfile({
       measuredAt: new Date().toISOString(),
-      backend: "cuda",
-      deviceName: "NVIDIA Test GPU",
-      precision: "float16",
+      backend,
+      deviceName,
+      precision,
       source: "physical-microbenchmark",
       activationCodecId: "fp16",
       decodeMemory: series("GB/s", 400),
