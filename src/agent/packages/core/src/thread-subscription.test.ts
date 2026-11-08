@@ -992,4 +992,20 @@ describe("thread subscription recovery", () => {
     await expect(running).resolves.toBeUndefined();
     expect(add.mock.calls.length).toBe(remove.mock.calls.length);
   });
+
+  it("reports a live stream and a dropped stream without treating cancellation as a disconnect", async () => {
+    vi.useFakeTimers();
+    const { abort, channel, callbacks } = setup();
+    const states: string[] = [];
+    const running = runThreadSubscription({ ...callbacks, onConnection: (state) => states.push(state) });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(states).toEqual(["live"]);
+    channel.end();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(states).toContain("reconnecting");
+    const dropped = states.length;
+    abort.abort();
+    await running;
+    expect(states).toHaveLength(dropped);
+  });
 });

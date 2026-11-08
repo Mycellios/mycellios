@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { desktopBridge } from "../../lib/desktop";
+import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
 import { localTimezone } from "../../lib/local-timezone";
 import type { RpcClient } from "../../lib/rpc";
 import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
@@ -282,13 +282,9 @@ export function ScheduleWorkspace({
       data-view={view}
     >
       <header
-        className={`rk-schedule-header ${desktopBridge() ? "app-drag" : ""}`}
+        className={`rk-schedule-header ${desktopDragClass()}`}
         data-testid="conversation-header"
-        style={
-          desktopBridge() && desktopBridge()?.platform !== "win32"
-            ? { paddingInlineStart: 48 }
-            : undefined
-        }
+        style={desktopHidesTitleBar() ? { paddingInlineStart: 48 } : undefined}
       >
         <DropdownMenu>
           <DropdownMenuTrigger

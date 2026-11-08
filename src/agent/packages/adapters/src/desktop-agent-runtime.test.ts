@@ -210,3 +210,80 @@ it("keeps actual provider credentials and producer-side billing in cloud while P
     expect(calls).toEqual(["reserve", "provider", "settle", "usage"]);
   } finally { provider.closeAllConnections(); await new Promise<void>(resolve => provider.close(() => resolve())); }
 });
+
+it("redelivers a completed tool result when its acknowledgement is lost", async () => {
+  const token = "e".repeat(64);
+  let release!: () => void;
+  const hold = new Promise<void>((resolve) => { release = resolve; });
+  let toolCalls = 0;
+  const engine: AgentRuntime = {
+    describe, abort: vi.fn(),
+    async *run(input) {
+      const value = await input.executeTool!("shell", { command: "echo hi" }, "call-1") as { stdout?: string };
+      yield { type: "text", text: String(value.stdout) };
+      await hold;
+      yield { type: "done" };
+    },
+  };
+  const host = await startHostComputerServer({ root: tmpdir(), token, hostname: "127.0.0.1", agentRuntime: engine });
+  hosts.push(host);
+  host.setEnabled(true);
+  let acknowledgements = 0;
+  const transport = vi.fn(async (input: HostComputerRequest, ctx: AdapterContext) => {
+    const response = await fetch(`http://127.0.0.1:${host.port}/computer`, {
+      method: "POST", headers: { authorization: `Bearer ${token}` },
+      body: JSON.stringify(input), signal: ctx.signal,
+    });
+    if (input.method !== "agentMessage") return response;
+    acknowledgements += 1;
+    if (acknowledgements === 1) {
+      await response.body?.cancel();
+      return new Response(`${JSON.stringify({ value: { accepted: true } })}\n`);
+    }
+    release();
+    return response;
+  });
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
+  const input = request();
+  input.executeTool = async () => { toolCalls += 1; return { code: 0, stdout: "ok", stderr: "" }; };
+  const events: AgentRuntimeEvent[] = [];
+  for await (const event of runtime.run(input, context)) events.push(event);
+  expect(events).toEqual([{ type: "text", text: "ok" }, { type: "done" }]);
+  expect(toolCalls).toBe(1);
+  expect(acknowledgements).toBe(2);
+  expect(fallback.run).not.toHaveBeenCalled();
+});
+
+it("delivers a finished command result when the executor heartbeat marks the PC unavailable", async () => {
+  const token = "f".repeat(64);
+  const engine: AgentRuntime = {
+    describe, abort: vi.fn(),
+    async *run(input) {
+      const value = await input.executeTool!("shell", { command: "echo hi" }, "call-1") as { stdout?: string };
+      yield { type: "text", text: String(value.stdout) };
+      yield { type: "done" };
+    },
+  };
+  const host = await startHostComputerServer({ root: tmpdir(), token, hostname: "127.0.0.1", agentRuntime: engine });
+  hosts.push(host);
+  host.setEnabled(true);
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const runtime = new DesktopAgentRuntime({
+    fallback,
+    select: async () => ({ available: true, preferred: true }),
+    transport: (input, ctx) => fetch(`http://127.0.0.1:${host.port}/computer`, {
+      method: "POST", headers: { authorization: `Bearer ${token}` },
+      body: JSON.stringify(input), signal: ctx.signal,
+    }),
+  });
+  const input = request();
+  input.executeTool = async () => {
+    host.setEnabled(false, false);
+    return { code: 0, stdout: "ok", stderr: "" };
+  };
+  const events: AgentRuntimeEvent[] = [];
+  for await (const event of runtime.run(input, context)) events.push(event);
+  expect(events).toEqual([{ type: "text", text: "ok" }, { type: "done" }]);
+  expect(fallback.run).not.toHaveBeenCalled();
+});

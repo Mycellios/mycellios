@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { desktopBridge } from "../../lib/desktop";
+import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
 import { readFileAsBase64 } from "../../lib/pending-attachments";
 import type { RpcClient } from "../../lib/rpc";
 import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
@@ -129,12 +129,8 @@ export function TasksWorkspace({
     <section className="rk-tasks-workspace" data-testid="tasks-workspace" aria-label={t`Tasks`}>
       <header
         data-testid="conversation-header"
-        className={`rk-tasks-header ${desktopBridge() ? "app-drag" : ""}`}
-        style={
-          desktopBridge() && desktopBridge()?.platform !== "win32"
-            ? { paddingInlineStart: 48 }
-            : undefined
-        }
+        className={`rk-tasks-header ${desktopDragClass()}`}
+        style={desktopHidesTitleBar() ? { paddingInlineStart: 48 } : undefined}
       >
         <DropdownMenu>
           <DropdownMenuTrigger

@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CalendarClock, Menu, PanelRight, Pause, Pencil, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { desktopBridge } from "../../lib/desktop";
+import { desktopDragClass } from "../../lib/desktop";
 import { useSpaceQueries } from "../../lib/query";
 import type { RpcClient } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
@@ -100,7 +100,7 @@ export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onE
   const selectedState = selected ? actions.state(selected.id) : null;
   const next = selected?.nextRunAt;
   return <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="routine-workspace" aria-label={t`Routines`}>
-    <header data-testid="conversation-header" className={`${desktopBridge() ? "app-drag" : ""} flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3`}>
+    <header data-testid="conversation-header" className={`${desktopDragClass()} flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3`}>
       <Button variant="ghost" size="icon-sm" className="app-no-drag md:hidden" aria-label={t`Open navigation`} onClick={onNavigation}><Menu size={17} /></Button>
       <Button variant="ghost" size="icon-sm" className="app-no-drag" aria-label={t`Back to chat`} onClick={onExit}><ArrowLeft size={16} /></Button>
       <BotAvatar identity={bot.id} color={bot.color} size={21} status={bot.status} /><span className="min-w-0 truncate text-sm font-medium">{bot.name}</span>

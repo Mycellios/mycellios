@@ -27,7 +27,7 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { MycelliosWordmark } from "../../components/MycelliosBrand";
-import { desktopBridge, windowChromeKind } from "../../lib/desktop";
+import { desktopBridge, desktopHidesTitleBar, windowChromeKind } from "../../lib/desktop";
 import {
   type RailPage,
   railPinsKey,
@@ -182,12 +182,12 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
       className="rk-workspace-rail"
       aria-label={t`Workspace navigation`}
     >
-      <div className="app-drag flex h-[51px] shrink-0 items-center justify-center">
+      <div className={`${desktopHidesTitleBar(desktop) ? "app-drag" : ""} flex h-[51px] shrink-0 items-center justify-center`}>
         {windowChromeKind(desktop) === "controls" ? (
           <WindowChrome />
-        ) : !desktop || desktop.platform === "win32" ? (
+        ) : desktop?.platform === "darwin" ? null : (
           <MycelliosWordmark compact />
-        ) : null}
+        )}
       </div>
       <div className="rk-rail-pages flex flex-col items-center gap-1">
         <IconTooltip label={t`Micos`}>

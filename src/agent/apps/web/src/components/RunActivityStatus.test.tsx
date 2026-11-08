@@ -16,6 +16,7 @@ vi.mock("@rakazo/ui-web", () => ({
   ),
 }));
 import { RunActivityStatus } from "./RunActivityStatus";
+import { resetLiveThreadConnection, setLiveThreadConnection } from "../lib/live-thread-connection";
 const now = Date.parse("2026-01-01T12:00:00Z");
 const at = (minutes: number) => new Date(now + minutes * 60000).toISOString();
 const run = {
@@ -44,6 +45,7 @@ afterEach(() => {
   root = undefined;
   node?.remove();
   vi.useRealTimers();
+  resetLiveThreadConnection();
   if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
   else Reflect.deleteProperty(document, "hidden");
 });
@@ -86,6 +88,17 @@ it("keeps a long, silent run active and distinguishes worker contact from output
   expect(node.textContent).not.toContain("No new activity");
   expect(node.textContent).not.toContain("Last worker signal");
   expect(node.textContent).not.toContain("Cannot start");
+});
+it("leaves Working when live updates stay disconnected", async () => {
+  mount({ ...run, startedAt: new Date(now - 6000).toISOString() });
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  act(() => setLiveThreadConnection("reconnecting"));
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(node.querySelector("[role=alert]")?.textContent).toBe("Live updates stopped. The task was not cancelled.");
+  expect(node.textContent).not.toContain("Working");
+  act(() => setLiveThreadConnection("live"));
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
 });
 it("does not offer an empty disclosure before the first recorded step", () => {
   mount({ ...run, startedAt: new Date(now - 6000).toISOString(), modelId: "known-model" });

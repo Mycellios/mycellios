@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  desktopDragClass,
   desktopOAuthCode,
   oauthStateOf,
   onDesktopOAuthCallback,
@@ -53,6 +54,13 @@ describe("window chrome", () => {
     for (const platform of ["win32", "linux"]) {
       expect(windowChromeKind({ ...desktop(platform), nativeWindowFrame: true })).toBe("native");
     }
+  });
+
+  it("drags from the page only where macOS hides the title bar", () => {
+    expect(desktopDragClass()).toBe("");
+    expect(desktopDragClass(desktop("win32"))).toBe("");
+    expect(desktopDragClass(desktop("linux"))).toBe("");
+    expect(desktopDragClass(desktop("darwin"))).toBe("app-drag");
   });
 });
 

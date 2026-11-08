@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
-import { desktopBridge } from "../../lib/desktop";
+import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
 import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
 import { localTimezone } from "../../lib/local-timezone";
 import type { RpcClient } from "../../lib/rpc";
@@ -216,13 +216,9 @@ export function UsageWorkspace({
   return (
     <section className="rk-usage-workspace" data-testid="usage-workspace" aria-label={t`Usage`}>
       <header
-        className={`rk-usage-header ${desktopBridge() ? "app-drag" : ""}`}
+        className={`rk-usage-header ${desktopDragClass()}`}
         data-testid="conversation-header"
-        style={
-          desktopBridge() && desktopBridge()?.platform !== "win32"
-            ? { paddingInlineStart: 48 }
-            : undefined
-        }
+        style={desktopHidesTitleBar() ? { paddingInlineStart: 48 } : undefined}
       >
         <DropdownMenu>
           <DropdownMenuTrigger

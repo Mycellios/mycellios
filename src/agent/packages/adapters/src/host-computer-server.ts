@@ -75,10 +75,6 @@ export async function startHostComputerServer(options: {
       response.writeHead(503, { "x-mycellios-desktop-error": "desktop_updating" }).end();
       return;
     }
-    if (!enabled) {
-      response.writeHead(403).end();
-      return;
-    }
     if (request.method !== "POST" || request.url !== "/computer") {
       response.writeHead(404).end();
       return;
@@ -127,7 +123,8 @@ export async function startHostComputerServer(options: {
         response.writeHead(400).end();
         return;
       }
-      if (!enabled || controller.signal.aborted) {
+      const liveResult = parsed.data.method === "agentMessage" && agentHost?.hasSession(parsed.data.sessionId, parsed.data.botId, parsed.data.runId, parsed.data.projectSessionId);
+      if ((!enabled && !liveResult) || controller.signal.aborted) {
         response.writeHead(403).end();
         return;
       }
@@ -228,9 +225,10 @@ export async function startHostComputerServer(options: {
     context: AdapterContext,
   ): AsyncIterable<unknown> {
     if (input.method === "agentRun" || input.method === "agentMessage") {
-      if (!agentHost || !enabled || context.signal.aborted) throw Error("Desktop agent executor unavailable");
+      const liveResult = input.method === "agentMessage" && agentHost?.hasSession(input.sessionId, input.botId, input.runId, input.projectSessionId);
+      if (!agentHost || context.signal.aborted || (!enabled && !liveResult)) throw Error("Desktop agent executor unavailable");
       if (input.method === "agentMessage") {
-        agentHost.message(input.sessionId, input.message, input.botId, input.runId, input.projectSessionId);
+        await agentHost.message(input.sessionId, input.message, input.botId, input.runId, input.projectSessionId);
         yield { accepted: true }; return;
       }
       yield* agentHost.run(input.sessionId, input.request, input.botId, input.runId, { ...context, projectSessionId: input.projectSessionId });
@@ -573,11 +571,11 @@ export async function startHostComputerServer(options: {
     hasActiveWork: () =>
       [...providers.values()].some(provider => provider.hasActiveCommands()) ||
       [...active.values()].some(
-        (work) => work?.method === "execute" || work?.method === "writeFile" || work?.method === "agentRun",
+        (work) => work?.method === "execute" || work?.method === "writeFile" || work?.method === "agentRun" || work?.method === "agentMessage",
       ),
-    setEnabled(value: boolean) {
+    setEnabled(value: boolean, interrupt = true) {
       enabled = value;
-      if (!value) {
+      if (!value && interrupt) {
         for (const controller of active.keys()) controller.abort();
         for (const provider of providers.values()) provider.cancelAllCommands();
       }
