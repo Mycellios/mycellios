@@ -211,6 +211,7 @@
   Off-thread activity checks are scoped to the current Space and run only while away.
   Closed or suspended clients enroll in Web Push with existing OS permission and
   the device's reply-notification setting. Never prompt outside the user's gesture.
+  Installed mobile web apps offer the OS permission from a dismissible chat prompt.
   Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.

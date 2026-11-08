@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { notificationPreferences, subscribeNotifications } from "./notification-preferences";
 import { rpc } from "./rpc";
 
@@ -20,6 +20,10 @@ export function pushSupported() {
     window.isSecureContext
   );
 }
+export function isInstalledWebApp() {
+  return window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
 export function vapidBytes(value: string): Uint8Array<ArrayBuffer> {
   const text = atob(
     value
@@ -31,11 +35,18 @@ export function vapidBytes(value: string): Uint8Array<ArrayBuffer> {
 }
 async function registration() {
   // No permission prompt, and no endless wait when a build has no active worker.
-  const found = await navigator.serviceWorker.getRegistration(
-    new URL(import.meta.env.BASE_URL, location.href),
-  );
-  if (!found?.active) throw new Error("Reload Mycellios to finish preparing notifications.");
-  return found;
+  const scope = new URL(import.meta.env.BASE_URL, location.href);
+  const found = await navigator.serviceWorker.getRegistration(scope);
+  if (found?.active) return found;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const ready = await Promise.race([navigator.serviceWorker.ready,
+      new Promise<null>((resolve) => { timeout = setTimeout(() => resolve(null), 6_000); })]);
+    if (ready?.active && ready.scope === scope.href) return ready;
+    throw new Error("Reload Mycellios to finish preparing notifications.");
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function bindAccount(worker: ServiceWorker, accountId: string) {
@@ -147,7 +158,9 @@ export function pushEnrollmentAction(input: {
 }
 
 export function useWebPushPresence(userId?: string) {
+  const [publicKey, setPublicKey] = useState<string | null>(null);
   useEffect(() => {
+    setPublicKey(null);
     if (!userId) return;
     const owner = localStorage.getItem(OWNER_KEY);
     const clearPreviousOwner = owner && owner !== userId ? clearWebPushBinding().catch(() => undefined) : undefined;
@@ -166,6 +179,7 @@ export function useWebPushPresence(userId?: string) {
         const state = await rpc.notifications.webStatus({ clientId });
         if (disposed) return;
         configured = state.configured;
+        setPublicKey(state.publicKey);
         const supported = pushSupported();
         const bound = localStorage.getItem(OWNER_KEY) === userId;
         const enabled = notificationPreferences(userId).enabled;
@@ -182,7 +196,8 @@ export function useWebPushPresence(userId?: string) {
     const timer = window.setInterval(heartbeat, 20_000);
     window.addEventListener("focus", refresh);
     window.addEventListener("blur", heartbeat);
-    document.addEventListener("visibilitychange", heartbeat);
+    const onVisibility = () => document.visibilityState === "visible" ? void refresh() : heartbeat();
+    document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("mycellios:notifications-changed", refresh);
     navigator.serviceWorker?.addEventListener("controllerchange", refresh);
     const unsubscribe = subscribeNotifications(userId, refresh);
@@ -192,7 +207,7 @@ export function useWebPushPresence(userId?: string) {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("blur", heartbeat);
-      document.removeEventListener("visibilitychange", heartbeat);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("mycellios:notifications-changed", refresh);
       navigator.serviceWorker?.removeEventListener("controllerchange", refresh);
       unsubscribe();
@@ -200,4 +215,5 @@ export function useWebPushPresence(userId?: string) {
         void rpc.notifications.webPresence({ clientId, focused: false }).catch(() => undefined);
     };
   }, [userId]);
+  return publicKey;
 }

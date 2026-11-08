@@ -7746,6 +7746,18 @@ msgstr "Avisos con la app cerrada solo cuando me necesiten"
 msgid "Applies to all devices where you enabled closed-app notifications."
 msgstr "Se aplica a todos los dispositivos donde hayas activado estos avisos."
 
+msgid "Get notified when your Mico replies"
+msgstr "Recibe un aviso cuando responda tu Mico"
+
+msgid "You’ll get an alert even when Mycellios is closed."
+msgstr "Te avisaremos aunque Mycellios esté cerrado."
+
+msgid "Allow notifications"
+msgstr "Permitir notificaciones"
+
+msgid "Enabling…"
+msgstr "Activando…"
+
 #: src/pages/settings/SettingsOverlay.tsx
 msgid "Could not show the test notification."
 msgstr "No se ha podido mostrar la notificación de prueba."
