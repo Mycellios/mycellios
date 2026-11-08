@@ -62,8 +62,7 @@ export class DesktopRelayBroker {
     // the account lease must not lapse out from under a run whose command just finished.
     for (const account of this.accounts.values()) {
       const heartbeat = [...this.bindings.values()].some((binding) =>
-        binding.userId === account.userId && binding.spaceId === account.spaceId &&
-        binding.deviceId === account.deviceId && now - binding.seen <= LEASE_MS);
+        sameOwner(binding, account) && binding.deviceId === account.deviceId && now - binding.seen <= LEASE_MS);
       if (heartbeat) account.seen = now;
     }
     for (const [id, account] of this.accounts) if (now - account.seen > LEASE_MS) this.accounts.delete(id);
@@ -73,35 +72,55 @@ export class DesktopRelayBroker {
       for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Desktop disconnected. Check results before retrying.");
     }
   }
+  private accountKey(scope: {userId:string;spaceId:string;sessionId:string}, deviceId: string) {
+    return JSON.stringify([scope.userId, scope.spaceId, deviceId, scope.sessionId]);
+  }
   register(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string;agentExecution?:1}) {
     this.expire();
-    const id = JSON.stringify([owner.userId,owner.spaceId]);
-    const prior = this.accounts.get(id);
-    if (prior && prior.deviceId !== input.deviceId)
-      throw new Error("Another computer is already connected to this account");
-    if(prior&&(!sameOwner(owner,prior)||prior.generation!==input.generation))this.revoke(prior,prior.deviceId);
-    if (!prior && this.accounts.size >= 128) throw new Error("Desktop relay is busy");
-    const samePc = prior && sameOwner(owner, prior) && prior.deviceId === input.deviceId && prior.generation === input.generation;
-    const agentExecution = input.agentExecution ?? (samePc ? prior?.agentExecution : undefined);
+    for (const prior of [...this.accounts.values()]) {
+      if (prior.userId !== owner.userId || prior.spaceId !== owner.spaceId || prior.deviceId !== input.deviceId) continue;
+      if (sameOwner(prior, owner) && prior.generation === input.generation) continue;
+      if (this.polling.has(this.pollKey(prior, input.deviceId))) continue;
+      this.revoke(prior, input.deviceId);
+    }
+    const id = this.accountKey(owner, input.deviceId);
+    const current = this.accounts.get(id);
+    if (current && current.generation !== input.generation && this.polling.has(this.pollKey(owner, input.deviceId))) {
+      current.seen = this.now();
+      if (input.agentExecution === 1) current.agentExecution = 1;
+      return;
+    }
+    if (!current && this.accounts.size >= 128) throw new Error("Desktop relay is busy");
+    const devices = new Set([...this.accounts.values()].filter(account => account.userId === owner.userId && account.spaceId === owner.spaceId).map(account => account.deviceId));
+    if (!devices.has(input.deviceId) && devices.size >= 8) throw new Error("Desktop relay is busy");
+    const samePc = !!current && current.generation === input.generation;
+    const agentExecution = input.agentExecution ?? (samePc ? current.agentExecution : undefined);
     this.accounts.set(id,{...owner,deviceId:input.deviceId,generation:input.generation,...(agentExecution ? {agentExecution} : {}),seen:this.now()});
   }
   needsExecutionPreference(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string}) {
-    const account = this.accounts.get(JSON.stringify([owner.userId, owner.spaceId]));
-    return !account || !sameOwner(owner, account) || account.deviceId !== input.deviceId || account.generation !== input.generation || account.agentExecution !== 1;
+    const account = this.accounts.get(this.accountKey(owner, input.deviceId));
+    return !account || !sameOwner(owner, account) || account.generation !== input.generation || account.agentExecution !== 1;
   }
   /** Called only after the API rechecks ownership of this particular bot. */
   connectAccountBot(scope: {userId:string;spaceId:string}, botId: string) {
     this.expire();
     if (this.bindings.has(key(scope,botId))) return;
-    const account = this.accounts.get(JSON.stringify([scope.userId,scope.spaceId]));
+    const live = [...this.accounts.values()].filter(account => account.userId === scope.userId && account.spaceId === scope.spaceId);
+    const account = live.length === 1 ? live[0] : undefined;
     if (account) this.bind(account,{deviceId:account.deviceId,generation:account.generation,botId});
   }
   bind(owner: DesktopExecutorOwner, input: DesktopExecutorBinding) {
     this.expire();
     const id = key(owner, input.botId);
     const existing = this.bindings.get(id);
-    if (existing && (!sameOwner(owner, existing) || existing.deviceId !== input.deviceId || existing.generation !== input.generation))
-      throw new Error("This agent is already connected to a computer. Disconnect it first.");
+    const sameAccount = !!existing && existing.userId === owner.userId && existing.spaceId === owner.spaceId;
+    if (existing && !sameAccount) throw new Error("This agent is already connected to a computer. Disconnect it first.");
+    if (existing && (!sameOwner(owner, existing) || existing.deviceId !== input.deviceId || existing.generation !== input.generation)) {
+      const busy = [...this.operations.values()].some(op => op.binding === existing && !op.closed);
+      if (busy) throw new Error("This agent is already connected to a computer. Disconnect it first.");
+      this.bindings.set(id, { ...owner, ...input, seen: this.now() });
+      return;
+    }
     if (this.bindings.size >= 128 && !existing) throw new Error("Desktop relay is busy");
     this.bindings.set(id, existing ?? { ...owner, ...input, seen: this.now() });
   }
@@ -112,14 +131,18 @@ export class DesktopRelayBroker {
   }
   agentAvailable(scope: { userId: string; spaceId: string }, botId: string) {
     if (!this.available(scope, botId)) return false;
-    const account = this.accounts.get(JSON.stringify([scope.userId, scope.spaceId]));
     const binding = this.bindings.get(key(scope, botId));
-    return account?.agentExecution === 1 && binding?.deviceId === account.deviceId && binding.generation === account.generation;
+    if (!binding) return false;
+    const account = this.accounts.get(this.accountKey(binding, binding.deviceId));
+    return !!account && account.agentExecution === 1 && account.deviceId === binding.deviceId && account.generation === binding.generation && sameOwner(account, binding);
+  }
+  hasAgentDevice(scope: { userId: string; spaceId: string }) {
+    return [...this.accounts.values()].some(account => account.userId === scope.userId && account.spaceId === scope.spaceId && account.agentExecution === 1);
   }
   revoke(owner: DesktopExecutorOwner, deviceId: string) {
-    const accountKey=JSON.stringify([owner.userId,owner.spaceId]);
+    const accountKey=this.accountKey(owner, deviceId);
     const account=this.accounts.get(accountKey);
-    if(account && sameOwner(account,owner) && account.deviceId===deviceId)this.accounts.delete(accountKey);
+    if(account && sameOwner(account,owner))this.accounts.delete(accountKey);
     for (const [id, binding] of this.bindings) if (sameOwner(owner, binding) && binding.deviceId === deviceId) {
       this.bindings.delete(id);
       for (const op of this.operations.values()) if (op.binding === binding) this.fail(op, "Local computer access was revoked.");
@@ -176,8 +199,8 @@ export class DesktopRelayBroker {
       signal.throwIfAborted();
       const state = this.pollState(owner, deviceId, false);
       if (wait && !state.operations.length && active.every(id => state.active.includes(id))) {
-        const account = this.accounts.get(JSON.stringify([owner.userId,owner.spaceId]));
-        if (!(account && sameOwner(owner,account) && account.deviceId === deviceId) && !this.ownedBindings(owner,deviceId).length) throw Error("Desktop device is not connected");
+        const account = this.accounts.get(this.accountKey(owner, deviceId));
+        if (!(account && sameOwner(owner,account)) && !this.ownedBindings(owner,deviceId).length) throw Error("Desktop device is not connected");
         await new Promise<void>(resolve => {
           const finish = () => { clearTimeout(timer); signal.removeEventListener("abort", finish); this.waiting.delete(id); resolve(); };
           const timer = setTimeout(finish, 15_000); timer.unref();

@@ -299,6 +299,51 @@ it("keeps a connected PC available while parallel calls wait, and reports queue 
  const missing=await dispatch({method:"environment",botId:"unowned"});expect(missing.status).toBe(404);
 });
 
+it("keeps the other signed-in desktop online when one instance disconnects", async () => {
+  const app = new Hono();
+  let preferred = false;
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    desktopExecution: async (_actor, enabled) => {
+      if (enabled !== undefined) preferred = enabled;
+      return preferred;
+    },
+    authenticate: async (request) => request.headers.get("x-test-auth") === "yes"
+      ? { actor: owner, sessionId: request.headers.get("x-test-session") ?? "session-a" }
+      : null,
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const call = (session: string, action: string, body: unknown) => app.request(`/api/desktop-relay/${action}`, {
+    method: "POST",
+    headers: { "x-mycellios-desktop": "1", "x-test-auth": "yes", "x-test-session": session, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const prodIdentity = await (await call("session-a", "identity", {})).json();
+  const devIdentity = await (await call("session-b", "identity", {})).json();
+  const prodDevice = randomUUID();
+  const devDevice = randomUUID();
+  const prodGeneration = randomUUID();
+  const devGeneration = randomUUID();
+  const prod = { deviceId: prodDevice, generation: prodGeneration, identity: prodIdentity, agentExecution: 1 };
+  const dev = { deviceId: devDevice, generation: devGeneration, identity: devIdentity, agentExecution: 1 };
+  expect((await call("session-a", "account", prod)).status).toBe(200);
+  expect((await call("session-a", "bind", { deviceId: prodDevice, generation: prodGeneration, botId: "test-bot" })).status).toBe(200);
+  expect((await call("session-b", "account", dev)).status).toBe(200);
+  expect((await call("session-a", "account", prod)).status).toBe(200);
+  const probe = () => {
+    const body = JSON.stringify({ probe: "test-bot", agentExecution: 1, scope: { userId: owner.userId, spaceId: owner.spaceId }, nonce: randomUUID() });
+    const time = String(Date.now());
+    return app.request("/api/desktop-relay/internal", { method: "POST", headers: { "x-desktop-time": time, "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body) }, body });
+  };
+  expect(await (await probe()).json()).toEqual({ agentExecution: 1, available: true, preferred: true });
+  expect((await call("session-b", "revoke", { deviceId: devDevice })).status).toBe(200);
+  expect(preferred).toBe(true);
+  expect(await (await probe()).json()).toMatchObject({ available: true, preferred: true });
+  expect((await call("session-a", "revoke", { deviceId: prodDevice })).status).toBe(200);
+  expect(preferred).toBe(false);
+});
+
 it("reports actual disconnection distinctly from queue pressure without accepting work",async()=>{
  const app=fixture();const body=JSON.stringify({scope:{userId:owner.userId,spaceId:owner.spaceId},request:{method:"environment",botId:"test-bot"},nonce:randomUUID()}),time=String(Date.now());
  const r=await app.request("/api/desktop-relay/internal",{method:"POST",headers:{"x-desktop-time":time,"x-desktop-signature":signDesktopRelay(desktopRelayKey("test-purpose-secret"),time,body)},body});

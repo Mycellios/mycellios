@@ -157,7 +157,7 @@ export function mountDesktopRelay(
         }
         case "revoke":
           broker.revoke(owner, parseDesktopPoll(input).deviceId);
-          await deps.desktopExecution?.(session.actor, false);
+          if (!broker.hasAgentDevice(owner)) await deps.desktopExecution?.(session.actor, false);
           return c.json({ ok: true });
         default:
           return c.json({ error: "Unavailable" }, 404);
