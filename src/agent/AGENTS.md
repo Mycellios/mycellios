@@ -542,11 +542,13 @@
 - A running computer does not prove its screen is connected. Offer screen retry and
   confirmed recovery separately, preserving the recovery dialog during background refreshes.
 
-- Keep transcript progress compact: status and elapsed time first, tool activity
-  and execution diagnostics folded by default. Unknown worker health stays visibly
-  unconfirmed; folding details must never cancel, retry or restart a task.
-  Keep the latest projected action visible outside disclosures, scoped to the
-  active run and labelled as recorded activity rather than worker liveness.
+- Keep transcript progress live: stream the reply as it arrives unless the user
+  saved streaming off, and show the current step with its specific command, path
+  or query plus live output in an open timeline. Unknown worker health stays
+  visibly unconfirmed; folding details must never cancel, retry or restart a task.
+  Keep the latest projected action visible, scoped to the active run and labelled
+  as recorded activity rather than worker liveness. Finished tool cards stay behind
+  the tool-activity preference.
 - Protect multiline secret fragments during streaming as well as whole-output redaction;
   monitoring must scrub Windows profile paths with either slash direction and spaces.
 
@@ -855,15 +857,14 @@
   or SSH/live destinations and runbooks, never credentials. Projects are optional.
   Verify native-computer-execution.test.ts and native-computer-workspace.test.ts.
 
-- Running-chat status shows a brief health label and elapsed time. Group
-  consecutive actions in a short, plain-language timeline and mark errors or
-  waits there. Keep raw commands, paths and
-  reported execution metadata folded separately, and leave worker timestamps
-  and empty metadata out of the chat. On narrow screens, keep a single activity
-  row and open the timeline in a sheet on demand, even when auto-expand is enabled.
-  Preserve actionable blocked/waiting states and keep observation independent
-  from cancellation/retry. Verify RunActivityStatus.test.tsx and the mobile
-  activity sheet case in tool-activity.spec.ts.
+- Running-chat status shows the current step and elapsed time. The timeline stays
+  open on desktop and lists the specific command, path or query, with live output
+  on that step. Mark errors or waits there. Leave worker timestamps and empty
+  metadata out of the chat. On narrow screens, keep a single activity row and open
+  the timeline in a sheet on demand. Preserve actionable blocked/waiting states
+  and keep observation independent from cancellation/retry. Verify
+  RunActivityStatus.test.tsx and the mobile activity sheet case in
+  tool-activity.spec.ts.
 
 - Narrow chat transcripts keep message actions in a sheet opened by holding a
   message, with a focusable trigger for assistive input. Keep scroll, links and

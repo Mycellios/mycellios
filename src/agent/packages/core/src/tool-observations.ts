@@ -36,17 +36,17 @@ export function observeToolEvent(
     tools = observedTools(blocks);
   if (event.type === "computer.command") {
     const parsed = ComputerCommandSchema.safeParse(payload);
-    if (!parsed.success) return [...blocks];
+    if (!parsed.success) return blocks as MessageBlock[];
     const command = parsed.data,
       id = command.executionId.slice(0, 256);
     const index = tools.findIndex((tool) => tool.id === id),
       previous = tools[index];
-    if (previous?.commandStatus === "done" && command.status === "running") return [...blocks];
+    if (previous?.commandStatus === "done" && command.status === "running") return blocks as MessageBlock[];
     if (
       previous?.commandStatus === command.status &&
       Date.parse(previous.updatedAt ?? "") > Date.parse(event.createdAt)
     )
-      return [...blocks];
+      return blocks as MessageBlock[];
     const item: ToolObservation = {
       ...previous,
       id,
@@ -78,9 +78,9 @@ export function observeToolEvent(
   } else if (event.type === "thread.progress") {
     const index = tools.findLastIndex((tool) => tool.outcome === "running");
     if (payload.activity !== true || typeof payload.text !== "string" || index < 0)
-      return [...blocks];
+      return blocks as MessageBlock[];
     const running = tools[index];
-    if (!running) return [...blocks];
+    if (!running) return blocks as MessageBlock[];
     tools[index] = { ...running, detail: payload.text.slice(0, 2000), updatedAt: event.createdAt };
   } else {
     if (
@@ -88,7 +88,7 @@ export function observeToolEvent(
       !payload.executionId ||
       typeof payload.name !== "string"
     )
-      return [...blocks];
+      return blocks as MessageBlock[];
     const id = payload.executionId.slice(0, 256),
       index = tools.findIndex((tool) => tool.id === id);
     const previous = index < 0 ? undefined : tools[index];
@@ -98,15 +98,17 @@ export function observeToolEvent(
       : event.type === "agent.tool.called"
         ? "running"
         : payload.outcome;
-    if (!["running", "succeeded", "error", "paused"].includes(String(outcome))) return [...blocks];
+    if (!["running", "succeeded", "error", "paused"].includes(String(outcome))) return blocks as MessageBlock[];
     // A repeated call notification must not turn an already finished tool back into running.
-    if (outcome === "running" && previous && previous.outcome !== "running") return [...blocks];
+    if (outcome === "running" && previous && previous.outcome !== "running") return blocks as MessageBlock[];
+    const label = typeof payload.label === "string" ? payload.label.trim().slice(0, 2000) : "";
     const item: ToolObservation = {
       ...previous,
       id,
       name: payload.name.slice(0, 200),
       outcome: outcome as ToolObservation["outcome"],
       updatedAt: event.createdAt,
+      ...(previous?.detail || !label ? {} : { detail: label }),
     };
     if (
       typeof payload.durationMs === "number" &&

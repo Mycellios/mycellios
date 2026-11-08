@@ -6,11 +6,12 @@ import {
 } from "./response-streaming";
 
 describe("response streaming preference", () => {
-  it("leaves streaming off unless a saved choice turns it on", () => {
+  it("streams unless a saved choice turns it off", () => {
     expect(resolveResponseStreamingPreference({ stored: "on" })).toBe("on");
     expect(resolveResponseStreamingPreference({ stored: "off" })).toBe("off");
-    expect(resolveResponseStreamingPreference({ stored: null })).toBe("off");
-    expect(resolveResponseStreamingPreference({ stored: "" })).toBe("off");
+    expect(resolveResponseStreamingPreference({ stored: null })).toBe("on");
+    expect(resolveResponseStreamingPreference({ stored: "" })).toBe("on");
+    expect(resolveResponseStreamingPreference({ stored: "maybe" })).toBe("off");
   });
 
   it("persists through storage helpers", () => {

@@ -1579,6 +1579,7 @@ export function applyMobileThreadEvent(
       blocks: reduceLiveMessageBlocks((previous?.blocks ?? []) as MessageBlock[], {
         type: "tool",
         name: String(event.payload?.name ?? ""),
+        label: typeof event.payload?.label === "string" ? event.payload.label : undefined,
       }),
       ...(event.botId ? { botId: event.botId } : {}),
       ...(event.runId ? { runId: event.runId } : {}),

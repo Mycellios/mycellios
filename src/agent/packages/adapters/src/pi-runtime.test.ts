@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeToolActivity } from "./pi-runtime.js";
+import { describeToolActivity, thinkingActivityLine } from "./pi-runtime.js";
 
 describe("describeToolActivity", () => {
   it("summarizes builtin tools with their most informative argument", () => {
@@ -81,5 +81,18 @@ describe("describeToolActivity", () => {
 
   it("falls back to the tool name", () => {
     expect(describeToolActivity("destination_write", undefined)).toBe("Using destination_write");
+  });
+});
+
+describe("thinkingActivityLine", () => {
+  it("keeps a short reasoning tail out of the answer", () => {
+    expect(thinkingActivityLine("  check the lockfile\nthen the tests  ")).toBe(
+      "Thinking: check the lockfile then the tests",
+    );
+    const long = "x".repeat(400);
+    const line = thinkingActivityLine(long);
+    expect(line.startsWith("Thinking: …")).toBe(true);
+    expect(line.length).toBe("Thinking: …".length + 160);
+    expect(thinkingActivityLine("   ")).toBe("");
   });
 });

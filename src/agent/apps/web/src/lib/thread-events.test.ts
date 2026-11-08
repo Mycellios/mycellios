@@ -1142,6 +1142,81 @@ describe("thread event reduction", () => {
     expect(next?.messages).toEqual(initial.messages);
   });
 
+  it("keeps the tool label and streams command output onto the live message", () => {
+    const initial = snapshot([]);
+    const called = reduceThreadSnapshot(
+      initial,
+      event({
+        type: "agent.tool.called",
+        seq: 4,
+        runId: "run-1",
+        payload: {
+          name: "shell",
+          executionId: "exec-1",
+          label: "Running: git status --short",
+        },
+      }),
+    );
+    expect(called?.messages[0]?.blocks).toEqual([
+      {
+        kind: "steps",
+        steps: [{ label: "Running: git status --short", count: 1 }],
+        tools: [
+          expect.objectContaining({
+            id: "exec-1",
+            name: "shell",
+            outcome: "running",
+            detail: "Running: git status --short",
+          }),
+        ],
+      },
+    ]);
+
+    const output = reduceThreadSnapshot(
+      called,
+      event({
+        type: "computer.command",
+        seq: 5,
+        runId: "run-1",
+        payload: {
+          executionId: "exec-1",
+          kind: "shell",
+          command: "git status --short",
+          cwd: "/work",
+          status: "running",
+          exitCode: null,
+          output: " M README.md",
+        },
+      }),
+    );
+    expect(output?.messages).toHaveLength(1);
+    expect(output?.messages[0]?.blocks[0]).toMatchObject({
+      kind: "steps",
+      tools: [expect.objectContaining({ output: " M README.md", command: "git status --short" })],
+    });
+
+    const finished = reduceThreadSnapshot(output, event({ type: "run.completed", seq: 6, runId: "run-1" }));
+    const late = reduceThreadSnapshot(
+      finished,
+      event({
+        type: "computer.command",
+        seq: 7,
+        runId: "run-1",
+        payload: {
+          executionId: "exec-1",
+          kind: "shell",
+          command: "git status --short",
+          cwd: "/work",
+          status: "done",
+          exitCode: 0,
+          output: "done",
+        },
+      }),
+    );
+    expect(late?.messages.some((message) => message.id.startsWith("progress:"))).toBe(false);
+    expect(late?.cursor).toBe(7);
+  });
+
   it("holds a tool call that lands mid-sentence until the sentence completes", () => {
     const initial = snapshot([]);
 

@@ -4,6 +4,9 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Run } from "@rakazo/contracts";
 vi.mock("@rakazo/ui-web/hooks/use-mobile", () => ({ useIsMobile: () => false }));
+vi.mock("../lib/space-rpc", () => ({
+  useSpaceRpc: () => ({ computer: { commands: async () => [] } }),
+}));
 vi.mock("@lingui/react/macro", () => ({
   useLingui: () => ({ t: (s: TemplateStringsArray, ...values: unknown[]) => s.reduce((text, part, index) => text + part + (values[index] ?? ""), ""), i18n: { locale: "en" } }),
 }));
@@ -164,9 +167,9 @@ it("shows real tool activity without claiming the worker is connected or opening
     role: "bot", createdAt: at(-1), blocks: [{ kind: "steps", steps: [{ label: "List files", count: 1 }] }],
   } as import("@rakazo/contracts").ThreadMessage;
   mount({ ...run, leaseExpiresAt: undefined, observedAt: undefined }, false, [message]);
-  expect(node.querySelector('ol[aria-label="Task activity"]')?.textContent).toContain("Reviewing files…");
+  expect(node.querySelector('ol[aria-label="Task activity"]')?.textContent).toContain("List files");
   expect(node.querySelector("[role=status]")?.textContent).toBe("Status not confirmed");
-  expect(node.querySelector("details")?.open).toBe(false);
+  expect(node.querySelector("details")?.open).toBe(true);
   expect(node.querySelector("details")?.contains(node.querySelector('ol[aria-label="Task activity"]'))).toBe(true);
   expect(node.textContent).not.toContain("Technical details");
 });
@@ -184,13 +187,12 @@ it("keeps commands and paths inside details and preserves the disclosure choice 
   const render = () => root!.render(<RunActivityStatus run={run} messages={[]} bots={[]} activity={activity} onRefresh={async () => undefined} />);
   act(render);
   const details = node.querySelector("details")!;
-  expect(details.open).toBe(false);
-  expect(details.textContent).not.toContain(activity);
+  expect(details.open).toBe(true);
+  expect(details.textContent).toContain(activity);
   const summary = details.querySelector("summary");
   expect(summary?.textContent).toContain("Waiting for an activity update");
   expect(summary?.textContent).not.toContain("ssh");
   expect(summary?.textContent).not.toContain("/srv/");
-  details.open = true;
   const technical = details.querySelector("details")!;
   act(() => {
     technical.open = true;
@@ -199,6 +201,71 @@ it("keeps commands and paths inside details and preserves the disclosure choice 
   expect(technical.querySelector('[data-testid="latest-run-activity"]')?.textContent).toBe(activity);
   act(render);
   expect(node.querySelector("details")!.open).toBe(true);
+});
+it("shows the command, its output and elapsed time while the run is active", () => {
+  const message = {
+    id: "progress:run",
+    runId: "run",
+    threadId: "thread",
+    seq: 2,
+    role: "bot",
+    createdAt: at(0),
+    blocks: [
+      { kind: "text", text: "I'll check the working tree." },
+      {
+        kind: "steps",
+        steps: [
+          { label: "Reading a.ts", count: 1 },
+          { label: "Reading b.ts", count: 1 },
+        ],
+        tools: [
+          {
+            id: "exec-1",
+            name: "read_file",
+            outcome: "running",
+            updatedAt: at(0),
+            command: "git status --short",
+            detail: "Running: git status --short",
+            output: " M README.md",
+            commandStartedAt: new Date(now - 3000).toISOString(),
+          },
+        ],
+      },
+    ],
+  } as import("@rakazo/contracts").ThreadMessage;
+  mount({ ...run, startedAt: new Date(now - 8000).toISOString() }, false, [message]);
+  const status = node.querySelector("[role=status]")?.textContent ?? "";
+  const timeline = node.querySelector('ol[aria-label="Task activity"]')?.textContent ?? "";
+  expect(status).toContain("git status --short");
+  expect(status).not.toContain("Running a command");
+  expect(timeline).toContain("git status --short");
+  expect(timeline).toContain("M README.md");
+  expect(timeline).not.toContain("×2");
+  expect(node.querySelector("pre")?.textContent).toContain("M README.md");
+  expect(node.querySelector("details")?.open).toBe(true);
+});
+it("keeps different file steps separate", () => {
+  const message = {
+    id: "progress:run",
+    runId: "run",
+    threadId: "thread",
+    seq: 2,
+    role: "bot",
+    createdAt: at(0),
+    blocks: [{
+      kind: "steps",
+      steps: [
+        { label: "Reading src/a.ts", count: 1 },
+        { label: "Reading src/b.ts", count: 1 },
+      ],
+    }],
+  } as import("@rakazo/contracts").ThreadMessage;
+  mount({ ...run, startedAt: new Date(now - 8000).toISOString() }, false, [message]);
+  const timeline = node.querySelector('ol[aria-label="Task activity"]')?.textContent ?? "";
+  expect(timeline).toContain("Reading src/a.ts");
+  expect(timeline).toContain("Reading src/b.ts");
+  expect(timeline).not.toContain("×");
+  expect(node.querySelector("[role=status]")?.textContent).toContain("Reading src/b.ts");
 });
 it("shows seconds instead of zero minutes and omits the initial timer noise", () => {
   mount({...run, startedAt: new Date(now - 1000).toISOString()});

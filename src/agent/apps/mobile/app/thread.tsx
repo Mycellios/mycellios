@@ -653,7 +653,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   const streamResponses = useSyncExternalStore(
     subscribeResponseStreaming,
     getCachedResponseStreamingEnabled,
-    () => false,
+    () => true,
   );
   const streamResponsesRef = useRef(streamResponses);
   streamResponsesRef.current = streamResponses;

@@ -5,7 +5,8 @@ tools the bot called during the run.
 
 ## Behavior
 
-- Off by default, so chats stay clean. **Settings → General → Advanced → Show tool activity** turns it on. Nothing stored counts as off; only a saved "on" shows the cards.
+- Off by default, so finished chats stay clean. **Settings → General → Advanced → Show tool activity** turns the finished cards on. Nothing stored counts as off; only a saved "on" shows those cards.
+- The live run timeline is separate. It opens while work is happening and shows the specific step and command output as they arrive. Streaming replies are on unless the user saved them off.
 - The choice is stored in the browser's local storage (`rakazo.showToolActivity`), so it
   applies to that browser or desktop install only. It is not saved to the account and does
   not sync between devices.
