@@ -1,8 +1,18 @@
+import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { DesktopRelayClient } from "./desktop-relay.js";
-import { restoreUpdateBinding } from "./update-resume.js";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
+import { restoreUpdateBinding } from "./update-resume.js";
+
+export function desktopInstanceId(profileId: string, installation: string): string {
+  const hex = createHash("sha256")
+    .update("mycellios-desktop-instance-v1\0")
+    .update(profileId)
+    .update("\0")
+    .update(installation)
+    .digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
 
 type Host = {
   hasRememberedAccess(scope: string): boolean;
@@ -119,12 +129,16 @@ export class AccountComputerConnection {
       if (!this.deviceId) {
         const file = path.join(this.options.profile, "desktop-device-id");
         const stored = await readPrivateFile(file, 128);
-        this.deviceId =
+        const profileId =
           stored &&
           /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(stored)
             ? stored
             : randomUUID();
-        if (stored !== this.deviceId) await writePrivateFile(file, this.deviceId);
+        if (stored !== profileId) await writePrivateFile(file, profileId);
+        this.deviceId = desktopInstanceId(
+          profileId,
+          `${process.execPath}\0${path.resolve(this.options.profile)}`,
+        );
       }
       const transport = (spaceId?: string) => async (url: string, init?: RequestInit) => {
         const headers = new Headers(init?.headers);
