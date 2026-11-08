@@ -77,6 +77,7 @@ export function installPushWorker(scope: ServiceWorkerGlobalScope) {
         } else {
           await cache.delete(bindingUrl);
         }
+        event.ports[0]?.postMessage("bound");
         if (previous !== data.accountId)
           for (const notice of await scope.registration.getNotifications()) notice.close();
         if (typeof data.botId === "string" && ID.test(data.botId)) {

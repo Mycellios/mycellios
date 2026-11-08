@@ -36,6 +36,27 @@ async function registration() {
   if (!found?.active) throw new Error("Reload Mycellios to finish preparing notifications.");
   return found;
 }
+
+function bindAccount(worker: ServiceWorker, accountId: string) {
+  return new Promise<void>((resolve, reject) => {
+    const channel = new MessageChannel();
+    const complete = (error?: Error) => {
+      window.clearTimeout(timer);
+      channel.port1.close();
+      if (error) reject(error);
+      else resolve();
+    };
+    const timer = window.setTimeout(() => complete(new Error("Reload Mycellios to finish preparing notifications.")), 3000);
+    channel.port1.onmessage = (event) => {
+      if (event.data === "bound") complete();
+    };
+    try {
+      worker.postMessage({ type: "mycellios:push-binding", accountId }, [channel.port2]);
+    } catch (error) {
+      complete(error instanceof Error ? error : new Error("Could not bind notifications."));
+    }
+  });
+}
 export async function enableWebPush(publicKey: string, accountId: string) {
   if (!pushSupported())
     throw new Error(
@@ -67,6 +88,7 @@ export async function enableWebPush(publicKey: string, accountId: string) {
     applicationServerKey: expected,
   });
   try {
+    await bindAccount(worker.active!, accountId);
     await rpc.notifications.webRegister({
       clientId,
       subscription: subscription.toJSON() as {
@@ -74,12 +96,11 @@ export async function enableWebPush(publicKey: string, accountId: string) {
         keys: { p256dh: string; auth: string };
       },
     });
-    worker.active?.postMessage({ type: "mycellios:push-binding", accountId });
     localStorage.setItem(OWNER_KEY, accountId);
     window.dispatchEvent(new Event("mycellios:notifications-changed"));
   } catch (error) {
     // Do not leave an unowned subscription attached to a failed registration.
-    await subscription.unsubscribe();
+    await clearWebPushBinding().catch(() => subscription.unsubscribe());
     throw error;
   }
 }

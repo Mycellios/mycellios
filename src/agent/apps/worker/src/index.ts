@@ -336,7 +336,7 @@ async function main() {
     jobs,
     sandbox,
     events,
-    notifications,
+    notifications: nativeNotifications,
     leadership: createPostgresReconciliationLeadership(pool),
     reconcileModelCredits: createModelCreditReconciler({
       prisma,
