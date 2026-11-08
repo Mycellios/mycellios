@@ -20,6 +20,7 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [needsIdentity, setNeedsIdentity] = useState(false);
+  const [incomplete, setIncomplete] = useState(false);
   const [supported, setSupported] = useState(Boolean(runtime));
   const mounted = useRef(true);
   const reading = useRef(false);
@@ -31,12 +32,14 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
     reading.current = true;
     try {
       const local = await runtime.status();
+      const missingRuntime = local.enrolled && !local.installed;
       if (mounted.current && epoch === revision.current) {
         setSupported(local.supported);
         setNeedsIdentity(local.installed && local.enrolled && !local.nodeId);
+        setIncomplete(missingRuntime);
       }
-      const value = local.nodeId ? await rpc.models.contributionStatus({ nodeId: local.nodeId }) : null;
-      if (mounted.current && epoch === revision.current) { setNode(value); setError(local.enrolled && !local.installed); }
+      const value = !missingRuntime && local.nodeId ? await rpc.models.contributionStatus({ nodeId: local.nodeId }) : null;
+      if (mounted.current && epoch === revision.current) { setNode(value); setError(false); }
     } catch { if (mounted.current && epoch === revision.current) setError(true); }
     finally { reading.current = false; }
   }
@@ -59,7 +62,10 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
       // A verification click stays read-only even if another process has already
       // published the identity. Starting compute always needs a separate click.
       const verifyingOnly = needsIdentity || (local.enrolled && !local.nodeId);
-      if (local.enrolled && !local.installed) throw new Error("The existing runtime installation is incomplete");
+      if (local.enrolled && !local.installed) {
+        if (mounted.current) { setIncomplete(true); setNode(null); }
+        return;
+      }
       if (needsIdentity && !local.enrolled) throw new Error("The existing runtime identity is unavailable");
       if (!local.enrolled) local = await runtime.enroll(await rpc.models.contributionEnrollment());
       else if (!local.nodeId && runtime.identify) local = await runtime.identify();
@@ -80,13 +86,15 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   }
   const waiting = Boolean(node?.pending);
   const active = node?.enabled === true;
-  const hasError = error || Boolean(node?.rejected);
+  const hasError = !incomplete && (error || Boolean(node?.rejected));
   const idleLabel = t`Earn credits with your computer`;
   const shortLabel = t`Earn with your computer`;
+  const browserLabel = incomplete ? t`Contribute in browser` : idleLabel;
   const label = busy ? needsIdentity ? t`Verifying this computer…` : t`Setting up contribution…`
     : needsIdentity ? t`Verify this computer` : hasError ? t`Retry`
     : waiting ? t`Waiting for this computer…` : active ? t`Pause contribution` : idleLabel;
-  const detail = needsIdentity ? error ? t`Could not verify this computer. Try again or open the dashboard.` : t`Verify the existing installation before contributing.`
+  const detail = incomplete ? t`The local contribution runtime is missing.`
+    : needsIdentity ? error ? t`Could not verify this computer. Try again or open the dashboard.` : t`Verify the existing installation before contributing.`
     : hasError ? t`Could not confirm contribution. Try again or open the dashboard.`
     : !runtime || !supported ? t`Use this browser to contribute while the page stays open.`
     : node && !node.connected ? t`Computer offline. Waiting for reconnection.`
@@ -97,12 +105,12 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   const actionClass = "h-auto min-h-9 min-w-0 justify-start gap-1.5 px-2 py-1 text-start text-xs font-medium";
   return <div className={mini ? "shrink-0 px-2 py-1" : "min-w-0 max-w-full"}>
     <div className="flex min-w-0 items-center">
-    {!runtime || !supported ? <a href={browserWorkerUrl}
-      target="_blank" rel="noopener noreferrer" aria-label={idleLabel}
-      title={mini ? idleLabel : detail}
+    {!runtime || !supported || incomplete ? <a href={browserWorkerUrl}
+      target="_blank" rel="noopener noreferrer" aria-label={browserLabel}
+      title={mini ? browserLabel : detail}
       className={buttonVariants({ variant: "ghost", className: actionClass })}>
       <Cpu className="size-4 shrink-0" aria-hidden="true" />
-      {!mini && <><span className="min-w-0 whitespace-normal">{shortLabel}</span><ArrowUpRight className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" /></>}
+      {!mini && <><span className="min-w-0 whitespace-normal">{incomplete ? browserLabel : shortLabel}</span><ArrowUpRight className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" /></>}
     </a> :
     <Button variant="ghost" className={actionClass}
       onClick={() => { if (hasError && !needsIdentity) void refresh(); else void toggle(); }} disabled={busy || (waiting && !hasError)} aria-label={label} title={mini ? `${label}. ${detail}` : detail}>
@@ -110,10 +118,10 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
       {!mini && <span className="min-w-0 whitespace-normal">{label === idleLabel ? shortLabel : label}</span>}
     </Button>}
     </div>
-    {!mini && (hasError || (requested && (busy || needsIdentity)) || active || waiting) && (
+    {!mini && (incomplete || hasError || (requested && (busy || needsIdentity)) || active || waiting) && (
       <div className="px-2 pb-1 text-[11px]">
         <p role={hasError ? "alert" : "status"} className={hasError ? "text-destructive" : "text-muted-foreground"}>{detail}</p>
-        {hasError && <a className="text-muted-foreground underline underline-offset-2 hover:text-foreground" href={new URL("/dashboard?view=contribute", productBrand.apiBaseUrl).href}>{t`Open dashboard`}</a>}
+        {(hasError || incomplete) && <a className="text-muted-foreground underline underline-offset-2 hover:text-foreground" href={new URL("/dashboard?view=contribute", productBrand.apiBaseUrl).href}>{t`Open dashboard`}</a>}
       </div>
     )}
   </div>;

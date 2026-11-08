@@ -27,6 +27,9 @@ describe("outbound Desktop relay", () => {
     const data = Buffer.from('{"done":true}\n').toString("base64");
     broker.result(owner, "device", id, 0, data, true); broker.result(owner, "device", id, 0, data, true);
     expect(await response.text()).toBe('{"done":true}\n');
+    // A Desktop 0.3.24 poll can still hold a snapshot from before completion.
+    const stale = Buffer.from('{"error":"Desktop delivery was interrupted. Check results before retrying."}\n').toString("base64");
+    expect(() => broker.result(owner, "device", id, 0, stale, true)).not.toThrow();
     expect(() => broker.result(owner, "device", id, 0, "", true)).toThrow();
   });
   it("does not stop a quiet long command while authenticated Desktop heartbeats continue", async () => {
@@ -169,6 +172,20 @@ it("wakes a native long poll on dispatch and cancellation without busy polling o
   broker.result(owner,"device",state.operations[0]!.id,0,"",true);
   expect((await next).active).toEqual([]);await command.text();
   const stopped=broker.waitPoll(owner,"device",controller.signal,true,[]);controller.abort();await stopped;
+});
+
+it("leaves a callback available if the poll drops during reauthentication", async () => {
+  broker = new DesktopRelayBroker(); broker.bind(owner, binding);
+  const command = broker.dispatch({ method: "environment", botId: "bot" }, context());
+  const controller = new AbortController();
+  const dropped = await broker.waitPoll(owner, "device", controller.signal, true, [], async () => {
+    await expect(broker.waitPoll(owner, "device", controller.signal)).rejects.toThrow("already pending");
+    controller.abort();
+  });
+  expect(dropped.operations).toEqual([]);
+  const next = await broker.waitPoll(owner, "device", new AbortController().signal);
+  expect(next.operations).toHaveLength(1);
+  await command.body?.cancel();
 });
 
 it("fences a second agent start even when later callbacks share the same run",async()=>{

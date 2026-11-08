@@ -7219,6 +7219,9 @@ msgid "Pause contribution"
 msgstr "Pause contribution"
 
 #: src/components/SidebarContribution.tsx
+msgid "The local contribution runtime is missing."
+msgstr "The local contribution runtime is missing."
+
 msgid "Could not confirm contribution. Try again or open the dashboard."
 msgstr "Could not confirm contribution. Try again or open the dashboard."
 

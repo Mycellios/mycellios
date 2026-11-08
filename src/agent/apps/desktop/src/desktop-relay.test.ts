@@ -1,7 +1,44 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { DesktopRelayClient } from "./desktop-relay.js";
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
+
+it("still executes a newly delivered operation if the API rejects an orphan report", async () => {
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  const local = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response('{"done":true}\n'));
+  const reports: { id: string; done: boolean }[] = [];
+  let binding: unknown;
+  const client = new DesktopRelayClient({
+    base: "https://example.test/agent", localUrl: "http://127.0.0.1:1234",
+    localToken: "unused", revoked: vi.fn(),
+    fetch: async (url, init) => {
+      const action = url.split("/").at(-1);
+      const payload = JSON.parse(String(init?.body));
+      if (action === "identity") return Response.json(identity);
+      if (action === "bind") {
+        binding = payload;
+        return Response.json({ ok: true });
+      }
+      if (action === "poll") {
+        return Response.json({
+          identity, active: ["orphan", "fresh"],
+          operations: [{ id: "fresh", binding, request: { method: "environment", botId: "bot" } }],
+        });
+      }
+      reports.push({ id: payload.id, done: payload.done });
+      return new Response(null, { status: payload.id === "orphan" ? 409 : 200 });
+    },
+  });
+  try {
+    await client.bind("bot");
+    await vi.waitFor(() => expect(reports).toContainEqual({ id: "fresh", done: true }), { timeout: 3_000 });
+    expect(reports[0]).toEqual({ id: "orphan", done: true });
+    expect(local).toHaveBeenCalledOnce();
+  } finally { client.stop(); }
+});
 
 it("retries one timed-out identity read without repeating an operation", async () => {
   const identity = { userId: "owner", spaceId: "space", connectionId: "session" };

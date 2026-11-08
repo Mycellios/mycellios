@@ -6990,6 +6990,9 @@ msgstr "Esperando confirmación del equipo…"
 msgid "Pause contribution"
 msgstr "Pausar contribución"
 
+msgid "The local contribution runtime is missing."
+msgstr "Falta el runtime local de contribución."
+
 msgid "Could not confirm contribution. Try again or open the dashboard."
 msgstr "No se ha confirmado la contribución. Reintenta o abre el panel."
 

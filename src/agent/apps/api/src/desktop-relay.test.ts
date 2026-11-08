@@ -57,6 +57,61 @@ it("remembers Desktop execution across API restarts without admitting old client
   close();app=fixture(true,preference);
   expect(await (await probe()).json()).toEqual({agentExecution:1,available:false,preferred:true});
 });
+
+it("claims callbacks only after reauthentication and delivers each claim in that response", async () => {
+  const app = new Hono();
+  let onReauthenticate: (() => Promise<void>) | undefined;
+  let pollAuthentications = 0;
+  close = mountDesktopRelay(app, {
+    enabled: true,
+    secret: "test-purpose-secret",
+    authenticate: async (request) => {
+      if (new URL(request.url).pathname.endsWith("/poll") && ++pollAuthentications === 2)
+        await onReauthenticate?.();
+      return { actor: owner, sessionId: "test-session" };
+    },
+    ownsBot: async (_actor, id) => id === "test-bot",
+  });
+  const headers = { "x-mycellios-desktop": "1", "content-type": "application/json" };
+  const native = (action: string, payload: unknown) =>
+    app.request(`/api/desktop-relay/${action}`, { method: "POST", headers, body: JSON.stringify(payload) });
+  const identity = await (await native("identity", {})).json();
+  const deviceId = randomUUID();
+  expect((await native("account", { deviceId, generation: randomUUID(), identity, agentExecution: 1 })).status).toBe(200);
+  const sessionId = randomUUID();
+  const dispatch = async (message: string) => {
+    const body = JSON.stringify({
+      nonce: randomUUID(),
+      scope: { userId: owner.userId, spaceId: owner.spaceId },
+      request: { method: "agentMessage", botId: "test-bot", runId: "test-run", sessionId, message },
+    });
+    const time = String(Date.now());
+    return app.request("/api/desktop-relay/internal", {
+      method: "POST",
+      headers: {
+        "x-desktop-time": time,
+        "x-desktop-signature": signDesktopRelay(desktopRelayKey("test-purpose-secret"), time, body),
+      },
+      body,
+    });
+  };
+  const first = await dispatch("first");
+  let second: Response | undefined;
+  onReauthenticate = async () => { second = await dispatch("during-reauthentication"); };
+  try {
+    const state = await (await native("poll", { deviceId, wait: true, active: [] })).json();
+    expect(state.operations.map((op: { request: { message: string } }) => op.request.message))
+      .toEqual(["first", "during-reauthentication"]);
+    expect(state.active).toEqual(state.operations.map((op: { id: string }) => op.id));
+
+    const next = await (await native("poll", { deviceId, active: state.active })).json();
+    expect(next.operations).toEqual([]);
+    expect(next.active).toEqual(state.active);
+  } finally {
+    await first.body?.cancel();
+    await second?.body?.cancel();
+  }
+});
 it("requires an authenticated native session and owned agent, and stays off by default", async () => {
   const app = fixture();
   const payload = { deviceId: randomUUID(), generation: randomUUID(), botId: "test-bot" };

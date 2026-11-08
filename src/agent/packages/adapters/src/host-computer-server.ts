@@ -190,7 +190,8 @@ export async function startHostComputerServer(options: {
         message = "computer file not found";
       }
       if (!response.headersSent) response.writeHead(400);
-      if (!response.destroyed && !response.writableEnded) response.end(`${JSON.stringify({ error: message })}\n`);
+      const missingSession = error instanceof Error && error.message === "Desktop agent session changed";
+      if (!response.destroyed && !response.writableEnded) response.end(`${JSON.stringify({ error: message, ...(missingSession ? { code: "desktop_session_missing" } : {}) })}\n`);
     } finally {
       clearTimeout(timer);
       clearInterval(heartbeat);

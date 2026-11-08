@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Actor } from "@rakazo/contracts";
+import { getLogger } from "@rakazo/logging";
 import type { Hono } from "hono";
 import {
   parseDesktopBinding,
@@ -102,22 +103,24 @@ export function mountDesktopRelay(
     };
     const body = await readBoundedBody(c.req.raw, 360_000);
     if (body === null) return c.json({ error: "Too large" }, 413);
+    const action = c.req.param("action");
+    let resultId: string | undefined;
     try {
       const input = JSON.parse(body);
-      const poll = async (value: {deviceId:string;wait?:boolean;active?:string[]}) => {
-        const state = await broker.waitPoll(owner,value.deviceId,c.req.raw.signal,value.wait,value.active);
-        if (value.wait) {
+      const poll = (value: {deviceId:string;wait?:boolean;active?:string[]}) =>
+        broker.waitPoll(owner, value.deviceId, c.req.raw.signal, value.wait, value.active, value.wait ? async () => {
           const current = await deps.authenticate(c.req.raw);
           if (!current || current.sessionId !== owner.sessionId || current.actor.userId !== owner.userId || current.actor.spaceId !== owner.spaceId) {
             broker.revoke(owner,value.deviceId); throw Error("Desktop session changed while waiting");
           }
-          for (const botId of broker.ownedBindings(owner,value.deviceId)) if (!await deps.ownsBot(current.actor,botId)) broker.revokeBot(owner,botId);
-          const admitted = broker.poll(owner,value.deviceId);
-          return {...admitted,operations:state.operations.filter(op=>admitted.active.includes(op.id))};
-        }
-        return state;
-      };
-      switch (c.req.param("action")) {
+          const verifiedBots = new Set<string>();
+          for (const botId of broker.ownedBindings(owner, value.deviceId)) {
+            if (await deps.ownsBot(current.actor, botId)) verifiedBots.add(botId);
+            else broker.revokeBot(owner, botId);
+          }
+          return verifiedBots;
+        } : undefined);
+      switch (action) {
         case "identity":
           return c.json(identity);
         case "spaces":
@@ -148,6 +151,7 @@ export function mountDesktopRelay(
         }
         case "result": {
           const value = parseDesktopResult(input);
+          resultId = value.id;
           broker.result(owner, value.deviceId, value.id, value.seq, value.data, value.done);
           return c.json({ ok: true });
         }
@@ -159,7 +163,19 @@ export function mountDesktopRelay(
           return c.json({ error: "Unavailable" }, 404);
       }
     } catch (error) {
-      if (error instanceof Error && error.message === "Desktop session changed while waiting") return c.json({error:"Sign in again"},403);
+      const message = error instanceof Error ? error.message : "";
+      const reason = message === "Desktop poll is already pending" ? "poll_already_pending"
+        : message === "Desktop device is not connected" ? "device_not_connected"
+        : message === "Desktop session changed while waiting" ? "session_changed"
+        : message === "Operation unavailable" ? "operation_unavailable"
+        : message === "Invalid Desktop result" ? "invalid_result"
+        : message === "Slow consumer" ? "slow_consumer" : "request_rejected";
+      if (!c.req.raw.signal.aborted && (action === "account" || action === "poll" || resultId)) {
+        getLogger().warn("desktop.relay.request_rejected", {
+          "desktop.action": action, "desktop.operation.id": resultId, "desktop.reason": reason,
+        });
+      }
+      if (reason === "session_changed") return c.json({error:"Sign in again"},403);
       return c.json({ error: "PC connection changed. Reconnect the paired computer." }, 409);
     }
   });

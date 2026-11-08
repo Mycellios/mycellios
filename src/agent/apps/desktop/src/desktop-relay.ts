@@ -172,9 +172,10 @@ export class DesktopRelayClient {
   private async poll() {
     if (this.stopped) return;
     const pollController = new AbortController(); this.pollController = pollController;
+    const previousActive = new Set(this.active.keys());
     try {
       const state = (await (
-        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {})} : {}),...(this.options.agentExecution && this.lastContact ? {wait:true,active:[...this.active.keys()]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
+        await this.post(this.accountGeneration ? "account" : "poll", { deviceId: this.deviceId,...(this.accountGeneration ? {generation:this.accountGeneration,identity:this.accountIdentity,...(this.options.agentExecution ? {agentExecution:this.options.agentExecution} : {})} : {}),...(this.options.agentExecution && this.lastContact ? {wait:true,active:[...previousActive]} : {}) }, AbortSignal.any([pollController.signal, AbortSignal.timeout(25_000)]))
       ).json()) as DesktopExecutorPoll & { identity?: unknown };
       if(this.stopped)return;
       if (!this.owner || JSON.stringify(state.identity) !== this.owner) {
@@ -211,19 +212,25 @@ export class DesktopRelayClient {
           this.active.delete(id);
         }
       for (const id of state.active)
-        if (!this.active.has(id) && !state.operations.some((op) => op.id === id)) {
+        if (!previousActive.has(id) && !this.active.has(id) && !state.operations.some((op) => op.id === id)) {
           // A lost poll is an uncertain delivery, never a reason to replay an effectful command.
-          await this.post("result", {
-            deviceId: this.deviceId,
-            id,
-            seq: 0,
-            data: Buffer.from(
-              JSON.stringify({
-                error: "Desktop delivery was interrupted. Check results before retrying.",
-              }) + "\n",
-            ).toString("base64"),
-            done: true,
-          });
+          try {
+            await this.post("result", {
+              deviceId: this.deviceId,
+              id,
+              seq: 0,
+              data: Buffer.from(
+                JSON.stringify({
+                  error: "Desktop delivery was interrupted. Check results before retrying.",
+                }) + "\n",
+              ).toString("base64"),
+              done: true,
+            });
+          } catch {
+            // The orphan may have expired on the API. Other operations in this
+            // authenticated batch still have their own valid delivery.
+            if (this.stopped) return;
+          }
         }
       for (const operation of state.operations) {
         if (this.active.has(operation.id)) continue;
