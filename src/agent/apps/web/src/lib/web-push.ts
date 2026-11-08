@@ -85,11 +85,15 @@ export async function enableWebPush(publicKey: string, accountId: string) {
 }
 export async function disableWebPush() {
   await rpc.notifications.webUnregister({ clientId: notificationClientId() });
+  await clearWebPushBinding();
+  window.dispatchEvent(new Event("mycellios:notifications-changed"));
+}
+
+async function clearWebPushBinding() {
+  localStorage.removeItem(OWNER_KEY);
   const worker = await registration();
   worker.active?.postMessage({ type: "mycellios:push-binding", accountId: null });
   await (await worker.pushManager.getSubscription())?.unsubscribe();
-  localStorage.removeItem(OWNER_KEY);
-  window.dispatchEvent(new Event("mycellios:notifications-changed"));
 }
 let serverDelivery = false;
 export function usesServerPush() {
