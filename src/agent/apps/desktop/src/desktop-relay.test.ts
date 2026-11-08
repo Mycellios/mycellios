@@ -234,3 +234,37 @@ it("restores every owned legacy Mico generation on the same PC after a planned u
     expect(bindings.at(-1)?.generation).not.toBe("generation-two");
   } finally {client.stop();}
 });
+
+it("stays online when a poll also lists another desktop", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(50_000);
+  const identity = { userId: "owner", spaceId: "space", connectionId: "session" };
+  const revoked = vi.fn();
+  const mine = "11111111-1111-4111-8111-111111111111";
+  const client = new DesktopRelayClient({
+    base: "https://example.test",
+    localUrl: "http://127.0.0.1:1234",
+    localToken: "unused",
+    deviceId: mine,
+    revoked,
+    fetch: async (url) => {
+      const action = url.split("/").at(-1);
+      return Response.json(action === "identity" ? identity : {
+        identity,
+        bindings: [
+          { deviceId: "22222222-2222-4222-8222-222222222222", botId: "other", generation: "33333333-3333-4333-8333-333333333333" },
+          { deviceId: mine, botId: "mine", generation: "44444444-4444-4444-8444-444444444444" },
+        ],
+        active: [],
+        operations: [],
+      });
+    },
+  });
+  try {
+    await client.registerAccount(identity);
+    expect(client.online()).toBe(true);
+    expect(client.connected("mine")).toBe(true);
+    expect(client.connected("other")).toBe(false);
+    expect(revoked).not.toHaveBeenCalled();
+  } finally { client.stop(); }
+});

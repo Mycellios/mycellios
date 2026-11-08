@@ -214,7 +214,7 @@ export class DesktopRelayClient {
       if(this.accountGeneration){
         if(!Array.isArray(state.bindings)||state.bindings.length>128)throw Error("Invalid account bindings");
         const grants=new Map<string,{generation:string}>();
-        for(const raw of state.bindings){const b=parseDesktopBinding(raw);if(b.deviceId!==this.deviceId)throw Error("Another device binding");grants.set(b.botId,{generation:b.generation});}
+        for(const raw of state.bindings){const b=parseDesktopBinding(raw);if(b.deviceId!==this.deviceId)continue;grants.set(b.botId,{generation:b.generation});}
         this.grants=grants;
       }
       this.lastContact = (this.options.now ?? Date.now)();

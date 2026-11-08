@@ -6377,3 +6377,11 @@ msgstr "{pendingCount, plural, other {# 个待授权连接}}"
 #: src/components/ReleaseNotes.tsx
 msgid "See which accounts are connected to each app."
 msgstr "查看每个应用已连接的账户。"
+
+#: src/pages/Auth.tsx
+msgid "Signing in…"
+msgstr "正在登录…"
+
+#: src/pages/Auth.tsx
+msgid "This is taking a while."
+msgstr "比平时久了一点。"
