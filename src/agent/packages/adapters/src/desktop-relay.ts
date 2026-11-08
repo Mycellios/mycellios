@@ -57,7 +57,16 @@ export class DesktopRelayBroker {
     this.sweep.unref();
   }
   private expire() {
-    for (const [id, account] of this.accounts) if (this.now() - account.seen > LEASE_MS) this.accounts.delete(id);
+    const now = this.now();
+    // A desktop poll refreshes the binding. That heartbeat is the PC's presence:
+    // the account lease must not lapse out from under a run whose command just finished.
+    for (const account of this.accounts.values()) {
+      const heartbeat = [...this.bindings.values()].some((binding) =>
+        binding.userId === account.userId && binding.spaceId === account.spaceId &&
+        binding.deviceId === account.deviceId && now - binding.seen <= LEASE_MS);
+      if (heartbeat) account.seen = now;
+    }
+    for (const [id, account] of this.accounts) if (now - account.seen > LEASE_MS) this.accounts.delete(id);
     for (const [id, run] of this.runs) if (run.until < this.now()) this.runs.delete(id);
     for (const [id, binding] of this.bindings) if (this.now() - binding.seen > LEASE_MS) {
       this.bindings.delete(id);
@@ -72,7 +81,9 @@ export class DesktopRelayBroker {
       throw new Error("Another computer is already connected to this account");
     if(prior&&(!sameOwner(owner,prior)||prior.generation!==input.generation))this.revoke(prior,prior.deviceId);
     if (!prior && this.accounts.size >= 128) throw new Error("Desktop relay is busy");
-    this.accounts.set(id,{...owner,deviceId:input.deviceId,generation:input.generation,...(input.agentExecution ? {agentExecution:input.agentExecution} : {}),seen:this.now()});
+    const samePc = prior && sameOwner(owner, prior) && prior.deviceId === input.deviceId && prior.generation === input.generation;
+    const agentExecution = input.agentExecution ?? (samePc ? prior?.agentExecution : undefined);
+    this.accounts.set(id,{...owner,deviceId:input.deviceId,generation:input.generation,...(agentExecution ? {agentExecution} : {}),seen:this.now()});
   }
   needsExecutionPreference(owner: DesktopExecutorOwner, input: {deviceId:string;generation:string}) {
     const account = this.accounts.get(JSON.stringify([owner.userId, owner.spaceId]));
@@ -183,8 +194,15 @@ export class DesktopRelayBroker {
   dispatch(input: HostComputerRequest, context: AdapterContext): Response {
     this.expire();
     const binding = this.bindings.get(key(context, input.botId));
-    if ((input.method === "agentRun" || input.method === "agentMessage") && !this.agentAvailable(context, input.botId))
+    const started = input.runId ? this.runs.get(key(context, `${input.botId}:${input.runId}`)) : undefined;
+    if (input.method === "agentRun" && !this.agentAvailable(context, input.botId))
       throw new DesktopRelayError("desktop_disconnected", "Desktop agent execution is unavailable");
+    if (input.method === "agentMessage" && !this.agentAvailable(context, input.botId)) {
+      // The command already ran inside this dispatch. A missed heartbeat must not
+      // drop the result or make the cloud report the executor as unavailable.
+      if (!started || !binding) throw new DesktopRelayError("desktop_disconnected", "Desktop agent execution is unavailable");
+      getLogger().warn("desktop.agent.result_while_unavailable", { "run.id": input.runId, "desktop.method": input.method });
+    }
     if (!binding) throw new DesktopRelayError("desktop_disconnected", "The paired PC is disconnected. Start Mycellios Desktop on that computer.");
     const requestBytes = Buffer.byteLength(JSON.stringify(input));
     if (requestBytes > HOST_COMPUTER_MAX_BYTES) throw new DesktopRelayError("desktop_request_too_large", "The PC request is too large.", 413);

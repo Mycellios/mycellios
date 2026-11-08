@@ -460,6 +460,11 @@ import {
   SHELL_STILL_RUNNING_NOTICE,
 } from "./shell-command-stream.js";
 import {
+  confirmDesktopCommandResult,
+  isUnconfirmedCommandDelivery,
+  UNCONFIRMED_COMMAND_RESULT,
+} from "./desktop-command-confirmation.js";
+import {
   isExactNoResponse,
   NO_RESPONSE,
   stripNoResponseReply,
@@ -6387,14 +6392,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
               exitCode: null,
               output: "",
             });
+            let publishTimer: ReturnType<typeof setTimeout> | undefined;
+            const clearPublishTimer = () => {
+              if (publishTimer) clearTimeout(publishTimer);
+              publishTimer = undefined;
+            };
+            let desktopCommand = false;
+            let commandStartedAt = Date.now();
             try {
               let latestOutput = "";
               let lastPublishedAt = 0;
-              let publishTimer: ReturnType<typeof setTimeout> | undefined;
-              const clearPublishTimer = () => {
-                if (publishTimer) clearTimeout(publishTimer);
-                publishTimer = undefined;
-              };
               const publishRunning = (output: string, immediate = false) => {
                 latestOutput = output.slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS);
                 const send = () => {
@@ -6426,6 +6433,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 (computer.kind === "desktop"
                   ? await deps.sandbox.environment?.(computer, context)
                   : undefined);
+              desktopCommand = shellEnvironment?.durableCommands === true;
+              commandStartedAt = Date.now();
               pendingCommands.add(commandId);
               const observed = await observeShellCommand(
                 deps.sandbox.execute(
@@ -6466,6 +6475,25 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   },
                 },
               );
+              if (desktopCommand && observed.completion) {
+                const final = await observed.completion;
+                clearPublishTimer();
+                pendingCommands.delete(commandId);
+                await appendComputerCommand({
+                  ...commandEvent,
+                  status: "done",
+                  exitCode: final.code,
+                  output: commandOutput(final, false).slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS),
+                });
+                getLogger().info("desktop.command.result_delivered", {
+                  "run.id": runId,
+                  "tool.name": name,
+                  "desktop.command.id": commandId,
+                  "desktop.elapsed_ms": Date.now() - commandStartedAt,
+                  "desktop.exit_code": final.code,
+                });
+                return finish({ ...final, commandId, durable: true });
+              }
               if (observed.completion) {
                 let releaseStored!:()=>void;
                 const runningStored=new Promise<void>(resolve=>{releaseStored=resolve;});
@@ -6508,6 +6536,61 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
               return finish({...redacted,commandId});
             } catch (error) {
+              clearPublishTimer();
+              if (desktopCommand && !context.signal.aborted && isUnconfirmedCommandDelivery(error) && deps.sandbox.commandStatus) {
+                let outcome: Awaited<ReturnType<typeof confirmDesktopCommandResult>>;
+                try {
+                  const computer = await getRunComputer("tool", name);
+                  outcome = await confirmDesktopCommandResult({
+                    runId,
+                    toolName: name,
+                    commandId,
+                    startedAt: commandStartedAt,
+                    read: () => deps.sandbox.commandStatus!(computer, commandId, context),
+                    signal: context.signal,
+                    log: (event, fields) => getLogger().info(event, fields),
+                  });
+                } catch {
+                  if (context.signal.aborted) throw error;
+                  getLogger().warn("desktop.command.result_unconfirmed", {
+                    "run.id": runId,
+                    "tool.name": name,
+                    "desktop.command.id": commandId,
+                    "desktop.elapsed_ms": Date.now() - commandStartedAt,
+                  });
+                  outcome = { confirmed: false, error: UNCONFIRMED_COMMAND_RESULT };
+                }
+                pendingCommands.delete(commandId);
+                if (outcome.confirmed) {
+                  const safe = redactShellStreams(
+                    { stdout: outcome.stdout, stderr: outcome.stderr },
+                    runSecrets,
+                    { withholdPartial: false },
+                  );
+                  await appendComputerCommand({
+                    ...commandEvent,
+                    status: "done",
+                    exitCode: outcome.code,
+                    output: `${safe.stdout}${safe.stderr}`.slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS),
+                  });
+                  getLogger().info("desktop.command.result_delivered", {
+                    "run.id": runId,
+                    "tool.name": name,
+                    "desktop.command.id": commandId,
+                    "desktop.elapsed_ms": Date.now() - commandStartedAt,
+                    "desktop.exit_code": outcome.code,
+                  });
+                  return finish({ stdout: safe.stdout, stderr: safe.stderr, code: outcome.code, commandId, durable: true });
+                }
+                const detail = redactSecrets(outcome.error, runSecrets).slice(-COMPUTER_COMMAND_OUTPUT_MAX_CHARS);
+                await appendComputerCommand({
+                  ...commandEvent,
+                  status: "done",
+                  exitCode: null,
+                  output: detail,
+                });
+                return finish({ error: outcome.error, uncertain: true, commandId, code: null });
+              }
               await appendComputerCommand({
                 ...commandEvent,
                 status: "running",

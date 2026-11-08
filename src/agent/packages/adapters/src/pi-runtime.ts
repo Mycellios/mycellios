@@ -557,6 +557,7 @@ export class PiAgentRuntime implements AgentRuntime {
                   },
                 ),
               target.config.cacheCapabilities?.retentionMode,
+              { runId: request.runId },
             ),
           onContextOverflow: () => compactor?.requestRecovery() ?? false,
           onContextLimit: (contextWindow) => {
@@ -2141,6 +2142,7 @@ async function executeSubagent(host: ToolHost, executionId: string, args: Record
             },
           ),
         requestModel.cacheCapabilities?.retentionMode,
+        { runId: host.request.runId },
       ),
   };
   const childSystemPrompt = [
@@ -3854,6 +3856,7 @@ export interface StreamIdleWatchdog {
 export function modelStreamIdleWatchdog(
   upstream: AbortSignal | undefined,
   idleTimeoutMs: number = MODEL_STREAM_IDLE_TIMEOUT_MS,
+  meta?: { runId?: string; model?: string },
 ): StreamIdleWatchdog {
   const controller = new AbortController();
   let timedOut = false;
@@ -3870,6 +3873,11 @@ export function modelStreamIdleWatchdog(
       timer = undefined;
       if (controller.signal.aborted) return;
       timedOut = true;
+      getLogger().warn("model.stream.idle_timeout", {
+        "run.id": meta?.runId,
+        "model.id": meta?.model,
+        "desktop.elapsed_ms": idleTimeoutMs,
+      });
       controller.abort(new Error(MODEL_STREAM_IDLE_TIMEOUT_MESSAGE));
     }, idleTimeoutMs);
     timer.unref?.();
@@ -4013,8 +4021,12 @@ export function reliableModelStream(
   accessToken?: string | (() => string | undefined),
   runStream?: (options: ModelsSimpleStreamOptions) => AssistantMessageEventStream,
   cacheRetention?: ModelsSimpleStreamOptions["cacheRetention"],
+  streamMeta?: { runId?: string },
 ): AssistantMessageEventStream {
-  const watchdog = modelStreamIdleWatchdog(options?.signal);
+  const watchdog = modelStreamIdleWatchdog(options?.signal, MODEL_STREAM_IDLE_TIMEOUT_MS, {
+    runId: streamMeta?.runId,
+    model: model.id,
+  });
   try {
     const preparedOptions = reliableStreamOptions(
       model,

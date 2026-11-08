@@ -114,6 +114,7 @@ import { MycelliosCredits } from "../components/MycelliosCredits";
 import { SidebarContribution } from "../components/SidebarContribution";
 import { PageLoading } from "../components/PageLoading";
 import { PasskeyOffer } from "../components/PasskeyOffer";
+import { setLiveThreadConnection } from "../lib/live-thread-connection";
 import { notificationPreferences } from "../lib/notification-preferences";
 import { createReplySoundGate, playReplySound, unlockReplySound } from "../lib/reply-sound";
 import { ReleaseNotes } from "../components/ReleaseNotes";
@@ -1747,8 +1748,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     const sidebarRefresh = createRefreshCoalescer(() => refreshBots());
     const snapshotRefresh = createRefreshCoalescer(() => refreshThread(active.id));
     const abort = new AbortController();
+    setLiveThreadConnection("live");
     void runThreadSubscription({
       signal: abort.signal,
+      onConnection: setLiveThreadConnection,
       loadInitial: async () => {
         const primed = bootstrappedThread.current;
         bootstrappedThread.current = null;
@@ -1826,6 +1829,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       },
     });
     return () => {
+      setLiveThreadConnection("live");
       sidebarRefresh.dispose();
       snapshotRefresh.dispose();
       abort.abort();
@@ -1887,8 +1891,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     const sidebarRefresh = createRefreshCoalescer(() => refreshBots());
     const snapshotRefresh = createRefreshCoalescer(() => refreshGroupThread(groupId));
     const abort = new AbortController();
+    setLiveThreadConnection("live");
     void runThreadSubscription({
       signal: abort.signal,
+      onConnection: setLiveThreadConnection,
       loadInitial: () =>
         pendingJump
           ? rpc.threads.get({ groupId }, { signal: threadSnapshotSignal(abort.signal) })
@@ -1937,6 +1943,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       },
     });
     return () => {
+      setLiveThreadConnection("live");
       sidebarRefresh.dispose();
       snapshotRefresh.dispose();
       window.removeEventListener("focus", markVisibleGroupRead);

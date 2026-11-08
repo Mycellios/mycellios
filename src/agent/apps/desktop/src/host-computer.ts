@@ -82,7 +82,9 @@ export async function prepareHostComputer(userDataDir: string, agentRuntime?: Ag
     },
     activate(value: boolean) {
       active = value;
-      server.setEnabled(active && allowed);
+      const admit = active && allowed;
+      // A failed presence check must not abort a run whose command already finished.
+      server.setEnabled(admit, admit || !server.hasActiveWork());
     },
     async grant(scope?: string) {
       if (scope !== undefined && !/^[a-f0-9]{64}$/.test(scope)) throw new Error("Invalid computer consent scope");

@@ -25,6 +25,7 @@ export async function runThreadSubscription(options: {
   beforeEvent?: (event: ProductEvent) => void;
   applyEvent: (event: ProductEvent) => void;
   onEvent: (event: ProductEvent, initial: ThreadHead) => void;
+  onConnection?: (state: "live" | "reconnecting") => void;
 }): Promise<void> {
   const { signal } = options;
   const stopped = Symbol("stopped");
@@ -138,6 +139,7 @@ export async function runThreadSubscription(options: {
           attempt.signal,
         );
         if (events === stopped || isStopped() || generation !== attemptGeneration) continue;
+        options.onConnection?.("live");
         const iterator = events[Symbol.asyncIterator]();
         try {
           let pending: Promise<IteratorResult<ProductEvent>> | undefined;
@@ -159,8 +161,11 @@ export async function runThreadSubscription(options: {
               next === stopped ||
               next === "idle" ||
               next.done
-            )
+            ) {
+              if (!isStopped() && generation === attemptGeneration && (next === "idle" || (next !== stopped && next.done)))
+                options.onConnection?.("reconnecting");
               break;
+            }
             pending = undefined;
             const event = next.value;
             retryMs = 250;
@@ -200,6 +205,7 @@ export async function runThreadSubscription(options: {
       } catch (error) {
         // Reconnect from the last durable event after a transient failure.
         noteFailure(error);
+        if (!isStopped()) options.onConnection?.("reconnecting");
       } finally {
         attempt.abort();
         activeAttempt = undefined;
