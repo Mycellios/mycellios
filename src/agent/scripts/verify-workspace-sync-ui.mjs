@@ -62,7 +62,11 @@ try {
   await page.getByRole("button", { name: "Month", exact: true }).click();
   await expect(page.getByTestId("schedule-workspace")).toHaveAttribute("data-view", "month");
   await page.screenshot({ path: path.join(output, "schedule-month.png"), animations: "disabled" });
-  await rail.getByRole("button", { name: "Usage", exact: true }).click();
+  const quotaTrigger = rail.getByTestId("provider-quota-trigger");
+  await quotaTrigger.hover();
+  await expect(page.getByTestId("provider-quota-panel")).toBeVisible();
+  await quotaTrigger.click();
+  await expect(page.getByTestId("provider-quota-panel")).toBeHidden();
   await expect(page.getByRole("combobox", { name: "Usage period" })).toBeVisible();
   await page.getByRole("combobox", { name: "Usage period" }).selectOption("7");
   await page.screenshot({ path: path.join(output, "usage-dashboard.png"), animations: "disabled" });
