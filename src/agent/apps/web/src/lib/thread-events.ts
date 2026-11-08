@@ -14,6 +14,7 @@ import {
   isBackgroundRunTrigger,
   isRunTerminalEvent,
   mergeThreadHistory,
+  observeToolEvent,
   prependThreadHistoryPage,
   progressMessageId,
   QUEUE_HOLDING_RUN_STATUSES,
@@ -253,6 +254,7 @@ export function isThreadSnapshotEvent(event: ProductEvent): boolean {
     event.type === "thread.cloud_agent" ||
     event.type === "agent.tool.called" ||
     event.type === "agent.tool.completed" ||
+    event.type === "computer.command" ||
     event.type === "thread.message.created" ||
     event.type === "thread.message.updated" ||
     event.type === "thread.message.reaction" ||
@@ -452,10 +454,13 @@ export function reduceThreadSnapshot(
   if (event.type === "thread.progress") {
     const liveId = progressMessageId(event);
     const { previous, remaining } = takeLiveMessage(prev.messages, liveId);
-    const blocks = reduceLiveMessageBlocks(previous?.blocks ?? [], {
-      type: "progress",
-      payload: event.payload,
-    });
+    const blocks = observeToolEvent(
+      reduceLiveMessageBlocks(previous?.blocks ?? [], {
+        type: "progress",
+        payload: event.payload,
+      }),
+      { type: event.type, payload: event.payload, createdAt: event.createdAt },
+    );
     const streaming: ThreadMessage = {
       id: liveId,
       threadId: event.threadId,
@@ -471,10 +476,15 @@ export function reduceThreadSnapshot(
   if (event.type === "agent.tool.called") {
     const liveId = progressMessageId(event);
     const { previous, remaining } = takeLiveMessage(prev.messages, liveId);
-    const blocks = reduceLiveMessageBlocks(previous?.blocks ?? [], {
-      type: "tool",
-      name: String(event.payload.name ?? ""),
-    });
+    const label = typeof event.payload.label === "string" ? event.payload.label : undefined;
+    const blocks = observeToolEvent(
+      reduceLiveMessageBlocks(previous?.blocks ?? [], {
+        type: "tool",
+        name: String(event.payload.name ?? ""),
+        label,
+      }),
+      { type: event.type, payload: event.payload, createdAt: event.createdAt },
+    );
     const next: ThreadMessage = {
       id: liveId,
       threadId: event.threadId,
@@ -487,8 +497,25 @@ export function reduceThreadSnapshot(
     };
     return { ...prev, cursor: event.seq, messages: [...remaining, next] };
   }
-  if (event.type === "agent.tool.completed") {
-    return { ...prev, cursor: event.seq };
+  if (event.type === "agent.tool.completed" || event.type === "computer.command") {
+    const liveId = progressMessageId(event);
+    const current = prev.messages.find((message) => message.id === liveId);
+    if (!current) return prev.cursor === event.seq ? prev : { ...prev, cursor: event.seq };
+    const blocks = observeToolEvent(current.blocks, {
+      type: event.type,
+      payload: event.payload,
+      createdAt: event.createdAt,
+    });
+    if (blocks === current.blocks) {
+      return prev.cursor === event.seq ? prev : { ...prev, cursor: event.seq };
+    }
+    return {
+      ...prev,
+      cursor: event.seq,
+      messages: prev.messages.map((message) =>
+        message.id === liveId ? { ...message, blocks, seq: event.seq } : message,
+      ),
+    };
   }
   if (event.type === "thread.subagent") {
     const block = subagentBlockFromPayload(event.payload);

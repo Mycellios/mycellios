@@ -10,11 +10,28 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-activity-preference";
 import { liveThreadDisconnected, subscribeLiveThreadConnection } from "../lib/live-thread-connection";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
-import { activityKind } from "../lib/activity-kind";
 import { RunExecutionDetails } from "./RunExecutionDetails";
 import { useCommandActivity } from "../lib/use-command-activity";
 
-type ActivityStep = { label: string; count: number; outcome?: "error" | "paused" };
+type ActivityStep = {
+  label: string;
+  count: number;
+  outcome?: "error" | "paused";
+  output?: string;
+  elapsedMs?: number;
+};
+
+function presentActivityLabel(value: string): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  return text.length > 180 ? `${text.slice(0, 179)}…` : text;
+}
+
+function toolActivityLabel(tool: ToolObservation): string {
+  const command = tool.command?.replace(/\s+/g, " ").trim();
+  const detail = tool.detail?.replace(/\s+/g, " ").trim();
+  return presentActivityLabel(command || detail || tool.name.replaceAll("_", " "));
+}
 
 function summarizeSteps(steps: readonly ActivityStep[], describe: (label: string) => string) {
   return steps.reduce<ActivityStep[]>((summary, step) => {
@@ -81,8 +98,7 @@ export function PendingRunActivity({ messages, bots, onRefresh }: {
     return () => { disposed = true; window.clearInterval(timer); };
   }, []);
   const live = messages.findLast(message => message.id.startsWith("progress:"));
-  const describe = useActivityDescription();
-  const steps = summarizeSteps(live?.blocks.flatMap(block => block.kind === "steps" ? block.steps : []) ?? [], describe);
+  const steps = summarizeSteps(live?.blocks.flatMap(block => block.kind === "steps" ? block.steps : []) ?? [], presentActivityLabel);
   return <div className="flex min-w-0 items-start gap-2.5 px-1 py-2">
     <GroupAvatar members={bots} size={28} />
     <div className="min-w-0 max-w-prose text-sm text-muted-foreground">
@@ -94,30 +110,6 @@ export function PendingRunActivity({ messages, bots, onRefresh }: {
       </details> : <span role="status">{t`Receiving activity · task status not confirmed`}</span>}
     </div>
   </div>;
-}
-
-function useActivityDescription() {
-  const { t } = useLingui();
-  return (value: string) => {
-    switch (activityKind(value)) {
-      case "history": return t`Searching conversation history…`;
-      case "tests": return t`Running tests…`;
-      case "changes": return t`Reviewing changes…`;
-      case "editing": return t`Editing files…`;
-      case "files": return t`Reviewing files…`;
-      case "web": return t`Searching the web…`;
-      case "server": return t`Working on the server…`;
-      case "image": return t`Preparing an image…`;
-      case "schedule": return t`Managing a routine…`;
-      case "message": return t`Coordinating with another agent…`;
-      case "planning": return t`Organizing the task…`;
-      case "calendar": return t`Checking the calendar…`;
-      case "mail": return t`Checking email…`;
-      case "build": return t`Building the project…`;
-      case "command": return t`Running a command…`;
-      default: return t`Using a tool…`;
-    }
-  };
 }
 
 /** This observer only reads state. It never stops, retries or restarts a run. */
@@ -141,8 +133,8 @@ export function RunActivityStatus({
   onOpenComputer?: () => void;
 }) {
   const { t, i18n } = useLingui();
-  const describe = useActivityDescription();
   const [now, setNow] = useState(Date.now);
+  const [foldedRunId, setFoldedRunId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const expanded = useSyncExternalStore(subscribeToolActivity, getToolActivityExpanded, () => false);
   const refresh = useRef(onRefresh);
@@ -185,7 +177,6 @@ export function RunActivityStatus({
     missingComputer,
     lastOutputAt: lastRunOutput(run, messages),
   });
-  // Activity labels can contain commands and paths. Keep them inside the closed disclosure.
   const liveMessage = messages.findLast((message) =>
     message.id === `progress:${run.id}` ||
     (message.id.startsWith("progress:") && message.runId === run.id),
@@ -221,28 +212,40 @@ export function RunActivityStatus({
       : minutes > 0 ? unit(minutes, "minute") : unit(Math.floor(ms / 1000), "second");
   };
   const toolSteps = latestSteps?.kind === "steps" ? latestSteps.steps : [];
-  const activityOf = (tool: ToolObservation) => {
-    const kind = activityKind(tool.name);
-    if (kind !== "tool" && kind !== "command") return tool.name;
-    const detail = tool.command ?? tool.detail;
-    return detail && activityKind(detail) !== "tool" ? detail : tool.name;
-  };
   const toolEvents = useCommandActivity(run.id, run.botId, liveMessage ? observedTools(liveMessage.blocks) : []);
-  const visibleSteps = summarizeSteps(toolEvents.length ? toolEvents.map((tool) => ({
-    label: activityOf(tool),
-    count: 1,
-    outcome: tool.outcome === "error" || tool.outcome === "paused" ? tool.outcome : undefined,
-  })) : toolSteps, describe);
+  const stepElapsed = (tool: ToolObservation): number | undefined => {
+    const started = tool.commandStartedAt ? Date.parse(tool.commandStartedAt) : NaN;
+    const finished = tool.commandFinishedAt ? Date.parse(tool.commandFinishedAt) : NaN;
+    if (Number.isFinite(started)) {
+      return Math.max(0, (Number.isFinite(finished) ? finished : now) - started);
+    }
+    return tool.durationMs;
+  };
+  const visibleSteps: ActivityStep[] = toolEvents.length
+    ? toolEvents.slice(-8).map((tool) => ({
+        label: toolActivityLabel(tool),
+        count: 1,
+        outcome: tool.outcome === "error" || tool.outcome === "paused" ? tool.outcome : undefined,
+        output: tool.output?.trim() ? tool.output : undefined,
+        elapsedMs: stepElapsed(tool),
+      }))
+    : summarizeSteps(toolSteps, presentActivityLabel);
   const runningTool = toolEvents.findLast(tool => tool.outcome === "running");
   const settledTool = runningTool ? undefined : toolEvents.at(-1);
   const updatesStopped = useSyncExternalStore(subscribeLiveThreadConnection, liveThreadDisconnected, () => false);
   const liveUpdatesStopped = updatesStopped && (health.state === "running" || health.state === "quiet" || health.state === "unknown" || health.state === "recovering");
+  const specificNow = runningTool
+    ? toolActivityLabel(runningTool)
+    : scopedActivity
+      ? presentActivityLabel(scopedActivity)
+      : showActivity
+        ? presentActivityLabel(latestActivity)
+        : "";
   const primaryLabel = liveUpdatesStopped
     ? t`Live updates stopped. The task was not cancelled.`
     : health.state === "quiet" ? t`Waiting for an activity update…`
-    : health.state === "running" && runningTool ? describe(activityOf(runningTool))
+    : health.state === "running" && specificNow ? specificNow
     : health.state === "running" && settledTool?.outcome === "paused" ? t`A tool is waiting for input`
-    : health.state === "running" && showActivity && (scopedActivity || !settledTool) ? describe(scopedActivity || latestActivity)
     : labels[health.state];
   const status = liveUpdatesStopped
     ? <span role="alert" className="break-words text-destructive">{primaryLabel}</span>
@@ -257,14 +260,18 @@ export function RunActivityStatus({
   const details = (
     <div className="mt-1 min-w-0 max-w-prose space-y-2 text-xs">
       {visibleSteps.length ? <ol aria-label={t`Task activity`} className="space-y-1.5 border-s border-border py-1 ps-3">
-        {visibleSteps.map((step, index) => <li key={`${index}:${step.label}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5" aria-current={index === visibleSteps.length - 1 ? "step" : undefined}>
-          <span aria-hidden="true" className="text-muted-foreground">·</span>
-          <span className={index === visibleSteps.length - 1 ? "text-foreground" : "text-muted-foreground"}>{step.label}</span>
-          {step.count > 1 ? <span className="text-muted-foreground tabular-nums">×{step.count}</span> : null}
-          {step.outcome === "error" ? <span className="text-destructive">{t`Reported an error`}</span> : null}
-          {step.outcome === "paused" ? <span className="text-muted-foreground">{t`Waiting for input`}</span> : null}
+        {visibleSteps.map((step, index) => <li key={`${index}:${step.label}`} className="min-w-0" aria-current={index === visibleSteps.length - 1 ? "step" : undefined}>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span aria-hidden="true" className="text-muted-foreground">·</span>
+            <span className={`min-w-0 break-words ${index === visibleSteps.length - 1 ? "text-foreground" : "text-muted-foreground"}`}>{step.label}</span>
+            {step.count > 1 ? <span className="text-muted-foreground tabular-nums">×{step.count}</span> : null}
+            {step.elapsedMs != null && step.elapsedMs >= 1000 ? <span className="text-muted-foreground tabular-nums">{duration(step.elapsedMs)}</span> : null}
+            {step.outcome === "error" ? <span className="text-destructive">{t`Reported an error`}</span> : null}
+            {step.outcome === "paused" ? <span className="text-muted-foreground">{t`Waiting for input`}</span> : null}
+          </div>
+          {step.output ? <div role="region" aria-label={t`A command's output`}><pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted px-2 py-1.5 font-mono text-[11px] text-foreground">{step.output}</pre></div> : null}
         </li>)}
-      </ol> : showActivity ? <p>{describe(latestActivity)}</p> : null}
+      </ol> : showActivity ? <p className="break-words">{presentActivityLabel(latestActivity)}</p> : null}
       {hasTechnicalDetails ? <TechnicalActivity run={run} cost={cost} tools={toolEvents} legacyCommand={legacyCommand} /> : null}
     </div>
   );
@@ -296,7 +303,10 @@ export function RunActivityStatus({
     <div className="flex min-w-0 items-start gap-2.5 px-1 py-2" data-testid="run-activity-status">
       <GroupAvatar members={bots} size={28} />
       <div className="min-w-0 max-w-full space-y-1 text-sm text-muted-foreground">
-        {hasDetails ? <details key={run.id} open={expanded} className="group/activity">
+        {hasDetails ? <details key={run.id} open={expanded || foldedRunId !== run.id} className="group/activity" onToggle={(event) => {
+          if (expanded) return;
+          setFoldedRunId(event.currentTarget.open ? null : run.id);
+        }}>
           <summary className="flex w-fit max-w-full cursor-pointer list-none items-baseline gap-2 rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden" aria-label={t`Show task activity`}>
             {status}
             {elapsed}

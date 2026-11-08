@@ -199,6 +199,7 @@ export const MessageBlock = z.discriminatedUnion("kind", [
     /** Provider-generated tool status rather than assistant-authored narration. */
     activity: z.literal(true).optional(),
     pendingToolNames: z.array(z.string()).optional(),
+    pendingToolLabels: z.array(z.string().max(500)).max(32).optional(),
   }),
   z.object({
     kind: z.literal("steps"),

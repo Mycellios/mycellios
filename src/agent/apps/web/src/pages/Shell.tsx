@@ -480,7 +480,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const streamResponses = useSyncExternalStore(
     subscribeResponseStreaming,
     getResponseStreamingEnabled,
-    () => false,
+    () => true,
   );
   const streamResponsesRef = useRef(streamResponses);
   streamResponsesRef.current = streamResponses;

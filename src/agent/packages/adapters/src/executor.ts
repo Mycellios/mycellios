@@ -397,7 +397,7 @@ import {
   serializeModelSecret,
   withModelCredentialLock,
 } from "./pi-oauth.js";
-import { namedAgentTools } from "./pi-runtime.js";
+import { describeToolActivity, namedAgentTools } from "./pi-runtime.js";
 import type { PlotSpec } from "./plot-tool.js";
 import {
   assertPlotDataWithinLimits,
@@ -4808,19 +4808,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
         // Tool calls that land mid-sentence wait here until the narration catches up to a
         // sentence boundary, so the step chips never render in the middle of a clause.
-        let pendingToolNames: string[] = [];
+        let pendingTools: { name: string; label: string }[] = [];
         const flushPendingTools = () => {
           if (currentTextSegment) {
             messageSegments = appendTextSegment(messageSegments, currentTextSegment);
             currentTextSegment = "";
           }
-          for (const name of pendingToolNames) {
-            messageSegments = appendToolCallSegment(messageSegments, name);
+          for (const tool of pendingTools) {
+            messageSegments = appendToolCallSegment(messageSegments, tool.name, tool.label);
           }
-          pendingToolNames = [];
+          pendingTools = [];
         };
         const tryFlushPendingTools = () => {
-          if (pendingToolNames.length > 0 && endsSentence(currentTextSegment)) flushPendingTools();
+          if (pendingTools.length > 0 && endsSentence(currentTextSegment)) flushPendingTools();
         };
         let pendingProgress = "";
         let lastProgressAt = 0;
@@ -8815,15 +8815,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 await publishMidTurnNarration();
               }
               assistantTurnBreakPending = true;
+              const toolLabel = redactSecrets(
+                describeToolActivity(event.name, event.args),
+                runSecrets,
+              );
               await deps.events.append({
                 spaceId: run.spaceId,
                 threadId: thread.id,
                 botId: bot.id,
                 type: "agent.tool.called",
                 runId,
-                payload: { name: event.name, executionId: event.executionId },
+                payload: { name: event.name, executionId: event.executionId, label: toolLabel },
               });
-              pendingToolNames.push(event.name);
+              pendingTools.push({ name: event.name, label: toolLabel });
               tryFlushPendingTools();
               const loopGuard = advanceToolCallLoopGuard(toolCallStreak, event.name, event.args);
               toolCallStreak = loopGuard.streak;
@@ -10233,8 +10237,11 @@ export function mayOpenModelStream(
 
 export { isExactNoResponse, NO_RESPONSE, stripNoResponseReply, stripStrayNoResponse };
 
+export const LIVE_TURN_NARRATION =
+  "Before the first tool call, write one short sentence in the user's language saying what you are about to do. Write another sentence only when the plan changes, something fails, or you need the user. Do not narrate every tool call, and do not send a sentence only to say you are still working. Keep chain-of-thought out of the reply; the host shows a short thinking summary.";
+
 export function longWorkProgressGuidance(maxLength = messageUserMaxLength()): string {
-  return `During long computer tasks or multi-step jobs, keep the user informed with message_user: after roughly a minute of work, explain briefly what you have checked, what you found, and what comes next. Send another short update when a meaningful result or blocker changes the next step. Base updates on observed actions and results, in the user's language; do not invent progress, percentages or completion estimates. Do not interrupt a running tool just to send an update. Keep quick replies silent until the answer, avoid a message for every tool call, and keep thinking private. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.`;
+  return `${LIVE_TURN_NARRATION} During long computer tasks or multi-step jobs, keep the user informed with message_user: after roughly a minute of work, explain briefly what you have checked, what you found, and what comes next. Send another short update when a meaningful result or blocker changes the next step. Base updates on observed actions and results, in the user's language; do not invent progress, percentages or completion estimates. Do not interrupt a running tool just to send an update. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.`;
 }
 
 export const ROUTINE_SILENT_REPLY_GUIDANCE = `If this routine's prompt says to stay silent when there is nothing to report, the entire final assistant reply must be exactly ${NO_RESPONSE} — no surrounding prose, no variants, no progress updates, no all-clear, and no meta note that you are staying silent. Do not call message_user unless you have something to report.`;
@@ -10271,7 +10278,7 @@ function replyGuidanceForOfferedTools(
 ): string | undefined {
   if (!disabled?.has("message_user")) return guidance;
   if (guidance === longWorkProgressGuidance()) {
-    return "Always put the complete final answer in your normal reply.";
+    return `${LIVE_TURN_NARRATION} Always put the complete final answer in your normal reply.`;
   }
   if (guidance === REACTION_SILENT_REPLY_GUIDANCE) {
     return guidance.replace(", with no message_user call.", ".");

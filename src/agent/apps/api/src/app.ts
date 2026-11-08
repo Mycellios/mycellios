@@ -886,7 +886,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         },
       },
     });
-    if (matched) return c.newResponse(response.body, response);
+    if (matched) {
+      if ((response.headers.get("content-type") ?? "").includes("text/event-stream")) {
+        response.headers.set("cache-control", "no-cache, no-transform");
+        response.headers.set("x-accel-buffering", "no");
+      }
+      return c.newResponse(response.body, response);
+    }
     await next();
   });
   mountVoiceHttpRoutes(app, { prisma, secrets, env }, async (c) => {

@@ -172,7 +172,7 @@ export default function Account() {
   const streamReplies = useSyncExternalStore(
     subscribeResponseStreaming,
     getCachedResponseStreamingEnabled,
-    () => false,
+    () => true,
   );
   const loadRemoteImages = useSyncExternalStore(
     subscribeRemoteImages,

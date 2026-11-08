@@ -45,13 +45,14 @@ describe("isRunTerminalEvent", () => {
 });
 
 describe("response streaming preference", () => {
-  it("enables streaming only for an explicit on value", () => {
+  it("streams when nothing is saved and stays off for an explicit off", () => {
     expect(normalizeResponseStreamingPreference("on")).toBe("on");
     expect(normalizeResponseStreamingPreference(" ON ")).toBe("on");
     expect(normalizeResponseStreamingPreference("off")).toBe("off");
     expect(normalizeResponseStreamingPreference(" OFF ")).toBe("off");
-    expect(normalizeResponseStreamingPreference("")).toBe("off");
-    expect(normalizeResponseStreamingPreference(null)).toBe("off");
+    expect(normalizeResponseStreamingPreference("")).toBe("on");
+    expect(normalizeResponseStreamingPreference(null)).toBe("on");
+    expect(normalizeResponseStreamingPreference(undefined)).toBe("on");
     expect(normalizeResponseStreamingPreference("maybe")).toBe("off");
     expect(responseStreamingEnabled()).toBe(false);
     expect(responseStreamingEnabled("off")).toBe(false);
@@ -140,6 +141,47 @@ describe("reduceLiveMessageBlocks", () => {
 
     expect(reduceLiveMessageBlocks(activity, { type: "tool", name: "shell" })).toEqual([
       { kind: "steps", steps: [{ label: "Shell", count: 1 }] },
+    ]);
+  });
+
+  it("shows a specific tool label as soon as the activity line is up", () => {
+    const narrating = reduceLiveMessageBlocks([], {
+      type: "progress",
+      payload: { text: "I'll check the repo", streaming: true },
+    });
+    const activity = reduceLiveMessageBlocks(narrating, {
+      type: "progress",
+      payload: { text: "Running: git status", activity: true },
+    });
+    expect(activity).toEqual([
+      { kind: "text", text: "I'll check the repo" },
+      { kind: "progress", text: "Running: git status", activity: true },
+    ]);
+    expect(
+      reduceLiveMessageBlocks(activity, {
+        type: "tool",
+        name: "shell",
+        label: "Running: git status",
+      }),
+    ).toEqual([
+      { kind: "text", text: "I'll check the repo" },
+      { kind: "steps", steps: [{ label: "Running: git status", count: 1 }] },
+    ]);
+  });
+
+  it("keeps a labelled tool behind an unfinished sentence", () => {
+    expect(
+      reduceLiveMessageBlocks(
+        [{ kind: "progress", text: "Let me check " }],
+        { type: "tool", name: "shell", label: "Running: git status" },
+      ),
+    ).toEqual([
+      {
+        kind: "progress",
+        text: "Let me check ",
+        pendingToolNames: ["shell"],
+        pendingToolLabels: ["Running: git status"],
+      },
     ]);
   });
 });

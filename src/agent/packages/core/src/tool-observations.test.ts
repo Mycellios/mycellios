@@ -108,6 +108,15 @@ it("retains bounded execution observations, command details and explicit complet
     });
   expect(observedTools(blocks)).toHaveLength(16);
 });
+it("keeps a called label until a later activity line replaces it", () => {
+  const blocks = observeToolEvent([], {
+    ...called,
+    payload: { ...called.payload, label: "Running: git status" },
+  });
+  expect(observedTools(blocks)[0]?.detail).toBe("Running: git status");
+  const again = observeToolEvent(blocks, called);
+  expect(observedTools(again)[0]?.detail).toBe("Running: git status");
+});
 it("does not interpret arbitrary result bodies, absent identities or unknown outcomes", () => {
   expect(observeToolEvent([], { ...called, payload: { name: "shell" } })).toEqual([]);
   expect(

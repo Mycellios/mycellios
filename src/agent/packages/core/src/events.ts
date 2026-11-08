@@ -234,11 +234,13 @@ export function isRunTerminalEvent(event: { type: string }): boolean {
 export const RESPONSE_STREAMING_STORAGE_KEY = "rakazo.responseStreaming";
 export type ResponseStreamingPreference = "on" | "off";
 
-/** Missing and unknown values stay off; only an explicit "on" enables streaming. */
+/** Nothing saved streams. Only an explicit "off" hides live reply text. Unknown values stay off. */
 export function normalizeResponseStreamingPreference(
   raw: string | null | undefined,
 ): ResponseStreamingPreference {
-  return raw?.trim().toLowerCase() === "on" ? "on" : "off";
+  const value = raw?.trim().toLowerCase();
+  if (!value) return "on";
+  return value === "off" ? "off" : value === "on" ? "on" : "off";
 }
 
 export function responseStreamingEnabled(preference: ResponseStreamingPreference = "off"): boolean {
@@ -312,54 +314,91 @@ function clampRunFailure(message: string): string {
 
 export type LiveMessageUpdate =
   | { type: "progress"; payload: Record<string, unknown> | undefined }
-  | { type: "tool"; name: string };
+  | { type: "tool"; name: string; label?: string };
+
+function heldTools(
+  source: { pendingToolNames?: string[]; pendingToolLabels?: string[] } | undefined,
+): { name: string; label?: string }[] {
+  return (source?.pendingToolNames ?? []).map((name, index) => ({
+    name,
+    label: source?.pendingToolLabels?.[index] || undefined,
+  }));
+}
+
+function flushHeldTools(
+  segments: readonly MessageBlock[],
+  text: string | undefined,
+  tools: readonly { name: string; label?: string }[],
+  keepText: boolean,
+): MessageBlock[] {
+  let next = keepText && text ? appendTextSegment(segments, text) : [...segments];
+  for (const tool of tools) next = appendToolCallSegment(next, tool.name, tool.label);
+  return next;
+}
+
+function holdTools(
+  segments: readonly MessageBlock[],
+  text: string,
+  tools: readonly { name: string; label?: string }[],
+): MessageBlock[] {
+  if (!tools.length) {
+    return text
+      ? [...segments, { kind: "progress", text }]
+      : [...segments];
+  }
+  const pendingToolNames = tools.map((tool) => tool.name);
+  const pendingToolLabels = tools.map((tool) => tool.label ?? "");
+  return [
+    ...segments,
+    {
+      kind: "progress",
+      text,
+      pendingToolNames,
+      ...(pendingToolLabels.some((label) => label.length > 0) ? { pendingToolLabels } : {}),
+    },
+  ];
+}
 
 export function reduceLiveMessageBlocks(
   blocks: readonly MessageBlock[],
   update: LiveMessageUpdate,
 ): MessageBlock[] {
   const tail = blocks.at(-1);
-  const segments = tail?.kind === "progress" ? blocks.slice(0, -1) : blocks;
-  const priorText = liveMessageText(blocks);
-  const flushedLength =
-    tail?.kind === "progress" ? priorText.length - tail.text.length : priorText.length;
-  const tailText =
-    update.type === "progress"
-      ? progressMessageText(update.payload, priorText).slice(flushedLength)
-      : tail?.kind === "progress"
-        ? tail.text
-        : "";
-  const pendingToolNames = [
-    ...(tail?.kind === "progress" ? (tail.pendingToolNames ?? []) : []),
-    ...(update.type === "tool" ? [update.name] : []),
-  ];
-  const activity =
-    update.type === "progress"
-      ? update.payload?.activity === true
-      : tail?.kind === "progress" && tail.activity === true;
+  const segments = tail?.kind === "progress" ? blocks.slice(0, -1) : [...blocks];
+  const replyTail = tail?.kind === "progress" && tail.activity !== true ? tail : undefined;
+  const activityTail = tail?.kind === "progress" && tail.activity === true ? tail : undefined;
 
-  if (pendingToolNames.length > 0 && endsSentence(tailText)) {
-    let next = activity ? [...segments] : appendTextSegment(segments, tailText);
-    for (const name of pendingToolNames) next = appendToolCallSegment(next, name);
-    return next;
+  if (update.type === "progress" && update.payload?.activity === true) {
+    const activityText = String(update.payload.text ?? "");
+    const flushed = replyTail
+      ? flushHeldTools(segments, replyTail.text, heldTools(replyTail), true)
+      : segments;
+    if (!activityText) return flushed;
+    return [
+      ...flushed,
+      { kind: "progress", text: activityText, activity: true as const },
+    ];
   }
-  if (!tailText) return [...segments];
-  return [
-    ...segments,
-    {
-      kind: "progress",
-      text: tailText,
-      ...(activity ? { activity: true as const } : {}),
-      ...(pendingToolNames.length > 0 ? { pendingToolNames } : {}),
-    },
-  ];
-}
 
-function liveMessageText(blocks: readonly MessageBlock[]): string {
-  return blocks
-    .filter((block) => block.kind === "text" || block.kind === "progress")
-    .map((block) => block.text)
-    .join("");
+  if (update.type === "tool") {
+    const incoming = { name: update.name, label: update.label };
+    if (activityTail) {
+      return flushHeldTools(segments, undefined, [...heldTools(activityTail), incoming], false);
+    }
+    const pending = [...heldTools(replyTail), incoming];
+    const text = replyTail?.text ?? "";
+    if (endsSentence(text)) return flushHeldTools(segments, text, pending, true);
+    return holdTools(segments, text, pending);
+  }
+
+  const previousReply = replyTail?.text ?? "";
+  const nextText = progressMessageText(update.payload, previousReply);
+  const pending = heldTools(replyTail);
+  if (pending.length > 0 && endsSentence(nextText)) {
+    return flushHeldTools(segments, nextText, pending, true);
+  }
+  if (!nextText) return pending.length ? flushHeldTools(segments, "", pending, false) : [...segments];
+  return holdTools(segments, nextText, pending);
 }
 
 /**
@@ -387,13 +426,17 @@ export function liveActivityLine(
 
 export type ToolStep = { label: string; count: number };
 
-export function appendToolStep(steps: readonly ToolStep[], toolName: string): ToolStep[] {
-  const label = humanizeToolName(toolName);
+export function appendToolStep(
+  steps: readonly ToolStep[],
+  toolName: string,
+  label?: string,
+): ToolStep[] {
+  const shown = (label?.trim() || humanizeToolName(toolName)).slice(0, 500);
   const last = steps.at(-1);
-  if (last && last.label === label) {
-    return [...steps.slice(0, -1), { label, count: last.count + 1 }];
+  if (last && last.label === shown) {
+    return [...steps.slice(0, -1), { label: shown, count: last.count + 1 }];
   }
-  return [...steps, { label, count: 1 }];
+  return [...steps, { label: shown, count: 1 }];
 }
 
 export type ToolCallStreak = { key: string | undefined; count: number };
@@ -432,10 +475,11 @@ export function appendTextSegment(segments: readonly MessageBlock[], text: strin
 export function appendToolCallSegment(
   segments: readonly MessageBlock[],
   toolName: string,
+  label?: string,
 ): MessageBlock[] {
   const last = segments.at(-1);
   const priorSteps = last?.kind === "steps" ? last.steps : [];
-  const steps = appendToolStep(priorSteps, toolName);
+  const steps = appendToolStep(priorSteps, toolName, label);
   if (last?.kind === "steps") {
     return [...segments.slice(0, -1), { ...last, steps }];
   }
