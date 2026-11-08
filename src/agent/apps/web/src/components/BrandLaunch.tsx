@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { desktopDragClass } from "../lib/desktop";
 import "./brand-launch.css";
 
 export const SIGN_IN_WAIT_MS = 8000;
@@ -77,7 +78,7 @@ export function BrandLaunch({
       role={appState ? "status" : undefined}
       aria-label={appState ? "Mycellios" : undefined}
     >
-      <header className={drag ? "brand-launch-bar app-drag" : "brand-launch-bar"}>
+      <header className={["brand-launch-bar", drag ? desktopDragClass() : ""].filter(Boolean).join(" ")}>
         {wordAsLink ? (
           <a className="brand-launch-wordmark" href="/" aria-label="Mycellios">
             {word}

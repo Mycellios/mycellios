@@ -114,6 +114,7 @@ import { MycelliosCredits } from "../components/MycelliosCredits";
 import { SidebarContribution } from "../components/SidebarContribution";
 import { PageLoading } from "../components/PageLoading";
 import { PasskeyOffer } from "../components/PasskeyOffer";
+import { setLiveThreadConnection } from "../lib/live-thread-connection";
 import { notificationPreferences } from "../lib/notification-preferences";
 import { createReplySoundGate, playReplySound, unlockReplySound } from "../lib/reply-sound";
 import { ReleaseNotes } from "../components/ReleaseNotes";
@@ -126,7 +127,7 @@ import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
 import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
-import { desktopBridge } from "../lib/desktop";
+import { desktopBridge, desktopDragClass } from "../lib/desktop";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
@@ -1747,8 +1748,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     const sidebarRefresh = createRefreshCoalescer(() => refreshBots());
     const snapshotRefresh = createRefreshCoalescer(() => refreshThread(active.id));
     const abort = new AbortController();
+    setLiveThreadConnection("live");
     void runThreadSubscription({
       signal: abort.signal,
+      onConnection: setLiveThreadConnection,
       loadInitial: async () => {
         const primed = bootstrappedThread.current;
         bootstrappedThread.current = null;
@@ -1826,6 +1829,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       },
     });
     return () => {
+      setLiveThreadConnection("live");
       sidebarRefresh.dispose();
       snapshotRefresh.dispose();
       abort.abort();
@@ -1887,8 +1891,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     const sidebarRefresh = createRefreshCoalescer(() => refreshBots());
     const snapshotRefresh = createRefreshCoalescer(() => refreshGroupThread(groupId));
     const abort = new AbortController();
+    setLiveThreadConnection("live");
     void runThreadSubscription({
       signal: abort.signal,
+      onConnection: setLiveThreadConnection,
       loadInitial: () =>
         pendingJump
           ? rpc.threads.get({ groupId }, { signal: threadSnapshotSignal(abort.signal) })
@@ -1937,6 +1943,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       },
     });
     return () => {
+      setLiveThreadConnection("live");
       sidebarRefresh.dispose();
       snapshotRefresh.dispose();
       window.removeEventListener("focus", markVisibleGroupRead);
@@ -4206,7 +4213,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         /> : <>
         {/* The header floats so the transcript scrolls under its buttons. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <div data-testid="conversation-header" className={`${desktopBridge() ? "app-drag" : ""} ${desktopBridge()?.platform === "win32" ? "app-windows-caption-safe" : ""} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
+          <div data-testid="conversation-header" className={`${desktopDragClass()} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
             <div className="flex items-center">
               <Button
                 variant="floating"

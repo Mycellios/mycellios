@@ -1,4 +1,5 @@
 import type { AdapterContext, AgentRunRequest, AgentRuntime } from "@rakazo/adapter-kit";
+import { getLogger } from "@rakazo/logging";
 import { NativeEventQueue } from "./native-agent-process.js";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
 import type { AgentRpcMessage, AgentWire } from "./desktop-agent-rpc.js";
@@ -63,10 +64,22 @@ export class DesktopAgentHost {
     finally { signal.removeEventListener("abort", abort); controller.abort(); rpc.close(); await this.runtime.abort(runId); await work; this.sessions.delete(sessionId); }
   }
 
-  message(sessionId: string, message: unknown, botId: string, runId: string, projectSessionId?: string) {
+  hasSession(sessionId: string, botId: string, runId: string, projectSessionId?: string) {
+    const session = this.sessions.get(sessionId);
+    return !!session && session.botId === botId && session.runId === runId && session.projectSessionId === projectSessionId;
+  }
+
+  async message(sessionId: string, message: unknown, botId: string, runId: string, projectSessionId?: string) {
     const session = this.sessions.get(sessionId);
     if (!session || session.botId !== botId || session.runId !== runId || session.projectSessionId !== projectSessionId) throw Error("Desktop agent session changed");
-    // Do not hold a second native execution slot while awaiting a nested callback.
+    const result = !!message && typeof message === "object" && (message as { kind?: unknown }).kind === "result";
+    if (result) {
+      const started = Date.now();
+      await session.rpc.accept(message);
+      getLogger().info("desktop.agent.result_applied", { "run.id": runId, "desktop.elapsed_ms": Date.now() - started });
+      return;
+    }
+    // Calls stay fire-and-forget: awaiting a nested callback would hold a second native execution slot.
     void session.rpc.accept(message).catch(session.fail);
   }
 }

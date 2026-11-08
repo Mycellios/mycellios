@@ -71,10 +71,10 @@ test("an active Electron window keeps header dragging selection-free and control
     await page.getByRole("button", { name: "Bot settings" }).click();
     await expect(page.locator("#result")).toHaveText("opened");
 
-    if (process.platform === "win32") {
+    if (process.platform === "win32" || process.platform === "linux") {
       for (const mode of ["narrow", "maximized", "restored"] as const) {
         await app.evaluate(({ BrowserWindow }, mode) => {
-          const win = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().startsWith("data:text/html"));
+          const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().startsWith("data:text/html"));
           if (!win) throw new Error("Missing caption fixture window");
           if (mode === "narrow") win.setSize(460, 580);
           else if (mode === "maximized") win.maximize();
@@ -82,12 +82,12 @@ test("an active Electron window keeps header dragging selection-free and control
         }, mode);
         await expect.poll(async () => {
           const native = await app.evaluate(({ BrowserWindow }) => {
-            const win = BrowserWindow.getAllWindows().find(win => win.webContents.getURL().startsWith("data:text/html"));
+            const win = BrowserWindow.getAllWindows().find((candidate) => candidate.webContents.getURL().startsWith("data:text/html"));
             if (!win) throw new Error("Missing caption fixture window");
             return { height: win.getContentBounds().height, maximized: win.isMaximized() };
           });
           return { inset: native.height - await page.evaluate(() => innerHeight), maximized: native.maximized };
-        }).toEqual({ inset: 51, maximized: mode === "maximized" });
+        }).toEqual({ inset: 0, maximized: mode === "maximized" });
         await page.getByRole("button", { name: "Close panel" }).click();
         await expect(page.locator("#result")).toHaveText("closed");
         await page.getByRole("button", { name: "Bot settings" }).click();

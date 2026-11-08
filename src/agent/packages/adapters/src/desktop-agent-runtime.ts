@@ -1,12 +1,56 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import type { AdapterContext, AgentRunRequest, AgentRuntime, AgentRuntimeEvent } from "@rakazo/adapter-kit";
 import { DESKTOP_RUN_INTERRUPTED_ERROR, isUncertainDesktopRun } from "@rakazo/core";
-import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
+import { getLogger } from "@rakazo/logging";
+import { DesktopAgentRpc, type AgentRpcMessage } from "./desktop-agent-rpc.js";
 import { desktopAgentFrames } from "./desktop-agent-stream.js";
 import type { DesktopAgentFrame } from "./desktop-agent-host.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
 import { desktopModelAccess } from "./desktop-model-access.js";
 import { ComputerUpdatingError } from "./computer-errors.js";
+
+const RESULT_DELIVERY_ATTEMPTS = 3;
+
+function retryableResultDelivery(error: unknown): boolean {
+  if (error instanceof ComputerUpdatingError || !(error instanceof Error) || error.name === "AbortError") return false;
+  return [
+    "Desktop execution interrupted",
+    "Desktop execution disconnected",
+    "Desktop executor unavailable",
+    "Desktop operation interrupted",
+    "Desktop delivery was interrupted",
+    "Desktop response disconnected",
+    "Local computer disconnected",
+  ].some((prefix) => error.message === prefix || error.message.startsWith(prefix));
+}
+
+async function deliverAgentResult(
+  send: () => Promise<void>,
+  runId: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const started = Date.now();
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= RESULT_DELIVERY_ATTEMPTS; attempt += 1) {
+    if (signal.aborted) throw signal.reason instanceof Error ? signal.reason : new Error("Desktop execution aborted");
+    try {
+      await send();
+      if (attempt > 1) getLogger().info("desktop.agent.result_acknowledged", {
+        "run.id": runId, "desktop.attempt": attempt, "desktop.elapsed_ms": Date.now() - started,
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!retryableResultDelivery(error) || attempt === RESULT_DELIVERY_ATTEMPTS) break;
+      getLogger().warn("desktop.agent.result_unacknowledged", {
+        "run.id": runId, "desktop.attempt": attempt, "desktop.elapsed_ms": Date.now() - started,
+      });
+      await delay(250, undefined, { signal });
+    }
+  }
+  throw lastError;
+}
 
 export class DesktopAgentRuntime implements AgentRuntime {
   private active = new Map<string, AbortController>();
@@ -49,9 +93,13 @@ export class DesktopAgentRuntime implements AgentRuntime {
     this.active.set(request.runId, controller);
     const owned = { ...context, signal };
     let callbackError: unknown;
-    const rpc = new DesktopAgentRpc(async message => {
-      const response = await this.options.transport({ method: "agentMessage", botId: request.botId, runId: request.runId, sessionId, message, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
-      for await (const _ of desktopAgentFrames(response, signal, "callback")) { /* consume the complete acknowledgement */ }
+    const rpc = new DesktopAgentRpc(async (message: AgentRpcMessage) => {
+      const post = async () => {
+        const response = await this.options.transport({ method: "agentMessage", botId: request.botId, runId: request.runId, sessionId, message, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
+        for await (const _ of desktopAgentFrames(response, signal, "callback")) { /* consume the complete acknowledgement */ }
+      };
+      if (message.kind !== "result") { await post(); return; }
+      await deliverAgentResult(post, request.runId, signal);
     });
     const capture = request.onCheckpoint;
     const cleanup = new Set<() => void>();

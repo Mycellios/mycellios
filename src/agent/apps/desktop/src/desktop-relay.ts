@@ -11,11 +11,23 @@ import {
 } from "../../../packages/adapters/src/host-computer-protocol.js";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
+
+/** A delivery the broker has already accepted must be forgotten, never aborted or replayed. */
+export function missingOperationAction(
+  id: string,
+  active: readonly string[],
+  settled: ReadonlySet<string>,
+): "keep" | "forget" | "abort" {
+  if (active.includes(id)) return "keep";
+  if (settled.has(id)) return "forget";
+  return "abort";
+}
 /** Native-only outbound transport. The renderer never receives the host bearer. */
 export class DesktopRelayClient {
   private deviceId: string = randomUUID();
   private grants = new Map<string, { generation: string }>();
   private active = new Map<string, AbortController>();
+  private settled = new Set<string>();
   private pollController?: AbortController;
   private stopped = true;
   private timer?: ReturnType<typeof setTimeout>;
@@ -206,11 +218,13 @@ export class DesktopRelayClient {
         this.grants=grants;
       }
       this.lastContact = (this.options.now ?? Date.now)();
-      for (const [id, controller] of this.active)
-        if (!state.active.includes(id)) {
-          controller.abort();
-          this.active.delete(id);
-        }
+      for (const [id, controller] of this.active) {
+        const action = missingOperationAction(id, state.active, this.settled);
+        if (action === "keep") continue;
+        this.active.delete(id);
+        if (action === "forget") { this.settled.delete(id); continue; }
+        controller.abort();
+      }
       for (const id of state.active)
         if (!previousActive.has(id) && !this.active.has(id) && !state.operations.some((op) => op.id === id)) {
           // A lost poll is an uncertain delivery, never a reason to replay an effectful command.
@@ -244,7 +258,7 @@ export class DesktopRelayClient {
           continue;
         const controller = new AbortController();
         this.active.set(operation.id, controller);
-        void this.execute(operation, controller).finally(() => { this.active.delete(operation.id); });
+        void this.execute(operation, controller).finally(() => { this.active.delete(operation.id); this.settled.delete(operation.id); });
       }
     } catch {
       if ((this.options.now ?? Date.now)() - this.lastContact > 40_000) {
@@ -267,12 +281,18 @@ export class DesktopRelayClient {
       const next = delivery.then(async () => {
         if (closed) return;
         const body = {deviceId:this.deviceId,id:operation.id,seq,data:Buffer.from(data).toString("base64"),done};
+        const attempts = done ? 4 : 1;
         for (let attempt = 0; ; attempt++) {
+          if (done) this.settled.add(operation.id);
           try { await this.post("result", body, AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])); break; }
-          catch (error) { if (attempt >= 1 || controller.signal.aborted || this.stopped) throw error; }
+          catch (error) {
+            if (done) this.settled.delete(operation.id);
+            if (attempt >= attempts || controller.signal.aborted || this.stopped) throw error;
+          }
         }
         seq++;
         closed = done;
+        if (done) this.settled.add(operation.id);
       });
       delivery = next;
       return next;

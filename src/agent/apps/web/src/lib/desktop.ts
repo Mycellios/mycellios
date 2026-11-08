@@ -57,3 +57,12 @@ export function windowChromeKind(desktop?: RakazoDesktop): "spacer" | "darwin" |
   if (desktop.nativeWindowFrame) return "native";
   return "controls";
 }
+
+/** macOS hides the title bar into the page. Windows and Linux use the OS frame. */
+export function desktopHidesTitleBar(desktop: RakazoDesktop | undefined = desktopBridge()): boolean {
+  return desktop?.platform === "darwin";
+}
+
+export function desktopDragClass(desktop?: RakazoDesktop): string {
+  return desktopHidesTitleBar(desktop) ? "app-drag" : "";
+}

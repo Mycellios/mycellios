@@ -152,6 +152,27 @@ it("reserves callback and command lanes while two tasks of the same Mico own nat
   broker.close();await Promise.all(responses.map(r=>r.text()));
 });
 
+it("does not drop a finished command when the account lease lapses under a live heartbeat", () => {
+  let now = 0;
+  broker = new DesktopRelayBroker(() => now);
+  broker.register(owner, { ...binding, agentExecution: 1 });
+  broker.connectAccountBot(owner, "bot");
+  const sessionId = crypto.randomUUID();
+  const run = broker.dispatch({ method: "agentRun", botId: "bot", runId: "run", sessionId, request: {} }, context());
+  expect(broker.poll(owner, "device").operations).toHaveLength(1);
+  now = 30_000;
+  expect(broker.poll(owner, "device").active).toEqual([expect.any(String)]);
+  now = 70_000;
+  expect(broker.agentAvailable(owner, "bot")).toBe(true);
+  broker.register(owner, binding);
+  expect(broker.agentAvailable(owner, "bot")).toBe(true);
+  const callback = broker.dispatch({ method: "agentMessage", botId: "bot", runId: "run", sessionId, message: { kind: "result" } }, context());
+  expect(callback.ok).toBe(true);
+  broker.close();
+  void run.body?.cancel();
+  void callback.body?.cancel();
+});
+
 it("does not route an agent engine to old clients or another owner's device",()=>{
   broker=new DesktopRelayBroker();broker.register(owner,binding);broker.connectAccountBot(owner,"bot");
   expect(broker.agentAvailable(owner,"bot")).toBe(false);

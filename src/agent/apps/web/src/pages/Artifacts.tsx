@@ -44,7 +44,7 @@ import { PdfViewer } from "../components/PdfViewer";
 import { SandboxedHtmlViewer } from "../components/SandboxedHtmlViewer";
 import { decodeArtifactBase64, downloadArtifactBytes } from "../lib/artifact-open";
 import { takeInitialBootstrap } from "../lib/bootstrap";
-import { desktopBridge } from "../lib/desktop";
+import { desktopBridge, desktopDragClass } from "../lib/desktop";
 import { useSpaceQueries, writeSaved } from "../lib/query";
 import { formatRelativeTime } from "../lib/relative-time";
 import { useSpaceRpc } from "../lib/space-rpc";
@@ -260,7 +260,7 @@ export function ArtifactsPage({ onOpenNavigation, workspaceBots }: {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground" data-testid="file-library">
-      <header className="app-drag px-4 py-4 md:px-8 md:pt-7">
+      <header className={`${desktopDragClass()} px-4 py-4 md:px-8 md:pt-7`}>
         <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3">
           <div className="flex min-w-0 items-center gap-2">
             {embedded ? (
