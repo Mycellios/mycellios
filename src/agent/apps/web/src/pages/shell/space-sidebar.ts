@@ -1,4 +1,4 @@
-import { groupBotsForSidebar } from "@rakazo/core";
+import { groupBotsForSidebar, userFacingLabel } from "@rakazo/core";
 
 type SidebarChat = {
   id: string;
@@ -41,11 +41,13 @@ export async function commitSpaceRename(input: {
 export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends SidebarChat>(
   spaces: readonly SidebarSpace<TBot, TGroup>[],
   query: string,
-  labels?: { pinned: string; unassigned: string },
+  labels?: { pinned: string; unassigned: string; space?: string },
 ) {
+  const unnamedSpace = labels?.space ?? "Space";
   const needle = query.toLowerCase();
   const showSpaceNames = spaces.length > 1;
   return spaces.flatMap((space) => {
+    const label = userFacingLabel({ name: space.name }, unnamedSpace);
     const visibleBots = space.bots.filter((bot) =>
       `${bot.name} ${bot.title ?? ""} ${bot.preview ?? ""}`.toLowerCase().includes(needle),
     );
@@ -89,12 +91,12 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
       sectionId: group.key.startsWith("section:") ? group.key.slice("section:".length) : null,
       key: showSpaceNames ? `space:${space.id}:${group.key}` : group.key,
       // A header holding the space menu is never blank, even for the only space.
-      title: showSpaceNames ? space.name : index === 0 && !group.title ? space.name : group.title,
+      title: showSpaceNames ? label : index === 0 && !group.title ? label : group.title,
       subtitle: showSpaceNames && group.title ? group.title : undefined,
       showLock: showSpaceNames,
       emptySpaceId: undefined as string | undefined,
       spaceId: space.id,
-      spaceName: space.name,
+      spaceName: label,
       ...spaceHeaderMenu(space, index === 0),
     }));
     if (sections.length > 0) return sections;
@@ -106,14 +108,14 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
       ? []
       : space.botSections.map((section) => ({
           key: showSpaceNames ? `space:${space.id}:section:${section.id}` : `section:${section.id}`,
-          title: showSpaceNames ? space.name : section.name,
+          title: showSpaceNames ? label : section.name,
           subtitle: showSpaceNames ? section.name : undefined,
           bots: [] as (typeof sections)[number]["bots"],
           sectionId: section.id as string | null,
           showLock: showSpaceNames,
           emptySpaceId: undefined as string | undefined,
           spaceId: space.id,
-          spaceName: space.name,
+          spaceName: label,
           ...spaceHeaderMenu(space, false),
         }));
     // A lone space is the selected one, so its settings stay in the account menu too.
@@ -124,14 +126,14 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
     return [
       {
         key: showSpaceNames ? `space:${space.id}:empty` : `space:${space.id}:actions`,
-        title: space.name,
+        title: label,
         subtitle: undefined,
         bots: [],
         sectionId: null,
         showLock: showSpaceNames,
         emptySpaceId: showSpaceNames ? space.id : undefined,
         spaceId: space.id,
-        spaceName: space.name,
+        spaceName: label,
         ...spaceHeaderMenu(space, true),
       },
       ...emptySections,

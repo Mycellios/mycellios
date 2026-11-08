@@ -20,6 +20,7 @@ import {
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { desktopBridge } from "../../lib/desktop";
+import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
 import { localTimezone } from "../../lib/local-timezone";
 import type { RpcClient } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
@@ -228,7 +229,7 @@ export function UsageWorkspace({
             className="app-no-drag rk-usage-space"
             aria-label={t`Switch workspace`}
           >
-            <span>{spaces.find((space) => space.id === spaceId)?.name ?? "Mycellios"}</span>
+            <span>{selectedSpaceLabel(spaces, spaceId)}</span>
             <ChevronsUpDown size={11} />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -242,7 +243,7 @@ export function UsageWorkspace({
                   )
                 }
               >
-                {space.name}
+                {spaceLabel(space.name)}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

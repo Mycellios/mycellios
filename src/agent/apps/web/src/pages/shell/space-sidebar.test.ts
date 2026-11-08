@@ -30,6 +30,14 @@ function space(
 }
 
 describe("sidebarGroupsForSpaces", () => {
+  it("does not list an opaque space id as the space name", () => {
+    const id = "550e8400-e29b-41d4-a716-446655440000";
+    const [group] = sidebarGroupsForSpaces([space(id, id)], "");
+    expect(group?.title).toBe("Space");
+    expect(group?.spaceName).toBe("Space");
+    expect(group?.title).not.toBe(id);
+  });
+
   it("keeps an empty space with saved sections openable", () => {
     const empty = {
       ...space("space-2", "Support", { canRename: true, bots: [] }),

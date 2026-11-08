@@ -134,7 +134,7 @@ export default defineConfig({
   resolve: { alias: await workspaceViteAliases(agent) },
   plugins: [
     react(),
-    babel({ plugins: ["@lingui/babel-plugin-lingui-macro"] }),
+    babel({ plugins: [["@lingui/babel-plugin-lingui-macro", { descriptorFields: "message" }]] }),
     lingui(),
     tailwindcss(),
     {

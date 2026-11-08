@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { accountDisplay, displayMessageBlock, displayName } from "./display-name.js";
+import {
+  accountDisplay,
+  displayMessageBlock,
+  displayName,
+  userFacingLabel,
+} from "./display-name.js";
 
 const email = "demo@example.com";
 const opaque = [
@@ -64,6 +69,14 @@ describe("accountDisplay", () => {
     expect(accountDisplay({ name: "'ada" }, "You").initial).toBe("A");
     expect(accountDisplay({}, "…").initial).toBeNull();
   });
+});
+
+it("never uses a record id as its label", () => {
+  const id = "550e8400-e29b-41d4-a716-446655440000";
+  expect(userFacingLabel({ name: id, title: "" }, "Space")).toBe("Space");
+  expect(userFacingLabel({ title: "  " }, "Step")).toBe("Step");
+  expect(userFacingLabel({ name: "Finanzas", title: id }, "Space")).toBe("Finanzas");
+  expect(userFacingLabel({}, "Space")).toBe("Space");
 });
 
 it("guards identity metadata without changing literal message text", () => {

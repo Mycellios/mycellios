@@ -22,6 +22,7 @@ import {
 } from "@rakazo/ui-web";
 import { Lock } from "lucide-react";
 import { useId, useState } from "react";
+import { spaceLabel } from "../../lib/space-label";
 import { errorText } from "../../lib/user-error";
 
 /** Each dialog is mounted only while open, so `open` is always true and the
@@ -389,7 +390,7 @@ export function DeleteSpaceDialog({
   onConfirm: () => Promise<void>;
 }) {
   const botCount = space.botCount ?? 0;
-  const name = space.name;
+  const name = spaceLabel(space.name);
   return (
     <DeleteItemDialog
       item={space}

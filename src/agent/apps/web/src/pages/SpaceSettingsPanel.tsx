@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Field, FieldLabel, Input } from "@rakazo/ui-web";
 import { useId, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../components/SettingsRows";
+import { spaceLabel } from "../lib/space-label";
 import type { SettingsSpace } from "./shell/dialogs";
 import { DeleteSpaceDialog } from "./shell/dialogs";
 
@@ -50,7 +51,10 @@ export function SpaceSettingsPanel({
   return (
     <div className="space-y-8" data-testid="space-settings">
       <p className="max-w-prose text-[13.5px] leading-relaxed text-muted-foreground">
-        <Trans>A space groups your agents and conversations. You can give it its own model, voice and approval settings. Until you customize them, it uses your account settings.</Trans>
+        <Trans>
+          A space groups your agents and conversations. You can give it its own model, voice and
+          approval settings. Until you customize them, it uses your account settings.
+        </Trans>
       </p>
       <SettingsGroup>
         {draft !== null ? (
@@ -105,7 +109,7 @@ export function SpaceSettingsPanel({
           </form>
         ) : (
           <SettingsRow
-            label={<p className="break-words">{space.name}</p>}
+            label={<p className="break-words">{spaceLabel(space.name)}</p>}
             control={
               space.canRename ? (
                 <Button
