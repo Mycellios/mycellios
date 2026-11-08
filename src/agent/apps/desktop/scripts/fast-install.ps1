@@ -79,6 +79,49 @@ function Restore-Previous {
  $script:state.phase='restored';Save-State
 }
 
+function Restore-InterruptedExtraction([string]$version) {
+ if(!(Test-Path -LiteralPath $backupRoot -PathType Container) -or
+    ((Get-Item -LiteralPath $backupRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)){return}
+ $receipts=@(foreach($folder in Get-ChildItem -LiteralPath $backupRoot -Directory){
+  if($folder.Name -notmatch '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' -or
+     ($folder.Attributes -band [IO.FileAttributes]::ReparsePoint)){continue}
+  $file=Join-Path $folder.FullName 'receipt.json'
+  if(!(Test-Path -LiteralPath $file -PathType Leaf)){continue}
+  try{$saved=Get-Content -LiteralPath $file -Raw -Encoding UTF8|ConvertFrom-Json}catch{continue}
+  if($saved.schema -eq 'mycellios-fast-install/1' -and $saved.phase -eq 'prepared' -and
+     $saved.target -eq $version -and $saved.installation -eq $installationPath -and
+     $saved.backup -eq (Join-Path $folder.FullName 'installation')){$saved}
+ })
+ if($receipts.Count -eq 0){return}
+ if($receipts.Count -ne 1){throw 'Interrupted installation recovery is ambiguous'}
+ $saved=$receipts[0]
+ $folder=[IO.Path]::GetDirectoryName($saved.backup)
+ $old=Get-Item -LiteralPath $saved.backup -Force
+ if(!$old.PSIsContainer -or ($old.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+    !(Test-Path -LiteralPath (Join-Path $saved.backup $Uninstaller) -PathType Leaf)){throw 'Incomplete installation recovery'}
+ $keys=@($InstallRegistryKey,$UninstallRegistryKey)
+ if(@($saved.registry).Count -ne $keys.Count){throw 'Incomplete registration recovery'}
+ for($index=0;$index -lt $keys.Count;$index++){
+  $entry=$saved.registry[$index]
+  if($entry.file -ne ('registration-'+$index+'.reg')){throw 'Unexpected registration recovery file'}
+  $file=Join-Path $folder $entry.file
+  $headers=@(Get-Content -LiteralPath $file | Where-Object { $_ -match '^\[' })
+  if($headers.Count -ne 1 -or $headers[0] -ne ('[HKEY_CURRENT_USER\'+$keys[$index]+']') -or
+     (Hash-File $file) -ne $entry.sha256){throw 'Registration recovery scope differs'}
+ }
+ $shortcutPaths=@((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Mycellios Desktop.lnk'),(Join-Path ([Environment]::GetFolderPath('Programs')) 'Mycellios Desktop.lnk'))
+ $index=0
+ foreach($shortcut in $saved.shortcuts){
+  if($shortcut.path -notin $shortcutPaths -or $shortcut.file -ne ('shortcut-'+$index+'.lnk') -or
+     (Hash-File (Join-Path $folder $shortcut.file)) -ne $shortcut.sha256){throw 'Shortcut recovery scope differs'}
+  $index++
+ }
+ $script:state=$saved
+ Restore-Previous
+ Remove-Item -LiteralPath $Journal
+ $script:state=$null
+}
+
 try {
  Assert-Installation
  if($Operation -eq 'check'){
@@ -93,10 +136,16 @@ try {
   if((Get-Item -LiteralPath $oldExe).VersionInfo.ProductName -ne 'Mycellios Desktop'){throw 'Installed product identity differs'}
   $manifest=Get-Content -LiteralPath (Join-Path $installationPath 'resources\desktop-build.json') -Raw|ConvertFrom-Json
   if($manifest.schema -ne 'mycellios-desktop-build/1' -or $manifest.platform -ne 'windows-x64' -or $manifest.version -notmatch '^\d+\.\d+\.\d+$'){throw 'Installed build identity differs'}
-  if([IO.Path]::GetFileName($Uninstaller) -ne $Uninstaller -or $Uninstaller -ne 'Uninstall Mycellios Desktop.exe' -or
-     !(Test-Path -LiteralPath (Join-Path $installationPath $Uninstaller))){throw 'Installed uninstaller differs'}
+  if([IO.Path]::GetFileName($Uninstaller) -ne $Uninstaller -or $Uninstaller -ne 'Uninstall Mycellios Desktop.exe'){throw 'Installed uninstaller differs'}
   foreach($key in @($InstallRegistryKey,$UninstallRegistryKey)){
    if($key -notmatch '^Software\\(?:Microsoft\\Windows\\CurrentVersion\\Uninstall\\)?\{?[0-9a-fA-F-]{36}\}?$'){throw 'Installation registration scope differs'}
+  }
+  $fresh=$script:state
+  $uninstallPath=Join-Path $installationPath $Uninstaller
+  if(!(Test-Path -LiteralPath $uninstallPath -PathType Leaf)){
+   Restore-InterruptedExtraction $manifest.version
+   if(!(Test-Path -LiteralPath $uninstallPath -PathType Leaf)){throw 'Installed uninstaller differs'}
+   $script:state=$fresh
   }
   $folder=Join-Path $backupRoot ([Guid]::NewGuid().ToString())
   New-Item -ItemType Directory -Path $folder -Force|Out-Null

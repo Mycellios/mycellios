@@ -108,6 +108,7 @@ await build({
   format: "esm",
   target: "node24",
   conditions: ["node"],
+  tsconfig: path.join(root, "scripts", "tsconfig.server-build.json"),
   sourcemap: true,
   banner: {
     js: 'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);',

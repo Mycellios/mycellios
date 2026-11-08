@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,mkdir,writeFile,readFile,link,copyFile,access,rm,readdir} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,link,copyFile,access,rm,readdir,unlink} from 'node:fs/promises';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID} from 'node:crypto';
@@ -18,7 +18,7 @@ test('Windows snapshot/rollback preserves installation registration, drafts and 
   const journal=path.join(root,'journal.json'),guid=randomUUID();
   const keys=['Software\\'+guid,'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\'+guid];
   const reg=(...args)=>execFileSync('reg.exe',args,{windowsHide:true,stdio:'pipe'}).toString();
-  const invoke=(operation,extra=[])=>execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation',operation,'-Installation',installation,'-Journal',journal,...extra],{windowsHide:true,stdio:'pipe'});
+  const invoke=(operation,extra=[],receipt=journal)=>execFileSync(ps,['-NoProfile','-NonInteractive','-File',helper,'-Operation',operation,'-Installation',installation,'-Journal',receipt,...extra],{windowsHide:true,stdio:'pipe'});
   try {
     for(const key of keys){assert.throws(()=>reg('query','HKCU\\'+key));reg('add','HKCU\\'+key,'/v','InstallLocation','/t','REG_SZ','/d',installation,'/f');}
     reg('add','HKCU\\'+keys[1],'/v','DisplayVersion','/t','REG_SZ','/d','0.3.18','/f');
@@ -44,6 +44,26 @@ test('Windows snapshot/rollback preserves installation registration, drafts and 
     assert.equal(await readFile(path.join(profile,'drafts.json'),'utf8'),drafts);
     assert.equal(await readFile(path.join(profile,'tasks.json'),'utf8'),tasks);
     const restored=JSON.parse((await readFile(journal,'utf8')).replace(/^\uFEFF/,''));assert.equal(restored.phase,'restored');
+    const interruptedJournal=path.join(root,'interrupted.json'), retryJournal=path.join(root,'retry.json');
+    const args=['-Uninstaller','Uninstall Mycellios Desktop.exe','-InstallRegistryKey',keys[0],'-UninstallRegistryKey',keys[1]];
+    invoke('prepare',[...args,'-TargetVersion','99.0.1'],interruptedJournal);
+    const interrupted=JSON.parse((await readFile(interruptedJournal,'utf8')).replace(/^\uFEFF/,''));
+    // Extraction was interrupted after writing the binary and manifest but before registering the uninstaller.
+    await unlink(path.join(installation,'Uninstall Mycellios Desktop.exe'));
+    await copyFile(source,target);
+    await mkdir(path.join(installation,'resources'));
+    await writeFile(path.join(installation,'resources/desktop-build.json'),JSON.stringify({schema:'mycellios-desktop-build/1',platform:'windows-x64',version:'99.0.1'}));
+    invoke('prepare',[...args,'-TargetVersion','99.0.2'],retryJournal);
+    const recovered=JSON.parse((await readFile(path.join(path.dirname(interrupted.backup),'receipt.json'),'utf8')).replace(/^\uFEFF/,''));
+    const retry=JSON.parse((await readFile(retryJournal,'utf8')).replace(/^\uFEFF/,''));
+    assert.equal(recovered.phase,'restored');
+    assert.ok((await readdir(path.dirname(interrupted.backup))).some(name=>name.startsWith('failed-')));
+    assert.equal(retry.phase,'prepared');
+    assert.notEqual(retry.backup,interrupted.backup);
+    invoke('rollback',[],retryJournal);
+    await access(target);
+    assert.equal(await readFile(path.join(profile,'drafts.json'),'utf8'),drafts);
+    assert.equal(await readFile(path.join(profile,'tasks.json'),'utf8'),tasks);
   } finally {
     for(const key of keys){try{reg('delete','HKCU\\'+key,'/f')}catch{}}
     assert.ok(path.resolve(root).startsWith(path.resolve(tmpdir())+path.sep+'mycellios-fast-install-'));
