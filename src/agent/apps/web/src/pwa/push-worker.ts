@@ -1,4 +1,25 @@
 /// <reference lib="webworker" />
+// Keep the classic worker self-contained and only allow artwork bundled with it.
+const NOTIFICATION_AVATARS = new Set([
+  "axolotl", "crab", "fish", "fox", "frog", "hedgehog",
+  "moth", "mushroom", "octopus", "owl", "snail", "turtle",
+]);
+
+const NOTICE_COPY = {
+  en: {
+    completion: ["Reply ready", "Open the chat to read the reply."],
+    failure: ["Task interrupted", "Open the chat to see what happened."],
+    help: ["Your Mico needs an answer", "Open the chat to reply."],
+    takeover: ["Your Mico needs your help", "Open the chat to continue."],
+  },
+  es: {
+    completion: ["Respuesta lista", "Abre el chat para leerla."],
+    failure: ["Tarea interrumpida", "Abre el chat para ver qué ha pasado."],
+    help: ["Tu Mico espera una respuesta", "Abre el chat para responder."],
+    takeover: ["Tu Mico necesita tu ayuda", "Abre el chat para continuar."],
+  },
+} as const;
+
 /** Independent of the shell cache/update protocol. No remote URL is accepted from a push. */
 type PushPayload = {
   version: 1;
@@ -6,6 +27,9 @@ type PushPayload = {
   accountId: string;
   title: string;
   body: string;
+  kind?: keyof typeof NOTICE_COPY.en;
+  preview?: boolean;
+  avatar?: string;
   botId: string;
   threadId: string;
   spaceId: string;
@@ -30,6 +54,9 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
     p.title.length > 100 ||
     typeof p.body !== "string" ||
     p.body.length > 200 ||
+    (p.kind !== undefined && (typeof p.kind !== "string" || !Object.hasOwn(NOTICE_COPY.en, p.kind))) ||
+    (p.preview !== undefined && typeof p.preview !== "boolean") ||
+    (p.avatar !== undefined && !NOTIFICATION_AVATARS.has(p.avatar)) ||
     p.tag !== `mycellios:${p.threadId}` ||
     !Number.isFinite(p.expiresAt) ||
     p.expiresAt <= now ||
@@ -37,6 +64,23 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
   )
     return null;
   return p;
+}
+
+export function pushNotification(p: PushPayload, scopeUrl: string, language: string) {
+  const spanish = /^es(?:-|$)/i.test(language);
+  const copy = p.kind ? NOTICE_COPY[spanish ? "es" : "en"][p.kind] : undefined;
+  const avatar = p.preview && p.avatar && NOTIFICATION_AVATARS.has(p.avatar) ? p.avatar : undefined;
+  return {
+    title: copy && !p.preview ? copy[0] : p.title,
+    options: {
+      body: copy ? (p.preview && p.body.trim() ? p.body : copy[1]) : p.body,
+      tag: p.tag,
+      badge: new URL("mycellios/notification-badge.png", scopeUrl).href,
+      icon: new URL(`mycellios/notification-micos/${avatar ?? "mushroom"}.png`, scopeUrl).href,
+      actions: [{ action: "open-chat", title: spanish ? "Abrir chat" : "Open chat" }],
+      data: { url: pushChatUrl(p, scopeUrl), pushAccountId: p.accountId, botId: p.botId },
+    },
+  };
 }
 export function pushChatUrl(
   p: Pick<PushPayload, "botId" | "groupId" | "spaceId" | "taskThreadId">,
@@ -110,14 +154,9 @@ export function installPushWorker(scope: ServiceWorkerGlobalScope) {
       const key = new URL(`__push_receipt/${encodeURIComponent(p.id)}`, scope.registration.scope)
         .href;
       if (await receipts.match(key)) return;
-      // userVisibleOnly requires a visible notification (especially Safari).
-    // Foreground suppression happens in the server presence hold before transport.
-    await scope.registration.showNotification(p.title, {
-        body: p.body,
-        tag: p.tag,
-        icon: new URL("mycellios/app-icon-v2-192.png", scope.registration.scope).href,
-        data: { url: pushChatUrl(p, scope.registration.scope), pushAccountId: p.accountId },
-      });
+      // Foreground suppression happens in the server presence hold before transport.
+      const notice = pushNotification(p, scope.registration.scope, scope.navigator.language);
+      await scope.registration.showNotification(notice.title, notice.options);
       await receipts.put(key, new Response(String(p.expiresAt)));
       for (const receipt of await receipts.keys()) {
         const expiry = Number(await (await receipts.match(receipt))?.text());

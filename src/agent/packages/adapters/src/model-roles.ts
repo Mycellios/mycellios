@@ -83,17 +83,20 @@ export async function resolveMemberMainModel(
   deps: { prisma: PrismaClient; secretStore: Pick<SecretStore, "load"> },
   scope: { userId: string; spaceId: string },
 ): Promise<MemberMainModel | null> {
-  const { primary } = await appliedModelRole(deps.prisma, scope, "main");
-  if (!primary) return null;
-  const credential = await findConnectedModelCredential(
-    deps.prisma,
-    deps.secretStore,
-    scope,
-    primary.provider,
-    primary.modelId,
-    { credentialId: primary.credentialId },
-  );
-  return { ...primary, credential };
+  const { primary, backups } = await appliedModelRole(deps.prisma, scope, "main");
+  for (const choice of primary ? [primary] : backups) {
+    const credential = await findConnectedModelCredential(
+      deps.prisma,
+      deps.secretStore,
+      scope,
+      choice.provider,
+      choice.modelId,
+      { credentialId: choice.credentialId },
+    );
+    // An explicitly saved primary may also be served by a funded deployment.
+    if (primary || credential) return { ...choice, credential };
+  }
+  return null;
 }
 
 /** Select configuration without loading secrets or applying a runtime-specific fallback. */

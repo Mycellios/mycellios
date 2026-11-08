@@ -11,6 +11,8 @@ import {
   WebPushSubscriptionSchema,
 } from "@rakazo/contracts";
 import type { NotificationSettings, WebPushSubscription } from "@rakazo/contracts";
+import { micoAvatarShape, parseBotAvatarValue } from "@rakazo/contracts";
+import { currentMicoAvatarValue } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { runAsSystem } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
@@ -257,13 +259,19 @@ export class WebPushService {
           botId: message.botId,
           threadId: message.threadId,
         },
-        select: { updatedAt: true },
+        select: {
+          bot: { select: { name: true, color: true } },
+          thread: { select: { group: { select: { name: true } } } },
+        },
       });
       if (!run) return 0;
       const event = await this.notificationEvent(runId, message.kind);
       if (!event || event.createdAt.getTime() < Date.now() - 300_000) return 0;
       const expiresAt = event.createdAt.getTime() + 300_000;
       const eventKey = event.id;
+      const name = run.thread.group?.name ?? run.bot.name;
+      const appearance = parseBotAvatarValue(currentMicoAvatarValue(run.bot.color, message.botId));
+      const avatar = appearance.kind === "shape" ? micoAvatarShape(appearance.shapeIndex)?.id : undefined;
       const devices = await this.db.$queryRaw<
         Device[]
       >`SELECT * FROM web_push_devices WHERE "userId" = ${context.userId}`;
@@ -273,7 +281,10 @@ export class WebPushService {
           version: 1,
           id: eventKey,
           accountId: context.userId,
-          ...privateNotification(message, settings.previews),
+          ...privateNotification({ ...message, title: name }, settings.previews),
+          kind: message.kind,
+          preview: settings.previews,
+          avatar: settings.previews && !message.groupId ? avatar : undefined,
           botId: message.botId,
           threadId: message.threadId,
           spaceId: context.spaceId,
@@ -385,6 +396,9 @@ export class WebPushService {
         const payload = JSON.stringify({
           ...saved,
           ...privateNotification({ ...saved, kind: row.kind }, currentSettings.previews),
+          kind: row.kind,
+          preview: currentSettings.previews && saved.preview !== false,
+          avatar: currentSettings.previews && saved.preview === true ? saved.avatar : undefined,
         });
         // Standard encrypted Web Push. Provider errors are never logged with endpoint/payload.
         await this.sender(subscription, payload, this.config!);

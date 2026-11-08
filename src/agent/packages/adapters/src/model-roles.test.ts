@@ -334,7 +334,7 @@ describe("model roles", () => {
     });
   });
 
-  it("serves a compatible main model from the connection that enables it", async () => {
+  it.each([0, 1])("serves a compatible model saved at position %s from the connection that enables it", async (position) => {
     // Connection A is the provider's default; the main model is enabled only on B.
     const connectionA = { ...credential("openai-compatible", "model-a"), id: "a", secretId: "a" };
     const connectionB = { ...credential("openai-compatible", null), id: "b", secretId: "b" };
@@ -363,7 +363,7 @@ describe("model roles", () => {
       ...roleClient([
         {
           role: "main",
-          position: 0,
+          position,
           provider: "openai-compatible",
           modelId: "model-b",
           thinkingLevel: null,

@@ -19,9 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@rakazo/ui-web";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, Circle, CircleCheck, Cpu, Plug, Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { TextOnlyMark } from "../../components/TextOnlyMark";
+import { appPath } from "../../lib/app-path";
 
 /** A chat's model: a themed select, with search once there are too many choices to scan. */
 export function ChatModelPicker({
@@ -30,23 +31,40 @@ export function ChatModelPicker({
   value,
   onChange,
   inline = false,
+  defaultKey,
+  currentProvider,
+  heading,
+  onManage,
+  catalogProviders,
+  onExplore,
+  initialProvider,
 }: {
   id: string;
   choices: readonly ChatModelChoice[];
   value: string;
   onChange: (key: string) => void;
   inline?: boolean;
+  defaultKey?: string;
+  currentProvider?: string;
+  heading?: string;
+  onManage?: () => void;
+  catalogProviders?: readonly string[];
+  onExplore?: (provider: string) => void;
+  initialProvider?: string | null;
 }) {
   const { t } = useLingui();
   const imagesHintId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [provider, setProvider] = useState<string | null>(null);
-  const providers = [...new Set(choices.flatMap((choice) => choice.providerLabel ? [choice.providerLabel] : []))];
+  const providers = [...new Set([...(catalogProviders ?? []), ...choices.flatMap((choice) => choice.providerLabel ? [choice.providerLabel] : [])])];
+  const [provider, setProvider] = useState(() =>
+    initialProvider ?? choices.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? null,
+  );
+  const activeProvider = provider && providers.includes(provider) ? provider : providers[0];
   const sections = useMemo(() => groupModelChoices(
-    provider ? choices.filter((choice) => !choice.providerLabel || choice.providerLabel === provider) : choices,
+    inline && activeProvider ? choices.filter((choice) => !choice.providerLabel || choice.providerLabel === activeProvider) : choices,
     query,
-  ), [choices, provider, query]);
+  ), [choices, inline, activeProvider, query]);
   const selected = choices.find((choice) => choice.key === value) ?? choices[0];
   const textOnly = selected?.images === false;
   const imagesHint = <span id={imagesHintId} hidden>{t`Can't read images`}</span>;
@@ -98,23 +116,31 @@ export function ChatModelPicker({
           <Trans>No matching models</Trans>
         </CommandEmpty>
         {sections.map((section) => (
-          <CommandGroup key={section.key} heading={section.heading}>
+          <CommandGroup key={section.key} heading={inline && section.heading === activeProvider ? undefined : section.heading}>
             {section.data.map((choice) => (
               <CommandItem
                 key={choice.key}
                 aria-label={choice.label}
+                title={inline ? choice.label : undefined}
                 // cmdk falls back to the row's text for an empty value.
                 value={choice.key || "space-default"}
                 data-checked={choice.key === value}
+                className={inline ? "[&>svg:last-child]:hidden" : undefined}
                 aria-describedby={choice.images === false ? imagesHintId : undefined}
                 onSelect={() => {
                   onChange(choice.key);
                   openChange(false);
                 }}
               >
+                {inline ? (choice.key === value
+                  ? <CircleCheck aria-hidden className="shrink-0 text-foreground" />
+                  : <Circle aria-hidden className="shrink-0 text-muted-foreground/70" />) : null}
                 <span className="min-w-0 flex-1 truncate">
                   {choice.title ?? choice.label}
                 </span>
+                {inline && choice.key && choice.key === defaultKey ? (
+                  <span className="shrink-0 rounded-full bg-accent px-1.5 text-[11px] text-muted-foreground">{t`Default`}</span>
+                ) : null}
                 {choice.images === false ? (
                   <span className="shrink-0 text-muted-foreground">
                     <TextOnlyMark />
@@ -130,21 +156,42 @@ export function ChatModelPicker({
 
   if (inline) {
     return (
-      <div className="min-w-0">
+      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)]">
         {imagesHint}
-        {providers.length > 1 ? (
-          <div className="mb-2 flex max-w-full gap-1 overflow-x-auto" role="group" aria-label={t`Providers`}>
-            <Button type="button" size="sm" variant={provider === null ? "secondary" : "ghost"} aria-pressed={provider === null} onClick={() => setProvider(null)}>
-              {t`All`}
-            </Button>
+        {providers.length || onManage ? (
+          <div className="flex w-[5.25rem] flex-col items-center gap-1 border-e border-border bg-background px-1.5 py-2" role="group" aria-label={t`Providers`}>
             {providers.map((name) => (
-              <Button key={name} type="button" size="sm" variant={provider === name ? "secondary" : "ghost"} aria-pressed={provider === name} onClick={() => setProvider(name)}>
-                {name}
+              <Button key={name} type="button" size="sm" variant={activeProvider === name ? "secondary" : "ghost"}
+                className="h-auto w-full flex-col gap-1 px-1 py-1.5"
+                aria-pressed={activeProvider === name} aria-label={name} title={name}
+                onClick={() => { setProvider(name); setQuery(""); }}>
+                {name === "Mycellios" ? <img src={appPath("/mycellios/app-icon-v2-192.png")} alt="" className="size-4 rounded-sm" /> :
+                  catalogProviders?.includes(name) || name === "OpenAI-compatible" ? <Plug aria-hidden /> : <Cpu aria-hidden />}
+                <span className="w-full truncate text-center text-[11px]">{name}</span>
               </Button>
             ))}
+            {onManage ? (
+              <Button type="button" size="icon-sm" variant="ghost" aria-label={t`Manage models`} title={t`Manage models`} onClick={onManage}>
+                <Plus aria-hidden />
+              </Button>
+            ) : null}
           </div>
         ) : null}
-        {options}
+        <div className="min-w-0 px-2 py-2">
+          <p className="mb-1.5 truncate px-1 text-sm font-semibold">{heading ?? activeProvider ?? t`Model`}</p>
+          {currentProvider ? (
+            <p className="mb-1 truncate px-1 text-xs text-muted-foreground" title={currentProvider}>
+              {t`Provider for this Mico`}{currentProvider !== activeProvider ? ` · ${currentProvider}` : null}
+            </p>
+          ) : null}
+          {heading && activeProvider ? <p className="mb-1 truncate px-1 text-xs text-muted-foreground">{activeProvider}</p> : null}
+          {options}
+          {activeProvider && catalogProviders?.includes(activeProvider) && onExplore ? (
+            <Button type="button" variant="ghost" size="sm" className="mt-1 w-full justify-start gap-2" onClick={() => onExplore(activeProvider)}>
+              <Search aria-hidden />{t`Explore catalog`}
+            </Button>
+          ) : null}
+        </div>
       </div>
     );
   }

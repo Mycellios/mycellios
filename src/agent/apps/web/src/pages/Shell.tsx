@@ -114,6 +114,7 @@ import { SidebarContribution } from "../components/SidebarContribution";
 import { PageLoading } from "../components/PageLoading";
 import { PasskeyOffer } from "../components/PasskeyOffer";
 import { notificationPreferences } from "../lib/notification-preferences";
+import { createReplySoundGate, playReplySound, unlockReplySound } from "../lib/reply-sound";
 import { ReleaseNotes } from "../components/ReleaseNotes";
 import { SidebarFooter } from "../components/SidebarFooter";
 import { DesktopSidebarUpdate } from "../components/DesktopUpdates";
@@ -1124,6 +1125,21 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     [markBotRead, captureReadBoundary],
   );
   useEffect(() => userId ? watchNotificationFocus(userId) : undefined, [userId]);
+  const replySoundGate = useMemo(() => createReplySoundGate(), [userId, currentSpaceId]);
+  useEffect(() => {
+    if (!userId) return;
+    const unlock = () => {
+      const { enabled, sound } = notificationPreferences(userId);
+      if (enabled && sound) unlockReplySound();
+    };
+    // Touch pointerdown is not a user activation on mobile.
+    window.addEventListener("pointerup", unlock, true);
+    window.addEventListener("keydown", unlock, true);
+    return () => {
+      window.removeEventListener("pointerup", unlock, true);
+      window.removeEventListener("keydown", unlock, true);
+    };
+  }, [userId]);
   const deliverBrowserNotification = useCallback((pending: PendingBrowserNotification): boolean => {
     if (usesServerPush()) return true;
     const currentBot = botsRef.current.find((bot) => bot.id === pending.botId);
@@ -1174,9 +1190,17 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     ) => {
       const botId = event.botId;
       if (!userId) return;
+      const completedReply = streamReady && replySoundGate(event, subscribedThreadId, initialCursor);
       const preferences = notificationPreferences(userId);
       if (!preferences.enabled || preferences.mutedUntil > Date.now()) return;
       if (typeof botId !== "string" && !notificationGroupId) return;
+      if (
+        enabled && preferences.sound && !preferences.attentionOnly &&
+        document.visibilityState === "visible" && document.hasFocus() &&
+        completedReply
+      ) {
+        playReplySound();
+      }
       const eligible = shouldNotifyBrowser(event, {
         subscribedThreadId: subscribedThreadId ?? "",
         initialCursor,
@@ -1205,7 +1229,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         pendingBrowserNotifications.current.set(event.threadId, pending);
       }
     },
-    [deliverBrowserNotification, userId],
+    [deliverBrowserNotification, replySoundGate, userId],
   );
   useEffect(() => {
     if (!userId || !currentSpaceId || typeof Notification === "undefined") return;

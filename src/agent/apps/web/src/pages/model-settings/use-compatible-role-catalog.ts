@@ -2,10 +2,23 @@ import type { ModelCredential } from "@rakazo/contracts";
 import { ANTSEED_PROVIDER_ID, isMycelliosBaseUrl, isOpenAiCompatibleProvider, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
 import { useQueries } from "@tanstack/react-query";
 import { useSpaceRpc } from "../../lib/space-rpc";
+import type { RpcClient } from "../../lib/rpc";
 import { classifyModelConnectionFailure } from "../../lib/model-connection-preflight";
 
 export const compatibleRoleCatalogKey = (userId: string, spaceId: string, credentialId: string, baseUrl: string) =>
   ["compatible-role-catalog", userId, spaceId, credentialId, baseUrl];
+
+export async function discoverCompatibleModels(rpc: RpcClient, connection: ModelCredential, spaceId: string, signal?: AbortSignal) {
+  const options = { context: { spaceId }, ...(signal ? { signal } : {}) };
+  if (isMycelliosBaseUrl(connection.baseUrl)) {
+    return { models: (await rpc.models.mycelliosModels(undefined, options)).map(entry => entry.id) };
+  }
+  return rpc.models.probeOpenAiCompatible({
+    provider: connection.provider === ANTSEED_PROVIDER_ID ? ANTSEED_PROVIDER_ID : OPENAI_COMPATIBLE_PROVIDER_ID,
+    baseUrl: connection.baseUrl!,
+    credentialId: connection.id,
+  }, options);
+}
 
 /** Discover with the saved, owned connection; keys never enter the browser. */
 export function useCompatibleRoleCatalog(
@@ -21,13 +34,7 @@ export function useCompatibleRoleCatalog(
   const compatible = credentials.filter(entry => isOpenAiCompatibleProvider(entry.provider) && entry.baseUrl && (!mycelliosOnly || isMycelliosBaseUrl(entry.baseUrl)));
   const queries = useQueries({ queries: compatible.map(connection => ({
     queryKey: compatibleRoleCatalogKey(userId, spaceId, connection.id, connection.baseUrl!),
-    queryFn: async () => isMycelliosBaseUrl(connection.baseUrl)
-      ? { models: (await rpc.models.mycelliosModels(undefined, { context: { spaceId } })).map(entry => entry.id) }
-      : rpc.models.probeOpenAiCompatible({
-      provider: connection.provider === ANTSEED_PROVIDER_ID ? ANTSEED_PROVIDER_ID : OPENAI_COMPATIBLE_PROVIDER_ID,
-      baseUrl: connection.baseUrl!,
-      credentialId: connection.id,
-    }, { context: { spaceId } }),
+    queryFn: () => discoverCompatibleModels(rpc, connection, spaceId),
     enabled: open,
     staleTime: 60_000,
     retry: (count: number, error: unknown) => count < 1 && classifyModelConnectionFailure(error).outcome === "timeout",
