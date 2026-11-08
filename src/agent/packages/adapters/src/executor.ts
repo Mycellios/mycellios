@@ -9434,6 +9434,7 @@ async function failRunBeforeTurn(
 async function notifyRun(
   deps: ExecutorDeps,
   run: {
+    id?: string;
     spaceId: string;
     userId: string;
     botId: string;
@@ -9469,6 +9470,7 @@ async function notifyRun(
     .send(
       {
         ...message,
+        runId: run.id,
         ...(notice.groupId ? { groupId: notice.groupId } : {}),
         ...(notice.taskThreadId ? { taskThreadId: notice.taskThreadId } : {}),
         ...(badge === undefined ? {} : { badge }),

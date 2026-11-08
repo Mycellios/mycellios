@@ -67,6 +67,9 @@ model User {
   @@map("user")
   messagingInstallations MessagingInstallation[]
   messagingInstallSessions MessagingInstallSession[]
+  webPushSettings WebPushSettings?
+  webPushDevices WebPushDevice[]
+  webPushPresence WebPushPresence[]
 }
 
 /// A row with no answers means the user skipped the survey.
@@ -2104,4 +2107,55 @@ model InboxTask {
  @@unique([spaceId,userId,clientNonce])
  @@index([spaceId,userId,createdAt], map: "task_inbox_owner_idx")
  @@map("task_inbox")
+}
+
+/// Web Push uses narrow system-only raw SQL for session locking and atomic outbox claims.
+model WebPushSettings {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  settings Json @default("{}")
+  @@map("web_push_settings")
+}
+model WebPushPresence {
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String
+  clientId String
+  focusedUntil DateTime @db.Timestamptz(6)
+  @@id([userId, sessionId, clientId])
+  @@map("web_push_presence")
+}
+model WebPushDevice {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String
+  clientId String
+  digest String @unique
+  ciphertext String
+  focusedUntil DateTime? @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+  deliveries WebPushDelivery[]
+  @@unique([userId, sessionId, clientId])
+  @@index([userId], map: "web_push_devices_user")
+  @@map("web_push_devices")
+}
+model WebPushDelivery {
+  id String @id
+  deviceId String
+  device WebPushDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  eventKey String
+  ciphertext String
+  spaceId String
+  botId String
+  runId String
+  kind String
+  eventId String
+  dueAt DateTime @default(now()) @db.Timestamptz(6)
+  expiresAt DateTime @db.Timestamptz(6)
+  leaseUntil DateTime? @db.Timestamptz(6)
+  attempts Int @default(0)
+  finishedAt DateTime? @db.Timestamptz(6)
+  @@unique([deviceId, eventKey])
+  @@map("web_push_deliveries")
 }

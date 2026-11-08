@@ -1,3 +1,4 @@
+import type { WebPushService } from "@rakazo/adapters";
 import type {
   AgentHomeStore,
   AgentRuntime,
@@ -61,6 +62,7 @@ export interface RouterDeps {
   };
 
   pushTokens: PushTokenStore;
+  webPush?: WebPushService;
   analytics?: ProductAnalytics;
   cloudAgent?: CloudAgentConnection | null;
   prisma: PrismaClient;

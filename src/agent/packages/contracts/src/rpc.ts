@@ -1,3 +1,4 @@
+import { NotificationSettingsSchema, WebPushSubscriptionSchema } from "./notification-settings.js";
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
 import { AccountPlanLimitsSchema } from "./plan-limits.js";
@@ -1171,6 +1172,12 @@ export const appContract = {
     bot: oc.input(botId).output(ExportManifestSchema),
   },
   notifications: {
+    webStatus: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ configured: z.boolean(), publicKey: z.string().nullable(), registered: z.boolean(), settings: NotificationSettingsSchema, bots: z.array(z.object({ id: z.string(), name: z.string(), notifyOnFinish: z.boolean() })) })),
+    webRegister: oc.input(z.object({ clientId: z.string().uuid(), subscription: WebPushSubscriptionSchema })).output(z.object({ ok: z.literal(true) })),
+    webUnregister: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ ok: z.literal(true) })),
+    webPresence: oc.input(z.object({ clientId: z.string().uuid(), focused: z.boolean() })).output(z.object({ ok: z.literal(true) })),
+    settings: oc.output(NotificationSettingsSchema),
+    saveSettings: oc.input(NotificationSettingsSchema).output(NotificationSettingsSchema),
     registerPush: oc
       // No whitespace: the token store keeps the registering session on the next line.
       .input(z.object({ token: z.string().min(8).max(512).regex(/^\S+$/) }))

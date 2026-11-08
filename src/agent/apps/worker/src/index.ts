@@ -1,3 +1,4 @@
+import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { JobPublisher, JobWorkerHost } from "@rakazo/adapter-kit";
 import { ComposioConnector, IntegrationProviderSettings } from "@rakazo/adapters";
@@ -249,11 +250,13 @@ async function main() {
   const cloudAgent = createCloudAgentConnection();
   // Shared with the reconciler so a stuck wait uses the same push path as a finish notice.
   const pushTokens = new PrismaPushTokenStore(prisma, resolveEncryptionKey(process.env));
-  const notifications = new ExpoPushProvider(pushTokens, {
+  const nativeNotifications = new ExpoPushProvider(pushTokens, {
     sessionExpiresAt: (sessionId) => pushSessionExpiresAt(prisma, sessionId),
     jobs,
     accessToken: process.env.EXPO_ACCESS_TOKEN,
   });
+  const webPush = new WebPushService(prisma, resolveEncryptionKey(process.env), jobs, webPushConfig(process.env));
+  const notifications = webPush.config ? notificationChannels(nativeNotifications, webPush) : nativeNotifications;
   const executor = createRunExecutor({
     maxUploadSizeBytes: uploadSizeFromEnv(process.env),
     prisma,
@@ -325,7 +328,8 @@ async function main() {
     deploymentModelConfigured,
     messaging,
     cloudAgent,
-    notifications,
+    notifications: nativeNotifications,
+    webPush,
   });
   const reconciler = createJobReconciler({
     prisma,
@@ -360,6 +364,7 @@ async function main() {
     shutdown.abort();
     try {
       await stopHealth?.();
+      webPush.stop();
       await reconciler.stop();
       await jobHost.stop();
       await jobs.close();
@@ -411,6 +416,7 @@ async function main() {
     }
   }
   if (stopping) return;
+  webPush.start();
   reconciler.start();
   stopHealth = startWorkerHealth(reconciler.lastCompletedAt);
 

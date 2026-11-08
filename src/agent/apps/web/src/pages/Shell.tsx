@@ -1,3 +1,4 @@
+import { useWebPushPresence, usesServerPush } from "../lib/web-push";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { LayoutGrid } from "lucide-react";
@@ -144,8 +145,12 @@ import {
 import { readBotsSidebarCollapsed, writeBotsSidebarCollapsed } from "../lib/bots-sidebar-pref";
 import {
   deliverBrowserNotification as deliverNativeBrowserNotification,
+  hasFocusedNotificationTab,
   requestBrowserNotificationPermission,
+  requiresNotificationAttention,
   shouldNotifyBrowser,
+  showSystemNotification,
+  watchNotificationFocus,
 } from "../lib/browser-notifications";
 import {
   getSnapshot as getCallSnapshot,
@@ -326,10 +331,11 @@ const McpServersOverlay = lazyOverlay(() =>
 );
 
 type PendingBrowserNotification = {
-  event: Pick<ProductEvent, "id" | "type" | "threadId" | "botId" | "payload">;
-  botId: string;
+  event: Pick<ProductEvent, "id" | "type" | "threadId" | "botId" | "payload" | "runId">;
+  botId: string | null;
   botName: string;
-  groupNotification: boolean;
+  groupId?: string;
+  taskId?: string;
 };
 
 const THREAD_SNAPSHOT_TIMEOUT_MS = 2_000;
@@ -357,7 +363,10 @@ export function ShellPage() {
   const reviewTarget = useParams();
   const [taskSearch] = useSearchParams();
   const taskThreadId = reviewTarget.botId && !taskSearch.has("view") ? taskSearch.get("task") || undefined : undefined;
-  const taskSpaceId = taskThreadId ? taskSearch.get("taskSpace") || selectedSpaceId() : selectedSpaceId();
+  const notificationSpace = taskSearch.get("noticeSpace");
+  const taskSpaceId = (notificationSpace && /^[a-zA-Z0-9_-]{1,160}$/.test(notificationSpace)
+    ? notificationSpace
+    : taskThreadId ? taskSearch.get("taskSpace") : null) || selectedSpaceId();
   const taskScope = useMemo(() => taskThreadId && reviewTarget.botId
     ? { botId: reviewTarget.botId, taskThreadId } : undefined, [reviewTarget.botId, taskThreadId]);
   const scopedRpc = useMemo(() => createSpaceRpc(taskSpaceId, taskScope), [spaceEpoch, taskScope, taskSpaceId]);
@@ -381,6 +390,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const rpc = useSpaceRpc();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  useWebPushPresence(userId);
   const chatHistory = useChatHistory();
   const [taskAgentsOpen, setTaskAgentsOpen] = useState(false);
   const [chatToolsOpen, setChatToolsOpen] = useState(false);
@@ -1112,26 +1122,37 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     },
     [markBotRead, captureReadBoundary],
   );
+  useEffect(() => userId ? watchNotificationFocus(userId) : undefined, [userId]);
   const deliverBrowserNotification = useCallback((pending: PendingBrowserNotification): boolean => {
+    if (usesServerPush()) return true;
     const currentBot = botsRef.current.find((bot) => bot.id === pending.botId);
-    if (!currentBot || typeof Notification === "undefined") return true;
+    if ((!currentBot && !pending.groupId) || !userId || typeof Notification === "undefined") return true;
     const preferences = notificationPreferences(userId ?? "");
+    const query = new URLSearchParams();
+    if (currentSpaceId) query.set("noticeSpace", currentSpaceId);
+    if (pending.taskId) query.set("task", pending.taskId);
+    const messageId = pending.event.type === "thread.message.created" ? pending.event.payload.messageId : undefined;
+    if (typeof messageId === "string" && /^[a-zA-Z0-9_-]{1,160}$/.test(messageId)) query.set("m", messageId);
+    const chat = pending.groupId ? `/app/g/${encodeURIComponent(pending.groupId)}`
+      : `/app/${encodeURIComponent(pending.botId ?? "")}`;
+    const route = query.size ? `${chat}?${query}` : chat;
     const result = deliverNativeBrowserNotification(
       pending.event,
-      currentBot.name || pending.botName,
+      pending.groupId ? pending.botName : currentBot?.name || pending.botName,
       {
-        enabled: preferences.enabled && (pending.groupNotification || currentBot.notifyOnFinish),
+        enabled: preferences.enabled && preferences.mutedUntil <= Date.now() && Boolean(pending.groupId || currentBot?.notifyOnFinish) &&
+          (!preferences.attentionOnly || requiresNotificationAttention(pending.event)),
         preview: preferences.preview,
-        pageVisible: document.visibilityState === "visible",
-        windowFocused: document.hasFocus(),
+        pageVisible: true,
+        windowFocused: hasFocusedNotificationTab(userId),
         permission: Notification.permission,
         notifiedEventIds: notifiedBrowserEvents.current,
         show: (title, body, tag) =>
-          new Notification(title, { body, tag, ...(!preferences.sound ? { silent: true } : {}) }),
+          showSystemNotification(title, body, `mycellios:${userId}:${tag}`, route, preferences.sound, () => navigate(route)),
       },
     );
     return result !== "pending";
-  }, [userId]);
+  }, [currentSpaceId, navigate, userId]);
   const flushPendingBrowserNotifications = useCallback(() => {
     for (const [threadId, pending] of pendingBrowserNotifications.current) {
       if (deliverBrowserNotification(pending)) {
@@ -1141,32 +1162,36 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   }, [deliverBrowserNotification]);
   const notifyBrowserForEvent = useCallback(
     (
-      event: Pick<ProductEvent, "id" | "type" | "threadId" | "seq" | "botId" | "payload">,
+      event: Pick<ProductEvent, "id" | "type" | "threadId" | "seq" | "botId" | "payload" | "runId">,
       subscribedThreadId: string | undefined,
       initialCursor: number,
       streamReady: boolean,
       botName: string,
       enabled: boolean,
-      groupNotification: boolean,
+      notificationGroupId?: string,
+      notificationTaskId?: string,
     ) => {
       const botId = event.botId;
-      if (!notificationPreferences(userId ?? "").enabled) return;
-      if (typeof botId !== "string") return;
+      if (!userId) return;
+      const preferences = notificationPreferences(userId);
+      if (!preferences.enabled || preferences.mutedUntil > Date.now()) return;
+      if (typeof botId !== "string" && !notificationGroupId) return;
       const eligible = shouldNotifyBrowser(event, {
         subscribedThreadId: subscribedThreadId ?? "",
         initialCursor,
         streamReady,
-        pageVisible: document.visibilityState === "visible",
-        windowFocused: document.hasFocus(),
+        pageVisible: true,
+        windowFocused: hasFocusedNotificationTab(userId),
         permission: "granted",
         notifiedEventIds: notifiedBrowserEvents.current,
       });
       if (!eligible || !enabled) return;
       const pending = {
         event,
-        botId,
+        botId: botId ?? null,
         botName,
-        groupNotification,
+        groupId: notificationGroupId,
+        taskId: notificationTaskId,
       } satisfies PendingBrowserNotification;
       if (typeof Notification === "undefined" || Notification.permission === "denied") return;
       if (Notification.permission === "default") {
@@ -1181,6 +1206,66 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     },
     [deliverBrowserNotification, userId],
   );
+  useEffect(() => {
+    if (!userId || !currentSpaceId || typeof Notification === "undefined") return;
+    const client = createSpaceRpc(currentSpaceId);
+    const stop = new AbortController();
+    let busy = false;
+    let after = Date.now();
+    const check = async () => {
+      const preferences = notificationPreferences(userId);
+      if (hasFocusedNotificationTab(userId) || !preferences.enabled ||
+        preferences.mutedUntil > Date.now() || Notification.permission !== "granted") {
+        after = Date.now();
+        return;
+      }
+      if (busy) return;
+      busy = true;
+      const before = Date.now();
+      try {
+        const options = { signal: stop.signal };
+        const [activeRuns, recentRuns] = await Promise.all([
+          client.runs.list({ filter: "active" }, options),
+          preferences.attentionOnly ? null : client.runs.list({ filter: "recent" }, options),
+        ]);
+        if (stop.signal.aborted || hasFocusedNotificationTab(userId)) return;
+        for (const run of [...activeRuns.runs, ...(recentRuns?.runs ?? [])].reverse()) {
+          const time = Date.parse(run.updatedAt);
+          if (!run.notificationsEnabled || run.threadId === snapshotRef.current?.threadId ||
+            !Number.isFinite(time) || time < Math.max(after, before - 5 * 60_000)) continue;
+          // The activity list has no routine-level notification preference or quiet-result flag.
+          if (run.trigger === "routine" && (run.status === "completed" || run.status === "failed")) continue;
+          const type = run.status === "waiting_input" ? "run.waiting_input"
+            : run.status === "waiting_takeover" ? "computer.takeover.requested"
+            : run.status === "completed" ? "run.completed"
+            : run.status === "failed" ? "run.failed" : null;
+          if (!type) continue;
+          const bot = botsRef.current.find((item) => item.id === run.botId);
+          deliverBrowserNotification({
+            event: { id: `notice:${run.runId}:${run.status}:${run.updatedAt}`, type,
+              botId: run.botId, runId: run.runId, threadId: run.threadId, payload: {} },
+            botId: run.botId,
+            botName: run.groupName ?? run.botName,
+            groupId: run.groupId ?? undefined,
+            taskId: !run.groupId && bot && bot.threadId !== run.threadId ? run.threadId : undefined,
+          });
+        }
+        after = Math.max(after, before);
+      } catch {
+        // A transient read failure keeps the previous cursor for the next poll.
+      } finally {
+        busy = false;
+      }
+    };
+    const timer = window.setInterval(() => void check(), 12_000);
+    const foreground = () => { after = Date.now(); };
+    window.addEventListener("focus", foreground);
+    return () => {
+      stop.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", foreground);
+    };
+  }, [currentSpaceId, deliverBrowserNotification, userId]);
 
   const refreshBots = useCallback(
     async (includeArchived = false, replaceBotOrder = false) => {
@@ -1681,7 +1766,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           true,
           currentBot?.name ?? active.name,
           currentBot?.notifyOnFinish ?? false,
-          false,
+          undefined,
+          taskScope?.taskThreadId,
         );
         if (event.type === "thread.cleared") {
           expandedHistoryThread.current = null;
@@ -1804,15 +1890,14 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           computerRef,
         ),
       onEvent: (event, initial) => {
-        const eventBot = botsRef.current.find((bot) => bot.id === event.botId);
         notifyBrowserForEvent(
           event,
           initial.threadId,
           initial.cursor,
           true,
-          eventBot?.name ?? activeGroup.name,
+          activeGroup.name,
           true,
-          true,
+          groupId,
         );
         if (event.type === "thread.message.created" && event.payload.role === "bot") {
           readVisibleGroups.current.delete(groupId);

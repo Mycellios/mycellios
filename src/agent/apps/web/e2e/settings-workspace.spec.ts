@@ -23,12 +23,13 @@ test("unified settings persist real local changes, guard drafts and keep every s
   await page.addInitScript(() => {
     const calls: unknown[] = [];
     Object.defineProperty(window, "__settingsNotifications", { value: calls });
-    class FixtureNotification {
+    class FixtureNotification extends EventTarget {
       static permission = "granted";
       static async requestPermission() {
         return "granted";
       }
       constructor(title: string, options: unknown) {
+        super();
         calls.push({ title, options });
       }
       close() {}

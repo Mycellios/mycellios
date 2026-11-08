@@ -6,6 +6,7 @@ import {
   deliverBrowserNotification,
   requestBrowserNotificationPermission,
   shouldNotifyBrowser,
+  showSystemNotification,
 } from "./browser-notifications.js";
 import { i18n } from "./i18n.js";
 
@@ -16,6 +17,8 @@ function event(
       | "run.completed"
       | "run.failed"
       | "run.cancelled"
+      | "run.waiting_input"
+      | "thread.choice"
       | "thread.subagent"
       | "run.started";
     threadId: string;
@@ -50,6 +53,23 @@ function context(overrides: Partial<BrowserNotificationContext> = {}): BrowserNo
 }
 
 describe("browser notifications", () => {
+  it("delivers through an active service worker on mobile with a namespaced chat link", async () => {
+    const show = vi.fn(async () => undefined);
+    const constructor = vi.fn();
+    vi.stubGlobal("Notification", constructor);
+    vi.stubGlobal("navigator", { serviceWorker: { getRegistration: async () => ({
+      active: {}, showNotification: show,
+    }) } });
+    try {
+      await showSystemNotification("Chief", "Reply ready", "thread-1", "/app/g/group", false);
+      expect(show).toHaveBeenCalledExactlyOnceWith("Chief", expect.objectContaining({
+        tag: "thread-1", silent: true, data: { url: expect.stringMatching(/\/app\/g\/group$/) },
+      }));
+      expect(constructor).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   beforeEach(() => {
     i18n.load("en", {
       "{name} failed": "{name} failed",
@@ -66,7 +86,7 @@ describe("browser notifications", () => {
     expect(shouldNotifyBrowser(event(), context())).toBe(true);
     expect(shouldNotifyBrowser(event({ type: "run.started" }), context())).toBe(false);
     expect(shouldNotifyBrowser(event({ type: "run.failed" }), context())).toBe(true);
-    expect(shouldNotifyBrowser(event({ type: "run.cancelled" }), context())).toBe(true);
+    expect(shouldNotifyBrowser(event({ type: "run.cancelled" }), context())).toBe(false);
     expect(shouldNotifyBrowser(event({ payload: { role: "user", blocks: [] } }), context())).toBe(
       false,
     );
@@ -113,6 +133,19 @@ describe("browser notifications", () => {
       title: "Chief stopped",
       body: "Stopped.",
     });
+  });
+
+  it("alerts once for a choice and its waiting-state event without exposing the prompt", () => {
+    const choice = event({ type: "thread.choice", payload: { text: "Private approval details" } });
+    const waiting = event({ id: "event-2", type: "run.waiting_input" });
+    const notifiedEventIds = new Set<string>();
+    const show = vi.fn();
+    expect(shouldNotifyBrowser(choice, context())).toBe(true);
+    expect(deliverBrowserNotification(choice, "Chief", {
+      ...context(), enabled: true, notifiedEventIds, show,
+    })).toBe("delivered");
+    expect(show.mock.calls[0]?.[1]).not.toContain("Private approval details");
+    expect(shouldNotifyBrowser(waiting, context({ notifiedEventIds }))).toBe(false);
   });
 
   it("dedupes a replay but delivers another message from the same run", () => {

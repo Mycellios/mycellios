@@ -29,6 +29,7 @@ const payloadSchemas = {
     ref: z.string().min(1),
   }),
   "cloud_agent.poll": z.object({ agentId: z.string().min(1) }),
+  "webpush.deliver": z.object({ id: z.string().uuid() }),
   "push.receipt": z.object({
     userId: z.string().min(1),
     ticketId: z.string().min(1),

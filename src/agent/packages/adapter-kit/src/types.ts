@@ -712,6 +712,7 @@ export interface BackgroundJobPayloads {
   /** Reconcile durable remote-agent intent; scope is loaded from the database. */
   "cloud_agent.poll": { agentId: string };
   /** Read an Expo push receipt; the token is identified by its digest, never stored. */
+  "webpush.deliver": { id: string };
   "push.receipt": { userId: string; ticketId: string; tokenDigest: string };
 }
 
@@ -772,6 +773,8 @@ export interface ArtifactPut {
 }
 
 export interface NotificationMessage {
+  /** Durable run ownership and notification deduplication; never a command to replay. */
+  runId?: string;
   kind: "completion" | "failure" | "help" | "takeover";
   title: string;
   body: string;

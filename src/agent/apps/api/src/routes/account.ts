@@ -177,6 +177,36 @@ export function accountRoutes(ctx: RouterContext) {
       }),
     },
     notifications: {
+      webStatus: authed.notifications.webStatus.handler(async ({ context, input }) => {
+        if (!deps.webPush) throw new ORPCError("SERVICE_UNAVAILABLE");
+        if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
+        return deps.webPush.status(context.actor.userId, context.sessionId, input.clientId);
+      }),
+      settings: authed.notifications.settings.handler(async ({ context }) => {
+        if (!deps.webPush) throw new ORPCError("SERVICE_UNAVAILABLE");
+        return deps.webPush.settings(context.actor.userId);
+      }),
+      saveSettings: authed.notifications.saveSettings.handler(async ({ context, input }) => {
+        if (!deps.webPush) throw new ORPCError("SERVICE_UNAVAILABLE");
+        return deps.webPush.saveSettings(context.actor.userId, input);
+      }),
+      webRegister: authed.notifications.webRegister.handler(async ({ context, input }) => {
+        if (!deps.webPush?.config) throw new ORPCError("SERVICE_UNAVAILABLE");
+        if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
+        await deps.webPush.register(context.actor.userId, context.sessionId, input.clientId, input.subscription);
+        return { ok: true as const };
+      }),
+      webUnregister: authed.notifications.webUnregister.handler(async ({ context, input }) => {
+        if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
+        await deps.webPush?.unregister(context.actor.userId, context.sessionId, input.clientId);
+        return { ok: true as const };
+      }),
+      webPresence: authed.notifications.webPresence.handler(async ({ context, input }) => {
+        if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
+        await deps.webPush?.presence(context.actor.userId, context.sessionId, input.clientId, input.focused);
+        return { ok: true as const };
+      }),
+
       registerPush: authed.notifications.registerPush.handler(async ({ context, input }) => {
         const sessionId = context.sessionId;
         if (!sessionId) throw new ORPCError("UNAUTHORIZED");
