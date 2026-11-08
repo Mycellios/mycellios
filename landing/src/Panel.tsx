@@ -1,8 +1,6 @@
-import { Badge as UiBadge } from "./ui/primitives";
 import { SPORE_WELCOME_REWARD } from "../../src/contracts/spore-rewards";
 import { AgentNavigationLink, Sidebar, SidebarFooter } from "./ui/Sidebar";
-import { DialogPanel as UiDialogPanel } from "./ui/primitives";
-import { Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Select as UiSelect, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
+import { Badge as UiBadge, DialogPanel as UiDialogPanel, Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Select as UiSelect, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
 import { AppSelect, Toggle, PageTitle, PanelDisclosure, SummaryStrip, Metric, Empty, PanelLoading } from "./ui/patterns";
 import {
   Activity,
