@@ -89,7 +89,7 @@ export function threadsRoutes(ctx: RouterContext) {
           botId: input.botId, taskThreadId: input.taskThreadId,
         });
         if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
-        const nativeEngine = "agentEngine" in target.bot && ["codex", "claude", "acp"].includes(String(target.bot.agentEngine));
+        const nativeEngine = "agentEngine" in target.bot && ["codex", "claude", "acp", "opencode"].includes(String(target.bot.agentEngine));
         if (!nativeEngine && await threadNeedsModel(deps, context.actor, target.bot))
           throw new ORPCError("BAD_REQUEST", { message: MODEL_REQUIRED_SEND_ERROR });
         await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);

@@ -235,7 +235,9 @@ async function requireNativeEngine(deps: RouterDeps, actor: Actor, engine: strin
   const engines = await discoverNativeEngines(deps.dataDir);
   if (!engines.some((candidate) => candidate.id === engine && candidate.available)) {
     throw new ORPCError("BAD_REQUEST", {
-      message: "Install and sign in to this agent on the server computer first.",
+      message: engine === "opencode"
+        ? "Install OpenCode on the computer running this server."
+        : "Install and sign in to this agent on the server computer first.",
     });
   }
 }

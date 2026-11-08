@@ -1,4 +1,5 @@
 import { Trans, useLingui } from "@lingui/react/macro";
+import { SPORE_WELCOME_REWARD } from "@rakazo/contracts";
 import {
   credentialIssue,
   MAX_PASSWORD_LENGTH,
@@ -252,6 +253,11 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         </div>
       ) : (
         <>
+          {mode === "up" && !codeStep && reset?.passwordAuth ? (
+            <p className="mb-4 text-center text-sm text-muted-foreground">
+              <Trans>Create your account and get {SPORE_WELCOME_REWARD} trial Spore with no monetary value.</Trans>
+            </p>
+          ) : null}
           {capabilityError ? (
             <div role="alert" className="w-full text-center">
               <p>

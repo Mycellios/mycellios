@@ -312,14 +312,13 @@ it("opens the Space section for the space it acts on, with the space picker", as
     const nav = [...container.querySelectorAll('[data-testid^="settings-nav-"]')].map((item) =>
       item.getAttribute("data-testid"),
     );
-    // The account's sections come first; the per-space ones sit together under the picker.
-    expect(nav.slice(0, 6)).toEqual([
-      "settings-nav-general",
-      "settings-nav-profile",
-      "settings-nav-agents",
-      "settings-nav-models",
-      "settings-nav-notifications",
-      "settings-nav-voice",
+    expect(nav).toEqual([
+      "settings-nav-space",
+      "settings-nav-memory",
+      "settings-nav-space-mcp",
+      "settings-nav-space-providers",
+      "settings-nav-space-voice",
+      "settings-nav-space-approvals",
     ]);
     expect(container.querySelector('[data-testid="settings-space"]')?.textContent).toBe("Acme");
     const panel = container.querySelector<HTMLButtonElement>('[data-testid="space-settings"]');
@@ -360,7 +359,7 @@ it("opens a linked billing section once billing turns out to be on", async () =>
   }
 });
 
-it("shows no space label or switcher when there is only one space", async () => {
+it("shows the space name without a switcher when there is only one space", async () => {
   const { container, cleanup } = await render({
     space: acme,
     spaces: [acme],
@@ -368,7 +367,7 @@ it("shows no space label or switcher when there is only one space", async () => 
     section: "space",
   });
   try {
-    expect(container.querySelector('[data-testid="settings-space"]')).toBeNull();
+    expect(container.querySelector('p[data-testid="settings-space"]')?.textContent).toBe("Acme");
   } finally {
     await cleanup();
   }

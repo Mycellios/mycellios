@@ -1,4 +1,5 @@
 import { Badge as UiBadge } from "./ui/primitives";
+import { SPORE_WELCOME_REWARD } from "../../src/contracts/spore-rewards";
 import { AgentNavigationLink, Sidebar, SidebarFooter } from "./ui/Sidebar";
 import { DialogPanel as UiDialogPanel } from "./ui/primitives";
 import { Button as UiButton, Card as UiCard, Disclosure as UiDisclosure, DisclosureSummary as UiDisclosureSummary, FieldLabel as UiFieldLabel, Form as UiForm, Heading as UiHeading, Input as UiInput, Link as UiLink, Select as UiSelect, Table as UiTable, TableBody as UiTableBody, TableCell as UiTableCell, TableHead as UiTableHead, TableHeader as UiTableHeader, TableRow as UiTableRow, Text as UiText, Textarea as UiTextarea } from "./ui/primitives";
@@ -1197,6 +1198,7 @@ export function AccountModal({
         <AccountDetails tab={accountTab} titleId={titleId} session={session} identity={identity} account={account} usage={usage} usageBusy={usageBusy} linkBusy={linkBusy} roleBusy={roleBusy} providers={config.providers} error={error} onLinkProvider={(provider) => void linkProvider(provider)} onRetryRole={() => void retryRole()} onSignOut={onSignOut} />
       </> : <>
         <UiHeading as="h2" id={titleId}>{!emailAvailable ? "Continue to Mycellios" : mode === "signin" ? "Welcome back" : "Create your account"}</UiHeading>
+        {(!emailAvailable || mode === "signup") && <UiText>Create your account and get {SPORE_WELCOME_REWARD} trial Spore in Mycellios Agent. Trial Spore has no monetary value.</UiText>}
         {!emailAvailable && <UiText>Email sign-in is unavailable on this network. Choose a provider below.</UiText>}
         {emailAvailable && <div className="account-mode-tabs"><UiButton className={mode === "signin" ? "active" : ""} onClick={() => { setMode("signin"); setNotice(null); setError(null); }}>Sign in</UiButton><UiButton className={mode === "signup" ? "active" : ""} onClick={() => { setMode("signup"); setNotice(null); setError(null); }}>Create account</UiButton></div>}
         {emailAvailable && <UiForm onSubmit={(event) => void submit(event)}>

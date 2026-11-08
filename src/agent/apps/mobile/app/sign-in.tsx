@@ -246,9 +246,9 @@ export default function SignIn() {
                 {resetSent || codeStep
                   ? t("Check your email")
                   : mode === "in"
-                    ? t("Sign in to Rakazo")
+                    ? t("Sign in to Mycellios")
                     : mode === "up"
-                      ? t("Sign up for Rakazo")
+                      ? t("Sign up for Mycellios")
                       : t("Reset your password")}
               </Text>
               {resetSent ? (

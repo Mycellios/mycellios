@@ -1,9 +1,9 @@
 import { LocalVoice } from "./local-voice.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
-import { ManualUpdateController } from "./manual-update.js";
+import { ManualUpdateController, requireManualUpdateSpace } from "./manual-update.js";
 import { publishedWindowsRelease } from "./published-desktop-release.js";
-import { launchManualUpdate } from "./manual-update-handoff.js";
+import { acknowledgeManualUpdate, launchManualUpdate } from "./manual-update-handoff.js";
 import { saveUpdateResume, restoreUpdateBinding } from "./update-resume.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -152,6 +152,8 @@ const manualDesktopUpdater = process.platform === "win32" && process.arch === "x
     busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
     prepare: prepareRendererUpdate,
     handoff: async (file, release) => {
+      const profile = app.getPath("userData");
+      await requireManualUpdateSpace(profile, process.execPath);
       const win = mainWindow;
       if (!win || win.isDestroyed()) throw Error("The app window changed");
       const reopen = new URL(win.webContents.getURL());
@@ -169,7 +171,7 @@ const manualDesktopUpdater = process.platform === "win32" && process.arch === "x
         accountComputer?.stop();
         cloudComputer?.stop();
         hostComputer?.activate(false);
-        await launchManualUpdate({ profile: app.getPath("userData"), executable: process.execPath,
+        await launchManualUpdate({ profile, executable: process.execPath,
           oldPid: process.pid, installer: file, release, reopenUrl: reopen.href });
         quitting = true;
         app.quit();
@@ -892,7 +894,7 @@ function installApplicationMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-/** Setup IPC must only answer the setup window, never a connected Rakazo server. */
+/** Setup IPC must only answer the setup window, never a connected Mycellios server. */
 function fromSetupWindow(event: Electron.IpcMainInvokeEvent) {
   return (
     setupWindow !== null && !setupWindow.isDestroyed() && event.sender === setupWindow.webContents
@@ -919,7 +921,7 @@ async function probeServer(rawUrl: string, signal?: AbortSignal): Promise<Deskto
         ok: false,
         status: response.status,
         url,
-        error: "That address redirects elsewhere. Enter the final Rakazo server address.",
+        error: "That address redirects elsewhere. Enter the final Mycellios server address.",
       };
     }
     if (!response.ok) {
@@ -936,7 +938,7 @@ async function probeServer(rawUrl: string, signal?: AbortSignal): Promise<Deskto
         ok: false,
         status: response.status,
         url,
-        error: "That address did not respond like a Rakazo server.",
+        error: "That address did not respond like a Mycellios server.",
       };
     }
     return {
@@ -1051,8 +1053,13 @@ async function openAppOnce(targetUrl: string, switching: boolean) {
     win = created.win;
     // On launch the web app's error screen stays up so its Refresh can recover;
     // switching to a server that cannot render keeps the previous one instead.
-    if ((await created.loaded) === "failed" && switching) {
+    const loaded = await created.loaded;
+    if (loaded === "failed" && switching) {
       throw new Error("The server page did not become ready.");
+    }
+    if (loaded !== "failed" && manualDesktopUpdater) {
+      void acknowledgeManualUpdate(app.getPath("userData"), process.execPath, app.getVersion(), process.pid, process.argv)
+        .catch(() => console.warn("Could not record Desktop update startup"));
     }
     currentTargetUrl = targetUrl;
     activateDesktopMonitoring(targetUrl, target.value);
@@ -1415,7 +1422,7 @@ app.whenReady().then(async () => {
     }
     return voice;
   };
-  ipcMain.handle("desktop.localVoice.status", event => localVoice(event).status());
+  ipcMain.handle("desktop.localVoice.status", event => localVoice(event).statusFromDisk());
   ipcMain.handle("desktop.localVoice.prepare", event => localVoice(event).prepare());
   ipcMain.handle("desktop.localVoice.transcribe", (event, samples: Float32Array) => localVoice(event).run({ samples }));
   ipcMain.handle("desktop.localVoice.speak", (event, input: { text: string; language: string; speed: number }) => {
@@ -1812,7 +1819,7 @@ app.whenReady().then(async () => {
         if (managedUrl === null || !(await localStack.matchesDesiredStack())) {
           return {
             ok: false,
-            error: "The app-managed Rakazo services are not ready. Retry setup.",
+            error: "The app-managed Mycellios services are not ready. Retry setup.",
           };
         }
         openSetup = { mode: "new", serverUrl: managedUrl };

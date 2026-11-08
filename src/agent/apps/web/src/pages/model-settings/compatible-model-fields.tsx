@@ -308,52 +308,6 @@ export function CompatibleModelFields({
         {effectiveBaseUrl ? endpointField : null}
 
         {children}
-        {!connectionOnly && compatibleRows.length ? (
-          <div className="mt-5">
-            <p>
-              <Trans>Available models · {enabledCount} enabled</Trans>
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                aria-label={t`Filter models`}
-                placeholder={t`Search models`}
-                className="min-w-0 flex-1 text-foreground"
-              />
-              <Button
-                type="button"
-                variant={enabledOnly ? "secondary" : "outline"}
-                size="sm"
-                aria-pressed={enabledOnly}
-                onClick={() => setEnabledOnly((value) => !value)}
-              >
-                <Trans>Enabled only</Trans>
-              </Button>
-            </div>
-            <div className="rk-scroll mt-3 grid max-h-64 gap-2 overflow-y-auto overscroll-contain pr-2">
-              {visibleModels.length === 0 ? (
-                <p role="status">
-                  <Trans>No matching models</Trans>
-                </p>
-              ) : null}
-              {visibleModels.map((id) => (
-                <Label key={id} className="font-normal text-foreground">
-                  <Checkbox
-                    checked={id === modelId || enabledModelIds.includes(id)}
-                    disabled={busy || id === modelId}
-                    onCheckedChange={(checked) => {
-                      selectionRevisionRef.current += 1;
-                      setEnabledModelIds((current) => toggleEnabledModelId(current, id, checked));
-                      setNotice(null);
-                    }}
-                  />
-                  <span className="min-w-0 break-all">{id}</span>
-                </Label>
-              ))}
-            </div>
-          </div>
-        ) : null}
 
         <ModelHeadersEditor
           rows={headerRows}
@@ -367,6 +321,52 @@ export function CompatibleModelFields({
           }}
         />
       </ModelThinkingOptions>
+      {!connectionOnly && compatibleRows.length ? (
+        <div className="mt-5">
+          <p>
+            <Trans>Available models · {enabledCount} enabled</Trans>
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              aria-label={t`Filter models`}
+              placeholder={t`Search models`}
+              className="min-w-0 flex-1 text-foreground"
+            />
+            <Button
+              type="button"
+              variant={enabledOnly ? "secondary" : "outline"}
+              size="sm"
+              aria-pressed={enabledOnly}
+              onClick={() => setEnabledOnly((value) => !value)}
+            >
+              <Trans>Enabled only</Trans>
+            </Button>
+          </div>
+          <div className="rk-scroll mt-3 grid max-h-64 gap-2 overflow-y-auto overscroll-contain pr-2">
+            {visibleModels.length === 0 ? (
+              <p role="status">
+                <Trans>No matching models</Trans>
+              </p>
+            ) : null}
+            {visibleModels.map((id) => (
+              <Label key={id} className="font-normal text-foreground">
+                <Checkbox
+                  checked={id === modelId || enabledModelIds.includes(id)}
+                  disabled={busy || id === modelId}
+                  onCheckedChange={(checked) => {
+                    selectionRevisionRef.current += 1;
+                    setEnabledModelIds((current) => toggleEnabledModelId(current, id, checked));
+                    setNotice(null);
+                  }}
+                />
+                <span className="min-w-0 break-all">{id}</span>
+              </Label>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

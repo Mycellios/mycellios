@@ -15,7 +15,7 @@ const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js")
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");
 const { routineCalendar } = await import("../apps/api/src/routine-calendar.js");
-const { usageDashboard } = await import("../apps/api/src/usage-dashboard.js");
+const { sporeRewards, usageDashboard } = await import("../apps/api/src/usage-dashboard.js");
 const { selectOfflineCloudWorkspace } = await import("../packages/adapters/src/offline-cloud-workspace.js");
 const { acquireDedicatedScreenLeaseFence, provisionComputer, releaseComputerExecutionLease } =
   await import("../packages/adapters/src/computer-lifecycle.js");
@@ -57,6 +57,8 @@ try {
     ]) {
       await sql.query(await readFile(`packages/db/prisma/migrations/${migration}/migration.sql`, "utf8"));
     }
+    await sql.query('DROP INDEX "usage_records_userId_idx"');
+    await sql.query(await readFile("packages/db/prisma/migrations/20261108170000_usage_records_account_rewards_index/migration.sql", "utf8"));
   } finally { await sql.end(); }
   checks.push("additive inbox migration with the published thread owner constraints");
   db = createDb(url, { encryptContent: false, applicationName: "synthetic-workspace-sync" });
@@ -159,6 +161,27 @@ try {
   assert.equal((await runAsTenant(actor, () => routineCalendar(prisma, actor, range))).routines.length, 0);
   await assert.rejects(runAsTenant({ ...actor, userId: "foreign" }, () => usageDashboard(prisma, { ...actor, userId: "foreign" }, { ...range, botId: bot.id })));
   checks.push("bounded calendar/usage reads and API owner/Space isolation; missing usage is not zero cost");
+  const balance = () => runAsTenant(actor, () => sporeRewards(prisma, actor));
+  assert.deepEqual(await balance(), { welcome: 100, earned: 0, progressTokens: 0 });
+  const modelUsage = { provider: "fixture", model: "fixture", operationKind: "compaction" };
+  const firstCall = { ...modelUsage, ...actor, callId: randomUUID(), totalTokens: 999_999 };
+  await system.usageRecord.create({ data: firstCall });
+  assert.deepEqual(await balance(), { welcome: 100, earned: 0, progressTokens: 999_999 });
+  await system.usageRecord.createMany({
+    skipDuplicates: true,
+    data: [
+      firstCall,
+      { ...modelUsage, userId: actor.userId, spaceId: "other-space", operationKind: "setup",
+        inputTokens: 1, outputTokens: 2, cacheReadTokens: 3, cacheWriteTokens: 4,
+        cacheWrite1hTokens: 4, reasoningTokens: 2 },
+      { ...modelUsage, ...actor, inputTokens: 99_000_000 },
+      { ...modelUsage, ...actor, userId: "another-user", totalTokens: 10_000_000 },
+    ],
+  });
+  const expectedRewards = { welcome: 100, earned: 1, progressTokens: 9 };
+  assert.deepEqual(await balance(), expectedRewards);
+  assert.deepEqual(await balance(), expectedRewards);
+  checks.push("trial Spore threshold, cross-Space account ownership, canonical usage and replay safety");
   const rls = database.getPgClient(); await rls.connect();
   try {
     await rls.query("CREATE ROLE inbox_probe NOLOGIN");

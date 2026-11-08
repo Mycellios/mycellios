@@ -643,8 +643,8 @@ msgid "An API key is stored for this provider, not a subscription sign-in."
 msgstr "Há uma chave de API armazenada para este provedor, não um login de assinatura."
 
 #: src/pages/memory-providers/HonchoSettingsForm.tsx
-msgid "An existing Honcho peer to read from. Rakazo never writes to it."
-msgstr "Um peer existente do Honcho para leitura. O Rakazo nunca grava nele."
+msgid "An existing Honcho peer to read from. Mycellios never writes to it."
+msgstr "Um peer existente do Honcho para leitura. O Mycellios nunca grava nele."
 
 #: src/lib/agent-import-errors.ts
 msgid "An imported API key could not be checked. Try again."
@@ -1176,7 +1176,7 @@ msgid "Choose folder"
 msgstr "Escolher pasta"
 
 #: src/components/ModelCredits.tsx
-msgid "Choose how to use Rakazo"
+msgid "Choose how to use Mycellios"
 msgstr ""
 
 #: src/lib/localized-provider-hint.ts
@@ -1460,8 +1460,8 @@ msgstr "Conectar Treg"
 
 #. js-lingui-explicit-id
 #: src/lib/run-error.ts
-msgid "Connect your own API key in Models or choose Rakazo credits in Billing."
-msgstr "Conecte sua própria chave de API em Modelos ou escolha créditos Rakazo em Faturamento."
+msgid "Connect your own API key in Models or choose Mycellios credits in Billing."
+msgstr "Conecte sua própria chave de API em Modelos ou escolha créditos Mycellios em Faturamento."
 
 #: src/components/integrations/IntegrationSetup.tsx
 #: src/pages/McpOAuthCallback.tsx
@@ -2046,8 +2046,8 @@ msgid "Create space"
 msgstr ""
 
 #: src/pages/Auth.tsx
-msgid "Create your Rakazo"
-msgstr "Crie o seu Rakazo"
+msgid "Create your Mycellios"
+msgstr "Crie o seu Mycellios"
 
 #: src/components/AskCard.tsx
 msgid "Created"
@@ -2799,7 +2799,7 @@ msgid "How to check"
 msgstr "Como verificar"
 
 #: src/components/SignupSurvey.tsx
-msgid "How will you use Rakazo?"
+msgid "How will you use Mycellios?"
 msgstr ""
 
 #: src/pages/shell/computer-release-actions.tsx
@@ -3655,8 +3655,8 @@ msgid "Not imported"
 msgstr "Não importado"
 
 #: src/pages/shell/import-status.ts
-msgid "Not in Rakazo's catalog"
-msgstr "Fora do catálogo do Rakazo"
+msgid "Not in Mycellios's catalog"
+msgstr "Fora do catálogo do Mycellios"
 
 #: src/pages/PluginsOverlay.tsx
 msgid "Not in the plugin catalog"
@@ -3668,12 +3668,12 @@ msgstr "Agora não"
 
 #: src/pages/shell/agent-import.tsx
 #: src/pages/shell/import-status.ts
-msgid "Not supported in Rakazo"
-msgstr "Não compatível com o Rakazo"
+msgid "Not supported in Mycellios"
+msgstr "Não compatível com o Mycellios"
 
 #: src/pages/shell/agent-import.tsx
-msgid "Not used by Rakazo"
-msgstr "Não usado pelo Rakazo"
+msgid "Not used by Mycellios"
+msgstr "Não usado pelo Mycellios"
 
 #: src/components/McpServerHealthLine.tsx
 msgid "Not working"
@@ -3892,8 +3892,8 @@ msgid "Paste a replacement key"
 msgstr "Cole uma chave de substituição"
 
 #: src/pages/model-settings/compatible-model-fields.tsx
-msgid "Paste the OpenAI-compatible address from your server. Rakazo adds /v1 if needed."
-msgstr "Cole o endereço compatível com OpenAI do seu servidor. Rakazo adiciona /v1 se necessário."
+msgid "Paste the OpenAI-compatible address from your server. Mycellios adds /v1 if needed."
+msgstr "Cole o endereço compatível com OpenAI do seu servidor. Mycellios adiciona /v1 se necessário."
 
 #: src/pages/shell/agent-import.tsx
 msgid "Paste the reply"
@@ -4036,11 +4036,11 @@ msgid "Queued"
 msgstr "Na fila"
 
 #: src/components/ModelCredits.tsx
-msgid "Rakazo credits"
+msgid "Mycellios credits"
 msgstr ""
 
 #: src/pages/memory-providers/HonchoSettingsForm.tsx
-msgid "rakazo-shared and IDs starting with bot- are reserved for Rakazo."
+msgid "rakazo-shared and IDs starting with bot- are reserved for Mycellios."
 msgstr ""
 
 #: src/pages/shell/message-hover-actions.tsx
@@ -4399,8 +4399,8 @@ msgid "Return to call with {0}"
 msgstr ""
 
 #: src/pages/McpOAuthCallback.tsx
-msgid "Return to Rakazo"
-msgstr "Retorno a Rakazo"
+msgid "Return to Mycellios"
+msgstr "Retorno a Mycellios"
 
 #: src/lib/model-connection-preflight.ts
 msgid "Review provider settings and test again."
@@ -4772,8 +4772,8 @@ msgid "Sign in at <0>{0}</0>, then paste the code here."
 msgstr "Entre em <0>{0}</0> e cole o código aqui."
 
 #: src/pages/Auth.tsx
-msgid "Sign in to Rakazo"
-msgstr "Entrar no Rakazo"
+msgid "Sign in to Mycellios"
+msgstr "Entrar no Mycellios"
 
 #: src/lib/user-error.ts
 msgid "Sign in to your existing account to link SSO"
@@ -5213,8 +5213,8 @@ msgid "This server is already connected. Disconnect it first to authorize again.
 msgstr "Este servidor já está conectado. Desconecte-o primeiro para autorizar novamente."
 
 #: src/pages/model-settings/connection-controls.tsx
-msgid "This subscription sign-in is not available in Rakazo yet. Use a deployment credential or choose another provider."
-msgstr "Este login de assinatura ainda não está disponível no Rakazo. Use uma credencial de implantação ou escolha outro provedor."
+msgid "This subscription sign-in is not available in Mycellios yet. Use a deployment credential or choose another provider."
+msgstr "Este login de assinatura ainda não está disponível no Mycellios. Use uma credencial de implantação ou escolha outro provedor."
 
 #: src/pages/Artifacts.tsx
 msgid "This week"
@@ -5495,7 +5495,7 @@ msgstr ""
 
 #: src/components/ModelCredits.tsx
 #: src/pages/Onboarding.tsx
-msgid "Use Rakazo credits"
+msgid "Use Mycellios credits"
 msgstr ""
 
 #: src/pages/model-settings/space-bots-model.tsx
@@ -5596,7 +5596,7 @@ msgid "Weekdays"
 msgstr "Dias da semana"
 
 #: src/components/SignupSurvey.tsx
-msgid "Welcome to Rakazo"
+msgid "Welcome to Mycellios"
 msgstr ""
 
 #: src/pages/shell/dialogs.tsx
@@ -5604,7 +5604,7 @@ msgid "What about its memories?"
 msgstr "E suas memórias?"
 
 #: src/components/SignupSurvey.tsx
-msgid "What do you most want Rakazo to help with?"
+msgid "What do you most want Mycellios to help with?"
 msgstr ""
 
 #: src/pages/shell/message-cards.tsx

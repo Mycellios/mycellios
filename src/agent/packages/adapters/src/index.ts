@@ -109,6 +109,7 @@ export * from "./model-selection.js";
 export * from "./model-vision.js";
 export * from "./mycellios-account.js";
 export * from "./native-agent-runtime.js";
+export { installManagedOpenCode } from "./managed-opencode.js";
 export * from "./none-sandbox.js";
 export * from "./openai-compatible-url.js";
 export * from "./openai-compatible-voice.js";

@@ -25,10 +25,10 @@ function ExecutionDetails({ run, cost }: { run: Run; cost?: TaskCost }) {
     ? new Intl.NumberFormat(i18n.locale || "en", { style: "unit", unit: "second", unitDisplay: "short", maximumFractionDigits: 0 }).format(elapsed / 1000) : null;
   return <div className="min-w-0 space-y-2" data-testid="run-execution-details">
     <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
-      <dt className="text-muted-foreground">{t`Execution model`}</dt>
-      <dd className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground">{run.modelId || t`Not reported yet`}</dd>
-      <dt className="text-muted-foreground">{t`Model provider`}</dt>
-      <dd className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground">{run.modelProvider || t`Not reported yet`}</dd>
+      {run.modelId ? <><dt className="text-muted-foreground">{t`Execution model`}</dt>
+      <dd className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground">{run.modelId}</dd></> : null}
+      {run.modelProvider ? <><dt className="text-muted-foreground">{t`Model provider`}</dt>
+      <dd className="min-w-0 break-words [overflow-wrap:anywhere] text-foreground">{run.modelProvider}</dd></> : null}
       {seconds ? <><dt>{t`Duration`}</dt><dd className="tabular-nums">{seconds}</dd></> : null}
     </dl>
     {previousModels.length ? <div><p>{t`Previous models observed in this view`}</p>

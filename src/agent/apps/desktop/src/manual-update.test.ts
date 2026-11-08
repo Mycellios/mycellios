@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ManualUpdateController, windowsManualRelease, type ManualRelease } from "./manual-update.js";
+import { ManualUpdateController, ManualUpdateDiskSpaceError, windowsManualRelease, type ManualRelease } from "./manual-update.js";
 
 const bytes = new Uint8Array(Buffer.from("MZcontrolled-installer-fixture"));
 const entry = { id: "windows-x64", version: "0.3.15", format: "EXE",
@@ -52,7 +52,20 @@ describe("official Windows manual releases", () => {
     expect(prepare).not.toHaveBeenCalled();
     expect(handoff).not.toHaveBeenCalled();
     await controller.check(false);
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(handoff).not.toHaveBeenCalled();
+  });
+  it("refreshes a staged release without downgrading or installing it", async () => {
+    let published: ManualRelease | null = null;
+    const { controller, handoff } = await fixture({ backgroundDownloads: true, publishedRelease: async () => published });
+    expect(await controller.check(false)).toMatchObject({ phase: "ready", availableVersion: entry.version });
+    const version = "0.3.17";
+    const fileName = `Mycellios-Desktop-${version}-windows-x64-pilot.exe`;
+    published = { version, fileName, bytes: entry.bytes, sha256: entry.sha256,
+      url: `https://github.com/Mycellios/mycellios/releases/download/desktop-v${version}-windows-preview/${fileName}` };
+    expect(await controller.check(false)).toMatchObject({ phase: "ready", availableVersion: version });
+    published = null;
+    expect(await controller.check(false)).toMatchObject({ phase: "ready", availableVersion: version });
     expect(handoff).not.toHaveBeenCalled();
   });
   it("keeps a verified update available for recovery after a failed transfer", async () => {
@@ -101,6 +114,17 @@ describe("official Windows manual releases", () => {
     expect(handoff).not.toHaveBeenCalled();
     await controller.install(); await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(1));
     await controller.install(); expect(handoff).toHaveBeenCalledTimes(1);
+  });
+  it("keeps the verified installer ready when disk space blocks the restart", async () => {
+    const { controller, handoff } = await fixture();
+    handoff.mockRejectedValueOnce(new ManualUpdateDiskSpaceError());
+    await controller.check(true);
+    await controller.install();
+    await vi.waitFor(() => expect(controller.state()).toMatchObject({
+      phase: "ready", installPending: false, message: "Free at least 6 GB of disk space before restarting to update.",
+    }));
+    await controller.install();
+    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(2));
   });
   it("requires renderer acknowledgement and rechecks activity after acknowledgement", async () => {
     let ready = false, busy = false;

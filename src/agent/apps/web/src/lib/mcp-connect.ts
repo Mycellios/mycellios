@@ -1,6 +1,6 @@
 import { appPath } from "./app-path";
 import { MCP_OAUTH_CHANNEL } from "./mcp-oauth-channel";
-import { rpc } from "./rpc";
+import { rpc, type RpcClient } from "./rpc";
 
 export { MCP_OAUTH_CHANNEL } from "./mcp-oauth-channel";
 
@@ -23,8 +23,8 @@ export function mcpOAuthRedirectUri(): string {
   return `${window.location.origin}${appPath("/mcp/oauth/callback")}`;
 }
 
-export async function connectMcpOauth(serverId: string): Promise<McpOauthResult> {
-  const started = await rpc.mcp.oauth.begin({ serverId, redirectUri: mcpOAuthRedirectUri() });
+export async function connectMcpOauth(serverId: string, client: RpcClient = rpc): Promise<McpOauthResult> {
+  const started = await client.mcp.oauth.begin({ serverId, redirectUri: mcpOAuthRedirectUri() });
   if (started.status !== "authorization_required") return started.status;
   const popup = window.open(
     started.authorizationUrl,

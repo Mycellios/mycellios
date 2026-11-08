@@ -34,7 +34,6 @@ test("sidebar rail keeps chats interactive and remembers a dragged width", async
   await expect(handle).toHaveAttribute("aria-valuenow", String(preferredWidth));
   await captureScreenshot(page, testInfo, "sidebar-resized-expanded");
 
-  await sidebar.getByTestId("sidebar-search-trigger").click();
   await sidebar.getByRole("textbox", { name: "Search", exact: true }).fill("no roster matches");
   await expect(row).toHaveCount(0);
   await page.getByTestId("minimize-bots-sidebar").click();
@@ -64,7 +63,6 @@ test("sidebar rail keeps chats interactive and remembers a dragged width", async
     })
     .toBe(true);
   await captureScreenshot(page, testInfo, "sidebar-mini-avatar-rail");
-  await page.getByTestId("user-menu-trigger").click();
   await page.getByRole("button", { name: "Connect apps", exact: true }).click();
   await expect(page.getByTestId("account-menu-header")).toBeHidden();
   await page.getByRole("button", { name: "Close integrations", exact: true }).click();

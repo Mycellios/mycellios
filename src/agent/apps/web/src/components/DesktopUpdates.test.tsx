@@ -93,6 +93,18 @@ it("keeps the gate open on a failed download and provides retry and the official
   expect(bridge.check).toHaveBeenCalledTimes(1);
 });
 
+it("lets the user return to their chat when disk space blocks the update", async () => {
+  fixture.state.message = "Free at least 6 GB of disk space before restarting to update.";
+  await render();
+  expect(gate()?.textContent).toContain(fixture.state.message);
+  const later = [...gate()!.querySelectorAll("button")].find(button => button.textContent === "Later")!;
+  await act(async () => later.click());
+  await refresh();
+  expect(gate()).toBeNull();
+  expect(host.querySelector("main")?.textContent).toBe("Chat draft");
+  expect(bridge.install).not.toHaveBeenCalled();
+});
+
 it("shows the mandatory update during a call and closes audio before requesting restart", async () => {
   fixture.call = true;
   fixture.state = { ...fixture.state, supportsForceRestart: true };

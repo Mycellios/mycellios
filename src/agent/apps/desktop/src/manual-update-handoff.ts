@@ -5,6 +5,23 @@ import path from "node:path";
 import { writePrivateFile } from "./setup-store.js";
 import type { ManualRelease } from "./manual-update.js";
 
+const UPDATE_JOB = /^--manual-update-job=([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/;
+
+/** Acknowledge the running package, after acquiring the profile's instance lock. */
+export async function acknowledgeManualUpdate(
+  profile: string, executable: string, version: string, pid: number, args: readonly string[],
+): Promise<void> {
+  const job = args.map(arg => UPDATE_JOB.exec(arg)?.[1]).find(Boolean);
+  if (!job) return;
+  const directory = path.join(profile, "updates", job);
+  const request = JSON.parse((await readFile(path.join(directory, "request.json"), "utf8")).replace(/^\uFEFF/, ""));
+  const commit = JSON.parse(await readFile(path.join(directory, "commit.json"), "utf8"));
+  if (request?.schema !== "mycellios-manual-update/1" || request.version !== version ||
+      typeof request.executable !== "string" || request.executable.toLowerCase() !== executable.toLowerCase() ||
+      commit?.approved !== true) return;
+  await writePrivateFile(path.join(directory, "launch.json"), JSON.stringify({ version, pid }));
+}
+
 /** Windows PowerShell 5.1 writes UTF-8 receipts with a byte-order mark. */
 export function manualUpdatePhase(contents: string): string | null {
   const state: unknown = JSON.parse(contents.replace(/^\uFEFF/, ""));

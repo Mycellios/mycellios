@@ -385,18 +385,18 @@ function catalogBilling(
   const signInMeta = SUBSCRIPTION_SIGN_IN_PROVIDERS[providerId];
   if (signInMeta) return signInMeta.billing;
   if (providerId === LOCAL_PROVIDER_ID) {
-    return "Runs on infrastructure configured by the server operator. No model charges from Rakazo.";
+    return "Runs on infrastructure configured by the server operator. No model charges from Mycellios.";
   }
   if (isOpenAiCompatibleProvider(providerId)) {
     return "Uses your gateway or server. Mycellios does not pay for model usage.";
   }
   if (opts.oauth && !opts.apiKey) {
-    return `${name} subscription login is not in the Rakazo UI yet. Skip if this deployment already has credentials.`;
+    return `${name} subscription login is not in the Mycellios UI yet. Skip if this deployment already has credentials.`;
   }
   if (opts.apiKey) {
-    return `Uses your ${name} API key. Rakazo does not pay for model usage.`;
+    return `Uses your ${name} API key. Mycellios does not pay for model usage.`;
   }
-  return `Uses your ${name} key. Rakazo does not pay for model usage.`;
+  return `Uses your ${name} key. Mycellios does not pay for model usage.`;
 }
 
 export const scriptedCatalogEntry: PiCatalogEntry = {

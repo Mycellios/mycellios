@@ -14,10 +14,23 @@ import models from "./local-voice-models.json" with { type: "json" };
 // Pinned public model manifests: Parakeet (CC-BY-4.0), Supertonic (OpenRAIL-M).
 // Pins match OpenBot's speech-models manifest; inference uses sherpa-onnx (Apache-2.0).
 const require = createRequire(import.meta.url);
+const totalBytes = [...models.asr, ...models.tts].reduce((n, file) => n + file.bytes, 0);
+
+async function verifiedModel(target: string, file: { bytes: number; sha256: string }) {
+  try {
+    if ((await stat(target)).size !== file.bytes) return false;
+    const hash = createHash("sha256");
+    for await (const bytes of createReadStream(target)) hash.update(bytes);
+    return hash.digest("hex") === file.sha256;
+  } catch { return false; }
+}
+
 export class LocalVoice {
   private downloadAbort?: AbortController;
   private tree?: NativeProcessTree;
   private preparing?: Promise<void>;
+  private cachedCheck?: Promise<void>;
+  private nextCacheCheck = 0;
   private worker?: ChildProcess;
   private busy = false;
   private idleTimer?: ReturnType<typeof setTimeout>;
@@ -26,12 +39,37 @@ export class LocalVoice {
   private error?: string;
   constructor(private directory: string, private nodeExecutable = process.execPath) {}
   status() { return { ready: this.ready, preparing: Boolean(this.preparing), downloaded: this.downloaded,
-    total: [...models.asr, ...models.tts].reduce((n, f) => n + f.bytes, 0), error: this.error }; }
+    total: totalBytes, error: this.error }; }
+  async statusFromDisk() {
+    if (!this.ready && !this.preparing) {
+      if (!this.cachedCheck && Date.now() >= this.nextCacheCheck) {
+        this.cachedCheck = this.checkStoredModels().finally(() => {
+          this.cachedCheck = undefined;
+          this.nextCacheCheck = Date.now() + 30_000;
+        });
+      }
+      await this.cachedCheck;
+    }
+    return this.status();
+  }
+  private async checkStoredModels() {
+    for (const [kind, files] of Object.entries(models)) {
+      for (const file of files) {
+        if (!(await verifiedModel(join(this.directory, kind, file.name), file))) return;
+      }
+    }
+    this.downloaded = totalBytes;
+    this.ready = true;
+  }
   async prepare() {
+    if (this.ready) return;
     if (this.preparing) return this.preparing;
     this.error = undefined;
     this.downloadAbort = new AbortController();
-    this.preparing = this.download().catch((error) => {
+    this.preparing = (async () => {
+      await this.cachedCheck;
+      if (!this.ready) await this.download();
+    })().catch((error) => {
       this.error = "Local voice preparation failed. Retry to resume verified files.";
       throw error;
     }).finally(() => { this.preparing = undefined; });
@@ -44,15 +82,7 @@ export class LocalVoice {
       for (const file of files) {
         const completed = this.downloaded;
         const target = join(this.directory, kind, file.name);
-        const valid = async () => {
-          try {
-            if ((await stat(target)).size !== file.bytes) return false;
-            const hash = createHash("sha256");
-            for await (const bytes of createReadStream(target)) hash.update(bytes);
-            return hash.digest("hex") === file.sha256;
-          } catch { return false; }
-        };
-        if (!(await valid())) {
+        if (!(await verifiedModel(target, file))) {
           const temporary = target + `.partial-${process.pid}-${Date.now()}`;
           const response = await fetch(file.url, { signal: AbortSignal.any([AbortSignal.timeout(600_000), this.downloadAbort!.signal]) });
           if (!response.ok || !response.body) throw new Error("Model download failed");

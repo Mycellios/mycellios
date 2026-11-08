@@ -88,7 +88,7 @@ export const InstructionVersionSchema = z.object({
 });
 
 export const BotSchema = z.object({
-  agentEngine: z.enum(["pi", "codex", "claude", "acp"]).optional(),
+  agentEngine: z.enum(["pi", "codex", "claude", "acp", "opencode"]).optional(),
   id: Id,
   spaceId: Id,
   name: z.string(),
@@ -369,7 +369,7 @@ export const BOT_TITLE_MAX_LENGTH = 500;
 export const BOT_DESCRIPTION_MAX_LENGTH = 4000;
 export const BOT_INSTRUCTIONS_MAX_LENGTH = 20000;
 export const FIRST_MICO_SPAWN_KEY = "onboarding:first";
-export const NativeBotEngineSchema = z.enum(["codex", "claude", "acp"]);
+export const NativeBotEngineSchema = z.enum(["codex", "claude", "acp", "opencode"]);
 
 export const CreateBotInput = z.object({
   name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH),
@@ -408,7 +408,7 @@ export function normalizeCreateBotProfile(
 export const UpdateBotInput = z
   .object({
     botId: Id,
-    agentEngine: z.enum(["pi", "codex", "claude", "acp"]).optional(),
+    agentEngine: z.enum(["pi", "codex", "claude", "acp", "opencode"]).optional(),
     name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH).optional(),
     title: z.string().trim().max(BOT_TITLE_MAX_LENGTH).optional(),
     description: z.string().trim().max(BOT_DESCRIPTION_MAX_LENGTH).optional(),
@@ -851,7 +851,7 @@ const McpOAuthClientFields = {
  * authorization server, so the client is bound to it on first use. */
 const McpOAuthClientInput = z.object(McpOAuthClientFields).nullable().optional();
 /** A stdio server has no URL to discover from, so its client names the
- * authorization server (its issuer, e.g. https://accounts.google.com). Rakazo
+ * authorization server (its issuer, e.g. https://accounts.google.com). Mycellios
  * runs the OAuth flow and passes the grant through `{{oauth.*}}` env references. */
 const McpStdioOAuthClientInput = z
   .object({ ...McpOAuthClientFields, authorizationServer: McpRemoteEndpointSchema })

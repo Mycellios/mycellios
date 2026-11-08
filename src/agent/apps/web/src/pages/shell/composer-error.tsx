@@ -75,8 +75,9 @@ export function ComposerError({
     ? normalizeRunError(runError, translateRunError, i18n.locale || "en", undefined, runErrorProviderLabel)
     : null;
   const recovery = sendError ? undefined : normalizedRunError?.recovery;
+  const interrupted = normalizedRunError?.kind === "interrupted";
   const missingModel = !sendError && runError?.trim() === MISSING_MODEL_RUN_ERROR;
-  const modelAction = !sendError && runError && recovery !== "computer" ? runErrorModelAction : null;
+  const modelAction = !sendError && runError && !interrupted && recovery !== "computer" ? runErrorModelAction : null;
   const recoveryAction =
     recovery === "model" && !modelAction
       ? { label: t`Choose a model`, onClick: onOpenModels }
@@ -123,7 +124,7 @@ export function ComposerError({
           </>
         ) : null}
         {modelAction}
-        {normalizedRunError?.kind !== "interrupted" && !(recovery === "computer" && recoveryAction) && !sendError && runError && runErrorId && onRetryError ? (
+        {!interrupted && !(recovery === "computer" && recoveryAction) && !sendError && runError && runErrorId && onRetryError ? (
           <button
             type="button"
             data-testid="composer-error-retry"

@@ -13,6 +13,7 @@ import {
   truncateSlashDescription,
 } from "@rakazo/core";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
+import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
 import { ArrowUp, AudioLines, Box, FilePlus, ImagePlus, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, Trash2, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent, ReactNode, RefObject } from "react";
 import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -222,6 +223,8 @@ export const Composer = memo(function Composer({
       previousReply.current = { id: replyId, quote };
     }
   }, [replyId, quote]);
+  const mobileVoice = useIsMobile();
+  const desktopVoice = voice.state !== null && !mobileVoice;
   const {
     textareaRef,
     attachButtonRef,
@@ -229,7 +232,7 @@ export const Composer = memo(function Composer({
     composerBarRef,
     composerFieldRef,
     expanded,
-  } = useComposerLayout(voiceDraft, selectedSkill !== null || selectedMentions.length > 0 || voice.state !== null);
+  } = useComposerLayout(voiceDraft, selectedSkill !== null || selectedMentions.length > 0 || (mobileVoice && voice.state !== null));
   const recordingVoice = voice.state?.phase === "recording";
   useLayoutEffect(() => {
     const field = textareaRef.current;
@@ -775,7 +778,7 @@ export const Composer = memo(function Composer({
         ref={composerBarRef}
         data-testid="composer-bar"
         data-expanded={expanded}
-        className={`grid grid-cols-[auto_minmax(0,1fr)_auto] content-end items-center rounded-[26px] border border-border pe-2.5 ps-3 transition-colors focus-within:border-input ${voice.state ? "bg-muted/70" : "bg-background"} ${
+        className={`grid grid-cols-[auto_minmax(0,1fr)_auto] content-end items-center border border-border pe-2.5 ps-3 transition-colors focus-within:border-input ${desktopVoice ? "rounded-xl bg-card" : voice.state ? "rounded-[26px] bg-muted/70" : "rounded-[26px] bg-background"} ${
           expanded ? "gap-x-2 gap-y-2 pb-[9px] pt-3" : "gap-x-3.5 py-[9px]"
         }`}
       >
@@ -787,7 +790,7 @@ export const Composer = memo(function Composer({
           className="hidden"
           onChange={(event) => pickAttachments(event.target.files)}
         />
-        {voice.state ? (
+        {voice.state && mobileVoice ? (
           <Button type="button" variant="ghost" size="icon" className="col-start-1 row-start-2 size-11 rounded-full text-muted-foreground"
             aria-label={t`Discard recording`} onClick={voice.cancel}><Trash2 size={17} aria-hidden /></Button>
         ) : <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
@@ -795,7 +798,7 @@ export const Composer = memo(function Composer({
           render={<Button variant="ghost" size="icon" />}
           ref={attachButtonRef}
           aria-label={t`Add to message`}
-          disabled={disabled}
+          disabled={disabled || desktopVoice}
           className={`col-start-1 size-8 shrink-0 rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${
             expanded ? "row-start-2" : ""
           }`}
@@ -879,7 +882,8 @@ export const Composer = memo(function Composer({
             onPaste={handlePaste}
             onKeyDown={(event) => {
               if (voice.state) {
-                if (event.key === "Escape") voice.finish();
+                if (event.key === "Escape") voice.cancel();
+                if (event.key === "Enter" && !event.nativeEvent.isComposing) voice.finish();
                 if (event.key === "Escape" || event.key === "Enter") event.preventDefault();
                 return;
               }
@@ -927,7 +931,7 @@ export const Composer = memo(function Composer({
             }}
             disabled={disabled}
             placeholder={
-              voice.state
+              voice.state && mobileVoice
                 ? voice.transcriptAfterStop ? t`Text appears when you stop recording` : t`Listening…`
                 : showComposerPlaceholder
                 ? activeName
@@ -949,20 +953,22 @@ export const Composer = memo(function Composer({
             className="rk-scroll max-h-25 min-h-[24px] min-w-[8rem] flex-1 resize-none overflow-y-auto bg-transparent py-0.5 text-body1 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-40"
           />
         </div>
-        {voice.state ? <div className="col-start-2 row-start-2 min-w-0"><ComposerVoiceStrip voice={voice} /></div> : null}
+        {voice.state && mobileVoice ? <div className="col-start-2 row-start-2 min-w-0"><ComposerVoiceStrip voice={voice} /></div> : null}
         <div
           ref={composerActionsRef}
           className={`col-start-3 flex shrink-0 items-center gap-2 justify-self-end ${
             expanded ? "row-start-2" : ""
           }`}
         >
-          <ComposerVoiceButton voice={voice} disabled={disabled || sending || onCall || reviewedVoice.stage !== "closed"} />
+          {desktopVoice ? <ComposerVoiceStrip voice={voice} compact /> : (
+            <ComposerVoiceButton voice={voice} disabled={disabled || sending || onCall || reviewedVoice.stage !== "closed"} />
+          )}
           <Button
               size="icon"
               aria-label={t`Send`}
               disabled={Boolean(voice.state) || sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
               onClick={send}
-              className={`shrink-0 rounded-full transition-transform active:scale-95 disabled:opacity-100 ${voice.state ? "size-10 disabled:bg-status-working/25 disabled:text-status-working" : "size-8 disabled:bg-primary-disabled disabled:text-foreground/30"}`}
+              className={`shrink-0 rounded-full transition-transform active:scale-95 disabled:opacity-100 ${voice.state && mobileVoice ? "size-10 disabled:bg-status-working/25 disabled:text-status-working" : "size-8 disabled:bg-primary-disabled disabled:text-foreground/30"}`}
             >
               <ArrowUp size={16} strokeWidth={2.2} />
           </Button>

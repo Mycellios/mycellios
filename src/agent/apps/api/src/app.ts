@@ -852,7 +852,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         );
         return c.redirect(productAppUrl(env.webOrigin, "/app?messaging"));
       } catch {
-        return c.text("Slack connection failed. Return to Rakazo and try again.", 400);
+        return c.text("Slack connection failed. Return to Mycellios and try again.", 400);
       }
     });
   }

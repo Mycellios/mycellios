@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { captureScreenshot, completeOnboarding, signup } from "./helpers";
 
-test("sidebar search opens from its icon and closes without moving chats mid-click", async ({
+test("desktop sidebar search stays visible and is accessible when collapsed", async ({
   page,
 }, testInfo) => {
   await signup(page, `sidebar-search-${Date.now()}@rakazo.test`, "password12", "Search Sample");
@@ -9,13 +9,11 @@ test("sidebar search opens from its icon and closes without moving chats mid-cli
   const sidebar = page.locator("aside").first();
   const trigger = sidebar.getByTestId("sidebar-search-trigger");
   const search = sidebar.getByRole("textbox", { name: "Search", exact: true });
-  await expect(search).toHaveCount(0);
-  await captureScreenshot(page, testInfo, "sidebar-search-closed");
-
-  await trigger.click();
-  await expect(trigger).toHaveAttribute("aria-pressed", "true");
-  await expect(search).toBeFocused();
-  await captureScreenshot(page, testInfo, "sidebar-search-open");
+  await expect(search).toBeVisible();
+  await expect(trigger).toHaveCount(0);
+  const header = await sidebar.getByTestId("sidebar-topbar").boundingBox();
+  expect((await search.boundingBox())?.y).toBeGreaterThan(header!.y + header!.height);
+  await captureScreenshot(page, testInfo, "sidebar-search-visible");
 
   // Leaving an empty field keeps the roster still, so a chat click lands.
   const chief = sidebar.getByRole("button", { name: /^Chief/ }).first();
@@ -26,12 +24,9 @@ test("sidebar search opens from its icon and closes without moving chats mid-cli
 
   await search.fill("no roster matches");
   await search.press("Escape");
-  await expect(search).toHaveCount(0);
-  await expect(trigger).toHaveAttribute("aria-pressed", "false");
-
-  await trigger.click();
   await expect(search).toHaveValue("");
-  await search.fill("kept");
-  await trigger.click();
+  await page.getByTestId("minimize-bots-sidebar").click();
   await expect(search).toHaveCount(0);
+  await trigger.click();
+  await expect(search).toBeFocused();
 });

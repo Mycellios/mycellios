@@ -15,6 +15,20 @@
 
 # AGENTS.md
 
+- The workspace selector opens Space settings independently of personal Settings.
+  Bind each Space panel and its writes to the Space being edited, even when the
+  open conversation belongs to another Space. Preserve account model credentials
+  and per-Space inheritance for model, voice and approval preferences.
+  The native OpenCode engine is opt-in per Mico and uses the server's installed
+  CLI over ACP. Preserve operator account/Space grants and a private CLI home per
+  conversation. Keep project config and external plugins disabled and deny native
+  permissions outside the approved MCP bridge. Verify the scoped settings and
+  native-agent-runtime tests. Protocol fixtures do not qualify real inference.
+  Managed OpenCode installs are explicitly admitted by allowOpenCodeInstall
+  in the host's native-agents.json and the same account/Space grant. Verify
+  both artifact digests and preserve operator command overrides, the published
+  version directory and the no-fallback model policy.
+
 - Account-owned Desktop execution keeps the existing cloud account, conversations,
   model connections, leases and approval effects. Advertise agentExecution v1 only
   after the native host starts and authenticates remembered account consent.
@@ -68,7 +82,14 @@
   Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
   actual Windows PowerShell encoding in manual-update-helper tests. Start the
   worker through a hidden non-detached launcher so it survives Desktop's exit.
+  Wait on the installer process handle with a deadline before checking its exit
+  code and the installed version. Do not wait on the installer's entire process
+  tree or roll back over an installer still running. Confirm the reopened
+  window against the committed job, target version and child PID. Record failed
+  relaunch separately from a failed installation.
   Keep private logs and leave Desktop open until the worker acknowledges.
+  Check space on both installation and profile volumes before quitting, then
+  recheck before backing up. Keep checking for newer releases while one is staged.
   Verify manual-update, desktop-update-work, composer-draft and preload tests plus
   a fresh-profile native handoff before applying it to an installed profile.
   Published Windows preview tags use the owned GitHub release's bounded
@@ -116,7 +137,9 @@
   Verify scripts/verify-workspace-sync-db.ts and verify-workspace-sync-ui.mjs;
   the browser fixture uses synthetic RPCs and does not qualify real agent execution.
 - Continuous voice keeps its immutable Space/task client and stops its owned audio
-  resources on close. Native speech preparation is explicit and verifies pinned
+  resources on close. Track the accepted turn by run and task ID so an older
+  chat failure cannot stop the microphone or speak an unrelated reply.
+  Native speech preparation is explicit and verifies pinned
   files. Keep standalone Node, its license, optional native modules and Windows
   Job ownership in packaging; never replace them with a renderer-selected runtime.
   Browser tests do not qualify microphones, model inference or native installers.
@@ -199,7 +222,8 @@
   Delegation from ordinary Mico tabs uses internal work scope; explicit project
   delegation keeps its independent native project binding and admission.
 
-- Settings uses one searchable account/Space shell. General contains device UI
+- Settings uses one searchable full-viewport account/Space shell, with a fixed
+  section header and independently scrolling content. General contains device UI
   preferences; Profile owns identity/security; Micos opens the existing per-Mico
   editor and its canonical skills editor. Keep Models, Voice, Approvals, Memory, Usage,
   Computer, Mobile and Updates connected to their existing services, with Billing
@@ -207,6 +231,17 @@
   clears a query before closing. Profile/model/voice/memory drafts use the shared
   leave guard and saves block navigation while pending. Do not duplicate account
   connection editors or cross a Space boundary with the current Space's client.
+  The account provider directory uses the existing main role for its compact
+  default selector. A connection does not pick a default model. Keep host
+  discovery and installation scoped to the existing grants. The ACP Registry is
+  a read-only metadata catalog and supplies no executable commands.
+  OpenCode is listed as a built-in engine even without a host grant. Its detail
+  reads actual availability and offers the managed download only when granted.
+  Zen and Go connections use the account API model path, separate from the
+  isolated native engine selected per Mico.
+  AntSeed shares the built-in provider detail layout and groups the account's
+  AntSeed gateways. Its detail reuses endpoint-bound credentials and the model
+  catalog editor. Changing gateway models never changes the account main role.
   Reply-notification preferences are local per user/device; per-Mico switches save
   through the owned Space RPC. Hidden previews never reveal reply text or names.
   Open web clients deliver via the active service worker where available, or the
@@ -362,12 +397,12 @@
   activate automatic unsigned updates or treat a same-profile install as clean-OS proof.
 
 - First-party Mycellios sign-in uses the normal same-window OIDC redirect on web
-  and Desktop. Windows uses transparent native titleBarOverlay controls over the
-  floating header; never paint an opaque caption rectangle over scrolling messages.
-  Authentication pages keep a transparent host-owned drag region across the free
-  caption row; exclude Windows caption buttons and restore the compact region on returning to chat.
-  Right side panels also reserve the native caption row outside their scrolling
-  content, so panel and preview close buttons stay below Windows window controls.
+  and Desktop. Windows owns a separate caption row above the entire renderer
+  view, with transparent native titleBarOverlay controls and a sandboxed drag
+  region outside their hit area. Keep the page viewport below that row on every
+  route, including fixed panels and dialogs. Size both views on resize, maximize
+  and restore. Fullscreen gives the row back to the page. Avoid page selectors
+  or web padding to reserve space for native controls.
   Linux uses the local host-owned three-color control strip
   across navigation, including login and renderer failures, without the OS title bar.
   Keep it in its own sandboxed view, restrict its IPC to its owning window and three
@@ -537,6 +572,11 @@
   `npm run export:brand --workspace @rakazo/ui-tokens`. Keep separate opaque maskable/iOS
   and transparent adaptive/notification outputs; Windows ICO includes small native frames.
 - Preserve the separate contribution and paid-model ledgers; product naming does not merge or revalue them. Paid top-ups use the shared integer conversion in `credit-units.ts` (10 USD = 10 Credits). Mico/Micos names the user agents; Spore is the official token name, with existing launch gates unchanged.
+  Trial Spore in Usage is off-chain and has no monetary value. Derive it from the
+  account's canonical processed usage across Spaces, using the same token buckets
+  as the usage report. Keep it separate from Credits, paid usage and blockchain
+  balances. Verify reward thresholds, isolation and duplicate calls with the
+  workspace PostgreSQL check.
 - Credit refreshes are account-scoped, cancellable and serialized. A transient failure
   may retain the same owner's last verified amount only with a stale indicator; clear
   it on identity/permission changes or an authoritative null. Never persist client
@@ -684,6 +724,9 @@
   Preserve current input, steering, images, completed tool effects and checkpoint
   suffixes. A provider input-overflow rejection permits one model-only recovery
   before visible output; never restart tools or silently change models to recover.
+  Use the current attempt's output ceiling for local admission. Context rejection
+  logs distinguish local admission from provider overflow and contain only model,
+  run and sizing metadata.
 - AntSeed uses provider ID `antseed` with the shared configurable compatible
   transport. Keep its gateway key, enabled models and billing independent from
   Mycellios. Use `isOpenAiCompatibleProvider` for text connection/runtime checks;
@@ -748,6 +791,9 @@
   Verify dictation, composer, voice.spec.ts and call-session tests as applicable.
   Composer dictation is independent of the deployment's phone-call capability;
   disabling calls must not hide or disable the microphone in text chats.
+  Desktop reports already installed voice models as ready after verifying the
+  pinned files on disk. A status check must not download files. Keep confirming
+  the transcription and sending the draft as separate actions in the composer.
 
 - This is a public repository: assume all tracked content and diffs are public. Never commit secrets, `.env` files, private URLs, personal/customer data, or real production data; use fake placeholders. Review `git status` and the staged diff before committing, and never force-add ignored files. If private data appears, stop and alert the maintainer.
 - Rakazo is one product across web, Electron desktop, and Expo mobile; Electron hosts the web UI. Put shared behavior, contracts, API logic, and reusable UI in packages. Keep only genuinely native navigation, storage, permissions, and interactions platform-specific. Core workflows must cover every applicable surface or degrade safely for an explicit reason.
@@ -812,10 +858,12 @@
   or SSH/live destinations and runbooks, never credentials. Projects are optional.
   Verify native-computer-execution.test.ts and native-computer-workspace.test.ts.
 
-- Running-chat status shows a brief health label and elapsed time. Tool activity
-  labels can contain commands and paths, so render them only inside the closed
-  execution-details disclosure. On narrow screens, keep a single activity row
-  and open the timeline in a sheet on demand, even when auto-expand is enabled.
+- Running-chat status shows a brief health label and elapsed time. Group
+  consecutive actions in a short, plain-language timeline and mark errors or
+  waits there. Keep raw commands, paths and
+  reported execution metadata folded separately, and leave worker timestamps
+  and empty metadata out of the chat. On narrow screens, keep a single activity
+  row and open the timeline in a sheet on demand, even when auto-expand is enabled.
   Preserve actionable blocked/waiting states and keep observation independent
   from cancellation/retry. Verify RunActivityStatus.test.tsx and the mobile
   activity sheet case in tool-activity.spec.ts.
@@ -826,6 +874,10 @@
 - Narrow workspace navigation fills the viewport and keeps search at the bottom.
   Keep account tools behind the overflow and folder expansion scoped to the
   mobile layout. Verify mobile-sidebar-swipe.spec.ts.
+  On desktop, keep search visible below the expanded sidebar header. The search
+  icon in the collapsed sidebar expands it and focuses the same field.
+  Keep account and integration controls in the workspace rail and place credits
+  and compute contribution at the foot of the chat sidebar.
 - The transcript follows geometry changes only while the reader is at the end.
   Preserve history and explicit reply jumps, and animate only newly appended
   messages when motion is enabled. Verify chat-progress-messages.spec.ts.

@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
-import type { Actor, UsageDashboard, UsageDashboardTotals } from "@rakazo/contracts";
-import { Prisma, type PrismaClient } from "@rakazo/db";
+import { SPORE_WELCOME_REWARD, TOKENS_PER_TRIAL_SPORE, type Actor, type SporeRewards, type UsageDashboard, type UsageDashboardTotals } from "@rakazo/contracts";
+import { Prisma, runAsSystem, type PrismaClient } from "@rakazo/db";
 
 // These SQL expressions use only canonical UsageRecord buckets. The one-hour
 // write bucket and reasoning tokens are subsets, so neither is added again.
@@ -13,6 +13,25 @@ const TOKEN_EXPRESSIONS = {
   processed:
     'COALESCE("totalTokens"::bigint, "inputTokens"::bigint + "outputTokens" + "cacheWriteTokens" + "cacheReadTokens")',
 } as const;
+const knownProcessedTokens = Prisma.sql`("totalTokens">=0 OR ("totalTokens" IS NULL AND "inputTokens">=0 AND "outputTokens">=0 AND "cacheWriteTokens">=0 AND "cacheReadTokens">=0))`;
+
+/** The trial balance is derived from account-owned usage, so reads and retries award it once. */
+export async function sporeRewards(prisma: PrismaClient, actor: Pick<Actor, "userId">): Promise<SporeRewards> {
+  const [reward] = await runAsSystem("sum the signed-in account's recorded usage across Spaces", () =>
+    prisma.$queryRaw<Array<{ earned: bigint; progressTokens: number }>>(Prisma.sql`
+      WITH usage AS (
+        SELECT COALESCE(SUM(${Prisma.raw(TOKEN_EXPRESSIONS.processed)}) FILTER (WHERE ${knownProcessedTokens}), 0) AS tokens
+        FROM usage_records
+        WHERE "userId" = ${actor.userId}
+      )
+      SELECT FLOOR(tokens / ${TOKENS_PER_TRIAL_SPORE})::bigint AS earned,
+             MOD(tokens, ${TOKENS_PER_TRIAL_SPORE})::int AS "progressTokens"
+      FROM usage
+    `),
+  );
+  if (!reward) throw new Error("Could not calculate Spore rewards");
+  return { welcome: SPORE_WELCOME_REWARD, earned: Number(reward.earned), progressTokens: reward.progressTokens };
+}
 type Metric = keyof typeof TOKEN_EXPRESSIONS;
 export type UsageBucket = UsageDashboardTotals & {
   day: string;
@@ -108,7 +127,7 @@ export async function usageDashboard(
       key === "tokens"
         ? Prisma.sql`"inputTokens">=0 AND "outputTokens">=0 AND "cacheWriteTokens">=0`
         : key === "processed"
-          ? Prisma.sql`("totalTokens">=0 OR ("totalTokens" IS NULL AND "inputTokens">=0 AND "outputTokens">=0 AND "cacheWriteTokens">=0 AND "cacheReadTokens">=0))`
+          ? knownProcessedTokens
           : Prisma.sql`${sql}>=0`;
     return Prisma.sql`COALESCE(SUM(${sql}) FILTER (WHERE ${valid}),0)::float8 AS ${Prisma.raw(`"${key}"`)}, COUNT(*) FILTER (WHERE ${valid})::int AS ${Prisma.raw(`"${key}Count"`)}`;
   });

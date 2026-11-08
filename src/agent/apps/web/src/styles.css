@@ -214,6 +214,7 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
   .rk-rail-more-menu { animation: none; transition: none; }
 }
 .rk-chat-tools-panel { display: none; }
+
 .rk-routine-body { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
 .rk-routine-canvas { position: relative; flex: 1; min-width: 0; min-height: 240px; overflow: hidden; touch-action: none; background: var(--background); }
 .rk-routine-node { position: absolute; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--foreground); cursor: grab; user-select: none; outline: none; }

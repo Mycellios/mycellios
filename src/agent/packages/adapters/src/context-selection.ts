@@ -38,6 +38,7 @@ export class ContextBudgetError extends Error {
     public readonly availableTokens: number,
     /** Instructions and tools alone fill the window, so no conversation can fit. */
     modelTooSmall = false,
+    public readonly budget?: Pick<ContextBudget, "contextWindow" | "outputReserve">,
   ) {
     super(
       modelTooSmall
@@ -522,6 +523,7 @@ export function selectContext<T extends ContextMessage>(
       requiredFixed,
       options.budget.contextWindow - options.budget.outputReserve,
       true,
+      { contextWindow: options.budget.contextWindow, outputReserve: options.budget.outputReserve },
     );
   }
   // A result followed by any assistant message has been read, with or without a later tool call.
@@ -605,6 +607,7 @@ export function selectContext<T extends ContextMessage>(
       used + fixed,
       options.budget.contextWindow - options.budget.outputReserve,
       available <= 0,
+      { contextWindow: options.budget.contextWindow, outputReserve: options.budget.outputReserve },
     );
   }
   const keepPrefix =

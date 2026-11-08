@@ -1,10 +1,15 @@
-import { discoverNativeEngines, nativeHostAccess } from "@rakazo/adapters";
+import { ORPCError } from "@orpc/server";
+import {
+  canInstallNativeOpenCode, discoverNativeEngines, installManagedOpenCode,
+  nativeHostAccess, reconcileWorkStops,
+} from "@rakazo/adapters";
 import { createTaskControls } from "../task-controls.js";
+import { createAcpRegistry } from "../acp-registry.js";
 import { controlWorkTree, workStatus, IsolationError } from "@rakazo/db";
-import { reconcileWorkStops } from "@rakazo/adapters";
 import type { RouterContext } from "./context.js";
 
 export function localCapabilityRoutes({ authed, deps }: RouterContext) {
+  const acpRegistry = createAcpRegistry();
   return {
     engines: {
       list: authed.engines.list.handler(async ({ context }) =>
@@ -12,6 +17,24 @@ export function localCapabilityRoutes({ authed, deps }: RouterContext) {
           ? discoverNativeEngines(deps.dataDir)
           : [{ id: "pi" as const, name: "Pi", available: true }],
       ),
+      installOpenCode: authed.engines.installOpenCode.handler(async ({ context }) => {
+        if (!deps.dataDir || !(await canInstallNativeOpenCode(deps.dataDir, context.actor))) {
+          throw new ORPCError("FORBIDDEN");
+        }
+        try {
+          await installManagedOpenCode(deps.dataDir);
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", { message: "OpenCode could not be installed." });
+        }
+        return { installed: true as const };
+      }),
+      registry: authed.engines.registry.handler(async () => {
+        try {
+          return await acpRegistry();
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", { message: "ACP registry unavailable." });
+        }
+      }),
     },
     tasks: {
       overview: authed.tasks.overview.handler(async ({ context }) => {

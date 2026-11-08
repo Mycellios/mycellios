@@ -5,6 +5,7 @@ import { AccountPlanLimitsSchema } from "./plan-limits.js";
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
 import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
+import { SporeRewardsSchema } from "./spore-rewards.js";
 import { ProjectId, ProjectName, ProjectSummary } from "./projects.js";
 import { WorkflowSchema, WorkflowGraphSchema, WorkflowExecutionSchema } from "./workflows.js";
 import { ContributionEnrollmentSchema, ContributionNodeInput, ContributionStateSchema } from "./contribution.js";
@@ -300,12 +301,18 @@ export const appContract = {
     list: oc.output(
       z.array(
         z.object({
-          id: z.enum(["pi", "codex", "claude", "acp"]),
+          id: z.enum(["pi", "codex", "claude", "acp", "opencode"]),
           name: z.string(),
           available: z.boolean(),
+          managedVersion: z.string().optional(),
+          canInstall: z.boolean().optional(),
         }),
       ),
     ),
+    installOpenCode: oc.output(z.object({ installed: z.literal(true) })),
+    registry: oc.output(z.array(z.object({
+      id: z.string(), name: z.string(), version: z.string(), description: z.string().optional(),
+    }))),
   },
   models: {
     planLimits: oc.input(z.object({ refresh: z.boolean().optional() }).optional()).output(AccountPlanLimitsSchema),
@@ -1161,6 +1168,7 @@ export const appContract = {
     remove: oc.input(z.object({ artifactId: Id })).output(z.object({ ok: z.literal(true) })),
   },
   usage: {
+    sporeRewards: oc.output(SporeRewardsSchema),
     dashboard: oc.input(UsageDashboardInputSchema).output(UsageDashboardSchema),
     agents: oc.output(AgentUsageReportSchema),
     agent: oc.input(botId).output(TaskCostSchema.omit({ runId: true }).extend({ botId: Id })),

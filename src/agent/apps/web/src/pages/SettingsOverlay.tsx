@@ -29,7 +29,6 @@ import {
   CreditCard,
   Gauge,
   ListChecks,
-  Lock,
   Monitor,
   Search,
   Settings,
@@ -53,7 +52,9 @@ import {
 } from "./AccountSettingsOverlay";
 import { BillingSettingsPanel } from "./BillingSettingsPanel";
 import { MemorySettingsOverlay } from "./MemorySettingsOverlay";
+import { McpServersOverlay } from "./McpServersOverlay";
 import { ModelSettingsOverlay } from "./ModelSettingsOverlay";
+import { SpaceSettingOverrides } from "./SpaceSettingOverrides";
 import { RunLogsSettingsPanel } from "./RunLogsSettingsPanel";
 import { SpaceSettingsPanel } from "./SpaceSettingsPanel";
 import {
@@ -65,19 +66,12 @@ import { NotificationsPanel } from "./settings/NotificationsPanel";
 import { settingsKeywords, settingsMatch } from "./settings/navigation";
 import { UpdatesPanel } from "./settings/UpdatesPanel";
 import type { SettingsSpace } from "./shell/dialogs";
-import type { SettingsSection } from "./shell-overlay";
+import { spaceSettingsSections, type SettingsSection } from "./shell-overlay";
 import { VoiceSettingsOverlay } from "./VoiceSettingsOverlay";
 
-/**
- * Sections whose settings belong to a space; only these show the space picker. Models, voice,
- * and confirmations are the account's, and a space customizes them from its Space section.
- */
-const SPACE_SECTIONS: ReadonlySet<SettingsSection> = new Set([
-  "space",
-  "memory",
-  "logs",
-  "agents",
-  "notifications",
+/** Account settings that also display data from a selected space. */
+const accountSectionsWithSpaceData: ReadonlySet<SettingsSection> = new Set([
+  "logs", "agents", "notifications",
 ]);
 
 type NavItem = {
@@ -183,7 +177,12 @@ export function SettingsOverlay({
       ? "general"
       : requestedSection;
   const panelBusy = memoryBusy || voiceBusy || notificationBusy || formState.busy;
-  const spaceScoped = SPACE_SECTIONS.has(section);
+  const serverSettings = spaceSettingsSections.has(section);
+  const spaceScoped = serverSettings || accountSectionsWithSpaceData.has(section);
+  const overrideSetting =
+    section === "space-providers" ? "models" :
+    section === "space-voice" ? "voice" :
+    section === "space-approvals" ? "confirmations" : null;
   const spaceId = spaceScoped ? (space?.id ?? null) : null;
   // The shell only holds the selected space's memory config; another space's loads here.
   const otherSpace = Boolean(spaceId && currentSpaceId && spaceId !== currentSpaceId);
@@ -251,7 +250,15 @@ export function SettingsOverlay({
     }
   }, [section, onUsageOpen]);
 
-  const navItems: NavItem[] = [
+  const settingsTitle = serverSettings ? t`Space settings` : t`Settings`;
+  const navItems: NavItem[] = serverSettings ? [
+    { id: "space", label: t`General`, icon: Settings },
+    { id: "memory", label: t`Memory`, icon: Brain },
+    { id: "space-mcp", label: "MCP", icon: Cpu },
+    { id: "space-providers", label: t`Providers`, icon: Cpu },
+    { id: "space-voice", label: t`Voice`, icon: Volume2 },
+    { id: "space-approvals", label: t`Approvals`, icon: ShieldCheck },
+  ] : [
     { id: "general", label: t`General`, icon: Settings },
     { id: "profile", label: t`Profile and security`, icon: UserRound },
     { id: "agents", label: t`Micos`, icon: BotIcon },
@@ -259,8 +266,6 @@ export function SettingsOverlay({
     { id: "notifications", label: t`Notifications`, icon: Bell },
     { id: "voice", label: t`Voice`, icon: Volume2 },
     { id: "confirmations", label: t`Approvals`, icon: ShieldCheck },
-    { id: "space", label: t`Space`, icon: Lock },
-    { id: "memory", label: t`Memory`, icon: Brain },
     { id: "usage", label: t`Usage`, icon: Gauge },
     ...(developerMode ? [{ id: "logs" as const, label: t`Logs`, icon: ListChecks }] : []),
     ...(showComputer ? [{ id: "computer" as const, label: t`Computer`, icon: Monitor }] : []),
@@ -358,16 +363,17 @@ export function SettingsOverlay({
         ref={panelRef}
         data-testid="user-settings"
         data-settings-section={section}
+        data-settings-scope={serverSettings ? "space" : "account"}
         showCloseButton={false}
         initialFocus={() =>
           section === "usage" ? (usageRef.current ?? panelRef.current) : panelRef.current
         }
-        className="flex h-[min(760px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-[calc(100dvw-2rem)] max-w-[1080px] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-h-[calc(100dvh-5rem)] sm:max-w-[1080px]"
+        className="inset-0 top-0 left-0 flex h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none bg-background p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] ring-0 sm:max-w-none data-open:animate-none data-closed:animate-none"
       >
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <div className="flex min-h-0 shrink-0 flex-col border-b border-border md:w-[232px] md:border-b-0 md:border-e">
             <div className="space-y-3 px-4 pt-4 pb-2">
-              <p className="hidden text-sm font-semibold md:block">{t`Settings`}</p>
+              <p className="text-sm font-semibold">{settingsTitle}</p>
               <div className="relative">
                 <Search className="pointer-events-none absolute start-2.5 top-2.5 size-3.5 text-muted-foreground" />
                 <Input
@@ -415,7 +421,7 @@ export function SettingsOverlay({
               <nav
                 ref={setNavElement}
                 data-testid="settings-nav"
-                aria-label={t`Settings`}
+                aria-label={settingsTitle}
                 className="flex min-h-0 min-w-0 flex-1 flex-row gap-1 overflow-x-auto py-2 md:h-full md:w-full md:flex-col md:overflow-y-auto md:px-3"
               >
                 {visibleItems.map((item) => {
@@ -481,7 +487,7 @@ export function SettingsOverlay({
                       if (next !== space.id) leaveSettings(() => onSpaceChange(next));
                     }}
                   />
-                ) : space && spaces.length > 1 ? (
+                ) : space && (serverSettings || spaces.length > 1) ? (
                   <p
                     data-testid="settings-space"
                     className="break-words text-sm text-muted-foreground"
@@ -553,9 +559,20 @@ export function SettingsOverlay({
                     space={space}
                     onRename={(name) => onRenameSpace?.(space.id, name) ?? Promise.resolve()}
                     onDelete={() => onDeleteSpace?.(space.id) ?? Promise.resolve()}
+                  />
+                ) : null}
+                {overrideSetting && space ? (
+                  <SpaceSettingOverrides
+                    key={overrideSetting}
+                    setting={overrideSetting}
                     onClose={requestClose}
                     onBusyChange={setVoiceBusy}
+                    onFormStateChange={setFormState}
+                    onRequestLeave={leaveSettings}
                   />
+                ) : null}
+                {section === "space-mcp" && space ? (
+                  <McpServersOverlay embedded onClose={requestClose} />
                 ) : null}
                 {section === "confirmations" ? <ApprovalRulesSettings scope="account" /> : null}
                 {section === "usage" ? (

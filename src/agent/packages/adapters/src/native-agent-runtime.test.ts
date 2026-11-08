@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { approvalPausedToolResult } from "./approval-effect.js";
-import { nativeEnvironment } from "./native-agent-process.js";
+import { findNativeCommand, nativeEnvironment } from "./native-agent-process.js";
 import { codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
 import { ScriptedAgentRuntime } from "./scripted-runtime.js";
 import { restoreTurnCheckpoint } from "./turn-checkpoint.js";
@@ -15,7 +15,7 @@ afterEach(async () => {
   for (const path of roots.splice(0)) await rm(path, { recursive: true, force: true });
 });
 const fixture = fileURLToPath(new URL("./fixtures/native-agent.mjs", import.meta.url));
-async function setup(engine: "codex" | "claude" | "acp", extra: string[] = [], fixturePath = fixture) {
+async function setup(engine: NonNullable<AgentRunRequest["agentEngine"]>, extra: string[] = [], fixturePath = fixture) {
   const dataDir = await mkdtemp(join(tmpdir(), "rakazo-native-test-"));
   roots.push(dataDir);
   await writeFile(
@@ -25,7 +25,7 @@ async function setup(engine: "codex" | "claude" | "acp", extra: string[] = [], f
   const runtime = new NativeAgentRuntime({
     dataDir,
     fallback: new ScriptedAgentRuntime(),
-    commands: { [engine]: { command: process.execPath, args: [fixturePath, engine, ...extra] } },
+    commands: { [engine]: { command: process.execPath, args: [fixturePath, engine === "opencode" ? "acp" : engine, ...extra] } },
   });
   const executeTool = vi.fn<NonNullable<AgentRunRequest['executeTool']>>(async () => ({ content: "fixture file" }));
   const onCheckpoint = vi.fn();
@@ -59,6 +59,13 @@ async function setup(engine: "codex" | "claude" | "acp", extra: string[] = [], f
 }
 
 describe("native agent protocol integration", () => {
+  it("discovers the OpenCode executable as an ACP command", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "rakazo-native-test-"));
+    roots.push(dataDir);
+    const command = join(dataDir, process.platform === "win32" ? "opencode.exe" : "opencode");
+    await writeFile(command, "", { mode: 0o700 });
+    expect(findNativeCommand("opencode", { PATH: dataDir })).toEqual({ command, args: ["acp"] });
+  });
   it("does not advertise missing executables or directories and does not replace a broken override", async () => {
     const test = await setup("acp");
     await writeFile(join(test.dataDir, "native-agents.json"), JSON.stringify({
@@ -95,7 +102,7 @@ describe("native agent protocol integration", () => {
     expect(test.executeTool).not.toHaveBeenCalled();
   });
 
-  it.each(["codex", "claude", "acp"] as const)(
+  it.each(["codex", "claude", "acp", "opencode"] as const)(
     "bridges %s tools through the app executor and preserves unknown billing",
     async (engine) => {
       const test = await setup(engine);

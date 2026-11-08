@@ -35,11 +35,10 @@ function fixture(platform: NodeJS.Platform = "linux") {
     contentView: page as any, getContentBounds: vi.fn(() => ({ width: 720, height: 560 })),
     setContentView: vi.fn(function(this: any, view: unknown) { this.contentView = view; }),
     isDestroyed: vi.fn(() => false), isMaximized: vi.fn(() => false), isFullScreen: vi.fn(() => false),
-    webContents: Object.assign(new EventEmitter(), {getURL:vi.fn(()=>"https://www.mycellios.com/agent/app/mico"),executeJavaScript:vi.fn(async()=>"rgb(247, 245, 240)"),insertCSS:vi.fn(async()=>"caption-style")}),
+    webContents: Object.assign(new EventEmitter(), {executeJavaScript:vi.fn(async()=>"rgb(247, 245, 240)")}),
     setBackgroundColor:vi.fn(),setTitleBarOverlay:vi.fn(),
     close: vi.fn(), minimize: vi.fn(), maximize: vi.fn(), unmaximize: vi.fn(), setFullScreen: vi.fn(),
   });
-  if(platform === "win32") win.contentView = {children:[],addChildView:vi.fn()} as any;
   installWindowChrome(win as any, platform);
   return { win, page, strip: state.views.at(-1) };
 }
@@ -79,38 +78,35 @@ describe("persistent host window controls", () => {
     expect(callback).toHaveBeenCalledWith(false);
     win.emit("closed"); expect(wc.close).toHaveBeenCalledOnce(); expect(win.listenerCount("resize")).toBe(0);
   });
-  it("uses native Windows actions over a matching surface", async () => {
+  it("gives native Windows actions a row outside the renderer viewport", async () => {
     const {win,page,strip}=fixture("win32");
-    expect(page.setBounds).not.toHaveBeenCalled();
-    expect(win.setContentView).not.toHaveBeenCalled();
-    expect(strip.bounds).toEqual({x:0,y:0,width:88,height:51});
-    win.webContents.emit("dom-ready");
-    expect(win.webContents.insertCSS.mock.calls[0][0]).toContain('aside[data-testid="side-panel"]');
-    expect(win.webContents.insertCSS.mock.calls[0][0]).toContain("padding-top: 51px");
-    expect(win.webContents.insertCSS.mock.calls[0][0]).toContain("background: transparent");
-    expect(win.webContents.insertCSS.mock.calls[0][0]).not.toContain("border-bottom: 1px");
-    expect(win.webContents.insertCSS.mock.calls[0][0]).toContain("padding-inline-end: 162px");
+    expect(win.contentView.children).toEqual([page, strip]);
+    expect(strip.bounds).toEqual({x:0,y:0,width:558,height:51});
+    expect(page.setBounds).toHaveBeenLastCalledWith({x:0,y:51,width:720,height:509});
     win.webContents.emit("did-finish-load"); await new Promise(resolve=>setTimeout(resolve,0));
     expect(win.setTitleBarOverlay).toHaveBeenCalledWith({color:"#00000000",symbolColor:"#1e2a22",height:51});
   });
   it("preserves the existing native macOS traffic lights", () => {
     const { win } = fixture("darwin"); expect(win.setContentView).not.toHaveBeenCalled();
   });
-  it("keeps login draggable after redirects without covering native controls or the app header", () => {
-    const {win,strip}=fixture("win32");
-    win.webContents.getURL.mockReturnValue("https://www.mycellios.com/oauth/consent?authorization_id=example");
-    win.webContents.emit("did-navigate");
-    expect(strip.bounds).toEqual({x:0,y:0,width:582,height:51});
-    win.getContentBounds.mockReturnValue({width:460,height:560});win.emit("resize");
-    expect(strip.bounds).toEqual({x:0,y:0,width:322,height:51});
-    win.webContents.getURL.mockReturnValue("https://www.mycellios.com/agent/sign-in");
-    win.webContents.emit("did-navigate-in-page");
-    expect(strip.bounds).toEqual({x:0,y:0,width:322,height:51});
-    win.webContents.getURL.mockReturnValue("https://www.mycellios.com/agent/app/mico?settings=models");
-    win.webContents.emit("did-navigate");
-    expect(strip.bounds).toEqual({x:0,y:0,width:88,height:51});
+  it("keeps the renderer below the caption when resized, maximized or restored", () => {
+    const {win,page,strip}=fixture("win32");
+    for (const [event, width, height] of [
+      ["resize", 460, 560], ["maximize", 1440, 900], ["unmaximize", 460, 560],
+    ] as const) {
+      win.getContentBounds.mockReturnValue({width,height});
+      win.emit(event);
+      expect(strip.bounds).toEqual({x:0,y:0,width:width-162,height:51});
+      expect(page.setBounds).toHaveBeenLastCalledWith({x:0,y:51,width,height:height-51});
+    }
+    win.isFullScreen.mockReturnValue(true);
+    win.emit("enter-full-screen");
+    expect(page.setBounds).toHaveBeenLastCalledWith({x:0,y:0,width:460,height:560});
+    win.isFullScreen.mockReturnValue(false);
+    win.emit("leave-full-screen");
+    expect(page.setBounds).toHaveBeenLastCalledWith({x:0,y:51,width:460,height:509});
     win.emit("closed");
-    expect(win.webContents.listenerCount("did-navigate")).toBe(0);
-    expect(win.webContents.listenerCount("did-navigate-in-page")).toBe(0);
+    expect(strip.webContents.close).toHaveBeenCalledOnce();
+    expect(win.listenerCount("unmaximize")).toBe(0);
   });
 });

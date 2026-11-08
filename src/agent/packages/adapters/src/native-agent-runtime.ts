@@ -17,13 +17,14 @@ import { deliverFinishedShells } from "./shell-command-stream.js";
 import { isToolPauseResult } from "./approval-effect.js";
 import type { NativeCommand } from "./native-agent-process.js";
 import { findNativeCommand, nativeCommandAvailable, NativeAgentProcess, NativeEventQueue } from "./native-agent-process.js";
+import { MANAGED_OPENCODE_VERSION, managedOpenCodeCommand, supportsManagedOpenCode } from "./managed-opencode.js";
 import {
   restoreTurnCheckpoint,
   serializeTurnCheckpoint,
   unresolvedTurnCheckpointCalls,
 } from "./turn-checkpoint.js";
 
-type Engine = "codex" | "claude" | "acp";
+type Engine = "codex" | "claude" | "acp" | "opencode";
 type NativeConfig = Partial<Record<Engine, NativeCommand>>;
 const object = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -76,7 +77,13 @@ export async function nativeHostAccess(
   dataDir: string | undefined,
   scope: { userId: string; spaceId: string },
 ) {
-  const { authorizedScopes } = await readNativeConfig(dataDir);
+  return hostAllowsScope(await readNativeConfig(dataDir), scope);
+}
+
+function hostAllowsScope(
+  { authorizedScopes }: Record<string, unknown>,
+  scope: { userId: string; spaceId: string },
+) {
   return (
     Array.isArray(authorizedScopes) &&
     authorizedScopes.length <= 64 &&
@@ -94,10 +101,9 @@ export async function nativeHostAccess(
   );
 }
 
-async function configuredCommands(dataDir?: string): Promise<NativeConfig> {
-  const parsed = await readNativeConfig(dataDir);
+function configuredCommands(parsed: Record<string, unknown>): NativeConfig {
   const commands: NativeConfig = {};
-  for (const engine of ["codex", "claude", "acp"] as const) {
+  for (const engine of ["codex", "claude", "acp", "opencode"] as const) {
     const entry = object(parsed[engine]);
     if (!isAbsolute(text(entry.command))) continue;
     if (
@@ -110,8 +116,20 @@ async function configuredCommands(dataDir?: string): Promise<NativeConfig> {
   return commands;
 }
 
+export async function canInstallNativeOpenCode(
+  dataDir: string | undefined,
+  scope: { userId: string; spaceId: string },
+) {
+  if (!supportsManagedOpenCode(dataDir)) return false;
+  const config = await readNativeConfig(dataDir);
+  return config.allowOpenCodeInstall === true && hostAllowsScope(config, scope) &&
+    !configuredCommands(config).opencode;
+}
+
 export async function discoverNativeEngines(dataDir?: string) {
-  const configured = await configuredCommands(dataDir);
+  const host = await readNativeConfig(dataDir);
+  const configured = configuredCommands(host);
+  const managedOpenCode = configured.opencode ? null : managedOpenCodeCommand(dataDir);
   return [
     { id: "pi" as const, name: "Pi", available: true },
     {
@@ -125,6 +143,14 @@ export async function discoverNativeEngines(dataDir?: string) {
       available: nativeCommandAvailable(configured.claude ?? findNativeCommand("claude")),
     },
     { id: "acp" as const, name: "ACP", available: nativeCommandAvailable(configured.acp) },
+    {
+      id: "opencode" as const,
+      name: "OpenCode",
+      available: nativeCommandAvailable(configured.opencode ?? managedOpenCode ?? findNativeCommand("opencode")),
+      ...(managedOpenCode ? { managedVersion: MANAGED_OPENCODE_VERSION } : {}),
+      canInstall: !managedOpenCode && !configured.opencode &&
+        host.allowOpenCodeInstall === true && supportsManagedOpenCode(dataDir),
+    },
   ];
 }
 
@@ -272,13 +298,17 @@ export class NativeAgentRuntime implements AgentRuntime {
     )
       throw new Error("This user and Space are not authorized to use the server's native agents.");
     const config = {
-      ...(await configuredCommands(this.options.dataDir)),
+      ...configuredCommands(await readNativeConfig(this.options.dataDir)),
       ...this.options.commands,
     };
-    const command = config[engine] ?? (engine === "acp" ? null : findNativeCommand(engine));
+    const command = config[engine] ??
+      (engine === "opencode" ? managedOpenCodeCommand(this.options.dataDir) : null) ??
+      (engine === "acp" ? null : findNativeCommand(engine));
     if (!command)
       throw new Error(
-        `Install and sign in to ${engine} on the computer running this server first.`,
+        engine === "opencode"
+          ? "Install OpenCode on the computer running this server first."
+          : `Install and sign in to ${engine} on the computer running this server first.`,
       );
     if (!nativeCommandAvailable(command))
       throw new Error("The configured native agent executable is unavailable. Correct its path or remove the override.");
@@ -715,6 +745,10 @@ export class NativeAgentRuntime implements AgentRuntime {
               },
             });
           } else {
+            // OpenCode discovers credentials and plugins through the host's home directory.
+            // Keep its fresh profile inside the same account/Space/chat boundary as this run.
+            const openCodeHome = engine === "opencode" ? join(cwd, ".opencode-home") : null;
+            if (openCodeHome) await mkdir(openCodeHome, { recursive: true, mode: 0o700 });
             process = new NativeAgentProcess(
               command,
               [],
@@ -742,6 +776,26 @@ export class NativeAgentRuntime implements AgentRuntime {
                   });
               },
               failure,
+              openCodeHome ? {
+                HOME: openCodeHome,
+                USERPROFILE: openCodeHome,
+                APPDATA: openCodeHome,
+                LOCALAPPDATA: openCodeHome,
+                XDG_CONFIG_HOME: join(openCodeHome, "config"),
+                XDG_DATA_HOME: join(openCodeHome, "data"),
+                XDG_CACHE_HOME: join(openCodeHome, "cache"),
+                XDG_STATE_HOME: join(openCodeHome, "state"),
+                OPENCODE_PURE: "true",
+                OPENCODE_DISABLE_PROJECT_CONFIG: "true",
+                OPENCODE_DISABLE_AUTOUPDATE: "true",
+                OPENCODE_DISABLE_LSP_DOWNLOAD: "true",
+                OPENCODE_DISABLE_EXTERNAL_SKILLS: "true",
+                OPENCODE_DISABLE_CLAUDE_CODE: "true",
+                OPENCODE_CONFIG_CONTENT: JSON.stringify({
+                  enabled_providers: ["opencode"],
+                  permission: { "*": "deny", "rakazo_*": "allow" },
+                }),
+              } : undefined,
             );
             await process.request("initialize", {
               protocolVersion: 1,

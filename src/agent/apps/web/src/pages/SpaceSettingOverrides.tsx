@@ -12,23 +12,33 @@ import { useSpaceRpc } from "../lib/space-rpc";
 import { errorText } from "../lib/user-error";
 import { ModelSettingsOverlay } from "./ModelSettingsOverlay";
 import { VoiceSettingsOverlay } from "./VoiceSettingsOverlay";
+import { useProviderRuntimes } from "./model-settings/provider-runtime";
 
 /**
  * Account settings the bound Space follows until the member customizes them here. A customized
  * setting shows the same panel as the account's section, editing the Space's own copy.
  */
 export function SpaceSettingOverrides({
+  setting,
   onClose,
   onBusyChange,
+  onFormStateChange,
+  onRequestLeave,
 }: {
+  setting: SpaceSetting;
   onClose: () => void;
   onBusyChange?: (busy: boolean) => void;
+  onFormStateChange?: (state: { busy: boolean; dirty: boolean }) => void;
+  onRequestLeave: (next: () => void) => void;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
   const queries = useSpaceQueries();
   const queryClient = useQueryClient();
   const overrides = useQuery(queries.spaceSettings.overrides.queryOptions());
+  const { engines, installing: installingOpenCode, installFailed: installError, installOpenCode } =
+    useProviderRuntimes(setting === "models");
+  const openCode = engines.data?.find((engine) => engine.id === "opencode");
   const [pending, setPending] = useState<SpaceSetting | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -36,7 +46,15 @@ export function SpaceSettingOverrides({
     {
       id: "models",
       label: t`Models`,
-      panel: () => <ModelSettingsOverlay embedded scope="space" onClose={onClose} />,
+      panel: () => (
+        <ModelSettingsOverlay
+          embedded
+          scope="space"
+          onClose={onClose}
+          onFormStateChange={onFormStateChange}
+          onRequestLeave={onRequestLeave}
+        />
+      ),
     },
     {
       id: "voice",
@@ -47,6 +65,7 @@ export function SpaceSettingOverrides({
           scope="space"
           onClose={onClose}
           onBusyChange={onBusyChange}
+          onFormStateChange={onFormStateChange}
         />
       ),
     },
@@ -92,8 +111,43 @@ export function SpaceSettingOverrides({
 
   return (
     <div className="space-y-3">
+      {setting === "models" ? (
+        <SettingsGroup>
+          <SettingsRow
+            label={
+              <>
+                <p>OpenCode</p>
+                {openCode?.managedVersion ? (
+                  <p className="text-[13px] text-muted-foreground">
+                    {t`Version ${openCode.managedVersion} · Downloaded by Mycellios`}
+                  </p>
+                ) : null}
+                <p className="text-[13px] text-muted-foreground">
+                  {openCode?.available
+                    ? t`Available in each Mico’s Agent engine settings.`
+                    : engines.isPending
+                      ? t`Loading…`
+                      : openCode?.canInstall
+                        ? t`Download OpenCode to use it on this server.`
+                        : t`OpenCode is unavailable for this space.`}
+                </p>
+              </>
+            }
+            control={openCode?.canInstall ? (
+              <Button variant="outline" size="sm" disabled={installingOpenCode} onClick={() => void installOpenCode()}>
+                {installingOpenCode ? t`Downloading…` : t`Download`}
+              </Button>
+            ) : null}
+          />
+          {installError ? (
+            <p role="alert" className="px-4 pb-3 text-sm text-destructive">
+              {t`Could not install OpenCode. Try again.`}
+            </p>
+          ) : null}
+        </SettingsGroup>
+      ) : null}
       <SettingsGroup data-testid="space-setting-overrides">
-        {settings.map(({ id, label, panel }) => {
+        {settings.filter(({ id }) => id === setting).map(({ id, label, panel }) => {
           const custom = customized.includes(id);
           return (
             <div key={id} data-testid={`space-setting-${id}`}>
@@ -114,7 +168,7 @@ export function SpaceSettingOverrides({
                     className="rounded-full"
                     aria-label={custom ? t`Use defaults for ${label}` : t`Customize ${label}`}
                     disabled={pending !== null}
-                    onClick={() => void setOverride(id, !custom)}
+                    onClick={() => onRequestLeave(() => void setOverride(id, !custom))}
                   >
                     {custom ? t`Use defaults` : t`Customize`}
                   </Button>

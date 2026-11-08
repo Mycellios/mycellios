@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { captureScreenshot, completeOnboarding, openNewSpace, rpc, signup } from "./helpers";
+import { captureScreenshot, completeOnboarding, openNewSpace, openUserSettings, rpc, signup } from "./helpers";
 
 test("the only space is named in the sidebar and chat creation requires approval", async ({
   page,
@@ -245,10 +245,15 @@ test("a space's menu opens its settings in place, and settings can switch space"
 
   // Models, voice, and approvals follow the account until this space customizes them.
   const overrides = settings.getByTestId("space-setting-overrides");
-  for (const name of ["Models", "Voice", "Approvals"]) {
+  for (const [section, name] of [
+    ["space-providers", "Models"],
+    ["space-voice", "Voice"],
+    ["space-approvals", "Approvals"],
+  ]) {
+    await settings.getByTestId(`settings-nav-${section}`).click();
     await expect(overrides.getByRole("button", { name: `Customize ${name}` })).toBeVisible();
+    await expect(overrides.getByText("Your defaults", { exact: true })).toHaveCount(1);
   }
-  await expect(overrides.getByText("Your defaults", { exact: true })).toHaveCount(3);
   await captureScreenshot(page, testInfo, "space-settings-uses-defaults");
 
   await overrides.getByRole("button", { name: "Customize Approvals" }).click();
@@ -257,10 +262,11 @@ test("a space's menu opens its settings in place, and settings can switch space"
   await expect(spaceNeverAsk).toHaveAttribute("aria-pressed", "false");
   await spaceNeverAsk.click();
   await expect(spaceNeverAsk).toHaveAttribute("aria-pressed", "true");
-  await expect(overrides.getByText("Your defaults", { exact: true })).toHaveCount(2);
+  await expect(overrides.getByText("Your defaults", { exact: true })).toHaveCount(0);
   await captureScreenshot(page, testInfo, "space-settings-customized-confirmations");
 
   // The account's own approvals stay as they were.
+  await openUserSettings(page);
   await settings.getByTestId("settings-nav-confirmations").click();
   await expect(settings.getByTestId("settings-space")).toHaveCount(0);
   await expect(settings.getByRole("button", { name: "Never ask", exact: true })).toHaveAttribute(
@@ -268,13 +274,17 @@ test("a space's menu opens its settings in place, and settings can switch space"
     "false",
   );
 
-  await settings.getByTestId("settings-nav-space").click();
+  await settings.getByRole("button", { name: "Close user settings" }).click();
+  await sidebar.getByRole("button", { name: "Switch workspace" }).click({ button: "right" });
+  await page.getByRole("button", { name: "Space settings", exact: true }).click();
+  await settings.getByTestId("settings-nav-space-approvals").click();
   await expect(picker).toHaveText("Support");
   await overrides.getByRole("button", { name: "Use defaults for Approvals" }).click();
   await expect(approvals.getByTestId("approval-mode")).toHaveCount(0);
   await expect(overrides.getByRole("button", { name: "Customize Approvals" })).toBeVisible();
 
   // Sections that are not per space show no picker.
+  await openUserSettings(page);
   await settings.getByTestId("settings-nav-general").click();
   await expect(settings.getByTestId("settings-space")).toHaveCount(0);
   await settings.getByTestId("settings-nav-models").click();

@@ -153,9 +153,15 @@ describe("normalizeRunError", () => {
   it("identifies uncertain Desktop execution even without a provider diagnosis", () => {
     const details = "Desktop execution interrupted; check existing results before retrying";
     expect(isUncertainDesktopRun(details)).toBe(true);
-    expect(isUncertainDesktopRun(modelFallbackFailure("503: unavailable", [
+    const fallback = modelFallbackFailure("503: unavailable", [
       { provider: "external", modelId: "alternative", status: "failed", reason: details },
-    ]))).toBe(true);
+    ]);
+    expect(isUncertainDesktopRun(fallback)).toBe(true);
+    expect(normalizeRunError(fallback)).toEqual({
+      summary: "Desktop could not confirm the result. Review what it already did before continuing.",
+      kind: "interrupted",
+      details: `503: unavailable\nexternal alternative: ${details}`,
+    });
     expect(normalizeRunError(details, undefined, "en", undefined, "OmniRoute")).toEqual({
       summary: "Desktop could not confirm the result. Review what it already did before continuing.",
       kind: "interrupted",
@@ -820,6 +826,11 @@ describe("the one action that fixes a failed run", () => {
     const error = action(details);
     expect(error.summary).toMatch(/Try again/);
     expect(error.recovery).toBeUndefined();
+  });
+
+  it("rebrands the saved hosted model error without changing its recovery action", () => {
+    expect(normalizeRunError("Connect your own API key in Models or choose Rakazo credits in Billing."))
+      .toEqual(normalizeRunError(HOSTED_MODEL_CREDITS_REQUIRED_ERROR));
   });
 
   it.each([MISSING_MODEL_RUN_ERROR, HOSTED_MODEL_CREDITS_REQUIRED_ERROR])(

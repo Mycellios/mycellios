@@ -4,6 +4,8 @@ import { Button, Disclosure, NativeSelect, NativeSelectOption } from "@rakazo/ui
 import { useId, useState } from "react";
 import { useSpaceRpc } from "../../lib/space-rpc";
 
+type InstalledEngine = Exclude<NonNullable<Bot["agentEngine"]>, "pi">;
+
 export function AgentEngineSettings({
   bot,
   onSave,
@@ -69,7 +71,9 @@ export function AgentEngineSettings({
         </NativeSelect>
         {value !== "pi" ? (
           <p className="text-sm text-muted-foreground">
-            <Trans>Uses this engine’s local sign-in and default model.</Trans>
+            {value === "opencode"
+              ? t`Uses OpenCode in an isolated profile without your local sign-in.`
+              : t`Uses this engine’s local sign-in and default model.`}
           </p>
         ) : null}
         {error ? (
@@ -85,11 +89,11 @@ export function AgentEngineSettings({
 export function InstalledAgentOnboarding({
   onSelect,
 }: {
-  onSelect: (engine: "codex" | "claude" | "acp") => Promise<void>;
+  onSelect: (engine: InstalledEngine) => Promise<void>;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
-  const [engines, setEngines] = useState<Array<{ id: "codex" | "claude" | "acp"; name: string }>>(
+  const [engines, setEngines] = useState<Array<{ id: InstalledEngine; name: string }>>(
     [],
   );
   const [busy, setBusy] = useState(false);
@@ -99,7 +103,7 @@ export function InstalledAgentOnboarding({
     setError("");
     try {
       const found = (await rpc.engines.list()).filter(
-        (engine): engine is typeof engine & { id: "codex" | "claude" | "acp" } =>
+        (engine): engine is typeof engine & { id: InstalledEngine } =>
           engine.id !== "pi" && engine.available,
       );
       setEngines(found);
@@ -111,7 +115,7 @@ export function InstalledAgentOnboarding({
       setBusy(false);
     }
   }
-  async function select(engine: "codex" | "claude" | "acp") {
+  async function select(engine: InstalledEngine) {
     setBusy(true);
     setError("");
     try {

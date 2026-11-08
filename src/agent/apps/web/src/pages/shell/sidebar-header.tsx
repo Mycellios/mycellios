@@ -29,7 +29,6 @@ export function useCreateMenu() {
 
 export function SidebarHeader({
   mini = false,
-  searchOpen = false,
   onSearch,
   onCreateProject,
   createMenuOpen,
@@ -56,7 +55,6 @@ export function SidebarHeader({
   mobileMenu,
 }: {
   mini?: boolean;
-  searchOpen?: boolean;
   onSearch?: () => void;
   onCreateProject?: () => void;
   createMenuOpen: boolean;
@@ -99,18 +97,28 @@ export function SidebarHeader({
       {!mini ? <div className={mobile ? "order-last min-w-0 basis-full" : "contents"}>
         {mobile ? <div className="mt-2 flex items-center gap-2"><h1 className="text-3xl font-semibold tracking-tight">Mycellios</h1><Badge variant="outline" className="text-[10px] text-muted-foreground">Beta</Badge></div> : null}
         <Popover open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
-        <PopoverTrigger className={`app-no-drag flex min-w-0 max-w-full items-center gap-2 rounded-md text-sm font-medium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "min-h-11 text-muted-foreground" : "h-8 px-1.5"}`} aria-label={t`Switch workspace`}>
+        <PopoverTrigger
+          className={`app-no-drag flex min-w-0 max-w-full items-center gap-2 rounded-md text-sm font-medium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "min-h-11 text-muted-foreground" : "h-8 px-1.5"}`}
+          aria-label={t`Switch workspace`}
+          aria-keyshortcuts="Shift+F10"
+          onContextMenu={(event) => { event.preventDefault(); setWorkspaceOpen(true); }}
+          onKeyDown={(event) => {
+            if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
+            event.preventDefault();
+            setWorkspaceOpen(true);
+          }}
+        >
           <span className="truncate">{spaceName ?? "Mycellios"}</span><ChevronsUpDown size={mobile ? 15 : 12} className="shrink-0 text-muted-foreground" />
         </PopoverTrigger>
         {workspaceOpen ? <PopoverContent align="start" className={`app-no-drag max-h-[var(--available-height)] w-64 gap-1 overflow-y-auto p-1 ${mobile ? "[&_button]:min-h-11" : ""}`}>
           {spaces.map(space => <Button key={space.id} variant="ghost" className="justify-start" aria-current={space.id === spaceId ? "true" : undefined} onClick={() => { setWorkspaceOpen(false); const first = space.bots[0]; const group = space.groups[0]; onSpace(space.id, first ? `/app/${first.id}` : group ? `/app/g/${group.id}` : "/onboarding"); }}>{space.name}</Button>)}
           <div className="my-1 border-t border-border" />
+          {spaceId ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); onSpaceSettings(); }}><Settings size={15} />{t`Space settings`}</Button> : null}
           {onRoutines ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onRoutines(); }}><Workflow size={15} />{t`Routines`}</Button> : null}
           {onWorkflows ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onWorkflows(); }}><Workflow size={15} />{t`Workflows`}</Button> : null}
           {onUsage ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onUsage(); }}><Workflow size={15} />{t`Usage`}</Button> : null}
           {onSchedule ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onSchedule(); }}><Workflow size={15} />{t`Schedule`}</Button> : null}
           {onTasks ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onTasks(); }}><Workflow size={15} />{t`Tasks`}</Button> : null}
-          <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); onSpaceSettings(); }}><Settings size={15} />{t`Space settings`}</Button>
           <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setNewSpaceOpen(true); }}><Plus size={15} />{t`New space`}</Button>
         </PopoverContent> : null}
       </Popover></div> : null}
@@ -126,7 +134,6 @@ export function SidebarHeader({
               variant="ghost"
               size="icon-sm"
               aria-label={t`Search`}
-              aria-pressed={searchOpen}
               data-testid="sidebar-search-trigger"
               onClick={onSearch}
               className="app-no-drag flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground/70 hover:text-foreground/75"

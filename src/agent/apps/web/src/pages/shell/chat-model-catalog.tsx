@@ -64,7 +64,11 @@ export function ChatModelCatalog({ source, userId, spaceId, onBack, onPick }: {
           setLimit(PAGE_SIZE);
         }} />
       </div>
-      {remote && modelQuery.isPending ? <Spinner className="m-2 size-4" /> :
+      {remote && modelQuery.isPending ? (
+        <div className="grid min-h-28 place-items-center">
+          <Spinner aria-label={t`Loading models…`} className="text-muted-foreground" />
+        </div>
+      ) :
         remote && failure && !modelQuery.data ? (
           <div className="space-y-1 px-2 text-xs">
             <p role="alert" className="break-words">{t`Could not load the catalog.`} {failure.message}</p>

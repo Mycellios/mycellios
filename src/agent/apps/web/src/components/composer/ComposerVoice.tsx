@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { isAttachmentAudioMimeType } from "@rakazo/contracts";
 import { Button, Spinner } from "@rakazo/ui-web";
-import { Mic, Square } from "lucide-react";
+import { Check, Mic, Square, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isAndroidHost } from "../../lib/android-host";
 import { dictation } from "../../lib/dictation";
@@ -209,8 +209,8 @@ export function useComposerVoice({ scope, transcribe, blocked, onText, onAudio }
   return { state, preview, transcriptAfterStop, error, start, finish, cancel };
 }
 
-function VoiceWave({ startedAt }: { startedAt: number }) {
-  const [levels, setLevels] = useState(() => Array<number>(64).fill(0));
+function VoiceWave({ startedAt, compact = false }: { startedAt: number; compact?: boolean }) {
+  const [levels, setLevels] = useState(() => Array<number>(compact ? 14 : 64).fill(0));
   const [seconds, setSeconds] = useState(0);
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -221,18 +221,32 @@ function VoiceWave({ startedAt }: { startedAt: number }) {
     return () => window.clearInterval(timer);
   }, [startedAt]);
   return <>
-    <span className="size-2 shrink-0 rounded-full bg-destructive motion-safe:animate-pulse" aria-hidden />
-    <span className="shrink-0 tabular-nums">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span>
-    <span dir="ltr" className="flex h-6 min-w-0 flex-1 items-center justify-end gap-0.5 overflow-hidden text-status-working" aria-hidden>
-      {levels.map((level, index) => <span key={index} className="h-[22px] w-[3px] shrink-0 rounded-full bg-current transition-transform duration-100 motion-reduce:transition-none" style={{ transform: `scaleY(${0.14 + Math.min(1, level * 1.3) * 0.86})` }} />)}
+    {!compact ? <span className="size-2 shrink-0 rounded-full bg-destructive motion-safe:animate-pulse" aria-hidden /> : null}
+    <span className={compact ? "sr-only" : "shrink-0 tabular-nums"}>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span>
+    <span dir="ltr" className={`flex min-w-0 flex-1 items-center justify-end gap-0.5 overflow-hidden ${compact ? "h-4 text-foreground/75" : "h-6 text-status-working"}`} aria-hidden>
+      {levels.map((level, index) => <span key={index} className={`${compact ? "h-[14px]" : "h-[22px]"} w-[3px] shrink-0 rounded-full bg-current transition-transform duration-100 motion-reduce:transition-none`} style={{ transform: `scaleY(${0.2 + Math.min(1, level * 1.3) * 0.8})` }} />)}
     </span>
   </>;
 }
 
-export function ComposerVoiceStrip({ voice }: { voice: ReturnType<typeof useComposerVoice> }) {
+export function ComposerVoiceStrip({ voice, compact = false }: { voice: ReturnType<typeof useComposerVoice>; compact?: boolean }) {
   const { t } = useLingui();
   if (!voice.state) return null;
   const recording = voice.state.phase === "recording";
+  if (compact) return (
+    <div data-testid="composer-voice-strip" className="flex h-8 shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 text-muted-foreground">
+      <div className="flex w-[74px] items-center justify-center ps-1">
+        {recording ? <VoiceWave startedAt={voice.state.startedAt} compact /> : <Spinner className="size-3.5" />}
+      </div>
+      <span role="status" className="sr-only">{recording ? t`Listening…` : t`Transcribing…`}</span>
+      <Button type="button" variant="ghost" size="icon" className="size-6 rounded-full" aria-label={t`Discard recording`} onClick={voice.cancel}>
+        <X className="size-3.5" aria-hidden="true" />
+      </Button>
+      <Button type="button" size="icon" className="size-6 rounded-full" aria-label={t`Stop recording`} disabled={!recording} onClick={voice.finish}>
+        <Check className="size-3.5" aria-hidden="true" />
+      </Button>
+    </div>
+  );
   return <div data-testid="composer-voice-strip" className="flex min-h-10 w-full min-w-0 items-center gap-2 px-1 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-150">
     {recording ? <VoiceWave startedAt={voice.state.startedAt} /> : <Spinner />}
     <span role="status" className={recording ? "sr-only" : undefined}>{recording ? t`Listening…` : t`Transcribing…`}</span>

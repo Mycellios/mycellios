@@ -81,13 +81,17 @@ it("explains a preflight block instead of a working animation", () => {
 });
 it("keeps a long, silent run active and distinguishes worker contact from output", () => {
   mount(run);
-  expect(node.querySelector("details")?.open).toBe(false);
+  expect(node.querySelector("details")).toBeNull();
   expect(node.querySelector("[role=status]")?.textContent).toBe("Waiting for an activity update…");
-  expect(node.textContent).toContain("Worker connected · no recent output");
-  expect(node.textContent).toContain("A long task is not stopped");
-  expect(node.textContent).toContain("Last worker signal");
-  expect(node.textContent).toContain("Last output");
+  expect(node.textContent).not.toContain("No new activity");
+  expect(node.textContent).not.toContain("Last worker signal");
   expect(node.textContent).not.toContain("Cannot start");
+});
+it("does not offer an empty disclosure before the first recorded step", () => {
+  mount({ ...run, startedAt: new Date(now - 6000).toISOString(), modelId: "known-model" });
+  expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
+  expect(node.querySelector("details")).toBeNull();
+  expect(node.textContent).not.toContain("known-model");
 });
 it("polls without overlap, pauses while hidden and disposes on unmount", async () => {
   const { refresh } = mount(run);
@@ -147,10 +151,11 @@ it("shows real tool activity without claiming the worker is connected or opening
     role: "bot", createdAt: at(-1), blocks: [{ kind: "steps", steps: [{ label: "List files", count: 1 }] }],
   } as import("@rakazo/contracts").ThreadMessage;
   mount({ ...run, leaseExpiresAt: undefined, observedAt: undefined }, false, [message]);
-  expect(node.querySelector("[data-testid=latest-run-activity]")?.textContent).toBe("Latest activity: List files");
+  expect(node.querySelector('ol[aria-label="Task activity"]')?.textContent).toContain("Reviewing files…");
   expect(node.querySelector("[role=status]")?.textContent).toBe("Status not confirmed");
   expect(node.querySelector("details")?.open).toBe(false);
-  expect(node.querySelector("details")?.contains(node.querySelector("[data-testid=latest-run-activity]"))).toBe(true);
+  expect(node.querySelector("details")?.contains(node.querySelector('ol[aria-label="Task activity"]'))).toBe(true);
+  expect(node.textContent).not.toContain("Technical details");
 });
 it("does not show activity from another run or completed history", () => {
   const message = { id: "progress:other", runId: "other", threadId: "thread", seq: 1,
@@ -167,13 +172,18 @@ it("keeps commands and paths inside details and preserves the disclosure choice 
   act(render);
   const details = node.querySelector("details")!;
   expect(details.open).toBe(false);
-  expect(details.textContent).toContain(activity);
-  const outside = node.cloneNode(true) as HTMLElement;
-  outside.querySelector("details")!.remove();
-  expect(outside.textContent).toContain("No new activity");
-  expect(outside.textContent).not.toContain("ssh");
-  expect(outside.textContent).not.toContain("/srv/");
+  expect(details.textContent).not.toContain(activity);
+  const summary = details.querySelector("summary");
+  expect(summary?.textContent).toContain("Waiting for an activity update");
+  expect(summary?.textContent).not.toContain("ssh");
+  expect(summary?.textContent).not.toContain("/srv/");
   details.open = true;
+  const technical = details.querySelector("details")!;
+  act(() => {
+    technical.open = true;
+    technical.dispatchEvent(new Event("toggle"));
+  });
+  expect(technical.querySelector('[data-testid="latest-run-activity"]')?.textContent).toBe(activity);
   act(render);
   expect(node.querySelector("details")!.open).toBe(true);
 });

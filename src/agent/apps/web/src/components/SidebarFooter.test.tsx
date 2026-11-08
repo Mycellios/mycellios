@@ -40,6 +40,7 @@ async function render(
   onIntegrations = vi.fn(),
   onBoard?: () => void,
   logos?: Array<{ name: string; logo?: string }>,
+  rail = false,
 ) {
   const email = "account@rakazo.test";
   await act(async () =>
@@ -47,6 +48,7 @@ async function render(
       <DesktopUpdatesProvider>
         <SidebarFooter
           logos={logos}
+          rail={rail}
           name={name}
           initials={name
             .split(" ")
@@ -202,6 +204,20 @@ it("falls back when app artwork fails and accepts replacement artwork", async ()
     { name: "Slack", logo: "https://example.test/new-slack.svg" },
   ]);
   expect(pill.querySelector("img")?.src).toBe("https://example.test/new-slack.svg");
+});
+
+it("shows the app marks in a single rail shortcut beside the account control", async () => {
+  const onIntegrations = vi.fn();
+  const logos = ["Gmail", "GitHub", "Calendar"].map((name) => ({
+    name,
+    logo: `https://example.test/${name}.svg`,
+  }));
+  await render("Demo User", undefined, onIntegrations, undefined, logos, true);
+  const shortcut = host.querySelector<HTMLButtonElement>('[aria-label="Connect apps"]')!;
+  expect([...shortcut.querySelectorAll("img")].map((image) => image.src)).toEqual(logos.map((mark) => mark.logo));
+  expect(host.querySelector('[data-testid="user-menu-trigger"]')).not.toBeNull();
+  await act(async () => shortcut.click());
+  expect(onIntegrations).toHaveBeenCalledOnce();
 });
 it.each(["throw", "state"] as const)(
   "shows a %s install failure while unsaved work delays the update screen",

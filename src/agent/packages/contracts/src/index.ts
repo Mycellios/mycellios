@@ -29,6 +29,7 @@ export * from "./model-headers.js";
 export * from "./model-provider.js";
 export * from "./mycellios-account.js";
 export * from "./credit-units.js";
+export * from "./spore-rewards.js";
 export * from "./model-roles.js";
 export * from "./openai-compatible-ui.js";
 export * from "./product-brand.js";
