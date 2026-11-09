@@ -3,6 +3,14 @@
 @import "./components/brand-launch.css";
 
 html, body, #root { height: 100%; margin: 0; background: var(--background); color: var(--foreground); }
+.app-startup {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--background);
+}
 .app-loading-mark {
   display: inline-grid;
   justify-items: center;
