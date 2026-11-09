@@ -4610,6 +4610,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 }}
                 onRecoveryDismissed={releaseComputerRecovery}
                 onOpenComputerSettings={() => openSettings("computer")}
+                onOpenBotSettings={() => setPanel("settings")}
                 onOpen={() => void openComputer()}
                 routines={activeRoutines}
                 runningRoutineId={

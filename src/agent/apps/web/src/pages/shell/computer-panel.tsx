@@ -1,6 +1,7 @@
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { Bot, ComputerStatus, Routine } from "@rakazo/contracts";
+import { Button } from "@rakazo/ui-web";
 import { Maximize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { ComputersUnavailableHint } from "../../components/ComputersUnavailableHint";
@@ -25,6 +26,7 @@ type ComputerPanelProps = {
   onRecovered: (sandboxProvider: string) => void;
   onRecoveryDismissed: () => void;
   onOpenComputerSettings?: () => void;
+  onOpenBotSettings?: () => void;
   onOpen: () => void;
   routines: Routine[];
   runningRoutineId?: string;
@@ -49,6 +51,7 @@ export function ComputerPanel({
   onRecovered,
   onRecoveryDismissed,
   onOpenComputerSettings,
+  onOpenBotSettings,
   onOpen,
   routines,
   runningRoutineId,
@@ -116,6 +119,11 @@ export function ComputerPanel({
           </button>
         ) : null}
       </div>
+      {computer?.state !== "running" && onOpenBotSettings ? (
+        <Button variant="outline" size="sm" className="mt-3 w-full" onClick={onOpenBotSettings}>
+          <Trans>Open Mico settings</Trans>
+        </Button>
+      ) : null}
       <p className="mt-2 truncate text-[13.5px] text-muted-foreground" dir="auto">
         {t`${bot.name}'s screen`}
       </p>
