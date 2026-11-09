@@ -86,7 +86,7 @@ it("does not publish a completion if the Desktop stream loses its terminal frame
   expect(fallback.run).not.toHaveBeenCalled();
 });
 
-it("runs new turns in cloud when Desktop is offline and preserves bound work", async () => {
+it("runs new turns in cloud only when Desktop is not preferred and preserves bound work", async () => {
   const fallback = { describe, abort: vi.fn(), run: vi.fn(async function* () { yield { type: "done" as const }; }) };
   const transport = vi.fn();
   const old = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: false, preferred: false }) });
@@ -94,12 +94,10 @@ it("runs new turns in cloud when Desktop is offline and preserves bound work", a
   expect(fallback.run).toHaveBeenCalledTimes(1);
   const offline = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: false, preferred: true }) });
   const fresh = { ...request(), resumeToolResult: { content: [{ type: "text" as const, text: "hello" }] } };
-  for await (const _ of offline.run(fresh, context)) {}
-  expect(fallback.run).toHaveBeenCalledTimes(2);
-  expect(fallback.run).toHaveBeenLastCalledWith(
-    expect.objectContaining({ instructions: expect.stringContaining("This turn runs on the server") }),
-    context,
+  await expect(async () => { for await (const _ of offline.run(fresh, context)) {} }).rejects.toThrow(
+    "did not move to the cloud",
   );
+  expect(fallback.run).toHaveBeenCalledTimes(1);
   for (const [input, scope] of [
     [request(), { ...context, projectSessionId: "project" }],
     [{ ...request(), resumeFromCheckpoint: "checkpoint" }, context],
@@ -107,7 +105,7 @@ it("runs new turns in cloud when Desktop is offline and preserves bound work", a
   ] as const) {
     await expect(async () => { for await (const _ of offline.run(input, scope)) {} }).rejects.toThrow("bound");
   }
-  expect(fallback.run).toHaveBeenCalledTimes(2);
+  expect(fallback.run).toHaveBeenCalledTimes(1);
   expect(transport).not.toHaveBeenCalled();
 });
 
