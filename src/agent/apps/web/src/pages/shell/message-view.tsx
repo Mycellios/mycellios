@@ -5,7 +5,7 @@ import type { ChildBotBlock } from "@rakazo/core";
 import { isPeerReceiptBlocks, isSecretAskBlock, isToolActivityBlock } from "@rakazo/core";
 import { BotAvatar, Button, cn, resolvePersonaColorDef } from "@rakazo/ui-web";
 import { UserRound } from "lucide-react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, useState, type ComponentProps } from "react";
 import { ArtifactFileCard } from "../../components/ArtifactFileCard";
 import { AskCard } from "../../components/AskCard";
 import { CollaborationMarker } from "../../components/ai/CollaborationMarker";
@@ -488,7 +488,7 @@ export const MessageView = memo(function MessageView({
                   dir="auto"
                 >
                   <div data-quote-message-id={quoteMessageId}>
-                    <ChatMarkdown renderMention={renderMention}>{block.text}</ChatMarkdown>
+                    <CollapsibleMessageText text={block.text} renderMention={renderMention} />
                   </div>
 
                 </div>
@@ -622,5 +622,41 @@ function BotMention({
       </span>
       {name}
     </button>
+  );
+}
+
+/** Long bot replies keep the useful answer in view; the rest stays one click away. */
+function CollapsibleMessageText({
+  text,
+  renderMention,
+}: {
+  text: string;
+  renderMention?: ComponentProps<typeof ChatMarkdown>["renderMention"];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const collapsible = text.length > 1200 || text.split("\n").length > 24;
+  if (!collapsible) return <ChatMarkdown renderMention={renderMention}>{text}</ChatMarkdown>;
+  return (
+    <div>
+      <div className={cn("relative overflow-hidden", !expanded && "max-h-[26rem]")}>
+        <ChatMarkdown renderMention={renderMention}>{text}</ChatMarkdown>
+        {!expanded ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-14"
+            style={{ background: "linear-gradient(to top, var(--card), transparent)" }}
+          />
+        ) : null}
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="mt-1 h-7 px-2 text-xs text-muted-foreground"
+        onClick={() => setExpanded((value) => !value)}
+      >
+        {expanded ? <Trans>Show less</Trans> : <Trans>Show more</Trans>}
+      </Button>
+    </div>
   );
 }
