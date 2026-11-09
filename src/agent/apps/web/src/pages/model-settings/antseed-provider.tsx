@@ -54,6 +54,11 @@ export function AntSeedProvider({ credentials, nameOf, onBack, onManage, connect
           <p className="text-sm text-muted-foreground">{t`Your AntSeed gateway manages its own balance and spending limits.`}</p>
         </>} control={<a href="https://antseed.com/docs/gateway/" target="_blank" rel="noopener noreferrer"
           className="text-sm underline underline-offset-4">{t`Gateway guide`}</a>} />
+        <SettingsRow label={<>
+          <p className="font-medium">{t`Pin a seller`}</p>
+          <p className="text-sm text-muted-foreground">{t`Use peerId@model as the exact model ID. A pinned seller keeps routing and prompt caching stable.`}</p>
+        </>} control={<a href="https://antseedstats.com/network" target="_blank" rel="noopener noreferrer"
+          className="text-sm underline underline-offset-4">{t`Find a peer ID`}</a>} />
       </SettingsGroup>
     </ProviderDetail>
   );

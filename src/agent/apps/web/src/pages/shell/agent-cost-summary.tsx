@@ -26,6 +26,12 @@ export function AgentCostSummary({ botId }: { botId: string }) {
   const loaded = result?.botId === botId;
   const cost = loaded ? result.cost : null;
   const amount = cost?.amountUsd == null ? null : formatTaskCostAmount(cost.amountUsd, i18n.locale);
+  const compact = (value: number | null | undefined) =>
+    value == null ? null : new Intl.NumberFormat(i18n.locale, {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(value);
+  const last = cost?.lastCall ?? null;
   return <section className="my-6" data-testid="agent-cost-summary"
     title={t`Includes model calls attributed to this agent. Gas and external services are separate.`}>
     <h3 className="mb-2 text-xs font-medium text-muted-foreground"><Trans>Total AI cost</Trans></h3>
@@ -35,5 +41,12 @@ export function AgentCostSummary({ botId }: { botId: string }) {
       {cost?.state === "estimated" ? <span className="text-xs text-muted-foreground"><Trans>Estimated AI cost</Trans></span>
        : null}
     </div>
+    {last ? (
+      <p className="mt-2 text-xs text-muted-foreground" data-testid="agent-last-call">
+        <Trans>Last model call</Trans>: {compact(last.totalTokens ?? last.inputTokens) ?? "—"}{" "}
+        <Trans>context</Trans>
+        {last.cacheReadTokens ? <> · {compact(last.cacheReadTokens)} <Trans>cached</Trans></> : null}
+      </p>
+    ) : null}
   </section>;
 }

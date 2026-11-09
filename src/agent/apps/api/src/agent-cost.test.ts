@@ -8,8 +8,9 @@ function fixture({all=3,known=3,amount=0.6,estimated=0,pending=0,active=0,owned=
  const aggregate=vi.fn(async()=>({_sum:{costUsd:amount},_count:{id:known}}));
  const bot=vi.fn(async()=>owned?{id:"bot"}:null);
  const run=vi.fn(async()=>active);
- const deps={prisma:{bot:{findFirst:bot},usageRecord:{count,aggregate},run:{count:run}}} as unknown as RouterDeps;
- return {deps,count,aggregate,bot,run};
+ const last=vi.fn(async()=>null);
+ const deps={prisma:{bot:{findFirst:bot},usageRecord:{count,aggregate,findFirst:last},run:{count:run}}} as unknown as RouterDeps;
+ return {deps,count,aggregate,bot,run,last};
 }
 describe("agent total cost",()=>{
  it("sums the full authorized history without a recent-record limit",async()=>{
@@ -31,5 +32,10 @@ describe("agent total cost",()=>{
  it("does not read another account's agent usage",async()=>{
   const f=fixture({owned:false});await expect(agentCost(f.deps,actor,"foreign")).rejects.toMatchObject({code:"NOT_FOUND"});
   expect(f.aggregate).not.toHaveBeenCalled();expect(f.count).not.toHaveBeenCalled();
+ });
+ it("reports the last call context and cache reuse",async()=>{
+  const f=fixture();f.last.mockResolvedValue({model:"antseed/deepseek",createdAt:new Date("2026-11-09T11:52:33Z"),inputTokens:157,outputTokens:496,cacheReadTokens:39552,totalTokens:40205});
+  const result=await agentCost(f.deps,actor,"bot");
+  expect(result.lastCall).toEqual({model:"antseed/deepseek",createdAt:"2026-11-09T11:52:33.000Z",inputTokens:157,outputTokens:496,cacheReadTokens:39552,totalTokens:40205});
  });
 });
