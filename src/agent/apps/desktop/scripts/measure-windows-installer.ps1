@@ -13,5 +13,12 @@ if(Test-Path -LiteralPath $errorFile){
   $installerError=(Get-Content -LiteralPath $errorFile -Raw).Trim()
   Remove-Item -LiteralPath $errorFile -Force -ErrorAction SilentlyContinue
 }
-@{exitCode=$process.ExitCode;elapsedMs=$watch.Elapsed.TotalMilliseconds;installation=$root;installerError=$installerError}|ConvertTo-Json|Set-Content -LiteralPath $Result -Encoding UTF8
+$trace=@()
+foreach($file in @((Join-Path $env:TEMP 'mycellios-fast-install-trace.txt'),'C:\Users\Public\mycellios-fast-install-trace.txt')){
+  if(Test-Path -LiteralPath $file){
+    $trace += @(Get-Content -LiteralPath $file -Tail 60)
+    Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+  }
+}
+@{exitCode=$process.ExitCode;elapsedMs=$watch.Elapsed.TotalMilliseconds;installation=$root;installerError=$installerError;installerTrace=($trace -join "`n")}|ConvertTo-Json|Set-Content -LiteralPath $Result -Encoding UTF8
 if($process.ExitCode -ne 0){exit 1}

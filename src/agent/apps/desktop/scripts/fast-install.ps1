@@ -13,6 +13,13 @@ $ErrorActionPreference='Stop'
 # from a neutral one.
 Set-Location -LiteralPath $env:TEMP
 $installationPath=[IO.Path]::GetFullPath($Installation).TrimEnd('\')
+$traceFiles=@((Join-Path $env:TEMP 'mycellios-fast-install-trace.txt'),'C:\Users\Public\mycellios-fast-install-trace.txt')
+function Trace([string]$message){
+ foreach($file in $traceFiles){
+  try{Add-Content -LiteralPath $file -Value ((Get-Date).ToString('o')+' '+$message) -Encoding UTF8}catch{}
+ }
+}
+Trace ('start '+$Operation+' '+$installationPath)
 $parent=[IO.Path]::GetDirectoryName($installationPath)
 $backupRoot=Join-Path $parent 'mycellios-desktop-upgrade-backups'
 $exeName='Mycellios Desktop.exe'
@@ -34,8 +41,15 @@ function Assert-Installation {
 }
 function Assert-Idle {
  $paths=@((Join-Path $installationPath $exeName))
- if($script:state -and $script:state.backup){$paths+=Join-Path $script:state.backup $exeName}
- if(@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -in $paths}).Count){throw 'Close Mycellios normally before updating'}
+ # A prepared rollback copy is data, not a running installation. The second
+ # NSIS check runs after prepare and must only test the live path.
+ if($Operation -ne 'check' -and $script:state -and $script:state.backup){$paths+=Join-Path $script:state.backup $exeName}
+ $running=@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -in $paths})
+ if($running.Count){
+  Trace ('idle: running '+((@($running|ForEach-Object {$_.ExecutablePath})|Sort-Object -Unique) -join ','))
+  throw 'Close Mycellios normally before updating'
+ }
+ Trace 'idle: clear'
 }
 function Save-State {
  $temporary=$Journal+'.tmp'
@@ -178,7 +192,9 @@ try {
   # Keep the installation at its path: the taskbar pin and the Start Menu
   # shortcut target this directory, and renaming it makes Windows drop the pin.
   # A same-volume copy still gives us a rollback without changing the path.
+  Trace 'prepare: copying installation'
   & robocopy $installationPath $script:state.backup /E /COPY:DAT /DCOPY:DAT /XJ /R:2 /W:1 /NFL /NDL /NP /NJH /NJS | Out-Null
+  Trace ('prepare: copy exit '+$LASTEXITCODE)
   if($LASTEXITCODE -ge 8){throw 'Could not snapshot the installation'}
   $script:state.phase='prepared';Save-State
  } else {
@@ -197,13 +213,11 @@ try {
  exit 0
 } catch {
  $failure=$_.Exception.Message
- if($Operation -eq 'prepare'){
-  try{
-   $errorFile=Join-Path $env:TEMP 'mycellios-fast-install-error.txt'
-   Set-Content -LiteralPath $errorFile -Value $failure -Encoding UTF8
-  }catch{}
-  try{Restore-Previous}catch{}
- }
+ Trace ('error '+$Operation+': '+$failure)
+ try{
+  Set-Content -LiteralPath (Join-Path $env:TEMP 'mycellios-fast-install-error.txt') -Value ($Operation+': '+$failure) -Encoding UTF8
+ }catch{}
+ if($Operation -eq 'prepare'){try{Restore-Previous}catch{}}
  Write-Error ('Desktop update was not applied: '+$failure) -ErrorAction Continue
  exit 1
 }
