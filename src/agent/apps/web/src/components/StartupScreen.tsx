@@ -1,15 +1,9 @@
-import { productBrand } from "@rakazo/contracts";
-import { appPath } from "../lib/app-path";
-import { BrandLaunch } from "./BrandLaunch";
+import { MycelliosLoader } from "./MycelliosLoader";
 
 export function StartupScreen({ state }: { state: "session-pending" | "i18n-pending" }) {
   return (
-    <BrandLaunch
-      documentFrame
-      busy
-      appState={state}
-      markSrc={appPath(productBrand.mascotPath)}
-      wordSrc={appPath(productBrand.markPath)}
-    />
+    <div className="app-startup" data-rakazo-app-state={state} role="status" aria-label="Mycellios">
+      <MycelliosLoader />
+    </div>
   );
 }

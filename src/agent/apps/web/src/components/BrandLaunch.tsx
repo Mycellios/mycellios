@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { appPath } from "../lib/app-path";
 import { desktopDragClass } from "../lib/desktop";
 import "./brand-launch.css";
 
@@ -134,27 +135,21 @@ export function BrandMark({
   alt?: string;
   busy?: boolean;
 }) {
+  if (busy) {
+    return (
+      <div className="brand-launch-mark brand-launch-loader">
+        <img
+          src={appPath("/mycellios/loader.svg")}
+          alt=""
+          width={192}
+          height={192}
+          draggable={false}
+        />
+      </div>
+    );
+  }
   return (
-    <div className={busy ? "brand-launch-mark is-busy" : "brand-launch-mark"}>
-      {busy ? (
-        <>
-          <span className="brand-launch-plate" />
-          <span className="brand-launch-ring" aria-hidden="true">
-            <svg viewBox="0 0 100 100">
-              <circle
-                cx="50"
-                cy="50"
-                r="46"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeDasharray="72 217"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-        </>
-      ) : null}
+    <div className="brand-launch-mark">
       <picture>
         {animatedSrc ? (
           <source
