@@ -32,10 +32,8 @@ test('Windows snapshot/rollback preserves installation registration, drafts and 
     invoke('prepare',['-Uninstaller','Uninstall Mycellios Desktop.exe','-InstallRegistryKey',keys[0],'-UninstallRegistryKey',keys[1],'-TargetVersion','99.0.0']);
     const state=JSON.parse((await readFile(journal,'utf8')).replace(/^\uFEFF/,''));
     assert.equal(state.phase,'prepared');assert.ok(state.backup.startsWith(path.join(root,'mycellios-desktop-upgrade-backups')+path.sep));
-    await access(path.join(state.backup,'Mycellios Desktop.exe'));await access(target);
-    const prepared=await readdir(installation);
-    assert.ok(prepared.includes('Mycellios Desktop.exe'));
-    assert.ok(prepared.includes('Uninstall Mycellios Desktop.exe'));
+    await access(path.join(state.backup,'Mycellios Desktop.exe'));await assert.rejects(access(target));
+    assert.deepEqual(await readdir(installation),['Uninstall Mycellios Desktop.exe']);
     // Simulate a failed extraction/registration after the old uninstaller ran.
     await writeFile(path.join(installation,'partial-new-version'),'partial');
     reg('add','HKCU\\'+keys[1],'/v','DisplayVersion','/t','REG_SZ','/d','broken','/f');
@@ -53,7 +51,7 @@ test('Windows snapshot/rollback preserves installation registration, drafts and 
     // Extraction was interrupted after writing the binary and manifest but before registering the uninstaller.
     await unlink(path.join(installation,'Uninstall Mycellios Desktop.exe'));
     await copyFile(source,target);
-    await mkdir(path.join(installation,'resources'),{recursive:true});
+    await mkdir(path.join(installation,'resources'));
     await writeFile(path.join(installation,'resources/desktop-build.json'),JSON.stringify({schema:'mycellios-desktop-build/1',platform:'windows-x64',version:'99.0.1'}));
     invoke('prepare',[...args,'-TargetVersion','99.0.2'],retryJournal);
     const recovered=JSON.parse((await readFile(path.join(path.dirname(interrupted.backup),'receipt.json'),'utf8')).replace(/^\uFEFF/,''));
