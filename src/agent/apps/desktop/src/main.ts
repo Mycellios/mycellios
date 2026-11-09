@@ -78,7 +78,7 @@ import {
   safeExternalUrl,
   sessionPartitionForServerUrl,
 } from "./setup-config.js";
-import { clearSetup, readSetup, writeSetup } from "./setup-store.js";
+import { clearSetup, readPrivateFile, readSetup, writePrivateFile, writeSetup } from "./setup-store.js";
 import { oauthPopupSessionPreferences, shouldOpenInAppPopup } from "./window-open.js";
 import { installWindowChrome } from "./window-chrome.js";
 import { installProjectBrowser } from "./project-browser.js";
@@ -197,6 +197,33 @@ let accountComputerSession: {base:string;session:Session}|undefined;
 let projectRunner: ReturnType<typeof installProjectRunner> | undefined;
 let contributionRuntime: ContributionRuntime;
 let requestingComputerAccess = false;
+/**
+ * OpenBot's model: closing the window quits, unless the user explicitly chose to
+ * keep the app running in the background. The preference is native and local.
+ */
+let keepRunningInBackground = false;
+let backgroundPreferenceProfile: string | undefined;
+
+async function loadBackgroundPreference(profile: string) {
+  backgroundPreferenceProfile = profile;
+  const raw = await readPrivateFile(path.join(profile, "app-behavior.json"), 4096).catch(() => null);
+  try {
+    const saved = raw ? JSON.parse(raw) : null;
+    keepRunningInBackground = saved?.schema === 1 && saved.keepRunningInBackground === true;
+  } catch {
+    keepRunningInBackground = false;
+  }
+  installApplicationMenu();
+}
+
+function setKeepRunningInBackground(checked: boolean) {
+  keepRunningInBackground = checked;
+  installApplicationMenu();
+  if (backgroundPreferenceProfile) {
+    void writePrivateFile(path.join(backgroundPreferenceProfile, "app-behavior.json"),
+      JSON.stringify({ schema: 1, keepRunningInBackground: checked })).catch(() => undefined);
+  }
+}
 
 markOnce("rk:main:module-evaluated");
 if (PERFORMANCE_USER_DATA) {
@@ -800,6 +827,12 @@ function installApplicationMenu() {
     visible: manualDesktopUpdater !== null || updaterSupport(updaterEnvironment).supported,
     click: () => void checkForUpdatesFromMenu(),
   };
+  const keepRunningBackground: Electron.MenuItemConstructorOptions = {
+    type: "checkbox",
+    checked: keepRunningInBackground,
+    label: "Keep Running in the Background",
+    click: (item) => setKeepRunningInBackground(item.checked),
+  };
   const changeServer: Electron.MenuItemConstructorOptions = {
     id: "change-rakazo-server",
     label: "Advanced: change server…",
@@ -883,6 +916,7 @@ function installApplicationMenu() {
               stopStack,
               { type: "separator" },
               checkForUpdates,
+              keepRunningBackground,
               { type: "separator" },
               { role: "quit" },
             ],
@@ -1216,6 +1250,7 @@ app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
   installSessionPermissions(session.defaultSession, permissionTarget);
   const userDataDir = app.getPath("userData");
+  void loadBackgroundPreference(userDataDir);
   contributionRuntime = new ContributionRuntime({
     platform: process.platform,
     resources: process.resourcesPath,
@@ -1459,6 +1494,7 @@ app.whenReady().then(async () => {
     profile:userDataDir,host:hostComputer,nativeVersion:app.getVersion(),
     localUrl:hostComputer.connection.url.replace("host.docker.internal","127.0.0.1"),localToken:hostComputer.connection.token,
     consentScope:computerConsentScope,window:()=>mainWindow,changed:installApplicationMenu,
+    keepRunningInBackground:()=>keepRunningInBackground,
     context:async()=>{
       if(currentSetup?.mode === "new")return null;
       const base=projectServer() ?? normalizeServerUrl(currentSetup?.serverUrl ?? currentTargetUrl ?? (target.kind === "app" ? target.url : ""));
@@ -1960,8 +1996,9 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", () => {
   // A hidden session probe (defaultSessionHasOriginData) can be the only window
-  // during startup; its teardown must not quit the app.
-  if (liveProbeWindows > 0 || accountComputer?.hasConsent()) return;
+  // during startup; its teardown must not quit the app. A hidden main window is
+  // still a window, so "keep running in the background" does not reach here.
+  if (liveProbeWindows > 0) return;
   if (process.platform !== "darwin") app.quit();
 });
 

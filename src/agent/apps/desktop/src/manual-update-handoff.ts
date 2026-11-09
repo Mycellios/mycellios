@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, open, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { writePrivateFile } from "./setup-store.js";
 import type { ManualRelease } from "./manual-update.js";
@@ -49,7 +50,7 @@ export async function launchManualUpdate(options: {
   const child = (() => {
     try {
       return spawn(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", helper, "-ConfigFile", config, "-Launch"], {
-        windowsHide: true, stdio: ["ignore", output.fd, output.fd],
+        windowsHide: true, cwd: tmpdir(), stdio: ["ignore", output.fd, output.fd],
       });
     } finally {
       void output.close().catch(() => undefined);

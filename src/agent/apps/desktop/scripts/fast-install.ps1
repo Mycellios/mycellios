@@ -8,6 +8,10 @@ param(
  [string]$TargetVersion
 )
 $ErrorActionPreference='Stop'
+# The installer may be started from the installation directory. A directory
+# cannot be renamed while it is a process's current directory, so always work
+# from a neutral one.
+Set-Location -LiteralPath $env:TEMP
 $installationPath=[IO.Path]::GetFullPath($Installation).TrimEnd('\')
 $parent=[IO.Path]::GetDirectoryName($installationPath)
 $backupRoot=Join-Path $parent 'mycellios-desktop-upgrade-backups'

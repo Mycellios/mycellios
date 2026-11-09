@@ -5,6 +5,8 @@ import { AccountComputerConnection } from "./account-computer.js";
 export function installAccountComputerBackground(
   options: ConstructorParameters<typeof AccountComputerConnection>[0] & {
     window(): BrowserWindow | null;
+    /** The user asked to keep the app alive in the background instead of quitting. */
+    keepRunningInBackground?: () => boolean;
   },
 ) {
   let quitting = false;
@@ -27,7 +29,7 @@ export function installAccountComputerBackground(
     if (!win || watched.has(win)) return;
     watched.add(win);
     win.on("close", (event) => {
-      if (!quitting && service.hasConsent()) {
+      if (!quitting && options.keepRunningInBackground?.() === true && service.hasConsent()) {
         event.preventDefault();
         win.hide();
       }

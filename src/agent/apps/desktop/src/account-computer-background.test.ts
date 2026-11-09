@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { afterEach, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ allowed: true, changed: () => {}, stopped: 0 }));
+const state = vi.hoisted(() => ({ allowed: true, keep: false, changed: () => {}, stopped: 0 }));
 vi.mock("./account-computer.js", () => ({
   AccountComputerConnection: class {
     constructor(options: any) {
@@ -39,9 +39,35 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.useRealTimers();
 });
+it("closes the window and quits unless the user chose to keep running in the background", async () => {
+  vi.useFakeTimers();
+  state.allowed = true;
+  state.keep = false;
+  const window = Object.assign(new EventEmitter(), {
+    hide: vi.fn(),
+    show: vi.fn(),
+    focus: vi.fn(),
+  });
+  installAccountComputerBackground({
+    profile: "fixture",
+    host: {} as any,
+    localUrl: "http://127.0.0.1",
+    localToken: "fixture",
+    context: async () => null,
+    consentScope: () => "fixture",
+    window: () => window as any,
+    keepRunningInBackground: () => state.keep,
+  });
+  const close = { preventDefault: vi.fn() };
+  window.emit("close", close);
+  expect(close.preventDefault).not.toHaveBeenCalled();
+  expect(window.hide).not.toHaveBeenCalled();
+});
+
 it("keeps a consented window and its draft alive in the background, with explicit quit and revocation", async () => {
   vi.useFakeTimers();
   state.allowed = true;
+  state.keep = true;
   state.stopped = 0;
   const window = Object.assign(new EventEmitter(), {
     hide: vi.fn(),
@@ -56,6 +82,7 @@ it("keeps a consented window and its draft alive in the background, with explici
     context: async () => null,
     consentScope: () => "fixture",
     window: () => window as any,
+    keepRunningInBackground: () => state.keep,
   });
   const close = { preventDefault: vi.fn() };
   window.emit("close", close);
@@ -78,6 +105,11 @@ it("keeps a consented window and its draft alive in the background, with explici
   window.emit("close", revokedClose);
   expect(revokedClose.preventDefault).not.toHaveBeenCalled();
   state.allowed = true;
+  state.keep = false;
+  const quitDefaultClose = { preventDefault: vi.fn() };
+  window.emit("close", quitDefaultClose);
+  expect(quitDefaultClose.preventDefault).not.toHaveBeenCalled();
+  state.keep = true;
   app.emit("before-quit");
   const quitClose = { preventDefault: vi.fn() };
   window.emit("close", quitClose);
