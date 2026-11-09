@@ -23,7 +23,7 @@ import { LocalAgentHomeStore } from "./home.js";
 import { hostComputerDeadlineMs } from "./host-computer-protocol.js";
 import { HostComputerSandbox } from "./host-computer-sandbox.js";
 import { startHostComputerServer } from "./host-computer-server.js";
-import { nativeShellCommandArgv } from "./native-shell.js";
+import { isBashShell, nativeShellCommandArgv } from "./native-shell.js";
 
 const context = {
   operationId: "test",
@@ -174,8 +174,9 @@ describe("native host computer transport", () => {
 
   it("uses the host shell for the real shell tool, including PowerShell on Windows", async () => {
     const environment = await client.environment(computer, context);
-    const command =
-      environment.platform === "win32"
+    const command = isBashShell(environment.shell)
+      ? "printf 'native-shell-ok\\n'"
+      : environment.platform === "win32"
         ? "Write-Output 'native-shell-ok'"
         : "printf 'native-shell-ok\\n'";
     const events = await collect(

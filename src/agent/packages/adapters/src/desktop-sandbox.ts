@@ -51,6 +51,7 @@ import {
 } from "./desktop-sandbox-win32-path.js";
 import { removeOwnedWorkspaceChildren } from "./desktop-workspace-cleanup.js";
 import { hostCommandEnvironment } from "./sandbox-command-environment.js";
+import { gitBashPath } from "./native-shell.js";
 import { NativeCommandJournal } from "./native-command-journal.js";
 
 const O_NOFOLLOW = constants.O_NOFOLLOW ?? 0;
@@ -280,11 +281,15 @@ export class DesktopSandboxProvider implements SandboxProvider {
   }
 
   async environment() {
+    const bash = gitBashPath();
     return {
       durableCommands: true,
       platform: process.platform,
       home: homedir(),
-      shell: process.platform === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/sh",
+      shell:
+        process.platform === "win32"
+          ? bash ?? "powershell.exe"
+          : process.env.SHELL || "/bin/sh",
       runtimeExecutable: process.execPath,
     };
   }

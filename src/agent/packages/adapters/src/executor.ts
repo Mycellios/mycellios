@@ -379,7 +379,7 @@ import {
   modelAcceptsImageInput,
   modelIdSupportsImages,
 } from "./model-vision.js";
-import { nativeShellCommandArgv } from "./native-shell.js";
+import { isBashShell, nativeShellCommandArgv } from "./native-shell.js";
 import { assertAllowedOpenAiCompatibleUrl } from "./openai-compatible-url.js";
 import type { CodexLiveCatalog } from "./pi-codex-catalog.js";
 import { codexLiveListsModel } from "./pi-codex-catalog.js";
@@ -4722,8 +4722,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
         if (isolatedProjectRun && (context.projectSessionId !== run.threadId || hostEnvironment?.taskIsolation !== "worktree-v1")) {
           await failRunBeforeModel("The isolated project connection changed. Reopen this conversation on the linked PC before continuing.", false); return;
         }
+        const hostShellIsBash = hostEnvironment ? isBashShell(hostEnvironment.shell) : false;
         const hostInstruction = hostEnvironment
-          ? `Commands run on the user's ${hostEnvironment.platform} computer with their account permissions. Home: ${JSON.stringify(hostEnvironment.home)}. Shell: ${JSON.stringify(hostEnvironment.shell)}. The shell tool executes commands with that shell. Use its native syntax, paths and installed tools; do not assume Linux or bash. Local files outside the bot workspace can be accessed through commands. App launching is available through OS commands; graphical screen control is unavailable.`
+          ? `Commands run on the user's ${hostEnvironment.platform} computer with their account permissions. Home: ${JSON.stringify(hostEnvironment.home)}. Shell: ${JSON.stringify(hostEnvironment.shell)}. ${
+              hostShellIsBash
+                ? `The shell tool runs bash${hostEnvironment.platform === "win32" ? " (Git Bash)" : ""}. Use POSIX syntax, pipes and paths${hostEnvironment.platform === "win32" ? "; Windows drives appear as /c/, so C:\\Users is /c/Users" : ""}. Do not assume PowerShell or cmd; call powershell.exe explicitly for a Windows-only command.`
+                : "The shell tool runs PowerShell. Use PowerShell syntax: 2>$null instead of 2>/dev/null, Select-Object -Last N instead of tail, Select-String instead of grep, and ; instead of && on Windows PowerShell 5.1. A pipe after an ssh command runs locally; put remote pipes inside the quoted ssh command."
+            } The shell tool executes commands with that shell. Use its native syntax, paths and installed tools. Local files outside the bot workspace can be accessed through commands. App launching is available through OS commands; graphical screen control is unavailable.`
           : undefined;
         const projectInstruction = hostEnvironment?.projectPath
           ? `The user opened this local project: ${JSON.stringify(hostEnvironment.projectPath)}. ${context.projectSessionId
