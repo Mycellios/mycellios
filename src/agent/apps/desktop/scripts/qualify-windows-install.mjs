@@ -31,6 +31,13 @@ async function preservation(mode,resources,label){
  const proof=await json(result);assert.equal(proof.passed,true);return proof;
 }
 async function measure(installation,label){
+ const journal=path.join(root,label+'-journal.json');
+ try{
+  execFileSync(ps,['-NoProfile','-NonInteractive','-File',path.join(desktop,'scripts/fast-install.ps1'),'-Operation','check','-Installation',installation,'-Journal',journal,'-Uninstaller','Uninstall Mycellios Desktop.exe','-InstallRegistryKey',keys[0],'-UninstallRegistryKey',keys[1],'-TargetVersion',identity.version],{windowsHide:true,stdio:'pipe'});
+ }catch(error){
+  const detail=String(error?.stderr??'').trim()||String(error?.stdout??'').trim()||String(error?.message??error);
+  throw new Error(`fast-install check failed before the installer: ${detail}`);
+ }
  const result=path.join(root,label+'-timing.json');
  let executionError;
  try{
