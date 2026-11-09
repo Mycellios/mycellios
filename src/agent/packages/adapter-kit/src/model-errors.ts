@@ -71,6 +71,14 @@ export function isProviderTimeout(error: unknown): boolean {
 /** Only provider availability failures may advance the user's explicit chain. */
 export function isRetryableProviderUnavailable(error: unknown): boolean {
   const { text, statuses } = errorFacts(error);
+  // The OpenCode Go gateway reports its own malformed upstream reply as a 400.
+  // That is a transport failure before any effect, not the caller's request, and
+  // it can clear on the next attempt. Keep every other 400 permanent.
+  if (
+    statuses.has(400) &&
+    /upstream response was not valid json|upstream request failed[^.]*invalid json/.test(text)
+  )
+    return true;
   if (statuses.has(400) || statuses.has(401)) return false;
   // Kimi For Coding reports an exhausted usage window as HTTP 403. errorFacts lowercases text.
   if (
