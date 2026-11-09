@@ -572,6 +572,16 @@ export function BotSettings({
               void enqueueSave({ title: value });
             }}
           />
+          <Textarea
+            aria-label={t`Description`}
+            value={description}
+            maxLength={BOT_DESCRIPTION_MAX_LENGTH}
+            onChange={(event) => setDescription(event.target.value)}
+            onBlur={() => void enqueueSave()}
+            placeholder={t`What this agent does`}
+            rows={2}
+            className="mt-2 min-h-10 w-full resize-none border-0 bg-transparent p-0 text-center text-sm text-muted-foreground shadow-none field-sizing-content"
+          />
         </div>
         {!bot.agentEngine || bot.agentEngine === "pi" ? (
           <section ref={modelRef} className="mt-6" data-testid="bot-model-settings">
@@ -636,17 +646,20 @@ export function BotSettings({
             </div>
           </section>
         ) : null}
-        <SettingsLinks label={t`Context`}>
+        <SettingsLinks label={t`Knows`}>
           <SettingsLink page="instructions" icon={FileText} label={t`Instructions`} onClick={() => setPage("instructions")} />
-          <SettingsLink page="memory" icon={BookOpen} label={t`Memory`} onClick={() => setPage("memory")} />
+          <SettingsLink page="memory" icon={BookOpen} label={t`Memories`} onClick={() => setPage("memory")} />
           <SettingsLink page="skills" icon={Puzzle} label={t`Skills`} onClick={() => setPage("skills")} />
-          {onOpenFiles ? <SettingsLink icon={Folder} label={t`Library`} onClick={onOpenFiles} /> : null}
+          {onOpenFiles ? <SettingsLink icon={Folder} label={t`Files`} onClick={onOpenFiles} /> : null}
+        </SettingsLinks>
+        <SettingsLinks label={t`Does`}>
           {onOpenRoutines ? <SettingsLink icon={CalendarClock} label={t`Routines`} onClick={onOpenRoutines} /> : null}
           {onOpenUsage ? <SettingsLink icon={Gauge} label={t`Usage`} onClick={onOpenUsage} /> : null}
+          <SettingsLink icon={Download} label={t`Export agent`} onClick={() => void onExport()} />
         </SettingsLinks>
         <SettingsLinks label={t`Rules`}>
           <SettingsLink page="computer" icon={Monitor} label={t`Computer`} detail={computerLabel} onClick={() => setPage("computer")} />
-          <SettingsLink page="permissions" icon={ShieldCheck} label={t`Permissions`} onClick={() => setPage("permissions")} />
+          <SettingsLink page="permissions" icon={ShieldCheck} label={t`Access`} onClick={() => setPage("permissions")} />
           <SettingsLink page="advanced" icon={SlidersHorizontal} label={t`Advanced`} onClick={() => setPage("advanced")} />
         </SettingsLinks>
         <section className="mt-6">
@@ -817,22 +830,6 @@ export function BotSettings({
                 </NativeSelect>
               </label>
             ) : null}
-          </SettingsGroup>
-          <SettingsGroup label={t`Description`}>
-            <label htmlFor={`${ids}-description`} className="block text-xs text-muted-foreground">
-              <Trans>How other bots see it</Trans>
-              <Textarea
-                id={`${ids}-description`}
-                aria-label={t`Description`}
-                value={description}
-                maxLength={BOT_DESCRIPTION_MAX_LENGTH}
-                onChange={(e) => setDescription(e.target.value)}
-                onBlur={() => void enqueueSave()}
-                placeholder={t`What this bot is for`}
-                rows={2}
-                className="mt-2 min-h-16 resize-none field-sizing-content border-0 bg-transparent p-0 text-foreground shadow-none"
-              />
-            </label>
           </SettingsGroup>
           <SettingsGroup label={t`Tools`}>
             <section data-testid="bot-settings-tools">
