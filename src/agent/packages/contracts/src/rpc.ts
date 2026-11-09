@@ -143,7 +143,7 @@ import { RoutineHistorySchema, RoutineRunCursorSchema, RunsListOutputSchema } fr
 import { SearchQueryOutputSchema } from "./search.js";
 import { SecurityEventListInputSchema, SecurityEventSchema } from "./security-events.js";
 import { SettingsScopeSchema, SpaceSettingSchema, settingsScopeInput } from "./settings-scope.js";
-import { AgentUsageReportSchema, TaskCostSchema } from "./task-cost.js";
+import { AgentUsageReportSchema, LastModelCallSchema, TaskCostSchema } from "./task-cost.js";
 
 const botId = z.object({ botId: Id });
 const groupId = z.object({ groupId: Id });
@@ -1171,7 +1171,7 @@ export const appContract = {
     sporeRewards: oc.output(SporeRewardsSchema),
     dashboard: oc.input(UsageDashboardInputSchema).output(UsageDashboardSchema),
     agents: oc.output(AgentUsageReportSchema),
-    agent: oc.input(botId).output(TaskCostSchema.omit({ runId: true }).extend({ botId: Id })),
+    agent: oc.input(botId).output(TaskCostSchema.omit({ runId: true }).extend({ botId: Id, lastCall: LastModelCallSchema.nullable() })),
     tasks: oc.input(z.object({ runIds: z.array(Id).max(100) })).output(z.array(TaskCostSchema)),
     list: oc.output(z.array(UsageRecordSchema)),
     summary: oc.output(UsageSummarySchema),

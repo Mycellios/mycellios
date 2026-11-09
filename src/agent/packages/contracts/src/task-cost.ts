@@ -9,6 +9,17 @@ export const TaskCostSchema = z.object({
 });
 export type TaskCost = z.infer<typeof TaskCostSchema>;
 
+/** The last model call attributed to an agent, including prompt-cache reuse. */
+export const LastModelCallSchema = z.object({
+  model: z.string(),
+  createdAt: z.string(),
+  inputTokens: z.number().int().nonnegative().nullable(),
+  outputTokens: z.number().int().nonnegative().nullable(),
+  cacheReadTokens: z.number().int().nonnegative().nullable(),
+  totalTokens: z.number().int().nonnegative().nullable(),
+});
+export type LastModelCall = z.infer<typeof LastModelCallSchema>;
+
 export const AgentUsageTotalsSchema = TaskCostSchema.omit({ runId: true }).extend({
   inputTokens: z.number().int().nonnegative().nullable(),
   outputTokens: z.number().int().nonnegative().nullable(),

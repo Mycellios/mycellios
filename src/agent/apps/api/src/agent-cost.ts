@@ -13,17 +13,26 @@ export async function agentCost(deps: RouterDeps, actor: Actor, botId: string) {
     { costSource: { in: ["provider-reported", "pi-catalog-estimate"] } },
     { costUsd: 0, usageSource: { in: ["provider-rejected", "not-started"] } },
   ] };
-  const [all, known, estimated, pending, active] = await Promise.all([
+  const [all, known, estimated, pending, active, last] = await Promise.all([
     deps.prisma.usageRecord.count({ where: scope }),
     deps.prisma.usageRecord.aggregate({ where: priced, _sum: { costUsd: true }, _count: { id: true } }),
     deps.prisma.usageRecord.count({ where: { ...priced, costSource: "pi-catalog-estimate" } }),
     deps.prisma.usageRecord.count({ where: { ...scope, costUsd: null,
       pricingSnapshot: { path: ["antseedReceiptState"], equals: "pending" } } }),
     deps.prisma.run.count({ where: { ...scope, status: { notIn: ["completed", "failed", "cancelled"] } } }),
+    deps.prisma.usageRecord.findFirst({
+      where: scope,
+      orderBy: { createdAt: "desc" },
+      select: {
+        model: true, createdAt: true, inputTokens: true, outputTokens: true,
+        cacheReadTokens: true, totalTokens: true,
+      },
+    }),
   ]);
   const amount = known._sum.costUsd ?? 0;
   const complete = all === known._count.id && Number.isFinite(amount) && amount >= 0;
   const state: TaskCost["state"] = active || pending ? "pending" : !complete ? "unavailable" : estimated ? "estimated" : "confirmed";
   return { botId, state, amountUsd: complete && !active && !pending ? amount : null,
-    modelCalls: all, unpricedCalls: Math.max(0, all - known._count.id) };
+    modelCalls: all, unpricedCalls: Math.max(0, all - known._count.id),
+    lastCall: last ? { ...last, createdAt: last.createdAt.toISOString() } : null };
 }
