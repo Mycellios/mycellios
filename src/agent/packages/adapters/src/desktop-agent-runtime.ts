@@ -147,10 +147,12 @@ export class DesktopAgentRuntime implements AgentRuntime {
       if (route.preferred && (context.projectSessionId || request.resumeFromCheckpoint || request.turnCheckpoint)) {
         throw Error("This task is bound to your Desktop. Reconnect the PC to resume it.");
       }
-      const cloudRequest = route.preferred
-        ? { ...request, instructions: `${request.instructions}\nDesktop is offline. This turn runs on the server. Use only available tools and workspaces. Explain any specific dependency on local files or devices.` }
-        : request;
-      yield* this.options.fallback.run(cloudRequest, context);
+      if (route.preferred) {
+        // Local-first: never move a Desktop turn to the cloud without consent.
+        // The user can switch this Mico's computer explicitly from its settings.
+        throw Error("Your Desktop is offline. Reconnect it to continue. This Mico did not move to the cloud; switch its computer explicitly if you want to run it there.");
+      }
+      yield* this.options.fallback.run(request, context);
       return;
     }
     if (this.active.has(request.runId)) throw Error("Desktop run already active");

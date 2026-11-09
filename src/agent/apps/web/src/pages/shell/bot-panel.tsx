@@ -93,7 +93,7 @@ export function ComputerModePicker({
           }}
           className="capitalize aria-pressed:border-foreground/40 aria-pressed:text-foreground"
         >
-          {mode === "team" ? <Trans>Team</Trans> : <Trans>Private</Trans>}
+          {mode === "team" ? <Trans>Cloud/Team</Trans> : <Trans>This PC</Trans>}
         </Toggle>
       ))}
     </div>
@@ -527,7 +527,7 @@ export function BotSettings({
     permissions: t`Permissions`,
     advanced: t`Advanced`,
   };
-  const computerLabel = computerMode === "team" ? t`Team` : t`Private`;
+  const computerLabel = computerMode === "team" ? t`Cloud/Team` : t`This PC`;
 
   return (
     <div data-testid="bot-settings">
@@ -726,6 +726,18 @@ export function BotSettings({
       {page === "computer" ? (
         <SettingsGroup label={t`Computer`}>
           <ComputerModePicker value={computerMode} onChange={setComputerMode} />
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            <Trans>
+              Cloud/Team runs on a shared computer on the server and does not see files on your PC.
+              This PC runs on your desktop with your folders, shell and tools.
+            </Trans>
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            <Trans>
+              If this PC is offline, the turn stops. It never moves to the cloud without your
+              permission.
+            </Trans>
+          </p>
           {memoryProviderConfigured ? (
             <div className="mt-4 text-sm text-foreground">
               <Trans>Memory scope</Trans>
