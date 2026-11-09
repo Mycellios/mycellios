@@ -180,7 +180,7 @@ describe("automatic in-run context compaction", () => {
     expect(compactor.requestRecovery()).toBe(false);
   });
 
-  it("retains source history when summarization fails, is empty or exceeds the output budget", async () => {
+  it("retains source history when summarization fails or is empty, and clamps an over-budget summary", async () => {
     const ctx = context(old("history ".repeat(1500)), current);
     const before = JSON.stringify(ctx);
     for (const summarize of [
@@ -188,11 +188,19 @@ describe("automatic in-run context compaction", () => {
         throw new Error("credit refused");
       },
       async () => "",
-      async () => "long ".repeat(2000),
     ]) {
       await expect(createContextCompactor({ summarize }).prepare(ctx, model)).rejects.toThrow();
       expect(JSON.stringify(ctx)).toBe(before);
     }
+    const result = await createContextCompactor({
+      summarize: async () => "long ".repeat(2000),
+    }).prepare(ctx, model);
+    expect(JSON.stringify(ctx)).toBe(before);
+    expect(result.messages.at(-1)).toBe(current);
+    const summary = result.messages[0]?.content;
+    expect(typeof summary).toBe("string");
+    expect(String(summary)).toContain(LIVE_COMPACTION_PREFIX);
+    expect(estimateContextTokens(result)).toBeLessThan(estimateContextTokens(ctx));
   });
 
   it("honors cancellation and bounds cumulative summary calls", async () => {

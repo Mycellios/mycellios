@@ -51,6 +51,21 @@ function historicalText(message: Message): string {
   return `${source}${message.role}: ${content}`;
 }
 
+/** Keep a verbose model inside the summary budget instead of failing the whole turn. */
+function clampSummary(text: string, maxTokens: number): string {
+  if (estimateTextTokens(text) <= maxTokens) return text;
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (estimateTextTokens(text.slice(0, middle)) <= maxTokens) low = middle;
+    else high = middle - 1;
+  }
+  // Do not split a UTF-16 surrogate pair.
+  if (low < text.length && /[\uD800-\uDBFF]/.test(text.charAt(low - 1))) low--;
+  return text.slice(0, low).trimEnd();
+}
+
 /** Split by estimated tokens; never send an unbounded transcript to the summarizer. */
 function nextChunk(text: string, maxTokens: number): string {
   let low = 0;
@@ -207,7 +222,12 @@ export function createContextCompactor(options: {
             next = await summarizeChunk();
           }
           options.signal?.throwIfAborted();
-          if (!next || estimateTextTokens(next) > output + 64)
+          if (!next) throw new Error("Automatic context compaction returned an empty summary.");
+          // Small OpenAI-compatible models often ignore the requested output limit.
+          // A bounded summary is better than aborting the user's turn; the complete
+          // original history is still retained in the chat.
+          next = clampSummary(next, output);
+          if (!next)
             throw new Error(
               "Automatic context compaction returned an invalid summary; original history was retained.",
             );
