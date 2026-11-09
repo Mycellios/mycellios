@@ -32,6 +32,10 @@ describe("transient model errors", () => {
       "Usage limit; retry-after: 1 second.",
     ].map((message): [string, unknown] => [message, { status: 429, message }]),
     ["service unavailable", { status: 503, message: "service unavailable" }],
+    [
+      "gateway reports a malformed upstream reply",
+      '400 {"type":"error","error":{"type":"api_error","message":"Upstream request failed: [api_error] Upstream response was not valid JSON"}}',
+    ],
     ["bad gateway", new Error("502 Bad Gateway")],
     ["empty truncated stream", new Error("Stream ended without finish_reason")],
     ["dropped fetch body", new TypeError("terminated")],
@@ -74,6 +78,7 @@ describe("transient model errors", () => {
     ["forbidden", "403 Forbidden"],
     ["context overflow", "context_length_exceeded: maximum context length is 128000 tokens"],
     ["bad request", { status: 400, message: "Unsupported parameter: temperature" }],
+    ["gateway upstream refusal", { status: 400, message: "Upstream request failed: invalid API key" }],
     ["auth failure mentioning a connection error", { status: 401, message: "Connection error." }],
     ["cancellation", new Error("Request was aborted")],
     ["unknown", new Error("Model stream ended without a terminal event")],
