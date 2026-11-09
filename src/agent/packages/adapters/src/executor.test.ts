@@ -1770,7 +1770,7 @@ describe("persistentComputerInstruction", () => {
           graphical,
           disabled: new Set(disabled),
         });
-      const filesOff = ["list_files", "read_file", "write_file", "attach_file"];
+      const filesOff = ["list_files", "read_file", "write_file", "edit_file", "attach_file"];
       expect(instruction(["shell"])).not.toContain("shell");
       expect(instruction(["shell"])).toContain("filesystem");
       expect(instruction(filesOff)).not.toContain("filesystem");
@@ -4194,7 +4194,7 @@ describe("computer-unavailable chat", () => {
       messagingChannelRun: false, historyRetrievalEnabled: true });
     const names = tools.map((tool) => tool.name);
     expect(names).toEqual(expect.arrayContaining(["ask_user", "message_user", "web_fetch", "search_history", "connect_app"]));
-    for (const name of ["shell", "read_file", "write_file", "attach_file", "list_files", "render_plot",
+    for (const name of ["shell", "read_file", "write_file", "edit_file", "attach_file", "list_files", "render_plot",
       "computer_observe", "computer_act", "open_path", "launch_app", "request_takeover", "browser_navigate", "browser_snapshot", "browser_act"])
       expect(names).not.toContain(name);
     expect(persistentComputerInstruction({ computerAvailable: false, heldForTakeover: false,

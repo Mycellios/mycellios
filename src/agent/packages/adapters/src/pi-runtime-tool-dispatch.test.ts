@@ -443,6 +443,20 @@ const writeFileTool: ConnectorTool = {
   },
 };
 
+const editFileTool: ConnectorTool = {
+  name: "edit_file",
+  description: "Replace an exact string in an existing UTF-8 file.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      path: { type: "string" },
+      old_string: { type: "string" },
+      new_string: { type: "string" },
+      replace_all: { type: "boolean" },
+    },
+  },
+};
+
 const shellTool = {
   name: "shell",
   description: "Run a command",
@@ -2303,6 +2317,55 @@ describe("Pi connector tool dispatch", () => {
       {
         path: "shared/state.json",
         content: '{\n  "last_run": 1787648953\n}',
+      },
+      JSON.stringify(["pi-tool", "main", "call-1"]),
+      undefined,
+      { onShellStillRunning: expect.any(Function) },
+    );
+  });
+
+  it("passes an exact range to edit_file instead of rewriting the file", async () => {
+    fakeAgentState.invoke = {
+      name: "edit_file",
+      args: {
+        path: "config.ts",
+        old_string: "const MAX_RETRIES = 3;",
+        new_string: "const MAX_RETRIES = 5;",
+        replace_all: false,
+      },
+    };
+    const executeTool = vi.fn(async () => ({ ok: true }));
+    const runtime = new PiAgentRuntime();
+
+    for await (const _event of runtime.run(
+      {
+        botId: "b",
+        threadId: "t",
+        runId: "r",
+        prompt: "change the retry limit",
+        instructions: "Use edit_file for a small change.",
+        history: [],
+        tools: [editFileTool],
+        model: { provider: "test", id: "dispatch-test-model" },
+        executeTool,
+      },
+      {
+        operationId: "edit",
+        traceId: "edit",
+        spaceId: "w",
+        userId: "u",
+        signal: new AbortController().signal,
+      },
+    )) {
+      // Exhaust the runtime event stream so tool execution completes.
+    }
+
+    expect(executeTool).toHaveBeenCalledWith(
+      "edit_file",
+      {
+        path: "config.ts",
+        old_string: "const MAX_RETRIES = 3;",
+        new_string: "const MAX_RETRIES = 5;",
       },
       JSON.stringify(["pi-tool", "main", "call-1"]),
       undefined,

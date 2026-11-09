@@ -25,6 +25,7 @@ export const BUILTIN_TOOL_NAMES = [
   "list_files",
   "read_file",
   "write_file",
+  "edit_file",
   "attach_file",
   "shell",
   "command_status",

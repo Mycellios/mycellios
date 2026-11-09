@@ -371,17 +371,27 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "read_file",
     description:
-      "Read a UTF-8 text file from this bot's home. On a Team Computer, relative paths use the bot folder and shared/... accesses shared work. Open visual or binary files with open_path instead.",
+      "Read a UTF-8 text file from this bot's home. Use offset and limit to read only the lines you need from a large file; both are one-based lines. On a Team Computer, relative paths use the bot folder and shared/... accesses shared work. Open visual or binary files with open_path instead.",
     inputSchema: {
       type: "object",
-      properties: { path: { type: "string" } },
+      properties: {
+        path: { type: "string" },
+        offset: {
+          type: "number",
+          description: "First line to read, starting at 1. Defaults to the first line.",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum lines to return. Defaults to 2000.",
+        },
+      },
       required: ["path"],
     },
   },
   {
     name: "write_file",
     description:
-      "Write a UTF-8 file into this bot's home. On a Team Computer, relative paths use the bot folder; use shared/... only for work other bots should share.",
+      "Write a UTF-8 file into this bot's home. Use it for a new file or a full rewrite; for a small change to an existing file use edit_file instead. On a Team Computer, relative paths use the bot folder; use shared/... only for work other bots should share.",
     inputSchema: {
       type: "object",
       properties: {
@@ -389,6 +399,24 @@ export const builtinAgentTools: ConnectorTool[] = [
         content: { type: "string" },
       },
       required: ["path", "content"],
+    },
+  },
+  {
+    name: "edit_file",
+    description:
+      "Replace an exact string in an existing UTF-8 file. old_string must match exactly once; include enough surrounding text to be unique, or set replace_all to change every match. Prefer this over write_file for a small change so the whole file is not rewritten. Read the file first; never guess its contents.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        old_string: { type: "string", description: "Exact text to replace. Must not be empty." },
+        new_string: { type: "string", description: "Replacement text." },
+        replace_all: {
+          type: "boolean",
+          description: "Replace every match instead of requiring a unique one.",
+        },
+      },
+      required: ["path", "old_string", "new_string"],
     },
   },
   {
