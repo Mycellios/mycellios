@@ -32,8 +32,14 @@ async function preservation(mode,resources,label){
 }
 async function measure(installation,label){
  const result=path.join(root,label+'-timing.json');
- execFileSync(ps,['-NoProfile','-NonInteractive','-File',path.join(desktop,'scripts/measure-windows-installer.ps1'),'-Candidate',candidate,'-Installation',installation,'-Result',result],{windowsHide:true,timeout:240000,stdio:'pipe'});
- const timing=await json(result);assert.equal(timing.exitCode,0);
+ let executionError;
+ try{
+  execFileSync(ps,['-NoProfile','-NonInteractive','-File',path.join(desktop,'scripts/measure-windows-installer.ps1'),'-Candidate',candidate,'-Installation',installation,'-Result',result],{windowsHide:true,timeout:240000,stdio:'pipe'});
+ }catch(error){executionError=error;}
+ let timing;
+ try{timing=await json(result);}catch{throw executionError??new Error('Installer qualification produced no result');}
+ if(timing.exitCode!==0)throw new Error(`Installer failed (${timing.exitCode}): ${timing.installerError??'no error detail'}`);
+ assert.equal(timing.exitCode,0);
  const manifest=await json(path.join(installation,'resources/desktop-build.json'));
  assert.equal(manifest.version,identity.version);assert.equal(manifest.revision,identity.revision);
  await preservation('verify',path.join(installation,'resources'),label+'-drafts');
@@ -50,6 +56,10 @@ try{
  execFileSync(zip,['e','-y','-o'+extracted,legacy,'$PLUGINSDIR/app-64.7z','$R0/Uninstall Mycellios Desktop.exe'],{stdio:'pipe'});
  execFileSync(zip,['x','-y','-o'+installation,path.join(extracted,'app-64.7z')],{stdio:'pipe'});
  await fs.copyFile(path.join(extracted,'Uninstall Mycellios Desktop.exe'),path.join(installation,'Uninstall Mycellios Desktop.exe'));
+ // Free the download and the extracted payload before the upgrade copies the
+ // installation for rollback; the hosted runner otherwise runs out of disk.
+ await fs.rm(legacy,{force:true});
+ await fs.rm(extracted,{recursive:true,force:true});
  // Exercise the real NSIS error path, without starting an old application.
  const refused=path.join(root,'refused/mycellios-desktop');
  await fs.mkdir(path.join(refused,'resources'),{recursive:true});
