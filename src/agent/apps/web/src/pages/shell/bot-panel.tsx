@@ -77,9 +77,11 @@ function advancedValues(bot: Bot) {
 export function ComputerModePicker({
   value,
   onChange,
+  desktopAvailable = true,
 }: {
   value: ComputerMode;
   onChange: (value: ComputerMode) => void;
+  desktopAvailable?: boolean;
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -88,6 +90,7 @@ export function ComputerModePicker({
           key={mode}
           variant="outline"
           pressed={value === mode}
+          disabled={mode === "dedicated" && !desktopAvailable}
           onPressedChange={(pressed) => {
             if (pressed) onChange(mode);
           }}
@@ -112,6 +115,7 @@ export function BotSettings({
   onOpenFiles,
   onOpenRoutines,
   onOpenUsage,
+  onUseThisComputer,
 }: {
   bot: Bot;
   focusModel?: number;
@@ -119,6 +123,8 @@ export function BotSettings({
   onOpenFiles?: () => void;
   onOpenRoutines?: () => void;
   onOpenUsage?: () => void;
+  /** Present only on Desktop: bind this Mico to the running PC and repair a Docker fallback. */
+  onUseThisComputer?: () => Promise<void>;
   /** Unused: the skill sections read and save the shared cached skill list. */
   onSkillsChange?: (skills: AgentSkillCatalogEntry[]) => void;
   memoryProviderConfigured: boolean;
@@ -252,6 +258,7 @@ export function BotSettings({
     advancedSnapshot !== savedAdvanced ||
     description.trim() !== savedDescriptionRef.current;
   const [error, setError] = useState<string | null>(null);
+  const [computerBusy, setComputerBusy] = useState(false);
   const saveQueueRef = useRef(Promise.resolve());
   const executeSaveRef = useRef<
     (
@@ -476,6 +483,20 @@ export function BotSettings({
     }
   }
   executeSaveRef.current = executeSave;
+
+  async function switchToThisComputer() {
+    if (!onUseThisComputer || computerBusy) return;
+    setComputerBusy(true);
+    setError(null);
+    try {
+      await onUseThisComputer();
+      setComputerMode("dedicated");
+    } catch (err) {
+      setError(errorText(err, t`Could not switch to this PC`));
+    } finally {
+      setComputerBusy(false);
+    }
+  }
 
   function disableBuiltinTool(raw: string) {
     const name = raw.trim();
@@ -725,7 +746,23 @@ export function BotSettings({
       ) : null}
       {page === "computer" ? (
         <SettingsGroup label={t`Computer`}>
-          <ComputerModePicker value={computerMode} onChange={setComputerMode} />
+          <ComputerModePicker
+            value={computerMode}
+            onChange={setComputerMode}
+            desktopAvailable={Boolean(onUseThisComputer)}
+          />
+          {onUseThisComputer && computerMode === "dedicated" ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3 w-full"
+              disabled={computerBusy}
+              aria-busy={computerBusy}
+              onClick={() => void switchToThisComputer()}
+            >
+              {computerBusy ? t`Connecting…` : t`Use this PC`}
+            </Button>
+          ) : null}
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
             <Trans>
               Cloud/Team runs on a shared computer on the server and does not see files on your PC.

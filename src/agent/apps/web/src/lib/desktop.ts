@@ -21,6 +21,25 @@ export function defaultComputerMode(desktop?: RakazoDesktop): "team" | "dedicate
   return desktop ? "dedicated" : "team";
 }
 
+/**
+ * Bind this Mico to the Desktop that is actually running it. "This PC" must
+ * never be saved without a live host binding, because the server would have to
+ * fall back to a cloud container while the label still says This PC.
+ */
+export async function connectThisComputer(botId: string): Promise<void> {
+  const computer = desktopBridge()?.computer;
+  if (!computer?.connect) {
+    throw new Error("Open Mycellios Desktop on this computer to use it.");
+  }
+  if (!(await computer.requestAccess())) {
+    throw new Error("Local computer access was not allowed.");
+  }
+  await computer.connect(botId);
+  if (computer.connected && !(await computer.connected(botId))) {
+    throw new Error("The local computer is disconnected.");
+  }
+}
+
 /** The compact `code#state` form the manual paste flow already accepts. */
 export function desktopOAuthCode(callback: RakazoDesktopOAuthCallback) {
   return callback.state === undefined ? callback.code : `${callback.code}#${callback.state}`;

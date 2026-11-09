@@ -15,7 +15,7 @@ import {
 import { chooseBotAvatar, chooseMicoAvatar } from "./bot-avatar-choice.js";
 import type { Prisma, PrismaClient } from "./client.js";
 import type { ComputerMode } from "./computers.js";
-import { ensureComputerRecord, parseComputerMode } from "./computers.js";
+import { computerKindForMode, ensureComputerRecord, parseComputerMode } from "./computers.js";
 import { createThreadMessageInTransaction } from "./messages.js";
 import { withNewestThreadMessages } from "./preview-messages.js";
 import { BotSectionNameConflictError, IsolationError } from "./scope.js";
@@ -624,7 +624,8 @@ export function createRepos(
               spaceId: actor.spaceId,
               userId: actor.userId,
               botId: created.id,
-              kind,
+              // "This PC" means the desktop host; it must never become Docker.
+              kind: computerKindForMode("dedicated", kind),
             });
             await tx.bot.update({ where: { id: created.id }, data: { computerId: dedicated.id } });
           }
@@ -715,24 +716,42 @@ export function createRepos(
       });
     },
 
-    async setBotComputer(actor: Actor, botId: string, mode: ComputerMode): Promise<Bot> {
+    async setBotComputer(
+      actor: Actor,
+      botId: string,
+      mode: ComputerMode,
+      kind?: string,
+    ): Promise<Bot> {
       const bot = await prisma.bot.findFirst({
         where: { id: botId, spaceId: actor.spaceId, userId: actor.userId },
         include: { computer: true },
       });
       if (!bot?.computer) throw new IsolationError();
-      const kind = bot.computer.kind;
+      const targetKind = kind ?? computerKindForMode(mode, bot.computer.kind);
       // Keep ensure + bot link in one transaction so a capped quota lock covers
       // both steps (a computer row alone does not count until a live bot refs it).
       const updated = await withTransactionRetry(() =>
         prisma.$transaction(async (tx) => {
-          const computer = await ensureComputerRecord(tx, {
+          let computer = await ensureComputerRecord(tx, {
             mode,
             spaceId: actor.spaceId,
             userId: actor.userId,
             botId,
-            kind,
+            kind: targetKind,
           });
+          // A stopped row created before "This PC" meant the desktop host still
+          // points at Docker. Move it now so the next boot uses the user's PC;
+          // a live row is never re-kinded under its provider reference.
+          if (
+            computer.kind !== targetKind &&
+            !computer.providerRef &&
+            computer.state === "stopped"
+          ) {
+            computer = await tx.computer.update({
+              where: { id: computer.id },
+              data: { kind: targetKind },
+            });
+          }
           return tx.bot.update({
             where: { id: botId },
             data: { computerId: computer.id },

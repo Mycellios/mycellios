@@ -29,6 +29,7 @@ import {
   botProfileLabelsChanged,
   ComputerLimitError,
   commitBotUpdate,
+  computerKindForMode,
   InstructionConflictError,
   IsolationError,
   recordComputerRunEnd,
@@ -457,9 +458,32 @@ export function botsRoutes(ctx: RouterContext) {
         const bot = await repos.getBot(context.actor, input.botId);
         if (!bot.computer) throw new IsolationError();
         const currentMode = bot.computer.scope === "dedicated" ? "dedicated" : "team";
-        if (currentMode === input.mode) {
+        const isolatedKind = deps.sandbox.describe().id;
+        // "This PC" is the user's desktop host. A Docker deployment must prove
+        // the PC is connected instead of quietly provisioning a container.
+        if (input.mode === "dedicated" && isolatedKind === "docker") {
+          const probe = computerContext(context.actor, bot.id, "computer.verify");
+          const provisionKind = await (deps.sandbox.provisionKind
+            ? deps.sandbox.provisionKind(probe).catch(() => undefined)
+            : Promise.resolve(undefined));
+          if (provisionKind !== "desktop") {
+            throw new ORPCError("BAD_REQUEST", {
+              message:
+                "This PC is not connected. Open Mycellios Desktop on that computer, allow local access, then try again.",
+            });
+          }
+        }
+        const targetKind = computerKindForMode(input.mode, isolatedKind);
+        if (
+          currentMode === input.mode &&
+          !(
+            input.mode === "dedicated" &&
+            isolatedKind === "docker" &&
+            bot.computer.kind !== "desktop"
+          )
+        ) {
           try {
-            return await repos.setBotComputer(context.actor, bot.id, input.mode);
+            return await repos.setBotComputer(context.actor, bot.id, input.mode, targetKind);
           } catch (error) {
             throw mapSpaceLifecycleError(error);
           }
@@ -509,7 +533,7 @@ export function botsRoutes(ctx: RouterContext) {
             });
             await recordComputerRunEnd(deps.prisma, bot.computer, "stopped");
           }
-          return await repos.setBotComputer(context.actor, bot.id, input.mode);
+          return await repos.setBotComputer(context.actor, bot.id, input.mode, targetKind);
         } catch (error) {
           throw mapSpaceLifecycleError(error);
         } finally {
