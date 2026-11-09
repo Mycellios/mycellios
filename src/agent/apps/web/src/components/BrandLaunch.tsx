@@ -137,7 +137,7 @@ export function BrandMark({
 }) {
   if (busy) {
     return (
-      <div className="brand-launch-mark brand-launch-loader">
+      <div className="brand-launch-mark is-busy brand-launch-loader">
         <img
           src={appPath("/mycellios/loader.svg")}
           alt=""
