@@ -7,10 +7,76 @@ import { DesktopAgentRpc, type AgentRpcMessage } from "./desktop-agent-rpc.js";
 import { desktopAgentFrames } from "./desktop-agent-stream.js";
 import type { DesktopAgentFrame } from "./desktop-agent-host.js";
 import type { HostComputerRequest } from "./host-computer-protocol.js";
+import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
 import { desktopModelAccess } from "./desktop-model-access.js";
 import { ComputerUpdatingError } from "./computer-errors.js";
 
 const RESULT_DELIVERY_ATTEMPTS = 3;
+type DesktopImage = NonNullable<AgentRunRequest["currentTurnImages"]>[number];
+
+/** Approximate the JSON wire without expanding Uint8Array image bytes into an object. */
+function requestBytesApprox(request: AgentRunRequest): number {
+  const plain = {
+    ...request,
+    currentTurnImages: undefined,
+    history: request.history.map((message) => ({ ...message, images: undefined })),
+  };
+  let bytes = Buffer.byteLength(JSON.stringify(plain));
+  const images = [
+    ...(request.currentTurnImages ?? []),
+    ...request.history.flatMap((message) => message.images ?? []),
+  ];
+  for (const image of images) bytes += Math.ceil(image.data.byteLength * 4 / 3) + 256;
+  return bytes;
+}
+
+/** Downscale an attachment so the Desktop bridge can carry it without losing the turn. */
+async function shrinkDesktopImage(image: DesktopImage): Promise<DesktopImage> {
+  try {
+    const { default: sharp } = await import("sharp");
+    const input = Buffer.from(image.data);
+    const resized = sharp(input, { failOn: "none" })
+      .rotate()
+      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 80 });
+    const output = await resized.toBuffer();
+    if (output.byteLength >= input.byteLength) return image;
+    return { ...image, mimeType: "image/jpeg", data: output };
+  } catch {
+    return image;
+  }
+}
+
+/**
+ * The Desktop bridge caps one request at HOST_COMPUTER_MAX_BYTES, while the model
+ * image budget allows more bytes than that. Compress images first, then drop only
+ * the oldest history images, so a large screenshot cannot abort the whole turn.
+ */
+async function fitDesktopRequest(request: AgentRunRequest): Promise<AgentRunRequest> {
+  const limit = HOST_COMPUTER_MAX_BYTES - 256 * 1024;
+  if (requestBytesApprox(request) <= limit) return request;
+  const currentTurnImages = request.currentTurnImages
+    ? await Promise.all(request.currentTurnImages.map(shrinkDesktopImage))
+    : undefined;
+  let history = request.history.map((message) => ({ ...message }));
+  for (const message of history) {
+    if (message.images?.length) message.images = await Promise.all(message.images.map(shrinkDesktopImage));
+  }
+  let prepared: AgentRunRequest = { ...request, currentTurnImages, history };
+  for (let index = 0; index < history.length && requestBytesApprox(prepared) > limit; index += 1) {
+    if (!history[index]?.images?.length) continue;
+    history = history.map((message, position) =>
+      position === index ? { ...message, images: undefined } : message,
+    );
+    prepared = { ...prepared, history };
+  }
+  if (requestBytesApprox(prepared) > limit) {
+    throw new Error(
+      "This turn is too large for the Desktop bridge even after compressing attachments. Remove an attachment or start a new chat.",
+    );
+  }
+  return prepared;
+}
 
 function retryableResultDelivery(error: unknown): boolean {
   if (error instanceof ComputerUpdatingError || !(error instanceof Error) || error.name === "AbortError") return false;
@@ -105,7 +171,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
     const cleanup = new Set<() => void>();
     const trustedUsage: AgentRuntimeEvent[] = [];
     const accounting = { runId: request.runId, userId: context.userId, operationKind: request.usageOperationKind, onUsage: request.onUsage, push: (event: AgentRuntimeEvent) => trustedUsage.push(event) };
-    const encodeRequest = () => rpc.encode({ ...request,
+    const encodeRequest = (input: AgentRunRequest = request) => rpc.encode({ ...input,
       // A native client may not self-report paid usage or bypass a reservation. Provider
       // credentials, credit observers and genuine usage stay at the cloud model boundary.
       onUsage: async () => undefined,
@@ -120,7 +186,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
     let dispatched = false;
     let receivedFailure = false;
     try {
-      const wire = encodeRequest();
+      const wire = encodeRequest(await fitDesktopRequest(request));
       dispatched = true;
       const response = await this.options.transport({ method: "agentRun", botId: request.botId, runId: request.runId, sessionId, request: wire, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
       // No fallback after dispatch: a lost response can conceal real local effects.

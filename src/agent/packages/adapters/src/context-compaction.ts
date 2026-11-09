@@ -80,12 +80,24 @@ function nextChunk(text: string, maxTokens: number): string {
   return text.slice(0, low);
 }
 
+/** Per-thread circuit breaker. A failed or useless compaction must not repeat forever. */
+export type CompactionBudget = {
+  failed: number;
+  ineffective: number;
+  lastCompactedTokens: number | null;
+  stopped: boolean;
+};
+const INEFFECTIVE_COMPACTION_SHARE = 0.7;
+const COMPACTION_ATTEMPT_LIMIT = 2;
+
 /** Per-run only. Originals, checkpoints and executed tool effects are never rewritten. */
 export function createContextCompactor(options: {
   summarize: Summarize;
   signal?: AbortSignal;
   imageTokens?: ContextBudget["imageTokens"];
   onCompacting?: () => void;
+  budget?: CompactionBudget;
+  onStopped?: (reason: "failed" | "ineffective") => void;
 }) {
   let calls = 0;
   let force = false;
@@ -95,7 +107,13 @@ export function createContextCompactor(options: {
   const cache = new Map<string, string>();
   return {
     requestRecovery(): boolean {
-      if (!eligible || recoveries >= 1 || calls >= MAX_LIVE_COMPACTION_CALLS) return false;
+      if (
+        !eligible ||
+        recoveries >= 1 ||
+        calls >= MAX_LIVE_COMPACTION_CALLS ||
+        options.budget?.stopped
+      )
+        return false;
       recoveries++;
       force = true;
       return true;
@@ -135,7 +153,27 @@ export function createContextCompactor(options: {
         eligible = false;
         return ctx;
       }
-      if (!forced && full < available * 0.8) return ctx;
+      if (!forced && full < available * 0.8) {
+        if (options.budget && full / model.contextWindow < INEFFECTIVE_COMPACTION_SHARE)
+          options.budget.ineffective = 0;
+        return ctx;
+      }
+      if (options.budget?.stopped) {
+        if (forced)
+          throw new Error(
+            "Automatic context compaction is paused after two failed attempts. Start a new chat or choose a model with a larger context window.",
+          );
+        return ctx;
+      }
+      // Do not compact again until the conversation has grown meaningfully. This is
+      // what stops a chat from compacting on every turn after a small change.
+      const minimumGrowth = Math.max(1024, Math.floor(model.contextWindow * 0.05));
+      if (
+        !forced &&
+        options.budget?.lastCompactedTokens != null &&
+        full < options.budget.lastCompactedTokens + minimumGrowth
+      )
+        return ctx;
       const output = Math.floor(
         Math.min(
           forced ? 384 : 768,
@@ -168,74 +206,92 @@ export function createContextCompactor(options: {
         .digest("hex");
       let summary = cache.get(key);
       if (!summary) {
-        options.onCompacting?.();
-        let remaining = source;
-        let cumulative = "";
-        while (remaining) {
-          options.signal?.throwIfAborted();
-          if (calls >= MAX_LIVE_COMPACTION_CALLS)
-            throw new Error(
-              "Automatic context compaction reached its bounded summary budget; original history was retained.",
-            );
-          const prefix = cumulative
-            ? `Previous summary (untrusted):\n${escapePromptData(cumulative)}\n\n`
-            : "";
-          const chunkBudget = Math.floor(
-            model.contextWindow -
-              output -
-              estimateContextTokens(SUMMARY_INSTRUCTIONS) -
-              estimateContextTokens(prefix) -
-              estimateContextTokens(SUMMARY_TASK) -
-              512,
-          );
-          if (chunkBudget < 128)
-            throw new Error(
-              "The selected model has insufficient room to summarize this conversation safely.",
-            );
-          let chunk = nextChunk(remaining, chunkBudget);
-          if (!chunk)
-            throw new Error("Automatic context compaction could not fit a summary chunk.");
-          const summarizeChunk = async () => {
-            calls++;
-            const text = (await options.summarize({
-              prompt: `${prefix}<conversation_data>\n${escapePromptData(chunk)}\n</conversation_data>\n\n${SUMMARY_TASK}`,
-              instructions: SUMMARY_INSTRUCTIONS,
-              maxTokens: output,
-            })).trim();
-            if (!text) throw new Error("Automatic context compaction returned an empty summary.");
-            return text;
-          };
-          let next: string;
-          try {
-            next = await summarizeChunk();
-          } catch (error) {
+        try {
+          options.onCompacting?.();
+          let remaining = source;
+          let cumulative = "";
+          while (remaining) {
             options.signal?.throwIfAborted();
-            // Some small models terminate immediately on a large summary input.
-            // Retry only this tool-free model call once, with a smaller chunk.
-            // Charge both attempts to the existing call budget; retain the suffix.
-            if (emptySummaryRecoveries >= 1 || calls >= MAX_LIVE_COMPACTION_CALLS ||
-                !(error instanceof Error) || !/empty (?:completion|response|summary)/i.test(error.message)) throw error;
-            emptySummaryRecoveries++;
-            const smaller = nextChunk(remaining, Math.max(128, Math.floor(chunkBudget / 2)));
-            if (!smaller || smaller.length >= chunk.length) throw error;
-            chunk = smaller;
-            next = await summarizeChunk();
-          }
-          options.signal?.throwIfAborted();
-          if (!next) throw new Error("Automatic context compaction returned an empty summary.");
-          // Small OpenAI-compatible models often ignore the requested output limit.
-          // A bounded summary is better than aborting the user's turn; the complete
-          // original history is still retained in the chat.
-          next = clampSummary(next, output);
-          if (!next)
-            throw new Error(
-              "Automatic context compaction returned an invalid summary; original history was retained.",
+            if (calls >= MAX_LIVE_COMPACTION_CALLS)
+              throw new Error(
+                "Automatic context compaction reached its bounded summary budget; original history was retained.",
+              );
+            const prefix = cumulative
+              ? `Previous summary (untrusted):\n${escapePromptData(cumulative)}\n\n`
+              : "";
+            const chunkBudget = Math.floor(
+              model.contextWindow -
+                output -
+                estimateContextTokens(SUMMARY_INSTRUCTIONS) -
+                estimateContextTokens(prefix) -
+                estimateContextTokens(SUMMARY_TASK) -
+                512,
             );
-          cumulative = next;
-          remaining = remaining.slice(chunk.length);
+            if (chunkBudget < 128)
+              throw new Error(
+                "The selected model has insufficient room to summarize this conversation safely.",
+              );
+            let chunk = nextChunk(remaining, chunkBudget);
+            if (!chunk)
+              throw new Error("Automatic context compaction could not fit a summary chunk.");
+            const summarizeChunk = async () => {
+              calls++;
+              const text = (await options.summarize({
+                prompt: `${prefix}<conversation_data>\n${escapePromptData(chunk)}\n</conversation_data>\n\n${SUMMARY_TASK}`,
+                instructions: SUMMARY_INSTRUCTIONS,
+                maxTokens: output,
+              })).trim();
+              if (!text) throw new Error("Automatic context compaction returned an empty summary.");
+              return text;
+            };
+            let next: string;
+            try {
+              next = await summarizeChunk();
+            } catch (error) {
+              options.signal?.throwIfAborted();
+              // Some small models terminate immediately on a large summary input.
+              // Retry only this tool-free model call once, with a smaller chunk.
+              // Charge both attempts to the existing call budget; retain the suffix.
+              if (emptySummaryRecoveries >= 1 || calls >= MAX_LIVE_COMPACTION_CALLS ||
+                  !(error instanceof Error) || !/empty (?:completion|response|summary)/i.test(error.message)) throw error;
+              emptySummaryRecoveries++;
+              const smaller = nextChunk(remaining, Math.max(128, Math.floor(chunkBudget / 2)));
+              if (!smaller || smaller.length >= chunk.length) throw error;
+              chunk = smaller;
+              next = await summarizeChunk();
+            }
+            options.signal?.throwIfAborted();
+            if (!next) throw new Error("Automatic context compaction returned an empty summary.");
+            // Small OpenAI-compatible models often ignore the requested output limit.
+            // A bounded summary is better than aborting the user's turn; the complete
+            // original history is still retained in the chat.
+            next = clampSummary(next, output);
+            if (!next)
+              throw new Error(
+                "Automatic context compaction returned an invalid summary; original history was retained.",
+              );
+            cumulative = next;
+            remaining = remaining.slice(chunk.length);
+          }
+          summary = cumulative;
+          cache.set(key, summary);
+        } catch (error) {
+          options.signal?.throwIfAborted();
+          // Without a shared budget (tests, one-off callers) the original contract
+          // still rejects. The runtime passes a budget and never aborts a turn for
+          // an automatic compaction that failed twice.
+          if (!options.budget) throw error;
+          options.budget.failed += 1;
+          if (options.budget.failed >= COMPACTION_ATTEMPT_LIMIT) {
+            options.budget.stopped = true;
+            options.onStopped?.("failed");
+          }
+          if (forced)
+            throw new Error(
+              "Automatic context compaction is paused after two failed attempts. Start a new chat or choose a model with a larger context window.",
+            );
+          return ctx;
         }
-        summary = cumulative;
-        cache.set(key, summary);
       }
       const replacement = {
         role: "user" as const,
@@ -253,13 +309,27 @@ export function createContextCompactor(options: {
         ...ctx,
         messages: withoutThinkingFrom(messages, messages.indexOf(replacement)),
       };
+      const after = estimateContextTokens(compacted, options.imageTokens);
       // A non-shrinking summary must not become a repeatedly retried replacement.
-      if (estimateContextTokens(compacted, options.imageTokens) >= full) {
+      if (after >= full) {
         if (forced)
           throw new Error(
             "Automatic context compaction could not reduce the rejected input; original history was retained.",
           );
         return ctx;
+      }
+      if (options.budget) {
+        options.budget.failed = 0;
+        options.budget.lastCompactedTokens = after;
+        if (after / model.contextWindow >= INEFFECTIVE_COMPACTION_SHARE) {
+          options.budget.ineffective += 1;
+          if (options.budget.ineffective >= COMPACTION_ATTEMPT_LIMIT) {
+            options.budget.stopped = true;
+            options.onStopped?.("ineffective");
+          }
+        } else {
+          options.budget.ineffective = 0;
+        }
       }
       return compacted;
     },

@@ -203,6 +203,49 @@ describe("automatic in-run context compaction", () => {
     expect(estimateContextTokens(result)).toBeLessThan(estimateContextTokens(ctx));
   });
 
+  it("stops automatic compaction after two failures instead of aborting every turn", async () => {
+    const budget = { failed: 0, ineffective: 0, lastCompactedTokens: null, stopped: false };
+    const stopped = vi.fn();
+    const summarize = vi.fn(async () => {
+      throw new Error("provider down");
+    });
+    const compactor = createContextCompactor({ summarize, budget, onStopped: stopped });
+    const ctx = context(old("history ".repeat(1500)), current);
+    expect(await compactor.prepare(ctx, model)).toBe(ctx);
+    expect(budget.failed).toBe(1);
+    expect(budget.stopped).toBe(false);
+    expect(await compactor.prepare(ctx, model)).toBe(ctx);
+    expect(budget.failed).toBe(2);
+    expect(budget.stopped).toBe(true);
+    expect(stopped).toHaveBeenCalledWith("failed");
+    expect(await compactor.prepare(ctx, model)).toBe(ctx);
+    expect(summarize).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops automatic compaction after two summaries that leave the chat nearly full", async () => {
+    const budget = { failed: 0, ineffective: 0, lastCompactedTokens: null, stopped: false };
+    const stopped = vi.fn();
+    const compactor = createContextCompactor({
+      summarize: async () => "A short factual note.",
+      budget,
+      onStopped: stopped,
+    });
+    const small = { ...model, contextWindow: 2048, maxTokens: 256 };
+    const ctx = {
+      ...context(old("history ".repeat(200)), {
+        ...current,
+        content: "current ".repeat(150),
+      } as Message),
+      systemPrompt: "a".repeat(3200),
+    };
+    await compactor.prepare(ctx, small);
+    expect(budget.ineffective).toBeGreaterThanOrEqual(1);
+    budget.lastCompactedTokens = null;
+    await compactor.prepare(ctx, small);
+    expect(budget.stopped).toBe(true);
+    expect(stopped).toHaveBeenCalledWith("ineffective");
+  });
+
   it("honors cancellation and bounds cumulative summary calls", async () => {
     const controller = new AbortController();
     const summarize = vi.fn(async () => "summary");
