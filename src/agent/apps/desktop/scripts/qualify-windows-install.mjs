@@ -45,7 +45,7 @@ async function measure(installation,label){
  }catch(error){executionError=error;}
  let timing;
  try{timing=await json(result);}catch{throw executionError??new Error('Installer qualification produced no result');}
- if(timing.exitCode!==0)throw new Error(`Installer failed (${timing.exitCode}): ${timing.installerError??'no error detail'}`);
+ if(timing.exitCode!==0)throw new Error(`Installer failed (${timing.exitCode}): ${timing.installerError??'no error detail'}\n${timing.installerTrace??''}`);
  assert.equal(timing.exitCode,0);
  const manifest=await json(path.join(installation,'resources/desktop-build.json'));
  assert.equal(manifest.version,identity.version);assert.equal(manifest.revision,identity.revision);

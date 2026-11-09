@@ -13,6 +13,13 @@ $ErrorActionPreference='Stop'
 # from a neutral one.
 Set-Location -LiteralPath $env:TEMP
 $installationPath=[IO.Path]::GetFullPath($Installation).TrimEnd('\')
+$traceFiles=@((Join-Path $env:TEMP 'mycellios-fast-install-trace.txt'),'C:\Users\Public\mycellios-fast-install-trace.txt')
+function Trace([string]$message){
+ foreach($file in $traceFiles){
+  try{Add-Content -LiteralPath $file -Value ((Get-Date).ToString('o')+' '+$message) -Encoding UTF8}catch{}
+ }
+}
+Trace ('start '+$Operation+' '+$installationPath)
 $parent=[IO.Path]::GetDirectoryName($installationPath)
 $backupRoot=Join-Path $parent 'mycellios-desktop-upgrade-backups'
 $exeName='Mycellios Desktop.exe'
@@ -178,7 +185,9 @@ try {
   # Keep the installation at its path: the taskbar pin and the Start Menu
   # shortcut target this directory, and renaming it makes Windows drop the pin.
   # A same-volume copy still gives us a rollback without changing the path.
+  Trace 'prepare: copying installation'
   & robocopy $installationPath $script:state.backup /E /COPY:DAT /DCOPY:DAT /XJ /R:2 /W:1 /NFL /NDL /NP /NJH /NJS | Out-Null
+  Trace ('prepare: copy exit '+$LASTEXITCODE)
   if($LASTEXITCODE -ge 8){throw 'Could not snapshot the installation'}
   $script:state.phase='prepared';Save-State
  } else {
@@ -197,6 +206,7 @@ try {
  exit 0
 } catch {
  $failure=$_.Exception.Message
+ Trace ('error '+$Operation+': '+$failure)
  try{
   Set-Content -LiteralPath (Join-Path $env:TEMP 'mycellios-fast-install-error.txt') -Value ($Operation+': '+$failure) -Encoding UTF8
  }catch{}
