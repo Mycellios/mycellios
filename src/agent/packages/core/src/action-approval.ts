@@ -11,6 +11,7 @@ const APPROVAL_EXEMPT_TOOLS = new Set([
   "read_history",
   "search_history",
   "write_file",
+  "edit_file",
   "shell",
   "command_status",
   "work_status",
@@ -209,6 +210,7 @@ const OWN_STATE_RESULT_TOOLS = new Set([
   "skill_read",
   "task_catalog",
   "write_file",
+  "edit_file",
 ]);
 
 export function toolResultTaintsRun(toolName: string): boolean {

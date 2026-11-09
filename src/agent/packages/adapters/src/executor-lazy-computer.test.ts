@@ -192,7 +192,15 @@ async function runRoutine(
     botSecret: { findMany: vi.fn(async () => []) },
     agentSkill: { findMany: vi.fn(async () => []) },
     scratchpadItem: { findMany: vi.fn(async () => []) },
-    externalEffect: { findMany: vi.fn(async () => []) },
+    externalEffect: {
+      findMany: vi.fn(async () => []),
+      findUnique: vi.fn(async () => null),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: "effect-1",
+        ...data,
+      })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
     artifact: {
       findMany: vi.fn(async () =>
         options.attachments
@@ -218,6 +226,9 @@ async function runRoutine(
         })
       : undefined,
     listFiles: vi.fn(async () => [{ path: "notes.txt", kind: "file", size: 4 }]),
+    readFile: vi.fn(async () =>
+      new TextEncoder().encode("const MAX_RETRIES = 3;\nconst TIMEOUT_MS = 1000;\n"),
+    ),
     writeFile: vi.fn(async () => undefined),
     releaseScreen: vi.fn(async () => undefined),
     exportWorkspace: vi.fn(async function* () {
@@ -525,6 +536,35 @@ describe("run computer provisioning", () => {
     expect(toolResults[0]).toMatchObject({ entries: [{ path: "notes.txt" }] });
     expect(sleepJobs).toHaveLength(1);
     expect(sandbox.releaseScreen).toHaveBeenCalledWith(COMPUTER, expect.anything());
+  });
+
+  it("replaces one exact range instead of rewriting the whole file", async () => {
+    const { sandbox, toolResults } = await runRoutine([
+      {
+        name: "edit_file",
+        args: {
+          path: "config.ts",
+          old_string: "const MAX_RETRIES = 3;",
+          new_string: "const MAX_RETRIES = 5;",
+        },
+      },
+    ]);
+
+    expect(toolResults[0]).toMatchObject({ ok: true, path: "config.ts", replacements: 1 });
+    expect(sandbox.readFile).toHaveBeenCalledWith(
+      COMPUTER,
+      expect.stringContaining("config.ts"),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(sandbox.writeFile).toHaveBeenCalledOnce();
+    const written = sandbox.writeFile.mock.calls[0]?.[1] as {
+      path: string;
+      content: Uint8Array;
+    };
+    expect(new TextDecoder().decode(written.content)).toBe(
+      "const MAX_RETRIES = 5;\nconst TIMEOUT_MS = 1000;\n",
+    );
   });
 
   it("completes the run when its closing workspace checkpoint fails", async () => {

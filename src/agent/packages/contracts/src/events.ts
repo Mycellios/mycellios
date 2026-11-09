@@ -344,6 +344,7 @@ export const COMPUTER_COMMAND_OUTPUT_MAX_CHARS = 16_000;
 export const ComputerCommandKind = z.enum([
   "shell",
   "write_file",
+  "edit_file",
   "attach_file",
   "open_path",
   "launch_app",

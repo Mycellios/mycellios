@@ -170,6 +170,7 @@ export function narrateTool(toolName: string): string | null {
     [/^(bash|shell|terminal|run_command|execute|computer_exec)$/, "running a command"],
     [/^(read|read_file|view|list_files)$/, "reading a file"],
     [/^(write|write_file|create_file)$/, "writing a file"],
+    [/^(edit|edit_file|patch_file)$/, "editing a file"],
     [/^(edit|apply_patch|str_replace|multiedit)$/, "editing a file"],
     [/^(grep|search|glob|find)$/, "searching"],
     [/^(web_?search|websearch)$/, "searching the web"],

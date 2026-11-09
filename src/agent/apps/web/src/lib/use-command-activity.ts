@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ComputerCommand } from "@rakazo/contracts";
 import { observeToolEvent, observedTools, type ToolObservation } from "@rakazo/core";
 import { useSpaceRpc } from "./space-rpc";
-const computerTools = new Set(["shell", "write_file", "attach_file", "open_path", "launch_app"]);
+const computerTools = new Set(["shell", "write_file", "edit_file", "attach_file", "open_path", "launch_app"]);
 
 /** Older APIs expose command history separately. Join only exact current-run tool IDs. */
 export function useCommandActivity(runId: string, botId: string, tools: ToolObservation[]) {

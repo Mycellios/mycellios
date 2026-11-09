@@ -164,6 +164,13 @@ const TONE_AND_STYLE = [
   "- When referencing code, use file_path:line_number.",
   "- Use a long structured report only when the user explicitly asks for an analysis, comparison, or audit.",
 ].join("\n");
+const FILE_EDIT_GUIDANCE = [
+  "File changes:",
+  "- Read only the lines you need; pass offset and limit to read_file on a large file.",
+  "- Prefer edit_file for a small change. Quote enough surrounding text for old_string to match exactly once.",
+  "- Use write_file only for a new file or a full rewrite.",
+  "- Read before editing; never guess a file's contents.",
+].join("\n");
 interface ToolCallBudget {
   count: number;
   exceeded: boolean;
@@ -433,9 +440,13 @@ export class PiAgentRuntime implements AgentRuntime {
             (request.allowSilentEmpty || request.script
               ? fallbackPrompt
               : withLiveTurnNarration(fallbackPrompt)));
-        const systemPrompt = baseSystemPrompt.includes("Tone and style:")
+        const withTone = baseSystemPrompt.includes("Tone and style:")
           ? baseSystemPrompt
           : `${baseSystemPrompt}\n\n${TONE_AND_STYLE}`;
+        const systemPrompt =
+          toolDefs.some((tool) => tool.name === "edit_file") && !withTone.includes("File changes:")
+            ? `${withTone}\n\n${FILE_EDIT_GUIDANCE}`
+            : withTone;
         const thinkingLevel = thinkingLevelFor(model, request.model.thinkingLevel);
         let piSession: PiSessionHandle | undefined;
         // Never write an unscoped transcript. Production requests carry userId;
@@ -1567,6 +1578,7 @@ export function describeToolActivity(toolName: string, args: unknown): string {
   if (toolName === "shell") return `Running: ${detail(record.command)}`;
   if (toolName === "read_file") return `Reading ${detail(record.path)}`;
   if (toolName === "write_file") return `Writing ${detail(record.path)}`;
+  if (toolName === "edit_file") return `Editing ${detail(record.path)}`;
   if (toolName === "list_files") return `Listing ${detail(record.path ?? ".")}`;
   if (toolName === "attach_file") return `Attaching ${detail(record.path)}`;
   if (toolName === "open_path") return `Opening ${detail(record.path)}`;
@@ -1818,8 +1830,23 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         };
       }
       if (tool.name === "list_files") return { path: String(raw.path ?? "") };
-      if (tool.name === "read_file" || tool.name === "open_path") {
+      if (tool.name === "read_file") {
+        return {
+          path: String(raw.path ?? ""),
+          ...(raw.offset !== undefined ? { offset: Number(raw.offset) } : {}),
+          ...(raw.limit !== undefined ? { limit: Number(raw.limit) } : {}),
+        };
+      }
+      if (tool.name === "open_path") {
         return { path: String(raw.path ?? "") };
+      }
+      if (tool.name === "edit_file") {
+        return {
+          path: String(raw.path ?? ""),
+          old_string: textContentArg(raw.old_string, ""),
+          new_string: textContentArg(raw.new_string, ""),
+          ...(raw.replace_all === true ? { replace_all: true } : {}),
+        };
       }
       if (tool.name === "launch_app") {
         return {
