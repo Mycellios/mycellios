@@ -1,11 +1,15 @@
 param([Parameter(Mandatory=$true)][string]$ConfigFile,[switch]$Launch)
 $ErrorActionPreference='Stop'
+# Never inherit the installation directory as the working directory: Windows
+# cannot rename a directory that is a process's current directory, and the
+# installer's fast-install step renames it.
+Set-Location -LiteralPath $env:TEMP
 $job=[IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ConfigFile))
 if($Launch){
  # PowerShell 5.1 needs a console to initialize. The hidden launcher starts
  # another process so the update worker outlives Electron's direct-child job.
  $argsForWorker=@('-NoLogo','-NoProfile','-NonInteractive','-File',('"' + $PSCommandPath + '"'),'-ConfigFile',('"' + $ConfigFile + '"'))
- $worker=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsForWorker -WindowStyle Hidden -RedirectStandardOutput (Join-Path $job 'helper.log') -RedirectStandardError (Join-Path $job 'helper-error.log') -PassThru
+ $worker=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsForWorker -WindowStyle Hidden -WorkingDirectory $env:TEMP -RedirectStandardOutput (Join-Path $job 'helper.log') -RedirectStandardError (Join-Path $job 'helper-error.log') -PassThru
  $worker.WaitForExit()
  exit $worker.ExitCode
 }
@@ -21,9 +25,10 @@ function Write-Result($receipt){
  $receipt|ConvertTo-Json|Set-Content -LiteralPath $temporary -Encoding UTF8
  [IO.File]::Move($temporary,$result)
 }
-function Copy-Safe([string]$source,[string]$destination,[string[]]$exclude=@()){
- $arguments=@($source,$destination,'/E','/COPY:DAT','/DCOPY:DAT','/XJ','/R:1','/W:1','/NFL','/NDL','/NP','/NJH','/NJS')
+function Copy-Safe([string]$source,[string]$destination,[string[]]$exclude=@(),[string[]]$excludeFiles=@()){
+ $arguments=@($source,$destination,'/E','/COPY:DAT','/DCOPY:DAT','/XJ','/R:10','/W:2','/NFL','/NDL','/NP','/NJH','/NJS')
  if($exclude.Count){$arguments+=@('/XD');$arguments+=$exclude}
+ if($excludeFiles.Count){$arguments+=@('/XF');$arguments+=$excludeFiles}
  & robocopy @arguments >> (Join-Path $job 'copy.log')
  if($LASTEXITCODE -ge 8){throw 'Could not make a recoverable backup'}
 }
@@ -110,7 +115,7 @@ try {
  Copy-Safe $installation (Join-Path $backup 'installation')
  $excluded=@('Cache','Code Cache','GPUCache','DawnGraphiteCache','DawnWebGPUCache','GPUPersistentCache','GrShaderCache','ShaderCache')
  $excluded+=@('updates','computers','local-data','local-web','apps-local-backups','upgrade-backups')|ForEach-Object {Join-Path $profile $_}
- Copy-Safe $profile (Join-Path $backup 'profile') $excluded
+ Copy-Safe $profile (Join-Path $backup 'profile') $excluded @('Cookies','Cookies-journal')
  $drafts=Draft-Stores
  $drafts|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $backup 'draft-stores.json') -Encoding UTF8
  Installer-Valid
@@ -118,7 +123,7 @@ try {
  Progress 'installing'
  # Wait for NSIS itself. Start-Process -Wait waits for its whole process tree,
  # which can keep the helper in "installing" after the installer has exited.
- $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Hidden -PassThru
+ $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Hidden -WorkingDirectory $env:TEMP -PassThru
  if(!$setup.WaitForExit(600000)){
   # An installer still running may own files. Leave it and its recovery data alone.
   $canReopen=$false
