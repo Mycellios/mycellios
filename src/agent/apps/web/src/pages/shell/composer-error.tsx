@@ -76,8 +76,11 @@ export function ComposerError({
     : null;
   const recovery = sendError ? undefined : normalizedRunError?.recovery;
   const interrupted = normalizedRunError?.kind === "interrupted";
+  // A deploy interruption is not a model problem: keep the message neutral and
+  // do not offer a model change; the turn can be retried as-is.
+  const maintenance = normalizedRunError?.kind === "maintenance";
   const missingModel = !sendError && runError?.trim() === MISSING_MODEL_RUN_ERROR;
-  const modelAction = !sendError && runError && !interrupted && recovery !== "computer" ? runErrorModelAction : null;
+  const modelAction = !sendError && runError && !interrupted && !maintenance && recovery !== "computer" ? runErrorModelAction : null;
   const recoveryAction =
     recovery === "model" && !modelAction
       ? { label: t`Choose a model`, onClick: onOpenModels }
@@ -95,7 +98,11 @@ export function ComposerError({
       ref={runErrorRef}
       role="alert"
       data-testid="composer-error"
-      className="mb-3 flex items-center gap-2 rounded-[14px] border border-destructive/40 bg-destructive/10 px-4 py-2 text-[13px] text-destructive animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:animate-none"
+      className={`mb-3 flex items-center gap-2 rounded-[14px] border px-4 py-2 text-[13px] animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:animate-none ${
+        maintenance
+          ? "border-border bg-muted/50 text-foreground"
+          : "border-destructive/40 bg-destructive/10 text-destructive"
+      }`}
     >
       <div className="min-w-0 flex-1">
         {isModelRequiredSendError(sendError) ? (
@@ -152,7 +159,7 @@ export function ComposerError({
           onDismissError();
           window.requestAnimationFrame(() => textareaRef.current?.focus());
         }}
-        className="shrink-0 text-destructive hover:text-foreground"
+        className={`shrink-0 ${maintenance ? "text-muted-foreground" : "text-destructive"} hover:text-foreground`}
       >
         <X size={13} strokeWidth={2} />
       </button>

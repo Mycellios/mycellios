@@ -46,6 +46,7 @@ import {
   isRunTerminalEvent,
   isRunWorking,
   jumpTargetId,
+  normalizeRunError,
   reorderBotTo,
   resolveComposerSendPlan,
   runThreadSubscription,
@@ -2347,6 +2348,34 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const runError = threadRunError(activeSnapshot, dismissedRunErrorIds);
   const displayedRunError = !sendError ? runError : null;
   const displayedRunErrorId = displayedRunError ? (activeSnapshot?.run?.id ?? null) : null;
+  // A deploy drains the backend mid-turn. Retry the same saved turn a few
+  // times with backoff instead of leaving a permanent error; the API still
+  // refuses a retry once the turn produced output or actions.
+  const retryFailedRunRef = useRef<(options?: { silent?: boolean }) => Promise<void>>(
+    async () => undefined,
+  );
+  useEffect(() => {
+    if (!displayedRunErrorId || !displayedRunError) return;
+    if (normalizeRunError(displayedRunError).kind !== "maintenance") return;
+    let cancelled = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      if (cancelled || attempt >= 3) return;
+      const delay = [10_000, 30_000, 60_000][attempt] ?? 60_000;
+      timer = setTimeout(async () => {
+        if (cancelled) return;
+        attempt += 1;
+        await retryFailedRunRef.current({ silent: true });
+        schedule();
+      }, delay);
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [displayedRunError, displayedRunErrorId]);
   const failedRun = displayedRunErrorId ? activeSnapshot?.run : null;
   const ownedFailedRun = failedRun && (!failedRun.userId || failedRun.userId === userId) &&
     (!taskScope || failedRun.threadId === taskScope.taskThreadId);
@@ -3423,7 +3452,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     }
   }
 
-  async function retryFailedRun() {
+  retryFailedRunRef.current = retryFailedRun;
+  async function retryFailedRun(options?: { silent?: boolean }) {
     const runId = displayedRunErrorId;
     if (!runId || retryInFlight.current || !activeSnapshot) return;
     const target: { groupId: string } | { botId: string } = inGroup
@@ -3457,7 +3487,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         setSendError(t`Wait for the current task to finish before retrying.`);
       }
     } catch (error) {
-      if (isCurrent()) setSendError(errorText(error, t`Could not continue`));
+      // The automatic maintenance retry keeps the original error visible and
+      // tries again with backoff; only an explicit retry surfaces its failure.
+      if (isCurrent() && !options?.silent) setSendError(errorText(error, t`Could not continue`));
     } finally {
       if (retryInFlight.current === runId) {
         retryInFlight.current = null;

@@ -13,10 +13,19 @@ import {
   MODEL_REQUIRED_SEND_ERROR,
   modelFallbackFailure,
   normalizeRunError,
+  RUN_INTERRUPTED_BY_MAINTENANCE_ERROR,
   userRunError,
 } from "./run-error.js";
 
 describe("normalizeRunError", () => {
+  it("calls a deploy interruption maintenance instead of blaming the model", () => {
+    expect(normalizeRunError(RUN_INTERRUPTED_BY_MAINTENANCE_ERROR)).toMatchObject({
+      kind: "maintenance",
+      details: RUN_INTERRUPTED_BY_MAINTENANCE_ERROR,
+    });
+    expect(normalizeRunError(RUN_INTERRUPTED_BY_MAINTENANCE_ERROR).recovery).toBeUndefined();
+  });
+
   it.each([
     "Computers unavailable. Set SANDBOX_PROVIDER=docker with SANDBOX_SUPERVISOR_TOKEN",
     "Computers unavailable: SANDBOX_PROVIDER requires a token.",
