@@ -197,7 +197,13 @@ try {
  exit 0
 } catch {
  $failure=$_.Exception.Message
- if($Operation -eq 'prepare'){try{Restore-Previous}catch{}}
+ if($Operation -eq 'prepare'){
+  try{
+   $errorFile=Join-Path $env:TEMP 'mycellios-fast-install-error.txt'
+   Set-Content -LiteralPath $errorFile -Value $failure -Encoding UTF8
+  }catch{}
+  try{Restore-Previous}catch{}
+ }
  Write-Error ('Desktop update was not applied: '+$failure) -ErrorAction Continue
  exit 1
 }

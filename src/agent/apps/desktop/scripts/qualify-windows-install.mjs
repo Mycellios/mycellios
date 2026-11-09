@@ -78,6 +78,9 @@ try{
  assert.equal(snapshots.length,1);
  const backup=path.join(path.dirname(installation),'mycellios-desktop-upgrade-backups',snapshots[0],'installation');
  assert.equal((await json(path.join(backup,'resources/desktop-build.json'))).version,'0.3.18');
+ await fs.rm(legacy,{force:true});
+ await fs.rm(extracted,{recursive:true,force:true});
+ await fs.rm(path.join(path.dirname(installation),'mycellios-desktop-upgrade-backups'),{recursive:true,force:true});
  for(const key of keys)reg('delete','HKCU\\'+key,'/f');
  await measure(path.join(root,'fresh/mycellios-desktop'),'fresh');
  const archives=await preservation('archives',path.join(installation,'resources'),'archive-tools');
