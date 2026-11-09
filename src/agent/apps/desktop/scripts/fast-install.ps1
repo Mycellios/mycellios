@@ -41,8 +41,15 @@ function Assert-Installation {
 }
 function Assert-Idle {
  $paths=@((Join-Path $installationPath $exeName))
- if($script:state -and $script:state.backup){$paths+=Join-Path $script:state.backup $exeName}
- if(@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -in $paths}).Count){throw 'Close Mycellios normally before updating'}
+ # A prepared rollback copy is data, not a running installation. The second
+ # NSIS check runs after prepare and must only test the live path.
+ if($Operation -ne 'check' -and $script:state -and $script:state.backup){$paths+=Join-Path $script:state.backup $exeName}
+ $running=@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -in $paths})
+ if($running.Count){
+  Trace ('idle: running '+((@($running|ForEach-Object {$_.ExecutablePath})|Sort-Object -Unique) -join ','))
+  throw 'Close Mycellios normally before updating'
+ }
+ Trace 'idle: clear'
 }
 function Save-State {
  $temporary=$Journal+'.tmp'
