@@ -160,6 +160,7 @@ async function render(
   overrides: Partial<Bot> = {},
   memoryProviderConfigured = false,
   focusModel = 0,
+  onUseThisComputer?: () => Promise<void>,
 ) {
   await act(async () => {
     root.render(
@@ -172,6 +173,7 @@ async function render(
           onSave={onSave}
           onExport={async () => undefined}
           onClear={() => undefined}
+          {...(onUseThisComputer ? { onUseThisComputer } : {})}
         />
       </QueryClientProvider>,
     );
@@ -274,6 +276,11 @@ it("opens settings subpages and returns focus to the overview row", async () => 
 
   await openSettingsPage("computer");
   expect(container.textContent).toContain("Memory scope");
+  expect(
+    [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+      (button) => button.textContent === "This PC",
+    )?.disabled,
+  ).toBe(true);
   await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="Back"]')!.click());
   await openSettingsPage("permissions");
   expect(container.querySelector('[id$="-fleet-management"]')).not.toBeNull();
@@ -282,6 +289,18 @@ it("opens settings subpages and returns focus to the overview row", async () => 
   expect(container.querySelector('[id$="-disabled-tools"]')).not.toBeNull();
   expect(container.querySelector('[id$="-auto-speak"]')).not.toBeNull();
   expect(container.querySelector('[id$="-model"]')?.closest("[hidden]")).not.toBeNull();
+});
+
+it("binds and repairs This PC from the computer page", async () => {
+  const onUseThisComputer = vi.fn(async () => undefined);
+  await render("Billing", { computerMode: "dedicated" }, false, 0, onUseThisComputer);
+  await openSettingsPage("computer");
+  const button = [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+    (candidate) => candidate.textContent === "Use this PC",
+  );
+  expect(button).toBeDefined();
+  await act(async () => button!.click());
+  expect(onUseThisComputer).toHaveBeenCalledTimes(1);
 });
 
 describe("BotSettings model choices", () => {

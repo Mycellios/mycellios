@@ -4,6 +4,7 @@ import {
   assertComputerQuotaForRestore,
   ComputerLimitError,
   computerHomeKey,
+  computerKindForMode,
   computerScopeKey,
   ensureComputerRecord,
   resolveMaxComputersPerUser,
@@ -30,6 +31,23 @@ function fakeRestorePrisma(results: { alreadyLive: number; inUse: number }) {
     computer: { count },
   } as unknown as PrismaClient;
 }
+
+describe("computerKindForMode", () => {
+  it("runs This PC on the desktop host instead of the deployment's Docker", () => {
+    expect(computerKindForMode("dedicated", "docker")).toBe("desktop");
+  });
+
+  it("keeps Cloud/Team on the deployment's isolated provider", () => {
+    expect(computerKindForMode("team", "docker")).toBe("docker");
+    expect(computerKindForMode("team", "e2b")).toBe("e2b");
+  });
+
+  it("leaves providers that are already the chosen host untouched", () => {
+    expect(computerKindForMode("dedicated", "desktop")).toBe("desktop");
+    expect(computerKindForMode("dedicated", "fake")).toBe("fake");
+    expect(computerKindForMode("dedicated", "none")).toBe("none");
+  });
+});
 
 /**
  * Root PrismaClient mock whose $transaction + $queryRaw simulate a per-user

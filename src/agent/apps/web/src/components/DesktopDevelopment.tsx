@@ -33,6 +33,9 @@ export function DesktopDevelopment() {
           )
         )
           throw new Error("Wait for the agent to become idle.");
+        // Bind the host before switching so the server can prove This PC is
+        // connected instead of provisioning a Docker container.
+        await desktop!.computer?.connect?.(botId);
         await rpc.bots.setComputer({ botId, mode: "dedicated" });
       }
       const result = await desktop!.development!.open!(botId);

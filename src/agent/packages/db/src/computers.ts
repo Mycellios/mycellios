@@ -12,6 +12,18 @@ export function parseComputerMode(scope: string): ComputerMode {
   throw new Error(`Unknown computer scope: ${scope}`);
 }
 
+/**
+ * "This PC" is the signed-in user's desktop host, never a Docker container.
+ * Cloud/Team keeps whatever isolated provider the deployment runs, and a
+ * deployment with no computer stays `none` instead of inventing one.
+ */
+export function computerKindForMode(mode: ComputerMode, isolatedKind: string): string {
+  if (mode !== "dedicated") return isolatedKind;
+  // A Docker deployment only reaches This PC through the user's desktop host.
+  // Other providers (self-hosted desktop, tests, managed sandboxes) keep theirs.
+  return isolatedKind === "docker" ? "desktop" : isolatedKind;
+}
+
 export type ComputerKeyInput = {
   mode: ComputerMode;
   spaceId: string;

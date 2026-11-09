@@ -127,7 +127,7 @@ import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
 import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
-import { defaultComputerMode, desktopBridge, desktopDragClass } from "../lib/desktop";
+import { connectThisComputer, defaultComputerMode, desktopBridge, desktopDragClass } from "../lib/desktop";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
@@ -4695,10 +4695,22 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 onOpenFiles={() => showLibrary(active.id)}
                 onOpenRoutines={showRoutines}
                 onOpenUsage={() => openUsage(active.id)}
+                onUseThisComputer={
+                  desktopBridge()?.computer?.connect
+                    ? async () => {
+                        await connectThisComputer(active.id);
+                        await rpc.bots.setComputer({ botId: active.id, mode: "dedicated" });
+                        await refreshBots().catch(() => undefined);
+                      }
+                    : undefined
+                }
                 memoryProviderConfigured={memoryProviderConfig != null}
                 onSkillsChange={setAgentSkills}
                 onSave={async ({ computerMode, ...patch }) => {
                   if (computerMode !== undefined && computerMode !== active.computerMode) {
+                    // Saving This PC must bind the running Desktop first so the
+                    // server can prove the host and never fall back to Docker.
+                    if (computerMode === "dedicated") await connectThisComputer(active.id);
                     await rpc.bots.setComputer({
                       botId: active.id,
                       mode: computerMode,
