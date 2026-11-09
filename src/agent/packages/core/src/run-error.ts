@@ -172,10 +172,15 @@ export type RunErrorKind =
   | "context"
   | "output"
   | "quota"
-  | "interrupted";
+  | "interrupted"
+  | "maintenance";
 
 export const DESKTOP_RUN_INTERRUPTED_ERROR =
   "Desktop execution interrupted; check existing results before retrying";
+
+/** A deploy drained the worker before this turn finished. Safe to retry when it produced no output. */
+export const RUN_INTERRUPTED_BY_MAINTENANCE_ERROR =
+  "Backend maintenance in progress. This turn was interrupted; retry in a minute.";
 
 const UNCERTAIN_DESKTOP_RUN = new Set([
   DESKTOP_RUN_INTERRUPTED_ERROR,
@@ -245,6 +250,13 @@ export function normalizeRunError(
     details = HOSTED_MODEL_CREDITS_REQUIRED_ERROR;
   }
   const trimmed = details.trim();
+  if (/^Backend maintenance in progress\b/i.test(trimmed)) {
+    return {
+      summary: translate("Mycellios is updating. This turn was interrupted before it finished."),
+      details,
+      kind: "maintenance",
+    };
+  }
   if (UNCERTAIN_DESKTOP_RUN.has(trimmed)) {
     return {
       summary: translate("Desktop could not confirm the result. Review what it already did before continuing."),
