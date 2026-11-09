@@ -180,7 +180,7 @@ describe("automatic in-run context compaction", () => {
     expect(compactor.requestRecovery()).toBe(false);
   });
 
-  it("retains source history when summarization fails, is empty or exceeds the output budget", async () => {
+  it("retains source history when summarization fails or is empty, and clamps an over-budget summary", async () => {
     const ctx = context(old("history ".repeat(1500)), current);
     const before = JSON.stringify(ctx);
     for (const summarize of [
@@ -188,11 +188,62 @@ describe("automatic in-run context compaction", () => {
         throw new Error("credit refused");
       },
       async () => "",
-      async () => "long ".repeat(2000),
     ]) {
       await expect(createContextCompactor({ summarize }).prepare(ctx, model)).rejects.toThrow();
       expect(JSON.stringify(ctx)).toBe(before);
     }
+    const result = await createContextCompactor({
+      summarize: async () => "long ".repeat(2000),
+    }).prepare(ctx, model);
+    expect(JSON.stringify(ctx)).toBe(before);
+    expect(result.messages.at(-1)).toBe(current);
+    const summary = result.messages[0]?.content;
+    expect(typeof summary).toBe("string");
+    expect(String(summary)).toContain(LIVE_COMPACTION_PREFIX);
+    expect(estimateContextTokens(result)).toBeLessThan(estimateContextTokens(ctx));
+  });
+
+  it("stops automatic compaction after two failures instead of aborting every turn", async () => {
+    const budget = { failed: 0, ineffective: 0, lastCompactedTokens: null, stopped: false };
+    const stopped = vi.fn();
+    const summarize = vi.fn(async () => {
+      throw new Error("provider down");
+    });
+    const compactor = createContextCompactor({ summarize, budget, onStopped: stopped });
+    const ctx = context(old("history ".repeat(1500)), current);
+    expect(await compactor.prepare(ctx, model)).toBe(ctx);
+    expect(budget.failed).toBe(1);
+    expect(budget.stopped).toBe(false);
+    expect(await compactor.prepare(ctx, model)).toBe(ctx);
+    expect(budget.failed).toBe(2);
+    expect(budget.stopped).toBe(true);
+    expect(stopped).toHaveBeenCalledWith("failed");
+    expect(await compactor.prepare(ctx, model)).toBe(ctx);
+    expect(summarize).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops automatic compaction after two summaries that leave the chat nearly full", async () => {
+    const budget = { failed: 0, ineffective: 0, lastCompactedTokens: null, stopped: false };
+    const stopped = vi.fn();
+    const compactor = createContextCompactor({
+      summarize: async () => "A short factual note.",
+      budget,
+      onStopped: stopped,
+    });
+    const small = { ...model, contextWindow: 2048, maxTokens: 256 };
+    const ctx = {
+      ...context(old("history ".repeat(200)), {
+        ...current,
+        content: "current ".repeat(150),
+      } as Message),
+      systemPrompt: "a".repeat(3200),
+    };
+    await compactor.prepare(ctx, small);
+    expect(budget.ineffective).toBeGreaterThanOrEqual(1);
+    budget.lastCompactedTokens = null;
+    await compactor.prepare(ctx, small);
+    expect(budget.stopped).toBe(true);
+    expect(stopped).toHaveBeenCalledWith("ineffective");
   });
 
   it("honors cancellation and bounds cumulative summary calls", async () => {

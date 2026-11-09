@@ -12,6 +12,15 @@ export function desktopBridge(): RakazoDesktop | undefined {
   return typeof window === "undefined" ? undefined : window.rakazoDesktop;
 }
 
+/**
+ * A new bot on the Desktop app must run on this PC. The hosted default is a
+ * Team Computer, which needs Docker; choosing it on a laptop without Docker is
+ * why the computer panel fails to start and the executor looks unavailable.
+ */
+export function defaultComputerMode(desktop?: RakazoDesktop): "team" | "dedicated" {
+  return desktop ? "dedicated" : "team";
+}
+
 /** The compact `code#state` form the manual paste flow already accepts. */
 export function desktopOAuthCode(callback: RakazoDesktopOAuthCallback) {
   return callback.state === undefined ? callback.code : `${callback.code}#${callback.state}`;

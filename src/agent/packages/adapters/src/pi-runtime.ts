@@ -70,7 +70,7 @@ import { automated, withAutomatedLabels } from "./automated-messages.js";
 import { connectionIdArgument, credentialArgument } from "./bot-secrets.js";
 import { DELEGATION_TOOL_NAMES } from "./builtin-tools.js";
 import { withCloudflareAuth } from "./cloudflare-ai-gateway.js";
-import { createContextCompactor, isContextOverflow } from "./context-compaction.js";
+import { createContextCompactor, isContextOverflow, type CompactionBudget } from "./context-compaction.js";
 import { ModelImageLimitError, pruneForRebuild } from "./context-pruning.js";
 import { estimateContextTokens, shortenToolResultText } from "./context-selection.js";
 import { DEFAULT_OPENROUTER_MODEL_ID } from "./deployment-model.js";
@@ -132,6 +132,25 @@ import { desktopModelCatalog } from "./desktop-model-stream.js";
 import { argumentGiven } from "./update-bot-patch.js";
 
 const running = new Map<string, { controller: AbortController; work: Promise<void> }>();
+/**
+ * Per-thread compaction breaker. Two failed or two ineffective compactions stop
+ * automatic compaction for this chat; the chat stays usable and a new chat resets
+ * the budget. Bounded so a long-lived worker cannot retain every old thread.
+ */
+const compactionBudgets = new Map<string, CompactionBudget>();
+function compactionBudgetFor(botId: string, threadId: string): CompactionBudget {
+  const key = `${botId}:${threadId}`;
+  let budget = compactionBudgets.get(key);
+  if (!budget) {
+    budget = { failed: 0, ineffective: 0, lastCompactedTokens: null, stopped: false };
+    if (compactionBudgets.size >= 500) {
+      const oldest = compactionBudgets.keys().next().value;
+      if (oldest !== undefined) compactionBudgets.delete(oldest);
+    }
+    compactionBudgets.set(key, budget);
+  }
+  return budget;
+}
 interface ToolCallBudget {
   count: number;
   exceeded: boolean;
@@ -468,6 +487,17 @@ export class PiAgentRuntime implements AgentRuntime {
         const compactor = request.usageOperationKind === "compaction" ? undefined : createContextCompactor({
           signal,
           imageTokens: estimatePiImageTokens,
+          budget: compactionBudgetFor(request.botId, request.threadId),
+          onStopped: (reason) => {
+            queue.push({
+              type: "progress",
+              text:
+                reason === "failed"
+                  ? "Automatic context compaction paused after two failed attempts. Start a new chat or choose a model with a larger context window."
+                  : "Automatic compaction is not reducing this chat. Start a new chat or choose a model with a larger context window.",
+              activity: true,
+            });
+          },
           onCompacting: () => {
             compacting = true;
             queue.push({ type: "progress", text: "Compacting earlier conversation to make room for this request.", activity: true });

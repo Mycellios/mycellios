@@ -175,10 +175,11 @@ try {
   }}
   Save-State
   Assert-Idle
-  # Both resolved paths are siblings on the same volume. No profile path is moved.
-  Move-Item -LiteralPath $installationPath -Destination $script:state.backup
-  New-Item -ItemType Directory -Path $installationPath|Out-Null
-  Copy-Item -LiteralPath (Join-Path $script:state.backup $Uninstaller) -Destination (Join-Path $installationPath $Uninstaller)
+  # Keep the installation at its path: the taskbar pin and the Start Menu
+  # shortcut target this directory, and renaming it makes Windows drop the pin.
+  # A same-volume copy still gives us a rollback without changing the path.
+  & robocopy $installationPath $script:state.backup /E /COPY:DAT /DCOPY:DAT /XJ /R:2 /W:1 /NFL /NDL /NP /NJH /NJS | Out-Null
+  if($LASTEXITCODE -ge 8){throw 'Could not snapshot the installation'}
   $script:state.phase='prepared';Save-State
  } else {
   $script:state=Read-State
