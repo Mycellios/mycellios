@@ -127,7 +127,7 @@ import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
 import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
-import { desktopBridge, desktopDragClass } from "../lib/desktop";
+import { defaultComputerMode, desktopBridge, desktopDragClass } from "../lib/desktop";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
@@ -3061,6 +3061,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     const isFirstBot = botsRef.current.length === 0;
     const bot = await rpc.bots.create({
       ...input,
+      computerMode: defaultComputerMode(desktopBridge()),
       notifyOnFinish: true,
       ...(first ? {
         color: input.color ?? MICO_PRIMARY_AVATAR,

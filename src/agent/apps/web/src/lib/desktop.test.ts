@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  defaultComputerMode,
   desktopDragClass,
   desktopOAuthCode,
   oauthStateOf,
@@ -39,6 +40,11 @@ function desktop(platform: string): RakazoDesktop {
 describe("window chrome", () => {
   it("does not paint fake traffic lights in the browser", () => {
     expect(windowChromeKind(undefined)).toBe("spacer");
+  });
+  it("defaults a new Desktop bot to this PC instead of a Docker Team Computer", () => {
+    expect(defaultComputerMode(undefined)).toBe("team");
+    expect(defaultComputerMode(desktop("linux"))).toBe("dedicated");
+    expect(defaultComputerMode(desktop("win32"))).toBe("dedicated");
   });
 
   it("leaves macOS traffic lights to Electron", () => {
