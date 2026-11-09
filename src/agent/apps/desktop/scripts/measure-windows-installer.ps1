@@ -7,5 +7,11 @@ if(!$root.StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase) -or [IO.Pat
 $watch=[Diagnostics.Stopwatch]::StartNew()
 $process=Start-Process -FilePath $Candidate -ArgumentList @('/S',('/D='+$root)) -WindowStyle Hidden -PassThru -Wait
 $watch.Stop()
-@{exitCode=$process.ExitCode;elapsedMs=$watch.Elapsed.TotalMilliseconds;installation=$root}|ConvertTo-Json|Set-Content -LiteralPath $Result -Encoding UTF8
+$errorFile=Join-Path $env:TEMP 'mycellios-fast-install-error.txt'
+$installerError=$null
+if(Test-Path -LiteralPath $errorFile){
+  $installerError=(Get-Content -LiteralPath $errorFile -Raw).Trim()
+  Remove-Item -LiteralPath $errorFile -Force -ErrorAction SilentlyContinue
+}
+@{exitCode=$process.ExitCode;elapsedMs=$watch.Elapsed.TotalMilliseconds;installation=$root;installerError=$installerError}|ConvertTo-Json|Set-Content -LiteralPath $Result -Encoding UTF8
 if($process.ExitCode -ne 0){exit 1}
