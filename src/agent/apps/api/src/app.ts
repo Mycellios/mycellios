@@ -646,6 +646,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     : undefined;
   reconciler?.start();
 
+  // Filled once the desktop relay mounts; the router only needs a live probe.
+  let desktopHostProbe: ((scope: { userId: string; spaceId: string }) => boolean) | undefined;
+
   const router = createRouter({
     sideQuestions: { runtime, resolveModel: executor.resolveModel },
     analytics,
@@ -654,6 +657,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     prisma,
     pushTokens,
     webPush,
+    desktopAgentAvailable: (scope) => desktopHostProbe?.(scope) ?? false,
     events,
     ticketChanges,
     boardEvents,
@@ -820,8 +824,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     return actor && { actor, sessionId: session.session.id };
   };
   const sessionActor = async (request: Request) => (await requestSession(request))?.actor ?? null;
-  const stopDesktopRelay = mountDesktopRelay(app, {
-    desktopExecution: (actor, enabled) => runAsTenant(actor, async () => {
+  const stopDesktopRelay = mountDesktopRelay(app, {    desktopExecution: (actor, enabled) => runAsTenant(actor, async () => {
       const where = { spaceId_userId: { spaceId: actor.spaceId, userId: actor.userId } };
       if (enabled !== undefined) {
         return (await prisma.desktopExecutionPreference.upsert({ where, create: { ...where.spaceId_userId, enabled }, update: { enabled } })).enabled;
@@ -843,6 +846,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         ),
       ),
   });
+  desktopHostProbe = stopDesktopRelay.hasAgentDevice;
   if (messagingInstallations) {
     app.get("/api/v1/messaging/install/slack/callback", async (c) => {
       try {
