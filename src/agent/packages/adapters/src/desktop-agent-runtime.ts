@@ -171,15 +171,18 @@ export class DesktopAgentRuntime implements AgentRuntime {
     });
     const capture = request.onCheckpoint;
     const cleanup = new Set<() => void>();
+    const nativeEngine = Boolean(request.agentEngine && request.agentEngine !== "pi");
     const trustedUsage: AgentRuntimeEvent[] = [];
     const accounting = { runId: request.runId, userId: context.userId, operationKind: request.usageOperationKind, onUsage: request.onUsage, push: (event: AgentRuntimeEvent) => trustedUsage.push(event) };
     const encodeRequest = (input: AgentRunRequest = request) => rpc.encode({ ...input,
       // A native client may not self-report paid usage or bypass a reservation. Provider
       // credentials, credit observers and genuine usage stay at the cloud model boundary.
       onUsage: async () => undefined,
-      model: desktopModelAccess(request.model, signal, cleanup, accounting),
-      ...(request.resolveModel ? { resolveModel: async (provider: string, id: string) => desktopModelAccess(await request.resolveModel!(provider, id), signal, cleanup, accounting) } : {}),
-      ...(request.resolveFallbackModel ? { resolveFallbackModel: async (provider: string, id: string, connection?: string) => desktopModelAccess(await request.resolveFallbackModel!(provider, id, connection), signal, cleanup, accounting) } : {}),
+      // A native engine runs its own model from its local configuration; handing it
+      // the account model made every native run fail as unavailable.
+      model: nativeEngine ? request.model : desktopModelAccess(request.model, signal, cleanup, accounting),
+      ...(request.resolveModel ? { resolveModel: async (provider: string, id: string) => nativeEngine ? request.resolveModel!(provider, id) : desktopModelAccess(await request.resolveModel!(provider, id), signal, cleanup, accounting) } : {}),
+      ...(request.resolveFallbackModel ? { resolveFallbackModel: async (provider: string, id: string, connection?: string) => nativeEngine ? request.resolveFallbackModel!(provider, id, connection) : desktopModelAccess(await request.resolveFallbackModel!(provider, id, connection), signal, cleanup, accounting) } : {}),
       ...(capture ? { onCheckpoint: (blob: string, id: string) => capture(() => blob, id) } : {}),
     });
     const callbacks = new Set<Promise<void>>();
