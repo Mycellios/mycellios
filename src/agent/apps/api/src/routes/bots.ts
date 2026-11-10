@@ -259,9 +259,12 @@ async function preferredAgentEngine(
   actor: Actor,
 ): Promise<"codex" | "opencode" | "claude" | undefined> {
   try {
+    // A connected desktop host brings its own engine. OpenCode first: it accepts
+    // OpenAI-compatible providers, so the account's own model keeps working.
+    if (deps.desktopAgentAvailable?.(actor)) return "opencode";
     if (!(await nativeHostAccess(deps.dataDir, actor))) return undefined;
     const engines = await discoverNativeEngines(deps.dataDir);
-    for (const id of ["codex", "opencode", "claude"] as const) {
+    for (const id of ["opencode", "codex", "claude"] as const) {
       if (engines.some((candidate) => candidate.id === id && candidate.available)) return id;
     }
   } catch {
