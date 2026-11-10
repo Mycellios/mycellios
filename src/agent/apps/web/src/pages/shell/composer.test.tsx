@@ -1089,6 +1089,18 @@ it("uses the saved busy-message preference and still permits a per-message overr
   expect(onSend).toHaveBeenLastCalledWith("Do this later", [], expect.any(String), "queue");
 });
 
+it("uses a Mico's saved choice before the device default", async () => {
+  setGeneralPreferences({ busyMessageMode: "steer" });
+  const onSend = vi.fn().mockResolvedValue(true);
+  const textarea = renderComposer(onSend, { running: true, busyMessageMode: "queue" });
+  expect(container!.querySelector<HTMLSelectElement>('select[aria-label="Send message to"]')?.value).toBe("queue");
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Do this later");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Add to queue"]')!.click());
+  expect(onSend).toHaveBeenLastCalledWith("Do this later", [], expect.any(String), "queue");
+});
 
 it("separates microphone dictation from the voice conversation control", () => {
   const open = vi.fn(), send = vi.fn();

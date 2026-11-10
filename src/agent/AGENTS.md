@@ -1081,6 +1081,8 @@
   Explicit queue entries use steering origin queued_user and are drained FIFO;
   the running turn must not claim them as steering or release a human takeover.
   Queue reads use the authenticated owned thread resolver, including side threads.
+  Micos may override the device's busy-message default. A null override inherits
+  the device setting. Keep group conversations and the per-message choice independent.
   Repeat automatically opens an unsaved routine from the original user request;
   it never schedules an assistant result or starts a routine before Save.
 

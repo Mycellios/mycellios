@@ -4,7 +4,7 @@ import { DesktopCompanionsPanel } from "./settings/DesktopCompanionsPanel";
 import { desktopBridge } from "../lib/desktop";
 import { useLingui } from "@lingui/react/macro";
 import { spaceLabel } from "../lib/space-label";
-import type { Bot, SpaceMemoryConfig } from "@rakazo/contracts";
+import type { Bot, BusyMessageMode, SpaceMemoryConfig } from "@rakazo/contracts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,6 +91,7 @@ type NavItem = {
 export function SettingsOverlay({
   bots = [],
   onBotNotificationsChange,
+  onBusyMessageModeChange,
   onOpenMico,
   onWhatsNew,
   onOpenVoice,
@@ -122,6 +123,7 @@ export function SettingsOverlay({
 }: {
   bots?: Bot[];
   onBotNotificationsChange?: (id: string, enabled: boolean) => Promise<void>;
+  onBusyMessageModeChange?: (id: string, value: BusyMessageMode | null) => Promise<void>;
   onOpenMico?: (id: string) => void;
   onWhatsNew?: () => void;
   onOpenVoice?: () => void;
@@ -572,6 +574,7 @@ export function SettingsOverlay({
                 ) : section === "agents" ? (
                   <MicosSettingsPanel
                     bots={shownBots}
+                    onBusyMessageModeChange={onBusyMessageModeChange}
                     onOpen={onOpenMico ? (id) => leaveSettings(() => onOpenMico(id)) : undefined}
                     onSkills={onOpenSkills ? () => leaveSettings(onOpenSkills) : undefined}
                     onModels={() => leaveSettings(() => onSectionChange("models"))}

@@ -4497,6 +4497,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               onNewChatStarted={() => { closeAside(); if (active) void refreshThread(active.id).catch(() => undefined); }}
               running={composerRunning}
               busyMessages={currentRuns.some(run => run.status === "running" || run.status === "queued" || run.status === "leased")}
+              busyMessageMode={inGroup ? undefined : active?.busyMessageMode}
               disabled={Boolean(recordingSkill) || Boolean(taskScope && activeSnapshot?.threadId !== taskScope.taskThreadId)}
               pendingAttachments={activePendingAttachments}
               attachmentNotice={attachmentNotice}
@@ -5031,6 +5032,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           <SettingsOverlay
             bots={bots.filter(bot => bot.spaceId === (settingsSpaceId ?? currentSpaceId))}
             onBotNotificationsChange={async (botId, enabled) => { const updated = await createSpaceRpc(settingsSpaceId ?? currentSpaceId).bots.update({botId, notifyOnFinish:enabled}); setBots(current => current.map(bot => bot.id === updated.id ? updated : bot)); }}
+            onBusyMessageModeChange={async (botId, busyMessageMode) => {
+              const updated = await createSpaceRpc(settingsSpaceId ?? currentSpaceId).bots.update({ botId, busyMessageMode });
+              setBots(current => current.map(bot => bot.id === updated.id ? updated : bot));
+            }}
             onOpenMico={id => { const targetSpaceId = bots.find(bot => bot.id === id)?.spaceId ?? settingsSpaceId ?? currentSpaceId; if(targetSpaceId && userId) {writeRightPanelState(rightPanelStorageKey(userId,targetSpaceId,"bot",id),"settings"); setOverlay(null); if(active?.id === id) setPanel("settings"); openSpaceChat(targetSpaceId, `/app/${id}`);} }}
             onWhatsNew={() => {setOverlay(null); setReleaseNotesOpen(true);}}
             space={settingsSpace}

@@ -553,6 +553,7 @@ model Bot {
   taskConcurrency Int @default(4)
   agentEngine String @default("pi")
   nativeConfig Json?
+  busyMessageMode String?
   skillPins BotSkillPin[]
   screenGeneration Int @default(0)
   id                String            @id @default(cuid())
