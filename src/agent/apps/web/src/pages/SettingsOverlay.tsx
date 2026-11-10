@@ -662,7 +662,7 @@ export function SettingsOverlay({
                 ) : null}
                 {section === "voice" ? (
                   <>
-                    <VoiceEntryPanel onOpen={onOpenVoice ? () => leaveSettings(onOpenVoice) : undefined} />
+                    <VoiceEntryPanel accountId={userId ?? undefined} onOpen={onOpenVoice ? () => leaveSettings(onOpenVoice) : undefined} />
                     <Disclosure summary={t`Connected voice services`} className="rk-settings-details"
                       open={voiceServicesOpen || formState.dirty || voiceBusy}
                       onOpenChange={next => { if (!voiceBusy && !formState.dirty) setVoiceServicesOpen(next); }}

@@ -4579,7 +4579,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       {Object.entries(sideQuestionTargets).map(([key, target]) => <SideQuestion key={key} {...target} enterToSend={enterToSend}
         active={key === asideKey && target.visible && !libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && !panel && !reviewWorkspace?.open}
         onClose={() => closeAside(key)} onBrowser={chatTools.onBrowser} onFiles={chatTools.onFiles} onSettings={chatTools.onSettings} onVoice={chatTools.onVoice}/>) }
-      {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
+      {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} accountId={userId} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
 
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall

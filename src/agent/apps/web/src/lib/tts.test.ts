@@ -24,6 +24,21 @@ function stubSelectedSpace(id: string) {
 }
 
 describe("Speaker", () => {
+  it("does not request a second network clip or fall back when the first one lacks credits", async () => {
+    const fetcher = vi.fn(async () => Response.json({ error: "Insufficient credits" }, { status: 402 }));
+    const localSpeak = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    vi.stubGlobal("window", { rakazoDesktop: { localVoice: { speak: localSpeak } } });
+    const speaker = new Speaker();
+    await expect(speaker.speak("Hola, esta es una prueba. ".repeat(45), {
+      networkLanguage: "es",
+      botId: "bot-1",
+      spaceId: "space-1",
+    })).resolves.toBe("Insufficient credits");
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(localSpeak).not.toHaveBeenCalled();
+  });
+
   it("reads manually with a device voice and makes no network request", async () => {
     const fetchMock = vi.fn();
     const cancel = vi.fn();

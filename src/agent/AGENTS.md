@@ -1110,6 +1110,12 @@
   and downloads are idle. Retain per-window cancellation and keep a recording
   started in local mode on the device even if its model becomes unavailable.
   Verify local-voice, preload, TaskComposer, dictation, tts and VoiceConversation tests.
+  Network spoken replies are an account-scoped opt-in in continuous voice.
+  Send only reply text to the canonical Mycellios speech model with explicit
+  contribution funding. Authorize the Mico and saved account connection and
+  verify bounded WAV output. Do not retry or switch providers on a paid failure.
+  Dictation continues to follow the device and connected transcription settings.
+  Verify mycellios-network-speech, voice and tts tests.
 
 - Sidebar contribution is a direct contribute/pause action. The warm bottom-edge
   indicator requires a supported, connected, confirmed contributor and clears

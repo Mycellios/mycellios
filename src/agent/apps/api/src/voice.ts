@@ -42,6 +42,8 @@ import {
 import { getLogger } from "@rakazo/logging";
 import type { Context, Hono } from "hono";
 import { readBoundedBody } from "./http-body.js";
+import { renderNetworkSpeech } from "./mycellios-network-speech.js";
+import { ownedMycelliosConnection } from "./mycellios-owned-connection.js";
 import { withSerializableRetry } from "./serializable-retry.js";
 
 export interface VoiceDeps {
@@ -491,8 +493,25 @@ export async function synthesizeVoice(
     botId?: string;
     scope?: SettingsScope;
     signal?: AbortSignal;
+    networkLanguage?: "en" | "es";
   },
 ) {
+  if (input.networkLanguage) {
+    if (!input.botId || !(await deps.prisma.bot.findFirst({
+      where: { id: input.botId, userId: actor.userId, spaceId: actor.spaceId, archivedAt: null },
+      select: { id: true },
+    }))) throw new IsolationError();
+    let token: string | undefined;
+    try {
+      token = (await ownedMycelliosConnection(deps, actor.userId))?.saved.apiKey;
+    } catch {
+      throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Your Mycellios connection could not be read." });
+    }
+    if (!token) {
+      throw new ORPCError("CONFLICT", { message: "Connect your Mycellios account in Models to use network voice." });
+    }
+    return renderNetworkSpeech(token, { text: input.text, language: input.networkLanguage, signal: input.signal });
+  }
   const target = await resolveVoiceTarget(deps, actor, input);
   const text = input.text.trim();
   if (!text) throw new ORPCError("BAD_REQUEST", { message: "Nothing to speak." });
@@ -552,12 +571,20 @@ export function mountVoiceHttpRoutes(
     if (raw === null) return c.json({ error: "Request body is too large." }, 413);
     const body = parseVoiceRequestBody(raw);
     try {
+      const language = body.networkLanguage;
+      if (language !== undefined && language !== "en" && language !== "es") {
+        throw new ORPCError("BAD_REQUEST", { message: "Network voice supports Spanish and English." });
+      }
+      if (language && c.req.header("content-type")?.split(";")[0]?.trim().toLowerCase() !== "application/json") {
+        return c.json({ error: "Network voice requires a JSON request." }, 415);
+      }
       const clip = await runAsTenant(actor, () =>
         synthesizeVoice(deps, actor, {
           text: String((body as { text?: unknown }).text ?? ""),
           voiceId: optionalString((body as { voiceId?: unknown }).voiceId),
           botId: optionalString((body as { botId?: unknown }).botId),
           scope: SettingsScopeSchema.safeParse((body as { scope?: unknown }).scope).data,
+          networkLanguage: language,
           signal: AbortSignal.any(
             [c.req.raw.signal, AbortSignal.timeout(SPEAK_TIMEOUT_MS)].filter(
               Boolean,
@@ -642,7 +669,12 @@ function voiceHttpError(c: Context, error: unknown) {
   if (error instanceof ORPCError) {
     const code = String(error.code ?? "BAD_REQUEST");
     const status =
-      code === "UNAUTHORIZED" ? 401 : code === "NOT_FOUND" ? 404 : code === "CONFLICT" ? 409 : 400;
+      code === "UNAUTHORIZED" ? 401 :
+      code === "NOT_FOUND" ? 404 :
+      code === "CONFLICT" ? 409 :
+      code === "PAYMENT_REQUIRED" ? 402 :
+      code === "BAD_GATEWAY" ? 502 :
+      code === "SERVICE_UNAVAILABLE" ? 503 : 400;
     return c.json({ error: error.message }, status);
   }
   if (error instanceof VoiceAccountError) {

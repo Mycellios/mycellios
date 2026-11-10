@@ -10794,3 +10794,21 @@ msgstr "Lee las respuestas en voz alta en este ordenador."
 
 msgid "Download Parakeet to transcribe on this computer."
 msgstr "Descarga Parakeet para transcribir en este ordenador."
+
+msgid "Voice conversation output"
+msgstr "Voz de la conversación"
+
+msgid "Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings."
+msgstr "Mycellios lee las respuestas en español e inglés con tu cuenta conectada y tus créditos. El dictado usa tus ajustes actuales."
+
+msgid "Mycellios network · uses credits"
+msgstr "Red Mycellios · usa créditos"
+
+msgid "Mycellios network voice supports Spanish and English. Set a dictation language in Voice settings."
+msgstr "La voz de la red Mycellios admite español e inglés. Elige un idioma de dictado en Ajustes de voz."
+
+msgid "Spoken replies use the Mycellios network and your credits."
+msgstr "Las respuestas en voz alta usan la red Mycellios y tus créditos."
+
+msgid "Contribute computing power and earn credits."
+msgstr "Aporta potencia y gana créditos."

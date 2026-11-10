@@ -7,7 +7,7 @@ import { desktopBridge } from "../../lib/desktop";
 import { setGeneralPreferences, useGeneralPreferences, type GeneralPreferences } from "../../lib/general-preferences";
 import { UI_LOCALES, UI_LOCALE_LABELS } from "../../lib/ui-locale";
 
-export function DeviceVoiceSettings() {
+export function DeviceVoiceSettings({ accountId }: { accountId?: string }) {
   const { t } = useLingui(); const id = useId(); const value = useGeneralPreferences();
   const native = desktopBridge()?.localVoice;
   const [status, setStatus] = useState<Awaited<ReturnType<NonNullable<typeof native>["status"]>>>();
@@ -61,10 +61,29 @@ export function DeviceVoiceSettings() {
     </SettingsRow>;
   }
   const separateModels = Boolean(native?.prepareModel && status?.models);
+  const networkSelected = Boolean(accountId && value.networkSpeechAccount === accountId);
+  const conversationOutput = networkSelected ? "network" : native ? value.speechEngine : "provider";
   return <div className="mb-6 space-y-6">
-    {native && <SettingsGroup title={t`Voice processing`}>
-      <SettingsRow label={t`Spoken replies`} description={t`Local voice stays on this computer and uses no credits. Connected providers use their own account.`}
-        control={<OptionSelect aria-label={t`Spoken replies`} value={value.speechEngine} options={[{value:"local",label:t`Local · Supertonic 3`},{value:"provider",label:t`Connected provider`}]} onValueChange={speechEngine => save({speechEngine:speechEngine as "local" | "provider"})} />} />
+    {(native || accountId) && <SettingsGroup title={t`Voice processing`}>
+      <SettingsRow label={t`Voice conversation output`}
+        description={networkSelected
+          ? t`Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings.`
+          : t`Local voice stays on this computer and uses no credits. Connected providers use their own account.`}
+        control={<OptionSelect
+          aria-label={t`Voice conversation output`}
+          value={conversationOutput}
+          options={[
+            ...(native ? [{ value: "local", label: t`Local · Supertonic 3` }] : []),
+            { value: "provider", label: t`Connected provider` },
+            ...(accountId ? [{ value: "network", label: t`Mycellios network · uses credits` }] : []),
+          ]}
+          onValueChange={choice => {
+            if (choice === "network" && accountId) save({ networkSpeechAccount: accountId });
+            if (choice === "local" || choice === "provider") {
+              save({ speechEngine: choice, ...(networkSelected ? { networkSpeechAccount: "" } : {}) });
+            }
+          }}
+        />} />
     </SettingsGroup>}
     <SettingsGroup title={t`Dictation`}>
       {native && (separateModels

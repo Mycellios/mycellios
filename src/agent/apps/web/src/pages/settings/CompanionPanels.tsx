@@ -109,11 +109,11 @@ export function MobileSettingsPanel() {
   );
 }
 
-export function VoiceEntryPanel({ onOpen }: { onOpen?: () => void }) {
+export function VoiceEntryPanel({ onOpen, accountId }: { onOpen?: () => void; accountId?: string }) {
   const { t } = useLingui();
   return (
     <div className="rk-general-settings mb-6">
-      <DeviceVoiceSettings />
+      <DeviceVoiceSettings accountId={accountId} />
       {onOpen && <SettingsGroup title={t`Voice conversation`}>
         <SettingsRow
           label={t`Talk with your Mico`}
