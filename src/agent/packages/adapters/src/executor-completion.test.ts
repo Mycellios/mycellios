@@ -519,6 +519,13 @@ describe("runReplyGuidance", () => {
     expect(runReplyGuidance("routine")).not.toContain("Leave the final reply empty");
   });
 
+  it("tells routines to stay silent when nothing material changed", () => {
+    const guidance = runReplyGuidance("routine");
+    expect(guidance).toContain("nothing material changed");
+    expect(guidance).toContain("Do not restate hashes, paths, worktrees or counts");
+    expect(guidance).toContain("one short paragraph");
+  });
+
   it("gives the creation intro the profile fields its prompt asks about", () => {
     const bot = {
       name: "Ada",
