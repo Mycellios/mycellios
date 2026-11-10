@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 
 interface SessionState {
   isPending: boolean;
@@ -61,6 +61,8 @@ vi.mock("./pages/IntegrationSetup", () => ({ IntegrationSetupPage: () => null })
 vi.mock("./pages/McpOAuthCallback", () => ({ McpOAuthCallbackPage: () => null }));
 
 import { App } from "./App";
+import { GENERAL_PREFERENCES_KEY, setGeneralPreferences } from "./lib/general-preferences";
+beforeEach(() => { localStorage.removeItem(GENERAL_PREFERENCES_KEY); capability.screen.mockClear(); });
 
 it.each([
   signedIn,
@@ -97,6 +99,7 @@ it.each([
 );
 
 it("loads the board chunk only after bootstrap enables the route", async () => {
+  localStorage.setItem(GENERAL_PREFERENCES_KEY, JSON.stringify({ productAnalytics: true }));
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const container = document.createElement("div");
   const root = createRoot(container);
@@ -158,6 +161,7 @@ it("keeps the sign-in page mounted while a signed-out session refetches", async 
 it.each(["throw", "reject"])(
   "keeps screen reporting failures out of the app error boundary (%s)",
   async (mode) => {
+    localStorage.setItem(GENERAL_PREFERENCES_KEY, JSON.stringify({ productAnalytics: true }));
     if (mode === "throw")
       capability.screen.mockImplementationOnce(() => {
         throw new Error("analytics unavailable");
@@ -181,3 +185,16 @@ it.each(["throw", "reject"])(
     }
   },
 );
+
+it("reports screen usage only after the device explicitly opts in", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const div = document.createElement("div"), root = createRoot(div);
+  try {
+    await act(async () => root.render(<MemoryRouter initialEntries={["/app"]}><App /></MemoryRouter>));
+    expect(capability.screen).not.toHaveBeenCalled();
+    await act(async () => setGeneralPreferences({ productAnalytics: true }));
+    expect(capability.screen).toHaveBeenCalledExactlyOnceWith({ screen: "home", surface: "web" });
+    await act(async () => setGeneralPreferences({ productAnalytics: false }));
+    expect(capability.screen).toHaveBeenCalledTimes(1);
+  } finally { await act(async () => root.unmount()); vi.unstubAllGlobals(); }
+});

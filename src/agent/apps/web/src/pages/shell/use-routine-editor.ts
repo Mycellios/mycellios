@@ -63,6 +63,7 @@ export function useRoutineEditor({
   const routineRunPending = useRef(false);
   const addSkillRoutine = useCallback((name: string, prompt: string) => {
     setRoutineDraft({ ...emptyRoutineDraft(), name, prompt });
+    setRoutineError(null);
     setRoutineWebhookSecret(null);
     setEditingRoutine(null);
     setPanel("routine");
@@ -184,6 +185,7 @@ export function useRoutineEditor({
                 prompt: routineDraft.prompt || t`Check in.`,
                 crons,
                 active: armOneShot ? true : routineDraft.active,
+                notify: routineDraft.notify ?? targetRoutine.notify,
                 webhookEnabled: routineDraft.webhookEnabled,
                 githubEnabled: routineDraft.githubEnabled,
                 messageProvider: routineDraft.messageProvider,
@@ -203,7 +205,7 @@ export function useRoutineEditor({
                 crons,
                 timezone: timezone ?? localTimezone(),
                 active: routineDraft.active,
-                notify: true,
+                notify: routineDraft.notify ?? true,
                 webhookEnabled: routineDraft.webhookEnabled,
                 githubEnabled: routineDraft.githubEnabled,
                 messageProvider: routineDraft.messageProvider,

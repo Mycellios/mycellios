@@ -239,3 +239,13 @@ describe("Mico avatar settings", () => {
     expect(document.querySelector('[data-mico-avatar="plush"] image')?.getAttribute("filter")).toBeNull();
   });
 });
+
+it("creates from a purpose alone with an automatic name and instructions", async () => {
+  const onCreate = vi.fn().mockResolvedValue(undefined);
+  await render(onCreate);
+  const textarea = document.querySelector("textarea")!;
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Prepare weekly budgets"); textarea.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(onCreate).not.toHaveBeenCalled();
+  await click(button("Create"));
+  expect(onCreate).toHaveBeenCalledWith({ name: productBrand.companionName, description: "Prepare weekly budgets", instructions: "Prepare weekly budgets" });
+});

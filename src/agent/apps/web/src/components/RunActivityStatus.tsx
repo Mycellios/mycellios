@@ -315,6 +315,10 @@ export function RunActivityStatus({
           {details}
         </details> : <div className="flex items-baseline gap-2 py-1">{status}{elapsed}</div>}
         {health.state === "blocked" ? <p className="text-xs">{t`No model has started. Configure a virtual computer to continue.`}</p> : null}
+        {liveUpdatesStopped || health.state === "unknown" || health.state === "recovering" || health.state === "quiet" ? <div className="space-y-1">
+          <p className="text-xs">{t`Checking the saved task status. You do not need to send your message again.`}</p>
+          <Button variant="ghost" size="sm" onClick={() => void refresh.current().catch(() => undefined)}>{t`Refresh status`}</Button>
+        </div> : null}
         {computerAction}
       </div>
     </div>

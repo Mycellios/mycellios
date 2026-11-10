@@ -4,7 +4,7 @@ import type { Bot, Routine, RoutineRun, ThreadMessage } from "@rakazo/contracts"
 import { isOneShotRoutineCrons } from "@rakazo/core";
 import { BotAvatar, Button, NativeSelect, NativeSelectOption, Spinner } from "@rakazo/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarClock, Menu, PanelRight, Pause, Pencil, Play, Plus } from "lucide-react";
+import { ArrowLeft, Menu, PanelRight, Pause, Pencil, Play, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { desktopDragClass } from "../../lib/desktop";
@@ -16,6 +16,7 @@ import { routineDiagramSummary } from "./routine-summary";
 import type { RoutineHistoryState } from "../RoutineRunHistory";
 import { RoutineRunHistory } from "../RoutineRunHistory";
 import { previewMessageText } from "../shell/chat-shared";
+import { RoutineEmptyState } from "./RoutineEmptyState";
 import { RoutineCanvas } from "./RoutineCanvas";
 import { ownedRoutines, routineCanRun } from "./routine-diagram";
 import { useRoutineActions } from "./use-routine-actions";
@@ -103,20 +104,21 @@ export function RoutineWorkspace({ bot, scope, client, selectedId, onSelect, onE
     <header data-testid="conversation-header" className={`${desktopDragClass()} flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3`}>
       <Button variant="ghost" size="icon-sm" className="app-no-drag md:hidden" aria-label={t`Open navigation`} onClick={onNavigation}><Menu size={17} /></Button>
       <Button variant="ghost" size="icon-sm" className="app-no-drag" aria-label={t`Back to chat`} onClick={onExit}><ArrowLeft size={16} /></Button>
-      <BotAvatar identity={bot.id} color={bot.color} size={21} status={bot.status} /><span className="min-w-0 truncate text-sm font-medium">{bot.name}</span>
+      <BotAvatar identity={bot.id} color={bot.color} size={21} status={bot.status} /><span className="min-w-0 truncate text-sm font-medium">{bot.name}</span><span className="hidden text-sm text-muted-foreground sm:inline">/ {t`Routines`}</span>
       <div className="app-no-drag ms-auto flex shrink-0 items-center gap-1">
         <Button variant="ghost" size="icon-sm" aria-label={t`Create Routine`} onClick={() => onEdit()}><Plus size={16} /></Button>
-        <Button size="sm" disabled={!selected || !canRun(selected.id)} onClick={() => selected && run(selected)}><Play size={13} />{selectedState?.busy ? t`Starting` : t`Run`}</Button>
-        <Button variant="ghost" size="icon-sm" aria-label={t`Routine details`} aria-expanded={detailsOpen && !editorOpen} onClick={() => setDetailsOpen(value => !value)}><PanelRight size={16} /></Button>
+        {selected ? <Button size="sm" disabled={!canRun(selected.id)} onClick={() => selected && run(selected)}><Play size={13} />{selectedState?.busy ? t`Starting` : t`Run`}</Button> : null}
+        {selected ? <Button variant="ghost" size="icon-sm" aria-label={t`Routine details`} aria-expanded={detailsOpen && !editorOpen} onClick={() => setDetailsOpen(value => !value)}><PanelRight size={16} /></Button> : null}
       </div>
     </header>
     {list.error ? <div role="alert" className="flex items-center gap-3 border-b border-border p-3 text-sm text-destructive">{errorText(list.error)}<Button size="xs" variant="outline" onClick={() => void list.refetch()}>{t`Retry`}</Button></div> : null}
     {selectedState?.error ? <p role="alert" className="border-b border-border px-4 py-2 text-xs text-destructive">{selectedState.error}</p> : null}
-    {list.isPending ? <div className="grid flex-1 place-items-center"><Spinner aria-label={t`Loading…`} /></div> : !selected ? <div className="grid flex-1 place-items-center p-6"><div className="flex flex-col items-center gap-3 text-center"><CalendarClock size={28} className="text-muted-foreground" /><p className="text-sm text-muted-foreground">{list.error ? t`Routines unavailable` : t`No routines yet`}</p>{!list.error ? <Button size="sm" onClick={() => onEdit()}><Plus size={15} />{t`Create Routine`}</Button> : null}</div></div> : <>
+    {list.isPending ? <div className="grid flex-1 place-items-center"><Spinner aria-label={t`Loading…`} /></div> : !selected ? (list.error ? <div className="grid flex-1 place-items-center p-6"><p className="text-sm text-muted-foreground">{t`Routines unavailable`}</p></div> : <RoutineEmptyState bot={bot} onCreate={() => onEdit()} />) : <>
       <div className="app-no-drag flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <NativeSelect aria-label={t`Select routine`} value={selected.id} onChange={event => onSelect(event.target.value)} className="max-w-full text-xs">
           {routines.map(routine => <NativeSelectOption key={routine.id} value={routine.id}>{routine.name}</NativeSelectOption>)}
         </NativeSelect>
+        <span className="hidden min-w-0 truncate text-xs text-muted-foreground lg:block">{routineDiagramSummary(selected, i18n.locale)}</span>
         <span className="ms-auto hidden truncate text-xs text-muted-foreground sm:block">{selected.active ? t`Active` : t`Paused`}</span>
       </div>
       <div className="rk-routine-body">

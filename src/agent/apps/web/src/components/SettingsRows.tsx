@@ -32,11 +32,11 @@ export function SettingsGroup({
   "data-testid"?: string;
 }) {
   return (
-    <section data-testid={testId}>
+    <section data-testid={testId} data-slot="settings-group">
       {title ? (
         <h3 className="mb-2 px-1 text-[14px] font-medium text-foreground">{title}</h3>
       ) : null}
-      <div className="divide-y divide-border rounded-xl border border-border">{children}</div>
+      <div data-slot="settings-group-content" className="divide-y divide-border rounded-xl border border-border">{children}</div>
     </section>
   );
 }
@@ -47,17 +47,19 @@ export function SettingsRow({
   control,
   children,
   help,
+  description,
 }: {
   label: ReactNode;
   control?: ReactNode;
   children?: ReactNode;
   help?: SettingHelp;
+  description?: ReactNode;
 }) {
   return (
-    <div className="px-4 py-3">
+    <div className="rk-settings-row px-4 py-3">
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex min-w-0 items-center gap-2 break-words text-[14px] text-foreground">
-          <div className="min-w-0">{label}</div>
+          <div className="min-w-0">{label}{description ? <p className="rk-settings-description mt-1 text-[13px] leading-[1.4] text-muted-foreground">{description}</p> : null}</div>
           {help && <InfoTooltip label={help.label} icon="info">{help.description}</InfoTooltip>}
         </div>
         {control ? (

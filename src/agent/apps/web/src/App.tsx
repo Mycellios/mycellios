@@ -1,3 +1,4 @@
+import { getGeneralPreferences, useGeneralPreferences } from "./lib/general-preferences";
 import { StartupScreen } from "./components/StartupScreen";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { LinkFavicons } from "@rakazo/chat-ui/web";
@@ -103,6 +104,7 @@ function SessionApp() {
   const pathname = useLocation().pathname;
   const screen = analyticsScreen(pathname);
   const analyticsUserId = session.data?.user.id;
+  const { productAnalytics } = useGeneralPreferences();
   const lastScreen = useRef<string | undefined>(undefined);
   useEffect(() => {
     // A pending session is not a sign-out; startup already tagged the signed-in user.
@@ -110,7 +112,7 @@ function SessionApp() {
     void identifyMonitoringUser(Boolean(analyticsUserId));
   }, [analyticsUserId, session.isPending]);
   useEffect(() => {
-    if (!analyticsUserId) {
+    if (!analyticsUserId || !productAnalytics) {
       lastScreen.current = undefined;
       return;
     }
@@ -118,10 +120,12 @@ function SessionApp() {
     const key = `${analyticsUserId}:${screen}`;
     if (lastScreen.current === key) return;
     lastScreen.current = key;
+    let current = true;
     void Promise.resolve()
-      .then(() => rpc.analytics.screen({ screen, surface: desktopBridge() ? "desktop" : "web" }))
+      .then(() => current && getGeneralPreferences().productAnalytics ? rpc.analytics.screen({ screen, surface: desktopBridge() ? "desktop" : "web" }) : undefined)
       .catch(() => undefined);
-  }, [analyticsUserId, screen]);
+    return () => { current = false; };
+  }, [analyticsUserId, screen, productAnalytics]);
   const gate = sessionGate(session);
   useEffect(() => {
     if (gate === "authenticated" || gate === "anonymous") setQueryUser(analyticsUserId ?? null);

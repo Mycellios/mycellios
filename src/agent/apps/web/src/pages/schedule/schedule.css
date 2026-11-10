@@ -357,31 +357,6 @@
   border-radius: 6px;
   background: var(--accent);
 }
-.rk-schedule-empty {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 14px;
-  min-height: 480px;
-  text-align: center;
-  padding: 32px;
-}
-.rk-schedule-empty h2 {
-  font-size: 28px;
-  font-weight: 600;
-}
-.rk-schedule-empty p {
-  font-size: 14px;
-  color: var(--muted-foreground);
-}
-.rk-schedule-create {
-  padding: 9px 20px;
-  border-radius: 8px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-size: 13px;
-  font-weight: 500;
-}
 .rk-schedule-workspace button:focus-visible {
   outline: 2px solid var(--task-blue);
   outline-offset: 2px;

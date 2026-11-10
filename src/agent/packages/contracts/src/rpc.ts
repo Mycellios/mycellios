@@ -1,7 +1,7 @@
 import { NotificationSettingsSchema, WebPushSubscriptionSchema } from "./notification-settings.js";
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
-import { AccountPlanLimitsSchema } from "./plan-limits.js";
+import { AccountPlanLimitSchema, AccountPlanLimitsSchema } from "./plan-limits.js";
 import { InboxTaskSchema, TaskInboxSendSchema } from "./task-inbox.js";
 import { RoutineCalendarInputSchema, RoutineCalendarSchema } from "./routine-calendar.js";
 import { UsageDashboardInputSchema, UsageDashboardSchema } from "./usage-dashboard.js";
@@ -178,6 +178,7 @@ const threadSendInput = threadTarget
   .safeExtend({
     text: z.string().optional(),
     taskInstructions: z.string().max(16000).optional(),
+    delivery: z.enum(["queue", "steer"]).optional(),
     artifactIds: z.array(Id).max(ATTACHMENT_MAX_COUNT).optional(),
     /** Bare bot ids (legacy) or typed mention chips from the composer. */
     mentions: z
@@ -298,6 +299,8 @@ export const appContract = {
     apply: oc.input(ServerUpdateRequestSchema).output(ServerUpdateRunSchema),
   },
   engines: {
+    codexQuota: oc.output(AccountPlanLimitSchema.nullable()),
+    codexModels: oc.output(z.array(z.object({ id: z.string(), label: z.string(), isDefault: z.boolean(), thinkingLevels: z.array(z.string()), defaultThinkingLevel: z.string().optional(), fast: z.boolean() }))),
     list: oc.output(
       z.array(
         z.object({
@@ -533,6 +536,7 @@ export const appContract = {
     subscribe: oc
       .input(threadTarget.safeExtend({ cursor: z.number().int().min(-1) }))
       .output(eventIterator(ProductEventSchema)),
+    queue: oc.input(threadTarget).output(z.array(z.object({ messageId: Id, text: z.string(), createdAt: z.string() }))),
     send: oc.input(threadSendInput).output(
       z.object({
         taskId: Id,
@@ -605,6 +609,7 @@ export const appContract = {
         }),
       )
       .output(z.object({ ok: z.literal(true) })),
+    newChat: oc.input(threadTarget.and(z.object({ clientNonce: z.string().min(1).max(128) }))).output(z.object({ ok: z.literal(true) })),
     clear: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
     answer: oc
       .input(

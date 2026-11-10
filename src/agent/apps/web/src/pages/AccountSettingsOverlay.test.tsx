@@ -176,14 +176,14 @@ it("flips the stored tool activity preference from the settings toggle", async (
       toggle.click();
     });
 
-    expect(localStorage.getItem(TOOL_ACTIVITY_STORAGE_KEY)).toBe("on");
+    expect(localStorage.getItem(TOOL_ACTIVITY_STORAGE_KEY)).toBe("expanded");
     expect(toggle.getAttribute("aria-checked")).toBe("true");
 
     await act(async () => {
       toggle.click();
     });
 
-    expect(localStorage.getItem(TOOL_ACTIVITY_STORAGE_KEY)).toBe("off");
+    expect(localStorage.getItem(TOOL_ACTIVITY_STORAGE_KEY)).toBe("on");
     expect(toggle.getAttribute("aria-checked")).toBe("false");
   } finally {
     await act(async () => root.unmount());

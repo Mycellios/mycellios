@@ -33,8 +33,10 @@ export async function answerSideQuestion(
   try {
     signal.throwIfAborted();
     const model = await deps.sideQuestions.resolveModel({ ...actor, botId: target.botId });
+    const thread = await deps.prisma.thread.findFirst({ where: { id: target.threadId, spaceId: actor.spaceId, userId: actor.userId }, select: { contextStartSeq: true } });
+    if (!thread) throw new ORPCError("NOT_FOUND");
     const messages = await deps.prisma.message.findMany({
-      where: { threadId: target.threadId, steeringMessages: { none: { botId: target.botId, claimedAt: null } } },
+      where: { threadId: target.threadId, seq: { gte: thread.contextStartSeq }, steeringMessages: { none: { botId: target.botId, claimedAt: null } } },
       orderBy: { seq: "desc" },
       take: 60,
       select: { role: true, blocks: true },
@@ -97,6 +99,7 @@ export async function answerSideQuestion(
         usageOperationKind: "answer",
         onUsage: account,
         allowSilentEmpty: true,
+        ephemeral: true,
       },
       { ...actor, operationId, traceId: operationId, signal },
     )) {

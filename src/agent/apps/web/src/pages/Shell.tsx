@@ -1,3 +1,7 @@
+import { WorkAreaHeader } from "../components/WorkAreaHeader";
+import { DesktopCompanions } from "../components/DesktopCompanions";
+import { getGeneralPreferences } from "../lib/general-preferences";
+import { SideQuestion, type SideQuestionTarget } from "./shell/side-question";
 import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
 import { PushPermissionPrompt } from "../components/PushPermissionPrompt";
 import { useAndroidShortcut } from "./shell/use-android-shortcut";
@@ -132,7 +136,6 @@ import { connectThisComputer, defaultComputerMode, desktopBridge, desktopDragCla
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
-import { PanelRightOpen } from "lucide-react";
 import { authClient } from "../lib/auth";
 import { autoReadStillWanted } from "../lib/auto-read";
 import {
@@ -228,7 +231,7 @@ import { marketplaceTab, type MarketplaceTab } from "./marketplace/catalog";
 import { WorkspaceRail } from "./shell/workspace-rail";
 import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
-import { ChatToolsPanel, ChatToolsMenu, MobileChatActions, MobileChatToolLinks } from "./shell/chat-tools-panel";
+import { MobileChatActions, MobileChatToolLinks } from "./shell/chat-tools-panel";
 import { VoiceConversation } from "../components/call/VoiceConversation";
 import { ProviderQuota } from "../components/ProviderQuota";
 import { HelpMenu } from "../components/HelpMenu";
@@ -399,8 +402,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const pushPublicKey = useWebPushPresence(userId);
   const chatHistory = useChatHistory();
   const [taskAgentsOpen, setTaskAgentsOpen] = useState(false);
-  const [chatToolsOpen, setChatToolsOpen] = useState(false);
   const [voiceConversation, setVoiceConversation] = useState<{ id: string; name: string; color: string } | null>(null);
+  const [sideQuestionTargets, setSideQuestionTargets] = useState<Record<string, SideQuestionTarget>>({});
+  useEffect(() => setSideQuestionTargets({}), [userId]);
   const projectCollection = useProjects(rpc, userId ?? null, shellSpaceId);
   const [creatingProject, setCreatingProject] = useState(false);
   const activeProject = projectCollection.projects.find(project => project.conversations.some(chat => chat.threadId === taskScope?.taskThreadId));
@@ -413,7 +417,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     if (primed) return { seed: primed, startChat: undefined };
     const cached = queryClient.getQueryData(spaceSeedKey(userId ?? null, shellSpaceId));
     const lastChat = queryClient.getQueryData(lastChatKey(userId ?? null, shellSpaceId));
-    return { seed: cached, startChat: botId || groupId ? undefined : lastChatOf(cached, lastChat) };
+    return { seed: cached, startChat: botId || groupId || !getGeneralPreferences().restoreLastWorkspace ? undefined : lastChatOf(cached, lastChat) };
   });
   const routerNavigate = useNavigate();
   const navigateRef = useRef(routerNavigate);
@@ -1684,7 +1688,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       autoSpoken.current = lastBot?.id ?? null;
       return;
     }
-    if (call?.botId === active.id || !active.autoSpeak) {
+    if (call?.botId === active.id || !(active.autoSpeak || getGeneralPreferences().readReplies)) {
       autoSpoken.current = lastBot?.id ?? null;
       return;
     }
@@ -2715,7 +2719,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id));
   }, []);
   const sendMessage = useCallback(
-    async (text: string, mentions: ComposerMention[], clientNonce: string) => {
+    async (text: string, mentions: ComposerMention[], clientNonce: string, delivery?: "queue" | "steer") => {
       const initialBotTarget = activeBotId.current;
       const initialGroupTarget = activeGroupId.current;
       if ((!initialBotTarget && !initialGroupTarget) || sending ||
@@ -2806,6 +2810,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           await rpc.threads.send({
             groupId: groupTarget,
             clientNonce,
+            delivery,
             text: trimmed || undefined,
             mentions: plan.mentionPayload.length ? plan.mentionPayload : undefined,
             artifactIds: artifactIds.length ? artifactIds : undefined,
@@ -2817,6 +2822,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           const sent = await rpc.threads.send({
             botId: botTarget,
             clientNonce,
+            delivery,
             text: trimmed || undefined,
             mentions: plan.mentionPayload.length ? plan.mentionPayload : undefined,
             artifactIds: artifactIds.length ? artifactIds : undefined,
@@ -3683,12 +3689,38 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       }}
     />
   ) : null;
+  const asideKey = JSON.stringify([userId, currentSpaceId, active?.id, taskScope?.taskThreadId]);
+  const asideVisible = !inGroup && Boolean(sideQuestionTargets[asideKey]?.visible);
+  function hideAside() {
+    setSideQuestionTargets(current => current[asideKey] ? { ...current, [asideKey]: { ...current[asideKey], visible: false } } : current);
+  }
+  function closeAside(key = asideKey) {
+    setSideQuestionTargets(current => { const next = { ...current }; delete next[key]; return next; });
+  }
+  function openAside(text = "") {
+    if (!active || inGroup || !userId || !currentSpaceId) return;
+    const append = { id: newClientId(), text };
+    reviewWorkspace?.hide(); setPanel(null); setComputerOpen(false);
+    setSideQuestionTargets(current => ({ ...current, [asideKey]: {
+      ...current[asideKey], botId: active.id, name: active.name, color: active.color,
+      rpc: current[asideKey]?.rpc ?? rpc, taskThreadId: taskScope?.taskThreadId, visible: true, append,
+    } }));
+  }
   const chatTools = {
-    onBrowser: () => { setVoiceConversation(null); setPanel(null); reviewWorkspace?.show(); },
+    onBrowser: () => { hideAside(); setVoiceConversation(null); setPanel(null); reviewWorkspace?.show(); },
     onFiles: () => showLibrary(),
-    onSettings: () => { setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(inGroup ? "group-settings" : "settings"); },
-    onVoice: !inGroup && active ? () => { reviewWorkspace?.hide(); setPanel(null); setVoiceConversation({ id: active.id, name: active.name, color: active.color }); } : undefined,
+    onSettings: () => { hideAside(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel(inGroup ? "group-settings" : "settings"); },
+    onVoice: !inGroup && active ? () => { hideAside(); reviewWorkspace?.hide(); setPanel(null); setVoiceConversation({ id: active.id, name: active.name, color: active.color }); } : undefined,
   };
+  const openComputerWorkspace = () => {
+    hideAside(); setVoiceConversation(null); reviewWorkspace?.hide(); setPanel("computer");
+    if (active) void refreshThread(active.id).catch(() => undefined);
+  };
+  const workAreaHeader = (mode: "browser" | "computer") => <WorkAreaHeader active={mode} onBrowser={chatTools.onBrowser}
+    onComputer={!inGroup && active ? openComputerWorkspace : undefined} onFiles={chatTools.onFiles} onSettings={chatTools.onSettings} onVoice={chatTools.onVoice}
+    onComputerSettings={!inGroup && active ? () => openSettings("computer") : undefined}
+    onClose={() => { reviewWorkspace?.hide(); setPanel(null); }}
+    maintenance={mode === "computer" && active && !computerOpen && computerPanelNeedsMaintenance(computer?.state, booting) ? <ComputerMaintenanceActions botId={active.id} computer={computer} onChanged={async()=>{await refreshThread(active.id);}}/> : undefined} />;
   const marketplaceView = searchParams.get("view") === "marketplace" || overlay?.kind === "integrations";
   const libraryView = searchParams.get("view") === "library";
   function showLibrary(botId?: string) {
@@ -3817,47 +3849,44 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             else chatTools.onVoice?.();
           }}
           data-active={call?.botId === active.id ? "" : undefined}
-          className="app-no-drag"
+          className={`app-no-drag ${isMobileSidebar ? "" : "rk-chat-action"}`}
         >
-          <Phone strokeWidth={1.6} className="size-[17px]" aria-hidden />
+          <Phone strokeWidth={1.75} className="size-[18px]" aria-hidden />
           {isMobileSidebar ? (call?.botId === active.id ? t`Open call` : t`Call`) : null}
         </Button>
       </IconTooltip>
     ) : null}
-    {!taskScope ? <InviteFriends inMenu={isMobileSidebar} /> : null}
-    {!isMobileSidebar && (active || activeGroup) && <><IconTooltip label={t`Chat tools`}><Button variant="ghost" size="icon-sm" aria-label={t`Chat tools`} aria-expanded={chatToolsOpen} onClick={() => setChatToolsOpen(open => !open)} className="app-no-drag hidden min-[1100px]:inline-flex"><PanelRightOpen size={17}/></Button></IconTooltip><ChatToolsMenu {...chatTools} /></>}
-    {!inGroup && active ? (
-      <IconTooltip label={t`Agent computer`}>
+
+    {((!inGroup && active) || (!isMobileSidebar && activeGroup)) ? (
+      <IconTooltip label={inGroup ? t`Browser` : isMobileSidebar ? t`Agent computer` : t`Browser and computer`}>
         <Button
           variant={isMobileSidebar ? "ghost" : "floating"}
           data-mobile-chat-action={isMobileSidebar || undefined}
           size="icon-lg"
-          aria-label={t`Agent computer`}
-          aria-pressed={panel === "computer"}
+          aria-label={inGroup ? t`Browser` : isMobileSidebar ? t`Agent computer` : t`Browser and computer`}
+          aria-pressed={panel === "computer" || Boolean(reviewWorkspace?.open)}
           onClick={() => {
             close?.();
-            const next = panel === "computer" ? null : "computer";
-            setPanel(next);
-            if (next === "computer" && active) {
-              // Refresh run/computer so Take control isn't stuck on a stale busyBotName.
-              void refreshThread(active.id).catch(() => undefined);
-            }
+            if (panel === "computer" || reviewWorkspace?.open) { setPanel(null); reviewWorkspace?.hide(); }
+            else if (isMobileSidebar) openComputerWorkspace(); else chatTools.onBrowser();
           }}
-          className="app-no-drag"
+          className={`app-no-drag ${isMobileSidebar ? "" : "rk-chat-action"}`}
         >
-          <Monitor strokeWidth={1.6} className="size-[18px]" aria-hidden />
+          <Monitor strokeWidth={1.75} className="size-[18px]" aria-hidden />
           {isMobileSidebar ? t`Agent computer` : null}
         </Button>
       </IconTooltip>
     ) : null}
+
+    {!taskScope ? <InviteFriends inMenu={isMobileSidebar} className={isMobileSidebar ? undefined : "rk-chat-action"} /> : null}
     </>
   );
   const sidebarSearch = miniSidebar ? null : (
     <InputGroup
       data-testid="sidebar-search"
       className={isMobileSidebar
-        ? "mx-4 mb-[max(1rem,env(safe-area-inset-bottom))] mt-2 min-h-12 w-auto shrink-0 rounded-full border border-border bg-card text-muted-foreground"
-        : "mx-2.5 my-2.5 h-8 w-auto shrink-0 rounded-md border-border bg-muted text-muted-foreground"}
+        ? "rk-sidebar-search mx-4 mb-[max(1rem,env(safe-area-inset-bottom))] mt-2 min-h-12 w-auto shrink-0 rounded-full border border-border text-muted-foreground"
+        : "rk-sidebar-search mx-2.5 my-2.5 h-8 w-auto shrink-0 rounded-md border-border text-muted-foreground"}
     >
       <InputGroupAddon>
         <Search size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -3986,6 +4015,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   );
   const shell = (
     <>
+    <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} />
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
     <BotsSidebarLayout
       userId={userId}
@@ -4220,7 +4250,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         data-space-switch="main"
         aria-hidden={(mobileSidebarOpen || (isMobileSidebar && reviewWorkspace?.open)) || undefined}
         inert={mobileSidebarOpen || (isMobileSidebar && reviewWorkspace?.open)}
-        className="isolate flex min-w-0 flex-1 flex-col bg-background"
+        className="rk-chat-canvas isolate flex min-w-0 flex-1 flex-col bg-background"
       >
         {/* Inside main so the composer and its menus stay above it. */}
         {!mobileSidebarOpen ? (
@@ -4463,7 +4493,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 setPanel("import-agent");
               }}
               activeName={inGroup ? (activeGroup?.name ?? activeSnapshot?.groupName) : active?.name}
+              activeColor={active?.color}
+              onNewChatStarted={() => { closeAside(); if (active) void refreshThread(active.id).catch(() => undefined); }}
               running={composerRunning}
+              busyMessages={currentRuns.some(run => run.status === "running" || run.status === "queued" || run.status === "leased")}
               disabled={Boolean(recordingSkill) || Boolean(taskScope && activeSnapshot?.threadId !== taskScope.taskThreadId)}
               pendingAttachments={activePendingAttachments}
               attachmentNotice={attachmentNotice}
@@ -4506,7 +4539,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               onSend={sendMessage}
               onStop={stopRun}
               onOpenVoice={!inGroup && active ? chatTools.onVoice : undefined}
+              onAskAside={!inGroup && active ? openAside : undefined}
               voiceConversationActive={Boolean(voiceConversation)}
+              onCloseVoice={() => setVoiceConversation(null)}
               voiceShortcutRequested={!inGroup && Boolean(active && activeSnapshot?.botId === active.id) && searchParams.get("dictate") === "1"}
               onVoiceShortcutConsumed={() => {
                 const next = new URLSearchParams(searchParams);
@@ -4541,8 +4576,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         </>}
       </main>
 
-      {voiceConversation ? <VoiceConversation key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
-      {!libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && chatToolsOpen && !voiceConversation && !panel && !reviewWorkspace?.open ? <ChatToolsPanel {...chatTools} onClose={() => setChatToolsOpen(false)} /> : null}
+      {Object.entries(sideQuestionTargets).map(([key, target]) => <SideQuestion key={key} {...target} enterToSend={enterToSend}
+        active={key === asideKey && target.visible && !libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && !panel && !reviewWorkspace?.open}
+        onClose={() => closeAside(key)} onBrowser={chatTools.onBrowser} onFiles={chatTools.onFiles} onSettings={chatTools.onSettings} onVoice={chatTools.onVoice}/>) }
+      {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
+
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall
         bots={bootstrapMe?.phoneCallsEnabled ? bots : []}
@@ -4550,7 +4588,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onAnswered={(botId) => navigate(`/app/${botId}`)}
       />
 
-      <ReviewWorkspacePanel agentName={inGroup ? activeGroup?.name : active?.name}
+      <ReviewWorkspacePanel workspaceNavigation={!isMobileSidebar ? workAreaHeader("browser") : undefined} agentName={inGroup ? activeGroup?.name : active?.name}
         agentAvatar={isMobileSidebar && (inGroup
           ? <GroupAvatar members={activeSnapshot?.members ?? activeGroup?.members ?? []} size={24} />
           : active && <BotAvatar color={active.color} identity={active.id} size={24} status={active.status} />)}
@@ -4572,8 +4610,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         panel={panel ?? "closed"}
       >
         {panel && (active || activeGroup || panel === "import-agent") ? (
-          <div className="rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]">
-            {panel !== "routine" &&
+          <div className={panel === "computer" ? "rk-scroll flex h-full w-full flex-col overflow-y-auto" : "rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]"}>
+            {panel === "computer" && workAreaHeader("computer")}
+            {panel !== "computer" && panel !== "routine" &&
             panel !== "create-group" &&
             panel !== "group-settings" &&
             panel !== "import-agent" ? (
@@ -4584,18 +4623,6 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   </span>
                 ) : null}
                 <div className="ml-auto flex gap-1">
-                  {active &&
-                  panel === "computer" &&
-                  !computerOpen &&
-                  computerPanelNeedsMaintenance(computer?.state, booting) ? (
-                    <ComputerMaintenanceActions
-                      botId={active.id}
-                      computer={computer}
-                      onChanged={async () => {
-                        await refreshThread(active.id);
-                      }}
-                    />
-                  ) : null}
                   {active ? (
                     <Button
                       variant="ghost"
@@ -4625,6 +4652,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             {panel === "computer" && active ? (
               <ComputerPanel
                 bot={active}
+                onOpenBrowser={chatTools.onBrowser}
                 computer={computer}
                 computerOpen={computerOpen}
                 embeddedScreenUrl={embeddedScreenUrl}

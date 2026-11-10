@@ -1816,7 +1816,9 @@ export async function createPendingSteeringRun(
   // One origin per continuation so a group channel and the owner's private chat are not answered
   // together. The app and the owner's direct line are one private conversation.
   const origin = steeringOrigin(pending[0]!);
-  const batch = pending.filter((item) => steeringOrigin(item) === origin);
+  const batch = pending[0]!.originTrigger === "queued_user"
+    ? [pending[0]!]
+    : pending.filter((item) => item.originTrigger !== "queued_user" && steeringOrigin(item) === origin);
   const source = batch.at(-1)!;
   const modelPin = continuationModelPin(batch);
   const task = await tx.task.create({
@@ -1848,7 +1850,7 @@ export async function createPendingSteeringRun(
           ? "webhook"
           : origin === "private" &&
               batch.every(
-                (item) => item.originTrigger === null && !hasChannelMessage(item.message.blocks),
+                (item) => (item.originTrigger === null || item.originTrigger === "queued_user") && !hasChannelMessage(item.message.blocks),
               )
             ? "follow_up"
             : "messaging",

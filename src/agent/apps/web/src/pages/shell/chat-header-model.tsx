@@ -1,8 +1,8 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
-import { isMycelliosBaseUrl, isOpenAiCompatibleProvider } from "@rakazo/contracts";
+import { ThinkingLevelSchema, isMycelliosBaseUrl, isOpenAiCompatibleProvider } from "@rakazo/contracts";
 import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey, resolveSelectableModelId } from "@rakazo/core";
-import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner } from "@rakazo/ui-web";
+import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@rakazo/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Cpu } from "lucide-react";
 import { useId, useRef, useState } from "react";
@@ -16,7 +16,17 @@ import { ChatModelPicker } from "./chat-model-picker";
 
 const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
-export type ChatModelPatch = Pick<Bot, "modelProvider" | "modelId" | "thinkingLevel">;
+export type ChatModelPatch = Pick<Bot, "modelProvider" | "modelId" | "thinkingLevel"> & {
+  agentEngine?: Bot["agentEngine"];
+  nativeConfig?: Bot["nativeConfig"];
+};
+
+const NATIVE_PROVIDERS = { codex: "ChatGPT", claude: "Claude Code", opencode: "OpenCode", acp: "ACP" } as const;
+type NativeProvider = keyof typeof NATIVE_PROVIDERS;
+
+function selectedNativeProvider(provider: string): NativeProvider | undefined {
+  return (Object.keys(NATIVE_PROVIDERS) as NativeProvider[]).find(engine => provider === `native-${engine}`);
+}
 
 function connectionName(connection: ModelCredential) {
   if (isMycelliosBaseUrl(connection.baseUrl)) return "Mycellios";
@@ -53,9 +63,15 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const me = meQuery.data ?? initialMe;
   const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), enabled: open });
   const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), enabled: open });
+  const enginesQuery = useQuery(queries.engines.list.queryOptions({ enabled: open }));
+  const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({ enabled: open && (enginesQuery.data ?? []).some(engine => engine.id === "codex" && engine.available) }));
+  const nativeModels = nativeCatalog.data ?? [];
+  const nativeModel = nativeModels.find(model => bot.nativeConfig?.modelId ? model.id === bot.nativeConfig.modelId : model.isDefault);
   const credentials = credentialsQuery.data ?? EMPTY_CREDENTIALS;
   const catalog = catalogQuery.data ?? EMPTY_CATALOG;
   const general = generalChatModel(me, catalog);
+  const nativeEngine = bot.agentEngine && bot.agentEngine !== "pi" ? bot.agentEngine : null;
+  const nativeName = nativeEngine ? NATIVE_PROVIDERS[nativeEngine] : undefined;
   const override = bot.modelProvider && bot.modelId
     ? { provider: bot.modelProvider, modelId: bot.modelId }
     : null;
@@ -64,8 +80,9 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const effectiveId = provider && model ? resolveSelectableModelId(catalog, provider, model) : null;
   const entry = provider && model ? selectableCatalogEntry(catalog, provider, model) : undefined;
   const credential = credentialForModel(credentials, provider ?? null, effectiveId ?? null);
-  const levels = (credential?.thinkingLevels ?? entry?.thinkingLevels ?? []).filter(level => level !== "off");
-  const value = bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, resolveSelectableModelId(catalog, bot.modelProvider, bot.modelId)) : "";
+  const levels = nativeEngine === "codex" ? (nativeModel?.thinkingLevels ?? []).flatMap(level => { const parsed = ThinkingLevelSchema.safeParse(level); return parsed.success ? [parsed.data] : []; }) : nativeEngine ? [] : (credential?.thinkingLevels ?? entry?.thinkingLevels ?? []).filter(level => level !== "off");
+  const value = nativeEngine ? modelOptionKey(`native-${nativeEngine}`, nativeEngine === "codex" ? bot.nativeConfig?.modelId ?? "default" : "default")
+    : bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, resolveSelectableModelId(catalog, bot.modelProvider, bot.modelId)) : "";
   const inheritLabel = t`Use general model`;
   const sources = new Map<string, ChatModelCatalogSource>();
   const namedCredentials = credentials.map(connection => {
@@ -86,20 +103,34 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   });
   const explorer = exploring ? sources.get(exploring) : undefined;
   const defaultKey = general ? modelOptionKey(general.provider, resolveSelectableModelId(catalog, general.provider, general.modelId)) : "";
-  const currentProvider = connected.find((choice) => choice.key === (value || defaultKey))?.providerLabel
+  const currentProvider = nativeName ?? connected.find((choice) => choice.key === (value || defaultKey))?.providerLabel
     ?? entry?.providerName ?? provider;
   const quickChoices = connected.filter(choice => {
     const source = sources.get(choice.providerLabel);
     return isOpenAiCompatibleProvider(choice.provider) || choice.key === value || choice.key === defaultKey ||
       (source?.connection?.modelId ? choice.modelId === source.connection.modelId : choice.modelId === source?.models[0]?.id);
   }).sort((left, right) => Number(right.key === (value || defaultKey)) - Number(left.key === (value || defaultKey)));
-  const choices = editingDefault ? connected : chatModelChoices(
+  // Installed account providers live beside API connections in the same picker.
+  // OpenCode/ACP legacy selections stay visible, but new key connections never
+  // ask the user to select the implementation that executes their model.
+  const nativeProviders = [...new Set([
+    ...(enginesQuery.data ?? []).filter(engine => engine.available && (engine.id === "codex" || engine.id === "claude")).map(engine => engine.id as NativeProvider),
+    ...(nativeEngine ? [nativeEngine] : []),
+  ])];
+  const nativeChoices = nativeProviders.map(engine => ({
+    key: modelOptionKey(`native-${engine}`, "default"), provider: `native-${engine}`,
+    providerLabel: NATIVE_PROVIDERS[engine], label: NATIVE_PROVIDERS[engine] as string, title: t`Use this account`,
+  }));
+  if (nativeProviders.includes("codex")) nativeChoices.push(...nativeModels.map(model => ({
+    key: modelOptionKey("native-codex", model.id), provider: "native-codex", providerLabel: NATIVE_PROVIDERS.codex, label: model.label, title: model.label,
+  })));
+  const choices = editingDefault ? connected : [...chatModelChoices(
     recovery ? connected : quickChoices,
     value,
     general ? `${inheritLabel} · ${general.label}` : inheritLabel,
     general?.entry?.images,
-  ).filter((choice) => choice.key || general || !me?.needsModel);
-  const label = recovery ? t`Change model` : entry?.label ?? model ?? (me?.needsModel ? t`Choose a model` : t`Model`);
+  ).filter((choice) => !selectedNativeProvider(choice.provider ?? "") && (choice.key || general || !me?.needsModel)), ...nativeChoices];
+  const label = recovery ? t`Change model` : (nativeEngine === "codex" ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? entry?.label ?? model ?? (me?.needsModel ? t`Choose a model` : t`Model`);
   const queryError = credentialsQuery.error ?? catalogQuery.error;
 
   async function save(apply: () => Promise<void>, close = true) {
@@ -136,7 +167,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
           } : entry),
         );
       }
-      if (use) await onSave({ modelProvider: source.provider, modelId, thinkingLevel: null });
+      if (use) await onSave({ agentEngine: "pi", modelProvider: source.provider, modelId, thinkingLevel: null });
     }, use);
   }
 
@@ -152,7 +183,15 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
         await queryClient.invalidateQueries({ queryKey: queries.me.queryKey() });
       });
     } else {
-      void save(() => onSave({ modelProvider: selected?.provider ?? null, modelId: selected?.modelId ?? null, thinkingLevel: null }));
+      const engine = selected ? selectedNativeProvider(selected.provider) : undefined;
+      void save(() => onSave({
+        agentEngine: engine ?? "pi",
+        nativeConfig: engine === "codex" ? { modelId: selected?.modelId === "default" ? null : selected?.modelId,
+          fastMode: false, thinkingLevel: null } : null,
+        modelProvider: engine ? null : selected?.provider ?? null,
+        modelId: engine ? null : selected?.modelId ?? null,
+        thinkingLevel: null,
+      }));
     }
   }
   return (
@@ -167,7 +206,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
         </PopoverTrigger>
         {open ? <PopoverContent align="end" className={recovery
           ? "app-no-drag w-80 max-w-[calc(100vw-24px)] gap-3 p-3"
-          : "app-no-drag w-[364px] max-w-[calc(100vw-24px)] max-h-(--available-height) gap-0 overflow-y-auto p-0"}>
+          : "app-no-drag w-[410px] max-w-[calc(100vw-24px)] max-h-(--available-height) gap-0 overflow-y-auto p-0"}>
           {recovery ? <label htmlFor={`${id}-model`} className="text-xs font-medium">{t`Model`}</label> : null}
           {recovery ? <p className="text-xs text-muted-foreground">{t`This changes the model for this Mico. Your message stays in the chat.`}</p> : null}
           {credentialsQuery.isPending || catalogQuery.isPending ? (
@@ -182,30 +221,40 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 id={`${id}-model`}
                 choices={choices}
                 value={editingDefault ? defaultKey : value}
-                defaultKey={defaultKey}
+                defaultKey={nativeEngine === "codex" ? modelOptionKey("native-codex", nativeModels.find(model => model.isDefault)?.id ?? "default") : defaultKey}
                 currentProvider={editingDefault ? undefined : currentProvider}
                 inline={!recovery}
                 onManage={() => { setOpen(false); setEditingDefault(false); onConnections(); }}
                 onChange={choose}
                 heading={editingDefault ? t`Choose the general model` : undefined}
                 catalogProviders={!editingDefault && !recovery && me ? [...sources.keys()] : undefined}
+                providerIds={Object.fromEntries([...sources].map(([name, source]) => [name, source.provider]))}
                 initialProvider={editingDefault ? undefined : lastProvider}
+                onProviderChange={setLastProvider}
                 onExplore={name => { setLastProvider(name); setExploring(name); setError(null); }}
               />}
             </fieldset>}
-          {!recovery && !editingDefault && !explorer && levels.length ? <label className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs">{t`Thinking`}
+          {!recovery && !editingDefault && !explorer && (!lastProvider || lastProvider === currentProvider) && levels.length ? <label className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3 text-sm">{t`Effort`}
             <OptionSelect
               aria-label={t`Thinking`}
-              className="w-32"
-              value={bot.thinkingLevel ?? ""}
+              className="w-48 min-w-48 shrink-0"
+              value={(nativeEngine === "codex" ? bot.nativeConfig?.thinkingLevel : bot.thinkingLevel) ?? ""}
               disabled={saving}
               options={[
                 { value: "", label: t`Default` },
                 ...levels.map((level) => ({ value: level, label: thinkingLevelLabel(level) })),
               ]}
-              onValueChange={(value) => void save(() => onSave({ modelProvider: bot.modelProvider, modelId: bot.modelId, thinkingLevel: (value || null) as ThinkingLevel | null }))}
+              onValueChange={(value) => void save(() => onSave(nativeEngine === "codex"
+                ? { agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, thinkingLevel: (value || null) as ThinkingLevel | null } }
+                : { modelProvider: bot.modelProvider, modelId: bot.modelId, thinkingLevel: (value || null) as ThinkingLevel | null }), false)}
             />
           </label> : null}
+          {!recovery && !editingDefault && !explorer && (!lastProvider || lastProvider === currentProvider) && nativeEngine === "codex" && nativeModel?.fast ? <label className="flex items-center justify-between gap-3 px-4 pb-3 text-sm">
+            <span title={t`Uses priority processing and may use more quota.`}>{t`Fast`}</span>
+            <Switch aria-label={t`Fast`} checked={bot.nativeConfig?.fastMode === true} disabled={saving}
+              onCheckedChange={fastMode => void save(() => onSave({ agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, fastMode } }), false)} />
+          </label> : null}
+          {nativeEngine === "codex" && nativeCatalog.error && open ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Could not load this account's models. Fast mode is unavailable until the catalog can be checked.`}</p> : null}
           {saving ? <Spinner aria-label={t`Saving…`} className="mx-auto my-2 text-muted-foreground" /> : null}
           {error ? <p role="alert" className="p-2 text-xs text-destructive">{error}</p> : null}
           {explorer ? null : recovery || !sources.size ? (
@@ -220,7 +269,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
           ) : null}
         </PopoverContent> : null}
       </Popover>
-      {!recovery && bot.thinkingLevel ? <span className="hidden shrink-0 text-xs text-muted-foreground xl:inline">· {thinkingLevelLabel(bot.thinkingLevel)}</span> : null}
+      {!recovery && !nativeEngine && bot.thinkingLevel ? <span className="hidden shrink-0 text-xs text-muted-foreground xl:inline">· {thinkingLevelLabel(bot.thinkingLevel)}</span> : null}
     </div>
   );
 }

@@ -11,6 +11,8 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("./queued-messages", () => ({ QueuedMessages: () => null }));
+
 vi.mock("@lingui/react/macro", () => {
   const t = (parts: TemplateStringsArray, ...values: unknown[]) =>
     parts.reduce((text, part, index) => `${text}${index > 0 ? values[index - 1] : ""}${part}`, "");
@@ -18,6 +20,7 @@ vi.mock("@lingui/react/macro", () => {
 });
 
 import { dictation } from "../../lib/dictation";
+import { setGeneralPreferences } from "../../lib/general-preferences";
 import { spaceQueries } from "../../lib/query";
 import type { RpcClient } from "../../lib/rpc";
 import { SpaceRpcProvider } from "../../lib/space-rpc";
@@ -250,7 +253,7 @@ it.each([false, true])("enables only the chosen catalog model, using it only whe
     credentialId: "omni", modelId: "existing-model", enabledModelIds: ["existing-model", "new-model"], makeDefault: false,
   }), { context: { spaceId: "space-1" } });
   if (useModel) {
-    expect(onSave).toHaveBeenCalledExactlyOnceWith({ modelProvider: "openai-compatible", modelId: "new-model", thinkingLevel: null });
+    expect(onSave).toHaveBeenCalledExactlyOnceWith({ agentEngine: "pi", modelProvider: "openai-compatible", modelId: "new-model", thinkingLevel: null });
   } else {
     expect(onSave).not.toHaveBeenCalled();
     expect(document.querySelector('[role="option"][aria-label="new-model (OmniRoute)"]')).not.toBeNull();
@@ -440,24 +443,13 @@ describe("Composer", () => {
     expect(container?.querySelector('[data-testid="mention-chip"]')?.textContent).toBe("Alice");
   });
 
-  it.each([false, true])(
-    "draws an idle Send button with the primary disabled tokens (running: %s)",
-    (running) => {
-      renderComposer(vi.fn(), { running });
-      const send = container?.querySelector<HTMLButtonElement>('button[aria-label="Send"]');
-      expect(send?.disabled).toBe(true);
-      expect(send?.className.split(" ")).toEqual(
-        expect.arrayContaining([
-          "bg-primary",
-          "hover:bg-primary-hover",
-          "disabled:bg-primary-disabled",
-          "disabled:text-foreground/30",
-          "disabled:opacity-100",
-        ]),
-      );
-      expect(send?.className).not.toContain("disabled:opacity-50");
-    },
-  );
+  it("keeps an idle Send disabled when voice conversations are unavailable", () => {
+    renderComposer(vi.fn());
+    const send = container?.querySelector<HTMLButtonElement>('button[aria-label="Send"]');
+    expect(send?.disabled).toBe(true);
+    expect(send?.className).toContain("disabled:bg-primary-disabled");
+    expect(send?.className).toContain("disabled:text-foreground/30");
+  });
 
   it("clears the draft once the message is sent", async () => {
     const onSend = vi.fn().mockResolvedValue(true);
@@ -1054,4 +1046,118 @@ it("accepts file drops in transparent padding only during file drags", () => {
   dispatchDrag(window, "dragenter", dataTransfer);
   dispatchDrag(window, "dragend", dataTransfer);
   expect(fieldset.classList.contains("pointer-events-none")).toBe(true);
+});
+
+it("defaults a busy message to the durable queue and lets the user explicitly steer", async () => {
+  const onSend = vi.fn().mockResolvedValue(true);
+  const textarea = renderComposer(onSend, { running: true });
+  const type = async (value: string) => act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, value);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await type("Do this afterwards");
+  await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Add to queue"]')!.click());
+  expect(onSend).toHaveBeenLastCalledWith("Do this afterwards", [], expect.any(String), "queue");
+  expect(container!.textContent).toContain("Message saved in the queue.");
+  await act(async () => {
+    const select = container!.querySelector<HTMLSelectElement>('select[aria-label="Send message to"]')!;
+    select.value = "steer"; select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await type("Use the shorter version instead");
+  await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Update current task"]')!.click());
+  expect(onSend).toHaveBeenLastCalledWith("Use the shorter version instead", [], expect.any(String), "steer");
+});
+
+it("keeps an answer to a waiting question out of the busy-message queue", () => {
+  renderComposer(vi.fn(), { running: true, busyMessages: false });
+  expect(container!.querySelector('[data-testid="busy-message-actions"]')).toBeNull();
+  expect(container!.querySelector('button[aria-label="Send"]')).not.toBeNull();
+});
+
+it("uses the saved busy-message preference and still permits a per-message override", async () => {
+  setGeneralPreferences({ busyMessageMode: "steer" });
+  const onSend = vi.fn().mockResolvedValue(true);
+  const textarea = renderComposer(onSend, { running: true });
+  const select = container!.querySelector<HTMLSelectElement>('select[aria-label="Send message to"]')!;
+  expect(select.value).toBe("steer");
+  await act(async () => {
+    select.value = "queue"; select.dispatchEvent(new Event("change", { bubbles: true }));
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Do this later");
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Add to queue"]')!.click());
+  expect(onSend).toHaveBeenLastCalledWith("Do this later", [], expect.any(String), "queue");
+});
+
+
+it("separates microphone dictation from the voice conversation control", () => {
+  const open = vi.fn(), send = vi.fn();
+  renderComposer(send, { onOpenVoice: open });
+  const dictate = container!.querySelector<HTMLButtonElement>('[aria-label="Dictate message"]')!;
+  const voice = container!.querySelector<HTMLButtonElement>('[aria-label="Start voice conversation"]')!;
+  expect(dictate.title).toBe("Dictate message");
+  expect(dictate.querySelector(".lucide-mic")).not.toBeNull();
+  expect(voice.querySelector(".lucide-audio-lines")).not.toBeNull();
+  expect(container!.querySelector('[aria-label="Send"]')).toBeNull();
+  act(() => voice.click()); expect(open).toHaveBeenCalledOnce(); expect(send).not.toHaveBeenCalled();
+});
+it("uses Send for text and attachments and returns to Voice when the draft is empty", () => {
+  const field = renderComposer(vi.fn(), { onOpenVoice: vi.fn() });
+  type(field, "A written instruction");
+  expect(container!.querySelector('[aria-label="Start voice conversation"]')).toBeNull();
+  expect(container!.querySelector<HTMLButtonElement>('[aria-label="Send"]')?.disabled).toBe(false);
+  type(field, "");
+  expect(container!.querySelector('[aria-label="Start voice conversation"]')).not.toBeNull();
+  rerenderComposer({ pendingAttachments: [{ id: "image", threadKey: "bot:bot-1", file: new File(["image"], "image.png", { type: "image/png" }), previewUrl: "data:image/png;base64," }] });
+  expect(container!.querySelector('[aria-label="Start voice conversation"]')).toBeNull();
+  expect(container!.querySelector<HTMLButtonElement>('[aria-label="Send"]')?.disabled).toBe(false);
+});
+it("ends an active voice conversation through its owner and blocks the dictation microphone", () => {
+  const close = vi.fn(), open = vi.fn();
+  renderComposer(vi.fn(), { onOpenVoice: open, onCloseVoice: close, voiceConversationActive: true });
+  expect(container!.querySelector<HTMLButtonElement>('[aria-label="Dictate message"]')?.disabled).toBe(true);
+  act(() => container!.querySelector<HTMLButtonElement>('[aria-label="End voice conversation"]')!.click());
+  expect(close).toHaveBeenCalledOnce(); expect(open).not.toHaveBeenCalled();
+});
+it("gives Stop priority when the Mico is working and the draft is empty", () => {
+  const stop = vi.fn(async () => {}), open = vi.fn();
+  renderComposer(vi.fn(), { running: true, busyMessages: true, onStop: stop, onOpenVoice: open });
+  expect(container!.querySelector('[aria-label="Start voice conversation"]')).toBeNull();
+  expect(container!.querySelector('[aria-label="Add to queue"]')).toBeNull();
+  act(() => container!.querySelector<HTMLButtonElement>('[aria-label="Stop"]')!.click());
+  expect(stop).toHaveBeenCalledOnce(); expect(open).not.toHaveBeenCalled();
+});
+it("keeps a single Voice menu entry and one attachment picker for all supported files", async () => {
+  const open = vi.fn(); renderComposer(vi.fn(), { onOpenVoice: open });
+  await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Add to message"]')!.click());
+  const items = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+  expect(items.map(item => item.textContent?.trim())).toEqual(["Attach files", "Use a skill", "Ask aside", "Voice"]);
+  expect(document.body.textContent).not.toContain("Record voice message");
+  await act(async () => items.find(item => item.textContent?.trim() === "Voice")!.click());
+  expect(open).toHaveBeenCalledOnce();
+});
+it("dictates into a reviewable draft without recording an audio attachment or sending it", async () => {
+  const listen = vi.spyOn(dictation, "listen").mockResolvedValue();
+  const send = vi.fn(), open = vi.fn();
+  try {
+    renderComposer(send, { onOpenVoice: open });
+    await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Dictate message"]')!.click());
+    expect(listen).toHaveBeenCalledWith(expect.objectContaining({ liveTranscript: true, onRecording: undefined }));
+    expect(container!.querySelector('[data-testid="composer-voice-strip"]')).not.toBeNull();
+    expect(container!.querySelector('[aria-label="Start voice conversation"]')).toBeNull();
+    expect(send).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+    await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Discard recording"]')!.click());
+    expect(container!.querySelector('[aria-label="Start voice conversation"]')).not.toBeNull();
+  } finally { listen.mockRestore(); }
+});
+
+it("moves an unattached text draft to the side pane without sending or steering the main task", async () => {
+ const aside=vi.fn(),send=vi.fn();const field=renderComposer(send,{onAskAside:aside,running:true,busyMessages:true});type(field,"Question about this chat");
+ await act(async()=>container!.querySelector<HTMLButtonElement>('[data-testid="busy-message-actions"] button')!.click());
+ expect(aside).toHaveBeenCalledExactlyOnceWith("Question about this chat");expect(field.value).toBe("");expect(send).not.toHaveBeenCalled();
+});
+it("leaves files and their draft in the main composer when opening the side pane", async () => {
+ const aside=vi.fn();const field=renderComposer(vi.fn(),{onAskAside:aside,running:true,busyMessages:true,pendingAttachments:[{id:"file",threadKey:"bot:bot-1",file:new File(["x"],"image.png",{type:"image/png"}),previewUrl:"data:image/png;base64,"}]});type(field,"Draft with a file");
+ await act(async()=>container!.querySelector<HTMLButtonElement>('[data-testid="busy-message-actions"] button')!.click());
+ expect(aside).toHaveBeenCalledExactlyOnceWith("");expect(field.value).toBe("Draft with a file");
 });

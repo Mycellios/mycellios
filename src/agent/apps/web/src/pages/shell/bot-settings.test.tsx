@@ -509,3 +509,13 @@ it("keeps cross-space communication off until explicitly enabled", async () => {
   await flush();
   expect(onSave).toHaveBeenCalledWith({ crossSpaceCommunication: true });
 });
+
+it("preserves the native provider when an unrelated setting is saved", async () => {
+  const onSave = vi.fn().mockResolvedValue(undefined);
+  await renderSettings(onSave, { ...bot, agentEngine: "codex" });
+  const toggle = container.querySelector<HTMLButtonElement>('[aria-label="Enable Remember"]')!;
+  await act(async () => toggle.click()); await flush();
+  expect(onSave).toHaveBeenCalled();
+  expect(onSave.mock.lastCall![0]).not.toHaveProperty("modelProvider");
+  expect(onSave.mock.lastCall![0]).not.toHaveProperty("agentEngine");
+});

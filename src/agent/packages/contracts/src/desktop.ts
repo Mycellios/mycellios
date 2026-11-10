@@ -1,4 +1,6 @@
 import type { DesktopRuntimeBridge } from "../../../../contracts/desktop-runtime.js";
+import type { DesktopCompanionPreferences, DesktopCompanionSnapshot } from "./desktop-companions.js";
+export * from "./desktop-companions.js";
 import type { ProjectRunnerBridge } from "../../../../contracts/project-runner.js";
 export type { ProjectRunState, ProjectRunConfig, ProjectRunnerBridge } from "../../../../contracts/project-runner.js";
 
@@ -19,6 +21,10 @@ export type DesktopUpdatePhase =
   | "error";
 
 export interface DesktopUpdateState {
+  relaunchPending?: boolean;
+  relaunchWaitingFor?: "local_work" | "unsaved_work" | "update_download";
+  relaunchError?: boolean;
+  autoInstallEnabled?: boolean;
   phase: DesktopUpdatePhase;
   /** The installed desktop release, which can drift from the server this app points at. */
   currentVersion: string;
@@ -35,6 +41,10 @@ export interface DesktopUpdateState {
 }
 
 export interface RakazoDesktopUpdate {
+  preferences?: () => Promise<DesktopUpdatePreferences>;
+  savePreferences?: (patch: { autoDownload?: boolean; autoInstall?: boolean }) => Promise<DesktopUpdatePreferences>;
+  restartWhenIdle?: () => Promise<DesktopUpdateState>;
+  cancelRestart?: () => Promise<DesktopUpdateState>;
   state: () => Promise<DesktopUpdateState>;
   check: () => Promise<DesktopUpdateState>;
   download: () => Promise<DesktopUpdateState>;
@@ -47,12 +57,34 @@ export interface RakazoDesktopUpdate {
   onPrepare?: (listener: () => boolean | Promise<boolean>) => () => void;
 }
 
+export interface DesktopUpdatePreferences {
+  channel: "stable" | "development";
+  supported: boolean;
+  autoDownload: boolean;
+  autoInstall: boolean;
+}
+
 export interface RakazoDesktopOAuthCallback {
   code: string;
   state?: string;
 }
 
 export interface RakazoDesktop {
+  servers?: { list(): Promise<{ servers: (DesktopSetup & { name: string })[]; current: string | null }>; manage(url?: string): Promise<void> };
+  companions?: {
+    state: () => Promise<DesktopCompanionPreferences>;
+    save: (value: DesktopCompanionPreferences) => Promise<DesktopCompanionPreferences>;
+    displays: () => Promise<{ id: number; label: string }[]>;
+    publish: (snapshot: DesktopCompanionSnapshot) => Promise<void>;
+    onSelect: (listener: (target: { scope: string; botId: string }) => void) => () => void;
+  };
+  /** Preferences of this computer. Older releases have no settings bridge. */
+  settings?: {
+    state: () => Promise<DesktopBehaviorSettings>;
+    update: (patch: Partial<DesktopBehaviorSettings>) => Promise<DesktopBehaviorSettings>;
+    fonts?: () => Promise<string[]>;
+    logo?: (png: string | null) => Promise<void>;
+  };
   localVoice?: {
     status: () => Promise<{ ready: boolean; preparing: boolean; downloaded: number; total: number; error?: string }>;
     prepare: () => Promise<void>;
@@ -130,6 +162,14 @@ export interface RakazoDesktop {
      */
     onCallback: (listener: (callback: RakazoDesktopOAuthCallback) => void) => () => void;
   };
+}
+
+export interface DesktopBehaviorSettings {
+  launchAtLogin: boolean | null;
+  keepRunningInBackground: boolean;
+  keepAwake: boolean | null;
+  keepAwakeOnBattery: boolean;
+  externalLinkTarget: "system" | "app";
 }
 
 export interface PreviewBounds {
@@ -220,6 +260,8 @@ export type DesktopSetupLink = "docker-desktop" | "orbstack" | "docker-engine";
  * narrower `rakazoDesktop` bridge so a connected server can never re-point the app.
  */
 export interface RakazoSetup {
+  servers?: () => Promise<(DesktopSetup & { name: string })[]>;
+  forgetServer?: (url: string) => Promise<(DesktopSetup & { name: string })[]>;
   /** Used only to reserve space for native window controls in the local setup UI. */
   platform: string;
   state: () => Promise<DesktopSetupState>;

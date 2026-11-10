@@ -7,13 +7,13 @@ const html = readFileSync(path.resolve("apps/desktop/src/setup.html"), "utf8");
 const script = readFileSync(path.resolve("apps/desktop/src/setup.js"), "utf8");
 const cloud = "https://www.mycellios.com/agent";
 
-async function mount(recovery = true) {
+async function mount(recovery = true, manager = false) {
   document.documentElement.innerHTML = new DOMParser().parseFromString(html, "text/html").documentElement.innerHTML;
   let onStackChange = () => {};
   const bridge = {
     platform: "win32",
     state: vi.fn(async () => ({
-      recovery, cloudUrl: cloud, defaultLocalUrl: "http://127.0.0.1:45173",
+      manager, recovery, cloudUrl: cloud, defaultLocalUrl: "http://127.0.0.1:45173",
       saved: { mode: "new", serverUrl: "http://127.0.0.1:45173" },
       error: "private connection diagnostic",
     })),
@@ -86,4 +86,12 @@ it("keeps explicit server configuration in Advanced", async () => {
   expect((document.querySelector("#mode-new") as HTMLInputElement).checked).toBe(true);
   expect(document.querySelector("#status")?.textContent).toBe("private connection diagnostic");
   expect(bridge.stack.start).not.toHaveBeenCalled();
+});
+
+it("keeps connected-server management simple without changing first-run recovery", async () => {
+ await mount(false, true);
+ expect(document.querySelector("#heading")?.textContent).toBe("Servidores");
+ expect(document.querySelector("fieldset")?.hidden).toBe(true);
+ expect(document.querySelector("#check")?.textContent).toBe("Comprobar conexión");
+ expect((document.querySelector("#server-name") as HTMLInputElement).maxLength).toBe(80);
 });

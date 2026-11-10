@@ -1,28 +1,41 @@
+import { DeviceVoiceSettings } from "./DeviceVoiceSettings";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
-import { Button } from "@rakazo/ui-web";
+import { BotAvatar, Button, OptionSelect } from "@rakazo/ui-web";
 import { useState } from "react";
 import { MobileInstallOffer, mobileInstallUrl } from "../../components/MobileInstallOffer";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { SkillLibrarySettings } from "../SkillLibrarySettings";
+import { setGeneralPreferences, useGeneralPreferences } from "../../lib/general-preferences";
 
 export function MicosSettingsPanel({
   bots = [],
   onOpen,
+  onModels,
 }: {
   bots?: Bot[];
   onOpen?: (id: string) => void;
   onSkills?: () => void;
+  onModels?: () => void;
 }) {
   const { t } = useLingui();
+  const value = useGeneralPreferences(); const [error, setError] = useState("");
   return (
-    <div className="space-y-6">
+    <div className="rk-settings-panel space-y-6">
+      <SettingsGroup title={t`Preferences`}>
+        <SettingsRow label={t`Models and connections`} description={t`Choose a provider once. Your Micos use it automatically.`}
+          control={<Button variant="outline" size="sm" disabled={!onModels} onClick={onModels}>{t`Manage`}</Button>} />
+        <SettingsRow label={t`Messages while a Mico works`} description={t`Choose the usual behavior. You can change it before sending a message.`}
+          control={<OptionSelect aria-label={t`Messages while a Mico works`} value={value.busyMessageMode}
+            className="w-48 max-w-full" options={[{ value: "queue", label: t`Next turn` }, { value: "steer", label: t`Current task` }]}
+            onValueChange={busyMessageMode => { try { setGeneralPreferences({ busyMessageMode: busyMessageMode as "queue" | "steer" }); setError(""); } catch { setError(t`Could not save this preference.`); } }} />} />
+      </SettingsGroup>
       <SettingsGroup title={t`Your Micos`}>
         {bots.length ? (
           bots.map((bot) => (
             <SettingsRow
               key={bot.id}
-              label={bot.name}
+              label={<span className="flex items-center gap-3"><BotAvatar color={bot.color} size={28} />{bot.name}</span>}
               control={
                 <Button
                   variant="outline"
@@ -31,15 +44,14 @@ export function MicosSettingsPanel({
                   onClick={() => onOpen?.(bot.id)}
                 >{t`Manage`}</Button>
               }
-            >
-              <p className="text-xs text-muted-foreground">{t`Open the chat to edit this Mico's instructions, tools and routine settings.`}</p>
-            </SettingsRow>
+            />
           ))
         ) : (
           <p className="px-4 py-3 text-sm text-muted-foreground">{t`No Micos in this space.`}</p>
         )}
       </SettingsGroup>
       <SkillLibrarySettings />
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
@@ -48,6 +60,7 @@ export function MobileSettingsPanel() {
   const [open, setOpen] = useState(false);
   const [copy, setCopy] = useState("");
   const url = mobileInstallUrl(window.location.origin);
+  const localOnly = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(url);
@@ -57,17 +70,16 @@ export function MobileSettingsPanel() {
     }
   }
   return (
-    <div className="space-y-6">
+    <div className="rk-settings-panel space-y-6">
       <SettingsGroup title={t`Mycellios on your phone`}>
         <SettingsRow
-          label={t`Use your existing account`}
+          label={localOnly ? t`Local preview` : t`Use your existing account`}
+          description={localOnly ? t`This address only opens on this computer. Use a reachable server address to connect a phone.` : t`Open Mycellios on your phone, sign in and add it to your Home Screen.`}
           control={
             <Button variant="outline" onClick={() => setOpen(true)}>{t`How to install`}</Button>
           }
-        >
-          <p className="text-sm text-muted-foreground">{t`Your chats and Micos follow your account. Open this link on iPhone or Android and add Mycellios to your Home Screen.`}</p>
-        </SettingsRow>
-        <SettingsRow
+        />
+        {!localOnly && <SettingsRow
           label={
             <a
               href={url}
@@ -85,7 +97,7 @@ export function MobileSettingsPanel() {
               onClick={() => void copyLink()}
             >{t`Copy link`}</Button>
           }
-        />
+        />}
       </SettingsGroup>
       {copy ? (
         <p role="status" className="text-sm text-muted-foreground">
@@ -100,21 +112,16 @@ export function MobileSettingsPanel() {
 export function VoiceEntryPanel({ onOpen }: { onOpen?: () => void }) {
   const { t } = useLingui();
   return (
-    <div className="mb-6">
-      <SettingsGroup title={t`Voice conversation`}>
+    <div className="rk-general-settings mb-6">
+      <DeviceVoiceSettings />
+      {onOpen && <SettingsGroup title={t`Voice conversation`}>
         <SettingsRow
           label={t`Talk with your Mico`}
           control={
             <Button variant="outline" disabled={!onOpen} onClick={onOpen}>{t`Open voice`}</Button>
           }
-        >
-          <p className="text-xs text-muted-foreground">
-            {onOpen
-              ? t`Desktop can prepare local speech models in the voice panel. Browser speech depends on your device. The services below are optional alternatives.`
-              : t`Select a Mico chat to start a voice conversation. You can manage voice services below.`}
-          </p>
-        </SettingsRow>
-      </SettingsGroup>
+        />
+      </SettingsGroup>}
     </div>
   );
 }

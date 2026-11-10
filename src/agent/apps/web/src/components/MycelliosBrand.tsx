@@ -4,6 +4,7 @@ import { appPath } from "../lib/app-path";
 export function MycelliosWordmark({ compact = false }: { compact?: boolean }) {
   return (
     <span role="img" className="inline-flex items-center gap-2.5" aria-label={productBrand.name}>
+      <span className="rk-personal-logo inline-flex size-[26px] shrink-0">
       <img
         src={appPath(productBrand.markPath)}
         alt=""
@@ -11,6 +12,7 @@ export function MycelliosWordmark({ compact = false }: { compact?: boolean }) {
         height={26}
         className="size-[26px] rounded-full object-contain"
       />
+      </span>
       {!compact && (
         <span className="flex items-baseline gap-2">
           <span className="font-display text-[23px] font-medium tracking-[-0.025em]">Mycellios</span>

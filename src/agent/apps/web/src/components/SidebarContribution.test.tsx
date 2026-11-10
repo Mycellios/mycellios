@@ -2,8 +2,9 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { beforeEach, expect, it, vi } from "vitest";
-const f = vi.hoisted(() => ({ status: vi.fn(), control: vi.fn(), enrollment: vi.fn(), native: vi.fn(), enroll: vi.fn(), identify: vi.fn(), bridge: vi.fn() }));
+const f = vi.hoisted(() => ({ status: vi.fn(), control: vi.fn(), enrollment: vi.fn(), native: vi.fn(), enroll: vi.fn(), identify: vi.fn(), bridge: vi.fn(), capabilities: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ rpc: { models: { contributionStatus: f.status, contributionControl: f.control, contributionEnrollment: f.enrollment } } }));
+vi.mock("../lib/auth-capabilities", () => ({ fetchAuthCapabilities: f.capabilities }));
 vi.mock("../lib/desktop", () => ({ desktopBridge: f.bridge }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
 vi.mock("@rakazo/ui-web", () => ({ Button: (props: object) => <button {...props} />, buttonVariants: () => "" }));
@@ -11,14 +12,15 @@ import { SidebarContribution } from "./SidebarContribution";
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   for (const mock of Object.values(f)) mock.mockReset();
+  f.capabilities.mockResolvedValue({ sso: { name: "Mycellios", availability: "available" } });
   f.bridge.mockReturnValue({ runtime: { status: f.native, enroll: f.enroll, identify: f.identify } });
   f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
   f.status.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: false, pending: null, rejected: false });
   f.control.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: false, pending: "resume", rejected: false });
 });
-async function rendered(check: (host: HTMLDivElement) => Promise<void>, mini = false) {
+async function rendered(check: (host: HTMLDivElement) => Promise<void> | void, mini = false, expanded = false) {
   const host = document.createElement("div"); document.body.append(host); const root = createRoot(host);
-  try { await act(async () => root.render(<SidebarContribution mini={mini} />)); await check(host); }
+  try { await act(async () => root.render(<SidebarContribution mini={mini} expanded={expanded} activationLabel={expanded ? "Activate contribution" : undefined} />)); await check(host); }
   finally { await act(async () => root.unmount()); host.remove(); }
 }
 it("does not start compute on mount; starts the existing identity only after a click", async () => {
@@ -26,7 +28,7 @@ it("does not start compute on mount; starts the existing identity only after a c
     expect(f.control).not.toHaveBeenCalled(); expect(f.enrollment).not.toHaveBeenCalled();
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
-    expect(host.textContent).toContain("Waiting for this computer");
+    expect(host.textContent).toContain("Activating…");
     expect(host.querySelector("button")!.disabled).toBe(true);
   });
 });
@@ -56,7 +58,7 @@ it("does not offer a Desktop download inside the native app", async () => {
 it("pauses confirmed contribution without inventing an earned balance", async () => {
   f.status.mockResolvedValue({ nodeId: "same-node", connected: true, enabled: true, pending: null, rejected: false });
   await rendered(async host => {
-    expect(host.textContent).toContain("Pause contribution");
+    expect(host.textContent).toContain("Pause");
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "pause" });
   });
@@ -89,7 +91,7 @@ it("verifies the existing installation before offering a separate start action",
     expect(f.enrollment).not.toHaveBeenCalled();
     expect(f.enroll).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
     f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
@@ -103,7 +105,7 @@ it("keeps verification read-only when another process has already repaired the i
     await act(async () => host.querySelector("button")!.click());
     expect(f.identify).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
   });
 });
 
@@ -142,7 +144,7 @@ it("refreshes a rejected command instead of replaying its effect", async () => {
     expect(host.querySelector("button")!.textContent).toContain("Retry");
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
   });
 });
 it("keeps a newly enrolled contributor running instead of immediately pausing it", async () => {
@@ -154,7 +156,7 @@ it("keeps a newly enrolled contributor running instead of immediately pausing it
     expect(f.enroll).not.toHaveBeenCalled();
     await act(async () => host.querySelector("button")!.click());
     expect(f.enrollment).toHaveBeenCalledOnce(); expect(f.enroll).toHaveBeenCalledOnce();
-    expect(f.control).not.toHaveBeenCalled(); expect(host.textContent).toContain("Pause contribution");
+    expect(f.control).not.toHaveBeenCalled(); expect(host.textContent).toContain("Pause");
   });
 });
 it("honors a click during a slow refresh and ignores its later stale result", async () => {
@@ -164,7 +166,7 @@ it("honors a click during a slow refresh and ignores its later stale result", as
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
     await act(async () => finish({ nodeId: "same-node", connected: true, enabled: true, pending: null, rejected: false }));
-    expect(host.textContent).toContain("Waiting for this computer");
+    expect(host.textContent).toContain("Activating…");
   });
 });
 
@@ -175,9 +177,9 @@ it("does not pause an already active contributor when its first status read is s
   await rendered(async host => {
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.textContent).toContain("Pause contribution");
+    expect(host.textContent).toContain("Pause");
     await act(async () => finish({ nodeId: "same-node", connected: true, enabled: false, pending: null, rejected: false }));
-    expect(host.textContent).toContain("Pause contribution");
+    expect(host.textContent).toContain("Pause");
   });
 });
 
@@ -189,7 +191,7 @@ it("can request resume before the first worker observation instead of requiring 
   await rendered(async host => {
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
-    expect(host.textContent).toContain("Waiting for this computer");
+    expect(host.textContent).toContain("Activating…");
   });
 });
 
@@ -199,6 +201,63 @@ it("never resumes a node when the user requested pause and it is already paused"
   await rendered(async host => {
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Earn with your computer");
+    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
   });
+});
+
+it("offers the browser path without polling or controlling a native node on a password-only Dev server", async () => {
+  f.capabilities.mockResolvedValue({ sso: null, mycelliosAccount: false });
+  await rendered(async host => {
+    expect(f.native).not.toHaveBeenCalled();
+    expect(f.status).not.toHaveBeenCalled();
+    expect(f.control).not.toHaveBeenCalled();
+    expect(f.enrollment).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(host.textContent).toContain("Contribute in your browser while this page stays open.");
+    expect(host.querySelector('[aria-label="Contribute in browser"]')).not.toBeNull();
+    const dashboard = host.querySelector<HTMLAnchorElement>('a[href*="dashboard"]')!;
+    expect(dashboard.target).toBe("_blank");
+    expect(dashboard.rel).toContain("noopener");
+  });
+});
+
+it("exposes one direct contribution control without a disclosure", async () => {
+ f.capabilities.mockResolvedValue({ sso: null });
+ await rendered(host => {
+   expect(host.querySelector("details")).toBeNull();
+   expect(host.querySelector('[aria-label="Contribute in browser"]')?.textContent).toContain("Contribute");
+   expect(f.control).not.toHaveBeenCalled();
+ });
+});
+
+it("offers explicit activation in voice without a second disclosure or automatic compute", async () => {
+ await rendered(async host => {
+   expect(host.querySelector("details")).toBeNull();
+   expect(host.querySelector('button[aria-label="Activate contribution"]')).not.toBeNull();
+   expect(f.control).not.toHaveBeenCalled(); expect(f.enrollment).not.toHaveBeenCalled();
+   await act(async()=>host.querySelector<HTMLButtonElement>("button")!.click());
+   expect(f.control).toHaveBeenCalledExactlyOnceWith({nodeId:"same-node",action:"resume"});
+ }, false, true);
+});
+
+it("shows the warm activity indicator only for a connected, confirmed contributor", async () => {
+ await rendered(async host => {
+  expect(document.body.dataset.mycelliosContributing).not.toBe("true");
+  await act(async()=>host.querySelector<HTMLButtonElement>("button")!.click());
+  expect(document.body.dataset.mycelliosContributing).not.toBe("true");
+ });
+ f.status.mockResolvedValue({nodeId:"same-node",connected:true,enabled:true,pending:null,rejected:false});
+ await rendered(host=>{expect(host.querySelector('[data-active="true"]')).not.toBeNull(); expect(document.body.dataset.mycelliosContributing).toBe("true");});
+ expect(document.body.dataset.mycelliosContributing).toBe("false");
+ f.status.mockResolvedValue({nodeId:"same-node",connected:false,enabled:true,pending:null,rejected:false});
+ await rendered(()=>expect(document.body.dataset.mycelliosContributing).not.toBe("true"));
+});
+
+it("clears the activity indicator when a previously active node cannot be verified", async () => {
+ vi.useFakeTimers(); f.status.mockResolvedValueOnce({nodeId:"same-node",connected:true,enabled:true,pending:null,rejected:false}).mockRejectedValue(Error("offline"));
+ try {await rendered(async()=>{
+  expect(document.body.dataset.mycelliosContributing).toBe("true");
+  await act(async()=>vi.advanceTimersByTimeAsync(10000));
+  expect(document.body.dataset.mycelliosContributing).toBe("false");
+ });}finally{vi.useRealTimers();}
 });

@@ -10,6 +10,7 @@ vi.mock("@rakazo/ui-web", () => ({ BotAvatar: () => <span />, Button: ({ variant
 vi.mock("../../lib/dictation", () => ({ webSpeechAvailable: () => true, dictation: { listen: audio.listen, stop: audio.stop, subscribe: () => () => {} } }));
 vi.mock("../../lib/tts", () => ({ browserSpeechAvailable: () => true, speaker: { speak: audio.speak, stop: audio.silence, subscribe: () => () => {} } }));
 vi.mock("../../lib/call-session", () => ({ endCall: vi.fn() }));
+vi.mock("../SidebarContribution", () => ({ SidebarContribution: ({activationLabel}: {activationLabel?:string}) => <button>{activationLabel}</button> }));
 import { VoiceConversation } from "./VoiceConversation";
 
 let root: ReturnType<typeof createRoot> | undefined;
@@ -67,4 +68,21 @@ it("shows a microphone error and restarts capture without resending a message", 
   expect(host.querySelector("[role=alert]")).toBeNull();
   expect(audio.listen).toHaveBeenCalledTimes(2);
   expect(send).not.toHaveBeenCalled();
+});
+
+it("prepares local models once and never starts the microphone after the panel closes", async () => {
+ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+ let complete!: ()=>void;
+ const prepare = vi.fn(()=>new Promise<void>(resolve=>{complete=resolve;}));
+ const native={status:vi.fn(async()=>({ready:false,preparing:false,downloaded:0,total:200})),prepare,stop:vi.fn(async()=>{})};
+ Object.defineProperty(window,"rakazoDesktop",{configurable:true,value:{localVoice:native}});
+ const get=vi.fn(); const host=document.createElement("div");root=createRoot(host);
+ try {
+  await act(async()=>root!.render(<VoiceConversation rpc={{threads:{get}} as unknown as RpcClient} bot={{id:"mico",name:"Mico",color:"#3F9F78"}} onClose={()=>{}} onSettings={()=>{}} />));
+  const activate=[...host.querySelectorAll("button")].find(b=>b.textContent==="Activate local voice")!;
+  await act(async()=>{activate.click();activate.click();}); expect(prepare).toHaveBeenCalledOnce();
+  await act(async()=>root!.unmount());root=undefined;
+  await act(async()=>complete()); expect(get).not.toHaveBeenCalled(); expect(audio.listen).not.toHaveBeenCalled();
+  expect(native.stop).toHaveBeenCalled();
+ } finally {delete window.rakazoDesktop;}
 });

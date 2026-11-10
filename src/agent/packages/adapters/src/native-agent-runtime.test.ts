@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -120,6 +120,8 @@ describe("native agent protocol integration", () => {
       );
       const [capture] = test.onCheckpoint.mock.calls[0]!;
       const saved = restoreTurnCheckpoint(capture(), test.request.model);
+      expect(saved.systemPrompt).toContain("Mycellios conversation style:");
+      expect(saved.systemPrompt).toContain(test.request.instructions);
       expect(saved.messages.at(-1)).toMatchObject({
         role: "assistant",
         content: [{ type: "toolCall", name: "read_file" }],
@@ -249,4 +251,32 @@ it.each(['codex','claude','acp'] as const)('waits for the actual background resu
  expect(test.executeTool).toHaveBeenCalledOnce();
  expect(events.filter(e=>e.type==='turn')).toHaveLength(1);
  expect(events.some(e=>e.type==='done')).toBe(true);
+});
+
+it("forwards the saved model, effort and Fast tier through Codex turn/start", async () => {
+  const test = await setup("codex", ["--fixture-fast"]);
+  test.request.nativeConfig = { modelId: "fixture-model", thinkingLevel: "medium", fastMode: true };
+  const events = [];
+  for await (const event of test.runtime.run(test.request, test.context)) events.push(event);
+  expect(test.executeTool).toHaveBeenCalledOnce();
+  expect(events.some(event => event.type === "done")).toBe(true);
+});
+
+
+it("starts a fresh native session after a new-chat context change and keeps the workspace", async () => {
+  const logRoot = await mkdtemp(join(tmpdir(), "mycellios-new-chat-")); roots.push(logRoot);
+  const log = join(logRoot, "protocol.log");
+  const test = await setup("codex", ["--protocol-log", log]);
+  const consume = async () => { for await (const _event of test.runtime.run(test.request, test.context)) { /* fixture protocol */ } };
+  await consume();
+  const directories = await readdir(join(test.dataDir, "native-agents"));
+  const workspace = join(test.dataDir, "native-agents", directories[0]!);
+  await writeFile(join(workspace, "kept-note.txt"), "Workspace survives");
+  await writeFile(log, ""); await consume();
+  expect(await readFile(log, "utf8")).toContain("thread/resume");
+  test.request.instructions += "\nConversation context begins at sequence 42. Earlier chat messages are outside this conversation; persistent memories and workspace files remain available.";
+  await writeFile(log, ""); await consume();
+  const calls = await readFile(log, "utf8");
+  expect(calls).toContain("thread/start"); expect(calls).not.toContain("thread/resume");
+  expect(await readFile(join(workspace, "kept-note.txt"), "utf8")).toBe("Workspace survives");
 });

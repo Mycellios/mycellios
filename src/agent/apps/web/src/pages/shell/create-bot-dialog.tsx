@@ -15,6 +15,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Disclosure,
   Input,
   OptionSelect,
   Textarea,
@@ -109,7 +110,7 @@ export function CreateBotDialog({
   inline?: boolean;
 }) {
   const { t } = useLingui();
-  const nameRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLTextAreaElement>(null);
   const id = useId();
   const [name, setName] = useState(inline ? productBrand.companionName : "");
   const [description, setDescription] = useState("");
@@ -117,14 +118,15 @@ export function CreateBotDialog({
   const [model, setModel] = useState<CreateBotInput["model"]>();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const trimmed = name.trim();
+  const [reviewing, setReviewing] = useState(false);
+  const trimmed = name.trim() || (description.trim() ? productBrand.companionName : "");
 
   async function create() {
     if (!trimmed || submitting) return;
     setError(null);
     setSubmitting(true);
     try {
-      const profile = normalizeCreateBotProfile({ name, title: "", description });
+      const profile = normalizeCreateBotProfile({ name: trimmed, title: "", description });
       await onCreate({
         name: profile.name,
         ...(look ? { color: look } : {}),
@@ -166,24 +168,14 @@ export function CreateBotDialog({
           <BotLookPicker compact value={look} onAutomatic={() => setLook("")} onChange={setLook} />
           <fieldset disabled={submitting} className="grid min-w-0 gap-3">
             <div className="grid gap-1.5">
-              <label htmlFor={`${id}-name`} className="text-xs font-medium"><Trans>Name</Trans> <span aria-hidden>*</span></label>
-              <Input
-                id={`${id}-name`}
-                ref={nameRef}
-                required
-                placeholder={t`Name your Bot`}
-                value={name}
-                maxLength={BOT_NAME_MAX_LENGTH}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-            <div className="grid gap-1.5">
               <label htmlFor={`${id}-description`} className="text-xs font-medium">
                 <Trans id="create-mico.purpose">What should this Mico help with?</Trans>
               </label>
               <Textarea
                 id={`${id}-description`}
-                rows={2}
+                ref={nameRef}
+                autoFocus
+                rows={3}
                 className="max-h-32"
                 value={description}
                 maxLength={BOT_DESCRIPTION_MAX_LENGTH}
@@ -191,7 +183,22 @@ export function CreateBotDialog({
                 onChange={(event) => setDescription(event.target.value)}
               />
             </div>
-            {me ? <CreateBotModelPicker me={me} model={model} onChange={setModel} /> : null}
+            <div className="grid gap-1.5">
+              <label htmlFor={`${id}-name`} className="text-xs font-medium"><Trans>Name</Trans></label>
+              <Input
+                id={`${id}-name`}
+                required={!description.trim()}
+                placeholder={t`Name your Bot`}
+                value={name}
+                maxLength={BOT_NAME_MAX_LENGTH}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </div>
+            {me ? <Disclosure summary={t`Model · automatic`}><CreateBotModelPicker me={me} model={model} onChange={setModel} /></Disclosure> : null}
+            {description.trim() ? <Disclosure summary={t`Review instructions`} open={reviewing} onOpenChange={setReviewing}>
+              <p className="whitespace-pre-wrap text-sm">{normalizeCreateBotProfile({ name, title: "", description }).instructions}</p>
+              <p className="mt-2 text-xs text-muted-foreground">{t`These instructions will be saved when you create the Mico. You can edit them later.`}</p>
+            </Disclosure> : null}
           </fieldset>
           {error ? (
             <p role="alert" data-testid="create-bot-error" className="text-[13px] text-destructive">

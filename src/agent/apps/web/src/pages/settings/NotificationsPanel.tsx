@@ -1,6 +1,8 @@
+import { SoundSettings } from "./SoundSettings";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, NotificationSettings } from "@rakazo/contracts";
 import { Button, Label, Switch } from "@rakazo/ui-web";
+import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { rpc } from "../../lib/rpc";
@@ -133,15 +135,8 @@ export function NotificationsPanel({
     }
   }
   return (
-    <div className="space-y-6">
+    <div className="rk-general-settings space-y-6">
       <SettingsGroup title={t`This device`}>
-        {push?.registered && <SettingsRow
-          label={<Label htmlFor={`${id}-push-attention`}>{t`Push alerts only when I’m needed`}</Label>}
-          control={<Switch id={`${id}-push-attention`} checked={push.settings.level === "needs_me"}
-            disabled={busy !== null} onCheckedChange={(on) => void savePushSettings({ level: on ? "needs_me" : "all" })} />}
-        >
-          <p className="text-xs text-muted-foreground">{t`Applies to all devices where you enabled closed-app notifications.`}</p>
-        </SettingsRow>}
         <SettingsRow
           label={<Label htmlFor={`${id}-enabled`}>{t`Reply notifications`}</Label>}
           control={
@@ -157,21 +152,6 @@ export function NotificationsPanel({
             ? t`Receive alerts on this device even when Mycellios is closed. They open the corresponding chat.`
             : t`Notify you about Mico replies while this app is open in the background.`}</p>
         </SettingsRow>
-        <SettingsRow
-          label={<Label htmlFor={`${id}-attention`}>{t`Only when I’m needed`}</Label>}
-          control={<Switch id={`${id}-attention`} checked={value.attentionOnly}
-            disabled={!value.enabled} onCheckedChange={(attentionOnly) => save({ attentionOnly })} />}
-        >
-          <p className="text-xs text-muted-foreground">{t`Get notified when a Mico needs your answer or approval.`}</p>
-        </SettingsRow>
-        <SettingsRow
-          label={t`Pause notifications`}
-          control={<Button variant="outline" size="sm" disabled={!value.enabled}
-            onClick={() => {
-              setNow(Date.now());
-              save({ mutedUntil: paused ? 0 : Date.now() + 3_600_000 });
-            }}>{paused ? t`Resume notifications` : t`Pause for 1 hour`}</Button>}
-        />
         <SettingsRow
           label={<Label htmlFor={`${id}-preview`}>{t`Show message previews`}</Label>}
           control={
@@ -197,7 +177,7 @@ export function NotificationsPanel({
             />
           }
         />
-        <SettingsRow
+        {permission !== "granted" && <SettingsRow
           label={t`System permission`}
           control={
             permission === "default" ? (
@@ -226,6 +206,7 @@ export function NotificationsPanel({
                 : t`Permission is requested only when you choose to enable notifications.`}
           </p>
         </SettingsRow>
+        }
         {permission === "granted" ? (
           <SettingsRow
             label={t`Test notification`}
@@ -240,7 +221,35 @@ export function NotificationsPanel({
           />
         ) : null}
       </SettingsGroup>
-      <SettingsGroup title={t`Micos in this space`}>
+      <SoundSettings />
+      <Disclosure summary={t`More notification settings`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground">
+        <SettingsGroup>
+        <SettingsRow
+          label={<Label htmlFor={`${id}-attention`}>{t`Only when I’m needed`}</Label>}
+          control={<Switch id={`${id}-attention`} checked={value.attentionOnly}
+            disabled={!value.enabled} onCheckedChange={(attentionOnly) => save({ attentionOnly })} />}
+        >
+          <p className="text-xs text-muted-foreground">{t`Get notified when a Mico needs your answer or approval.`}</p>
+        </SettingsRow>
+        <SettingsRow
+          label={t`Pause notifications`}
+          control={<Button variant="outline" size="sm" disabled={!value.enabled}
+            onClick={() => {
+              setNow(Date.now());
+              save({ mutedUntil: paused ? 0 : Date.now() + 3_600_000 });
+            }}>{paused ? t`Resume notifications` : t`Pause for 1 hour`}</Button>}
+        />
+        {push?.registered && <SettingsRow
+          label={<Label htmlFor={`${id}-push-attention`}>{t`Push alerts only when I’m needed`}</Label>}
+          control={<Switch id={`${id}-push-attention`} checked={push.settings.level === "needs_me"}
+            disabled={busy !== null} onCheckedChange={(on) => void savePushSettings({ level: on ? "needs_me" : "all" })} />}
+        >
+          <p className="text-xs text-muted-foreground">{t`Applies to all devices where you enabled closed-app notifications.`}</p>
+        </SettingsRow>}
+        </SettingsGroup>
+      </Disclosure>
+      <Disclosure summary={t`Notifications by Mico`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground">
+      <SettingsGroup>
         {bots.length ? (
           bots.map((bot) => (
             <SettingsRow
@@ -260,6 +269,7 @@ export function NotificationsPanel({
           <p className="px-4 py-3 text-sm text-muted-foreground">{t`No Micos in this space.`}</p>
         )}
       </SettingsGroup>
+      </Disclosure>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

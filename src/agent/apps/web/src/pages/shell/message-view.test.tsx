@@ -51,13 +51,14 @@ function renderMessage(
   blocks: ThreadMessage["blocks"],
   peerBot: PeerBot,
   mentions?: ReturnType<typeof planner>[],
+  options: { id?: string; showFullText?: boolean; textWasStreamed?: boolean; role?: ThreadMessage["role"] } = {},
 ) {
   const onOpenBot = vi.fn();
   const message: ThreadMessage = {
-    id: "message",
+    id: options.id ?? "message",
     threadId: "thread",
     seq: 1,
-    role: "bot",
+    role: options.role ?? "bot",
     createdAt: new Date().toISOString(),
     blocks,
   };
@@ -82,6 +83,8 @@ function renderMessage(
         onSpeak={vi.fn()}
         onOpenComputer={vi.fn()}
         showToolActivity={false}
+        showFullText={options.showFullText}
+        textWasStreamed={options.textWasStreamed}
         onReply={vi.fn()}
         onMarkUnread={vi.fn()}
         onReact={vi.fn()}
@@ -89,7 +92,7 @@ function renderMessage(
     ),
   );
   const mention = container.querySelector<HTMLElement>('[data-testid="bot-mention"]')!;
-  act(() => mention.click());
+  if (mention) act(() => mention.click());
   return { mention, onOpenBot };
 }
 
@@ -147,4 +150,42 @@ it("names the bot once across a reply's text blocks", () => {
   expect(container.querySelectorAll('[data-testid="bot-mention"]')).toHaveLength(1);
   expect(container.textContent).toContain("Setting up.");
   expect(container.textContent).toContain("Planner is ready.");
+});
+
+it("folds a long plain assistant answer and expands it without losing its ending", () => {
+  const text = "A useful complete paragraph. ".repeat(1000) + "Final finding.";
+  renderMessage([{ kind: "text", text }], missingBot);
+  const more = [...container.querySelectorAll("button")].find(button => button.textContent === "Show more")!;
+  expect(more.getAttribute("aria-expanded")).toBe("false");
+  expect(container.textContent).not.toContain("Final finding.");
+  act(() => more.click());
+  expect(more.getAttribute("aria-expanded")).toBe("true");
+  expect(container.textContent).toContain("Final finding.");
+  expect(more.textContent).toBe("Show less");
+});
+
+it("does not fold or hold back a long answer while it is streaming", () => {
+  const text = "Streaming words. ".repeat(1500);
+  renderMessage([{ kind: "progress", text }], missingBot, undefined, { id: "progress:run" });
+  expect(container.textContent).toContain(text.trim());
+  expect(container.textContent).not.toContain("Show more");
+});
+
+it("reveals the full answer for a search or quote jump", () => {
+  renderMessage([{ kind: "text", text: "Searchable answer. ".repeat(1500) }], missingBot, undefined, { showFullText: true });
+  expect(container.textContent).not.toContain("Show more");
+});
+
+it("keeps a streamed reply expanded after completion and lets the reader fold it", () => {
+  renderMessage([{ kind: "text", text: "Watched while streaming. ".repeat(1000) }], missingBot, undefined, { textWasStreamed: true });
+  const less = [...container.querySelectorAll("button")].find(button => button.textContent === "Show less")!;
+  expect(less.getAttribute("aria-expanded")).toBe("true");
+  act(() => less.click());
+  expect(less.textContent).toBe("Show more");
+});
+
+it("keeps an exact short answer exact without appending headings or tool activity", () => {
+  renderMessage([{ kind: "text", text: "Listo" }], missingBot);
+  expect(container.querySelector('[data-testid="message-bot-bubble"]')?.textContent).toBe("Listo");
+  expect(container.querySelector('[data-testid="tool-activity"]')).toBeNull();
 });

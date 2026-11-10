@@ -1,3 +1,4 @@
+import { useGeneralPreferences } from "../../lib/general-preferences";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { MessageReaction, ThreadMessage } from "@rakazo/contracts";
 import { canReactToThreadMessage, MESSAGE_REACTIONS } from "@rakazo/contracts";
@@ -13,7 +14,7 @@ import {
   PopoverTrigger,
 } from "@rakazo/ui-web";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@rakazo/ui-web/components/ui/sheet";
-import { Copy, MessageSquareDot, MoreHorizontal, Reply, Smile, X } from "lucide-react";
+import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Reply, Smile, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MessageHoverMetadata } from "../../components/MessageHoverMetadata";
 import { copyableMessageText } from "../../lib/message-text";
@@ -23,6 +24,7 @@ type MessageActions = {
   onReply: (message: ThreadMessage) => void;
   onMarkUnread: (message: ThreadMessage) => void;
   markedUnread?: boolean;
+  onAddRoutine?: (name: string, prompt: string) => void;
   onReact: (message: ThreadMessage, reaction: MessageReaction) => Promise<void>;
 };
 
@@ -32,7 +34,7 @@ function copyMessage(message: ThreadMessage) {
 }
 
 export function MessageTouchActions({
-  message, onReply, onMarkUnread, markedUnread, onReact, children,
+  message, onReply, onMarkUnread, markedUnread, onReact, onAddRoutine, children,
 }: MessageActions & { children: ReactNode }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
@@ -98,6 +100,7 @@ export function MessageTouchActions({
         ) : null}
         <div className="flex flex-col [&_button]:min-h-12 [&_button]:justify-start">
           <SheetClose render={<Button variant="ghost" />} onClick={() => onReply(message)}><Reply />{t`Reply`}</SheetClose>
+          {onAddRoutine && message.role === "user" && copyableMessageText(message) ? <SheetClose render={<Button variant="ghost" />} onClick={() => onAddRoutine(copyableMessageText(message).slice(0, 80), copyableMessageText(message))}><Repeat2 />{t`Repeat automatically`}</SheetClose> : null}
           {copyableMessageText(message) ? <SheetClose render={<Button variant="ghost" />} onClick={() => copyMessage(message)}><Copy />{t`Copy`}</SheetClose> : null}
           {canMarkMessageUnread(message) && !markedUnread ? (
             <SheetClose render={<Button variant="ghost" />} onClick={() => onMarkUnread(message)}><MessageSquareDot />{t`Mark as unread`}</SheetClose>
@@ -115,8 +118,10 @@ export function MessageHoverActions({
   onMarkUnread,
   markedUnread = false,
   onReact,
+  onAddRoutine,
 }: MessageActions & { side: "start" | "end" }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
+  const { compactMessageActions } = useGeneralPreferences();
   const [moreOpen, setMoreOpen] = useState(false);
   const [reactionsOpen, setReactionsOpen] = useState(false);
 
@@ -129,6 +134,7 @@ export function MessageHoverActions({
 
   return (
     <MessageHoverMetadata pinned={moreOpen || reactionsOpen} side={side}>
+      {!compactMessageActions && <time className="text-xs text-muted-foreground" dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleTimeString(i18n.locale || "en", { hour: "2-digit", minute: "2-digit" })}</time>}
       <div data-testid="message-hover-actions" className="flex items-center gap-0.5">
         {canReactToThreadMessage(message) ? (
           <Popover open={reactionsOpen} onOpenChange={setReactionsOpen}>
@@ -190,6 +196,9 @@ export function MessageHoverActions({
                 <Trans>Mark as unread</Trans>
               </DropdownMenuItem>
             ) : null}
+            {onAddRoutine && message.role === "user" && copyableMessageText(message) ? <DropdownMenuItem onClick={() => { setMoreOpen(false); onAddRoutine(copyableMessageText(message).slice(0, 80), copyableMessageText(message)); }}>
+              <Repeat2 size={14} /><Trans>Repeat automatically</Trans>
+            </DropdownMenuItem> : null}
             <DropdownMenuItem onClick={() => copyMessage(message)}>
               <Copy size={14} strokeWidth={1.7} />
               <Trans>Copy</Trans>

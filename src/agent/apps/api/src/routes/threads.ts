@@ -1,3 +1,4 @@
+import { resetThreadContext, ThreadContextBusyError } from "@rakazo/db";
 import { answerSideQuestion } from "../side-question.js";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@rakazo/adapter-kit";
@@ -203,6 +204,19 @@ export function threadsRoutes(ctx: RouterContext) {
           void follow.return(undefined).catch(() => {});
         }
       }),
+      queue: authed.threads.queue.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        const rows = await deps.prisma.steeringMessage.findMany({
+          where: { runId: null, originTrigger: "queued_user", message: { threadId: target.threadId }, ...(target.kind === "bot" ? { botId: target.botId } : {}) },
+          include: { message: { select: { id: true, blocks: true, createdAt: true } } },
+          orderBy: [{ message: { seq: "asc" } }, { id: "asc" }], take: 50,
+        });
+        const seen = new Set<string>();
+        return rows.filter(row => { if (seen.has(row.messageId)) return false; seen.add(row.messageId); return true; }).map(row => ({
+          messageId: row.message.id, createdAt: row.message.createdAt.toISOString(),
+          text: (row.message.blocks as Array<{ kind: string; text?: string }>).filter(block => block.kind === "text").map(block => block.text ?? "").join("\n").slice(0, 1000),
+        }));
+      }),
       send: authed.threads.send.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         await admitMicoTaskComputer(deps.sandbox,context.actor,target);
@@ -269,6 +283,20 @@ export function threadsRoutes(ctx: RouterContext) {
         await stopThreadRuns(deps, context.actor, target);
         await stopWorkForThread(deps, context.actor, target.threadId);
         return { ok: true as const };
+      }),
+      newChat: authed.threads.newChat.handler(async ({ context, input }) => {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind !== "bot") throw new ORPCError("BAD_REQUEST");
+        try {
+          const result = await resetThreadContext(deps.prisma, context.actor, {
+            threadId: target.threadId, botId: target.botId, clientNonce: input.clientNonce,
+          });
+          if (result.eventSeq !== null) await deps.events.notify(target.threadId, result.eventSeq).catch(() => undefined);
+          return { ok: true as const };
+        } catch (error) {
+          if (error instanceof ThreadContextBusyError) throw new ORPCError("CONFLICT", { message: error.message });
+          throw error;
+        }
       }),
       clear: authed.threads.clear.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);

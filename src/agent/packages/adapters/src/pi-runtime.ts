@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { withConversationStyle } from "./conversation-style.js";
 import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation } from "./work-continuation.js";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
@@ -153,19 +154,6 @@ function compactionBudgetFor(botId: string, threadId: string): CompactionBudget 
   }
   return budget;
 }
-/**
- * Mirrors the Claude Code tone rules OpenBot inherits: brevity and tool-call
- * punctuation are part of the system prompt, not a post-processing pass.
- */
-const TONE_AND_STYLE = [
-  "Tone and style:",
-  "- Your responses should be short and concise.",
-  "- Lead with the result. Do not repeat the question or narrate what you are about to do.",
-  "- Only use emojis if the user explicitly requests it.",
-  "- Do not use a colon before tool calls. End that sentence with a period.",
-  "- When referencing code, use file_path:line_number.",
-  "- Use a long structured report only when the user explicitly asks for an analysis, comparison, or audit.",
-].join("\n");
 const FILE_EDIT_GUIDANCE = [
   "File changes:",
   "- Read only the lines you need; pass offset and limit to read_file on a large file.",
@@ -464,9 +452,7 @@ export class PiAgentRuntime implements AgentRuntime {
             (request.allowSilentEmpty || request.script
               ? fallbackPrompt
               : withLiveTurnNarration(fallbackPrompt)));
-        const withTone = baseSystemPrompt.includes("Tone and style:")
-          ? baseSystemPrompt
-          : `${baseSystemPrompt}\n\n${TONE_AND_STYLE}`;
+        const withTone = withConversationStyle(baseSystemPrompt);
         const systemPrompt =
           toolDefs.some((tool) => tool.name === "edit_file") && !withTone.includes("File changes:")
             ? `${withTone}\n\n${FILE_EDIT_GUIDANCE}`
@@ -475,7 +461,7 @@ export class PiAgentRuntime implements AgentRuntime {
         let piSession: PiSessionHandle | undefined;
         // Never write an unscoped transcript. Production requests carry userId;
         // callers without an authenticated context simply skip optional recording.
-        if (this.sessionRecorder && context?.userId) {
+        if (this.sessionRecorder && context?.userId && !request.ephemeral) {
           try {
             piSession = await this.sessionRecorder.start({
               runId: request.runId,

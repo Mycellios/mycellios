@@ -1,3 +1,5 @@
+import { useGeneralPreferences } from "../../lib/general-preferences";
+import { NewChatDivider } from "../../components/composer/NewChatDivider";
 import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
 import type { MessageReaction, ThreadMessage, Run } from "@rakazo/contracts";
@@ -146,7 +148,9 @@ export const Transcript = memo(function Transcript({
   onOpenImport?: () => void;
 }) {
   const { t } = useLingui();
-  const compactMessages = useIsMobile();
+  const touchLayout = useIsMobile();
+  const { compactMessageActions } = useGeneralPreferences();
+  const compactMessages = touchLayout && compactMessageActions;
   const contentRef = useRef<HTMLDivElement>(null);
   const [atEnd, setAtEnd] = useState(true);
   const following = useRef(true);
@@ -183,6 +187,19 @@ export const Transcript = memo(function Transcript({
     () => new Map(messages.map((message) => [message.id, message])),
     [messages],
   );
+  // A reply the reader watched arrive must not shrink when its durable message replaces progress.
+  // Keys include the thread; the bounded set never changes another conversation's presentation.
+  const [streamedTextRuns, setStreamedTextRuns] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    const live = messages.filter(message => message.runId && message.id.startsWith("progress:") &&
+      message.blocks.some(block => (block.kind === "text" || block.kind === "progress") && block.text.trim() && !("activity" in block && block.activity)));
+    if (!live.length) return;
+    setStreamedTextRuns(previous => {
+      const keys = live.map(message => `${message.threadId}:${message.runId}`);
+      if (keys.every(key => previous.has(key))) return previous;
+      return new Set([...previous, ...keys].slice(-128));
+    });
+  }, [messages]);
   const mentionView = useMemo(() => projectBotMentions(messages), [messages]);
   const jumpToMessage = useCallback(
     (messageId: string) => onJumpToMessage(mentionView.foldedInto.get(messageId) ?? messageId),
@@ -468,8 +485,8 @@ export const Transcript = memo(function Transcript({
         style={
           userBubble
             ? ({
-                "--chat-user": userBubble.background,
-                "--chat-user-foreground": userBubble.foreground,
+                "--chat-user": "var(--custom-chat-user, " + userBubble.background + ")",
+                "--chat-user-foreground": "var(--custom-chat-user-foreground, " + userBubble.foreground + ")",
               } as CSSProperties)
             : undefined
         }
@@ -521,6 +538,7 @@ export const Transcript = memo(function Transcript({
             );
           }
           const message = item.message;
+          if (message.blocks.some(block => block.kind === "context_reset")) return <NewChatDivider key={message.id} messageId={message.id}/>;
           const messageToolActivity = showToolActivity && !(running && activeRun &&
             message.id.startsWith("progress:") &&
             (message.id === `progress:${activeRun.id}` || message.runId === activeRun.id));
@@ -531,11 +549,11 @@ export const Transcript = memo(function Transcript({
             compactMessages && !peerReceipt && !message.id.startsWith("progress:") &&
             message.blocks.some((block) => block.kind === "text" || block.kind === "file" || block.kind === "image" || block.kind === "ask")
               ? <MessageTouchActions message={message} onReply={onReply} onMarkUnread={onMarkUnread}
-                  markedUnread={message.id === markedUnreadMessageId} onReact={onReact}>{content}</MessageTouchActions>
+                  markedUnread={message.id === markedUnreadMessageId} onReact={onReact} onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}>{content}</MessageTouchActions>
               : content;
           return (
             <Fragment key={message.id}>
-              {separatorIds.has(message.id) ? (
+              {compactMessageActions && separatorIds.has(message.id) ? (
                 <TimeSeparator createdAt={message.createdAt} locale={i18n.locale || "en"} />
               ) : null}
               {message.id === unreadDividerId ? (
@@ -607,6 +625,8 @@ export const Transcript = memo(function Transcript({
                       onOpenImportSetup={onOpenImportSetup}
                       onOpenImport={onOpenImport}
                       showToolActivity={messageToolActivity}
+                      showFullText={scrollRequest?.messageId === message.id}
+                      textWasStreamed={Boolean(message.runId && streamedTextRuns.has(`${message.threadId}:${message.runId}`))}
                       hideHoverActions={compactMessages}
                       onReply={onReply}
                       onMarkUnread={onMarkUnread}

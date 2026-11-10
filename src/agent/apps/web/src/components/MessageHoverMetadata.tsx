@@ -1,3 +1,4 @@
+import { useGeneralPreferences } from "../lib/general-preferences";
 import type { ReactNode } from "react";
 
 export function MessageHoverMetadata({
@@ -9,6 +10,8 @@ export function MessageHoverMetadata({
   pinned?: boolean;
   children: ReactNode;
 }) {
+  const { compactMessageActions } = useGeneralPreferences();
+  if (!compactMessageActions) return <div data-testid="message-inline-rail" className={`mt-1 flex w-full items-center gap-2 ${side === "start" ? "justify-end" : "justify-start"}`}>{children}</div>;
   // Touch shows the rail in-flow below the bubble; hover-capable pointers reveal it beside the bubble on demand.
   const reveal = pinned
     ? "pointer-events-auto opacity-100"
@@ -17,7 +20,8 @@ export function MessageHoverMetadata({
   return (
     <div
       data-testid="message-hover-rail"
-      className={`absolute top-1/2 z-10 flex -translate-y-1/2 items-center transition-opacity ${reveal} ${
+      data-message-side={side}
+      className={`rk-message-hover-rail absolute top-1/2 z-10 flex -translate-y-1/2 items-center transition-opacity ${reveal} ${
         side === "end" ? "start-full ms-1" : "end-full me-1"
       } [@media(hover:none)]:static [@media(hover:none)]:mt-1 [@media(hover:none)]:w-full [@media(hover:none)]:translate-y-0 ${
         side === "end"

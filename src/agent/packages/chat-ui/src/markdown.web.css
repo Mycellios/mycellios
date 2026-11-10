@@ -282,7 +282,7 @@
 
 .rk-chat-markdown-cursor {
   position: absolute;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0.24em;
   width: 0.16em;
   height: 1em;
@@ -295,6 +295,10 @@
   50% {
     opacity: 0;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rk-chat-markdown-cursor { animation: none; }
 }
 
 /* A website link: its site icon, then the label. The icon never ends a line on its own. */

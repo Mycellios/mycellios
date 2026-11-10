@@ -26,6 +26,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Disclosure,
   ModelThinkingOptions,
   Spinner,
 } from "@rakazo/ui-web";
@@ -365,6 +366,7 @@ export function ModelSettingsOverlay({
           />
         ) : null}
         {connection}
+        {connected && !model.apiKey.trim() && notice ? <Button className="mt-4" onClick={handleClose}>{t`Back to chat`}</Button> : null}
       </fieldset>
     </div>
   );
@@ -474,9 +476,11 @@ export function ModelSettingsOverlay({
             />
           )}
           {providersOnly && scope === "account" ? (
+            <Disclosure summary={t`Advanced`}>
             <ProviderDiscovery host={host} disabled={busy} onSelect={(url, id) => openConnection(
               { id: OPENAI_COMPATIBLE_PROVIDER_ID, name: t`Custom provider`, baseUrl: url }, null, null, "discovered", id,
             )} />
+            </Disclosure>
           ) : null}
           {connectionAt === "discovered" ? panelFor(true) : null}
           </div>

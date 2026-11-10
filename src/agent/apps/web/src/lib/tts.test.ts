@@ -245,3 +245,36 @@ describe("Speaker", () => {
     expect(speaker.state.error).toBe("Voice request timed out.");
   });
 });
+
+describe("local speech routing", () => {
+ it("does not send text to a provider when the local model is not ready", async () => {
+   const fetchMock=vi.fn(); vi.stubGlobal("fetch",fetchMock);
+   const speak=vi.fn(); vi.stubGlobal("window",{rakazoDesktop:{localVoice:{status:async()=>({ready:false}),speak,stop:vi.fn(async()=>{})}}});
+   const speaker=new Speaker(); const error=await speaker.speak("Hola",{browser:true});
+   expect(error).toContain("modelos de voz local"); expect(fetchMock).not.toHaveBeenCalled(); expect(speak).not.toHaveBeenCalled();
+ });
+ it("discards an inference result after playback is cancelled without making a paid fallback request", async () => {
+   let finish!: (v:unknown)=>void;
+   const speak=vi.fn(()=>new Promise(resolve=>{finish=resolve;})),stop=vi.fn(async()=>{}),fetchMock=vi.fn();
+   vi.stubGlobal("fetch",fetchMock); vi.stubGlobal("navigator",{language:"es-ES"});
+   vi.stubGlobal("window",{rakazoDesktop:{localVoice:{status:async()=>({ready:true}),speak,stop}}});
+   const speaker=new Speaker(); const pending=speaker.speak("Hola");
+   await vi.waitFor(()=>expect(speak).toHaveBeenCalled()); speaker.stop(); finish({samples:new Float32Array([0]),sampleRate:24000}); await pending;
+   expect(stop).toHaveBeenCalledOnce(); expect(fetchMock).not.toHaveBeenCalled(); expect(speaker.state.status).toBe("idle");
+ });
+});
+
+it("renders local PCM audio with the selected speed without calling a speech provider", async () => {
+ const fetchMock=vi.fn(),speak=vi.fn(async()=>({samples:new Float32Array([0,0.1,0]),sampleRate:24000}));
+ vi.stubGlobal("fetch",fetchMock);vi.stubGlobal("navigator",{language:"es-ES"});
+ vi.stubGlobal("window",{rakazoDesktop:{localVoice:{status:async()=>({ready:true}),speak,stop:vi.fn(async()=>{})}}});
+ const close=vi.fn(async()=>{}),copy=vi.fn();
+ vi.stubGlobal("AudioContext",class {
+  destination={};resume=async()=>{};close=close;
+  createBuffer(){return {copyToChannel:copy};}
+  createBufferSource(){return {buffer:null,connect:()=>{},onended:null as null|(()=>void),start(){queueMicrotask(()=>this.onended?.());}};}
+ });
+ const speaker=new Speaker(); expect(await speaker.speak("Hola",{speed:1.25})).toBeUndefined();
+ expect(speak).toHaveBeenCalledWith({text:"Hola",language:"es",speed:1.25});
+ expect(copy).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();expect(fetchMock).not.toHaveBeenCalled();expect(speaker.state.status).toBe("idle");
+});

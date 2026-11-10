@@ -30,10 +30,12 @@ export function ResizableSidePanel({
   open,
   panel,
   children,
+  expanded = false,
 }: {
   open: boolean;
   panel: string;
   children: ReactNode;
+  expanded?: boolean;
 }) {
   const reservedLeadingPx = useBotsSidebarWidth();
   const storageKey = panel === "review" ? `${STORAGE_KEY}:browser` : STORAGE_KEY;
@@ -45,7 +47,7 @@ export function ResizableSidePanel({
   const overlay = viewportWidth - reservedLeadingPx < MIN_CHAT_WIDTH + MIN_WIDTH;
   const [dragging, setDragging] = useState(false);
   const drag = useRef<{ x: number; width: number; direction: number } | null>(null);
-  const width = Math.max(MIN_WIDTH, Math.min(maxWidth, preferredWidth));
+  const width = expanded ? Math.max(MIN_WIDTH, viewportWidth - reservedLeadingPx - 52) : Math.max(MIN_WIDTH, Math.min(maxWidth, preferredWidth));
 
   useEffect(() => {
     try {
@@ -79,12 +81,13 @@ export function ResizableSidePanel({
     <aside
       data-testid="side-panel"
       data-panel={panel}
+      data-expanded={expanded || undefined}
       data-panel-open={open || undefined}
       data-overlay={overlay || undefined}
       style={{ "--panel-width": `${width}px` } as CSSProperties}
-      className={`absolute inset-y-0 end-0 z-20 flex min-h-0 shrink-0 flex-col overflow-hidden bg-background ${overlay ? "md:absolute" : "md:relative"} ${dragging ? "" : panel === "review" ? "md:motion-safe:transition-[width] md:duration-150 md:ease-out" : "transition-[width] duration-150 ease-out"} ${open ? `w-full ${panel === "review" ? "md:border-s" : "max-w-[384px] border-s"} border-sidebar-border md:w-(--panel-width) md:max-w-none` : "pointer-events-none w-0"}`}
+      className={`absolute inset-y-0 end-0 ${panel === "side-question" ? "z-40" : "z-20"} flex min-h-0 shrink-0 flex-col overflow-hidden bg-background ${overlay || expanded ? "md:absolute" : "md:relative"} ${dragging ? "" : panel === "review" ? "md:motion-safe:transition-[width] md:duration-150 md:ease-out" : "transition-[width] duration-150 ease-out"} ${open ? `w-full ${(panel === "review" || panel === "side-question") ? "md:border-s" : "max-w-[384px] border-s"} border-sidebar-border md:w-(--panel-width) md:max-w-none` : "pointer-events-none w-0"}`}
     >
-      {open ? (
+      {open && !expanded ? (
         <hr
           tabIndex={0}
           aria-label={t`Resize panel`}

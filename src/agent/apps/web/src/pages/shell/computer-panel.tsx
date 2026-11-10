@@ -1,3 +1,4 @@
+import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 import { t } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import type { Bot, ComputerStatus, Routine } from "@rakazo/contracts";
@@ -25,6 +26,7 @@ type ComputerPanelProps = {
   sandboxProvider?: string | null;
   onRecovered: (sandboxProvider: string) => void;
   onRecoveryDismissed: () => void;
+  onOpenBrowser?: () => void;
   onOpenComputerSettings?: () => void;
   onOpenBotSettings?: () => void;
   onOpen: () => void;
@@ -50,6 +52,7 @@ export function ComputerPanel({
   sandboxProvider,
   onRecovered,
   onRecoveryDismissed,
+  onOpenBrowser,
   onOpenComputerSettings,
   onOpenBotSettings,
   onOpen,
@@ -60,7 +63,7 @@ export function ComputerPanel({
   onStopRun,
 }: ComputerPanelProps) {
   return (
-    <div>
+    <div className="space-y-5 p-5">
       <div
         data-testid="computer-preview"
         className={`group relative rounded-[14px] bg-background ${
@@ -72,7 +75,10 @@ export function ComputerPanel({
             <Trans>Open in full window</Trans>
           </div>
         ) : computer?.kind === "desktop" ? (
-          <DesktopKindEmptyState className="grid h-full place-items-center px-6 text-center text-sm text-muted-foreground/80" />
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground/80">
+            <DesktopKindEmptyState />
+            {onOpenBrowser && <Button variant="secondary" size="sm" onClick={onOpenBrowser}><Trans>Open browser</Trans></Button>}
+          </div>
         ) : computer?.state === "running" && embeddedScreenUrl && !computerScreenError ? (
           <iframe
             key={screenFrameKey}
@@ -88,12 +94,11 @@ export function ComputerPanel({
           <div className="grid h-full place-items-center px-6 text-center text-sm text-muted-foreground/80">
             {computerScreenError ??
               (showComputerRecoveryHint ? (
-                <ComputersUnavailableHint
-                  sandboxProvider={sandboxProvider}
-                  onRecovered={onRecovered}
-                  onRecoveryDismissed={onRecoveryDismissed}
-                  onOpenComputerSettings={onOpenComputerSettings}
-                />
+                <div className="space-y-3 text-center">
+                  <p className="font-medium text-foreground"><Trans>Computer unavailable</Trans></p>
+                  <p><Trans>Use Browser for pages and previews. Computer shows the Mico’s working environment when it is connected.</Trans></p>
+                  {onOpenBrowser && <Button variant="secondary" size="sm" onClick={onOpenBrowser}><Trans>Open browser</Trans></Button>}
+                </div>
               ) : (
                 (computerBooting ??
                 computerPlaceholder(
@@ -104,7 +109,7 @@ export function ComputerPanel({
               ))}
           </div>
         )}
-        {!computerScreenError && !showingRecoveryHint ? (
+        {!computerOpen && computer?.kind !== "desktop" && computer?.state === "running" && embeddedScreenUrl && !computerScreenError && !showingRecoveryHint ? (
           <button
             type="button"
             data-testid="computer-preview-open"
@@ -119,15 +124,19 @@ export function ComputerPanel({
           </button>
         ) : null}
       </div>
+      <Disclosure summary={t`Connection and diagnostics`} summaryClassName="w-full py-2 text-sm text-muted-foreground">
+        <ComputersUnavailableHint sandboxProvider={sandboxProvider} onRecovered={onRecovered} onRecoveryDismissed={onRecoveryDismissed} onOpenComputerSettings={onOpenComputerSettings} />
       {computer?.state !== "running" && onOpenBotSettings ? (
         <Button variant="outline" size="sm" className="mt-3 w-full" onClick={onOpenBotSettings}>
           <Trans>Open Mico settings</Trans>
         </Button>
       ) : null}
-      <p className="mt-2 truncate text-[13.5px] text-muted-foreground" dir="auto">
+      </Disclosure>
+      {computer?.state === "running" && embeddedScreenUrl && <p className="mt-2 truncate text-[13.5px] text-muted-foreground" dir="auto">
         {t`${bot.name}'s screen`}
-      </p>
+      </p>}
 
+      <Disclosure summary={t`Routines for this Mico`} summaryClassName="w-full py-2 text-sm text-muted-foreground">
       <RoutineListHeader onCreate={onCreateRoutine} />
       {routines.map((routine) => (
         <RoutineListRow
@@ -138,6 +147,7 @@ export function ComputerPanel({
           onStop={onStopRun}
         />
       ))}
+      </Disclosure>
     </div>
   );
 }

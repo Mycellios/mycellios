@@ -1,3 +1,5 @@
+import { SidebarContribution } from "../SidebarContribution";
+import { getGeneralPreferences } from "../../lib/general-preferences";
 import { useLingui } from "@lingui/react/macro";
 import { isEchoOfSpeech, isRunWorking, isSecretAskBlock, normalizeRunError, speakable, speechFromBlocks, toUtterances } from "@rakazo/core";
 import { BotAvatar, Button } from "@rakazo/ui-web";
@@ -12,8 +14,8 @@ import { isAndroidHost } from "../../lib/android-host";
 import { translateRunError } from "../../lib/run-error";
 import { errorText } from "../../lib/user-error";
 
-export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe, voiceReady, onClose, onSettings }: {
-  rpc: RpcClient; spaceId?: string | null; taskThreadId?: string;
+export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, bot, transcribe, voiceReady, onClose, onSettings }: {
+  hidden?: boolean; rpc: RpcClient; spaceId?: string | null; taskThreadId?: string;
   bot: { id: string; name: string; color: string }; transcribe?: boolean; voiceReady?: boolean;
   onClose: () => void; onSettings: () => void;
 }) {
@@ -24,12 +26,14 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
   const [error, setError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [level, setLevel] = useState(0);
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(() => getGeneralPreferences().speechSpeed);
   const [model, setModel] = useState<{ ready: boolean; preparing: boolean; downloaded: number; total: number } | null>(null);
-  const alive = useRef(true), generation = useRef(0), enabled = useRef(false), mute = useRef(false), rate = useRef(1);
+  const alive = useRef(true), generation = useRef(0), enabled = useRef(false), mute = useRef(false), rate = useRef(getGeneralPreferences().speechSpeed);
   const output = useRef<AudioContext | null>(null);
   const abort = useRef(new AbortController());
   const spoken = useRef("");
+  const preparing = useRef(false);
+  const preparationTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const seen = useRef(new Set<string>());
   const native = window.rakazoDesktop?.localVoice;
   const canCapture = Boolean(transcribe || isAndroidHost() || webSpeechAvailable());
@@ -53,6 +57,7 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
     });
     const release = () => {
       if (!alive.current) return;
+      clearInterval(preparationTimer.current);
       alive.current = false; enabled.current = false; generation.current++; abort.current.abort();
       dictation.stop("cancel"); speaker.stop(); void output.current?.close().catch(() => {}); void native?.stop().catch(() => {});
     };
@@ -79,7 +84,9 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
   async function speak(text: string, own: number) {
     if (!alive.current || own !== generation.current) return;
     spoken.current = speakable(text); setCaption(text); setPhase("thinking");
-    if (native) {
+    if (native && getGeneralPreferences().speechEngine === "local") {
+      // Capture and synthesis share one local worker. Stop capture before inference.
+      dictation.stop("cancel");
       // Native synthesis is bounded; play sequential parts, never truncate the reply.
       for (const part of toUtterances(text, { minChars: 12, maxChars: 1200 })) {
         if (!alive.current || own !== generation.current) return;
@@ -166,29 +173,36 @@ export function VoiceConversation({ rpc, spaceId, taskThreadId, bot, transcribe,
     } catch { if (alive.current && own === generation.current) stopWithError(t`Could not open this chat for voice. Try again.`); }
   }
   async function prepare() {
-    if (!native) return;
+    if (!native || preparing.current) return;
+    preparing.current = true;
     setPhase("preparing"); setError(null);
-    const poll = setInterval(() => void refresh().catch(() => {}), 1000);
+    preparationTimer.current = setInterval(() => void refresh().catch(() => {}), 1000);
     try { await native.prepare(); await refresh(); if (alive.current) await start(); }
     catch { if (alive.current) stopWithError(t`Could not prepare local voice. Try again.`); }
-    finally { clearInterval(poll); }
+    finally { clearInterval(preparationTimer.current); preparationTimer.current = undefined; preparing.current = false; }
   }
   const needsModels = Boolean(native && !model?.ready);
   const canStart = native ? model?.ready : canCapture;
-  return <aside role="dialog" data-continuous-voice aria-label={t`Voice conversation`} className="fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-border bg-background px-6 pb-8 pt-16 md:w-[400px]">
-    <header className="flex items-center justify-between"><span className="text-sm font-medium">{bot.name}</span><Button variant="ghost" size="icon" aria-label={t`Close voice`} onClick={onClose}><X /></Button></header>
+  return <aside style={{ display: hidden ? "none" : undefined }} aria-hidden={hidden || undefined} role="dialog" data-continuous-voice aria-label={t`Voice conversation`} className="fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-border bg-background md:w-[400px]">
+    <header data-testid="voice-panel-header" className="flex h-[50px] shrink-0 items-center justify-between border-b border-border px-4"><span className="text-sm font-medium">{bot.name}</span><Button variant="ghost" size="icon" aria-label={t`Close voice`} onClick={onClose}><X /></Button></header>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6">
     <p aria-live="polite" className="mt-2 text-center text-sm text-muted-foreground">{phase === "listening" ? t`Listening` : phase === "speaking" ? t`Speaking` : phase === "thinking" ? t`Thinking` : phase === "preparing" ? t`Preparing local voice…` : t`Voice`}</p>
-    <div className="flex flex-1 flex-col items-center justify-center gap-8">
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6">
       <div style={{ transform: `scale(${1 + level * .12})` }}><BotAvatar identity={bot.id} color={bot.color} size={112} /></div>
       <div className="flex h-6 items-center gap-1" aria-hidden="true">{Array.from({length: 24}, (_, i) => <span key={i} className="w-0.5 rounded-full bg-muted-foreground" style={{ height: 2 + level * 24 * (1 - Math.abs(i-11.5)/24) }} />)}</div>
       <p className="max-h-40 overflow-y-auto text-center text-sm text-muted-foreground" dir="auto">{caption || (phase === "listening" ? t`Speak now` : "")}</p>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-      {needsModels ? <Button disabled={phase === "preparing"} onClick={() => void prepare()}>{phase === "preparing" ? `${Math.round((model?.downloaded ?? 0)/1024/1024)} / ${Math.round((model?.total ?? 0)/1024/1024)} MB` : t`Prepare local voice`}</Button> : phase === "ready" ? <Button disabled={!canStart} onClick={() => void start()}>{t`Start talking`}</Button> : null}
-      {needsModels ? <p className="text-xs text-muted-foreground">Parakeet · Supertonic 3</p> : null}
+      {needsModels ? <Button disabled={phase === "preparing"} onClick={() => void prepare()}>{phase === "preparing" ? `${Math.round((model?.downloaded ?? 0)/1024/1024)} / ${Math.round((model?.total ?? 0)/1024/1024)} MB` : t`Activate local voice`}</Button> : phase === "ready" ? <Button disabled={!canStart} onClick={() => void start()}>{t`Start talking`}</Button> : null}
+      {needsModels ? <p className="max-w-xs text-center text-xs text-muted-foreground">{t`Parakeet and Supertonic 3. Download once, then process audio on this computer without credits.`}</p> : null}
       {!canStart && !needsModels ? <p className="text-center text-sm text-muted-foreground">{t`Connect a transcription provider in Voice settings, or use local voice in Desktop.`}</p> : null}
       {!native ? <Button variant="ghost" onClick={onSettings}>{t`Voice settings`}</Button> : null}
     </div>
-    <footer className="flex justify-center gap-3">
+    <div className="shrink-0 border-t border-border py-3 text-sm">
+      <p className="mb-2 text-xs text-muted-foreground">{t`Contribute computing power and earn credits. Voice stays local; network voice is not available yet.`}</p>
+      <SidebarContribution expanded activationLabel={t`Activate contribution`} />
+    </div>
+    </div>
+    <footer className="flex shrink-0 justify-center gap-3 px-6 py-4">
       <Button className="rounded-full" variant="secondary" aria-label={t`Playback speed`} onClick={() => { rate.current = rate.current === 1 ? 1.25 : rate.current === 1.25 ? 1.5 : 1; setSpeed(rate.current); }}>{speed}×</Button>
       <Button className="rounded-full" variant="secondary" size="icon" aria-label={t`Mute microphone`} aria-pressed={muted} onClick={() => { mute.current = !mute.current; setMuted(mute.current); silence(); if (!mute.current) void listen(); }}>{muted ? <MicOff/> : <Mic/>}</Button>
       <Button className="rounded-full" variant="secondary" size="icon" aria-label={t`Interrupt reply`} onClick={() => { silence(); void listen(); }}><Square/></Button>

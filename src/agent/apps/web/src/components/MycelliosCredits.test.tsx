@@ -21,13 +21,13 @@ it("keeps an actual zero distinct from an unavailable account", async () => {
   readAccount.mockResolvedValue({ balanceMicrounits: 0, availableMicrounits: 0 });
   await rendered(host => expect(host.textContent).toBe("Credits0"));
   readAccount.mockResolvedValue(null);
-  await rendered(host => expect(host.textContent).toBe("Credits—"));
+  await rendered(host => expect(host.textContent).toBe("CreditsBalance unavailable"));
 });
 it("keeps the row visible while loading and on failure", async () => {
   readAccount.mockReturnValue(new Promise(() => {}));
   await rendered(host => { expect(host.textContent).toBe("Credits…"); expect(host.firstElementChild?.getAttribute("aria-busy")).toBe("true"); });
   readAccount.mockRejectedValue(new Error("offline"));
-  await rendered(host => expect(host.textContent).toBe("Credits—Retrying…"));
+  await rendered(host => expect(host.textContent).toBe("CreditsBalance unavailable"));
 });
 it("refreshes the real balance when the window receives focus", async () => {
   readAccount.mockResolvedValueOnce({ balanceMicrounits: 1000000 }).mockResolvedValueOnce({ balanceMicrounits: 2000000 });
@@ -57,7 +57,7 @@ it("recovers an initial timeout after two seconds without inventing a zero balan
   vi.useFakeTimers();
   readAccount.mockRejectedValueOnce(new Error("timeout")).mockResolvedValue({ balanceMicrounits: 954188 });
   await rendered(async host => {
-    expect(host.textContent).toBe("Credits—Retrying…");
+    expect(host.textContent).toBe("CreditsBalance unavailable");
     await act(async () => vi.advanceTimersByTimeAsync(1_999));
     expect(readAccount).toHaveBeenCalledTimes(1);
     await act(async () => vi.advanceTimersByTimeAsync(1));
@@ -75,7 +75,7 @@ it("keeps the last verified balance and promo explicitly stale until recovery", 
     .mockResolvedValue({ balanceMicrounits: 900000, promotionalGrantedMicrounits: 1000000 });
   await rendered(async host => {
     await act(async () => window.dispatchEvent(new Event("focus")));
-    expect(host.textContent).toBe("Credits0,954188Refreshing…Promo");
+    expect(host.textContent).toBe("Credits0,954188Promo");
     expect(host.firstElementChild?.getAttribute("data-balance-status")).toBe("stale");
     expect(host.firstElementChild?.getAttribute("title")).toBe("Last verified balance. Retrying automatically.");
     await act(async () => vi.advanceTimersByTimeAsync(2_000));
@@ -123,7 +123,7 @@ it.each(["UNAUTHORIZED","FORBIDDEN"])("clears cached money on %s and does not re
     .mockRejectedValue({ code });
   await rendered(async host => {
     await act(async () => window.dispatchEvent(new Event("focus")));
-    expect(host.textContent).toBe("Credits—");
+    expect(host.textContent).toBe("CreditsBalance unavailable");
     expect(host.firstElementChild?.getAttribute("title")).toBe("Sign in again to see your credits.");
     await act(async () => vi.advanceTimersByTimeAsync(59_999));
     expect(readAccount).toHaveBeenCalledTimes(2);
@@ -143,7 +143,7 @@ it("aborts old identity reads and never applies their late balance to another us
     await act(async () => finish({ balanceMicrounits: 999999999 }));
     expect(host.textContent).toBe("Credits2");
     await act(async () => root.render(<MycelliosCredits ownerId="" />));
-    expect(host.textContent).toBe("Credits—");
+    expect(host.textContent).toBe("CreditsBalance unavailable");
     expect(readAccount).toHaveBeenCalledTimes(2);
   } finally { await act(async () => root.unmount());host.remove(); }
 });
@@ -152,7 +152,7 @@ it("clears a previously verified account when the authority returns null", async
   readAccount.mockResolvedValueOnce({ balanceMicrounits: 954188 }).mockResolvedValue(null);
   await rendered(async host => {
     await act(async () => window.dispatchEvent(new Event("focus")));
-    expect(host.textContent).toBe("Credits—");
+    expect(host.textContent).toBe("CreditsBalance unavailable");
     expect(host.firstElementChild?.getAttribute("data-balance-status")).toBe("unavailable");
   });
 });
@@ -164,9 +164,56 @@ it("bounds a hung read and cancels all pending work on unmount", async () => {
   }));
   await rendered(async host => {
     await act(async () => vi.advanceTimersByTimeAsync(12_000));
-    expect(host.textContent).toBe("Credits—Retrying…");
+    expect(host.textContent).toBe("CreditsBalance unavailable");
     await act(async () => vi.advanceTimersByTimeAsync(2_000));
     expect(readAccount).toHaveBeenCalledTimes(2);
   });
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it("lets the user retry a failed balance read without reloading or fabricating credits", async () => {
+  readAccount.mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ balanceMicrounits: 2000000 });
+  await rendered(async host => {
+    expect(host.textContent).toContain("Balance unavailable");
+    await act(async () => host.querySelector<HTMLButtonElement>("button")!.click());
+    expect(readAccount).toHaveBeenCalledTimes(2);
+    expect(host.textContent).toBe("Credits2");
+  });
+});
+
+it("keeps unavailable credits compact with one destination and an icon-only retry", async () => {
+  readAccount.mockRejectedValue(new Error("offline"));
+  await rendered(host => {
+    expect(host.textContent).toBe("CreditsBalance unavailable");
+    expect(host.querySelectorAll("a")).toHaveLength(1);
+    expect(host.querySelector('[aria-label="Retry"]')?.textContent).toBe("");
+    expect(host.querySelector("p")).toBeNull();
+  });
+});
+
+it("highlights only verified contribution earnings, never a purchase or a timer", async () => {
+ vi.useFakeTimers();
+ readAccount.mockResolvedValue({balanceMicrounits:1000000,contributionEarnedMicrounits:0});
+ await rendered(async host=>{
+   expect(host.querySelector(".rk-credit-gain")).toBeNull();
+   readAccount.mockResolvedValue({balanceMicrounits:2000000,contributionEarnedMicrounits:0});
+   await act(async()=>window.dispatchEvent(new Event("focus")));
+   expect(host.querySelector(".rk-credit-gain")).toBeNull();
+   readAccount.mockResolvedValue({balanceMicrounits:2000123,contributionEarnedMicrounits:123});
+   await act(async()=>window.dispatchEvent(new Event("focus")));
+   expect(host.querySelector(".rk-credit-gain")?.textContent).toBe("+0,000123 Earned");
+   await act(async()=>vi.advanceTimersByTimeAsync(5000));
+   expect(host.querySelector(".rk-credit-gain")).toBeNull();
+ });
+});
+
+it("refreshes every five seconds while contributing without inventing gains", async () => {
+ vi.useFakeTimers(); document.body.dataset.mycelliosContributing="true";
+ readAccount.mockResolvedValue({balanceMicrounits:1000001,contributionEarnedMicrounits:0});
+ try { await rendered(async host=>{
+  expect(readAccount).toHaveBeenCalledOnce();
+  await act(async()=>vi.advanceTimersByTimeAsync(4999));expect(readAccount).toHaveBeenCalledOnce();
+  await act(async()=>vi.advanceTimersByTimeAsync(1));expect(readAccount).toHaveBeenCalledTimes(2);
+  expect(host.textContent).toBe("Credits1,000001");expect(host.querySelector(".rk-credit-gain")).toBeNull();
+ }); } finally {delete document.body.dataset.mycelliosContributing;vi.useRealTimers();}
 });

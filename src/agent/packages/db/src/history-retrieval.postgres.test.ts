@@ -24,7 +24,7 @@ postgres("history retrieval (PostgreSQL)", () => {
     prisma = new PrismaClient({ adapter: new PrismaPg(pool, { schema: "pg_temp" }) });
     await pool.query(`
       CREATE TEMP TABLE bots (id text PRIMARY KEY, "spaceId" text, "userId" text, "archivedAt" timestamptz);
-      CREATE TEMP TABLE threads (id text PRIMARY KEY, "spaceId" text, "userId" text, "botId" text, "groupId" text);
+      CREATE TEMP TABLE threads (id text PRIMARY KEY, "spaceId" text, "userId" text, "botId" text, "groupId" text, "contextStartSeq" integer NOT NULL DEFAULT 0);
       CREATE TEMP TABLE chat_groups (id text PRIMARY KEY, "spaceId" text, "userId" text, "archivedAt" timestamptz);
       CREATE TEMP TABLE chat_group_members ("groupId" text, "botId" text);
       CREATE TEMP TABLE messages (id text PRIMARY KEY, "threadId" text, seq integer, role text, "runId" text,
@@ -485,4 +485,12 @@ postgres("history retrieval (PostgreSQL)", () => {
       (await readHistory(prisma, channelScope, { messageId: "channel-result" })).messages,
     ).toEqual([]);
   });
+  it("excludes earlier chat from model search and explicit history reads after a reset", async () => {
+    await pool.query('UPDATE threads SET "contextStartSeq"=20000');
+    try {
+      expect((await searchHistory(prisma,scope,{query:"exports batching"})).messages).toEqual([]);
+      expect((await readHistory(prisma,scope,{messageId:"m-42"})).messages).toEqual([]);
+    } finally { await pool.query('UPDATE threads SET "contextStartSeq"=0'); }
+  });
+
 });

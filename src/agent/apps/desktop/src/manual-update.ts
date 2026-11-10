@@ -72,6 +72,7 @@ export class ManualUpdateController {
     handoff(file: string, release: ManualRelease): Promise<void>;
     pause?: (ms: number) => Promise<void>;
     backgroundDownloads?: boolean;
+    autoDownload?: () => boolean;
     publishedRelease?: () => Promise<ManualRelease | null>;
   }) {
     this.current = { phase: "idle", supportsForceRestart: true, currentVersion: options.version, availableVersion: null,
@@ -105,7 +106,7 @@ export class ManualUpdateController {
       this.release = release;
       this.current = { ...this.current, phase: this.release ? "available" : "idle",
         availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString() };
-      if (this.release) await this.runDownload();
+      if (this.release && (this.options.autoDownload?.() ?? true)) await this.runDownload();
     } catch {
       if (staged && this.file) return this.state();
       if (this.checkRequested || this.current.availableVersion) this.fail();

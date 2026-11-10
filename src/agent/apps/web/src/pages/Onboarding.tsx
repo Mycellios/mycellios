@@ -135,6 +135,7 @@ export function OnboardingPage() {
   modelIdRef.current = modelId;
   const [apiKey, setApiKey] = useState("");
   const [advancedSetup, setAdvancedSetup] = useState(false);
+  const [connectionPath, setConnectionPath] = useState<"account" | "key" | null>(null);
   const [savingModel, setSavingModel] = useState(false);
   const [accountId, setAccountId] = useState("");
   const [gatewayId, setGatewayId] = useState("");
@@ -286,16 +287,21 @@ export function OnboardingPage() {
     };
     const main = [
       ...(billingEnabled ? [{ value: CREDITS_OPTION, label: t`Mycellios credits` }] : []),
-      ...MAIN_PROVIDER_OPTIONS.filter((option) => byId.has(option.provider)).map((option) => ({
+      ...MAIN_PROVIDER_OPTIONS.filter((option) => {
+        if (!byId.has(option.provider)) return false;
+        const signIn = option.auth === "sign-in" || (option.auth !== "key" && ["oauth", "both"].includes(byId.get(option.provider)?.auth ?? ""));
+        return connectionPath === "account" ? signIn : connectionPath === "key" ? !signIn : true;
+      }).map((option) => ({
         value: providerOptionValue(option.provider, option.auth),
         label: optionLabel(option.provider, option.auth),
       })),
     ];
-    if (byId.has(OPENAI_COMPATIBLE_PROVIDER_ID))
+    if (connectionPath !== "key" && byId.has(OPENAI_COMPATIBLE_PROVIDER_ID))
       main.unshift({ value: "mycellios-preset", label: productBrand.shortName });
     const rest = providers
       .filter(
-        (entry) => !MAIN_PROVIDER_OPTIONS.some((option) => option.provider === entry.provider),
+        (entry) => !MAIN_PROVIDER_OPTIONS.some((option) => option.provider === entry.provider) &&
+          (connectionPath === "account" ? entry.auth === "oauth" || entry.auth === "both" : entry.auth !== "oauth"),
       )
       .flatMap((entry) => {
         const item = { value: entry.provider, label: entry.providerName ?? entry.provider };
@@ -304,7 +310,7 @@ export function OnboardingPage() {
           : [item];
       });
     return { main, rest };
-  }, [billingEnabled, providers, t]);
+  }, [billingEnabled, providers, connectionPath, t]);
   // Base UI Select.Value only resolves labels when Root gets `items`.
   const providerItems = useMemo(
     () => [...providerOptions.main, ...providerOptions.rest],
@@ -646,14 +652,20 @@ export function OnboardingPage() {
             <h1 className="text-[32px] font-medium text-foreground">
               <Trans>Set up your assistant</Trans>
             </h1>
-            {!isMycellios || advancedSetup ? (
+            {connectionPath === null ? <div className="mt-6 grid gap-3" data-testid="connection-path">
+              <p className="text-muted-foreground">{t`Choose how to connect. Mycellios handles the model setup for you.`}</p>
+              <Button onClick={() => { setAdvancedSetup(false); if (mycelliosSignIn === true) selectProvider(OPENAI_COMPATIBLE_PROVIDER_ID, productBrand.apiBaseUrl); else selectProvider("openai-codex"); setConnectionPath("account"); }}>{t`Use my account`}</Button>
+              <Button variant="outline" onClick={() => { setAdvancedSetup(true); selectProvider("opencode-go"); setConnectionPath("key"); }}>{t`Use an API key`}</Button>
+            </div> : <Button variant="ghost" className="mt-3" onClick={() => setConnectionPath(null)}>{t`Back`}</Button>}
+            <div hidden={connectionPath === null}>
+            {connectionPath === "account" ? (
               <InstalledAgentOnboarding
                 onSelect={async (agentEngine) => {
                   navigate("/app", { replace: true, state: { firstMicoEngine: agentEngine } });
                 }}
               />
             ) : null}
-            {simpleAntseed ? (
+            {connectionPath !== null && simpleAntseed ? (
               <form
                 className="mt-4"
                 onSubmit={(event) => {
@@ -757,7 +769,7 @@ export function OnboardingPage() {
                 </Button>
               </form>
             ) : null}
-            {accountSetup ? (
+            {connectionPath !== null && accountSetup ? (
               <>
                 <p className="mt-4 text-muted-foreground">
                   <Trans>Use your Mycellios credits to chat. No setup needed.</Trans>
@@ -803,7 +815,7 @@ export function OnboardingPage() {
                 ) : null}
               </>
             ) : null}
-            {simpleAntseed || accountSetup ? null : (
+            {connectionPath === null || simpleAntseed || accountSetup ? null : (
               <div>
                 {advancedSetup && hostedAntseedGateway() ? (
                   <Button
@@ -1344,6 +1356,7 @@ export function OnboardingPage() {
                 </div>
               </div>
             )}
+            </div>
           </div>
         ) : null}
       </div>

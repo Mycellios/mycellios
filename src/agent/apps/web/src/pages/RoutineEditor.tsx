@@ -100,6 +100,7 @@ export type RoutineDraftState = {
   githubEnabled: boolean;
   messageProvider: string | null;
   active: boolean;
+  notify?: boolean;
   runAtLocal: string;
   /** Empty runs this routine on the bot's model. */
   modelKey: string;
@@ -212,6 +213,7 @@ export function draftFromRoutine(routine: Routine): RoutineDraftState {
     githubEnabled: routine.githubEnabled,
     messageProvider: routine.messageProvider,
     active: routine.active,
+    notify: routine.notify,
     runAtLocal: routineNeedsOneShotArm(routine, routine.crons) ? defaultArmRunAtLocal() : "",
     modelKey:
       routine.modelProvider && routine.modelId
@@ -472,6 +474,10 @@ export function RoutineEditor({
         />
       </label>
 
+      <label className="mt-5 flex items-center gap-2 text-sm">
+        <Switch checked={draft.notify ?? true} onCheckedChange={notify => onChange({ ...draft, notify })} />
+        {t`Notify me when there are results or a problem`}
+      </label>
       <label htmlFor={`${fieldId}-prompt`} className="mt-5 block text-sm text-muted-foreground">
         <Trans>Instruction</Trans>
         <Textarea
@@ -484,6 +490,15 @@ export function RoutineEditor({
         />
       </label>
 
+      {!editing && !draft.schedules.length && !draft.webhookEnabled && !draft.githubEnabled && !draft.messageProvider && !draft.watch ? <div className="mt-5 space-y-2">
+        <p className="text-sm text-muted-foreground">{t`Repeat this task`}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => addSchedule("Every day")}>{t`Every day`}</Button>
+          <Button variant="outline" onClick={() => addSchedule("Weekdays")}>{t`Weekdays`}</Button>
+          <Button variant="outline" onClick={() => addSchedule("Every week")}>{t`Every week`}</Button>
+        </div>
+        <p className="text-xs text-muted-foreground">{t`Results will appear in this Mico's chat. Nothing runs until you save.`}</p>
+      </div> : null}
       <div className="mt-5 text-sm text-muted-foreground">
         <div className="flex items-baseline gap-2">
           <Trans>When to run</Trans>

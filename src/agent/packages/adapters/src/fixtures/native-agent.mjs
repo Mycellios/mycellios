@@ -1,3 +1,4 @@
+import { appendFileSync } from "node:fs";
 import readline from "node:readline";
 
 const engine = process.argv[2];
@@ -10,6 +11,8 @@ if (engine === "claude")
   bridge = JSON.parse(process.argv[process.argv.indexOf("--mcp-config") + 1]).mcpServers.rakazo;
 lines.on("line", (line) => {
   const message = JSON.parse(line);
+  const logIndex = process.argv.indexOf("--protocol-log");
+  if (logIndex >= 0 && typeof message.method === "string") appendFileSync(process.argv[logIndex + 1], `${message.method}\n`);
   void (async () => {
     if (engine === "codex") {
       if (
@@ -26,9 +29,12 @@ lines.on("line", (line) => {
         return;
       }
       if (message.method === "initialize") reply(message, { userAgent: "fixture" });
+      else if (message.method === "account/rateLimits/read") reply(message, { rateLimits: { primary: { usedPercent: 8, windowDurationMins: 10080, resetsAt: 1900000000 }, secondary: null, planType: "plus" }, accountId: "private-account" });
+      else if (message.method === "model/list") reply(message, { data: [{ id: "fixture-model", model: "fixture-model", isDefault: true, serviceTiers: [{ id: "priority" }], supportedReasoningEfforts: [{ reasoningEffort: "medium" }] }] });
       else if (message.method === "thread/start" || message.method === "thread/resume")
         reply(message, { thread: { id: "fixture-thread" } });
       else if (message.method === "turn/start") {
+        if (process.argv.includes("--fixture-fast") && (message.params.model !== "fixture-model" || message.params.effort !== "medium" || message.params.serviceTier !== "priority")) throw new Error("Fast settings were not forwarded");
         reply(message, { turn: { id: "fixture-turn" } });
         if (process.argv.includes("--fixture-hang")) return;
         if (process.argv.includes("--fixture-model-unavailable") || process.argv.includes("--fixture-quota")) {

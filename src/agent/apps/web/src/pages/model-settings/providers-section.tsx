@@ -14,7 +14,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@rakazo/ui-web";
-import { ChevronRight, Network, Plug, Plus, Search, SlidersHorizontal, SquareTerminal, Terminal } from "lucide-react";
+import { ChevronRight, Network, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { ProviderLogo } from "../../components/ProviderLogo";
 import type { ReactNode, Ref } from "react";
 import { useId, useRef, useState } from "react";
 import type { ModelCredential } from "../../lib/model-auth";
@@ -84,9 +85,8 @@ export function ProvidersSection({
   ) : [];
   const visibleCredentials = genericCredentials.filter((credential) => matches(nameOf(credential), credential.provider) || panelAt === credential.id);
   const visibleRuntimes = runtimes.filter((runtime) =>
-    (!onOpenIntegration || runtime.id !== "opencode") && matches(runtime.name, runtime.id),
+    (runtime.id === "codex" || runtime.id === "claude") && matches(runtime.name, runtime.id),
   );
-  const openCode = runtimes.find((runtime) => runtime.id === "opencode");
   const integrationRow = (id: ProviderIntegration, name: string, status: string, icon: ReactNode) => (
     <li data-testid={`${id}-provider`}>
       <button ref={integrationTriggers?.[id]} type="button" className={rowClass} disabled={disabled} onClick={() => onOpenIntegration?.(id)}>
@@ -99,11 +99,8 @@ export function ProvidersSection({
       </button>
     </li>
   );
-  const openCodeRow = onOpenIntegration && matches("OpenCode") ? integrationRow(
-    "opencode", "OpenCode",
-    openCode?.available ? t`Available on this server` : openCode?.canInstall ? t`Download available` : t`Built-in agent engine`,
-    <SquareTerminal aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
-  ) : null;
+  // Go and Zen are connections in the provider directory. An installed OpenCode
+  // executable is an implementation detail, not a second connection to choose.
   const antseedRow = onOpenIntegration && matches("AntSeed", ...antseedCredentials.map(nameOf)) ? integrationRow(
     "antseed", "AntSeed", antseedConnected ? t`Connected` : t`Not connected`,
     <Network aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
@@ -114,7 +111,7 @@ export function ProvidersSection({
     return <li key={runtime.id}>
       <button type="button" className={rowClass} aria-expanded={expanded} disabled={disabled}
         onClick={() => setOpenRuntime(expanded ? null : runtime.id)}>
-        <Terminal className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <ProviderLogo name={runtime.name} providerId={runtime.id} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{runtime.name}</span>
           <span className="block text-xs text-muted-foreground">
@@ -159,7 +156,7 @@ export function ProvidersSection({
                 aria-expanded={panelAt === credential.id}
                 className={rowClass}
               >
-                <Plug className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <ProviderLogo name={nameOf(credential)} providerId={credential.provider} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{nameOf(credential)}</span>
                   {showDirectory ? <span className="block text-xs text-muted-foreground">{t`Connected`}</span> : null}
@@ -172,13 +169,12 @@ export function ProvidersSection({
               {panelAt === credential.id ? <div className="px-3 pb-3">{panel}</div> : null}
             </li>
           ))}
-        {openCode?.available ? openCodeRow : null}
         {antseedConnected ? antseedRow : null}
         {visibleRuntimes.filter((runtime) => runtime.available).map(runtimeRow)}
         {!showDirectory || !query.trim() ? <li>
           <AddProvider providers={providers} disabled={disabled} onPick={onAdd} />
         </li> : null}
-        {showDirectory && !(showPrimary && primaryConnected) && !(openCodeRow && openCode?.available) &&
+        {showDirectory && !(showPrimary && primaryConnected) &&
           !(antseedRow && antseedConnected) &&
           !visibleCredentials.length && !visibleRuntimes.some((runtime) => runtime.available) ?
           <li className="px-3 py-2 text-sm text-muted-foreground">{t`No results`}</li> : null}
@@ -187,18 +183,16 @@ export function ProvidersSection({
       {showDirectory ? (
         <div className="mt-6">
           <h3 className="mb-2.5 text-[15px] font-medium text-foreground">{t`Other providers`}</h3>
-          {available.length || (showPrimary && !primaryConnected) || (openCodeRow && !openCode?.available) ||
+          {available.length || (showPrimary && !primaryConnected) ||
             (antseedRow && !antseedConnected) || visibleRuntimes.some((runtime) => !runtime.available) ? (
             <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
               {showPrimary && !primaryConnected ? primary : null}
-              {!openCode?.available ? openCodeRow : null}
               {!antseedConnected ? antseedRow : null}
               {visibleRuntimes.filter((runtime) => !runtime.available).map(runtimeRow)}
               {available.map((provider) => {
                 const key = providerKey(provider);
                 const expanded = panelAt === `new:${key}`;
                 const custom = isCustom(provider);
-                const Icon = custom ? SlidersHorizontal : Plug;
                 return <li key={key}>
                   <button
                     type="button"
@@ -207,7 +201,8 @@ export function ProvidersSection({
                     className={rowClass}
                     onClick={() => expanded ? onClose?.() : onAdd(provider, key)}
                   >
-                    <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    {custom ? <SlidersHorizontal className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      : <ProviderLogo name={provider.name} providerId={provider.id} />}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{custom ? t`Custom provider` : provider.name}</span>
                       <span className="block text-xs text-muted-foreground">{custom ? t`Connect your own model endpoint` : t`Not connected`}</span>

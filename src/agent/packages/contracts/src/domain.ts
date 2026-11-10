@@ -87,7 +87,14 @@ export const InstructionVersionSchema = z.object({
   createdAt: z.string(),
 });
 
+export const NativeCodexConfigSchema = z.object({
+  modelId: z.string().trim().min(1).max(200).nullable().optional(),
+  thinkingLevel: ThinkingLevelSchema.nullable().optional(),
+  fastMode: z.boolean().optional(),
+});
+
 export const BotSchema = z.object({
+  nativeConfig: NativeCodexConfigSchema.nullable().optional(),
   agentEngine: z.enum(["pi", "codex", "claude", "acp", "opencode"]).optional(),
   id: Id,
   spaceId: Id,
@@ -407,6 +414,7 @@ export function normalizeCreateBotProfile(
 
 export const UpdateBotInput = z
   .object({
+    nativeConfig: NativeCodexConfigSchema.nullable().optional(),
     botId: Id,
     agentEngine: z.enum(["pi", "codex", "claude", "acp", "opencode"]).optional(),
     name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH).optional(),

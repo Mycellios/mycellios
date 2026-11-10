@@ -630,6 +630,19 @@ describe("model setup gate", () => {
     return response;
   }
 
+  it("reads only the owned conversation queue and refuses another Mico", async () => {
+    const { actor, deps, handler } = modelGateDeps({ agentRuntime: "scripted" });
+    const findMany = vi.fn().mockResolvedValue([]);
+    Object.assign(deps.prisma, { steeringMessage: { findMany } });
+    const response = await call(handler, actor, "threads/queue", { botId: "bot-1" });
+    expect(response?.status).toBe(200);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ botId: "bot-1", runId: null, originTrigger: "queued_user", message: { threadId: "thread-1" } }) }));
+    vi.mocked(deps.prisma.bot.findFirst).mockResolvedValueOnce(null);
+    const denied = await call(handler, actor, "threads/queue", { botId: "foreign-bot" });
+    expect(denied?.status).not.toBe(200);
+    expect(findMany).toHaveBeenCalledTimes(1);
+  });
+
   it.each([undefined, 25 * 1024 * 1024])(
     "advertises the effective upload limit in me (%s)",
     async (maxUploadSizeBytes) => {

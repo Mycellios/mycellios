@@ -1,3 +1,5 @@
+import { useGeneralPreferences } from "../../lib/general-preferences";
+import { NewChatControl } from "../../components/composer/NewChatControl";
 import { isAndroidHost } from "../../lib/android-host";
 import { useSpaceRpc, useBoundTaskThreadScope } from "../../lib/space-rpc";
 import { useLingui } from "@lingui/react/macro";
@@ -14,7 +16,7 @@ import {
 } from "@rakazo/core";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
 import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
-import { ArrowUp, AudioLines, Box, FilePlus, ImagePlus, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, Trash2, X } from "lucide-react";
+import { ArrowUp, AudioLines, Box, File as FileIcon, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, Trash2, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent, ReactNode, RefObject } from "react";
 import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -49,7 +51,7 @@ import {
   slashActionLabel,
 } from "./composer-mentions";
 import { useComposerLayout } from "./use-composer-layout";
-import { SideQuestion } from "./side-question";
+import { QueuedMessages } from "./queued-messages";
 import { useVoiceShortcut } from "./use-voice-shortcut";
 import { ReviewedVoice, useReviewedVoice } from "./reviewed-voice";
 
@@ -57,7 +59,10 @@ const ATTACHMENT_ACCEPT = attachmentPickerAccept(navigator.userAgent);
 export const Composer = memo(function Composer({
   artifactTarget,
   activeName,
+  activeColor,
+  onNewChatStarted,
   running,
+  busyMessages = running,
   disabled,
   pendingAttachments,
   attachmentNotice,
@@ -92,12 +97,17 @@ export const Composer = memo(function Composer({
   enterToSend,
   onImportAgent,
   onOpenVoice,
+  onCloseVoice,
+  onAskAside,
   voiceConversationActive = false,
   voiceShortcutRequested = false,
   onVoiceShortcutConsumed,
 }: {
   activeName?: string;
+  activeColor?: string;
+  onNewChatStarted?: () => void;
   running: boolean;
+  busyMessages?: boolean;
   disabled?: boolean;
   pendingAttachments: PendingAttachment[];
   attachmentNotice: string | null;
@@ -117,7 +127,7 @@ export const Composer = memo(function Composer({
   fileInputRef: RefObject<HTMLInputElement | null>;
   onAttachmentPick: (files: FileList | readonly File[] | null) => boolean;
   onRemoveAttachment: (attachment: PendingAttachment) => void;
-  onSend: (text: string, mentions: ComposerMention[], clientNonce: string) => Promise<boolean>;
+  onSend: (text: string, mentions: ComposerMention[], clientNonce: string, delivery?: "queue" | "steer") => Promise<boolean>;
   onStop: () => Promise<void>;
   /** Whether the configured voice provider transcribes audio. Undefined while unknown. */
   dictationTranscribe?: boolean;
@@ -135,6 +145,8 @@ export const Composer = memo(function Composer({
   /** When set, a dropped OpenClaw or Hermes folder or backup offers Import or Attach. */
   onImportAgent?: (agent: AgentImportReader) => void;
   onOpenVoice?: () => void;
+  onCloseVoice?: () => void;
+  onAskAside?: (text: string) => void;
   voiceConversationActive?: boolean;
   voiceShortcutRequested?: boolean;
   onVoiceShortcutConsumed?: () => void;
@@ -143,7 +155,11 @@ export const Composer = memo(function Composer({
   const rpc = useSpaceRpc();
   const taskScope = useBoundTaskThreadScope();
   const [draft, setDraft] = useState(() => readComposerDraft(draftKey));
-  const [sideQuestionOpen, setSideQuestionOpen] = useState(false);
+  const defaultDelivery = useGeneralPreferences().busyMessageMode;
+  const [delivery, setDelivery] = useState<"queue" | "steer">(defaultDelivery);
+  const [acceptedMode, setAcceptedMode] = useState<"queue" | "steer" | null>(null);
+  useEffect(() => { setDelivery(defaultDelivery); setAcceptedMode(null); }, [draftKey, defaultDelivery]);
+  useEffect(() => { if (!running) setAcceptedMode(null); }, [running]);
   const sideQuestionBotId = "botId" in artifactTarget ? artifactTarget.botId : null;
   const review = useReviewWorkspace();
   const lastReviewDraft = useRef(0);
@@ -281,6 +297,14 @@ export const Composer = memo(function Composer({
     selectedSkill !== null ||
     selectedMentions.length > 0 ||
     pendingAttachments.length > 0;
+
+  function askAside() {
+    if (!sideQuestionBotId || !onAskAside) return;
+    setAddMenuOpen(false);
+    const text = pendingAttachments.length === 0 ? draft : "";
+    if (text) updateDraft("");
+    onAskAside(text);
+  }
 
   function markEdited() {
     editRevision.current += 1;
@@ -424,7 +448,9 @@ export const Composer = memo(function Composer({
     const mentions = selectedMentions;
     setSelectedMentions([]);
     try {
-      const accepted = (await onSend(text, mentions, clientNonce)) !== false;
+      const mode = busyMessages ? delivery : undefined;
+      const accepted = (await (mode ? onSend(text, mentions, clientNonce, mode) : onSend(text, mentions, clientNonce))) !== false;
+      if (accepted && mode) setAcceptedMode(mode);
       settleComposerDraftSubmission(draftKey, submission, accepted);
       if (accepted) return;
     } catch {
@@ -799,41 +825,34 @@ export const Composer = memo(function Composer({
           ref={attachButtonRef}
           aria-label={t`Add to message`}
           disabled={disabled || desktopVoice}
-          className={`col-start-1 size-8 shrink-0 rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground ${
+          className={`col-start-1 size-10 shrink-0 rounded-full border-0 bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:size-7 ${
             expanded ? "row-start-2" : ""
           }`}
         >
           <Plus size={16} strokeWidth={2} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-56 max-w-[calc(100vw-2rem)] p-1.5" aria-label={t`Add to message`}>
-          <DropdownMenuItem className="min-h-10 gap-2.5" onClick={() => {
+        <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-48 max-w-[calc(100vw-2rem)] p-1.5" aria-label={t`Add to message`}>
+          <DropdownMenuItem className="min-h-8 gap-2" onClick={() => {
             setAddMenuOpen(false);
             const input = fileInputRef.current;
-            if (input) { input.accept = "image/png,image/jpeg,image/webp,image/gif"; input.click(); }
-          }}><ImagePlus aria-hidden="true" />{t`Attach image`}</DropdownMenuItem>
-          <DropdownMenuItem className="min-h-10 gap-2.5" onClick={() => {
+            if (input) { input.accept = ATTACHMENT_ACCEPT; input.click(); }
+          }}><FileIcon aria-hidden="true" />{t`Attach files`}</DropdownMenuItem>
+          <DropdownMenuItem className="min-h-8 gap-2" onClick={() => {
             setAddMenuOpen(false);
             onSlashOpen?.(); setMentionQuery(null); setSkillPickerOnly(true); setSlashQuery("");
             requestAnimationFrame(() => requestAnimationFrame(() => focusComposer()));
           }}><Puzzle aria-hidden="true" />{t`Use a skill`}</DropdownMenuItem>
-          <DropdownMenuItem className="min-h-10 gap-2.5" onClick={() => {
-            setAddMenuOpen(false);
-            const input = fileInputRef.current;
-            if (input) { input.accept = ATTACHMENT_ACCEPT; input.click(); }
-          }}><FilePlus aria-hidden="true" />{t`Add context`}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="min-h-10 gap-2.5" disabled={!sideQuestionBotId} onClick={() => { setAddMenuOpen(false); setSideQuestionOpen(true); }}>
+          <DropdownMenuItem className="min-h-8 gap-2" disabled={!sideQuestionBotId || !onAskAside} onClick={askAside}>
             <MessageCircleQuestion aria-hidden="true" />{t`Ask aside`}
           </DropdownMenuItem>
-          <DropdownMenuItem className="min-h-11 gap-2.5"
-            disabled={disabled || onCall || sending || voice.state !== null || reviewedVoice.stage !== "closed" ||
-              pendingAttachments.length >= ATTACHMENT_MAX_COUNT || typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia}
-            onClick={() => { setAddMenuOpen(false); voice.start(true); }}>
-            <AudioLines aria-hidden="true" />{t`Record voice message`}
-          </DropdownMenuItem>
-          <DropdownMenuItem className="min-h-10 gap-2.5" disabled={!onOpenVoice || onCall || !sideQuestionBotId} onClick={() => { setAddMenuOpen(false); onOpenVoice?.(); }}>
-            <AudioLines aria-hidden="true" />{t`Voice`}
-          </DropdownMenuItem>
+          {onOpenVoice && sideQuestionBotId ? (
+            <DropdownMenuItem className="min-h-8 gap-2"
+              disabled={disabled || sending || onCall || voice.state !== null || reviewedVoice.stage !== "closed"}
+              onClick={() => { setAddMenuOpen(false); onOpenVoice(); }}>
+              <AudioLines aria-hidden="true" />{t`Voice`}
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
         </DropdownMenu>}
         <div
@@ -956,37 +975,57 @@ export const Composer = memo(function Composer({
         {voice.state && mobileVoice ? <div className="col-start-2 row-start-2 min-w-0"><ComposerVoiceStrip voice={voice} /></div> : null}
         <div
           ref={composerActionsRef}
-          className={`col-start-3 flex shrink-0 items-center gap-2 justify-self-end ${
+          className={`col-start-3 flex shrink-0 items-center gap-1.5 justify-self-end ${
             expanded ? "row-start-2" : ""
           }`}
         >
+          {sideQuestionBotId ? <NewChatControl key={draftKey} botId={sideQuestionBotId}
+            name={activeName ?? t`Mico`} color={activeColor} onStarted={onNewChatStarted}
+            disabled={Boolean(disabled || running || sending || onCall || voice.state || reviewedVoice.stage !== "closed")} /> : null}
           {desktopVoice ? <ComposerVoiceStrip voice={voice} compact /> : (
             <ComposerVoiceButton voice={voice} disabled={disabled || sending || onCall || reviewedVoice.stage !== "closed"} />
           )}
-          <Button
-              size="icon"
-              aria-label={t`Send`}
-              disabled={Boolean(voice.state) || sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
+          {!voice.state ? running && busyMessages && !canSend ? (
+            <Button type="button" variant="ghost" size="icon" aria-label={t`Stop`}
+              title={t`Stop`} disabled={sending} onClick={() => void onStop()}
+              className="size-10 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 hover:text-background md:size-7">
+              <Square size={12} strokeWidth={0} fill="currentColor" aria-hidden />
+            </Button>
+          ) : !running && !canSend && onOpenVoice && sideQuestionBotId && !sending && !disabled && (!onCall || voiceConversationActive) ? (
+            <Button type="button" variant="ghost" size="icon"
+              data-testid="composer-voice-conversation"
+              aria-label={voiceConversationActive ? t`End voice conversation` : t`Start voice conversation`}
+              title={voiceConversationActive ? t`End voice conversation` : t`Start voice conversation`}
+              disabled={reviewedVoice.stage !== "closed" || (voiceConversationActive && !onCloseVoice)}
+              onClick={() => voiceConversationActive ? onCloseVoice?.() : onOpenVoice()}
+              className="size-10 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 hover:text-background md:size-7">
+              {voiceConversationActive ? <X size={16} aria-hidden /> : <AudioLines size={16} aria-hidden />}
+            </Button>
+          ) : (
+            <Button type="button" size="icon"
+              aria-label={busyMessages ? delivery === "queue" ? t`Add to queue` : t`Update current task` : t`Send`}
+              disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
               onClick={send}
-              className={`shrink-0 rounded-full transition-transform active:scale-95 disabled:opacity-100 ${voice.state && mobileVoice ? "size-10 disabled:bg-status-working/25 disabled:text-status-working" : "size-8 disabled:bg-primary-disabled disabled:text-foreground/30"}`}
-            >
-              <ArrowUp size={16} strokeWidth={2.2} />
-          </Button>
-          {running ? (
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label={t`Stop`}
-              disabled={sending}
-              onClick={() => void onStop()}
-              className="size-8 rounded-full border border-border bg-muted text-foreground/80 shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <Square size={11} strokeWidth={0} fill="currentColor" />
+              className="size-10 shrink-0 rounded-full transition-transform active:scale-95 disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100 md:size-7">
+              <ArrowUp size={16} strokeWidth={2.2} aria-hidden />
             </Button>
           ) : null}
         </div>
       </div>
-      {sideQuestionBotId ? <SideQuestion key={`${sideQuestionBotId}:${taskScope?.taskThreadId ?? ""}`} rpc={rpc} taskThreadId={taskScope?.taskThreadId} botId={sideQuestionBotId} open={sideQuestionOpen} onOpenChange={setSideQuestionOpen} /> : null}
+      <QueuedMessages target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }} running={running} sending={sending} />
+      {busyMessages ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-2 text-xs text-muted-foreground" data-testid="busy-message-actions">
+        <label className="flex items-center gap-2">{t`Send message to`}
+          <select aria-label={t`Send message to`} value={delivery} disabled={sending || disabled}
+            className="rounded-md border border-border bg-background px-2 py-1 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            onChange={event => setDelivery(event.target.value as "queue" | "steer")}>
+            <option value="queue">{t`Queue · after this task`}</option>
+            <option value="steer">{t`Current task · update instructions`}</option>
+          </select>
+        </label>
+        {sideQuestionBotId ? <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={askAside}>{t`Ask without interrupting`}</button> : null}
+        {acceptedMode ? <span role="status">{acceptedMode === "queue" ? t`Message saved in the queue.` : t`Instructions sent to the current task.`}</span> : null}
+      </div> : null}
+
     </fieldset>
   );
 });

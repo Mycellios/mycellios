@@ -15,7 +15,7 @@ export type ChatToolsActions = {
 export function ChatToolsMenu(props: ChatToolsActions) {
   const { t } = useLingui();
   return <DropdownMenu>
-    <DropdownMenuTrigger aria-label={t`Chat tools`} className="app-no-drag inline-flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring min-[1100px]:hidden"><PanelRightOpen size={17} /></DropdownMenuTrigger>
+    <DropdownMenuTrigger aria-label={t`Chat tools`} className="app-no-drag rk-chat-action inline-flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring min-[1100px]:hidden"><PanelRightOpen size={18} strokeWidth={1.75} aria-hidden /></DropdownMenuTrigger>
     <DropdownMenuContent align="end">
       <DropdownMenuItem onClick={props.onBrowser}><Monitor size={15} />{t`Open browser`}</DropdownMenuItem>
       <DropdownMenuItem onClick={props.onFiles}><FolderOpen size={15} />{t`Open library`}</DropdownMenuItem>

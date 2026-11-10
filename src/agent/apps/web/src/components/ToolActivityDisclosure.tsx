@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@rakazo/ui-web/components/ui/collapsible";
-import { ChevronRight } from "lucide-react";
+import { Check, ChevronRight, LoaderCircle } from "lucide-react";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { getToolActivityExpanded, subscribeToolActivity } from "../lib/tool-activity-preference";
 import { formatToolActivityDuration, toolStepCount } from "../lib/tool-activity-view";
@@ -38,13 +38,10 @@ export function ToolSteps({
         const index = hidden + offset;
         const isCurrent = index === currentIndex;
         return (
-          <div key={index} className="flex min-w-0 items-center gap-2 leading-5">
-            <span
-              className={`text-[12px] ${isCurrent ? "text-warning" : "text-success"}`}
-              style={{ animation: isCurrent ? "rkPulse 1.2s ease-in-out infinite" : undefined }}
-            >
-              {isCurrent ? "◷" : "✓"}
-            </span>
+          <div key={index} aria-current={isCurrent ? "step" : undefined} className="flex min-w-0 items-center gap-2 leading-5">
+            {isCurrent
+              ? <LoaderCircle className="size-3.5 shrink-0 text-muted-foreground motion-safe:animate-spin" aria-hidden="true" />
+              : <Check className="size-3.5 shrink-0 text-success" aria-hidden="true" />}
             <span
               className={`min-w-0 flex-1 truncate text-[13px] ${
                 isCurrent ? "text-foreground" : "text-muted-foreground"

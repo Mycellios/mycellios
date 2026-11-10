@@ -660,6 +660,7 @@ export async function sendThreadMessage(
     clientNonce?: string;
     responseLocale?: string;
     taskInstructions?: string;
+    delivery?: "queue" | "steer";
   },
   releaseTakeover?: (runId: string) => Promise<void>,
   beforeCommit?: (tx: Prisma.TransactionClient) => Promise<void>,
@@ -669,7 +670,7 @@ export async function sendThreadMessage(
     deps,
     target.threadId,
     input.clientNonce,
-    releaseTakeover,
+    input.delivery === "queue" ? undefined : releaseTakeover,
   );
   if (existing) return existing;
   // Live events carry the call id so a spoken turn joins the call card on first
@@ -815,7 +816,8 @@ export async function sendThreadMessage(
               messageId: message.id,
               botId: target.botId,
               userId: actor.userId,
-              runId: steersUserMessage(active) ? active.id : null,
+              runId: input.delivery === "queue" ? null : steersUserMessage(active) ? active.id : null,
+              ...(input.delivery === "queue" ? { originTrigger: "queued_user" } : {}),
             },
           });
           await tx.message.update({ where: { id: message.id }, data: { runId: active.id } });
@@ -975,7 +977,8 @@ export async function sendThreadMessage(
               messageId: message.id,
               botId,
               userId: actor.userId,
-              runId: steersUserMessage(active) ? active.id : null,
+              runId: input.delivery === "queue" ? null : steersUserMessage(active) ? active.id : null,
+              ...(input.delivery === "queue" ? { originTrigger: "queued_user" } : {}),
             },
           });
           runs.push(active);
@@ -1052,7 +1055,7 @@ export async function sendThreadMessage(
       deps,
       target.threadId,
       input.clientNonce,
-      releaseTakeover,
+      input.delivery === "queue" ? undefined : releaseTakeover,
     );
     if (winner) return { replay: winner } as const;
     throw error;
@@ -1062,7 +1065,7 @@ export async function sendThreadMessage(
     // Subscribers catch up from the durable event cursor after a missed realtime wake.
     getLogger().error("thread send realtime notification", error);
   });
-  if (releaseTakeover) {
+  if (releaseTakeover && input.delivery !== "queue") {
     for (const run of committed.runs) {
       if (steersUserMessage(run)) await releaseTakeover(run.id);
     }

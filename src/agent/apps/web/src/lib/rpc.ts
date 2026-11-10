@@ -1,3 +1,5 @@
+import { getGeneralPreferences } from "./general-preferences";
+import { shouldRestoreSavedSpace } from "./startup-space";
 import { createORPCClient, RECURSIVE_CLIENT_UNWRAP_KEYS } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
@@ -14,11 +16,14 @@ import { reportClientError } from "./monitoring";
 import { taskThreadInput, taskThreadResult, type TaskThreadScope } from "./task-thread-scope";
 
 const SPACE_STORAGE_KEY = "rakazo:space-id";
+// Read once: changing this preference never changes the active Space.
+let restoreSavedSpace = shouldRestoreSavedSpace(getGeneralPreferences().restoreLastWorkspace,
+  typeof window === "undefined" ? "" : window.location?.pathname ?? "");
 
 type RpcClientContext = { spaceId?: string | null };
 
 export function selectedSpaceId(): string | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined" || !restoreSavedSpace) return null;
   try {
     return window.localStorage.getItem(SPACE_STORAGE_KEY);
   } catch {
@@ -27,6 +32,7 @@ export function selectedSpaceId(): string | null {
 }
 
 export function selectSpace(id: string): boolean {
+  restoreSavedSpace = true;
   try {
     window.localStorage.setItem(SPACE_STORAGE_KEY, id);
     return true;

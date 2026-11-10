@@ -1,3 +1,4 @@
+import { getGeneralPreferences } from "./general-preferences";
 import { readBoundedResponseBytes, speechLocaleTag } from "@rakazo/core";
 import { isAndroidHost, startAndroidDictation } from "./android-host";
 import { appPath } from "./app-path";
@@ -109,6 +110,8 @@ const RESTART_GIVE_UP_ERROR =
  * app. The browser's language stays in that case.
  */
 export function recognitionLanguage(): string {
+  const explicit = getGeneralPreferences().dictationLanguage;
+  if (explicit !== "auto") return explicit;
   const browser = navigator.language || "en-US";
   const tag = speechLocaleTag(getActiveUiLocale());
   return tag && tag !== "en-US" ? tag : browser;
@@ -119,6 +122,8 @@ export function recognitionLanguage(): string {
  * (`es`, `pt`, `zh`). Undefined leaves detection to the provider.
  */
 export function transcriptionLanguage(): string | undefined {
+  const explicit = getGeneralPreferences().dictationLanguage;
+  if (explicit !== "auto") return explicit.split("-")[0]?.toLowerCase();
   const tag = speechLocaleTag(getActiveUiLocale());
   return tag ? tag.split("-")[0]?.toLowerCase() : undefined;
 }

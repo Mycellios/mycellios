@@ -40,7 +40,7 @@ export function ProviderRuntimeDetails({ runtime }: { runtime: ProviderRuntime }
   const { t } = useLingui();
   return (
     <div className="space-y-2 ps-7 text-sm text-muted-foreground">
-      <p>{runtime.available ? t`Available in each Mico’s Agent engine settings.`
+      <p>{runtime.available ? t`Select this provider from the model menu in your chat.`
         : t`A server administrator must configure this agent engine before it can be used.`}</p>
     </div>
   );
@@ -55,7 +55,7 @@ export function ProviderDiscovery({ host, onSelect, disabled }: {
   const queries = useSpaceQueries();
   const registry = useQuery(queries.engines.registry.queryOptions({ enabled: false, staleTime: 5 * 60_000 }));
   const [search, setSearch] = useState("");
-  const native = host.engines.data?.filter((engine) => engine.id !== "pi") ?? [];
+  const native = host.engines.data?.filter((engine) => engine.id === "codex" || engine.id === "claude") ?? [];
   const matches = registry.data?.filter((agent) => !search.trim() || matchesSearchQuery(search, agent.name, agent.id, agent.description));
   return (
     <div className="space-y-6" data-testid="provider-discovery">

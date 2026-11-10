@@ -39,6 +39,7 @@ import {
 } from "./calendar-dates";
 import "../tasks/tasks.css";
 import "./schedule.css";
+import { ScheduleEmptyState } from "./ScheduleEmptyState";
 
 export function ScheduleWorkspace({
   client,
@@ -280,6 +281,7 @@ export function ScheduleWorkspace({
       data-testid="schedule-workspace"
       aria-label={t`Schedule`}
       data-view={view}
+      data-empty={!loading && !error && data?.routines.length === 0}
     >
       <header
         className={`rk-schedule-header ${desktopDragClass()}`}
@@ -416,26 +418,8 @@ export function ScheduleWorkspace({
           >{t`Some occurrences could not be displayed. Choose a smaller range or review the routines.`}</p>
         ) : null}
         {loading ? <p className="sr-only" role="status">{t`Loading schedule…`}</p> : null}
-        {!loading && data?.routines.length === 0 ? (
-          <div className="rk-schedule-empty">
-            <Clock3 size={30} />
-            <h2>{t`Give your Micos a schedule.`}</h2>
-            <p>{t`Create a routine to see its upcoming runs here.`}</p>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className="rk-schedule-create"
-                disabled={!bots.length}
-              >{t`Create Routine`}</DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {bots.map((bot) => (
-                  <DropdownMenuItem key={bot.id} onClick={() => onCreateRoutine(bot.id)}>
-                    <BotAvatar identity={bot.id} color={bot.color} size={18} />
-                    {bot.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+        {!loading && !error && data?.routines.length === 0 ? (
+          <ScheduleEmptyState bots={bots.filter(bot => !spaceId || bot.spaceId === spaceId)} anchor={anchor} today={today} onCreateRoutine={onCreateRoutine} onCreateMico={onExit} />
         ) : null}
         {loading || (data && data.routines.length > 0) ? (
           <div className="rk-schedule-body" aria-busy={loading}>

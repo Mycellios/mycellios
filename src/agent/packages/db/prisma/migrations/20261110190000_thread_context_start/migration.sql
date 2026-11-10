@@ -1,0 +1,1 @@
+ALTER TABLE "threads" ADD COLUMN "contextStartSeq" INTEGER NOT NULL DEFAULT 0;

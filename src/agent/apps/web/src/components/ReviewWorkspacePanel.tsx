@@ -36,7 +36,7 @@ import { ReviewPdfViewer } from "./ReviewPdfViewer";
 import { SandboxedHtmlViewer } from "./SandboxedHtmlViewer";
 import { ProjectRunControls, type ProjectPreparationStatus } from "./ProjectRunControls";
 
-export function ReviewWorkspacePanel({ agentName, agentAvatar, onReturnToChat, botId, taskThreadId, prepareProject, inspectPreparation, cancelPreparation }: { agentName?: string; agentAvatar?: ReactNode; onReturnToChat?: () => void; botId?: string; taskThreadId?: string; prepareProject?: (prompt: string, id: string) => Promise<string | undefined>; inspectPreparation?: (runId: string) => Promise<ProjectPreparationStatus>; cancelPreparation?: (runId: string) => Promise<unknown> } = {}) {
+export function ReviewWorkspacePanel({ agentName, agentAvatar, onReturnToChat, botId, taskThreadId, prepareProject, inspectPreparation, cancelPreparation, workspaceNavigation }: { workspaceNavigation?: ReactNode; agentName?: string; agentAvatar?: ReactNode; onReturnToChat?: () => void; botId?: string; taskThreadId?: string; prepareProject?: (prompt: string, id: string) => Promise<string | undefined>; inspectPreparation?: (runId: string) => Promise<ProjectPreparationStatus>; cancelPreparation?: (runId: string) => Promise<unknown> } = {}) {
   const review = useReviewWorkspace();
   const { t } = useLingui();
   const mobile = useIsMobile();
@@ -122,6 +122,7 @@ export function ReviewWorkspacePanel({ agentName, agentAvatar, onReturnToChat, b
               else returnToChat();
             }
           }}>
+          {workspaceNavigation}
           {mobile ? (
             <header className="flex h-14 shrink-0 items-center gap-2 px-3">
               <Button ref={backToChat} variant="floating" size="icon-lg" className={mobileButton}
@@ -145,8 +146,8 @@ export function ReviewWorkspacePanel({ agentName, agentAvatar, onReturnToChat, b
           </p>}
           <header className={mobile
             ? `shrink-0 justify-end gap-2 px-3 pb-2 ${tools === "options" ? "flex" : "hidden"}`
-            : "flex h-14 shrink-0 items-center gap-2 border-b border-border px-4"}>
-            {!mobile && <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{t`Browser`}</h2>}
+            : `flex ${workspaceNavigation ? "h-10" : "h-14"} shrink-0 items-center gap-2 border-b border-border px-4`}>
+            {!mobile && !workspaceNavigation && <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{t`Browser`}</h2>}
             <Button
               variant="ghost"
               size="icon-sm"
@@ -167,7 +168,7 @@ export function ReviewWorkspacePanel({ agentName, agentAvatar, onReturnToChat, b
               className={buttonVariants({ variant: "ghost", size: "sm", className: "min-h-11" })}
               href={active.url} target="_blank" rel="noopener noreferrer"
             ><Globe size={18} aria-hidden />{t`Open in browser`}</a>}
-            {!mobile && <Button
+            {!mobile && !workspaceNavigation && <Button
               variant="ghost"
               size="icon-sm"
               aria-label={t`Close preview`}

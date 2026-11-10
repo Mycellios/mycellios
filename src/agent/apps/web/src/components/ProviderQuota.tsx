@@ -1,21 +1,9 @@
 import { useLingui } from "@lingui/react/macro";
 import type { AccountPlanLimits } from "@rakazo/contracts";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  Popover,
-  PopoverContent,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@rakazo/ui-web";
-import { ChartArea, ChevronDown, Gauge, RefreshCw, Settings2 } from "lucide-react";
+import { Button, Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@rakazo/ui-web";
+import { ChevronDown, Gauge } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { appPath } from "../lib/app-path";
+import { ProviderLogo } from "./ProviderLogo";
 import { useSpaceRpc } from "../lib/space-rpc";
 import {
   freshQuota,
@@ -66,7 +54,11 @@ function QuotaContent({
       const abort = new AbortController();
       controller.current = abort;
       try {
-        const value = await rpc.models.planLimits({ refresh }, { signal: abort.signal });
+        const [value, native] = await Promise.all([
+          rpc.models.planLimits({ refresh }, { signal: abort.signal }),
+          rpc.engines.codexQuota(undefined, { signal: abort.signal }).catch(() => null),
+        ]);
+        if (native) value.accounts = [...value.accounts, native];
         if (alive.current && !abort.signal.aborted) {
           setData(value);
           setError(false);
@@ -111,14 +103,6 @@ function QuotaContent({
     window.addEventListener("storage", sync);
     return () => window.removeEventListener("storage", sync);
   }, [scope]);
-  function save(next: typeof preferences) {
-    setPreferences(next);
-    try {
-      localStorage.setItem(quotaPreferencesKey(scope), JSON.stringify(next));
-    } catch {
-      /* Session preferences still work. */
-    }
-  }
   const accounts = data?.accounts.filter((row) => row.status !== "unsupported") ?? [];
   const account =
     accounts.find((row) => row.credentialId === preferences.accountId) ??
@@ -127,12 +111,6 @@ function QuotaContent({
   const windows = !error ? ringWindows(account, now) : [];
   const remaining = windows.length ? Math.min(...windows.map(remainingQuota)) : null;
   const name = account ? providerName(account.provider) : t`Model accounts`;
-  const logo =
-    account?.provider === "openai-codex"
-      ? "openai"
-      : account?.provider === "anthropic"
-        ? "anthropic"
-        : null;
   const summary =
     remaining === null ? t`Quota unavailable` : t`${Math.round(remaining)}% remaining`;
   const action = (callback: () => void) => {
@@ -192,7 +170,7 @@ function QuotaContent({
                       cy="17"
                       r={radius}
                       fill="none"
-                      stroke={quotaColor(remainingQuota(window))}
+                      stroke={remainingQuota(window) >= 30 ? "#22c55e" : quotaColor(remainingQuota(window))}
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeDasharray={`${(perimeter * remainingQuota(window)) / 100} ${perimeter}`}
@@ -203,8 +181,10 @@ function QuotaContent({
               );
             })}
           </svg>
-          {logo ? (
-            <img src={appPath(`/providers/${logo}.svg`)} alt="" className="size-3.5 dark:invert" />
+          {account ? (
+            <span className="grid size-3.5 place-items-center [&_img]:size-3.5 [&_span]:size-3.5 [&_svg]:size-3.5">
+              <ProviderLogo name={name} providerId={account.provider} />
+            </span>
           ) : (
             <Gauge size={15} className="text-muted-foreground" />
           )}
@@ -221,54 +201,19 @@ function QuotaContent({
         align="end"
         sideOffset={8}
         collisionAvoidance={{ side: "shift", align: "shift", fallbackAxisSide: "none" }}
-        className="app-no-drag max-h-[calc(100dvh-24px)] w-[340px] max-w-[calc(100vw-24px)] gap-0 overflow-y-auto rounded-xl p-0"
+        className="app-no-drag max-h-[calc(100dvh-24px)] w-[340px] max-w-[calc(100vw-24px)] gap-0 overflow-y-auto rounded-xl border-0 bg-sidebar p-3 shadow-none ring-0 dark:bg-[#222222]"
         data-testid="provider-quota-panel"
       >
-        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-          <PopoverTitle className="flex items-center gap-2"><Gauge size={16} aria-hidden="true" />{t`Usage`}</PopoverTitle>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t`Refresh quota`}
-              disabled={busy}
-              onClick={() => void load(true)}
-            >
-              <RefreshCw
-                size={15}
-                className={busy ? "animate-spin motion-reduce:animate-none" : ""}
-              />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                aria-label={t`Quota settings`}
-                className="grid size-8 place-items-center rounded-md hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Settings2 size={16} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 max-w-[calc(100vw-24px)]">
-                <DropdownMenuCheckboxItem
-                  checked={preferences.autoRefresh}
-                  onCheckedChange={(value) => save({ ...preferences, autoRefresh: value })}
-                >{t`Refresh automatically`}</DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => action(onModels)}
-                >{t`Manage model accounts`}</DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => action(onUsage)}
-                >{t`View usage and costs`}</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-        <div className="space-y-3 px-4 py-3">
+        <PopoverTitle className="mb-2 flex items-center gap-2 text-xs font-semibold leading-4">
+          <Gauge size={14} aria-hidden="true" />{t`Usage`}
+        </PopoverTitle>
+        <div className="space-y-3">
           {busy && !data ? (
-            <p role="status" className="text-sm text-muted-foreground">{t`Checking quota…`}</p>
+            <p role="status" className="text-xs text-muted-foreground">{t`Checking quota…`}</p>
           ) : error ? (
-            <p role="status" className="text-sm text-muted-foreground">{t`Could not refresh quota. Try again.`}</p>
+            <p role="status" className="text-xs text-muted-foreground">{t`Could not refresh quota. Try again.`}</p>
           ) : !accounts.length ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {data?.accounts.length
                 ? t`This connection does not report subscription quota.`
                 : t`Connect a model account to see its subscription quota.`}
@@ -276,11 +221,12 @@ function QuotaContent({
           ) : (
             accounts.map((row) => {
               const provider = providerName(row.provider);
-              const icon = row.provider === "openai-codex" ? "openai" : row.provider === "anthropic" ? "anthropic" : null;
               return (
-                <section key={row.credentialId} className="space-y-2 border-b border-border pb-3 last:border-0 last:pb-0">
-                  <h3 className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-                    {icon ? <img src={appPath(`/providers/${icon}.svg`)} alt="" className="size-4 shrink-0 dark:invert" /> : null}
+                <section key={row.credentialId} className="space-y-1">
+                  <h3 className="flex min-w-0 items-center gap-2 text-xs font-semibold leading-4">
+                    <span className="grid size-4 shrink-0 place-items-center [&_img]:size-4 [&_span]:size-4 [&_svg]:size-4">
+                      <ProviderLogo name={provider} providerId={row.provider} />
+                    </span>
                     <span className="truncate">{provider}</span>
                     {row.label !== row.provider && row.label !== provider ? (
                       <span className="truncate text-xs font-normal text-muted-foreground">{row.label}</span>
@@ -295,7 +241,7 @@ function QuotaContent({
                           : t`Quota is temporarily unavailable.`}
                     </p>
                   ) : (
-                    <ul className="space-y-2">
+                    <ul className="space-y-1.5 pl-6">
                       {row.windows.map((window) => {
                         const fresh = freshQuota(row, now) && usableWindow(window, now);
                         const value = remainingQuota(window);
@@ -317,11 +263,11 @@ function QuotaContent({
                               aria-valuemax={100}
                               aria-valuenow={fresh ? Math.round(value) : undefined}
                               aria-valuetext={fresh ? t`${Math.round(value)}% remaining` : t`Awaiting refresh`}
-                              className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
+                              className="h-1 min-w-6 flex-1 overflow-hidden rounded-full bg-foreground/15"
                             >
-                              {fresh ? <div style={{ width: `${value}%`, backgroundColor: quotaColor(value) }} className="h-full rounded-full" /> : null}
+                              {fresh ? <div style={{ width: `${value}%`, backgroundColor: value < 30 ? quotaColor(value) : "var(--foreground)" }} className="h-full rounded-full" /> : null}
                             </div>
-                            {fresh ? <span className="shrink-0 font-semibold" style={{ color: quotaColor(value) }}>{Math.round(value)}%</span> : <span>{t`Awaiting refresh`}</span>}
+                            {fresh ? <span className="shrink-0 font-semibold text-foreground">{t`${Math.round(value)}% remaining`}</span> : <span>{t`Awaiting refresh`}</span>}
                             {fresh && date ? (
                               <time dateTime={date.toISOString()} title={new Intl.DateTimeFormat(i18n.locale, { dateStyle: "full", timeStyle: "short" }).format(date)} className="shrink-0">
                                 {remainingTime}
@@ -337,16 +283,16 @@ function QuotaContent({
             })
           )}
         </div>
-        <div className="grid gap-1 border-t p-2">
-          <Button variant="ghost" className="justify-start gap-2" onClick={() => action(onModels)}>
-            <Settings2 size={15} />
+        {(error || (!busy && !accounts.length)) ? (
+          <Button variant="link" className="mt-2 h-auto justify-start p-0 text-xs" disabled={busy}
+            onClick={() => error ? void load(true) : action(onModels)}>
+            {error ? t`Retry` : t`Manage model accounts`}
+          </Button>
+        ) : accounts.some((row) => row.status !== "available") ? (
+          <Button variant="link" className="mt-2 h-auto justify-start p-0 text-xs" onClick={() => action(onModels)}>
             {t`Manage model accounts`}
           </Button>
-          <Button variant="ghost" className="justify-start gap-2" onClick={() => action(onUsage)}>
-            <ChartArea size={15} />
-            {t`View usage and costs`}
-          </Button>
-        </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

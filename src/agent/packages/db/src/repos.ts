@@ -65,6 +65,7 @@ function rosterUpdatedAt(newestMessage: { createdAt: Date } | undefined, botUpda
 
 function mapBot(
   bot: {
+    nativeConfig?: unknown;
     id: string;
     spaceId: string;
     name: string;
@@ -133,6 +134,7 @@ function mapBot(
     updatedAt: updatedAt.toISOString(),
     voiceId: bot.voiceId ?? null,
     autoSpeak: bot.autoSpeak ?? false,
+    nativeConfig: (bot.nativeConfig ?? null) as Bot["nativeConfig"],
     agentEngine: (bot.agentEngine ?? "pi") as Bot["agentEngine"],
     modelProvider: bot.modelProvider ? canonicalPiProviderId(bot.modelProvider) : null,
     modelId: bot.modelId ?? null,

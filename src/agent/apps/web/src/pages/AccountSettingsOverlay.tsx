@@ -1,3 +1,4 @@
+import { AppearanceExtras, ConversationExtras, AppBehaviorPanel, DevicePrivacySettings } from "./settings/GeneralPreferences";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AccountSecurity } from "@rakazo/contracts";
 import {
@@ -172,12 +173,13 @@ export function GeneralSettingsPanels({
   );
   const passkeysSupported = usePasskeysSupported();
   const [timezonePending, setTimezonePending] = useState(false);
+  const [nativePending, setNativePending] = useState(false);
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
   const deviceTimezone = localTimezone();
   const dirtyName = editingName && nameDraft.trim() !== displayName(name, "");
   useEffect(() => {
-    onFormStateChange?.({ busy: namePending || timezonePending, dirty: dirtyName });
-  }, [onFormStateChange, namePending, timezonePending, dirtyName]);
+    onFormStateChange?.({ busy: namePending || timezonePending || nativePending, dirty: dirtyName });
+  }, [onFormStateChange, namePending, timezonePending, nativePending, dirtyName]);
   useEffect(() => () => onFormStateChange?.({ busy: false, dirty: false }), [onFormStateChange]);
 
   function chooseLocale(next: UiLocale) {
@@ -204,7 +206,7 @@ export function GeneralSettingsPanels({
   }
 
   return (
-    <div className="space-y-8">
+    <div className={mode === "profile" ? "space-y-8" : "rk-general-settings space-y-6"}>
       {mode !== "general" ? <SettingsGroup title={<Trans>Account</Trans>} data-testid="account-card">
         {editingName ? (
           <form
@@ -293,9 +295,10 @@ export function GeneralSettingsPanels({
         ) : null}
       </SettingsGroup> : null}
 
-      {mode !== "profile" ? <><SettingsGroup title={<Trans>Preferences</Trans>}>
+      {mode !== "profile" ? <><SettingsGroup title={<Trans>Appearance</Trans>}>
         <SettingsRow
-          label={<Trans>Appearance</Trans>}
+          label={<Trans>Theme</Trans>}
+          description={t`Light or dark colors. System follows your device.`}
           control={
             <AppearancePicker
               value={appearance}
@@ -306,6 +309,61 @@ export function GeneralSettingsPanels({
             />
           }
         />
+        <SettingsRow
+          label={<Trans>Language</Trans>}
+          description={t`Menus, buttons and messages use this language.`}
+          control={<UiLocalePicker value={locale} onChange={chooseLocale} />}
+        />
+        <SettingsRow
+          label={<Label htmlFor={interfaceSizeId}>{t`Interface size`}</Label>}
+          description={t`The size of text and controls in Mycellios.`}
+          control={
+            <OptionSelect
+              id={interfaceSizeId}
+              value={interfaceSize}
+              options={INTERFACE_SIZES.map((value) => ({ value, label: `${value} %` }))}
+              onValueChange={(value) => {
+                updateInterfaceSize(value);
+                setInterfaceSize(value);
+              }}
+            />
+          }
+        />
+        <AppearanceExtras />
+      </SettingsGroup>
+
+      <SettingsGroup title={t`Conversations`}>
+          <SettingsRow
+            label={<Label htmlFor={enterToSendId}>{t`Send shortcut`}</Label>}
+            control={
+              <OptionSelect
+                id={enterToSendId}
+                data-testid="composer-send-shortcut"
+                value={enterToSend ? "enter" : "modified"}
+                options={[
+                  { value: "enter", label: t`Enter to send` },
+                  { value: "modified", label: t`Ctrl/⌘ + Enter to send` },
+                ]}
+                onValueChange={(value) => setComposerEnterToSend(value === "enter")}
+              />
+            }
+          />
+        <SettingsRow label={<Label htmlFor={showToolActivityId}>{t`Show agent steps`}</Label>}
+          description={t`Open reasoning, tool steps and memory changes by default for each turn.`}
+          control={<Switch id={showToolActivityId} data-testid="tool-activity-toggle" checked={toolActivity === "expanded"}
+            onCheckedChange={checked => setToolActivityPreference(checked ? "expanded" : "on")} />} />
+        <ConversationExtras />
+      </SettingsGroup>
+      <AppBehaviorPanel onBusyChange={setNativePending} />
+      <DevicePrivacySettings />
+
+      <Disclosure
+        data-testid="advanced-settings"
+        className="group rounded-xl border border-border"
+        summary={<Trans>Advanced</Trans>}
+        summaryClassName="w-full flex items-center justify-between gap-4 px-4 py-3 text-[14px] text-foreground"
+      >
+        <div className="divide-y divide-border border-t border-border">
         <SettingsRow
           label={
             <span id={sidebarDensityLabelId}>
@@ -339,24 +397,6 @@ export function GeneralSettingsPanels({
                 <Trans>Compact</Trans>
               </ToggleGroupItem>
             </ToggleGroup>
-          }
-        />
-        <SettingsRow
-          label={<Trans>Language</Trans>}
-          control={<UiLocalePicker value={locale} onChange={chooseLocale} />}
-        />
-        <SettingsRow
-          label={<Label htmlFor={interfaceSizeId}>{t`Interface size`}</Label>}
-          control={
-            <OptionSelect
-              id={interfaceSizeId}
-              value={interfaceSize}
-              options={INTERFACE_SIZES.map((value) => ({ value, label: `${value} %` }))}
-              onValueChange={(value) => {
-                updateInterfaceSize(value);
-                setInterfaceSize(value);
-              }}
-            />
           }
         />
         {onTimezoneChange ? (
@@ -407,15 +447,7 @@ export function GeneralSettingsPanels({
             </SettingsRow>
           </div>
         ) : null}
-      </SettingsGroup>
 
-      <Disclosure
-        data-testid="advanced-settings"
-        className="group rounded-xl border border-border"
-        summary={<Trans>Advanced</Trans>}
-        summaryClassName="w-full flex items-center justify-between gap-4 px-4 py-3 text-[14px] text-foreground"
-      >
-        <div className="divide-y divide-border border-t border-border">
           <SettingsRow
             label={
               <Label htmlFor={developerModeId}>
@@ -436,21 +468,6 @@ export function GeneralSettingsPanels({
             </p>
           </SettingsRow>
           <SettingsRow
-            label={<Label htmlFor={enterToSendId}>{t`Send shortcut`}</Label>}
-            control={
-              <OptionSelect
-                id={enterToSendId}
-                data-testid="composer-send-shortcut"
-                value={enterToSend ? "enter" : "modified"}
-                options={[
-                  { value: "enter", label: t`Enter to send` },
-                  { value: "modified", label: t`Ctrl/⌘ + Enter to send` },
-                ]}
-                onValueChange={(value) => setComposerEnterToSend(value === "enter")}
-              />
-            }
-          />
-          <SettingsRow
             label={
               <Label htmlFor={streamRepliesId} className="text-[14px] font-normal text-foreground">
                 <Trans>Stream replies</Trans>
@@ -466,29 +483,6 @@ export function GeneralSettingsPanels({
                   setStreamReplies(checked);
                   setResponseStreamingPreference(checked ? "on" : "off");
                 }}
-              />
-            }
-          />
-          <SettingsRow
-            label={<Label htmlFor={showToolActivityId}>{t`Show tool activity`}</Label>}
-            help={{ label: t`Show tool activity`, description: t`Shows the steps taken with tools, such as searching the web or reading a file. Hiding this activity does not stop the tools from running.` }}
-            control={
-              <Switch
-                id={showToolActivityId}
-                data-testid="tool-activity-toggle"
-                checked={toolActivity !== "off"}
-                onCheckedChange={(checked) => setToolActivityPreference(checked ? "on" : "off")}
-              />
-            }
-          />
-          <SettingsRow
-            label={<Label htmlFor={`${showToolActivityId}-expanded`}>{t`Expand agent steps by default`}</Label>}
-            control={
-              <Switch
-                id={`${showToolActivityId}-expanded`}
-                checked={toolActivity === "expanded"}
-                disabled={toolActivity === "off"}
-                onCheckedChange={(checked) => setToolActivityPreference(checked ? "expanded" : "on")}
               />
             }
           />
@@ -526,7 +520,7 @@ export function GeneralSettingsPanels({
       ) : null}
 
       {mode === "all" ? <SkillLibrarySettings /> : null}
-      {mode !== "general" ? <AccountAccess onSecurity={setAccountSecurity} /> : null}
+      {mode !== "general" ? <Disclosure summary={t`Account access`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground"><AccountAccess onSecurity={setAccountSecurity} /></Disclosure> : null}
     </div>
   );
 }
@@ -748,43 +742,11 @@ function SettingsPasswordInput({
   );
 }
 
-function AppearancePicker({
-  value,
-  onChange,
-}: {
-  value: AppearancePreference;
-  onChange: (next: AppearancePreference) => void;
-}) {
+function AppearancePicker({ value, onChange }: { value: AppearancePreference; onChange: (next: AppearancePreference) => void }) {
   const { t } = useLingui();
-  const options: { value: AppearancePreference; label: string }[] = [
-    { value: "system", label: t`System` },
-    { value: "light", label: t`Light` },
-    { value: "dark", label: t`Dark` },
-  ];
-
-  return (
-    <ToggleGroup
-      aria-label={t`Appearance`}
-      data-testid="ui-appearance-select"
-      value={[value]}
-      onValueChange={([next]) => {
-        if (next) onChange(next as AppearancePreference);
-      }}
-      spacing={1}
-      className="grid min-w-0 grid-cols-3 rounded-lg bg-muted p-1"
-    >
-      {options.map((option) => (
-        <ToggleGroupItem
-          key={option.value}
-          value={option.value}
-          data-testid={`ui-appearance-${option.value}`}
-          className="text-[13px] aria-pressed:bg-background aria-pressed:shadow-sm"
-        >
-          {option.label}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
-  );
+  return <OptionSelect aria-label={t`Theme`} data-testid="ui-appearance-select" value={value} className="w-44 max-w-full"
+    options={[{ value: "system", label: t`System` }, { value: "light", label: t`Light` }, { value: "dark", label: t`Dark` }]}
+    onValueChange={value => onChange(value as AppearancePreference)} />;
 }
 
 function UiLocalePicker({

@@ -5,7 +5,7 @@ import type { ChildBotBlock } from "@rakazo/core";
 import { isPeerReceiptBlocks, isSecretAskBlock, isToolActivityBlock } from "@rakazo/core";
 import { BotAvatar, Button, cn, resolvePersonaColorDef } from "@rakazo/ui-web";
 import { UserRound } from "lucide-react";
-import { memo, useCallback, useMemo, useState, type ComponentProps } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { ArtifactFileCard } from "../../components/ArtifactFileCard";
 import { AskCard } from "../../components/AskCard";
 import { CollaborationMarker } from "../../components/ai/CollaborationMarker";
@@ -63,6 +63,8 @@ export const MessageView = memo(function MessageView({
   onOpenImportSetup,
   onOpenImport,
   showToolActivity,
+  showFullText = false,
+  textWasStreamed = false,
   hideHoverActions = false,
   onReply,
   onMarkUnread,
@@ -102,6 +104,9 @@ export const MessageView = memo(function MessageView({
   /** Opens the agent importer (from Chief's first-run focus card). */
   onOpenImport?: () => void;
   showToolActivity: boolean;
+  /** A search or quote jump must reveal the complete target. */
+  showFullText?: boolean;
+  textWasStreamed?: boolean;
   hideHoverActions?: boolean;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread: (message: ThreadMessage) => void;
@@ -188,6 +193,7 @@ export const MessageView = memo(function MessageView({
       onMarkUnread={onMarkUnread}
       markedUnread={markedUnread}
       onReact={onReact}
+      onAddRoutine={"botId" in artifactTarget ? onAddRoutine : undefined}
     />
   );
   if (isNarration) {
@@ -236,9 +242,7 @@ export const MessageView = memo(function MessageView({
                       key={i}
                       data-quote-message-id={block.kind === "text" ? quoteMessageId : undefined}
                     >
-                      <ChatMarkdown streaming={block.kind === "progress"} renderMention={renderMention}>
-                        {block.text}
-                      </ChatMarkdown>
+                      <CollapsibleMessageText text={block.text} streaming={isLive || block.kind === "progress"} initiallyExpanded={textWasStreamed} showFull={showFullText} renderMention={renderMention} />
                     </div>
                   );
                 }
@@ -488,7 +492,7 @@ export const MessageView = memo(function MessageView({
                   dir="auto"
                 >
                   <div data-quote-message-id={quoteMessageId}>
-                    <CollapsibleMessageText text={block.text} renderMention={renderMention} />
+                    <CollapsibleMessageText text={block.text} initiallyExpanded={textWasStreamed} showFull={showFullText} renderMention={renderMention} />
                   </div>
 
                 </div>
@@ -629,30 +633,32 @@ function BotMention({
 function CollapsibleMessageText({
   text,
   renderMention,
+  streaming = false,
+  showFull = false,
+  initiallyExpanded = false,
 }: {
   text: string;
   renderMention?: ComponentProps<typeof ChatMarkdown>["renderMention"];
+  streaming?: boolean;
+  showFull?: boolean;
+  initiallyExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const collapsible = text.length > 1200 || text.split("\n").length > 24;
-  if (!collapsible) return <ChatMarkdown renderMention={renderMention}>{text}</ChatMarkdown>;
+  const [expanded, setExpanded] = useState(initiallyExpanded || streaming);
+  useEffect(() => { if (showFull) setExpanded(true); }, [showFull]);
+  const collapsible = !streaming && !showFull && text.length > 20_000;
+  if (!collapsible) return <ChatMarkdown streaming={streaming} renderMention={renderMention}>{text}</ChatMarkdown>;
+  // Bound actual Markdown work, not just its CSS height. Copy/quote still use the original message.
+  const boundary = text.lastIndexOf("\n", 3000);
+  const preview = text.slice(0, boundary > 1800 ? boundary : 3000).trimEnd();
   return (
     <div>
-      <div className={cn("relative overflow-hidden", !expanded && "max-h-[26rem]")}>
-        <ChatMarkdown renderMention={renderMention}>{text}</ChatMarkdown>
-        {!expanded ? (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-14"
-            style={{ background: "linear-gradient(to top, var(--card), transparent)" }}
-          />
-        ) : null}
-      </div>
+      <ChatMarkdown renderMention={renderMention}>{expanded ? text : preview}</ChatMarkdown>
       <Button
         type="button"
         variant="ghost"
         size="sm"
         className="mt-1 h-7 px-2 text-xs text-muted-foreground"
+        aria-expanded={expanded}
         onClick={() => setExpanded((value) => !value)}
       >
         {expanded ? <Trans>Show less</Trans> : <Trans>Show more</Trans>}
