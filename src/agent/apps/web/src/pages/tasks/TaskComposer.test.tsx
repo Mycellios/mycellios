@@ -120,3 +120,24 @@ it("prepares native voice only after explicit action and then starts dictation",
   expect(native.prepare).toHaveBeenCalledOnce();
   expect(dictation.listen).toHaveBeenCalledOnce();
 });
+
+it("installs only the dictation model on Desktop versions that support separate models", async () => {
+  let ready = false;
+  const native = {
+    status: vi.fn(async () => ({
+      ready: false, preparing: false, downloaded: 0, total: 0,
+      models: { asr: { ready, preparing: false, downloaded: 0, total: 0 } },
+    })),
+    prepare: vi.fn(),
+    prepareModel: vi.fn(async () => { ready = true; }),
+  };
+  vi.stubGlobal("rakazoDesktop", { localVoice: native });
+  await click("Dictate task");
+  const prepare = [...container.querySelectorAll("button")].find(
+    button => button.textContent === "Prepare local voice",
+  );
+  await act(async () => prepare!.click());
+  expect(native.prepareModel).toHaveBeenCalledWith("asr");
+  expect(native.prepare).not.toHaveBeenCalled();
+  expect(dictation.listen).toHaveBeenCalledOnce();
+});

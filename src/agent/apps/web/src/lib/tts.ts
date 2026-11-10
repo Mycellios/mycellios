@@ -183,7 +183,7 @@ export class Speaker {
     this.set({ status: "preparing", botId: opts.botId, messageId: opts.messageId });
     try {
       const state = await native.status(); if (mine !== this.token) return;
-      if (!state.ready) throw Error("Descarga los modelos de voz local en Ajustes > Voz.");
+      if (!(state.models?.tts.ready ?? state.ready)) throw Error("Descarga Supertonic en Ajustes > Voz.");
       const language = getGeneralPreferences().dictationLanguage === "auto" ? (navigator.language || "es").split("-")[0]! : getGeneralPreferences().dictationLanguage;
       for (const part of text.match(/[\s\S]{1,1800}/g) ?? []) {
         const result = await native.speak({ text: part, language, speed: opts.speed ?? getGeneralPreferences().speechSpeed });

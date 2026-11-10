@@ -10773,3 +10773,24 @@ msgstr "Usa Navegador para abrir páginas y archivos. Ordenador muestra el entor
 
 msgid "Open Mico settings"
 msgstr "Ajustes del Mico"
+
+msgid "Could not remove the model. Stop local voice and try again."
+msgstr "No se pudo quitar el modelo. Detén la voz local e inténtalo de nuevo."
+
+msgid "Remove {name}"
+msgstr "Quitar {name}"
+
+msgid "Download {name}"
+msgstr "Descargar {name}"
+
+msgid "Transcribes on this computer and detects the language automatically."
+msgstr "Transcribe en este ordenador y detecta el idioma automáticamente."
+
+msgid "Transcribe and speak on this computer."
+msgstr "Transcribe y reproduce voz en este ordenador."
+
+msgid "Reads replies aloud on this computer."
+msgstr "Lee las respuestas en voz alta en este ordenador."
+
+msgid "Download Parakeet to transcribe on this computer."
+msgstr "Descarga Parakeet para transcribir en este ordenador."

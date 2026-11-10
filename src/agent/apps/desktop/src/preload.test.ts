@@ -96,14 +96,18 @@ describe("desktop preload bridge", () => {
     expect(Object.keys(bridge.update).sort()).toEqual(["cancelInstall", "cancelRestart", "check", "download", "forceInstall", "install", "onPrepare", "preferences", "restartWhenIdle", "savePreferences", "state"]);
     expect(Object.keys(bridge.runtime!).sort()).toEqual(["enroll", "identify", "status"]);
 
-    expect(Object.keys(bridge.localVoice!).sort()).toEqual(["prepare", "speak", "status", "stop", "transcribe"]);
+    expect(Object.keys(bridge.localVoice!).sort()).toEqual(["prepare", "prepareModel", "removeModel", "speak", "status", "stop", "transcribe"]);
     await bridge.localVoice!.status();
     await bridge.localVoice!.prepare();
+    await bridge.localVoice!.prepareModel!("asr");
+    await bridge.localVoice!.removeModel!("tts");
     await bridge.localVoice!.transcribe(new Float32Array([0, 0.1]));
     await bridge.localVoice!.speak({ text: "Hola", language: "es", speed: 1 });
     await bridge.localVoice!.stop();
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.status");
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.prepare");
+    expect(invoke).toHaveBeenCalledWith("desktop.localVoice.prepareModel", "asr");
+    expect(invoke).toHaveBeenCalledWith("desktop.localVoice.removeModel", "tts");
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.speak", { text: "Hola", language: "es", speed: 1 });
     expect(invoke).toHaveBeenCalledWith("desktop.localVoice.stop");
 
@@ -126,6 +130,8 @@ describe("desktop preload bridge", () => {
     expect(invoke.mock.calls.map(([channel]) => channel)).toEqual([
       "desktop.localVoice.status",
       "desktop.localVoice.prepare",
+      "desktop.localVoice.prepareModel",
+      "desktop.localVoice.removeModel",
       "desktop.localVoice.transcribe",
       "desktop.localVoice.speak",
       "desktop.localVoice.stop",

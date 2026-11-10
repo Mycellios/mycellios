@@ -1,7 +1,8 @@
 import { windowsProcessTree, type NativeProcessTree } from "../../../packages/adapters/src/desktop-process-tree.js";
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, rename, stat, unlink } from "node:fs/promises";
+import { lstat, mkdir, rename, stat, unlink } from "node:fs/promises";
+import type { LocalVoiceModelKind, LocalVoiceModelStatus, LocalVoiceStatus } from "@rakazo/contracts";
 import { createRequire } from "node:module";
 import { join, sep } from "node:path";
 import { spawn } from "node:child_process";
@@ -14,7 +15,24 @@ import models from "./local-voice-models.json" with { type: "json" };
 // Pinned public model manifests: Parakeet (CC-BY-4.0), Supertonic (OpenRAIL-M).
 // Pins match OpenBot's speech-models manifest; inference uses sherpa-onnx (Apache-2.0).
 const require = createRequire(import.meta.url);
-const totalBytes = [...models.asr, ...models.tts].reduce((n, file) => n + file.bytes, 0);
+const modelKinds = ["asr", "tts"] as const;
+
+function modelState(kind: LocalVoiceModelKind) {
+  return {
+    ready: false,
+    downloaded: 0,
+    total: models[kind].reduce((sum, file) => sum + file.bytes, 0),
+    nextCheck: 0,
+    checking: undefined as Promise<void> | undefined,
+    preparing: undefined as Promise<void> | undefined,
+    error: undefined as string | undefined,
+  };
+}
+
+export function requireVoiceModelKind(value: unknown): LocalVoiceModelKind {
+  if (value === "asr" || value === "tts") return value;
+  throw new Error("Invalid voice model");
+}
 
 async function verifiedModel(target: string, file: { bytes: number; sha256: string }) {
   try {
@@ -26,92 +44,143 @@ async function verifiedModel(target: string, file: { bytes: number; sha256: stri
 }
 
 export class LocalVoice {
-  private downloadAbort?: AbortController;
+  private readonly models = { asr: modelState("asr"), tts: modelState("tts") };
   private tree?: NativeProcessTree;
-  private preparing?: Promise<void>;
-  private cachedCheck?: Promise<void>;
-  private nextCacheCheck = 0;
   private worker?: ChildProcess;
+  private owner?: number;
   private busy = false;
+  private removing = false;
+  private stopping?: Promise<void>;
   private idleTimer?: ReturnType<typeof setTimeout>;
-  private ready = false;
-  private downloaded = 0;
-  private error?: string;
   constructor(private directory: string, private nodeExecutable = process.execPath) {}
-  status() { return { ready: this.ready, preparing: Boolean(this.preparing), downloaded: this.downloaded,
-    total: totalBytes, error: this.error }; }
+  private modelStatus(kind: LocalVoiceModelKind): LocalVoiceModelStatus {
+    const { ready, preparing, downloaded, total, error } = this.models[kind];
+    return { ready, preparing: Boolean(preparing), downloaded, total, error };
+  }
+  status(): LocalVoiceStatus {
+    const asr = this.modelStatus("asr");
+    const tts = this.modelStatus("tts");
+    return {
+      ready: asr.ready && tts.ready,
+      preparing: asr.preparing || tts.preparing,
+      downloaded: asr.downloaded + tts.downloaded,
+      total: asr.total + tts.total,
+      error: asr.error ?? tts.error,
+      models: { asr, tts },
+    };
+  }
   async statusFromDisk() {
-    if (!this.ready && !this.preparing) {
-      if (!this.cachedCheck && Date.now() >= this.nextCacheCheck) {
-        this.cachedCheck = this.checkStoredModels().finally(() => {
-          this.cachedCheck = undefined;
-          this.nextCacheCheck = Date.now() + 30_000;
-        });
-      }
-      await this.cachedCheck;
-    }
+    await Promise.all(modelKinds.map(kind => this.checkStoredModel(kind)));
     return this.status();
   }
-  private async checkStoredModels() {
-    for (const [kind, files] of Object.entries(models)) {
-      for (const file of files) {
+  private async checkStoredModel(kind: LocalVoiceModelKind) {
+    const state = this.models[kind];
+    if (state.checking) return state.checking;
+    if (this.removing || state.ready || state.preparing || Date.now() < state.nextCheck) return;
+    state.checking = (async () => {
+      for (const file of models[kind]) {
         if (!(await verifiedModel(join(this.directory, kind, file.name), file))) return;
       }
-    }
-    this.downloaded = totalBytes;
-    this.ready = true;
+      state.downloaded = state.total;
+      state.ready = true;
+    })().finally(() => {
+      state.checking = undefined;
+      state.nextCheck = Date.now() + 30_000;
+    });
+    return state.checking;
   }
   async prepare() {
-    if (this.ready) return;
-    if (this.preparing) return this.preparing;
-    this.error = undefined;
-    this.downloadAbort = new AbortController();
-    this.preparing = (async () => {
-      await this.cachedCheck;
-      if (!this.ready) await this.download();
+    for (const kind of modelKinds) await this.prepareModel(kind);
+  }
+  async prepareModel(kind: LocalVoiceModelKind) {
+    const state = this.models[kind];
+    if (this.removing) throw new Error("A local voice model is being removed");
+    if (state.ready) return;
+    if (state.preparing) return state.preparing;
+    state.error = undefined;
+    state.preparing = (async () => {
+      await state.checking;
+      if (!state.ready) await this.download(kind);
     })().catch((error) => {
-      this.error = "Local voice preparation failed. Retry to resume verified files.";
+      state.error = "Local voice preparation failed. Retry to resume verified files.";
       throw error;
-    }).finally(() => { this.preparing = undefined; });
-    return this.preparing;
+    }).finally(() => { state.preparing = undefined; });
+    return state.preparing;
   }
-  private async download() {
-    this.downloaded = 0;
-    for (const [kind, files] of Object.entries(models)) {
-      await mkdir(join(this.directory, kind), { recursive: true });
-      for (const file of files) {
-        const completed = this.downloaded;
-        const target = join(this.directory, kind, file.name);
-        if (!(await verifiedModel(target, file))) {
-          const temporary = target + `.partial-${process.pid}-${Date.now()}`;
-          const response = await fetch(file.url, { signal: AbortSignal.any([AbortSignal.timeout(600_000), this.downloadAbort!.signal]) });
-          if (!response.ok || !response.body) throw new Error("Model download failed");
-          let count = 0;
-          const hash = createHash("sha256");
-          const stream = Readable.fromWeb(response.body as never);
-          stream.on("data", (bytes: Buffer) => {
-            count += bytes.length;
-            this.downloaded = completed + count;
-            if (count > file.bytes) stream.destroy(new Error("Model exceeds pinned size"));
-            hash.update(bytes);
-          });
-          try {
-            await pipeline(stream, createWriteStream(temporary));
-            if (count !== file.bytes || hash.digest("hex") !== file.sha256) throw new Error("Model integrity failed");
-            await rename(temporary, target);
-          } catch (error) { await unlink(temporary).catch(() => {}); throw error; }
+  private async download(kind: LocalVoiceModelKind) {
+    const state = this.models[kind];
+    state.downloaded = 0;
+    await mkdir(join(this.directory, kind), { recursive: true });
+    for (const file of models[kind]) {
+      const completed = state.downloaded;
+      const target = join(this.directory, kind, file.name);
+      if (!(await verifiedModel(target, file))) {
+        const temporary = target + `.partial-${process.pid}-${Date.now()}`;
+        const response = await fetch(file.url, { signal: AbortSignal.timeout(600_000) });
+        if (!response.ok || !response.body) throw new Error("Model download failed");
+        let count = 0;
+        const hash = createHash("sha256");
+        const stream = Readable.fromWeb(response.body as never);
+        stream.on("data", (bytes: Buffer) => {
+          count += bytes.length;
+          state.downloaded = completed + Math.min(count, file.bytes);
+          if (count > file.bytes) stream.destroy(new Error("Model exceeds pinned size"));
+          hash.update(bytes);
+        });
+        try {
+          await pipeline(stream, createWriteStream(temporary));
+          if (count !== file.bytes || hash.digest("hex") !== file.sha256) throw new Error("Model integrity failed");
+          await rename(temporary, target);
+        } catch (error) {
+          await unlink(temporary).catch(() => {});
+          throw error;
         }
-        this.downloaded = completed + file.bytes;
       }
+      state.downloaded = completed + file.bytes;
     }
-    this.ready = true;
+    state.ready = true;
   }
-  async run(input: { samples?: Float32Array; text?: string; language?: string; speed?: number }) {
-    if (!this.ready || this.busy) throw new Error("Local voice is not ready or is busy");
+  async removeModel(kind: LocalVoiceModelKind) {
+    if (this.busy || this.removing || modelKinds.some(model => this.models[model].preparing)) {
+      throw new Error("Wait for local voice to finish before removing a model");
+    }
+    this.removing = true;
+    const state = this.models[kind];
+    try {
+      await state.checking;
+      await this.stop();
+      state.ready = false;
+      state.downloaded = 0;
+      state.nextCheck = 0;
+      state.error = undefined;
+      const modelDirectory = join(this.directory, kind);
+      for (const directory of [this.directory, modelDirectory]) {
+        const info = await lstat(directory).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined;
+          throw error;
+        });
+        if (!info) return;
+        if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Invalid model directory");
+      }
+      for (const file of models[kind]) {
+        await unlink(join(modelDirectory, file.name)).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== "ENOENT") throw error;
+        });
+      }
+    } finally {
+      this.removing = false;
+    }
+  }
+  async run(owner: number, input: { samples?: Float32Array; text?: string; language?: string; speed?: number }) {
+    const kind = input.samples ? "asr" : "tts";
+    if (!this.models[kind].ready || this.busy || this.removing || this.stopping) {
+      throw new Error("Local voice is not ready or is busy");
+    }
     if (input.samples && (!(input.samples instanceof Float32Array) || !input.samples.length || input.samples.length > 16000 * 60 ||
       !input.samples.every(Number.isFinite))) throw new Error("Invalid audio");
     if (!input.samples && (typeof input.text !== "string" || !input.text.trim() || input.text.length > 2000)) throw new Error("Invalid speech text");
     this.busy = true;
+    this.owner = owner;
     clearTimeout(this.idleTimer);
     try {
       const unpacked = (file: string) => file.replace(`app.asar${sep}`, `app.asar.unpacked${sep}`);
@@ -155,9 +224,14 @@ export class LocalVoice {
       this.idleTimer.unref();
     }
   }
-  async stop() {
+  async stop(owner?: number) {
+    if (owner !== undefined && owner !== this.owner) return;
+    if (this.stopping) return this.stopping;
+    this.stopping = this.stopWorker().finally(() => { this.stopping = undefined; });
+    return this.stopping;
+  }
+  private async stopWorker() {
     clearTimeout(this.idleTimer);
-    this.downloadAbort?.abort();
     const tree = this.tree; this.tree = undefined;
     tree?.kill();
     const host=this.worker; this.worker=undefined;

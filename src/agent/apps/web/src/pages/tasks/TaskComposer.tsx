@@ -152,7 +152,8 @@ export function TaskComposer({
     const native = window.rakazoDesktop?.localVoice;
     if (native) {
       try {
-        const status = await native.status();
+        const fullStatus = await native.status();
+        const status = fullStatus.models?.asr ?? fullStatus;
         if (!alive.current) return;
         if (!status.ready) {
           setModel(status);
@@ -195,13 +196,14 @@ export function TaskComposer({
         void native
           .status()
           .then((status) => {
-            if (alive.current) setModel(status);
+            if (alive.current) setModel(status.models?.asr ?? status);
           })
           .catch(() => {}),
       1000,
     );
     try {
-      await native.prepare();
+      if (native.prepareModel) await native.prepareModel("asr");
+      else await native.prepare();
       if (alive.current) {
         setModel(null);
         await listen();
