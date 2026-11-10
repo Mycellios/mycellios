@@ -63,6 +63,7 @@ import {
   modelFallbackFailure,
   normalizeRunError,
   parseModelFallbackFailure,
+  retryDelayMs,
 } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
 import { isToolPauseResult, uncertainEffectResult } from "./approval-effect.js";
@@ -3687,11 +3688,15 @@ function fallbackAwareModelStream(
               if (isTransientModelError(event.error)) {
                 firstRetryableError ??= event;
                 const idle = event.error.errorMessage === MODEL_STREAM_IDLE_TIMEOUT_MESSAGE;
-                const delay = idle
+                const backoff = idle
                   ? recoveredIdle
                     ? undefined
                     : MODEL_PROVIDER_RETRY_DELAYS_MS[0]
                   : MODEL_PROVIDER_RETRY_DELAYS_MS[retries];
+                // A 429 or a proxy's Retry-After wins over the local backoff; the
+                // total request budget still bounds the wait.
+                const delay =
+                  backoff === undefined || idle ? backoff : retryDelayMs(event.error, backoff);
                 if (idle && delay !== undefined) {
                   // The post-header idle bound can outlast the header retry window.
                   // Renew it once for this empty call, retaining completed tool results.

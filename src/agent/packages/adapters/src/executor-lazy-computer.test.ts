@@ -558,10 +558,12 @@ describe("run computer provisioning", () => {
       expect.anything(),
     );
     expect(sandbox.writeFile).toHaveBeenCalledOnce();
-    const written = sandbox.writeFile.mock.calls[0]?.[1] as {
-      path: string;
-      content: Uint8Array;
-    };
+    const written = (
+      sandbox.writeFile.mock.calls[0] as unknown as [
+        unknown,
+        { path: string; content: Uint8Array },
+      ]
+    )[1];
     expect(new TextDecoder().decode(written.content)).toBe(
       "const MAX_RETRIES = 5;\nconst TIMEOUT_MS = 1000;\n",
     );

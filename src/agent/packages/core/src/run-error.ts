@@ -537,7 +537,11 @@ export function normalizeRunError(
     /overload|over capacity|experiencing high demand/i.test(signals)
   ) {
     summary = translate("{provider} is overloaded right now. Try again in a moment.", { provider });
-  } else if (status === 503 || /temporarily unavailable|service unavailable/i.test(signals)) {
+  } else if (
+    status === 502 ||
+    status === 503 ||
+    /temporarily unavailable|service unavailable|bad gateway|origin_bad_gateway/i.test(signals)
+  ) {
     summary = translate("{provider} is temporarily unavailable.", { provider });
   } else if (
     // The provider SDKs report a refused or unresolvable host as a bare "Connection error.".
