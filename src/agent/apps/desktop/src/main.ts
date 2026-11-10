@@ -1,5 +1,5 @@
 import { ServerDirectory } from "./server-directory.js";
-import { LocalVoice } from "./local-voice.js";
+import { LocalVoice, requireVoiceModelKind } from "./local-voice.js";
 import { AppBehavior } from "./app-behavior.js";
 import { UpdatePreferences } from "./update-preferences.js";
 import { installedFonts, validDesktopIcon } from "./appearance-settings.js";
@@ -1576,26 +1576,43 @@ app.whenReady().then(async () => {
     const prefix = base.pathname.replace(/\/$/, "");
     return page.origin === base.origin && (page.pathname === prefix || page.pathname.startsWith(prefix + "/"));
   };
-  const localVoices = new Map<number, LocalVoice>();
-  const localVoice = (event: Electron.IpcMainInvokeEvent) => {
+  const localVoice = new LocalVoice(
+    path.join(app.getPath("userData"), "voice-models"),
+    path.join(app.getAppPath(), "dist", process.platform === "win32" ? "voice-node.exe" : "voice-node"),
+  );
+  const voiceWindows = new Set<number>();
+  const voiceOwner = (event: Electron.IpcMainInvokeEvent) => {
     if (!isCloudComputerRequest(event) && !isManagedComputerRequest(event)) throw new Error("Untrusted voice caller");
     const win = windowFrom(event)!;
-    let voice = localVoices.get(win.id);
-    if (!voice) {
-      voice = new LocalVoice(path.join(app.getPath("userData"), "voice-models"), path.join(app.getAppPath(), "dist", process.platform === "win32" ? "voice-node.exe" : "voice-node"));
-      localVoices.set(win.id, voice);
-      win.once("closed", () => { void voice!.stop(); localVoices.delete(win.id); });
+    const owner = win.id;
+    if (!voiceWindows.has(owner)) {
+      voiceWindows.add(owner);
+      win.once("closed", () => { void localVoice.stop(owner); voiceWindows.delete(owner); });
     }
-    return voice;
+    return owner;
   };
-  ipcMain.handle("desktop.localVoice.status", event => localVoice(event).statusFromDisk());
-  ipcMain.handle("desktop.localVoice.prepare", event => localVoice(event).prepare());
-  ipcMain.handle("desktop.localVoice.transcribe", (event, samples: Float32Array) => localVoice(event).run({ samples }));
+  ipcMain.handle("desktop.localVoice.status", event => {
+    voiceOwner(event);
+    return localVoice.statusFromDisk();
+  });
+  ipcMain.handle("desktop.localVoice.prepare", event => {
+    voiceOwner(event);
+    return localVoice.prepare();
+  });
+  ipcMain.handle("desktop.localVoice.prepareModel", (event, kind: unknown) => {
+    voiceOwner(event);
+    return localVoice.prepareModel(requireVoiceModelKind(kind));
+  });
+  ipcMain.handle("desktop.localVoice.removeModel", (event, kind: unknown) => {
+    voiceOwner(event);
+    return localVoice.removeModel(requireVoiceModelKind(kind));
+  });
+  ipcMain.handle("desktop.localVoice.transcribe", (event, samples: Float32Array) => localVoice.run(voiceOwner(event), { samples }));
   ipcMain.handle("desktop.localVoice.speak", (event, input: { text: string; language: string; speed: number }) => {
     if (!input || typeof input.language !== "string" || !/^[a-z]{2}$/.test(input.language) || !Number.isFinite(input.speed)) throw new Error("Invalid voice input");
-    return localVoice(event).run({ text: input.text, language: input.language, speed: input.speed });
+    return localVoice.run(voiceOwner(event), { text: input.text, language: input.language, speed: input.speed });
   });
-  ipcMain.handle("desktop.localVoice.stop", event => localVoice(event).stop());
+  ipcMain.handle("desktop.localVoice.stop", event => localVoice.stop(voiceOwner(event)));
   const getCloudComputer = () => {
     if (!hostComputer || !mainWindow) throw new Error("Local computer unavailable");
     const base = projectServer();

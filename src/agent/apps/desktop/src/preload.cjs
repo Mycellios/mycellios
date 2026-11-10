@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
   localVoice: {
     status: () => ipcRenderer.invoke("desktop.localVoice.status"),
     prepare: () => ipcRenderer.invoke("desktop.localVoice.prepare"),
+    prepareModel: kind => ipcRenderer.invoke("desktop.localVoice.prepareModel", kind),
+    removeModel: kind => ipcRenderer.invoke("desktop.localVoice.removeModel", kind),
     transcribe: samples => ipcRenderer.invoke("desktop.localVoice.transcribe", samples),
     speak: input => ipcRenderer.invoke("desktop.localVoice.speak", input),
     stop: () => ipcRenderer.invoke("desktop.localVoice.stop"),

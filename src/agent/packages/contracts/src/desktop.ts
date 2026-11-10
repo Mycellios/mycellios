@@ -6,6 +6,18 @@ export type { ProjectRunState, ProjectRunConfig, ProjectRunnerBridge } from "../
 
 export type DesktopMicoFolder = { name: string; path: string; repositoryId?: string };
 
+export type LocalVoiceModelKind = "asr" | "tts";
+export interface LocalVoiceModelStatus {
+  ready: boolean;
+  preparing: boolean;
+  downloaded: number;
+  total: number;
+  error?: string;
+}
+export interface LocalVoiceStatus extends LocalVoiceModelStatus {
+  models?: Record<LocalVoiceModelKind, LocalVoiceModelStatus>;
+}
+
 /**
  * `unsupported` covers an unpackaged build and a repository with no published releases, which is
  * the normal state for a fork. It is not an error the user needs to act on. Automatic checks stay
@@ -86,8 +98,10 @@ export interface RakazoDesktop {
     logo?: (png: string | null) => Promise<void>;
   };
   localVoice?: {
-    status: () => Promise<{ ready: boolean; preparing: boolean; downloaded: number; total: number; error?: string }>;
+    status: () => Promise<LocalVoiceStatus>;
     prepare: () => Promise<void>;
+    prepareModel?: (kind: LocalVoiceModelKind) => Promise<void>;
+    removeModel?: (kind: LocalVoiceModelKind) => Promise<void>;
     transcribe: (samples: Float32Array) => Promise<{ text?: string }>;
     speak: (input: { text: string; language: string; speed: number }) => Promise<{ samples?: Float32Array; sampleRate?: number }>;
     stop: () => Promise<void>;
