@@ -66,6 +66,7 @@ function rosterUpdatedAt(newestMessage: { createdAt: Date } | undefined, botUpda
 function mapBot(
   bot: {
     nativeConfig?: unknown;
+    busyMessageMode?: string | null;
     id: string;
     spaceId: string;
     name: string;
@@ -119,6 +120,9 @@ function mapBot(
     instructionHistory: InstructionVersionSchema.array().parse(bot.instructionHistory ?? []),
     color: bot.color,
     notifyOnFinish: bot.notifyOnFinish,
+    ...(bot.busyMessageMode === "queue" || bot.busyMessageMode === "steer"
+      ? { busyMessageMode: bot.busyMessageMode }
+      : {}),
     pinned: bot.pinned,
     sectionId: bot.sectionId,
     archivedAt: bot.archivedAt?.toISOString() ?? null,
@@ -506,6 +510,7 @@ export function createRepos(
         description: string;
         instructions: string;
         notifyOnFinish: boolean;
+        busyMessageMode?: string | null;
         fleetManagement?: boolean;
         color?: string;
         avatarFamily?: number;
@@ -593,6 +598,7 @@ export function createRepos(
               description: input.description,
               instructions: input.instructions,
               notifyOnFinish: input.notifyOnFinish,
+              ...(input.busyMessageMode !== undefined ? { busyMessageMode: input.busyMessageMode } : {}),
               fleetManagement: input.fleetManagement,
               color: avatar.color,
               position: (positions._max.position ?? -1) + 1,

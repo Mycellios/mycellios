@@ -10773,3 +10773,12 @@ msgstr "Usa Navegador para abrir páginas y archivos. Ordenador muestra el entor
 
 msgid "Open Mico settings"
 msgstr "Ajustes del Mico"
+
+msgid "Default on this device. Each Mico can follow it or use its own preference."
+msgstr "Preferencia de este dispositivo. Cada Mico puede usarla o tener la suya."
+
+msgid "Messages while {name} works"
+msgstr "Mensajes mientras trabaja {name}"
+
+msgid "Use default"
+msgstr "Usar preferencia general"
