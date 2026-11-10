@@ -192,6 +192,8 @@ const UNCERTAIN_DESKTOP_RUN = new Set([
   "Desktop runtime disconnected",
   "Desktop run already active",
   "This local run already started. Check existing results before retrying.",
+  "This run already finished on your PC. Ask again if you need a new answer.",
+  "This run was interrupted on your PC. Send a new message to continue.",
   "This Desktop run was already dispatched. Check existing results before retrying.",
   "The account model stream was interrupted. Check existing results before retrying.",
 ]);

@@ -14,7 +14,7 @@ it("isolates account/server scopes and rejects replay across engine and process 
  let engine=createDesktopAgentEngine(root,()=>scope,start);
  for await(const _ of engine.run(input)){}
  engine=createDesktopAgentEngine(root,()=>scope,start);
- await expect(async()=>{for await(const _ of engine.run(input)){};}).rejects.toThrow("already started");
+ await expect(async()=>{for await(const _ of engine.run(input)){};}).rejects.toThrow("already finished on your PC");
  expect(start).toHaveBeenCalledTimes(1);
  const receiptDir=path.join(root,"agent-executor",scope,"receipts");
  const receipt=await readFile(path.join(receiptDir,(await readdir(receiptDir))[0]!),"utf8");
@@ -22,4 +22,13 @@ it("isolates account/server scopes and rejects replay across engine and process 
  scope="b".repeat(64);for await(const _ of engine.run(input)){};expect(start).toHaveBeenCalledTimes(2);
  scope=undefined;await expect(async()=>{for await(const _ of engine.run({...input,runId:"new"})){};}).rejects.toThrow("unavailable");
  expect(start).toHaveBeenCalledTimes(2);
+});
+it("reports an interrupted local run instead of asking the user to audit it",async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),"mc-engine-test-"));roots.push(root);
+ const scope="c".repeat(64);
+ const start=vi.fn(():AgentRuntime=>({describe:()=>({id:"fixture",contractVersion:"1",adapterVersion:"1",capabilities:{streaming:true,tools:true,compaction:true,scripted:true}}),abort:vi.fn(),async *run(){throw new Error("provider dropped");}}));
+ const engine=createDesktopAgentEngine(root,()=>scope,start);
+ await expect(async()=>{for await(const _ of engine.run(input)){};}).rejects.toThrow("provider dropped");
+ await expect(async()=>{for await(const _ of engine.run(input)){};}).rejects.toThrow("interrupted on your PC. Send a new message");
+ expect(start).toHaveBeenCalledTimes(1);
 });
