@@ -232,9 +232,15 @@ export async function enqueueBotIntroRun(deps: RouterDeps, actor: Actor, bot: Bo
 }
 
 async function requireNativeEngine(deps: RouterDeps, actor: Actor, engine: string) {
-  if (!(await nativeHostAccess(deps.dataDir, actor))) throw new ORPCError("FORBIDDEN");
+  if (!(await nativeHostAccess(deps.dataDir, actor))) {
+    // The turn can also execute on a connected desktop host, which brings its own
+    // engines. Accept the choice there; the host still refuses an engine it lacks.
+    if (engine !== "pi" && deps.desktopAgentAvailable?.(actor)) return;
+    throw new ORPCError("FORBIDDEN");
+  }
   const engines = await discoverNativeEngines(deps.dataDir);
   if (!engines.some((candidate) => candidate.id === engine && candidate.available)) {
+    if (deps.desktopAgentAvailable?.(actor)) return;
     throw new ORPCError("BAD_REQUEST", {
       message: engine === "opencode"
         ? "Install OpenCode on the computer running this server."

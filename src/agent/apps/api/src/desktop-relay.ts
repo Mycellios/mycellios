@@ -179,5 +179,8 @@ export function mountDesktopRelay(
       return c.json({ error: "PC connection changed. Reconnect the paired computer." }, 409);
     }
   });
-  return () => broker.close();
+  return Object.assign(() => broker.close(), {
+    /** A connected desktop host that advertises agent execution for this scope. */
+    hasAgentDevice: (scope: { userId: string; spaceId: string }) => broker.hasAgentDevice(scope),
+  });
 }
