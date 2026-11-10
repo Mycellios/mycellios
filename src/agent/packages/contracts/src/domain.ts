@@ -93,8 +93,12 @@ export const NativeCodexConfigSchema = z.object({
   fastMode: z.boolean().optional(),
 });
 
+export const BusyMessageModeSchema = z.enum(["queue", "steer"]);
+export type BusyMessageMode = z.infer<typeof BusyMessageModeSchema>;
+
 export const BotSchema = z.object({
   nativeConfig: NativeCodexConfigSchema.nullable().optional(),
+  busyMessageMode: BusyMessageModeSchema.optional(),
   agentEngine: z.enum(["pi", "codex", "claude", "acp", "opencode"]).optional(),
   id: Id,
   spaceId: Id,
@@ -415,6 +419,7 @@ export function normalizeCreateBotProfile(
 export const UpdateBotInput = z
   .object({
     nativeConfig: NativeCodexConfigSchema.nullable().optional(),
+    busyMessageMode: BusyMessageModeSchema.nullable().optional(),
     botId: Id,
     agentEngine: z.enum(["pi", "codex", "claude", "acp", "opencode"]).optional(),
     name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH).optional(),

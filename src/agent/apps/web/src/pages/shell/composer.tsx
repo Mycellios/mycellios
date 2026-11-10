@@ -63,6 +63,7 @@ export const Composer = memo(function Composer({
   onNewChatStarted,
   running,
   busyMessages = running,
+  busyMessageMode,
   disabled,
   pendingAttachments,
   attachmentNotice,
@@ -108,6 +109,7 @@ export const Composer = memo(function Composer({
   onNewChatStarted?: () => void;
   running: boolean;
   busyMessages?: boolean;
+  busyMessageMode?: "queue" | "steer";
   disabled?: boolean;
   pendingAttachments: PendingAttachment[];
   attachmentNotice: string | null;
@@ -155,7 +157,8 @@ export const Composer = memo(function Composer({
   const rpc = useSpaceRpc();
   const taskScope = useBoundTaskThreadScope();
   const [draft, setDraft] = useState(() => readComposerDraft(draftKey));
-  const defaultDelivery = useGeneralPreferences().busyMessageMode;
+  const preferences = useGeneralPreferences();
+  const defaultDelivery = busyMessageMode ?? preferences.busyMessageMode;
   const [delivery, setDelivery] = useState<"queue" | "steer">(defaultDelivery);
   const [acceptedMode, setAcceptedMode] = useState<"queue" | "steer" | null>(null);
   useEffect(() => { setDelivery(defaultDelivery); setAcceptedMode(null); }, [draftKey, defaultDelivery]);

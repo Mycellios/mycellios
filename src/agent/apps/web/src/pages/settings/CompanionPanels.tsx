@@ -1,6 +1,6 @@
 import { DeviceVoiceSettings } from "./DeviceVoiceSettings";
 import { useLingui } from "@lingui/react/macro";
-import type { Bot } from "@rakazo/contracts";
+import type { Bot, BusyMessageMode } from "@rakazo/contracts";
 import { BotAvatar, Button, OptionSelect } from "@rakazo/ui-web";
 import { useState } from "react";
 import { MobileInstallOffer, mobileInstallUrl } from "../../components/MobileInstallOffer";
@@ -12,22 +12,42 @@ export function MicosSettingsPanel({
   bots = [],
   onOpen,
   onModels,
+  onBusyMessageModeChange,
 }: {
   bots?: Bot[];
   onOpen?: (id: string) => void;
   onSkills?: () => void;
   onModels?: () => void;
+  onBusyMessageModeChange?: (id: string, value: BusyMessageMode | null) => Promise<void>;
 }) {
   const { t } = useLingui();
-  const value = useGeneralPreferences(); const [error, setError] = useState("");
+  const value = useGeneralPreferences();
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const messageModes = [
+    { value: "queue", label: t`Next turn` },
+    { value: "steer", label: t`Current task` },
+  ];
+  async function saveMicoMessageMode(id: string, mode: string) {
+    if (!onBusyMessageModeChange || saving) return;
+    setError("");
+    setSaving(true);
+    try {
+      await onBusyMessageModeChange(id, mode === "inherit" ? null : mode as BusyMessageMode);
+    } catch {
+      setError(t`Could not save this preference.`);
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
     <div className="rk-settings-panel space-y-6">
       <SettingsGroup title={t`Preferences`}>
         <SettingsRow label={t`Models and connections`} description={t`Choose a provider once. Your Micos use it automatically.`}
           control={<Button variant="outline" size="sm" disabled={!onModels} onClick={onModels}>{t`Manage`}</Button>} />
-        <SettingsRow label={t`Messages while a Mico works`} description={t`Choose the usual behavior. You can change it before sending a message.`}
+        <SettingsRow label={t`Messages while a Mico works`} description={t`Default on this device. Each Mico can follow it or use its own preference.`}
           control={<OptionSelect aria-label={t`Messages while a Mico works`} value={value.busyMessageMode}
-            className="w-48 max-w-full" options={[{ value: "queue", label: t`Next turn` }, { value: "steer", label: t`Current task` }]}
+            className="w-48 max-w-full" options={messageModes}
             onValueChange={busyMessageMode => { try { setGeneralPreferences({ busyMessageMode: busyMessageMode as "queue" | "steer" }); setError(""); } catch { setError(t`Could not save this preference.`); } }} />} />
       </SettingsGroup>
       <SettingsGroup title={t`Your Micos`}>
@@ -36,14 +56,18 @@ export function MicosSettingsPanel({
             <SettingsRow
               key={bot.id}
               label={<span className="flex items-center gap-3"><BotAvatar color={bot.color} size={28} />{bot.name}</span>}
-              control={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={!onOpen}
-                  onClick={() => onOpen?.(bot.id)}
-                >{t`Manage`}</Button>
-              }
+              control={<div className="flex flex-wrap items-center gap-2">
+                {onBusyMessageModeChange && <OptionSelect
+                  aria-label={t`Messages while ${bot.name} works`}
+                  value={bot.busyMessageMode ?? "inherit"}
+                  options={[{ value: "inherit", label: t`Use default` }, ...messageModes]}
+                  disabled={saving}
+                  onValueChange={mode => void saveMicoMessageMode(bot.id, mode)}
+                />}
+                <Button variant="outline" size="sm" disabled={!onOpen} onClick={() => onOpen?.(bot.id)}>
+                  {t`Manage`}
+                </Button>
+              </div>}
             />
           ))
         ) : (
