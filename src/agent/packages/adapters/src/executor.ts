@@ -8712,6 +8712,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
               assistantTurnText = "";
             }
             if (event.type === "text") {
+              if (event.replace) {
+                // A retried stream restarted the answer. Drop the interrupted
+                // segment so the reply never shows two beginnings glued together,
+                // and let the next flush replace the live text.
+                const interrupted = currentTextSegment;
+                if (interrupted && assembled.endsWith(interrupted)) {
+                  assembled = assembled.slice(0, assembled.length - interrupted.length);
+                }
+                assistantTurnText = "";
+                currentTextSegment = "";
+                pendingProgress = "";
+                hasStreamedText = false;
+              }
               assistantTurnText += event.text;
               if (assistantTurnBreakPending && event.text) {
                 assistantTurnBreakPending = false;

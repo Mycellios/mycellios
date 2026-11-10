@@ -604,7 +604,11 @@ export interface ModelCallObserver {
 }
 
 export type AgentRuntimeEvent =
-  | { type: "text"; text: string }
+  /**
+   * Assistant text. `replace` means a retried stream restarted the answer: drop
+   * the partial text shown so far instead of appending to it.
+   */
+  | { type: "text"; text: string; replace?: boolean }
   /** A new assistant message starts; its text does not continue the previous text. */
   | { type: "turn" }
   | {

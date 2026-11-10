@@ -131,6 +131,7 @@ import {
 import { fetchPairedWithDispatcher } from "./undici-fetch.js";
 import { desktopModelCatalog } from "./desktop-model-stream.js";
 import { argumentGiven } from "./update-bot-patch.js";
+import { restartsReply } from "./text-prefix.js";
 
 const running = new Map<string, { controller: AbortController; work: Promise<void> }>();
 /**
@@ -838,9 +839,20 @@ export class PiAgentRuntime implements AgentRuntime {
           if (!joinCutReply) return;
           const { tail, held, requested } = joinCutReply;
           joinCutReply = undefined;
-          joinDropped = held.slice(0, continuationRepeat(tail, held, requested));
-          const text = held.slice(joinDropped.length);
+          const repeat = continuationRepeat(tail, held, requested);
+          joinDropped = held.slice(0, repeat);
+          const text = held.slice(repeat);
           if (!text) return;
+          // A retried stream that starts again from the beginning of this answer is a
+          // restart, not a continuation: replace the interrupted text instead of
+          // appending a second beginning to it.
+          const restart =
+            !requested && repeat === 0 && restartsReply(streamed, text, MIN_RESTART_PREFIX);
+          if (restart) {
+            streamed = text;
+            queue.push({ type: "text", text, replace: true });
+            return;
+          }
           streamed += text;
           queue.push({ type: "text", text });
         };
@@ -3230,6 +3242,8 @@ function eventHasVisibleOutput(event: AssistantMessageEvent): boolean {
 const MAX_SELF_RECOVERIES_PER_RUN = 3;
 const MIN_CONTINUATION_OVERLAP = 4;
 const MAX_CONTINUATION_OVERLAP = 240;
+/** A retry that repeats this many opening characters is restarting the answer. */
+const MIN_RESTART_PREFIX = 4;
 
 /**
  * How much of the start of a continuation repeats the end of the cut reply: the longest such
