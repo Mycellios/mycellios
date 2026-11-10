@@ -8,6 +8,9 @@ import { createRunExecutor } from "../../adapters/src/executor.js";
 import { PiAgentRuntime } from "../../adapters/src/pi-runtime.js";
 import { startModelEmulator } from "./model-emulator.js";
 
+// This fixture asserts the full synthetic tool list; keep its schemas eager.
+process.env.PI_MAX_EAGER_TOOL_SCHEMAS = "1000";
+
 vi.mock("../../adapters/src/computer-lifecycle.js", async (original) => ({
   ...(await original<typeof ComputerLifecycle>()),
   acquireComputerExecutionLease: async () => null,

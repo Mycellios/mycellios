@@ -196,6 +196,16 @@ const MODEL_PROVIDER_RETRY_DELAYS_MS = [2_000, 8_000, 20_000] as const;
 // instead of taking another assistant turn. A bounded internal follow-up keeps
 // that provider quirk from making a long task look complete after one step.
 const MAX_SILENT_TOOL_CONTINUATIONS = 3;
+// OpenBot exposes a compact core tool set. Above this many schemas, page the
+// rest behind search/load even when the context window would fit them, so a
+// simple chat turn does not re-send every connector schema on every request.
+const DEFAULT_MAX_EAGER_TOOL_SCHEMAS = 24;
+function maxEagerToolSchemas(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PI_MAX_EAGER_TOOL_SCHEMAS?.trim();
+  if (!raw) return DEFAULT_MAX_EAGER_TOOL_SCHEMAS;
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_EAGER_TOOL_SCHEMAS;
+}
 const CHECKPOINT_RESUME_PROMPT = automated(
   "The pending tool call has been resolved. Continue the original task from its result above. Do not repeat completed actions. This is an internal continuation, not a new user request.",
 );
@@ -1437,11 +1447,15 @@ function runtimeToolsForInitialState(
   const allTools = toAgentTools(definitions, host);
   // The canonical admission check can shrink an output reservation. Keep
   // mandatory tools here and let that check reject them only if they still fail.
-  if (definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length <= 1) return allTools;
+  const toolCount = definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length;
+  if (toolCount <= 1) return allTools;
   const available = model.contextWindow - resolveCompletionMaxTokens(
     model.maxTokens, host.activeModel.config.maxTokens, undefined, model.reasoning, model.contextWindow,
   );
-  if (estimateContextTokens(systemPrompt) + estimateContextTokens(allTools) <= available)
+  if (
+    toolCount <= maxEagerToolSchemas() &&
+    estimateContextTokens(systemPrompt) + estimateContextTokens(allTools) <= available
+  )
     return allTools;
   const named = namedAgentTools(definitions);
   const wireNames = new Map(named.map(({ tool, name }) => [tool, name]));

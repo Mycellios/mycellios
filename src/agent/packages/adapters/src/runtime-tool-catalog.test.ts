@@ -16,7 +16,7 @@ describe("runtime schema catalog", () => {
   it("declares authorized memory and clarification schemas immediately and retains them while paging", () => {
     const memory = definition("remember");
     const clarification = definition("ask_user");
-    const other = definition("read_file");
+    const other = definition("run_subagent");
     const catalog = new RuntimeToolCatalog([memory, clarification, other], {
       wireName: (tool) => tool.name,
       pendingTools: () => new Set(),
@@ -25,14 +25,14 @@ describe("runtime schema catalog", () => {
     expect(catalog.definitionsForModel()).toContain(memory);
     expect(catalog.definitionsForModel()).toContain(clarification);
     expect(catalog.definitionsForModel()).not.toContain(other);
-    catalog.load({ id: "read_file" });
+    catalog.load({ id: "run_subagent" });
     expect(catalog.definitionsForModel()).toContain(memory);
     expect(catalog.definitionsForModel()).toContain(clarification);
     expect(catalog.definitionsForModel()).toContain(other);
   });
 
   it("keeps every authorized tool discoverable and activates the exact original definition", () => {
-    const tools = [definition("list_fleet"), definition("write_file"), definition("run_subagent")];
+    const tools = [definition("list_fleet"), definition("render_plot"), definition("run_subagent")];
     const accept = vi.fn();
     const catalog = new RuntimeToolCatalog(tools, {
       wireName: (tool) => tool.name,
@@ -52,21 +52,21 @@ describe("runtime schema catalog", () => {
   });
 
   it("retains in-flight tool definitions and pages out only resolved schemas", () => {
-    const tools = [definition("list_fleet"), definition("read_file"), definition("write_file")];
+    const tools = [definition("list_fleet"), definition("render_plot"), definition("run_subagent")];
     const pending = new Set<ConnectorTool>([tools[1]!]);
     const catalog = new RuntimeToolCatalog(tools, {
       wireName: (tool) => tool.name,
       pendingTools: () => pending,
       accept: () => undefined,
     });
-    catalog.load({ id: "write_file" });
+    catalog.load({ id: "run_subagent" });
     expect(catalog.definitionsForModel()).toContain(tools[1]);
     expect(catalog.definitionsForModel()).toContain(tools[2]);
     pending.clear();
-    catalog.load({ id: "read_file" });
+    catalog.load({ id: "render_plot" });
     expect(catalog.definitionsForModel()).not.toContain(tools[2]);
-    expect(catalog.search({ query: "write_file" })).toMatchObject({
-      tools: [{ id: "write_file" }],
+    expect(catalog.search({ query: "run_subagent" })).toMatchObject({
+      tools: [{ id: "run_subagent" }],
     });
   });
 
@@ -97,15 +97,15 @@ describe("runtime schema catalog", () => {
   });
 
   it("does not change state after a schema budget rejection or name collision", () => {
-    const catalog = new RuntimeToolCatalog([definition("write_file")], {
+    const catalog = new RuntimeToolCatalog([definition("run_subagent")], {
       wireName: (tool) => tool.name,
       pendingTools: () => new Set(),
       accept: () => {
         throw new Error("too large");
       },
     });
-    expect(() => catalog.load({ id: "write_file" })).toThrow("too large");
-    expect(catalog.definitionsForModel().some((tool) => tool.name === "write_file")).toBe(false);
+    expect(() => catalog.load({ id: "run_subagent" })).toThrow("too large");
+    expect(catalog.definitionsForModel().some((tool) => tool.name === "run_subagent")).toBe(false);
     expect(
       () =>
         new RuntimeToolCatalog([definition(RUNTIME_TOOL_LOAD)], {
