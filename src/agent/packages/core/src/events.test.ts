@@ -768,6 +768,29 @@ describe("appendTextSegment", () => {
       { kind: "text", text: "done" },
     ]);
   });
+
+  it("keeps a sentence whole when a step landed mid-sentence", () => {
+    const segments = appendToolCallSegment(
+      [{ kind: "text", text: "Voy a revisar la carta of" }],
+      "web_search",
+    );
+    expect(appendTextSegment(segments, "erta por si dice algo.")).toEqual([
+      { kind: "text", text: "Voy a revisar la carta oferta por si dice algo." },
+      { kind: "steps", steps: [{ label: "Web search", count: 1 }] },
+    ]);
+  });
+
+  it("still starts a paragraph after a step that closed its sentence", () => {
+    const segments = appendToolCallSegment(
+      [{ kind: "text", text: "Voy a revisar la carta." }],
+      "web_search",
+    );
+    expect(appendTextSegment(segments, "La oferta no dice nada.")).toEqual([
+      { kind: "text", text: "Voy a revisar la carta." },
+      { kind: "steps", steps: [{ label: "Web search", count: 1 }] },
+      { kind: "text", text: "La oferta no dice nada." },
+    ]);
+  });
 });
 
 describe("appendToolCallSegment", () => {

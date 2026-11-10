@@ -469,6 +469,17 @@ export function appendTextSegment(segments: readonly MessageBlock[], text: strin
   if (last?.kind === "text") {
     return [...segments.slice(0, -1), { kind: "text", text: last.text + text }];
   }
+  // A tool step can land mid-sentence when the model interleaves text with a
+  // call. Keep that sentence whole and move the step after it instead of
+  // starting a new paragraph, which used to split words in half.
+  const beforeStep = segments.at(-2);
+  if (last?.kind === "steps" && beforeStep?.kind === "text" && !endsSentence(beforeStep.text)) {
+    return [
+      ...segments.slice(0, -2),
+      { kind: "text", text: beforeStep.text + text },
+      last,
+    ];
+  }
   return [...segments, { kind: "text", text }];
 }
 
