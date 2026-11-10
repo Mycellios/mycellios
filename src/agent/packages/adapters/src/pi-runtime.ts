@@ -1191,6 +1191,25 @@ export class PiAgentRuntime implements AgentRuntime {
               "pi.agent": host.agentNamespace ?? "main",
               "pi.setup_ms": Date.now() - setupStartedAt,
               "pi.tools": toolDefs.length,
+              // Rough size of what this call actually sends, so a provider's
+              // token-per-minute limit can be compared with our own request.
+              "pi.context_tokens":
+                estimateContextTokens(systemPrompt) +
+                estimateContextTokens(initialPrompt) +
+                toolDefs.reduce(
+                  (sum, tool) => sum + estimateContextTokens(JSON.stringify(tool)),
+                  0,
+                ) +
+                request.history.reduce(
+                  (sum, message) =>
+                    sum +
+                    estimateContextTokens(
+                      typeof message.content === "string"
+                        ? message.content
+                        : JSON.stringify(message.content),
+                    ),
+                  0,
+                ),
             });
             await agent.prompt(initialPrompt, images?.length ? images : undefined);
           }

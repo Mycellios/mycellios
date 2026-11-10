@@ -98,6 +98,16 @@ process.setSourceMapsEnabled(true);
 installDesktopEarlyErrorReporting();
 
 const PERFORMANCE_USER_DATA = process.env.RAKAZO_PERFORMANCE_USER_DATA;
+// An isolated development profile must be recognisable at a glance, so a dev
+// window can never be mistaken for the production app.
+if (PERFORMANCE_USER_DATA) {
+  app.on("browser-window-created", (_event, window) => {
+    window.on("page-title-updated", (titleEvent, title) => {
+      titleEvent.preventDefault();
+      window.setTitle(`${title} · dev`);
+    });
+  });
+}
 /** Test hook: where the app-managed stack answers. Mode `new` still requires loopback. */
 const LOCAL_WEB_URL = process.env.RAKAZO_LOCAL_WEB_URL?.trim() || DEFAULT_LOCAL_WEB_URL;
 const PROBE_TIMEOUT_MS = 8_000;

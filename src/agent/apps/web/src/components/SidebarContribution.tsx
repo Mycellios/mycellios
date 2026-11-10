@@ -86,7 +86,9 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   }
   const waiting = Boolean(node?.pending);
   const active = node?.enabled === true;
-  const hasError = !incomplete && (error || Boolean(node?.rejected));
+  // A failed lookup before this account ever had a contribution identity is not an
+  // error: show the normal invitation instead of a red "check the dashboard" banner.
+  const hasError = !incomplete && Boolean(node) && (error || Boolean(node?.rejected));
   const idleLabel = t`Earn credits with your computer`;
   const shortLabel = t`Earn with your computer`;
   const browserLabel = incomplete ? t`Contribute in browser` : idleLabel;
@@ -103,6 +105,9 @@ export function SidebarContribution({ mini = false }: { mini?: boolean }) {
   const spinning = busy || (waiting && !hasError);
   const Icon = spinning ? LoaderCircle : needsIdentity || hasError ? RefreshCw : active ? Pause : Cpu;
   const actionClass = "h-auto min-h-9 min-w-0 justify-start gap-1.5 px-2 py-1 text-start text-xs font-medium";
+  // Without a contribution identity there is nothing to activate here. A local or
+  // fresh account has no node yet, so the invitation would only be a dead control.
+  if (!node && !busy && (error || !runtime || !supported)) return null;
   return <div className={mini ? "shrink-0 px-2 py-1" : "min-w-0 max-w-full"}>
     <div className="flex min-w-0 items-center">
     {!runtime || !supported || incomplete ? <a href={browserWorkerUrl}

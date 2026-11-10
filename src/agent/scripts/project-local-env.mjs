@@ -26,6 +26,9 @@ export function projectLocalEnvironment(inherited = process.env) {
     WAKEUP_DRIVER: 'graphile', SECRET_STORE: 'encrypted', CONTENT_ENCRYPTION: 'on',
     DB_POOL_MAX: '8', AUTH_BREACHED_PASSWORD_CHECK_ENABLED: 'false',
     RAKAZO_WORKER_HEALTH_FILE: path.join(localDataDir, 'worker-health.json'),
+    // Local development owns the same PC that serves the UI, so the desktop relay
+    // must be available; without it "use this computer" asks a dead endpoint.
+    MYCELLIOS_DESKTOP_RELAY_ENABLED: 'true',
   };
 }
 
