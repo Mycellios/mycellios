@@ -361,6 +361,7 @@ export class PiAgentRuntime implements AgentRuntime {
     context?: Partial<AdapterContext>,
   ): AsyncGenerator<AgentRuntimeEvent, void> {
     const continuity = new WorkContinuation(!request.allowSilentEmpty && !request.script);
+    const setupStartedAt = Date.now();
     request = withWorkContinuation(request, continuity);
     const signal = context?.signal
       ? AbortSignal.any([controller.signal, context.signal])
@@ -1173,6 +1174,12 @@ export class PiAgentRuntime implements AgentRuntime {
               await agent.continue();
             }
           } else {
+            getLogger().info("pi.prompt_started", {
+              "run.id": request.runId,
+              "pi.agent": host.agentNamespace ?? "main",
+              "pi.setup_ms": Date.now() - setupStartedAt,
+              "pi.tools": toolDefs.length,
+            });
             await agent.prompt(initialPrompt, images?.length ? images : undefined);
           }
         } finally {
