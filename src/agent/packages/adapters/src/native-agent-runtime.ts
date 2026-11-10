@@ -1,6 +1,8 @@
+import { prepareOpenCodeProfile } from "./opencode-profile.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { platform } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { Message } from "@earendil-works/pi-ai";
 import type {
@@ -99,6 +101,12 @@ function hostAllowsScope(
       );
     })
   );
+}
+
+export function codexPermissionProfile(cwd: string, platformName = platform()) {
+  // Codex's elevated Windows sandbox wrapper refuses to start unless the profile
+  // grants root read; writes stay denied and the workspace stays read-only.
+  return `permissions.rakazo-runtime.filesystem={":root"="${platformName === "win32" ? "read" : "deny"}",":minimal"="read",${JSON.stringify(cwd)}="read"}`;
 }
 
 function configuredCommands(parsed: Record<string, unknown>): NativeConfig {
@@ -532,7 +540,7 @@ export class NativeAgentRuntime implements AgentRuntime {
               "-c",
               "mcp_servers={}",
               "-c",
-              `permissions.rakazo-runtime.filesystem={":root"="deny",":minimal"="read",${JSON.stringify(cwd)}="read"}`,
+              codexPermissionProfile(cwd),
               "-c",
               "permissions.rakazo-runtime.network.enabled=false",
               ...(this.options.codexArgs ?? []),
@@ -618,7 +626,8 @@ export class NativeAgentRuntime implements AgentRuntime {
           process.send({ method: "initialized", params: {} });
           const params = {
             cwd,
-            ...(request.model.id !== "default" ? { model: request.model.id } : {}),
+            // Native Codex owns its account and default model. The chat catalog
+            // can name a model that this separate CLI account cannot execute.
             approvalPolicy: "untrusted",
             permissions: "rakazo-runtime",
             developerInstructions: request.instructions,
@@ -748,7 +757,7 @@ export class NativeAgentRuntime implements AgentRuntime {
             // OpenCode discovers credentials and plugins through the host's home directory.
             // Keep its fresh profile inside the same account/Space/chat boundary as this run.
             const openCodeHome = engine === "opencode" ? join(cwd, ".opencode-home") : null;
-            if (openCodeHome) await mkdir(openCodeHome, { recursive: true, mode: 0o700 });
+            const openCodeConfig = openCodeHome ? await prepareOpenCodeProfile(openCodeHome) : null;
             process = new NativeAgentProcess(
               command,
               [],
@@ -791,10 +800,7 @@ export class NativeAgentRuntime implements AgentRuntime {
                 OPENCODE_DISABLE_LSP_DOWNLOAD: "true",
                 OPENCODE_DISABLE_EXTERNAL_SKILLS: "true",
                 OPENCODE_DISABLE_CLAUDE_CODE: "true",
-                OPENCODE_CONFIG_CONTENT: JSON.stringify({
-                  enabled_providers: ["opencode"],
-                  permission: { "*": "deny", "rakazo_*": "allow" },
-                }),
+                OPENCODE_CONFIG_CONTENT: JSON.stringify(openCodeConfig),
               } : undefined,
             );
             await process.request("initialize", {

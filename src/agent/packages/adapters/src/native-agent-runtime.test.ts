@@ -6,7 +6,7 @@ import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { approvalPausedToolResult } from "./approval-effect.js";
 import { findNativeCommand, nativeEnvironment } from "./native-agent-process.js";
-import { codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
+import { codexPermissionProfile, codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
 import { ScriptedAgentRuntime } from "./scripted-runtime.js";
 import { restoreTurnCheckpoint } from "./turn-checkpoint.js";
 
@@ -127,6 +127,11 @@ describe("native agent protocol integration", () => {
     },
     25000,
   );
+  it("grants Codex root read only where its Windows sandbox wrapper requires it", () => {
+    expect(codexPermissionProfile("C:\\work", "win32")).toContain('":root"="read"');
+    expect(codexPermissionProfile("C:\\work", "win32")).toContain('":minimal"="read"');
+    expect(codexPermissionProfile("/work", "linux")).toContain('":root"="deny"');
+  });
   it("uses the Codex wire approval policy and the scoped permission profile", async () => {
     const test = await setup("codex");
     const events: AgentRuntimeEvent[] = [];
