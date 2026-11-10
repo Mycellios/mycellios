@@ -1,6 +1,11 @@
 /** Default for deployments and clients connected to older servers. */
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
-export const ATTACHMENT_MAX_COUNT = 4;
+/**
+ * Attachments per message. Files upload as separate artifacts, so this bounds the
+ * composer and the reference list, not the request body. Twenty matches what other
+ * chat clients accept for a batch of documents.
+ */
+export const ATTACHMENT_MAX_COUNT = 20;
 /** Shared photo preparation policy for web and mobile composers. */
 export const ATTACHMENT_IMAGE_MAX_EDGE = 1_600;
 export const ATTACHMENT_IMAGE_QUALITY = 0.7;

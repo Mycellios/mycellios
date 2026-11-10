@@ -441,6 +441,11 @@ describe("recent thread files", () => {
     });
     const writeFile = vi.fn().mockResolvedValue(undefined);
     const markWorkspaceDirty = vi.fn();
+    // One fewer readable file than the budget so the cap still binds after the
+    // unreadable newest turn is skipped, whatever ATTACHMENT_MAX_COUNT is.
+    const readable = Array.from({ length: ATTACHMENT_MAX_COUNT - 1 }, (_, index) =>
+      block(`file-${index}`),
+    );
     const files = await materializeRecentThreadFiles(
       {
         prisma: { artifact: { findMany } } as unknown as PrismaClient,
@@ -451,7 +456,7 @@ describe("recent thread files", () => {
       [
         { id: "outside", blocks: [block("outside")] },
         { id: "old", blocks: [block("extra"), block("last")] },
-        { id: "middle", blocks: [block("second"), block("first"), block("existing")] },
+        { id: "middle", blocks: [block("existing"), ...readable] },
         {
           id: "new",
           blocks: Array.from({ length: ATTACHMENT_MAX_COUNT }, (_, i) => block(`missing-${i}`)),
@@ -475,18 +480,19 @@ describe("recent thread files", () => {
         markWorkspaceDirty,
       },
     );
+    const newestFirst = [...readable].reverse().map((file) => file.name);
     expect(files.map((file) => file.name)).toEqual(
-      maxTurns === 1 ? [] : ["existing.txt", "first.txt", "second.txt", "last.txt"],
+      maxTurns === 1 ? [] : [...newestFirst, "existing.txt"],
     );
     expect(files).toHaveLength(maxTurns === 1 ? 0 : ATTACHMENT_MAX_COUNT);
-    expect(writeFile).toHaveBeenCalledTimes(maxTurns === 1 ? 0 : 3);
+    expect(writeFile).toHaveBeenCalledTimes(maxTurns === 1 ? 0 : newestFirst.length);
     expect(markWorkspaceDirty).not.toHaveBeenCalled();
     expect(get.mock.calls.map(([id]) => id)).toEqual([
-      "missing-3",
-      "missing-2",
-      "missing-1",
-      "missing-0",
-      ...(maxTurns === 1 ? [] : ["first", "second", "last"]),
+      ...Array.from(
+        { length: ATTACHMENT_MAX_COUNT },
+        (_, index) => `missing-${ATTACHMENT_MAX_COUNT - 1 - index}`,
+      ),
+      ...(maxTurns === 1 ? [] : newestFirst.map((name) => name.replace(/\.txt$/, ""))),
     ]);
   });
 
