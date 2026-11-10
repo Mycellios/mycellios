@@ -323,9 +323,9 @@ describe("Mycellios tool compatibility", () => {
   it("loads a deferred schema in the real agent loop without sending the full catalog or executing metadata tools", async () => {
     const nativeRequests: Array<Record<string, unknown>> = [];
     const replies = [
-      { name: "__agent_search_tools", arguments: { query: "read_file" } },
-      { name: "__agent_load_tool", arguments: { id: "read_file" } },
-      { name: "read_file", arguments: { path: "notes.txt" } },
+      { name: "__agent_search_tools", arguments: { query: "other_0" } },
+      { name: "__agent_load_tool", arguments: { id: "other_0" } },
+      { name: "other_0", arguments: {} },
     ];
     const transport: typeof fetch = vi.fn(async (_input, init) => {
       nativeRequests.push(JSON.parse(String(init?.body)));
@@ -380,12 +380,14 @@ describe("Mycellios tool compatibility", () => {
       ),
     ).toHaveBeenCalledOnce();
     expect(executeTool.mock.calls[0]).toEqual(
-      expect.arrayContaining(["read_file", { path: "notes.txt" }]),
+      expect.arrayContaining(["other_0", {}]),
     );
     const first = JSON.stringify(nativeRequests[0]);
     expect(first).not.toContain("A large authorized schema");
-    expect(first).not.toContain('\\"name\\":\\"read_file\\"');
-    expect(JSON.stringify(nativeRequests[2])).toContain('\\"name\\":\\"read_file\\"');
+    // read_file is a core tool, so it is eager; the connector schema stays deferred.
+    expect(first).toContain('\\"name\\":\\"read_file\\"');
+    expect(first).not.toContain('\\"name\\":\\"other_0\\"');
+    expect(JSON.stringify(nativeRequests[2])).toContain('\\"name\\":\\"other_0\\"');
     expect(events.some((event) => event.type === "done")).toBe(true);
   });
 

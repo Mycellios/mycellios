@@ -74,12 +74,15 @@ vi.mock("./pi-openai-compatible-provider.js", () => ({
   registerOpenAiCompatibleRuntime: (models: unknown) => models,
 }));
 
-import { PiAgentRuntime } from "./pi-runtime.js";
+import { ALL_TOOL_SCHEMAS_EAGER, PiAgentRuntime } from "./pi-runtime.js";
 import type { createRuntimeContextPolicy } from "./runtime-context.js";
 
 it("uses the image planner in a nested subagent's screenshot context", async () => {
   captured.policies = [];
-  for await (const _event of new PiAgentRuntime().run(
+  for await (const _event of new PiAgentRuntime({
+    // This fixture inspects the nested agent's tool plan, not catalog paging.
+    maxEagerToolSchemas: ALL_TOOL_SCHEMAS_EAGER,
+  }).run(
     {
       botId: "bot",
       threadId: "thread",

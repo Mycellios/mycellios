@@ -5,11 +5,8 @@ import { APPROVED_ACTION_NOT_RUN_ERROR } from "@rakazo/core";
 import { describe, expect, it, vi } from "vitest";
 import type * as ComputerLifecycle from "../../adapters/src/computer-lifecycle.js";
 import { createRunExecutor } from "../../adapters/src/executor.js";
-import { PiAgentRuntime } from "../../adapters/src/pi-runtime.js";
+import { ALL_TOOL_SCHEMAS_EAGER, PiAgentRuntime } from "../../adapters/src/pi-runtime.js";
 import { startModelEmulator } from "./model-emulator.js";
-
-// This fixture asserts the full synthetic tool list; keep its schemas eager.
-process.env.PI_MAX_EAGER_TOOL_SCHEMAS = "1000";
 
 vi.mock("../../adapters/src/computer-lifecycle.js", async (original) => ({
   ...(await original<typeof ComputerLifecycle>()),
@@ -236,7 +233,7 @@ function fixture(
   );
   const executor = createRunExecutor({
     prisma,
-    runtime: new PiAgentRuntime(),
+    runtime: new PiAgentRuntime({ maxEagerToolSchemas: ALL_TOOL_SCHEMAS_EAGER }),
     mcpAllowPrivateEndpoint: true,
     deploymentModelKey: "fixture-key",
     secretStore: {

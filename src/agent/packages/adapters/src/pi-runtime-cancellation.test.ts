@@ -82,7 +82,7 @@ vi.mock("./pi-openai-compatible-provider.js", () => ({
   registerOpenAiCompatibleRuntime: (models: unknown) => models,
 }));
 
-import { PiAgentRuntime } from "./pi-runtime.js";
+import { ALL_TOOL_SCHEMAS_EAGER, PiAgentRuntime } from "./pi-runtime.js";
 
 const request: AgentRunRequest = {
   botId: "bot",
@@ -242,7 +242,10 @@ describe("Pi runtime cancellation", () => {
 
   it("aborts and settles nested agent work before returning", async () => {
     fake.state.delegate = true;
-    const runtime = new PiAgentRuntime();
+    const runtime = new PiAgentRuntime({
+      // The fake agent only reaches run_subagent when every schema is eager.
+      maxEagerToolSchemas: ALL_TOOL_SCHEMAS_EAGER,
+    });
     const stream = runtime.run(request)[Symbol.asyncIterator]();
     await stream.next();
     await microtasks();
