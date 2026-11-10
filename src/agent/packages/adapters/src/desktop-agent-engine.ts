@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentRuntime } from "@rakazo/adapter-kit";
 import { NativeAgentRuntime } from "./native-agent-runtime.js";
@@ -21,7 +21,20 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       await mkdir(receipts, { recursive: true, mode: 0o700 });
       const receipt = path.join(receipts, hash([request.botId, request.runId]) + ".json");
       try { await writeFile(receipt, JSON.stringify({ version: 1, state: "started", startedAt: new Date().toISOString() }), { flag: "wx", mode: 0o600 }); }
-      catch (error) { if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") throw Error("This local run already started. Check existing results before retrying."); throw Error("Desktop could not record ownership of this run"); }
+      catch (error) {
+        if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") {
+          // The desktop owns this run: never execute it twice. Report what the
+          // previous attempt actually did so the thread ends interrupted (like a
+          // local engine) instead of asking the user to audit an unknown effect.
+          const previous = await readFile(receipt, "utf8")
+            .then((text) => JSON.parse(text) as { state?: string })
+            .catch(() => null);
+          throw Error(previous?.state === "completed"
+            ? "This run already finished on your PC. Ask again if you need a new answer."
+            : "This run was interrupted on your PC. Send a new message to continue.");
+        }
+        throw Error("Desktop could not record ownership of this run");
+      }
       if (accessScope() !== scope || context?.signal?.aborted) throw Error("Desktop account changed before execution");
       const runtime = makeRuntime(directory, () => accessScope() === scope), localId = hash([scope, request.runId]);
       active.set(request.runId, { runtime, localId });
