@@ -249,7 +249,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const created = prismaOverride
     ? { prisma: prismaOverride, pool: undefined }
     : createDb(env.databaseUrl, {
-        poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, 4),
+        poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, 8),
         applicationName: "rakazo-api",
         encryptContent: env.contentEncryption,
       });
@@ -314,7 +314,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   let ownedJobPool: Pool | undefined;
   if (!inMemoryJobs && !created.pool) {
     ownedJobPool = createPool(env.databaseUrl, {
-      poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, 4),
+      poolMax: parsePositiveInteger(process.env.DB_POOL_MAX, 8),
       applicationName: "rakazo-api-jobs",
     });
   }

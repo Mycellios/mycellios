@@ -97,7 +97,11 @@ const logger = createRootLogger(SERVICE_NAMES.worker);
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required");
-  const poolMax = parsePositiveInteger(process.env.DB_POOL_MAX, 8);
+  const concurrency = parsePositiveInteger(process.env.GRAPHILE_WORKER_CONCURRENCY, 4);
+  // A run holds a connection while it checks context and commits effects, so a
+  // pool smaller than the queue concurrency stalls turns for seconds and shows
+  // up as db.pool.saturated. Keep headroom above concurrency instead.
+  const poolMax = parsePositiveInteger(process.env.DB_POOL_MAX, Math.max(8, concurrency + 4));
   // Three queue listeners and reconciliation leadership hold connections. Leave
   // room for job queries and transactions instead of starting a stalled worker.
   if (process.env.WAKEUP_DRIVER !== "memory" && poolMax < 6)
@@ -308,7 +312,7 @@ async function main() {
     withRunWorker(
       new RunWorkerHost(prisma, realtime),
       createReservedGraphileJobWorkerHost(pool, {
-        concurrency: parsePositiveInteger(process.env.GRAPHILE_WORKER_CONCURRENCY, 4),
+        concurrency,
       }),
     );
 
