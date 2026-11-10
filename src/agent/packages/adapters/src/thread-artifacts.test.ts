@@ -445,7 +445,7 @@ describe("recent thread files", () => {
     // unreadable newest turn is skipped, whatever ATTACHMENT_MAX_COUNT is.
     const readable = Array.from({ length: ATTACHMENT_MAX_COUNT - 1 }, (_, index) =>
       block(`file-${index}`),
-    );
+    ) as Array<Extract<MessageBlock, { kind: "file" }>>;
     const files = await materializeRecentThreadFiles(
       {
         prisma: { artifact: { findMany } } as unknown as PrismaClient,
