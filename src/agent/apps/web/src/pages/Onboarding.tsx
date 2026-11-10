@@ -51,6 +51,7 @@ import {
   modelPreflightTestingLabel,
 } from "../components/ModelConnectionPreflightNotice";
 import { ModelHeadersEditor } from "../components/ModelHeadersEditor";
+import { ModelPicker } from "./model-settings/model-picker";
 import { MycelliosWordmark } from "../components/MycelliosBrand";
 import { PageLoading } from "../components/PageLoading";
 import { SignupSurvey } from "../components/SignupSurvey";
@@ -141,6 +142,7 @@ export function OnboardingPage() {
   const [headerRows, setHeaderRows] = useState<ModelHeaderRow[] | null>(null);
   const [reasoning, setReasoning] = useState(false);
   const [manualModelId, setManualModelId] = useState(false);
+  const [hostedModels, setHostedModels] = useState<string[]>([]);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(null);
   const [maxTokens, setMaxTokens] = useState("");
   const [contextWindow, setContextWindow] = useState(String(DEFAULT_MODEL_CONTEXT_WINDOW));
@@ -234,8 +236,24 @@ export function OnboardingPage() {
     isMycellios && !advancedSetup && (Boolean(hostedAntseedGateway()) || mycelliosSignIn === true);
   const simpleAntseed =
     provider === ANTSEED_PROVIDER_ID && Boolean(hostedAntseedGateway()) && !advancedSetup;
-  const isCloudflareGateway = provider === CLOUDFLARE_AI_GATEWAY_PROVIDER_ID;
-  const isCloudflare = isCloudflareModelProvider(provider);
+  const isCloudflareGateway = provider === CLOUDFLARE_AI_GATEWAY_PROVIDER_ID;  const isCloudflare = isCloudflareModelProvider(provider);
+  // The hosted Mycellios catalog comes from the signed-in account, not from a
+  // provider key, so the model picker has real options without a probe.
+  useEffect(() => {
+    if (!isMycellios) return;
+    let alive = true;
+    void rpc.models
+      .mycelliosModels()
+      .then((rows) => {
+        if (alive) setHostedModels(rows.map((row) => row.id));
+      })
+      .catch(() => {
+        if (alive) setHostedModels([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isMycellios]);
   const cloudflareRoutingReady =
     !isCloudflare || cloudflareModelRouting({ provider, accountId, gatewayId }) !== undefined;
   const subscriptionSignIn = selected?.signIn !== undefined && providerAuth !== "key";
@@ -732,7 +750,7 @@ export function OnboardingPage() {
                 <Button
                   type="button"
                   variant="link"
-                  className="mt-3 px-0 text-muted-foreground"
+                  className="mt-3 hidden px-0 text-muted-foreground"
                   onClick={() => setAdvancedSetup(true)}
                 >
                   <Trans>Advanced setup</Trans>
@@ -826,13 +844,31 @@ export function OnboardingPage() {
                     items={providerItems}
                   >
                     <SelectTrigger aria-label={t`Provider`} className="mt-2 w-full">
-                      <SelectValue placeholder={t`Choose a provider`} />
+                      {isMycellios ? (
+                        <span className="block min-w-0 flex-1 truncate text-left">
+                          {productBrand.shortName}
+                          <span className="ml-1 text-[11px] font-medium text-success">
+                            (Free)
+                          </span>
+                        </span>
+                      ) : (
+                        <SelectValue placeholder={t`Choose a provider`} />
+                      )}
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
                         {providerOptions.main.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
-                            {option.label}
+                            {option.value === "mycellios-preset" ? (
+                              <>
+                                {option.label}
+                                <span className="ml-1 text-[11px] font-medium text-success">
+                                  (Free)
+                                </span>
+                              </>
+                            ) : (
+                              option.label
+                            )}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -854,7 +890,7 @@ export function OnboardingPage() {
                     <div className="mt-6 block text-sm text-foreground">
                       {isOpenAiCompatible ? (
                         <>
-                          {isMycellios ? compatibleKeyField : null}
+                          {null}
                           {!isMycellios ? (
                             <label htmlFor={`${fieldId}-base-url`} className="block font-medium">
                               {provider === ANTSEED_PROVIDER_ID ? (
@@ -881,6 +917,7 @@ export function OnboardingPage() {
                               />
                             </label>
                           ) : null}
+                          {!isMycellios ? (
                           <div className="mt-3">
                             <Button
                               variant="outline"
@@ -898,6 +935,7 @@ export function OnboardingPage() {
                               <ModelPreflightFeedback success={null} failure={preflightFailure} />
                             ) : null}
                           </div>
+                          ) : null}
                           <div className="mt-4 block">
                             <span className="font-medium">
                               <Trans>Model</Trans>
@@ -939,17 +977,27 @@ export function OnboardingPage() {
                                 </SelectContent>
                               </Select>
                             ) : (
-                              <Input
-                                value={modelId}
-                                onChange={(e) => {
-                                  setManualModelId(true);
-                                  setModelId(e.target.value);
-                                  invalidatePreflight();
-                                }}
-                                aria-label={t`Model id`}
-                                placeholder="exact-model-id"
-                                className="mt-2"
-                              />
+                              <div className="mt-2">
+                                <ModelPicker
+                                  value={modelId}
+                                  provider={provider}
+                                  allowCustom
+                                  placeholder={t`Choose a model`}
+                                  options={(probeModels.length ? probeModels : hostedModels).map(
+                                    (id) => ({
+                                      id,
+                                      provider,
+                                      label: id,
+                                      billing: "",
+                                    }),
+                                  )}
+                                  onChange={(value) => {
+                                    setManualModelId(true);
+                                    setModelId(value);
+                                    invalidatePreflight();
+                                  }}
+                                />
+                              </div>
                             )}
                             {probeModels.length && manualModelId ? (
                               <Button
@@ -966,6 +1014,7 @@ export function OnboardingPage() {
                               </Button>
                             ) : null}
                           </div>
+                          {advancedSetup ? (
                           <ModelThinkingOptions
                             reasoning={reasoning}
                             onReasoningChange={(value) => {
@@ -1011,6 +1060,7 @@ export function OnboardingPage() {
                               }}
                             />
                           </ModelThinkingOptions>
+                          ) : null}
                         </>
                       ) : (
                         <>

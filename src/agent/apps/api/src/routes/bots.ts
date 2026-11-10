@@ -243,6 +243,27 @@ async function requireNativeEngine(deps: RouterDeps, actor: Actor, engine: strin
   }
 }
 
+/**
+ * A new Mico starts on the best engine this server can actually run, the way the
+ * packaged desktop client starts on Codex. Pi stays the fallback so a server with
+ * no installed agent still works.
+ */
+async function preferredAgentEngine(
+  deps: RouterDeps,
+  actor: Actor,
+): Promise<"codex" | "opencode" | "claude" | undefined> {
+  try {
+    if (!(await nativeHostAccess(deps.dataDir, actor))) return undefined;
+    const engines = await discoverNativeEngines(deps.dataDir);
+    for (const id of ["codex", "opencode", "claude"] as const) {
+      if (engines.some((candidate) => candidate.id === id && candidate.available)) return id;
+    }
+  } catch {
+    // Discovery is an optimisation; a failure must not block creating a Mico.
+  }
+  return undefined;
+}
+
 export function botsRoutes(ctx: RouterContext) {
   const { deps, repos, botModelValidation, removeBot, agentImportServices, groupRepos, authed } =
     ctx;
@@ -262,6 +283,8 @@ export function botsRoutes(ctx: RouterContext) {
         if (profile.agentEngine) {
           if (model) throw new ORPCError("BAD_REQUEST", { message: "Choose a model or an installed agent." });
           await requireNativeEngine(deps, context.actor, profile.agentEngine);
+        } else if (!model) {
+          profile.agentEngine = await preferredAgentEngine(deps, context.actor);
         }
         if (model) {
           const result = await validateBotModelChange(botModelValidation(context.actor), {

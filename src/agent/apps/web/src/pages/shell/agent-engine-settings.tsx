@@ -102,10 +102,15 @@ export function InstalledAgentOnboarding({
     setBusy(true);
     setError("");
     try {
-      const found = (await rpc.engines.list()).filter(
+      const available = (await rpc.engines.list()).filter(
         (engine): engine is typeof engine & { id: InstalledEngine } =>
           engine.id !== "pi" && engine.available,
       );
+      // OpenCode is a built-in engine, so it stays listed even when this server
+      // has no host advertising it yet; selecting it reports the real refusal.
+      const found = available.some((engine) => engine.id === "opencode")
+        ? available
+        : [...available, { id: "opencode" as InstalledEngine, name: "OpenCode" }];
       setEngines(found);
       if (!found.length)
         setError(t`Install and sign in to an agent on the computer running this server first.`);

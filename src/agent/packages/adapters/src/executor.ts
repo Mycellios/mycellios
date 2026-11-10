@@ -8712,6 +8712,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
               assistantTurnText = "";
             }
             if (event.type === "text") {
+              if (event.replace) {
+                // A retried stream restarted the answer. Drop the interrupted
+                // segment so the reply never shows two beginnings glued together,
+                // and let the next flush replace the live text.
+                const interrupted = currentTextSegment;
+                if (interrupted && assembled.endsWith(interrupted)) {
+                  assembled = assembled.slice(0, assembled.length - interrupted.length);
+                }
+                assistantTurnText = "";
+                currentTextSegment = "";
+                pendingProgress = "";
+                hasStreamedText = false;
+              }
               assistantTurnText += event.text;
               if (assistantTurnBreakPending && event.text) {
                 assistantTurnBreakPending = false;
@@ -10312,7 +10325,7 @@ export function longWorkProgressGuidance(maxLength = messageUserMaxLength()): st
   return `${LIVE_TURN_NARRATION} During long computer tasks or multi-step jobs, keep the user informed with message_user: after roughly a minute of work, explain briefly what you have checked, what you found, and what comes next. Send another short update when a meaningful result or blocker changes the next step. Base updates on observed actions and results, in the user's language; do not invent progress, percentages or completion estimates. Do not interrupt a running tool just to send an update. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.`;
 }
 
-export const ROUTINE_SILENT_REPLY_GUIDANCE = `If this routine's prompt says to stay silent when there is nothing to report, the entire final assistant reply must be exactly ${NO_RESPONSE} — no surrounding prose, no variants, no progress updates, no all-clear, and no meta note that you are staying silent. Do not call message_user unless you have something to report.`;
+export const ROUTINE_SILENT_REPLY_GUIDANCE = `This run was scheduled, not asked in chat. Report only what changed since your previous report, in one short paragraph. When nothing material changed — the same blockers, the same commits, the same counts, the same next step — the entire final assistant reply must be exactly ${NO_RESPONSE}: no all-clear, no "nothing new" summary, no repeated baseline, and no meta note that you are staying silent. Do not restate hashes, paths, worktrees or counts that did not change. Do not call message_user unless you have something to report.`;
 
 export const REACTION_SILENT_REPLY_GUIDANCE = `The user reacted with an emoji to your message. Reply only if the reaction calls for it, such as a correction after 👎, a go-ahead on something you proposed, or a question. Otherwise the entire final assistant reply must be exactly ${NO_RESPONSE}, with no message_user call.`;
 
