@@ -229,11 +229,11 @@ describe("normalizeRunError", () => {
         "Your Anthropic is overloaded right now. Try again in a moment.",
       ],
       ['503: {"message":"Service Unavailable"}', "Your model provider is temporarily unavailable."],
-      ["502 Bad Gateway", "Your model provider returned a server error."],
+      ["502 Bad Gateway", "Your model provider is temporarily unavailable."],
       ["503 provider unavailable", "Your model provider is temporarily unavailable."],
       [
         '502: {"message":"Gateway error","metadata":{"provider":"OpenAI"}}',
-        "Your OpenAI returned a server error.",
+        "Your OpenAI is temporarily unavailable.",
       ],
       ["Codex error: Our servers are currently overloaded. Please try again later.", overloaded],
       [
