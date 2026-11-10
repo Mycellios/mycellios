@@ -59,6 +59,7 @@ function fixture() {
     prisma: {
       bot: { findFirst: bot, update: writes },
       message: { findMany: messages, create: writes },
+      thread: { findFirst: vi.fn(async () => ({ contextStartSeq: 0 })) },
       run: { create: writes, update: writes },
       event: { create: writes },
       $transaction: async (callback) => callback(tx),
@@ -111,6 +112,7 @@ it("integrates authenticated RPC, bounded owned context, independent runtime and
   const [request, context] = f.run.mock.calls[0]!;
   expect(request).toMatchObject({
     agentEngine: "pi",
+    ephemeral: true,
     history: [],
     tools: [],
     model: { maxTokens: 2048, apiKey: "server-only" },
@@ -159,4 +161,11 @@ it("does not substitute a chat send when the service is unavailable or empty", a
   ).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
   expect(f.run).not.toHaveBeenCalled();
   expect(f.writes).not.toHaveBeenCalled();
+});
+
+it("reads only the current chat generation after New chat", async () => {
+ const f=fixture();f.deps.prisma.thread.findFirst.mockResolvedValue({contextStartSeq:42});
+ await f.client().threads.sideQuestion({botId:"bot",question:"What changed?",earlier:[]});
+ expect(f.messages).toHaveBeenCalledWith(expect.objectContaining({where:expect.objectContaining({threadId:"thread",seq:{gte:42}})}));
+ expect(f.writes).not.toHaveBeenCalled();
 });

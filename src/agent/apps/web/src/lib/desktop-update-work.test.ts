@@ -47,3 +47,11 @@ it("lets the update screen cover an active call, but requires audio to close bef
     expect(canRestartDesktop()).toBe(true);
   } finally { unregister(); }
 });
+
+it("allows the server chooser menu but still protects unrelated forms and calls", () => {
+ document.body.innerHTML = '<section role="dialog"><section data-testid="desktop-server-menu"></section></section>';
+ expect(canRestartDesktop()).toBe(true);
+ state.call = {}; expect(canRestartDesktop()).toBe(false); state.call = null;
+ document.body.innerHTML += '<section role="dialog"><input value="draft" /></section>';
+ expect(canRestartDesktop()).toBe(false);
+});

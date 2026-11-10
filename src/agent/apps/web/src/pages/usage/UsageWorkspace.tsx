@@ -339,25 +339,27 @@ export function UsageWorkspace({
         </div>
       </header>
       <div className="rk-usage-content rk-scroll">
-        <section className="mb-4 space-y-2 rounded-xl border border-border bg-card p-4" aria-label={t`Trial Spore`}>
-          <h2 className="text-sm font-semibold">{t`Trial Spore`}</h2>
-          {rewards.data ? (
-            <>
-              <p className="text-2xl font-semibold tabular-nums">{exact(rewards.data.welcome + rewards.data.earned)} Spore</p>
-              <p className="text-sm text-muted-foreground">
-                {t`${exact(rewards.data.welcome)} welcome Spore · ${exact(rewards.data.earned)} earned from usage`}
+        <section className="mb-4 rounded-xl border border-border bg-card px-4 py-3" aria-label={t`Trial Spore`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-sm text-muted-foreground">{t`Trial Spore`}</h2>
+            {rewards.data ? <p className="text-2xl font-semibold tabular-nums">{exact(rewards.data.welcome + rewards.data.earned)} Spore</p> : (
+              <p className="text-sm text-muted-foreground" role="status">
+                {rewards.isError ? t`Could not load Spore rewards.` : t`Loading Spore rewards…`}
               </p>
-              <p className="text-sm tabular-nums text-muted-foreground">
-                {t`${exact(rewards.data.progressTokens)} / ${exact(TOKENS_PER_TRIAL_SPORE)} tokens toward the next Spore`}
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground" role="status">
-              {rewards.isError ? t`Could not load Spore rewards.` : t`Loading Spore rewards…`}
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">{t`Earn 1 Spore for every million tokens processed.`}</p>
-          <p className="text-sm text-muted-foreground">{t`Across all your spaces. Trial rewards have no monetary value and are not on-chain.`}</p>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{t`Trial balance. No monetary value.`}</p>
+          <details className="mt-2 text-xs text-muted-foreground">
+            <summary className="w-fit cursor-pointer rounded-sm py-1 underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring">{t`How it works`}</summary>
+            <div className="space-y-1.5 pt-2">
+              {rewards.data ? <>
+                <p>{t`${exact(rewards.data.welcome)} welcome Spore · ${exact(rewards.data.earned)} earned from usage`}</p>
+                <p className="tabular-nums">{t`${exact(rewards.data.progressTokens)} / ${exact(TOKENS_PER_TRIAL_SPORE)} tokens toward the next Spore`}</p>
+              </> : null}
+              <p>{t`Earn 1 Spore for every million tokens processed.`}</p>
+              <p>{t`Across all your spaces. Trial rewards have no monetary value and are not on-chain.`}</p>
+            </div>
+          </details>
         </section>
         {error ? (
           <p className="rk-usage-notice text-destructive" role="alert">

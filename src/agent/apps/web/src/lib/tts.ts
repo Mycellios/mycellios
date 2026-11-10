@@ -1,3 +1,4 @@
+import { getGeneralPreferences } from "./general-preferences";
 import type { SettingsScope } from "@rakazo/contracts";
 import { readBoundedResponseBytes } from "@rakazo/core";
 import { appPath } from "./app-path";
@@ -43,6 +44,9 @@ export function browserSpeechAvailable(): boolean {
 }
 
 export class Speaker {
+  private localContext?: AudioContext;
+  private finishLocal?: () => void;
+  private localActive = false;
   private snapshot: SpeechSnapshot = IDLE;
   private watchers = new Set<(s: SpeechSnapshot) => void>();
   private token = 0;
@@ -77,6 +81,10 @@ export class Speaker {
 
   stop() {
     this.token += 1;
+    this.finishLocal?.(); this.finishLocal = undefined;
+    void this.localContext?.close().catch(() => {}); this.localContext = undefined;
+    if (this.localActive) void window.rakazoDesktop?.localVoice?.stop().catch(() => {});
+    this.localActive = false;
     if (this.settleBrowser) {
       const settle = this.settleBrowser;
       this.settleBrowser = null;
@@ -106,6 +114,7 @@ export class Speaker {
   /** Resolves with this request's failure text; stopping or superseding it resolves with none. */
   async speak(text: string, opts: SpeakOptions = {}): Promise<string | undefined> {
     this.stop();
+    if (typeof window !== "undefined" && window.rakazoDesktop?.localVoice && getGeneralPreferences().speechEngine === "local") return this.speakLocal(text, opts);
     if (opts.browser) return this.speakBrowser(text, opts);
     const mine = this.token;
     const controller = new AbortController();
@@ -157,7 +166,7 @@ export class Speaker {
         messageId: opts.messageId,
         caption: utterances[i],
       });
-      const finished = await this.play(rendered.blob, live, opts.speed ?? 1);
+      const finished = await this.play(rendered.blob, live, opts.speed ?? getGeneralPreferences().speechSpeed);
       if (!finished || !live()) {
         if (live()) this.set(IDLE);
         if (this.request === controller) this.request = null;
@@ -168,16 +177,45 @@ export class Speaker {
     if (this.request === controller) this.request = null;
   }
 
+  private async speakLocal(text: string, opts: SpeakOptions): Promise<string | undefined> {
+    const native = window.rakazoDesktop!.localVoice!; const mine = this.token;
+    this.localActive = true;
+    this.set({ status: "preparing", botId: opts.botId, messageId: opts.messageId });
+    try {
+      const state = await native.status(); if (mine !== this.token) return;
+      if (!state.ready) throw Error("Descarga los modelos de voz local en Ajustes > Voz.");
+      const language = getGeneralPreferences().dictationLanguage === "auto" ? (navigator.language || "es").split("-")[0]! : getGeneralPreferences().dictationLanguage;
+      for (const part of text.match(/[\s\S]{1,1800}/g) ?? []) {
+        const result = await native.speak({ text: part, language, speed: opts.speed ?? getGeneralPreferences().speechSpeed });
+        if (mine !== this.token) return;
+        if (!result.samples?.length || !result.sampleRate) throw Error("No se ha podido generar la voz local.");
+        const context = new AudioContext({ sampleRate: result.sampleRate }); this.localContext = context;
+        const buffer = context.createBuffer(1, result.samples.length, result.sampleRate);
+        buffer.copyToChannel(new Float32Array(result.samples), 0);
+        const source = context.createBufferSource(); source.buffer = buffer; source.connect(context.destination);
+        this.set({status:"speaking",botId:opts.botId,messageId:opts.messageId,caption:part});
+        await context.resume();
+        if (mine !== this.token) { await context.close(); return; }
+        await new Promise<void>(resolve => { this.finishLocal = resolve; source.onended = () => resolve(); source.start(); });
+        this.finishLocal = undefined; await context.close().catch(() => {}); this.localContext = undefined;
+        if (mine !== this.token) return;
+      }
+      this.set(IDLE);
+    } catch (error) { if (mine === this.token) { const failure = errorText(error); this.set({...IDLE,error:failure}); return failure; } }
+    finally { if (mine === this.token) { this.localActive = false; void this.localContext?.close().catch(() => {}); this.localContext = undefined; this.finishLocal = undefined; } }
+  }
+
   private async speakBrowser(text: string, opts: SpeakOptions): Promise<string | undefined> {
     if (!browserSpeechAvailable()) return "Read aloud is not available on this device.";
     const voices = window.speechSynthesis.getVoices().filter((voice) => voice.localService);
     const language = navigator.language.split("-")[0];
-    const voice = voices.find((item) => item.lang.split("-")[0] === language) ?? voices[0];
+    const preferred = getGeneralPreferences().deviceVoice;
+    const voice = voices.find(item => item.voiceURI === preferred) ?? voices.find((item) => item.lang.split("-")[0] === language) ?? voices[0];
     if (!voice) return "No device voice is available. You can still read the reply.";
     const mine = this.token;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voice;
-    utterance.rate = opts.speed ?? 1;
+    utterance.rate = opts.speed ?? getGeneralPreferences().speechSpeed;
     utterance.lang = voice.lang;
     this.set({ status: "speaking", botId: opts.botId, messageId: opts.messageId, caption: text });
     return new Promise((resolve) => {

@@ -86,7 +86,6 @@ export function ConnectionControls({
   const [keyShownFor, setKeyShownFor] = useState<string | null>(null);
   const keyFolded =
     subscriptionSignIn &&
-    credential?.authKind === "oauth" &&
     keyShownFor !== (selected?.provider ?? null);
   // Opening the fold swaps the summary for the form, so focus moves to the key field.
   useEffect(() => {
@@ -316,20 +315,6 @@ export function ConnectionControls({
             </label>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            {acceptsKey && selected?.catalogProbe ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy || preflightTesting || apiKey.trim().length < 8}
-                onClick={() => void testApiKeyConnection()}
-              >
-                {modelPreflightTestingLabel(
-                  preflightTesting && preflightTarget === "api-key",
-                  "api-key",
-                )}
-              </Button>
-            ) : null}
             <Button
               type="button"
               variant="secondary"

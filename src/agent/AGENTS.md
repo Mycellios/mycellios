@@ -19,6 +19,22 @@
   Bind each Space panel and its writes to the Space being edited, even when the
   open conversation belongs to another Space. Preserve account model credentials
   and per-Space inheritance for model, voice and approval preferences.
+  The chat provider/model selection owns execution: saved API/OAuth connections
+  use Pi automatically; installed account providers are selected in the same
+  model menu. Do not expose a second Agent engine switch in Mico settings or
+  select an unrelated CLI merely because a PC is connected. New Micos inherit
+  the general connection unless the user selects an installed provider.
+  Sidebar subscription quota reads saved OAuth accounts and the authorized native
+  Codex CLI through account/rateLimits/read. Recheck native account/Space grants
+  before serving cached quota; forward only sanitized limit metadata, never CLI
+  account identity or credentials. Keep stale measurements visibly unavailable.
+  Codex model, effort and Fast preferences live in Bot.nativeConfig, separately
+  from API model connections. Read the authenticated CLI catalog and validate
+  the selected model/effort/tier again in the executing CLI. Fast requests priority;
+  switching it off explicitly requests default. Preserve those fields through
+  Desktop dispatch and continuation turns; do not substitute an API model or
+  lower reasoning effort to simulate speed. Verify native-codex-settings and
+  native-agent-runtime regression tests.
   The native OpenCode engine is opt-in per Mico and uses the server's installed
   CLI over ACP. Preserve operator account/Space grants and a private CLI home per
   conversation. Keep project config and external plugins disabled and deny native
@@ -28,6 +44,34 @@
   in the host's native-agents.json and the same account/Space grant. Verify
   both artifact digests and preserve operator command overrides, the published
   version directory and the no-fallback model policy.
+
+- Ask aside lives in a resizable side pane, with transient state pinned to user,
+  Space, Mico and task. Hiding or switching panes preserves pending exchanges;
+  closing deletes them and aborts only the aside request. Move a plain text draft
+  there only when it has no files. Never send, steer or stop the main task from
+  the aside pane. Respect the current contextStartSeq and send-key preference.
+  Side-question generations are ephemeral: meter usage, but do not write a chat
+  message or a Pi session transcript. Verify scoped pane/composer/API tests.
+
+- New chat is distinct from Clear: retain messages with a context_reset divider,
+  advance Thread.contextStartSeq, invalidate local summaries/checkpoints and rotate
+  the native session binding while keeping the same workspace and Mico settings.
+  Reject busy/queued resets under the Send thread-row lock and deduplicate by
+  client nonce. Model history, compaction and history tools respect the boundary;
+  display paging keeps earlier messages. Verify scoped DB/UI/native tests and
+  PostgreSQL transaction tests with synthetic temporary tables.
+
+- Composer audio follows one clear split: Mic dictates an editable text draft;
+  AudioLines opens the voice conversation, or closes its owner when active.
+  The empty composer uses Voice, a draft uses Send, and an empty running turn
+  uses Stop. A turn waiting for an answer retains Send. The + menu has one Voice entry and one supported-file picker.
+  Preserve recording cancellation, Space/Mico ownership and explicit Send.
+
+- Marketplace integrations include a bundled remote MCP catalog when no managed
+  provider is configured. Preserve managed-provider entries and deduplicate by
+  app slug. Bind creation, OAuth and health checks to the edited Space; do not
+  mark registration or cancelled authorization as connected, and do not approve
+  a Mico's tool access implicitly from a catalog connection.
 
 - Account-owned Desktop execution keeps the existing cloud account, conversations,
   model connections, leases and approval effects. Advertise agentExecution v1 only
@@ -265,6 +309,15 @@
   Web update checks share the existing guarded tracker; they never deploy servers
   or reload through open settings/drafts/calls. Desktop uses the installed package's
   real updater policy; do not fabricate channel/automatic-install permissions.
+  Account navigation keeps secondary tools under More settings. Models remain
+  reachable from Micos, approvals from Computer use and usage from Billing.
+  Font choices, notification filters, account access and connected voice services
+  use shared state-preserving disclosures; search must still reveal their fields.
+  Desktop update choices persist transactionally in update-preferences.json.
+  Disabling automatic downloads checks metadata without fetching the installer.
+  Idle restarts require both a fresh renderer acknowledgement and an idle native
+  executor check, remain cancellable and never interrupt an update download.
+  Development/managed installations must not offer unsupported automatic updates.
   Qualify affected settings/security/model/voice/update tests and the isolated
   `playwright.settings.config.ts` flow. No live OAuth, paid run, payment, password
   change, account deletion, microphone permission or model download is a fixture.
@@ -639,6 +692,19 @@
   space when rendering a header. Keep long selector values inside the trigger;
   bound open menus to the available viewport and wrap the complete option label.
   Qualify narrow layouts with long names and keyboard selection, not just empty forms.
+- Device General preferences persist in `mycellios.general.v1`; validate font/color
+  values before applying CSS. Keep separate chat backgrounds for light and dark.
+  Read startup restoration once; preserve explicit deep links and active RPC scopes.
+  Native Settings use main-frame-only IPC, transactional profile writes and actual
+  login/power APIs. A failed write must leave the saved switch unchanged. Keep
+  battery wake disabled until AC wake is enabled; never prevent display sleep.
+- Desktop dock and island windows are sandboxed, without the app preload. Publish
+  only the owned account/Space roster, clear it on sign-out/scope exit, validate
+  bounded PNG avatars and accept selections only from companion windows and the
+  current roster. Result text is opt-in. Preserve click-through when auto-hidden.
+- Device Voice preferences set dictation hints, local device voice and playback
+  speed. Model downloads require a user gesture. Optional screen-usage reporting
+  is off until this device opts in; this does not disable security/error reporting.
 - General settings retain upstream SettingsGroup/SettingsRow geometry: grouped
   rows with compact controls beside labels, wrapping on narrow screens. Keep
   password editing closed until requested rather than stretching the default form.
@@ -1011,9 +1077,49 @@
   Keep instruction drafts and their conflict baseline across that navigation.
   Verify bot-panel and InstructionSettings tests.
 
+- Busy chat sends distinguish queued messages from corrections to the live task.
+  Explicit queue entries use steering origin queued_user and are drained FIFO;
+  the running turn must not claim them as steering or release a human takeover.
+  Queue reads use the authenticated owned thread resolver, including side threads.
+  Repeat automatically opens an unsaved routine from the original user request;
+  it never schedules an assistant result or starts a routine before Save.
+
 - Composer retry re-reads the owned thread and targets only the saved failed user
   run. Never offer it for introductions or copy text/files to replay a request.
   Keep API effect fences and chat/Space/unmount guards; reconcile known conflicts
   without another POST. An uncertain Desktop dispatch cannot be replayed even
   when no effects were recorded. The model picker in the error notice changes
   only the Mico's model settings. Verify web/API retry-thread-run and composer tests.
+
+- The empty routine canvas and schedule show explicitly labelled inert examples. Only Create
+  opens a real draft; preview motion must pause when hidden, offscreen, on request
+  or under reduced motion. Never render failed routine loading as an empty success.
+
+- Desktop server history is private servers.json, with validated addresses and no credentials.
+  Connection management stays in the trusted setup window; the connected renderer
+  may only open that window with an already-saved address. Probe and mount before
+  committing a switch; retain origin-partitioned sessions and rollback on failure.
+
+- Continuous voice uses a flush 50px header, a scrollable body and fixed controls.
+  Local model preparation is single-flight and must never start capture after
+  the owning panel closes. Native ASR and TTS share a worker; stop capture before
+  local synthesis. Contribution uses the existing verified-account controls and
+  never implies that donating compute enables distributed speech inference.
+
+- Sidebar contribution is a direct contribute/pause action. The warm bottom-edge
+  indicator requires a supported, connected, confirmed contributor and clears
+  on errors or unmount. Animate only verified contribution-earned deltas; never
+  mint display credits from timers, purchases, promotions or unconfirmed jobs.
+
+- The chat has one Browser and computer entry. Both views share WorkAreaHeader;
+  secondary library, Mico settings and voice actions stay in its More menu.
+  Computer recovery and per-Mico routines remain in state-preserving disclosures.
+  Keep browser documents, native preview sessions, iframe sandboxing and computer
+  maintenance permissions intact when switching views.
+
+- Native CLIs and connected API models share stable conversation-style defaults; explicit
+  user/Mico formatting and silent routine rules take precedence. Do not shorten output
+  with post-processing or reduce model effort to simulate speed. Text progress publishes
+  immediately first, then coalesces at 80 ms, with final/tool-boundary flushes retained.
+  Long replies use the same disclosure for plain text and mixed blocks. Keep streamed
+  answers expanded on completion and reveal search/quote targets without losing text.

@@ -64,6 +64,7 @@ function visible(scope: HistoryScope): Prisma.Sql {
   const channel = scope.channelId;
   return Prisma.sql`
     t.id = ${scope.threadId} AND t."spaceId" = ${scope.spaceId}
+    AND m.seq >= t."contextStartSeq"
     AND t."userId" = ${scope.userId}
     AND (t."botId" = ${scope.botId} OR (t."botId" IS NULL AND EXISTS (
       SELECT 1 FROM chat_groups g JOIN chat_group_members member ON member."groupId" = g.id

@@ -4551,3 +4551,17 @@ it("checks cross-space peer permission inside the message transaction before cre
   expect(tx.task.create).not.toHaveBeenCalled();
   expect(tx.run.create).not.toHaveBeenCalled();
 });
+
+it("drains explicit queued messages one at a time in FIFO order", async () => {
+  const tx = {
+    run: { findFirst: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: "next" }) },
+    task: { create: vi.fn().mockResolvedValue({ id: "task" }) },
+    steeringMessage: {
+      findMany: vi.fn().mockResolvedValue([1, 2].map(n => ({ id: `queued-${n}`, userId: "user", originTrigger: "queued_user", message: { id: `message-${n}`, blocks: [{ kind: "text", text: `request ${n}` }], seq: n } }))),
+      updateMany: vi.fn(),
+    },
+  };
+  await createPendingSteeringRun(tx as never, { spaceId: "space", threadId: "thread", botId: "bot" });
+  expect(tx.steeringMessage.updateMany).toHaveBeenCalledWith({ where: { id: { in: ["queued-1"] }, runId: null }, data: { runId: "next", claimedAt: null } });
+  expect(tx.run.create).toHaveBeenCalledWith({ data: expect.objectContaining({ sourceMessageId: "message-1", trigger: "follow_up" }) });
+});

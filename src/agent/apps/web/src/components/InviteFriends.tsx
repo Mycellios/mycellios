@@ -22,7 +22,7 @@ const mascots = [
   { shape: MICO_AVATAR_SHAPES[3], palette: MICO_AVATAR_PALETTES[3], size: 39 },
 ];
 
-export function InviteFriends({ inMenu = false }: { inMenu?: boolean }) {
+export function InviteFriends({ inMenu = false, className }: { inMenu?: boolean; className?: string }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">("idle");
   const linkRef = useRef<HTMLInputElement>(null);
   const { protocol, hostname, origin } = window.location;
@@ -47,10 +47,10 @@ export function InviteFriends({ inMenu = false }: { inMenu?: boolean }) {
     <Dialog onOpenChange={() => setCopyState("idle")}>
       <IconTooltip label="Invitar amigos">
         <DialogTrigger
-          render={<Button variant={inMenu ? "ghost" : "floating"} size="icon-lg" className="app-no-drag" data-mobile-chat-action={inMenu || undefined} />}
+          render={<Button variant={inMenu || className ? "ghost" : "floating"} size="icon-lg" className={`app-no-drag ${className ?? ""}`} data-mobile-chat-action={inMenu || undefined} />}
           aria-label="Invitar amigos"
         >
-          <Gift size={17} strokeWidth={1.6} aria-hidden="true" />
+          <Gift size={18} strokeWidth={1.75} aria-hidden="true" />
           {inMenu ? "Invitar amigos" : null}
         </DialogTrigger>
       </IconTooltip>

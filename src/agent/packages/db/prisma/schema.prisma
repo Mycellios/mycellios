@@ -552,6 +552,7 @@ model Bot {
   inboxTasks InboxTask[]
   taskConcurrency Int @default(4)
   agentEngine String @default("pi")
+  nativeConfig Json?
   skillPins BotSkillPin[]
   screenGeneration Int @default(0)
   id                String            @id @default(cuid())
@@ -725,6 +726,8 @@ model Thread {
   createdAt                   DateTime   @default(now())
   nextEventSeq                Int        @default(0)
   nextMessageSeq              Int        @default(0)
+  /// First message the agent may read; earlier messages remain visible to the user.
+  contextStartSeq            Int        @default(0)
   historyCompactedUpToSeq     Int?
   historyCompactionSummary    String?    @db.Text
   historyCompactionGeneration Int        @default(0)

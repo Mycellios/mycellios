@@ -8,10 +8,13 @@ export function loadRunHistoryMessages(
   run: { id: string; threadId: string },
   limit: number,
   channelId?: string,
+  contextStartSeq = 0,
 ) {
   return prisma.message.findMany({
     where: {
       threadId: run.threadId,
+      ...(contextStartSeq > 0 ? { seq: { gte: contextStartSeq } } : {}),
+      NOT: { steeringMessages: { some: { originTrigger: "queued_user", claimedAt: null, OR: [{ runId: null }, { runId: { not: run.id } }] } } },
       ...(channelId
         ? {
             OR: [

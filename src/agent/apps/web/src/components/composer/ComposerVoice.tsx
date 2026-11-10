@@ -1,7 +1,7 @@
 import { useLingui } from "@lingui/react/macro";
 import { isAttachmentAudioMimeType } from "@rakazo/contracts";
 import { Button, Spinner } from "@rakazo/ui-web";
-import { Check, Mic, Square, X } from "lucide-react";
+import { Check, Mic, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isAndroidHost } from "../../lib/android-host";
 import { dictation } from "../../lib/dictation";
@@ -257,11 +257,12 @@ export function ComposerVoiceButton({ voice, disabled }: { voice: ReturnType<typ
   const { t } = useLingui();
   const recording = voice.state?.phase === "recording";
   return <Button type="button" variant="ghost" size="icon"
-    className="size-11 shrink-0 rounded-full text-muted-foreground transition-[transform,color] active:scale-95 motion-reduce:transition-none"
+    className="size-10 shrink-0 rounded-full bg-muted text-muted-foreground transition-[transform,color] hover:bg-accent hover:text-foreground active:scale-95 motion-reduce:transition-none md:size-7"
     aria-label={recording ? t`Stop recording` : t`Dictate message`}
+    title={recording ? t`Stop recording` : t`Dictate message`}
     disabled={voice.state ? !recording : disabled}
     onClick={() => recording ? voice.finish() : voice.start()}>
-    {recording ? <Square size={16} fill="currentColor" className="text-destructive" aria-hidden /> : voice.state ? <Spinner /> : <Mic size={20} aria-hidden />}
+    {recording ? <Check size={16} aria-hidden /> : voice.state ? <Spinner /> : <Mic size={16} aria-hidden />}
   </Button>;
 }
 

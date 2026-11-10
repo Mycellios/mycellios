@@ -634,6 +634,11 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
     const form = formRevisionRef.current;
     const stillSelected = () => form === formRevisionRef.current;
     try {
+      if (!settingsOnly && newKey && selected.catalogProbe) {
+        const checked = await runModelConnectionPreflight({ authKind: "api-key", provider: selected.provider, apiKey: newKey, modelId: selected.id, catalogProbe: true, probeCatalog: rpc.models.probeCatalog });
+        if (!stillSelected()) return;
+        if (!checked.ok) { setPreflightTarget("api-key"); setPreflightSuccess(null); setPreflightFailure(checked.failure); return; }
+      }
       const saved = await rpc.models.connect(
         isOpenAiCompatible
           ? {
@@ -649,7 +654,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
               contextWindow: parsedContextWindow,
               supportsImages,
               maxImagesPerPrompt: maxImagesPerPromptInput,
-              ...(intent ? { makeDefault: intent.makeDefault, scope } : {}),
+              ...(intent ? { makeDefault: intent.makeDefault, scope } : me?.needsModel ? { makeDefault: true, scope } : {}),
               apiKey: apiKey.trim() || undefined,
               label: selected.providerName ?? selected.provider,
               credentialId: credential?.id ?? null,
@@ -665,7 +670,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
               ...(!savingLimitOnly || modelChanged || thinkingDirty
                 ? { thinkingLevel: stagedThinking }
                 : {}),
-              ...(intent ? { makeDefault: intent.makeDefault, scope } : {}),
+              ...(intent ? { makeDefault: intent.makeDefault, scope } : me?.needsModel ? { makeDefault: true, scope } : {}),
               maxTokens: parsedMaxTokens ?? null,
               label: selected.providerName ?? selected.provider,
               credentialId: credential?.id ?? null,
@@ -690,7 +695,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
           credentialId: saved?.id,
         });
       // A fresh connection speaks for itself through the Active model row.
-      if (isOpenAiCompatible || savingLimitOnly) setNotice(t`Saved.`);
+      setNotice(settingsOnly ? t`Saved.` : t`Connected. You can start chatting.`);
     } catch (err) {
       if (stillSelected()) setError(errorText(err, t`Could not connect this provider`));
     } finally {

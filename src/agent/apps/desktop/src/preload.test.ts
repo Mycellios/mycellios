@@ -25,6 +25,13 @@ function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: u
 }
 
 describe("desktop preload bridge", () => {
+  it("exposes settings as named IPC methods without a raw IPC capability", async () => {
+    const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    await bridge.settings!.state(); await bridge.settings!.update({ keepAwake: true });
+    expect(invoke.mock.calls).toEqual([["desktop.settings.state"], ["desktop.settings.update", { keepAwake: true }]]);
+    expect((bridge as unknown as Record<string, unknown>).ipcRenderer).toBeUndefined();
+  });
   it("acknowledges only bounded native update requests without exposing IPC events", async () => {
     const { on, off, send, exposeInMainWorld } = runPreload("preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
@@ -65,6 +72,7 @@ describe("desktop preload bridge", () => {
     expect(Object.keys(bridge).sort()).toEqual([
       "appsStudio",
       "badge",
+      "companions",
       "computer",
       "localVoice",
       "nativeWindowFrame",
@@ -74,6 +82,8 @@ describe("desktop preload bridge", () => {
       "preview",
       "projectRunner",
       "runtime",
+      "servers",
+      "settings",
       "update",
       "window",
     ]);
@@ -83,7 +93,7 @@ describe("desktop preload bridge", () => {
       "state",
       "toggleMaximize",
     ]);
-    expect(Object.keys(bridge.update).sort()).toEqual(["cancelInstall", "check", "download", "forceInstall", "install", "onPrepare", "state"]);
+    expect(Object.keys(bridge.update).sort()).toEqual(["cancelInstall", "cancelRestart", "check", "download", "forceInstall", "install", "onPrepare", "preferences", "restartWhenIdle", "savePreferences", "state"]);
     expect(Object.keys(bridge.runtime!).sort()).toEqual(["enroll", "identify", "status"]);
 
     expect(Object.keys(bridge.localVoice!).sort()).toEqual(["prepare", "speak", "status", "stop", "transcribe"]);
@@ -135,6 +145,18 @@ describe("desktop preload bridge", () => {
     ]);
   });
 
+  it("exposes update choices and idle-restart commands without a general IPC escape hatch", async () => {
+    const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    await bridge.update.preferences!();
+    await bridge.update.savePreferences!({ autoDownload: false });
+    await bridge.update.restartWhenIdle!(); await bridge.update.cancelRestart!();
+    expect(invoke.mock.calls).toEqual([
+      ["desktop.update.preferences"], ["desktop.update.savePreferences", { autoDownload: false }],
+      ["desktop.update.restartWhenIdle"], ["desktop.update.cancelRestart"],
+    ]);
+  });
+
   it("forwards captured codes without leaking the IPC event to the renderer", () => {
     const listeners: Array<(event: unknown, callback: unknown) => void> = [];
     const on = vi.fn((channel: string, handler: (event: unknown, callback: unknown) => void) => {
@@ -165,11 +187,13 @@ describe("setup preload bridge", () => {
     expect(globalName).toBe("rakazoSetup");
     expect(bridge.platform).toBe("linux");
     expect(Object.keys(bridge).sort()).toEqual([
+      "forgetServer",
       "openLink",
       "platform",
       "quit",
       "retry",
       "save",
+      "servers",
       "stack",
       "state",
       "test",

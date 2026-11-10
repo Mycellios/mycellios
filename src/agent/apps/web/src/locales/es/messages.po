@@ -1369,7 +1369,7 @@ msgstr "Completado"
 #: src/pages/shell/bot-panel.tsx
 #: src/pages/shell/message-view.tsx
 msgid "Computer"
-msgstr "Computadora"
+msgstr "Ordenador"
 
 #: src/pages/Shell.tsx
 #: src/pages/shell/computer-view.tsx
@@ -1570,7 +1570,7 @@ msgstr ""
 
 #: src/pages/MessagingSettingsOverlay.tsx
 msgid "Conversations"
-msgstr ""
+msgstr "Conversaciones"
 
 #: src/components/ComputersUnavailableHint.tsx
 #: src/pages/model-settings/connection-controls.tsx
@@ -3809,7 +3809,7 @@ msgstr "Abrir chat con {0}"
 
 #: src/components/ComputersUnavailableHint.tsx
 msgid "Open computer settings"
-msgstr ""
+msgstr "Ajustes del ordenador"
 
 #: src/components/markdown-link-prompt.tsx
 msgid "Open external link?"
@@ -4764,6 +4764,9 @@ msgstr ""
 msgid "Show more"
 msgstr "Mostrar más"
 
+msgid "Show less"
+msgstr "Mostrar menos"
+
 #: src/components/I18nBootstrap.tsx
 msgid "Show password"
 msgstr "Mostrar contraseña"
@@ -5580,7 +5583,7 @@ msgstr "Verificando…"
 
 #: src/pages/Artifacts.tsx
 msgid "Version"
-msgstr ""
+msgstr "Versión"
 
 #: src/pages/RoutineRunHistory.tsx
 msgid "View chat"
@@ -9072,7 +9075,7 @@ msgstr "Cuota no disponible"
 
 #: src/components/ProviderQuota.tsx
 msgid "{0}% remaining"
-msgstr "{0}% disponible"
+msgstr "{0} % restante"
 
 #: src/components/ProviderQuota.tsx
 msgid "Refresh quota"
@@ -9956,3 +9959,817 @@ msgstr "Entrando…"
 #: src/pages/Auth.tsx
 msgid "This is taking a while."
 msgstr "Está tardando un poco."
+
+msgid "Select this provider from the model menu in your chat."
+msgstr "Elige este proveedor en el selector de modelos del chat."
+
+
+msgid "Mycellios credits need a linked account."
+msgstr "Vincula tu cuenta Mycellios para consultar los créditos."
+
+
+msgid "View credits"
+msgstr "Ver créditos"
+
+
+msgid "Computer contribution needs a linked Mycellios account. You can contribute in the browser."
+msgstr "La contribución desde el PC requiere una cuenta Mycellios vinculada. Puedes contribuir desde el navegador."
+
+msgid "Use my account"
+msgstr "Usar mi cuenta"
+
+msgid "Use an API key"
+msgstr "Poner una clave API"
+
+msgid "Choose how to connect. Mycellios handles the model setup for you."
+msgstr "Elige cómo conectarte. Mycellios se encarga de configurar el modelo."
+
+msgid "Connected. You can start chatting."
+msgstr "Conectado. Ya puedes empezar a hablar."
+
+msgid "Add to queue"
+msgstr "Añadir a la cola"
+
+msgid "Update current task"
+msgstr "Corregir la tarea actual"
+
+msgid "Send message to"
+msgstr "Enviar a"
+
+msgid "Queue · after this task"
+msgstr "Cola · después de esta tarea"
+
+msgid "Current task · update instructions"
+msgstr "Tarea actual · corregir instrucciones"
+
+msgid "Ask without interrupting"
+msgstr "Preguntar sin interrumpir"
+
+msgid "Message saved in the queue."
+msgstr "Mensaje guardado en la cola."
+
+msgid "Instructions sent to the current task."
+msgstr "Instrucciones enviadas a la tarea actual."
+
+msgid "Queued messages"
+msgstr "Mensajes en cola"
+
+msgid "Saved messages run in order after the current task."
+msgstr "Los mensajes guardados se ejecutan por orden al terminar la tarea actual."
+
+msgid "Checking the saved task status. You do not need to send your message again."
+msgstr "Comprobando el estado guardado de la tarea. No necesitas volver a enviar el mensaje."
+
+msgid "Refresh status"
+msgstr "Actualizar estado"
+
+msgid "Repeat automatically"
+msgstr "Repetir automáticamente"
+
+msgid "New conversation"
+msgstr "Nueva conversación"
+
+msgid "Work on another topic with this Mico without interrupting the current conversation."
+msgstr "Trabaja en otro tema con este Mico sin interrumpir la conversación actual."
+
+msgid "Model · automatic"
+msgstr "Modelo · automático"
+
+msgid "Review instructions"
+msgstr "Revisar instrucciones"
+
+msgid "These instructions will be saved when you create the Mico. You can edit them later."
+msgstr "Estas instrucciones se guardarán al crear el Mico. Podrás editarlas después."
+
+msgid "Repeat this task"
+msgstr "Repetir esta tarea"
+
+msgid "Results will appear in this Mico's chat. Nothing runs until you save."
+msgstr "Los resultados aparecerán en el chat de este Mico. No se ejecutará nada hasta que guardes."
+
+msgid "Notify me when there are results or a problem"
+msgstr "Avisarme cuando haya resultados o un problema"
+
+msgid "Choose a model to use this provider"
+msgstr "Elige una opción para usar este proveedor"
+
+msgid "Use this account"
+msgstr "Usar esta cuenta"
+
+
+msgid "Fast"
+msgstr "Rápido"
+
+
+msgid "Effort"
+msgstr "Esfuerzo"
+
+
+msgid "Uses priority processing and may use more quota."
+msgstr "Usa procesamiento prioritario y puede consumir más cuota."
+
+
+msgid "Could not load this account's models. Fast mode is unavailable until the catalog can be checked."
+msgstr "No se pudieron consultar los modelos de esta cuenta. El modo rápido estará disponible al verificar el catálogo."
+
+msgid "Every morning"
+msgstr "Cada mañana"
+
+msgid "Morning briefing"
+msgstr "Resumen del día"
+
+msgid "Review the day's priorities and prepare a short summary."
+msgstr "Revisa las prioridades del día y prepara un breve resumen."
+
+msgid "Weekdays · 09:00"
+msgstr "De lunes a viernes · 09:00"
+
+msgid "Your Mico"
+msgstr "Tu Mico"
+
+msgid "Gather what matters. Turn it into a clear plan."
+msgstr "Recoge lo importante y conviértelo en un plan claro."
+
+msgid "Preparing the summary"
+msgstr "Preparando el resumen"
+
+msgid "A clear next step"
+msgstr "El siguiente paso"
+
+msgid "Priorities for today"
+msgstr "Prioridades de hoy"
+
+msgid "Everything in one place"
+msgstr "Todo en un mismo lugar"
+
+msgid "The result"
+msgstr "El resultado"
+
+msgid "Your briefing is ready"
+msgstr "Tu resumen está listo"
+
+msgid "A useful update in your chat. No extra steps."
+msgstr "Una actualización útil en tu chat. Sin pasos de más."
+
+msgid "Ready when you are"
+msgstr "Listo para ti"
+
+msgid "Set it up once."
+msgstr "Prepáralo una vez."
+
+msgid "Let your Mico take it from here."
+msgstr "Tu Mico se encarga del resto."
+
+msgid "Choose when. Tell your Mico what to do."
+msgstr "Elige cuándo y dile a tu Mico qué hacer."
+
+msgid "Find the result right in your chat."
+msgstr "Recibe el resultado directamente en tu chat."
+
+msgid "Review everything before activating it."
+msgstr "Revisa todo antes de activarlo."
+
+msgid "Illustrative example · no tasks are running"
+msgstr "Ejemplo ilustrativo · no se están ejecutando tareas"
+
+msgid "Pause preview"
+msgstr "Pausar animación"
+
+msgid "Play preview"
+msgstr "Reanudar animación"
+
+msgid "Results will appear here after the first run."
+msgstr "El resultado aparecerá aquí tras la primera ejecución."
+
+
+msgid "Balance unavailable"
+msgstr "No disponible"
+
+
+msgid "Contribution active"
+msgstr "Contribuyendo"
+
+
+msgid "Contribute in your browser while this page stays open."
+msgstr "Contribuye desde el navegador mientras la página esté abierta."
+
+msgid "Inbox, in order"
+msgstr "Bandeja en orden"
+
+msgid "Your priorities, ready before the day begins."
+msgstr "Tus prioridades, listas antes de empezar el día."
+
+msgid "The important messages. None of the noise."
+msgstr "Los mensajes importantes. Sin todo el ruido."
+
+msgid "Weekly overview"
+msgstr "Balance de la semana"
+
+msgid "A clear picture of what moved forward."
+msgstr "Una visión clara de todo lo que ha avanzado."
+
+msgid "A little planning."
+msgstr "Configúralo una vez."
+
+msgid "A lot already done."
+msgstr "Despierta con todo hecho."
+
+msgid "Give your Micos a time and a task."
+msgstr "Dales a tus Micos un horario y una tarea."
+
+msgid "Come back to useful results, right in your chat."
+msgstr "Vuelve y encuentra los resultados en tu chat."
+
+msgid "You choose the schedule. Your Mico takes care of the rest."
+msgstr "Tú eliges el horario. Tu Mico se encarga del resto."
+
+msgid "Illustrative schedule · no tasks are running"
+msgstr "Ejemplo de programación · no se están ejecutando tareas"
+
+msgid "Create a Mico"
+msgstr "Crear un Mico"
+
+msgid "Trial balance. No monetary value."
+msgstr "Saldo de prueba. Sin valor monetario."
+
+msgid "How it works"
+msgstr "Cómo funciona"
+
+msgid "Attach files"
+msgstr "Adjuntar archivos"
+
+msgid "Start voice conversation"
+msgstr "Iniciar conversación por voz"
+
+msgid "New chat"
+msgstr "Nuevo chat"
+
+msgid "Start a new chat with {name}?"
+msgstr "¿Iniciar un nuevo chat con {name}?"
+
+msgid "The Mico forgets this chat. Messages remain visible above a divider. Instructions, model, tools, memories, workspace and browser stay the same."
+msgstr "El Mico olvida este chat. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian."
+
+msgid "Start new chat"
+msgstr "Iniciar nuevo chat"
+
+msgid "Could not start a new chat. Try again."
+msgstr "No se pudo iniciar un nuevo chat. Vuelve a intentarlo."
+
+msgid "Close side question"
+msgstr "Cerrar pregunta aparte"
+
+msgid "Open another panel"
+msgstr "Abrir otro panel"
+
+msgid "Restore panel size"
+msgstr "Restaurar tamaño del panel"
+
+msgid "Expand panel"
+msgstr "Ampliar panel"
+
+msgid "Ask about this chat"
+msgstr "Pregunta sobre este chat"
+
+msgid "{name} reads this chat to answer. Nothing here goes back to the chat."
+msgstr "{name} lee este chat para responder. Nada de aquí vuelve al chat."
+
+msgid "Side questions"
+msgstr "Preguntas aparte"
+
+msgid "Ask a side question"
+msgstr "Haz una pregunta aparte"
+
+msgid "Send side question"
+msgstr "Enviar pregunta aparte"
+
+msgid "Could not check side questions. Try again."
+msgstr "No se pudo comprobar Pregunta aparte. Vuelve a intentarlo."
+
+msgid "A short sound when a Mico finishes a reply."
+msgstr "Un sonido breve cuando un Mico termina de responder."
+
+msgid "Action sounds"
+msgstr "Sonidos de las acciones"
+
+msgid "Also on battery"
+msgstr "También con batería"
+
+msgid "Application behavior"
+msgstr "Comportamiento de la aplicación"
+
+msgid "Blue"
+msgstr "Azul"
+
+msgid "Bottom"
+msgstr "Abajo"
+
+msgid "Bubble"
+msgstr "Burbuja"
+
+msgid "Chat background"
+msgstr "Fondo del chat"
+
+msgid "Chat color"
+msgstr "Color del chat"
+
+msgid "Classic"
+msgstr "Clásico"
+
+msgid "Code font"
+msgstr "Fuente del código"
+
+msgid "Compact message actions"
+msgstr "Acciones de mensaje compactas"
+
+msgid "Could not load application settings."
+msgstr "No se pudieron cargar los ajustes de la aplicación."
+
+msgid "Default browser"
+msgstr "Navegador habitual"
+
+msgid "Default size"
+msgstr "Tamaño predeterminado"
+
+msgid "Device voice"
+msgstr "Voz del dispositivo"
+
+msgid "Dictation"
+msgstr "Dictado"
+
+msgid "Dictation language"
+msgstr "Idioma del dictado"
+
+msgid "Download models"
+msgstr "Descargar modelos"
+
+msgid "Dynamic Island"
+msgstr "Isla dinámica"
+
+msgid "Each theme remembers its own background. Text stays readable."
+msgstr "Cada tema conserva su propio fondo. El texto se mantiene legible."
+
+msgid "Follow activity on every connected screen."
+msgstr "Sigue la actividad en todas las pantallas conectadas."
+
+msgid "Follow your Micos from a small window at the top of the screen."
+msgstr "Sigue a tus Micos desde una pequeña ventana en la parte superior de la pantalla."
+
+msgid "Gold"
+msgstr "Dorado"
+
+msgid "Green"
+msgstr "Verde"
+
+msgid "Grey"
+msgstr "Gris"
+
+msgid "Height"
+msgstr "Alto"
+
+msgid "Hide automatically"
+msgstr "Ocultar automáticamente"
+
+msgid "Interface font"
+msgstr "Fuente de la interfaz"
+
+msgid "Keep Mycellios running in the background"
+msgstr "Mantener Mycellios en segundo plano"
+
+msgid "Keep a small handle visible when the dock is hidden."
+msgstr "Mantén una pequeña pestaña visible cuando el dock esté oculto."
+
+msgid "Keep tasks active when you close the window. Use Quit to exit completely."
+msgstr "Mantén las tareas activas al cerrar la ventana. Usa Salir para cerrar la aplicación por completo."
+
+msgid "Keep the computer awake"
+msgstr "Mantener el ordenador activo"
+
+msgid "Keep the computer awake on battery too. This uses more power."
+msgstr "Mantén el ordenador activo también con batería. La batería se agotará antes."
+
+msgid "Keep the island visible when no Mico is working."
+msgstr "Mantén la isla visible cuando ningún Mico esté trabajando."
+
+msgid "Language hint for the browser and connected transcription services."
+msgstr "Idioma para el dictado del navegador y los servicios de transcripción conectados."
+
+msgid "Left"
+msgstr "Izquierda"
+
+msgid "Local speech models"
+msgstr "Modelos de voz locales"
+
+msgid "Logo color"
+msgstr "Color del logotipo"
+
+msgid "Mechanical"
+msgstr "Mecánico"
+
+msgid "Mico dock"
+msgstr "Dock de Micos"
+
+msgid "Micos on this dock"
+msgstr "Micos en este dock"
+
+msgid "Move to the edge until you hover over the dock."
+msgstr "Se oculta en el borde hasta que acerques el cursor."
+
+msgid "Mycellios window"
+msgstr "Ventana de Mycellios"
+
+msgid "None"
+msgstr "Ninguno"
+
+msgid "Open Mycellios at login"
+msgstr "Abrir Mycellios al iniciar sesión"
+
+msgid "Open a Mico without leaving the app you are working in."
+msgstr "Abre un Mico sin salir de la aplicación en la que trabajas."
+
+msgid "Open external links in"
+msgstr "Abrir enlaces externos en"
+
+msgid "Open the application when you sign in on this computer."
+msgstr "Abre la aplicación al iniciar sesión en este equipo."
+
+msgid "Peach"
+msgstr "Melocotón"
+
+msgid "Personalize the Mycellios logo on this device."
+msgstr "Personaliza el logotipo de Mycellios en este dispositivo."
+
+msgid "Pink"
+msgstr "Rosa claro"
+
+msgid "Position"
+msgstr "Posición"
+
+msgid "Press"
+msgstr "Pulsación"
+
+msgid "Preview sound"
+msgstr "Escuchar sonido"
+
+msgid "Primary screen"
+msgstr "Pantalla principal"
+
+msgid "Purple"
+msgstr "Violeta"
+
+msgid "Read aloud"
+msgstr "Lectura en voz alta"
+
+msgid "Read new replies aloud"
+msgstr "Leer las nuevas respuestas en voz alta"
+
+msgid "Read new replies in the open chat on this device. Existing Mico voice preferences still apply."
+msgstr "Lee las nuevas respuestas del chat abierto en este dispositivo. También se mantienen las preferencias de voz de cada Mico."
+
+msgid "Reopen the space and conversation you used last. Explicit chat links always take priority."
+msgstr "Vuelve al último espacio y conversación. Los enlaces a chats concretos siempre tienen prioridad."
+
+msgid "Restart the updated desktop app to manage computer settings here."
+msgstr "Reinicia la aplicación de escritorio actualizada para gestionar aquí los ajustes del equipo."
+
+msgid "Restore the last workspace on startup"
+msgstr "Restaurar el último espacio de trabajo al iniciar"
+
+msgid "Right"
+msgstr "Derecha"
+
+msgid "Rose"
+msgstr "Rosa"
+
+msgid "Run routines on time while plugged in. The screen can turn off."
+msgstr "Ejecuta las rutinas a tiempo mientras el equipo esté conectado a la corriente. La pantalla puede apagarse."
+
+msgid "Screen"
+msgstr "Pantalla"
+
+msgid "Short sounds for your own actions, such as a click."
+msgstr "Sonidos breves para tus acciones, como hacer clic."
+
+msgid "Show Dynamic Island"
+msgstr "Mostrar isla dinámica"
+
+msgid "Show a short preview beside each Mico."
+msgstr "Muestra una vista previa breve junto a cada Mico."
+
+msgid "Show edge strip"
+msgstr "Mostrar pestaña en el borde"
+
+msgid "Show on additional displays"
+msgstr "Mostrar en pantallas adicionales"
+
+msgid "Show results"
+msgstr "Mostrar resultados"
+
+msgid "Show the Mico dock"
+msgstr "Mostrar dock de Micos"
+
+msgid "Show when idle"
+msgstr "Mostrar en reposo"
+
+msgid "Shows React, Reply and More beside a message, with the time between messages. Turn off to show actions and time below every message."
+msgstr "Muestra Reaccionar, Responder y Más junto a los mensajes, y la hora entre ellos. Desactívalo para ver las acciones y la hora debajo de cada mensaje."
+
+msgid "Size"
+msgstr "Tamaño"
+
+msgid "Sounds"
+msgstr "Sonidos"
+
+msgid "System default"
+msgstr "Predeterminado del sistema"
+
+msgid "Task completion sound"
+msgstr "Sonido al terminar una tarea"
+
+msgid "The font used for menus and messages."
+msgstr "La fuente de los menús y los mensajes."
+
+msgid "The font used in code blocks and the terminal."
+msgstr "La fuente de los bloques de código y del terminal."
+
+msgid "Tints your message bubbles on this device."
+msgstr "Tiñe las burbujas de tus mensajes en este dispositivo."
+
+msgid "Transcribe and speak on this PC. Download once when you choose."
+msgstr "Transcribe y habla en este PC. Descarga los modelos una vez, cuando tú elijas."
+
+msgid "Used when reading with your device instead of a connected provider."
+msgstr "Se usa al leer con el dispositivo en lugar de un proveedor conectado."
+
+msgid "Warm"
+msgstr "Cálido"
+
+msgid "Where links from chats and settings open."
+msgstr "Dónde se abren los enlaces de los chats y de los ajustes."
+
+msgid "White"
+msgstr "Blanco"
+
+msgid "Width"
+msgstr "Ancho"
+
+msgid "Theme"
+msgstr "Tema"
+
+msgid "Light or dark colors. System follows your device."
+msgstr "Colores claros u oscuros. Sistema sigue el ajuste de tu dispositivo."
+
+msgid "Menus, buttons and messages use this language."
+msgstr "Los menús, botones y mensajes se muestran en este idioma."
+
+msgid "The size of text and controls in Mycellios."
+msgstr "El tamaño del texto y los controles en Mycellios."
+
+msgid "Show agent steps"
+msgstr "Mostrar pasos del agente"
+
+msgid "Open reasoning, tool steps and memory changes by default for each turn."
+msgstr "Abre por defecto el razonamiento, los pasos de herramientas y los cambios de recuerdos de cada turno."
+
+msgid "Privacy"
+msgstr "Privacidad"
+
+msgid "Help improve Mycellios"
+msgstr "Ayudar a mejorar Mycellios"
+
+msgid "Share which app screens you use from this device. This optional report contains no messages, prompts or credentials."
+msgstr "Comparte qué pantallas de la aplicación usas desde este dispositivo. Este informe opcional no contiene mensajes, instrucciones ni credenciales."
+
+msgid "Open a Mico from any application."
+msgstr "Accede a un Mico desde cualquier aplicación."
+
+msgid "Your settings"
+msgstr "Tus ajustes"
+
+msgid "Profile"
+msgstr "Perfil"
+
+msgid "More settings"
+msgstr "Más ajustes"
+
+msgid "Computer use"
+msgstr "Uso del equipo"
+
+msgid "Fonts"
+msgstr "Fuentes"
+
+msgid "Account access"
+msgstr "Acceso a la cuenta"
+
+msgid "Manage approvals"
+msgstr "Gestionar permisos"
+
+msgid "View usage"
+msgstr "Ver uso"
+
+msgid "Models and connections"
+msgstr "Modelos y conexiones"
+
+msgid "Choose a provider once. Your Micos use it automatically."
+msgstr "Conecta un proveedor y tus Micos lo usarán automáticamente."
+
+msgid "Messages while a Mico works"
+msgstr "Mensajes mientras un Mico trabaja"
+
+msgid "Choose the usual behavior. You can change it before sending a message."
+msgstr "Elige qué hacer por defecto. Puedes cambiarlo antes de enviar cada mensaje."
+
+msgid "Wait for the next task"
+msgstr "Esperar al siguiente turno"
+
+msgid "Update the current task"
+msgstr "Actualizar la tarea actual"
+
+msgid "Connected voice services"
+msgstr "Servicios de voz conectados"
+
+msgid "More notification settings"
+msgstr "Más opciones de notificaciones"
+
+msgid "Notifications by Mico"
+msgstr "Notificaciones por Mico"
+
+msgid "Local preview"
+msgstr "Versión local"
+
+msgid "This address only opens on this computer. Use a reachable server address to connect a phone."
+msgstr "Esta dirección solo funciona en este ordenador. Para conectar el móvil necesitas una dirección de servidor accesible."
+
+msgid "Open Mycellios on your phone, sign in and add it to your Home Screen."
+msgstr "Abre Mycellios en el móvil, inicia sesión y añádelo a la pantalla de inicio."
+
+msgid "Update channel"
+msgstr "Canal de actualizaciones"
+
+msgid "Tested versions of Mycellios."
+msgstr "Versiones probadas de Mycellios."
+
+msgid "You are using the local development version."
+msgstr "Estás usando la versión de desarrollo local."
+
+msgid "Development"
+msgstr "Desarrollo"
+
+msgid "Stable"
+msgstr "Estable"
+
+msgid "Could not load update settings. Try again."
+msgstr "No se han podido cargar los ajustes de actualización. Inténtalo de nuevo."
+
+msgid "Waiting for Micos to finish. You can keep working."
+msgstr "Esperando a que terminen los Micos. Puedes seguir trabajando."
+
+msgid "Waiting for the update download to finish."
+msgstr "Esperando a que termine la descarga de la actualización."
+
+msgid "Could not restart. Try again."
+msgstr "No se ha podido reiniciar. Inténtalo de nuevo."
+
+msgid "This development build updates from the project. Installed apps use published releases."
+msgstr "Esta versión de desarrollo se actualiza desde el proyecto. La aplicación instalada recibe las versiones publicadas."
+
+msgid "The update is ready to install."
+msgstr "La actualización está lista para instalar."
+
+msgid "A new version is available."
+msgstr "Hay una nueva versión disponible."
+
+msgid "You receive tested releases from the stable channel."
+msgstr "Recibes las versiones probadas del canal estable."
+
+msgid "Restart Mycellios"
+msgstr "Reiniciar Mycellios"
+
+msgid "Restart when Micos are idle, after saving drafts and finishing calls."
+msgstr "Reinicia cuando terminen las tareas, se guarden los borradores y finalicen las llamadas."
+
+msgid "Cancel restart"
+msgstr "Cancelar reinicio"
+
+msgid "Restart when idle"
+msgstr "Reiniciar sin actividad"
+
+msgid "Download updates automatically"
+msgstr "Descargar actualizaciones automáticamente"
+
+msgid "Download new versions in the background."
+msgstr "Descarga las nuevas versiones en segundo plano."
+
+msgid "Install updates automatically"
+msgstr "Instalar actualizaciones automáticamente"
+
+msgid "Restart with the downloaded version when your Micos and this app are idle."
+msgstr "Instala la versión descargada cuando los Micos y la aplicación estén sin actividad."
+
+msgid "Web app"
+msgstr "Aplicación web"
+
+msgid "The server keeps Mycellios up to date. Drafts and calls are protected."
+msgstr "El servidor mantiene Mycellios al día. Tus borradores y llamadas se conservan."
+
+msgid "Version details"
+msgstr "Detalles de la versión"
+
+msgid "Download Mycellios Desktop"
+msgstr "Descargar Mycellios Desktop"
+
+msgid "Next turn"
+msgstr "Siguiente turno"
+
+msgid "Current task"
+msgstr "Tarea actual"
+
+msgid "Servers"
+msgstr "Servidores"
+
+msgid "Add a server"
+msgstr "Añadir un servidor"
+
+msgid "Server settings"
+msgstr "Ajustes del servidor"
+
+msgid "Could not load servers."
+msgstr "No se han podido cargar los servidores."
+
+msgid "Save drafts and finish calls before changing servers."
+msgstr "Guarda los borradores y termina las llamadas antes de cambiar de servidor."
+
+msgid "Server view"
+msgstr "Vista de servidores"
+
+msgid "Sidebar"
+msgstr "Barra lateral"
+
+msgid "Menu"
+msgstr "Menú"
+
+msgid "Finish active tasks, save drafts and end calls before changing servers."
+msgstr "Termina las tareas activas y las llamadas, y guarda los borradores antes de cambiar de servidor."
+
+msgid "Voice processing"
+msgstr "Procesamiento de voz"
+
+msgid "Spoken replies"
+msgstr "Respuestas habladas"
+
+msgid "Local voice stays on this computer and uses no credits. Connected providers use their own account."
+msgstr "La voz local se procesa en este ordenador y no consume créditos. Los proveedores conectados usan su propia cuenta."
+
+msgid "Local · Supertonic 3"
+msgstr "Local · Supertonic 3"
+
+msgid "Connected provider"
+msgstr "Proveedor conectado"
+
+msgid "Activate local voice"
+msgstr "Activar voz local"
+
+msgid "Parakeet and Supertonic 3. Download once, then process audio on this computer without credits."
+msgstr "Parakeet y Supertonic 3. Descárgalos una vez y procesa el audio en este ordenador sin gastar créditos."
+
+msgid "Contribute computing power and earn credits. Voice stays local; network voice is not available yet."
+msgstr "Aporta potencia y gana créditos. La voz sigue siendo local; la voz de la red aún no está disponible."
+
+msgid "Activate contribution"
+msgstr "Activar aportación"
+
+msgid "Contribute"
+msgstr "Aportar"
+
+msgid "Activating…"
+msgstr "Activando…"
+
+msgid "Pausing…"
+msgstr "Pausando…"
+
+msgid "Earned"
+msgstr "ganados"
+
+msgid "Browser and computer"
+msgstr "Navegador y ordenador"
+
+msgid "More tools"
+msgstr "Más herramientas"
+
+msgid "Close workspace"
+msgstr "Cerrar espacio de trabajo"
+
+msgid "Connection and diagnostics"
+msgstr "Conexión y diagnóstico"
+
+msgid "Routines for this Mico"
+msgstr "Rutinas de este Mico"
+
+msgid "Computer unavailable"
+msgstr "Ordenador no disponible"
+
+msgid "Use Browser for pages and previews. Computer shows the Mico’s working environment when it is connected."
+msgstr "Usa Navegador para abrir páginas y archivos. Ordenador muestra el entorno de trabajo del Mico cuando está conectado."
+
+msgid "Open Mico settings"
+msgstr "Ajustes del Mico"

@@ -1,4 +1,9 @@
+import { ServerDirectory } from "./server-directory.js";
 import { LocalVoice } from "./local-voice.js";
+import { AppBehavior } from "./app-behavior.js";
+import { UpdatePreferences } from "./update-preferences.js";
+import { installedFonts, validDesktopIcon } from "./appearance-settings.js";
+import { installDesktopCompanions } from "./desktop-companions.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
 import { ManualUpdateController, requireManualUpdateSpace } from "./manual-update.js";
@@ -14,7 +19,7 @@ import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, session, shell, utilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -158,6 +163,7 @@ const manualDesktopUpdater = process.platform === "win32" && process.arch === "x
   ? new ManualUpdateController({
     version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
     backgroundDownloads: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1",
+    autoDownload: () => updatePreferences?.preferences().autoDownload ?? true,
     publishedRelease: () => publishedWindowsRelease(app.getVersion()),
     busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
     prepare: prepareRendererUpdate,
@@ -196,6 +202,9 @@ const manualDesktopUpdater = process.platform === "win32" && process.arch === "x
     },
   }) : null;
 const desktopUpdater = manualDesktopUpdater ?? automaticDesktopUpdater;
+let updatePreferences: UpdatePreferences | undefined;
+let serverDirectory: ServerDirectory;
+let preferredServer: string | null = null;
 let launchUpdateCheckScheduled = false;
 let localStack: Pick<LocalStackController, "webUrl" | "state" | "matchesDesiredStack" | "start" | "stop" | "abort">;
 let hostComputer: Awaited<ReturnType<typeof prepareHostComputer>> | undefined;
@@ -212,27 +221,27 @@ let requestingComputerAccess = false;
  * keep the app running in the background. The preference is native and local.
  */
 let keepRunningInBackground = false;
-let backgroundPreferenceProfile: string | undefined;
+let appBehavior: AppBehavior | undefined;
+let desktopCompanions: Awaited<ReturnType<typeof installDesktopCompanions>> | undefined;
 
 async function loadBackgroundPreference(profile: string) {
-  backgroundPreferenceProfile = profile;
-  const raw = await readPrivateFile(path.join(profile, "app-behavior.json"), 4096).catch(() => null);
-  try {
-    const saved = raw ? JSON.parse(raw) : null;
-    keepRunningInBackground = saved?.schema === 1 && saved.keepRunningInBackground === true;
-  } catch {
-    keepRunningInBackground = false;
-  }
-  installApplicationMenu();
+  appBehavior = new AppBehavior({
+    packaged: app.isPackaged, platform: process.platform,
+    read: () => readPrivateFile(path.join(profile, "app-behavior.json"), 4096).catch(() => null),
+    write: raw => writePrivateFile(path.join(profile, "app-behavior.json"), raw),
+    login: { get: () => app.getLoginItemSettings().openAtLogin,
+      set: openAtLogin => app.setLoginItemSettings({ openAtLogin }) },
+    power: { onBattery: () => powerMonitor.isOnBatteryPower(),
+      start: () => powerSaveBlocker.start("prevent-app-suspension"), stop: id => powerSaveBlocker.stop(id) },
+    changed: value => { keepRunningInBackground = value.keepRunningInBackground; installApplicationMenu(); },
+  });
+  await appBehavior.load();
+  powerMonitor.on("on-ac", () => appBehavior?.syncPower());
+  powerMonitor.on("on-battery", () => appBehavior?.syncPower());
 }
 
 function setKeepRunningInBackground(checked: boolean) {
-  keepRunningInBackground = checked;
-  installApplicationMenu();
-  if (backgroundPreferenceProfile) {
-    void writePrivateFile(path.join(backgroundPreferenceProfile, "app-behavior.json"),
-      JSON.stringify({ schema: 1, keepRunningInBackground: checked })).catch(() => undefined);
-  }
+  void appBehavior?.update({ keepRunningInBackground: checked }).catch(error => reportDesktopError(error, "desktop.settings"));
 }
 
 markOnce("rk:main:module-evaluated");
@@ -277,6 +286,25 @@ function fromMainWindow(event: Electron.IpcMainInvokeEvent) {
 
 function fromUpdateWindow(event: Electron.IpcMainInvokeEvent) {
   return fromMainWindow(event) && event.senderFrame === event.sender.mainFrame;
+}
+
+function openExternalLink(url: string) {
+  if (appBehavior?.state().externalLinkTarget !== "app" || !/^https?:/.test(url)) {
+    void shell.openExternal(url).catch(error => reportDesktopError(error, "desktop.externalLink"));
+    return;
+  }
+  // An external page never inherits our preload, native bridge or server cookies.
+  const browser = new BrowserWindow({ width: 1100, height: 780, title: url,
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: "external-links" } });
+  browser.webContents.setWindowOpenHandler(({ url: target }) => {
+    const safe = safeExternalUrl(target);
+    if (safe) openExternalLink(safe);
+    return { action: "deny" };
+  });
+  browser.webContents.on("will-navigate", (event, target) => {
+    if (!/^https?:/.test(target)) { event.preventDefault(); const safe = safeExternalUrl(target); if (safe) void shell.openExternal(safe); }
+  });
+  void browser.loadURL(url).catch(error => reportDesktopError(error, "desktop.externalLink"));
 }
 
 /** Dock/taskbar icon for unpackaged launches; packaged builds get theirs from electron-builder. */
@@ -419,14 +447,14 @@ function createWindow(url: string, partition: string | null) {
       };
     }
     const external = safeExternalUrl(childUrl);
-    if (external !== null) void shell.openExternal(external);
+    if (external !== null) openExternalLink(external);
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (event, navigationUrl) => {
     if (targetOrigin !== null && safeOrigin(navigationUrl) === targetOrigin) return;
     event.preventDefault();
     const external = safeExternalUrl(navigationUrl);
-    if (external !== null) void shell.openExternal(external);
+    if (external !== null) openExternalLink(external);
   });
   // The popup has no address bar, so a loopback redirect would otherwise strand
   // the user on a blank window holding the authorization code in a URL they
@@ -452,6 +480,10 @@ function createWindow(url: string, partition: string | null) {
     popup.webContents.on("will-navigate", (details) => capture(details));
   });
   win.on("close", (event) => {
+    if (!quitting && keepRunningInBackground) {
+      event.preventDefault(); win.hide(); return;
+    }
+    desktopCompanions?.clear();
     if (
       process.platform === "darwin" &&
       !quitting &&
@@ -743,14 +775,20 @@ function checkForUpdatesFromMenu() {
 
 async function runMenuUpdateCheck() {
   let state = await desktopUpdater.check(true);
-  // A found update starts downloading on its own; wait for it so the answer can be "restart".
-  if (state.phase === "available" || state.phase === "downloading") {
-    state = await desktopUpdater.download();
-  }
   const alert = (options: Electron.MessageBoxOptions) =>
     mainWindow && !mainWindow.isDestroyed()
       ? dialog.showMessageBox(mainWindow, options)
       : dialog.showMessageBox(options);
+  if (state.phase === "available") {
+    const { response } = await alert({
+      message: `Mycellios ${state.availableVersion} is available.`, buttons: ["Download", "Later"],
+      defaultId: 0, cancelId: 1, noLink: true,
+    });
+    if (response !== 0) return;
+    state = await desktopUpdater.download();
+  } else if (state.phase === "downloading") {
+    state = await desktopUpdater.download();
+  }
   if (state.phase === "ready") {
     const { response } = await alert({
       message: `Mycellios ${state.availableVersion} is ready to install.`,
@@ -786,6 +824,7 @@ async function installUpdate(force = false) {
   if (hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()) return {
     ...desktopUpdater.state(), message: "A local task is still running. Install the update when it finishes.",
   };
+  if (!await prepareRendererUpdate()) return { ...desktopUpdater.state(), message: "Save changes or finish the call to restart." };
   quitting = true;
   const state = await desktopUpdater.install();
   // A failed install stays ready for retry but reports a message. Restore normal
@@ -1260,7 +1299,83 @@ app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
   installSessionPermissions(session.defaultSession, permissionTarget);
   const userDataDir = app.getPath("userData");
-  void loadBackgroundPreference(userDataDir);
+  await loadBackgroundPreference(userDataDir);
+  serverDirectory = new ServerDirectory({
+    read: () => readPrivateFile(path.join(userDataDir, "servers.json"), 65536),
+    write: raw => writePrivateFile(path.join(userDataDir, "servers.json"), raw),
+  });
+  await serverDirectory.load();
+  ipcMain.handle("desktop.servers.list", event => {
+    if (!fromUpdateWindow(event)) throw new Error("Servers require the main app window");
+    return { servers: serverDirectory.list(), current: currentTargetUrl };
+  });
+  ipcMain.handle("desktop.servers.manage", async (event, selected: unknown) => {
+    if (!fromUpdateWindow(event)) throw new Error("Servers require the main app window");
+    if (hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()) throw new Error("Finish active work before changing servers");
+    if (!await prepareRendererUpdate()) throw new Error("Save drafts and finish calls before changing servers");
+    if (selected !== undefined && (typeof selected !== "string" || !serverDirectory.list().some(entry => entry.serverUrl === selected))) throw new Error("Unknown server");
+    preferredServer = typeof selected === "string" ? selected : null;
+    showSetupWindow();
+  });
+  ipcMain.handle("desktop.setup.servers", event => {
+    if (!fromSetupWindow(event)) throw new Error("Setup is not active");
+    return serverDirectory.list();
+  });
+  ipcMain.handle("desktop.setup.forgetServer", async (event, url: unknown) => {
+    if (!fromSetupWindow(event) || typeof url !== "string" || setupSaveInProgress) throw new Error("Setup is busy");
+    if (normalizeServerUrl(url) === normalizeServerUrl(currentTargetUrl ?? "")) throw new Error("Cannot forget the current server");
+    await serverDirectory.remove(url); return serverDirectory.list();
+  });
+
+  updatePreferences = new UpdatePreferences({
+    packaged: app.isPackaged,
+    allowed: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1" && Boolean(manualDesktopUpdater || updaterSupport(updaterEnvironment).supported),
+    read: () => readPrivateFile(path.join(userDataDir, "update-preferences.json"), 4096).catch(() => null),
+    write: raw => writePrivateFile(path.join(userDataDir, "update-preferences.json"), raw),
+    state: () => desktopUpdater.state(), download: () => desktopUpdater.download(), install: () => installUpdate(),
+    cancelInstall: () => manualDesktopUpdater?.cancelInstall() ?? Promise.resolve(desktopUpdater.state()),
+    busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
+    prepare: prepareRendererUpdate,
+    relaunch: async () => {
+      const win = mainWindow; if (!win || win.isDestroyed()) throw new Error("The app window changed");
+      try {
+        await win.webContents.session.cookies.flushStore(); await win.webContents.session.flushStorageData();
+        await accountComputer?.freezeForUpdate();
+        await Promise.all([accountComputer?.beginUpdate(), cloudComputer?.beginUpdate()]);
+        await hostComputer?.prepareUpdate();
+        app.relaunch(); quitting = true; app.quit();
+      } catch (error) {
+        hostComputer?.cancelUpdate(); cloudComputer?.cancelUpdate(); accountComputer?.cancelUpdate(); accountComputer?.start(); throw error;
+      }
+    },
+  });
+  await updatePreferences.load();
+  const updatePolicyTimer = setInterval(() => { if (!quitting) void updatePreferences?.tick(); }, 2_000);
+  updatePolicyTimer.unref(); app.once("before-quit", () => clearInterval(updatePolicyTimer));
+  desktopCompanions = await installDesktopCompanions({ profile: userDataDir, allowed: fromUpdateWindow,
+    reveal: target => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      revealSecondInstanceWindow(mainWindow);
+      mainWindow.webContents.send("desktop.companions.select", target);
+    } });
+  ipcMain.handle("desktop.settings.state", event => {
+    if (!fromUpdateWindow(event)) throw new Error("Settings require the main app window");
+    return appBehavior!.state();
+  });
+  ipcMain.handle("desktop.settings.fonts", event => {
+    if (!fromUpdateWindow(event)) throw new Error("Settings require the main app window");
+    return installedFonts(process.platform);
+  });
+  ipcMain.handle("desktop.settings.logo", (event, png: unknown) => {
+    if (!fromUpdateWindow(event) || !validDesktopIcon(png)) throw new Error("Invalid app icon");
+    const image = png === null ? nativeImage.createFromPath(path.join(import.meta.dirname, "assets", process.platform === "darwin" ? "icon-macos.png" : "icon.png")) : nativeImage.createFromDataURL(png);
+    if (image.isEmpty()) throw new Error("Invalid app icon");
+    mainWindow?.setIcon(image); app.dock?.setIcon(image);
+  });
+  ipcMain.handle("desktop.settings.update", (event, patch: unknown) => {
+    if (!fromUpdateWindow(event)) throw new Error("Settings require the main app window");
+    return appBehavior!.update(patch);
+  });
   contributionRuntime = new ContributionRuntime({
     platform: process.platform,
     resources: process.resourcesPath,
@@ -1270,7 +1385,11 @@ app.whenReady().then(async () => {
   });
   const agentEngine = createDesktopAgentEngine(userDataDir, () => hostComputer?.executionScope());
   for (;;) {
-    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine), { report: code => console.error("Desktop executor startup failed", { code }) }); break; }
+    try { hostComputer = await startDesktopExecutor(() => prepareHostComputer(userDataDir, agentEngine), {
+      // A development launcher may have exited and closed stderr. Report through
+      // the desktop reporter so a diagnostic cannot itself throw EPIPE.
+      report: code => reportDesktopError(new Error(`Desktop executor startup failed (${code})`), "desktop.startup"),
+    }); break; }
     catch {
       // Do not open a working-looking chat with no native executor and swallow its cause.
       const result = await dialog.showMessageBox({ type: "error", title: "Mycellios", message: "The PC executor could not start.", detail: "Retry to start local execution.", buttons: ["Retry", "Close"], defaultId: 0, cancelId: 1, noLink: true });
@@ -1341,6 +1460,8 @@ app.whenReady().then(async () => {
     });
   }
   currentSetup = await readSetup(userDataDir);
+  const knownTarget = normalizeServerUrl(process.env.RAKAZO_WEB_URL ?? currentSetup?.serverUrl ?? "");
+  if (knownTarget) await serverDirectory.remember({mode: currentSetup?.serverUrl === knownTarget ? currentSetup.mode : "existing", serverUrl: knownTarget}).catch(() => {});
   const target = resolveStartupTarget({
     envUrl: process.env.RAKAZO_WEB_URL,
     saved: currentSetup,
@@ -1794,7 +1915,23 @@ app.whenReady().then(async () => {
       fullScreen: win?.isFullScreen() ?? false,
     };
   });
-  ipcMain.handle("desktop.update.state", () => desktopUpdater.state());
+  ipcMain.handle("desktop.update.state", event => fromUpdateWindow(event) ? updatePreferences!.state() : desktopUpdater.state());
+  ipcMain.handle("desktop.update.preferences", event => {
+    if (!fromUpdateWindow(event)) throw new Error("Update settings require the main app window");
+    return updatePreferences!.preferences();
+  });
+  ipcMain.handle("desktop.update.savePreferences", (event, patch: unknown) => {
+    if (!fromUpdateWindow(event)) throw new Error("Update settings require the main app window");
+    return updatePreferences!.save(patch);
+  });
+  ipcMain.handle("desktop.update.restartWhenIdle", event => {
+    if (!fromUpdateWindow(event)) throw new Error("Restart requires the main app window");
+    return updatePreferences!.request(desktopUpdater.state().phase === "ready" ? "update" : "relaunch");
+  });
+  ipcMain.handle("desktop.update.cancelRestart", event => {
+    if (!fromUpdateWindow(event)) throw new Error("Restart requires the main app window");
+    return updatePreferences!.cancel();
+  });
   ipcMain.handle("desktop.update.cancelInstall", (event) =>
     fromUpdateWindow(event) && manualDesktopUpdater ? manualDesktopUpdater.cancelInstall() : desktopUpdater.state(),
   );
@@ -1805,14 +1942,17 @@ app.whenReady().then(async () => {
     fromUpdateWindow(event) ? desktopUpdater.download() : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.update.forceInstall", (event) =>
-      fromUpdateWindow(event) && manualDesktopUpdater ? installUpdate(true) : desktopUpdater.state(),
-    );
-    ipcMain.handle("desktop.update.install", (event) =>
-    fromUpdateWindow(event) ? installUpdate() : desktopUpdater.state(),
+    fromUpdateWindow(event) && manualDesktopUpdater ? installUpdate(true) : desktopUpdater.state(),
+  );
+  ipcMain.handle("desktop.update.install", (event) =>
+    fromUpdateWindow(event) ? updatePreferences!.request("update") : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.setup.state", (event) => {
     if (!fromSetupWindow(event)) return null;
     return {
+      manager: currentTargetUrl !== null,
+      preferredServer,
+      activeServer: currentTargetUrl,
       defaultLocalUrl: localStack.webUrl(),
       cloudUrl: RAKAZO_CLOUD_URL,
       saved: currentSetup,
@@ -1845,6 +1985,8 @@ app.whenReady().then(async () => {
     // A launch still loading counts too: the switch must open and check its own server.
     if (setupSaveInProgress || appOpener.busy())
       return { ok: false, error: "A connection attempt is already running." };
+    if (currentTargetUrl && (hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()))
+      return { ok: false, error: "Termina las tareas activas antes de cambiar de servidor." };
     setupSaveInProgress = true;
     const previousSetup = currentSetup;
     const previousUrl = currentTargetUrl;
@@ -1903,6 +2045,7 @@ app.whenReady().then(async () => {
           const message = await recoverFromCrashedSave(userDataDir, previousSetup, previousUrl);
           return { ok: false, error: message };
         }
+        await serverDirectory.remember(openSetup, typeof payload === "object" && payload !== null && "name" in payload && typeof payload.name === "string" ? payload.name : undefined).catch(() => console.warn("Could not save server directory"));
         destroySetupWindow();
         // Final check after setup closes — a crash in this gap still rolls back.
         if (rendererWatch?.crashed()) {
@@ -2023,6 +2166,8 @@ app.on("before-quit", (event) => {
     return;
   }
   accountComputer?.stop();
+  appBehavior?.dispose();
+  desktopCompanions?.dispose();
   cloudComputer?.stop();
   quitting = true;
   clearTimeout(warmWindowTimer);

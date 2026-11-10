@@ -490,6 +490,7 @@ export interface AgentRunRequest {
   workState?: unknown;
   saveWorkState?: (state: unknown) => Promise<void>;
   agentEngine?: "pi" | "codex" | "claude" | "acp" | "opencode";
+  nativeConfig?: { modelId?: string | null; thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | null; fastMode?: boolean } | null;
   /** Awaited producer-side accounting, independent of event-consumer cancellation. */
   onUsage?: (event: Extract<AgentRuntimeEvent, { type: "usage" }>) => void | Promise<void>;
   contextStrategy?: AgentContextStrategy;
@@ -538,6 +539,8 @@ export interface AgentRunRequest {
    * When set, skip synthetic empty-turn fallbacks (including after tools).
    */
   allowSilentEmpty?: boolean;
+  /** Temporary read-only generations must not be written to session transcripts. */
+  ephemeral?: boolean;
   /** Contextual fallback when a non-silent run produces no written response. */
   emptyResponseText?: string;
   executeTool?: (

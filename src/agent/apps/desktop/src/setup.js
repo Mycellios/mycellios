@@ -83,7 +83,9 @@
     else status.setAttribute("data-tone", tone);
   }
 
+  let setupBusy = false;
   function setBusy(busy) {
+    setupBusy = busy;
     checkButton.disabled = busy;
     continueButton.disabled = busy;
   }
@@ -98,7 +100,7 @@
     panelNew.hidden = mode !== "new";
     panelExisting.hidden = mode !== "existing";
     checkButton.hidden = mode !== "existing";
-    if (mode !== "new") continueButton.textContent = "Continue";
+    if (mode !== "new") continueButton.textContent = document.getElementById("heading").textContent === "Servidores" ? "Conectar" : "Continue";
     setStatus("");
   }
 
@@ -194,7 +196,7 @@
     lockMode(true);
     setStatus("Connecting…");
     try {
-      const saved = await bridge.save({ mode, serverUrl: url });
+      const saved = await bridge.save({ name: document.getElementById("server-name").value, mode, serverUrl: url });
       if (!saved.ok) setStatus(saved.error ?? "Could not save that address.", "error");
     } catch {
       setStatus("Could not save that address. Try again.", "error");
@@ -382,8 +384,35 @@
     try {
       const state = await bridge.state();
       if (state === null) throw new Error("Setup is not active");
+      const savedServers = document.getElementById("saved-servers");
+      async function renderServers() {
+        savedServers.replaceChildren();
+        const entries = await bridge.servers?.().catch(() => []) ?? [];
+        if (!entries.length) return;
+        const heading = document.createElement("h2"); heading.textContent = "Servidores"; savedServers.append(heading);
+        for (const entry of entries) {
+          const row = document.createElement("div"); row.className = "actions";
+          const button = document.createElement("button"); button.type = "button"; button.className = "button button-secondary";
+          button.textContent = entry.name; button.title = entry.serverUrl;
+          button.onclick = () => { if (setupBusy) return; document.querySelector(`input[name="mode"][value="${entry.mode}"]`).checked = true; serverUrl.value = entry.serverUrl; document.getElementById("server-name").value = entry.name; syncPanels(); continueButton.focus(); };
+          row.append(button);
+          if (state.activeServer !== entry.serverUrl) { const forget = document.createElement("button"); forget.type = "button"; forget.className = "link"; forget.textContent = "Quitar";
+            forget.onclick = async () => { if (setupBusy) return; try { await bridge.forgetServer(entry.serverUrl); await renderServers(); } catch { setStatus("No se ha podido quitar el servidor.", "error"); } }; row.append(forget); }
+          savedServers.append(row);
+        }
+      }
+      await renderServers();
       defaultLocalUrl = state.defaultLocalUrl;
       cloudUrl = state.cloudUrl;
+      if (state.manager) {
+        document.getElementById("heading").textContent = "Servidores";
+        subheading.textContent = "Conecta otro servidor y conserva tus sesiones por separado.";
+        advanced.querySelector("summary").textContent = "Conexión del servidor";
+        checkButton.textContent = "Comprobar conexión";
+        form.querySelector("fieldset").hidden = true;
+        document.querySelector('label[for="server-url"]').textContent = "Dirección del servidor";
+        document.getElementById("mode-existing").checked = true;
+      }
       recovering = state.recovery === true;
       showRecoveryDiagnostic(recovering ? state.error : null);
       recovery.hidden = state.recovery !== true;
@@ -395,6 +424,12 @@
         const modeInput = document.querySelector(`input[name="mode"][value="${mode}"]`);
         if (modeInput !== null) modeInput.checked = true;
         if (mode === "existing") serverUrl.value = state.saved.serverUrl;
+      }
+      if (state.preferredServer) {
+        document.getElementById("mode-existing").checked = true;
+        serverUrl.value = state.preferredServer;
+        const chosen = ((await bridge.servers?.().catch(() => [])) ?? []).find(entry => entry.serverUrl === state.preferredServer);
+        if (chosen) { document.querySelector(`input[name="mode"][value="${chosen.mode}"]`).checked = true; document.getElementById("server-name").value = chosen.name; }
       }
       // A relaunch with the stack down starts it before this window opens; show that
       // attempt instead of the saved mode, and follow it while it is still running.

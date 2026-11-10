@@ -1,3 +1,5 @@
+import { BUILTIN_CONNECTOR, BUILTIN_INTEGRATIONS, integrationCatalog, type BuiltinIntegration } from "./marketplace/builtin-integrations";
+import { connectBuiltinIntegration } from "../lib/connect-builtin-integration";
 import { appCategory, appDescription, appPriority, groupByCategory, matches } from "./marketplace/catalog";
 import { CategoryName } from "./marketplace/parts";
 import { useSpaceRpc } from "../lib/space-rpc";
@@ -67,6 +69,7 @@ function ConnectorIcon({ name, logo }: { name: string; logo?: string | null }) {
 type SourceKind = "treg" | "executor" | "mcp" | "api" | "graphql";
 
 const NO_CATALOG: ConnectionCatalogItem[] = [];
+const NO_MCP: import("@rakazo/contracts").McpServer[] = [];
 const NO_CONNECTIONS: Connection[] = [];
 const NO_SOURCES: CapabilityInstall[] = [];
 
@@ -103,6 +106,8 @@ export function PluginsOverlay({
 }) {
   const { t, i18n } = useLingui();
   const rpc = useSpaceRpc();
+  const [keyApp, setKeyApp] = useState<BuiltinIntegration | null>(null);
+  const [appKey, setAppKey] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -134,7 +139,7 @@ export function PluginsOverlay({
   const queryClient = useQueryClient();
   const mcpOptions = queries.mcp.servers.list.queryOptions();
   const mcpQuery = useQuery(mcpOptions);
-  const mcpServers = mcpQuery.data ?? [];
+  const mcpServers = mcpQuery.data ?? NO_MCP;
   const mcpError = mcpQuery.error ? errorText(mcpQuery.error, t`Could not load MCP servers`) : null;
   async function loadIntegrations() {
     // The catalog call reconciles connection rows, so list them after it settles.
@@ -161,7 +166,8 @@ export function PluginsOverlay({
   const integrations = useQuery(integrationsOptions);
   const catalogLoaded = integrations.data !== undefined;
   const loading = !catalogLoaded && integrations.isFetching;
-  const catalog = integrations.data?.catalog ?? NO_CATALOG;
+  const managedCatalog = integrations.data?.catalog ?? NO_CATALOG;
+  const catalog = useMemo(() => integrationCatalog(managedCatalog, mcpServers), [managedCatalog, mcpServers]);
   const connections = integrations.data?.connections ?? NO_CONNECTIONS;
   const sources = integrations.data?.sources ?? NO_SOURCES;
   const catalogFeedEnabled = integrations.data?.catalogFeedEnabled ?? false;
@@ -248,6 +254,7 @@ export function PluginsOverlay({
     .slice(0, visibleCount);
 
   function openDetail(item: ConnectionCatalogItem) {
+    if (item.connectorId === BUILTIN_CONNECTOR) { onOpenMcp?.(); return; }
     setCatalogError(null);
     setDetailKey({ connectorId: item.connectorId, slug: item.slug });
   }
@@ -278,7 +285,23 @@ export function PluginsOverlay({
     }));
   }
 
+  async function connectBuiltin(app: BuiltinIntegration, key?: string) {
+    if (pending) return;
+    setPending(`${BUILTIN_CONNECTOR}:${app.slug}`);
+    setCatalogError(null);
+    try {
+      await connectBuiltinIntegration(app, rpc, key);
+      setKeyApp(null); setAppKey("");
+    } catch (err) { setCatalogError(errorText(err, t`Could not connect`)); }
+    finally { setPending(null); void mcpQuery.refetch(); }
+  }
   async function connect(item: ConnectionCatalogItem) {
+    if (item.connectorId === BUILTIN_CONNECTOR) {
+      const app = BUILTIN_INTEGRATIONS.find(app => app.slug === item.slug)!;
+      if (app.auth === "key") { setAppKey(""); setKeyApp(app); }
+      else await connectBuiltin(app);
+      return;
+    }
     connectionAttempt.current?.abort();
     const controller = new AbortController();
     connectionAttempt.current = controller;
@@ -525,7 +548,7 @@ export function PluginsOverlay({
           void connect(item);
         }}
       >
-        {connecting ? <Trans>Adding…</Trans> : <Trans>Add</Trans>}
+        {connecting ? <Trans>Connecting…</Trans> : <><Plus size={14} /><Trans>Connect</Trans></>}
       </Button>
     );
   }
@@ -798,6 +821,18 @@ export function PluginsOverlay({
 
   return (
     <section className="rk-market-apps" data-testid="marketplace-apps">
+      <Dialog open={keyApp !== null} onOpenChange={(open) => { if (!open && !pending) { setKeyApp(null); setAppKey(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{t`Connect`} {keyApp?.name}</DialogTitle></DialogHeader>
+          <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (keyApp) void connectBuiltin(keyApp, appKey); }}>
+            <label className="block space-y-2 text-sm"><span>{t`API key`}</span>
+              <Input type="password" autoComplete="off" value={appKey} onChange={event => setAppKey(event.target.value)} required disabled={Boolean(pending)} />
+            </label>
+            {catalogError ? <p role="alert" className="text-sm text-destructive">{catalogError}</p> : null}
+            <Button type="submit" disabled={!appKey.trim() || Boolean(pending)}>{pending ? t`Connecting…` : t`Connect`}</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
       {!detailItem ? (
         <>
           <div className="rk-market-heading">
@@ -848,7 +883,7 @@ export function PluginsOverlay({
           </div>
         ) : null}
 
-        {!detailItem && (mcpServers.length > 0 || mcpError) ? (
+        {!detailItem && (mcpServers.some(server => !BUILTIN_INTEGRATIONS.some(app => app.endpoint === server.endpoint)) || mcpError) ? (
           <section data-testid="registered-mcp-servers" className="mb-6">
             <div className="mb-2 flex items-center justify-between gap-3">
               <h2 className="text-sm font-medium">
@@ -869,6 +904,7 @@ export function PluginsOverlay({
               </div>
             ) : null}
             {mcpServers
+              .filter((server) => !BUILTIN_INTEGRATIONS.some(app => app.endpoint === server.endpoint))
               .filter((server) =>
                 `${server.name} ${server.description}`
                   .toLowerCase()
@@ -906,7 +942,7 @@ export function PluginsOverlay({
           renderDetail(detailItem)
         ) : (
           <>
-            {catalogLoaded && visible.length === 0 ? (
+            {!loading && !loadError && visible.length === 0 ? (
               <p className="rk-market-empty">
                 <Trans>No apps match your search.</Trans>
               </p>

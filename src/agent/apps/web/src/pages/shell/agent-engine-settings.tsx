@@ -1,90 +1,10 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
-import { Button, Disclosure, NativeSelect, NativeSelectOption } from "@rakazo/ui-web";
-import { useId, useState } from "react";
+import { Button } from "@rakazo/ui-web";
+import { useState } from "react";
 import { useSpaceRpc } from "../../lib/space-rpc";
 
 type InstalledEngine = Exclude<NonNullable<Bot["agentEngine"]>, "pi">;
-
-export function AgentEngineSettings({
-  bot,
-  onSave,
-}: {
-  bot: Bot;
-  onSave: (patch: { agentEngine: NonNullable<Bot["agentEngine"]> }) => Promise<void>;
-}) {
-  const { t } = useLingui();
-  const rpc = useSpaceRpc();
-  const id = useId();
-  const [choices, setChoices] = useState<
-    Array<{ id: NonNullable<Bot["agentEngine"]>; name: string; available: boolean }>
-  >([]);
-  const [value, setValue] = useState(bot.agentEngine ?? "pi");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function load(open: boolean) {
-    if (!open) return;
-    setBusy(true);
-    setError("");
-    try {
-      setChoices(await rpc.engines.list());
-    } catch {
-      setError(t`Could not check agent engines`);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function save(agentEngine: NonNullable<Bot["agentEngine"]>) {
-    setBusy(true);
-    setError("");
-    try {
-      await onSave({ agentEngine });
-      setValue(agentEngine);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t`Could not change agent engine`);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <Disclosure summary={t`Agent engine`} onOpenChange={(open) => void load(open)}>
-      <div className="space-y-2 py-3">
-        <label htmlFor={id} className="text-sm">
-          <Trans>Engine on the server computer</Trans>
-        </label>
-        <NativeSelect
-          id={id}
-          value={value}
-          disabled={busy || !choices.length}
-          onChange={(event) => void save(event.target.value as NonNullable<Bot["agentEngine"]>)}
-        >
-          {choices.length ? (
-            choices.map((choice) => (
-              <NativeSelectOption key={choice.id} value={choice.id} disabled={!choice.available}>
-                {choice.name}
-                {choice.available ? "" : t` (not installed)`}
-              </NativeSelectOption>
-            ))
-          ) : (
-            <NativeSelectOption value={value}>{value}</NativeSelectOption>
-          )}
-        </NativeSelect>
-        {value !== "pi" ? (
-          <p className="text-sm text-muted-foreground">
-            {value === "opencode"
-              ? t`Uses OpenCode in an isolated profile without your local sign-in.`
-              : t`Uses this engine’s local sign-in and default model.`}
-          </p>
-        ) : null}
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-      </div>
-    </Disclosure>
-  );
-}
 
 export function InstalledAgentOnboarding({
   onSelect,
@@ -104,13 +24,9 @@ export function InstalledAgentOnboarding({
     try {
       const available = (await rpc.engines.list()).filter(
         (engine): engine is typeof engine & { id: InstalledEngine } =>
-          engine.id !== "pi" && engine.available,
+          (engine.id === "codex" || engine.id === "claude") && engine.available,
       );
-      // OpenCode is a built-in engine, so it stays listed even when this server
-      // has no host advertising it yet; selecting it reports the real refusal.
-      const found = available.some((engine) => engine.id === "opencode")
-        ? available
-        : [...available, { id: "opencode" as InstalledEngine, name: "OpenCode" }];
+      const found = available;
       setEngines(found);
       if (!found.length)
         setError(t`Install and sign in to an agent on the computer running this server first.`);

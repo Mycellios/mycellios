@@ -114,6 +114,8 @@ export type ClientOperation =
   | "voice.turn"
   | "rpc.transport"
   | "desktop.startup"
+  | "desktop.settings"
+  | "desktop.externalLink"
   | "desktop.update"
   | "desktop.renderer"
   | "desktop.child"

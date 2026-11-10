@@ -58,7 +58,7 @@ function useDesktopUpdates() {
     };
   }, [bridge]);
 
-  async function act(action: "check" | "download" | "install" | "forceInstall" | "cancelInstall") {
+  async function act(action: "check" | "download" | "install" | "forceInstall" | "cancelInstall" | "restartWhenIdle" | "cancelRestart") {
     if (!bridge || pending.current) return;
     pending.current = true;
     revision.current++;
@@ -96,6 +96,7 @@ function useDesktopUpdates() {
 }
 
 const UpdatesContext = createContext<ReturnType<typeof useDesktopUpdates> | null>(null);
+export function useDesktopUpdateSettings() { return useContext(UpdatesContext); }
 
 export function DesktopUpdatesProvider({ children }: { children: ReactNode }) {
   const updates = useDesktopUpdates();
@@ -103,7 +104,8 @@ export function DesktopUpdatesProvider({ children }: { children: ReactNode }) {
   return (
     <UpdatesContext.Provider value={updates}>
       {children}
-      {updates.state && updates.safeToInterrupt && updateRequiresAttention(updates.state) &&
+      {updates.state && !updates.state.autoInstallEnabled && !updates.state.relaunchPending && updates.state.phase !== "available" &&
+        !document.querySelector('[data-testid="desktop-update-settings"]') && updates.safeToInterrupt && updateRequiresAttention(updates.state) &&
         updates.state.availableVersion !== deferredVersion && (
         <DesktopUpdateGate {...updates} state={updates.state} onDefer={setDeferredVersion} />
       )}
@@ -235,6 +237,7 @@ export function useSidebarUpdate() {
     install: () => {
       void updates?.act(updates.state?.installPending && updates.forceAvailable ? "forceInstall" : "install");
     },
+    download: () => { void updates?.act("download"); },
   };
 }
 
@@ -252,7 +255,7 @@ export function DesktopSidebarUpdate() {
     <div className="mx-2.5 mt-2 min-w-0 rounded-xl border border-border bg-sidebar-accent p-3">
       <p role="status" className="text-xs font-medium">
         {state.installPending ? <PendingRestart state={state} /> : update.error ??
-          (ready ? <Trans>Restart to update</Trans> : <Trans>Downloading…</Trans>)}
+          (ready ? <Trans>Restart to update</Trans> : state.phase === "available" ? <Trans>Update available</Trans> : <Trans>Downloading…</Trans>)}
       </p>
       {ready ? (
         <Button
@@ -263,7 +266,7 @@ export function DesktopSidebarUpdate() {
         >
           {state.installPending && state.supportsForceRestart ? <Trans>Restart now</Trans> : <Trans>Restart to update</Trans>}
         </Button>
-      ) : percent !== null ? (
+      ) : state.phase === "available" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.download}><Trans>Download update</Trans></Button> : percent !== null ? (
         <div className="mt-2 flex items-center gap-2">
           <progress
             aria-label={t`Download progress`}

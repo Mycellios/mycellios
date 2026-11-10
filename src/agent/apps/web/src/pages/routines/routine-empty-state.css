@@ -1,0 +1,62 @@
+.rk-routine-empty { container-type: inline-size; display: flex; flex: 1; min-height: 0; flex-direction: column; overflow: auto; background: var(--background); }
+.rk-routine-empty-stage { position: relative; flex: 1; width: 100%; min-height: 530px; max-width: 1200px; margin-inline: auto; isolation: isolate; }
+.rk-routine-example { position: absolute; inset: 0; overflow: hidden; pointer-events: none; user-select: none; }
+.rk-routine-example-links { position: absolute; width: 100%; height: 100%; inset: 0; }
+.rk-routine-example-track { stroke: var(--border); stroke-width: 1.25; }
+.rk-routine-example-signal { stroke: var(--primary); stroke-width: 1.8; stroke-dasharray: 4 160; animation: rk-routine-signal 12s linear infinite; opacity: .55; }
+.rk-routine-sample { position: absolute; width: 19%; max-width: 208px; min-width: 134px; padding: 13px; border: 1px solid var(--border); border-radius: 12px; color: var(--muted-foreground); background: var(--card); font-size: 11px; line-height: 1.5; }
+.rk-routine-sample-trigger { left: 3.5%; top: 41%; }
+.rk-routine-sample-agent { left: 36.5%; top: 11%; animation: rk-routine-agent 12s ease-in-out infinite; }
+.rk-routine-sample-notes { left: 39%; top: 76%; }
+.rk-routine-sample-result { right: 2%; top: 44%; animation: rk-routine-result 12s ease-in-out infinite; }
+.rk-routine-sample-heading { display: flex; gap: 8px; align-items: center; line-height: 1.35; }
+.rk-routine-sample-heading > svg { width: 20px; height: 20px; flex-shrink: 0; color: var(--primary); }
+.rk-routine-sample-heading > span { min-width: 0; }
+.rk-routine-sample-heading strong { display: block; margin-top: 2px; color: var(--foreground); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.rk-routine-sample p { margin-top: 12px; }
+.rk-routine-sample-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 15px; font-size: 10px; }
+.rk-routine-sample-foot > svg { width: 12px; height: 12px; color: var(--primary); }
+.rk-routine-sample-days { display: flex; width: 100%; gap: 4px; }
+.rk-routine-sample-days i { width: 4px; height: 4px; border-radius: 50%; background: var(--primary); opacity: .6; }
+.rk-routine-sample-days i:nth-last-child(-n+2) { background: var(--border); }
+.rk-routine-sample-progress { height: 3px; overflow: hidden; margin-top: 16px; border-radius: 3px; background: var(--border); }
+.rk-routine-sample-progress span { display: block; height: 100%; background: var(--primary); transform-origin: left; animation: rk-routine-progress 12s ease-in-out infinite; }
+.rk-routine-sample-lines { display: grid; gap: 7px; margin-top: 17px; }
+.rk-routine-sample-lines i { height: 3px; background: var(--border); border-radius: 2px; }
+.rk-routine-sample-lines i:nth-child(2) { width: 78%; }
+.rk-routine-sample-lines i:nth-child(3) { width: 56%; }
+.rk-routine-empty-copy { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; pointer-events: none; }
+.rk-routine-empty-copy::before { position: absolute; z-index: -1; content: ""; width: min(620px,78%); height: 340px; background: radial-gradient(ellipse, var(--background) 53%, transparent 74%); }
+.rk-routine-empty-copy h1 { max-width: 520px; font-size: clamp(25px,3.5cqi,42px); font-weight: 600; line-height: 1.18; letter-spacing: -.035em; text-wrap: balance; }
+.rk-routine-empty-copy h1 span { color: var(--primary); }
+.rk-routine-empty-copy > p { margin: 20px 0 27px; color: var(--muted-foreground); font-size: clamp(13px,1.5cqi,16px); line-height: 1.7; text-wrap: balance; }
+.rk-routine-empty-copy > button { width: min(280px,100%); pointer-events: auto; }
+.rk-routine-empty-reassurance { margin-top: 12px; color: var(--muted-foreground); font-size: 11px; }
+.rk-routine-empty-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 5px 16px; padding: 14px 20px 20px; color: var(--muted-foreground); font-size: 11px; }
+.rk-routine-empty * { animation-play-state: paused; }
+.rk-routine-empty[data-animate="true"] * { animation-play-state: running; }
+@keyframes rk-routine-signal { to { stroke-dashoffset: -656; } }
+@keyframes rk-routine-progress { 0%,12% { transform: scaleX(.08); } 58%,85% { transform: scaleX(1); } 100% { transform: scaleX(.08); } }
+@keyframes rk-routine-agent { 0%,12%,85%,100% { border-color: var(--border); } 25%,60% { border-color: var(--primary); } }
+@keyframes rk-routine-result { 0%,50%,100% { border-color: var(--border); } 65%,85% { border-color: var(--primary); } }
+@container (max-width: 640px) {
+  .rk-routine-empty-stage { display: flex; flex-direction: column; justify-content: center; gap: 32px; min-height: 480px; padding: 38px 18px 20px; }
+  .rk-routine-empty-copy { position: relative; inset: auto; order: 0; padding: 0; }
+  .rk-routine-empty-copy::before { display: none; }
+  .rk-routine-empty-copy h1 { font-size: clamp(25px,6cqi,34px); max-width: 420px; }
+  .rk-routine-empty-copy > p { font-size: 14px; }
+  .rk-routine-example { position: relative; inset: auto; display: flex; order: 1; overflow: visible; align-items: center; justify-content: center; gap: 15px; width: 100%; }
+  .rk-routine-example-links, .rk-routine-sample-notes { display: none; }
+  .rk-routine-sample { position: relative; inset: auto; flex: 1; width: auto; max-width: 150px; min-width: 0; padding: 10px; }
+  .rk-routine-sample:not(.rk-routine-sample-result)::after { position: absolute; content: ""; top: 50%; inset-inline-start: 100%; width: 16px; border-top: 1px dashed var(--primary); opacity: .6; }
+  .rk-routine-sample-heading { flex-direction: column; text-align: center; gap: 6px; }
+  .rk-routine-sample-heading > span { font-size: 9px; }
+  .rk-routine-sample-heading strong { font-size: 10px; }
+  .rk-routine-sample p, .rk-routine-sample-foot, .rk-routine-sample-progress { display: none; }
+  .rk-routine-empty-footer { padding-top: 0; font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rk-routine-empty * { animation: none !important; }
+  .rk-routine-example-signal { stroke-dasharray: 4 8; opacity: .35; }
+  .rk-routine-sample-progress span { transform: scaleX(1); }
+}

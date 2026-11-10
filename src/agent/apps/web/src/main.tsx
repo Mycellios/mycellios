@@ -1,4 +1,7 @@
+import { syncNativeLogo } from "./lib/logo-preference";
+import { installActionSounds } from "./lib/reply-sound";
 import "./lib/i18n";
+import { applyGeneralPreferences, subscribeGeneralPreferences } from "./lib/general-preferences";
 import { installAndroidHost, isAndroidHost } from "./lib/android-host";
 import "./monitoring-bootstrap";
 import "./lib/native-pc-bootstrap";
@@ -31,6 +34,10 @@ if (!isAndroidHost()) { clientUpdates().install(); registerServiceWorker(); }
 applyUiDirection(resolveUiLocale());
 applyUiAppearance();
 applyInterfaceSize();
+applyGeneralPreferences();
+installActionSounds();
+void syncNativeLogo().catch(() => undefined);
+subscribeGeneralPreferences(() => { void syncNativeLogo().catch(() => undefined); });
 
 function PerformanceProbe() {
   useLayoutEffect(() => {

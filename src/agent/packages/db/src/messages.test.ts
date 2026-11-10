@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Prisma, PrismaClient } from "./client.js";
 import {
+  loadRunHistoryMessages,
   createThreadMessage,
   createThreadMessageInTransaction,
   RunHistoryWriteError,
@@ -90,4 +91,18 @@ describe("createThreadMessage", () => {
     ).rejects.toThrow("unique constraint");
     expect(run).toHaveBeenCalledTimes(1);
   });
+});
+
+it("keeps another turn's pending queue out of the model history", async () => {
+  const findMany = vi.fn().mockResolvedValue([]);
+  await loadRunHistoryMessages({ message: { findMany } } as unknown as PrismaClient, { id: "current", threadId: "owned-thread" }, 20);
+  expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({
+    threadId: "owned-thread", NOT: { steeringMessages: { some: { originTrigger: "queued_user", claimedAt: null, OR: [{ runId: null }, { runId: { not: "current" } }] } } },
+  }) }));
+});
+
+it("limits model history to messages after the new-chat boundary while leaving display paging alone", async () => {
+ const findMany = vi.fn().mockResolvedValue([]);
+ await loadRunHistoryMessages({ message: { findMany } } as unknown as PrismaClient, { id: "run", threadId: "thread" }, 20, undefined, 42);
+ expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ threadId: "thread", seq: { gte: 42 } }) }));
 });

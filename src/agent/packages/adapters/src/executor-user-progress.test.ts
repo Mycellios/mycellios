@@ -496,6 +496,26 @@ describe("withheld narration on short reply-producing turns", () => {
   });
 });
 
+it("publishes text within the shorter cadence and flushes the final tail in order", async () => {
+  const clock = vi.spyOn(Date, "now").mockReturnValue(10_000);
+  try {
+    const { append } = await runTurn("", false, undefined, [], "fyi", {
+      runtimeEvents: [
+        { type: "text", text: "One " },
+        { type: "text", text: "two " },
+        { type: "text", text: "three " },
+        { type: "text", text: "four." },
+        { type: "done" },
+      ],
+      beforeRuntimeEvent: (index) => clock.mockReturnValue(10_000 + index * 40),
+    });
+    const chunks = append.mock.calls.map(([event]) => event)
+      .filter(event => event.type === "thread.progress" && event.payload?.streaming === true)
+      .map(event => String(event.payload.text ?? event.payload.delta ?? ""));
+    expect(chunks).toEqual(["One ", "two three ", "four."]);
+  } finally { clock.mockRestore(); }
+});
+
 describe("text from separate assistant turns", () => {
   it.each(["The draft is posted.", "The draft is posted at https://example.com/drafts/42"])(
     "keeps a paragraph break after %j in finalized blocks",

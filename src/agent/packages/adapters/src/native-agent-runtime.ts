@@ -1,3 +1,5 @@
+import { nativeCodexQuota } from "./native-codex-quota.js";
+import { withConversationStyle } from "./conversation-style.js";
 import { prepareOpenCodeProfile } from "./opencode-profile.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -25,6 +27,8 @@ import {
   serializeTurnCheckpoint,
   unresolvedTurnCheckpointCalls,
 } from "./turn-checkpoint.js";
+
+import { nativeCodexModels, codexTurnSettings } from "./native-codex-settings.js";
 
 type Engine = "codex" | "claude" | "acp" | "opencode";
 type NativeConfig = Partial<Record<Engine, NativeCommand>>;
@@ -132,6 +136,29 @@ export async function canInstallNativeOpenCode(
   const config = await readNativeConfig(dataDir);
   return config.allowOpenCodeInstall === true && hostAllowsScope(config, scope) &&
     !configuredCommands(config).opencode;
+}
+
+export async function discoverNativeCodexModels(dataDir?: string) {
+  const command = configuredCommands(await readNativeConfig(dataDir)).codex ?? findNativeCommand("codex");
+  if (!command || !nativeCommandAvailable(command)) throw new Error("Codex is unavailable.");
+  const child = new NativeAgentProcess(command, ["app-server", "-c", "mcp_servers={}"], dataDir ?? process.cwd(), () => {}, () => {});
+  try {
+    await child.request("initialize", { clientInfo: { name: "mycellios-model-picker", version: "0.1.0" }, capabilities: { experimentalApi: true } }, 10000);
+    child.send({ method: "initialized", params: {} });
+    return nativeCodexModels(await child.request("model/list", { includeHidden: false }, 10000));
+  } finally { await child.stop(); }
+}
+
+/** Called only behind the same account/Space grant as native model discovery. */
+export async function discoverNativeCodexQuota(dataDir?: string) {
+  const command = configuredCommands(await readNativeConfig(dataDir)).codex ?? findNativeCommand("codex");
+  if (!command || !nativeCommandAvailable(command)) return null;
+  const child = new NativeAgentProcess(command, ["app-server", "-c", "mcp_servers={}"], dataDir ?? process.cwd(), () => {}, () => {});
+  try {
+    await child.request("initialize", { clientInfo: { name: "mycellios-usage", version: "0.1.0" }, capabilities: { experimentalApi: true } }, 10000);
+    child.send({ method: "initialized", params: {} });
+    return nativeCodexQuota(await child.request("account/rateLimits/read", {}, 10000));
+  } finally { await child.stop(); }
 }
 
 export async function discoverNativeEngines(dataDir?: string) {
@@ -329,7 +356,7 @@ export class NativeAgentRuntime implements AgentRuntime {
       : controller.signal;
     const queue = new NativeEventQueue<AgentRuntimeEvent>();
     const continuity = new WorkContinuation(!request.allowSilentEmpty && !request.script);
-    request = withWorkContinuation(request, continuity);
+    request = withWorkContinuation({ ...request, instructions: withConversationStyle(request.instructions ?? "") }, continuity);
     const tools = request.tools.filter((tool) => tool.name !== "run_subagent");
     const binding = hash([engine, request.model.id, request.instructions, tools]);
     let sessionId: string | undefined;
@@ -624,8 +651,12 @@ export class NativeAgentRuntime implements AgentRuntime {
             capabilities: { experimentalApi: true },
           });
           process.send({ method: "initialized", params: {} });
+          const selection = request.nativeConfig
+            ? codexTurnSettings(request.nativeConfig, nativeCodexModels(await process.request("model/list", { includeHidden: false }))) : {};
           const params = {
             cwd,
+            ...("model" in selection ? { model: selection.model } : {}),
+            ...("serviceTier" in selection ? { serviceTier: selection.serviceTier } : {}),
             // Native Codex owns its account and default model. The chat catalog
             // can name a model that this separate CLI account cannot execute.
             approvalPolicy: "untrusted",
@@ -652,7 +683,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           continueTurn = async (note) => {
             if (signal.aborted || paused) return;
             const next = await process!.request<{ turn: { id: string } }>("turn/start", {
-              threadId: sessionId, input: [{ type: "text", text: note }],
+              threadId: sessionId, ...selection, input: [{ type: "text", text: note }],
               approvalPolicy: "untrusted", permissions: "rakazo-runtime",
             });
             turnId = next.turn.id;
@@ -660,6 +691,7 @@ export class NativeAgentRuntime implements AgentRuntime {
           startedModelTurn = true;
           const startedTurn = await process.request<{ turn: { id: string } }>("turn/start", {
             threadId: sessionId,
+            ...selection,
             input: [
               { type: "text", text: startPrompt },
               ...(request.currentTurnImages ?? []).map((image) => ({

@@ -1,4 +1,5 @@
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
+import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
 import { claimMicoRun, ComputerLimitError, isOwnedWorkflowThread } from "@rakazo/db";
@@ -3947,9 +3948,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
             : undefined;
         const channelId = messagingChannelId(sourceBlocks);
         const messagingChannelRun = isMessagingChannelRun(run.trigger, sourceBlocks);
+        const thread = await deps.prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } });
         const [
           bot,
-          thread,
           messages,
           peerMessage,
           task,
@@ -3967,8 +3968,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             where: { id: run.botId },
             include: { computer: true },
           }),
-          deps.prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } }),
-          loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId),
+          loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId, thread.contextStartSeq),
           run.trigger === "bot_message"
             ? loadBotMessageContext(deps.prisma, run.sourceMessageId)
             : Promise.resolve(undefined),
@@ -8464,6 +8464,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             {
               botId: bot.id,
               agentEngine: bot.agentEngine as AgentRunRequest["agentEngine"],
+              nativeConfig: bot.nativeConfig as AgentRunRequest["nativeConfig"],
               threadId: thread.id,
               runId,
               routineId: run.routineId,
@@ -8487,7 +8488,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
               contextStrategy: deps.contextStrategy,
               instructions: [
                 ...userTurnInstructions({
-                  botInstructions: runIdentityInstruction(bot, run.trigger),
+                  botInstructions: [runIdentityInstruction(bot, run.trigger),
+                    thread.contextStartSeq > 0 ? `Conversation context begins at sequence ${thread.contextStartSeq}. Earlier chat messages are outside this conversation; persistent memories and workspace files remain available.` : ""].filter(Boolean).join("\n"),
                   groupContext,
                   messagingContext,
                   redactedMemoryContext: memoryContext
@@ -8741,7 +8743,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               tryFlushPendingTools();
               pendingProgress += progressRedactor.push(event.text);
               const now = Date.now();
-              if (!scripted && pendingProgress && now - lastProgressAt >= 250) {
+              if (!scripted && shouldPublishTextProgress(now, lastProgressAt, pendingProgress.length)) {
                 await flushProgress();
               }
             } else if (event.type === "turn") {

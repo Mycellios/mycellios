@@ -31,6 +31,7 @@
       <details id="advanced">
         <summary>Advanced</summary>
         <p id="recovery-diagnostic" class="recovery-diagnostic" hidden></p>
+      <section id="saved-servers" aria-label="Servidores"></section>
       <form id="setup" novalidate>
           <fieldset class="choices">
             <legend class="sr-only">Instance</legend>
@@ -84,6 +85,7 @@
           </div>
         </section>
 
+        <label class="field-label" for="server-name">Nombre del servidor</label><input id="server-name" class="field" maxlength="80" autocomplete="off" placeholder="Mi servidor" />
         <section id="panel-existing" class="panel" hidden>
           <label class="field-label" for="server-url">Server address</label>
           <input

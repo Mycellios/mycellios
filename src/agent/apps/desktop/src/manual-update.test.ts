@@ -14,17 +14,24 @@ const catalog = { automaticUpdates: false, packages: [entry] };
 const folders: string[] = [];
 afterEach(async () => { for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true }); });
 async function fixture(overrides: { busy?: () => boolean; prepare?: () => Promise<boolean>; body?: Uint8Array;
-  backgroundDownloads?: boolean; publishedRelease?: () => Promise<ManualRelease | null>; catalogUnavailable?: boolean } = {}) {
+  autoDownload?: () => boolean; backgroundDownloads?: boolean; publishedRelease?: () => Promise<ManualRelease | null>; catalogUnavailable?: boolean } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-")); folders.push(directory);
   const handoff = vi.fn(async () => {});
   const request = vi.fn(async (url: string | URL | Request) => String(url).endsWith("desktop-downloads")
     ? overrides.catalogUnavailable ? new Response(null, {status: 503}) : new Response(JSON.stringify(catalog)) : new Response(overrides.body ?? bytes));
   const controller = new ManualUpdateController({ version: "0.3.13", directory: () => directory,
     fetch: request, busy: overrides.busy ?? (() => false), prepare: overrides.prepare ?? (async () => true), handoff,
-    backgroundDownloads: overrides.backgroundDownloads, publishedRelease: overrides.publishedRelease });
+    autoDownload: overrides.autoDownload, backgroundDownloads: overrides.backgroundDownloads, publishedRelease: overrides.publishedRelease });
   return { controller, handoff, request, directory };
 }
 describe("official Windows manual releases", () => {
+  it("checks metadata without downloading when the user disables automatic downloads", async () => {
+    const { controller, request, handoff } = await fixture({ backgroundDownloads: true, autoDownload: () => false });
+    expect(await controller.check(true)).toMatchObject({ phase: "available", availableVersion: entry.version });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(await controller.download()).toMatchObject({ phase: "ready", availableVersion: entry.version });
+    expect(request).toHaveBeenCalledTimes(2); expect(handoff).not.toHaveBeenCalled();
+  });
   it("stages a newer published package even when the website catalog is unavailable", async () => {
     const version = "0.3.17", fileName = `Mycellios-Desktop-${version}-windows-x64-pilot.exe`;
     const published: ManualRelease = {version, fileName, bytes: bytes.byteLength, sha256: entry.sha256,

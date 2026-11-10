@@ -1,0 +1,12 @@
+/* The warm edge represents a confirmed, connected contribution setting. */
+body[data-mycellios-contributing="true"]::after { content:""; position:fixed; pointer-events:none; z-index:70; bottom:0; inset-inline:0; height:2px; background:linear-gradient(90deg,transparent,#e49b53 20%,#f2bd78 50%,#e49b53 80%,transparent); }
+body[data-mycellios-contributing="true"]::before { content:""; position:fixed; pointer-events:none; z-index:69; bottom:0; inset-inline:0; height:58px; background:radial-gradient(ellipse at 50% 110%,rgb(224 139 55 / 18%),transparent 72%); animation:contribution-breathe 4s ease-in-out infinite alternate; }
+.rk-contribution-control { width:100%; }
+.rk-contribution-button { width:100%; min-height:38px; border:1px solid var(--border); border-radius:10px; background:var(--background); color:var(--foreground); }
+[data-active="true"] .rk-contribution-button { border-color:color-mix(in srgb,#d58b43 45%,var(--border)); background:color-mix(in srgb,#db964f 9%,var(--background)); }
+.rk-contribution-status { display:flex; align-items:center; gap:6px; padding:7px 8px 2px; font-size:11px; color:var(--muted-foreground); }
+.rk-contribution-status > span { width:5px; height:5px; border-radius:50%; background:#d48b43; }
+.rk-credit-gain { font-size:11px; color:var(--foreground); font-variant-numeric:tabular-nums; animation:credit-arrival .5s ease-out; }
+@keyframes contribution-breathe { from {opacity:.55} to {opacity:1} }
+@keyframes credit-arrival { from {opacity:0;transform:translateY(3px)} to {opacity:1;transform:translateY(0)} }
+@media (prefers-reduced-motion:reduce) { body[data-mycellios-contributing="true"]::before,.rk-credit-gain {animation:none;} }

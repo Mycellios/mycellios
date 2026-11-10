@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import {
-  canInstallNativeOpenCode, discoverNativeEngines, installManagedOpenCode,
+  canInstallNativeOpenCode, discoverNativeCodexModels, discoverNativeCodexQuota, discoverNativeEngines, installManagedOpenCode,
   nativeHostAccess, reconcileWorkStops,
 } from "@rakazo/adapters";
 import { createTaskControls } from "../task-controls.js";
@@ -10,8 +10,25 @@ import type { RouterContext } from "./context.js";
 
 export function localCapabilityRoutes({ authed, deps }: RouterContext) {
   const acpRegistry = createAcpRegistry();
+  let quota: { at: number; value: Awaited<ReturnType<typeof discoverNativeCodexQuota>> } | undefined;
+  let pendingQuota: ReturnType<typeof discoverNativeCodexQuota> | undefined;
   return {
     engines: {
+      codexQuota: authed.engines.codexQuota.handler(async ({ context }) => {
+        // Check on every request, including cached reads, so revocation is immediate.
+        if (!(await nativeHostAccess(deps.dataDir, context.actor))) return null;
+        if (quota && Date.now() - quota.at < 60_000) return quota.value;
+        pendingQuota ??= discoverNativeCodexQuota(deps.dataDir).catch(() => null);
+        try {
+          const value = await pendingQuota;
+          quota = { at: Date.now(), value };
+          return value;
+        } finally { pendingQuota = undefined; }
+      }),
+      codexModels: authed.engines.codexModels.handler(async ({ context }) => {
+        if (!(await nativeHostAccess(deps.dataDir, context.actor))) throw new ORPCError("FORBIDDEN");
+        return discoverNativeCodexModels(deps.dataDir);
+      }),
       list: authed.engines.list.handler(async ({ context }) =>
         (await nativeHostAccess(deps.dataDir, context.actor))
           ? discoverNativeEngines(deps.dataDir)

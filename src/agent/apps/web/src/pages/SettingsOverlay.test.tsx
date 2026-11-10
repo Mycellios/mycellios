@@ -19,6 +19,9 @@ const developer = vi.hoisted(() => ({ enabled: true }));
 vi.mock("../lib/developer-mode", () => ({ useDeveloperMode: () => [developer.enabled, vi.fn()] }));
 
 vi.mock("@rakazo/ui-web", () => ({
+  BotAvatar: () => <span aria-hidden="true" />,
+  Label: (props: React.ComponentProps<"label">) => <label {...props} />,
+  Switch: ({ checked, onCheckedChange, ...props }: React.ComponentProps<"button"> & { checked: boolean; onCheckedChange: (value: boolean) => void }) => <button {...props} role="switch" aria-checked={checked} onClick={() => onCheckedChange(!checked)} />,
   Button: ({ children, ...props }: React.ComponentProps<"button">) => (
     <button type="button" {...props}>
       {children}
@@ -558,4 +561,24 @@ it("shows Updates in the desktop app", async () => {
   } finally {
     await cleanup();
   }
+});
+
+it("keeps secondary sections behind More settings while preserving direct navigation", async () => {
+  const onSectionChange = vi.fn(); const view = await render({ section: "general", onSectionChange });
+  try {
+    const more = [...view.container.querySelectorAll("button")].find(button => button.textContent?.includes("More settings"))!;
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => more.click()); expect(more.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => view.container.querySelector<HTMLButtonElement>('[data-testid="settings-nav-models"]')!.click());
+    expect(onSectionChange).toHaveBeenCalledWith("models");
+  } finally { await view.cleanup(); }
+});
+
+it("opens model connections from Micos without leaving the settings flow", async () => {
+  const onSectionChange = vi.fn(); const view = await render({ section: "agents", onSectionChange });
+  try {
+    const row = [...view.container.querySelectorAll(".rk-settings-row")].find(row => row.textContent?.includes("Models and connections"))!;
+    await act(async () => row.querySelector<HTMLButtonElement>("button")!.click());
+    expect(onSectionChange).toHaveBeenCalledWith("models");
+  } finally { await view.cleanup(); }
 });

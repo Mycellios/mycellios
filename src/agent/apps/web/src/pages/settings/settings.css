@@ -1,0 +1,24 @@
+.rk-settings-page { --settings-measure: 760px; }
+.rk-settings-page > * { max-width: var(--settings-measure); margin-inline: auto; width: 100%; }
+.rk-settings-page [data-slot="settings-group-content"] { border: 0; background: var(--muted); padding-inline: 16px; }
+.rk-settings-page [data-slot="settings-group-content"] > .rk-settings-row { padding-inline: 0; }
+.rk-settings-page .rk-settings-row > div:first-child { flex-wrap: nowrap; align-items: center; gap: 24px; }
+.rk-settings-page .rk-settings-row > div:first-child > div:first-child { flex: 1; min-width: 0; font-weight: 500; }
+.rk-settings-page .rk-settings-row > div:first-child > div:last-child:not(:first-child) { flex: 0 0 auto; max-width: 220px; }
+.rk-settings-page [data-slot="label"] { color: var(--foreground); font-weight: 500; line-height: 1.35; }
+.rk-settings-page .rk-settings-description { font-weight: 400; }
+.rk-settings-value { display: inline-flex; min-height: 32px; min-width: 112px; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 8px; padding: 4px 12px; font-size: 13px; }
+.rk-settings-details { margin-top: 24px; }
+.rk-settings-page .rk-settings-row[data-settings-match] { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 4px; }
+.rk-settings-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; }
+.rk-settings-shortcuts > button { min-height: 36px; }
+.rk-settings-nav-more { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+.rk-settings-nav-more [data-slot="collapsible-content"] > button { width: 100%; }
+@media (max-width: 767px) {
+  .rk-settings-nav-more { display: flex; margin-top: 0; padding-top: 0; border-top: 0; }
+  .rk-settings-nav-more [data-slot="collapsible-content"] { display: flex; }
+  .rk-settings-page .rk-settings-row > div:first-child { flex-wrap: wrap; gap: 10px; }
+  .rk-settings-page .rk-settings-row > div:first-child > div:first-child { flex-basis: 100%; }
+  .rk-settings-page .rk-settings-row > div:first-child > div:last-child:not(:first-child) { max-width: 100%; }
+  .rk-settings-page [data-slot="select-trigger"], .rk-settings-page .rk-settings-row button:not([role="switch"]) { min-height: 44px; }
+}

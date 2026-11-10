@@ -1,4 +1,5 @@
 import type { ProductEvent } from "@rakazo/contracts";
+import { getGeneralPreferences } from "./general-preferences";
 
 const DURATION = 0.2;
 let audioContext: AudioContext | undefined;
@@ -16,15 +17,18 @@ export function unlockReplySound(): void {
   }
 }
 
-export function playReplySound(): void {
+export function playReplySound(choice = getGeneralPreferences().taskSound): void {
+  if (choice === "off") return;
   const context = audioContext;
   if (!context || context.state !== "running") return;
   try {
     const start = context.currentTime;
     const tone = context.createOscillator();
     const volume = context.createGain();
-    tone.frequency.setValueAtTime(440, start);
-    tone.frequency.exponentialRampToValueAtTime(185, start + 0.15);
+    const frequencies: Record<string, [number, number]> = { classic: [440, 185], default: [520, 660], mech: [1100, 120], bubble: [480, 820], press: [220, 100] };
+    const [first, last] = frequencies[choice] ?? frequencies.classic!;
+    tone.frequency.setValueAtTime(first, start);
+    tone.frequency.exponentialRampToValueAtTime(last, start + 0.15);
     volume.gain.setValueAtTime(0.001, start);
     volume.gain.linearRampToValueAtTime(0.13, start + 0.012);
     volume.gain.exponentialRampToValueAtTime(0.001, start + DURATION);
@@ -35,6 +39,19 @@ export function playReplySound(): void {
   } catch {
     // Losing the audio output cannot interrupt a chat update.
   }
+}
+
+/** Gesture-only action cues, installed once. Does not read or transmit message contents. */
+export function installActionSounds(target = document) {
+  const click = (event: MouseEvent) => {
+    const choice = getGeneralPreferences().actionSound;
+    if (choice === "off" || !(event.target instanceof Element)) return;
+    const button = event.target.closest("button, [role=menuitem], [role=tab]");
+    if (!button || button.hasAttribute("disabled") || button.closest("[data-sound-preview]")) return;
+    unlockReplySound(); playReplySound(choice);
+  };
+  target.addEventListener("click", click);
+  return () => target.removeEventListener("click", click);
 }
 
 /** A persisted reply and its terminal event arrive separately on the live stream. */

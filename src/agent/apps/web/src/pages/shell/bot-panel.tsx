@@ -42,7 +42,6 @@ import { generalChatModel, selectableCatalogEntry, thinkingLevelLabel } from "..
 import { lazyComponent } from "../../lib/preload-recovery";
 import { useSpaceQueries } from "../../lib/query";
 import { errorText } from "../../lib/user-error";
-import { AgentEngineSettings } from "./agent-engine-settings";
 import { AgentImportUndo } from "./agent-import-undo";
 import { AvatarStudioPopover } from "./avatar-studio-popover";
 import { BotCredentialsSection } from "./bot-credentials";
@@ -406,8 +405,11 @@ export function BotSettings({
         memoryScope,
         autoSpeak,
         voiceId: voiceId || null,
-        modelProvider: selected?.provider ?? null,
-        modelId: selected?.modelId ?? null,
+        ...((selected?.provider ?? null) !== (bot.modelProvider ?? null) || (selected?.modelId ?? null) !== (bot.modelId ?? null) ? {
+          agentEngine: "pi" as const,
+          modelProvider: selected?.provider ?? null,
+          modelId: selected?.modelId ?? null,
+        } : {}),
         ...(modelMetaReady &&
         (thinkingOptions.length > 0 ||
           (selected?.provider ?? null) !== bot.modelProvider ||
@@ -843,7 +845,6 @@ export function BotSettings({
       ) : null}
       {page === "advanced" ? (
         <div className="space-y-5">
-          <AgentEngineSettings bot={bot} onSave={onSave} />
           <SettingsGroup label={t`Voice`}>
             <label
               htmlFor={`${ids}-auto-speak`}

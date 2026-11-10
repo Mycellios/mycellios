@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("rakazoSetup", {
+  servers: () => ipcRenderer.invoke("desktop.setup.servers"),
+  forgetServer: url => ipcRenderer.invoke("desktop.setup.forgetServer", url),
   platform: process.platform,
   state: () => ipcRenderer.invoke("desktop.setup.state"),
   retry: () => ipcRenderer.invoke("desktop.setup.retry"),

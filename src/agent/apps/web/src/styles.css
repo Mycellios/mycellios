@@ -1,4 +1,37 @@
 @import "tailwindcss";
+
+/* OpenBot's settings rhythm, using the Mycellios semantic surfaces. */
+.rk-general-settings { max-width: 760px; margin-inline: auto; }
+.rk-general-settings section > div { background: var(--muted); border: 0; padding-inline: 16px; }
+.rk-general-settings .rk-settings-row { padding: 14px 0; }
+.rk-general-settings .rk-settings-row > div:first-child { flex-wrap: nowrap; gap: 24px; min-height: 35px; }
+.rk-general-settings .rk-settings-row > div:first-child > div:first-child { flex: 1; font-weight: 500; }
+.rk-general-settings [data-slot="label"] { color: var(--foreground); font-size: 14px; line-height: 1.35; }
+.rk-settings-description { font-weight: 400; max-width: 68ch; }
+.rk-general-settings .rk-settings-row > div:first-child > div:last-child:not(:first-child) { flex: 0 0 auto; max-width: 200px; }
+.rk-general-settings [data-slot="select-trigger"] { min-width: 168px; font-size: 13px; background: transparent; }
+.rk-settings-swatches { display: grid; grid-template-columns: repeat(6, 30px); gap: 6px; }
+.rk-settings-swatches button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; transition: box-shadow 140ms, background-color 140ms; }
+.rk-settings-swatches button:hover { background: var(--accent); }
+.rk-settings-swatches button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--foreground); }
+.rk-settings-swatches button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.rk-settings-swatches button span { background: var(--swatch-color, var(--primary)); width: 18px; height: 18px; border-radius: 50%; }
+.rk-settings-swatch-default { border: 2px solid var(--background); outline: 1px solid var(--border); }
+[data-theme="light"] .rk-chat-canvas { background-color: color-mix(in srgb, var(--custom-chat-background-light, var(--background)) 16%, var(--background)); }
+[data-theme="dark"] .rk-chat-canvas { background-color: color-mix(in srgb, var(--custom-chat-background-dark, var(--background)) 16%, var(--background)); }
+[data-testid="message-user-bubble"] { background-color: var(--custom-chat-user, var(--chat-user)); color: var(--custom-chat-user-foreground, var(--chat-user-foreground)); }
+[data-logo-color="custom"][data-custom-logo-ready="true"] .rk-personal-logo { background: var(--custom-logo-image) center / contain no-repeat; }
+[data-logo-color="custom"][data-custom-logo-ready="true"] .rk-personal-logo img { opacity: 0; }
+@media (max-width: 600px) {
+  .rk-general-settings .rk-settings-row > div:first-child { flex-wrap: wrap; gap: 10px; }
+  .rk-general-settings .rk-settings-row > div:first-child > div:first-child { flex-basis: 100%; }
+  .rk-general-settings .rk-settings-row > div:first-child > div:last-child:not(:first-child) { max-width: 100%; }
+  .rk-general-settings [data-slot="select-trigger"] { width: 100%; min-height: 44px; }
+  .rk-general-settings .rk-settings-row > div:first-child > div:last-child:not(:first-child) { flex-basis: 100%; }
+  .rk-settings-swatches { grid-template-columns: repeat(6, 36px); gap: 4px; }
+  .rk-settings-swatches button { width: 36px; height: 36px; }
+}
+@media (prefers-reduced-motion: reduce) { .rk-settings-swatches button { transition: none; } }
 @import "@rakazo/ui-web/styles.css";
 @import "./typography.css";
 
@@ -10,6 +43,18 @@
 @source "../../packages/ui-web/src/**/*.{ts,tsx}";
 @source "./src/**/*.{ts,tsx}";
 @source "./components/WebUpdates.tsx";
+
+/* Give sidebar search a distinct, readable surface in both appearances. */
+.rk-sidebar-search {
+  background-color: #e1ece3;
+  border-color: #b5caba;
+  --muted-foreground: #4f6b57;
+}
+[data-theme="dark"] .rk-sidebar-search {
+  background-color: #263b30;
+  border-color: #4c6855;
+  --muted-foreground: #b5cbb9;
+}
 
 /* The composer overlays the transcript: tint an opaque surface, not the messages below. */
 [data-testid="composer-error"] {
@@ -295,4 +340,20 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
 .rk-message-bubble { background: var(--card); line-height: 1.5; }
 .rk-message-bubble .rk-chat-markdown strong { font-weight: 600; }
 
+/* The chat can be narrow beside Browser even on a wide desktop. Keep actions inside it. */
+.rk-chat-canvas { container-type: inline-size; container-name: chat; }
+@container chat (max-width: 48rem) {
+  .rk-message-hover-rail { position: static; width: 100%; translate: none; transform: none; margin-block-start: 4px; margin-inline: 0; }
+  .rk-message-hover-rail[data-message-side="start"] { justify-content: flex-end; }
+  .rk-message-hover-rail[data-message-side="end"] { justify-content: flex-start; }
+}
+
 .rk-workflow-input[data-slot="native-select-wrapper"] { padding: 0; border: 0; width: 100%; }
+
+/* Header actions share one compact shape; pointer clicks do not acquire a focus halo. */
+.rk-chat-action { width:34px; height:34px; border-radius:10px; border:1px solid var(--border); background:transparent; color:var(--muted-foreground); box-shadow:none; backdrop-filter:none; }
+.rk-chat-action:hover, .rk-chat-action[aria-expanded="true"], .rk-chat-action[aria-pressed="true"], .rk-chat-action[data-active] { background:var(--accent); color:var(--foreground); }
+.rk-chat-action > svg { width:18px; height:18px; stroke-width:1.75; }
+.rk-chat-action:focus:not(:focus-visible) { outline:none; box-shadow:none; }
+
+.rk-chat-action:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }

@@ -20,7 +20,7 @@ function canInterrupt(allowCall: boolean): boolean {
   return ![...document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog[open]')]
     .some(dialog => !dialog.matches("dialog[data-desktop-update-gate]") &&
       !(allowCall && hasCall && dialog.matches("[data-continuous-voice]")) &&
-      !dialog.querySelector('[data-testid="desktop-update-settings"]'));
+      !dialog.querySelector('[data-testid="desktop-update-settings"], [data-testid="desktop-server-menu"]'));
 }
 
 /** A call may continue behind the update screen until the owner chooses to end it. */

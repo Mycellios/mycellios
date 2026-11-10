@@ -2,6 +2,8 @@ const SETTINGS_SECTIONS = [
   "general",
   "profile",
   "notifications",
+  "dynamic-island",
+  "agent-dock",
   "agents",
   "mobile",
   "space",

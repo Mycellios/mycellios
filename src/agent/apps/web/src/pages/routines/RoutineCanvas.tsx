@@ -122,7 +122,7 @@ export function RoutineCanvas(props: Props) {
           </header>
           <div className="flex min-h-32 flex-col gap-2 p-3 text-xs">
             <p className="line-clamp-2 text-muted-foreground">{kind === "trigger" ? `${routineDiagramSummary(routine, i18n.locale)} · ${routine.timezone}` : routine.prompt}</p>
-            <p className="line-clamp-3 whitespace-pre-wrap break-words">{kind === "trigger" ? routine.prompt : props.output(routine.id)}</p>
+            <p className="line-clamp-3 whitespace-pre-wrap break-words">{kind === "trigger" ? routine.prompt : props.output(routine.id) || t`Results will appear here after the first run.`}</p>
             <div className="mt-auto flex items-center justify-between gap-2 pt-1">
               {kind === "trigger" ? <><Button variant="ghost" size="xs" onClick={() => props.onEdit(routine)}>{t`Edit`}</Button><Button variant="secondary" size="xs" disabled={!props.canRun(routine.id)} onClick={() => props.onRun(routine)}>{t`Run`}</Button></> : props.status(routine.id)}
             </div>

@@ -22,8 +22,8 @@ import {
 } from "@rakazo/adapters";
 import type { Actor, Bot, BotSecretMetadata } from "@rakazo/contracts";
 import { BotSecretAuth, FIRST_MICO_SPAWN_KEY } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES, displayName } from "@rakazo/core";
-import type { Prisma } from "@rakazo/db";
+import { ACTIVE_RUN_STATUSES, agentEngineForProviderSelection, displayName } from "@rakazo/core";
+import { Prisma } from "@rakazo/db";
 import {
   BotSectionNameConflictError,
   botProfileLabelsChanged,
@@ -249,30 +249,6 @@ async function requireNativeEngine(deps: RouterDeps, actor: Actor, engine: strin
   }
 }
 
-/**
- * A new Mico starts on the best engine this server can actually run, the way the
- * packaged desktop client starts on Codex. Pi stays the fallback so a server with
- * no installed agent still works.
- */
-async function preferredAgentEngine(
-  deps: RouterDeps,
-  actor: Actor,
-): Promise<"codex" | "opencode" | "claude" | undefined> {
-  try {
-    // A connected desktop host brings its own engine. OpenCode first: it accepts
-    // OpenAI-compatible providers, so the account's own model keeps working.
-    if (deps.desktopAgentAvailable?.(actor)) return "opencode";
-    if (!(await nativeHostAccess(deps.dataDir, actor))) return undefined;
-    const engines = await discoverNativeEngines(deps.dataDir);
-    for (const id of ["opencode", "codex", "claude"] as const) {
-      if (engines.some((candidate) => candidate.id === id && candidate.available)) return id;
-    }
-  } catch {
-    // Discovery is an optimisation; a failure must not block creating a Mico.
-  }
-  return undefined;
-}
-
 export function botsRoutes(ctx: RouterContext) {
   const { deps, repos, botModelValidation, removeBot, agentImportServices, groupRepos, authed } =
     ctx;
@@ -292,8 +268,11 @@ export function botsRoutes(ctx: RouterContext) {
         if (profile.agentEngine) {
           if (model) throw new ORPCError("BAD_REQUEST", { message: "Choose a model or an installed agent." });
           await requireNativeEngine(deps, context.actor, profile.agentEngine);
-        } else if (!model) {
-          profile.agentEngine = await preferredAgentEngine(deps, context.actor);
+        } else {
+          // Saved model connections and the general model use the managed loop.
+          // An installed CLI must be selected as a provider, never inferred from
+          // the presence of a connected PC.
+          profile.agentEngine = undefined;
         }
         if (model) {
           const result = await validateBotModelChange(botModelValidation(context.actor), {
@@ -401,6 +380,9 @@ export function botsRoutes(ctx: RouterContext) {
           });
           if (!section) throw new IsolationError();
         }
+        if (input.nativeConfig && (input.agentEngine ?? existing.agentEngine) !== "codex") {
+          throw new ORPCError("BAD_REQUEST", { message: "Codex preferences require the Codex provider." });
+        }
         const modelChange = await validateBotModelChange(botModelValidation(context.actor), {
           userId: context.actor.userId,
           spaceId: context.actor.spaceId,
@@ -430,7 +412,8 @@ export function botsRoutes(ctx: RouterContext) {
             description: input.description,
             instructions: input.instructions,
             selfUpdateInstructions: input.selfUpdateInstructions,
-            agentEngine: input.agentEngine,
+            agentEngine: agentEngineForProviderSelection(input),
+            ...(input.nativeConfig !== undefined ? { nativeConfig: input.nativeConfig ?? Prisma.JsonNull } : {}),
             notifyOnFinish: input.notifyOnFinish,
             color: input.color,
             pinned: input.pinned,

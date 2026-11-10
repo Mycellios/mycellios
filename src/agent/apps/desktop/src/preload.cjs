@@ -2,7 +2,25 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("rakazoDesktop", {
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
+  servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url) },
   platform: process.platform,
+  settings: {
+    fonts: () => ipcRenderer.invoke("desktop.settings.fonts"),
+    logo: png => ipcRenderer.invoke("desktop.settings.logo", png),
+    state: () => ipcRenderer.invoke("desktop.settings.state"),
+    update: patch => ipcRenderer.invoke("desktop.settings.update", patch),
+  },
+  companions: {
+    state: () => ipcRenderer.invoke("desktop.companions.state"),
+    save: value => ipcRenderer.invoke("desktop.companions.save", value),
+    displays: () => ipcRenderer.invoke("desktop.companions.displays"),
+    publish: value => ipcRenderer.invoke("desktop.companions.publish", value),
+    onSelect: listener => {
+      const handler = (_event, target) => listener(target);
+      ipcRenderer.on("desktop.companions.select", handler);
+      return () => ipcRenderer.off("desktop.companions.select", handler);
+    },
+  },
   localVoice: {
     status: () => ipcRenderer.invoke("desktop.localVoice.status"),
     prepare: () => ipcRenderer.invoke("desktop.localVoice.prepare"),
@@ -62,6 +80,10 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     state: () => ipcRenderer.invoke("desktop.window.state"),
   },
   update: {
+    preferences: () => ipcRenderer.invoke("desktop.update.preferences"),
+    savePreferences: patch => ipcRenderer.invoke("desktop.update.savePreferences", patch),
+    restartWhenIdle: () => ipcRenderer.invoke("desktop.update.restartWhenIdle"),
+    cancelRestart: () => ipcRenderer.invoke("desktop.update.cancelRestart"),
     state: () => ipcRenderer.invoke("desktop.update.state"),
     check: () => ipcRenderer.invoke("desktop.update.check"),
     download: () => ipcRenderer.invoke("desktop.update.download"),
