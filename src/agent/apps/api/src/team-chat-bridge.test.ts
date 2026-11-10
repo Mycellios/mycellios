@@ -5,6 +5,7 @@ import type {
   TeamChatSendRequest,
 } from "@rakazo/adapter-kit";
 import type { MessageBlock } from "@rakazo/contracts";
+import { ATTACHMENT_MAX_COUNT } from "@rakazo/contracts";
 import { userTurnMessageForRun } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
@@ -514,14 +515,16 @@ describe("team chat bridge", () => {
       ]);
       expect(storeAttachment.mock.calls.map(([call]) => call.attachment.name)).toEqual([
         "a.png",
+        "b.png",
         "c.png",
         "d.png",
         "e.png",
       ]);
       expect(sendUserMessage.mock.calls[0]?.[0]).toMatchObject({
         blocks: [
-          { kind: "text", text: "message 100.1\n[file: b.png (unavailable)]" },
+          { kind: "text", text: "message 100.1" },
           { kind: "image", artifactId: "artifact-a.png" },
+          { kind: "image", artifactId: "artifact-b.png" },
         ],
       });
       expect(sendUserMessage.mock.calls[2]?.[0]).toMatchObject({
@@ -861,7 +864,7 @@ describe("team chat bridge", () => {
       expect.objectContaining({
         blocks: [
           { kind: "text", text: JSON.parse(batchContext ?? "{}").prompt },
-          ...files.slice(-4),
+          ...files.slice(-ATTACHMENT_MAX_COUNT),
         ],
         trigger: "messaging",
         linkMessageToRun: true,
