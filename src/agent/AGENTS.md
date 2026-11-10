@@ -1107,6 +1107,11 @@
   the owning panel closes. Native ASR and TTS share a worker; stop capture before
   local synthesis. Contribution uses the existing verified-account controls and
   never implies that donating compute enables distributed speech inference.
+  Local dictation and speech model files are managed independently in one shared
+  Desktop cache. Only remove pinned files for the selected model while inference
+  and downloads are idle. Retain per-window cancellation and keep a recording
+  started in local mode on the device even if its model becomes unavailable.
+  Verify local-voice, preload, TaskComposer, dictation, tts and VoiceConversation tests.
 
 - Sidebar contribution is a direct contribute/pause action. The warm bottom-edge
   indicator requires a supported, connected, confirmed contributor and clears

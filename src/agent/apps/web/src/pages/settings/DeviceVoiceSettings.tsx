@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import type { LocalVoiceModelKind } from "@rakazo/contracts";
 import { Button, Label, OptionSelect, Switch } from "@rakazo/ui-web";
 import { useEffect, useId, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
@@ -10,7 +11,8 @@ export function DeviceVoiceSettings() {
   const { t } = useLingui(); const id = useId(); const value = useGeneralPreferences();
   const native = desktopBridge()?.localVoice;
   const [status, setStatus] = useState<Awaited<ReturnType<NonNullable<typeof native>["status"]>>>();
-  const [preparing, setPreparing] = useState(false); const [error, setError] = useState("");
+  const [operation, setOperation] = useState<LocalVoiceModelKind | "both">();
+  const [error, setError] = useState("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   useEffect(() => {
     const speech = window.speechSynthesis;
@@ -22,35 +24,59 @@ export function DeviceVoiceSettings() {
   useEffect(() => {
     let live = true;
     const refresh = () => void native?.status().then(next => { if (live) setStatus(next); }).catch(() => { if (live) setError(t`Could not check local voice. Try again.`); });
-    refresh(); const timer = preparing || status?.preparing ? window.setInterval(refresh, 1000) : undefined;
+    refresh();
+    const timer = operation || status?.preparing ? window.setInterval(refresh, 1000) : undefined;
     return () => { live = false; window.clearInterval(timer); };
-  }, [native, preparing, status?.preparing]);
+  }, [native, operation, status?.preparing]);
   function save(patch: Partial<GeneralPreferences>) {
     try { setGeneralPreferences(patch); setError(""); } catch { setError(t`Could not save this preference.`); }
   }
-  async function prepare() {
-    if (!native || preparing) return; setPreparing(true); setError("");
-    try { await native.prepare(); setStatus(await native.status()); }
-    catch { setError(t`Could not prepare local voice. Try again.`); } finally { setPreparing(false); }
+  async function changeModel(kind: LocalVoiceModelKind | "both", remove = false) {
+    if (!native || operation) return;
+    setOperation(kind);
+    setError("");
+    try {
+      if (remove && kind !== "both" && native.removeModel) await native.removeModel(kind);
+      else if (kind !== "both" && native.prepareModel) await native.prepareModel(kind);
+      else await native.prepare();
+    } catch {
+      setError(remove ? t`Could not remove the model. Stop local voice and try again.` : t`Could not prepare local voice. Try again.`);
+    } finally {
+      await native.status().then(setStatus).catch(() => {});
+      setOperation(undefined);
+    }
   }
+  function modelRow(kind: LocalVoiceModelKind | "both", name: string, description: string) {
+    const model = kind === "both" ? status : status?.models?.[kind];
+    const canRemove = kind !== "both" && Boolean(native?.removeModel);
+    const preparing = Boolean(model?.preparing || (operation === kind && !model?.ready));
+    return <SettingsRow label={name} description={description}
+      control={<Button variant="outline" size="sm"
+        aria-label={model?.ready && canRemove ? t`Remove ${name}` : !model?.ready && !preparing ? t`Download ${name}` : undefined}
+        disabled={!model || Boolean(operation) || status?.preparing || (model.ready && !canRemove)}
+        onClick={() => void changeModel(kind, model?.ready)}>
+        {model?.ready ? canRemove ? t`Remove` : t`Ready` : preparing ? t`Preparing…` : t`Download`}
+      </Button>}>
+      {preparing && model?.total ? <p role="status" className="mt-2 text-xs tabular-nums text-muted-foreground">{Math.round(model.downloaded / 1024 / 1024)} / {Math.round(model.total / 1024 / 1024)} MB</p> : null}
+    </SettingsRow>;
+  }
+  const separateModels = Boolean(native?.prepareModel && status?.models);
   return <div className="mb-6 space-y-6">
     {native && <SettingsGroup title={t`Voice processing`}>
       <SettingsRow label={t`Spoken replies`} description={t`Local voice stays on this computer and uses no credits. Connected providers use their own account.`}
         control={<OptionSelect aria-label={t`Spoken replies`} value={value.speechEngine} options={[{value:"local",label:t`Local · Supertonic 3`},{value:"provider",label:t`Connected provider`}]} onValueChange={speechEngine => save({speechEngine:speechEngine as "local" | "provider"})} />} />
     </SettingsGroup>}
     <SettingsGroup title={t`Dictation`}>
-      {native && <SettingsRow label="Parakeet TDT 0.6B v3 + Supertonic 3" description={t`Transcribe and speak on this PC. Download once when you choose.`}
-        control={<Button variant="outline" size="sm" disabled={preparing || status?.preparing || status?.ready} onClick={() => void prepare()}>
-          {status?.ready ? t`Ready` : preparing || status?.preparing ? t`Preparing…` : t`Download models`}
-        </Button>}>
-        {(preparing || status?.preparing) && status?.total ? <p role="status" className="mt-2 text-xs text-muted-foreground">{Math.round(status.downloaded / 1024 / 1024)} / {Math.round(status.total / 1024 / 1024)} MB</p> : null}
-      </SettingsRow>}
+      {native && (separateModels
+        ? modelRow("asr", "Parakeet TDT 0.6B v3", t`Transcribes on this computer and detects the language automatically.`)
+        : modelRow("both", "Parakeet TDT 0.6B v3 + Supertonic 3", t`Transcribe and speak on this computer.`))}
       <SettingsRow label={t`Dictation language`} description={t`Language hint for the browser and connected transcription services.`}
         control={<OptionSelect aria-label={t`Dictation language`} value={value.dictationLanguage} className="w-48 max-w-full"
           options={[{ value: "auto", label: t`Automatic` }, ...UI_LOCALES.map(locale => ({ value: locale, label: UI_LOCALE_LABELS[locale] }))]}
           onValueChange={dictationLanguage => save({ dictationLanguage })} />} />
     </SettingsGroup>
     <SettingsGroup title={t`Read aloud`}>
+      {separateModels && modelRow("tts", "Supertonic 3", t`Reads replies aloud on this computer.`)}
       <SettingsRow label={<Label htmlFor={id}>{t`Read new replies aloud`}</Label>} description={t`Read new replies in the open chat on this device. Existing Mico voice preferences still apply.`}
         control={<Switch id={id} checked={value.readReplies} onCheckedChange={readReplies => save({ readReplies })} />} />
       {voices.length > 0 && (!native || value.speechEngine === "provider") && <SettingsRow label={t`Device voice`} description={t`Used when reading with your device instead of a connected provider.`}

@@ -1,5 +1,6 @@
 import { SidebarContribution } from "../SidebarContribution";
-import { getGeneralPreferences } from "../../lib/general-preferences";
+import { getGeneralPreferences, useGeneralPreferences } from "../../lib/general-preferences";
+import type { LocalVoiceStatus } from "@rakazo/contracts";
 import { useLingui } from "@lingui/react/macro";
 import { isEchoOfSpeech, isRunWorking, isSecretAskBlock, normalizeRunError, speakable, speechFromBlocks, toUtterances } from "@rakazo/core";
 import { BotAvatar, Button } from "@rakazo/ui-web";
@@ -27,7 +28,7 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
   const [muted, setMuted] = useState(false);
   const [level, setLevel] = useState(0);
   const [speed, setSpeed] = useState(() => getGeneralPreferences().speechSpeed);
-  const [model, setModel] = useState<{ ready: boolean; preparing: boolean; downloaded: number; total: number } | null>(null);
+  const [model, setModel] = useState<LocalVoiceStatus | null>(null);
   const alive = useRef(true), generation = useRef(0), enabled = useRef(false), mute = useRef(false), rate = useRef(getGeneralPreferences().speechSpeed);
   const output = useRef<AudioContext | null>(null);
   const abort = useRef(new AbortController());
@@ -37,6 +38,10 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
   const seen = useRef(new Set<string>());
   const native = window.rakazoDesktop?.localVoice;
   const canCapture = Boolean(transcribe || isAndroidHost() || webSpeechAvailable());
+  const localReplies = useGeneralPreferences().speechEngine === "local";
+  const modelsReady = (status: LocalVoiceStatus | null) => localReplies
+    ? status?.ready === true
+    : canCapture || Boolean(status?.models?.asr.ready ?? status?.ready);
   const refresh = async () => { if (native) { const status = await native.status(); if (alive.current) setModel(status); } };
   useEffect(() => {
     alive.current = true;
@@ -44,7 +49,7 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
     let mounted = true;
     void (async () => {
       try {
-        if (native) { const status = await native.status(); if (!mounted) return; setModel(status); if (status.ready) await start(); }
+        if (native) { const status = await native.status(); if (!mounted) return; setModel(status); if (modelsReady(status)) await start(); }
         else if (canCapture) await start();
       } catch { if (mounted) setError(t`Could not check local voice. Try again.`); }
     })();
@@ -177,12 +182,18 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
     preparing.current = true;
     setPhase("preparing"); setError(null);
     preparationTimer.current = setInterval(() => void refresh().catch(() => {}), 1000);
-    try { await native.prepare(); await refresh(); if (alive.current) await start(); }
+    try {
+      if (!localReplies && native.prepareModel) await native.prepareModel("asr");
+      else await native.prepare();
+      await refresh();
+      if (alive.current) await start();
+    }
     catch { if (alive.current) stopWithError(t`Could not prepare local voice. Try again.`); }
     finally { clearInterval(preparationTimer.current); preparationTimer.current = undefined; preparing.current = false; }
   }
-  const needsModels = Boolean(native && !model?.ready);
-  const canStart = native ? model?.ready : canCapture;
+  const needsModels = Boolean(native && !modelsReady(model));
+  const canStart = native ? modelsReady(model) : canCapture;
+  const download = localReplies ? model : model?.models?.asr ?? model;
   return <aside style={{ display: hidden ? "none" : undefined }} aria-hidden={hidden || undefined} role="dialog" data-continuous-voice aria-label={t`Voice conversation`} className="fixed inset-y-0 end-0 z-40 flex w-full flex-col border-s border-border bg-background md:w-[400px]">
     <header data-testid="voice-panel-header" className="flex h-[50px] shrink-0 items-center justify-between border-b border-border px-4"><span className="text-sm font-medium">{bot.name}</span><Button variant="ghost" size="icon" aria-label={t`Close voice`} onClick={onClose}><X /></Button></header>
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6">
@@ -192,8 +203,8 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
       <div className="flex h-6 items-center gap-1" aria-hidden="true">{Array.from({length: 24}, (_, i) => <span key={i} className="w-0.5 rounded-full bg-muted-foreground" style={{ height: 2 + level * 24 * (1 - Math.abs(i-11.5)/24) }} />)}</div>
       <p className="max-h-40 overflow-y-auto text-center text-sm text-muted-foreground" dir="auto">{caption || (phase === "listening" ? t`Speak now` : "")}</p>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-      {needsModels ? <Button disabled={phase === "preparing"} onClick={() => void prepare()}>{phase === "preparing" ? `${Math.round((model?.downloaded ?? 0)/1024/1024)} / ${Math.round((model?.total ?? 0)/1024/1024)} MB` : t`Activate local voice`}</Button> : phase === "ready" ? <Button disabled={!canStart} onClick={() => void start()}>{t`Start talking`}</Button> : null}
-      {needsModels ? <p className="max-w-xs text-center text-xs text-muted-foreground">{t`Parakeet and Supertonic 3. Download once, then process audio on this computer without credits.`}</p> : null}
+      {needsModels ? <Button disabled={phase === "preparing"} onClick={() => void prepare()}>{phase === "preparing" ? `${Math.round((download?.downloaded ?? 0)/1024/1024)} / ${Math.round((download?.total ?? 0)/1024/1024)} MB` : t`Activate local voice`}</Button> : phase === "ready" ? <Button disabled={!canStart} onClick={() => void start()}>{t`Start talking`}</Button> : null}
+      {needsModels ? <p className="max-w-xs text-center text-xs text-muted-foreground">{localReplies ? t`Parakeet and Supertonic 3. Download once, then process audio on this computer without credits.` : t`Download Parakeet to transcribe on this computer.`}</p> : null}
       {!canStart && !needsModels ? <p className="text-center text-sm text-muted-foreground">{t`Connect a transcription provider in Voice settings, or use local voice in Desktop.`}</p> : null}
       {!native ? <Button variant="ghost" onClick={onSettings}>{t`Voice settings`}</Button> : null}
     </div>

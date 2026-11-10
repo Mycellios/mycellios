@@ -196,6 +196,7 @@ export class Dictation {
   private onSpeechStart: (() => void) | undefined;
   private onRecording: ((audio: Blob) => void) | undefined;
   private skipRecordingTranscription = false;
+  private useLocalTranscription = false;
   private waitForSpeechEnd = false;
   private finishingSpeech = false;
   private reportBufferedTranscript = false;
@@ -260,6 +261,7 @@ export class Dictation {
     this.onFinal = null;
     this.onRecording = undefined;
     this.skipRecordingTranscription = false;
+    this.useLocalTranscription = false;
     this.waitForSpeechEnd = false;
     this.finishingSpeech = false;
     this.reportBufferedTranscript = false;
@@ -304,7 +306,8 @@ export class Dictation {
     const native = typeof window !== "undefined" ? window.rakazoDesktop?.localVoice : undefined;
     const nativeStatus = native ? await native.status().catch(() => null) : null;
     if (this.token !== mine) return;
-    if (nativeStatus?.ready) {
+    if (nativeStatus?.models?.asr.ready ?? nativeStatus?.ready) {
+      this.useLocalTranscription = true;
       await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
       return;
     }
@@ -675,9 +678,8 @@ export class Dictation {
     );
     try {
       const native = typeof window !== "undefined" ? window.rakazoDesktop?.localVoice : undefined;
-      const nativeStatus = native ? await native.status().catch(() => null) : null;
-      if (this.token !== mine) return;
-      if (native && nativeStatus?.ready) {
+      if (this.useLocalTranscription) {
+        if (!native) throw new Error("Local transcription is unavailable.");
         const context = new AudioContext();
         try {
           const decoded = await context.decodeAudioData(await blob.arrayBuffer());
