@@ -1256,6 +1256,9 @@ export async function countSpaceContainers(spaceId: string): Promise<number> {
   const listed = await docker.listContainers({ all: true });
   let count = 0;
   for (const item of listed) {
+    // A container that already exited cannot serve a run, so it must not hold the
+    // space's slot forever; the supervisor recreates it on demand.
+    if (item.State === "exited" || item.State === "dead") continue;
     if (await isManagedSpaceContainer(item, spaceId)) count++;
   }
   return count;
