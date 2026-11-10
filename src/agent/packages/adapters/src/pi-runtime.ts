@@ -196,6 +196,18 @@ const MODEL_PROVIDER_RETRY_DELAYS_MS = [2_000, 8_000, 20_000] as const;
 // instead of taking another assistant turn. A bounded internal follow-up keeps
 // that provider quirk from making a long task look complete after one step.
 const MAX_SILENT_TOOL_CONTINUATIONS = 3;
+// OpenBot exposes a compact core tool set. Above this many schemas, page the
+// rest behind search/load even when the context window would fit them, so a
+// simple chat turn does not re-send every connector schema on every request.
+const DEFAULT_MAX_EAGER_TOOL_SCHEMAS = 24;
+function maxEagerToolSchemas(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PI_MAX_EAGER_TOOL_SCHEMAS?.trim();
+  if (!raw) return DEFAULT_MAX_EAGER_TOOL_SCHEMAS;
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_EAGER_TOOL_SCHEMAS;
+}
+/** Every authorized schema in one call: fixtures that assert the full tool list. */
+export const ALL_TOOL_SCHEMAS_EAGER = Number.MAX_SAFE_INTEGER;
 const CHECKPOINT_RESUME_PROMPT = automated(
   "The pending tool call has been resolved. Continue the original task from its result above. Do not repeat completed actions. This is an internal continuation, not a new user request.",
 );
@@ -266,6 +278,12 @@ export interface PiAgentRuntimeOptions {
   /** Explicit transport for tests and synthetic wire diagnostics. */
   modelFetch?: typeof globalThis.fetch;
   modelCallObserver?: ModelCallObserver;
+  /**
+   * Tool schemas kept available without a discovery round trip. Above this,
+   * the rest page behind search/load like OpenBot's connector catalog. Defaults
+   * to PI_MAX_EAGER_TOOL_SCHEMAS or the built-in compact core.
+   */
+  maxEagerToolSchemas?: number;
   /** Sanitized per-call selection telemetry; never includes prompt or credentials. */
   onContextDecision?: (
     decision: RuntimeContextDecision & {
@@ -281,11 +299,13 @@ export class PiAgentRuntime implements AgentRuntime {
   private readonly modelFetch?: typeof globalThis.fetch;
   private readonly modelCallObserver?: ModelCallObserver;
   private readonly onContextDecision?: PiAgentRuntimeOptions["onContextDecision"];
+  private readonly maxEagerToolSchemas: number;
 
   constructor(options: PiAgentRuntimeOptions = {}) {
     this.modelFetch = options.modelFetch;
     this.modelCallObserver = options.modelCallObserver;
     this.onContextDecision = options.onContextDecision;
+    this.maxEagerToolSchemas = options.maxEagerToolSchemas ?? maxEagerToolSchemas();
     this.sessionRecorder = options.sessionRoot
       ? new PiJsonlSessionRecorder(options.sessionRoot)
       : undefined;
@@ -377,6 +397,7 @@ export class PiAgentRuntime implements AgentRuntime {
         const host: ToolHost = {
           queue,
           context,
+          maxEagerToolSchemas: this.maxEagerToolSchemas,
           modelFetch: this.modelFetch,
           onContextDecision: this.onContextDecision,
           modelCallObserver: this.modelCallObserver,
@@ -1437,11 +1458,15 @@ function runtimeToolsForInitialState(
   const allTools = toAgentTools(definitions, host);
   // The canonical admission check can shrink an output reservation. Keep
   // mandatory tools here and let that check reject them only if they still fail.
-  if (definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length <= 1) return allTools;
+  const toolCount = definitions.filter(tool => tool.name !== WORK_PLAN_TOOL).length;
+  if (toolCount <= 1) return allTools;
   const available = model.contextWindow - resolveCompletionMaxTokens(
     model.maxTokens, host.activeModel.config.maxTokens, undefined, model.reasoning, model.contextWindow,
   );
-  if (estimateContextTokens(systemPrompt) + estimateContextTokens(allTools) <= available)
+  if (
+    toolCount <= (host.maxEagerToolSchemas ?? maxEagerToolSchemas()) &&
+    estimateContextTokens(systemPrompt) + estimateContextTokens(allTools) <= available
+  )
     return allTools;
   const named = namedAgentTools(definitions);
   const wireNames = new Map(named.map(({ tool, name }) => [tool, name]));
@@ -3009,6 +3034,7 @@ interface ToolHost {
   toolCatalog?: RuntimeToolCatalog;
   toolsForModel?: () => AgentTool[];
   context?: Partial<AdapterContext>;
+  maxEagerToolSchemas?: number;
   modelFetch?: typeof globalThis.fetch;
   onContextDecision?: PiAgentRuntimeOptions["onContextDecision"];
   modelCallObserver?: ModelCallObserver;

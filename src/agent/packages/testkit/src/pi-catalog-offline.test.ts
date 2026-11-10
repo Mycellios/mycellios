@@ -142,7 +142,10 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
       steps: [
         {
           expect(body) {
+            // write_file is a core tool now, so it is eager and the fixture
+            // defers an ordinary connector schema instead.
             expect(body.tools?.map((tool) => tool.function.name)).toEqual([
+              "write_file",
               "__agent_search_tools",
               "__agent_load_tool",
             ]);
@@ -151,7 +154,7 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
             type: "tool",
             id: "search",
             name: "__agent_search_tools",
-            arguments: { query: "write_file" },
+            arguments: { query: "fixture_tool_0" },
           },
         },
         {
@@ -162,19 +165,19 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
             type: "tool",
             id: "load",
             name: "__agent_load_tool",
-            arguments: { id: "write_file" },
+            arguments: { id: "fixture_tool_0" },
           },
         },
         {
           expect(body) {
-            expect(body.tools?.some((tool) => tool.function.name === "write_file")).toBe(true);
+            expect(body.tools?.some((tool) => tool.function.name === "fixture_tool_0")).toBe(true);
             expect(body.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "load" });
           },
           response: {
             type: "tool",
             id: "write",
-            name: "write_file",
-            arguments: { path: "notes.txt", content: "hello" },
+            name: "fixture_tool_0",
+            arguments: {},
           },
         },
         {
@@ -192,10 +195,7 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
     const events = await collect(new PiAgentRuntime().run(request(server.model, { executeTool })));
     server.assertComplete();
     expect(executeTool).toHaveBeenCalledOnce();
-    expect(executeTool.mock.calls[0]?.slice(0, 2)).toEqual([
-      "write_file",
-      { path: "notes.txt", content: "hello" },
-    ]);
+    expect(executeTool.mock.calls[0]?.slice(0, 2)).toEqual(["fixture_tool_0", {}]);
     expect(events.at(-1)).toEqual({ type: "done", text: "Saved." });
   });
 
@@ -204,7 +204,7 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
       steps: [
         {
           expect(body) {
-            expect(body.tools?.some((tool) => tool.function.name === "write_file")).toBe(true);
+            expect(body.tools?.some((tool) => tool.function.name === "fixture_tool_0")).toBe(true);
             expect(body.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "load" });
           },
           response: { type: "text", text: "Ready." },
@@ -231,7 +231,7 @@ describe("real Pi runtime with paged schemas and an offline model fixture", () =
               type: "toolCall",
               id: "load",
               name: "__agent_load_tool",
-              arguments: { id: "write_file" },
+              arguments: { id: "fixture_tool_0" },
             },
           ],
           usage: {

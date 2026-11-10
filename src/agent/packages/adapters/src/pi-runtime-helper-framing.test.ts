@@ -70,7 +70,7 @@ vi.mock("./pi-openai-compatible-provider.js", () => ({
 }));
 
 import { isSubagentToolExecution } from "./executor.js";
-import { PiAgentRuntime } from "./pi-runtime.js";
+import { ALL_TOOL_SCHEMAS_EAGER, PiAgentRuntime } from "./pi-runtime.js";
 
 describe("helpers know who they are talking to", () => {
   beforeEach(async () => {
@@ -79,7 +79,10 @@ describe("helpers know who they are talking to", () => {
     seen.helperToolNames = [];
     seen.toolExecutionIds.clear();
     seen.resultForParent = undefined;
-    for await (const _event of new PiAgentRuntime().run(
+    for await (const _event of new PiAgentRuntime({
+      // This fixture inspects the complete authorized tool list frame by frame.
+      maxEagerToolSchemas: ALL_TOOL_SCHEMAS_EAGER,
+    }).run(
       {
         botId: "b",
         threadId: "t",
