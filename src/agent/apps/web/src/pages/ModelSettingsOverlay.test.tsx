@@ -607,7 +607,7 @@ it("shows a compact account default above the providers without changing it on l
     );
     expect(models.setRole).not.toHaveBeenCalled();
     expect(view.container.textContent).toContain("DeepSeek");
-    expect(view.container.textContent).toContain("Pi");
+    expect(view.container.textContent).not.toContain("Pi");
     expect(engines.registry).not.toHaveBeenCalled();
     const registryForm = view.container.querySelector('[data-testid="provider-discovery"] form')!;
     await act(async () => {
@@ -620,18 +620,14 @@ it("shows a compact account default above the providers without changing it on l
   }
 });
 
-it("keeps built-in OpenCode visible without host access and shows its own details", async () => {
+it("keeps installed CLI selection out of the account API-provider settings", async () => {
   const view = await renderSettings(true, testQueryClient(), "account", true);
   try {
-    const row = view.container.querySelector('[data-testid="opencode-provider"]')!;
-    await click(row.querySelector("button") ?? undefined);
-    const detail = view.container.querySelector('[data-testid="opencode-provider-detail"]')!;
-    expect(detail.textContent).toContain("OpenCode is unavailable for this space.");
-    expect(detail.textContent).not.toContain("Download OpenCode");
-    expect(models.setRole).not.toHaveBeenCalled();
-    await click(detail.querySelector("button") ?? undefined);
+    expect(view.container.querySelector('[data-testid="opencode-provider"]')).toBeNull();
     expect(view.container.querySelector('[data-testid="opencode-provider-detail"]')).toBeNull();
-    expect(view.container.querySelector('[data-testid="opencode-provider"]')).toBe(row);
+    expect(view.container.querySelector('[data-testid="default-provider"]')).not.toBeNull();
+    expect(view.container.textContent).toContain("DeepSeek");
+    expect(models.setRole).not.toHaveBeenCalled();
   } finally {
     await view.unmount();
   }
