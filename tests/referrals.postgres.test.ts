@@ -101,6 +101,17 @@ it("rolls back BOTH grants on failure, then safely retries", async () => {
   expect((await referrals.redeem(newcomer, receipt, now + 200)).status).toBe("awarded");
 });
 
+it("cannot issue either reward while release qualification is closed", async () => {
+  const { receipt } = await invitation(); const newcomer = await account("newcomer");
+  await db.raw.exec(`CREATE TABLE jobs(id text); CREATE FUNCTION test_release_guard() RETURNS trigger LANGUAGE plpgsql AS $test$ BEGIN RETURN NULL; END; $test$;
+    CREATE TRIGGER mycellios_release_admission_guard BEFORE INSERT ON jobs FOR EACH STATEMENT EXECUTE FUNCTION test_release_guard()`);
+  try {
+    await expect(referrals.redeem(newcomer, receipt, now + 100)).rejects.toMatchObject({ code: "55000" });
+    expect(await db.raw.prepare("SELECT COUNT(*) AS count FROM economic_promotional_grants").get()).toMatchObject({ count: 0 });
+  } finally { await db.raw.exec("DROP TABLE jobs; DROP FUNCTION test_release_guard()"); }
+  expect((await referrals.redeem(newcomer, receipt, now + 200)).status).toBe("awarded");
+});
+
 it("rejects self referral, reused verified email, old accounts, expired and forged receipts", async () => {
   const { owner, invite, receipt } = await invitation();
   expect((await referrals.redeem(owner, receipt, now + 20)).status).toBe("not_eligible");

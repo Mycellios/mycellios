@@ -31,6 +31,20 @@ CREATE TABLE IF NOT EXISTS referral_redemptions (
   rewarded_at BIGINT NOT NULL, expires_at BIGINT NOT NULL,
   CHECK(account_id <> inviter_id)
 );
+CREATE OR REPLACE FUNCTION mycellios_referral_award_admission() RETURNS trigger LANGUAGE plpgsql AS $guard$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t
+    JOIN pg_catalog.pg_class c ON c.oid=t.tgrelid
+    JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname=TG_TABLE_SCHEMA AND c.relname='jobs'
+      AND t.tgname='mycellios_release_admission_guard' AND NOT t.tgisinternal AND t.tgenabled<>'D') THEN
+    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='referral_awards_wait_for_release_qualification';
+  END IF;
+  RETURN NEW;
+END;$guard$;
+DROP TRIGGER IF EXISTS mycellios_referral_award_admission_guard ON referral_redemptions;
+CREATE TRIGGER mycellios_referral_award_admission_guard BEFORE INSERT ON referral_redemptions
+  FOR EACH ROW EXECUTE FUNCTION mycellios_referral_award_admission();
 `;
 
 export class Referrals {
