@@ -110,6 +110,7 @@
     "node:package:deb": "node scripts/build-node-deb.mjs",
     "node:package:deb:verify": "node scripts/verify-node-deb.mjs",
     "desktop:package:rpm": "node scripts/build-desktop-rpm.mjs",
+    "desktop:publish:linux": "tsx scripts/publish-desktop-downloads.ts",
     "node:package:pkg": "node scripts/build-node-pkg.mjs",
     "node:package:pkg:verify": "node scripts/verify-node-pkg.mjs",
     "node:package:msi": "node scripts/build-node-msi.mjs",
