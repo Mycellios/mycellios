@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { eventBase, planChecks } from './ci-proportional.mjs';
+import { eventBase, planChecks, uncoveredNativeFiles } from './ci-proportional.mjs';
+
+test('transcription has real Python checks without admitting unrelated native changes', () => {
+  const files = ['python/distributed_runtime/transcription_engine.py', 'python/tests/test_transcription_engine.py'];
+  const plan = planChecks(files);
+  assert.ok(plan.some(c => c.bin === 'python3' && c.args.includes('unittest')));
+  assert.ok(plan.some(c => c.bin === 'python3' && c.label.endsWith('syntax')));
+  assert.deepEqual(uncoveredNativeFiles(files), []);
+  assert.deepEqual(uncoveredNativeFiles([...files, 'python/distributed_runtime/decision_actor.py', 'native/unknown.cpp']),
+    ['python/distributed_runtime/decision_actor.py', 'native/unknown.cpp']);
+});
 
 test('documentation requires no dependency installation', () => {
   const plan = planChecks(['docs/DEVELOPMENT.md', 'AGENTS.md']);
