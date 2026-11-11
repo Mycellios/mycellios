@@ -41,6 +41,16 @@ Hardware SDKs and drivers may have separate vendor terms and are not
 relicensed by Mycellios. Review the generated SBOM and applicable vendor terms
 before redistributing a release artifact.
 
+## Velvet avatar eyes
+
+The compact Mico eyes use the original generic felt-eye images and adapted
+projection/slicing helpers from `@norbert_bodziony/bloub` 0.6.4, published at
+https://github.com/NorbertBodziony/bloub, revision
+`7983de0bb7e868ac84881581eaa8c2e1f459dd30`. These MIT-licensed files are attributed
+to Copyright (c) 2026 Jérémy Perret. The complete license accompanies the assets at
+`src/agent/packages/core/assets/Bloub-LICENSE.txt`. No OpenBot application code or
+SolidJS runtime is incorporated. The Mycellios animal body artwork is separate.
+
 ## Adapted receipt invariant
 
 The fail-closed zero-work invariant in

@@ -1,6 +1,7 @@
 import {
   MICO_AVATAR_DEFAULT_SHAPES,
   MICO_AVATAR_SHAPES,
+  micoAvatarDefaultFinish,
   micoAvatarShape,
   micoAvatarValue,
   parseBotAvatarValue,
@@ -18,7 +19,7 @@ export function currentMicoAvatarValue(value: string, identity?: string): string
   const fallback = MICO_AVATAR_DEFAULT_SHAPES[avatarIdentitySeed(seed) % MICO_AVATAR_DEFAULT_SHAPES.length]!;
   const shape = parsed.kind === "shape" ? MICO_AVATAR_SHAPES[parsed.shapeIndex] ?? fallback : fallback;
   const color = resolvePersonaColorDef(seed, parsed.kind === "other" ? undefined : parsed.color).hex;
-  return micoAvatarValue(shape.index, color, { eyes: 0, finish: "flat", original: false });
+  return micoAvatarValue(shape.index, color, { eyes: 0, finish: micoAvatarDefaultFinish(shape.index), original: false });
 }
 
 type MicoArt = {

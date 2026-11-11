@@ -22,6 +22,13 @@ export const MICO_AVATAR_SHAPES = [
   { id: "otter", index: 1014, originalColor: "#A67A51" },
 ] as const;
 
+/** The six approved compact velvet bodies; other saved shapes keep their finish. */
+export const MICO_COMPACT_AVATAR_INDEXES: readonly number[] = [1000, 1001, 1004, 1005, 1007, 1008];
+
+export function micoAvatarDefaultFinish(shapeIndex: number | undefined): "flat" | "plush" {
+  return shapeIndex !== undefined && MICO_COMPACT_AVATAR_INDEXES.includes(shapeIndex) ? "plush" : "flat";
+}
+
 export const MICO_AVATAR_DEFAULT_SHAPES = MICO_AVATAR_SHAPES.filter(
   ({ id }) => id !== "mushroom" && id !== "owl" && id !== "crab",
 );
@@ -93,7 +100,7 @@ export function micoAvatarDetails(value: string): MicoAvatarDetails {
   const look = decodeMicoLook(shapeIndex);
   return look
     ? { eyes: look.eyes, finish: look.finish, original: look.original }
-    : { eyes: 0, finish: "flat", original: true };
+    : { eyes: 0, finish: micoAvatarDefaultFinish(shapeIndex), original: micoAvatarDefaultFinish(shapeIndex) !== "plush" };
 }
 
 export function micoAvatarShape(shapeIndex: number | undefined) {
@@ -131,7 +138,10 @@ export function withMicoAvatarShape(value: string, shapeIndex: number): string {
     ? current.color
     : undefined;
   const originalColor = micoAvatarShape(shapeIndex)?.originalColor ?? MICO_AVATAR_DEFAULT_SHAPES[0]!.originalColor;
-  return micoAvatarValue(shapeIndex, color ?? originalColor, micoAvatarDetails(value));
+  const look = current.kind === "shape" && micoAvatarShape(current.shapeIndex)
+    ? micoAvatarDetails(value)
+    : { eyes: 0, finish: micoAvatarDefaultFinish(shapeIndex), original: false };
+  return micoAvatarValue(shapeIndex, color ?? originalColor, look);
 }
 
 export function withMicoAvatarPalette(value: string, color: string): string {

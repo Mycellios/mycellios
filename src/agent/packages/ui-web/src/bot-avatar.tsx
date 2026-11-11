@@ -1,11 +1,18 @@
-import { MICO_AVATAR_SHAPES, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
-import type { BotColorDef } from "@rakazo/core";
+import { MICO_AVATAR_SHAPES, micoAvatarDefaultFinish, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
+import type { BotColorDef, CompactMicoArt } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
   avatarIdentitySeed,
   BOT_AVATAR_COLORS,
   BOT_COLOR_LIST,
   currentMicoAvatarValue,
+  compactMicoArt,
+  compactMicoEyes,
+  compactMicoTint,
+  COMPACT_EYE_WIDTH,
+  COMPACT_EYE_HEIGHT,
+  COMPACT_EYE_PAD,
+  micoEyePadPieces,
   DEFAULT_BOT_AVATAR_COLOR,
   MICO_AVATAR_EYE_COLOR,
   MICO_AVATAR_VIEWBOX,
@@ -147,6 +154,11 @@ export const BotAvatar = memo(function BotAvatar({
   const shape = micoAvatarShape(parsed.shapeIndex);
   const shapeOrdinal = MICO_AVATAR_SHAPES.findIndex(({ index }) => index === parsed.shapeIndex);
   const mico = micoAvatarArt(parsed.shapeIndex, look.original ? shape?.originalColor ?? parsed.color : parsed.color);
+  const compact = look.finish === "plush" ? compactMicoArt(parsed.shapeIndex) : undefined;
+  if (mico && compact) {
+    return <CompactVelvetAvatar id={id} art={compact} color={mico.color} eyeColor={mico.eyeColor} look={look}
+      size={size} shape={shape?.id} isWorking={isWorking} className={className} />;
+  }
   const plush = look.finish === "plush" ? MICO_PLUSH_CROPS[shapeOrdinal] : undefined;
   if (mico && !plush) {
     return (
@@ -283,31 +295,75 @@ export const BotAvatar = memo(function BotAvatar({
 const plushSheets = {
   first: new URL("./assets/micos-terciopelo-base.png", import.meta.url).href,
   second: new URL("./assets/micos-terciopelo-coleccion.png", import.meta.url).href,
+  compact: new URL("../../core/assets/micos-compact-eyeless.webp", import.meta.url).href,
 };
+const eyePads = {
+  x: new URL("../../core/assets/bloub-eye-x.webp", import.meta.url).href,
+  y: new URL("../../core/assets/bloub-eye-y.webp", import.meta.url).href,
+};
+const neutralEyePieces = micoEyePadPieces(COMPACT_EYE_PAD, COMPACT_EYE_WIDTH, COMPACT_EYE_HEIGHT);
 
-function MicoPlushBody({ id, tint, firstSheet }: { id: string; tint?: string; firstSheet: boolean }) {
+function CompactVelvetAvatar({ id, art, color, eyeColor, look, size, shape, isWorking, className }: {
+  id: string; art: CompactMicoArt; color: string; eyeColor: string;
+  look: ReturnType<typeof micoAvatarDetails>; size: number; shape?: string;
+  isWorking: boolean; className?: string;
+}) {
+  const [x, y, side] = art.crop;
+  const eyes = compactMicoEyes(art);
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true" data-mico-avatar="plush" data-mico-compact=""
+      data-mico-shape={shape} data-working={isWorking}
+      className={cn("rakazo-bot-avatar shrink-0 select-none", className)} style={{ width: size, height: size }}>
+      <svg viewBox={`${x} ${y} ${side} ${side}`} width="64" height="64" overflow="hidden">
+        <MicoPlushBody id={id} firstSheet={false} compact={art} tint={look.original ? undefined : color} />
+      </svg>
+      {look.eyes === 0 ? (
+        <g className="rakazo-mico-gaze" data-mico-eye-source="bloub-0.6.4">
+          {eyes.map((eye, i) => (
+            <g key={i} transform={`translate(${eye.x} ${eye.y}) ${eye.matrix}`}>
+              <g className="rakazo-compact-mico-eye" style={{ isolation: "isolate" }}>
+                {neutralEyePieces.map((piece, j) => (
+                  <svg key={j} x={piece.x} y={piece.y} width={piece.w} height={piece.h}
+                    viewBox={piece.viewBox} preserveAspectRatio="none" style={{ mixBlendMode: "plus-lighter" }}>
+                    <image href={eyePads[piece.src]} width="1" height="1" preserveAspectRatio="none" />
+                  </svg>
+                ))}
+              </g>
+            </g>
+          ))}
+        </g>
+      ) : <MicoEyes eyes={look.eyes} positions={eyes.map((eye) => [eye.x, eye.y])} scale={0.4} color={eyeColor} />}
+    </svg>
+  );
+}
+
+function MicoPlushBody({ id, tint, firstSheet, compact }: {
+  id: string; tint?: string; firstSheet: boolean; compact?: CompactMicoArt;
+}) {
   const filterId = `${id}-plush`;
   const tables = tint && [1, 3, 5].map((offset) => {
     const value = Number.parseInt(tint.slice(offset, offset + 2), 16) / 255;
     return [0, 0.16 * value, 0.52 * value, 0.94 * value, 0.43 + 0.57 * value, 1].join(" ");
   });
+  const compactTint = compact && tint ? compactMicoTint(tint, compact) : undefined;
+  const activeTables = compactTint?.tables ?? tables;
   return (
     <>
-      {tables && <defs>
+      {activeTables && <defs>
         <filter id={filterId} colorInterpolationFilters="sRGB">
-          <feColorMatrix type="saturate" values="0" />
+          <feColorMatrix type={compactTint ? "matrix" : "saturate"} values={compactTint?.matrix ?? "0"} />
           <feComponentTransfer>
-            <feFuncR type="table" tableValues={tables[0]} />
-            <feFuncG type="table" tableValues={tables[1]} />
-            <feFuncB type="table" tableValues={tables[2]} />
+            <feFuncR type="table" tableValues={activeTables[0]} />
+            <feFuncG type="table" tableValues={activeTables[1]} />
+            <feFuncB type="table" tableValues={activeTables[2]} />
           </feComponentTransfer>
         </filter>
       </defs>}
       <image
-        href={firstSheet ? plushSheets.first : plushSheets.second}
-        width={firstSheet ? 2048 : 1774}
-        height={firstSheet ? 683 : 887}
-        filter={tables ? `url(#${filterId})` : undefined}
+        href={compact ? plushSheets.compact : firstSheet ? plushSheets.first : plushSheets.second}
+        width={compact ? 1536 : firstSheet ? 2048 : 1774}
+        height={compact ? 1024 : firstSheet ? 683 : 887}
+        filter={activeTables ? `url(#${filterId})` : undefined}
       />
     </>
   );
@@ -473,7 +529,7 @@ export function BotShapePreview({
       )}
     >
       {mico ? (
-        <BotAvatar color={micoAvatarValue(mico.index, color, { eyes: 0, finish: "flat", original: false })} size={compact ? 22 : 34} />
+        <BotAvatar color={micoAvatarValue(mico.index, color, { eyes: 0, finish: micoAvatarDefaultFinish(mico.index), original: false })} size={compact ? 22 : 34} />
       ) : shapeIndex === undefined ? (
         <BotAvatar color={color} identity={identity} size={32} />
       ) : (

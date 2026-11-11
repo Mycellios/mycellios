@@ -16,6 +16,8 @@ export * from "./barge-in.js";
 export * from "./bot-avatar-colors.js";
 export * from "./bot-avatar-shapes.js";
 export * from "./mico-avatar-art.js";
+export * from "./compact-mico-avatar.js";
+export { padPieces as micoEyePadPieces } from "./bloub-eye-slices.js";
 export * from "./bot-mentions.js";
 export * from "./bot-messages.js";
 export * from "./bot-sections.js";

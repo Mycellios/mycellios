@@ -1118,11 +1118,13 @@
 
 - Mico avatar preferences persist together in the existing `bots.color` shape
   encoding. Keep the reserved appearance slots stable and preserve legacy
-  shapes and uploaded images. The default collection uses solid animal
-  silhouettes and capsule eyes based on the loader. Choose light or dark eyes
-  by contrast against the silhouette's fill. Keep explicit web velvet
-  choices and the original-color option. Animate the eyes in web previews and
-  honor reduced motion. Verify bot-avatar and create-bot-dialog tests.
+  shapes and uploaded images. The six approved compact bodies default to velvet;
+  their eyeless WebP atlas is shared artwork, with independent MIT Bloub eye pads.
+  Recolor body luminance from the saved palette without tinting the eye artwork or
+  changing alpha. Preserve explicit flat/custom-eye/original-color choices and
+  other animal shapes. Resting web bodies are static; only hover/working eyes move,
+  with reduced motion honored. Verify bot-avatar, compact-mico-avatar,
+  create-bot-dialog and `node scripts/verify-compact-micos.mjs --output=...`.
   New Mico opens with the green brand mushroom, which also starts the automatic
   avatar assignment in an empty space. Later Micos use the animal rotation.
 
