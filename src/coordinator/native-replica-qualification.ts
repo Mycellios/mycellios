@@ -21,7 +21,7 @@ interface Options {
   adminToken: string | undefined;
   networkToken: string | undefined;
   hub: { currentWorkerSessionId(workerId: string): string | null; setWorkerMaintenance(workerId: string, enabled: boolean): Promise<void> };
-  store: Pick<MeshStore, "getWorker" | "updateWorkerHeartbeat">;
+  store: Pick<MeshStore, "getWorker" | "updateWorkerHeartbeat"> & { database: Pick<MeshStore["database"], "transaction"> };
   service: Pick<MeshService, "submit" | "cancel">;
   attachReceipt(event: Completed, model: string, route: "replica"): Completed | Promise<Completed>;
 }
@@ -142,6 +142,7 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
           inputTokens: r.metrics.inputTokens, outputTokens: 0, completedAt: Date.now() });
         activeJob = null;
       }
+      const evidence = await options.store.database.transaction(async () => {
       const latest = await current();
       const evidence = createNativeReplicaEvidence({ schema: "mycellios-native-replica-qualification/1",
         workerId: worker.id, sessionId, deploymentId: deployment.deploymentId, activationId: deployment.activationId,
@@ -152,6 +153,8 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
       capabilities.deployments = capabilities.deployments.map(d => d.deploymentId === deployment.deploymentId
         ? { ...d, verificationState: "verified", nativeReplicaEvidence: evidence } : d);
       await options.store.updateWorkerHeartbeat(worker.id, capabilities, latest.status);
+      return evidence;
+      });
       return { data: evidence };
     } finally {
       if (activeJob) await options.service.cancel(activeJob);

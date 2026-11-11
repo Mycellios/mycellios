@@ -27,7 +27,7 @@ try {
  if(-not $ready){throw 'Transcription engine did not become ready'}
  $entry=Join-Path $root 'Runtime\dist\worker\transcription-main.js'
  if(Test-Path -LiteralPath $entry){
-  $worker=Start-Process -FilePath 'C:\Program Files\Mycellios\node.exe' -ArgumentList @('--max-old-space-size=256',$entry) -WorkingDirectory (Join-Path $root 'Runtime') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $root 'Logs\worker.stdout.log') -RedirectStandardError (Join-Path $root 'Logs\worker.stderr.log')
+  $worker=Start-Process -FilePath 'C:\Program Files\Mycellios\bin\node.exe' -ArgumentList @('--max-old-space-size=256',$entry) -WorkingDirectory (Join-Path $root 'Runtime') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $root 'Logs\worker.stdout.log') -RedirectStandardError (Join-Path $root 'Logs\worker.stderr.log')
   $worker.PriorityClass='Normal'
  }
  while(-not $engine.HasExited -and (-not $worker -or -not $worker.HasExited)){
@@ -39,3 +39,4 @@ try {
 }finally{
  foreach($child in @($worker,$engine)){if($child -and -not $child.HasExited){Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue}}
 }
+
