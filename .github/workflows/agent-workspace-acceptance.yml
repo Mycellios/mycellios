@@ -86,6 +86,9 @@ jobs:
         run: node scripts/verify-workspace-sync-ui.mjs --output=workspace-proof
       - name: Exercise conversation delivery, progress and reduced motion
         run: node scripts/verify-chat-fluidity.mjs --output=chat-flow-proof
+      - name: Exercise Cadencia local media editing with a synthetic clip
+        working-directory: src/agent/apps/web
+        run: npm exec -- playwright test --config playwright.integrations.config.ts --grep Cadencia
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -93,5 +96,6 @@ jobs:
           path: |
             src/agent/workspace-proof
             src/agent/chat-flow-proof
+            src/agent/playwright-integration-report
           if-no-files-found: warn
           retention-days: 7
