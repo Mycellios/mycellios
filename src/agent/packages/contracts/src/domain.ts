@@ -836,6 +836,8 @@ const McpServerBaseInput = z.object({
   /** Update-only: drop the stored static credential (secret/env/headers).
    * OAuth state survives so a connected server stays connected. */
   clearCredential: z.boolean().optional(),
+  networkId: z.string().min(1).max(100).nullable().optional(),
+  networkOAuthOrigins: z.array(z.string().url().max(2048)).max(10).optional(),
 });
 const McpOAuthClientFields = {
   clientId: z.string().trim().min(1).max(512),
@@ -919,6 +921,8 @@ export const McpServerHealthSchema = z.object({
 export type McpServerHealth = z.infer<typeof McpServerHealthSchema>;
 
 export const McpServerSchema = z.object({
+  networkId: z.string().nullable().optional(),
+  networkOAuthOrigins: z.array(z.string()).optional(),
   id: Id,
   spaceId: Id,
   slug: z.string(),

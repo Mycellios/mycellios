@@ -17,6 +17,11 @@ type AuditedProcedure = {
  * new credential route is audited by adding a line here instead of a call in its handler.
  */
 export const AUDITED_PROCEDURES: Record<string, AuditedProcedure> = {
+  "tailscale.create": { type: "credential.created", kind: "tailscale" },
+  "tailscale.connect": { type: "credential.changed", kind: "tailscale", fields: ["id"] },
+  "tailscale.disconnect": { type: "credential.deleted", kind: "tailscale", fields: ["id"] },
+  "tailscale.grant": { type: "approval.policy.changed", kind: "tailscale", fields: ["id"] },
+  "tailscale.company": { type: "approval.policy.changed", kind: "tailscale", fields: ["enabled"] },
   "models.connect": { type: "credential.created", kind: "model", fields: ["provider"] },
   "models.connectMycellios": { type: "credential.created", kind: "model" },
   "models.finishOAuth": { type: "credential.created", kind: "model" },

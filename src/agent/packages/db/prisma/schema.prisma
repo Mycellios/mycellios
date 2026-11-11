@@ -44,6 +44,7 @@ model User {
   modelCredentials            UserModelCredential[]
   voiceCredentials            UserVoiceCredential[]
   secrets                     Secret[]
+  tailnetConnections          TailnetConnection[]
   mcpServers                  McpServer[]
   botSections                 BotSection[]
   developmentProjects         DevelopmentProject[]
@@ -303,6 +304,8 @@ model Space {
   computers                   Computer[]
   computerRuns                ComputerRun[]
   externalEffects             ExternalEffect[]
+  tailnetConnections          TailnetConnection[]
+  tailnetPolicies             TailnetPolicy[]
   mcpServers                  McpServer[]
   mcpOAuthSessions            McpOAuthSession[]
   modelOAuthSessions          ModelOAuthSession[]
@@ -1509,7 +1512,39 @@ model Secret {
   @@map("secrets")
 }
 
+model TailnetPolicy {
+  id String @id @default(cuid())
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  dnsSuffix String
+  enabled Boolean @default(false)
+  @@unique([spaceId, dnsSuffix])
+  @@map("tailnet_policies")
+}
+
+model TailnetConnection {
+  id String @id @default(cuid())
+  spaceId String
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  kind String
+  dnsSuffix String
+  allowedBotIds Json @default("[]")
+  generation Int @default(0)
+  enabled Boolean @default(false)
+  createdAt DateTime @default(now())
+  servers McpServer[]
+  @@index([spaceId, userId])
+  @@map("tailnet_connections")
+}
+
 model McpServer {
+  networkOAuthOrigins Json @default("[]")
+  networkId String?
+  network TailnetConnection? @relation(fields: [networkId], references: [id], onDelete: Restrict)
+
   id            String            @id @default(cuid())
   spaceId       String
   space         Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)

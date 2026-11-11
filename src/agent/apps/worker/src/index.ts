@@ -1,3 +1,4 @@
+import { tailnetServiceFromEnv } from "@rakazo/adapters";
 import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { JobPublisher, JobWorkerHost } from "@rakazo/adapter-kit";
@@ -170,7 +171,8 @@ async function main() {
     prisma,
   });
   const allowPrivateEndpoint = process.env.MCP_ALLOW_PRIVATE_ENDPOINT === "true";
-  const mcpOAuth = new McpOAuthBroker(prisma, secrets, {}, allowPrivateEndpoint);
+  const tailnets = tailnetServiceFromEnv(prisma);
+  const mcpOAuth = new McpOAuthBroker(prisma, secrets, {}, allowPrivateEndpoint, tailnets);
   const mcp = new McpConnector(
     prisma,
     secrets,
@@ -183,6 +185,7 @@ async function main() {
       ...mcpStdioOptionsFromEnv(process.env),
       events,
       allowPrivateEndpoint,
+      tailnets,
     },
     mcpOAuth,
   );
@@ -374,6 +377,7 @@ async function main() {
       await jobs.close();
       await secrets.close();
       await realtime.close();
+      await tailnets.close();
       await mcp.close();
       await prisma.$disconnect().catch(() => undefined);
       await pool.end().catch(() => undefined);

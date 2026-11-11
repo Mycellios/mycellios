@@ -228,7 +228,7 @@ function boundClient(
   return information;
 }
 
-type ServerRef = { id: string; endpoint: string | null; secretId: string | null };
+type ServerRef = { id: string; endpoint: string | null; secretId: string | null; networkId?: string | null; networkOAuthOrigins?: unknown };
 type ActorRef = { spaceId: string; userId: string };
 
 class McpCredentialRefusedError extends Error {}
@@ -914,6 +914,7 @@ export class McpOAuthBroker {
     private readonly secrets: SecretStore,
     private readonly network: RemoteTransportDependencies = {},
     private readonly allowPrivateEndpoint = false,
+    private readonly tailnets?: import("./tailscale.js").TailnetService,
   ) {}
 
   async statusFor(server: ServerRef, context: ActorRef): Promise<McpOAuthSummary["status"]> {
@@ -930,6 +931,14 @@ export class McpOAuthBroker {
     recordId: string | undefined,
   ): Promise<McpOAuthSummary> {
     return summarize(ciphertext && recordId ? await this.read(ciphertext, recordId) : {});
+  }
+
+  private async networkFor(serverId: string, context: ActorRef) {
+    const server = await this.prisma.mcpServer.findFirst({ where: { id: serverId, spaceId: context.spaceId, userId: context.userId } });
+    if (!server) throw new Error("MCP server is unavailable");
+    if (!server.networkId) return this.network;
+    if (!this.tailnets) throw new Error("Tailscale is unavailable");
+    return this.tailnets.transport(server.networkId, context, server);
   }
 
   async providerFor(
@@ -994,11 +1003,12 @@ export class McpOAuthBroker {
     // Never destroy working tokens here: if this attempt fails (network error,
     // cancelled popup), the server keeps its valid connection. The SDK itself
     // invalidates dead tokens when a refresh is rejected with invalid_grant.
+    const route = await this.networkFor(server.id, context);
     const networkFetch = oauthFetch(
       target,
-      this.network,
+      route,
       server.endpoint ? loaded.material : withoutRequestCredentials(loaded.material),
-      this.allowPrivateEndpoint,
+      this.allowPrivateEndpoint || Boolean(route.managedFetch),
     );
     try {
       if (server.endpoint)
@@ -1145,19 +1155,20 @@ export class McpOAuthBroker {
     // the one this flow started with, in case an overlapping flow bound the client first.
     const current = await this.prisma.mcpServer.findFirst({
       where: { id: pending.serverId, spaceId: input.spaceId, userId: input.userId },
-      select: { id: true, endpoint: true, secretId: true },
+      select: { id: true, endpoint: true, secretId: true, networkId: true, networkOAuthOrigins: true },
     });
     if (current) {
       const stored = await this.loadMaterial(current, input);
       pending.provider.adoptClientBinding(stored.material.oauthClient);
     }
+    const route = await this.networkFor(pending.serverId, input);
     const networkFetch = oauthFetch(
       pending.endpoint,
-      this.network,
+      route,
       // Only for redacting errors: the exchange sends the client secret, but none of
       // the server's static headers.
       { oauth: { clientInformation: pending.provider.clientInformation() } },
-      this.allowPrivateEndpoint,
+      this.allowPrivateEndpoint || Boolean(route.managedFetch),
     );
     try {
       if (pending.stdio)
@@ -1266,7 +1277,7 @@ export class McpOAuthBroker {
                 ),
             }
           : {}),
-        allowPrivateEndpoint: this.allowPrivateEndpoint,
+        allowPrivateEndpoint: this.allowPrivateEndpoint || Boolean(server.networkId),
         ...options,
       },
     );
@@ -1288,7 +1299,8 @@ export class McpOAuthBroker {
     onPersisted?: ProviderOptions["onPersisted"],
   ): Promise<TokenGrant> {
     // Resolve the network before taking a connection for the lock.
-    const network = oauthFetch(target, this.network, {}, this.allowPrivateEndpoint);
+    const route = await this.networkFor(serverId, context);
+    const network = oauthFetch(target, route, {}, this.allowPrivateEndpoint || Boolean(route.managedFetch));
     let stored: { id: string; ciphertext: string } | undefined;
     let rotated: { material: OAuthMaterial; grant: TokenGrant; spent: string } | undefined;
     try {
@@ -1316,7 +1328,7 @@ export class McpOAuthBroker {
                     material,
                     current,
                     network.fetch,
-                    this.allowPrivateEndpoint,
+                    this.allowPrivateEndpoint || Boolean(route.managedFetch),
                   ),
                 };
                 grant.obtainedAt = Date.now();

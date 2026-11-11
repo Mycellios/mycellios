@@ -322,6 +322,8 @@ export function mcpRoutes(ctx: RouterContext) {
                     description: existing.description,
                     enabled: existing.enabled,
                     transport: existing.transport as "streamable_http" | "sse",
+                    networkId: existing.networkId,
+                    networkOAuthOrigins: Array.isArray(existing.networkOAuthOrigins) ? existing.networkOAuthOrigins.map(String) : [],
                     endpoint: existing.endpoint!,
                     headers: (existingMaterial.headers ?? {}) as Record<string, string>,
                     secret: input.secret,
@@ -330,13 +332,20 @@ export function mcpRoutes(ctx: RouterContext) {
               throw new ORPCError("BAD_REQUEST", { message: "A remote MCP server is required" });
             }
             const nextEndpoint = "endpoint" in config ? config.endpoint : null;
-            if (existing.endpoint !== nextEndpoint) {
+            const networkId = config.networkId === undefined ? existing.networkId : config.networkId;
+            if (networkId) {
+              if (config.transport === "stdio" || !nextEndpoint) throw new Error("Tailscale requires a remote MCP URL");
+              if (!deps.tailnets) throw new Error("Tailscale is unavailable");
+              await deps.tailnets.validateBinding(networkId, context.actor, nextEndpoint);
+              for (const origin of config.networkOAuthOrigins ?? []) await deps.tailnets.validateBinding(networkId, context.actor, origin);
+            }
+            if (!networkId && (existing.endpoint !== nextEndpoint || existing.networkId)) {
               await assertMcpRemoteEndpoint(nextEndpoint, deps);
             }
             if (config.transport === "stdio") {
               await assertMcpRemoteEndpoint(config.oauthClient?.authorizationServer, deps);
             }
-            const endpointChanged = existing.endpoint !== nextEndpoint;
+            const endpointChanged = existing.endpoint !== nextEndpoint || existing.networkId !== networkId;
             const update = buildMcpUpdateMaterial(existingMaterial, config, {
               clearOAuth: endpointChanged,
               endpointChanged,
@@ -407,6 +416,8 @@ export function mcpRoutes(ctx: RouterContext) {
                   const updated = await tx.mcpServer.update({
                     where: { id: existing.id },
                     data: {
+                      networkId,
+                      networkOAuthOrigins: config.networkOAuthOrigins ?? existing.networkOAuthOrigins ?? [],
                       slug: config.slug,
                       name: config.name,
                       description: config.description,

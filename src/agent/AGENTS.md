@@ -15,6 +15,16 @@
 
 # AGENTS.md
 
+- Tailscale connections use the optional private Linux gateway in `infra/tailscale`.
+  Each user/Space/network owns a userspace device; never enable global private
+  egress or join customer routes to the API/worker host. Require both the network's
+  Mico allowlist and existing MCP/tool assignments. Revalidate cached sessions,
+  membership, company policy and exact MCP binding at every request. Private OAuth
+  origins require explicit per-MCP grants. Never fall back to public egress after
+  a private connection fails. Verify tailscale contract/adapter, MCP connector/OAuth,
+  gateway and deployment tests, `scripts/verify-tailscale-db.ts` and
+  `scripts/verify-tailscale-ui.mjs`. Fixtures do not qualify real Tailscale consent.
+
 - The workspace selector opens Space settings independently of personal Settings.
   Bind each Space panel and its writes to the Space being edited, even when the
   open conversation belongs to another Space. Preserve account model credentials

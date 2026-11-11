@@ -1,3 +1,4 @@
+export * from "./tailscale.js";
 export * from "./agent-import.js";
 export * from "./app-actions.js";
 export * from "./app-manifest.js";

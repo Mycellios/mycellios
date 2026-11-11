@@ -23,6 +23,8 @@ export function mcpServerDto(
     name: string;
     description: string;
     transport: string;
+    networkId?: string | null;
+    networkOAuthOrigins?: unknown;
     endpoint: string | null;
     command: string | null;
     args: unknown;
@@ -55,6 +57,8 @@ export function mcpServerDto(
     name: row.name,
     description: row.description,
     transport: row.transport as McpServer["transport"],
+    networkId: row.networkId ?? null,
+    networkOAuthOrigins: Array.isArray(row.networkOAuthOrigins) ? row.networkOAuthOrigins.filter((v): v is string => typeof v === "string") : [],
     endpoint: row.endpoint,
     command: row.command,
     args,
@@ -256,7 +260,12 @@ export function createMcpServers(
     return painted;
   };
   const prepareMcpServer = async (actor: Actor, input: McpServerConfigInput) => {
-    await assertMcpRemoteEndpoint("endpoint" in input ? input.endpoint : null, deps);
+    if (input.networkId) {
+      if (input.transport === "stdio") throw new Error("Tailscale requires a remote MCP URL");
+      if (!deps.tailnets) throw new Error("Tailscale is unavailable");
+      await deps.tailnets.validateBinding(input.networkId, actor, input.endpoint);
+      for (const origin of input.networkOAuthOrigins ?? []) await deps.tailnets.validateBinding(input.networkId, actor, origin);
+    } else await assertMcpRemoteEndpoint("endpoint" in input ? input.endpoint : null, deps);
     if (input.transport === "stdio") {
       assertMcpOAuthTemplates(input.env, input.files ?? {}, Boolean(input.oauthClient));
       await assertMcpRemoteEndpoint(input.oauthClient?.authorizationServer, deps);
@@ -287,6 +296,8 @@ export function createMcpServers(
       data: {
         spaceId: actor.spaceId,
         userId: actor.userId,
+        networkId: input.networkId ?? null,
+        networkOAuthOrigins: input.networkOAuthOrigins ?? [],
         slug: input.slug,
         name: input.name,
         description: input.description,

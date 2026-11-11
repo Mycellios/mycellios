@@ -90,6 +90,8 @@ export function McpServersOverlay({
   const [transport, setTransport] = useState<McpTransport>("streamable_http");
   const [name, setName] = useState("");
   const [endpoint, setEndpoint] = useState("");
+  const [networkId, setNetworkId] = useState<string | null>(null);
+  const [networkOAuthOrigins, setNetworkOAuthOrigins] = useState("");
   const [secret, setSecret] = useState("");
   const [headerName, setHeaderName] = useState("Authorization");
   const [headerValue, setHeaderValue] = useState("");
@@ -107,6 +109,7 @@ export function McpServersOverlay({
   const [testingIds, setTestingIds] = useState<Set<string>>(() => new Set());
   const queries = useSpaceQueries();
   const queryClient = useQueryClient();
+  const networksQuery = useQuery({ queryKey: [...queries.bots.list.key(), "tailscale-connections"], queryFn: () => rpc.tailscale.list() });
   const serversOptions = queries.mcp.servers.list.queryOptions();
   const serversQuery = useQuery({
     ...serversOptions,
@@ -195,6 +198,8 @@ export function McpServersOverlay({
     setEditing(null);
     setName("");
     setEndpoint("");
+    setNetworkId(null);
+    setNetworkOAuthOrigins("");
     setSecret("");
     setHeaderName("Authorization");
     setHeaderValue("");
@@ -217,6 +222,8 @@ export function McpServersOverlay({
     setName(server.name);
     setTransport(server.transport);
     setEndpoint(server.endpoint ?? "");
+    setNetworkId(server.networkId ?? null);
+    setNetworkOAuthOrigins((server.networkOAuthOrigins ?? []).join("\n"));
     setCommand(server.command ?? "");
     setArgs(server.args.join(" "));
     setHeaderName(server.headerKeys[0] ?? "Authorization");
@@ -294,6 +301,8 @@ export function McpServersOverlay({
               name: name.trim(),
               transport,
               endpoint: endpoint.trim(),
+              networkId,
+              networkOAuthOrigins: networkId ? networkOAuthOrigins.split(/\s+/).filter(Boolean).map(value => new URL(value).origin) : [],
               headers,
               secret: secret || undefined,
               oauthClient: oauthBase,
@@ -518,12 +527,27 @@ export function McpServersOverlay({
                     />
                   </Field>
                 )}
+                {transport !== "stdio" ? <Field>
+                  <FieldLabel><Trans>Network</Trans></FieldLabel>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label={t`MCP network`}>
+                    <Toggle pressed={networkId === null} onPressedChange={() => setNetworkId(null)}><Trans>Server default</Trans></Toggle>
+                    {(networksQuery.data?.connections ?? []).map(network => <Toggle key={network.id}
+                      pressed={networkId === network.id} onPressedChange={() => setNetworkId(network.id)}>{network.name}</Toggle>)}
+                  </div>
+                  <p className="text-sm text-muted-foreground"><Trans>A Tailscale MCP must use its full server.tailnet.ts.net URL. Its Micos need permission for both the network and the MCP.</Trans></p>
+                  {networkId && !networksQuery.data?.connections.some(network => network.id === networkId) ? <p role="status" className="text-sm"><Trans>The saved private network is unavailable. Its binding is preserved.</Trans></p> : null}
+                </Field> : null}
                 <Disclosure
                   className="group rounded-xl border border-border"
                   summary={<Trans>Advanced</Trans>}
                   summaryClassName="w-full flex items-center justify-between px-3 py-2.5 text-sm text-foreground"
                 >
                   <div className="space-y-4 border-t border-border p-3">
+                    {networkId ? <Field>
+                      <FieldLabel htmlFor="mcp-private-oauth"><Trans>Additional private OAuth origins</Trans></FieldLabel>
+                      <Textarea id="mcp-private-oauth" value={networkOAuthOrigins} onChange={event => setNetworkOAuthOrigins(event.target.value)} placeholder="https://login.tail123.ts.net" />
+                      <p className="text-sm text-muted-foreground"><Trans>Optional. One origin per line, only when this MCP uses a separate sign-in server inside the same tailnet.</Trans></p>
+                    </Field> : null}
                     <Field>
                       <FieldLabel htmlFor="mcp-secret">
                         <Trans>Access token (optional)</Trans>

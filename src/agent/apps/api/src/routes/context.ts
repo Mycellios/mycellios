@@ -91,7 +91,7 @@ export function createRouterContext(deps: RouterDeps) {
     phoneCallRingSeconds: deps.env?.phoneCallRingSeconds,
   });
   const onboardingDeps = { prisma: deps.prisma, events: deps.events, connectors: deps.connectors };
-  const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets);
+  const mcpOAuth = deps.mcpOAuth ?? new McpOAuthBroker(deps.prisma, deps.secrets, {}, false, deps.tailnets);
   const {
     mcpAwaitsOAuth,
     probeMcpServer,

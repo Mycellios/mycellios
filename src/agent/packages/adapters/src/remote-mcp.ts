@@ -35,6 +35,8 @@ export interface RemoteUrlPolicy {
 }
 
 export interface RemoteTransportDependencies {
+  /** Server-owned transport enforcing tenant and destination policy on every request. */
+  managedFetch?: typeof globalThis.fetch;
   fetch?: typeof globalThis.fetch;
   resolveHostname?: ResolveHostname;
 }

@@ -1,3 +1,4 @@
+import { tailnetServiceFromEnv } from "@rakazo/adapters";
 import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { ORPCError, onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
@@ -360,11 +361,13 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
             }
           : undefined,
     });
+  const tailnets = tailnetServiceFromEnv(prisma);
   const mcpOAuth = new McpOAuthBroker(
     prisma,
     secrets,
     remoteConnectors,
     env.mcpAllowPrivateEndpoint,
+    tailnets,
   );
   const memoryProviders = new SpaceMemoryProviderResolver(prisma, secrets);
   const oauthLogins = new PiOAuthLogins(undefined, { prisma, secrets });
@@ -379,6 +382,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       allowedCommands: env.mcpStdioAllowedCommands,
       ...env.mcpStdio,
       network: remoteConnectors,
+      tailnets,
       events,
       allowPrivateEndpoint: env.mcpAllowPrivateEndpoint,
     },
@@ -671,6 +675,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     oauthLogins,
     integrationSettings,
     mcpOAuth,
+    tailnets,
     mcp,
     composio: stack.composio,
     connectors: stack.connector,
@@ -1350,6 +1355,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       await jobs.close();
       await secrets.close();
       await realtime.close();
+      await tailnets.close();
       await mcp.close();
       await prisma.$disconnect().catch(() => undefined);
       await created.pool?.end().catch(() => undefined);

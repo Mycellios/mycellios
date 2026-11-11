@@ -1,0 +1,63 @@
+name: Tailscale gateway qualification
+
+on:
+  push:
+    branches: [feat/tailscale-connections]
+  pull_request:
+    paths:
+      - src/agent/infra/tailscale/**
+      - .github/workflows/tailscale-gateway.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tailscale-gateway-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gateway:
+    name: Linux gateway build and native startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: Build the exact gateway candidate
+        run: |
+          mkdir -p build/tailscale-gateway
+          docker build --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --iidfile build/tailscale-gateway/image-id.txt \
+            -f src/agent/infra/tailscale/Dockerfile \
+            -t mycellios-tailscale:qualification src/agent
+      - name: Exercise real userspace Tailscale without host privileges
+        run: |
+          export TAILSCALE_GATEWAY_KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$TAILSCALE_GATEWAY_KEY"
+          docker volume create tailscale-qualification-state >/dev/null
+          docker run -d --name tailscale-qualification --read-only --init \
+            --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp \
+            --memory 512m --cpus 1 -e TAILSCALE_GATEWAY_KEY \
+            -v tailscale-qualification-state:/state -p 127.0.0.1:8095:8095 \
+            mycellios-tailscale:qualification
+          node src/agent/infra/tailscale/native-smoke.mjs build/tailscale-gateway/native-startup.json
+      - name: Seal the built image
+        run: |
+          docker save mycellios-tailscale:qualification | gzip > build/tailscale-gateway/image.tar.gz
+          sha256sum build/tailscale-gateway/image.tar.gz > build/tailscale-gateway/image.tar.gz.sha256
+          printf '%s\n' "$GITHUB_SHA" > build/tailscale-gateway/revision.txt
+      - name: Stop only this qualification container
+        if: always()
+        run: docker rm -f tailscale-qualification >/dev/null 2>&1 || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: tailscale-gateway-${{ github.sha }}
+          path: build/tailscale-gateway
+          if-no-files-found: error
+          retention-days: 14

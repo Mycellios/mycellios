@@ -1,5 +1,33 @@
 # Status and evidence
 
+## Tailscale private MCP connections — local candidate, 2026-11-11
+
+Conexiones has personal and company tailnet enrollment, explicit per-Mico network
+grants and an MCP network selector. Each user/Space/network uses a separate
+userspace device in an optional private Linux gateway. Existing MCP/tool grants
+are retained. Discovery, cached-session execution and every private HTTP request
+revalidate owner, current membership, network policy and the saved MCP binding.
+Company policy cannot be bypassed by labeling its known tailnet personal.
+Separate private OAuth origins need explicit per-MCP authorization. Disconnect
+closes admission before device cleanup; the gateway never retries uncertain calls.
+
+The source incorporates main `fd83aa53ed7567c0918cd7a90f1f9b2946876d7e`, preserving
+its floating-chat, spoken-reply and translation changes. Local focused validation
+passes 302 tests across contracts, transport, MCP/OAuth, authenticated API and
+deployment settings, plus three gateway protocol tests. Incremental API, worker
+and web typing passes. An isolated loopback PostgreSQL instance passes the actual
+additive migration, legacy MCP compatibility, network FK and owner/Space RLS
+checks. The real network/MCP components pass synthetic browser interactions at
+desktop and 390px widths. Synthetic RPCs and MCP emulation are not a live tailnet.
+
+NOT QUALIFIED: gateway Docker image build/startup (the local Docker engine was
+unavailable), real Tailscale enrollment, a real private MCP call, live two-account
+isolation, production migration/deployment and a new packaged Desktop release.
+Full CI remains paused. The older general Compose environment audit reports
+missing pre-existing non-Tailscale settings; the focused Tailscale comparison
+passes and does not enable global private egress. No release or production
+capability is claimed. See `DEVELOPMENT.md` and `specs/tailscale-connections/spec.md`.
+
 ## Desktop-owned Mico execution candidate - 2026-11-07
 
 The local candidate adds account-scoped Desktop execution of the existing Mico

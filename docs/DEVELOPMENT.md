@@ -1,5 +1,63 @@
 # Development
 
+## Private MCP connections through Tailscale
+
+The optional Tailscale connection lives in Agent's existing Conexiones surface.
+Users save a personal or company tailnet, explicitly select authorized Micos,
+then choose that network when configuring a remote MCP. Existing MCP assignment
+and tool restrictions still apply. Company networks first need a Space admin's
+enabled policy for the exact MagicDNS suffix; each member enrolls their own
+device. A known company network cannot be connected as personal to bypass policy.
+
+The isolated gateway is `src/agent/infra/tailscale/gateway.mjs`, with an optional
+Docker recipe and Compose overlay beside it. It uses the public Tailscale device
+login flow, rather than claiming compatibility with another vendor's private
+OAuth registration. No Tailscale admin API token is required by Mycellios.
+
+For a deployment, build the gateway from the `src/agent` context and attach the
+optional Compose service to the same private Docker network as API and worker.
+Set `TAILSCALE_GATEWAY_URL=http://tailscale-gateway:8095` and a new private random
+`TAILSCALE_GATEWAY_KEY` of at least 32 characters on API, worker and the gateway.
+Store the key in the deployment's secret manager. Expose no gateway or proxy
+ports to the public host. Persist `/state` on a private volume: it holds device
+identity keys and must not enter logs, source control or public backups. Run one
+gateway owner for this volume; do not share live state between replicas.
+The container has no TUN device, host networking, Docker socket or extra Linux
+capabilities. It does not change the user's installed Tailscale client.
+
+Apply the additive Agent database migration before starting the new API/worker.
+Leave `MCP_ALLOW_PRIVATE_ENDPOINT` unchanged. Without gateway configuration the
+feature is unavailable and ordinary MCPs retain their existing execution path.
+In Tailscale's DNS page find the `tail....ts.net` suffix. Add it in Conexiones,
+connect, follow the official sign-in link and approve the device if the tailnet
+requires it. The gateway checks the actual enrolled suffix against the requested
+one. Then add `https://server.tail....ts.net/mcp` and choose this network.
+
+Only full MagicDNS hosts within that tailnet are admitted. IP literals, arbitrary
+DNS names, subnet routes, cross-tailnet routing and redirects are deliberately
+refused. The private MCP origin is bound to the saved server. When an MCP uses a
+different private OAuth issuer, explicitly add that origin in its advanced
+settings; public OAuth issuers retain the existing public-only SSRF protection.
+Tailnet ACLs and service authentication still apply independently of Mycellios.
+The login device has the consenting Tailscale user's access; this candidate does
+not configure Grok-specific posture attributes or promise automatic least-
+privilege Tailscale ACLs. Narrow those rules in the tailnet admin console.
+
+Disconnect refuses new requests before attempting logout; a gateway failure
+leaves admission disabled and cleanup retryable. Running requests revalidate
+network access every two seconds; known devices are checked for policy/member
+revocation every fifteen seconds. An uncertain MCP call is never replayed by
+the gateway. Revoking a Mico does not remove another Mico's independent grant.
+
+Run focused Tailscale/MCP tests through the shared scheduler. The standalone
+`src/agent/scripts/verify-tailscale-db.ts` uses an isolated loopback PostgreSQL
+cluster to test the actual migration and RLS. `verify-tailscale-ui.mjs` checks
+the real components with synthetic RPCs at desktop/mobile widths. Real device
+enrollment, a private MCP call and a second-account denial remain separate live
+acceptance checks. Publishing a gateway image, migrating production and releasing
+the web/Desktop UI follow the normal release policy and are not performed by
+these checks.
+
 ## Proportional remote delivery
 
 Remote CI is the primary validation route. Local checks provide optional early
