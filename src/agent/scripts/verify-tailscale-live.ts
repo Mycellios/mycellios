@@ -45,8 +45,16 @@ try {
     await prisma.botMcpServer.create({ data: { ...owner, botId, serverId: "private-mcp" } });
   }
   assert.equal((await tailnets.status(network.id, owner)).status, "connected");
+  const server = await prisma.mcpServer.findUniqueOrThrow({ where: { id: "private-mcp" } });
+  await tailnets.authorize(network.id, context(), server);
+  const transport = await tailnets.transport(network.id, context(), server);
+  const probe = await transport.managedFetch!(network.endpoint, { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "qualification", version: "1" } } }) });
+  const probeBody = await probe.text();
+  assert.equal(probe.status, 200, `Private MCP transport: ${probeBody}`);
+  assert.ok(JSON.parse(probeBody).result?.serverInfo, "Actual private MCP initialization");
   const tools = await connector.discoverTools(context());
-  assert.ok(tools.some(t => t.name === "mcp__private__read"), "authorized Mico discovers private tool");
+  assert.ok(tools.some(t => t.name === "mcp__private__read"), `authorized Mico discovers private tool: ${JSON.stringify(tools)}`);
   const allowed = await execute();
   assert.ok(allowed.some(e => e.type === "result" && JSON.stringify(e).includes("private-tailnet-ok")), JSON.stringify(allowed));
   assert.equal(counter(), 1);

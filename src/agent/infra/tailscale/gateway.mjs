@@ -202,7 +202,13 @@ export function gateway(nodes, key) {
           : await nodes.status(id, input.dnsSuffix, action === 'connect');
         response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(value));
       }
-    } catch {
+    } catch (error) {
+      // Only fixed error classes/codes: never log URLs, headers, bodies or login links.
+      const code = error?.cause?.code ?? error?.code;
+      console.warn('tailscale.gateway.request_failed', {
+        name: ['Error', 'TypeError', 'AbortError', 'TimeoutError'].includes(error?.name) ? error.name : 'Error',
+        code: typeof code === 'string' && /^[A-Z_]{2,64}$/.test(code) ? code : undefined,
+      });
       if (response.headersSent) response.destroy();
       else response.writeHead(502, { 'content-type': 'application/json' }).end('{"error":"Tailscale connection failed"}');
     }
