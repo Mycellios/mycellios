@@ -20,3 +20,12 @@ regressions, account/Mico/Space admission tests, plus real managed voice output 
 its usage/hold/settlement records. A single physical GPU is sufficient for a speech
 replica; it does not qualify a multi-computer pipeline. Unavailable physical tests
 must remain explicitly unqualified.
+
+The operator-only `apps/api/src/cli/verify-network-voice.ts` is built explicitly
+with the normal server bundler. It requires `--confirm-credit-use`, a private JSON
+target containing `userId`, `spaceId`, `botId`, `language`, and a private output
+directory. It checks that Mico's ownership under the tenant context, loads only
+the account's canonical connection and uses the normal bounded speech renderer.
+Never run it as routine CI or against a third-party account. Its WAV/job receipt
+must be correlated with normal API usage and a balanced economic settlement;
+the CLI itself never writes ledger entries or adjusts balances.
