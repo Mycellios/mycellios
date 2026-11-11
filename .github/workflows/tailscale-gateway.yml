@@ -20,7 +20,15 @@ jobs:
   gateway:
     name: Linux gateway build and native startup
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18.4-alpine
+        env:
+          POSTGRES_PASSWORD: qualification
+          POSTGRES_DB: qualification
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -39,6 +47,7 @@ jobs:
         run: |
           export TAILSCALE_GATEWAY_KEY="$(openssl rand -hex 32)"
           echo "::add-mask::$TAILSCALE_GATEWAY_KEY"
+          echo "TAILSCALE_GATEWAY_KEY=$TAILSCALE_GATEWAY_KEY" >> "$GITHUB_ENV"
           docker volume create tailscale-qualification-state >/dev/null
           docker run -d --name tailscale-qualification --read-only --init \
             --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /tmp \
@@ -46,6 +55,19 @@ jobs:
             -v tailscale-qualification-state:/state -p 127.0.0.1:8095:8095 \
             mycellios-tailscale:qualification
           node src/agent/infra/tailscale/native-smoke.mjs build/tailscale-gateway/native-startup.json
+      - name: Create an ephemeral real Tailscale network
+        run: node src/agent/infra/tailscale/live-network.mjs
+      - name: Install locked Agent qualification dependencies
+        working-directory: src/agent
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test actual Mico admission against the private MCP
+        working-directory: src/agent
+        env:
+          DATABASE_URL: postgres://postgres:qualification@127.0.0.1:5432/qualification
+        run: |
+          npm run db:generate
+          npm run migrate --workspace @rakazo/db
+          npx tsx scripts/verify-tailscale-live.ts
       - name: Seal the built image
         run: |
           docker save mycellios-tailscale:qualification | gzip > build/tailscale-gateway/image.tar.gz
@@ -53,7 +75,9 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > build/tailscale-gateway/revision.txt
       - name: Stop only this qualification container
         if: always()
-        run: docker rm -f tailscale-qualification >/dev/null 2>&1 || true
+        run: |
+          docker rm -f tailscale-qualification tailnet-peer tailnet-control >/dev/null 2>&1 || true
+          docker network rm tailnet-qualification >/dev/null 2>&1 || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
