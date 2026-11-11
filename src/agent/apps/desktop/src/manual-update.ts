@@ -10,9 +10,23 @@ import { fetchDesktopArtifact } from "./published-desktop-release.js";
 import { ManualUpdateInProgressError } from "./manual-update-lock.js";
 
 const ORIGIN = "https://www.mycellios.com";
+/** Fedora RPMs are published as the optional `fedora` entry of the extended catalog. */
+export const DESKTOP_CATALOG_URL = `${ORIGIN}/public/v1/desktop-downloads`;
+export const DESKTOP_CATALOG_ALL_URL = `${ORIGIN}/public/v1/desktop-downloads?include=macos-all`;
 const MAX_BYTES = 2_000_000_000;
 const VERSION = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
 const MIN_INSTALL_BYTES = 6 * 1024 ** 3;
+
+/** The package this installation owns; each one is published under its own entry. */
+export type ManualPackageKind = "windows-x64" | "fedora-x64" | "linux-x64";
+
+const escapeVersion = (value: string) => value.replaceAll(".", "\\.");
+const PACKAGES: Record<ManualPackageKind, { format: "EXE" | "RPM" | "DEB"; entry: "packages" | "fedora"; fileName: (version: string) => RegExp }> = {
+  "windows-x64": { format: "EXE", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-windows-x64-pilot\\.exe$`) },
+  "linux-x64": { format: "DEB", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-linux-x64-pilot\\.deb$`) },
+  // The RPM builder appends its own build revision after the first one.
+  "fedora-x64": { format: "RPM", entry: "fedora", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}(-\\d+)?-fedora-x86_64\\.rpm$`) },
+};
 
 export class ManualUpdateDiskSpaceError extends Error {
   constructor() { super("Free at least 6 GB of disk space before restarting to update."); }
@@ -31,21 +45,37 @@ export function newerRelease(candidate: string, current: string): boolean {
   return false;
 }
 export function windowsManualRelease(catalog: unknown, current: string): ManualRelease | null {
+  return catalogManualRelease(catalog, current, "windows-x64");
+}
+
+function catalogEntry(catalog: unknown, kind: ManualPackageKind): Record<string, unknown> {
   if (!catalog || typeof catalog !== "object") throw Error("Invalid release catalog");
-  const data = catalog as { packages?: unknown; automaticUpdates?: unknown };
-  if (!Array.isArray(data.packages) || data.packages.length > 32) throw Error("Invalid release catalog");
-  const packages = data.packages.filter(p => p && p.id === "windows-x64");
-  if (packages.length !== 1) throw Error("Windows release is unavailable");
-  const item = packages[0];
+  const spec = PACKAGES[kind];
+  if (spec.entry === "fedora") {
+    const fedora = (catalog as { fedora?: unknown }).fedora;
+    if (!fedora || typeof fedora !== "object") throw Error("Fedora release is unavailable");
+    return fedora as Record<string, unknown>;
+  }
+  const packages = (catalog as { packages?: unknown }).packages;
+  if (!Array.isArray(packages) || packages.length > 32) throw Error("Invalid release catalog");
+  const matches = packages.filter(item => item && typeof item === "object" && (item as Record<string, unknown>).id === kind);
+  if (matches.length !== 1) throw Error(`${kind} release is unavailable`);
+  return matches[0] as Record<string, unknown>;
+}
+
+/** The official catalog entry for this installation, never a renderer-supplied path. */
+export function catalogManualRelease(catalog: unknown, current: string, kind: ManualPackageKind = "windows-x64"): ManualRelease | null {
+  const spec = PACKAGES[kind];
+  const item = catalogEntry(catalog, kind);
   if (typeof item.version !== "string" || !VERSION.test(item.version)) throw Error("Invalid release version");
-  const fileName = `Mycellios-Desktop-${item.version}-windows-x64-pilot.exe`;
-  if (item.fileName !== fileName || item.format !== "EXE" ||
-      item.path !== `/downloads/desktop/releases/${item.version}/${fileName}` ||
+  const version = item.version;
+  if (typeof item.fileName !== "string" || !spec.fileName(version).test(item.fileName) || item.format !== spec.format ||
+      item.path !== `/downloads/desktop/releases/${version}/${item.fileName}` ||
       typeof item.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(item.sha256) ||
-      !Number.isSafeInteger(item.bytes) || item.bytes <= 0 || item.bytes > MAX_BYTES)
-    throw Error("Invalid Windows release artifact");
-  return newerRelease(item.version, current) ? { version: item.version, fileName,
-    url: ORIGIN + item.path, sha256: item.sha256, bytes: item.bytes } : null;
+      !Number.isSafeInteger(item.bytes) || (item.bytes as number) <= 0 || (item.bytes as number) > MAX_BYTES)
+    throw Error(`Invalid ${kind} release artifact`);
+  return newerRelease(version, current) ? { version, fileName: item.fileName,
+    url: ORIGIN + item.path, sha256: item.sha256, bytes: item.bytes as number } : null;
 }
 export async function verifyManualInstaller(file: string, release: ManualRelease): Promise<void> {
   const info = await lstat(file);
@@ -71,12 +101,18 @@ export class ManualUpdateController {
     busy(): boolean;
     prepare(): Promise<boolean>;
     handoff(file: string, release: ManualRelease): Promise<void>;
+    /** Defaults to the Windows installer; the RPM/DEB entries use their own catalog and handoff. */
+    packageKind?: ManualPackageKind;
+    catalogUrl?: string;
+    installAction?: "restart" | "system-installer";
     pause?: (ms: number) => Promise<void>;
     backgroundDownloads?: boolean;
     autoDownload?: () => boolean;
     publishedRelease?: () => Promise<ManualRelease | null>;
   }) {
-    this.current = { phase: "idle", supportsForceRestart: true, currentVersion: options.version, availableVersion: null,
+    this.current = { phase: "idle", installAction: options.installAction ?? "restart",
+      supportsForceRestart: options.installAction !== "system-installer",
+      currentVersion: options.version, availableVersion: null,
       percent: null, message: null, checkedAt: null };
   }
   state() { return { ...this.current }; }
@@ -106,7 +142,7 @@ export class ManualUpdateController {
       this.file = null;
       this.release = release;
       this.current = { ...this.current, phase: this.release ? "available" : "idle",
-        availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString() };
+        availableVersion: this.release?.version ?? null, checkedAt: new Date().toISOString(), handoffComplete: false };
       if (this.release && (this.options.autoDownload?.() ?? true)) await this.runDownload();
     } catch {
       if (staged && this.file) return this.state();
@@ -116,7 +152,7 @@ export class ManualUpdateController {
     return this.state();
   }
   private async catalogRelease(): Promise<ManualRelease | null> {
-      const response = await (this.options.fetch ?? fetch)(ORIGIN + "/public/v1/desktop-downloads", {
+      const response = await (this.options.fetch ?? fetch)(this.options.catalogUrl ?? DESKTOP_CATALOG_URL, {
         redirect: "error", credentials: "omit", cache: "no-store", signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) throw Error("Catalog unavailable");
@@ -133,7 +169,7 @@ export class ManualUpdateController {
         }
         text += decoder.decode();
       } finally { await reader.cancel().catch(() => undefined); }
-      return windowsManualRelease(JSON.parse(text), this.options.version);
+      return catalogManualRelease(JSON.parse(text), this.options.version, this.options.packageKind);
   }
   download(): Promise<DesktopUpdateState> {
     if (this.operation) return this.operation;
@@ -213,6 +249,13 @@ export class ManualUpdateController {
             this.current = { ...this.current, waitingFor: undefined };
             this.committed = true;
             await this.options.handoff(this.file!, this.release!);
+            // The system package manager applies the update; the app stays open so the
+            // owner can finish work and restart after the installer exits.
+            if (this.options.installAction === "system-installer") {
+              this.current = { ...this.current, phase: "ready", installPending: false, restartMode: undefined,
+                waitingFor: undefined, handoffComplete: true, percent: 100,
+                message: "Opened the system installer. Restart Mycellios when it finishes." };
+            }
             return;
           }
         }

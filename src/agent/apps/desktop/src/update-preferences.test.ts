@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { DesktopUpdateState } from "@rakazo/contracts";
 import { UpdatePreferences } from "./update-preferences.js";
 
-function fixture(options: { packaged?: boolean; allowed?: boolean; saved?: string } = {}) {
+function fixture(options: { packaged?: boolean; allowed?: boolean; saved?: string; installSupported?: boolean } = {}) {
   let state: DesktopUpdateState = { currentVersion: "0.3.27", availableVersion: "0.3.28", phase: "ready", percent: null, message: null, checkedAt: null };
   let busy = false;
-  const ports = { packaged: options.packaged ?? true, allowed: options.allowed ?? true,
+  const ports = { packaged: options.packaged ?? true, allowed: options.allowed ?? true, installSupported: options.installSupported,
     read: vi.fn(async () => options.saved ?? null), write: vi.fn(async (_raw: string) => {}), state: () => state,
     download: vi.fn(async () => { state = { ...state, phase: "ready" }; return state; }),
     install: vi.fn(async () => ({ ...state, installPending: true })), cancelInstall: vi.fn(async () => state),
@@ -80,5 +80,25 @@ describe("native update preferences and idle restarts", () => {
     await policy.tick(); await policy.tick();
     expect(ports.install).toHaveBeenCalledOnce(); expect(policy.state().relaunchError).toBe(true);
     policy.request("update"); await settle(); expect(ports.install).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("installs applied by the system package manager", () => {
+  it("keeps unattended installation off and reports the package's explicit install action", async () => {
+    const { policy } = fixture({ installSupported: false });
+    expect(policy.preferences()).toMatchObject({ supported: true, installSupported: false, autoInstall: false });
+    await expect(policy.save({ autoInstall: true })).rejects.toThrow();
+  });
+  it("does not treat a completed system installer handoff as a failed restart", async () => {
+    const { policy, ports } = fixture({ installSupported: false });
+    const opened = { ...ports.state(), phase: "ready" as const, installPending: false, handoffComplete: true,
+      message: "Opened the system installer. Restart Mycellios when it finishes." };
+    ports.install.mockResolvedValueOnce(opened);
+    await policy.request("update"); await settle();
+    expect(policy.state()).toMatchObject({ relaunchError: false, relaunchPending: false });
+    // The same message without a completed handoff still fails loudly.
+    ports.install.mockResolvedValueOnce({ ...opened, handoffComplete: false });
+    await policy.request("update"); await settle();
+    expect(policy.state().relaunchError).toBe(true);
   });
 });
