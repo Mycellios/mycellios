@@ -38,6 +38,8 @@ try {
   for (let i = 0; i < 6; i++) {
     const box = await page.getByTestId(`mico-${i}`).locator(":scope > svg").boundingBox();
     assert.equal(box.width, 36); assert.equal(box.height, 36);
+    const body = await page.getByTestId(`mico-${i}`).locator(":scope > svg > svg").boundingBox();
+    assert.equal(body.width, 36); assert.equal(body.height, 36);
   }
   proof.scenarios.push("six eyeless bodies and independent original eye pads at 36px");
   await page.getByRole("button", { name: "All red", exact: true }).click();

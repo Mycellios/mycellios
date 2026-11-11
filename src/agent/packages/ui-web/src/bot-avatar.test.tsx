@@ -55,7 +55,7 @@ describe("BotAvatar", () => {
 
     const gradMatches = [...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
     expect(gradMatches).toHaveLength(2);
-    expect(new Set(gradMatches).size).toBe(4);
+    expect(new Set(gradMatches).size).toBe(2);
     for (const id of gradMatches) {
       expect(id).toBeTruthy();
       expect(html).toContain(`url(#${id})`);

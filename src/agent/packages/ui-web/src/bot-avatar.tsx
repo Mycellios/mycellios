@@ -314,7 +314,7 @@ function CompactVelvetAvatar({ id, art, color, eyeColor, look, size, shape, isWo
     <svg viewBox="0 0 64 64" aria-hidden="true" data-mico-avatar="plush" data-mico-compact=""
       data-mico-shape={shape} data-working={isWorking}
       className={cn("rakazo-bot-avatar shrink-0 select-none", className)} style={{ width: size, height: size }}>
-      <svg viewBox={`${x} ${y} ${side} ${side}`} width="64" height="64" overflow="hidden">
+      <svg viewBox={`${x} ${y} ${side} ${side}`} width="64" height="64" overflow="hidden" style={{ width: 64, height: 64 }}>
         <MicoPlushBody id={id} firstSheet={false} compact={art} tint={look.original ? undefined : color} />
       </svg>
       {look.eyes === 0 ? (
@@ -324,7 +324,7 @@ function CompactVelvetAvatar({ id, art, color, eyeColor, look, size, shape, isWo
               <g className="rakazo-compact-mico-eye" style={{ isolation: "isolate" }}>
                 {neutralEyePieces.map((piece, j) => (
                   <svg key={j} x={piece.x} y={piece.y} width={piece.w} height={piece.h}
-                    viewBox={piece.viewBox} preserveAspectRatio="none" style={{ mixBlendMode: "plus-lighter" }}>
+                    viewBox={piece.viewBox} preserveAspectRatio="none" style={{ width: piece.w, height: piece.h, mixBlendMode: "plus-lighter" }}>
                     <image href={eyePads[piece.src]} width="1" height="1" preserveAspectRatio="none" />
                   </svg>
                 ))}

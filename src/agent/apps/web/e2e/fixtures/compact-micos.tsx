@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MICO_COMPACT_AVATAR_INDEXES, micoAvatarValue, withMicoAvatarPalette } from "@rakazo/contracts";
-import { BotAvatar } from "@rakazo/ui-web";
+import { BotAvatar, Button } from "@rakazo/ui-web";
 import "../../src/styles.css";
 
 const names = ["Guide", "Builder", "Research", "Planner", "Support", "Studio"];
@@ -18,12 +18,12 @@ function Fixture() {
       </div>
       <section aria-label="Conversation list" style={{ width: 340, maxWidth: "100%" }}>
         {values.map((color, i) => (
-          <button key={i} data-mico-avatar-hover="" data-testid={`mico-${i}`} aria-label={names[i]}
+          <Button key={i} variant="ghost" data-mico-avatar-hover="" data-testid={`mico-${i}`} aria-label={names[i]}
             style={{ display: "flex", width: "100%", alignItems: "center", gap: 12, padding: 12, textAlign: "left", borderRadius: 10,
               background: i === 0 ? "var(--secondary)" : "transparent" }}>
             <BotAvatar color={color} identity={`fixture-${i}`} size={36} />
             <span><span style={{ display: "block", fontSize: 15 }}>{names[i]}</span><span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>Conversation preview</span></span>
-          </button>
+          </Button>
         ))}
       </section>
       <section aria-label="Compatibility" style={{ display: "flex", gap: 12, marginTop: 24 }}>
