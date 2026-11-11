@@ -47,6 +47,10 @@ export interface DesktopUpdateState {
   checkedAt: string | null;
   /** A user-requested restart waits without cancelling active or unsaved work. */
   installPending?: boolean;
+  /** A verified package is applied inside the app or handed to the system installer. */
+  installAction?: "restart" | "system-installer";
+  /** The verified package was handed to the system installer; the owner restarts after it runs. */
+  handoffComplete?: boolean;
   supportsForceRestart?: boolean;
   restartMode?: "whenIdle" | "now";
   waitingFor?: "local_work" | "unsaved_work";
@@ -74,6 +78,8 @@ export interface DesktopUpdatePreferences {
   supported: boolean;
   autoDownload: boolean;
   autoInstall: boolean;
+  /** Unattended installation stays off where the package manager applies the update. */
+  installSupported?: boolean;
 }
 
 export interface RakazoDesktopOAuthCallback {

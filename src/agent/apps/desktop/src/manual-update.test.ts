@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ManualUpdateController, ManualUpdateDiskSpaceError, windowsManualRelease, type ManualRelease } from "./manual-update.js";
+import { ManualUpdateController, ManualUpdateDiskSpaceError, catalogManualRelease, windowsManualRelease, type ManualPackageKind, type ManualRelease } from "./manual-update.js";
 
 const bytes = new Uint8Array(Buffer.from("MZcontrolled-installer-fixture"));
 const entry = { id: "windows-x64", version: "0.3.15", format: "EXE",
@@ -14,14 +14,16 @@ const catalog = { automaticUpdates: false, packages: [entry] };
 const folders: string[] = [];
 afterEach(async () => { for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true }); });
 async function fixture(overrides: { busy?: () => boolean; prepare?: () => Promise<boolean>; body?: Uint8Array;
-  autoDownload?: () => boolean; backgroundDownloads?: boolean; publishedRelease?: () => Promise<ManualRelease | null>; catalogUnavailable?: boolean } = {}) {
+  autoDownload?: () => boolean; backgroundDownloads?: boolean; publishedRelease?: () => Promise<ManualRelease | null>; catalogUnavailable?: boolean;
+  packageKind?: ManualPackageKind; installAction?: "restart" | "system-installer"; catalog?: unknown } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-")); folders.push(directory);
   const handoff = vi.fn(async () => {});
-  const request = vi.fn(async (url: string | URL | Request) => String(url).endsWith("desktop-downloads")
-    ? overrides.catalogUnavailable ? new Response(null, {status: 503}) : new Response(JSON.stringify(catalog)) : new Response(overrides.body ?? bytes));
+  const request = vi.fn(async (url: string | URL | Request) => String(url).includes("/public/v1/desktop-downloads")
+    ? overrides.catalogUnavailable ? new Response(null, {status: 503}) : new Response(JSON.stringify(overrides.catalog ?? catalog)) : new Response(overrides.body ?? bytes));
   const controller = new ManualUpdateController({ version: "0.3.13", directory: () => directory,
     fetch: request, busy: overrides.busy ?? (() => false), prepare: overrides.prepare ?? (async () => true), handoff,
-    autoDownload: overrides.autoDownload, backgroundDownloads: overrides.backgroundDownloads, publishedRelease: overrides.publishedRelease });
+    autoDownload: overrides.autoDownload, backgroundDownloads: overrides.backgroundDownloads, publishedRelease: overrides.publishedRelease,
+    packageKind: overrides.packageKind, installAction: overrides.installAction });
   return { controller, handoff, request, directory };
 }
 describe("official Windows manual releases", () => {
@@ -177,4 +179,60 @@ it("explicit restart bypasses continuous native work but never bypasses saving r
   saved=true;
   await vi.waitFor(()=>expect(handoff).toHaveBeenCalledTimes(1),{timeout:5000});
   expect(controller.state().restartMode).toBe("now");
+});
+
+const rpmBytes = new Uint8Array(Buffer.from("RPM-controlled-installer-fixture"));
+const fedoraEntry = { id: "fedora-x64", version: "0.3.32", format: "RPM",
+  fileName: "Mycellios-Desktop-0.3.32-fedora-x86_64.rpm",
+  path: "/downloads/desktop/releases/0.3.32/Mycellios-Desktop-0.3.32-fedora-x86_64.rpm",
+  bytes: rpmBytes.byteLength, sha256: createHash("sha256").update(rpmBytes).digest("hex"),
+  source: { path: "/downloads/desktop/releases/0.3.32/Mycellios-Desktop-0.3.32-source-e25994ba.tar.gz", sha256: "a".repeat(64) } };
+const fedoraCatalog = { ...catalog, fedora: fedoraEntry };
+
+describe("official Fedora manual releases", () => {
+  it("selects the RPM entry of the extended catalog for a Fedora installation", () => {
+    expect(catalogManualRelease(fedoraCatalog, "0.3.30", "fedora-x64")).toMatchObject({
+      version: "0.3.32", fileName: fedoraEntry.fileName,
+      url: "https://www.mycellios.com" + fedoraEntry.path });
+    expect(catalogManualRelease(fedoraCatalog, "0.3.32", "fedora-x64")).toBeNull();
+    // Another package kind never borrows this entry.
+    expect(() => catalogManualRelease(fedoraCatalog, "0.3.30", "linux-x64")).toThrow();
+    expect(catalogManualRelease(fedoraCatalog, "0.3.30", "windows-x64")).toBeNull();
+  });
+  it("accepts the RPM builder's build revision and rejects altered artifacts", () => {
+    const version = "0.3.32", fileName = "Mycellios-Desktop-0.3.32-2-fedora-x86_64.rpm";
+    const rebuilt = { ...fedoraEntry, fileName, path: `/downloads/desktop/releases/${version}/${fileName}` };
+    expect(catalogManualRelease({ fedora: rebuilt }, "0.3.30", "fedora-x64")?.fileName).toBe(fileName);
+    for (const patch of [{ fileName: "desktop.rpm" }, { path: "https://other.invalid/desktop.rpm" },
+      { path: "/downloads/../desktop.rpm" }, { sha256: "wrong" }, { bytes: 2_000_000_001 },
+      { bytes: 0 }, { version: "0.3.32-2" }, { format: "DEB" }])
+      expect(() => catalogManualRelease({ fedora: { ...fedoraEntry, ...patch } }, "0.3.30", "fedora-x64")).toThrow();
+    expect(() => catalogManualRelease({ packages: [entry] }, "0.3.30", "fedora-x64")).toThrow();
+  });
+  it("downloads the verified RPM and hands it to the system installer without quitting", async () => {
+    const { controller, handoff, request, directory } = await fixture({ packageKind: "fedora-x64",
+      installAction: "system-installer", catalog: fedoraCatalog, body: rpmBytes });
+    expect(controller.state()).toMatchObject({ installAction: "system-installer", supportsForceRestart: false });
+    expect(await controller.check(true)).toMatchObject({ phase: "ready", availableVersion: "0.3.32" });
+    expect(request.mock.calls[0]?.[0]).toBe("https://www.mycellios.com/public/v1/desktop-downloads");
+    expect(await readFile(path.join(directory, fedoraEntry.fileName))).toEqual(Buffer.from(rpmBytes));
+    await controller.install();
+    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(controller.state()).toMatchObject({
+      phase: "ready", installPending: false, handoffComplete: true,
+      message: "Opened the system installer. Restart Mycellios when it finishes.",
+    }));
+  });
+  it("keeps an unchanged staged RPM ready after a failed system installer handoff", async () => {
+    const { controller, handoff } = await fixture({ packageKind: "fedora-x64",
+      installAction: "system-installer", catalog: fedoraCatalog, body: rpmBytes });
+    handoff.mockRejectedValueOnce(new ManualUpdateDiskSpaceError());
+    await controller.check(true);
+    await controller.install();
+    await vi.waitFor(() => expect(controller.state()).toMatchObject({
+      phase: "ready", installPending: false, message: "Free at least 6 GB of disk space before restarting to update." }));
+    expect(controller.state().handoffComplete).not.toBe(true);
+    await controller.install();
+    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(2));
+  });
 });

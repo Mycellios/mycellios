@@ -5,6 +5,23 @@ HTTPS download catalog. Verified newer packages may download in the background; 
 install waits for local work, renderer sends/uploads/calls and unsaved forms;
 saved text drafts are retained in the existing profile, never sent implicitly.
 
+## Linux packages
+
+The same catalog check serves the Fedora RPM and the Debian DEB. The native host
+identifies which package owns the running executable through its package database,
+reads only that entry of the extended catalog and verifies version, exact file
+name, byte size and SHA-256. AppImages, unpackaged builds and unowned executables
+receive no offer, because replacing them is not a package operation.
+
+Installation stays explicit and manual: the verified package is opened with the
+system installer, which owns authentication and elevation. The app never runs the
+package manager itself and never restarts into an update it did not install. The
+panel reports the handoff, keeps the window usable and asks the owner to reopen
+Mycellios after the installer exits. Unattended installation is reported as
+unsupported so no background restart can be armed. A new version is only offered
+after the published catalog entry itself moves, so a missing Fedora entry leaves
+the check honest instead of inventing a download.
+
 The native host selects the platform, URL, exact version, byte size and SHA-256.
 Renderers cannot provide installer paths or commands. Reject other origins,
 redirects, unsafe paths, downgrades, altered payloads and unbounded responses.

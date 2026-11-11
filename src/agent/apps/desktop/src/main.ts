@@ -7,9 +7,10 @@ import { installDesktopCompanions } from "./desktop-companions.js";
 import { FloatingChats } from "./floating-chats.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
-import { ManualUpdateController, requireManualUpdateSpace } from "./manual-update.js";
+import { DESKTOP_CATALOG_ALL_URL, ManualUpdateController, requireManualUpdateSpace } from "./manual-update.js";
 import { publishedWindowsRelease } from "./published-desktop-release.js";
 import { acknowledgeManualUpdate, launchManualUpdate } from "./manual-update-handoff.js";
+import { linuxPackageKind } from "./linux-package.js";
 import { saveUpdateResume, restoreUpdateBinding } from "./update-resume.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -144,6 +145,13 @@ let warmWindowTimer: NodeJS.Timeout | undefined;
 let liveProbeWindows = 0;
 const WARM_WINDOW_TTL_MS = warmWindowTtlMs(process.env.RAKAZO_WARM_WINDOW_TTL_MS);
 
+/** A verified RPM/DEB installs through the system package manager, so the app only hands it over. */
+async function openSystemInstaller(file: string): Promise<void> {
+  await requireManualUpdateSpace(app.getPath("userData"), process.execPath);
+  const failure = await shell.openPath(file);
+  if (failure) throw Error(failure);
+}
+
 const updaterEnvironment = {
   packaged: app.isPackaged,
   version: app.getVersion(),
@@ -160,15 +168,22 @@ const automaticDesktopUpdater = new DesktopUpdateController(
     quitting = false;
   },
 );
-const manualDesktopUpdater = process.platform === "win32" && process.arch === "x64" && app.isPackaged
+// Fedora RPM and Debian DEB installations update from the same signed catalog as
+// Windows; AppImages and unpackaged builds own no package and get no offer.
+const linuxPackage = process.platform === "linux" && process.arch === "x64" && app.isPackaged
+  ? linuxPackageKind(process.execPath)
+  : null;
+const manualDesktopUpdater = (process.platform === "win32" || linuxPackage !== null) && process.arch === "x64" && app.isPackaged
   ? new ManualUpdateController({
     version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
     backgroundDownloads: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1",
     autoDownload: () => updatePreferences?.preferences().autoDownload ?? true,
-    publishedRelease: () => publishedWindowsRelease(app.getVersion()),
+    ...(linuxPackage
+      ? { packageKind: linuxPackage, catalogUrl: DESKTOP_CATALOG_ALL_URL, installAction: "system-installer" as const }
+      : { publishedRelease: () => publishedWindowsRelease(app.getVersion()) }),
     busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
     prepare: prepareRendererUpdate,
-    handoff: async (file, release) => {
+    handoff: linuxPackage ? file => openSystemInstaller(file) : async (file, release) => {
       const profile = app.getPath("userData");
       await requireManualUpdateSpace(profile, process.execPath);
       const win = mainWindow;
@@ -1328,6 +1343,8 @@ app.whenReady().then(async () => {
   updatePreferences = new UpdatePreferences({
     packaged: app.isPackaged,
     allowed: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1" && Boolean(manualDesktopUpdater || updaterSupport(updaterEnvironment).supported),
+    // Only a same-user Windows handoff installs unattended; a package manager needs the owner.
+    installSupported: process.platform === "win32",
     read: () => readPrivateFile(path.join(userDataDir, "update-preferences.json"), 4096).catch(() => null),
     write: raw => writePrivateFile(path.join(userDataDir, "update-preferences.json"), raw),
     state: () => desktopUpdater.state(), download: () => desktopUpdater.download(), install: () => installUpdate(),
