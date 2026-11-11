@@ -1,5 +1,18 @@
 # Status and evidence
 
+## Compact velvet Micos candidate — 2026-11-11
+
+The six approved compact mushroom/animal bodies use an eyeless transparent WebP
+atlas and independent neutral felt-eye artwork/projection from MIT Bloub 0.6.4.
+Every body accepts the saved palette through luminance tinting, preserving its
+texture, highlight and alpha independently of the eyes. No API permission or
+database schema changes are involved. Saved uploads, explicit flat/custom-eye and
+original-color choices, other animals and the existing avatar value slots remain
+available. The body stays still while hover/working eyes move, respecting reduced
+motion. Web is shared with server-hosted Desktop/Android web surfaces; existing
+native Expo vector rendering is retained and no installed binary qualification is
+implied. Validation and server publication need independent exact-revision evidence.
+
 ## Conversation responsiveness — published 2026-11-11
 
 The conversation shows a local pending user message before send acknowledgement,

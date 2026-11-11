@@ -166,6 +166,20 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  [data-mico-compact][data-working="true"] .rakazo-mico-gaze {
+    animation: rakazo-mico-look 3.2s ease-in-out infinite;
+  }
+
+  [data-mico-compact][data-working="true"] .rakazo-compact-mico-eye,
+  [data-mico-compact]:hover .rakazo-compact-mico-eye {
+    animation: rakazo-compact-mico-blink 3.2s ease-in-out infinite;
+  }
+
+  @keyframes rakazo-compact-mico-blink {
+    0%, 40%, 48%, 100% { clip-path: inset(0); }
+    44% { clip-path: inset(49% 0); }
+  }
+
   .rakazo-mico-gaze {
     transform-box: view-box;
     transition: transform 170ms ease-out;

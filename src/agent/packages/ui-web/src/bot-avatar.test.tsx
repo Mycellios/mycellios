@@ -13,9 +13,9 @@ import {
 } from "./bot-avatar.js";
 
 describe("BotAvatar", () => {
-  it("draws each animal as a solid silhouette with capsule eyes by default", () => {
+  it("retains the explicitly selected flat silhouettes and capsule eyes", () => {
     const silhouettes = MICO_AVATAR_DEFAULT_SHAPES.map(({ index, originalColor }) => {
-      const html = renderToString(<BotAvatar color={micoAvatarValue(index, originalColor)} size={26} />);
+      const html = renderToString(<BotAvatar color={micoAvatarValue(index, originalColor, { eyes: 0, finish: "flat", original: true })} size={26} />);
       expect(html).toContain('data-mico-avatar="flat"');
       expect(html).toContain('viewBox="0 0 64 64"');
       expect(html).toContain(`fill="${originalColor}"`);
@@ -54,8 +54,8 @@ describe("BotAvatar", () => {
     );
 
     const gradMatches = [...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
-    expect(gradMatches).toHaveLength(4);
-    expect(new Set(gradMatches).size).toBe(4);
+    expect(gradMatches).toHaveLength(2);
+    expect(new Set(gradMatches).size).toBe(2);
     for (const id of gradMatches) {
       expect(id).toBeTruthy();
       expect(html).toContain(`url(#${id})`);
@@ -65,7 +65,7 @@ describe("BotAvatar", () => {
   // Button sizes any SVG without a size class, which beats width/height attributes but not inline styles.
   it("sizes the shape with an inline style so icon sizing in a button cannot shrink it", () => {
     const html = renderToString(<BotAvatar color="#8B5CF6::shape_0" size={26} />);
-    const shape = html.match(/<svg[^>]*data-mico-avatar="flat"[^>]*>/)?.[0];
+    const shape = html.match(/<svg[^>]*data-mico-avatar="(?:flat|plush)"[^>]*>/)?.[0];
     expect(shape).toMatch(/style="[^"]*width:26px;height:26px/);
   });
 
@@ -157,8 +157,8 @@ describe("BotAvatar", () => {
     const html = renderToString(
       <BotAvatar color="#8B5CF6::shape_0" identity="maya" size={32} status="running" />,
     );
-    expect(html).toContain('data-mico-avatar="flat"');
-    expect(html.match(/class="rakazo-mico-eye"/g)).toHaveLength(2);
+    expect(html).toContain('data-mico-compact=""');
+    expect(html.match(/class="rakazo-compact-mico-eye"/g)).toHaveLength(2);
     expect(html).not.toContain("animate-pulse");
   });
 
@@ -182,7 +182,7 @@ describe("BotAvatar", () => {
     const shaped = renderToString(
       <BotAvatar color={`${DEFAULT_BOT_AVATAR_COLOR}::shape_3`} identity="maya" />,
     );
-    expect(restored).toContain('data-mico-avatar="flat"');
+    expect(restored).toMatch(/data-mico-avatar="(?:flat|plush)"/);
     expect(shaped).toContain('data-mico-avatar="flat"');
     expect(restored.match(/data-mico-shape="([^"]+)"/)?.[1]).not.toBe(shaped.match(/data-mico-shape="([^"]+)"/)?.[1]);
   });
@@ -201,12 +201,12 @@ describe("BotAvatar", () => {
       <BotShapePreview identity="maya" label="Shape 1" color="#8B5CF6" selected={false} />,
     );
     expect(html).toContain('aria-label="Shape 1"');
-    expect(html).toContain('data-mico-avatar="flat"');
+    expect(html).toMatch(/data-mico-avatar="(?:flat|plush)"/);
   });
 
   it("draws plain-colour bots with the current mascot collection", () => {
     const html = renderToString(<BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} identity="maya" />);
-    expect(html).toContain('data-mico-avatar="flat"');
+    expect(html).toMatch(/data-mico-avatar="(?:flat|plush)"/);
     expect(html).not.toContain("rakazo-bot-avatar-visor");
   });
 
@@ -229,8 +229,18 @@ describe("BotAvatar", () => {
 
   it("uses a safe fallback when the custom color is invalid", () => {
     const html = renderToString(<BotAvatar color="#zzzzzz" identity="maya" />);
-    expect(html).toContain('data-mico-avatar="flat"');
-    expect(html).not.toContain("<feComponentTransfer");
+    expect(html).toMatch(/data-mico-avatar="(?:flat|plush)"/);
+    expect(html).not.toContain("NaN");
     expect(html).not.toContain("#zzzzzz");
+  });
+
+  it("draws separate original Bloub eye pads over the eyeless compact body", () => {
+    const html = renderToString(<BotAvatar color={micoAvatarValue(1001, "#C94A51")} size={36} />);
+    expect(html).toContain('data-mico-compact=""');
+    expect(html).toContain('data-mico-eye-source="bloub-0.6.4"');
+    expect(html).toContain("micos-compact-eyeless.webp");
+    expect(html).toContain("bloub-eye-y.webp");
+    expect(html).not.toContain("<linearGradient");
+    expect(html).toContain("<feComponentTransfer");
   });
 });

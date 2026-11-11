@@ -38,7 +38,7 @@ describe("bot avatar values", () => {
 
   it("round-trips the branded shape and lets each choice change independently", () => {
     const fox = withMicoAvatarShape("", 1001);
-    expect(fox).toBe("#D47046::shape_2432");
+    expect(fox).toBe("#D47046::shape_2033");
     const mintFox = withMicoAvatarPalette(fox, "#67B793");
     expect(parseBotAvatarValue(mintFox)).toEqual({
       kind: "shape", color: "#67B793", shapeIndex: 1001,
@@ -46,7 +46,7 @@ describe("bot avatar values", () => {
     expect(parseBotAvatarValue(withMicoAvatarShape(mintFox, 1011))).toEqual({
       kind: "shape", color: "#67B793", shapeIndex: 1011,
     });
-    expect(micoAvatarDetails(mintFox)).toEqual({ eyes: 0, finish: "flat", original: false });
+    expect(micoAvatarDetails(mintFox)).toEqual({ eyes: 0, finish: "plush", original: false });
     expect(UpdateBotInput.safeParse({ botId: "bot-1", color: mintFox }).success).toBe(true);
     expect(parseBotAvatarValue("#8B5CF6::shape_9")).toMatchObject({ shapeIndex: 1 });
   });
