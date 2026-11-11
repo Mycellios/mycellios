@@ -1,11 +1,11 @@
-# Desktop release: Linux packages in the publish pipeline (2026-11-11)
+# Desktop release: Linux and macOS packages in the publish pipeline (2026-11-11)
 
-Client versions from 0.3.40 include the Linux update path: an installed RPM or
-DEB queries the desktop catalog, verifies the exact file and SHA-256, and hands
-the package to the system installer. The code is in `main` (0.3.41). What is
-still missing is the release side: the publish pipeline only ships Windows, so
-`fedora` stays at 0.3.32 and no Fedora or Debian user can reach a build that
-contains the fix.
+Client versions from 0.3.40 include the Linux update path and from 0.3.44 the
+macOS one: an installed RPM, DEB or disk image queries the desktop catalog,
+verifies the exact file and SHA-256, and hands it to the system installer (or
+mounts the image). The code is in `main`. What is still missing is the release
+side: the publish pipeline only ships Windows, so `fedora` stays at 0.3.32 and no
+Fedora or Debian user can reach a build that contains the fix.
 
 ## What publishing has to add
 
@@ -70,6 +70,16 @@ published.
 - Preserve the existing entries when a deploy swaps the directory: the current
   pipeline already keeps other platforms (`otherPlatformsPreserved`), and the
   same must hold for `fedora`, `linux-x64` and `macos-*`.
+
+## macOS
+
+The same step publishes the disk images with `--macos`. Each architecture is
+listed only in the catalogs that already carry it: `macos-arm64` in
+`catalog-macos.json` and both architectures in `catalog-macos-all.json`. The
+client picks the image that matches the running architecture and opens it; the
+owner drags the app to Applications and reopens it, because a disk image has no
+package database to replace in place. A preview image is ad-hoc signed, so
+Gatekeeper still warns and `automaticUpdates` stays off.
 
 ## Debian and Ubuntu
 
