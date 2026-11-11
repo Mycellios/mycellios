@@ -24,6 +24,11 @@
   a private connection fails. Verify tailscale contract/adapter, MCP connector/OAuth,
   gateway and deployment tests, `scripts/verify-tailscale-db.ts` and
   `scripts/verify-tailscale-ui.mjs`. Fixtures do not qualify real Tailscale consent.
+  The gateway qualification workflow builds the exact Docker image and tests a
+  real ephemeral Headscale-controlled Tailscale network. Its private MCP fixture
+  listens only on peer loopback; `scripts/verify-tailscale-live.ts` uses isolated
+  PostgreSQL and the actual Mico connector. Never run its fixtures on production.
+  Headscale transport evidence does not certify Tailscale SaaS browser consent.
 
 - The workspace selector opens Space settings independently of personal Settings.
   Bind each Space panel and its writes to the Space being edited, even when the

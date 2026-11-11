@@ -30,6 +30,6 @@ assert.equal(url.protocol, 'https:');
 assert.equal(url.hostname, 'login.tailscale.com');
 await control('remove');
 const receipt = { nativeDaemon: true, unprivilegedUserspace: true, gatewayAuthentication: true,
-  officialDeviceConsent: true, logout: true, liveTailnet: false };
+  officialDeviceConsentUrl: true, saasConsentCompleted: false, logout: true, liveTailnet: false };
 if (process.argv[2]) await writeFile(process.argv[2], `${JSON.stringify(receipt, null, 2)}\n`);
 console.log(JSON.stringify(receipt));

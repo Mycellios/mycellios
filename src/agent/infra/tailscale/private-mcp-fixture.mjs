@@ -2,8 +2,10 @@
 // is the only network ingress. The counter detects unauthorized upstream calls.
 import { createServer } from 'node:http';
 let calls = 0;
+let requests = 0;
 createServer(async (req, res) => {
-  if (req.url === '/counter') return res.end(JSON.stringify({ calls }));
+  if (req.url === '/counter') return res.end(JSON.stringify({ calls, requests }));
+  requests++;
   if (req.method !== 'POST') return res.writeHead(405).end();
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);

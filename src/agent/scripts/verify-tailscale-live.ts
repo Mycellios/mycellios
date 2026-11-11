@@ -18,7 +18,7 @@ const connector = new McpConnector(prisma, new EncryptedSecretStore("isolated-qu
 const owner = { spaceId: "qualification-space", userId: "qualification-owner" };
 const context = (botId = "allowed-mico") => ({ ...owner, botId, operationId: "qualification", traceId: "qualification", signal: AbortSignal.timeout(90_000) });
 const counter = () => JSON.parse(execFileSync("docker", ["exec", "tailnet-peer", "node", "-e",
-  "fetch('http://127.0.0.1:8081/counter').then(r=>r.text()).then(console.log)"], { encoding: "utf8" })).calls;
+  "fetch('http://127.0.0.1:8081/counter').then(r=>r.text()).then(console.log)"], { encoding: "utf8" }));
 const execute = async (ctx = context()) => {
   const events = [];
   for await (const event of connector.execute({ tool: "mcp__private__read", args: {}, executionId: "qualification",
@@ -29,7 +29,7 @@ const blocked = async (ctx: ReturnType<typeof context>, label: string) => {
   const before = counter();
   const events = await execute(ctx);
   assert.ok(events.some(e => e.type === "error"), `${label}: explicit refusal`);
-  assert.equal(counter(), before, `${label}: no request reached the private tool`);
+  assert.deepEqual(counter(), before, `${label}: no request reached the private MCP`);
 };
 try {
   const now = new Date();
@@ -38,6 +38,11 @@ try {
   await prisma.member.create({ data: { id: "qualification-member", organizationId: "qualification-org", userId: owner.userId, role: "owner", createdAt: now } });
   await prisma.space.create({ data: { id: owner.spaceId, organizationId: "qualification-org", name: "Qualification" } });
   await prisma.spaceMember.create({ data: { id: "qualification-membership", ...owner, organizationId: "qualification-org", role: "owner", createdAt: now } });
+  await prisma.user.create({ data: { id: "other-owner", name: "Other member", email: "other@example.invalid" } });
+  await prisma.member.create({ data: { id: "other-member", organizationId: "qualification-org", userId: "other-owner", role: "member", createdAt: now } });
+  await prisma.spaceMember.create({ data: { id: "other-membership", spaceId: owner.spaceId, userId: "other-owner", organizationId: "qualification-org", createdAt: now } });
+  await prisma.space.create({ data: { id: "other-space", organizationId: "qualification-org", name: "Other Space" } });
+  await prisma.spaceMember.create({ data: { id: "other-space-membership", spaceId: "other-space", userId: owner.userId, organizationId: "qualification-org", role: "owner", createdAt: now } });
   for (const id of ["allowed-mico", "denied-mico", "unassigned-mico"]) {
     await prisma.bot.create({ data: { id, ...owner, name: id, color: "green" } });
   }
@@ -60,7 +65,7 @@ try {
   assert.ok(tools.some(t => t.name === "mcp__private__read"), `authorized Mico discovers private tool: ${JSON.stringify(tools)}`);
   const allowed = await execute();
   assert.ok(allowed.some(e => e.type === "result" && JSON.stringify(e).includes("private-tailnet-ok")), JSON.stringify(allowed));
-  assert.equal(counter(), 1);
+  assert.equal(counter().calls, 1);
   assert.equal((await connector.discoverTools(context("denied-mico"))).length, 0);
   await blocked(context("denied-mico"), "Mico without network grant");
   await blocked(context("unassigned-mico"), "Mico without MCP assignment");
@@ -78,6 +83,10 @@ try {
   await prisma.tailnetPolicy.updateMany({ where: { spaceId: owner.spaceId }, data: { enabled: false } });
   await blocked(context(), "Revoked company policy");
   await tailnets.reconcile();
+  const afterRevocation = await fetch(`http://127.0.0.1:8095/nodes/${network.id}/status`, { method: "POST",
+    headers: { authorization: `Bearer ${process.env.TAILSCALE_GATEWAY_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify({ dnsSuffix: network.suffix }) });
+  assert.equal((await afterRevocation.json()).status, "needs_auth", "Revocation logged the real device out");
   await writeFile(receipt, JSON.stringify({ ...network, passed: true, database: "isolated PostgreSQL", actualMicoConnector: true,
     checks: ["private discovery and execution", "network grant denial", "MCP assignment denial", "owner isolation", "Space isolation", "tool allowlist", "cached-session revocation", "company policy revocation"],
     fullLlmRun: false }, null, 2));

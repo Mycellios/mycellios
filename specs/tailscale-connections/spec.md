@@ -1,6 +1,7 @@
 # Tailscale connections
 
-Status: implementation candidate; no live tailnet or production qualification yet.
+Status: implementation candidate. Current qualification is recorded only in
+`docs/STATUS_AND_EVIDENCE.md`; deployment needs a revision-bound release receipt.
 
 Conexiones owns personal and company tailnets. Each consenting member gets an
 independent userspace Tailscale device per Space/network. Existing MCP servers
@@ -34,5 +35,7 @@ public listener or Docker socket. No global private-endpoint flag is enabled.
 
 Validation: focused contract, authorization, gateway and connector regression
 tests; isolated PostgreSQL migration/RLS checks; web interaction checks and
-incremental typing. Real enrollment and two-account/private-MCP acceptance need
-real Tailscale consent and are separately reported, never inferred from fixtures.
+incremental typing. The gateway workflow adds real userspace transport through an
+ephemeral Headscale-controlled network and an actual Mico connector/PostgreSQL
+admission test. This does not certify the separate Tailscale SaaS consent flow or
+a full LLM run. Deployment and real account enrollment are separately reported.

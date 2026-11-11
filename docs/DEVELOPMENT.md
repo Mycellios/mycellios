@@ -58,6 +58,18 @@ acceptance checks. Publishing a gateway image, migrating production and releasin
 the web/Desktop UI follow the normal release policy and are not performed by
 these checks.
 
+The focused `tailscale-gateway.yml` workflow builds the exact Linux image, obtains
+an official Tailscale device-login URL and then creates a disposable network with
+two real userspace Tailscale clients and Headscale 0.29.6. Its MCP fixture has only
+loopback ingress through Tailscale Serve. `verify-tailscale-live.ts` uses isolated
+PostgreSQL and the actual Mico connector to check access, independent network/MCP/
+tool grants, owner/Space isolation and cached-session/company-policy revocation.
+The private server counts upstream requests so denials cannot pass by returning
+an error after contacting it. The receipt distinguishes real encrypted transport
+from Tailscale SaaS consent and from a full LLM-driven Mico run. Never point these
+fixtures at production. Image checksums and the source revision accompany the
+uploaded gateway artifact; publication still needs its own health and rollback.
+
 ## Proportional remote delivery
 
 Remote CI is the primary validation route. Local checks provide optional early

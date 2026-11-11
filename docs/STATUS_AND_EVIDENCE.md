@@ -1,6 +1,6 @@
 # Status and evidence
 
-## Tailscale private MCP connections — local candidate, 2026-11-11
+## Tailscale private MCP connections — qualification candidate, 2026-11-11
 
 Conexiones has personal and company tailnet enrollment, explicit per-Mico network
 grants and an MCP network selector. Each user/Space/network uses a separate
@@ -20,13 +20,24 @@ additive migration, legacy MCP compatibility, network FK and owner/Space RLS
 checks. The real network/MCP components pass synthetic browser interactions at
 desktop and 390px widths. Synthetic RPCs and MCP emulation are not a live tailnet.
 
-NOT QUALIFIED: gateway Docker image build/startup (the local Docker engine was
-unavailable), real Tailscale enrollment, a real private MCP call, live two-account
-isolation, production migration/deployment and a new packaged Desktop release.
-Full CI remains paused. The older general Compose environment audit reports
+  The Linux gateway Docker build and unprivileged native startup passed in hosted
+  CI. Run `42985962400` enrolled two real userspace Tailscale clients in a disposable
+  Headscale 0.29.6 network, verified encrypted peer reachability and executed the
+  private MCP through the actual Mico connector and isolated PostgreSQL. Network,
+  MCP and tool grants, owner/Space isolation, cached-session revocation and company
+  policy revocation passed. Both clients ran in separate containers on one hosted
+  runner; this is not physical two-host evidence. The migration history applied
+  successfully, separately from the focused PostgreSQL RLS qualification.
+
+  Native startup obtained a real official Tailscale device-consent URL. Completed
+  Tailscale SaaS browser consent, a full LLM-driven Mico run and a new packaged
+  Desktop release are NOT QUALIFIED by these checks. Production publication needs
+  its own exact-revision build, deployment/rollback receipts and health checks.
+  Full suites remain paused. The older general Compose environment audit reports
 missing pre-existing non-Tailscale settings; the focused Tailscale comparison
 passes and does not enable global private egress. No release or production
-capability is claimed. See `DEVELOPMENT.md` and `specs/tailscale-connections/spec.md`.
+  capability follows from validation alone. See `DEVELOPMENT.md` and
+  `specs/tailscale-connections/spec.md`.
 
 ## Desktop-owned Mico execution candidate - 2026-11-07
 
