@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import { SupabaseAuthService } from "../src/coordinator/supabase-auth.js";
 
 describe("Supabase network authorization", () => {
+  it.each([true, false, "true", undefined])("accepts email verification only from the authoritative userinfo boolean: %s", async verified => {
+    const issuer = "https://product.example.test/agent/auth/v1";
+    const token = `header.${Buffer.from(JSON.stringify({ iss: issuer, sub: "user-1", client_id: "agent-app", email_verified: true })).toString("base64url")}.signature`;
+    let calls = 0;
+    const auth = new SupabaseAuthService("https://auth.example.test", "service", async () => ++calls === 1
+      ? new Response(null, { status: 401 }) : Response.json({ sub: "user-1", email: "user@example.test", email_verified: verified }), ["agent-app"], issuer);
+    expect((await auth.authenticate(token))?.emailVerified === true).toBe(verified === true);
+  });
   const issuer = "https://product.example.test/agent/auth/v1";
   const oauthToken = (extra: Record<string, unknown> = {}) => `header.${Buffer.from(JSON.stringify({ iss: issuer, sub: "user-1", client_id: "agent-app", ...extra })).toString("base64url")}.signature`;
   it("verifies the separate pinned OAuth authority without forwarding a service key or network role", async () => {

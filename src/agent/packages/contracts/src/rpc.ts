@@ -1,4 +1,5 @@
 import { TailnetConnectionInput, TailnetConnectionSchema, TailnetSuffix } from "./tailscale.js";
+import { ReferralOwnerInput, ReferralInviteSchema, ReferralRedemptionSchema } from "./referrals.js";
 import { NotificationSettingsSchema, WebPushSubscriptionSchema } from "./notification-settings.js";
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
@@ -212,6 +213,10 @@ const threadSendInput = threadTarget
 const spaceName = z.string().trim().min(1).max(60);
 
 export const appContract = {
+  referrals: {
+    invite: oc.input(ReferralOwnerInput).output(ReferralInviteSchema),
+    redeem: oc.input(ReferralOwnerInput).output(ReferralRedemptionSchema),
+  },
   analytics: { screen: oc.input(AnalyticsScreenInput).output(z.object({ ok: z.literal(true) })) },
   aiConsent: {
     status: oc.input(AiConsentQuerySchema).output(AiConsentStatusSchema),

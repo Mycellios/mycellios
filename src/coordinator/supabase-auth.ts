@@ -6,6 +6,7 @@ export interface AuthenticatedNetworkUser {
   id: string;
   email: string | null;
   role: NetworkRole | null;
+  emailVerified?: boolean;
 }
 
 export class SupabaseAuthService {
@@ -35,7 +36,7 @@ export class SupabaseAuthService {
     if (!userResponse.ok) {
       throw new Error(`Supabase Auth returned HTTP ${userResponse.status}.`);
     }
-    const user = await userResponse.json() as { id?: unknown; email?: unknown };
+    const user = await userResponse.json() as { id?: unknown; email?: unknown; email_confirmed_at?: unknown };
     if (typeof user.id !== "string") return null;
     // Inspect claims only after Auth has verified the bearer. OAuth app tokens
     // must never inherit the account's network administrator role.
@@ -45,7 +46,8 @@ export class SupabaseAuthService {
       catch { return null; }
       if (claims.client_id !== undefined) {
         if (typeof claims.client_id !== "string" || !this.trustedOAuthClientIds.includes(claims.client_id)) return null;
-        return { id: user.id, email: typeof user.email === "string" ? user.email : null, role: null };
+        return { id: user.id, email: typeof user.email === "string" ? user.email : null, role: null,
+          ...(typeof user.email_confirmed_at === "string" && user.email_confirmed_at ? { emailVerified: true } : {}) };
       }
     }
     const roleResponse = await this.fetchImpl(
@@ -72,6 +74,7 @@ export class SupabaseAuthService {
       id: user.id,
       email: typeof user.email === "string" ? user.email : null,
       role: isNetworkRole(role) ? role : null,
+      ...(typeof user.email_confirmed_at === "string" && user.email_confirmed_at ? { emailVerified: true } : {}),
     };
   }
 
@@ -102,10 +105,11 @@ export class SupabaseAuthService {
       chunks.push(value);
     }
     const raw = Buffer.concat(chunks).toString("utf8");
-    let user: { sub?: unknown; email?: unknown };
+    let user: { sub?: unknown; email?: unknown; email_verified?: unknown };
     try { user = JSON.parse(raw) as typeof user; } catch { return null; }
     if (typeof user.sub !== "string" || user.sub !== claims.sub) return null;
-    return { id: user.sub, email: typeof user.email === "string" ? user.email : null, role: null };
+    return { id: user.sub, email: typeof user.email === "string" ? user.email : null, role: null,
+      ...(user.email_verified === true ? { emailVerified: true } : {}) };
   }
 }
 

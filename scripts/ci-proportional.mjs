@@ -14,6 +14,7 @@ export function planChecks(files) {
   const code = files.filter(f => /\.[cm]?[jt]sx?$/.test(f) && !f.endsWith('.d.ts'));
   const visual = f => /\.(md|png|svg|jpg|webp|css|po)$/.test(f);
   const root = files.some(f => !visual(f) && /^(src\/(?!agent\/)|landing\/|mobile\/|tests\/|scripts\/.*\.ts$|tsconfig|vite\.|vitest\.|package(?:-lock)?\.json$)/.test(f))
+    || files.includes('scripts/test-referrals-postgres.mjs')
     || files.some(f => /^scripts\/.*\.test\.[cm]?js$/.test(f) && f !== 'scripts/ci-fast-delivery.test.mjs');
   const agent = files.some(f => f.startsWith('src/agent/') && !visual(f));
   const desktopDownloadBrowserTest = 'scripts/desktop-macos/download-page.test.mjs';
@@ -37,6 +38,11 @@ export function planChecks(files) {
   if (root) {
     add('.', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'root locked dependencies');
     for (const script of ['verify:structure', 'verify:architecture', 'verify:component-boundaries']) add('.', 'npm', ['run', script], script);
+    if (files.some(f => ['src/economy/referrals.ts', 'src/economy/promotional-credits.ts',
+      'src/economy/contribution-credit-wallet.ts', 'src/coordinator/referral-routes.ts',
+      'src/coordinator/supabase-auth.ts', 'src/coordinator/server.ts',
+      'tests/referrals.postgres.test.ts', 'scripts/test-referrals-postgres.mjs'].includes(f)))
+      add('.', 'node', ['scripts/test-referrals-postgres.mjs'], 'referrals real PostgreSQL acceptance');
     const config = files.some(f => /^(package|tsconfig|vitest\.|vite\.)/.test(f));
     for (const [prefix, script] of [['src/', 'typecheck'], ['landing/', 'landing:typecheck'], ['mobile/', 'mobile:typecheck']]) {
       if (config || files.some(f => f.startsWith(prefix) && !f.startsWith('src/agent/'))) add('.', 'npm', ['run', script, '--', '--incremental', '--tsBuildInfoFile', `.ci/${script.replaceAll(':', '-')}.tsbuildinfo`], script);

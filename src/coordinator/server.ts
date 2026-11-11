@@ -2,6 +2,8 @@ import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
 import { createInferenceSettlement } from "./settle-completed-inference.js";
 import { beginContributionUsage } from "./contribution-funding.js";
 import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
+import { Referrals } from "../economy/referrals.js";
+import { mountReferralRoutes } from "./referral-routes.js";
 import { AsyncTaskScope, coalesceAsync } from "../core/async-task-scope.js";
 import { flatMapAsync, mapAsync } from "../core/async-collections.js";
 import { InferenceRouteRecovery } from "./inference-route-recovery.js";
@@ -678,7 +680,10 @@ export async function createCoordinator(
     privateKey: config.economicReceiptSigningPrivateKey ?? developmentEconomicKey!,
   };
   const economicLedger = new EconomicLedger(database, { receiptSigning });
-  const creditWallet = config.contributionCreditFunding ? new ContributionCreditWallet(database, economicLedger) : null;
+  if (config.referralRewardsEnabled && !config.contributionCreditFunding) throw new Error("Referral rewards require the credit wallet");
+  const creditWallet = config.contributionCreditFunding ? new ContributionCreditWallet(database, economicLedger, config.referralRewardsEnabled) : null;
+  const referrals = config.referralRewardsEnabled ? new Referrals(database, config.referralEmailPepper ?? "") : null;
+  await referrals?.initialize();
   if (creditWallet) await creditWallet.initialize();
   const executionReceipts = new ExecutionReceiptStore(database, receiptSigning);
   const modelCertifications = config.modelCertificationPinnedKeys?.length
@@ -870,6 +875,7 @@ export async function createCoordinator(
         kind: "user";
         userId: string;
         email: string | null;
+        emailVerified?: boolean;
         role: AuthenticatedNetworkUser["role"];
       }
     | ApiKeyPrincipal;
@@ -888,7 +894,8 @@ export async function createCoordinator(
   app.addHook("preHandler", async (request, reply) => {
     if (request.method === "OPTIONS") return;
     const path = request.url.split("?", 1)[0] ?? request.url;
-    if (!path.startsWith("/v1/") || path === "/v1/auth/me") return;
+    if (!path.startsWith("/v1/") || path === "/v1/auth/me" ||
+        (config.referralRewardsEnabled && /^\/v1\/referrals\/visit\/[A-Za-z0-9_-]{43}$/.test(path))) return;
     if (!apiAccessEnabled && !isAccountNodeRoute(path)) return;
     const token = parseBearerToken(request.headers.authorization);
     if (!token) {
@@ -933,6 +940,7 @@ export async function createCoordinator(
         kind: "user",
         userId: user.id,
         email: user.email,
+        emailVerified: user.emailVerified === true,
         role: user.role,
       });
     } catch (error) {
@@ -948,6 +956,10 @@ export async function createCoordinator(
       });
     }
   });
+  if (referrals) mountReferralRoutes(app, { service: referrals,
+    // The receipt and Agent sign-in must share the canonical browser origin.
+    publicOrigin: "https://www.mycellios.com",
+    account: request => { const principal = principalFor(request); return principal.kind === "user" ? principal : null; } });
   const store = new MeshStore(database);
   const persistence = config.supabaseUrl && config.supabaseServiceRoleKey
     ? new SupabasePersistence(store, {

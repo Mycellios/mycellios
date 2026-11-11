@@ -63,6 +63,12 @@ These rules apply to the complete repository.
 
 ## Changes and verification
 
+- Referral rewards use the canonical coordinator's verified OAuth identity and
+  atomic paired promotional grants. Follow `specs/agent-referrals/spec.md` for
+  the migration, private email fingerprint key, expiry and focused PostgreSQL
+  tests. Once the expiry schema exists, campaign flags must never revive expired
+  grants. Never qualify referrals by minting test rewards in production.
+
 - GitHub owner `Mycellios` is a personal account, outside the Nodecodex enterprise
   organization installer. Verify the existing `gh` identity and repository write
   permission for delivery; an `/orgs/Mycellios/installation` 404 is not evidence

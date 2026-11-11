@@ -11,6 +11,8 @@ export const MycelliosAccountSchema = z
     reservedMicrounits: z.number().int().nonnegative().safe().optional(),
     availableMicrounits: z.number().int().nonnegative().safe().optional(),
     promotionalGrantedMicrounits: z.number().int().nonnegative().safe().optional(),
+    promotionalExpiredMicrounits: z.number().int().nonnegative().safe().optional(),
+    nextPromotionalExpiry: z.number().int().positive().safe().nullable().optional(),
     contributionEarnedMicrounits: z.number().int().nonnegative().safe().optional(),
     contributionFundingSupported: z.boolean().optional(),
     environment: z.enum(["production", "sandbox"]).optional(),

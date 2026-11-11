@@ -1,5 +1,21 @@
 # Status and evidence
 
+## Paired referral promotions — implemented, not yet enabled 2026-11-11
+
+The opt-in coordinator issues personal links and first-touch HttpOnly receipts,
+binds pending attribution to authenticated accounts, and awards both verified
+participants 1 Credit each in one transaction, expiring after 14 days. Existing
+network accounts, self-referrals and duplicate verified email claims are rejected.
+Expiry protects reserved work and remains enforced when the campaign is disabled.
+The Agent copies only an authority-issued link and refreshes the actual wallet.
+
+Remote qualification passed 9 isolated PostgreSQL cases, 12 authentication tests
+and 34 Agent API/UI tests, native/API/web typing, native compilation and API/web
+release builds. PostgreSQL cases use fixture evidence to exercise the real signed
+ledger; they do not certify physical inference. Production migration, campaign
+activation, real signup qualification and release promotion remain pending.
+No test users or rewards were created in production. Full suites were NOT RUN.
+
 ## Conversation responsiveness — published 2026-11-11
 
 The conversation shows a local pending user message before send acknowledgement,
