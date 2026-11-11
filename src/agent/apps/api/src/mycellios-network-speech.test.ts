@@ -57,7 +57,7 @@ it("uses the canonical network endpoint, explicit credit funding and verified WA
   });
 });
 
-it.each([undefined, [], ["unsafe/identity"], [""]])("refuses unconfigured placement before any inference or credit reservation: %j", async workerIdentityIds => {
+it.each([{ workerIdentityIds: undefined }, { workerIdentityIds: [] }, { workerIdentityIds: ["unsafe/identity"] }, { workerIdentityIds: [""] }])("refuses unconfigured placement before any inference or credit reservation: %j", async ({ workerIdentityIds }) => {
   const fetcher = vi.fn<typeof fetch>();
   await expect(renderNetworkSpeech("test-key", { text, language: "es", workerIdentityIds }, fetcher))
     .rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", data: { voiceCode: "NETWORK_VOICE_UNAVAILABLE" } });
