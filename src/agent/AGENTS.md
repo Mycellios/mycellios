@@ -187,6 +187,10 @@
   Hold the profile's exclusive active-install.lock for the worker's lifetime;
   refuse a competing handoff before quitting. Keep Windows installer launch
   checks visible and distinguish starting-installer from a running installer.
+  A hidden worker gives shell file checks a real visible progress-window owner;
+  preserve normal ShellExecute security checks and the staged file's zone metadata.
+  Qualification Job Objects close their descendants when the command ends: verify
+  interactive relaunch outside that teardown before claiming the app stays open.
   Check space on both installation and profile volumes before quitting, then
   recheck before backing up. Keep checking for newer releases while one is staged.
   Verify manual-update, desktop-update-work, composer-draft and preload tests plus
