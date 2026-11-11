@@ -13,6 +13,11 @@ export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
   const { t, i18n } = useLingui();
   const bridge = desktopBridge()?.companions;
   useEffect(() => {
+    // Revoke the previous account immediately, before asynchronous avatar work.
+    // A Space switch keeps same-account floating chats while its dock refreshes.
+    void bridge?.publish({ scope, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light", agents: [] }).catch(() => undefined);
+  }, [bridge, scope]);
+  useEffect(() => {
     if (!bridge) return;
     let alive = true;
     const publish = async () => {
