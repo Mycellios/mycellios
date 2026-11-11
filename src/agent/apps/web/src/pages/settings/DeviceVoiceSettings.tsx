@@ -31,7 +31,7 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
     setError("");
     setPreviewing(true);
     try {
-      const failure = await speaker.speak(t`Hello, this is Mycellios voice.`, {
+      const failure = await speaker.speak(language === "es" ? "Hola, esta es la voz de Mycellios." : "Hello, this is Mycellios voice.", {
         networkLanguage: language, botId: previewBotId, spaceId, messageId: id, speed: value.speechSpeed,
       });
       if (failure) setError(failure);
@@ -93,7 +93,7 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
       <SettingsRow label={t`Voice conversation output`}
         description={networkSelected
           ? t`Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings.`
-          : t`Local voice stays on this computer and uses no credits. Connected providers use their own account.`}
+          : native ? t`Local voice stays on this computer and uses no credits. Connected providers use their own account.` : t`Connected providers use their own account.`}
         control={<OptionSelect
           aria-label={t`Voice conversation output`}
           value={conversationOutput}
@@ -112,8 +112,8 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
     </SettingsGroup>}
     {networkSelected && <SettingsGroup>
       <SettingsRow label="Kokoro" description={t`Preview uses your Mycellios credits.`}
-        control={<Button variant="outline" size="sm" disabled={!previewBotId || previewing}
-          onClick={() => void previewNetworkVoice()}>{previewing ? t`Playing…` : t`Listen`}</Button>} />
+        control={<Button variant="outline" size="sm" disabled={!previewBotId}
+          onClick={() => { if (previewing) { if (speaker.state.messageId === id) speaker.stop(); } else void previewNetworkVoice(); }}>{previewing ? t`Stop` : t`Listen`}</Button>} />
     </SettingsGroup>}
     <SettingsGroup title={t`Dictation`}>
       {native && (separateModels

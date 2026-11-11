@@ -9770,3 +9770,291 @@ msgstr "Messages while {0} works"
 
 msgid "Last activity · {0}"
 msgstr "Last activity · {0}"
+
+msgid "The account changed. Close settings and try again."
+msgstr "The account changed. Close settings and try again."
+
+msgid "Confirm your account"
+msgstr "Confirm your account"
+
+msgid "Sign in again to manage your phones. Your conversations stay in your account."
+msgstr "Sign in again to manage your phones. Your conversations stay in your account."
+
+msgid "Continue with your account"
+msgstr "Continue with your account"
+
+msgid "Confirm"
+msgstr "Confirm"
+
+msgid "Send sign-in code"
+msgstr "Send sign-in code"
+
+msgid "Sign-in code"
+msgstr "Sign-in code"
+
+msgid "Open in main window"
+msgstr "Open in main window"
+
+msgid "Open floating chat"
+msgstr "Open floating chat"
+
+msgid "Could not open the chat window. Try again."
+msgstr "Could not open the chat window. Try again."
+
+msgid "Scan to open Mycellios on your phone"
+msgstr "Scan to open Mycellios on your phone"
+
+msgid "Preparing code…"
+msgstr "Preparing code…"
+
+msgid "Could not show the code. Use the link below."
+msgstr "Could not show the code. Use the link below."
+
+msgid "Needs your attention"
+msgstr "Needs your attention"
+
+msgid "Mycellios network voice supports Spanish and English. Set a dictation language in Voice settings."
+msgstr "Mycellios network voice supports Spanish and English. Set a dictation language in Voice settings."
+
+msgid "Activate local voice"
+msgstr "Activate local voice"
+
+msgid "Parakeet and Supertonic 3. Download once, then process audio on this computer without credits."
+msgstr "Parakeet and Supertonic 3. Download once, then process audio on this computer without credits."
+
+msgid "Download Parakeet to transcribe on this computer."
+msgstr "Download Parakeet to transcribe on this computer."
+
+msgid "Spoken replies use the Mycellios network and your credits."
+msgstr "Spoken replies use the Mycellios network and your credits."
+
+msgid "Contribute computing power and earn credits."
+msgstr "Contribute computing power and earn credits."
+
+msgid "Activate contribution"
+msgstr "Activate contribution"
+
+msgid "Next turn"
+msgstr "Next turn"
+
+msgid "Current task"
+msgstr "Current task"
+
+msgid "Models and connections"
+msgstr "Models and connections"
+
+msgid "Choose a provider once. Your Micos use it automatically."
+msgstr "Choose a provider once. Your Micos use it automatically."
+
+msgid "Messages while a Mico works"
+msgstr "Messages while a Mico works"
+
+msgid "Default on this device. Each Mico can follow it or use its own preference."
+msgstr "Default on this device. Each Mico can follow it or use its own preference."
+
+msgid "Use default"
+msgstr "Use default"
+
+msgid "Local preview"
+msgstr "Local preview"
+
+msgid "This address only opens on this computer. Use a reachable server address to connect a phone."
+msgstr "This address only opens on this computer. Use a reachable server address to connect a phone."
+
+msgid "Open Mycellios on your phone, sign in and add it to your Home Screen."
+msgstr "Open Mycellios on your phone, sign in and add it to your Home Screen."
+
+msgid "Add phone"
+msgstr "Add phone"
+
+msgid "Open Mycellios on your phone"
+msgstr "Open Mycellios on your phone"
+
+msgid "Scan this code with your camera and sign in with the same account."
+msgstr "Scan this code with your camera and sign in with the same account."
+
+msgid "Could not load application settings."
+msgstr "Could not load application settings."
+
+msgid "Restart the updated desktop app to manage computer settings here."
+msgstr "Restart the updated desktop app to manage computer settings here."
+
+msgid "Mico dock"
+msgstr "Mico dock"
+
+msgid "Dynamic Island"
+msgstr "Dynamic Island"
+
+msgid "Show the Mico dock"
+msgstr "Show the Mico dock"
+
+msgid "Show Dynamic Island"
+msgstr "Show Dynamic Island"
+
+msgid "Open a Mico from any application."
+msgstr "Open a Mico from any application."
+
+msgid "Follow your Micos from a small window at the top of the screen."
+msgstr "Follow your Micos from a small window at the top of the screen."
+
+msgid "Show when idle"
+msgstr "Show when idle"
+
+msgid "Keep the island visible when no Mico is working."
+msgstr "Keep the island visible when no Mico is working."
+
+msgid "Show on additional displays"
+msgstr "Show on additional displays"
+
+msgid "Follow activity on every connected screen."
+msgstr "Follow activity on every connected screen."
+
+msgid "Open chats in"
+msgstr "Open chats in"
+
+msgid "Main window"
+msgstr "Main window"
+
+msgid "Floating windows"
+msgstr "Floating windows"
+
+msgid "Screen"
+msgstr "Screen"
+
+msgid "Primary screen"
+msgstr "Primary screen"
+
+msgid "Position"
+msgstr "Position"
+
+msgid "Left"
+msgstr "Left"
+
+msgid "Right"
+msgstr "Right"
+
+msgid "Bottom"
+msgstr "Bottom"
+
+msgid "Hide automatically"
+msgstr "Hide automatically"
+
+msgid "Move to the edge until you hover over the dock."
+msgstr "Move to the edge until you hover over the dock."
+
+msgid "Show edge strip"
+msgstr "Show edge strip"
+
+msgid "Keep a small handle visible when the dock is hidden."
+msgstr "Keep a small handle visible when the dock is hidden."
+
+msgid "Show results"
+msgstr "Show results"
+
+msgid "Show a short preview beside each Mico."
+msgstr "Show a short preview beside each Mico."
+
+msgid "Size"
+msgstr "Size"
+
+msgid "Width"
+msgstr "Width"
+
+msgid "Height"
+msgstr "Height"
+
+msgid "Default size"
+msgstr "Default size"
+
+msgid "Micos on this dock"
+msgstr "Micos on this dock"
+
+msgid "Choose Spanish or English in Dictation language to preview network voice."
+msgstr "Choose Spanish or English in Dictation language to preview network voice."
+
+msgid "Could not remove the model. Stop local voice and try again."
+msgstr "Could not remove the model. Stop local voice and try again."
+
+msgid "Voice processing"
+msgstr "Voice processing"
+
+msgid "Voice conversation output"
+msgstr "Voice conversation output"
+
+msgid "Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings."
+msgstr "Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings."
+
+msgid "Local voice stays on this computer and uses no credits. Connected providers use their own account."
+msgstr "Local voice stays on this computer and uses no credits. Connected providers use their own account."
+
+msgid "Local · Supertonic 3"
+msgstr "Local · Supertonic 3"
+
+msgid "Connected provider"
+msgstr "Connected provider"
+
+msgid "Mycellios network · uses credits"
+msgstr "Mycellios network · uses credits"
+
+msgid "Preview uses your Mycellios credits."
+msgstr "Preview uses your Mycellios credits."
+
+msgid "Dictation"
+msgstr "Dictation"
+
+msgid "Transcribes on this computer and detects the language automatically."
+msgstr "Transcribes on this computer and detects the language automatically."
+
+msgid "Transcribe and speak on this computer."
+msgstr "Transcribe and speak on this computer."
+
+msgid "Dictation language"
+msgstr "Dictation language"
+
+msgid "Language hint for the browser and connected transcription services."
+msgstr "Language hint for the browser and connected transcription services."
+
+msgid "Read aloud"
+msgstr "Read aloud"
+
+msgid "Reads replies aloud on this computer."
+msgstr "Reads replies aloud on this computer."
+
+msgid "Read new replies aloud"
+msgstr "Read new replies aloud"
+
+msgid "Read new replies in the open chat on this device. Existing Mico voice preferences still apply."
+msgstr "Read new replies in the open chat on this device. Existing Mico voice preferences still apply."
+
+msgid "Device voice"
+msgstr "Device voice"
+
+msgid "Used when reading with your device instead of a connected provider."
+msgstr "Used when reading with your device instead of a connected provider."
+
+msgid "Could not load your phones. Try again."
+msgstr "Could not load your phones. Try again."
+
+msgid "Could not disconnect the phone. Try again."
+msgstr "Could not disconnect the phone. Try again."
+
+msgid "Your phones"
+msgstr "Your phones"
+
+msgid "Signed-in phones"
+msgstr "Signed-in phones"
+
+msgid "Sign in on your phone using the link above. Your conversations appear with the same account."
+msgstr "Sign in on your phone using the link above. Your conversations appear with the same account."
+
+msgid "No phones are signed in yet."
+msgstr "No phones are signed in yet."
+
+msgid "Disconnect this phone?"
+msgstr "Disconnect this phone?"
+
+msgid "The phone will need to sign in again. Your conversations stay in your account."
+msgstr "The phone will need to sign in again. Your conversations stay in your account."
+
+msgid "Connected providers use their own account."
+msgstr "Connected providers use their own account."

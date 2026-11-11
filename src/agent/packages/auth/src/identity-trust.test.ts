@@ -545,6 +545,31 @@ describe("identity trust through auth endpoints", () => {
 });
 
 describe("session credentials", () => {
+  it("revokes only a fresh caller's owned session by public ID and retains deletion hooks", async () => {
+    const f = fixture({ delivery: false });
+    const { token } = await (await f.signup()).json() as { token: string };
+    await f.signin();
+    const owned = f.data.session![1]!;
+    await f.signup("another@example.test");
+    const foreign = f.data.session!.find(row => row.userId !== owned.userId)!;
+    const request = (sessionId: string) => f.request("/revoke-owned-session", { sessionId }, token);
+    expect((await request(String(foreign.id))).status).toBe(200);
+    expect(f.data.session).toContain(foreign);
+    const response = await request(String(owned.id));
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).not.toContain(String(owned.token));
+    expect(f.data.session).not.toContain(owned);
+    expect(recordSecurityEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: "auth.session.revoked", userId: owned.userId,
+      metadata: { via: "/revoke-owned-session" },
+    }));
+    expect((await request(String(owned.id))).status).toBe(200);
+    for (const row of f.data.session!) if (row.userId === owned.userId) row.createdAt = new Date(Date.now() - 2 * 86_400_000);
+    expect((await request(String(foreign.id))).status).toBe(403);
+    expect((await f.request("/revoke-owned-session", { sessionId: String(foreign.id) })).status).toBe(401);
+    expect((await request("" )).status).toBeGreaterThanOrEqual(400);
+  });
   it("lists and reads sessions without handing out their tokens", async () => {
     const f = fixture({ delivery: false });
     await f.signup();
