@@ -72,7 +72,11 @@ export async function launchManualUpdate(options: {
     const phase = await readFile(path.join(directory, "progress.json"), "utf8")
       .then(manualUpdatePhase).catch(() => null);
     if (child.exitCode !== null || child.signalCode !== null) {
-      throw Error(`The update helper exited before handoff (${child.exitCode ?? child.signalCode})`);
+      const failure = await readFile(path.join(directory, "result.json"), "utf8")
+        .then(contents => JSON.parse(contents.replace(/^\uFEFF/, "")) as { error?: unknown })
+        .catch(() => null);
+      const detail = typeof failure?.error === "string" ? `: ${failure.error.slice(0, 500)}` : "";
+      throw Error(`The update helper exited before handoff (${child.exitCode ?? child.signalCode})${detail}`);
     }
     if (phase === "waiting-for-app") {
       await writePrivateFile(path.join(directory, "commit.json"), JSON.stringify({ approved: true }));

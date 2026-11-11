@@ -58,9 +58,11 @@ it.runIf(process.platform === "win32")("starts the hidden helper and keeps a rej
     const fileName = "Mycellios-Desktop-0.0.1-windows-x64-pilot.exe";
     const installer = path.join(updates, fileName);
     await writeFile(installer, "fixture, never executable");
+    const executable = path.join(profile, "Mycellios Desktop.exe");
+    await copyFile(process.execPath, executable);
     const failure = await launchManualUpdate({
       profile,
-      executable: path.join(profile, "Mycellios Desktop.exe"),
+      executable,
       oldPid: process.pid,
       installer,
       release: { version: "0.0.1", fileName, bytes: 1, sha256: "a".repeat(64), url: "https://example.test/fixture" },
