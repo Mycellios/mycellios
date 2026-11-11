@@ -40,7 +40,7 @@ function speech(wav: Buffer, sha256 = createHash("sha256").update(wav).digest("h
 it("uses the canonical network endpoint, explicit credit funding and verified WAV audio", async () => {
   const wav = audio();
   const fetcher = vi.fn<typeof fetch>(async () => Response.json(speech(wav)));
-  await expect(renderNetworkSpeech("test-key", { text, language: "es" }, fetcher))
+  await expect(renderNetworkSpeech("test-key", { text, language: "es", workerIdentityIds: ["qualified-speech-device"] }, fetcher))
     .resolves.toEqual({ bytes: wav, mimeType: "audio/wav" });
   expect(fetcher).toHaveBeenCalledOnce();
   const [url, init] = fetcher.mock.calls[0]!;
@@ -53,16 +53,32 @@ it("uses the canonical network endpoint, explicit credit funding and verified WA
     language: "es",
     voice: "ef_dora",
     stream: false,
+    privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: ["qualified-speech-device"] },
   });
+});
+
+it.each([{ workerIdentityIds: undefined }, { workerIdentityIds: [] }, { workerIdentityIds: ["unsafe/identity"] }, { workerIdentityIds: [""] }])("refuses unconfigured placement before any inference or credit reservation: %j", async ({ workerIdentityIds }) => {
+  const fetcher = vi.fn<typeof fetch>();
+  await expect(renderNetworkSpeech("test-key", { text, language: "es", workerIdentityIds }, fetcher))
+    .rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", data: { voiceCode: "NETWORK_VOICE_UNAVAILABLE" } });
+  expect(fetcher).not.toHaveBeenCalled();
+});
+
+it("never drops placement or retries another worker when a pinned worker is unavailable", async () => {
+  const fetcher = vi.fn<typeof fetch>(async () => new Response("unavailable", {status:503}));
+  await expect(renderNetworkSpeech("test-key", {text,language:"es",workerIdentityIds:["qualified-speech-device"]},fetcher))
+    .rejects.toMatchObject({code:"SERVICE_UNAVAILABLE"});
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(JSON.parse(String(fetcher.mock.calls[0]![1]?.body)).privacy.pinned_identity_ids).toEqual(["qualified-speech-device"]);
 });
 
 it("rejects invalid speech bytes and reports insufficient credits without retrying", async () => {
   const fetcher = vi.fn<typeof fetch>()
     .mockResolvedValueOnce(Response.json(speech(audio(), "0".repeat(64))))
     .mockResolvedValueOnce(new Response("provider details", { status: 402 }));
-  await expect(renderNetworkSpeech("test-key", { text, language: "es" }, fetcher))
+  await expect(renderNetworkSpeech("test-key", { text, language: "es", workerIdentityIds: ["qualified-speech-device"] }, fetcher))
     .rejects.toMatchObject({ code: "BAD_GATEWAY" });
-  await expect(renderNetworkSpeech("test-key", { text, language: "es" }, fetcher))
+  await expect(renderNetworkSpeech("test-key", { text, language: "es", workerIdentityIds: ["qualified-speech-device"] }, fetcher))
     .rejects.toMatchObject({ code: "PAYMENT_REQUIRED" });
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
@@ -75,7 +91,7 @@ it.each([
   [503, "SERVICE_UNAVAILABLE", "NETWORK_VOICE_UNAVAILABLE"],
 ])("classifies HTTP %i without disclosing the upstream body or repeating the charge", async (status, code, voiceCode) => {
   const fetcher = vi.fn<typeof fetch>(async () => new Response("private-provider-body token=do-not-expose", { status: Number(status) }));
-  const failure = await renderNetworkSpeech("private-key", { text, language: "es" }, fetcher).catch(error => error);
+  const failure = await renderNetworkSpeech("private-key", { text, language: "es", workerIdentityIds: ["qualified-speech-device"] }, fetcher).catch(error => error);
   expect(failure).toMatchObject({ code, data: { voiceCode } });
   expect(failure.message).not.toMatch(/private|token=/);
   expect(fetcher).toHaveBeenCalledOnce();

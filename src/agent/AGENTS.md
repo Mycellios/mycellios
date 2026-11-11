@@ -15,6 +15,13 @@
 
 # AGENTS.md
 
+- Contribution-funded network speech uses deployment-owned
+  MYCELLIOS_NETWORK_SPEECH_IDENTITIES and the scheduler's authenticated pinned-edge
+  policy. Keep placement out of HTTP input, refuse missing/invalid placement before
+  inference, and never fall back to legacy CPU replicas or another funding source.
+  Qualify real WAV output, the debit, provider transfer and balanced settlement;
+  an advertised model or completed job alone is not economic qualification.
+
 - Conversation pending sends are local presentation scoped to account/Space/thread.
   Match durable echoes by client nonce or acknowledged message ID, never by
   text. Preserve existing draft/attachment recovery and nonce reuse on retries.
