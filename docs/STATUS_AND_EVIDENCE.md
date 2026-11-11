@@ -1,8 +1,8 @@
 # Status and evidence
 
-## Conversation responsiveness candidate — 2026-11-11
+## Conversation responsiveness — published 2026-11-11
 
-The candidate shows a local pending user message before send acknowledgement,
+The conversation shows a local pending user message before send acknowledgement,
 scoped to account/Space/thread. Exact client nonces and acknowledged message
 IDs reconcile SSE-first and HTTP-first delivery; matching text is not used.
 Rejected sends retain existing draft recovery. Receipt message identity remains
@@ -25,7 +25,33 @@ comparison over 123 identical events, immediate presentation requested 123 paint
 and frame presentation 64; React profiler render totals were approximately 1,153 ms
 and 461 ms. These are controlled UI measurements, not live model latency,
 production timing guarantees or installed Desktop qualification. Full suites
-remain paused. Remote validation and publication require separate evidence.
+remain paused.
+
+Publication is independently verified for main
+`76c80e94bad2743ab658c5630c83359fd4c5b818` (PRs #226 and #227), source tree
+`81eccb578f6a640402bb16e7b7d26f29957eec52`. The sealed release was built from
+`71af232b8e5ee379afc531b1438ad98057c7929c`, whose tree exactly matches integrated
+main. [Core remote validation](https://github.com/Mycellios/mycellios/actions/runs/43004483655)
+passed typing, 259 changed tests and 12,624 related tests (576 skipped); those
+groups overlap. [Workspace/browser and Windows acceptance](https://github.com/Mycellios/mycellios/actions/runs/43004483751)
+passed. The final CSS refinement passed
+[proportional validation](https://github.com/Mycellios/mycellios/actions/runs/43007995749)
+and [browser/Windows acceptance](https://github.com/Mycellios/mycellios/actions/runs/43007995882).
+Its ten synthetic browser scenarios include equal live/final heights for formatted
+and quoted replies and no completion entrance replay. The last controlled run
+requested 59 frame presentations versus 123 immediate presentations for the same
+123 events; this remains fixture evidence, not a production latency guarantee.
+
+The actual production-compiled Shell passed an isolated synthetic-session send
+probe, including pending feedback before acknowledgement, nonce preservation,
+one durable bubble and no JavaScript errors. API/worker/web release builds and
+compiled-server startup passed. Production serves web build `20261111104959`;
+served JavaScript and executing API/worker bundle hashes match the sealed release.
+Public readiness reports healthy without degradation. The prior gateway,
+configuration, independent services and published immutable assets are preserved.
+There are no new migrations. A verified database backup and prior containers are
+retained for rollback. No live model latency or installed Desktop acceptance is
+claimed by this delivery.
 
 The review compared [Rakazo conversation synchronization](https://github.com/elie222/rakazo/tree/v0.9.0/apps/web/src/pages/shell)
 and [OpenBot conversation UI](https://github.com/nightly-labs/openbot/tree/v0.67.1/packages/ui/src/features/conversation).
