@@ -15,8 +15,9 @@ process.chdir(root);
 const server = await createServer({ root, configFile: path.join(root, "vite.config.ts"), server: { host: "127.0.0.1", port: 0 }, plugins: [{
   name: "isolated-workspace-ui", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
-      if (req.url?.split("?")[0] !== "/__workspace_fixture") return next();
-      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/workspace-sync-preview.tsx"></script></body></html>');
+      const fixture = { "/__workspace_fixture": "workspace-sync-preview", "/__settings_fixture": "settings-preview" }[req.url?.split("?")[0]];
+      if (!fixture) return next();
+      const html = await server.transformIndexHtml(req.url, `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/${fixture}.tsx"></script></body></html>`);
       res.setHeader("content-type", "text/html"); res.end(html);
     });
   },
@@ -86,9 +87,21 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({ path: path.join(output, `${name}.png`), animations: "disabled" });
   }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/__settings_fixture`);
+  await page.getByRole("combobox", { name: "Open chats in" }).click();
+  await page.getByRole("option", { name: "Floating windows", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Open chats in" })).toHaveText("Floating windows");
+  await page.getByRole("button", { name: "Open floating chat" }).click();
+  await expect.poll(() => page.evaluate(() => window.__settingsFixture.calls.some(call => call.botId === "fixture-mico"))).toBe(true);
+  await expect(page.getByRole("img", { name: "Scan to open Mycellios on your phone" })).toBeVisible();
+  await page.screenshot({ path: path.join(output, "dock-and-mobile-code.png"), animations: "disabled" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: path.join(output, "settings-mobile.png"), animations: "disabled" });
   assert.deepEqual(errors, []);
   const result = { passed: true, realAccount: false, modelsCalled: false, microphoneUsed: false,
-    checks: ["task draft retained across workspaces", "stable pin menu", "condition node saved through the real client", "routine canvas", "calendar modes", "usage filters", "unified marketplace", "help menu", "mobile light/dark layout"] };
+    checks: ["task draft retained across workspaces", "stable pin menu", "condition node saved through the real client", "routine canvas", "calendar modes", "usage filters", "unified marketplace", "help menu", "mobile light/dark layout", "dock floating mode and scoped opening", "mobile QR canvas", "settings mobile layout"] };
   await writeFile(path.join(output, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
   console.log(`Workspace screenshots: ${output}`);

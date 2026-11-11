@@ -10,6 +10,7 @@ export const DEFAULT_GENERAL_PREFERENCES = {
   chatBackgroundLight: "default", chatBackgroundDark: "default",
   compactMessageActions: true, restoreLastWorkspace: true,
   speechEngine: "local" as "local" | "provider",
+  networkSpeechAccount: "",
   dictationLanguage: "auto", speechSpeed: 1, deviceVoice: "default", readReplies: false,
   taskSound: "classic", actionSound: "off",
   productAnalytics: false,
@@ -35,6 +36,8 @@ export function parseGeneralPreferences(raw: string | null): GeneralPreferences 
       dictationLanguage: UI_LOCALES.includes(value.dictationLanguage) ? value.dictationLanguage : "auto",
       speechSpeed: [0.75, 1, 1.25, 1.5, 2].includes(value.speechSpeed) ? value.speechSpeed : 1,
       speechEngine: value.speechEngine === "provider" ? "provider" : "local",
+      networkSpeechAccount: typeof value.networkSpeechAccount === "string" && value.networkSpeechAccount.length <= 128
+        ? value.networkSpeechAccount : "",
       deviceVoice: typeof value.deviceVoice === "string" && value.deviceVoice.length <= 200 ? value.deviceVoice : "default",
       readReplies: value.readReplies === true,
       taskSound: ["off", "classic", "default", "mech", "bubble", "press"].includes(value.taskSound) ? value.taskSound : "classic",

@@ -23,7 +23,11 @@ function useDesktopUpdates() {
   const [callActive, setCallActive] = useState(false);
   const pending = useRef(false);
   const revision = useRef(0);
-  useEffect(() => bridge?.onPrepare?.(canRestartDesktop), [bridge]);
+  const chatWindow = desktopBridge()?.chatWindow;
+  useEffect(() => {
+    const onPrepare = bridge?.onPrepare ?? chatWindow?.onPrepare;
+    return onPrepare?.(canRestartDesktop);
+  }, [bridge, chatWindow]);
 
   useEffect(() => {
     if (!bridge) return;

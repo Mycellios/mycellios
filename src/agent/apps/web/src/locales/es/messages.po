@@ -10777,8 +10777,8 @@ msgstr "Ajustes del Mico"
 msgid "Default on this device. Each Mico can follow it or use its own preference."
 msgstr "Preferencia de este dispositivo. Cada Mico puede usarla o tener la suya."
 
-msgid "Messages while {name} works"
-msgstr "Mensajes mientras trabaja {name}"
+msgid "Messages while {0} works"
+msgstr "Mensajes mientras trabaja {0}"
 
 msgid "Use default"
 msgstr "Usar preferencia general"
@@ -10806,3 +10806,93 @@ msgstr "Descarga Parakeet para transcribir en este ordenador."
 
 msgid "Another update is still running. Keep using Mycellios and finish that installation before retrying."
 msgstr "Ya hay una actualización en curso. Puedes seguir usando Mycellios; termina esa instalación antes de volver a intentarlo."
+
+msgid "Voice conversation output"
+msgstr "Voz de la conversación"
+
+msgid "Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings."
+msgstr "Mycellios lee las respuestas en español e inglés con tu cuenta conectada y tus créditos. El dictado usa tus ajustes actuales."
+
+msgid "Mycellios network · uses credits"
+msgstr "Red Mycellios · usa créditos"
+
+msgid "Mycellios network voice supports Spanish and English. Set a dictation language in Voice settings."
+msgstr "La voz de la red Mycellios admite español e inglés. Elige un idioma de dictado en Ajustes de voz."
+
+msgid "Spoken replies use the Mycellios network and your credits."
+msgstr "Las respuestas en voz alta usan la red Mycellios y tus créditos."
+
+msgid "Contribute computing power and earn credits."
+msgstr "Aporta potencia y gana créditos."
+
+msgid "Open in main window"
+msgstr "Abrir en la ventana principal"
+
+msgid "Open floating chat"
+msgstr "Abrir chat flotante"
+
+msgid "Could not open the chat window. Try again."
+msgstr "No se pudo abrir el chat. Inténtalo de nuevo."
+
+msgid "Open chats in"
+msgstr "Abrir chats en"
+
+msgid "Main window"
+msgstr "Ventana principal"
+
+msgid "Floating windows"
+msgstr "Ventanas flotantes"
+
+msgid "Your phones"
+msgstr "Tus móviles"
+
+msgid "Signed-in phones"
+msgstr "Móviles con sesión iniciada"
+
+msgid "Sign in on your phone using the link above. Your conversations appear with the same account."
+msgstr "Abre el enlace en tu móvil e inicia sesión con tu cuenta para ver tus conversaciones."
+
+msgid "Could not load your phones. Try again."
+msgstr "No se pudieron cargar tus móviles. Inténtalo de nuevo."
+
+msgid "Last activity · {0}"
+msgstr "Última actividad · {0}"
+
+msgid "No phones are signed in yet."
+msgstr "Todavía no has iniciado sesión en ningún móvil."
+
+msgid "Disconnect this phone?"
+msgstr "¿Desconectar este móvil?"
+
+msgid "The phone will need to sign in again. Your conversations stay in your account."
+msgstr "Tendrás que volver a iniciar sesión en el móvil. Tus conversaciones se conservan en tu cuenta."
+
+msgid "Could not disconnect the phone. Try again."
+msgstr "No se pudo desconectar el móvil. Inténtalo de nuevo."
+
+msgid "Add phone"
+msgstr "Añadir móvil"
+
+msgid "Open Mycellios on your phone"
+msgstr "Abre Mycellios en tu móvil"
+
+msgid "Scan this code with your camera and sign in with the same account."
+msgstr "Escanea este código con la cámara e inicia sesión con la misma cuenta."
+
+msgid "Scan to open Mycellios on your phone"
+msgstr "Escanea para abrir Mycellios en tu móvil"
+
+msgid "Preparing code…"
+msgstr "Preparando código…"
+
+msgid "Could not show the code. Use the link below."
+msgstr "No se pudo mostrar el código. Usa el enlace de abajo."
+
+msgid "Choose Spanish or English in Dictation language to preview network voice."
+msgstr "Elige español o inglés en Idioma del dictado para probar la voz de la red."
+
+msgid "Hello, this is Mycellios voice."
+msgstr "Hola, esta es la voz de Mycellios."
+
+msgid "Preview uses your Mycellios credits."
+msgstr "La prueba usa tus créditos de Mycellios."

@@ -15,8 +15,8 @@ import { isAndroidHost } from "../../lib/android-host";
 import { translateRunError } from "../../lib/run-error";
 import { errorText } from "../../lib/user-error";
 
-export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, bot, transcribe, voiceReady, onClose, onSettings }: {
-  hidden?: boolean; rpc: RpcClient; spaceId?: string | null; taskThreadId?: string;
+export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, taskThreadId, bot, transcribe, voiceReady, onClose, onSettings }: {
+  hidden?: boolean; rpc: RpcClient; accountId?: string; spaceId?: string | null; taskThreadId?: string;
   bot: { id: string; name: string; color: string }; transcribe?: boolean; voiceReady?: boolean;
   onClose: () => void; onSettings: () => void;
 }) {
@@ -38,7 +38,9 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
   const seen = useRef(new Set<string>());
   const native = window.rakazoDesktop?.localVoice;
   const canCapture = Boolean(transcribe || isAndroidHost() || webSpeechAvailable());
-  const localReplies = useGeneralPreferences().speechEngine === "local";
+  const preferences = useGeneralPreferences();
+  const networkReplies = Boolean(accountId && preferences.networkSpeechAccount === accountId);
+  const localReplies = !networkReplies && preferences.speechEngine === "local";
   const modelsReady = (status: LocalVoiceStatus | null) => localReplies
     ? status?.ready === true
     : canCapture || Boolean(status?.models?.asr.ready ?? status?.ready);
@@ -89,7 +91,7 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
   async function speak(text: string, own: number) {
     if (!alive.current || own !== generation.current) return;
     spoken.current = speakable(text); setCaption(text); setPhase("thinking");
-    if (native && getGeneralPreferences().speechEngine === "local") {
+    if (native && localReplies) {
       // Capture and synthesis share one local worker. Stop capture before inference.
       dictation.stop("cancel");
       // Native synthesis is bounded; play sequential parts, never truncate the reply.
@@ -110,7 +112,19 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
         clearInterval(timer); if (ctx.state !== "closed") await ctx.close();
       }
     } else {
-      const failure = await speaker.speak(speakable(text), { browser: !voiceReady && browserSpeechAvailable(), botId: bot.id, spaceId, speed: rate.current });
+      const language = (preferences.dictationLanguage === "auto" ? i18n.locale : preferences.dictationLanguage).split("-")[0];
+      if (networkReplies && language !== "es" && language !== "en") {
+        stopWithError(t`Mycellios network voice supports Spanish and English. Set a dictation language in Voice settings.`);
+        return;
+      }
+      const failure = await speaker.speak(speakable(text), {
+        browser: !networkReplies && !voiceReady && browserSpeechAvailable(),
+        networkLanguage: networkReplies ? language as "en" | "es" : undefined,
+        botId: bot.id,
+        spaceId,
+        speed: rate.current,
+      });
+      if (failure && networkReplies) { stopWithError(failure); return; }
       if (failure) throw new Error(failure);
     }
   }
@@ -209,7 +223,9 @@ export function VoiceConversation({ hidden = false, rpc, spaceId, taskThreadId, 
       {!native ? <Button variant="ghost" onClick={onSettings}>{t`Voice settings`}</Button> : null}
     </div>
     <div className="shrink-0 border-t border-border py-3 text-sm">
-      <p className="mb-2 text-xs text-muted-foreground">{t`Contribute computing power and earn credits. Voice stays local; network voice is not available yet.`}</p>
+      <p className="mb-2 text-xs text-muted-foreground">{networkReplies
+        ? t`Spoken replies use the Mycellios network and your credits.`
+        : t`Contribute computing power and earn credits.`}</p>
       <SidebarContribution expanded activationLabel={t`Activate contribution`} />
     </div>
     </div>

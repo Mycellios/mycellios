@@ -18,6 +18,21 @@ afterEach(() => {
 });
 
 describe("signed-out responses", () => {
+  it("pins a floating chat to its Space without changing the main window's saved selection", async () => {
+    const remove = vi.fn(), write = vi.fn(), read = vi.fn(() => "main-space");
+    vi.stubGlobal("window", {
+      rakazoDesktop: { chatWindow: { kind: "floating", spaceId: "chat-space" } },
+      localStorage: { getItem: read, setItem: write, removeItem: remove },
+    });
+    expect(selectedSpaceId()).toBe("chat-space");
+    expect(selectSpace("another-space")).toBe(false);
+    expect(selectSpace("chat-space")).toBe(true);
+    clearSpaceSelection();
+    await leaveUnavailableSpace("chat-space");
+    expect(write).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
   it("rechecks the session when the server answers 401, and only then", async () => {
     const fetch = vi.fn(async () =>
       Response.json({ json: { code: "UNAUTHORIZED", status: 401 } }, { status: 401 }),

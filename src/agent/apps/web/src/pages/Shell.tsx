@@ -1,5 +1,6 @@
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { DesktopCompanions } from "../components/DesktopCompanions";
+import { FloatingChatButton } from "../components/FloatingChatButton";
 import { getGeneralPreferences } from "../lib/general-preferences";
 import { SideQuestion, type SideQuestionTarget } from "./shell/side-question";
 import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
@@ -399,6 +400,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const rpc = useSpaceRpc();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const floatingChat = desktopBridge()?.chatWindow?.kind === "floating";
   const pushPublicKey = useWebPushPresence(userId);
   const chatHistory = useChatHistory();
   const [taskAgentsOpen, setTaskAgentsOpen] = useState(false);
@@ -3820,6 +3822,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   );
   const renderHeaderActions = (close?: () => void) => (
     <>
+    {!inGroup && active ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} /> : null}
     {active && !inGroup && !activeProject ? <>
       <MicoWorkMenu key={active.id} inMenu={isMobileSidebar} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
         onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} />
@@ -4015,7 +4018,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   );
   const shell = (
     <>
-    <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} />
+    <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} onOpen={openSpaceChat} />
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
     <BotsSidebarLayout
       userId={userId}
@@ -4031,7 +4034,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         reviewWorkspace.add({ id: crypto.randomUUID(), url: destination, name: new URL(destination).host, mimeType: "text/uri-list" });
       }}
       onPreviewCollapsedChange={setBotsSidebarCollapsed}
-      computerOpen={computerOpen || libraryView || marketplaceView || workflowView || scheduleView || usageView || (taskView && !taskAgentsOpen)}
+      computerOpen={floatingChat || computerOpen || libraryView || marketplaceView || workflowView || scheduleView || usageView || (taskView && !taskAgentsOpen)}
+      data-floating-chat={floatingChat || undefined}
       data-workspace-chrome="compact"
       data-task-desktop={Boolean(desktopBridge())}
       data-testid="shell-root"
@@ -4087,7 +4091,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       {bootstrapMe !== undefined ? (
         <HostComputerPrompt initialMe={bootstrapMe ?? undefined} onMeUpdated={setBootstrapMe} />
       ) : null}
-      <WorkspaceRail
+      {!floatingChat && <WorkspaceRail
         apps={appsOpen}
         library={libraryView}
         onApps={appsEnabled ? openApps : undefined}
@@ -4113,8 +4117,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         onWhatsNew={() => setReleaseNotesOpen(true)}
         onBoard={bootstrapMe?.ticketBoardEnabled ? () => navigate("/app/board") : undefined}
         accountControls={!isMobileSidebar ? sidebarFooter(undefined, true) : undefined}
-      />
-      {(!libraryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen ? <Sidebar
+      />}
+      {!floatingChat && ((!libraryView && !marketplaceView && !workflowView && !scheduleView && !usageView && (!taskView || taskAgentsOpen)) || mobileSidebarOpen) ? <Sidebar
         collapsible={isMobileSidebar ? "none" : "icon"}
         side={document.documentElement.dir === "rtl" ? "right" : "left"}
         data-testid="bots-sidebar"
@@ -4278,7 +4282,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         {/* The header floats so the transcript scrolls under its buttons. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div data-testid="conversation-header" className={`${desktopDragClass()} rk-conversation-header @container relative z-10 flex h-[51px] shrink-0 items-center gap-2 border-b border-border px-3 max-md:h-14 [&_button]:pointer-events-auto`}>
-            <div className="flex items-center">
+            <div className={floatingChat ? "hidden" : "flex items-center"}>
               <Button
                 variant="floating"
                 size="icon-lg"
@@ -4485,7 +4489,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             ) : null}
             <Composer
               key={inGroup ? `group:${groupId}` : `bot:${active?.id}`}
-              draftKey={inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : `bot:${active?.id}`}
+              draftKey={(floatingChat ? "floating:" : "") + (inGroup ? `group:${groupId}` : taskScope ? `bot:${active?.id}:task:${taskScope.taskThreadId}` : `bot:${active?.id}`)}
               enterToSend={enterToSend}
               onImportAgent={(agent) => {
                 setDroppedAgent(agent);
@@ -4580,7 +4584,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       {Object.entries(sideQuestionTargets).map(([key, target]) => <SideQuestion key={key} {...target} enterToSend={enterToSend}
         active={key === asideKey && target.visible && !libraryView && !marketplaceView && !usageView && !scheduleView && !taskView && !workflowView && !routineView && !panel && !reviewWorkspace?.open}
         onClose={() => closeAside(key)} onBrowser={chatTools.onBrowser} onFiles={chatTools.onFiles} onSettings={chatTools.onSettings} onVoice={chatTools.onVoice}/>) }
-      {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
+      {voiceConversation ? <VoiceConversation hidden={asideVisible} key={JSON.stringify([userId,currentSpaceId,voiceConversation.id,taskScope?.taskThreadId])} rpc={rpc} accountId={userId} spaceId={currentSpaceId} taskThreadId={taskScope?.taskThreadId} bot={voiceConversation} transcribe={voiceStatus?.transcribe} voiceReady={voiceStatus?.ready} onClose={() => setVoiceConversation(null)} onSettings={() => { setVoiceConversation(null); openSettings("voice"); }} /> : null}
 
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall

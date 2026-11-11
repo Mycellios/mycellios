@@ -1,6 +1,6 @@
 import { getGeneralPreferences } from "./general-preferences";
 import type { SettingsScope } from "@rakazo/contracts";
-import { readBoundedResponseBytes } from "@rakazo/core";
+import { readBoundedResponseBytes, toUtterances } from "@rakazo/core";
 import { appPath } from "./app-path";
 import { rpc, selectedSpaceId, withSpaceHeaders } from "./rpc.js";
 import { errorText, voiceAccountErrorText } from "./user-error.js";
@@ -26,6 +26,7 @@ interface SpeakOptions {
   voiceId?: string;
   botId?: string;
   messageId?: string;
+  networkLanguage?: "en" | "es";
 }
 
 type TtsErrorBody = { error?: string; code?: string };
@@ -114,8 +115,9 @@ export class Speaker {
   /** Resolves with this request's failure text; stopping or superseding it resolves with none. */
   async speak(text: string, opts: SpeakOptions = {}): Promise<string | undefined> {
     this.stop();
-    if (typeof window !== "undefined" && window.rakazoDesktop?.localVoice && getGeneralPreferences().speechEngine === "local") return this.speakLocal(text, opts);
-    if (opts.browser) return this.speakBrowser(text, opts);
+    const network = opts.networkLanguage !== undefined;
+    if (!network && typeof window !== "undefined" && window.rakazoDesktop?.localVoice && getGeneralPreferences().speechEngine === "local") return this.speakLocal(text, opts);
+    if (!network && opts.browser) return this.speakBrowser(text, opts);
     const mine = this.token;
     const controller = new AbortController();
     this.request = controller;
@@ -125,9 +127,9 @@ export class Speaker {
     this.set({ status: "preparing", botId: opts.botId, messageId: opts.messageId });
     let utterances: string[];
     try {
-      utterances = await withAbort(controller.signal, () =>
-        this.prepare(text, opts, controller.signal, spaceId),
-      );
+      utterances = network
+        ? toUtterances(text, { maxChars: 320 })
+        : await withAbort(controller.signal, () => this.prepare(text, opts, controller.signal, spaceId));
     } catch (error) {
       const failure = live() ? errorText(error) : undefined;
       if (failure) this.set({ ...IDLE, error: failure });
@@ -150,7 +152,7 @@ export class Speaker {
     let next: Promise<Rendered> | null = render(utterances[0] ?? "");
     for (let i = 0; i < utterances.length; i += 1) {
       const current = next;
-      next = i + 1 < utterances.length ? render(utterances[i + 1] ?? "") : null;
+      next = !network && i + 1 < utterances.length ? render(utterances[i + 1] ?? "") : null;
       if (!current) break;
       const rendered = await current;
       if ("error" in rendered) {
@@ -172,6 +174,8 @@ export class Speaker {
         if (this.request === controller) this.request = null;
         return;
       }
+      // Each network clip can use credits. Request the next one only after playback succeeds.
+      if (network && i + 1 < utterances.length) next = render(utterances[i + 1] ?? "");
     }
     if (live()) this.set(IDLE);
     if (this.request === controller) this.request = null;
@@ -275,6 +279,7 @@ export class Speaker {
             voiceId: opts.voiceId,
             botId: opts.botId,
             scope: opts.scope,
+            networkLanguage: opts.networkLanguage,
           }),
           signal: deadline.signal,
         }),

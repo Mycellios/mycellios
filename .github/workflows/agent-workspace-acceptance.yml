@@ -34,6 +34,24 @@ jobs:
           cache-dependency-path: src/agent/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm exec -- vitest run apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts packages/adapters/src/desktop-process-tree.test.ts --maxWorkers=2
+      - name: Exercise real isolated floating chat windows
+        shell: pwsh
+        run: |
+          node node_modules/electron/install.js
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          npm run db:generate
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          npm run build --workspace @rakazo/desktop
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          node apps/desktop/scripts/verify-floating-chats.mjs floating-chat-proof
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: floating-chat-proof-${{ github.sha }}
+          path: src/agent/floating-chat-proof
+          if-no-files-found: warn
+          retention-days: 7
   workspace:
     name: Agent workspace persistence and browser
     runs-on: ubuntu-latest

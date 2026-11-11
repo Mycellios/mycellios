@@ -1106,6 +1106,18 @@
   may only open that window with an already-saved address. Probe and mount before
   committing a switch; retain origin-partitioned sessions and rollback on failure.
 
+- Floating chats share the active server session but pin their Space without
+  writing the main window's selected Space or composer draft. Their preload is
+  chat-only; do not grant local computer or account configuration authority.
+  Close them on account/server changes and include every chat in update readiness.
+  Dock opening mode defaults to the main window for existing profiles.
+  Mobile setup QR codes contain only the current reachable server URL, never
+  credentials. Session revocation uses the authenticated account's existing API
+  after confirmation. Verify floating-chats, preload, rpc and MobileSessions tests.
+  After the native Desktop build, run
+  `node apps/desktop/scripts/verify-floating-chats.mjs <receipt-directory>` from
+  `src/agent` for the isolated real-window/session qualification on Windows.
+
 - Continuous voice uses a flush 50px header, a scrollable body and fixed controls.
   Local model preparation is single-flight and must never start capture after
   the owning panel closes. Native ASR and TTS share a worker; stop capture before
@@ -1116,6 +1128,12 @@
   and downloads are idle. Retain per-window cancellation and keep a recording
   started in local mode on the device even if its model becomes unavailable.
   Verify local-voice, preload, TaskComposer, dictation, tts and VoiceConversation tests.
+  Network spoken replies are an account-scoped opt-in in continuous voice.
+  Send only reply text to the canonical Mycellios speech model with explicit
+  contribution funding. Authorize the Mico and saved account connection and
+  verify bounded WAV output. Do not retry or switch providers on a paid failure.
+  Dictation continues to follow the device and connected transcription settings.
+  Verify mycellios-network-speech, voice and tts tests.
 
 - Sidebar contribution is a direct contribute/pause action. The warm bottom-edge
   indicator requires a supported, connected, confirmed contributor and clears
