@@ -1,11 +1,20 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { i18n } from "@lingui/core";
+import { i18n, setupI18n } from "@lingui/core";
+import { messages as englishMessages } from "../locales/en/messages.po";
 import { RUN_ERROR_LIMIT_MESSAGES } from "@rakazo/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { UI_LOCALES } from "./ui-locale";
 
 describe("lingui catalogs", () => {
+  it.each([
+    ["{name} reads this chat to answer. Nothing here goes back to the chat.", { name: "Mico QA" }, "Mico QA reads this chat to answer. Nothing here goes back to the chat."],
+    ["Times in {zone}", { zone: "Europe/Madrid" }, "Times in Europe/Madrid"],
+    ["New conversation in {0}", { 0: "Research" }, "New conversation in Research"],
+  ])("formats compiled English values without a development message fallback: %s", (id, values, expected) => {
+    const production = setupI18n({ locale: "en", messages: { en: englishMessages } });
+    expect(production._(id as string, values as Record<string, string>)).toBe(expected);
+  });
   it("includes the contribution and verification labels instead of exposing message IDs", () => {
     const messages = [
       "Contribute compute",

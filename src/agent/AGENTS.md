@@ -15,6 +15,10 @@
 
 # AGENTS.md
 
+- Production English messages with interpolated values must exist in
+  `apps/web/src/locales/en/messages.po`; production macros omit development text.
+  Verify compiled messages without a fallback in `i18n-catalog.test.ts`.
+
 - Tailscale connections use the optional private Linux gateway in `infra/tailscale`.
   Each user/Space/network owns a userspace device; never enable global private
   egress or join customer routes to the API/worker host. Require both the network's
