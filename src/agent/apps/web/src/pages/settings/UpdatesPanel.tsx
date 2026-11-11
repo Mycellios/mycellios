@@ -46,9 +46,11 @@ export function UpdatesPanel({ onWhatsNew, onClose, onBusyChange }: {
   const supported = state?.phase !== "unsupported";
   const restarting = state?.relaunchPending || state?.installPending;
   const phase = state?.phase;
+  const systemInstaller = state?.installAction === "system-installer";
   const nativeMessage = restarting ? (state?.relaunchWaitingFor === "update_download" ? t`Waiting for the update download to finish.` : state?.relaunchWaitingFor === "unsaved_work" || state?.waitingFor === "unsaved_work"
       ? t`Save changes or finish the call to restart.` : t`Waiting for Micos to finish. You can keep working.`)
     : state?.relaunchError ? t`Could not restart. Try again.`
+    : state?.handoffComplete ? t`Opened the system installer. Restart Mycellios when it finishes.`
     : phase === "unsupported" ? t`This development build updates from the project. Installed apps use published releases.`
     : phase === "downloading" ? t`Downloading…`
     : phase === "ready" ? t`The update is ready to install.`
@@ -66,7 +68,7 @@ export function UpdatesPanel({ onWhatsNew, onClose, onBusyChange }: {
         {bridge && state ? <>
           <SettingsRow label={`${t`Version`} ${state.currentVersion}`} description={<span role="status">{nativeMessage}</span>}
             control={<Button variant="outline" size="sm" disabled={pending || restarting || !supported || phase === "checking" || phase === "downloading"}
-              onClick={() => void native?.act(action)}>{phase === "downloading" ? `${Math.round(state.percent ?? 0)} %` : phase === "checking" ? t`Checking…` : phase === "ready" ? t`Restart to update` : phase === "available" ? t`Download update` : t`Check for updates`}</Button>} />
+              onClick={() => void native?.act(action)}>{phase === "downloading" ? `${Math.round(state.percent ?? 0)} %` : phase === "checking" ? t`Checking…` : phase === "ready" ? (systemInstaller ? t`Open installer` : t`Restart to update`) : phase === "available" ? t`Download update` : t`Check for updates`}</Button>} />
           {bridge.restartWhenIdle && <SettingsRow label={t`Restart Mycellios`} description={t`Restart when Micos are idle, after saving drafts and finishing calls.`}
             control={<Button variant="outline" size="sm" disabled={pending} onClick={() => void native?.act(restarting ? "cancelRestart" : "restartWhenIdle")}>
               {restarting ? t`Cancel restart` : t`Restart when idle`}</Button>} />}
@@ -75,7 +77,7 @@ export function UpdatesPanel({ onWhatsNew, onClose, onBusyChange }: {
               control={<Switch id={`${id}-download`} checked={preferences.autoDownload} disabled={pending || !preferences.supported}
                 onCheckedChange={autoDownload => void save({ autoDownload })} />} />
             <SettingsRow label={<Label htmlFor={`${id}-install`}>{t`Install updates automatically`}</Label>} description={t`Restart with the downloaded version when your Micos and this app are idle.`}
-              control={<Switch id={`${id}-install`} checked={preferences.autoInstall} disabled={pending || !preferences.supported}
+              control={<Switch id={`${id}-install`} checked={preferences.autoInstall} disabled={pending || !preferences.supported || preferences.installSupported === false}
                 onCheckedChange={autoInstall => void save({ autoInstall })} />} />
           </>}
         </> : !bridge ? <>

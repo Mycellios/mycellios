@@ -130,6 +130,11 @@ database backup are retained; this release adds no database migration.
 
 Windows checks and stages verified updates in the background. Installation still
 requires explicit confirmation; the unsigned automatic-install channel stays disabled.
+Fedora RPM and Debian DEB installations read the extended catalog entry for their own
+package and verify its exact version, byte size and SHA-256 before offering it.
+Installation stays the owner's explicit action: the app opens the verified package
+with the system installer and never elevates privileges or installs unattended.
+AppImages and unpackaged builds keep the manual download path.
 Restart now can checkpoint and requeue the same owned Run without waiting for all
 native tasks to finish. Saved drafts and fresh owner/session-bound PC grants survive;
 uncertain commands require receipt inspection before further mutations. Both direct

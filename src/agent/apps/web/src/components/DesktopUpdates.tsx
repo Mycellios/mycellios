@@ -93,7 +93,9 @@ function useDesktopUpdates() {
     }
   }
   const message = error ?? (
-    state?.message === UPDATE_DISK_SPACE_MESSAGE
+    state?.handoffComplete
+      ? t`Opened the system installer. Restart Mycellios when it finishes.`
+      : state?.message === UPDATE_DISK_SPACE_MESSAGE
       ? t`Free at least 6 GB of disk space before restarting to update.`
       : state?.message === "Another update is still running. Keep using Mycellios and finish that installation before retrying."
         ? t`Another update is still running. Keep using Mycellios and finish that installation before retrying.`
@@ -172,7 +174,7 @@ function DesktopUpdateGate({
         <div className="flex w-full max-w-sm flex-col items-center text-center">
           <img src={appPath("/mycellios/app-icon-v2-192.png")} alt="" width={64} height={64} className="mb-8 size-16" />
           <h1 id="desktop-update-heading" ref={heading} tabIndex={-1} className="text-heading2 font-medium outline-none">
-            {state.installPending ? <Trans>Preparing to restart</Trans>
+            {state.installPending ? (state.installAction === "system-installer" ? <Trans>Preparing the installer</Trans> : <Trans>Preparing to restart</Trans>)
               : failed ? <Trans>Could not complete the update</Trans>
               : ready ? <Trans>Update ready</Trans>
               : state.phase === "available" ? <Trans>Update available</Trans>
@@ -180,7 +182,8 @@ function DesktopUpdateGate({
           </h1>
           <p id="desktop-update-description" role="status" className="mt-2 text-sm text-muted-foreground">
             {state.installPending ? <PendingRestart state={state} /> : message ??
-              (ready && callActive ? <Trans>Your call will end when you restart.</Trans>
+              (ready && state.installAction === "system-installer" ? <Trans>Install the update with your system installer, then reopen Mycellios.</Trans>
+                : ready && callActive ? <Trans>Your call will end when you restart.</Trans>
                 : ready ? <Trans>Restart to finish installing the update.</Trans>
                 : <Trans>Mycellios will save your work before restarting.</Trans>)}
           </p>
@@ -204,7 +207,8 @@ function DesktopUpdateGate({
                 else void act(failed ? "check" : "download");
               }}
             >
-              {ready && callActive ? <Trans>End call and restart</Trans>
+              {ready && state.installAction === "system-installer" ? <Trans>Open installer</Trans>
+                : ready && callActive ? <Trans>End call and restart</Trans>
                 : canForce ? <Trans>Restart now</Trans> : failed ? <Trans>Try again</Trans>
                 : ready ? <Trans>Restart to update</Trans> : <Trans>Download update</Trans>}
             </Button>
@@ -266,7 +270,7 @@ export function DesktopSidebarUpdate() {
     <div className="mx-2.5 mt-2 min-w-0 rounded-xl border border-border bg-sidebar-accent p-3">
       <p role="status" className="text-xs font-medium">
         {state.installPending ? <PendingRestart state={state} /> : update.error ??
-          (ready ? <Trans>Restart to update</Trans> : state.phase === "available" ? <Trans>Update available</Trans> : <Trans>Downloading…</Trans>)}
+          (ready ? (state.installAction === "system-installer" ? <Trans>Update ready to install</Trans> : <Trans>Restart to update</Trans>) : state.phase === "available" ? <Trans>Update available</Trans> : <Trans>Downloading…</Trans>)}
       </p>
       {ready ? (
         <Button
@@ -275,7 +279,8 @@ export function DesktopSidebarUpdate() {
           disabled={update.busy}
           onClick={update.install}
         >
-          {update.callActive ? <Trans>End call and restart</Trans> : state.installPending && state.supportsForceRestart ? <Trans>Restart now</Trans> : <Trans>Restart to update</Trans>}
+          {state.installAction === "system-installer" ? <Trans>Open installer</Trans>
+            : update.callActive ? <Trans>End call and restart</Trans> : state.installPending && state.supportsForceRestart ? <Trans>Restart now</Trans> : <Trans>Restart to update</Trans>}
         </Button>
       ) : state.phase === "error" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.check}><Trans>Try again</Trans></Button>
         : state.phase === "available" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.download}><Trans>Download update</Trans></Button> : percent !== null ? (
@@ -319,7 +324,9 @@ export function DesktopUpdateSection() {
           disabled={busy || (state.installPending && (!forceAvailable || state.restartMode === "now")) || downloading || state.phase === "checking"}
           onClick={() => void act(state.installPending && forceAvailable ? "forceInstall" : ready ? "install" : "check")}
         >
-          {ready && updates.callActive ? <Trans>End call and restart</Trans> : state.installPending && forceAvailable ? <Trans>Restart now</Trans> : ready ? (
+          {state.installAction === "system-installer" && ready && updates.callActive ? <Trans>End call to update</Trans>
+            : state.installAction === "system-installer" && ready ? <Trans>Open installer</Trans>
+            : ready && updates.callActive ? <Trans>End call and restart</Trans> : state.installPending && forceAvailable ? <Trans>Restart now</Trans> : ready ? (
             <Trans>Restart to update</Trans>
           ) : downloading ? (
             <Trans>Downloading…</Trans>

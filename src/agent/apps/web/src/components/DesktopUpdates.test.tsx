@@ -82,3 +82,12 @@ it("keeps audio running until the user requests restart and ends it before hando
   expect(restart.textContent).toBe("End call and restart");
   await act(async () => restart.click()); expect(endCall).toHaveBeenCalledBefore(bridge.install);
 });
+it("hands a package-manager update to the system installer instead of announcing a restart", async () => {
+  fixture.state.installAction = "system-installer"; fixture.state.supportsForceRestart = false;
+  await render();
+  expect(host.textContent).toContain("Update ready to install");
+  const action = host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!;
+  expect(action.textContent).toBe("Open installer");
+  await act(async () => action.click());
+  expect(bridge.install).toHaveBeenCalledOnce();
+});
