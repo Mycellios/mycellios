@@ -13,6 +13,7 @@ import {
   computerPanelNeedsMaintenance,
   computerPanelNeedsScreen,
   computerTakeoverBlocked,
+  deferThreadProgressPresentation,
   isThreadSnapshotEvent,
   mergeThreadSnapshot,
   prependThreadMessagePage,
@@ -29,13 +30,22 @@ describe("thread event reduction", () => {
   it("keeps message identity separate from the live event cursor", () => {
     const initial = snapshot([]);
     const event = {
-      id: "event-90", seq: 90, threadId: initial.threadId, botId: "bot-1",
+      id: "event-90", seq: 90, spaceId: "workspace-1", threadId: initial.threadId, botId: "bot-1",
       type: "thread.message.created", createdAt: "2026-11-11T00:00:00.000Z",
       payload: { messageId: "message-7", seq: 7, role: "user", blocks: [{ kind: "text", text: "Sent" }] },
     } as ProductEvent;
     const next = reduceThreadSnapshot(initial, event)!;
     expect(next.cursor).toBe(90);
     expect(next.messages[0]?.seq).toBe(7);
+  });
+  it("paints first reply text immediately even when a tool already created the live row", () => {
+    const event = { id: "progress", spaceId: "workspace-1", threadId: "thread-1", botId: "bot-1",
+      runId: "run-1", type: "thread.progress", seq: 10, createdAt: "2026-11-11T00:00:00.000Z", payload: { text: "Hello" } } as ProductEvent;
+    expect(deferThreadProgressPresentation(snapshot([]), event)).toBe(false);
+    expect(deferThreadProgressPresentation(snapshot([message("progress:run-1", [{ kind: "progress", text: "Searching", activity: true }], 1)]), event)).toBe(false);
+    const shown = snapshot([message("progress:run-1", [{ kind: "progress", text: "Hello" }], 1)]);
+    expect(deferThreadProgressPresentation(shown, event)).toBe(true);
+    expect(deferThreadProgressPresentation(shown, { ...event, type: "run.completed" })).toBe(false);
   });
   it("shows a committed direct send as queued before its snapshot refresh returns", () => {
     const initial = snapshot([message("user-1", [{ kind: "text", text: "Continue" }], 4)]);

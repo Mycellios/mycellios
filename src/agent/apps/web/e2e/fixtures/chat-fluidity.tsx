@@ -6,7 +6,7 @@ import { createFramePublisher } from "../../src/lib/frame-publisher";
 import { bootstrapI18n, i18n } from "../../src/lib/i18n";
 import type { RpcClient } from "../../src/lib/rpc";
 import { SpaceRpcProvider } from "../../src/lib/space-rpc";
-import { reduceThreadSnapshot } from "../../src/lib/thread-events";
+import { deferThreadProgressPresentation, reduceThreadSnapshot } from "../../src/lib/thread-events";
 import { Composer } from "../../src/pages/shell/composer";
 import { usePendingThreadSends } from "../../src/pages/shell/use-pending-thread-sends";
 import { FixtureTranscript, threadEvent } from "./thread-fixture";
@@ -58,10 +58,7 @@ function ChatFixture() {
     const event = threadEvent(++seq.current, part);
     pending.observe(event);
     if (event.threadId !== reference.current.threadId) return;
-    const defer =
-      !immediate &&
-      event.type === "thread.progress" &&
-      reference.current.messages.some((message) => message.id === `progress:${event.runId}`);
+    const defer = !immediate && deferThreadProgressPresentation(reference.current, event);
     reference.current = reduceThreadSnapshot(reference.current, event)!;
     metrics.current.events++;
     publisher.publish(reference.current, defer);

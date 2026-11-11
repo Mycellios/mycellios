@@ -1,5 +1,6 @@
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { createFramePublisher } from "../lib/frame-publisher";
+import { deferThreadProgressPresentation } from "../lib/thread-events";
 import { usePendingThreadSends } from "./shell/use-pending-thread-sends";
 import { DesktopCompanions } from "../components/DesktopCompanions";
 import { FloatingChatButton } from "../components/FloatingChatButton";
@@ -5202,8 +5203,7 @@ function applyThreadEvent(
   computerRef: MutableRefObject<ComputerStatus | null>,
 ) {
   if (isThreadSnapshotEvent(event)) {
-    const deferProgress = event.type === "thread.progress" &&
-      Boolean(snapshotRef.current?.messages.some(message => message.id === `progress:${event.runId}`));
+    const deferProgress = deferThreadProgressPresentation(snapshotRef.current, event);
     const next = reduceThreadSnapshot(snapshotRef.current, event);
     commitSnapshot(next, deferProgress);
   }

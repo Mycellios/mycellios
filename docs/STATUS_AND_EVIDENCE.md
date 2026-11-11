@@ -16,7 +16,7 @@ without waiting for a frame. Stable reply-jump callbacks preserve memoized histo
 rows. Short send/live-reply/control transitions respect reduced motion and do not
 replay streamed text on completion or take scroll ownership from a history reader.
 
-Local focused validation passed 258 tests. A browser fixture using the real
+Local focused validation passed 259 tests. A browser fixture using the real
 Composer and Transcript passes delayed acknowledgement, delivery ordering,
 rejection, account/Space/thread isolation, mobile light/dark, reduced motion and
 history-scroll checks with synthetic events. In one Windows development-browser
