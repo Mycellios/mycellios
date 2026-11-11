@@ -103,7 +103,7 @@ jobs:
         working-directory: src/agent
         shell: pwsh
         run: |
-          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
+          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/manual-update-lock.test.ts apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node -e "require('electron')"
           if($LASTEXITCODE){exit $LASTEXITCODE}

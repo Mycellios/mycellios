@@ -75,7 +75,12 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
     ],
     win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true },
     // The resource tree exceeds ZIP32's entry limit; nsisunz rejects ZIP64.
-    nsis: { include:path.join(desktopRoot,'assets/fast-install.nsh'),useZip: false, oneClick: true, perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
+    // An assisted first install and an explicit Finish/Open action, as upstream.
+    // Updates still use /S and our confirmed same-profile relaunch. Keep the
+    // installation directory fixed until alternate paths have recovery coverage.
+    nsis: { include:path.join(desktopRoot,'assets/fast-install.nsh'),useZip: false, oneClick: false,
+      allowToChangeInstallationDirectory: false, allowElevation: false, runAfterFinish: true,
+      perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
     // This only writes standard updater metadata/block maps at build time.
     // The unsigned preview still installs through an explicit user action.
     publish: [{ provider: 'generic', url: 'https://www.mycellios.com/downloads/desktop/updates/windows' }],

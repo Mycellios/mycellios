@@ -40,7 +40,7 @@ it.runIf(process.platform === "win32")("parses the real helper and requires the 
   const text = await readFile(source, "utf8");
   expect(text).not.toMatch(/Stop-Process|taskkill|ExecutionPolicy|RmShutdown|legacyShutdown/);
   expect(text).toContain("The previous app has not finished saving; update was not applied");
-  expect(text).toMatch(/\$setup=Start-Process[^\r\n]+-PassThru\r?\n +if\(!\$setup\.WaitForExit\(600000\)\)/);
+  expect(text).toMatch(/\$setup=Start-Process[^\r\n]+-WindowStyle Normal[^\r\n]+-PassThru\r?\n +\$null=\$setup.Handle\r?\n +Progress 'installing'\r?\n +if\(!\$setup\.WaitForExit\(600000\)\)/);
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-helper-"));
   try {
     const file = path.join(directory, "parse.ps1");
@@ -58,9 +58,11 @@ it.runIf(process.platform === "win32")("starts the hidden helper and keeps a rej
     const fileName = "Mycellios-Desktop-0.0.1-windows-x64-pilot.exe";
     const installer = path.join(updates, fileName);
     await writeFile(installer, "fixture, never executable");
+    const executable = path.join(profile, "Mycellios Desktop.exe");
+    await copyFile(process.execPath, executable);
     const failure = await launchManualUpdate({
       profile,
-      executable: path.join(profile, "Mycellios Desktop.exe"),
+      executable,
       oldPid: process.pid,
       installer,
       release: { version: "0.0.1", fileName, bytes: 1, sha256: "a".repeat(64), url: "https://example.test/fixture" },
@@ -82,8 +84,12 @@ it.runIf(process.platform === "win32")("starts the hidden helper and keeps a rej
   }
 }, 60_000);
 
-it.runIf(process.platform === "win32")("acknowledges a live app and survives its normal exit", async () => {
-  const profile = await mkdtemp(path.join(os.tmpdir(), "mycellios update exit "));
+it.runIf(process.platform === "win32")("acknowledges a live app through a Windows path alias and survives its normal exit", async () => {
+  const profileRoot = await mkdtemp(path.join(os.tmpdir(), "mycellios update exit "));
+  const aliasScript = path.join(profileRoot, "alias.ps1");
+  await writeFile(aliasScript, "param([string]$Folder)\n(New-Object -ComObject Scripting.FileSystemObject).GetFolder($Folder).ShortPath\n");
+  const alias = await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", aliasScript, profileRoot], { windowsHide: true, timeout: 30_000, encoding: "utf8" });
+  const profile = alias.stdout.trim();
   try {
     const updates = path.join(profile, "updates");
     const executable = path.join(profile, "Mycellios Desktop.exe");
@@ -131,7 +137,7 @@ it.runIf(process.platform === "win32")("acknowledges a live app and survives its
     });
   } finally {
     // The worker writes its receipt immediately before closing the Windows log handles.
-    await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    await rm(profileRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 65_000);
 
