@@ -62,8 +62,10 @@ function CreateBotModelPicker({ me, model, onChange }: {
   const levels = (credential?.thinkingLevels ?? entry?.thinkingLevels ?? [])
     .filter((level) => level !== "off");
   const loadError = credentialsQuery.error ?? catalogQuery.error;
+  const modelName = entry?.label ?? model?.modelId ?? "";
 
   return (
+    <Disclosure summary={model ? <span className="max-w-[min(60vw,24rem)] truncate" title={modelName}>{t`Model · ${modelName}`}</span> : t`Model · automatic`}>
     <div className="grid gap-1.5">
       <div className="flex flex-wrap items-end gap-2">
         <div className="grid min-w-40 flex-1 gap-1.5 [&_button]:mt-0">
@@ -92,6 +94,7 @@ function CreateBotModelPicker({ me, model, onChange }: {
       </div>
       {loadError ? <p role="status" className="text-xs text-muted-foreground">{errorText(loadError)}</p> : null}
     </div>
+    </Disclosure>
   );
 }
 
@@ -194,7 +197,7 @@ export function CreateBotDialog({
                 onChange={(event) => setName(event.target.value)}
               />
             </div>
-            {me ? <Disclosure summary={t`Model · automatic`}><CreateBotModelPicker me={me} model={model} onChange={setModel} /></Disclosure> : null}
+            {me ? <CreateBotModelPicker me={me} model={model} onChange={setModel} /> : null}
             {description.trim() ? <Disclosure summary={t`Review instructions`} open={reviewing} onOpenChange={setReviewing}>
               <p className="whitespace-pre-wrap text-sm">{normalizeCreateBotProfile({ name, title: "", description }).instructions}</p>
               <p className="mt-2 text-xs text-muted-foreground">{t`These instructions will be saved when you create the Mico. You can edit them later.`}</p>

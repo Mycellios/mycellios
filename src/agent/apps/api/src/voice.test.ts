@@ -5,6 +5,7 @@ import type { PrismaClient } from "@rakazo/db";
 import * as db from "@rakazo/db";
 import { createLogger, createTestSink, installLogger } from "@rakazo/logging";
 import { Hono } from "hono";
+import { ORPCError } from "@orpc/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   disconnectVoiceCredential,
@@ -12,6 +13,7 @@ import {
   MAX_SPEAK_REQUEST_BYTES,
   MAX_TRANSCRIBE_REQUEST_BYTES,
   mountVoiceHttpRoutes,
+  voiceHttpError,
   persistVoiceCredential,
   synthesizeVoice,
   toVoiceCredential,
@@ -51,6 +53,18 @@ describe("toVoiceStatus", () => {
 });
 
 describe("voice HTTP routes", () => {
+  it.each([
+    ["FORBIDDEN", 403, "NETWORK_VOICE_KEY_REJECTED"],
+    ["PAYMENT_REQUIRED", 402, "NETWORK_VOICE_CREDITS"],
+    ["TOO_MANY_REQUESTS", 429, "NETWORK_VOICE_BUSY"],
+    ["GATEWAY_TIMEOUT", 504, "NETWORK_VOICE_TIMEOUT"],
+  ] as const)("keeps the app session intact for network voice %s", async (code, status, voiceCode) => {
+    const app = new Hono();
+    app.get("/fixture", c => voiceHttpError(c, new ORPCError(code, { message: "Safe message", data: { voiceCode, privateDetails: "never expose" } })));
+    const response = await app.request("/fixture");
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error: "Safe message", code: voiceCode });
+  });
   it("rejects a cross-origin simple request before resolving paid network speech", async () => {
     const app = new Hono();
     mountVoiceHttpRoutes(app, {} as VoiceDeps, async () => actor);

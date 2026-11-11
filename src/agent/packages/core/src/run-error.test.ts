@@ -18,6 +18,18 @@ import {
 } from "./run-error.js";
 
 describe("normalizeRunError", () => {
+  it("identifies native host admission without blaming the model or inviting another paid retry", () => {
+    expect(normalizeRunError("This user and Space are not authorized to use the server's native agents.")).toMatchObject({
+      summary: "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings.", recovery: "computer",
+    });
+  });
+  it.each([
+    "Install OpenCode on the computer running this server first.",
+    "Install and sign in to codex on the computer running this server first.",
+    "The configured native agent executable is unavailable. Correct its path or remove the override.",
+  ])("offers computer recovery for native setup: %s", details => {
+    expect(normalizeRunError(details)).toMatchObject({ recovery: "computer", summary: "The native agent is not available on this computer. Check its installation and Mico settings." });
+  });
   it("calls a deploy interruption maintenance instead of blaming the model", () => {
     expect(normalizeRunError(RUN_INTERRUPTED_BY_MAINTENANCE_ERROR)).toMatchObject({
       kind: "maintenance",

@@ -4,6 +4,10 @@ import type { RunErrorTranslator } from "@rakazo/core";
 /** Static descriptors keep shared run-error messages in Lingui extraction. */
 export const translateRunError: RunErrorTranslator = (message, values) => {
   switch (message) {
+    case "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings.":
+      return i18n._({ id: "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings.", message: "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings.", values });
+    case "The native agent is not available on this computer. Check its installation and Mico settings.":
+      return i18n._({ id: "The native agent is not available on this computer. Check its installation and Mico settings.", message: "The native agent is not available on this computer. Check its installation and Mico settings.", values });
     case "Mycellios encountered an internal error.":
       return i18n._({ id: "Mycellios encountered an internal error.", message: "Mycellios encountered an internal error.", values });
     case "Desktop could not confirm the result. Review what it already did before continuing.":

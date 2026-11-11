@@ -1178,6 +1178,13 @@
   verify bounded WAV output. Do not retry or switch providers on a paid failure.
   Dictation continues to follow the device and connected transcription settings.
   Verify mycellios-network-speech, voice and tts tests.
+  Network voice errors carry only allowlisted public reason codes; rejected model
+  keys are 403, never a lost-login 401. Preview requests are single-flight and
+  scoped to the account/Mico/Space; cancel on output changes and ignore late results.
+  Mico settings keep individual overrides in a searchable disclosure. Block
+  navigation while an override is being saved and retain confirmed values on failure.
+  Native host admission and missing-executable failures use computer recovery,
+  never a generic provider error or a blind retry. Preserve native host consent.
 
 - Sidebar contribution is a direct contribute/pause action. The warm bottom-edge
   indicator requires a supported, connected, confirmed contributor and clears
