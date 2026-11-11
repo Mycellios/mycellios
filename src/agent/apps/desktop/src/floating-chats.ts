@@ -35,6 +35,7 @@ export class FloatingChats {
     load: (win: BrowserWindow, url: string) => Promise<unknown>;
     external: (url: string) => void;
     reveal: (target: FloatingChatTarget) => void;
+    onEmpty?: () => void;
   }) {}
 
   account(scope: string) {
@@ -79,7 +80,11 @@ export class FloatingChats {
     });
     const record = { win, target };
     this.windows.set(key, record);
-    win.on("closed", () => { if (this.windows.get(key) === record) this.windows.delete(key); });
+    win.on("closed", () => {
+      if (this.windows.get(key) !== record) return;
+      this.windows.delete(key);
+      if (!this.windows.size) this.options.onEmpty?.();
+    });
     win.webContents.on("render-process-gone", () => { if (!win.isDestroyed()) win.destroy(); });
     win.webContents.setWindowOpenHandler(({ url: destination }) => {
       this.options.external(destination);
@@ -111,7 +116,8 @@ export class FloatingChats {
   }
 
   clear() {
-    for (const { win } of this.windows.values()) if (!win.isDestroyed()) win.destroy();
+    const windows = this.liveWindows();
     this.windows.clear();
+    for (const win of windows) win.destroy();
   }
 }

@@ -1363,6 +1363,11 @@ app.whenReady().then(async () => {
       if (safe) openExternalLink(safe);
     },
     reveal: revealChat,
+    onEmpty: () => {
+      if (!quitting && !keepRunningInBackground && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        revealSecondInstanceWindow(mainWindow);
+      }
+    },
   });
   ipcMain.handle("desktop.chat.return", event => floatingChats!.returnToMain(event.sender, event.senderFrame));
   desktopCompanions = await installDesktopCompanions({

@@ -39,7 +39,7 @@ it("shows only mobile sessions, keeps tokens private and revokes only after conf
   expect(div.textContent).not.toContain(phone.token);
   const buttons = () => [...div.querySelectorAll("button")].filter(b => b.textContent === "Disconnect");
   expect(buttons()).toHaveLength(1);
-  await act(async () => buttons()[0].click());
+  await act(async () => buttons()[0]!.click());
   expect(auth.revokeSession).not.toHaveBeenCalled();
   await act(async () => div.querySelector<HTMLButtonElement>('[role="dialog"] button:last-child')!.click());
   expect(auth.revokeSession).toHaveBeenCalledExactlyOnceWith({ token: phone.token });

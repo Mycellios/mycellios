@@ -21,10 +21,11 @@ const scope = JSON.stringify(["owner", "space-a"]);
 function fixture() {
   const main = new BrowserWindow();
   const reveal = vi.fn();
+  const onEmpty = vi.fn();
   const load = vi.fn<(win: BrowserWindow, url: string) => Promise<unknown>>(async () => undefined);
-  const chats = new FloatingChats({ main: () => main, load, reveal, external: vi.fn() });
+  const chats = new FloatingChats({ main: () => main, load, reveal, onEmpty, external: vi.fn() });
   chats.account(scope);
-  return { chats, main, reveal, load };
+  return { chats, main, reveal, load, onEmpty };
 }
 it("keeps server prefixes and rejects unsafe chat identifiers", () => {
   expect(floatingChatUrl("https://mycellios.example/agent/app/old?secret=unused", "mico"))
@@ -53,7 +54,7 @@ it("reuses a chat, shares its native session and closes it on account change", a
   await expect(chats.open({ scope, botId: "mico" })).rejects.toThrow("account changed");
 });
 it("discards a loading window when the account closes and recovers from load failure", async () => {
-  const { chats, load } = fixture();
+  const { chats, load, onEmpty } = fixture();
   let finish!: () => void;
   load.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
   const opening = chats.open({ scope, botId: "mico" });
@@ -62,8 +63,18 @@ it("discards a loading window when the account closes and recovers from load fai
   finish();
   await opening;
   expect(win.show).not.toHaveBeenCalled();
+  expect(onEmpty).not.toHaveBeenCalled();
   chats.account(scope);
   load.mockRejectedValueOnce(new Error("offline"));
   await expect(chats.open({ scope, botId: "mico" })).rejects.toThrow("offline");
   expect(chats.liveWindows()).toHaveLength(0);
+});
+it("reveals the main application after the last floating chat closes", async () => {
+  const { chats, onEmpty } = fixture();
+  await chats.open({ scope, botId: "one" });
+  await chats.open({ scope, botId: "two" });
+  state.windows[1].destroy();
+  expect(onEmpty).not.toHaveBeenCalled();
+  state.windows[2].destroy();
+  expect(onEmpty).toHaveBeenCalledOnce();
 });

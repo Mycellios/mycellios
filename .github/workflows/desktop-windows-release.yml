@@ -117,6 +117,8 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           npm run build --workspace @rakazo/desktop
           if($LASTEXITCODE){exit $LASTEXITCODE}
+          node apps/desktop/scripts/verify-floating-chats.mjs $env:DESKTOP_RELEASE_OUT
+          if($LASTEXITCODE){exit $LASTEXITCODE}
           npm run build:local-server --workspace @rakazo/desktop
           exit $LASTEXITCODE
       - name: Package and qualify the immutable installer

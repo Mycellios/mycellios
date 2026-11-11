@@ -89,8 +89,9 @@ try {
   }
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/__settings_fixture`);
-  await page.getByRole("combobox", { name: "Open chats in" }).selectOption("floating");
-  await expect(page.getByRole("combobox", { name: "Open chats in" })).toHaveValue("floating");
+  await page.getByRole("combobox", { name: "Open chats in" }).click();
+  await page.getByRole("option", { name: "Floating windows", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Open chats in" })).toHaveText("Floating windows");
   await page.getByRole("button", { name: "Open floating chat" }).click();
   await expect.poll(() => page.evaluate(() => window.__settingsFixture.calls.some(call => call.botId === "fixture-mico"))).toBe(true);
   await expect(page.getByRole("img", { name: "Scan to open Mycellios on your phone" })).toBeVisible();
