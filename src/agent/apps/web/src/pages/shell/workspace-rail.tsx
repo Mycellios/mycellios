@@ -203,12 +203,12 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
           </Button>
         </IconTooltip>
         {props.onApps ? (
-          <IconTooltip label={t`Apps`}>
+          <IconTooltip label="Hifa Store">
             <Button
               variant="ghost"
               size="icon"
               className="app-no-drag rk-rail-button"
-              aria-label={t`Apps`}
+              aria-label="Hifa Store"
               aria-current={props.apps ? "page" : undefined}
               onClick={props.onApps}
             >

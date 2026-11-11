@@ -1,0 +1,69 @@
+.hf-store {
+  min-width: 0;
+  color: var(--foreground);
+}
+.hf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 22px;
+  max-width: 1280px;
+}
+.hf-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  max-width: 360px;
+  min-width: 0;
+}
+.hf-cover {
+  width: 100%;
+  height: 154px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 24px;
+  background: var(--accent);
+  color: var(--foreground);
+  text-align: left;
+  white-space: normal;
+}
+.hf-cover > span {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.hf-cover > svg {
+  flex-shrink: 0;
+}
+.hf-body {
+  padding: 14px 16px 10px;
+}
+.hf-body h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+.hf-body > p {
+  margin: 7px 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted-foreground);
+  min-height: 40px;
+}
+.hf-footer,
+.hf-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.hf-footer {
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.hf-store :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -3px;
+}

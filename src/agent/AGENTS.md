@@ -1,3 +1,13 @@
+- Cadencia is a trusted first-party Hifa Store app, not a published HTML bundle.
+  Keep imported media, DSP workers, auditioning and codecs browser-local. Limit
+  clips to five minutes/250 MiB; preserve source audio rate and one compacted
+  audio/video timeline. Sustained-vowel proposals are acoustic candidates requiring
+  individual opt-in, never word alignment or a linguistic diagnosis. Keep original
+  files unchanged, review/export invalidation, cancellation, URL/codec cleanup and
+  account/Space-scoped memory-cache/reload guards. Verify Cadencia signal, timeline,
+  close/cache/UI tests and actual browser export/re-import; retain the pinned media
+  dependency/license and synthetic demo provenance. No remote media fallback.
+
 - The distributable Android host lives in apps/android and packages apps/web unchanged.
   Keep com.mycellios.android separate from the legacy Expo preview and use a durable
   release signing key, never the preview/debug certificate. Native capabilities use

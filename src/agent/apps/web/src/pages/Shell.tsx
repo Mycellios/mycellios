@@ -3782,9 +3782,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   }
   const appsEnabled = videoStudioEnabled(import.meta.env.VITE_MYCELLIOS_VIDEO_STUDIO);
   const requestedMarketplaceTab = marketplaceTab(searchParams.get("market"));
-  const activeMarketplaceTab = !appsEnabled && requestedMarketplaceTab === "mycellios-apps"
-    ? "apps"
-    : requestedMarketplaceTab;
+  const activeMarketplaceTab = requestedMarketplaceTab;
   const appsOpen = marketplaceView && activeMarketplaceTab === "mycellios-apps";
   const openApps = () => showMarketplace("mycellios-apps");
   function showMarketplace(tab:MarketplaceTab="apps") {
@@ -4032,7 +4030,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     <MobileChatActions label={t`More`} onDismiss={() => setMenuOpen(false)}>
       {close => (
         <>
-          {appsEnabled ? <Button variant="ghost" data-mobile-chat-action onClick={() => { close(); openApps(); }}><LayoutGrid />Apps</Button> : null}
+          <Button variant="ghost" data-mobile-chat-action onClick={() => { close(); openApps(); }}><LayoutGrid />Hifa Store</Button>
           <Button variant="ghost" data-mobile-chat-action onClick={() => { close(); showLibrary(); }}>
             <Archive />{t`Library`}
           </Button>
@@ -4126,7 +4124,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       {!floatingChat && <WorkspaceRail
         apps={appsOpen}
         library={libraryView}
-        onApps={appsEnabled ? openApps : undefined}
+        onApps={openApps}
         marketplace={marketplaceView && !appsOpen}
         scope={JSON.stringify([userId, currentSpaceId])}
         usage={usageView}
