@@ -1,4 +1,5 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { once } from "node:events";
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -40,10 +41,12 @@ it.runIf(process.platform === "win32")("parses the real helper and requires the 
   const text = await readFile(source, "utf8");
   expect(text).not.toMatch(/Stop-Process|taskkill|ExecutionPolicy|RmShutdown|legacyShutdown/);
   expect(text).toContain("The previous app has not finished saving; update was not applied");
-  expect(text).toContain("$start.UseShellExecute=$true");
-  expect(text).toContain("$start.ErrorDialog=$true;$start.ErrorDialogParentHandle=$window.Handle");
+  expect(text).toContain("$start.UseShellExecute=$false");
+  expect(text.indexOf("[MycelliosAttachment]::Approve($installer,$source,$owner)")).toBeLessThan(text.indexOf("Progress 'waiting-for-app'"));
+  expect(text).toContain("if(action!=2)throw new OperationCanceledException");
   expect(text).toContain("$window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()");
-  expect(text).toMatch(/\$null=\$setup.Handle\r?\n +Progress 'installing'\r?\n +if\(!\$setup\.WaitForExit\(600000\)\)/);
+  expect(text).toContain("$installDeadline=(Get-Date).AddMinutes(10)");
+  expect(text).toContain("while(!$setup.WaitForExit(250))");
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-helper-"));
   try {
     const file = path.join(directory, "parse.ps1");
@@ -87,6 +90,37 @@ it.runIf(process.platform === "win32")("starts the hidden helper and keeps a rej
   }
 }, 60_000);
 
+it.runIf(process.platform === "win32")("rejects an Internet-marked installer disguised as local before acknowledging app shutdown", async () => {
+  const profile = await mkdtemp(path.join(os.tmpdir(), "mycellios update origin "));
+  let app: ReturnType<typeof spawn> | undefined;
+  try {
+    const updates = path.join(profile, "updates");
+    await mkdir(updates);
+    const executable = path.join(profile, "Mycellios Desktop.exe");
+    await copyFile(process.execPath, executable);
+    const fileName = "Mycellios-Desktop-0.0.1-windows-x64-pilot.exe";
+    const installer = path.join(updates, fileName);
+    await copyFile(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "where.exe"), installer);
+    const bytes = await readFile(installer);
+    await writeFile(installer + ":Zone.Identifier", `[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=${pathToFileURL(installer).href}\r\n`);
+    app = spawn(executable, ["-e", "setTimeout(() => {}, 60000)"], { windowsHide: true, stdio: "ignore" });
+    await once(app, "spawn");
+    await expect(launchManualUpdate({ profile, executable, installer, oldPid: app.pid!,
+      release: { version: "0.0.1", fileName, bytes: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"), url: "https://example.test/fixture" },
+      reopenUrl: "https://example.test",
+    })).rejects.toThrow("Invalid installer download origin");
+    expect(app.exitCode).toBeNull();
+    const [job] = (await readdir(updates, { withFileTypes: true })).filter(entry => entry.isDirectory());
+    await expect(readFile(path.join(updates, job!.name, "commit.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    const receipt = JSON.parse((await readFile(path.join(updates, job!.name, "result.json"), "utf8")).replace(/^\uFEFF/, ""));
+    expect(receipt).toMatchObject({ installed: false, reopened: false, phase: "checking-installer" });
+  } finally {
+    if (app && app.exitCode === null) { const exited = once(app, "exit"); app.kill(); await exited; }
+    await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+}, 60_000);
+
 it.runIf(process.platform === "win32")("acknowledges a live app through a Windows path alias and survives its normal exit", async () => {
   const profileRoot = await mkdtemp(path.join(os.tmpdir(), "mycellios update exit "));
   const aliasScript = path.join(profileRoot, "alias.ps1");
@@ -100,8 +134,10 @@ it.runIf(process.platform === "win32")("acknowledges a live app through a Window
     await copyFile(process.execPath, executable);
     const fileName = "Mycellios-Desktop-0.0.1-windows-x64-pilot.exe";
     const installer = path.join(updates, fileName);
-    const bytes = Buffer.from("fixture, never executable");
-    await writeFile(installer, bytes);
+    await copyFile(path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "where.exe"), installer);
+    const bytes = await readFile(installer);
+    // This fixture is created locally, never downloaded or executed.
+    await writeFile(installer + ":Zone.Identifier", `[ZoneTransfer]\r\nZoneId=0\r\nHostUrl=${pathToFileURL(installer).href}\r\n`);
     const moduleUrl = pathToFileURL(path.join(import.meta.dirname, "manual-update-handoff.ts")).href;
     const request = {
       profile, executable, installer,
@@ -213,6 +249,8 @@ public static class Fixture {
 `);
     const exec = promisify(execFile);
     await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", compile, installer], { windowsHide: true, timeout: 30_000 });
+    // Preserve truthful local-origin evidence for the locally compiled fixture.
+    await writeFile(installer + ":Zone.Identifier", `[ZoneTransfer]\r\nZoneId=0\r\nHostUrl=${pathToFileURL(installer).href}\r\n`);
     const bytes = await readFile(installer);
     const request = path.join(job, "request.json");
     await writeFile(request, JSON.stringify({

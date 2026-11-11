@@ -66,8 +66,8 @@ export async function launchManualUpdate(options: {
   await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
   child.unref();
   // A successful spawn is not a successful handoff: wait for the exact worker's acknowledgement.
-  // Antivirus scanning and hashing the staged installer can exceed 15 seconds.
-  const deadline = Date.now() + 45_000;
+  // Windows scans and any owner file confirmation happen while Desktop stays open.
+  const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     const phase = await readFile(path.join(directory, "progress.json"), "utf8")
       .then(manualUpdatePhase).catch(() => null);
