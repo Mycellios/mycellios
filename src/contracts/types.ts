@@ -5,7 +5,7 @@ import type { NativeBuildIdentity } from "./build-identity.js";
 import type { HostMemoryObservation } from "./host-memory.js";
 import type { EngineRuntimeProfile } from "./engine-runtime-profile.js";
 export type WorkloadClass = "interactive" | "batch" | "benchmark";
-export type AdapterKind = "mycellios-native" | "kokoro" | "mycellios-pipeline" | "mock" | "embedding" | "decision";
+export type AdapterKind = "mycellios-native" | "kokoro" | "transcription" | "mycellios-pipeline" | "mock" | "embedding" | "decision";
 export type DeploymentAdapterKind = Exclude<AdapterKind, "mycellios-native">;
 export type ExecutionMode = "replica" | "pipeline";
 export type ExecutionDeviceType = "cpu" | "gpu" | "mixed";

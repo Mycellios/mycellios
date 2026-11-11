@@ -3,6 +3,13 @@ import { existsSync, mkdirSync, readFileSync, appendFileSync, writeFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// This optional replica's boundary tests need only Python's standard library.
+// Every other Python/native surface still requires its own focused admission.
+const transcriptionPython = new Set(['python/distributed_runtime/transcription_engine.py',
+  'python/distributed_runtime/replica_gpu_guard.py', 'python/tests/test_transcription_engine.py',
+  'python/tests/test_transcription_gpu_guard.py', 'scripts/qualify-transcription-gpu.py']);
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f));
+
 export function planChecks(files) {
   const code = files.filter(f => /\.[cm]?[jt]sx?$/.test(f) && !f.endsWith('.d.ts'));
   const visual = f => /\.(md|png|svg|jpg|webp|css|po)$/.test(f);
@@ -15,6 +22,10 @@ export function planChecks(files) {
   const agentScriptTests = [];
   const add = (cwd, bin, args, label) => commands.push({ cwd, bin, args, label });
   add('.', 'node', ['--test', 'scripts/ci-fast-delivery.test.mjs'], 'CI policy tests');
+  if (files.some(f => transcriptionPython.has(f) || f === 'python/transcription-artifacts.json')) {
+    add('.', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'python/tests', '-p', 'test_transcription_*.py'], 'native transcription Python boundaries (no model or GPU)');
+    add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...[...transcriptionPython].filter(f => existsSync(f))], 'native transcription Python syntax');
+  }
   if (root || agent) add('.', 'npm', ['install', '--global', 'npm@10.9.8', '--no-audit', '--no-fund'], 'pinned npm toolchain');
   for (const file of code.filter(f => /\.[cm]?js$/.test(f))) {
     add('.', 'node', ['--check', file], `syntax: ${file}`);
@@ -77,7 +88,7 @@ export function runCI() {
   try {
     git(['diff', '--check', base, head]);
     receipt.checks.push({ label: 'patch whitespace', status: 'passed' });
-    const native = files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f));
+    const native = uncoveredNativeFiles(files);
     if (native.length) throw new Error('Python/native changes need a dedicated focused validation job; this TypeScript/JavaScript gate cannot certify them.');
     for (const command of planChecks(files)) {
       // Removed sources still select their surface's types, but cannot be syntax-checked.

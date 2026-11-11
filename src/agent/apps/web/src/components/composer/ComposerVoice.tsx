@@ -63,8 +63,9 @@ async function voiceFile(audio: Blob, name: string): Promise<File> {
   }
 }
 
-export function useComposerVoice({ scope, transcribe, blocked, onText, onAudio }: {
+export function useComposerVoice({ scope, botId, transcribe, blocked, onText, onAudio }: {
   scope: string;
+  botId?: string;
   transcribe?: boolean;
   blocked: boolean;
   onText: (words: string) => void;
@@ -149,7 +150,7 @@ export function useComposerVoice({ scope, transcribe, blocked, onText, onAudio }
     setState({ phase: "recording", startedAt: session.startedAt });
     setError(null);
     void dictation.listen({
-      mode: "hold",
+      mode: "hold", botId,
       transcribe,
       preferServer: transcribe,
       liveTranscript: !recordAudio,

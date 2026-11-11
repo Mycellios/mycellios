@@ -142,12 +142,20 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels
           onClick={() => { if (previewRunning.current) stopPreview(); else void previewNetworkVoice(); }}>{previewing ? t`Stop` : t`Listen`}</Button>} />
     </SettingsGroup>}
     <SettingsGroup title={t`Dictation`}>
+      {accountId && <SettingsRow label={t`Dictation processing`}
+        description={t`Mycellios sends recordings of up to 30 seconds to the network and uses your credits. Spanish and English.`}
+        control={<OptionSelect aria-label={t`Dictation processing`}
+          value={value.networkTranscriptionAccount === accountId ? "network" : "device"}
+          options={[{ value: "device", label: t`Device or connected provider` }, { value: "network", label: t`Mycellios network · uses credits` }]}
+          onValueChange={choice => save({ networkTranscriptionAccount: choice === "network" ? accountId : "",
+            ...(choice === "network" && !["auto", "es", "en"].includes(value.dictationLanguage) ? { dictationLanguage: "auto" } : {}) })} />} />}
+
       {native && (separateModels
         ? modelRow("asr", "Parakeet TDT 0.6B v3", t`Transcribes on this computer and detects the language automatically.`)
         : modelRow("both", "Parakeet TDT 0.6B v3 + Supertonic 3", t`Transcribe and speak on this computer.`))}
       <SettingsRow label={t`Dictation language`} description={t`Language hint for the browser and connected transcription services.`}
         control={<OptionSelect aria-label={t`Dictation language`} value={value.dictationLanguage} className="w-48 max-w-full"
-          options={[{ value: "auto", label: t`Automatic` }, ...UI_LOCALES.map(locale => ({ value: locale, label: UI_LOCALE_LABELS[locale] }))]}
+          options={[{ value: "auto", label: t`Automatic` }, ...UI_LOCALES.filter(locale => value.networkTranscriptionAccount !== accountId || locale === "es" || locale === "en").map(locale => ({ value: locale, label: UI_LOCALE_LABELS[locale] }))]}
           onValueChange={dictationLanguage => save({ dictationLanguage })} />} />
     </SettingsGroup>
     <SettingsGroup title={t`Read aloud`}>

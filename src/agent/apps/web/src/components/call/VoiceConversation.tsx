@@ -37,12 +37,13 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
   const preparationTimer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const seen = useRef(new Set<string>());
   const native = window.rakazoDesktop?.localVoice;
-  const canCapture = Boolean(transcribe || isAndroidHost() || webSpeechAvailable());
   const preferences = useGeneralPreferences();
+  const networkDictation = Boolean(accountId && preferences.networkTranscriptionAccount === accountId);
+  const canCapture = Boolean(networkDictation || transcribe || isAndroidHost() || webSpeechAvailable());
   const networkReplies = Boolean(accountId && preferences.networkSpeechAccount === accountId);
   const localReplies = !networkReplies && preferences.speechEngine === "local";
   const modelsReady = (status: LocalVoiceStatus | null) => localReplies
-    ? status?.ready === true
+    ? (networkDictation ? Boolean(status?.models?.tts.ready ?? status?.ready) : status?.ready === true)
     : canCapture || Boolean(status?.models?.asr.ready ?? status?.ready);
   const refresh = async () => { if (native) { const status = await native.status(); if (alive.current) setModel(status); } };
   useEffect(() => {
@@ -83,7 +84,7 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
   async function listen(background = false) {
     if (!alive.current || !enabled.current || mute.current) return;
     if (!background) setPhase("listening"); setError(null);
-    try { await dictation.listen({ spaceId, mode: "endpoint", transcribe, preferServer: transcribe,
+    try { await dictation.listen({ spaceId, botId: bot.id, mode: "endpoint", transcribe, preferServer: transcribe,
       onSpeechStart: () => { if (!background) return; generation.current++; speaker.stop(); void output.current?.close().catch(() => {}); output.current = null; void native?.stop().catch(() => {}); setPhase("listening"); },
       onFinal: text => { if (background) { generation.current++; speaker.stop(); void output.current?.close().catch(() => {}); output.current = null; } void send(text); } }); }
     catch { if (alive.current && enabled.current) stopWithError(t`Could not use the microphone. Check its permission and try again.`); }
@@ -197,7 +198,8 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
     setPhase("preparing"); setError(null);
     preparationTimer.current = setInterval(() => void refresh().catch(() => {}), 1000);
     try {
-      if (!localReplies && native.prepareModel) await native.prepareModel("asr");
+      if (networkDictation && localReplies && native.prepareModel) await native.prepareModel("tts");
+      else if (!localReplies && native.prepareModel) await native.prepareModel("asr");
       else await native.prepare();
       await refresh();
       if (alive.current) await start();

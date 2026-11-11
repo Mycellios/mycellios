@@ -50,7 +50,7 @@ function fixture(mode: "normal" | "session-change" | "wrong-route" | "failed" | 
   registerNativeReplicaQualifications(app, {
     adminToken: "operator-admin", networkToken: "operator-network",
     hub: { currentWorkerSessionId: () => session, setWorkerMaintenance: async () => {} },
-    store: { getWorker: async () => worker, updateWorkerHeartbeat: async (_id, capabilities) => { writes++; worker.capabilities = capabilities; } },
+    store: { database: { transaction: async action => await action() }, getWorker: async () => worker, updateWorkerHeartbeat: async (_id, capabilities) => { writes++; worker.capabilities = capabilities; } },
     service: { submit: submit as MeshService["submit"], cancel },
     attachReceipt: event => ({ ...event, result: { ...event.result, executionReceiptId: sha(String(next)) } }),
   });

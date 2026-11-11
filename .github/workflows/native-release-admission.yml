@@ -1,0 +1,44 @@
+name: Native release admission acceptance
+on:
+  pull_request:
+    paths:
+      - src/coordinator/release-admission.ts
+      - tests/release-admission.postgres.test.ts
+      - .github/workflows/native-release-admission.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-admission-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  admission:
+    name: Native admission PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: asr_test
+          POSTGRES_PASSWORD: ephemeral_fixture_only
+          POSTGRES_DB: asr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U asr_test -d asr_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Exercise the actual admission barrier against isolated PostgreSQL
+        env:
+          # Disposable CI service, never a production credential or database.
+          MYCELLIOS_RELEASE_TEST_POSTGRES_URL: postgres://asr_test:ephemeral_fixture_only@127.0.0.1:5432/asr_test
+        run: node node_modules/vitest/vitest.mjs run tests/release-admission.postgres.test.ts --maxWorkers=1

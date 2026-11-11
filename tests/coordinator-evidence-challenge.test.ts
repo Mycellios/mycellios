@@ -450,6 +450,7 @@ function storedWorker(capabilities: WorkerCapabilities): StoredWorker {
 async function harness(initial: StoredWorker) {
   const current = { worker: initial, plans: [] as Array<Record<string, unknown>> };
   const store = {
+    database: { transaction: async <T>(run: () => Promise<T>) => run() },
     listRuntimeLinkSamples: async () => [],
     getWorker: (workerId: string) => workerId === current.worker.id ? current.worker : null,
     updateWorkerHeartbeat: (

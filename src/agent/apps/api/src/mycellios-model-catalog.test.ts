@@ -13,6 +13,7 @@ describe("Mycellios account chat catalog", () => {
           { id: "qwen3-4b", x_replicas: 0, x_pipelines: 0 },
           { id: "qwen3-embedding-4b" },
           { id: "kokoro" },
+            { id: "mycellios-whisper-small", task: "transcription" },
           { id: "ltx-video" },
           { id: "unrelated", task: "speech" },
         ],

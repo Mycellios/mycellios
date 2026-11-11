@@ -10375,3 +10375,12 @@ msgstr "{name} reads this chat to answer. Nothing here goes back to the chat."
 
 msgid "Remove {name}"
 msgstr "Remove {name}"
+
+msgid "Dictation processing"
+msgstr "Dictation processing"
+
+msgid "Mycellios sends recordings of up to 30 seconds to the network and uses your credits. Spanish and English."
+msgstr "Mycellios sends recordings of up to 30 seconds to the network and uses your credits. Spanish and English."
+
+msgid "Device or connected provider"
+msgstr "Device or connected provider"

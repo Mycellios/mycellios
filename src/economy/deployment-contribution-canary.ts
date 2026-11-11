@@ -18,7 +18,7 @@ export function verifiedContributionCanary(input: {
       || evidence.model !== deployment.model || evidence.modelDigest !== modelDigest
       || evidence.activationId !== deployment.activationId || evidence.physicalNodeId !== input.physicalNodeId
       || evidence.buildSourceId !== owner.capabilities.buildIdentity?.sourceId
-      || (evidence.responseKind === "speech" ? deployment.adapter !== "kokoro" : String(deployment.adapter) !== "embedding")) {
+      || (evidence.responseKind === "speech" ? deployment.adapter !== "kokoro" : evidence.responseKind === "transcription" ? deployment.adapter !== "transcription" : String(deployment.adapter) !== "embedding")) {
       throw new Error("economic_contribution_canary_binding_is_invalid");
     }
     if (evidence.observedAt > observedUntil || observedUntil - evidence.observedAt > DEPLOYMENT_CANARY_MAXIMUM_AGE_MS) {

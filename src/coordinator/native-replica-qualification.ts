@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { TRANSCRIPTION_MODEL, TRANSCRIPTION_DIGEST, TRANSCRIPTION_CANARY_SHA256, verifiedTranscriptionEnvelope, transcriptionInputSchema } from "../contracts/transcription.js";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
@@ -19,7 +21,7 @@ interface Options {
   adminToken: string | undefined;
   networkToken: string | undefined;
   hub: { currentWorkerSessionId(workerId: string): string | null; setWorkerMaintenance(workerId: string, enabled: boolean): Promise<void> };
-  store: Pick<MeshStore, "getWorker" | "updateWorkerHeartbeat">;
+  store: Pick<MeshStore, "getWorker" | "updateWorkerHeartbeat"> & { database: Pick<MeshStore["database"], "transaction"> };
   service: Pick<MeshService, "submit" | "cancel">;
   attachReceipt(event: Completed, model: string, route: "replica"): Completed | Promise<Completed>;
 }
@@ -30,6 +32,13 @@ function matches(value: unknown, expected: string | undefined): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 function plan(deployment: ModelDeployment) {
+  if (deployment.adapter === "transcription" && deployment.model === TRANSCRIPTION_MODEL && deployment.modelDigest === TRANSCRIPTION_DIGEST) {
+    const path = process.env.MYCELLIOS_TRANSCRIPTION_CANARY_PATH;
+    if (!path) return deny("transcription_qualification_audio_missing", 503);
+    const audio = readFileSync(path);
+    const content = JSON.stringify({ schema: "mycellios-transcription-input/1", audio: { format: "wav", sha256: TRANSCRIPTION_CANARY_SHA256, data: audio.toString("base64") }, language: "es" });
+    return { kind: "transcription" as const, content };
+  }
   if (String(deployment.adapter) === "embedding" && deployment.model === EMBEDDING_MODEL && deployment.modelDigest === EMBEDDING_DIGEST) {
     return { kind: "embedding" as const, content: JSON.stringify({ schema: "mycellios-embeddings/1", input: [TEXT], dimensions: 32 }) };
   }
@@ -39,8 +48,14 @@ function plan(deployment: ModelDeployment) {
   return deny("native_replica_model_is_not_supported", 422);
 }
 /** Returned bytes are validated without representing audio or vector components as text tokens. */
-export function verifyNativeQualificationResult(kind: "embedding" | "speech", text: string): void {
+export function verifyNativeQualificationResult(kind: "embedding" | "speech" | "transcription", text: string): void {
   if (Buffer.byteLength(text) > 1_500_000) deny("native_replica_response_too_large", 422);
+  if (kind === "transcription") {
+    const audio = readFileSync(process.env.MYCELLIOS_TRANSCRIPTION_CANARY_PATH!);
+    const result = verifiedTranscriptionEnvelope(text, transcriptionInputSchema.parse({ schema: "mycellios-transcription-input/1", audio: { format: "wav", sha256: TRANSCRIPTION_CANARY_SHA256, data: audio.toString("base64") }, language: "es" }));
+    if (!result.text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z0-9 ]/g, "").trim().replace(/\s+/g, " ").replace(/\bnueve\b/g, "9").includes("buenos dias la reunion empieza manana a las 9")) deny("transcription_qualification_text_mismatch", 422);
+    return;
+  }
   if (kind === "speech") {
     verifiedSpeechEnvelope(text, SPEECH_TEXT, { voice: "ef_dora", language: "es", speed: 1 });
     return;
@@ -102,7 +117,7 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
           ...(selectedPlan.kind === "speech" ? { voice: "ef_dora", language: "es", speed: 1 } : {}),
           privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: [worker.identityId] },
         }) as ChatCompletionRequest;
-        const handle = await options.service.submit(chat, `${challengeId}-${index}`);
+        const handle = await options.service.submit(chat, `${challengeId}-${index}`, undefined, process.env.MYCELLIOS_RELEASE_ADMISSION_REVISION);
         activeJob = handle.jobId;
         let result: Completed | null = null;
         for await (const event of handle.events) {
@@ -127,9 +142,10 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
           inputTokens: r.metrics.inputTokens, outputTokens: 0, completedAt: Date.now() });
         activeJob = null;
       }
+      const evidence = await options.store.database.transaction(async () => {
       const latest = await current();
       const evidence = createNativeReplicaEvidence({ schema: "mycellios-native-replica-qualification/1",
-        workerId: worker.id, sessionId, deploymentId: deployment.deploymentId, activationId: deployment.activationId,
+        workerId: worker.id, sessionId, deploymentId: deployment.deploymentId, activationId: deployment.activationId!,
         model: deployment.model, modelDigest: deployment.modelDigest, physicalNodeId,
         buildSourceId: worker.capabilities.buildIdentity!.sourceId, responseKind: selectedPlan.kind,
         challengeId, promptDigest: sha256Text(selectedPlan.content), issuedAt, observedAt: Date.now(), samples });
@@ -137,6 +153,8 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
       capabilities.deployments = capabilities.deployments.map(d => d.deploymentId === deployment.deploymentId
         ? { ...d, verificationState: "verified", nativeReplicaEvidence: evidence } : d);
       await options.store.updateWorkerHeartbeat(worker.id, capabilities, latest.status);
+      return evidence;
+      });
       return { data: evidence };
     } finally {
       if (activeJob) await options.service.cancel(activeJob);

@@ -1,3 +1,4 @@
+import { getGeneralPreferences } from "../../lib/general-preferences";
 import { botColors } from "@rakazo/ui-tokens";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
@@ -150,7 +151,7 @@ export function TaskComposer({
   async function listen() {
     if (disabled || recording) return;
     const native = window.rakazoDesktop?.localVoice;
-    if (native) {
+    if (native && !getGeneralPreferences().networkTranscriptionAccount) {
       try {
         const fullStatus = await native.status();
         const status = fullStatus.models?.asr ?? fullStatus;
@@ -175,6 +176,7 @@ export function TaskComposer({
     setSpeech({ status: "listening", transcript: "" });
     sendOnFinish.current = false;
     void dictation.listen({
+      botId,
       mode: "hold",
       transcribe,
       onFinal: (text) => {

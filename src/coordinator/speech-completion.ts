@@ -1,9 +1,11 @@
+import { isTranscriptionDeployment, MAX_TRANSCRIPTION_RESULT_BYTES } from "../contracts/transcription.js";
 import { isKokoroDeployment, MAX_SPEECH_RESPONSE_BYTES, verifiedSpeechEnvelope, resolveSpeechOptions } from "../contracts/speech.js";
 import { isDecisionDeployment, MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
 import type { ChatCompletionRequest, CompletionResult, ModelDeployment } from "../contracts/types.js";
 import { isEmbeddingDeployment, MAX_EMBEDDING_RESPONSE_BYTES } from "../contracts/embedding.js";
 
 export function replicaOutputByteLimit(deployment: ModelDeployment | undefined, maxTokens = 256): number {
+  if (isTranscriptionDeployment(deployment)) return MAX_TRANSCRIPTION_RESULT_BYTES;
   if (isDecisionDeployment(deployment)) return MAX_DECISION_RESPONSE_BYTES;
   if (isEmbeddingDeployment(deployment)) return MAX_EMBEDDING_RESPONSE_BYTES;
   return isKokoroDeployment(deployment) ? MAX_SPEECH_RESPONSE_BYTES

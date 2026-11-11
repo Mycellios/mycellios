@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_MODEL, isTranscriptionDeployment, parseTranscriptionRequest, verifiedTranscriptionEnvelope } from "../contracts/transcription.js";
 import { isKokoroDeployment } from "../contracts/speech.js";
 import { DECISION_DEADLINE_MS, DECISION_MODEL, isDecisionDeployment, parseDecisionRequest, verifiedDecisionEnvelope } from "../contracts/decision.js";
 import { EMBEDDING_MODEL, isEmbeddingDeployment, parseEmbeddingRequest, verifiedEmbeddingEnvelope } from "../contracts/embedding.js";
@@ -157,7 +158,9 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     request: ChatCompletionRequest,
     requestedSessionId?: string,
     idempotencyKey?: string,
+    operatorReleaseRevision?: string,
   ): Promise<JobHandle> {
+    if (operatorReleaseRevision && !/^[a-f0-9]{40}$/.test(operatorReleaseRevision)) throw new Error("Invalid operator release revision");
     const sessionId = requestedSessionId ?? request.session_id ?? newId("ses");
     const activeJobId = this.activeSessions.get(sessionId);
     if (activeJobId) {
@@ -192,6 +195,11 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const deadlineCeiling = stableRequest.model === DECISION_MODEL ? DECISION_DEADLINE_MS : stableRequest.model === EMBEDDING_MODEL ? 300_000 : modelRequestTimeout(stableRequest.model, this.options.modelRequestTimeoutsMs, this.requestTimeoutMs);
     const deadlineMs = Math.min(request.deadline_ms ?? deadlineCeiling, deadlineCeiling);
     (await this.store.database.transaction(async () => {
+      // Only the authenticated native qualification path supplies this permit.
+      // PostgreSQL clears it at this transaction's end; public requests cannot set it.
+      if (operatorReleaseRevision && this.store.database.raw.dialect === "postgres") {
+        await this.store.database.raw.prepare("SELECT set_config('mycellios.release_admission_revision', ?, true)").get(operatorReleaseRevision);
+      }
       (await this.store.createJob({
         id: jobId,
         sessionId,
@@ -208,7 +216,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const routePlan = (await this.scheduler.selectRoutePlan(stableRequest, sessionId, {
       ...routeOptions,
       allowPipeline: false,
-      maxStandbyRoutes: 2,
+      maxStandbyRoutes: stableRequest.model === TRANSCRIPTION_MODEL ? 0 : 2,
     }));
     if (!routePlan) {
       (await this.store.setJobStatus(jobId, "failed", "no_capacity"));
@@ -299,7 +307,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     return (await this.scheduler.selectRoutePlan(cloneRequest(request), sessionId, {
       ...routeOptionsForRequest(request, this.hub.connectedWorkerIds()),
       allowPipeline: false,
-      maxStandbyRoutes: 2,
+      maxStandbyRoutes: request.model === TRANSCRIPTION_MODEL ? 0 : 2,
     })) !== null;
   }
 
@@ -859,6 +867,13 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     );
     if (result.metrics.inputTokens < 1 || result.metrics.inputTokens > plausibleInputMaximum) {
       return { ok: false, reason: "Implausible input token count" };
+    }
+    if (isTranscriptionDeployment(deployment)) {
+      try {
+        const envelope = verifiedTranscriptionEnvelope(runtime.output, parseTranscriptionRequest(runtime.request));
+        if (result.text !== runtime.output || result.finishReason !== "stop" || result.metrics.outputTokens !== 0 || result.metrics.inputTokens !== envelope.usage.input_tokens) throw new Error("transcription_billing_mismatch");
+        return { ok: true };
+      } catch { return { ok: false, reason: "Transcription integrity validation failed" }; }
     }
     if (isKokoroDeployment(deployment)) return validateSpeechCompletion(runtime.request, result, runtime.output);
     if (isDecisionDeployment(deployment)) {

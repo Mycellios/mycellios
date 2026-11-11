@@ -1008,12 +1008,16 @@ export class WorkerHub extends EventEmitter<HubEvents> {
   private async applyHeartbeat(state: ConnectionState, payload: WorkerHeartbeatPayload): Promise<void> {
     const workerId = state.workerId!;
     const status = this.maintenance.status(workerId, payload.heartbeat.draining ? "draining" : "online");
-    const current = (await this.store.getWorker(workerId))?.capabilities ?? null;
-    (await this.store.updateWorkerHeartbeat(
-      workerId,
-      mergeCurrentSessionEvidence(workerId, state.sessionId, payload.capabilities, current),
-      status,
-    ));
+    // Read and merge under the same writer transaction as qualification publication.
+    // A queued heartbeat must not overwrite evidence committed after its snapshot.
+    await this.store.database.transaction(async () => {
+      const current = (await this.store.getWorker(workerId))?.capabilities ?? null;
+      await this.store.updateWorkerHeartbeat(
+        workerId,
+        mergeCurrentSessionEvidence(workerId, state.sessionId, payload.capabilities, current),
+        status,
+      );
+    });
   }
 
   private async closeInvalid(state: ConnectionState, reason: string, code = 4400): Promise<void> {

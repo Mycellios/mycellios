@@ -1,3 +1,4 @@
+import { TranscriptionAdapter } from "./transcription.js";
 import { KokoroAdapter } from "./kokoro.js";
 import { DecisionAdapter, decisionRuntimeToken } from "./decision.js";
 import { EmbeddingAdapter } from "./embedding.js";
@@ -13,6 +14,8 @@ export function createAdapter(config: WorkerConfig): InferenceAdapter {
       return new DecisionAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest!, activationId: config.deployment.activationId!, runtimeToken: decisionRuntimeToken() });
     case "embedding":
       return new EmbeddingAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest!, activationId: config.deployment.activationId! });
+    case "transcription":
+      return new TranscriptionAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest! });
     case "kokoro":
       return new KokoroAdapter({ ...config.adapter, modelDigest: config.deployment.modelDigest! });
     case "mycellios-native":

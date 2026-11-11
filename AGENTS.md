@@ -201,6 +201,13 @@ These rules apply to the complete repository.
 
 ## Optional speech replicas
 
+- Network transcription uses the pinned Whisper adapter and canonical mono 16 kHz
+  PCM WAV, at most 30 seconds. Keep raw audio out of durable conversations. Bill
+  recognized cl100k_base text only, never base64 bytes or audio output tokens.
+  Preserve the physical reservation, separate six-sample private qualification,
+  normal native qualification and no-replay paid requests. Verify transcription
+  contract, economic/isolation tests and python/tests/test_transcription_engine.py.
+
 - Keep worker heartbeats bounded independently of adapter and hardware probes.
   Missing adapter observations close admission without cancelling active leases;
   do not reuse late readiness or launch duplicate probes while one is pending.

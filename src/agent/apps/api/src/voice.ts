@@ -1,3 +1,4 @@
+import { renderNetworkTranscription } from "./mycellios-network-transcription.js";
 import { ORPCError } from "@orpc/server";
 import type { AdapterContext, SecretStore } from "@rakazo/adapter-kit";
 import { VoiceAccountError } from "@rakazo/adapter-kit";
@@ -50,7 +51,7 @@ export interface VoiceDeps {
   prisma: PrismaClient;
   secrets: SecretStore;
   /** The instance flag (`MCP_ALLOW_PRIVATE_ENDPOINT`). */
-  env?: { mcpAllowPrivateEndpoint?: boolean; mycelliosNetworkSpeechIdentityIds?: string[] };
+  env?: { mcpAllowPrivateEndpoint?: boolean; mycelliosNetworkSpeechIdentityIds?: string[]; mycelliosNetworkTranscriptionIdentityIds?: string[] };
 }
 
 /** A self-hosted speech server on a private address is limited like model endpoints. */
@@ -535,8 +536,20 @@ export async function synthesizeVoice(
 export async function transcribeVoice(
   deps: VoiceDeps,
   actor: Actor,
-  input: { audio: Uint8Array; mimeType: string; language?: string; signal?: AbortSignal },
+  input: { audio: Uint8Array; mimeType: string; language?: string; signal?: AbortSignal; networkAccountId?: string; botId?: string },
 ) {
+  if (input.networkAccountId !== undefined) {
+    if (input.networkAccountId !== actor.userId || !input.botId || !(await deps.prisma.bot.findFirst({
+      where: { id: input.botId, userId: actor.userId, spaceId: actor.spaceId, archivedAt: null }, select: { id: true },
+    }))) throw new IsolationError();
+    if (input.mimeType !== "audio/wav") throw new ORPCError("BAD_REQUEST", { message: "Network dictation requires PCM WAV." });
+    let token: string | undefined;
+    try { token = (await ownedMycelliosConnection(deps, actor.userId))?.saved.apiKey; }
+    catch { throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Your Mycellios connection could not be read." }); }
+    if (!token) throw new ORPCError("CONFLICT", { message: "Connect your Mycellios account in Models to use network dictation." });
+    return renderNetworkTranscription(token, { audio: input.audio, language: input.language, signal: input.signal,
+      workerIdentityIds: deps.env?.mycelliosNetworkTranscriptionIdentityIds });
+  }
   const loaded = await loadDefaultVoiceCredential(deps, actor);
   if (!loaded) throw new NoVoiceConfigured("key");
   const provider = await voiceProviderFor(deps, actor, loaded.cred.provider);
@@ -612,6 +625,8 @@ export function mountVoiceHttpRoutes(
     const raw = await readBoundedBody(c.req.raw, MAX_TRANSCRIBE_REQUEST_BYTES);
     if (raw === null) return c.json({ error: "Request body is too large." }, 413);
     const body = parseVoiceRequestBody(raw);
+    if (body.networkAccountId !== undefined && (typeof body.networkAccountId !== "string" || !body.networkAccountId.trim())) return c.json({ error: "Invalid network dictation account." }, 400);
+    if (body.networkAccountId !== undefined && c.req.header("content-type")?.split(";")[0]?.trim().toLowerCase() !== "application/json") return c.json({ error: "Network dictation requires JSON." }, 415);
     const audioBase64 = String((body as { audioBase64?: unknown }).audioBase64 ?? "");
     const language = optionalString((body as { language?: unknown }).language);
     try {
@@ -620,6 +635,8 @@ export function mountVoiceHttpRoutes(
         transcribeVoice(deps, actor, {
           audio,
           mimeType: String((body as { mimeType?: unknown }).mimeType ?? "audio/webm"),
+          networkAccountId: optionalString(body.networkAccountId),
+          botId: optionalString(body.botId),
           language,
           signal: c.req.raw.signal,
         }),
