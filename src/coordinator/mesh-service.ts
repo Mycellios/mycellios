@@ -158,7 +158,9 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     request: ChatCompletionRequest,
     requestedSessionId?: string,
     idempotencyKey?: string,
+    operatorReleaseRevision?: string,
   ): Promise<JobHandle> {
+    if (operatorReleaseRevision && !/^[a-f0-9]{40}$/.test(operatorReleaseRevision)) throw new Error("Invalid operator release revision");
     const sessionId = requestedSessionId ?? request.session_id ?? newId("ses");
     const activeJobId = this.activeSessions.get(sessionId);
     if (activeJobId) {
@@ -193,6 +195,11 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const deadlineCeiling = stableRequest.model === DECISION_MODEL ? DECISION_DEADLINE_MS : stableRequest.model === EMBEDDING_MODEL ? 300_000 : modelRequestTimeout(stableRequest.model, this.options.modelRequestTimeoutsMs, this.requestTimeoutMs);
     const deadlineMs = Math.min(request.deadline_ms ?? deadlineCeiling, deadlineCeiling);
     (await this.store.database.transaction(async () => {
+      // Only the authenticated native qualification path supplies this permit.
+      // PostgreSQL clears it at this transaction's end; public requests cannot set it.
+      if (operatorReleaseRevision && this.store.database.raw.dialect === "postgres") {
+        await this.store.database.raw.prepare("SELECT set_config('mycellios.release_admission_revision', ?, true)").get(operatorReleaseRevision);
+      }
       (await this.store.createJob({
         id: jobId,
         sessionId,

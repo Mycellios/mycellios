@@ -20,7 +20,7 @@ function input(audio = wav()) { return { schema: "mycellios-transcription-input/
 function request() { return chatCompletionRequestSchema.parse({ model: TRANSCRIPTION_MODEL, messages: [{ role: "user", content: JSON.stringify(input()) }], max_tokens: 1 }) as ChatCompletionRequest; }
 describe("bounded network transcription", () => {
   it("rejects implicit legacy funding before creating a job", async () => {
-    const runtime = await createCoordinator({ host: "127.0.0.1", port: 0, databasePath: ":memory:",
+    const runtime = await createCoordinator({ host: "127.0.0.1", port: 0, requestTimeoutMs: 60000, databasePath: ":memory:",
       allowDevelopmentAdapters: false, mobileAssetsPath: resolve("tests/fixtures/mobile-assets"),
       landingAssetsPath: resolve("tests/fixtures/landing-assets") });
     try {

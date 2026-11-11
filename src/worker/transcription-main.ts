@@ -38,7 +38,7 @@ if (health.status !== "ready" || health.artifact_identity !== cfg.modelDigest ||
   || gpu.reservation.memoryMiB !== cfg.memoryMiB || (gpu.reservation.expiresAt ?? 0) <= Date.now() + 20_000) {
   throw new Error("transcription_physical_runtime_not_qualified");
 }
-const workAdmissionPolicy = (model: string, at: Date) => {
+const workAdmissionPolicy = (model: string | null, at: Date) => {
   try {
     const node = JSON.parse(readFileSync(cfg.nativeConfigPath, "utf8"));
     const state = JSON.parse(readFileSync(cfg.nativeStatePath, "utf8"));
@@ -48,9 +48,9 @@ const workAdmissionPolicy = (model: string, at: Date) => {
 };
 if (workAdmissionPolicy(cfg.modelId, new Date())) throw new Error("physical_owner_policy_rejected_transcription");
 const buildIdentity = { schema: "mycellios-native-build-provenance/1" as const, version: runtime.version,
-  sourceId: "sha256:" + createHash("sha256").update(JSON.stringify({ base: runtime.buildIdentity,
+  sourceId: `sha256:${createHash("sha256").update(JSON.stringify({ base: runtime.buildIdentity,
     worker: createHash("sha256").update(readFileSync(new URL(import.meta.url))).digest("hex"),
-    core: cfg.gpuCoreSourceSha256, guard: cfg.guardSourceSha256, artifacts: cfg.artifactsSha256 })).digest("hex") };
+    core: cfg.gpuCoreSourceSha256, guard: cfg.guardSourceSha256, artifacts: cfg.artifactsSha256 })).digest("hex")}` as const };
 const agent = new WorkerAgent(loadWorkerConfig(resolve(process.env.GPU_MESH_WORKER_CONFIG)), {
   coordinatorUrl: process.env.GPU_MESH_COORDINATOR ?? "https://www.mycellios.com",
   admissionSigner: workerAdmissionSigner(loadOrCreateWorkerAdmissionCredential(resolve(process.env.MYCELLIOS_WORKER_CREDENTIAL_PATH))),

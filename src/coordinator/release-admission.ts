@@ -2,7 +2,7 @@
 import type postgres from "postgres";
 
 const trigger = "mycellios_release_admission_guard";
-const body = "BEGIN RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='mycellios_release_admission_closed'; END;";
+const body = (revision: string) => `BEGIN IF current_setting('mycellios.release_admission_revision',true)='${revision}' THEN RETURN NULL; END IF; RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='mycellios_release_admission_closed'; END;`;
 type Connection = postgres.Sql | postgres.TransactionSql;
 
 export class NativeReleaseAdmission {
@@ -20,7 +20,7 @@ export class NativeReleaseAdmission {
       JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_proc p ON p.oid=t.tgfoid
       WHERE n.nspname=$1 AND c.relname IN ('jobs','deployment_operations') AND t.tgname=$2 AND NOT t.tgisinternal`, [this.schema, trigger]);
     if (!rows.length) return false;
-    if (rows.length !== 2 || rows.some(row => row.label !== this.label(revision) || row.body !== body)) {
+    if (rows.length !== 2 || rows.some(row => row.label !== this.label(revision) || row.body !== body(revision))) {
       throw new Error("A different release owns native admission");
     }
     return true;
@@ -31,7 +31,7 @@ export class NativeReleaseAdmission {
       // Wait for earlier inserts to commit before installing the common barrier.
       await tx.unsafe(`LOCK TABLE ${this.schema}.jobs, ${this.schema}.deployment_operations IN SHARE ROW EXCLUSIVE MODE`);
       if (await this.owned(tx, revision)) return;
-      await tx.unsafe(`CREATE FUNCTION ${this.schema}.${trigger}() RETURNS trigger LANGUAGE plpgsql AS $guard$${body}$guard$`);
+      await tx.unsafe(`CREATE FUNCTION ${this.schema}.${trigger}() RETURNS trigger LANGUAGE plpgsql AS $guard$${body(revision)}$guard$`);
       for (const table of ["jobs", "deployment_operations"]) {
         await tx.unsafe(`CREATE TRIGGER ${trigger} BEFORE INSERT ON ${this.schema}.${table} FOR EACH STATEMENT EXECUTE FUNCTION ${this.schema}.${trigger}()`);
         await tx.unsafe(`COMMENT ON TRIGGER ${trigger} ON ${this.schema}.${table} IS '${label}'`);

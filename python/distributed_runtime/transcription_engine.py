@@ -105,7 +105,8 @@ class TranscriptionEngine:
                     if language is None:
                         raise ValueError("unsupported_audio_language")
                 tokens = self.model.generate(features, language=language, task="transcribe", max_new_tokens=256,
-                                             do_sample=False, num_beams=1, return_timestamps=False)
+                                             do_sample=False, num_beams=1, return_timestamps=False,
+                                             return_dict_in_generate=True).sequences
                 eos = self.model.generation_config.eos_token_id
                 if int(tokens[0, -1]) not in (eos if isinstance(eos, list) else [eos]):
                     raise ValueError("incomplete_transcription")

@@ -17,6 +17,11 @@ it.skipIf(!enabled)("closes every insert while letting existing work finish and 
   await gate.close(revision);
   await expect(sql.unsafe(`INSERT INTO ${schema}.jobs VALUES('new','queued')`)).rejects.toMatchObject({ code: "55000" });
   await expect(sql.unsafe(`INSERT INTO ${schema}.deployment_operations VALUES('new-operation','running')`)).rejects.toMatchObject({ code: "55000" });
+  await sql.begin(async tx => {
+    await tx`SELECT set_config('mycellios.release_admission_revision', ${revision}, true)`;
+    await tx.unsafe(`INSERT INTO ${schema}.jobs VALUES('operator-qualification','completed')`);
+  });
+  await expect(sql.unsafe(`INSERT INTO ${schema}.jobs VALUES('no-inherited-permit','queued')`)).rejects.toMatchObject({ code: "55000" });
   expect((await gate.status(revision)).drained).toBe(false);
   await sql.unsafe(`UPDATE ${schema}.jobs SET status='completed' WHERE id='active'`);
   expect((await gate.status(revision)).drained).toBe(true);

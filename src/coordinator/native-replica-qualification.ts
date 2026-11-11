@@ -53,7 +53,7 @@ export function verifyNativeQualificationResult(kind: "embedding" | "speech" | "
   if (kind === "transcription") {
     const audio = readFileSync(process.env.MYCELLIOS_TRANSCRIPTION_CANARY_PATH!);
     const result = verifiedTranscriptionEnvelope(text, transcriptionInputSchema.parse({ schema: "mycellios-transcription-input/1", audio: { format: "wav", sha256: TRANSCRIPTION_CANARY_SHA256, data: audio.toString("base64") }, language: "es" }));
-    if (!result.text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z ]/g, "").trim().replace(/\s+/g, " ").replace(/\bnueve\b/g, "9").includes("buenos dias la reunion empieza manana a las 9")) deny("transcription_qualification_text_mismatch", 422);
+    if (!result.text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z0-9 ]/g, "").trim().replace(/\s+/g, " ").replace(/\bnueve\b/g, "9").includes("buenos dias la reunion empieza manana a las 9")) deny("transcription_qualification_text_mismatch", 422);
     return;
   }
   if (kind === "speech") {
@@ -117,7 +117,7 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
           ...(selectedPlan.kind === "speech" ? { voice: "ef_dora", language: "es", speed: 1 } : {}),
           privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: [worker.identityId] },
         }) as ChatCompletionRequest;
-        const handle = await options.service.submit(chat, `${challengeId}-${index}`);
+        const handle = await options.service.submit(chat, `${challengeId}-${index}`, undefined, process.env.MYCELLIOS_RELEASE_ADMISSION_REVISION);
         activeJob = handle.jobId;
         let result: Completed | null = null;
         for await (const event of handle.events) {
@@ -145,7 +145,7 @@ export function registerNativeReplicaQualifications(app: FastifyInstance, option
       const evidence = await options.store.database.transaction(async () => {
       const latest = await current();
       const evidence = createNativeReplicaEvidence({ schema: "mycellios-native-replica-qualification/1",
-        workerId: worker.id, sessionId, deploymentId: deployment.deploymentId, activationId: deployment.activationId,
+        workerId: worker.id, sessionId, deploymentId: deployment.deploymentId, activationId: deployment.activationId!,
         model: deployment.model, modelDigest: deployment.modelDigest, physicalNodeId,
         buildSourceId: worker.capabilities.buildIdentity!.sourceId, responseKind: selectedPlan.kind,
         challengeId, promptDigest: sha256Text(selectedPlan.content), issuedAt, observedAt: Date.now(), samples });
