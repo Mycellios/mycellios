@@ -10803,3 +10803,6 @@ msgstr "Lee las respuestas en voz alta en este ordenador."
 
 msgid "Download Parakeet to transcribe on this computer."
 msgstr "Descarga Parakeet para transcribir en este ordenador."
+
+msgid "Another update is still running. Keep using Mycellios and finish that installation before retrying."
+msgstr "Ya hay una actualización en curso. Puedes seguir usando Mycellios; termina esa instalación antes de volver a intentarlo."

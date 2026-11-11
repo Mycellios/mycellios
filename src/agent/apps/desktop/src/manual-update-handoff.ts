@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { writePrivateFile } from "./setup-store.js";
 import type { ManualRelease } from "./manual-update.js";
+import { requireNoManualUpdate } from "./manual-update-lock.js";
 
 const UPDATE_JOB = /^--manual-update-job=([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/;
 
@@ -34,6 +35,7 @@ export async function launchManualUpdate(options: {
   profile: string; executable: string; oldPid: number; installer: string;
   release: ManualRelease; reopenUrl: string;
 }): Promise<void> {
+  await requireNoManualUpdate(options.profile);
   const directory = path.join(options.profile, "updates", randomUUID());
   const helper = path.join(directory, "manual-update-helper.ps1");
   const config = path.join(directory, "request.json");

@@ -17,6 +17,7 @@ $result=Join-Path $job 'result.json'
 $backup=Join-Path $job 'backup'
 $phase='preflight'
 $installerLock=$null
+$updateLock=$null
 $canReopen=$false
 $verifiedVersion=$null
 function Progress([string]$value){$script:phase=$value;@{phase=$value}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8}
@@ -65,8 +66,8 @@ function Installed-Process {
 function Reopen([switch]$Confirm) {
  if($config.reopen -eq $false){return}
  if($config.reopenUrl){$url=[Uri]$config.reopenUrl;if($url.Scheme -notin @('http','https') -or $url.UserInfo){throw 'Invalid saved app location'};$env:RAKAZO_WEB_URL=$url.AbsoluteUri}
- if(!$Confirm){Start-Process -FilePath $executable -WindowStyle Hidden | Out-Null;return}
- $app=Start-Process -FilePath $executable -ArgumentList ('--manual-update-job='+[IO.Path]::GetFileName($job)) -WindowStyle Hidden -PassThru
+ if(!$Confirm){Start-Process -FilePath $executable -WindowStyle Normal | Out-Null;return}
+ $app=Start-Process -FilePath $executable -ArgumentList ('--manual-update-job='+[IO.Path]::GetFileName($job)) -WindowStyle Normal -PassThru
  $launch=Join-Path $job 'launch.json'
  $deadline=(Get-Date).AddMinutes(2)
  do {
@@ -88,6 +89,9 @@ try {
  if($config.schema -ne 'mycellios-manual-update/1' -or $config.version -notmatch '^\d{1,6}\.\d{1,6}\.\d{1,6}$' -or $config.sha256 -notmatch '^[a-f0-9]{64}$'){throw 'Invalid native update request'}
  if([IO.Path]::GetFileName($executable) -ne 'Mycellios Desktop.exe' -or $profile.Length -lt 10 -or !$job.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Invalid update scope'}
  if(!$installer.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($installer) -ne ('Mycellios-Desktop-'+$config.version+'-windows-x64-pilot.exe')){throw 'Invalid installer scope'}
+ # A second app instance must not start a competing install while a worker is
+ # waiting for Windows, backing up or replacing this profile's installation.
+ $updateLock=[IO.File]::Open((Join-Path (Split-Path $job -Parent) 'active-install.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
  $installerLock=[IO.File]::Open($installer,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
  Installer-Valid
  $old=Get-Process -Id $config.oldPid -ErrorAction SilentlyContinue
@@ -120,10 +124,13 @@ try {
  $drafts|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $backup 'draft-stores.json') -Encoding UTF8
  Installer-Valid
  if((Installed-Process).Count){throw 'The previous application reopened before installation'}
- Progress 'installing'
+ Progress 'starting-installer'
  # Wait for NSIS itself. Start-Process -Wait waits for its whole process tree,
  # which can keep the helper in "installing" after the installer has exited.
- $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Hidden -WorkingDirectory $env:TEMP -PassThru
+ # Keep normal Windows downloaded-file checks visible. Hiding this launch can
+ # leave the app closed behind a shell/security prompt with no installer PID.
+ $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Normal -WorkingDirectory $env:TEMP -PassThru
+ Progress 'installing'
  if(!$setup.WaitForExit(600000)){
   # An installer still running may own files. Leave it and its recovery data alone.
   $canReopen=$false
@@ -149,4 +156,4 @@ try {
  } elseif(!$verifiedVersion -and $canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
  Write-Result @{installed=($null -ne $verifiedVersion);version=$verifiedVersion;reopened=$false;phase=$failedPhase;error=$_.Exception.Message;backup=$backup}
  exit 1
-} finally {if($installerLock){$installerLock.Dispose()}}
+} finally {if($installerLock){$installerLock.Dispose()};if($updateLock){$updateLock.Dispose()}}

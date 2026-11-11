@@ -64,6 +64,7 @@ function useDesktopUpdates() {
     revision.current++;
     setBusy(true);
     setError(null);
+    if ((action === "install" || action === "forceInstall") && desktopUpdateHasCall()) endDesktopUpdateCall();
     if (action === "check") setConfirmedCheck(null);
     try {
       const next = await bridge[action]?.();
@@ -90,6 +91,10 @@ function useDesktopUpdates() {
   const message = error ?? (
     state?.message === UPDATE_DISK_SPACE_MESSAGE
       ? t`Free at least 6 GB of disk space before restarting to update.`
+      : state?.message === "Another update is still running. Keep using Mycellios and finish that installation before retrying."
+        ? t`Another update is still running. Keep using Mycellios and finish that installation before retrying.`
+      : state?.message === "Could not complete the update. Try again."
+        ? t`Could not complete the update. Try again.`
       : state?.message ?? null
   );
   return { state, busy, message, act, confirmedCheck, safeToInterrupt, callActive, forceAvailable: state?.supportsForceRestart === true && typeof bridge?.forceInstall === "function" };
@@ -100,14 +105,12 @@ export function useDesktopUpdateSettings() { return useContext(UpdatesContext); 
 
 export function DesktopUpdatesProvider({ children }: { children: ReactNode }) {
   const updates = useDesktopUpdates();
-  const [deferredVersion, setDeferredVersion] = useState<string | null>(null);
   return (
     <UpdatesContext.Provider value={updates}>
       {children}
-      {updates.state && !updates.state.autoInstallEnabled && !updates.state.relaunchPending && updates.state.phase !== "available" &&
-        !document.querySelector('[data-testid="desktop-update-settings"]') && updates.safeToInterrupt && updateRequiresAttention(updates.state) &&
-        updates.state.availableVersion !== deferredVersion && (
-        <DesktopUpdateGate {...updates} state={updates.state} onDefer={setDeferredVersion} />
+      {updates.state?.installPending && !updates.state.autoInstallEnabled && !updates.state.relaunchPending &&
+        !document.querySelector('[data-testid="desktop-update-settings"]') && updates.safeToInterrupt && updateRequiresAttention(updates.state) && (
+        <DesktopUpdateGate {...updates} state={updates.state} />
       )}
     </UpdatesContext.Provider>
   );
@@ -120,8 +123,8 @@ function PendingRestart({ state }: { state: DesktopUpdateState }) {
 }
 
 function DesktopUpdateGate({
-  state, busy, message: updateMessage, act, forceAvailable, callActive, onDefer,
-}: ReturnType<typeof useDesktopUpdates> & { state: DesktopUpdateState; onDefer: (version: string) => void }) {
+  state, busy, message: updateMessage, act, forceAvailable, callActive,
+}: ReturnType<typeof useDesktopUpdates> & { state: DesktopUpdateState }) {
   const { t } = useLingui();
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -207,9 +210,9 @@ function DesktopUpdateGate({
               <Trans>End call</Trans>
             </Button>
           )}
-          {!state.installPending && state.message === UPDATE_DISK_SPACE_MESSAGE && state.availableVersion && (
-            <Button variant="ghost" className="mt-4" onClick={() => onDefer(state.availableVersion!)}>
-              <Trans>Later</Trans>
+          {state.installPending && (
+            <Button variant="ghost" className="mt-4" disabled={busy} onClick={() => void act("cancelInstall")}>
+              <Trans>Cancel update</Trans>
             </Button>
           )}
           <a
@@ -233,11 +236,15 @@ export function useSidebarUpdate() {
     available: updates?.state?.phase === "ready",
     busy: (updates?.busy ?? false) || (updates?.state?.installPending === true && (!updates?.forceAvailable || updates.state.restartMode === "now")),
     state: updates?.state ?? null,
+    callActive: updates?.callActive ?? false,
     error: updates?.message ?? null,
     install: () => {
       void updates?.act(updates.state?.installPending && updates.forceAvailable ? "forceInstall" : "install");
     },
     download: () => { void updates?.act("download"); },
+    check: () => { void updates?.act("check"); },
+    cancel: () => { void updates?.act("cancelInstall"); },
+    cancelBusy: updates?.busy ?? false,
   };
 }
 
@@ -264,9 +271,10 @@ export function DesktopSidebarUpdate() {
           disabled={update.busy}
           onClick={update.install}
         >
-          {state.installPending && state.supportsForceRestart ? <Trans>Restart now</Trans> : <Trans>Restart to update</Trans>}
+          {update.callActive ? <Trans>End call and restart</Trans> : state.installPending && state.supportsForceRestart ? <Trans>Restart now</Trans> : <Trans>Restart to update</Trans>}
         </Button>
-      ) : state.phase === "available" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.download}><Trans>Download update</Trans></Button> : percent !== null ? (
+      ) : state.phase === "error" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.check}><Trans>Try again</Trans></Button>
+        : state.phase === "available" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.download}><Trans>Download update</Trans></Button> : percent !== null ? (
         <div className="mt-2 flex items-center gap-2">
           <progress
             aria-label={t`Download progress`}
@@ -277,6 +285,11 @@ export function DesktopSidebarUpdate() {
           <span className="text-xs tabular-nums">{percent}%</span>
         </div>
       ) : null}
+      {update.error && <a href={new URL("/downloads/desktop", productBrand.apiBaseUrl).href} target="_blank" rel="noopener noreferrer"
+        className="mt-2 block text-xs underline underline-offset-4"><Trans>Download the latest version</Trans></a>}
+      {state.installPending && <Button size="sm" variant="ghost" className="mt-2 w-full" disabled={update.cancelBusy} onClick={update.cancel}>
+        <Trans>Cancel update</Trans>
+      </Button>}
     </div>
   );
 }
@@ -302,7 +315,7 @@ export function DesktopUpdateSection() {
           disabled={busy || (state.installPending && (!forceAvailable || state.restartMode === "now")) || downloading || state.phase === "checking"}
           onClick={() => void act(state.installPending && forceAvailable ? "forceInstall" : ready ? "install" : "check")}
         >
-          {state.installPending && forceAvailable ? <Trans>Restart now</Trans> : ready ? (
+          {ready && updates.callActive ? <Trans>End call and restart</Trans> : state.installPending && forceAvailable ? <Trans>Restart now</Trans> : ready ? (
             <Trans>Restart to update</Trans>
           ) : downloading ? (
             <Trans>Downloading…</Trans>
