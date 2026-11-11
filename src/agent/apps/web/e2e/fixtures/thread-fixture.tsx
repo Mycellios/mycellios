@@ -5,8 +5,11 @@ import type { ReactNode } from "react";
 import { useMemo, useRef } from "react";
 import { reduceThreadSnapshot } from "../../src/lib/thread-events";
 import { Transcript } from "../../src/pages/shell/transcript";
+import type { PendingThreadSend } from "../../src/lib/pending-thread-sends";
 
 const BOT = { botId: "bot-1", name: "Chief", color: DEFAULT_BOT_AVATAR_COLOR };
+const ARTIFACT_TARGET = { botId: BOT.botId };
+const peerBot = () => BOT;
 const NO_IDS = new Set<string>();
 const noop = () => {};
 const resolved = async () => {};
@@ -50,12 +53,16 @@ export function FixtureTranscript({
   showToolActivity,
   activeRun,
   header,
+  footer,
+  pendingMessages,
 }: {
   messages: readonly ThreadMessage[];
   running: boolean;
   showToolActivity: boolean;
   activeRun?: Run;
   header?: ReactNode;
+  footer?: ReactNode;
+  pendingMessages?: readonly PendingThreadSend[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const transcript = useMemo(
@@ -69,8 +76,9 @@ export function FixtureTranscript({
         scrollRef={scrollRef}
         scrollRequest={null}
         onScrollRequestHandled={noop}
-        artifactTarget={{ botId: BOT.botId }}
+        artifactTarget={ARTIFACT_TARGET}
         transcript={transcript}
+        pendingMessages={pendingMessages}
         showToolActivity={showToolActivity}
         olderCursor={null}
         unreadAfterSeq={null}
@@ -89,7 +97,7 @@ export function FixtureTranscript({
         onReact={resolved}
         onJumpToMessage={noop}
         onOpenPeerMessages={noop}
-        peerBot={() => BOT}
+        peerBot={peerBot}
         onRefresh={resolved}
         onBotChanged={resolved}
         onAddRoutine={noop}
@@ -98,6 +106,7 @@ export function FixtureTranscript({
         onSpeak={noop}
         onOpenComputer={noop}
       />
+      {footer}
     </main>
   );
 }

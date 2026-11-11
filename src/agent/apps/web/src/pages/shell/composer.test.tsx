@@ -1168,6 +1168,19 @@ it("moves an unattached text draft to the side pane without sending or steering 
  await act(async()=>container!.querySelector<HTMLButtonElement>('[data-testid="busy-message-actions"] button')!.click());
  expect(aside).toHaveBeenCalledExactlyOnceWith("Question about this chat");expect(field.value).toBe("");expect(send).not.toHaveBeenCalled();
 });
+
+it("submits once when Send is pressed twice before React commits", async () => {
+  let finish!: (accepted: boolean) => void;
+  const send = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; }));
+  const field = renderComposer(send);
+  type(field, "One intentional message");
+  const button = container!.querySelector<HTMLButtonElement>('[aria-label="Send"]')!;
+  act(() => { button.click(); button.click(); });
+  expect(send).toHaveBeenCalledOnce();
+  expect(field.value).toBe("");
+  await act(async () => finish(true));
+  expect(field.value).toBe("");
+});
 it("leaves files and their draft in the main composer when opening the side pane", async () => {
  const aside=vi.fn();const field=renderComposer(vi.fn(),{onAskAside:aside,running:true,busyMessages:true,pendingAttachments:[{id:"file",threadKey:"bot:bot-1",file:new File(["x"],"image.png",{type:"image/png"}),previewUrl:"data:image/png;base64,"}]});type(field,"Draft with a file");
  await act(async()=>container!.querySelector<HTMLButtonElement>('[data-testid="busy-message-actions"] button')!.click());

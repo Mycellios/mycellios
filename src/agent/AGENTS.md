@@ -15,6 +15,19 @@
 
 # AGENTS.md
 
+- Conversation pending sends are local presentation scoped to account/Space/thread.
+  Match durable echoes by client nonce or acknowledged message sequence, never by
+  text. Preserve existing draft/attachment recovery and nonce reuse on retries.
+  Event cursors and message sequences are distinct: retain the payload's message
+  sequence for rows and the event sequence for subscription recovery.
+  Coalesce only progress presentation to animation frames; reduce all events in
+  order and update the authoritative reference immediately. Flush structural,
+  terminal, navigation and preference changes without waiting for a frame.
+  New-reply/send/control motion must preserve reduced motion and history scroll
+  ownership. Run focused composer/thread/pending/frame tests and
+  `node scripts/verify-chat-fluidity.mjs --output=...` for actual browser components
+  with synthetic delivery/progress. This does not measure a live model's latency.
+
 - MCP stdio launch arguments remain unchanged for the child, but explicitly named
   credentials must join output/error/log redaction. Omit tool names or schemas
   that contain those credentials rather than corrupting JSON Schema with replacement

@@ -49,6 +49,9 @@ import { QuoteSelectionButton } from "./quote-selection-button";
 import { getResponseCostVisible, subscribeResponseCost } from "../../lib/response-cost-preference";
 import { TaskCostFooter } from "./task-cost-footer";
 import { useTaskCosts } from "./use-task-costs";
+import type { PendingThreadSend } from "../../lib/pending-thread-sends";
+
+const NO_PENDING_SENDS: readonly PendingThreadSend[] = [];
 
 export function bubbleFrameWidth(role: ThreadMessage["role"]) {
   return role === "user"
@@ -63,6 +66,7 @@ export const Transcript = memo(function Transcript({
   onScrollRequestHandled,
   artifactTarget,
   transcript,
+  pendingMessages = NO_PENDING_SENDS,
   showToolActivity,
   olderCursor,
   unreadAfterSeq,
@@ -104,6 +108,7 @@ export const Transcript = memo(function Transcript({
   onScrollRequestHandled: () => void;
   artifactTarget: ArtifactTarget;
   transcript: FoldedTranscript<ThreadMessage>;
+  pendingMessages?: readonly PendingThreadSend[];
   showToolActivity: boolean;
   olderCursor: number | null;
   /** The seq read up to when this chat opened; null when nothing was unread. */
@@ -194,16 +199,19 @@ export const Transcript = memo(function Transcript({
     const live = messages.filter(message => message.runId && message.id.startsWith("progress:") &&
       message.blocks.some(block => (block.kind === "text" || block.kind === "progress") && block.text.trim() && !("activity" in block && block.activity)));
     if (!live.length) return;
+    if (live.every(message => streamedTextRuns.has(`${message.threadId}:${message.runId}`))) return;
     setStreamedTextRuns(previous => {
       const keys = live.map(message => `${message.threadId}:${message.runId}`);
       if (keys.every(key => previous.has(key))) return previous;
       return new Set([...previous, ...keys].slice(-128));
     });
-  }, [messages]);
+  }, [messages, streamedTextRuns]);
   const mentionView = useMemo(() => projectBotMentions(messages), [messages]);
+  const foldedIntoRef = useRef(mentionView.foldedInto);
+  useLayoutEffect(() => { foldedIntoRef.current = mentionView.foldedInto; }, [mentionView.foldedInto]);
   const jumpToMessage = useCallback(
-    (messageId: string) => onJumpToMessage(mentionView.foldedInto.get(messageId) ?? messageId),
-    [mentionView, onJumpToMessage],
+    (messageId: string) => onJumpToMessage(foldedIntoRef.current.get(messageId) ?? messageId),
+    [onJumpToMessage],
   );
   const reactionView = useMemo(
     () => projectMessageReactions(mentionView.visibleMessages),
@@ -404,7 +412,9 @@ export const Transcript = memo(function Transcript({
   useLayoutEffect(() => {
     const previous = previousTail.current;
     previousTail.current = tail;
-    if (!previous || !tail || tail.seq <= previous.seq || !following.current ||
+    if (!previous || !tail || tail.role === "user" ||
+        (tail.runId && streamedTextRuns.has(`${tail.threadId}:${tail.runId}`)) ||
+        tail.seq <= previous.seq || !following.current ||
         jumpScrolling.current || document.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const row = contentRef.current?.querySelector(
       `[data-message-id="${CSS.escape(tail.id)}"]`,
@@ -505,7 +515,7 @@ export const Transcript = memo(function Transcript({
             {t`Load earlier messages`}
           </Button>
         ) : null}
-        {reactionView.visibleMessages.length === 0 && !running && olderCursor == null ? (
+        {reactionView.visibleMessages.length === 0 && !pendingMessages.length && !running && olderCursor == null ? (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-4 py-12 text-center">
             <AuthMushroom />
             <h2 className="font-display text-2xl tracking-tight">{t`What shall we work on?`}</h2>
@@ -561,7 +571,8 @@ export const Transcript = memo(function Transcript({
               ) : null}
               <div
                 data-message-id={message.id}
-                className={peerReceipt ? "relative py-0.5" : "group/message relative hover:z-20"}
+                className={cn(peerReceipt ? "relative py-0.5" : "group/message relative hover:z-20",
+                  message.id.startsWith("progress:") && "rk-chat-live-row")}
               >
                 <div
                   className={
@@ -670,6 +681,15 @@ export const Transcript = memo(function Transcript({
             </Fragment>
           );
         })}
+        {pendingMessages.map(message => (
+          <div key={message.nonce} data-testid="pending-message" aria-busy={message.seq === undefined} className="rk-chat-pending-row flex justify-end">
+            <div className={cn("min-w-0 rounded-[20px] bg-chat-user px-3.5 py-2.5 text-body1 text-chat-user-foreground", bubbleFrameWidth("user"))}>
+              {message.text ? <p className="whitespace-pre-wrap wrap-anywhere">{message.text}</p> : null}
+              {message.attachments.map((name, index) => <p key={`${index}:${name}`} className="break-all text-xs">{name}</p>)}
+              {message.seq === undefined ? <span role="status" className="sr-only">{t`Sending…`}</span> : null}
+            </div>
+          </div>
+        ))}
         {running &&
         (activeRun ||
           !messages.some(

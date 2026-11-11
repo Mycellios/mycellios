@@ -2994,7 +2994,7 @@ describe("sendThreadMessage", () => {
     expect(tx.event.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         type: "thread.message.created",
-        payload: expect.objectContaining({ messageId: "msg-1", seq: 7 }),
+        payload: expect.objectContaining({ messageId: "msg-1", seq: 7, clientNonce: "nonce-1" }),
       }),
     });
   });

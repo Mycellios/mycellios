@@ -26,6 +26,17 @@ import {
 } from "./thread-events.js";
 
 describe("thread event reduction", () => {
+  it("keeps message identity separate from the live event cursor", () => {
+    const initial = snapshot([]);
+    const event = {
+      id: "event-90", seq: 90, threadId: initial.threadId, botId: "bot-1",
+      type: "thread.message.created", createdAt: "2026-11-11T00:00:00.000Z",
+      payload: { messageId: "message-7", seq: 7, role: "user", blocks: [{ kind: "text", text: "Sent" }] },
+    } as ProductEvent;
+    const next = reduceThreadSnapshot(initial, event)!;
+    expect(next.cursor).toBe(90);
+    expect(next.messages[0]?.seq).toBe(7);
+  });
   it("shows a committed direct send as queued before its snapshot refresh returns", () => {
     const initial = snapshot([message("user-1", [{ kind: "text", text: "Continue" }], 4)]);
 

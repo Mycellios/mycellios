@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Feedback never gates content or waits for a typewriter effect. */
+.rk-chat-pending-row { animation: rk-chat-send-in 120ms cubic-bezier(.16,1,.3,1); }
+.rk-chat-live-row { animation: rk-chat-reply-in 120ms ease-out; }
+.rk-chat-control { transition: transform 100ms ease-out, background-color 120ms ease-out, color 120ms ease-out; }
+.rk-chat-control:active:not(:disabled) { transform: scale(.95); }
+.rk-chat-control > svg { animation: rk-chat-reply-in 100ms ease-out; }
+@keyframes rk-chat-send-in { from { opacity: .65; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes rk-chat-reply-in { from { opacity: .65; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .rk-chat-pending-row, .rk-chat-live-row, .rk-chat-control > svg { animation: none; }
+  .rk-chat-control { transition: background-color 80ms linear, color 80ms linear; }
+  .rk-chat-control:active:not(:disabled) { transform: none; }
+}
+
 /* OpenBot's settings rhythm, using the Mycellios semantic surfaces. */
 .rk-general-settings { max-width: 760px; margin-inline: auto; }
 .rk-general-settings section > div { background: var(--muted); border: 0; padding-inline: 16px; }

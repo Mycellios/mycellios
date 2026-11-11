@@ -157,6 +157,7 @@ export const Composer = memo(function Composer({
   const rpc = useSpaceRpc();
   const taskScope = useBoundTaskThreadScope();
   const [draft, setDraft] = useState(() => readComposerDraft(draftKey));
+  const submitting = useRef(false);
   const preferences = useGeneralPreferences();
   const defaultDelivery = busyMessageMode ?? preferences.busyMessageMode;
   const [delivery, setDelivery] = useState<"queue" | "steer">(defaultDelivery);
@@ -437,7 +438,8 @@ export const Composer = memo(function Composer({
     (skillPickerOnly || slashSkillOptions.length > 0 || slashActionOptions.length > 0);
 
   async function send() {
-    if (!canSend || sending || disabled || voice.state || reviewedVoice.stage !== "closed") return;
+    if (!canSend || submitting.current || sending || disabled || voice.state || reviewedVoice.stage !== "closed") return;
+    submitting.current = true;
     const revision = editRevision.current;
     const clientNonce = retryNonce.current ?? newClientId();
     retryNonce.current = null;
@@ -460,6 +462,8 @@ export const Composer = memo(function Composer({
       settleComposerDraftSubmission(draftKey, submission, false);
       // A rejected callback leaves acceptance unknown; do not restore a possible send.
       return;
+    } finally {
+      submitting.current = false;
     }
     // Restore only an untouched draft, retaining its nonce for an unchanged retry.
     if (editRevision.current !== revision) return;
@@ -991,7 +995,7 @@ export const Composer = memo(function Composer({
           {!voice.state ? running && busyMessages && !canSend ? (
             <Button type="button" variant="ghost" size="icon" aria-label={t`Stop`}
               title={t`Stop`} disabled={sending} onClick={() => void onStop()}
-              className="size-10 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 hover:text-background md:size-7">
+              className="rk-chat-control size-10 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 hover:text-background md:size-7">
               <Square size={12} strokeWidth={0} fill="currentColor" aria-hidden />
             </Button>
           ) : !running && !canSend && onOpenVoice && sideQuestionBotId && !sending && !disabled && (!onCall || voiceConversationActive) ? (
@@ -1009,7 +1013,7 @@ export const Composer = memo(function Composer({
               aria-label={busyMessages ? delivery === "queue" ? t`Add to queue` : t`Update current task` : t`Send`}
               disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
               onClick={send}
-              className="size-10 shrink-0 rounded-full transition-transform active:scale-95 disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100 md:size-7">
+              className="rk-chat-control size-10 shrink-0 rounded-full disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100 md:size-7">
               <ArrowUp size={16} strokeWidth={2.2} aria-hidden />
             </Button>
           ) : null}
