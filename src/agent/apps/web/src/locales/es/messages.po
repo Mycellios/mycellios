@@ -11029,3 +11029,24 @@ msgstr "Opcional. Un origen por línea, solo si este MCP usa otro servidor de in
 
 msgid "No Mico has network access yet."
 msgstr "Ningún Mico tiene acceso a la red todavía."
+
+msgid "Confirm your account"
+msgstr "Confirma tu cuenta"
+
+msgid "Sign in again to manage your phones. Your conversations stay in your account."
+msgstr "Vuelve a iniciar sesión para gestionar tus móviles. Tus conversaciones se conservan en tu cuenta."
+
+msgid "Continue with your account"
+msgstr "Continuar con tu cuenta"
+
+msgid "Send sign-in code"
+msgstr "Enviar código de acceso"
+
+msgid "Sign-in code"
+msgstr "Código de acceso"
+
+msgid "The account changed. Close settings and try again."
+msgstr "Ha cambiado la cuenta. Cierra los ajustes e inténtalo de nuevo."
+
+msgid "Connected providers use their own account."
+msgstr "Los proveedores conectados usan su propia cuenta."

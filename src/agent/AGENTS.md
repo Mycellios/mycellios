@@ -1120,6 +1120,10 @@
   Mobile setup QR codes contain only the current reachable server URL, never
   credentials. Session revocation uses the authenticated account's existing API
   after confirmation. Verify floating-chats, preload, rpc and MobileSessions tests.
+  Keep session tokens redacted. Revoke an owned session by public ID through
+  the fresh-session auth endpoint, preserving audit and device-disconnect hooks.
+  A stale sign-in opens normal account confirmation instead of a generic error;
+  confirm the resulting account before reloading sessions. Never disable freshness.
   After the native Desktop build, run
   `node apps/desktop/scripts/verify-floating-chats.mjs <receipt-directory>` from
   `src/agent` for the isolated real-window/session qualification on Windows.
