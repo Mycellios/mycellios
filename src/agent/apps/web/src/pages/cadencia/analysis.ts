@@ -288,6 +288,14 @@ export function sourceTime(segments: Segment[], time: number) {
   );
 }
 
+/** Audio preroll/tails may extend beyond picture, especially with Opus in WebM.
+ * Hold the boundary picture in those legitimate gaps without moving speech. */
+export function frameTime(requested: number, first: number, end: number) {
+  if (![requested, first, end].every(Number.isFinite) || end <= first)
+    throw new Error("El vídeo no tiene un intervalo de fotogramas válido.");
+  return Math.max(first, Math.min(requested, end - Math.min(0.000001, (end - first) / 2)));
+}
+
 export function auditionPcm(
   pcm: Float32Array,
   start: number,

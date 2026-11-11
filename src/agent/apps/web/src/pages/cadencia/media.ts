@@ -18,6 +18,7 @@ import {
   ANALYSIS_RATE,
   MAX_DURATION,
   MAX_FILE_BYTES,
+  frameTime,
   keptSegments,
   sourceTime,
   type Cut,
@@ -349,10 +350,17 @@ export async function renderMedia(
         poolSize: 2,
       });
       const count = Math.ceil(total * 30);
+      const [firstPicture, pictureEnd] = await Promise.all([
+        videoTrack.getFirstTimestamp(),
+        videoTrack.computeDuration(),
+      ]);
       function* timestamps() {
         for (let i = 0; i < count; i++)
-          yield info.origin +
-            sourceTime(segments, Math.min(total - 0.00001, i / 30));
+          yield frameTime(
+            info.origin + sourceTime(segments, Math.min(total - 0.00001, i / 30)),
+            firstPicture,
+            pictureEnd,
+          );
       }
       const context = canvas.getContext("2d")!;
       let index = 0;

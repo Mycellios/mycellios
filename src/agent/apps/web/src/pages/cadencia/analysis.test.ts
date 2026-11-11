@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   analyze,
   auditionPcm,
+  frameTime,
   keptSegments,
   selectedCuts,
   sourceTime,
@@ -169,5 +170,25 @@ describe("Cadencia non-destructive timeline", () => {
     expect(keptSegments([cut(1, 2, false)], 3)).toEqual([
       { start: 0, end: 3, output: 0 },
     ]);
+  });
+});
+
+describe("picture bounds on the unchanged audio timeline", () => {
+  it("holds the first picture during negative Opus preroll without shifting later cut mapping", () => {
+    const segments = keptSegments([cut(1, 2)], 4);
+    const origin = -0.0065;
+    expect(frameTime(origin + sourceTime(segments, 0), 0, 3.9)).toBe(0);
+    expect(frameTime(origin + sourceTime(segments, 1.2), 0, 3.9)).toBeCloseTo(2.1935);
+  });
+  it("holds the final picture for a longer audio tail, within the actual final frame interval", () => {
+    const requested = sourceTime(keptSegments([], 4), 3.99);
+    const actual = frameTime(requested, 0.01, 3.875);
+    expect(actual).toBeGreaterThan(3.874);
+    expect(actual).toBeLessThan(3.875);
+  });
+  it("rejects missing or invalid picture ranges rather than manufacturing interior frames", () => {
+    expect(() => frameTime(0, 0, 0)).toThrow();
+    expect(() => frameTime(1, NaN, 2)).toThrow();
+    expect(() => frameTime(Infinity, 0, 2)).toThrow();
   });
 });

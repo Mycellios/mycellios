@@ -28,6 +28,8 @@ upload, remote model, paid call or production deployment.
 - Audition original/edited context with identical selected cuts. Export audio at
   its decoded native sample rate with short boundary fades, video on a bounded
   frame grid, sharing the compacted timeline. Never speed up speech.
+  Hold the first/last picture for legitimate audio preroll/tails outside the
+  video track; do not shift speech or hide missing interior frames.
 - Use native codecs available in the browser; prefer MP4/H.264/AAC and explicitly
   use WebM/VP9/Opus when MP4 encoding is unavailable. No silent remote fallback.
 - Keep current work in the existing account/Space memory cache across internal
