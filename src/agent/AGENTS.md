@@ -19,6 +19,16 @@
   `apps/web/src/locales/en/messages.po`; production macros omit development text.
   Verify compiled messages without a fallback in `i18n-catalog.test.ts`.
 
+- MCP stdio launch arguments remain unchanged for the child, but explicitly named
+  credentials must join output/error/log redaction. Omit tool names or schemas
+  that contain those credentials rather than corrupting JSON Schema with replacement
+  text. Verify `mcp-launch-secrets`, MCP connector and OAuth tests.
+  Browser MCP authorization URLs have a 16,384-character budget after added scopes
+  and parameters; resource/fetch URL limits and private-egress authorization stay
+  unchanged. Auto Review accepts one complete flat verdict (optionally JSON-fenced);
+  duplicate keys, surrounding text, unknown fields and malformed values require
+  the existing owner-approval fallback. Verify auto-review and factory tests.
+
 - Tailscale connections use the optional private Linux gateway in `infra/tailscale`.
   Each user/Space/network owns a userspace device; never enable global private
   egress or join customer routes to the API/worker host. Require both the network's
