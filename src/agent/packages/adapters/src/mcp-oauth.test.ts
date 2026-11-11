@@ -7,7 +7,7 @@ import {
   oauthMaterialSecrets,
   StoredMcpOAuthProvider,
 } from "./mcp-oauth.js";
-import { McpSession } from "./mcp-transport.js";
+import { McpSession, validateUrl } from "./mcp-transport.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -833,6 +833,32 @@ describe("MCP OAuth", () => {
     expect(provider.authorizationUrl).toBeUndefined();
     expect(onAuthorization).not.toHaveBeenCalled();
     expect(await provider.tokens()).toMatchObject({ access_token: "working" });
+  });
+  it("accepts a long browser scope URL without relaxing MCP resource URL limits", async () => {
+    const onAuthorization = vi.fn();
+    const provider = new StoredMcpOAuthProvider("server-1", {}, async () => undefined, { onAuthorization });
+    const url = new URL("https://auth.example.test/authorize");
+    url.searchParams.set("scope", Array.from({ length: 350 }, (_, i) => `permission.${i}`).join(" "));
+    expect(url.href.length).toBeGreaterThan(2048);
+    await provider.redirectToAuthorization(url);
+    expect(onAuthorization).toHaveBeenCalledWith(url);
+    expect(() => validateUrl(url)).toThrow(/2048/);
+  });
+  it("bounds browser authorization URLs before publishing a sign-in link", async () => {
+    const onAuthorization = vi.fn();
+    const provider = new StoredMcpOAuthProvider("server-1", {}, async () => undefined, { onAuthorization });
+    await expect(provider.redirectToAuthorization(new URL(`https://auth.example.test/authorize?scope=${"x".repeat(17000)}`))).rejects.toThrow(/exceeds/);
+    expect(onAuthorization).not.toHaveBeenCalled();
+    expect(provider.authorizationUrl).toBeUndefined();
+  });
+  it("checks the final URL after configured authorization parameters are added", async () => {
+    const onAuthorization = vi.fn();
+    const provider = new StoredMcpOAuthProvider("server-1", {
+      oauthClient: { client_id: "client", authorization_server: "https://auth.example.test", authorization_params: "prompt=consent" },
+    }, async () => undefined, { onAuthorization });
+    const prefix = "https://auth.example.test/authorize?scope=";
+    await expect(provider.redirectToAuthorization(new URL(prefix + "x".repeat(16380 - prefix.length)))).rejects.toThrow(/exceeds/);
+    expect(onAuthorization).not.toHaveBeenCalled();
   });
 
   it("allows private-network HTTP authorization URLs only when the instance opts in", async () => {

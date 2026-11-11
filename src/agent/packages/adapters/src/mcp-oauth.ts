@@ -504,6 +504,20 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
     let authorizationUrl: URL;
     try {
       authorizationUrl = validateUrl(url, {
+        maxUrlLength: 16_384,
+        allowHttpLocalhost: true,
+        allowPrivateEndpoint: this.options.allowPrivateEndpoint,
+      });
+      const extra = this.material.oauthClient?.authorization_params;
+      if (extra) {
+        for (const [key, value] of Object.entries(parseMcpOAuthAuthorizationParams(extra)))
+          if (!authorizationUrl.searchParams.has(key)) authorizationUrl.searchParams.set(key, value);
+      }
+      requestOfflineAccess(authorizationUrl, this.material.oauth?.discoveryState);
+      // Added scopes/parameters must fit too. This larger budget is browser
+      // authorization only; MCP resource and network fetch limits stay intact.
+      authorizationUrl = validateUrl(authorizationUrl, {
+        maxUrlLength: 16_384,
         allowHttpLocalhost: true,
         allowPrivateEndpoint: this.options.allowPrivateEndpoint,
       });
@@ -513,12 +527,6 @@ export class StoredMcpOAuthProvider implements OAuthClientProvider {
       }
       throw error;
     }
-    const extra = this.material.oauthClient?.authorization_params;
-    if (extra) {
-      for (const [key, value] of Object.entries(parseMcpOAuthAuthorizationParams(extra)))
-        if (!authorizationUrl.searchParams.has(key)) authorizationUrl.searchParams.set(key, value);
-    }
-    requestOfflineAccess(authorizationUrl, this.material.oauth?.discoveryState);
     this.authorizationUrl = authorizationUrl;
     if (this.options.onAuthorization) {
       this.options.onAuthorization(authorizationUrl);

@@ -1,5 +1,46 @@
 # Status and evidence
 
+## Connector and approval hardening — upstream review, 2026-11-11
+
+The candidate collects explicitly named credentials in local MCP launch arguments
+(flags, headers, environment assignments and URL passwords/query tokens) without
+changing the arguments passed to the process. These values join existing output,
+error and log redaction. Credential-bearing tool names/schemas are omitted;
+descriptions are redacted without rewriting schema keywords. This is explicit
+credential detection, not arbitrary program or credential-file analysis.
+
+Auto Review accepts one complete flat `pass`/`ask` verdict, optionally JSON-fenced.
+Duplicate keys, unknown fields, surrounding text, malformed fields and oversized
+replies follow the existing owner-approval fallback. MCP browser authorization
+accepts URLs up to 16,384 characters, including appended parameters; resource URL
+limits, origin validation and private-network authorization remain unchanged.
+
+Local focused validation passes 224 tests in launch credential, MCP connector,
+OAuth, Auto Review and reviewer-factory suites. The regression fixtures cover
+launch/discovery/call failures, model-visible outputs and credential-bearing
+schemas. They do not qualify a live provider login or installed Desktop update.
+Remote typing, integration and publication need their own exact-revision evidence;
+full suites remain paused. These independently implemented changes were selected
+after reviewing [Rakazo 0.9.0](https://github.com/elie222/rakazo/releases/tag/v0.9.0)
+and [OpenBot 0.67.1](https://github.com/nightly-labs/openbot/releases/tag/v0.67.1).
+Existing ZIP import already accepts missing Unix file types while rejecting links
+and devices; no OpenBot implementation was copied.
+
+Publication is independently recorded for main
+`02daa6c03690843fd519f47e9b62e6e8d1f689e7` (PR #222), source tree
+`929bb5877f55cbed6380d25728a58ad1b90002b7`. PR run `42996170124` passed
+web/API/worker/Desktop typing and 2,436 related tests (308 skipped), plus 142 changed
+tests; these sets overlap. Workspace/browser and Windows acceptance passed in
+run `42996169567`; post-merge run `42996886076` also passed. The remote Linux
+release built API/worker and verified compiled startup. Its archive SHA-256 is
+`b77f3a5146a5991602c6766be842e0febe4c18f1203d127311acd66a67840650`.
+Production mounts serve the corresponding verified bundles and public readiness
+is healthy. Existing environments, frontend and gateway were preserved; gateway
+provenance remains its separately qualified earlier revision. No database
+migrations were added. The database backup and prior containers are retained
+for rollback. This server publication does not update the installed Desktop
+or qualify a live provider OAuth login.
+
 ## Tailscale private MCP connections — server release, 2026-11-11
 
 Conexiones has personal and company tailnet enrollment, explicit per-Mico network
