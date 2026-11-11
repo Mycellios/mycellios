@@ -13,6 +13,15 @@ reads only that entry of the extended catalog and verifies version, exact file
 name, byte size and SHA-256. AppImages, unpackaged builds and unowned executables
 receive no offer, because replacing them is not a package operation.
 
+## macOS
+
+A disk image has no package database, so the running architecture selects
+`macos-arm64` or `macos-x64` and the same verification applies, including the
+ad-hoc signature hash in the file name. The handoff opens the verified image for
+the owner to install; the app never mounts, copies or replaces itself. Preview
+images stay ad-hoc signed, Gatekeeper still warns and unattended installation
+stays unsupported.
+
 Installation stays explicit and manual: the verified package is opened with the
 system installer, which owns authentication and elevation. The app never runs the
 package manager itself and never restarts into an update it did not install. The

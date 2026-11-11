@@ -256,12 +256,14 @@ namespaces with temporary `/etc` and `/opt`, synthetic payloads and no network.
 Missing platform tools or unavailable user namespaces produce explicit skips.
 Interactive sign-in and real network enrollment require separate user testing.
 
-Installed RPM and DEB builds check the same desktop download catalog as Windows,
-using the `fedora` entry or the `linux-x64` package that owns the running
-executable. Verification (exact version, file name, size, SHA-256) happens before
-the panel offers anything, and installation remains the owner's action: the app
-opens the verified package with the system installer and asks for a restart after
-it finishes. Keep that boundary; do not add a package-manager call, elevation or
+Installed RPM, DEB and macOS builds check the same desktop download catalog as
+Windows, using the `fedora` entry, the `linux-x64` package that owns the running
+executable, or the macOS disk image that matches the running architecture.
+Verification (exact version, file name, size, SHA-256) happens before the panel
+offers anything, and installation remains the owner's action: the app opens the
+verified package with the system installer — or mounts the verified image — and
+asks for a restart after it finishes. Publish Linux packages with
+`desktop:publish:linux`, adding `--deb` and `--macos` for those artifacts. Keep that boundary; do not add a package-manager call, elevation or
 unattended install to the app. An AppImage or unpackaged build must keep receiving
 no offer. A published version is only visible once its catalog entry exists, so
 release must publish the RPM and its `fedora` entry together.

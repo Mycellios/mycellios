@@ -236,3 +236,33 @@ describe("official Fedora manual releases", () => {
     await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(2));
   });
 });
+
+const dmgName = "Mycellios-Desktop-0.3.41-macos-arm64-adhoc-ea645147545f.dmg";
+const macosCatalog = {
+  ...catalog,
+  packages: [
+    ...catalog.packages,
+    { id: "macos-arm64", format: "DMG", version: "0.3.41", fileName: dmgName,
+      path: `/downloads/desktop/releases/0.3.41/${dmgName}`, bytes: 42, sha256: "b".repeat(64),
+      source: { path: "/downloads/desktop/releases/0.3.41/Mycellios-Desktop-0.3.41-macos-source-553948e.tar.gz", sha256: "c".repeat(64) } },
+  ],
+};
+
+describe("official macOS disk images", () => {
+  it("selects the disk image for the running architecture", () => {
+    expect(catalogManualRelease(macosCatalog, "0.3.40", "macos-arm64")).toMatchObject({
+      version: "0.3.41", fileName: dmgName,
+      url: "https://www.mycellios.com" + macosCatalog.packages.at(-1)!.path });
+    // The Intel entry is absent until it is published.
+    expect(() => catalogManualRelease(macosCatalog, "0.3.40", "macos-x64")).toThrow();
+    // Another platform never borrows it.
+    expect(catalogManualRelease(macosCatalog, "0.3.40", "windows-x64")).toBeNull();
+  });
+  it("rejects a disk image whose name does not belong to the version or architecture", () => {
+    const patch = (fileName: string) => ({ packages: [...macosCatalog.packages.slice(0, -1),
+      { ...macosCatalog.packages.at(-1)!, fileName, path: `/downloads/desktop/releases/0.3.41/${fileName}` }] });
+    expect(() => catalogManualRelease(patch("Mycellios-Desktop-0.3.40-macos-arm64-adhoc-ea645147545f.dmg"), "0.3.39", "macos-arm64")).toThrow();
+    expect(() => catalogManualRelease(patch("Mycellios-Desktop-0.3.41-macos-x64-adhoc-ea645147545f.dmg"), "0.3.40", "macos-arm64")).toThrow();
+    expect(() => catalogManualRelease(patch("Mycellios-Desktop-0.3.41-macos-arm64.dmg"), "0.3.40", "macos-arm64")).toThrow();
+  });
+});
