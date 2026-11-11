@@ -52,6 +52,9 @@ permission matrix is run `42986840658`, including another actual member in the
 same Space, no upstream requests on denial and real device logout on revocation.
 This server release does not imply an updated installed Desktop renderer; Windows
 packaging/publication has its own revision-bound qualification and catalog.
+Enrollment uses official device login. It does not implement Grok Bot's
+[OAuth Apps onboarding](https://tailscale.com/blog/oauth-apps-ga), which requires
+a separately registered Mycellios OAuth App, or its app-specific posture policy.
 
 ## Desktop-owned Mico execution candidate - 2026-11-07
 
