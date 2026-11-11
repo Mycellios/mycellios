@@ -77,4 +77,3 @@ export function eyePoses(gaze: HeadGaze, scale: number, split = EYE_SPLIT): [Eye
 
   return [build(-1), build(1)]
 }
-
