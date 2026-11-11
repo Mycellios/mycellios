@@ -10271,3 +10271,107 @@ msgstr "Connect your Mycellios account in Models to use network voice."
 
 msgid "Your Mycellios connection could not be read. Open Models to check it."
 msgstr "Your Mycellios connection could not be read. Open Models to check it."
+
+msgid "{provider} rejected this request because it exceeds the plan's "
+"tokens-per-minute limit. Choose another model."
+msgstr "{provider} rejected this request because it exceeds the plan's "
+"tokens-per-minute limit. Choose another model."
+
+msgid "Custom model: {0}"
+msgstr "Custom model: {0}"
+
+msgid "New conversation in {0}"
+msgstr "New conversation in {0}"
+
+msgid "Pin {label}"
+msgstr "Pin {label}"
+
+msgid "I want to edit the routine “{0}”. Changes: "
+msgstr "I want to edit the routine “{0}”. Changes: "
+
+msgid "Times in {zone}"
+msgstr "Times in {zone}"
+
+msgid "Open Mico {0}"
+msgstr "Open Mico {0}"
+
+msgid "+{0} more"
+msgstr "+{0} more"
+
+msgid "Clocks change on {0}. Times follow {zone}."
+msgstr "Clocks change on {0}. Times follow {zone}."
+
+msgid "{days} days"
+msgstr "{days} days"
+
+msgid "Partial data: {0} unpriced calls, {1} incomplete token records, {2} runs "
+"without usage."
+msgstr "Partial data: {0} unpriced calls, {1} incomplete token records, {2} "
+"runs without usage."
+
+msgid "{0} sessions"
+msgstr "{0} sessions"
+
+msgid "{0} of known cost"
+msgstr "{0} of known cost"
+
+msgid "{0} of known tokens"
+msgstr "{0} of known tokens"
+
+msgid "{0} tokens"
+msgstr "{0} tokens"
+
+msgid "Collection started {0} · Updated {1}"
+msgstr "Collection started {0} · Updated {1}"
+
+msgid "Updated {0}"
+msgstr "Updated {0}"
+
+msgid "{0} calls have no stored conversation link. Session counts may be "
+"incomplete."
+msgstr "{0} calls have no stored conversation link. Session counts may be "
+"incomplete."
+
+msgid "{0} included guides"
+msgstr "{0} included guides"
+
+msgid "Pin {0}"
+msgstr "Pin {0}"
+
+msgid "Unpin {0}"
+msgstr "Unpin {0}"
+
+msgid "{0}% remaining"
+msgstr "{0}% remaining"
+
+msgid "Resets in {relative}"
+msgstr "Resets in {relative}"
+
+msgid "This deletes all {0} versions of this file. This can't be undone."
+msgstr "This deletes all {0} versions of this file. This can't be undone."
+
+msgid "Version {0} · Downloaded by Mycellios"
+msgstr "Version {0} · Downloaded by Mycellios"
+
+msgid "Create your account and get {SPORE_WELCOME_REWARD} trial Spore with no "
+"monetary value."
+msgstr "Create your account and get {SPORE_WELCOME_REWARD} trial Spore with no "
+"monetary value."
+
+msgid "{0} welcome Spore · {1} earned from usage"
+msgstr "{0} welcome Spore · {1} earned from usage"
+
+msgid "{0} / {1} tokens toward the next Spore"
+msgstr "{0} / {1} tokens toward the next Spore"
+
+msgid "{modelCount} models enabled"
+msgstr "{modelCount} models enabled"
+
+msgid "Start a new chat with {name}?"
+msgstr "Start a new chat with {name}?"
+
+msgid "{name} reads this chat to answer. Nothing here goes back to the chat."
+msgstr "{name} reads this chat to answer. Nothing here goes back to the chat."
+
+msgid "Remove {name}"
+msgstr "Remove {name}"
