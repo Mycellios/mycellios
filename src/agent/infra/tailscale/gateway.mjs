@@ -44,9 +44,20 @@ export class Nodes {
   starting = new Map();
   constructor(root, maxNodes = 128) { this.root = root; this.maxNodes = maxNodes; }
   async cli(node, ...args) {
-    const { stdout } = await exec('tailscale', [`--socket=${node.socket}`, ...args],
-      { timeout: 10_000, maxBuffer: 256 * 1024, windowsHide: true });
-    return stdout;
+    try {
+      const { stdout } = await exec('tailscale', [`--socket=${node.socket}`, ...args],
+        { timeout: 10_000, maxBuffer: 256 * 1024, windowsHide: true });
+      return stdout;
+    } catch (error) {
+      // The CLI returns nonzero before login even when its JSON status is valid.
+      if (args[0] === 'status' && args.includes('--json') && typeof error.stdout === 'string') {
+        try {
+          const status = JSON.parse(error.stdout);
+          if (['NeedsLogin', 'Stopped', 'Running', 'NeedsMachineAuth', 'Starting', 'NoState'].includes(status.BackendState)) return error.stdout;
+        } catch { /* Preserve the original command failure. */ }
+      }
+      throw error;
+    }
   }
   async node(id, suffix) {
     if (!nodePattern.test(id) || !suffixPattern.test(suffix)) throw new Error('Invalid connection');
