@@ -6,6 +6,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class MycelliosUpdatePath {
+ [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window,int command);
  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
  private static extern uint GetLongPathName(string path, StringBuilder result, uint capacity);
  public static string Canonical(string path) {
@@ -153,7 +154,32 @@ try {
  # which can keep the helper in "installing" after the installer has exited.
  # Keep normal Windows downloaded-file checks visible. Hiding this launch can
  # leave the app closed behind a shell/security prompt with no installer PID.
- $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Normal -WorkingDirectory $env:TEMP -PassThru
+ # Shell checks need a real visible owner, not a hidden console or the desktop
+ # pseudo-window. Keep downloaded-file checks and the verification handle.
+ Progress 'preparing-installer-ui'
+ Add-Type -AssemblyName System.Windows.Forms
+ $window=New-Object Windows.Forms.Form
+ $window.Text='Actualizando Mycellios'
+ $window.Width=440;$window.Height=140
+ $window.StartPosition=[Windows.Forms.FormStartPosition]::CenterScreen
+ $window.ControlBox=$false
+ $label=New-Object Windows.Forms.Label
+ $label.Text=('Windows est'+[char]0xE1+' comprobando el instalador. Mycellios se abrir'+[char]0xE1+' al terminar.')
+ $label.Dock=[Windows.Forms.DockStyle]::Fill
+ $label.Padding=New-Object Windows.Forms.Padding(20)
+ $window.Controls.Add($label)
+ try {
+  $window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()
+  # The hidden worker's STARTUPINFO can suppress the first ShowWindow call.
+  [MycelliosUpdatePath]::ShowWindow($window.Handle,5)|Out-Null
+  [Windows.Forms.Application]::DoEvents()
+  Progress 'waiting-for-windows'
+  $start=New-Object Diagnostics.ProcessStartInfo
+  $start.FileName=$installer;$start.Arguments='/S';$start.WorkingDirectory=$env:TEMP
+  $start.UseShellExecute=$true;$start.WindowStyle=[Diagnostics.ProcessWindowStyle]::Normal
+  $start.ErrorDialog=$true;$start.ErrorDialogParentHandle=$window.Handle
+  $setup=[Diagnostics.Process]::Start($start)
+ } finally {$window.Close();$window.Dispose()}
  $null=$setup.Handle
  Progress 'installing'
  if(!$setup.WaitForExit(600000)){
