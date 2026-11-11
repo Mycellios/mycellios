@@ -33,7 +33,7 @@ async function main() {
       if (!bot) throw new Error("Target Mico is not owned by the requested account and Space");
       const secrets = createSecretStore(env.encryptionKey);
       const connection = await ownedMycelliosConnection({ prisma: db.prisma, secrets }, target.userId);
-      if (!connection) throw new Error("No owned Mycellios connection");
+      if (!connection?.saved.apiKey) throw new Error("No owned Mycellios connection with an API key");
       const text = target.language === "es"
         ? `Prueba real de voz Mycellios. ${randomUUID().slice(0, 8)}.`
         : `Real Mycellios voice check. ${randomUUID().slice(0, 8)}.`;
