@@ -561,13 +561,10 @@ export function reduceThreadSnapshot(
     const blocks = (event.payload.blocks as ThreadMessage["blocks"]) ?? [];
     const id = String(event.payload.messageId ?? event.id);
     const known = prev.messages.find((message) => message.id === id);
-    const messageSeq = typeof event.payload.seq === "number" &&
-      Number.isSafeInteger(event.payload.seq) && event.payload.seq >= 0
-      ? event.payload.seq : (known?.seq ?? event.seq);
     const next: ThreadMessage = {
       id,
       threadId: event.threadId,
-      seq: messageSeq,
+      seq: event.seq,
       role,
       blocks,
       botId: event.botId,

@@ -55,7 +55,7 @@ try {
   await page.evaluate(() => window.__chatFlow.acknowledge(false));
   await expect(page.getByText("Acknowledged before its event", { exact: true })).toHaveCount(1);
   await expect(page.getByTestId("pending-message")).toHaveCount(0);
-  proof.scenarios.push("HTTP-before-SSE preserves one message and exact durable sequence");
+  proof.scenarios.push("HTTP-before-SSE preserves one message and exact durable ID");
   await send("Keep this draft on failure");
   await page.evaluate(() => window.__chatFlow.reject());
   await expect(page.getByTestId("pending-message")).toHaveCount(0);
@@ -83,6 +83,28 @@ try {
   assert.ok(proof.benchmarks.frame.paints < proof.benchmarks.immediate.paints, "presentation must coalesce actual progress events");
   proof.scenarios.push("every event reduced; identical complete reply with fewer presentation commits");
 
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  const reply = 'La respuesta aparece mientras llega.\n\n- Mensaje visible al enviar.\n- El historial mantiene su posición.\n\n```ts\nconst state = "streaming";\n```';
+  await page.evaluate(text => {
+    window.__chatFlow.emit({ type: "run.started", runId: "visual-run", payload: { trigger: "user" } });
+    window.__chatFlow.emit({ type: "thread.progress", runId: "visual-run", payload: { text, streaming: true } });
+  }, reply);
+  await expect(page.locator(".rk-chat-markdown-streaming")).toHaveCount(1);
+  await page.screenshot({ path: path.join(output, "streaming-mobile.png"), animations: "disabled" });
+  const liveHeight = await page.locator('[data-message-id="progress:visual-run"]').evaluate(el => el.getBoundingClientRect().height);
+  await page.evaluate(text => {
+    window.__chatFlow.emit({ type: "thread.message.created", runId: "visual-run", payload: { messageId: "visual-final", role: "bot", blocks: [{ kind: "text", text }] } });
+    window.__chatFlow.emit({ type: "run.completed", runId: "visual-run", payload: {} });
+  }, reply);
+  await expect(page.locator(".rk-chat-markdown-streaming")).toHaveCount(0);
+  const settled = await page.locator('[data-message-id="visual-final"]').evaluate(el => ({ height: el.getBoundingClientRect().height, animations: el.getAnimations().length }));
+  assert.equal(settled.animations, 0, "streamed text must not replay its entry animation");
+  assert.ok(Math.abs(settled.height - liveHeight) <= 2, `stream completion changed height: ${liveHeight} -> ${settled.height}`);
+  proof.streamCompletion = { liveHeight, finalHeight: settled.height, entryAnimations: settled.animations };
+  await page.screenshot({ path: path.join(output, "completed-mobile.png"), animations: "disabled" });
+  proof.scenarios.push("formatted reply completion preserves height and does not replay motion");
+
   for (const [name, width, height, theme, reducedMotion] of [
     ["mobile-light", 390, 844, "light", "no-preference"],
     ["mobile-dark-reduced", 390, 844, "dark", "reduce"],
@@ -108,7 +130,7 @@ try {
   assert.deepEqual(consoleErrors, []);
   proof.passed = true;
   await writeFile(path.join(output, "verification.json"), JSON.stringify(proof, null, 2));
-  console.log(JSON.stringify(proof, null, 2));
+  console.log(JSON.stringify({ ...proof, benchmarks: Object.fromEntries(Object.entries(proof.benchmarks).map(([key, { finalText, ...metrics }]) => [key, metrics])) }, null, 2));
 } finally {
   await browser?.close(); await server.close();
 }

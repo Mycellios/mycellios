@@ -4,9 +4,10 @@
 
 The candidate shows a local pending user message before send acknowledgement,
 scoped to account/Space/thread. Exact client nonces and acknowledged message
-sequences reconcile SSE-first and HTTP-first delivery; matching text is not used.
-Rejected sends retain existing draft recovery. Message sequence identity remains
-separate from the subscription's event cursor. Repeated Send presses are fenced
+IDs reconcile SSE-first and HTTP-first delivery; matching text is not used.
+Rejected sends retain existing draft recovery. Receipt message identity remains
+separate from the subscription's event cursor and transcript ordering is retained.
+Repeated Send presses are fenced
 before React commits. Queue/steering, permissions and model selection are retained.
 
 The authoritative snapshot still reduces every event immediately. Only repeated
@@ -16,13 +17,13 @@ without waiting for a frame. Stable reply-jump callbacks preserve memoized histo
 rows. Short send/live-reply/control transitions respect reduced motion and do not
 replay streamed text on completion or take scroll ownership from a history reader.
 
-Local focused validation passed 259 tests. A browser fixture using the real
+Local focused validation passed 285 tests. A browser fixture using the real
 Composer and Transcript passes delayed acknowledgement, delivery ordering,
 rejection, account/Space/thread isolation, mobile light/dark, reduced motion and
 history-scroll checks with synthetic events. In one Windows development-browser
 comparison over 123 identical events, immediate presentation requested 123 paints
-and frame presentation 55; React profiler render totals were approximately 605 ms
-and 429 ms. These are controlled UI measurements, not live model latency,
+and frame presentation 64; React profiler render totals were approximately 1,153 ms
+and 461 ms. These are controlled UI measurements, not live model latency,
 production timing guarantees or installed Desktop qualification. Full suites
 remain paused. Remote validation and publication require separate evidence.
 

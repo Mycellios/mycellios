@@ -682,11 +682,11 @@ export const Transcript = memo(function Transcript({
           );
         })}
         {pendingMessages.map(message => (
-          <div key={message.nonce} data-testid="pending-message" aria-busy={message.seq === undefined} className="rk-chat-pending-row flex justify-end">
+          <div key={message.nonce} data-testid="pending-message" aria-busy={message.messageId === undefined} className="rk-chat-pending-row flex justify-end">
             <div className={cn("min-w-0 rounded-[20px] bg-chat-user px-3.5 py-2.5 text-body1 text-chat-user-foreground", bubbleFrameWidth("user"))}>
               {message.text ? <p className="whitespace-pre-wrap wrap-anywhere">{message.text}</p> : null}
               {message.attachments.map((name, index) => <p key={`${index}:${name}`} className="break-all text-xs">{name}</p>)}
-              {message.seq === undefined ? <span role="status" className="sr-only">{t`Sending…`}</span> : null}
+              {message.messageId === undefined ? <span role="status" className="sr-only">{t`Sending…`}</span> : null}
             </div>
           </div>
         ))}

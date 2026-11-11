@@ -90,7 +90,7 @@ function ChatFixture() {
         },
       });
     if (sseFirst) deliver();
-    pending.accept(send.nonce, messageSeq);
+    pending.accept(send.nonce, `sent-${messageSeq}`);
     send.resolve(true);
     setSending(false);
     if (!sseFirst) setTimeout(deliver, 180);

@@ -40,20 +40,28 @@ describe("pending message identity", () => {
       pendingSendMatchesEvent(send, { ...event, payload: { role: "bot", clientNonce: "nonce" } }),
     ).toBe(false);
   });
-  it("reconciles an HTTP receipt with its exact durable user sequence", () => {
-    const accepted = { ...send, seq: 7 };
+  it("reconciles an HTTP receipt with its exact durable user message ID", () => {
+    const accepted = { ...send, messageId: "sent-7" };
     expect(visiblePendingSends([accepted], send.scope, snapshot)).toEqual([accepted]);
     expect(
       visiblePendingSends([accepted], send.scope, {
         ...snapshot,
-        messages: [{ seq: 7, role: "bot" }] as never,
+        messages: [{ id: "sent-7", seq: 90, role: "bot" }] as never,
       }),
     ).toEqual([accepted]);
     expect(
       visiblePendingSends([accepted], send.scope, {
         ...snapshot,
-        messages: [{ seq: 7, role: "user" }] as never,
+        messages: [{ id: "sent-7", seq: 90, role: "user" }] as never,
       }),
     ).toEqual([]);
+  });
+  it("does not confuse a receipt's message identity with a colliding event sequence", () => {
+    expect(
+      visiblePendingSends([{ ...send, messageId: "sent-7" }], send.scope, {
+        ...snapshot,
+        messages: [{ id: "another-message", seq: 7, role: "user" }] as never,
+      }),
+    ).toHaveLength(1);
   });
 });

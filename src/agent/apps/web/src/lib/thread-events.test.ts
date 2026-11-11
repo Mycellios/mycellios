@@ -27,17 +27,6 @@ import {
 } from "./thread-events.js";
 
 describe("thread event reduction", () => {
-  it("keeps message identity separate from the live event cursor", () => {
-    const initial = snapshot([]);
-    const event = {
-      id: "event-90", seq: 90, spaceId: "workspace-1", threadId: initial.threadId, botId: "bot-1",
-      type: "thread.message.created", createdAt: "2026-11-11T00:00:00.000Z",
-      payload: { messageId: "message-7", seq: 7, role: "user", blocks: [{ kind: "text", text: "Sent" }] },
-    } as ProductEvent;
-    const next = reduceThreadSnapshot(initial, event)!;
-    expect(next.cursor).toBe(90);
-    expect(next.messages[0]?.seq).toBe(7);
-  });
   it("paints first reply text immediately even when a tool already created the live row", () => {
     const event = { id: "progress", spaceId: "workspace-1", threadId: "thread-1", botId: "bot-1",
       runId: "run-1", type: "thread.progress", seq: 10, createdAt: "2026-11-11T00:00:00.000Z", payload: { text: "Hello" } } as ProductEvent;

@@ -16,10 +16,10 @@
 # AGENTS.md
 
 - Conversation pending sends are local presentation scoped to account/Space/thread.
-  Match durable echoes by client nonce or acknowledged message sequence, never by
+  Match durable echoes by client nonce or acknowledged message ID, never by
   text. Preserve existing draft/attachment recovery and nonce reuse on retries.
-  Event cursors and message sequences are distinct: retain the payload's message
-  sequence for rows and the event sequence for subscription recovery.
+  Send receipt message IDs are independent of event cursors; do not alter transcript
+  ordering or use a colliding sequence number to infer acknowledgement.
   Coalesce only progress presentation to animation frames; reduce all events in
   order and update the authoritative reference immediately. Flush structural,
   terminal, navigation and preference changes without waiting for a frame.

@@ -277,12 +277,17 @@
 
 .rk-chat-markdown-streaming {
   position: relative;
-  padding-right: 0.8em;
+}
+
+/* The cursor is an extra DOM child, not another paragraph. Keep the real
+   last block's spacing identical before and after streaming finishes. */
+.rk-chat-markdown-streaming > :nth-last-child(2) {
+  margin-bottom: 0;
 }
 
 .rk-chat-markdown-cursor {
   position: absolute;
-  inset-inline-end: 0;
+  inset-inline-end: -0.4em;
   bottom: 0.24em;
   width: 0.16em;
   height: 1em;

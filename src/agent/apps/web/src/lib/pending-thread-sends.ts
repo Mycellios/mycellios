@@ -6,7 +6,7 @@ export type PendingThreadSend = {
   nonce: string;
   text: string;
   attachments: readonly string[];
-  seq?: number;
+  messageId?: string;
 };
 
 /** Only exact durable identity may replace a local send, including SSE-before-HTTP. */
@@ -26,12 +26,12 @@ export function visiblePendingSends(
 ): PendingThreadSend[] {
   if (!snapshot) return [];
   const committed = new Set(
-    snapshot.messages.filter((message) => message.role === "user").map((message) => message.seq),
+    snapshot.messages.filter((message) => message.role === "user").map((message) => message.id),
   );
   return sends.filter(
     (send) =>
       send.scope === scope &&
       send.threadId === snapshot.threadId &&
-      (send.seq === undefined || !committed.has(send.seq)),
+      (send.messageId === undefined || !committed.has(send.messageId)),
   );
 }

@@ -18,10 +18,12 @@ export function usePendingThreadSends(scope: string, snapshot: ThreadSnapshot | 
         : current,
     );
   }, []);
-  const accept = useCallback((nonce: string, seq: number) => {
+  const accept = useCallback((nonce: string, messageId?: string) => {
     setSends((current) =>
       current.some((send) => send.nonce === nonce)
-        ? current.map((send) => (send.nonce === nonce ? { ...send, seq } : send))
+        ? messageId
+          ? current.map((send) => (send.nonce === nonce ? { ...send, messageId } : send))
+          : current.filter((send) => send.nonce !== nonce)
         : current,
     );
   }, []);
@@ -53,9 +55,9 @@ export function usePendingThreadSends(scope: string, snapshot: ThreadSnapshot | 
         (send) =>
           send.scope !== scope ||
           (snapshot?.threadId === send.threadId &&
-            send.seq !== undefined &&
+            send.messageId !== undefined &&
             snapshot.messages.some(
-              (message) => message.role === "user" && message.seq === send.seq,
+              (message) => message.role === "user" && message.id === send.messageId,
             )),
       )
     )
@@ -66,8 +68,10 @@ export function usePendingThreadSends(scope: string, snapshot: ThreadSnapshot | 
           send.scope === scope &&
           !(
             snapshot?.threadId === send.threadId &&
-            send.seq !== undefined &&
-            snapshot.messages.some((message) => message.role === "user" && message.seq === send.seq)
+            send.messageId !== undefined &&
+            snapshot.messages.some(
+              (message) => message.role === "user" && message.id === send.messageId,
+            )
           ),
       );
       return next.length === current.length ? current : next;

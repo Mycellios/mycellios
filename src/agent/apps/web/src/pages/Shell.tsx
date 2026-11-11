@@ -2844,7 +2844,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           });
           accepted = true;
           messageAccepted = true;
-          acceptPendingSend(clientNonce, sent.seq);
+          acceptPendingSend(clientNonce, sent.messageId);
         } else if (botTarget) {
           const sent = await rpc.threads.send({
             botId: botTarget,
@@ -2858,7 +2858,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           });
           accepted = true;
           messageAccepted = true;
-          acceptPendingSend(clientNonce, sent.seq);
+          acceptPendingSend(clientNonce, sent.messageId);
           if (activeBotId.current === botTarget) {
             updateSnapshot((current) =>
               applyThreadSendReceipt(

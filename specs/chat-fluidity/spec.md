@@ -6,7 +6,9 @@ queue/steering semantics and authoritative event reducer.
 - A submitted message appears immediately as a local pending row, including its
   attachment names. It is not a committed message or a model reply. Scope it to
   the current account, Space and thread; reconcile using the exact client nonce
-  from a durable event or the acknowledged message sequence, never matching text.
+  from a durable event or the acknowledged message ID, never matching text or
+  confusing message sequences with event cursors. Older APIs without receipt IDs
+  retain their pre-existing acknowledgement/refresh presentation.
 - Failed sends remove the local row and retain existing draft/attachment recovery.
   An SSE delivery before the HTTP response must not produce a duplicate bubble.
 - Reduce every event in order and advance the authoritative reference immediately.
