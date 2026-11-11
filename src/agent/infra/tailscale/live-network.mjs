@@ -53,7 +53,10 @@ try {
   }
   assert.ok(user?.id, 'Headscale started and created test identity');
   const key = JSON.parse(docker('exec', 'tailnet-control', 'headscale', 'preauthkeys', 'create', '--user', String(user.id), '--reusable', '--expiration', '30m', '--output', 'json'));
-  writeFileSync(`${dir}/authkey`, key.key, { mode: 0o600 });
+  // docker cp retains the runner UID, which differs from the unprivileged image
+  // UID. This short-lived test-only key must be readable there without granting
+  // either container CHOWN/FOWNER capabilities. Never log or upload this file.
+  writeFileSync(`${dir}/authkey`, key.key, { mode: 0o644 });
   docker('run', '-d', '--name', 'tailnet-peer', '--network', 'tailnet-qualification', '--cap-drop', 'ALL',
     '--security-opt', 'no-new-privileges:true', '--entrypoint', 'sh',
     '-v', `${resolve('src/agent/infra/tailscale/private-mcp-fixture.mjs')}:/fixture.mjs:ro`,
@@ -61,12 +64,10 @@ try {
     'node /fixture.mjs & exec tailscaled --tun=userspace-networking --socket=/tmp/peer.sock --statedir=/tmp/ts --port=0');
   await pause(2000);
   docker('cp', `${dir}/authkey`, 'tailnet-peer:/tmp/authkey');
-  docker('exec', '--user=0', 'tailnet-peer', 'chmod', '644', '/tmp/authkey');
   docker('exec', 'tailnet-peer', 'tailscale', '--socket=/tmp/peer.sock', 'up', '--login-server=http://tailnet-control:8080', '--auth-key=file:/tmp/authkey', '--hostname=private-mcp', '--accept-dns=false', '--accept-routes=false', '--timeout=30s');
   docker('exec', 'tailnet-peer', 'tailscale', '--socket=/tmp/peer.sock', 'serve', '--bg', '--http=8080', 'http://127.0.0.1:8081');
   await control('status'); // Create the real gateway daemon without SaaS login.
   docker('cp', `${dir}/authkey`, 'tailscale-qualification:/tmp/authkey');
-  docker('exec', '--user=0', 'tailscale-qualification', 'chmod', '644', '/tmp/authkey');
   docker('exec', 'tailscale-qualification', 'tailscale', `--socket=/state/${id}/tailscaled.sock`, 'up',
     '--login-server=http://tailnet-control:8080', '--auth-key=file:/tmp/authkey', '--hostname=gateway-test',
     '--accept-dns=false', '--accept-routes=false', '--shields-up', '--timeout=30s');
