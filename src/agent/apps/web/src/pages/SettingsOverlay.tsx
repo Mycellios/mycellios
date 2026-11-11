@@ -574,6 +574,7 @@ export function SettingsOverlay({
                 ) : section === "agents" ? (
                   <MicosSettingsPanel
                     bots={shownBots}
+                    onBusyChange={setCompanionBusy}
                     onBusyMessageModeChange={onBusyMessageModeChange}
                     onOpen={onOpenMico ? (id) => leaveSettings(() => onOpenMico(id)) : undefined}
                     onSkills={onOpenSkills ? () => leaveSettings(onOpenSkills) : undefined}
@@ -666,6 +667,7 @@ export function SettingsOverlay({
                 {section === "voice" ? (
                   <>
                     <VoiceEntryPanel accountId={userId ?? undefined} previewBotId={shownBots[0]?.id}
+                      onModels={() => leaveSettings(() => onSectionChange("models"))}
                       spaceId={space?.id ?? currentSpaceId}
                       onOpen={onOpenVoice ? () => leaveSettings(onOpenVoice) : undefined} />
                     <Disclosure summary={t`Connected voice services`} className="rk-settings-details"

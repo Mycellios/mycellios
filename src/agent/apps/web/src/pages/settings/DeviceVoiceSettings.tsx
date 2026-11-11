@@ -1,15 +1,16 @@
 import { useLingui } from "@lingui/react/macro";
 import type { LocalVoiceModelKind } from "@rakazo/contracts";
 import { Button, Label, OptionSelect, Switch } from "@rakazo/ui-web";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";
 import { setGeneralPreferences, useGeneralPreferences, type GeneralPreferences } from "../../lib/general-preferences";
 import { UI_LOCALES, UI_LOCALE_LABELS } from "../../lib/ui-locale";
 import { speaker } from "../../lib/tts";
+import { errorText } from "../../lib/user-error";
 
-export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
-  accountId?: string; previewBotId?: string; spaceId?: string | null;
+export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels }: {
+  accountId?: string; previewBotId?: string; spaceId?: string | null; onModels?: () => void;
 }) {
   const { t, i18n } = useLingui(); const id = useId(); const value = useGeneralPreferences();
   const native = desktopBridge()?.localVoice;
@@ -18,25 +19,46 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
   const [error, setError] = useState("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [previewing, setPreviewing] = useState(false);
-  useEffect(() => () => {
-    if (speaker.state.messageId === id) speaker.stop();
+  const previewGeneration = useRef(0);
+  const previewRunning = useRef(false);
+  useEffect(() => {
+    setPreviewing(false);
+    setError("");
+    return () => {
+      previewGeneration.current++;
+      previewRunning.current = false;
+      if (speaker.state.messageId === id) speaker.stop();
+    };
   }, [id, accountId, previewBotId, spaceId]);
+  function stopPreview() {
+    previewGeneration.current++;
+    previewRunning.current = false;
+    if (speaker.state.messageId === id) speaker.stop();
+    setPreviewing(false);
+  }
   async function previewNetworkVoice() {
-    if (!previewBotId || previewing) return;
+    if (!previewBotId || previewRunning.current) return;
     const language = (value.dictationLanguage === "auto" ? i18n.locale : value.dictationLanguage).split("-")[0];
     if (language !== "en" && language !== "es") {
       setError(t`Choose Spanish or English in Dictation language to preview network voice.`);
       return;
     }
     setError("");
+    previewRunning.current = true;
+    const generation = ++previewGeneration.current;
     setPreviewing(true);
     try {
       const failure = await speaker.speak(language === "es" ? "Hola, esta es la voz de Mycellios." : "Hello, this is Mycellios voice.", {
         networkLanguage: language, botId: previewBotId, spaceId, messageId: id, speed: value.speechSpeed,
       });
-      if (failure) setError(failure);
+      if (failure && generation === previewGeneration.current) setError(failure);
+    } catch (failure) {
+      if (generation === previewGeneration.current) setError(errorText(failure));
     } finally {
-      setPreviewing(false);
+      if (generation === previewGeneration.current) {
+        previewRunning.current = false;
+        setPreviewing(false);
+      }
     }
   }
   useEffect(() => {
@@ -54,7 +76,11 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
     return () => { live = false; window.clearInterval(timer); };
   }, [native, operation, status?.preparing]);
   function save(patch: Partial<GeneralPreferences>) {
-    try { setGeneralPreferences(patch); setError(""); } catch { setError(t`Could not save this preference.`); }
+    try {
+      setGeneralPreferences(patch);
+      if (patch.speechEngine !== undefined || patch.networkSpeechAccount !== undefined || patch.dictationLanguage !== undefined) stopPreview();
+      setError("");
+    } catch { setError(t`Could not save this preference.`); }
   }
   async function changeModel(kind: LocalVoiceModelKind | "both", remove = false) {
     if (!native || operation) return;
@@ -113,7 +139,7 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
     {networkSelected && <SettingsGroup>
       <SettingsRow label="Kokoro" description={t`Preview uses your Mycellios credits.`}
         control={<Button variant="outline" size="sm" disabled={!previewBotId}
-          onClick={() => { if (previewing) { if (speaker.state.messageId === id) speaker.stop(); } else void previewNetworkVoice(); }}>{previewing ? t`Stop` : t`Listen`}</Button>} />
+          onClick={() => { if (previewRunning.current) stopPreview(); else void previewNetworkVoice(); }}>{previewing ? t`Stop` : t`Listen`}</Button>} />
     </SettingsGroup>}
     <SettingsGroup title={t`Dictation`}>
       {native && (separateModels
@@ -136,6 +162,12 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
         options={[0.75, 1, 1.25, 1.5, 2].map(speed => ({ value: String(speed), label: `${speed}×` }))}
         onValueChange={speed => save({ speechSpeed: Number(speed) })} />} />
     </SettingsGroup>
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {error && <div className="space-y-3">
+      <p role="alert" className="text-sm text-destructive">{error}</p>
+      {networkSelected && <div className="flex flex-wrap gap-2">
+        {onModels && <Button size="sm" variant="outline" onClick={onModels}>{t`Models and connections`}</Button>}
+        {native && <Button size="sm" variant="outline" onClick={() => save({ speechEngine: "local", networkSpeechAccount: "" })}>{t`Use local voice`}</Button>}
+      </div>}
+    </div>}
   </div>;
 }

@@ -269,6 +269,22 @@ export function normalizeRunError(
   if (trimmed === INTERNAL_RUN_ERROR) {
     return { summary: translate("Mycellios encountered an internal error."), details };
   }
+  if (trimmed === "This user and Space are not authorized to use the server's native agents.") {
+    return {
+      summary: translate("This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings."),
+      details,
+      recovery: "computer",
+    };
+  }
+  if (trimmed === "Install OpenCode on the computer running this server first." ||
+      /^Install and sign in to (?:codex|claude|acp) on the computer running this server first\.$/.test(trimmed) ||
+      trimmed === "The configured native agent executable is unavailable. Correct its path or remove the override.") {
+    return {
+      summary: translate("The native agent is not available on this computer. Check its installation and Mico settings."),
+      details,
+      recovery: "computer",
+    };
+  }
   if (trimmed === "Bot has no computer")
     return {
       summary: translate(

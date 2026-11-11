@@ -10220,3 +10220,54 @@ msgstr "The phone will need to sign in again. Your conversations stay in your ac
 
 msgid "Connected providers use their own account."
 msgstr "Connected providers use their own account."
+
+msgid "Customize by Mico"
+msgstr "Customize by Mico"
+
+msgid "Micos follow the default unless you choose otherwise."
+msgstr "Micos follow the default unless you choose otherwise."
+
+msgid "Search Micos…"
+msgstr "Search Micos…"
+
+msgid "No Micos match your search."
+msgstr "No Micos match your search."
+
+msgid "Your Mycellios key was rejected. Reconnect it in Models."
+msgstr "Your Mycellios key was rejected. Reconnect it in Models."
+
+msgid "You do not have enough Mycellios credits for this reply."
+msgstr "You do not have enough Mycellios credits for this reply."
+
+msgid "Mycellios network voice is busy. Try again later or choose local voice."
+msgstr "Mycellios network voice is busy. Try again later or choose local voice."
+
+msgid "Mycellios network voice took too long. Try again later or choose local voice."
+msgstr "Mycellios network voice took too long. Try again later or choose local voice."
+
+msgid "Mycellios returned invalid speech audio."
+msgstr "Mycellios returned invalid speech audio."
+
+msgid "Mycellios network voice is unavailable. Try again later or choose local voice."
+msgstr "Mycellios network voice is unavailable. Try again later or choose local voice."
+
+msgid "Use local voice"
+msgstr "Use local voice"
+
+msgid "Your Mycellios connection cannot use this voice model. Check its access in Models."
+msgstr "Your Mycellios connection cannot use this voice model. Check its access in Models."
+
+msgid "Model · {modelName}"
+msgstr "Model · {modelName}"
+
+msgid "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings."
+msgstr "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings."
+
+msgid "The native agent is not available on this computer. Check its installation and Mico settings."
+msgstr "The native agent is not available on this computer. Check its installation and Mico settings."
+
+msgid "Connect your Mycellios account in Models to use network voice."
+msgstr "Connect your Mycellios account in Models to use network voice."
+
+msgid "Your Mycellios connection could not be read. Open Models to check it."
+msgstr "Your Mycellios connection could not be read. Open Models to check it."

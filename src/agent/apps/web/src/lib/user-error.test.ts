@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { authErrorText, errorText } from "./user-error";
+import { authErrorText, errorText, voiceAccountErrorText } from "./user-error";
+
+it.each([
+  ["NETWORK_VOICE_KEY_REJECTED", "Your Mycellios key was rejected. Reconnect it in Models."],
+  ["NETWORK_VOICE_ACCESS_DENIED", "Your Mycellios connection cannot use this voice model. Check its access in Models."],
+  ["NETWORK_VOICE_CREDITS", "You do not have enough Mycellios credits for this reply."],
+  ["NETWORK_VOICE_BUSY", "Mycellios network voice is busy. Try again later or choose local voice."],
+  ["NETWORK_VOICE_TIMEOUT", "Mycellios network voice took too long. Try again later or choose local voice."],
+  ["NETWORK_VOICE_UNAVAILABLE", "Mycellios network voice is unavailable. Try again later or choose local voice."],
+  ["NETWORK_VOICE_INVALID_AUDIO", "Mycellios returned invalid speech audio."],
+  ["NETWORK_VOICE_NOT_CONNECTED", "Connect your Mycellios account in Models to use network voice."],
+  ["NETWORK_VOICE_CONNECTION_UNAVAILABLE", "Your Mycellios connection could not be read. Open Models to check it."],
+])("uses local copy for %s instead of an upstream message", (code, expected) => {
+  expect(voiceAccountErrorText({ code, error: "provider details" })).toBe(expected);
+});
 
 describe("integration errorText", () => {
   it("explains server setup without a provider JSON dump", () => {

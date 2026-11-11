@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro";
-import { isVoiceAccountErrorCode } from "@rakazo/contracts";
+import { isNetworkVoiceErrorCode, isVoiceAccountErrorCode } from "@rakazo/contracts";
 import type { CredentialField } from "@rakazo/core";
 import { authErrorMessage, MAX_PASSWORD_LENGTH, userErrorMessage } from "@rakazo/core";
 
@@ -18,6 +18,19 @@ export function errorText(error: unknown, fallback = t`Something went wrong. Try
 /** Text for an RPC error or `/api/voice` body whose code says the voice account needs attention. */
 export function voiceAccountErrorText(error: unknown): string | undefined {
   const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+  if (isNetworkVoiceErrorCode(code)) {
+    switch (code) {
+      case "NETWORK_VOICE_KEY_REJECTED": return t`Your Mycellios key was rejected. Reconnect it in Models.`;
+      case "NETWORK_VOICE_ACCESS_DENIED": return t`Your Mycellios connection cannot use this voice model. Check its access in Models.`;
+      case "NETWORK_VOICE_CREDITS": return t`You do not have enough Mycellios credits for this reply.`;
+      case "NETWORK_VOICE_BUSY": return t`Mycellios network voice is busy. Try again later or choose local voice.`;
+      case "NETWORK_VOICE_TIMEOUT": return t`Mycellios network voice took too long. Try again later or choose local voice.`;
+      case "NETWORK_VOICE_INVALID_AUDIO": return t`Mycellios returned invalid speech audio.`;
+      case "NETWORK_VOICE_NOT_CONNECTED": return t`Connect your Mycellios account in Models to use network voice.`;
+      case "NETWORK_VOICE_CONNECTION_UNAVAILABLE": return t`Your Mycellios connection could not be read. Open Models to check it.`;
+      case "NETWORK_VOICE_UNAVAILABLE": return t`Mycellios network voice is unavailable. Try again later or choose local voice.`;
+    }
+  }
   if (!isVoiceAccountErrorCode(code)) return undefined;
   return code === "VOICE_OUT_OF_CREDIT"
     ? t`Your voice provider is out of credit.`
