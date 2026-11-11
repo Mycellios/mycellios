@@ -21,7 +21,7 @@ import type {
   VoiceCredential,
   VoiceStatus,
 } from "@rakazo/contracts";
-import { SettingsScopeSchema } from "@rakazo/contracts";
+import { isNetworkVoiceErrorCode, SettingsScopeSchema } from "@rakazo/contracts";
 import { toUtterances } from "@rakazo/core";
 import {
   deleteUnreferencedCredentialSecret,
@@ -505,10 +505,10 @@ export async function synthesizeVoice(
     try {
       token = (await ownedMycelliosConnection(deps, actor.userId))?.saved.apiKey;
     } catch {
-      throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Your Mycellios connection could not be read." });
+      throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Your Mycellios connection could not be read.", data: { voiceCode: "NETWORK_VOICE_CONNECTION_UNAVAILABLE" } });
     }
     if (!token) {
-      throw new ORPCError("CONFLICT", { message: "Connect your Mycellios account in Models to use network voice." });
+      throw new ORPCError("CONFLICT", { message: "Connect your Mycellios account in Models to use network voice.", data: { voiceCode: "NETWORK_VOICE_NOT_CONNECTED" } });
     }
     return renderNetworkSpeech(token, { text: input.text, language: input.networkLanguage, signal: input.signal });
   }
@@ -659,7 +659,7 @@ export function voiceAccountErrorStatus(code: VoiceAccountErrorCode) {
   return code === "VOICE_OUT_OF_CREDIT" ? 402 : 403;
 }
 
-function voiceHttpError(c: Context, error: unknown) {
+export function voiceHttpError(c: Context, error: unknown) {
   if (error instanceof IsolationError) {
     return c.json({ error: "Resource not found" }, 404);
   }
@@ -670,12 +670,15 @@ function voiceHttpError(c: Context, error: unknown) {
     const code = String(error.code ?? "BAD_REQUEST");
     const status =
       code === "UNAUTHORIZED" ? 401 :
+      code === "FORBIDDEN" ? 403 :
       code === "NOT_FOUND" ? 404 :
       code === "CONFLICT" ? 409 :
       code === "PAYMENT_REQUIRED" ? 402 :
       code === "BAD_GATEWAY" ? 502 :
       code === "SERVICE_UNAVAILABLE" ? 503 : 400;
-    return c.json({ error: error.message }, status);
+    const voiceCode = error.data && typeof error.data === "object" && "voiceCode" in error.data ? error.data.voiceCode : undefined;
+    const httpStatus = code === "TOO_MANY_REQUESTS" ? 429 : code === "GATEWAY_TIMEOUT" ? 504 : status;
+    return c.json({ error: error.message, ...(isNetworkVoiceErrorCode(voiceCode) ? { code: voiceCode } : {}) }, httpStatus);
   }
   if (error instanceof VoiceAccountError) {
     getLogger().warn("voice provider account rejected the request", {

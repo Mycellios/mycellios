@@ -99,6 +99,19 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: path.join(output, "settings-mobile.png"), animations: "disabled" });
+  const micos = page.getByTestId("mico-preferences-preview");
+  await expect(micos.getByRole("combobox", { name: "Messages while Investigación works" })).toBeHidden();
+  await micos.getByRole("button", { name: "Customize by Mico" }).click();
+  await micos.getByRole("textbox", { name: "Search Micos", exact: true }).fill("investigacion");
+  await expect(micos.getByRole("combobox", { name: "Messages while Mico 1 works", exact: true })).toHaveCount(0);
+  await micos.getByRole("combobox", { name: "Messages while Investigación works" }).click();
+  await page.getByRole("option", { name: "Current task", exact: true }).click();
+  await expect(micos.getByRole("combobox", { name: "Messages while Investigación works" })).toHaveText("Current task");
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await micos.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(output, "mico-preferences-mobile.png"), animations: "disabled" });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({ path: path.join(output, "mico-preferences-desktop.png"), animations: "disabled" });
   assert.deepEqual(errors, []);
   const result = { passed: true, realAccount: false, modelsCalled: false, microphoneUsed: false,
     checks: ["task draft retained across workspaces", "stable pin menu", "condition node saved through the real client", "routine canvas", "calendar modes", "usage filters", "unified marketplace", "help menu", "mobile light/dark layout", "dock floating mode and scoped opening", "mobile QR canvas", "settings mobile layout"] };

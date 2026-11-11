@@ -43,14 +43,23 @@ export async function renderNetworkSpeech(
       signal,
     });
   } catch {
-    throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Mycellios network voice is unavailable." });
+    if (signal.aborted && !input.signal?.aborted) {
+      throw new ORPCError("GATEWAY_TIMEOUT", { message: "Mycellios network voice took too long. Try again later or choose local voice.", data: { voiceCode: "NETWORK_VOICE_TIMEOUT" } });
+    }
+    throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Mycellios network voice is unavailable.", data: { voiceCode: "NETWORK_VOICE_UNAVAILABLE" } });
   }
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
-    if (response.status === 402) {
-      throw new ORPCError("PAYMENT_REQUIRED", { message: "You do not have enough Mycellios credits for this reply." });
+    if (response.status === 401 || response.status === 403) {
+      throw new ORPCError("FORBIDDEN", { message: "Your Mycellios key was rejected. Reconnect it in Models.", data: { voiceCode: "NETWORK_VOICE_KEY_REJECTED" } });
     }
-    throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Mycellios network voice is unavailable." });
+    if (response.status === 402) {
+      throw new ORPCError("PAYMENT_REQUIRED", { message: "You do not have enough Mycellios credits for this reply.", data: { voiceCode: "NETWORK_VOICE_CREDITS" } });
+    }
+    if (response.status === 429) {
+      throw new ORPCError("TOO_MANY_REQUESTS", { message: "Mycellios network voice is busy. Try again later or choose local voice.", data: { voiceCode: "NETWORK_VOICE_BUSY" } });
+    }
+    throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Mycellios network voice is unavailable.", data: { voiceCode: "NETWORK_VOICE_UNAVAILABLE" } });
   }
   try {
     const body = await readBoundedJsonResponse<{
@@ -64,6 +73,6 @@ export async function renderNetworkSpeech(
     const verified = verifiedSpeechEnvelope(content, text, options);
     return { bytes: Buffer.from(verified.audio.data, "base64"), mimeType: "audio/wav" };
   } catch {
-    throw new ORPCError("BAD_GATEWAY", { message: "Mycellios returned invalid speech audio." });
+    throw new ORPCError("BAD_GATEWAY", { message: "Mycellios returned invalid speech audio.", data: { voiceCode: "NETWORK_VOICE_INVALID_AUDIO" } });
   }
 }

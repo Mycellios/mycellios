@@ -2,9 +2,11 @@ import { DeviceVoiceSettings } from "./DeviceVoiceSettings";
 import { MobileSessions } from "./MobileSessions";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, BusyMessageMode } from "@rakazo/contracts";
-import { BotAvatar, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, OptionSelect } from "@rakazo/ui-web";
+import { BotAvatar, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, OptionSelect } from "@rakazo/ui-web";
+import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 import { ServerLinkCode } from "../../components/ServerLinkCode";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { settingsMatch } from "./navigation";
 import { MobileInstallOffer, mobileInstallUrl } from "../../components/MobileInstallOffer";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { SkillLibrarySettings } from "../SkillLibrarySettings";
@@ -15,23 +17,31 @@ export function MicosSettingsPanel({
   onOpen,
   onModels,
   onBusyMessageModeChange,
+  onBusyChange,
 }: {
   bots?: Bot[];
   onOpen?: (id: string) => void;
   onSkills?: () => void;
   onModels?: () => void;
   onBusyMessageModeChange?: (id: string, value: BusyMessageMode | null) => Promise<void>;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const { t } = useLingui();
   const value = useGeneralPreferences();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [search, setSearch] = useState("");
+  useEffect(() => { onBusyChange?.(saving); }, [saving, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
+  const matchingBots = bots.filter(bot => settingsMatch({ label: bot.name }, search));
   const messageModes = [
     { value: "queue", label: t`Next turn` },
     { value: "steer", label: t`Current task` },
   ];
   async function saveMicoMessageMode(id: string, mode: string) {
-    if (!onBusyMessageModeChange || saving) return;
+    if (!onBusyMessageModeChange || savingRef.current) return;
+    savingRef.current = true;
     setError("");
     setSaving(true);
     try {
@@ -39,6 +49,7 @@ export function MicosSettingsPanel({
     } catch {
       setError(t`Could not save this preference.`);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -46,18 +57,22 @@ export function MicosSettingsPanel({
     <div className="rk-settings-panel space-y-6">
       <SettingsGroup title={t`Preferences`}>
         <SettingsRow label={t`Models and connections`} description={t`Choose a provider once. Your Micos use it automatically.`}
-          control={<Button variant="outline" size="sm" disabled={!onModels} onClick={onModels}>{t`Manage`}</Button>} />
+          control={<Button variant="outline" size="sm" disabled={!onModels || saving} onClick={onModels}>{t`Manage`}</Button>} />
         <SettingsRow label={t`Messages while a Mico works`} description={t`Default on this device. Each Mico can follow it or use its own preference.`}
           control={<OptionSelect aria-label={t`Messages while a Mico works`} value={value.busyMessageMode}
-            className="w-48 max-w-full" options={messageModes}
+            className="w-48 max-w-full" options={messageModes} disabled={saving}
             onValueChange={busyMessageMode => { try { setGeneralPreferences({ busyMessageMode: busyMessageMode as "queue" | "steer" }); setError(""); } catch { setError(t`Could not save this preference.`); } }} />} />
       </SettingsGroup>
-      <SettingsGroup title={t`Your Micos`}>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <Disclosure summary={t`Customize by Mico`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm font-medium">
+      <p className="pb-3 text-sm text-muted-foreground">{t`Micos follow the default unless you choose otherwise.`}</p>
+      {bots.length > 5 && <Input className="mb-3" aria-label={t`Search Micos`} placeholder={t`Search Micos…`} value={search} onChange={event => setSearch(event.target.value)} disabled={saving} />}
+      <SettingsGroup>
         {bots.length ? (
-          bots.map((bot) => (
+          matchingBots.map((bot) => (
             <SettingsRow
               key={bot.id}
-              label={<span className="flex items-center gap-3"><BotAvatar color={bot.color} size={28} />{bot.name}</span>}
+              label={<span className="flex min-w-0 items-center gap-3"><span className="shrink-0"><BotAvatar color={bot.color} size={28} /></span><span className="min-w-0 break-words">{bot.name}</span></span>}
               control={<div className="flex flex-wrap items-center gap-2">
                 {onBusyMessageModeChange && <OptionSelect
                   aria-label={t`Messages while ${bot.name} works`}
@@ -66,7 +81,7 @@ export function MicosSettingsPanel({
                   disabled={saving}
                   onValueChange={mode => void saveMicoMessageMode(bot.id, mode)}
                 />}
-                <Button variant="outline" size="sm" disabled={!onOpen} onClick={() => onOpen?.(bot.id)}>
+                <Button variant="outline" size="sm" disabled={!onOpen || saving} onClick={() => onOpen?.(bot.id)}>
                   {t`Manage`}
                 </Button>
               </div>}
@@ -76,8 +91,9 @@ export function MicosSettingsPanel({
           <p className="px-4 py-3 text-sm text-muted-foreground">{t`No Micos in this space.`}</p>
         )}
       </SettingsGroup>
+      {bots.length > 0 && matchingBots.length === 0 && <p role="status" className="py-3 text-sm text-muted-foreground">{t`No Micos match your search.`}</p>}
+      </Disclosure>
       <SkillLibrarySettings />
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }
@@ -150,13 +166,13 @@ export function MobileSettingsPanel({ accountId }: { accountId?: string }) {
   );
 }
 
-export function VoiceEntryPanel({ onOpen, accountId, previewBotId, spaceId }: {
-  onOpen?: () => void; accountId?: string; previewBotId?: string; spaceId?: string | null;
+export function VoiceEntryPanel({ onOpen, accountId, previewBotId, spaceId, onModels }: {
+  onOpen?: () => void; accountId?: string; previewBotId?: string; spaceId?: string | null; onModels?: () => void;
 }) {
   const { t } = useLingui();
   return (
     <div className="rk-general-settings mb-6">
-      <DeviceVoiceSettings accountId={accountId} previewBotId={previewBotId} spaceId={spaceId} />
+      <DeviceVoiceSettings accountId={accountId} previewBotId={previewBotId} spaceId={spaceId} onModels={onModels} />
       {onOpen && <SettingsGroup title={t`Voice conversation`}>
         <SettingsRow
           label={t`Talk with your Mico`}

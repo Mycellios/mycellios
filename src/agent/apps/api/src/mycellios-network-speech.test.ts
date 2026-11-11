@@ -66,3 +66,17 @@ it("rejects invalid speech bytes and reports insufficient credits without retryi
     .rejects.toMatchObject({ code: "PAYMENT_REQUIRED" });
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
+
+it.each([
+  [401, "FORBIDDEN", "NETWORK_VOICE_KEY_REJECTED"],
+  [403, "FORBIDDEN", "NETWORK_VOICE_KEY_REJECTED"],
+  [402, "PAYMENT_REQUIRED", "NETWORK_VOICE_CREDITS"],
+  [429, "TOO_MANY_REQUESTS", "NETWORK_VOICE_BUSY"],
+  [503, "SERVICE_UNAVAILABLE", "NETWORK_VOICE_UNAVAILABLE"],
+])("classifies HTTP %i without disclosing the upstream body or repeating the charge", async (status, code, voiceCode) => {
+  const fetcher = vi.fn<typeof fetch>(async () => new Response("private-provider-body token=do-not-expose", { status: Number(status) }));
+  const failure = await renderNetworkSpeech("private-key", { text, language: "es" }, fetcher).catch(error => error);
+  expect(failure).toMatchObject({ code, data: { voiceCode } });
+  expect(failure.message).not.toMatch(/private|token=/);
+  expect(fetcher).toHaveBeenCalledOnce();
+});
