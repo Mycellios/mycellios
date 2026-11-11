@@ -21,17 +21,17 @@ test("Cadencia opens without Desktop, analyzes synthetic media and exports befor
   await expect(page.getByText("Demo sintetizada", { exact: true })).toBeVisible({
     timeout: 60_000,
   });
-  await expect(
-    page.getByRole("checkbox", { name: "Aplicar corte 4", exact: true }),
-  ).not.toBeChecked();
+  // Native codec availability changes tiny gaps (AAC here, Opus on Linux CI).
+  // Identify the sustained-vowel proposal by meaning, never its ordinal number.
+  const vowel = page.locator(".cd-cut").filter({ hasText: "Posible vocal alargada" });
+  await expect(vowel).toHaveCount(1);
+  await expect(vowel.getByRole("checkbox")).not.toBeChecked();
   await page.getByRole("button", { name: "Crear versión editada", exact: true }).click();
   const download = page.getByRole("link", { name: /Descargar (MP4|WebM|M4A)/ });
   await expect(download).toBeVisible({ timeout: 60_000 });
-  expect(
-    await page
-      .locator("video")
-      .evaluate((video) => Number.isFinite(video.duration) && video.duration < 10),
-  ).toBe(true);
+  await expect.poll(() => page.locator("video").evaluate(
+    video => Number.isFinite(video.duration) && video.duration < 10,
+  )).toBe(true);
   await testInfo.attach("cadencia-desktop", {
     body: await page.screenshot(),
     contentType: "image/png",
