@@ -4346,6 +4346,32 @@ msgstr "Resize panel"
 msgid "Restart to update"
 msgstr "Restart to update"
 
+#: src/components/DesktopUpdates.tsx
+msgid "End call to update"
+msgstr "End call to update"
+
+#: src/components/DesktopUpdates.tsx
+msgid "Install the update with your system installer, then reopen Mycellios."
+msgstr "Install the update with your system installer, then reopen Mycellios."
+
+#: src/components/DesktopUpdates.tsx
+#: src/pages/settings/UpdatesPanel.tsx
+msgid "Open installer"
+msgstr "Open installer"
+
+#: src/components/DesktopUpdates.tsx
+#: src/pages/settings/UpdatesPanel.tsx
+msgid "Opened the system installer. Restart Mycellios when it finishes."
+msgstr "Opened the system installer. Restart Mycellios when it finishes."
+
+#: src/components/DesktopUpdates.tsx
+msgid "Preparing the installer"
+msgstr "Preparing the installer"
+
+#: src/components/DesktopUpdates.tsx
+msgid "Update ready to install"
+msgstr "Update ready to install"
+
 #: src/components/InstructionSettings.tsx
 #: src/pages/shell/archived-chats.tsx
 msgid "Restore"

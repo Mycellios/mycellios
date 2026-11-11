@@ -6,6 +6,8 @@ type Ports = {
   state(): DesktopUpdateState; download(): Promise<DesktopUpdateState>;
   install(): Promise<DesktopUpdateState>; cancelInstall(): Promise<DesktopUpdateState>;
   busy(): boolean; prepare(): Promise<boolean>; relaunch(): Promise<void>;
+  /** Package-manager installs are explicit only; unattended installation stays off. */
+  installSupported?: boolean;
 };
 
 /** User-owned update choices. Every restart still requires a fresh idle and renderer check. */
@@ -18,11 +20,13 @@ export class UpdatePreferences {
   private waiting: "local_work" | "unsaved_work" | "update_download" | undefined;
   private failed = false;
   private deferredVersion: string | null = null;
+  private readonly installSupported: boolean;
   constructor(private ports: Ports) {
+    this.installSupported = ports.installSupported !== false;
     this.value = { channel: ports.packaged ? "stable" : "development", supported: ports.packaged && ports.allowed,
       autoDownload: true, autoInstall: false };
   }
-  preferences() { return { ...this.value }; }
+  preferences() { return { ...this.value, installSupported: this.installSupported }; }
   state(): DesktopUpdateState {
     return { ...this.ports.state(), relaunchPending: this.intent !== null, relaunchWaitingFor: this.waiting,
       relaunchError: this.failed, autoInstallEnabled: this.value.supported && this.value.autoInstall };
@@ -41,6 +45,8 @@ export class UpdatePreferences {
       if (!patch || typeof patch !== "object" || Array.isArray(patch) || Object.entries(patch).some(([key, value]) =>
         !["autoDownload", "autoInstall"].includes(key) || typeof value !== "boolean")) throw new Error("Invalid update preference");
       if (!this.value.supported) throw new Error("Updates are managed by this installation");
+      const choice = patch as { autoInstall?: boolean };
+      if (choice.autoInstall === true && !this.installSupported) throw new Error("This installation applies updates from the system installer");
       const next = { ...this.value, ...patch };
       await this.ports.write(JSON.stringify({ schema: 1, autoDownload: next.autoDownload, autoInstall: next.autoInstall }));
       this.value = next;
@@ -78,7 +84,7 @@ export class UpdatePreferences {
       if (this.ports.busy()) { this.waiting = "local_work"; return; }
       if (intent === "update") {
         const result = await this.ports.install();
-        if (result.message && !result.installPending) throw new Error("Update handoff failed");
+        if (result.message && !result.installPending && !result.handoffComplete) throw new Error("Update handoff failed");
       } else await this.ports.relaunch();
       if (revision === this.revision) { this.intent = null; this.waiting = undefined; }
     } catch {
