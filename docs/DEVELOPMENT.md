@@ -11,8 +11,11 @@ device. A known company network cannot be connected as personal to bypass policy
 
 The isolated gateway is `src/agent/infra/tailscale/gateway.mjs`, with an optional
 Docker recipe and Compose overlay beside it. It uses the public Tailscale device
-login flow, rather than claiming compatibility with another vendor's private
-OAuth registration. No Tailscale admin API token is required by Mycellios.
+login flow. Grok Bot uses the separate, public
+[Tailscale OAuth Apps flow](https://tailscale.com/blog/oauth-apps-ga). This release
+has no registered Mycellios OAuth App and does not implement that consent flow
+or automatically apply app-specific device posture. No Tailscale admin API token
+is required by this device-login implementation.
 
 For a deployment, build the gateway from the `src/agent` context and attach the
 optional Compose service to the same private Docker network as API and worker.

@@ -1,6 +1,6 @@
 # Status and evidence
 
-## Tailscale private MCP connections — qualification candidate, 2026-11-11
+## Tailscale private MCP connections — server release, 2026-11-11
 
 Conexiones has personal and company tailnet enrollment, explicit per-Mico network
 grants and an MCP network selector. Each user/Space/network uses a separate
@@ -38,6 +38,23 @@ missing pre-existing non-Tailscale settings; the focused Tailscale comparison
 passes and does not enable global private egress. No release or production
   capability follows from validation alone. See `DEVELOPMENT.md` and
   `specs/tailscale-connections/spec.md`.
+
+Server publication is independently recorded for main
+`c63f0aad06f41ba372a2de8281a6c470a0ddcf08` (PR #219), source tree
+`45626642bcbcf511c30a5fa3843e11c033d1a3e8`. API, worker and web were built from
+that integrated revision; web build `20261111083935` is publicly served. The
+private gateway is active without privileges or published ports, with the exact
+same source tree as its qualified CI image. Production runtime probes verified
+API/worker gateway configuration and access to the new tables with their existing
+database role. The additive migration, database backup, retained prior containers,
+backend/frontend deployment receipts and health checks passed. The final live
+permission matrix is run `42986840658`, including another actual member in the
+same Space, no upstream requests on denial and real device logout on revocation.
+This server release does not imply an updated installed Desktop renderer; Windows
+packaging/publication has its own revision-bound qualification and catalog.
+Enrollment uses official device login. It does not implement Grok Bot's
+[OAuth Apps onboarding](https://tailscale.com/blog/oauth-apps-ga), which requires
+a separately registered Mycellios OAuth App, or its app-specific posture policy.
 
 ## Desktop-owned Mico execution candidate - 2026-11-07
 
