@@ -105,6 +105,23 @@ try {
   await page.screenshot({ path: path.join(output, "completed-mobile.png"), animations: "disabled" });
   proof.scenarios.push("formatted reply completion preserves height and does not replay motion");
 
+  const quote = "La respuesta aparece mientras llega.\n\n> Una cita conserva su posición.";
+  await page.evaluate(text => {
+    window.__chatFlow.emit({ type: "run.started", runId: "quote-run", payload: { trigger: "user" } });
+    window.__chatFlow.emit({ type: "thread.progress", runId: "quote-run", payload: { text, streaming: true } });
+  }, quote);
+  await expect(page.locator(".rk-chat-markdown-streaming")).toHaveCount(1);
+  const quoteHeight = await page.locator('[data-message-id="progress:quote-run"]').evaluate(el => el.getBoundingClientRect().height);
+  await page.evaluate(text => {
+    window.__chatFlow.emit({ type: "thread.message.created", runId: "quote-run", payload: { messageId: "quote-final", role: "bot", blocks: [{ kind: "text", text }] } });
+    window.__chatFlow.emit({ type: "run.completed", runId: "quote-run", payload: {} });
+  }, quote);
+  await expect(page.locator(".rk-chat-markdown-streaming")).toHaveCount(0);
+  const quoteSettled = await page.locator('[data-message-id="quote-final"]').evaluate(el => el.getBoundingClientRect().height);
+  assert.ok(Math.abs(quoteHeight - quoteSettled) <= 2, "nested final-block spacing must not change at completion");
+  proof.quotedCompletion = { liveHeight: quoteHeight, finalHeight: quoteSettled };
+  proof.scenarios.push("quoted reply completion preserves nested final-block spacing");
+
   for (const [name, width, height, theme, reducedMotion] of [
     ["mobile-light", 390, 844, "light", "no-preference"],
     ["mobile-dark-reduced", 390, 844, "dark", "reduce"],
