@@ -13,6 +13,7 @@ import {
   isActive,
   isBackgroundRunTrigger,
   isRunTerminalEvent,
+  liveMessageComposing,
   mergeThreadHistory,
   observeToolEvent,
   prependThreadHistoryPage,
@@ -30,6 +31,12 @@ import {
 } from "@rakazo/core";
 
 const runTriggers = new Set<string>(RUN_TRIGGERS);
+
+/** First reply text and controls paint immediately, including after tool activity. */
+export function deferThreadProgressPresentation(snapshot: ThreadSnapshot | null, event: ProductEvent): boolean {
+  return event.type === "thread.progress" && Boolean(snapshot?.messages.some(message =>
+    message.id === progressMessageId(event) && liveMessageComposing(message.blocks)));
+}
 
 function runFromStartedEvent(event: ProductEvent, previous: Run | undefined): Run {
   const trigger = event.payload.trigger;

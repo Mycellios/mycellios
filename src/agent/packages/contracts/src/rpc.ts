@@ -543,6 +543,7 @@ export const appContract = {
         taskId: Id,
         runId: Id,
         seq: z.number().int(),
+        messageId: Id.optional(),
         runIds: z.array(Id).optional(),
       }),
     ),

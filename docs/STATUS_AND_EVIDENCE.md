@@ -1,5 +1,38 @@
 # Status and evidence
 
+## Conversation responsiveness candidate — 2026-11-11
+
+The candidate shows a local pending user message before send acknowledgement,
+scoped to account/Space/thread. Exact client nonces and acknowledged message
+IDs reconcile SSE-first and HTTP-first delivery; matching text is not used.
+Rejected sends retain existing draft recovery. Receipt message identity remains
+separate from the subscription's event cursor and transcript ordering is retained.
+Repeated Send presses are fenced
+before React commits. Queue/steering, permissions and model selection are retained.
+
+The authoritative snapshot still reduces every event immediately. Only repeated
+progress presentation is coalesced into animation frames; first progress,
+structural/terminal events, navigation and streaming preference changes flush
+without waiting for a frame. Stable reply-jump callbacks preserve memoized history
+rows. Short send/live-reply/control transitions respect reduced motion and do not
+replay streamed text on completion or take scroll ownership from a history reader.
+
+Local focused validation passed 285 tests. A browser fixture using the real
+Composer and Transcript passes delayed acknowledgement, delivery ordering,
+rejection, account/Space/thread isolation, mobile light/dark, reduced motion and
+history-scroll checks with synthetic events. In one Windows development-browser
+comparison over 123 identical events, immediate presentation requested 123 paints
+and frame presentation 64; React profiler render totals were approximately 1,153 ms
+and 461 ms. These are controlled UI measurements, not live model latency,
+production timing guarantees or installed Desktop qualification. Full suites
+remain paused. Remote validation and publication require separate evidence.
+
+The review compared [Rakazo conversation synchronization](https://github.com/elie222/rakazo/tree/v0.9.0/apps/web/src/pages/shell)
+and [OpenBot conversation UI](https://github.com/nightly-labs/openbot/tree/v0.67.1/packages/ui/src/features/conversation).
+The implementation uses existing Mycellios components without a new dependency,
+copied OpenBot implementation or an artificial typewriter backlog. See
+`specs/chat-fluidity/spec.md` and `scripts/verify-chat-fluidity.mjs` in the Agent workspace.
+
 ## Connector and approval hardening — upstream review, 2026-11-11
 
 The candidate collects explicitly named credentials in local MCP launch arguments

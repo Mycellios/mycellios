@@ -1,4 +1,7 @@
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
+import { createFramePublisher } from "../lib/frame-publisher";
+import { deferThreadProgressPresentation } from "../lib/thread-events";
+import { usePendingThreadSends } from "./shell/use-pending-thread-sends";
 import { DesktopCompanions } from "../components/DesktopCompanions";
 import { FloatingChatButton } from "../components/FloatingChatButton";
 import { getGeneralPreferences } from "../lib/general-preferences";
@@ -491,6 +494,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   );
   const streamResponsesRef = useRef(streamResponses);
   streamResponsesRef.current = streamResponses;
+  const [snapshotPublisher] = useState(() => createFramePublisher<ThreadSnapshot | null>(
+    next => setSnapshot(withLiveStreamingProgress(next, streamResponsesRef.current)),
+  ));
+  useEffect(() => () => snapshotPublisher.cancel(), [snapshotPublisher]);
   const showToolActivity = useSyncExternalStore(
     subscribeToolActivity,
     getToolActivityEnabled,
@@ -610,13 +617,13 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     }
   }
 
-  function commitSnapshot(next: ThreadSnapshot | null) {
+  function commitSnapshot(next: ThreadSnapshot | null, deferred = false) {
     snapshotRef.current = next;
-    setSnapshot(withLiveStreamingProgress(next, streamResponsesRef.current));
+    snapshotPublisher.publish(next, deferred);
   }
 
   useEffect(() => {
-    setSnapshot(withLiveStreamingProgress(snapshotRef.current, streamResponses));
+    snapshotPublisher.publish(snapshotRef.current);
   }, [streamResponses]);
 
   function commitComputer(next: ComputerStatus | null) {
@@ -1784,8 +1791,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           }
         }
       },
-      applyEvent: (event) =>
-        applyThreadEvent(event, commitSnapshot, commitComputer, snapshotRef, computerRef),
+      applyEvent: (event) => {
+        observePendingSend(event);
+        applyThreadEvent(event, commitSnapshot, commitComputer, snapshotRef, computerRef);
+      },
       onEvent: (event, initial) => {
         const currentBot = botsRef.current.find((bot) => bot.id === active.id);
         notifyBrowserForEvent(
@@ -1910,7 +1919,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       refresh: () => refreshGroupThread(groupId, threadSnapshotSignal(abort.signal)),
       currentSnapshot: () => snapshotRef.current,
       subscribe: (cursor, signal) => rpc.threads.subscribe({ groupId, cursor }, { signal }),
-      applyEvent: (event) =>
+      applyEvent: (event) => {
+        observePendingSend(event);
         applyThreadEvent(
           event,
           commitSnapshot,
@@ -1920,7 +1930,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           },
           snapshotRef,
           computerRef,
-        ),
+        );
+      },
       onEvent: (event, initial) => {
         notifyBrowserForEvent(
           event,
@@ -2333,6 +2344,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     : snapshot?.botId === active?.id
       ? snapshot
       : null;
+  const pendingSendScope = JSON.stringify([userId, currentSpaceId]);
+  const {
+    visible: pendingMessages, begin: beginPendingSend, accept: acceptPendingSend,
+    observe: observePendingSend, remove: removePendingSend,
+  } = usePendingThreadSends(pendingSendScope, activeSnapshot);
   // Keep the armed reply even when its parent leaves the loaded page: the
   // server resolves a paged-out target and degrades a deleted one to a plain
   // reply instead of failing the send.
@@ -2724,7 +2740,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     async (text: string, mentions: ComposerMention[], clientNonce: string, delivery?: "queue" | "steer") => {
       const initialBotTarget = activeBotId.current;
       const initialGroupTarget = activeGroupId.current;
-      if ((!initialBotTarget && !initialGroupTarget) || sending ||
+      if ((!initialBotTarget && !initialGroupTarget) || sendingRef.current ||
         (taskScope && activeSnapshot?.threadId !== taskScope.taskThreadId)) return false;
       const originThreadKey = initialGroupTarget ?? initialBotTarget;
       const attachments = attachmentsForThread(pendingAttachments, originThreadKey);
@@ -2752,6 +2768,12 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       setSending(true);
       setSendError(null);
       clearReadBoundary();
+      if (plan.shouldSend && activeSnapshot && !reroutedToGroup) {
+        beginPendingSend({
+          scope: pendingSendScope, threadId: activeSnapshot.threadId, nonce: clientNonce,
+          text: trimmed, attachments: attachments.map(attachment => attachment.file.name),
+        });
+      }
       const dropDelayedSetup = () => {
         // Only after successful engagement so a failed upload/send keeps the setup card.
         if (initialBotTarget && focusPromptBotIdRef.current === initialBotTarget) {
@@ -2760,6 +2782,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       };
       // Keep the draft cleared once any part of the submission is confirmed accepted.
       let accepted = false;
+      let messageAccepted = false;
       try {
         if (plan.shouldRunRoutines) {
           // Settle every run first so one that was accepted is never repeated.
@@ -2809,7 +2832,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           artifactIds.push(artifact.id);
         }
         if (groupTarget) {
-          await rpc.threads.send({
+          const sent = await rpc.threads.send({
             groupId: groupTarget,
             clientNonce,
             delivery,
@@ -2820,6 +2843,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             replyQuote: reroutedToGroup ? undefined : (activeReplyQuote ?? undefined),
           });
           accepted = true;
+          messageAccepted = true;
+          acceptPendingSend(clientNonce, sent.messageId);
         } else if (botTarget) {
           const sent = await rpc.threads.send({
             botId: botTarget,
@@ -2832,6 +2857,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
             replyQuote: activeReplyQuote ?? undefined,
           });
           accepted = true;
+          messageAccepted = true;
+          acceptPendingSend(clientNonce, sent.messageId);
           if (activeBotId.current === botTarget) {
             updateSnapshot((current) =>
               applyThreadSendReceipt(
@@ -2873,6 +2900,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         }
         return accepted;
       } finally {
+        if (!messageAccepted) removePendingSend(clientNonce);
         sendingRef.current = false;
         setSending(false);
       }
@@ -2881,6 +2909,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       activeReplyTarget?.id,
       activeReplyQuote,
       activeSnapshot?.threadId,
+      pendingSendScope,
+      beginPendingSend,
+      acceptPendingSend,
+      removePendingSend,
       taskScope,
       clearReply,
       flushPendingBrowserNotifications,
@@ -4387,6 +4419,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                   : undefined
               }
               transcript={transcript}
+              pendingMessages={pendingMessages}
               showToolActivity={showToolActivity}
               olderCursor={activeSnapshot?.olderCursor ?? null}
               unreadAfterSeq={
@@ -5164,14 +5197,15 @@ function firstThreadRoute(
 
 function applyThreadEvent(
   event: ProductEvent,
-  commitSnapshot: (next: ThreadSnapshot | null) => void,
+  commitSnapshot: (next: ThreadSnapshot | null, deferred?: boolean) => void,
   commitComputer: (next: ComputerStatus | null) => void,
   snapshotRef: MutableRefObject<ThreadSnapshot | null>,
   computerRef: MutableRefObject<ComputerStatus | null>,
 ) {
   if (isThreadSnapshotEvent(event)) {
+    const deferProgress = deferThreadProgressPresentation(snapshotRef.current, event);
     const next = reduceThreadSnapshot(snapshotRef.current, event);
-    commitSnapshot(next);
+    commitSnapshot(next, deferProgress);
   }
   if (isComputerStatusEvent(event)) {
     const next = reduceComputerStatus(computerRef.current, event);

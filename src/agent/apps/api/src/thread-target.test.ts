@@ -2991,10 +2991,11 @@ describe("sendThreadMessage", () => {
     );
 
     expect(result.seq).toBe(7);
+    expect(result.messageId).toBe("msg-1");
     expect(tx.event.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         type: "thread.message.created",
-        payload: expect.objectContaining({ messageId: "msg-1", seq: 7 }),
+        payload: expect.objectContaining({ messageId: "msg-1", seq: 7, clientNonce: "nonce-1" }),
       }),
     });
   });

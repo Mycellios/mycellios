@@ -13,6 +13,7 @@ import {
   computerPanelNeedsMaintenance,
   computerPanelNeedsScreen,
   computerTakeoverBlocked,
+  deferThreadProgressPresentation,
   isThreadSnapshotEvent,
   mergeThreadSnapshot,
   prependThreadMessagePage,
@@ -26,6 +27,15 @@ import {
 } from "./thread-events.js";
 
 describe("thread event reduction", () => {
+  it("paints first reply text immediately even when a tool already created the live row", () => {
+    const event = { id: "progress", spaceId: "workspace-1", threadId: "thread-1", botId: "bot-1",
+      runId: "run-1", type: "thread.progress", seq: 10, createdAt: "2026-11-11T00:00:00.000Z", payload: { text: "Hello" } } as ProductEvent;
+    expect(deferThreadProgressPresentation(snapshot([]), event)).toBe(false);
+    expect(deferThreadProgressPresentation(snapshot([message("progress:run-1", [{ kind: "progress", text: "Searching", activity: true }], 1)]), event)).toBe(false);
+    const shown = snapshot([message("progress:run-1", [{ kind: "progress", text: "Hello" }], 1)]);
+    expect(deferThreadProgressPresentation(shown, event)).toBe(true);
+    expect(deferThreadProgressPresentation(shown, { ...event, type: "run.completed" })).toBe(false);
+  });
   it("shows a committed direct send as queued before its snapshot refresh returns", () => {
     const initial = snapshot([message("user-1", [{ kind: "text", text: "Continue" }], 4)]);
 

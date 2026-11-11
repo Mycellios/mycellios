@@ -15,6 +15,19 @@
 
 # AGENTS.md
 
+- Conversation pending sends are local presentation scoped to account/Space/thread.
+  Match durable echoes by client nonce or acknowledged message ID, never by
+  text. Preserve existing draft/attachment recovery and nonce reuse on retries.
+  Send receipt message IDs are independent of event cursors; do not alter transcript
+  ordering or use a colliding sequence number to infer acknowledgement.
+  Coalesce only progress presentation to animation frames; reduce all events in
+  order and update the authoritative reference immediately. Flush structural,
+  terminal, navigation and preference changes without waiting for a frame.
+  New-reply/send/control motion must preserve reduced motion and history scroll
+  ownership. Run focused composer/thread/pending/frame tests and
+  `node scripts/verify-chat-fluidity.mjs --output=...` for actual browser components
+  with synthetic delivery/progress. This does not measure a live model's latency.
+
 - Production English messages with interpolated values must exist in
   `apps/web/src/locales/en/messages.po`; production macros omit development text.
   Verify compiled messages without a fallback in `i18n-catalog.test.ts`.
