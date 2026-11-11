@@ -3,6 +3,7 @@ import { authErrorText, errorText, voiceAccountErrorText } from "./user-error";
 
 it.each([
   ["NETWORK_VOICE_KEY_REJECTED", "Your Mycellios key was rejected. Reconnect it in Models."],
+  ["NETWORK_VOICE_ACCESS_DENIED", "Your Mycellios connection cannot use this voice model. Check its access in Models."],
   ["NETWORK_VOICE_CREDITS", "You do not have enough Mycellios credits for this reply."],
   ["NETWORK_VOICE_BUSY", "Mycellios network voice is busy. Try again later or choose local voice."],
   ["NETWORK_VOICE_TIMEOUT", "Mycellios network voice took too long. Try again later or choose local voice."],

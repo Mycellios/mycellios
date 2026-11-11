@@ -50,8 +50,11 @@ export async function renderNetworkSpeech(
   }
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       throw new ORPCError("FORBIDDEN", { message: "Your Mycellios key was rejected. Reconnect it in Models.", data: { voiceCode: "NETWORK_VOICE_KEY_REJECTED" } });
+    }
+    if (response.status === 403) {
+      throw new ORPCError("FORBIDDEN", { message: "Your Mycellios connection cannot use this voice model. Check its access in Models.", data: { voiceCode: "NETWORK_VOICE_ACCESS_DENIED" } });
     }
     if (response.status === 402) {
       throw new ORPCError("PAYMENT_REQUIRED", { message: "You do not have enough Mycellios credits for this reply.", data: { voiceCode: "NETWORK_VOICE_CREDITS" } });

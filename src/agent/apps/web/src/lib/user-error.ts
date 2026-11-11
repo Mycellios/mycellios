@@ -21,6 +21,7 @@ export function voiceAccountErrorText(error: unknown): string | undefined {
   if (isNetworkVoiceErrorCode(code)) {
     switch (code) {
       case "NETWORK_VOICE_KEY_REJECTED": return t`Your Mycellios key was rejected. Reconnect it in Models.`;
+      case "NETWORK_VOICE_ACCESS_DENIED": return t`Your Mycellios connection cannot use this voice model. Check its access in Models.`;
       case "NETWORK_VOICE_CREDITS": return t`You do not have enough Mycellios credits for this reply.`;
       case "NETWORK_VOICE_BUSY": return t`Mycellios network voice is busy. Try again later or choose local voice.`;
       case "NETWORK_VOICE_TIMEOUT": return t`Mycellios network voice took too long. Try again later or choose local voice.`;

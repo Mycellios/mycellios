@@ -11086,6 +11086,9 @@ msgstr "La voz de la red Mycellios no está disponible. Prueba más tarde o elig
 msgid "Use local voice"
 msgstr "Usar voz local"
 
+msgid "Your Mycellios connection cannot use this voice model. Check its access in Models."
+msgstr "Tu conexión de Mycellios no tiene acceso a este modelo de voz. Revisa sus permisos en Modelos."
+
 msgid "Model · {modelName}"
 msgstr "Modelo · {modelName}"
 

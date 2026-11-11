@@ -10228,6 +10228,9 @@ msgstr "Mycellios network voice is unavailable. Try again later or choose local 
 msgid "Use local voice"
 msgstr "Use local voice"
 
+msgid "Your Mycellios connection cannot use this voice model. Check its access in Models."
+msgstr "Your Mycellios connection cannot use this voice model. Check its access in Models."
+
 msgid "Model · {modelName}"
 msgstr "Model · {modelName}"
 
