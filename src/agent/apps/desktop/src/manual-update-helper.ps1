@@ -5,6 +5,39 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+[ComImport,Guid("73db1241-1e85-4581-8e4f-a81e1d0f8c57"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IMycelliosAttachment {
+ void SetClientTitle([MarshalAs(UnmanagedType.LPWStr)]string value);
+ void SetClientGuid(ref Guid value);
+ void SetLocalPath([MarshalAs(UnmanagedType.LPWStr)]string value);
+ void SetFileName([MarshalAs(UnmanagedType.LPWStr)]string value);
+ void SetSource([MarshalAs(UnmanagedType.LPWStr)]string value);
+ void SetReferrer([MarshalAs(UnmanagedType.LPWStr)]string value);
+ [PreserveSig]int CheckPolicy();
+ [PreserveSig]int Prompt(IntPtr window,int kind,out int action);
+ [PreserveSig]int Save();
+}
+public static class MycelliosAttachment {
+ public static void Approve(string file,string source,IntPtr owner) {
+  var attachment=(IMycelliosAttachment)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("4125dd96-e03a-4103-8f70-e0597d803b9c")));
+  try {
+   var client=new Guid("1e433c96-ef84-4b21-b6c9-4a8615e0d472");
+   attachment.SetClientGuid(ref client);attachment.SetClientTitle("Mycellios");
+   attachment.SetLocalPath(file);attachment.SetFileName(System.IO.Path.GetFileName(file));
+   if(!String.IsNullOrEmpty(source))attachment.SetSource(source);
+   // Windows may scan or quarantine the attachment and update its evidence.
+   int saved=attachment.Save();
+   if(saved!=0){Marshal.ThrowExceptionForHR(saved);throw new InvalidOperationException("Windows did not validate the installer");}
+   int policy=attachment.CheckPolicy();
+   if(policy==1){
+    if(owner==IntPtr.Zero)throw new InvalidOperationException("Open Mycellios to review the Windows file check before restarting");
+    int action;int prompt=attachment.Prompt(owner,2,out action);
+    if(prompt!=0){Marshal.ThrowExceptionForHR(prompt);throw new OperationCanceledException("Windows file check was not approved");}
+    if(action!=2)throw new OperationCanceledException("Windows file check was cancelled");
+   }else if(policy!=0){Marshal.ThrowExceptionForHR(policy);throw new InvalidOperationException("Windows blocked the installer");}
+  }finally{Marshal.FinalReleaseComObject(attachment);}
+ }
+}
 public static class MycelliosUpdatePath {
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window,int command);
  [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
@@ -44,7 +77,8 @@ $installerLock=$null
 $updateLock=$null
 $canReopen=$false
 $verifiedVersion=$null
-function Progress([string]$value){$script:phase=$value;@{phase=$value}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8}
+$window=$null
+function Progress([string]$value){$script:phase=$value;$receipt=@{phase=$value;atUtc=(Get-Date).ToUniversalTime().ToString('o');pid=$PID};$receipt|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8;$receipt|ConvertTo-Json -Compress|Add-Content -LiteralPath (Join-Path $job 'progress-history.jsonl') -Encoding UTF8}
 function Write-Result($receipt){
  $temporary=$result+'.tmp'
  $receipt|ConvertTo-Json|Set-Content -LiteralPath $temporary -Encoding UTF8
@@ -101,6 +135,7 @@ function Reopen([switch]$Confirm) {
    if($receipt.version -eq $config.version -and $receipt.pid -eq $app.Id -and !$app.HasExited){return}
   }
   if($app.HasExited){throw 'The installed app exited before confirming startup'}
+  if($window){[Windows.Forms.Application]::DoEvents()}
   Start-Sleep -Milliseconds 250
  } while((Get-Date) -lt $deadline)
  throw 'The installed app did not confirm startup'
@@ -120,8 +155,33 @@ try {
  $installerLock=[IO.File]::Open($installer,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
  Installer-Valid
  $old=Get-Process -Id $config.oldPid -ErrorAction SilentlyContinue
+ $owner=[IntPtr]::Zero
  if($old){
   if(!([MycelliosUpdatePath]::Canonical($old.Path)).Equals($executable,[StringComparison]::OrdinalIgnoreCase)){throw 'The previous process identity changed'}
+  $owner=$old.MainWindowHandle
+ }
+ # Apply Windows attachment policy and any required owner confirmation BEFORE
+ # acknowledging shutdown. A rejected, cancelled or unavailable check keeps
+ # the app open. Never remove the Internet zone or auto-approve a prompt.
+ Progress 'checking-installer'
+ $source=$null
+ $zone=Get-Content -LiteralPath ($installer+':Zone.Identifier') -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+ if($zone){
+  $zoneNumber=[regex]::Match($zone,'(?m)^ZoneId=([0-4])\s*$')
+  $origin=[regex]::Match($zone,'(?m)^HostUrl=([^\r\n]+)')
+  if(!$origin.Success -or !$zoneNumber.Success){throw 'The installer download origin is missing; download it again'}
+  $source=$origin.Groups[1].Value
+  $sourceUri=[Uri]$source
+  $localOrigin=$zoneNumber.Groups[1].Value -eq '0' -and $sourceUri.IsFile -and ([MycelliosUpdatePath]::Canonical($sourceUri.LocalPath)).Equals($installer,[StringComparison]::OrdinalIgnoreCase)
+  if(($sourceUri.Scheme -ne 'https' -and !$localOrigin) -or $sourceUri.UserInfo){throw 'Invalid installer download origin'}
+ }else{throw 'The installer download origin is missing; download it again'}
+ # Windows trust services are allowed to update ADS evidence or quarantine a
+ # file. Release only its verification handle, then re-open and hash again.
+ $installerLock.Dispose();$installerLock=$null
+ [MycelliosAttachment]::Approve($installer,$source,$owner)
+ $installerLock=[IO.File]::Open($installer,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+ Installer-Valid
+ if($old){
   $started=$old.StartTime.ToUniversalTime().ToFileTimeUtc()
   Progress 'waiting-for-app'
   $deadline=(Get-Date).AddMinutes(5)
@@ -152,10 +212,8 @@ try {
  Progress 'starting-installer'
  # Wait for NSIS itself. Start-Process -Wait waits for its whole process tree,
  # which can keep the helper in "installing" after the installer has exited.
- # Keep normal Windows downloaded-file checks visible. Hiding this launch can
- # leave the app closed behind a shell/security prompt with no installer PID.
- # Shell checks need a real visible owner, not a hidden console or the desktop
- # pseudo-window. Keep downloaded-file checks and the verification handle.
+ # File checks were approved before shutdown. Keep a responsive progress window
+ # while the already-verified per-user installer runs and the app reopens.
  Progress 'preparing-installer-ui'
  Add-Type -AssemblyName System.Windows.Forms
  $window=New-Object Windows.Forms.Form
@@ -164,29 +222,32 @@ try {
  $window.StartPosition=[Windows.Forms.FormStartPosition]::CenterScreen
  $window.ControlBox=$false
  $label=New-Object Windows.Forms.Label
- $label.Text=('Windows est'+[char]0xE1+' comprobando el instalador. Mycellios se abrir'+[char]0xE1+' al terminar.')
+ $label.Text=('Instalando la actualizaci'+[char]0xF3+'n. Mycellios se abrir'+[char]0xE1+' al terminar.')
  $label.Dock=[Windows.Forms.DockStyle]::Fill
  $label.Padding=New-Object Windows.Forms.Padding(20)
  $window.Controls.Add($label)
- try {
-  $window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()
+ $window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()
   # The hidden worker's STARTUPINFO can suppress the first ShowWindow call.
   [MycelliosUpdatePath]::ShowWindow($window.Handle,5)|Out-Null
   [Windows.Forms.Application]::DoEvents()
-  Progress 'waiting-for-windows'
   $start=New-Object Diagnostics.ProcessStartInfo
   $start.FileName=$installer;$start.Arguments='/S';$start.WorkingDirectory=$env:TEMP
-  $start.UseShellExecute=$true;$start.WindowStyle=[Diagnostics.ProcessWindowStyle]::Normal
-  $start.ErrorDialog=$true;$start.ErrorDialogParentHandle=$window.Handle
+  # Attachment Services already enforced policy, scanning and any owner prompt;
+  # the same bytes were rehashed under a read lock. Do not repeat the shell's
+  # hidden file-check UI after the app has quit. No unchecked fallback exists.
+  $start.UseShellExecute=$false;$start.WindowStyle=[Diagnostics.ProcessWindowStyle]::Normal
   $setup=[Diagnostics.Process]::Start($start)
- } finally {$window.Close();$window.Dispose()}
  $null=$setup.Handle
  Progress 'installing'
- if(!$setup.WaitForExit(600000)){
-  # An installer still running may own files. Leave it and its recovery data alone.
-  $canReopen=$false
-  Progress 'installer-timeout'
-  throw 'The installer is still running after ten minutes'
+ $installDeadline=(Get-Date).AddMinutes(10)
+ while(!$setup.WaitForExit(250)){
+  [Windows.Forms.Application]::DoEvents()
+  if((Get-Date) -gt $installDeadline){
+   # An installer still running may own files. Leave it and its recovery data alone.
+   $canReopen=$false
+   Progress 'installer-timeout'
+   throw 'The installer is still running after ten minutes'
+  }
  }
  $setup.Refresh()
  if($setup.ExitCode -ne 0){throw 'The installer did not finish successfully'}
@@ -208,4 +269,4 @@ try {
  } elseif(!$verifiedVersion -and $canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
  Write-Result @{installed=($null -ne $verifiedVersion);version=$verifiedVersion;reopened=$false;phase=$failedPhase;error=$_.Exception.Message;backup=$backup}
  exit 1
-} finally {if($installerLock){$installerLock.Dispose()};if($updateLock){$updateLock.Dispose()}}
+} finally {if($window){$window.Close();$window.Dispose()};if($installerLock){$installerLock.Dispose()};if($updateLock){$updateLock.Dispose()}}
