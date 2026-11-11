@@ -1,7 +1,9 @@
 import { DeviceVoiceSettings } from "./DeviceVoiceSettings";
+import { MobileSessions } from "./MobileSessions";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, BusyMessageMode } from "@rakazo/contracts";
-import { BotAvatar, Button, OptionSelect } from "@rakazo/ui-web";
+import { BotAvatar, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, OptionSelect } from "@rakazo/ui-web";
+import { ServerLinkCode } from "../../components/ServerLinkCode";
 import { useState } from "react";
 import { MobileInstallOffer, mobileInstallUrl } from "../../components/MobileInstallOffer";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
@@ -79,12 +81,13 @@ export function MicosSettingsPanel({
     </div>
   );
 }
-export function MobileSettingsPanel() {
+export function MobileSettingsPanel({ accountId }: { accountId?: string }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
   const [copy, setCopy] = useState("");
   const url = mobileInstallUrl(window.location.origin);
-  const localOnly = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+  const localOnly = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname) || window.location.hostname.endsWith(".localhost");
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(url);
@@ -100,7 +103,9 @@ export function MobileSettingsPanel() {
           label={localOnly ? t`Local preview` : t`Use your existing account`}
           description={localOnly ? t`This address only opens on this computer. Use a reachable server address to connect a phone.` : t`Open Mycellios on your phone, sign in and add it to your Home Screen.`}
           control={
-            <Button variant="outline" onClick={() => setOpen(true)}>{t`How to install`}</Button>
+            <Button variant="outline" onClick={() => localOnly ? setOpen(true) : setCodeOpen(true)}>
+              {localOnly ? t`How to install` : t`Add phone`}
+            </Button>
           }
         />
         {!localOnly && <SettingsRow
@@ -129,15 +134,29 @@ export function MobileSettingsPanel() {
         </p>
       ) : null}
       <MobileInstallOffer mini open={open} onOpenChange={setOpen} />
+      <MobileSessions key={accountId ?? "signed-out"} accountId={accountId} />
+      <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t`Open Mycellios on your phone`}</DialogTitle>
+            <DialogDescription>{t`Scan this code with your camera and sign in with the same account.`}</DialogDescription>
+          </DialogHeader>
+          {codeOpen && <ServerLinkCode url={url} />}
+          <Button variant="outline" onClick={() => void copyLink()}>{t`Copy link`}</Button>
+          <Button variant="ghost" onClick={() => { setCodeOpen(false); setOpen(true); }}>{t`How to install`}</Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-export function VoiceEntryPanel({ onOpen, accountId }: { onOpen?: () => void; accountId?: string }) {
+export function VoiceEntryPanel({ onOpen, accountId, previewBotId, spaceId }: {
+  onOpen?: () => void; accountId?: string; previewBotId?: string; spaceId?: string | null;
+}) {
   const { t } = useLingui();
   return (
     <div className="rk-general-settings mb-6">
-      <DeviceVoiceSettings accountId={accountId} />
+      <DeviceVoiceSettings accountId={accountId} previewBotId={previewBotId} spaceId={spaceId} />
       {onOpen && <SettingsGroup title={t`Voice conversation`}>
         <SettingsRow
           label={t`Talk with your Mico`}

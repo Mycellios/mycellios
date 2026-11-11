@@ -4,6 +4,7 @@ import { AppBehavior } from "./app-behavior.js";
 import { UpdatePreferences } from "./update-preferences.js";
 import { installedFonts, validDesktopIcon } from "./appearance-settings.js";
 import { installDesktopCompanions } from "./desktop-companions.js";
+import { FloatingChats } from "./floating-chats.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
 import { ManualUpdateController, requireManualUpdateSpace } from "./manual-update.js";
@@ -223,6 +224,7 @@ let requestingComputerAccess = false;
 let keepRunningInBackground = false;
 let appBehavior: AppBehavior | undefined;
 let desktopCompanions: Awaited<ReturnType<typeof installDesktopCompanions>> | undefined;
+let floatingChats: FloatingChats | undefined;
 
 async function loadBackgroundPreference(profile: string) {
   appBehavior = new AppBehavior({
@@ -480,7 +482,7 @@ function createWindow(url: string, partition: string | null) {
     popup.webContents.on("will-navigate", (details) => capture(details));
   });
   win.on("close", (event) => {
-    if (!quitting && keepRunningInBackground) {
+    if (!quitting && (keepRunningInBackground || (floatingChats?.liveWindows().length ?? 0) > 0)) {
       event.preventDefault(); win.hide(); return;
     }
     desktopCompanions?.clear();
@@ -556,14 +558,11 @@ async function probeDocument(url: string): Promise<string | null> {
  */
 function loadAppUrl(win: BrowserWindow, url: string): Promise<AppDocumentState> {
   const contents = win.webContents;
-  const targetSession = contents.session;
   let mainStatus: number | undefined;
-
-  targetSession.webRequest.onCompleted({ urls: ["*://*/*"] }, (details) => {
-    if (details.webContentsId === contents.id && details.resourceType === "mainFrame") {
-      mainStatus = details.statusCode;
-    }
-  });
+  // Session webRequest listeners are singletons. Floating chats share the
+  // session, so observe this window's navigation without replacing another load.
+  const onNavigate = (_event: Electron.Event, _url: string, status: number) => { mainStatus = status; };
+  contents.on("did-navigate", onNavigate);
 
   return new Promise<AppDocumentState>((resolve, reject) => {
     let settled = false;
@@ -573,7 +572,7 @@ function loadAppUrl(win: BrowserWindow, url: string): Promise<AppDocumentState> 
       contents.removeListener("did-fail-load", onFail);
       // Keep render-process-gone until document readiness finishes so a crash
       // during mount still fails the switch.
-      targetSession.webRequest.onCompleted(null);
+      contents.removeListener("did-navigate", onNavigate);
       if (error) {
         contents.removeListener("render-process-gone", onGone);
         reject(error);
@@ -615,14 +614,7 @@ function loadAppUrl(win: BrowserWindow, url: string): Promise<AppDocumentState> 
     contents.on("did-fail-load", onFail);
     contents.on("render-process-gone", onGone);
     void contents.loadURL(url).then(
-      async () => {
-        // onCompleted can lag loadURL; wait briefly for the main-frame status.
-        const deadline = Date.now() + 500;
-        while (mainStatus === undefined && Date.now() < deadline) {
-          await new Promise((r) => setTimeout(r, 10));
-        }
-        settle();
-      },
+      () => settle(),
       (error: unknown) => {
         settle(error instanceof Error ? error : new Error(String(error)));
       },
@@ -837,12 +829,18 @@ async function installUpdate(force = false) {
 async function prepareRendererUpdate(): Promise<boolean> {
   const win = mainWindow;
   if (!win || win.isDestroyed()) return false;
+  const windows = [win, ...(floatingChats?.liveWindows() ?? [])];
+  const prepared = await Promise.all(windows.map(window => prepareWindowUpdate(window)));
+  return mainWindow === win && prepared.every(Boolean);
+}
+
+async function prepareWindowUpdate(win: BrowserWindow): Promise<boolean> {
   const contents = win.webContents, url = contents.getURL(), nonce = randomBytes(16).toString("hex");
   return new Promise(resolve => {
     const finish = (ready: boolean) => {
       clearTimeout(timer);
       ipcMain.off("desktop.update.prepared", received);
-      resolve(ready && mainWindow === win && !win.isDestroyed() && contents.getURL() === url);
+      resolve(ready && !win.isDestroyed() && contents.getURL() === url);
     };
     const received = (event: Electron.IpcMainEvent, value: unknown) => {
       if (event.sender !== contents || event.senderFrame !== contents.mainFrame ||
@@ -1352,12 +1350,26 @@ app.whenReady().then(async () => {
   await updatePreferences.load();
   const updatePolicyTimer = setInterval(() => { if (!quitting) void updatePreferences?.tick(); }, 2_000);
   updatePolicyTimer.unref(); app.once("before-quit", () => clearInterval(updatePolicyTimer));
-  desktopCompanions = await installDesktopCompanions({ profile: userDataDir, allowed: fromUpdateWindow,
-    reveal: target => {
+  const revealChat = (target: { scope: string; botId: string }) => {
       if (!mainWindow || mainWindow.isDestroyed()) return;
       revealSecondInstanceWindow(mainWindow);
       mainWindow.webContents.send("desktop.companions.select", target);
-    } });
+  };
+  floatingChats = new FloatingChats({
+    main: () => mainWindow,
+    load: loadAppUrl,
+    external: destination => {
+      const safe = safeExternalUrl(destination);
+      if (safe) openExternalLink(safe);
+    },
+    reveal: revealChat,
+  });
+  ipcMain.handle("desktop.chat.return", event => floatingChats!.returnToMain(event.sender, event.senderFrame));
+  desktopCompanions = await installDesktopCompanions({
+    profile: userDataDir, allowed: fromUpdateWindow, reveal: revealChat,
+    openChat: target => floatingChats!.open(target),
+    scopeChanged: scope => floatingChats!.account(scope),
+  });
   ipcMain.handle("desktop.settings.state", event => {
     if (!fromUpdateWindow(event)) throw new Error("Settings require the main app window");
     return appBehavior!.state();
@@ -2185,6 +2197,7 @@ app.on("before-quit", (event) => {
   accountComputer?.stop();
   appBehavior?.dispose();
   desktopCompanions?.dispose();
+  floatingChats?.clear();
   cloudComputer?.stop();
   quitting = true;
   clearTimeout(warmWindowTimer);

@@ -1102,6 +1102,15 @@
   may only open that window with an already-saved address. Probe and mount before
   committing a switch; retain origin-partitioned sessions and rollback on failure.
 
+- Floating chats share the active server session but pin their Space without
+  writing the main window's selected Space or composer draft. Their preload is
+  chat-only; do not grant local computer or account configuration authority.
+  Close them on account/server changes and include every chat in update readiness.
+  Dock opening mode defaults to the main window for existing profiles.
+  Mobile setup QR codes contain only the current reachable server URL, never
+  credentials. Session revocation uses the authenticated account's existing API
+  after confirmation. Verify floating-chats, preload, rpc and MobileSessions tests.
+
 - Continuous voice uses a flush 50px header, a scrollable body and fixed controls.
   Local model preparation is single-flight and must never start capture after
   the owning panel closes. Native ASR and TTS share a worker; stop capture before

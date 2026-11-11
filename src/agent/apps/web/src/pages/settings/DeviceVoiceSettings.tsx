@@ -6,14 +6,39 @@ import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";
 import { setGeneralPreferences, useGeneralPreferences, type GeneralPreferences } from "../../lib/general-preferences";
 import { UI_LOCALES, UI_LOCALE_LABELS } from "../../lib/ui-locale";
+import { speaker } from "../../lib/tts";
 
-export function DeviceVoiceSettings({ accountId }: { accountId?: string }) {
-  const { t } = useLingui(); const id = useId(); const value = useGeneralPreferences();
+export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
+  accountId?: string; previewBotId?: string; spaceId?: string | null;
+}) {
+  const { t, i18n } = useLingui(); const id = useId(); const value = useGeneralPreferences();
   const native = desktopBridge()?.localVoice;
   const [status, setStatus] = useState<Awaited<ReturnType<NonNullable<typeof native>["status"]>>>();
   const [operation, setOperation] = useState<LocalVoiceModelKind | "both">();
   const [error, setError] = useState("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [previewing, setPreviewing] = useState(false);
+  useEffect(() => () => {
+    if (speaker.state.messageId === id) speaker.stop();
+  }, [id]);
+  async function previewNetworkVoice() {
+    if (!previewBotId || previewing) return;
+    const language = (value.dictationLanguage === "auto" ? i18n.locale : value.dictationLanguage).split("-")[0];
+    if (language !== "en" && language !== "es") {
+      setError(t`Choose Spanish or English in Dictation language to preview network voice.`);
+      return;
+    }
+    setError("");
+    setPreviewing(true);
+    try {
+      const failure = await speaker.speak(t`Hello, this is Mycellios voice.`, {
+        networkLanguage: language, botId: previewBotId, spaceId, messageId: id, speed: value.speechSpeed,
+      });
+      if (failure) setError(failure);
+    } finally {
+      setPreviewing(false);
+    }
+  }
   useEffect(() => {
     const speech = window.speechSynthesis;
     if (!speech) return;
@@ -84,6 +109,11 @@ export function DeviceVoiceSettings({ accountId }: { accountId?: string }) {
             }
           }}
         />} />
+    </SettingsGroup>}
+    {networkSelected && <SettingsGroup>
+      <SettingsRow label="Kokoro" description={t`Preview uses your Mycellios credits.`}
+        control={<Button variant="outline" size="sm" disabled={!previewBotId || previewing}
+          onClick={() => void previewNetworkVoice()}>{previewing ? t`Playing…` : t`Listen`}</Button>} />
     </SettingsGroup>}
     <SettingsGroup title={t`Dictation`}>
       {native && (separateModels

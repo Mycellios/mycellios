@@ -58,3 +58,18 @@ it("keeps a failed save out of the active native state and creates no empty dock
   await call("save", { ...DEFAULT_DESKTOP_COMPANIONS, dock: { ...DEFAULT_DESKTOP_COMPANIONS.dock, shown: true, agents: { "bot-a": false } } });
   call("publish", snapshot); expect(mocks.windows).toHaveLength(0); host.dispose();
 });
+
+it("opens only a Mico in the current snapshot and supports the floating dock preference", async () => {
+  const openChat = vi.fn(async () => undefined);
+  const host = await installDesktopCompanions({ profile: "test", allowed: event => event === good, reveal: vi.fn(), openChat });
+  call("publish", snapshot);
+  await call("openChat", { scope: snapshot.scope, botId: "bot-a" });
+  expect(openChat).toHaveBeenCalledWith({ scope: snapshot.scope, botId: "bot-a" });
+  expect(() => call("openChat", { scope: "another-user", botId: "bot-a" })).toThrow();
+  expect(() => call("openChat", { scope: snapshot.scope, botId: "other-bot" })).toThrow();
+  expect(DesktopCompanionPreferencesSchema.parse({
+    ...DEFAULT_DESKTOP_COMPANIONS,
+    dock: { shown: false, edge: "right", display: "primary", autoHide: false, edgeStrip: true, results: false, agents: {} },
+  }).dock.chatAction).toBe("main");
+  host.dispose();
+});

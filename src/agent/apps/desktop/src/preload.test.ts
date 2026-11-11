@@ -14,7 +14,7 @@ function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: u
   const source = readFileSync(path.join(import.meta.dirname, file), "utf8");
 
   vm.runInNewContext(source, {
-    process: { platform: "linux" },
+    process: { platform: "linux", argv: ["--mycellios-chat-space=space-a"] },
     require(moduleName: string) {
       if (moduleName !== "electron") throw new Error(`Unexpected preload import: ${moduleName}`);
       return { contextBridge: { exposeInMainWorld }, ipcRenderer: { invoke, on, off, send } };
@@ -25,6 +25,14 @@ function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: u
 }
 
 describe("desktop preload bridge", () => {
+  it("keeps floating chat access limited to its pinned Space and update acknowledgement", async () => {
+    const { invoke, exposeInMainWorld } = runPreload("floating-chat-preload.cjs");
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    expect(Object.keys(bridge).sort()).toEqual(["chatWindow", "nativeWindowFrame", "platform"]);
+    expect(bridge.chatWindow?.spaceId).toBe("space-a");
+    await bridge.chatWindow!.returnToMain();
+    expect(invoke).toHaveBeenCalledWith("desktop.chat.return");
+  });
   it("exposes settings as named IPC methods without a raw IPC capability", async () => {
     const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;

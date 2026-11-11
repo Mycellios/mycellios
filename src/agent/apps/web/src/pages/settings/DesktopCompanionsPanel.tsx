@@ -47,6 +47,12 @@ export function DesktopCompanionsPanel({ kind, bots, onBusyChange }: { kind: "do
           {toggle("displays", t`Show on additional displays`, t`Follow activity on every connected screen.`, value.island.additionalDisplays,
             additionalDisplays => void save({ ...value, island: { ...value.island, additionalDisplays } }), !shown)}
         </> : <>
+          <SettingsRow label={t`Open chats in`} control={<OptionSelect
+            aria-label={t`Open chats in`} disabled={busy || !shown || !bridge.openChat}
+            value={value.dock.chatAction ?? "main"} className="w-44 max-w-full"
+            options={[{ value: "main", label: t`Main window` }, { value: "floating", label: t`Floating windows` }]}
+            onValueChange={chatAction => void save({ ...value, dock: { ...value.dock, chatAction: chatAction as "main" | "floating" } })}
+          />} />
           <SettingsRow label={t`Screen`} control={<OptionSelect aria-label={t`Screen`} disabled={busy || !shown} value={String(value.dock.display)}
             className="w-44 max-w-full" options={[{ value: "primary", label: t`Primary screen` }, ...displays.map(display => ({ value: String(display.id), label: display.label }))]}
             onValueChange={display => void save({ ...value, dock: { ...value.dock, display: display === "primary" ? display : Number(display) } })} />} />

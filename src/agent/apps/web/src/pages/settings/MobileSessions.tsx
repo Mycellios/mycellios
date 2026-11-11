@@ -1,0 +1,95 @@
+import { useLingui } from "@lingui/react/macro";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@rakazo/ui-web";
+import { useEffect, useState } from "react";
+import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
+import { authClient } from "../../lib/auth";
+
+type Session = NonNullable<Awaited<ReturnType<typeof authClient.listSessions>>["data"]>[number];
+
+export function mobileDeviceName(userAgent: string | null | undefined) {
+  if (/iPad/i.test(userAgent ?? "")) return "iPad";
+  if (/iPhone|iPod/i.test(userAgent ?? "")) return "iPhone";
+  if (/Android/i.test(userAgent ?? "")) return "Android";
+  return null;
+}
+
+export function MobileSessions({ accountId }: { accountId?: string }) {
+  const { t, i18n } = useLingui();
+  const [sessions, setSessions] = useState<Session[]>();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [selected, setSelected] = useState<Session | null>(null);
+  const identity = authClient.useSession().data?.user.id;
+  async function load() {
+    if (loading || removing || !accountId || identity !== accountId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const response = await authClient.listSessions();
+      if (response.error || !response.data) throw new Error("Sessions unavailable");
+      setSessions(response.data.filter(session => mobileDeviceName(session.userAgent)));
+    } catch {
+      setError(t`Could not load your phones. Try again.`);
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => {
+    let live = true;
+    setSessions(undefined);
+    setSelected(null);
+    setError("");
+    if (!accountId || accountId !== identity) return;
+    setLoading(true);
+    void authClient.listSessions().then(response => {
+      if (!live) return;
+      if (response.error || !response.data) throw new Error("Sessions unavailable");
+      setSessions(response.data.filter(session => mobileDeviceName(session.userAgent)));
+    }).catch(() => {
+      if (live) setError(t`Could not load your phones. Try again.`);
+    }).finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [accountId, identity]);
+  async function disconnect() {
+    if (!selected || removing || !accountId || identity !== accountId) return;
+    const target = selected;
+    setRemoving(true);
+    setError("");
+    try {
+      const response = await authClient.revokeSession({ token: target.token });
+      if (response.error) throw new Error("Could not disconnect");
+      setSessions(current => current?.filter(session => session.id !== target.id));
+      setSelected(null);
+    } catch {
+      setError(t`Could not disconnect the phone. Try again.`);
+    } finally {
+      setRemoving(false);
+    }
+  }
+  if (!accountId || identity !== accountId) return null;
+  return <>
+    <SettingsGroup title={t`Your phones`}>
+      <SettingsRow label={t`Signed-in phones`} description={t`Sign in on your phone using the link above. Your conversations appear with the same account.`}
+        control={<Button size="sm" variant="outline" disabled={loading || removing} onClick={() => void load()}>{t`Refresh`}</Button>} />
+      {loading && !sessions && <p role="status" className="px-4 py-3 text-sm text-muted-foreground">{t`Loading…`}</p>}
+      {sessions?.map(session => <SettingsRow key={session.id}
+        label={mobileDeviceName(session.userAgent)}
+        description={t`Last activity · ${new Date(session.updatedAt).toLocaleString(i18n.locale)}`}
+        control={<Button size="sm" variant="outline" disabled={removing} onClick={() => setSelected(session)}>{t`Disconnect`}</Button>} />)}
+      {sessions?.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">{t`No phones are signed in yet.`}</p>}
+      {error && <p role="alert" className="px-4 py-3 text-sm text-destructive">{error}</p>}
+    </SettingsGroup>
+    <Dialog open={Boolean(selected)} onOpenChange={open => { if (!open && !removing) setSelected(null); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t`Disconnect this phone?`}</DialogTitle>
+          <DialogDescription>{t`The phone will need to sign in again. Your conversations stay in your account.`}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost" disabled={removing} onClick={() => setSelected(null)}>{t`Cancel`}</Button>
+          <Button variant="destructive" disabled={removing} onClick={() => void disconnect()}>{t`Disconnect`}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>;
+}
