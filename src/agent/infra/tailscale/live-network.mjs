@@ -2,13 +2,16 @@
 // private transport, not the separate Tailscale SaaS browser-consent workflow.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 const docker = (...args) => {
   try { return execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim(); }
   catch (error) { throw new Error(`Docker qualification command failed: ${error.stderr?.toString().slice(-1800)}`); }
 };
 const pause = ms => new Promise(r => setTimeout(r, ms));
+const putKey = (container, key) => execFileSync('docker', ['exec', '-i', container, 'node', '-e',
+  "require('node:fs').writeFileSync('/tmp/authkey',require('node:fs').readFileSync(0),{mode:0o600})"],
+  { input: key, stdio: ['pipe', 'pipe', 'pipe'] });
 const dir = resolve('build/tailscale-gateway/live');
 mkdirSync(dir, { recursive: true });
 const suffix = 'qualification.ts.net';
@@ -53,21 +56,17 @@ try {
   }
   assert.ok(user?.id, 'Headscale started and created test identity');
   const key = JSON.parse(docker('exec', 'tailnet-control', 'headscale', 'preauthkeys', 'create', '--user', String(user.id), '--reusable', '--expiration', '30m', '--output', 'json'));
-  // docker cp retains the runner UID, which differs from the unprivileged image
-  // UID. This short-lived test-only key must be readable there without granting
-  // either container CHOWN/FOWNER capabilities. Never log or upload this file.
-  writeFileSync(`${dir}/authkey`, key.key, { mode: 0o644 });
   docker('run', '-d', '--name', 'tailnet-peer', '--network', 'tailnet-qualification', '--cap-drop', 'ALL',
     '--security-opt', 'no-new-privileges:true', '--entrypoint', 'sh',
     '-v', `${resolve('src/agent/infra/tailscale/private-mcp-fixture.mjs')}:/fixture.mjs:ro`,
     'mycellios-tailscale:qualification', '-c',
     'node /fixture.mjs & exec tailscaled --tun=userspace-networking --socket=/tmp/peer.sock --statedir=/tmp/ts --port=0');
   await pause(2000);
-  docker('cp', `${dir}/authkey`, 'tailnet-peer:/tmp/authkey');
+  putKey('tailnet-peer', key.key);
   docker('exec', 'tailnet-peer', 'tailscale', '--socket=/tmp/peer.sock', 'up', '--login-server=http://tailnet-control:8080', '--auth-key=file:/tmp/authkey', '--hostname=private-mcp', '--accept-dns=false', '--accept-routes=false', '--timeout=30s');
   docker('exec', 'tailnet-peer', 'tailscale', '--socket=/tmp/peer.sock', 'serve', '--bg', '--http=8080', 'http://127.0.0.1:8081');
   await control('status'); // Create the real gateway daemon without SaaS login.
-  docker('cp', `${dir}/authkey`, 'tailscale-qualification:/tmp/authkey');
+  putKey('tailscale-qualification', key.key);
   docker('exec', 'tailscale-qualification', 'tailscale', `--socket=/state/${id}/tailscaled.sock`, 'up',
     '--login-server=http://tailnet-control:8080', '--auth-key=file:/tmp/authkey', '--hostname=gateway-test',
     '--accept-dns=false', '--accept-routes=false', '--shields-up', '--timeout=30s');
@@ -83,5 +82,7 @@ try {
   docker('exec', 'tailscale-qualification', 'tailscale', `--socket=/state/${id}/tailscaled.sock`, 'ping', '--c=1', '--timeout=20s', `private-mcp.${suffix}`);
   console.log('PASS: two real userspace Tailscale nodes enrolled; encrypted peer reachability; private MCP has no direct public ingress');
 } finally {
-  rmSync(`${dir}/authkey`, { force: true });
+  for (const container of ['tailnet-peer', 'tailscale-qualification']) {
+    try { docker('exec', container, 'rm', '-f', '/tmp/authkey'); } catch { /* Workflow cleanup removes the containers. */ }
+  }
 }
