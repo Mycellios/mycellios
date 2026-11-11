@@ -281,7 +281,8 @@
 
 /* The cursor is an extra DOM child, not another paragraph. Keep the real
    last block's spacing identical before and after streaming finishes. */
-.rk-chat-markdown-streaming > :nth-last-child(2) {
+.rk-chat-markdown-streaming > :nth-last-child(2),
+.rk-chat-markdown-streaming > :nth-last-child(2) > :last-child {
   margin-bottom: 0;
 }
 
