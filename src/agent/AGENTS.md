@@ -28,6 +28,10 @@
   `node scripts/verify-chat-fluidity.mjs --output=...` for actual browser components
   with synthetic delivery/progress. This does not measure a live model's latency.
 
+- Production English messages with interpolated values must exist in
+  `apps/web/src/locales/en/messages.po`; production macros omit development text.
+  Verify compiled messages without a fallback in `i18n-catalog.test.ts`.
+
 - MCP stdio launch arguments remain unchanged for the child, but explicitly named
   credentials must join output/error/log redaction. Omit tool names or schemas
   that contain those credentials rather than corrupting JSON Schema with replacement
