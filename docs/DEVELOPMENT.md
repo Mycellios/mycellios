@@ -256,6 +256,16 @@ namespaces with temporary `/etc` and `/opt`, synthetic payloads and no network.
 Missing platform tools or unavailable user namespaces produce explicit skips.
 Interactive sign-in and real network enrollment require separate user testing.
 
+Installed RPM and DEB builds check the same desktop download catalog as Windows,
+using the `fedora` entry or the `linux-x64` package that owns the running
+executable. Verification (exact version, file name, size, SHA-256) happens before
+the panel offers anything, and installation remains the owner's action: the app
+opens the verified package with the system installer and asks for a restart after
+it finishes. Keep that boundary; do not add a package-manager call, elevation or
+unattended install to the app. An AppImage or unpackaged build must keep receiving
+no offer. A published version is only visible once its catalog entry exists, so
+release must publish the RPM and its `fedora` entry together.
+
 The separate `/downloads/desktop` page is built from
 `landing/src/DesktopDownloads.tsx` with `node scripts/build-desktop-downloads.mjs`
 into `build/desktop-downloads/web`. Preserve the EXE/DEB catalog and existing
