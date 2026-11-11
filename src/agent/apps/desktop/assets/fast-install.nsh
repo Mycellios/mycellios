@@ -1,5 +1,11 @@
 !define MUI_CUSTOMFUNCTION_ABORT MycelliosRollback
 
+; The assisted wizard installs for this user only, without an elevation or
+; all-users choice. Keep the existing per-user registration and profile.
+!macro customInstallMode
+  StrCpy $isForceCurrentInstall "1"
+!macroend
+
 !macro MycelliosInitHelper
   InitPluginsDir
   StrCpy $MycelliosPowerShell "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe"

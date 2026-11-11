@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdir, open, readFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { writePrivateFile } from "./setup-store.js";
@@ -35,15 +35,20 @@ export async function launchManualUpdate(options: {
   profile: string; executable: string; oldPid: number; installer: string;
   release: ManualRelease; reopenUrl: string;
 }): Promise<void> {
-  await requireNoManualUpdate(options.profile);
-  const directory = path.join(options.profile, "updates", randomUUID());
+  // Windows process APIs report long paths, while TEMP/profile inputs can use
+  // 8.3 aliases. Resolve the same files before the worker checks process identity.
+  const profile = await realpath(options.profile);
+  const appExecutable = await realpath(options.executable);
+  const installer = await realpath(options.installer);
+  await requireNoManualUpdate(profile);
+  const directory = path.join(profile, "updates", randomUUID());
   const helper = path.join(directory, "manual-update-helper.ps1");
   const config = path.join(directory, "request.json");
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await writePrivateFile(helper, await readFile(new URL("./manual-update-helper.ps1", import.meta.url), "utf8"));
   await writePrivateFile(config, JSON.stringify({ schema: "mycellios-manual-update/1",
-    profile: options.profile, executable: options.executable, oldPid: options.oldPid,
-    installer: options.installer, version: options.release.version, sha256: options.release.sha256,
+    profile, executable: appExecutable, oldPid: options.oldPid,
+    installer, version: options.release.version, sha256: options.release.sha256,
     bytes: options.release.bytes, reopenUrl: options.reopenUrl }));
   const executable = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
   // Detached PowerShell 5.1 can exit before running the script. A hidden

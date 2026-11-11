@@ -10,7 +10,11 @@ if($Launch){
  # another process so the update worker outlives Electron's direct-child job.
  $argsForWorker=@('-NoLogo','-NoProfile','-NonInteractive','-File',('"' + $PSCommandPath + '"'),'-ConfigFile',('"' + $ConfigFile + '"'))
  $worker=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsForWorker -WindowStyle Hidden -WorkingDirectory $env:TEMP -RedirectStandardOutput (Join-Path $job 'helper.log') -RedirectStandardError (Join-Path $job 'helper-error.log') -PassThru
+ # Windows PowerShell can lose the native process handle returned by
+ # Start-Process. Retain it before waiting so exit/acknowledgement is real.
+ $null=$worker.Handle
  $worker.WaitForExit()
+ $worker.Refresh()
  exit $worker.ExitCode
 }
 $result=Join-Path $job 'result.json'
@@ -68,6 +72,7 @@ function Reopen([switch]$Confirm) {
  if($config.reopenUrl){$url=[Uri]$config.reopenUrl;if($url.Scheme -notin @('http','https') -or $url.UserInfo){throw 'Invalid saved app location'};$env:RAKAZO_WEB_URL=$url.AbsoluteUri}
  if(!$Confirm){Start-Process -FilePath $executable -WindowStyle Normal | Out-Null;return}
  $app=Start-Process -FilePath $executable -ArgumentList ('--manual-update-job='+[IO.Path]::GetFileName($job)) -WindowStyle Normal -PassThru
+ $null=$app.Handle
  $launch=Join-Path $job 'launch.json'
  $deadline=(Get-Date).AddMinutes(2)
  do {
@@ -130,6 +135,7 @@ try {
  # Keep normal Windows downloaded-file checks visible. Hiding this launch can
  # leave the app closed behind a shell/security prompt with no installer PID.
  $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Normal -WorkingDirectory $env:TEMP -PassThru
+ $null=$setup.Handle
  Progress 'installing'
  if(!$setup.WaitForExit(600000)){
   # An installer still running may own files. Leave it and its recovery data alone.
@@ -137,6 +143,7 @@ try {
   Progress 'installer-timeout'
   throw 'The installer is still running after ten minutes'
  }
+ $setup.Refresh()
  if($setup.ExitCode -ne 0){throw 'The installer did not finish successfully'}
  if((Installed-Process).Count){throw 'Unexpected app startup during installation; saved state must be inspected'}
  $version=([Version](Get-Item -LiteralPath $executable).VersionInfo.ProductVersion).ToString(3)

@@ -127,6 +127,8 @@
   Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
   actual Windows PowerShell encoding in manual-update-helper tests. Start the
   worker through a hidden non-detached launcher so it survives Desktop's exit.
+  Canonicalize owned file paths before Windows process identity checks, including
+  8.3 TEMP aliases. Retain process handles before waiting or reading exit codes.
   Wait on the installer process handle with a deadline before checking its exit
   code and the installed version. Do not wait on the installer's entire process
   tree or roll back over an installer still running. Confirm the reopened
