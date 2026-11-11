@@ -7,6 +7,13 @@ const base = {
 };
 
 describe("loadEnv", () => {
+  it("bounds operator speech placement and never accepts an empty or malformed identity entry", () => {
+    expect(loadEnv(base).mycelliosNetworkSpeechIdentityIds).toEqual([]);
+    expect(loadEnv({ ...base, MYCELLIOS_NETWORK_SPEECH_IDENTITIES: "speech-a, speech-b,speech-a" }).mycelliosNetworkSpeechIdentityIds).toEqual(["speech-a", "speech-b"]);
+    for (const value of ["speech-a,", "https://untrusted", "a b", "x".repeat(129), Array.from({length:65},(_,i)=>`node-${i}`).join(",")]) {
+      expect(() => loadEnv({ ...base, MYCELLIOS_NETWORK_SPEECH_IDENTITIES: value })).toThrow("worker identity IDs");
+    }
+  });
   it("enables Mycellios connection only with a configured issuer and bounded model defaults", () => {
     expect(loadEnv(base).mycelliosSso).toBe(false);
     expect(() => loadEnv({ ...base, MYCELLIOS_SSO_ENABLED: "true" })).toThrow("requires OIDC");

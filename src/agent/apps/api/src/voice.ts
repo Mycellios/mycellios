@@ -50,7 +50,7 @@ export interface VoiceDeps {
   prisma: PrismaClient;
   secrets: SecretStore;
   /** The instance flag (`MCP_ALLOW_PRIVATE_ENDPOINT`). */
-  env?: { mcpAllowPrivateEndpoint?: boolean };
+  env?: { mcpAllowPrivateEndpoint?: boolean; mycelliosNetworkSpeechIdentityIds?: string[] };
 }
 
 /** A self-hosted speech server on a private address is limited like model endpoints. */
@@ -510,7 +510,8 @@ export async function synthesizeVoice(
     if (!token) {
       throw new ORPCError("CONFLICT", { message: "Connect your Mycellios account in Models to use network voice.", data: { voiceCode: "NETWORK_VOICE_NOT_CONNECTED" } });
     }
-    return renderNetworkSpeech(token, { text: input.text, language: input.networkLanguage, signal: input.signal });
+    return renderNetworkSpeech(token, { text: input.text, language: input.networkLanguage, signal: input.signal,
+      workerIdentityIds: deps.env?.mycelliosNetworkSpeechIdentityIds });
   }
   const target = await resolveVoiceTarget(deps, actor, input);
   const text = input.text.trim();

@@ -2,6 +2,7 @@ import { ORPCError } from "@orpc/server";
 import { createOpenAiCompatibleFetch } from "@rakazo/adapters";
 import { productBrand } from "@rakazo/contracts";
 import { readBoundedJsonResponse } from "@rakazo/core";
+import { networkSpeechIdentityIds } from "./network-speech-placement.js";
 import {
   KOKORO_MODEL,
   MAX_SPEECH_RESPONSE_BYTES,
@@ -11,12 +12,18 @@ import {
 
 export async function renderNetworkSpeech(
   token: string,
-  input: { text: string; language: "en" | "es"; signal?: AbortSignal },
+  input: { text: string; language: "en" | "es"; signal?: AbortSignal; workerIdentityIds?: readonly string[] },
   transport: typeof fetch = createOpenAiCompatibleFetch(),
 ) {
   const text = input.text.trim();
   if (!text || text.length > 400) {
     throw new ORPCError("BAD_REQUEST", { message: "Network speech needs between 1 and 400 characters." });
+  }
+  let identities: string[];
+  try { identities = networkSpeechIdentityIds(input.workerIdentityIds?.join(",")); }
+  catch { identities = []; }
+  if (!identities.length) {
+    throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Mycellios network voice is not ready. Choose local voice or try again later.", data: { voiceCode: "NETWORK_VOICE_UNAVAILABLE" } });
   }
   const options = resolveSpeechOptions({ language: input.language });
   const signal = AbortSignal.any([
@@ -38,6 +45,10 @@ export async function renderNetworkSpeech(
         model: KOKORO_MODEL,
         messages: [{ role: "user", content: text }],
         stream: false,
+        // Keep the existing authenticated scheduler/dispatch privacy checks. A
+        // failed or unavailable pinned replica must never fall back to a legacy
+        // CPU worker whose execution cannot settle contribution-funded usage.
+        privacy: { trust: "trusted-only", boundary: "pinned-edges", pinned_identity_ids: identities },
         ...options,
       }),
       signal,

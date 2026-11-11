@@ -1,4 +1,5 @@
 import type { TelegramBotCredentials } from "@rakazo/adapters";
+import { networkSpeechIdentityIds } from "./network-speech-placement.js";
 import {
   boatApiKeyFromEnv,
   boatApiUrlFromEnv,
@@ -39,6 +40,8 @@ export interface AppEnv {
   breachedPasswordCheck?: boolean;
   oidc?: OidcConfig;
   mycelliosSso?: boolean;
+  /** Operator-approved speech replicas with current physical contribution evidence. */
+  mycelliosNetworkSpeechIdentityIds?: string[];
   defaultModelMaxTokens?: number;
   defaultModelContextWindow?: number;
   nodeEnv: string;
@@ -333,6 +336,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
       .filter(Boolean),
     mcpStdio: mcpStdioOptionsFromEnv(source),
     mcpAllowPrivateEndpoint: source.MCP_ALLOW_PRIVATE_ENDPOINT === "true",
+    mycelliosNetworkSpeechIdentityIds: networkSpeechIdentityIds(source.MYCELLIOS_NETWORK_SPEECH_IDENTITIES),
     port: Number(source.API_PORT ?? 3100),
     gitSha: optional(source.GIT_SHA) ?? optional(source.RAKAZO_GIT_SHA),
     minimumClientBuilds: parseMinimumClientBuilds(source.RAKAZO_MIN_CLIENT_BUILD),
