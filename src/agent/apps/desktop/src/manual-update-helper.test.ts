@@ -84,8 +84,12 @@ it.runIf(process.platform === "win32")("starts the hidden helper and keeps a rej
   }
 }, 60_000);
 
-it.runIf(process.platform === "win32")("acknowledges a live app and survives its normal exit", async () => {
-  const profile = await mkdtemp(path.join(os.tmpdir(), "mycellios update exit "));
+it.runIf(process.platform === "win32")("acknowledges a live app through a Windows path alias and survives its normal exit", async () => {
+  const profileRoot = await mkdtemp(path.join(os.tmpdir(), "mycellios update exit "));
+  const aliasScript = path.join(profileRoot, "alias.ps1");
+  await writeFile(aliasScript, "param([string]$Folder)\n(New-Object -ComObject Scripting.FileSystemObject).GetFolder($Folder).ShortPath\n");
+  const alias = await promisify(execFile)("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", aliasScript, profileRoot], { windowsHide: true, timeout: 30_000, encoding: "utf8" });
+  const profile = alias.stdout.trim();
   try {
     const updates = path.join(profile, "updates");
     const executable = path.join(profile, "Mycellios Desktop.exe");
@@ -133,7 +137,7 @@ it.runIf(process.platform === "win32")("acknowledges a live app and survives its
     });
   } finally {
     // The worker writes its receipt immediately before closing the Windows log handles.
-    await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    await rm(profileRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }, 65_000);
 

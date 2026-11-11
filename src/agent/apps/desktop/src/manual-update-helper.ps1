@@ -1,10 +1,29 @@
 param([Parameter(Mandatory=$true)][string]$ConfigFile,[switch]$Launch)
 $ErrorActionPreference='Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class MycelliosUpdatePath {
+ [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+ private static extern uint GetLongPathName(string path, StringBuilder result, uint capacity);
+ public static string Canonical(string path) {
+  path=Path.GetFullPath(path);
+  var result=new StringBuilder(32768);
+  uint count=GetLongPathName(path,result,(uint)result.Capacity);
+  if(count>0 && count<result.Capacity)return result.ToString();
+  // During recovery a leaf may not exist yet. Expand its existing ancestors.
+  var parent=Path.GetDirectoryName(path);
+  return String.IsNullOrEmpty(parent) || parent==path ? path : Path.Combine(Canonical(parent),Path.GetFileName(path));
+ }
+}
+'@
 # Never inherit the installation directory as the working directory: Windows
 # cannot rename a directory that is a process's current directory, and the
 # installer's fast-install step renames it.
 Set-Location -LiteralPath $env:TEMP
-$job=[IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ConfigFile))
+$job=[IO.Path]::GetDirectoryName([MycelliosUpdatePath]::Canonical($ConfigFile))
 if($Launch){
  # PowerShell 5.1 needs a console to initialize. The hidden launcher starts
  # another process so the update worker outlives Electron's direct-child job.
@@ -65,7 +84,7 @@ function Draft-Stores {
  return $entries
 }
 function Installed-Process {
- return ,@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -and $_.ExecutablePath.Equals($executable,[StringComparison]::OrdinalIgnoreCase)})
+ return ,@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -and ([MycelliosUpdatePath]::Canonical($_.ExecutablePath)).Equals($executable,[StringComparison]::OrdinalIgnoreCase)})
 }
 function Reopen([switch]$Confirm) {
  if($config.reopen -eq $false){return}
@@ -87,10 +106,10 @@ function Reopen([switch]$Confirm) {
 }
 try {
  $config=Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8|ConvertFrom-Json
- $profile=[IO.Path]::GetFullPath($config.profile)
- $executable=[IO.Path]::GetFullPath($config.executable)
+ $profile=[MycelliosUpdatePath]::Canonical($config.profile)
+ $executable=[MycelliosUpdatePath]::Canonical($config.executable)
  $installation=[IO.Path]::GetDirectoryName($executable)
- $installer=[IO.Path]::GetFullPath($config.installer)
+ $installer=[MycelliosUpdatePath]::Canonical($config.installer)
  if($config.schema -ne 'mycellios-manual-update/1' -or $config.version -notmatch '^\d{1,6}\.\d{1,6}\.\d{1,6}$' -or $config.sha256 -notmatch '^[a-f0-9]{64}$'){throw 'Invalid native update request'}
  if([IO.Path]::GetFileName($executable) -ne 'Mycellios Desktop.exe' -or $profile.Length -lt 10 -or !$job.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Invalid update scope'}
  if(!$installer.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($installer) -ne ('Mycellios-Desktop-'+$config.version+'-windows-x64-pilot.exe')){throw 'Invalid installer scope'}
@@ -101,7 +120,7 @@ try {
  Installer-Valid
  $old=Get-Process -Id $config.oldPid -ErrorAction SilentlyContinue
  if($old){
-  if(!$old.Path.Equals($executable,[StringComparison]::OrdinalIgnoreCase)){throw 'The previous process identity changed'}
+  if(!([MycelliosUpdatePath]::Canonical($old.Path)).Equals($executable,[StringComparison]::OrdinalIgnoreCase)){throw 'The previous process identity changed'}
   $started=$old.StartTime.ToUniversalTime().ToFileTimeUtc()
   Progress 'waiting-for-app'
   $deadline=(Get-Date).AddMinutes(5)
