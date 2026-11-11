@@ -18,14 +18,17 @@ const VERSION = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
 const MIN_INSTALL_BYTES = 6 * 1024 ** 3;
 
 /** The package this installation owns; each one is published under its own entry. */
-export type ManualPackageKind = "windows-x64" | "fedora-x64" | "linux-x64";
+export type ManualPackageKind = "windows-x64" | "fedora-x64" | "linux-x64" | "macos-arm64" | "macos-x64";
 
 const escapeVersion = (value: string) => value.replaceAll(".", "\\.");
-const PACKAGES: Record<ManualPackageKind, { format: "EXE" | "RPM" | "DEB"; entry: "packages" | "fedora"; fileName: (version: string) => RegExp }> = {
+const PACKAGES: Record<ManualPackageKind, { format: "EXE" | "RPM" | "DEB" | "DMG"; entry: "packages" | "fedora"; fileName: (version: string) => RegExp }> = {
   "windows-x64": { format: "EXE", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-windows-x64-pilot\\.exe$`) },
   "linux-x64": { format: "DEB", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-linux-x64-pilot\\.deb$`) },
   // The RPM builder appends its own build revision after the first one.
   "fedora-x64": { format: "RPM", entry: "fedora", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}(-\\d+)?-fedora-x86_64\\.rpm$`) },
+  // Mac previews record their ad-hoc signature in the file name.
+  "macos-arm64": { format: "DMG", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-macos-arm64-adhoc-[a-f0-9]+\\.dmg$`) },
+  "macos-x64": { format: "DMG", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-macos-x64-adhoc-[a-f0-9]+\\.dmg$`) },
 };
 
 export class ManualUpdateDiskSpaceError extends Error {

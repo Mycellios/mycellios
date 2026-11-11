@@ -15,11 +15,14 @@ const digest = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest(
 const rpmBytes = new Uint8Array(Buffer.from("rpm-payload"));
 const debBytes = new Uint8Array(Buffer.from("deb-payload"));
 const sourceBytes = new Uint8Array(Buffer.from("source-payload"));
+const dmgBytes = new Uint8Array(Buffer.from("dmg-payload"));
 
-function catalog(withFedora: boolean) {
+function catalog(kind: "default" | "macos" | "all") {
   const path = (release: string, name: string) => `/downloads/desktop/releases/${release}/${name}`;
   const windowsName = `Mycellios-Desktop-${windows}-windows-x64-pilot.exe`;
   const debName = "Mycellios-Desktop-0.3.32-linux-x64-pilot.deb";
+  const armName = "Mycellios-Desktop-0.3.9-macos-arm64-adhoc-ea645147545f.dmg";
+  const intelName = "Mycellios-Desktop-0.3.9-macos-x64-adhoc-e44f21f982dc.dmg";
   return {
     schema: "mycellios-desktop-downloads/1",
     version: windows,
@@ -30,9 +33,17 @@ function catalog(withFedora: boolean) {
       { id: "windows-x64", format: "EXE", version: windows, fileName: windowsName, path: path(windows, windowsName), bytes: 10, sha256: "a".repeat(64) },
       { id: "linux-x64", format: "DEB", version: "0.3.32", fileName: debName, path: path("0.3.32", debName), bytes: 20, sha256: "b".repeat(64),
         source: { path: path("0.3.32", "Mycellios-Desktop-0.3.32-source-e25994ba.tar.gz"), sha256: "c".repeat(64) } },
+      ...(kind === "default" ? [] : [{
+        id: "macos-arm64", format: "DMG", version: "0.3.9", fileName: armName, path: path("0.3.9", armName), bytes: 40, sha256: "f".repeat(64),
+        source: { path: path("0.3.9", "Mycellios-Desktop-0.3.9-macos-source-553948e.tar.gz"), sha256: "a".repeat(64) },
+      }]),
+      ...(kind !== "all" ? [] : [{
+        id: "macos-x64", format: "DMG", version: "0.3.9", fileName: intelName, path: path("0.3.9", intelName), bytes: 50, sha256: "9".repeat(64),
+        source: { path: path("0.3.9", "Mycellios-Desktop-0.3.9-macos-source-553948e.tar.gz"), sha256: "a".repeat(64) },
+      }]),
     ],
     source: { path: path(windows, `Mycellios-Desktop-${windows}-source-0321cc8e.tar.gz`), sha256: "d".repeat(64) },
-    ...(withFedora ? {
+    ...(kind === "all" ? {
       fedora: { id: "fedora-x64", format: "RPM", version: "0.3.32", fileName: "Mycellios-Desktop-0.3.32-fedora-x86_64.rpm",
         path: path("0.3.32", "Mycellios-Desktop-0.3.32-fedora-x86_64.rpm"), bytes: 30, sha256: "e".repeat(64),
         source: { path: path("0.3.32", "Mycellios-Desktop-0.3.32-source-e25994ba.tar.gz"), sha256: "c".repeat(64) } },
@@ -40,7 +51,7 @@ function catalog(withFedora: boolean) {
   };
 }
 
-async function fixture(options: { deb?: boolean } = {}) {
+async function fixture(options: { deb?: boolean; macos?: ("arm64" | "x64")[] } = {}) {
   const root = await mkdtemp(join(tmpdir(), "desktop-publish-")); temporary.push(root);
   const releaseDirectory = join(root, "release");
   const artifacts = join(root, "artifacts");
@@ -52,9 +63,12 @@ async function fixture(options: { deb?: boolean } = {}) {
   await writeFile(join(artifacts, "fedora", rpm), rpmBytes);
   await writeFile(join(artifacts, source), sourceBytes);
   if (options.deb) await writeFile(join(artifacts, `Mycellios-Desktop-${version}-linux-x64-pilot.deb`), debBytes);
+  for (const arch of options.macos ?? []) {
+    await writeFile(join(artifacts, `Mycellios-Desktop-${version}-macos-${arch}-adhoc-${arch === "arm64" ? "ea645147545f" : "e44f21f982dc"}.dmg`), dmgBytes);
+  }
 
-  for (const name of ["catalog.json", "catalog-macos.json", "catalog-macos-all.json"]) {
-    await writeFile(join(releaseDirectory, name), `${JSON.stringify(catalog(name === "catalog-macos-all.json"), null, 2)}\n`);
+  for (const [name, kind] of [["catalog.json", "default"], ["catalog-macos.json", "macos"], ["catalog-macos-all.json", "all"]] as const) {
+    await writeFile(join(releaseDirectory, name), `${JSON.stringify(catalog(kind), null, 2)}\n`);
   }
   return { root, releaseDirectory, artifacts, rpm, source };
 }
@@ -63,6 +77,7 @@ describe("publishing Linux packages into a staged Desktop release", () => {
   it("stages the RPM with the source and only adds the Fedora entry", async () => {
     const { releaseDirectory, artifacts, rpm, source } = await fixture();
     const before = JSON.parse(await readFile(join(releaseDirectory, "catalog.json"), "utf8"));
+    const beforeExtended = JSON.parse(await readFile(join(releaseDirectory, "catalog-macos-all.json"), "utf8"));
     const result = await publishDesktopDownloads({ releaseDirectory, artifacts, version });
 
     expect(result.packages).toEqual([{ id: "fedora-x64", fileName: rpm, bytes: rpmBytes.byteLength, sha256: digest(rpmBytes) }]);
@@ -73,7 +88,7 @@ describe("publishing Linux packages into a staged Desktop release", () => {
     expect(extended.fedora).toMatchObject({ version, fileName: rpm, bytes: rpmBytes.byteLength, sha256: digest(rpmBytes) });
     expect(extended.fedora.source).toEqual({ path: `/downloads/desktop/releases/${version}/${source}`, sha256: digest(sourceBytes) });
     // Windows and the old Linux entry are untouched.
-    expect(extended.packages.map((item: { id: string }) => item.id)).toEqual(before.packages.map((item: { id: string }) => item.id));
+    expect(extended.packages.map((item: { id: string }) => item.id)).toEqual(beforeExtended.packages.map((item: { id: string }) => item.id));
     expect(JSON.parse(await readFile(join(releaseDirectory, "catalog.json"), "utf8"))).toEqual(before);
   });
 
@@ -122,5 +137,32 @@ describe("publishing Linux packages into a staged Desktop release", () => {
     expect(result.packages).toHaveLength(1);
     expect(await readFile(join(releaseDirectory, "catalog-macos-all.json"), "utf8")).toBe(before);
     expect(await readdir(join(releaseDirectory, "releases", version))).toEqual([]);
+  });
+});
+
+describe("macOS disk images", () => {
+  it("publishes each architecture only where its catalog lists it", async () => {
+    const { releaseDirectory, artifacts } = await fixture({ deb: true, macos: ["arm64", "x64"] });
+    const result = await publishDesktopDownloads({ releaseDirectory, artifacts, version, deb: true, macos: true });
+    expect(result.packages.map(item => item.id)).toEqual(["fedora-x64", "linux-x64", "macos-arm64", "macos-x64"]);
+    expect(result.catalogs).toEqual([...(["catalog.json", "catalog-macos.json", "catalog-macos-all.json"])]);
+
+    const read = async (name: string) => JSON.parse(await readFile(join(releaseDirectory, name), "utf8"));
+    const arm = (catalog: { packages: Array<{ id: string }> }) => catalog.packages.find(item => item.id === "macos-arm64") as { version: string; format: string; sha256: string; bytes: number } | undefined;
+
+    const extended = await read("catalog-macos-all.json");
+    expect(extended.packages.map((item: { id: string }) => item.id)).toContain("macos-x64");
+    expect(arm(extended)).toMatchObject({ version, format: "DMG", bytes: dmgBytes.byteLength, sha256: digest(dmgBytes) });
+
+    const macos = await read("catalog-macos.json");
+    expect(arm(macos)).toMatchObject({ version, bytes: dmgBytes.byteLength });
+
+    const plain = await read("catalog.json");
+    expect(plain.packages.some((item: { id: string }) => item.id === "macos-arm64")).toBe(false);
+  });
+
+  it("refuses to promise macOS output without a disk image", async () => {
+    const { releaseDirectory, artifacts } = await fixture();
+    await expect(publishDesktopDownloads({ releaseDirectory, artifacts, version, macos: true })).rejects.toThrow(/no macOS disk image/);
   });
 });

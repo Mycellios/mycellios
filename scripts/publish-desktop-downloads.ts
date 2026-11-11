@@ -13,8 +13,12 @@ import { isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../src/co
 
 const VERSION = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
 const CATALOGS = ["catalog.json", "catalog-macos.json", "catalog-macos-all.json"] as const;
-/** Only the extended catalog carries the optional Fedora entry. */
-const FULL_CATALOG = "catalog-macos-all.json";
+/** Which package each catalog may advertise; a catalog only holds the entries it already lists. */
+const CATALOG_KINDS: Record<(typeof CATALOGS)[number], readonly PublishedPackage["id"][]> = {
+  "catalog.json": ["linux-x64"],
+  "catalog-macos.json": ["linux-x64", "macos-arm64"],
+  "catalog-macos-all.json": ["fedora-x64", "linux-x64", "macos-arm64", "macos-x64"],
+};
 
 export interface PublishInput {
   /** Staged `desktop-downloads` directory for this release. */
@@ -24,11 +28,13 @@ export interface PublishInput {
   version: string;
   /** Also publish the DEB as `linux-x64`, which reaches Debian and Ubuntu. */
   deb?: boolean;
+  /** Also publish the macOS disk images, one per architecture. */
+  macos?: boolean;
   dryRun?: boolean;
 }
 
 export interface PublishedPackage {
-  id: "fedora-x64" | "linux-x64";
+  id: "fedora-x64" | "linux-x64" | "macos-arm64" | "macos-x64";
   fileName: string;
   bytes: number;
   sha256: string;
@@ -68,6 +74,15 @@ async function single(directory: string, pattern: RegExp, hint: string): Promise
   return path.join(directory, names[0]!);
 }
 
+/** Disk images are optional and there is one per architecture. */
+async function optional(directory: string, pattern: RegExp, hint: string): Promise<string | null> {
+  const names = (await readdir(directory).catch(() => [] as string[]))
+    .filter(name => pattern.test(name))
+    .sort();
+  if (names.length > 1) fail(`${hint}: expected at most one file in ${directory}, found ${names.length}`);
+  return names.length ? path.join(directory, names[0]!) : null;
+}
+
 async function measure(file: string, id: PublishedPackage["id"], source: Candidate["source"]): Promise<Candidate> {
   const info = await lstat(file);
   if (!info.isFile() || info.isSymbolicLink()) fail(`${path.basename(file)} must be a regular file`);
@@ -104,10 +119,10 @@ function fedoraEntry(candidate: Candidate, release: string): NonNullable<Desktop
   };
 }
 
-function debEntry(candidate: Candidate, release: string): DesktopDownloadCatalog["packages"][number] {
+function packageEntry(candidate: Candidate, release: string): DesktopDownloadCatalog["packages"][number] {
   return {
-    id: "linux-x64",
-    format: "DEB",
+    id: candidate.id as Exclude<PublishedPackage["id"], "fedora-x64">,
+    format: candidate.id === "linux-x64" ? "DEB" : "DMG",
     version: release,
     fileName: candidate.fileName,
     path: releasePath(release, candidate.fileName),
@@ -124,9 +139,9 @@ function mergeCatalog(catalog: DesktopDownloadCatalog, candidates: Candidate[], 
       next.fedora = fedoraEntry(candidate, release);
       continue;
     }
-    const index = next.packages.findIndex(item => item.id === "linux-x64");
-    if (index < 0) fail("catalog has no linux-x64 entry to update");
-    next.packages[index] = debEntry(candidate, release);
+    const index = next.packages.findIndex(item => item.id === candidate.id);
+    if (index < 0) fail(`catalog has no ${candidate.id} entry to update`);
+    next.packages[index] = packageEntry(candidate, release);
   }
   return next;
 }
@@ -140,6 +155,12 @@ export async function publishDesktopDownloads(input: PublishInput): Promise<Publ
   const deb = input.deb
     ? await single(input.artifacts, new RegExp(`^Mycellios-Desktop-${escaped(release)}-linux-x64-pilot\\.deb$`), "Linux DEB")
     : null;
+  const macos = input.macos
+    ? (await Promise.all((["arm64", "x64"] as const).map(arch =>
+      optional(input.artifacts, new RegExp(`^Mycellios-Desktop-${escaped(release)}-macos-${arch}-adhoc-[a-f0-9]+\\.dmg$`), `macOS ${arch} DMG`))))
+      .filter((file): file is string => file !== null)
+    : [];
+  if (input.macos && !macos.length) fail("--macos was requested but no macOS disk image was found");
 
   const sourceInfo = await lstat(sourceFile);
   if (!sourceInfo.isFile() || sourceInfo.isSymbolicLink()) fail("source archive must be a regular file");
@@ -147,6 +168,9 @@ export async function publishDesktopDownloads(input: PublishInput): Promise<Publ
 
   const candidates = [await measure(rpm, "fedora-x64", source)];
   if (deb) candidates.push(await measure(deb, "linux-x64", source));
+  for (const file of macos) {
+    candidates.push(await measure(file, path.basename(file).includes("-macos-arm64-") ? "macos-arm64" : "macos-x64", source));
+  }
   const staged = [...candidates.map(candidate => candidate.fileName), path.basename(sourceFile)];
 
   const releases = path.join(input.releaseDirectory, "releases", release);
@@ -161,8 +185,9 @@ export async function publishDesktopDownloads(input: PublishInput): Promise<Publ
     const file = path.join(input.releaseDirectory, name);
     const parsed: unknown = JSON.parse(await readFile(file, "utf8").catch(() => fail(`${name} is missing from the staged release`)));
     if (!isDesktopDownloadCatalog(parsed)) fail(`${name} is not a valid Desktop download catalog`);
-    // Fedora lives only in the extended catalog; the DEB is advertised in all three.
-    const scoped = name === FULL_CATALOG ? candidates : candidates.filter(candidate => candidate.id === "linux-x64");
+    // Each catalog only advertises the packages it already lists.
+    const allowed = CATALOG_KINDS[name];
+    const scoped = candidates.filter(candidate => allowed.includes(candidate.id));
     if (!scoped.length) continue;
     const next = mergeCatalog(parsed, scoped, release);
     if (!isDesktopDownloadCatalog(next)) fail(`${name} was rejected after merging ${scoped.map(item => item.id).join(", ")}`);
@@ -192,13 +217,14 @@ async function main(): Promise<void> {
   const artifacts = argument(process.argv, "artifacts");
   const version = argument(process.argv, "version");
   if (!releaseDirectory || !artifacts || !version) {
-    fail("usage: tsx scripts/publish-desktop-downloads.ts --release-dir <dir> --artifacts <dir> --version <x.y.z> [--deb] [--dry-run]");
+    fail("usage: tsx scripts/publish-desktop-downloads.ts --release-dir <dir> --artifacts <dir> --version <x.y.z> [--deb] [--macos] [--dry-run]");
   }
   console.log(JSON.stringify(await publishDesktopDownloads({
     releaseDirectory,
     artifacts,
     version,
     deb: process.argv.includes("--deb"),
+    macos: process.argv.includes("--macos"),
     dryRun: process.argv.includes("--dry-run"),
   }), null, 2));
 }
