@@ -1,5 +1,47 @@
 # Status and evidence
 
+## Cadencia — local browser speech editing, 2026-11-11
+
+Hifa Store includes the first-party Cadencia app. It reads an explicitly selected
+video/audio file locally, proposes padded low-energy gaps and stable periodic
+voiced-sound intervals, lets the owner audition before/after and adjust/enable
+individual cuts, then renders an actual edited MP4 or supported WebM locally.
+Original files are unchanged. Possible elongated vowels default to unselected:
+this acoustic heuristic is not transcription or forced word/phoneme alignment,
+and cannot decide whether a sustained sound is an intentional expression.
+
+The browser media dependency is pinned to Mediabunny 1.65.2 with its MPL notice.
+Decode is incremental, DSP runs in a cancellable worker, imports are bounded to
+250 MiB/five minutes/stereo and output is bounded to 720p/30 fps. Audio export
+retains the decoded source sample rate and shares the selected compacted timeline
+with video. Short fades protect joins. Files/edits survive internal navigation in
+the existing account/Space memory cache, clear on account changes and explicit
+close, and hold automatic reloads while present/processing. URLs, audio contexts,
+workers and codecs are released. This grants no capability to untrusted hosted
+webs and sends no imported media to the server, model or paid provider.
+
+Local qualification uses an explicitly synthetic Windows speech/harmonic-vowel
+demo, with the reproducible generator and provenance retained. An actual browser
+MP4 was shortened from 10.880 s to 7.723 s, retained audio/video, sample rate and
+aspect ratio, and had 22.7 ms difference between audio/video ends. It played to
+completion, downloaded and re-imported through Cadencia; the second analysis found
+no remaining eligible cuts. Invalid input retained the prior project, and demo
+cancellation returned to the empty state. See `specs/cadencia/spec.md` for limits.
+
+Focused qualification passed 29 tests, incremental web TypeScript, the actual web
+production build, repository structure, architecture and component boundaries.
+The scoped UI detector returned no findings; an independent five-capture/source
+finish review returned ship, with no material findings. Desktop (1280 x 720) and mobile
+(390 x 844) captures were inspected, with no horizontal overflow; per-cut controls
+remain usable on mobile. Internal navigation retained a millisecond boundary edit.
+The local browser is left on the synthetic demo with four silence cuts applied
+and the possible vowel unselected, ready for before/after review.
+
+Real Manu recordings, linguistic/word-boundary accuracy, production promotion,
+native installer acceptance and full suites are NOT established by this evidence.
+
+
+
 ## Conversation responsiveness — published 2026-11-11
 
 The conversation shows a local pending user message before send acknowledgement,

@@ -130,6 +130,7 @@ function fixtureServer() {
 
 export default defineConfig({
   root: fixture,
+  publicDir: fileURLToPath(new URL("../public/", import.meta.url)),
   envDir: false,
   resolve: { alias: await workspaceViteAliases(agent) },
   plugins: [

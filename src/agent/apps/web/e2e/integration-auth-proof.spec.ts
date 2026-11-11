@@ -1,5 +1,53 @@
 import { expect, test } from "@playwright/test";
 
+test("Cadencia opens without Desktop, analyzes synthetic media and exports before/after", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const external: string[] = [];
+  page.on("request", (request) => {
+    if (!request.url().startsWith("http://127.0.0.1:") && /^https?:/.test(request.url()))
+      external.push(request.url());
+  });
+  await page.goto("/?cadencia=1");
+  await expect(page.getByRole("heading", { name: "Hifa Store", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Abrir Cadencia", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /^Cadencia/ })).toBeVisible();
+  await testInfo.attach("cadencia-empty", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await page.getByRole("button", { name: "Probar con la demo", exact: true }).click();
+  await expect(page.getByText("Demo sintetizada", { exact: true })).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(
+    page.getByRole("checkbox", { name: "Aplicar corte 4", exact: true }),
+  ).not.toBeChecked();
+  await page.getByRole("button", { name: "Crear versión editada", exact: true }).click();
+  const download = page.getByRole("link", { name: /Descargar (MP4|WebM|M4A)/ });
+  await expect(download).toBeVisible({ timeout: 60_000 });
+  expect(
+    await page
+      .locator("video")
+      .evaluate((video) => Number.isFinite(video.duration) && video.duration < 10),
+  ).toBe(true);
+  await testInfo.attach("cadencia-desktop", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await testInfo.attach("cadencia-mobile", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
+  const downloading = page.waitForEvent("download");
+  await download.click();
+  expect((await downloading).suggestedFilename()).toMatch(/^cadencia-.*\.(mp4|webm|m4a)$/);
+  expect(external).toEqual([]);
+});
+
 test("server setup is translated, bounded on small screens, and does not prevent another app connecting", async ({
   page,
 }, testInfo) => {

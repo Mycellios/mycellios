@@ -1,4 +1,5 @@
 /** Per-thread composer draft persistence (survives tab reloads and discards). */
+import { hasUnsavedEditorWork } from "./unsaved-editor-work";
 
 export const COMPOSER_DRAFT_STORAGE_PREFIX = "rakazo.composerDraft.";
 
@@ -41,7 +42,7 @@ export function setComposerUnsavedWork(pending: boolean): void {
 
 /** A send waiting for its answer, or attachments that only exist in memory. */
 export function composerHoldsUnsavedWork(): boolean {
-  return pendingSubmissions.size > 0 || unsavedWork || failedDraftWrites.size > 0;
+  return pendingSubmissions.size > 0 || unsavedWork || failedDraftWrites.size > 0 || hasUnsavedEditorWork();
 }
 
 /** Unsaved composer work, or saved text in any composer that has not been sent. */
