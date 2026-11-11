@@ -7,6 +7,7 @@ import { Readable, Transform } from "node:stream";
 import type { ReadableStream } from "node:stream/web";
 import { pipeline } from "node:stream/promises";
 import { fetchDesktopArtifact } from "./published-desktop-release.js";
+import { ManualUpdateInProgressError } from "./manual-update-lock.js";
 
 const ORIGIN = "https://www.mycellios.com";
 const MAX_BYTES = 2_000_000_000;
@@ -80,7 +81,7 @@ export class ManualUpdateController {
   }
   state() { return { ...this.current }; }
   private fail(error?: unknown) { this.committed = false; this.current = { ...this.current, phase: this.file ? "ready" : "error",
-    installPending: false, message: error instanceof ManualUpdateDiskSpaceError ? error.message : "Could not complete the update. Try again." }; }
+    installPending: false, message: error instanceof ManualUpdateDiskSpaceError || error instanceof ManualUpdateInProgressError ? error.message : "Could not complete the update. Try again." }; }
   check(userInitiated: boolean): Promise<DesktopUpdateState> {
     if ((!userInitiated && !this.options.backgroundDownloads) || this.current.installPending) return Promise.resolve(this.state());
     if (userInitiated) this.checkRequested = true;

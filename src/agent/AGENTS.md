@@ -122,8 +122,9 @@
 
 - Windows updates check the official HTTPS catalog and stage verified packages in
   the background; installation still requires the owner's explicit restart action.
-  The renderer covers the app window once a release is known and renderer work is
-  safe. A call may continue until the owner chooses to end it and restart.
+  Downloads and ready/error states stay in the sidebar without blocking chats.
+  Cover the app only after an explicit restart request and renderer readiness;
+  preserve Cancel while waiting. A call continues until the owner chooses to end it and restart.
   Keep an explicit retry and official download link for failed updates.
   RAKAZO_DISABLE_AUTO_UPDATE=1 suppresses background requests. Keep the unsigned
   automatic-install channel disabled. Bound and
@@ -141,12 +142,17 @@
   Read PowerShell progress receipts as UTF-8 with an optional BOM; qualify the
   actual Windows PowerShell encoding in manual-update-helper tests. Start the
   worker through a hidden non-detached launcher so it survives Desktop's exit.
+  Canonicalize owned file paths before Windows process identity checks, including
+  8.3 TEMP aliases. Retain process handles before waiting or reading exit codes.
   Wait on the installer process handle with a deadline before checking its exit
   code and the installed version. Do not wait on the installer's entire process
   tree or roll back over an installer still running. Confirm the reopened
   window against the committed job, target version and child PID. Record failed
   relaunch separately from a failed installation.
   Keep private logs and leave Desktop open until the worker acknowledges.
+  Hold the profile's exclusive active-install.lock for the worker's lifetime;
+  refuse a competing handoff before quitting. Keep Windows installer launch
+  checks visible and distinguish starting-installer from a running installer.
   Check space on both installation and profile volumes before quitting, then
   recheck before backing up. Keep checking for newer releases while one is staged.
   Verify manual-update, desktop-update-work, composer-draft and preload tests plus

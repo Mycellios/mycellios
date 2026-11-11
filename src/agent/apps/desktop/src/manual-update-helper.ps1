@@ -1,22 +1,46 @@
 param([Parameter(Mandatory=$true)][string]$ConfigFile,[switch]$Launch)
 $ErrorActionPreference='Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class MycelliosUpdatePath {
+ [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
+ private static extern uint GetLongPathName(string path, StringBuilder result, uint capacity);
+ public static string Canonical(string path) {
+  path=Path.GetFullPath(path);
+  var result=new StringBuilder(32768);
+  uint count=GetLongPathName(path,result,(uint)result.Capacity);
+  if(count>0 && count<result.Capacity)return result.ToString();
+  // During recovery a leaf may not exist yet. Expand its existing ancestors.
+  var parent=Path.GetDirectoryName(path);
+  return String.IsNullOrEmpty(parent) || parent==path ? path : Path.Combine(Canonical(parent),Path.GetFileName(path));
+ }
+}
+'@
 # Never inherit the installation directory as the working directory: Windows
 # cannot rename a directory that is a process's current directory, and the
 # installer's fast-install step renames it.
 Set-Location -LiteralPath $env:TEMP
-$job=[IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($ConfigFile))
+$job=[IO.Path]::GetDirectoryName([MycelliosUpdatePath]::Canonical($ConfigFile))
 if($Launch){
  # PowerShell 5.1 needs a console to initialize. The hidden launcher starts
  # another process so the update worker outlives Electron's direct-child job.
  $argsForWorker=@('-NoLogo','-NoProfile','-NonInteractive','-File',('"' + $PSCommandPath + '"'),'-ConfigFile',('"' + $ConfigFile + '"'))
  $worker=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsForWorker -WindowStyle Hidden -WorkingDirectory $env:TEMP -RedirectStandardOutput (Join-Path $job 'helper.log') -RedirectStandardError (Join-Path $job 'helper-error.log') -PassThru
+ # Windows PowerShell can lose the native process handle returned by
+ # Start-Process. Retain it before waiting so exit/acknowledgement is real.
+ $null=$worker.Handle
  $worker.WaitForExit()
+ $worker.Refresh()
  exit $worker.ExitCode
 }
 $result=Join-Path $job 'result.json'
 $backup=Join-Path $job 'backup'
 $phase='preflight'
 $installerLock=$null
+$updateLock=$null
 $canReopen=$false
 $verifiedVersion=$null
 function Progress([string]$value){$script:phase=$value;@{phase=$value}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $job 'progress.json') -Encoding UTF8}
@@ -60,13 +84,14 @@ function Draft-Stores {
  return $entries
 }
 function Installed-Process {
- return ,@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -and $_.ExecutablePath.Equals($executable,[StringComparison]::OrdinalIgnoreCase)})
+ return ,@(Get-CimInstance Win32_Process -Filter "name='Mycellios Desktop.exe'"|Where-Object {$_.ExecutablePath -and ([MycelliosUpdatePath]::Canonical($_.ExecutablePath)).Equals($executable,[StringComparison]::OrdinalIgnoreCase)})
 }
 function Reopen([switch]$Confirm) {
  if($config.reopen -eq $false){return}
  if($config.reopenUrl){$url=[Uri]$config.reopenUrl;if($url.Scheme -notin @('http','https') -or $url.UserInfo){throw 'Invalid saved app location'};$env:RAKAZO_WEB_URL=$url.AbsoluteUri}
- if(!$Confirm){Start-Process -FilePath $executable -WindowStyle Hidden | Out-Null;return}
- $app=Start-Process -FilePath $executable -ArgumentList ('--manual-update-job='+[IO.Path]::GetFileName($job)) -WindowStyle Hidden -PassThru
+ if(!$Confirm){Start-Process -FilePath $executable -WindowStyle Normal | Out-Null;return}
+ $app=Start-Process -FilePath $executable -ArgumentList ('--manual-update-job='+[IO.Path]::GetFileName($job)) -WindowStyle Normal -PassThru
+ $null=$app.Handle
  $launch=Join-Path $job 'launch.json'
  $deadline=(Get-Date).AddMinutes(2)
  do {
@@ -81,18 +106,21 @@ function Reopen([switch]$Confirm) {
 }
 try {
  $config=Get-Content -LiteralPath $ConfigFile -Raw -Encoding UTF8|ConvertFrom-Json
- $profile=[IO.Path]::GetFullPath($config.profile)
- $executable=[IO.Path]::GetFullPath($config.executable)
+ $profile=[MycelliosUpdatePath]::Canonical($config.profile)
+ $executable=[MycelliosUpdatePath]::Canonical($config.executable)
  $installation=[IO.Path]::GetDirectoryName($executable)
- $installer=[IO.Path]::GetFullPath($config.installer)
+ $installer=[MycelliosUpdatePath]::Canonical($config.installer)
  if($config.schema -ne 'mycellios-manual-update/1' -or $config.version -notmatch '^\d{1,6}\.\d{1,6}\.\d{1,6}$' -or $config.sha256 -notmatch '^[a-f0-9]{64}$'){throw 'Invalid native update request'}
  if([IO.Path]::GetFileName($executable) -ne 'Mycellios Desktop.exe' -or $profile.Length -lt 10 -or !$job.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Invalid update scope'}
  if(!$installer.StartsWith((Join-Path $profile 'updates')+'\',[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($installer) -ne ('Mycellios-Desktop-'+$config.version+'-windows-x64-pilot.exe')){throw 'Invalid installer scope'}
+ # A second app instance must not start a competing install while a worker is
+ # waiting for Windows, backing up or replacing this profile's installation.
+ $updateLock=[IO.File]::Open((Join-Path (Split-Path $job -Parent) 'active-install.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
  $installerLock=[IO.File]::Open($installer,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
  Installer-Valid
  $old=Get-Process -Id $config.oldPid -ErrorAction SilentlyContinue
  if($old){
-  if(!$old.Path.Equals($executable,[StringComparison]::OrdinalIgnoreCase)){throw 'The previous process identity changed'}
+  if(!([MycelliosUpdatePath]::Canonical($old.Path)).Equals($executable,[StringComparison]::OrdinalIgnoreCase)){throw 'The previous process identity changed'}
   $started=$old.StartTime.ToUniversalTime().ToFileTimeUtc()
   Progress 'waiting-for-app'
   $deadline=(Get-Date).AddMinutes(5)
@@ -120,16 +148,21 @@ try {
  $drafts|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $backup 'draft-stores.json') -Encoding UTF8
  Installer-Valid
  if((Installed-Process).Count){throw 'The previous application reopened before installation'}
- Progress 'installing'
+ Progress 'starting-installer'
  # Wait for NSIS itself. Start-Process -Wait waits for its whole process tree,
  # which can keep the helper in "installing" after the installer has exited.
- $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Hidden -WorkingDirectory $env:TEMP -PassThru
+ # Keep normal Windows downloaded-file checks visible. Hiding this launch can
+ # leave the app closed behind a shell/security prompt with no installer PID.
+ $setup=Start-Process -FilePath $installer -ArgumentList '/S' -WindowStyle Normal -WorkingDirectory $env:TEMP -PassThru
+ $null=$setup.Handle
+ Progress 'installing'
  if(!$setup.WaitForExit(600000)){
   # An installer still running may own files. Leave it and its recovery data alone.
   $canReopen=$false
   Progress 'installer-timeout'
   throw 'The installer is still running after ten minutes'
  }
+ $setup.Refresh()
  if($setup.ExitCode -ne 0){throw 'The installer did not finish successfully'}
  if((Installed-Process).Count){throw 'Unexpected app startup during installation; saved state must be inspected'}
  $version=([Version](Get-Item -LiteralPath $executable).VersionInfo.ProductVersion).ToString(3)
@@ -149,4 +182,4 @@ try {
  } elseif(!$verifiedVersion -and $canReopen -and (Test-Path -LiteralPath $executable) -and !(Installed-Process).Count){try{Reopen}catch{}}
  Write-Result @{installed=($null -ne $verifiedVersion);version=$verifiedVersion;reopened=$false;phase=$failedPhase;error=$_.Exception.Message;backup=$backup}
  exit 1
-} finally {if($installerLock){$installerLock.Dispose()}}
+} finally {if($installerLock){$installerLock.Dispose()};if($updateLock){$updateLock.Dispose()}}

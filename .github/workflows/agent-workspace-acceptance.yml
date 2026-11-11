@@ -33,7 +33,7 @@ jobs:
           cache: npm
           cache-dependency-path: src/agent/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npm exec -- vitest run apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts packages/adapters/src/desktop-process-tree.test.ts --maxWorkers=2
+      - run: npm exec -- vitest run apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts apps/desktop/src/manual-update.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/manual-update-lock.test.ts packages/adapters/src/desktop-process-tree.test.ts --maxWorkers=2
       - name: Exercise real isolated floating chat windows
         shell: pwsh
         run: |
