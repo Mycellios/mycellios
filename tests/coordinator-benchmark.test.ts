@@ -224,7 +224,7 @@ describe("automatic coordinator benchmark", () => {
     const cwd = mkdtempSync(join(tmpdir(), "mycellios-coordinator-build-"));
     writeFileSync(
       join(cwd, "package.json"),
-      JSON.stringify({ version: "0.2.19" }),
+      JSON.stringify({ version: PACKAGE_VERSION }),
       "utf8",
     );
     const workers = distributedWorkers();
