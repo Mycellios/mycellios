@@ -64,7 +64,7 @@ export function planChecks(files) {
     add('src/agent', 'npm', ['run', 'generate', '--workspace', '@rakazo/db'], 'Prisma client generation (no database connection)');
     if (files.some(f => ['src/agent/apps/web/src/components/InviteFriends.tsx',
       'src/agent/apps/web/e2e/fixtures/referrals.tsx', 'src/agent/scripts/verify-referrals-browser.mjs'].includes(f))) {
-      add('src/agent', 'node', ['node_modules/@playwright/test/cli.js', 'install', 'chromium', '--only-shell', '--with-deps'], 'referrals browser fixture Chromium');
+      add('src/agent', 'node', ['scripts/prepare-ui-browser.mjs'], 'referrals browser fixture Chromium');
       add('src/agent', 'node', ['scripts/verify-referrals-browser.mjs'], 'referrals browser and clipboard acceptance');
     }
     const shared = files.some(f => f.startsWith('src/agent/') && (!f.startsWith('src/agent/apps/') || f.startsWith('src/agent/apps/api/')));

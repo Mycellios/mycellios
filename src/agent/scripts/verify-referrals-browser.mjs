@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium, expect } from '@playwright/test';
@@ -16,7 +17,9 @@ const server = await createServer({ root, configFile: path.join(root, 'vite.conf
   } }] });
 let browser;
 try {
-  await server.listen(); browser = await chromium.launch();
+  await server.listen();
+  const executablePath = process.env.WORKSPACE_UI_CHROMIUM ?? (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
+  browser = await chromium.launch(executablePath ? { executablePath } : existsSync(chromium.executablePath()) ? {} : { channel: 'chrome' });
   const base = `http://127.0.0.1:${server.httpServer.address().port}/__referrals`;
   const page = await browser.newPage({ viewport: { width: 1100, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
