@@ -88,7 +88,22 @@ try {
     await pause(1000);
   }
   assert.ok(learned, 'Gateway received the peer network map');
-  docker('exec', 'tailscale-qualification', 'tailscale', `--socket=/state/${id}/tailscaled.sock`, 'ping', '--c=1', '--timeout=20s', peer.Self.TailscaleIPs[0]);
+  // TSMP ping can lose the first packet while the new peers discover a path.
+  // Wait on the actual read-only TCP service instead. Only this fixture's
+  // counter GET is retried; MCP tool calls in the real connector are never replayed.
+  let ready = false;
+  for (let n = 0; n < 4; n++) {
+    try {
+      const response = await fetch(`http://127.0.0.1:8095/nodes/${id}/fetch`, { method: 'POST',
+        headers: { authorization: `Bearer ${process.env.TAILSCALE_GATEWAY_KEY}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ dnsSuffix: suffix, method: 'GET', url: `http://${peerName}:8080/counter` }),
+        signal: AbortSignal.timeout(15_000) });
+      if (response.ok && (await response.json()).calls === 0) { ready = true; break; }
+      await response.body?.cancel();
+    } catch { /* Bounded setup-only readiness, before any Mico calls. */ }
+    await pause(2000);
+  }
+  assert.ok(ready, 'The real private MCP TCP service became reachable through the gateway');
   console.log('PASS: two real userspace Tailscale nodes enrolled; encrypted peer reachability; private MCP has no direct public ingress');
 } finally {
   for (const container of ['tailnet-peer', 'tailscale-qualification']) {
