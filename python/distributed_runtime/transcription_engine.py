@@ -54,6 +54,9 @@ class TranscriptionEngine:
         from transformers import WhisperProcessor, WhisperForConditionalGeneration
         guard.check(force=True)
         checked_artifacts(root, manifest)
+        if manifest["repo"] != "openai/whisper-small" or manifest["revision"] != "973afd24965f72e36ca33b3055d56a652f456b4d":
+            raise ValueError("transcription_model_revision_changed")
+        self.artifacts_sha256 = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         if torch.cuda.device_count() != 1 or not torch.cuda.is_available():
             raise RuntimeError("physical_cuda_required")
         torch.set_num_threads(2)
@@ -76,6 +79,7 @@ class TranscriptionEngine:
                 "precision": "float32", "fallback": False, "tf32": False,
                 "gpuCoreSourceSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 "guardSourceSha256": hashlib.sha256(Path(__file__).with_name("replica_gpu_guard.py").read_bytes()).hexdigest(),
+                "artifactsSha256": self.artifacts_sha256,
                 "reservation": {"id": lease["id"], "nodeId": self.guard.config["nodeId"],
                     "consumerId": self.guard.config["consumerId"], "memoryMiB": self.guard.config["memoryMiB"],
                     "expiresAt": lease["expiresAt"]}}
@@ -102,6 +106,9 @@ class TranscriptionEngine:
                         raise ValueError("unsupported_audio_language")
                 tokens = self.model.generate(features, language=language, task="transcribe", max_new_tokens=256,
                                              do_sample=False, num_beams=1, return_timestamps=False)
+                eos = self.model.generation_config.eos_token_id
+                if int(tokens[0, -1]) not in (eos if isinstance(eos, list) else [eos]):
+                    raise ValueError("incomplete_transcription")
                 text = self.processor.batch_decode(tokens, skip_special_tokens=True)[0].strip()
                 torch.cuda.synchronize()
             self.guard.check(force=True)

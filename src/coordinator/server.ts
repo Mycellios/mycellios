@@ -4674,6 +4674,7 @@ export async function createCoordinator(
         owned_by: "mycellios",
         x_replicas: model.replicas,
         x_pipelines: model.pipelines,
+        ...(model.id === TRANSCRIPTION_MODEL ? { task: "transcription", max_audio_seconds: 30 } : {}),
       })),
     };
   });
@@ -4684,6 +4685,9 @@ export async function createCoordinator(
 
   app.post("/v1/chat/completions", async (request, reply) => {
     const parsed = parseChatRequest(request.body, config.modelRequestTimeoutsMs);
+    if (parsed.model === TRANSCRIPTION_MODEL && request.headers["x-mycellios-funding"] !== "contribution-credits") {
+      return reply.code(400).send({ error: { code: "transcription_funding_required", message: "Network dictation requires explicit contribution-credit funding." } });
+    }
     const principal: ApiRequestPrincipal = apiAccessEnabled
       ? principalFor(request)
       : { kind: "system" };

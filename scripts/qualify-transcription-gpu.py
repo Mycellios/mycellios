@@ -75,6 +75,7 @@ for language, expected in [("es", "buenos dias la reunion empieza manana a las 9
 guard.check(force=True)
 import torch
 proof = {"backend": "cuda", "dtype": "float32", "tf32": False, "device": engine.device_name,
+         "artifactsSha256": engine.artifacts_sha256,
          "sourceSha256": source_sha, "modelDigest": engine.digest, "reservationId": cfg["qualificationReservationId"],
          "peakAllocatedBytes": torch.cuda.max_memory_allocated(), "rows": rows}
 path = root / "private-qualification.json"

@@ -17,20 +17,23 @@ const cfg = z.object({
   modelId: z.literal(TRANSCRIPTION_MODEL), modelDigest: z.literal(TRANSCRIPTION_DIGEST), nodeId: z.string().min(1),
   consumerId: z.string().min(1), memoryMiB: z.literal(2048), deviceName: z.string().min(1),
   gpuCoreSourceSha256: z.string().regex(/^[a-f0-9]{64}$/), guardSourceSha256: z.string().regex(/^[a-f0-9]{64}$/),
+  artifactsSha256: z.string().regex(/^[a-f0-9]{64}$/),
   nativeConfigPath: z.string().min(1), nativeStatePath: z.string().min(1),
 }).parse(JSON.parse(readFileSync(configPath, "utf8")));
 const runtime = readNativeRuntimeBuildMetadata(resolve(import.meta.dirname, "../.."));
+if (!runtime.buildIdentity || !runtime.revision) throw new Error("transcription_release_provenance_required");
 const response = await fetch("http://127.0.0.1:8892/health", { redirect: "error", signal: AbortSignal.timeout(5000) });
 if (!response.ok) throw new Error("transcription_runtime_unavailable");
 const health = await response.json() as { status?: string; artifact_identity?: string; execution?: {
   backend?: string; precision?: string; deviceName?: string; fallback?: boolean; tf32?: boolean;
-  gpuCoreSourceSha256?: string; guardSourceSha256?: string;
+  gpuCoreSourceSha256?: string; guardSourceSha256?: string; artifactsSha256?: string;
   reservation?: { nodeId?: string; consumerId?: string; memoryMiB?: number; expiresAt?: number };
 } };
 const gpu = health.execution;
 if (health.status !== "ready" || health.artifact_identity !== cfg.modelDigest || gpu?.backend !== "cuda"
   || gpu.precision !== "float32" || gpu.fallback !== false || gpu.tf32 !== false || gpu.deviceName !== cfg.deviceName
   || gpu.gpuCoreSourceSha256 !== cfg.gpuCoreSourceSha256 || gpu.guardSourceSha256 !== cfg.guardSourceSha256
+  || gpu.artifactsSha256 !== cfg.artifactsSha256
   || gpu.reservation?.nodeId !== cfg.nodeId || gpu.reservation.consumerId !== cfg.consumerId
   || gpu.reservation.memoryMiB !== cfg.memoryMiB || (gpu.reservation.expiresAt ?? 0) <= Date.now() + 20_000) {
   throw new Error("transcription_physical_runtime_not_qualified");
@@ -47,7 +50,7 @@ if (workAdmissionPolicy(cfg.modelId, new Date())) throw new Error("physical_owne
 const buildIdentity = { schema: "mycellios-native-build-provenance/1" as const, version: runtime.version,
   sourceId: "sha256:" + createHash("sha256").update(JSON.stringify({ base: runtime.buildIdentity,
     worker: createHash("sha256").update(readFileSync(new URL(import.meta.url))).digest("hex"),
-    core: cfg.gpuCoreSourceSha256, guard: cfg.guardSourceSha256 })).digest("hex") };
+    core: cfg.gpuCoreSourceSha256, guard: cfg.guardSourceSha256, artifacts: cfg.artifactsSha256 })).digest("hex") };
 const agent = new WorkerAgent(loadWorkerConfig(resolve(process.env.GPU_MESH_WORKER_CONFIG)), {
   coordinatorUrl: process.env.GPU_MESH_COORDINATOR ?? "https://www.mycellios.com",
   admissionSigner: workerAdmissionSigner(loadOrCreateWorkerAdmissionCredential(resolve(process.env.MYCELLIOS_WORKER_CREDENTIAL_PATH))),

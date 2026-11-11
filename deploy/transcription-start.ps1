@@ -9,6 +9,7 @@ $proof=Get-Content -LiteralPath (Join-Path $root 'private-qualification.json') -
 if($proof.sourceSha256 -ne $cfg.gpuCoreSourceSha256 -or $proof.modelDigest -ne $cfg.modelDigest -or $proof.rows.Count -ne 6 -or $proof.backend -ne 'cuda' -or $proof.tf32 -ne $false){throw 'Transcription private qualification missing'}
 $env:PYTHONPATH='C:\ProgramData\Mycellios\mcg\cuda\Lib\site-packages;C:\ProgramData\Mycellios\Kokoro\venv\Lib\site-packages;'+$root
 $env:PYTHONNOUSERSITE='1';$env:OMP_NUM_THREADS='2';$env:HF_HUB_OFFLINE='1'
+$env:TIKTOKEN_CACHE_DIR='C:\ProgramData\Mycellios\Kokoro\Cache\tiktoken'
 $env:MYCELLIOS_TRANSCRIPTION_GPU_CONFIG=Join-Path $root 'gpu-config.json'
 $env:MYCELLIOS_TRANSCRIPTION_ARTIFACTS=Join-Path $root 'transcription-artifacts.json'
 $env:MYCELLIOS_TRANSCRIPTION_MODEL_PATH=Join-Path $root 'model'
@@ -39,4 +40,3 @@ try {
 }finally{
  foreach($child in @($worker,$engine)){if($child -and -not $child.HasExited){Stop-Process -Id $child.Id -Force -ErrorAction SilentlyContinue}}
 }
-
