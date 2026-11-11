@@ -75,11 +75,20 @@ try {
   const peer = JSON.parse(docker('exec', 'tailnet-peer', 'tailscale', '--socket=/tmp/peer.sock', 'status', '--json'));
   assert.equal(peer.BackendState, 'Running');
   assert.equal(peer.CurrentTailnet.MagicDNSSuffix, suffix);
-  const endpoint = `http://private-mcp.${suffix}:8080/mcp`;
+  const peerName = peer.Self.DNSName.replace(/\.$/, '');
+  assert.equal(peerName, `private-mcp.${suffix}`, 'Actual MagicDNS name matches the bound MCP');
+  const endpoint = `http://${peerName}:8080/mcp`;
   await assert.rejects(fetch(endpoint, { signal: AbortSignal.timeout(2000) }), 'MCP is unreachable without tailnet');
   // The actual Prisma + Mico connector harness consumes this running network.
   writeFileSync(`${dir}/network.json`, JSON.stringify({ id, suffix, endpoint, controller: 'Headscale 0.29.6', saasConsentVerified: false }));
-  docker('exec', 'tailscale-qualification', 'tailscale', `--socket=/state/${id}/tailscaled.sock`, 'ping', '--c=1', '--timeout=20s', `private-mcp.${suffix}`);
+  let learned = false;
+  for (let n = 0; n < 30; n++) {
+    const map = JSON.parse(docker('exec', 'tailscale-qualification', 'tailscale', `--socket=/state/${id}/tailscaled.sock`, 'status', '--json'));
+    if (Object.values(map.Peer ?? {}).some(p => p.TailscaleIPs?.includes(peer.Self.TailscaleIPs[0]))) { learned = true; break; }
+    await pause(1000);
+  }
+  assert.ok(learned, 'Gateway received the peer network map');
+  docker('exec', 'tailscale-qualification', 'tailscale', `--socket=/state/${id}/tailscaled.sock`, 'ping', '--c=1', '--timeout=20s', peer.Self.TailscaleIPs[0]);
   console.log('PASS: two real userspace Tailscale nodes enrolled; encrypted peer reachability; private MCP has no direct public ingress');
 } finally {
   for (const container of ['tailnet-peer', 'tailscale-qualification']) {
