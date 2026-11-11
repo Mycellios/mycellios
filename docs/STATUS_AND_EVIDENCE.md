@@ -1,5 +1,31 @@
 # Status and evidence
 
+## Connector and approval hardening — upstream review, 2026-11-11
+
+The candidate collects explicitly named credentials in local MCP launch arguments
+(flags, headers, environment assignments and URL passwords/query tokens) without
+changing the arguments passed to the process. These values join existing output,
+error and log redaction. Credential-bearing tool names/schemas are omitted;
+descriptions are redacted without rewriting schema keywords. This is explicit
+credential detection, not arbitrary program or credential-file analysis.
+
+Auto Review accepts one complete flat `pass`/`ask` verdict, optionally JSON-fenced.
+Duplicate keys, unknown fields, surrounding text, malformed fields and oversized
+replies follow the existing owner-approval fallback. MCP browser authorization
+accepts URLs up to 16,384 characters, including appended parameters; resource URL
+limits, origin validation and private-network authorization remain unchanged.
+
+Local focused validation passes 224 tests in launch credential, MCP connector,
+OAuth, Auto Review and reviewer-factory suites. The regression fixtures cover
+launch/discovery/call failures, model-visible outputs and credential-bearing
+schemas. They do not qualify a live provider login or installed Desktop update.
+Remote typing, integration and publication need their own exact-revision evidence;
+full suites remain paused. These independently implemented changes were selected
+after reviewing [Rakazo 0.9.0](https://github.com/elie222/rakazo/releases/tag/v0.9.0)
+and [OpenBot 0.67.1](https://github.com/nightly-labs/openbot/releases/tag/v0.67.1).
+Existing ZIP import already accepts missing Unix file types while rejecting links
+and devices; no OpenBot implementation was copied.
+
 ## Tailscale private MCP connections — server release, 2026-11-11
 
 Conexiones has personal and company tailnet enrollment, explicit per-Mico network
