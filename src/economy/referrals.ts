@@ -47,6 +47,24 @@ CREATE TRIGGER mycellios_referral_award_admission_guard BEFORE INSERT ON referra
   FOR EACH ROW EXECUTE FUNCTION mycellios_referral_award_admission();
 `;
 
+/** Migration-owner only: browser database roles must never read or mint rewards. */
+export function referralAccessSchemaSql(runtimeRole: string) {
+  if (!/^[a-z_][a-z_0-9]{0,62}$/.test(runtimeRole)) throw new Error("Invalid referral runtime role");
+  const tables = ["referral_invites", "referral_visits", "referral_pending_accounts", "referral_redemptions", "economic_promotion_allocations"];
+  return tables.map(table => `
+    REVOKE ALL ON ${table} FROM PUBLIC;
+    DO $access$ DECLARE role_name text; BEGIN
+      FOR role_name IN SELECT rolname FROM pg_catalog.pg_roles WHERE rolname IN ('anon','authenticated','service_role') LOOP
+        EXECUTE format('REVOKE ALL ON ${table} FROM %I',role_name);
+      END LOOP;
+    END;$access$;
+    ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS referral_runtime_access ON ${table};
+    CREATE POLICY referral_runtime_access ON ${table} TO "${runtimeRole}" USING (true) WITH CHECK (true);
+    GRANT SELECT,INSERT,UPDATE ON ${table} TO "${runtimeRole}";
+  `).join("\n");
+}
+
 export class Referrals {
   constructor(private readonly database: MeshDatabase, private readonly emailPepper: string) {
     if (emailPepper.length < 32) throw new Error("Referral email fingerprint key is missing");

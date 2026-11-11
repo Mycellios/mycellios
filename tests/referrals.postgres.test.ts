@@ -7,13 +7,14 @@ import { MeshDatabase } from "../src/storage/database.js";
 import { EconomicLedger } from "../src/economy/economic-ledger.js";
 import { ContributionCreditWallet, contributionCreditSchemaSql } from "../src/economy/contribution-credit-wallet.js";
 import { PromotionalCredits, expiringPromotionSchemaSql } from "../src/economy/promotional-credits.js";
-import { Referrals, referralSchemaSql, type ReferralAccount } from "../src/economy/referrals.js";
+import { Referrals, referralSchemaSql, referralAccessSchemaSql, type ReferralAccount } from "../src/economy/referrals.js";
 import { mountReferralRoutes, referralReceipt, REFERRAL_COOKIE } from "../src/coordinator/referral-routes.js";
 
 // The dedicated CI gate supplies real PostgreSQL; ordinary unit discovery reports this suite skipped.
 const url = process.env.MYCELLIOS_REFERRAL_TEST_POSTGRES_URL;
 describe.skipIf(!url)("verified referrals on isolated PostgreSQL", () => {
 const schema = "referrals_test_" + Math.random().toString(36).slice(2);
+const runtimeRole = schema + "_native", deniedRole = schema + "_browser";
 const sql = postgres(url!, { max: 2, onnotice: () => {} });
 let db: MeshDatabase, ledger: EconomicLedger, wallet: ContributionCreditWallet, referrals: Referrals;
 const now = 2_000_000_000_000;
@@ -43,6 +44,8 @@ beforeAll(async () => {
   await sql.unsafe(`SET search_path TO ${schema}; CREATE TABLE schema_meta(version integer); INSERT INTO schema_meta VALUES(33);
     CREATE TABLE api_usage(id text primary key,status text); CREATE TABLE api_accounts(user_id text primary key,created_at bigint);
     CREATE TABLE api_operator_funded_usage(usage_id text);` + contributionCreditSchemaSql + expiringPromotionSchemaSql + referralSchemaSql);
+  await sql.unsafe(`CREATE ROLE ${runtimeRole} NOLOGIN; CREATE ROLE ${deniedRole} NOLOGIN;
+    GRANT USAGE ON SCHEMA ${schema} TO ${runtimeRole},${deniedRole}; SET search_path TO ${schema};` + referralAccessSchemaSql(runtimeRole));
   db = await MeshDatabase.openPostgres(url!, schema);
   ledger = new EconomicLedger(db, { receiptSigning: { keyId: "referral-test", privateKey: generateKeyPairSync("ed25519").privateKey } });
   await ledger.registerDefaultInternalPricing();
@@ -56,7 +59,17 @@ beforeEach(async () => {
     economic_promotional_grants,api_usage,api_accounts,economic_settlement_receipts,economic_ledger_entries,
     economic_settlements,economic_contribution_evidence,economic_accounts,economic_node_reputation CASCADE`);
 });
-afterAll(async () => { await db?.close(); await sql.unsafe(`DROP SCHEMA ${schema} CASCADE`); await sql.end(); });
+afterAll(async () => { await db?.close(); await sql.unsafe(`DROP SCHEMA ${schema} CASCADE; DROP ROLE ${runtimeRole}; DROP ROLE ${deniedRole}`); await sql.end(); });
+
+it("only the native database role can read or create invitations, even if browser table access is accidentally granted", async () => {
+  await invitation();
+  await sql.unsafe(`GRANT SELECT,INSERT ON ${schema}.referral_invites TO ${deniedRole}`);
+  const rows = await sql.begin(async tx => { await tx.unsafe(`SET LOCAL ROLE ${deniedRole}`); return await tx.unsafe(`SELECT * FROM ${schema}.referral_invites`); });
+  expect(rows).toHaveLength(0);
+  await expect(sql.begin(async tx => { await tx.unsafe(`SET LOCAL ROLE ${deniedRole}`); await tx.unsafe(`INSERT INTO ${schema}.referral_invites VALUES('forged','forged','forged',0)`); })).rejects.toMatchObject({ code: "42501" });
+  const allowed = await sql.begin(async tx => { await tx.unsafe(`SET LOCAL ROLE ${runtimeRole}`); return await tx.unsafe(`SELECT * FROM ${schema}.referral_invites`); });
+  expect(allowed).toHaveLength(1);
+});
 
 it("keeps personal links stable and first touch across another invite, reload and verification", async () => {
   const { owner, invite, receipt } = await invitation();
