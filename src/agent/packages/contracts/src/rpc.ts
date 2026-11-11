@@ -1,3 +1,4 @@
+import { TailnetConnectionInput, TailnetConnectionSchema, TailnetSuffix } from "./tailscale.js";
 import { NotificationSettingsSchema, WebPushSubscriptionSchema } from "./notification-settings.js";
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
@@ -935,6 +936,14 @@ export const appContract = {
       )
       .output(CapabilityInstallSchema),
     remove: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+  },
+  tailscale: {
+    list: oc.output(z.object({ available: z.boolean(), admin: z.boolean(), companyNetworks: z.array(z.object({ id: Id, dnsSuffix: TailnetSuffix, enabled: z.boolean() })), connections: z.array(TailnetConnectionSchema) })),
+    create: oc.input(TailnetConnectionInput).output(TailnetConnectionSchema),
+    connect: oc.input(z.object({ id: Id })).output(TailnetConnectionSchema),
+    disconnect: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
+    grant: oc.input(z.object({ id: Id, allowedBotIds: z.array(Id).max(100) })).output(z.object({ ok: z.literal(true) })),
+    company: oc.input(z.object({ dnsSuffix: TailnetSuffix, enabled: z.boolean() })).output(z.object({ ok: z.literal(true) })),
   },
   mcp: {
     servers: {

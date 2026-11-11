@@ -202,6 +202,8 @@ x-app-environment: &app-environment
   MCP_STDIO_IDLE_MS:
   MCP_DISCOVERY_TIMEOUT_MS:
   MCP_PACKAGES_DIR:
+  TAILSCALE_GATEWAY_URL:
+  TAILSCALE_GATEWAY_KEY:
   MCP_ALLOW_PRIVATE_ENDPOINT:
   # Messaging (outbound delivery runs in the worker)
   MESSAGING_OPEN_SIGNUP:

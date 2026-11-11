@@ -183,6 +183,7 @@ export type McpConnectorOptions = {
   stdioEnabled?: boolean;
   allowedCommands?: string[];
   network?: RemoteTransportDependencies;
+  tailnets?: import("./tailscale.js").TailnetService;
   /** Audit sink for failed discovery. Without it the log line stays the only trace. */
   events?: Pick<ThreadEvents, "append">;
   allowPrivateEndpoint?: boolean;
@@ -405,8 +406,18 @@ export class McpConnector implements ConnectorProvider {
       },
       include: { server: true },
     });
+    const authorizedAssignments = [];
+    for (const assignment of assignments) {
+      if (assignment.server.networkId) {
+        try {
+          if (!this.options.tailnets) continue;
+          await this.options.tailnets.authorize(assignment.server.networkId, context, assignment.server);
+        } catch { continue; }
+      }
+      authorizedAssignments.push(assignment);
+    }
     const groups = await Promise.all(
-      assignments.map(async (assignment): Promise<ConnectorTool[]> => {
+      authorizedAssignments.map(async (assignment): Promise<ConnectorTool[]> => {
         const startedAt = Date.now();
         const server = assignment.server;
         const key = this.sessionKey(server, context);
@@ -763,7 +774,7 @@ export class McpConnector implements ConnectorProvider {
   private sessionKey(server: McpServer, context: AdapterContext): string {
     // Identity headers are applied once, at connect time, so a session is only
     // valid for the identity it connected as. The key has to carry that identity.
-    return `${server.id} ${context.spaceId} ${context.userId}`;
+    return `${server.id} ${context.spaceId} ${context.userId}${server.networkId ? ` ${context.botId ?? "probe"}` : ""}`;
   }
 
   /** Stop stdio processes nobody used for `idleMs`. Returns how many were stopped. */
@@ -823,6 +834,8 @@ export class McpConnector implements ConnectorProvider {
     context: AdapterContext,
     use: (session: McpSession) => Promise<T>,
   ): Promise<T> {
+    if (server.networkId) await this.options.tailnets?.authorize(server.networkId, context, server);
+    if (server.networkId && !this.options.tailnets) throw new Error("Tailscale is unavailable");
     const sessionKey = this.sessionKey(server, context);
     for (let attempt = 0; ; attempt += 1) {
       const session = await this.sessionFor(server, context);
@@ -963,6 +976,8 @@ export class McpConnector implements ConnectorProvider {
     launchSecrets?: string[];
   }> {
     const session = new McpSession({ name: `rakazo-${server.slug}` });
+    if (server.networkId && !this.options.tailnets) throw new Error("Tailscale is unavailable");
+    if (server.networkId) await this.options.tailnets!.authorize(server.networkId, context, server);
     let credentialDir: string | undefined;
     const launchSecrets: string[] = [];
     // Hoisted so a throw after the secret is decoded can still hand the material out.
@@ -1122,7 +1137,10 @@ export class McpConnector implements ConnectorProvider {
         if (!server.endpoint) throw new Error("MCP endpoint is required");
         const endpoint = new URL(server.endpoint);
         const localHttp = endpoint.protocol === "http:" && isLocalMcpHost(endpoint.hostname);
-        const allowPrivateEndpoint = this.options.allowPrivateEndpoint === true;
+        const allowPrivateEndpoint = Boolean(server.networkId) || this.options.allowPrivateEndpoint === true;
+        const network = server.networkId
+          ? await this.options.tailnets!.transport(server.networkId, context, server)
+          : this.options.network;
         const authProvider =
           !localHttp && this.oauth
             ? await this.oauth.providerFor(server, context, loaded, onPersisted)
@@ -1148,7 +1166,7 @@ export class McpConnector implements ConnectorProvider {
           headerPolicy: { headers },
           fallbackToSse: false,
           authProvider,
-          network: this.options.network,
+          network,
           signal: context.signal,
         });
       }

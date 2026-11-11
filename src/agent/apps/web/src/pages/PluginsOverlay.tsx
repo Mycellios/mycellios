@@ -1,3 +1,4 @@
+import { TailscaleConnections } from "./TailscaleConnections";
 import { BUILTIN_CONNECTOR, BUILTIN_INTEGRATIONS, integrationCatalog, type BuiltinIntegration } from "./marketplace/builtin-integrations";
 import { connectBuiltinIntegration } from "../lib/connect-builtin-integration";
 import { appCategory, appDescription, appPriority, groupByCategory, matches } from "./marketplace/catalog";
@@ -883,7 +884,8 @@ export function PluginsOverlay({
           </div>
         ) : null}
 
-        {!detailItem && (mcpServers.some(server => !BUILTIN_INTEGRATIONS.some(app => app.endpoint === server.endpoint)) || mcpError) ? (
+                  {!detailItem ? <TailscaleConnections onOpenMcp={onOpenMcp} /> : null}
+{!detailItem && (mcpServers.some(server => !BUILTIN_INTEGRATIONS.some(app => app.endpoint === server.endpoint)) || mcpError) ? (
           <section data-testid="registered-mcp-servers" className="mb-6">
             <div className="mb-2 flex items-center justify-between gap-3">
               <h2 className="text-sm font-medium">

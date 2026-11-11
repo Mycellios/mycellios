@@ -1,5 +1,44 @@
 # Status and evidence
 
+## Tailscale private MCP connections — qualification candidate, 2026-11-11
+
+Conexiones has personal and company tailnet enrollment, explicit per-Mico network
+grants and an MCP network selector. Each user/Space/network uses a separate
+userspace device in an optional private Linux gateway. Existing MCP/tool grants
+are retained. Discovery, cached-session execution and every private HTTP request
+revalidate owner, current membership, network policy and the saved MCP binding.
+Company policy cannot be bypassed by labeling its known tailnet personal.
+Separate private OAuth origins need explicit per-MCP authorization. Disconnect
+closes admission before device cleanup; the gateway never retries uncertain calls.
+
+The source incorporates main `fd83aa53ed7567c0918cd7a90f1f9b2946876d7e`, preserving
+its floating-chat, spoken-reply and translation changes. Local focused validation
+passes 302 tests across contracts, transport, MCP/OAuth, authenticated API and
+deployment settings, plus three gateway protocol tests. Incremental API, worker
+and web typing passes. An isolated loopback PostgreSQL instance passes the actual
+additive migration, legacy MCP compatibility, network FK and owner/Space RLS
+checks. The real network/MCP components pass synthetic browser interactions at
+desktop and 390px widths. Synthetic RPCs and MCP emulation are not a live tailnet.
+
+  The Linux gateway Docker build and unprivileged native startup passed in hosted
+  CI. Run `42985962400` enrolled two real userspace Tailscale clients in a disposable
+  Headscale 0.29.6 network, verified encrypted peer reachability and executed the
+  private MCP through the actual Mico connector and isolated PostgreSQL. Network,
+  MCP and tool grants, owner/Space isolation, cached-session revocation and company
+  policy revocation passed. Both clients ran in separate containers on one hosted
+  runner; this is not physical two-host evidence. The migration history applied
+  successfully, separately from the focused PostgreSQL RLS qualification.
+
+  Native startup obtained a real official Tailscale device-consent URL. Completed
+  Tailscale SaaS browser consent, a full LLM-driven Mico run and a new packaged
+  Desktop release are NOT QUALIFIED by these checks. Production publication needs
+  its own exact-revision build, deployment/rollback receipts and health checks.
+  Full suites remain paused. The older general Compose environment audit reports
+missing pre-existing non-Tailscale settings; the focused Tailscale comparison
+passes and does not enable global private egress. No release or production
+  capability follows from validation alone. See `DEVELOPMENT.md` and
+  `specs/tailscale-connections/spec.md`.
+
 ## Desktop-owned Mico execution candidate - 2026-11-07
 
 The local candidate adds account-scoped Desktop execution of the existing Mico

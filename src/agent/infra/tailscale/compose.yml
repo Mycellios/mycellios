@@ -1,0 +1,21 @@
+# Optional private service. Connect it to the API/worker's private Docker network.
+# No host ports, Docker socket, TUN device, privileged mode or NET_ADMIN capability.
+services:
+  tailscale-gateway:
+    build:
+      context: ../..
+      dockerfile: infra/tailscale/Dockerfile
+    environment:
+      TAILSCALE_GATEWAY_KEY: ${TAILSCALE_GATEWAY_KEY:?Set a private gateway key of at least 32 characters}
+    volumes:
+      - tailnet-state:/state
+    restart: unless-stopped
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 1g
+    cpus: 1
+volumes:
+  tailnet-state:

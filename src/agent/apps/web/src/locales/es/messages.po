@@ -10897,6 +10897,141 @@ msgstr "Hola, esta es la voz de Mycellios."
 msgid "Preview uses your Mycellios credits."
 msgstr "La prueba usa tus créditos de Mycellios."
 
+#: src/pages/TailscaleConnections.tsx
+msgid "Could not update Tailscale. Try again."
+msgstr "No se pudo actualizar Tailscale. Inténtalo de nuevo."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Sign in required"
+msgstr "Necesita iniciar sesión"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Waiting for Tailscale device approval"
+msgstr "Pendiente de aprobación del dispositivo en Tailscale"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Signed in to a different network. Disconnect and connect again."
+msgstr "Has iniciado sesión en otra red. Desconecta y vuelve a conectar."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Authorized Micos"
+msgstr "Micos autorizados"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Create a Mico before granting network access."
+msgstr "Crea un Mico antes de conceder acceso a la red."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Connect a private network, then assign its MCP servers to your Micos."
+msgstr "Conecta una red privada y asigna sus servidores MCP a tus Micos."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Add network"
+msgstr "Añadir red"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Loading networks…"
+msgstr "Cargando redes…"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Could not load networks. Retry"
+msgstr "No se pudieron cargar las redes. Reintentar"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Tailscale is not available on this server yet."
+msgstr "Tailscale aún no está disponible en este servidor."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Network name"
+msgstr "Nombre de la red"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Tailscale DNS suffix"
+msgstr "Sufijo DNS de Tailscale"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Find the network suffix in Tailscale DNS settings. Sign in to this same network when connecting."
+msgstr "Encontrarás el sufijo de la red en los ajustes DNS de Tailscale. Al conectar, inicia sesión en esa misma red."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Network type"
+msgstr "Tipo de red"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Company"
+msgstr "Empresa"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "A Space administrator must enable this company network. Each member signs in with their own Tailscale account."
+msgstr "Un administrador del Space debe habilitar esta red de empresa. Cada miembro inicia sesión con su propia cuenta de Tailscale."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Enable company network"
+msgstr "Habilitar red de empresa"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Only selected Micos can use this network. Each Mico also needs its own MCP server and tool permissions."
+msgstr "Solo los Micos seleccionados pueden usar esta red. Cada Mico también necesita permisos para el servidor MCP y sus herramientas."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Save network"
+msgstr "Guardar red"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Sign in to Tailscale"
+msgstr "Iniciar sesión en Tailscale"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Save Mico access"
+msgstr "Guardar acceso de los Micos"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Enabled for this Space"
+msgstr "Habilitada para este Space"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Disabled for this Space"
+msgstr "Deshabilitada para este Space"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Disable company access"
+msgstr "Deshabilitar acceso de empresa"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Enable company access"
+msgstr "Habilitar acceso de empresa"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Network"
+msgstr "Red"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "MCP network"
+msgstr "Red del MCP"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Server default"
+msgstr "Predeterminada del servidor"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "A Tailscale MCP must use its full server.tailnet.ts.net URL. Its Micos need permission for both the network and the MCP."
+msgstr "Un MCP de Tailscale debe usar su URL completa servidor.red.ts.net. Sus Micos necesitan permiso tanto para la red como para el MCP."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "The saved private network is unavailable. Its binding is preserved."
+msgstr "La red privada guardada no está disponible. Se mantiene su vinculación."
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Additional private OAuth origins"
+msgstr "Orígenes OAuth privados adicionales"
+
+#: src/pages/TailscaleConnections.tsx
+msgid "Optional. One origin per line, only when this MCP uses a separate sign-in server inside the same tailnet."
+msgstr "Opcional. Un origen por línea, solo si este MCP usa otro servidor de inicio de sesión dentro de la misma red Tailscale."
+
+msgid "No Mico has network access yet."
+msgstr "Ningún Mico tiene acceso a la red todavía."
+
 msgid "Confirm your account"
 msgstr "Confirma tu cuenta"
 

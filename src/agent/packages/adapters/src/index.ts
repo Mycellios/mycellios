@@ -1,3 +1,4 @@
+export * from "./tailscale.js";
 export * from "./agent-connections.js";
 export * from "./agent-environment.js";
 export * from "./agent-import-settings.js";

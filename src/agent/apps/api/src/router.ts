@@ -39,6 +39,7 @@ import { connectionsRoutes } from "./routes/connections.js";
 import { contentRoutes } from "./routes/content.js";
 import { createRouterContext } from "./routes/context.js";
 import { localCapabilityRoutes } from "./routes/local-capabilities.js";
+import { tailscaleRoutes } from "./routes/tailscale.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memory.js";
 import { messagingRoutes } from "./routes/messaging.js";
@@ -102,6 +103,7 @@ export interface RouterDeps {
   integrationSettings?: IntegrationProviderSettings;
   composio?: ComposioProvider;
   mcpOAuth?: McpOAuthBroker;
+  tailnets?: import("@rakazo/adapters").TailnetService;
   /**
    * The API process's MCP connector, used to launch/list an MCP server once so its health
    * is visible (`mcp.servers.test` and the probe after create/update/OAuth). Without it
@@ -170,6 +172,7 @@ export function createRouter(deps: RouterDeps) {
     ...workflowsRoutes(ctx),
     ...boardsRoutes(ctx),
     ...mcpRoutes(ctx),
+    ...tailscaleRoutes(ctx),
     ...connectionsRoutes(ctx),
     ...messagingRoutes(ctx),
     ...contentRoutes(ctx),

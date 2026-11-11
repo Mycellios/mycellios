@@ -18,6 +18,61 @@ import { EncryptedSecretStore } from "./secrets.js";
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("MCP managed tailnet admission", () => {
+  function setup() {
+    const allowed = new Set(["mico-a", "mico-b"]);
+    const server = { id: "private", name: "Private", slug: "private", revision: 1,
+      networkId: "network-a", endpoint: "https://mcp.tail123.ts.net/mcp", transport: "streamable_http", secretId: null, args: [] };
+    const assignment = { server, serverId: server.id, spaceId: "s", userId: "u", allowAllTools: true, allowedTools: [] };
+    const prisma = {
+      botMcpServer: {
+        findMany: vi.fn(async () => [assignment]),
+        findFirst: vi.fn(async () => assignment),
+      },
+      mcpServer: { updateMany: vi.fn(async () => ({ count: 1 })) },
+    };
+    const state = { failNext: false, initializations: 0 };
+    const requests = vi.fn(mcpFetch(state, server.endpoint));
+    const tailnets = {
+      authorize: vi.fn(async (_id: string, context: { botId?: string }) => {
+        if (!allowed.has(context.botId ?? "")) throw new Error("Mico is not authorized for this network");
+      }),
+      transport: vi.fn(async () => ({ managedFetch: requests })),
+    };
+    const connector = new McpConnector(prisma as never, {} as never, { tailnets: tailnets as never });
+    const context = { operationId: "test", traceId: "test", spaceId: "s", userId: "u", botId: "mico-a", signal: new AbortController().signal };
+    return { allowed, state, requests, connector, context, server };
+  }
+  it("offers no private tools to a Mico without the network grant", async () => {
+    const f = setup(); f.allowed.clear();
+    try {
+      expect(await f.connector.discoverTools(f.context)).toEqual([]);
+      expect(f.requests).not.toHaveBeenCalled();
+    } finally { await f.connector.close(); }
+  });
+  it("never shares a private session between two Micos", async () => {
+    const f = setup();
+    try {
+      expect(await f.connector.discoverTools(f.context)).toHaveLength(1);
+      expect(await f.connector.discoverTools({ ...f.context, botId: "mico-b" })).toHaveLength(1);
+      expect(f.state.initializations).toBe(2);
+    } finally { await f.connector.close(); }
+  });
+  it("rechecks the network grant before executing on an existing session", async () => {
+    const f = setup();
+    try {
+      await f.connector.discoverTools(f.context);
+      const before = f.requests.mock.calls.length;
+      f.allowed.clear();
+      const events = [];
+      for await (const event of f.connector.execute({ tool: "mcp__private__read", args: {}, executionId: "test",
+        route: { connectorId: "mcp", resourceId: f.server.id, toolName: "read" } }, f.context)) events.push(event);
+      expect(events).toMatchObject([{ type: "error", message: expect.stringContaining("not authorized") }]);
+      expect(f.requests).toHaveBeenCalledTimes(before);
+    } finally { await f.connector.close(); }
+  });
+});
+
 /** Discovery of a failed server offers only its stand-in "unavailable" tool. */
 const unavailableOnly = (slug = "demo") => [
   expect.objectContaining({
@@ -2199,10 +2254,13 @@ describe("MCP connector stdio credential files", () => {
     const [launch] = launches;
     const file = launch?.files.MAIL_CREDENTIALS;
     expect(launch?.env.MAIL_REGION).toBe("eu");
-    expect(launch?.env.MAIL_CREDENTIALS).toMatch(/\/MAIL_CREDENTIALS$/);
-    expect(file?.dir.startsWith(`${credentialRoot}/rakazo-mcp-`)).toBe(true);
-    expect(file?.dirMode).toBe(0o700);
-    expect(file?.mode).toBe(0o600);
+    expect(launch?.env.MAIL_CREDENTIALS?.replace(/\\/g, "/")).toMatch(/\/MAIL_CREDENTIALS$/);
+    expect(file?.dir.replace(/\\/g, "/").startsWith(`${credentialRoot.replace(/\\/g, "/")}/rakazo-mcp-`)).toBe(true);
+    // Windows reports DOS attributes through stat, not POSIX owner-only bits.
+    if (process.platform !== "win32") {
+      expect(file?.dirMode).toBe(0o700);
+      expect(file?.mode).toBe(0o600);
+    }
     expect(JSON.parse(file?.content ?? "")).toEqual({
       token: "access-1",
       expiry: expect.any(Number),
