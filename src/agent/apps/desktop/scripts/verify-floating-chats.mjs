@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -14,6 +14,7 @@ const output = path.resolve(process.argv[2] ?? 'floating-chat-proof');
 const temp = await mkdtemp(path.join(tmpdir(), 'mycellios-floating-proof-'));
 const require = createRequire(import.meta.url);
 const electron = require('electron');
+await mkdir(output, { recursive: true });
 try {
   await copyFile(path.join(desktop, 'dist/floating-chat-preload.cjs'), path.join(temp, 'floating-chat-preload.cjs'));
   const source = `
@@ -26,8 +27,11 @@ app.setPath('userData', ${JSON.stringify(path.join(temp, 'profile'))});
 app.on('window-all-closed', () => {});
 const server = createServer((_req,res) => { res.setHeader('content-type','text/html'); res.end('<!doctype html><title>Isolated chat fixture</title><main>Chat fixture</main>'); });
 let main, chats;
-try {
+const phase = value => writeFileSync(${JSON.stringify(path.join(temp, 'phase.txt'))},value);
+async function qualify() { try {
+ phase('waiting for app readiness');
  await app.whenReady();
+ phase('creating native windows');
  await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
  const url = 'http://127.0.0.1:'+server.address().port+'/agent/app/main';
  main = new BrowserWindow({show:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
@@ -39,6 +43,7 @@ try {
  chats.account(scope);
  ipcMain.handle('desktop.chat.return',event=>chats.returnToMain(event.sender,event.senderFrame));
  await chats.open({scope,botId:'fixture-mico'});
+ phase('checking native preload and session');
  const win = chats.liveWindows()[0];
  assert.equal(win.webContents.getURL(),url.replace('/main','/fixture-mico'));
  assert.equal(win.webContents.session,main.webContents.session);
@@ -47,6 +52,7 @@ try {
  assert.equal(bridge.space,'fixture-space');
  assert.equal(bridge.cookie,'fixture_session=synthetic-only');
  await win.webContents.executeJavaScript('window.rakazoDesktop.chatWindow.returnToMain()');
+ phase('checking account changes and close');
  assert.equal(returned,true);
  await chats.open({scope,botId:'fixture-mico'});
  assert.equal(chats.liveWindows().length,1);
@@ -64,16 +70,23 @@ try {
  app.exit(0);
 } catch(error) { console.error(error); app.exit(1); }
 finally { chats?.clear(); if(main&&!main.isDestroyed())main.destroy(); server.close(); }
+}
+void qualify();
 `;
   const entry = path.join(temp, 'main.mjs');
   await build({ stdin: { contents: source, resolveDir: desktop, sourcefile: 'floating-proof.mjs' }, outfile: entry,
     bundle: true, platform: 'node', format: 'esm', target: 'node24', external: ['electron'] });
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
-  await promisify(execFile)(electron, [entry], { env, windowsHide: true, timeout: 60_000, maxBuffer: 1024 * 1024 });
+  try {
+    await promisify(execFile)(electron, [entry], { env, windowsHide: true, timeout: 60_000, maxBuffer: 1024 * 1024 });
+  } catch (error) {
+    const phase = await readFile(path.join(temp, 'phase.txt'), 'utf8').catch(() => 'entry did not initialize');
+    await writeFile(path.join(output, 'floating-chats-qualification.json'), JSON.stringify({ passed: false, realAccount: false, phase }));
+    console.error('Floating chat qualification stopped at: ' + phase);
+    throw error;
+  }
   const receipt = JSON.parse(await readFile(path.join(temp, 'result.json'), 'utf8'));
   assert.equal(receipt.passed, true);
-  const { mkdir } = await import('node:fs/promises');
-  await mkdir(output, { recursive: true });
   await writeFile(path.join(output, 'floating-chats-qualification.json'), JSON.stringify(receipt, null, 2));
   console.log(JSON.stringify(receipt));
 } finally {

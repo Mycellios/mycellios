@@ -54,6 +54,36 @@ not the source for future releases.
 
 ## Connection and model selection
 
+### Simple voice, dock and mobile settings
+
+Continuous voice may opt into Mycellios spoken replies for the signed-in account.
+The server must resolve its owned active connection and Mico, use only the canonical
+Kokoro route with explicit contribution-credit funding, bound input/audio and verify
+the returned WAV identity. Paid failures must not trigger retries or provider
+fallback. Dictation keeps its existing local/provider selection. The preview sends
+only a short sample; it must stop on account, Space, Mico or settings-panel changes.
+Distributed transcription is outside this route until a supported model exists.
+
+The dock must have one opening-mode choice, defaulting existing profiles to the main
+window. Floating chats must share the active server session, pin their Space and
+keep a separate draft without changing the main window's selected Space. Limit the
+number of windows, reuse an existing chat and close them on account/server changes.
+The preload must expose only chat return, pinned Space and update readiness, with
+no local-computer or account configuration authority. Update readiness must include
+all open chats. Closing the last floating window must recover a hidden main window
+when background operation is disabled.
+
+Mobile settings must show a reachable server-address QR code with normal sign-in,
+never credentials or a private chat URL. Show identifiable mobile sessions from
+the authenticated account and confirm revocation; failures must preserve the row.
+Loopback previews must explain that a phone needs a reachable server. This flow
+does not claim passwordless ticket pairing or physical phone qualification.
+
+Acceptance uses focused account/audio/session tests, rendered narrow-screen
+controls and an isolated real Electron window/preload/session test on Windows.
+Model output, physical phone behavior, multi-host execution and credit settlement
+require separate real evidence; synthetic fixtures cannot establish them.
+
 Provider forms connect accounts and keys without selecting the running model.
 The main and fallback role pickers own model selection. Connecting from an empty
 main slot also preserves that slot until the user explicitly chooses a model.

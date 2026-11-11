@@ -1110,6 +1110,9 @@
   Mobile setup QR codes contain only the current reachable server URL, never
   credentials. Session revocation uses the authenticated account's existing API
   after confirmation. Verify floating-chats, preload, rpc and MobileSessions tests.
+  After the native Desktop build, run
+  `node apps/desktop/scripts/verify-floating-chats.mjs <receipt-directory>` from
+  `src/agent` for the isolated real-window/session qualification on Windows.
 
 - Continuous voice uses a flush 50px header, a scrollable body and fixed controls.
   Local model preparation is single-flight and must never start capture after
