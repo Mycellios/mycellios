@@ -11086,6 +11086,9 @@ msgstr "La voz de la red Mycellios no está disponible. Prueba más tarde o elig
 msgid "Use local voice"
 msgstr "Usar voz local"
 
+msgid "Model · {modelName}"
+msgstr "Modelo · {modelName}"
+
 msgid "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings."
 msgstr "Este servidor no puede ejecutar el agente de este Mico con tu cuenta. Conecta Mycellios Desktop o revisa los ajustes del Mico."
 
