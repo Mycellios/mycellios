@@ -234,10 +234,19 @@ export function parseAutoReviewJudgeText(text: string): {
   reason?: string;
 } {
   const trimmed = text.trim();
-  const fenced = trimmed.match(/\{[\s\S]*\}/);
-  const candidate = fenced?.[0] ?? trimmed;
+  if (trimmed.length > 4_096) return { decision: "error" };
+  const fenced = /^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i.exec(trimmed);
+  const candidate = fenced?.[1] ?? trimmed;
   try {
-    const parsed = JSON.parse(candidate) as { decision?: unknown; reason?: unknown };
+    const parsed = JSON.parse(candidate);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { decision: "error" };
+    const keys = Object.keys(parsed);
+    // Only flat string fields are valid. Count complete JSON string tokens to
+    // reject duplicate (including escaped) keys that JSON.parse would overwrite.
+    const tokens = candidate.match(/"(?:\\.|[^"\\])*"/g) ?? [];
+    if (keys.some(key => key !== "decision" && key !== "reason") ||
+        tokens.length !== keys.length * 2 ||
+        ("reason" in parsed && typeof parsed.reason !== "string")) return { decision: "error" };
     if (parsed.decision === "pass" || parsed.decision === "ask") {
       return {
         decision: parsed.decision,

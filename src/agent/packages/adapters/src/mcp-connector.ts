@@ -24,6 +24,7 @@ import {
   resolveMcpOAuthFileTemplate,
 } from "@rakazo/contracts";
 import type { McpServer, PrismaClient, ThreadEvents } from "@rakazo/db";
+import { containsSecret, redactSecrets } from "@rakazo/core";
 import { getLogger } from "@rakazo/logging";
 import { sanitizedError } from "@rakazo/logging/monitoring";
 import { catalogToolPrefix } from "./approval-effect.js";
@@ -33,6 +34,7 @@ import {
   sanitizeConnectorError,
 } from "./connector-safety.js";
 import { credentialDigest } from "./credential-digest.js";
+import { mcpLaunchSecrets } from "./mcp-launch-secrets.js";
 import { appendToolCompletionAudit } from "./executor.js";
 import {
   CATALOG_EXECUTE,
@@ -281,6 +283,7 @@ function reportAllowlistDrift(
   assignment: { allowAllTools: boolean; allowedTools: unknown; server: { slug: string } },
   offered: Array<{ name: string }>,
   context: { spaceId: string; botId?: string },
+  secrets: string[] = [],
 ): void {
   if (assignment.allowAllTools) return;
   const drift = allowlistDrift(assignment.allowedTools, offered);
@@ -291,7 +294,7 @@ function reportAllowlistDrift(
       spaceId: context.spaceId,
       botId: context.botId,
       // Cap the list: the point is to name the drift, not to print an allowlist.
-      missing: drift.missing.slice(0, 10),
+      missing: drift.missing.slice(0, 10).map((name) => redactSecrets(name, secrets)),
     },
   );
 }
@@ -462,16 +465,24 @@ export class McpConnector implements ConnectorProvider {
             message: null,
             toolCount: listed.tools.length,
           });
-          reportAllowlistDrift(assignment, listed.tools, context);
+          const visibleSecrets = [
+            ...oauthMaterialSecrets(entry?.material ?? {}),
+            ...(entry?.launchSecrets ?? []),
+          ];
+          reportAllowlistDrift(assignment, listed.tools, context, visibleSecrets);
           return listed.tools
             .filter(
               (tool) =>
-                assignment.allowAllTools ||
-                (assignment.allowedTools as unknown[]).includes(tool.name),
+                // Never rewrite schema keywords into redaction strings: that
+                // could create an invalid model tool. Omit a credential-bearing
+                // definition instead, while keeping its server assignment intact.
+                !containsSecret({ name: tool.name, inputSchema: tool.inputSchema }, visibleSecrets) &&
+                (assignment.allowAllTools ||
+                  (assignment.allowedTools as unknown[]).includes(tool.name)),
             )
             .map((tool) => ({
               name: `mcp__${assignment.server.slug}__${tool.name}`,
-              description: tool.description ?? tool.name,
+              description: redactSecrets(tool.description ?? tool.name, visibleSecrets),
               inputSchema: tool.inputSchema as Record<string, unknown>,
               readOnly: tool.annotations?.readOnlyHint,
               route: {
@@ -979,7 +990,7 @@ export class McpConnector implements ConnectorProvider {
     if (server.networkId && !this.options.tailnets) throw new Error("Tailscale is unavailable");
     if (server.networkId) await this.options.tailnets!.authorize(server.networkId, context, server);
     let credentialDir: string | undefined;
-    const launchSecrets: string[] = [];
+    const launchSecrets = mcpLaunchSecrets(server.args);
     // Hoisted so a throw after the secret is decoded can still hand the material out.
     let material: OAuthMaterial | undefined;
     // What the process was handed; its stderr can echo any of it.
