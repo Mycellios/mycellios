@@ -23,6 +23,8 @@ export function companionBounds(area: { x: number; y: number; width: number; hei
 export async function installDesktopCompanions(options: {
   profile: string; allowed: (event: Electron.IpcMainInvokeEvent) => boolean;
   reveal: (target: { scope: string; botId: string }) => void;
+  openChat?: (target: { scope: string; botId: string }) => Promise<void>;
+  scopeChanged?: (scope: string) => void;
 }) {
   let prefs = structuredClone(DEFAULT_DESKTOP_COMPANIONS);
   let snapshot: DesktopCompanionSnapshot = { scope: "", theme: "light", agents: [] };
@@ -78,12 +80,25 @@ export async function installDesktopCompanions(options: {
   ipcMain.handle("desktop.companions.publish", (event, value: unknown) => {
     check(event); const next = DesktopCompanionSnapshotSchema.parse(value);
     if (next.agents.some(agent => agent.avatar && !validDesktopIcon(agent.avatar))) throw new Error("Invalid companion avatar");
+    options.scopeChanged?.(next.scope);
     snapshot = next; sync();
+  });
+  ipcMain.handle("desktop.companions.openChat", (event, value: unknown) => {
+    check(event);
+    const target = value as { scope?: unknown; botId?: unknown } | null;
+    if (!target || target.scope !== snapshot.scope || typeof target.botId !== "string" ||
+        !snapshot.agents.some(agent => agent.id === target.botId) || !options.openChat) {
+      throw new Error("This Mico is unavailable in the current Space");
+    }
+    return options.openChat({ scope: snapshot.scope, botId: target.botId });
   });
   const select = (event: Electron.IpcMainEvent, id: unknown) => {
     if (![...windows.values()].some(win => win.webContents === event.sender && event.senderFrame === event.sender.mainFrame)) return;
     if (typeof id !== "string" || !snapshot.agents.some(agent => agent.id === id)) return;
-    options.reveal({ scope: snapshot.scope, botId: id });
+    const target = { scope: snapshot.scope, botId: id };
+    if (prefs.dock.chatAction === "floating" && options.openChat) {
+      void options.openChat(target).catch(() => options.reveal(target));
+    } else options.reveal(target);
   };
   ipcMain.on("companion.select", select);
   screen.on("display-added", sync); screen.on("display-removed", sync); screen.on("display-metrics-changed", sync);
@@ -105,7 +120,7 @@ export async function installDesktopCompanions(options: {
     }
   }, 120);
   hoverTimer.unref();
-  return { clear: () => { snapshot = { scope: "", theme: "light", agents: [] }; sync(); },
+  return { clear: () => { options.scopeChanged?.(""); snapshot = { scope: "", theme: "light", agents: [] }; sync(); },
     dispose: () => { clearInterval(hoverTimer); for (const win of windows.values()) win.destroy(); windows.clear();
       screen.off("display-added", sync); screen.off("display-removed", sync); screen.off("display-metrics-changed", sync);
       ipcMain.removeListener("companion.select", select); } };

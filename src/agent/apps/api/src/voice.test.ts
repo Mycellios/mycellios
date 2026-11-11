@@ -51,6 +51,17 @@ describe("toVoiceStatus", () => {
 });
 
 describe("voice HTTP routes", () => {
+  it("rejects a cross-origin simple request before resolving paid network speech", async () => {
+    const app = new Hono();
+    mountVoiceHttpRoutes(app, {} as VoiceDeps, async () => actor);
+    const response = await app.request("/api/voice/speak", {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: JSON.stringify({ text: "Hello", botId: "bot-1", networkLanguage: "en" }),
+    });
+    expect(response.status).toBe(415);
+  });
+
   it("rejects unauthenticated speak and transcribe", async () => {
     const app = new Hono();
     mountVoiceHttpRoutes(app, {} as VoiceDeps, async () => null);

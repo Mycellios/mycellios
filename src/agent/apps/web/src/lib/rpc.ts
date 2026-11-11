@@ -23,6 +23,8 @@ let restoreSavedSpace = shouldRestoreSavedSpace(getGeneralPreferences().restoreL
 type RpcClientContext = { spaceId?: string | null };
 
 export function selectedSpaceId(): string | null {
+  const floatingSpace = typeof window === "undefined" ? undefined : window.rakazoDesktop?.chatWindow?.spaceId;
+  if (floatingSpace) return floatingSpace;
   if (typeof window === "undefined" || !restoreSavedSpace) return null;
   try {
     return window.localStorage.getItem(SPACE_STORAGE_KEY);
@@ -32,6 +34,8 @@ export function selectedSpaceId(): string | null {
 }
 
 export function selectSpace(id: string): boolean {
+  const floatingSpace = typeof window === "undefined" ? undefined : window.rakazoDesktop?.chatWindow?.spaceId;
+  if (floatingSpace) return id === floatingSpace;
   restoreSavedSpace = true;
   try {
     window.localStorage.setItem(SPACE_STORAGE_KEY, id);
@@ -47,6 +51,7 @@ export function selectSpace(id: string): boolean {
 }
 
 export function clearSpaceSelection(): void {
+  if (typeof window !== "undefined" && window.rakazoDesktop?.chatWindow) return;
   try {
     window.localStorage.removeItem(SPACE_STORAGE_KEY);
   } catch {
@@ -128,6 +133,7 @@ let leavingSpace: Promise<void> | null = null;
  * spaces the user has; if the selected one is not among them, reload into their default space.
  */
 export function leaveUnavailableSpace(spaceId: string): Promise<void> {
+  if (typeof window !== "undefined" && window.rakazoDesktop?.chatWindow) return Promise.resolve();
   leavingSpace ??= (async () => {
     try {
       const { spaces } = await rpc.spaces.list(undefined, { context: { spaceId: null } });

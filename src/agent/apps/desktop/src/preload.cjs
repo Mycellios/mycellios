@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     save: value => ipcRenderer.invoke("desktop.companions.save", value),
     displays: () => ipcRenderer.invoke("desktop.companions.displays"),
     publish: value => ipcRenderer.invoke("desktop.companions.publish", value),
+    openChat: target => ipcRenderer.invoke("desktop.companions.openChat", target),
     onSelect: listener => {
       const handler = (_event, target) => listener(target);
       ipcRenderer.on("desktop.companions.select", handler);

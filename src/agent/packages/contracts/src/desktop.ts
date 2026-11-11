@@ -82,12 +82,20 @@ export interface RakazoDesktopOAuthCallback {
 }
 
 export interface RakazoDesktop {
+  /** Chat-only window. Native settings and execution remain in the main window. */
+  chatWindow?: {
+    kind: "floating";
+    spaceId: string;
+    returnToMain: () => Promise<void>;
+    onPrepare: (listener: () => boolean | Promise<boolean>) => () => void;
+  };
   servers?: { list(): Promise<{ servers: (DesktopSetup & { name: string })[]; current: string | null }>; manage(url?: string): Promise<void> };
   companions?: {
     state: () => Promise<DesktopCompanionPreferences>;
     save: (value: DesktopCompanionPreferences) => Promise<DesktopCompanionPreferences>;
     displays: () => Promise<{ id: number; label: string }[]>;
     publish: (snapshot: DesktopCompanionSnapshot) => Promise<void>;
+    openChat?: (target: { scope: string; botId: string }) => Promise<void>;
     onSelect: (listener: (target: { scope: string; botId: string }) => void) => () => void;
   };
   /** Preferences of this computer. Older releases have no settings bridge. */

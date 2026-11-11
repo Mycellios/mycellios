@@ -591,7 +591,7 @@ export function SettingsOverlay({
                     onBusyChange={setNotificationBusy}
                   />
                 ) : null}
-                {section === "mobile" ? <MobileSettingsPanel /> : null}
+                {section === "mobile" ? <MobileSettingsPanel accountId={userId ?? undefined} /> : null}
                 {section === "space" && space ? (
                   <SpaceSettingsPanel
                     key={space.id}
@@ -665,7 +665,9 @@ export function SettingsOverlay({
                 ) : null}
                 {section === "voice" ? (
                   <>
-                    <VoiceEntryPanel onOpen={onOpenVoice ? () => leaveSettings(onOpenVoice) : undefined} />
+                    <VoiceEntryPanel accountId={userId ?? undefined} previewBotId={shownBots[0]?.id}
+                      spaceId={space?.id ?? currentSpaceId}
+                      onOpen={onOpenVoice ? () => leaveSettings(onOpenVoice) : undefined} />
                     <Disclosure summary={t`Connected voice services`} className="rk-settings-details"
                       open={voiceServicesOpen || formState.dirty || voiceBusy}
                       onOpenChange={next => { if (!voiceBusy && !formState.dirty) setVoiceServicesOpen(next); }}

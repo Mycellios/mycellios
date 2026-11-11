@@ -8,7 +8,6 @@ import {
   listPiCatalog,
   modelCredentialDto,
   oauthCredentialEmail,
-  parseModelSecret,
   prepareStoredModelAuth,
   probeCatalogProviderModels,
   probeOpenAiCompatibleModels,
@@ -65,6 +64,7 @@ import {
 import { withSerializableRetry } from "../serializable-retry.js";
 import type { RouterContext } from "./context.js";
 import { readMycelliosChatModels } from "../mycellios-model-catalog.js";
+import { ownedMycelliosConnection } from "../mycellios-owned-connection.js";
 
 export function modelsRoutes(ctx: RouterContext) {
   const {
@@ -84,26 +84,7 @@ export function modelsRoutes(ctx: RouterContext) {
   const mycelliosConnections = new Map<string, ReturnType<typeof persistModelCredential>>();
   // A compatible provider can now have several independent connections.
   // Select an owned Mycellios endpoint, never the newest arbitrary gateway.
-  async function ownedMycellios(actor: Actor) {
-    const credentials = await deps.prisma.userModelCredential.findMany({
-      where: { userId: actor.userId, provider: OPENAI_COMPATIBLE_PROVIDER_ID },
-      include: { userPreferences: { where: { userId: actor.userId } } },
-      orderBy: newestModelCredentialOrder,
-    });
-    for (const credential of credentials) {
-      const secret = await deps.prisma.secret.findFirst({
-        where: { id: credential.secretId, userId: actor.userId, spaceId: null },
-        select: { ciphertext: true },
-      });
-      if (!secret) continue;
-      const saved = parseModelSecret(
-        await deps.secrets.load(secret.ciphertext, credential.secretId),
-      );
-      if (saved.kind === "openai_compatible" && isMycelliosBaseUrl(saved.baseUrl))
-        return { credential, saved };
-    }
-    return null;
-  }
+  const ownedMycellios = (actor: Actor) => ownedMycelliosConnection(deps, actor.userId);
   return {
     models: {
       planLimits: authed.models.planLimits.handler(({ context, input }) => planLimits(context.actor.userId, input?.refresh)),

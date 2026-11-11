@@ -5,10 +5,18 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { desktopBridge } from "../lib/desktop";
 
-export function DesktopCompanions({ bots, spaceId, scope }: { bots: Bot[]; spaceId: string | null; scope: string }) {
+export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
+  bots: Bot[]; spaceId: string | null; scope: string;
+  onOpen?: (spaceId: string, path: string) => void;
+}) {
   const navigate = useNavigate();
   const { t, i18n } = useLingui();
   const bridge = desktopBridge()?.companions;
+  useEffect(() => {
+    // Revoke the previous account immediately, before asynchronous avatar work.
+    // A Space switch keeps same-account floating chats while its dock refreshes.
+    void bridge?.publish({ scope, theme: document.documentElement.dataset.theme === "dark" ? "dark" : "light", agents: [] }).catch(() => undefined);
+  }, [bridge, scope]);
   useEffect(() => {
     if (!bridge) return;
     let alive = true;
@@ -31,12 +39,19 @@ export function DesktopCompanions({ bots, spaceId, scope }: { bots: Bot[]; space
     const observer = new MutationObserver(publish);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     const off = bridge.onSelect(target => {
-      if (target.scope === scope && bots.some(bot => bot.id === target.botId && bot.spaceId === spaceId && !bot.archivedAt)) void navigate(`/app/${encodeURIComponent(target.botId)}`);
+      try {
+        const owner = JSON.parse(scope), destination = JSON.parse(target.scope);
+        if (!Array.isArray(destination) || destination[0] !== owner[0] || typeof destination[1] !== "string") return;
+        if (onOpen) onOpen(destination[1], `/app/${encodeURIComponent(target.botId)}`);
+        else if (target.scope === scope && bots.some(bot => bot.id === target.botId && bot.spaceId === spaceId && !bot.archivedAt)) {
+          void navigate(`/app/${encodeURIComponent(target.botId)}`);
+        }
+      } catch { /* A stale account scope cannot navigate another account. */ }
     });
     return () => { alive = false; observer.disconnect(); off(); };
-  }, [bridge, bots, spaceId, scope, navigate, i18n.locale]);
+  }, [bridge, bots, spaceId, scope, navigate, onOpen, i18n.locale]);
   useEffect(() => () => {
     void bridge?.publish({ scope: "", theme: "light", agents: [] }).catch(() => undefined);
-  }, [bridge, scope]);
+  }, [bridge]);
   return null;
 }
