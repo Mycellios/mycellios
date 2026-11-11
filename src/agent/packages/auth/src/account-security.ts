@@ -6,9 +6,11 @@ import {
   createAuthEndpoint,
   createAuthMiddleware,
   getSessionFromCtx,
+  freshSessionMiddleware,
   sessionMiddleware,
 } from "better-auth/api";
 import { bearer } from "better-auth/plugins";
+import { z } from "zod";
 import { accountDeletionEmail } from "./email.js";
 import { isCurrentOidcAccount } from "./oidc.js";
 
@@ -23,6 +25,23 @@ export function accountSecurity(
   return {
     id: "account-security",
     endpoints: {
+      revokeOwnedSession: createAuthEndpoint(
+        "/revoke-owned-session",
+        { method: "POST", requireHeaders: true, use: [freshSessionMiddleware],
+          body: z.object({ sessionId: z.string().min(1).max(160) }).strict() },
+        async ctx => {
+          // Session IDs are public metadata; bearer tokens never leave the server.
+          const target = await ctx.context.adapter.findOne<{ token: string }>({
+            model: "session", where: [
+              { field: "id", value: ctx.body.sessionId },
+              { field: "userId", value: ctx.context.session.user.id },
+            ],
+          });
+          if (target) await ctx.context.internalAdapter.deleteSession(target.token);
+          // Match the built-in endpoint's idempotent, non-enumerating response.
+          return ctx.json({ status: true });
+        },
+      ),
       accountSecurity: createAuthEndpoint(
         "/account-security",
         { method: "GET", use: [sessionMiddleware] },

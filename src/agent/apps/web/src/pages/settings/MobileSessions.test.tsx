@@ -5,8 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const auth = vi.hoisted(() => ({ owner: "owner", listSessions: vi.fn(), revokeSession: vi.fn() }));
 vi.mock("../../lib/auth", () => ({ authClient: {
   useSession: () => ({ data: { user: { id: auth.owner } } }),
-  listSessions: auth.listSessions, revokeSession: auth.revokeSession,
+  listSessions: auth.listSessions, $fetch: auth.revokeSession,
 } }));
+vi.mock("../../components/SessionConfirmation", () => ({ SessionConfirmation: ({ onConfirmed }: any) => <button onClick={() => void onConfirmed()}>Sign in again</button> }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
   t: (s: TemplateStringsArray, ...v: unknown[]) => s.reduce((out, part, i) => out + part + (v[i] ?? ""), ""),
   i18n: { locale: "en" },
@@ -42,8 +43,17 @@ it("shows only mobile sessions, keeps tokens private and revokes only after conf
   await act(async () => buttons()[0]!.click());
   expect(auth.revokeSession).not.toHaveBeenCalled();
   await act(async () => div.querySelector<HTMLButtonElement>('[role="dialog"] button:last-child')!.click());
-  expect(auth.revokeSession).toHaveBeenCalledExactlyOnceWith({ token: phone.token });
+  expect(auth.revokeSession).toHaveBeenCalledExactlyOnceWith("/revoke-owned-session", { method: "POST", body: { sessionId: phone.id } });
   expect(div.textContent).toContain("No phones are signed in yet.");
+});
+it("explains stale sign-in and reloads sessions after confirmation", async () => {
+  auth.listSessions.mockResolvedValueOnce({ error: { code: "SESSION_NOT_FRESH" } }).mockResolvedValue({ data: [phone] });
+  const div = await render(<MobileSessions accountId="owner" />);
+  expect(div.textContent).toContain("Confirm your account");
+  expect(div.textContent).not.toContain("Could not load");
+  await act(async () => [...div.querySelectorAll("button")].find(b => b.textContent === "Sign in again")!.click());
+  expect(div.textContent).toContain("iPhone");
+  expect(div.textContent).not.toContain("Confirm your account");
 });
 it("preserves the phone when revocation fails and does not load a different account", async () => {
   auth.listSessions.mockResolvedValue({ data: [phone] });

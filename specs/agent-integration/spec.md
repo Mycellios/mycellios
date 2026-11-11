@@ -76,6 +76,9 @@ when background operation is disabled.
 Mobile settings must show a reachable server-address QR code with normal sign-in,
 never credentials or a private chat URL. Show identifiable mobile sessions from
 the authenticated account and confirm revocation; failures must preserve the row.
+Retain fresh-session checks for listing and revocation. Use public session IDs
+for owner-scoped revocation and keep all bearer credentials on the server.
+Stale sessions must offer normal, account-bound sign-in confirmation.
 Loopback previews must explain that a phone needs a reachable server. This flow
 does not claim passwordless ticket pairing or physical phone qualification.
 
