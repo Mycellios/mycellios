@@ -15,7 +15,7 @@ jobs:
           node-version: 24.22.2
       - name: Install pinned qualification dependencies
         working-directory: src/agent
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
         with:
           name: desktop-windows-68779b4b032c187a304e328865878fa5111bb511
