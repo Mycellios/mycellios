@@ -10228,6 +10228,12 @@ msgstr "Mycellios network voice is unavailable. Try again later or choose local 
 msgid "Use local voice"
 msgstr "Use local voice"
 
+msgid "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings."
+msgstr "This server cannot run this Mico's native agent for your account. Connect your Desktop or review the Mico settings."
+
+msgid "The native agent is not available on this computer. Check its installation and Mico settings."
+msgstr "The native agent is not available on this computer. Check its installation and Mico settings."
+
 msgid "Connect your Mycellios account in Models to use network voice."
 msgstr "Connect your Mycellios account in Models to use network voice."
 
