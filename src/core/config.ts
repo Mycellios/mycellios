@@ -42,6 +42,8 @@ export interface CoordinatorConfig {
   allowDevelopmentAdapters?: boolean | undefined;
   apiAccessEnabled?: boolean | undefined;
   contributionCreditFunding?: boolean | undefined;
+  referralRewardsEnabled?: boolean | undefined;
+  referralEmailPepper?: string | undefined;
   apiStarterTokens?: number | undefined;
   apiRequestsPerMinute?: number | undefined;
   apiMaxConcurrent?: number | undefined;
@@ -366,6 +368,8 @@ export function loadCoordinatorConfig(
     ...(publicationWebhookSecret ? { publicationWebhookSecret } : {}),
     ...(supabaseUrl ? { supabaseUrl } : {}),
     contributionCreditFunding: environment.MYCELLIOS_CONTRIBUTION_CREDITS_ENABLED === "true",
+    referralRewardsEnabled: environment.MYCELLIOS_REFERRALS_ENABLED === "true",
+    referralEmailPepper: environment.MYCELLIOS_REFERRAL_EMAIL_PEPPER,
     supabaseTrustedOAuthClientIds,
     ...(supabaseTrustedOAuthIssuer ? { supabaseTrustedOAuthIssuer } : {}),
     ...(publicSupabaseUrl ? { publicSupabaseUrl } : {}),

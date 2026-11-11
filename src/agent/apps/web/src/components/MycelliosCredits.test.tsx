@@ -33,6 +33,10 @@ it("refreshes the real balance when the window receives focus", async () => {
   readAccount.mockResolvedValueOnce({ balanceMicrounits: 1000000 }).mockResolvedValueOnce({ balanceMicrounits: 2000000 });
   await rendered(async host => { expect(host.textContent).toBe("Credits1"); await act(async () => window.dispatchEvent(new Event("focus"))); expect(host.textContent).toBe("Credits2"); });
 });
+it("refreshes a verified referral award from the server instead of incrementing the displayed balance", async () => {
+  readAccount.mockResolvedValueOnce({ balanceMicrounits: 0 }).mockResolvedValueOnce({ balanceMicrounits: 1000000, promotionalGrantedMicrounits: 1000000 });
+  await rendered(async host => { expect(host.textContent).toBe("Credits0"); await act(async () => window.dispatchEvent(new Event("mycellios:credits-changed"))); expect(host.textContent).toBe("Credits1Promo"); });
+});
 
 it("identifies private sandbox credits without presenting them as production Credits", async () => {
   readAccount.mockResolvedValue({ balanceMicrounits: 1000000, environment: "sandbox" });

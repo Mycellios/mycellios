@@ -2,6 +2,7 @@ import { TRANSCRIPTION_MODEL, MAX_TRANSCRIPTION_TOKENS } from "../contracts/tran
 import { sha256CanonicalEvidence } from "../core/json.js";
 import type { MeshDatabase } from "../storage/database.js";
 import type { EconomicLedger, EconomicSettlementInput } from "./economic-ledger.js";
+import { PromotionalCredits } from "./promotional-credits.js";
 
 /** Apply with the existing migration owner before enabling contribution funding. */
 export const contributionCreditSchemaSql = `
@@ -40,7 +41,10 @@ export const contributionCreditSchemaSql = `
 
 /** Server-owned adjustments: transfers conserve the ledger's total supply. */
 export class ContributionCreditWallet {
-  constructor(private readonly database: MeshDatabase, private readonly ledger: EconomicLedger) {}
+  private promotions: PromotionalCredits | null;
+  constructor(private readonly database: MeshDatabase, private readonly ledger: EconomicLedger, expiringPromotions = false) {
+    this.promotions = expiringPromotions ? new PromotionalCredits(database) : null;
+  }
 
   async initialize(): Promise<void> {
     if ((this.database.raw as unknown as { dialect?: string }).dialect !== "postgres")
@@ -49,6 +53,12 @@ export class ContributionCreditWallet {
     for (const table of ["economic_credit_transfers", "economic_credit_holds",
       "economic_credit_replays", "api_contribution_funded_usage", "economic_promotional_grants"])
       await this.database.raw.prepare(`SELECT 1 FROM ${table} LIMIT 0`).all();
+    // Disabling new referrals must never revive previously expired awards.
+    // Once migrated, expiry remains authoritative independently of the campaign flag.
+    const expirySchema = await this.database.raw.prepare(`SELECT 1 FROM information_schema.columns
+      WHERE table_schema=current_schema() AND table_name='economic_promotional_grants' AND column_name='expires_at'`).get();
+    if (expirySchema && !this.promotions) this.promotions = new PromotionalCredits(this.database);
+    if (this.promotions) await this.promotions.totals();
     await this.database.raw.prepare(`UPDATE economic_credit_holds SET status='released'
       WHERE status='reserved' AND id IN (SELECT id FROM api_usage WHERE status='failed')`).run();
   }
@@ -83,7 +93,7 @@ export class ContributionCreditWallet {
     });
   }
 
-  async summary(kind: "account" | "node" | "platform", ownerId: string) {
+  async summary(kind: "account" | "node" | "platform", ownerId: string, now = Date.now()) {
     const summary = await this.ledger.summary(kind, ownerId);
     const row = kind === "platform" ? { total: 0 } : await this.database.raw.prepare(`
       SELECT COALESCE(SUM(amount_microunits),0) AS total FROM economic_credit_transfers
@@ -93,12 +103,15 @@ export class ContributionCreditWallet {
       SELECT COALESCE(SUM(amount_microunits),0) AS total FROM economic_promotional_grants
       ${kind === "account" ? "WHERE account_id=?" : ""}`).get(...(kind === "account" ? [ownerId] : [])) as { total: number };
     const promotionalGrantedMicrounits = Number(promotion.total);
+    const expiring = this.promotions && kind !== "node" ? await this.promotions.totals(kind === "account" ? ownerId : undefined, now) : null;
     const balanceMicrounits = summary.balanceMicrounits + adjustment
-      + promotionalGrantedMicrounits * (kind === "platform" ? -1 : 1);
+      + (promotionalGrantedMicrounits - (expiring?.expired ?? 0)) * (kind === "platform" ? -1 : 1);
     const reservedMicrounits = kind === "account" ? await this.reserved(ownerId) : 0;
     return { ...summary, balanceMicrounits, reservedMicrounits,
       availableMicrounits: Math.max(0, balanceMicrounits - reservedMicrounits),
       promotionalGrantedMicrounits, contributionEarnedMicrounits: kind === "account" ? adjustment : 0,
+      ...(expiring && kind === "account" ? { promotionalExpiredMicrounits: expiring.expired,
+        nextPromotionalExpiry: expiring.nextExpiry } : {}),
       lifetimeMicrounits: summary.lifetimeMicrounits + (kind === "account" ? adjustment : 0) };
   }
 
@@ -116,6 +129,7 @@ export class ContributionCreditWallet {
     const idempotency = idempotencyKey ? sha256CanonicalEvidence({ accountId, idempotencyKey }) : null;
     // The PostgreSQL driver serializes writers across instances; SQLite uses BEGIN IMMEDIATE.
     await this.database.transaction(async () => {
+      const admittedAt = Date.now();
       const previous = await this.database.raw.prepare("SELECT * FROM economic_credit_holds WHERE id=?").get(id);
       if (previous) {
         if (previous.account_id !== accountId || previous.request_digest !== digest
@@ -135,11 +149,12 @@ export class ContributionCreditWallet {
           .run(id, String(replay.id));
         return;
       }
-      const summary = await this.summary("account", accountId);
+      const summary = await this.summary("account", accountId, admittedAt);
       if (summary.availableMicrounits < maximum) throw new Error("insufficient_contribution_credits");
       await this.database.raw.prepare(`INSERT INTO economic_credit_holds
         (id,account_id,request_digest,idempotency_digest,amount_microunits,status,created_at) VALUES (?,?,?,?,?,'reserved',?)`)
         .run(id, accountId, digest, idempotency, maximum, now);
+      await this.promotions?.reserve(id, accountId, maximum, admittedAt);
     });
   }
 
@@ -185,8 +200,10 @@ export class ContributionCreditWallet {
           || (hold.status !== "reserved" && hold.status !== "settled"))
           throw new Error("contribution_settlement_invalid");
         if (hold.status === "reserved") {
+          await this.promotions?.settle(String(hold.id), result.grossMicrounits);
+          await this.database.raw.prepare("UPDATE economic_credit_holds SET status='settled' WHERE id=?").run(String(hold.id));
           const balanceAfterDebit = (await this.summary("account", result.payerAccountId)).balanceMicrounits;
-          const otherReservations = await this.reserved(result.payerAccountId) - Number(hold.amount_microunits);
+          const otherReservations = await this.reserved(result.payerAccountId);
           if (balanceAfterDebit < otherReservations) throw new Error("contribution_balance_changed");
         }
         await this.database.raw.prepare("UPDATE economic_credit_holds SET status='settled' WHERE id=?").run(String(hold.id));

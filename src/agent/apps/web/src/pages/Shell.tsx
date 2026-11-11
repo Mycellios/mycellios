@@ -191,6 +191,7 @@ import {
 } from "../lib/computer-screen";
 import { connectedAppMarks } from "../lib/connected-apps";
 import { InviteFriends } from "../components/InviteFriends";
+import { ReferralClaim } from "../components/ReferralClaim";
 import { scheduleFocusPrompt } from "../lib/focus-prompt";
 import { localTimezone } from "../lib/local-timezone";
 import {
@@ -3913,7 +3914,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       </IconTooltip>
     ) : null}
 
-    {!taskScope ? <InviteFriends inMenu={isMobileSidebar} className={isMobileSidebar ? undefined : "rk-chat-action"} /> : null}
+    {!taskScope ? <InviteFriends key={userId} userId={userId} inMenu={isMobileSidebar} className={isMobileSidebar ? undefined : "rk-chat-action"} /> : null}
     </>
   );
   const sidebarSearch = miniSidebar ? null : (
@@ -4051,6 +4052,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const shell = (
     <>
     <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} onOpen={openSpaceChat} />
+    {userId ? <ReferralClaim key={userId} userId={userId} /> : null}
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
     <BotsSidebarLayout
       userId={userId}

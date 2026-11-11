@@ -3,6 +3,15 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { eventBase, planChecks, uncoveredNativeFiles } from './ci-proportional.mjs';
 
+test('referral accounting and harness changes require real isolated PostgreSQL', () => {
+  for (const file of ['src/economy/referrals.ts', 'src/economy/promotional-credits.ts', 'src/economy/contribution-credit-wallet.ts',
+    'src/coordinator/referral-routes.ts', 'src/coordinator/server.ts', 'src/coordinator/supabase-auth.ts',
+    'tests/referrals.postgres.test.ts', 'scripts/test-referrals-postgres.mjs']) {
+    const plan = planChecks([file]);
+    assert.ok(plan.some(c => c.label === 'referrals real PostgreSQL acceptance' && c.args[0] === 'scripts/test-referrals-postgres.mjs'), file);
+  }
+});
+
 test('transcription has real Python checks without admitting unrelated native changes', () => {
   const files = ['python/distributed_runtime/transcription_engine.py', 'python/tests/test_transcription_engine.py'];
   const plan = planChecks(files);

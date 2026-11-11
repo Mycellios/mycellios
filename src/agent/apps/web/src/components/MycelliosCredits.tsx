@@ -102,6 +102,7 @@ export function MycelliosCredits({ ownerId }: { ownerId: string }) {
     window.addEventListener("mycellios:contribution-activity", onActivity);
     window.addEventListener("focus", onFocus);
     window.addEventListener("mycellios:contribution-changed", onFocus);
+    window.addEventListener("mycellios:credits-changed", onFocus);
     return () => {
       active = false;
       refreshBalance.current = () => undefined;
@@ -111,6 +112,7 @@ export function MycelliosCredits({ ownerId }: { ownerId: string }) {
       window.removeEventListener("mycellios:contribution-activity", onActivity);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("mycellios:contribution-changed", onFocus);
+      window.removeEventListener("mycellios:credits-changed", onFocus);
     };
   }, [ownerId]);
   const balance = account?.availableMicrounits ?? account?.balanceMicrounits;

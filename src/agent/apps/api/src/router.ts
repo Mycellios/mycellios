@@ -32,6 +32,7 @@ import type { Auth } from "@rakazo/auth";
 import type { BoardEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
 import type { BillingService } from "./billing.js";
 import { accountRoutes } from "./routes/account.js";
+import { referralRoutes } from "./routes/referrals.js";
 import { boardsRoutes } from "./routes/boards.js";
 import { botsRoutes } from "./routes/bots.js";
 import { computerRoutes } from "./routes/computer.js";
@@ -160,6 +161,7 @@ export function createRouter(deps: RouterDeps) {
   return os.router({
     ...localCapabilityRoutes(ctx),
     ...accountRoutes(ctx),
+    ...referralRoutes(ctx),
     ...spacesRoutes(ctx),
     ...modelsRoutes(ctx),
     ...botsRoutes(ctx),

@@ -49,3 +49,11 @@ jobs:
           path: build/desktop-downloads/web
           if-no-files-found: error
           retention-days: 14
+      - name: Preserve referral browser evidence
+        if: always() && hashFiles('.ci/referrals-ui/verification.json') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: referrals-ui-${{ github.sha }}
+          path: .ci/referrals-ui
+          if-no-files-found: error
+          retention-days: 14

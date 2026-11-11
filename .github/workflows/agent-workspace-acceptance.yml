@@ -79,7 +79,7 @@ jobs:
       - name: Exercise isolated PostgreSQL ownership and migration
         run: npm exec -- tsx scripts/verify-workspace-sync-db.ts
       - name: Install browser
-        run: npm exec -- playwright install --with-deps chromium
+        run: node scripts/prepare-ui-browser.mjs
         env:
           PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "120000"
       - name: Exercise real workspace controls with synthetic RPC fixtures

@@ -1,5 +1,4 @@
 import { MICO_AVATAR_PALETTES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
-import { productBrand } from "@rakazo/contracts/product-brand";
 import {
   BotAvatar,
   Button,
@@ -11,30 +10,43 @@ import {
   Input,
 } from "@rakazo/ui-web";
 import { Check, Copy, Gift } from "lucide-react";
-import { useRef, useState } from "react";
-import { appPath } from "../lib/app-path";
+import { useEffect, useRef, useState } from "react";
+import { useSpaceRpc } from "../lib/space-rpc";
 import { IconTooltip } from "./IconTooltip";
 
-const publicSignUp = new URL("/agent/sign-up", productBrand.apiBaseUrl).href;
 const mascots = [
   { shape: MICO_AVATAR_SHAPES[1], palette: MICO_AVATAR_PALETTES[1], size: 37 },
   { shape: MICO_AVATAR_SHAPES[0], palette: MICO_AVATAR_PALETTES[0], size: 53 },
   { shape: MICO_AVATAR_SHAPES[3], palette: MICO_AVATAR_PALETTES[3], size: 39 },
 ];
 
-export function InviteFriends({ inMenu = false, className }: { inMenu?: boolean; className?: string }) {
+export function InviteFriends({ inMenu = false, className, userId }: { inMenu?: boolean; className?: string; userId?: string | null }) {
+  const rpc = useSpaceRpc();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [invite, setInvite] = useState<{ link: string; rewardMicrounits: number; rewardDays: number; rewardedInvites: number } | null>(null);
+  const [error, setError] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">("idle");
   const linkRef = useRef<HTMLInputElement>(null);
-  const { protocol, hostname, origin } = window.location;
-  const canShareOrigin =
-    protocol === "https:" &&
-    !["localhost", "127.0.0.1", "[::1]"].includes(hostname) &&
-    !hostname.endsWith(".localhost");
-  const link = canShareOrigin ? new URL(appPath("/sign-up"), origin).href : publicSignUp;
+  useEffect(() => {
+    setInvite(null); setError("");
+    if (!open) return;
+    if (!userId) { setLoading(false); setError("Inicia sesión con tu cuenta Mycellios para invitar amigos."); return; }
+    let alive = true;
+    const abort = new AbortController();
+    setLoading(true);
+    void rpc.referrals.invite({ expectedUserId: userId }, { signal: abort.signal }).then(value => {
+      if (alive) setInvite(value);
+    }).catch(() => { if (alive) setError("El programa de referidos todavía no está disponible para esta sesión. Inicia sesión con tu cuenta Mycellios verificada o vuelve a intentarlo."); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; abort.abort(); };
+  }, [open, userId, rpc, attempt]);
 
   async function copyLink() {
+    if (!invite) return;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(invite.link);
       setCopyState("copied");
     } catch {
       linkRef.current?.focus();
@@ -44,7 +56,7 @@ export function InviteFriends({ inMenu = false, className }: { inMenu?: boolean;
   }
 
   return (
-    <Dialog onOpenChange={() => setCopyState("idle")}>
+    <Dialog open={open} onOpenChange={next => { setOpen(next); setCopyState("idle"); }}>
       <IconTooltip label="Invitar amigos">
         <DialogTrigger
           render={<Button variant={inMenu || className ? "ghost" : "floating"} size="icon-lg" className={`app-no-drag ${className ?? ""}`} data-mobile-chat-action={inMenu || undefined} />}
@@ -68,24 +80,27 @@ export function InviteFriends({ inMenu = false, className }: { inMenu?: boolean;
         <div className="space-y-2 text-center">
           <DialogTitle>Invita a tus amigos a Mycellios</DialogTitle>
           <DialogDescription>
-            Comparte este enlace para que puedan crear su cuenta y conocer a sus Micos.
+            Comparte tu enlace personal. Cuando tu amigo cree y verifique una cuenta nueva, ambos recibís el regalo.
           </DialogDescription>
         </div>
-        {import.meta.env.DEV ? (
+        {invite ? (
           <div className="flex items-start gap-3 rounded-lg bg-muted px-3 py-2.5">
             <Gift size={17} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
             <div>
-              <p className="font-medium">2 semanas gratis de modelos Mycellios</p>
-              <p className="text-xs text-muted-foreground">Vista previa del regalo. El enlace todavía no lo activa.</p>
+              <p>1 crédito promocional para cada uno</p>
+              <p className="text-xs text-muted-foreground">Caduca a los 14 días. Una recompensa por cada cuenta nueva verificada.</p>
+              {invite.rewardedInvites > 0 ? <p className="mt-1 text-xs text-muted-foreground">Invitaciones premiadas: {invite.rewardedInvites}</p> : null}
             </div>
           </div>
         ) : null}
-        <div className="space-y-2">
+        {loading ? <p role="status" className="text-center text-sm text-muted-foreground">Preparando tu enlace personal…</p> : null}
+        {error ? <div className="space-y-2 text-center"><p role="status" className="text-sm text-muted-foreground">{error}</p><Button variant="outline" onClick={() => setAttempt(value => value + 1)}>Reintentar</Button></div> : null}
+        {invite ? <div className="space-y-2">
           <Input
             ref={linkRef}
             aria-label="Enlace de invitación"
             readOnly
-            value={link}
+            value={invite.link}
             onFocus={(event) => event.currentTarget.select()}
           />
           <Button className="w-full" onClick={() => void copyLink()}>
@@ -97,7 +112,7 @@ export function InviteFriends({ inMenu = false, className }: { inMenu?: boolean;
               {copyState === "copied" ? "Ya puedes compartirlo." : "Selecciona y copia el enlace manualmente."}
             </p>
           ) : null}
-        </div>
+        </div> : null}
       </DialogContent>
     </Dialog>
   );
