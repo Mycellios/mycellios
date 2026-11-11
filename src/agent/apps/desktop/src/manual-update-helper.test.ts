@@ -40,7 +40,10 @@ it.runIf(process.platform === "win32")("parses the real helper and requires the 
   const text = await readFile(source, "utf8");
   expect(text).not.toMatch(/Stop-Process|taskkill|ExecutionPolicy|RmShutdown|legacyShutdown/);
   expect(text).toContain("The previous app has not finished saving; update was not applied");
-  expect(text).toMatch(/\$setup=Start-Process[^\r\n]+-WindowStyle Normal[^\r\n]+-PassThru\r?\n +\$null=\$setup.Handle\r?\n +Progress 'installing'\r?\n +if\(!\$setup\.WaitForExit\(600000\)\)/);
+  expect(text).toContain("$start.UseShellExecute=$true");
+  expect(text).toContain("$start.ErrorDialog=$true;$start.ErrorDialogParentHandle=$window.Handle");
+  expect(text).toContain("$window.Show();$window.Activate();[Windows.Forms.Application]::DoEvents()");
+  expect(text).toMatch(/\$null=\$setup.Handle\r?\n +Progress 'installing'\r?\n +if\(!\$setup\.WaitForExit\(600000\)\)/);
   const directory = await mkdtemp(path.join(os.tmpdir(), "manual-update-helper-"));
   try {
     const file = path.join(directory, "parse.ps1");
