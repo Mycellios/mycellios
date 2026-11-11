@@ -191,6 +191,7 @@ export const Composer = memo(function Composer({
   const onCall = phoneCall !== null || voiceConversationActive;
   const voice = useComposerVoice({
     scope: draftKey,
+    botId: "botId" in artifactTarget ? artifactTarget.botId : undefined,
     transcribe: dictationTranscribe,
     blocked: Boolean(disabled || onCall || sending),
     onText: words => updateDraft(appendSpeech(draft, words)),
@@ -202,7 +203,7 @@ export const Composer = memo(function Composer({
   });
   const voiceDraft = appendSpeech(draft, voice.preview);
   const reviewedVoice = useReviewedVoice({
-    scope: draftKey, transcribe: dictationTranscribe,
+    scope: draftKey, botId: "botId" in artifactTarget ? artifactTarget.botId : undefined, transcribe: dictationTranscribe,
     blocked: Boolean(disabled || running || sending || onCall || draft || pendingAttachments.length || voice.state),
     onSend: (text, nonce) => onSend(text, [], nonce),
   });

@@ -1,3 +1,4 @@
+import { MAX_TRANSCRIPTION_RESULT_BYTES } from "../contracts/transcription.js";
 import WebSocket from "ws";
 import { MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
 import { MAX_EMBEDDING_RESPONSE_BYTES } from "../contracts/embedding.js";
@@ -2358,7 +2359,7 @@ export class WorkerAgent {
     let output = "";
     let outputBytes = 0;
     let backendMetrics: AdapterChunk["metrics"] | undefined;
-    const outputByteLimit = this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "embedding" ? MAX_EMBEDDING_RESPONSE_BYTES : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
+    const outputByteLimit = this.adapter.kind === "transcription" ? MAX_TRANSCRIPTION_RESULT_BYTES : this.adapter.kind === "decision" ? MAX_DECISION_RESPONSE_BYTES : this.adapter.kind === "embedding" ? MAX_EMBEDDING_RESPONSE_BYTES : this.adapter.kind === "kokoro" ? MAX_OUTPUT_BYTES
       : Math.min(MAX_OUTPUT_BYTES, (payload.request.max_tokens ?? 256) * 32);
     try {
       for await (const chunk of this.adapter.generate(
@@ -2437,7 +2438,7 @@ export class WorkerAgent {
         leaseId: payload.leaseId,
         text: output,
         finishReason:
-          this.adapter.kind !== "kokoro" && this.adapter.kind !== "embedding" && this.adapter.kind !== "decision" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
+          this.adapter.kind !== "kokoro" && this.adapter.kind !== "transcription" && this.adapter.kind !== "embedding" && this.adapter.kind !== "decision" && outputTokens >= (payload.request.max_tokens ?? Number.POSITIVE_INFINITY)
             ? "length"
             : "stop",
         metrics,
@@ -2725,7 +2726,7 @@ function scaleMatches(observed: number, rawExpected: number): boolean {
 
 function deploymentAdapterKind(
   adapter: InferenceAdapter["kind"],
-): "mycellios-pipeline" | "kokoro" | "embedding" | "decision" | "mock" {
+): "mycellios-pipeline" | "kokoro" | "embedding" | "decision" | "transcription" | "mock" {
   if (adapter === "mycellios-native") {
     throw new Error("mycellios_native_control_cannot_be_a_model_deployment");
   }

@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_MODEL, TRANSCRIPTION_DIGEST, transcriptionWorkerAdapterSchema, parseTranscriptionRequest } from "./transcription.js";
 import { z } from "zod";
 import { DECISION_CONTEXT_LIMIT, DECISION_DEADLINE_MS, DECISION_DIGEST, DECISION_MODEL, decisionWorkerAdapterSchema, parseDecisionRequest } from "./decision.js";
 import { hostMemoryObservationSchema } from "./host-memory.js";
@@ -20,13 +21,14 @@ import {
 
 const adapterKind = z.enum([
   "mycellios-native",
+  "transcription",
   "kokoro",
   "embedding",
   "decision",
   "mycellios-pipeline",
   "mock",
 ]);
-const deploymentAdapterKind = z.enum(["mycellios-pipeline", "kokoro", "embedding", "decision", "mock"]);
+const deploymentAdapterKind = z.enum(["mycellios-pipeline", "transcription", "kokoro", "embedding", "decision", "mock"]);
 const executionBackend = z.enum(["cpu", "cuda", "rocm", "directml", "mps", "xpu", "vulkan", "webgpu"]);
 const sha256Digest = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 
@@ -120,6 +122,10 @@ export const chatCompletionRequestSchema = z.object({
     }
   }).optional(),
 }).strict().superRefine((request, context) => {
+  if (request.model === TRANSCRIPTION_MODEL) {
+    try { parseTranscriptionRequest(request); }
+    catch { context.addIssue({ code: "custom", message: "Invalid bounded transcription audio", path: ["messages"] }); }
+  }
   if (request.model === DECISION_MODEL) {
     try { parseDecisionRequest(request); }
     catch { context.addIssue({ code: "custom", message: "Invalid typed decision envelope", path: ["messages"] }); }
@@ -267,6 +273,8 @@ export const deploymentSchema = z
         || deployment.canaryEvidence || deployment.verificationState || deployment.throughputSource === "measured") {
         context.addIssue({ code: "custom", message: "Decision replicas require pinned identity, a bound activation and separate decision qualification" });
       }
+    } else if (deployment.adapter === "transcription") {
+      if (!deployment.activationId || deployment.model !== TRANSCRIPTION_MODEL || deployment.modelDigest !== TRANSCRIPTION_DIGEST || deployment.maxConcurrency !== 1 || deployment.canaryEvidence || deployment.verificationState || deployment.throughputSource === "measured") context.addIssue({ code: "custom", message: "Transcription requires a pinned activation and separate native qualification" });
     } else if (deployment.adapter === "embedding") {
       if (!deployment.activationId || deployment.modelDigest !== EMBEDDING_DIGEST || deployment.canaryEvidence || deployment.verificationState) {
         context.addIssue({ code: "custom", message: "Embedding requires its pinned activation and separate embedding qualification", path: ["activationId"] });
@@ -501,6 +509,7 @@ export const workerConfigSchema = z.object({
   }),
   adapter: z.discriminatedUnion("kind", [
     decisionWorkerAdapterSchema,
+    transcriptionWorkerAdapterSchema,
     embeddingWorkerAdapterSchema,
     kokoroWorkerAdapterSchema,
     z.object({
@@ -568,6 +577,7 @@ export const workerConfigSchema = z.object({
     || config.deployment.contextLimit !== DECISION_CONTEXT_LIMIT || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) {
     context.addIssue({ code: "custom", message: "Decision replicas require a pinned activation, context limit, one slot and whole-cell scope" });
   }
+  if (config.adapter.kind === "transcription" && (config.deployment.modelDigest !== TRANSCRIPTION_DIGEST || !config.deployment.activationId || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) context.addIssue({ code: "custom", message: "Transcription requires pinned artifact, activation, one slot and cell scope" });
   if (config.adapter.kind === "embedding" && (config.deployment.modelDigest !== EMBEDDING_DIGEST || !config.deployment.activationId || config.limits.maxConcurrency !== 1 || config.capacityScope !== "cell")) {
     context.addIssue({ code: "custom", message: "Embedding requires the pinned artifact, activation, one slot and whole-cell scope" });
   }
@@ -584,7 +594,7 @@ export const workerConfigSchema = z.object({
       path: ["deployment", "modelDigest"],
     });
   }
-  if (config.capacityScope === "cell" && config.adapter.kind !== "mycellios-pipeline" && config.adapter.kind !== "embedding" && config.adapter.kind !== "decision") {
+  if (config.capacityScope === "cell" && config.adapter.kind !== "mycellios-pipeline" && config.adapter.kind !== "embedding" && config.adapter.kind !== "transcription" && config.adapter.kind !== "decision") {
     context.addIssue({
       code: "custom",
       message: "capacityScope=cell requires a native Mycellios pipeline gateway",

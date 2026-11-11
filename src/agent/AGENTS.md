@@ -1187,7 +1187,11 @@
   Send only reply text to the canonical Mycellios speech model with explicit
   contribution funding. Authorize the Mico and saved account connection and
   verify bounded WAV output. Do not retry or switch providers on a paid failure.
-  Dictation continues to follow the device and connected transcription settings.
+  Network dictation has a separate account-scoped opt-in. Pin the account, Space
+  and Mico before recording and recheck before upload; never inherit audio consent
+  across accounts. Existing device/provider dictation remains the default. Convert
+  to bounded PCM on the device, with no paid retry or provider fallback. Verify
+  network-transcription-isolation, dictation-network and transcription-audio tests.
   Verify mycellios-network-speech, voice and tts tests.
   Network voice errors carry only allowlisted public reason codes; rejected model
   keys are 403, never a lost-login 401. Preview requests are single-flight and

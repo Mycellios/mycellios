@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_MODEL, isTranscriptionDeployment, parseTranscriptionRequest, verifiedTranscriptionEnvelope } from "../contracts/transcription.js";
 import { isKokoroDeployment } from "../contracts/speech.js";
 import { DECISION_DEADLINE_MS, DECISION_MODEL, isDecisionDeployment, parseDecisionRequest, verifiedDecisionEnvelope } from "../contracts/decision.js";
 import { EMBEDDING_MODEL, isEmbeddingDeployment, parseEmbeddingRequest, verifiedEmbeddingEnvelope } from "../contracts/embedding.js";
@@ -208,7 +209,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     const routePlan = (await this.scheduler.selectRoutePlan(stableRequest, sessionId, {
       ...routeOptions,
       allowPipeline: false,
-      maxStandbyRoutes: 2,
+      maxStandbyRoutes: stableRequest.model === TRANSCRIPTION_MODEL ? 0 : 2,
     }));
     if (!routePlan) {
       (await this.store.setJobStatus(jobId, "failed", "no_capacity"));
@@ -299,7 +300,7 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     return (await this.scheduler.selectRoutePlan(cloneRequest(request), sessionId, {
       ...routeOptionsForRequest(request, this.hub.connectedWorkerIds()),
       allowPipeline: false,
-      maxStandbyRoutes: 2,
+      maxStandbyRoutes: request.model === TRANSCRIPTION_MODEL ? 0 : 2,
     })) !== null;
   }
 
@@ -859,6 +860,13 @@ export class MeshService extends EventEmitter<MeshServiceEvents> {
     );
     if (result.metrics.inputTokens < 1 || result.metrics.inputTokens > plausibleInputMaximum) {
       return { ok: false, reason: "Implausible input token count" };
+    }
+    if (isTranscriptionDeployment(deployment)) {
+      try {
+        const envelope = verifiedTranscriptionEnvelope(runtime.output, parseTranscriptionRequest(runtime.request));
+        if (result.text !== runtime.output || result.finishReason !== "stop" || result.metrics.outputTokens !== 0 || result.metrics.inputTokens !== envelope.usage.input_tokens) throw new Error("transcription_billing_mismatch");
+        return { ok: true };
+      } catch { return { ok: false, reason: "Transcription integrity validation failed" }; }
     }
     if (isKokoroDeployment(deployment)) return validateSpeechCompletion(runtime.request, result, runtime.output);
     if (isDecisionDeployment(deployment)) {

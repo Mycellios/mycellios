@@ -12,7 +12,7 @@ const body = z.object({
   schema: z.literal("mycellios-native-replica-qualification/1"),
   workerId: id, sessionId: id, deploymentId: id, activationId: id,
   model: id, modelDigest: digest, buildSourceId: digest, physicalNodeId: id,
-  responseKind: z.enum(["embedding", "speech"]), challengeId: id, promptDigest: digest,
+  responseKind: z.enum(["embedding", "speech", "transcription"]), challengeId: id, promptDigest: digest,
   issuedAt: z.number().int().nonnegative().safe(), observedAt: z.number().int().nonnegative().safe(),
   samples: z.array(sample).length(3),
 }).strict().superRefine((value, context) => {

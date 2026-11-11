@@ -362,6 +362,7 @@ async function openMic() {
   micOpen = true;
   try {
     await dictation.listen({
+      botId: state.botId,
       mode: "endpoint",
       transcribe,
       preferServer: transcribe,

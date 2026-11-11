@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { TRANSCRIPTION_MODEL, TRANSCRIPTION_DIGEST, TRANSCRIPTION_CANARY_SHA256, verifiedTranscriptionEnvelope, transcriptionInputSchema } from "../contracts/transcription.js";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
@@ -30,6 +32,13 @@ function matches(value: unknown, expected: string | undefined): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 function plan(deployment: ModelDeployment) {
+  if (deployment.adapter === "transcription" && deployment.model === TRANSCRIPTION_MODEL && deployment.modelDigest === TRANSCRIPTION_DIGEST) {
+    const path = process.env.MYCELLIOS_TRANSCRIPTION_CANARY_PATH;
+    if (!path) return deny("transcription_qualification_audio_missing", 503);
+    const audio = readFileSync(path);
+    const content = JSON.stringify({ schema: "mycellios-transcription-input/1", audio: { format: "wav", sha256: TRANSCRIPTION_CANARY_SHA256, data: audio.toString("base64") }, language: "es" });
+    return { kind: "transcription" as const, content };
+  }
   if (String(deployment.adapter) === "embedding" && deployment.model === EMBEDDING_MODEL && deployment.modelDigest === EMBEDDING_DIGEST) {
     return { kind: "embedding" as const, content: JSON.stringify({ schema: "mycellios-embeddings/1", input: [TEXT], dimensions: 32 }) };
   }
@@ -39,8 +48,14 @@ function plan(deployment: ModelDeployment) {
   return deny("native_replica_model_is_not_supported", 422);
 }
 /** Returned bytes are validated without representing audio or vector components as text tokens. */
-export function verifyNativeQualificationResult(kind: "embedding" | "speech", text: string): void {
+export function verifyNativeQualificationResult(kind: "embedding" | "speech" | "transcription", text: string): void {
   if (Buffer.byteLength(text) > 1_500_000) deny("native_replica_response_too_large", 422);
+  if (kind === "transcription") {
+    const audio = readFileSync(process.env.MYCELLIOS_TRANSCRIPTION_CANARY_PATH!);
+    const result = verifiedTranscriptionEnvelope(text, transcriptionInputSchema.parse({ schema: "mycellios-transcription-input/1", audio: { format: "wav", sha256: TRANSCRIPTION_CANARY_SHA256, data: audio.toString("base64") }, language: "es" }));
+    if (!result.text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z ]/g, "").trim().replace(/\s+/g, " ").includes("buenos dias la reunion empieza manana a las nueve")) deny("transcription_qualification_text_mismatch", 422);
+    return;
+  }
   if (kind === "speech") {
     verifiedSpeechEnvelope(text, SPEECH_TEXT, { voice: "ef_dora", language: "es", speed: 1 });
     return;

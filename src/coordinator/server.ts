@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
 import { createInferenceSettlement } from "./settle-completed-inference.js";
 import { beginContributionUsage } from "./contribution-funding.js";
 import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
@@ -4753,7 +4754,7 @@ export async function createCoordinator(
     const conversationId = (await store.startInferenceConversation(
       handle.sessionId,
       parsed.model,
-      parsed.messages,
+      parsed.model === TRANSCRIPTION_MODEL ? [] : parsed.messages,
     ));
     reply.header("x-network-request-id", handle.jobId);
     reply.header("x-network-session-id", handle.sessionId);

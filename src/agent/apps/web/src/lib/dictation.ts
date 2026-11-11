@@ -1,3 +1,5 @@
+import { authClient } from "./auth";
+import { prepareNetworkTranscriptionAudio } from "./transcription-audio";
 import { getGeneralPreferences } from "./general-preferences";
 import { readBoundedResponseBytes, speechLocaleTag } from "@rakazo/core";
 import { isAndroidHost, startAndroidDictation } from "./android-host";
@@ -197,6 +199,7 @@ export class Dictation {
   private onRecording: ((audio: Blob) => void) | undefined;
   private skipRecordingTranscription = false;
   private useLocalTranscription = false;
+  private networkTarget: { accountId: string; botId: string } | null = null;
   private waitForSpeechEnd = false;
   private finishingSpeech = false;
   private reportBufferedTranscript = false;
@@ -262,6 +265,7 @@ export class Dictation {
     this.onRecording = undefined;
     this.skipRecordingTranscription = false;
     this.useLocalTranscription = false;
+    this.networkTarget = null;
     this.waitForSpeechEnd = false;
     this.finishingSpeech = false;
     this.reportBufferedTranscript = false;
@@ -271,6 +275,7 @@ export class Dictation {
   async listen(opts: {
     mode: DictationMode;
     spaceId?: string | null;
+    botId?: string;
     transcribe?: boolean;
     preferServer?: boolean;
     endpointMs?: number;
@@ -293,6 +298,18 @@ export class Dictation {
     const transcribe = Boolean(opts.transcribe);
     if (opts.onRecording) {
       await this.listenRecorder(mine, "hold", ENDPOINT_SILENCE_MS, spaceId);
+      return;
+    }
+    const networkAccount = getGeneralPreferences().networkTranscriptionAccount;
+    if (networkAccount) {
+      const session = await authClient.getSession({ query: { disableCookieCache: true } });
+      if (this.token !== mine) return;
+      if (session.data?.user.id !== networkAccount || !opts.botId) {
+        this.failListening(mine, "Select Mycellios dictation for this account in Voice settings, then open a Mico.");
+        return;
+      }
+      this.networkTarget = { accountId: networkAccount, botId: opts.botId };
+      await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
       return;
     }
     if (isAndroidHost()) {
@@ -550,7 +567,7 @@ export class Dictation {
       };
       media.start(mode === "endpoint" ? 250 : undefined);
       if (mode === "hold" && (this.onRecording || this.onSpeechStart)) this.armSilence(stream, mine, null);
-      this.recordingLimit = setTimeout(() => { if (this.token === mine && media && media.state !== "inactive") media.stop(); }, 60_000);
+      this.recordingLimit = setTimeout(() => { if (this.token === mine && media && media.state !== "inactive") media.stop(); }, this.networkTarget ? 29_000 : 60_000);
     } catch (error) {
       if (media) {
         media.ondataavailable = null;
@@ -692,7 +709,14 @@ export class Dictation {
           return;
         } finally { await context.close(); }
       }
-      const audioBase64 = await blobToBase64(blob);
+      const network = this.networkTarget;
+      const upload = network ? await prepareNetworkTranscriptionAudio(blob) : blob;
+      if (network) {
+        const session = await authClient.getSession({ query: { disableCookieCache: true } });
+        if (this.token !== mine) return;
+        if (session.data?.user.id !== network.accountId) throw new Error("The account changed. Record again after signing in.");
+      }
+      const audioBase64 = await blobToBase64(upload);
       if (this.token !== mine) return;
       const res = await withAbort(
         fetch(appPath("/api/voice/transcribe"), {
@@ -701,7 +725,8 @@ export class Dictation {
           credentials: "include",
           body: JSON.stringify({
             audioBase64,
-            mimeType: blob.type,
+            mimeType: upload.type,
+            ...(network ? { networkAccountId: network.accountId, botId: network.botId } : {}),
             language: transcriptionLanguage(),
           }),
           signal: abort.signal,

@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_MODEL, MAX_TRANSCRIPTION_TOKENS } from "../contracts/transcription.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
 import type { MeshDatabase } from "../storage/database.js";
 import type { EconomicLedger, EconomicSettlementInput } from "./economic-ledger.js";
@@ -106,7 +107,7 @@ export class ContributionCreditWallet {
     const policies = (await Promise.all((["remote-replica", "distributed-pipeline"] as const)
       .map(route => this.ledger.resolvePricingPolicy(request.model, route, now)))).filter(policy => policy !== null);
     if (!policies.length) throw new Error("contribution_pricing_unavailable");
-    const inputBound = Buffer.byteLength(JSON.stringify(request.messages), "utf8") + request.messages.length * 64;
+    const inputBound = request.model === TRANSCRIPTION_MODEL ? MAX_TRANSCRIPTION_TOKENS : Buffer.byteLength(JSON.stringify(request.messages), "utf8") + request.messages.length * 64;
     const maxima = policies.map(policy => BigInt(inputBound) * BigInt(policy.inputMicrounitsPerToken)
       + BigInt(request.max_tokens ?? 256) * BigInt(policy.outputMicrounitsPerToken));
     const maximum = Number(maxima.reduce((a, b) => a > b ? a : b));

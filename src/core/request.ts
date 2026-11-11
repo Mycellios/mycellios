@@ -1,3 +1,4 @@
+import { TRANSCRIPTION_MODEL, MAX_TRANSCRIPTION_TOKENS } from "../contracts/transcription.js";
 import { KOKORO_MODEL, resolveSpeechOptions } from "../contracts/speech.js";
 import type { ChatCompletionRequest } from "../contracts/types.js";
 import { canonicalJson, sha256Text } from "./json.js";
@@ -16,6 +17,7 @@ export function inputHashForRequest(request: ChatCompletionRequest): string {
 }
 
 export function estimateInputTokens(request: ChatCompletionRequest): number {
+  if (request.model === TRANSCRIPTION_MODEL) return MAX_TRANSCRIPTION_TOKENS;
   const characters = request.messages.reduce(
     (total, message) => total + message.role.length + message.content.length,
     0,

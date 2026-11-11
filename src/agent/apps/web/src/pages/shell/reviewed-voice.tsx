@@ -8,8 +8,8 @@ import { isAndroidHost } from "../../lib/android-host";
 type Stage = "closed" | "listening" | "stopping" | "review" | "sending";
 
 /** The shortcut records into a review, never directly into the agent's send path. */
-export function useReviewedVoice({ scope, transcribe, blocked, onSend }: {
-  scope: string; transcribe?: boolean; blocked: boolean;
+export function useReviewedVoice({ scope, botId, transcribe, blocked, onSend }: {
+  scope: string; botId?: string; transcribe?: boolean; blocked: boolean;
   onSend: (text: string, nonce: string) => Promise<boolean | void>;
 }) {
   const { t } = useLingui();
@@ -47,7 +47,7 @@ export function useReviewedVoice({ scope, transcribe, blocked, onSend }: {
     s.prefix = s.text;
     const epoch = ++s.epoch;
     s.owned = true; setError(null); move("listening");
-    void dictation.listen({ mode: "hold", transcribe, preferServer: transcribe, onFinal: words => {
+    void dictation.listen({ botId, mode: "hold", transcribe, preferServer: transcribe, onFinal: words => {
       if (session.current.epoch !== epoch) return;
       s.owned = false;
       edit([s.prefix, words].filter(Boolean).join(" "));
@@ -56,7 +56,7 @@ export function useReviewedVoice({ scope, transcribe, blocked, onSend }: {
       if (session.current.epoch !== epoch) return;
       s.owned = false; move("review"); setError(t`Could not start the microphone. Try again.`);
     });
-  }, [edit, move, transcribe, t]);
+  }, [edit, move, botId, transcribe, t]);
   const stop = useCallback(() => {
     if (session.current.stage !== "listening") return;
     move("stopping"); dictation.submitHold();

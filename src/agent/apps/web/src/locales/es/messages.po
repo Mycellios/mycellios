@@ -11129,3 +11129,12 @@ msgstr "Conecta tu cuenta de Mycellios en Modelos para usar la voz de la red."
 
 msgid "Your Mycellios connection could not be read. Open Models to check it."
 msgstr "No se ha podido leer tu conexión de Mycellios. Abre Modelos para comprobarla."
+
+msgid "Dictation processing"
+msgstr "Procesar dictado"
+
+msgid "Mycellios sends recordings of up to 30 seconds to the network and uses your credits. Spanish and English."
+msgstr "Mycellios envía grabaciones de hasta 30 segundos a la red y consume tus créditos. Español e inglés."
+
+msgid "Device or connected provider"
+msgstr "Dispositivo o proveedor conectado"
