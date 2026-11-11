@@ -1,11 +1,10 @@
 name: Tailscale gateway qualification
 
 on:
-  push:
-    branches: [feat/tailscale-connections]
   pull_request:
     paths:
       - src/agent/infra/tailscale/**
+      - src/agent/scripts/verify-tailscale-live.ts
       - .github/workflows/tailscale-gateway.yml
   workflow_dispatch:
 
@@ -18,7 +17,7 @@ concurrency:
 
 jobs:
   gateway:
-    name: Linux gateway build and native startup
+    name: Gateway build, real tailnet and Mico authorization
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
