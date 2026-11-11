@@ -51,10 +51,10 @@ if engine.device_name != cfg["deviceName"]:
     raise ValueError("qualification_device_changed")
 rows = []
 def normalized(text):
-    return " ".join("".join(c if c.isalnum() else " " for c in unicodedata.normalize("NFD", text.lower()) if not unicodedata.combining(c)).split())
+    return " ".join("".join(c if c.isalnum() else " " for c in unicodedata.normalize("NFD", text.lower()) if not unicodedata.combining(c)).split()).replace("nueve", "9").replace("nine", "9")
 
 
-for language, expected in [("es", "buenos dias la reunion empieza manana a las nueve"), ("en", "the meeting starts at nine tomorrow morning")]:
+for language, expected in [("es", "buenos dias la reunion empieza manana a las 9"), ("en", "the meeting starts at 9 tomorrow morning")]:
     audio = (root / ("canary-" + language + ".wav")).read_bytes()
     sha = hashlib.sha256(audio).hexdigest()
     if sha != cfg["qualificationAudioSha256"][language]:

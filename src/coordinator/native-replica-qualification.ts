@@ -53,7 +53,7 @@ export function verifyNativeQualificationResult(kind: "embedding" | "speech" | "
   if (kind === "transcription") {
     const audio = readFileSync(process.env.MYCELLIOS_TRANSCRIPTION_CANARY_PATH!);
     const result = verifiedTranscriptionEnvelope(text, transcriptionInputSchema.parse({ schema: "mycellios-transcription-input/1", audio: { format: "wav", sha256: TRANSCRIPTION_CANARY_SHA256, data: audio.toString("base64") }, language: "es" }));
-    if (!result.text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z ]/g, "").trim().replace(/\s+/g, " ").includes("buenos dias la reunion empieza manana a las nueve")) deny("transcription_qualification_text_mismatch", 422);
+    if (!result.text.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z ]/g, "").trim().replace(/\s+/g, " ").replace(/\bnueve\b/g, "9").includes("buenos dias la reunion empieza manana a las 9")) deny("transcription_qualification_text_mismatch", 422);
     return;
   }
   if (kind === "speech") {
