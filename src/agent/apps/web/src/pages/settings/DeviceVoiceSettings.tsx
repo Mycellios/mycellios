@@ -20,7 +20,7 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId }: {
   const [previewing, setPreviewing] = useState(false);
   useEffect(() => () => {
     if (speaker.state.messageId === id) speaker.stop();
-  }, [id]);
+  }, [id, accountId, previewBotId, spaceId]);
   async function previewNetworkVoice() {
     if (!previewBotId || previewing) return;
     const language = (value.dictationLanguage === "auto" ? i18n.locale : value.dictationLanguage).split("-")[0];

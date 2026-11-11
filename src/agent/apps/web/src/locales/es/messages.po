@@ -10777,8 +10777,8 @@ msgstr "Ajustes del Mico"
 msgid "Default on this device. Each Mico can follow it or use its own preference."
 msgstr "Preferencia de este dispositivo. Cada Mico puede usarla o tener la suya."
 
-msgid "Messages while {name} works"
-msgstr "Mensajes mientras trabaja {name}"
+msgid "Messages while {0} works"
+msgstr "Mensajes mientras trabaja {0}"
 
 msgid "Use default"
 msgstr "Usar preferencia general"
@@ -10893,6 +10893,3 @@ msgstr "Hola, esta es la voz de Mycellios."
 
 msgid "Preview uses your Mycellios credits."
 msgstr "La prueba usa tus créditos de Mycellios."
-
-msgid "Playing…"
-msgstr "Reproduciendo…"

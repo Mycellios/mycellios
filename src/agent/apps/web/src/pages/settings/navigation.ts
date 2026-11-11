@@ -14,7 +14,7 @@ export const settingsKeywords: Record<string, string> = {
   general:
     "appearance theme language timezone sidebar density developer enter shortcut interface size agent steps stream tool images logo color background font compact actions external links startup login awake battery restore workspace tipografia fuente colores fondo logotipo acciones compactas enlaces externos iniciar sesion segundo plano suspension bateria restaurar general apariencia tema idioma zona horaria densidad desarrollar teclado atajo tamaño interfaz pasos agente respuestas herramientas imágenes",
   "dynamic-island": "dynamic island idle display size width height isla dinamica reposo pantalla ancho alto tamaño",
-  "agent-dock": "mico dock position screen agents results automatic hide edge strip panel posicion pantalla resultados ocultar borde",
+  "agent-dock": "mico dock position screen agents results automatic hide edge strip floating chat window panel posicion pantalla resultados ocultar borde flotante ventana",
   profile:
     "profile account name email password passkeys sso security delete perfil cuenta nombre correo contraseña seguridad eliminar",
   notifications:
@@ -34,7 +34,7 @@ export const settingsKeywords: Record<string, string> = {
   usage: "usage cost tokens balance uso costes consumo créditos saldo",
   computer:
     "computer access sandbox local tools equipment equipo computadora ordenador acceso entorno archivos",
-  mobile: "mobile iphone android install app phone pwa connection móvil teléfono instalar conexión",
+  mobile: "mobile iphone android install app phone pwa connection qr code sessions disconnect móvil teléfono instalar conexión codigo sesiones desconectar",
   updates:
     "updates version download release restart automatic install channel stable actualizaciones versión descarga novedades reiniciar automaticas instalar canal estable",
   billing: "billing payments subscription factura pago suscripción",

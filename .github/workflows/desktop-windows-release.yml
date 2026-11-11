@@ -180,6 +180,7 @@ jobs:
             ${{ env.DESKTOP_RELEASE_OUT }}/desktop-build.json
             ${{ env.DESKTOP_RELEASE_OUT }}/desktop-release.json
             ${{ env.DESKTOP_RELEASE_OUT }}/packaged-smoke.json
+            ${{ env.DESKTOP_RELEASE_OUT }}/floating-chats-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/SHA256SUMS.txt
           if-no-files-found: error

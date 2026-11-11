@@ -76,4 +76,8 @@ finally { chats?.clear(); if(main&&!main.isDestroyed())main.destroy(); server.cl
   await mkdir(output, { recursive: true });
   await writeFile(path.join(output, 'floating-chats-qualification.json'), JSON.stringify(receipt, null, 2));
   console.log(JSON.stringify(receipt));
-} finally { await rm(temp, { recursive: true, force: true }); }
+} finally {
+  assert.equal(path.dirname(path.resolve(temp)), path.resolve(tmpdir()));
+  assert.ok(path.basename(temp).startsWith('mycellios-floating-proof-'));
+  await rm(temp, { recursive: true, force: true });
+}
