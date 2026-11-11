@@ -1,219 +1,41 @@
-name: Desktop Windows release package
+name: Qualify exact published Windows installer
 on:
-  push:
-    tags: ['desktop-v*.*.*-windows-preview']
-    branches: ['codex/desktop-release-*']
   workflow_dispatch:
-    inputs:
-      expedited:
-        description: Operator-requested build and startup only; installer timing and optional tests NOT RUN
-        type: boolean
-        default: false
 permissions:
   contents: read
-concurrency:
-  group: desktop-windows-release
-  cancel-in-progress: false
+  actions: read
 jobs:
-  package:
-    runs-on: windows-2025
-    timeout-minutes: 60
-    outputs:
-      version: ${{ steps.identity.outputs.version }}
-      revision: ${{ steps.identity.outputs.revision }}
-      tag: ${{ steps.identity.outputs.tag }}
-    env:
-      RAKAZO_PROJECT_LOCAL: '1'
-      NODE_OPTIONS: --max-old-space-size=4096
-      ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
-      DESKTOP_EXPEDITED_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.expedited && '1' || '0' }}
+  qualify:
+    runs-on: windows-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          fetch-depth: 0
-          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.2
-      - name: Bind the release to its source and version
-        id: identity
-        shell: pwsh
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_REF: ${{ github.ref_name }}
-        run: |
-          $version=(Get-Content src/agent/apps/desktop/package.json -Raw|ConvertFrom-Json).version
-          if($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$'){throw 'Invalid Desktop version'}
-          $tag="desktop-v$version-windows-preview"
-          $revision=git rev-parse HEAD
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          if($env:EVENT_NAME -eq 'push' -and $env:GITHUB_REF_TYPE -eq 'tag'){
-            if($env:RELEASE_REF -ne $tag){throw 'Release tag and package version differ'}
-            git fetch origin main --no-tags
-            if($LASTEXITCODE){exit $LASTEXITCODE}
-            git merge-base --is-ancestor $revision origin/main
-            if($LASTEXITCODE){throw 'The release candidate is not integrated in main'}
-          }
-          "version=$version" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "revision=$revision" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "tag=$tag" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-          $out=Join-Path $env:RUNNER_TEMP desktop-release
-          New-Item -ItemType Directory -Force $out | Out-Null
-          "DESKTOP_RELEASE_OUT=$out" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-          $temp=Join-Path $env:RUNNER_TEMP mycellios-desktop-release-temp
-          New-Item -ItemType Directory -Force $temp | Out-Null
-          "TEMP=$temp" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-          "TMP=$temp" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Install the locked build inputs
-        shell: pwsh
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          npm run verify:structure
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          npm run verify:architecture
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          npm run verify:component-boundaries
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          Set-Location src/agent
-          npm ci --ignore-scripts --no-audit --no-fund
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          npm run db:generate
-          exit $LASTEXITCODE
-      - name: Retrieve the pinned published native runtime
-        shell: pwsh
-        run: |
-          $runtime=Join-Path $env:RUNNER_TEMP desktop-runtime
-          New-Item -ItemType Directory -Force $runtime | Out-Null
-          $previous=Join-Path $runtime previous.exe
-          curl.exe --fail --location --retry 2 --output $previous https://www.mycellios.com/downloads/desktop/releases/0.3.15/Mycellios-Desktop-0.3.15-windows-x64-pilot.exe
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          if((Get-FileHash $previous).Hash.ToLowerInvariant() -ne 'a8ff09b461d69328ee3a287a9a0983983dfd5c4f4d3c59c91600c3558c896482'){throw 'Published runtime source installer changed'}
-          & 'C:/Program Files/7-Zip/7z.exe' e $previous '$PLUGINSDIR\app-64.*' "-o$runtime" -y
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          $payload=@(Get-ChildItem "$runtime/app-64.*" -File)
-          if($payload.Count -ne 1){throw 'Ambiguous runtime payload'}
-          & 'C:/Program Files/7-Zip/7z.exe' e $payload[0].FullName resources/contribution/mycellios-runtime.msi "-o$runtime" -y
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          $msi=Join-Path $runtime mycellios-runtime.msi
-          if((Get-FileHash $msi).Hash.ToLowerInvariant() -ne 'c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc'){throw 'Runtime hash differs from the approved native release'}
-          "DESKTOP_RUNTIME_MSI=$msi" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Test update and native package boundaries
-        if: inputs.expedited != true
+      - name: Install pinned qualification dependencies
         working-directory: src/agent
-        shell: pwsh
-        run: |
-          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/manual-update-lock.test.ts apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          node -e "require('electron')"
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs apps/desktop/scripts/compact-resources.test.mjs apps/desktop/scripts/windows-install-fixture.test.mjs
-          exit $LASTEXITCODE
-      - name: Compile all surfaces from this candidate
-        working-directory: src/agent
-        shell: pwsh
-        run: |
-          npm run build --workspace @rakazo/web -- --desktop
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          npm run build --workspace @rakazo/desktop
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          node apps/desktop/scripts/verify-floating-chats.mjs $env:DESKTOP_RELEASE_OUT
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          npm run build:local-server --workspace @rakazo/desktop
-          exit $LASTEXITCODE
-      - name: Package and qualify the immutable installer
-        id: package
-        working-directory: src/agent
-        shell: pwsh
-        run: |
-          node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc --out $env:DESKTOP_RELEASE_OUT
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
-          exit $LASTEXITCODE
-      - name: Qualify rollback helper
-        if: inputs.expedited != true
-        working-directory: src/agent
-        shell: pwsh
-        run: |
-          $env:MYCELLIOS_TEST_INSTALLED_EXE=Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/Mycellios Desktop.exe'
-          node --test apps/desktop/scripts/fast-install.test.mjs
-          exit $LASTEXITCODE
-      - name: Qualify real compact local server
-        if: inputs.expedited != true
-        working-directory: src/agent
-        shell: pwsh
-        run: |
-          node apps/desktop/scripts/verify-local-server.mjs --server-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/local-server') --web-root (Join-Path $env:DESKTOP_RELEASE_OUT 'win-unpacked/resources/web')
-          exit $LASTEXITCODE
-      - name: Measure real installer and retained development tools
-        if: ${{ !cancelled() && steps.package.outcome == 'success' && inputs.expedited != true }}
-        working-directory: src/agent
-        shell: pwsh
-        run: |
-          node apps/desktop/scripts/qualify-windows-install.mjs $env:DESKTOP_RELEASE_OUT
-          exit $LASTEXITCODE
-      - name: Qualify packaged startup and bind all receipts
-        working-directory: src/agent
-        shell: pwsh
-        run: |
-          node apps/desktop/scripts/qualify-windows-release.mjs $env:DESKTOP_RELEASE_OUT
-          exit $LASTEXITCODE
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: failure()
-        with:
-          name: desktop-windows-diagnostics-${{ steps.identity.outputs.revision }}
-          path: |
-            ${{ env.DESKTOP_RELEASE_OUT }}/desktop-build.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/win-unpacked/resources/local-server/compact-resources.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/*.exe
-            src/agent/apps/desktop/local-server/package-lock.json
-          if-no-files-found: warn
-          retention-days: 7
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: desktop-windows-${{ steps.identity.outputs.revision }}
-          path: |
-            ${{ env.DESKTOP_RELEASE_OUT }}/*.exe
-            ${{ env.DESKTOP_RELEASE_OUT }}/*.blockmap
-            ${{ env.DESKTOP_RELEASE_OUT }}/latest.yml
-            ${{ env.DESKTOP_RELEASE_OUT }}/desktop-build.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/desktop-release.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/packaged-smoke.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/floating-chats-qualification.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
-            ${{ env.DESKTOP_RELEASE_OUT }}/SHA256SUMS.txt
-          if-no-files-found: error
-          retention-days: 14
-  publish:
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'Mycellios/mycellios'
-    needs: package
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ needs.package.outputs.tag }}
-      RELEASE_REVISION: ${{ needs.package.outputs.revision }}
-    steps:
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
         with:
-          name: desktop-windows-${{ needs.package.outputs.revision }}
-          path: release
-      - name: Verify the qualified package and publish once
-        shell: bash
+          name: desktop-windows-68779b4b032c187a304e328865878fa5111bb511
+          run-id: 43035588681
+          github-token: ${{ github.token }}
+          path: qualified
+      - name: Bind exact published bytes and qualify native installation
+        working-directory: src/agent
+        shell: pwsh
         run: |
-          set -euo pipefail
-          cd release
-          sha256sum --check --strict SHA256SUMS.txt
-          jq -e --arg rev "$RELEASE_REVISION" --arg tag "$RELEASE_TAG" '.revision == $rev and .tag == $tag and .qualifiedStartup == true and .qualifiedInstallation == true and .automaticUpdates == false' desktop-release.json
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo 'This release already exists. Never replace an existing version; prepare a new version.' >&2
-            exit 1
-          fi
-          printf 'Versioned Windows preview from commit `%s`.\n\nVerified package, source identity and update manifests are attached. Installation requires an explicit restart.\n' "$RELEASE_REVISION" > notes.md
-          gh release create "$RELEASE_TAG" --verify-tag --target "$RELEASE_REVISION" --draft --prerelease --latest=false --title "Mycellios Desktop $RELEASE_TAG" --notes-file notes.md
-          gh release upload "$RELEASE_TAG" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json SHA256SUMS.txt
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          $output=Join-Path $env:GITHUB_WORKSPACE 'qualified'
+          $identity=Get-Content (Join-Path $output 'desktop-build.json') -Raw | ConvertFrom-Json
+          if($identity.version -ne '0.3.43' -or $identity.revision -ne '68779b4b032c187a304e328865878fa5111bb511'){throw 'Wrong candidate'}
+          $installer=Join-Path $output 'Mycellios-Desktop-0.3.43-windows-x64-pilot.exe'
+          if((Get-FileHash $installer).Hash.ToLowerInvariant() -ne 'f2efcd79996a01ffa0ee5c4b61901c9e61d2141c4539c1fa00ac123346601f8d'){throw 'Published installer differs'}
+          node apps/desktop/scripts/qualify-windows-install.mjs $output
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: exact-043-installation-qualification
+          path: qualified/installer-qualification.json
+          if-no-files-found: error
