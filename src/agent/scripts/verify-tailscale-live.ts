@@ -9,6 +9,9 @@ import { EncryptedSecretStore } from "../packages/adapters/src/secrets.js";
 
 const receipt = "../../build/tailscale-gateway/live/network.json";
 const network = JSON.parse(await readFile(receipt, "utf8"));
+const databaseUrl = new URL(process.env.DATABASE_URL!);
+assert.ok(["127.0.0.1", "localhost"].includes(databaseUrl.hostname) && databaseUrl.pathname === "/qualification",
+  "This fixture may run only against the isolated local qualification database");
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 const tailnets = new TailnetService(prisma, { url: "http://127.0.0.1:8095", key: process.env.TAILSCALE_GATEWAY_KEY! });
 const connector = new McpConnector(prisma, new EncryptedSecretStore("isolated-qualification-only"), { tailnets });

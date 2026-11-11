@@ -76,6 +76,25 @@ describe("private MCP authorization", () => {
     await expect(transport.managedFetch!(server.endpoint)).rejects.toThrow("binding changed");
     expect(f.fetch).not.toHaveBeenCalled();
   });
+  it("lets the SDK discard a response body without turning cleanup into an abort error", async () => {
+    const f = fixture();
+    let requestSignal: AbortSignal | undefined;
+    let cancelled = false;
+    f.fetch.mockImplementation(async (_input, init) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Response(new ReadableStream({
+        cancel() {
+          if (requestSignal?.aborted) throw new DOMException("This operation was aborted", "AbortError");
+          cancelled = true;
+        },
+      }), { status: 202 });
+    });
+    const transport = await f.service.transport("network-a", scope, server);
+    const response = await transport.managedFetch!(server.endpoint, { method: "POST", body: '{}' });
+    await expect(response.body!.cancel()).resolves.toBeUndefined();
+    expect(cancelled).toBe(true);
+    expect(requestSignal?.aborted).toBe(true);
+  });
   it("keeps cached sessions usable after the previous run's signal ends", async () => {
     const f = fixture(); const previous = new AbortController();
     const transport = await f.service.transport("network-a", { ...scope, signal: previous.signal }, server);

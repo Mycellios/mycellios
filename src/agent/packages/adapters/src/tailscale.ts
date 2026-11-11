@@ -227,7 +227,13 @@ export class TailnetService {
               else controller.enqueue(result.value);
             } catch { finish(); controller.error(new Error("Private MCP stream disconnected")); }
           },
-          async cancel() { finish(); abort.abort(); await reader.cancel(); },
+          async cancel() {
+            finish();
+            // The MCP SDK cancels accepted notification/GET response bodies.
+            // Abort fetch only after releasing its reader: aborting first makes
+            // reader.cancel reject and turns normal SDK cleanup into a failure.
+            try { await reader.cancel(); } finally { abort.abort(); }
+          },
         }), { status: response.status, headers: response.headers });
       } catch { finish(); throw new TailnetError("Private MCP connection failed; check Tailscale access"); }
     };
