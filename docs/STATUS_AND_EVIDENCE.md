@@ -26,6 +26,21 @@ and [OpenBot 0.67.1](https://github.com/nightly-labs/openbot/releases/tag/v0.67.
 Existing ZIP import already accepts missing Unix file types while rejecting links
 and devices; no OpenBot implementation was copied.
 
+Publication is independently recorded for main
+`02daa6c03690843fd519f47e9b62e6e8d1f689e7` (PR #222), source tree
+`929bb5877f55cbed6380d25728a58ad1b90002b7`. PR run `42996170124` passed
+web/API/worker/Desktop typing and 2,436 related tests (308 skipped), plus 142 changed
+tests; these sets overlap. Workspace/browser and Windows acceptance passed in
+run `42996169567`; post-merge run `42996886076` also passed. The remote Linux
+release built API/worker and verified compiled startup. Its archive SHA-256 is
+`b77f3a5146a5991602c6766be842e0febe4c18f1203d127311acd66a67840650`.
+Production mounts serve the corresponding verified bundles and public readiness
+is healthy. Existing environments, frontend and gateway were preserved; gateway
+provenance remains its separately qualified earlier revision. No database
+migrations were added. The database backup and prior containers are retained
+for rollback. This server publication does not update the installed Desktop
+or qualify a live provider OAuth login.
+
 ## Tailscale private MCP connections — server release, 2026-11-11
 
 Conexiones has personal and company tailnet enrollment, explicit per-Mico network
