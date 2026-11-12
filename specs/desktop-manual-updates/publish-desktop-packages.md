@@ -181,6 +181,11 @@ and physical update remain required before declaring activation complete.
 
 The custom manual updater retains its existing catalog/hash/owner/Attachment
 Services safeguards. This change does not enable the automatic-install channel.
+The owned GitHub release parser accepts qualified signed-package metadata as well
+as legacy previews. Existing installed 0.3.46 builds predate that parser support;
+qualify first-signed-release discovery from those clients separately, or direct
+users to the official download for that first upgrade. New parser support alone
+does not update already installed binaries.
 Keep the same legal publisher across updates; rotate certificates under that
 identity, and separately qualify a migration before changing the legal name.
 

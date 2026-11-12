@@ -8,6 +8,14 @@ const manifest = {schema: "mycellios-desktop-release-package/1", version, tag, p
 const release = (tag_name: string, draft = false) => ({tag_name, draft, assets: [{name: "desktop-release.json"}]});
 
 describe("published Desktop packages", () => {
+  it("accepts signed package metadata without weakening manual update or payload checks", () => {
+    const signed = {...manifest, signature: "authenticode", publisher: "Verified publisher fixture", signatureReceiptSha256: "d".repeat(64)};
+    expect(publishedWindowsArtifact(signed, version)).toEqual(publishedWindowsArtifact(manifest, version));
+    for (const change of [{signature: "self-signed"}, {publisher: ""}, {publisher: "\nfixture"},
+      {signatureReceiptSha256: undefined}, {signatureReceiptSha256: "invalid"}, {automaticUpdates: true},
+      {artifact: {...manifest.artifact, sha256: "invalid"}}])
+      expect(() => publishedWindowsArtifact({...signed, ...change}, version)).toThrow();
+  });
   it("selects the newest qualified Desktop tag without reading main or the headless latest release", async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify([release("v0.2.999"),
       release("desktop-v0.3.99-windows-preview", true), release("desktop-v0.3.16-windows-preview"), release(tag)])))

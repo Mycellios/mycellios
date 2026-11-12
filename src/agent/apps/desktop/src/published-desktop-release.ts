@@ -53,9 +53,15 @@ export function publishedWindowsArtifact(manifest: unknown, version: string): Ma
   const tag = `desktop-v${version}-windows-preview`;
   const a = m?.artifact as Record<string, unknown> | undefined;
   const fileName = `Mycellios-Desktop-${version}-windows-x64-pilot.exe`;
+  // Release metadata describes the package; Windows still verifies the downloaded
+  // executable during the existing attachment-policy handoff before shutdown.
+  const signatureMetadata = m?.signature === "unsigned-preview" ||
+    (m?.signature === "authenticode" && typeof m.publisher === "string" &&
+      m.publisher.trim().length > 0 && m.publisher.length <= 256 && !/[\r\n\0]/.test(m.publisher) &&
+      typeof m.signatureReceiptSha256 === "string" && /^[a-f0-9]{64}$/.test(m.signatureReceiptSha256));
   if (!TAG.test(tag) || m?.schema !== "mycellios-desktop-release-package/1" || m.version !== version ||
       m.tag !== tag || m.platform !== "windows-x64" || m.automaticUpdates !== false ||
-      m.qualifiedStartup !== true || m.signature !== "unsigned-preview" ||
+      m.qualifiedStartup !== true || !signatureMetadata ||
       typeof m.revision !== "string" || !/^[a-f0-9]{40}$/.test(m.revision) ||
       typeof m.tree !== "string" || !/^[a-f0-9]{40}$/.test(m.tree) ||
       a?.fileName !== fileName || typeof a.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(a.sha256) ||
