@@ -9,12 +9,51 @@ import { desktopAgentFrames } from "./desktop-agent-stream.js";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { PiAgentRuntime } from "./pi-runtime.js";
+import { createDesktopAgentEngine } from "./desktop-agent-engine.js";
+import { mkdtemp, rm } from "node:fs/promises";
+import path from "node:path";
 
 const context: AdapterContext = { userId: "owner", spaceId: "space", botId: "mico", runId: "run", traceId: "trace", operationId: "op", signal: new AbortController().signal };
 const describe = () => ({ id: "fixture", contractVersion: "1", adapterVersion: "1", capabilities: { streaming: true, tools: true, compaction: false, scripted: true } });
 const hosts: Array<Awaited<ReturnType<typeof startHostComputerServer>>> = [];
 afterEach(async () => { for (const host of hosts.splice(0)) await host.close(); });
 const request = (): AgentRunRequest => ({ botId: "mico", threadId: "thread", runId: "run", instructions: "Owned Mico", prompt: "hello", history: [], tools: [], model: { provider: "openai", id: "gpt-4o", apiKey: "must-not-reach-desktop" } });
+
+it("resumes an approved tool through the real native host once without replaying the original turn", async () => {
+  const profile = await mkdtemp(path.join(tmpdir(), "desktop-approval-flow-"));
+  const scope = "a".repeat(64), token = "b".repeat(64);
+  const engine = createDesktopAgentEngine(profile, () => scope, () => ({
+    describe, abort: vi.fn(), async *run(input) {
+      const result = await input.executeTool!("web_fetch", {}, "same-effect") as { approved?: boolean };
+      if (result.approved) yield { type: "text", text: "Approved result" };
+      yield { type: "done" };
+    },
+  }));
+  const host = await startHostComputerServer({ root: profile, token, hostname: "127.0.0.1", agentRuntime: engine });
+  host.setEnabled(true);
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const transport = vi.fn((input: HostComputerRequest, ctx: AdapterContext) => fetch(`http://127.0.0.1:${host.port}/computer`, {
+    method: "POST", headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(input), signal: ctx.signal,
+  }));
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
+  const tool = vi.fn(async () => ({ approved: false }));
+  const input = { ...request(), executeTool: tool };
+  try {
+    for await (const _ of runtime.run(input, context)) {}
+    tool.mockResolvedValue({ approved: true });
+    const resumed = { ...input, turnCheckpoint: "durable-approved-effect-checkpoint" };
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of runtime.run(resumed, context)) events.push(event);
+    expect(events).toContainEqual({ type: "text", text: "Approved result" });
+    expect(events.at(-1)?.type).toBe("done");
+    expect(tool).toHaveBeenCalledTimes(2);
+    const starts = transport.mock.calls.map(([input]) => input).filter(input => input.method === "agentRun");
+    expect(starts).toMatchObject([{ runId: input.runId, segmentId: undefined }, { runId: input.runId, segmentId: expect.stringMatching(/^[a-f0-9]{64}$/) }]);
+    await expect(async () => { for await (const _ of runtime.run(resumed, context)) {} }).rejects.toThrow("already finished");
+    expect(tool).toHaveBeenCalledTimes(2);
+    expect(fallback.run).not.toHaveBeenCalled();
+  } finally { await host.close(); await rm(profile, { recursive: true, force: true }); }
+});
 
 it("runs the engine on Desktop while awaiting account callbacks, checkpoints and nested shell observations", async () => {
   const observed: string[] = [];

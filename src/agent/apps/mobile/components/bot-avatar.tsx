@@ -15,6 +15,11 @@ import {
   avatarThinkingDot,
   avatarWorkingDot,
   currentMicoAvatarValue,
+  compactMicoArt,
+  compactMicoEyes,
+  compactMicoEyeColor,
+  COMPACT_EYE_WIDTH,
+  COMPACT_EYE_HEIGHT,
   isRunWorking,
   MICO_AVATAR_EYE_COLOR,
   MICO_AVATAR_VIEWBOX,
@@ -23,14 +28,16 @@ import {
   SHIPPED_BOT_AVATAR_CENTER,
   SHIPPED_BOT_AVATAR_VIEWBOX,
 } from "@rakazo/core";
-import { memo } from "react";
+import { memo, useId } from "react";
+import myceliumSheet from "../../../packages/core/assets/micos-mycelium-eyeless.png";
+import growthSheet from "../../../packages/core/assets/micos-mycelium-growth-eyeless.png";
 import { Image, Pressable, View } from "react-native";
 import Animated, {
   useAnimatedProps,
   useAnimatedStyle,
   useReducedMotion,
 } from "react-native-reanimated";
-import Svg, { Ellipse, G, Path, Rect } from "react-native-svg";
+import Svg, { Ellipse, G, Path, Rect, Image as SvgImage, Defs, Filter, FeColorMatrix } from "react-native-svg";
 import type { AvatarLife } from "../lib/avatar-life";
 import { useAvatarOnScreen, useLife, usePoke, useSettling } from "../lib/avatar-life";
 import { mobileBotAvatarPresentation } from "../lib/bot-avatar";
@@ -187,7 +194,9 @@ export const BotAvatar = memo(function BotAvatar({
         <Image source={{ uri: parsed.imageUrl }} style={{ width: size, height: size }} />
       </View>
     ) : mico ? (
-      <MicoAvatar art={mico} size={size} life={life} bodyStyle={bodyStyle} />
+      <MicoAvatar art={mico} size={size} life={life} bodyStyle={bodyStyle}
+        compact={parsed.kind === "shape" && micoAvatarDetails(displayedValue).finish === "plush" ? compactMicoArt(parsed.shapeIndex) : undefined}
+        original={micoAvatarDetails(displayedValue).original} />
     ) : parsed.kind === "shape" ? (
       <ShippedShapeAvatar
         color={parsed.color}
@@ -311,20 +320,32 @@ function MicoAvatar({
   art,
   size,
   life,
-  bodyStyle,
+  bodyStyle, compact, original,
 }: {
+  compact?: ReturnType<typeof compactMicoArt>;
+  original?: boolean;
   art: NonNullable<ReturnType<typeof micoAvatarArt>>;
   size: number;
   life: AvatarLife;
   bodyStyle: BodyStyle;
 }) {
+  const id = `mico-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const channels = [1, 3, 5].map(offset => Number.parseInt(art.color.slice(offset, offset + 2), 16) / 255);
+  const matrix = compact ? channels.flatMap(channel => [0.2126, 0.7152, 0.0722].map(weight => channel * weight / compact.luminance).concat(0, 0)).concat(0, 0, 0, 1, 0).join(" ") : undefined;
+  const eyes = compact ? compactMicoEyes(compact) : undefined;
+  const ink = compact ? compactMicoEyeColor(art.color, compact, original, true) : art.eyeColor;
   return (
     <Animated.View style={[{ width: size, height: size }, bodyStyle]}>
       <Svg width={size} height={size} viewBox={MICO_AVATAR_VIEWBOX}>
-        <Path d={art.path} fill={art.color} />
+        {compact ? <>
+          {!original && <Defs><Filter id={id}><FeColorMatrix type="matrix" values={matrix} /></Filter></Defs>}
+          <Svg x={0} y={0} width={64} height={64} viewBox={compact.crop.join(" ").replace(/ (\d+)$/, " $1 $1")}>
+            <SvgImage href={compact.collection === "growth" ? growthSheet : myceliumSheet} width={1536} height={1024} filter={original ? undefined : `url(#${id})`} />
+          </Svg>
+        </> : <Path d={art.path} fill={art.color} /> }
         {art.nose && <Path d={art.nose} fill={MICO_AVATAR_EYE_COLOR} />}
-        {art.eyes.map(([x, y, width, height]) => (
-          <MicoCapsuleEye key={x} x={x} y={y} width={width} height={height} color={art.eyeColor} life={life} />
+        {(eyes ? eyes.map(eye => [eye.x - COMPACT_EYE_WIDTH * eye.scale / 2, eye.y - COMPACT_EYE_HEIGHT * eye.scale / 2, COMPACT_EYE_WIDTH * eye.scale, COMPACT_EYE_HEIGHT * eye.scale] as const) : art.eyes).map(([x, y, width, height]) => (
+          <MicoCapsuleEye key={x} x={x} y={y} width={width} height={height} color={ink} life={life} />
         ))}
       </Svg>
     </Animated.View>

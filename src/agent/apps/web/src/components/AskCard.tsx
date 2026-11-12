@@ -7,6 +7,7 @@ import { isApprovalAskBlock, isSecretAskBlock, selectedAskActionLabel } from "@r
 import { Button, Input, Textarea } from "@rakazo/ui-web";
 import { useState } from "react";
 import { rpc } from "../lib/rpc";
+import { QuestionnaireCard } from "./QuestionnaireCard";
 import { QuestionOption } from "./QuestionOption";
 import { errorText } from "../lib/user-error";
 import { BuiCard } from "./ai/primitives";
@@ -87,6 +88,7 @@ export function AskCard({
       )
     : askActions;
   const secretInput = isSecretAskBlock(block);
+  const compactApproval = Boolean(approvalActions) && !secretInput && !block.instructionUpdate;
   const compactChoices = Boolean(
     !secretInput && !approvalActions && !block.instructionUpdate && askActions?.length,
   );
@@ -137,6 +139,10 @@ export function AskCard({
     } finally {
       setPendingAction(null);
     }
+  }
+
+  if (!secretInput && !block.approvalEffectId && !approvalActions && !block.instructionUpdate && (block.questions?.length || askActions?.length)) {
+    return <QuestionnaireCard key={JSON.stringify([block.text, block.questions, block.actions])} block={block} canAnswer={canAnswer} onAnswer={text => onAnswer(text, undefined)} />;
   }
 
   if (answered && !secretInput && !approvalActions && !block.instructionUpdate) {
@@ -205,21 +211,27 @@ export function AskCard({
           ? "secret-ask-card"
           : block.instructionUpdate
             ? "instruction-approval-card"
-            : compactChoices
-              ? "question-ask-card"
-              : undefined
+            : compactApproval
+              ? "approval-ask-card"
+              : compactChoices
+                ? "question-ask-card"
+                : undefined
       }
       className={
-        compactChoices
-          ? "w-full min-w-0 max-w-md rounded-2xl bg-card px-4 py-3"
-          : "w-full min-w-0 max-w-xl rounded-2xl bg-card px-5 py-4"
+        compactApproval
+          ? "w-full min-w-0 max-w-xl rounded-2xl bg-card px-4 py-3"
+          : compactChoices
+            ? "w-full min-w-0 max-w-md rounded-2xl bg-card px-4 py-3"
+            : "w-full min-w-0 max-w-xl rounded-2xl bg-card px-5 py-4"
       }
     >
       <div
         className={
-          compactChoices
-            ? "text-[14px] font-semibold leading-5 text-foreground"
-            : "text-[15.5px] leading-[1.5] text-foreground"
+          compactApproval
+            ? "text-sm leading-5 text-foreground"
+            : compactChoices
+              ? "text-[14px] font-semibold leading-5 text-foreground"
+              : "text-[15.5px] leading-[1.5] text-foreground"
         }
       >
         {block.instructionUpdate ? (
@@ -246,9 +258,11 @@ export function AskCard({
       {block.detail && !secretInput ? (
         <pre
           className={
-            block.detailFormat === "text"
-              ? "mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-[15.5px] leading-[1.5] text-foreground"
-              : "mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted px-3.5 py-3 font-mono text-[12.5px] leading-[1.7] text-muted-foreground"
+            compactApproval
+              ? `mt-1.5 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 ${block.detailFormat === "text" ? "font-sans text-foreground" : "rounded-lg bg-muted px-2.5 py-1.5 font-mono text-muted-foreground"}`
+              : block.detailFormat === "text"
+                ? "mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words font-sans text-[15.5px] leading-[1.5] text-foreground"
+                : "mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted px-3.5 py-3 font-mono text-[12.5px] leading-[1.7] text-muted-foreground"
           }
         >
           {block.detail}
@@ -277,7 +291,7 @@ export function AskCard({
         </form>
       ) : answered ? (
         <div
-          className={`mt-3.5 break-words text-[13.5px] font-medium ${displayedAnswer === "deny" || displayedDismissed ? "text-muted-foreground" : "text-success"}`}
+          className={`${compactApproval ? "mt-2 text-xs leading-4" : "mt-3.5 text-[13.5px]"} break-words font-medium ${displayedAnswer === "deny" || displayedDismissed ? "text-muted-foreground" : "text-success"}`}
         >
           {block.instructionUpdate
             ? displayedAnswer === "deny"

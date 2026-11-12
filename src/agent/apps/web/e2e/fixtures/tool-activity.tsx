@@ -16,6 +16,7 @@ import { FixtureTranscript } from "./thread-fixture";
 const params = new URLSearchParams(location.search);
 const view = params.get("view") === "settings" ? "settings" : "thread";
 const live = params.get("phase") === "live";
+const intermediate = params.has("intermediate");
 const withRun = live && params.has("run");
 
 const USER_TEXT = "Find a free slot on Tuesday.";
@@ -52,7 +53,10 @@ const activeRun: Run | undefined = withRun ? {
 } : undefined;
 
 // A live run that has only called tools so far, or the finished reply with its tool card.
-const messages: ThreadMessage[] = [
+const messages: ThreadMessage[] = params.has("grouped") ? [
+  ...["Find recent news.", "Include the sources."].map((text, i): ThreadMessage => ({id:`user-${i}`,threadId:"thread-1",seq:i+1,role:"user",blocks:[{kind:"text",text}],createdAt:observedAt})),
+  ...["I will check the latest news and compare the sources.", "Here is what I found.\n\n- The first story includes the original source.\n- The second story provides more context.", "I am checking one more source."].map((text, i): ThreadMessage => ({id:`bot-${i}`,threadId:"thread-1",botId:"bot-1",runId:"run-1",seq:i+3,role:"bot",blocks:[{kind:"text",text}],createdAt:observedAt})),
+] : [
   {
     id: "user-1",
     threadId: "thread-1",
@@ -66,7 +70,7 @@ const messages: ThreadMessage[] = [
     threadId: "thread-1",
     seq: 2,
     role: "bot",
-    blocks: live ? [stepsBlock] : [stepsBlock, { kind: "text", text: REPLY_TEXT }],
+    blocks: live ? [...(intermediate ? [{ kind: "text" as const, text: "I found a free slot. I am checking the remaining calendars." }] : []), stepsBlock] : [stepsBlock, { kind: "text", text: REPLY_TEXT }],
     botId: "bot-1",
     runId: "run-1",
     createdAt: withRun ? observedAt : createdAt,
@@ -76,7 +80,7 @@ const messages: ThreadMessage[] = [
 function ThreadFixture() {
   const showToolActivity = useSyncExternalStore(subscribeToolActivity, getToolActivityEnabled);
   return (
-    <FixtureTranscript messages={messages} running={live} showToolActivity={showToolActivity} activeRun={activeRun} />
+    <FixtureTranscript unreadAfterSeq={params.has("unread") ? 3 : null} messages={messages} running={live} showToolActivity={showToolActivity} activeRun={activeRun} />
   );
 }
 
@@ -96,7 +100,7 @@ function SettingsFixture() {
   );
 }
 
-void bootstrapI18n("en").then(() => {
+void bootstrapI18n(params.get("lang") === "es" ? "es" : "en").then(() => {
   createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <I18nProvider i18n={i18n}>

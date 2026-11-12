@@ -43,7 +43,8 @@ export function ChatModelCatalog({ source, userId, spaceId, onBack, onPick }: {
   });
   const failure = modelQuery.isError ? classifyModelConnectionFailure(modelQuery.error) : null;
   const enabled = new Set(connection ? savedModelIds(connection) : []);
-  const models = remote ? [...new Set(modelQuery.data?.models ?? [])].map(id => ({ id, label: id })) : source.models;
+  const detail=modelQuery.data&&"entries" in modelQuery.data?modelQuery.data.entries:undefined;
+  const models:Array<{id:string;label:string;billing?:string}> = remote ? detail??[...new Set(modelQuery.data?.models ?? [])].map(id => ({ id, label: id })) : source.models;
   const results = query.trim() ? models.filter(model => matchesSearchQuery(query, model.id, model.label)) : models;
   const picked = results.find(model => model.id === selected);
   const needsEnable = Boolean(picked && remote && !enabled.has(picked.id));
@@ -95,6 +96,7 @@ export function ChatModelCatalog({ source, userId, spaceId, onBack, onPick }: {
         )}
       {picked ? (
         <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-2">
+          {picked.billing?<p className="w-full break-words text-xs text-muted-foreground">{picked.billing}</p>:null}
           {needsEnable ? <Button type="button" size="sm" variant="outline" onClick={() => onPick(picked.id, false)}>{t`Enable`}</Button> : null}
           <Button type="button" size="sm" onClick={() => onPick(picked.id, true)}>{needsEnable ? t`Enable and use` : t`Use model`}</Button>
         </div>

@@ -13,6 +13,7 @@ import { errorText } from "../../lib/user-error";
 import { enableCompatibleModel, savedModelIds } from "../model-settings/enable-compatible-model";
 import { ChatModelCatalog, type ChatModelCatalogSource } from "./chat-model-catalog";
 import { ChatModelPicker } from "./chat-model-picker";
+import { ProviderLogo } from "../../components/ProviderLogo";
 
 const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
@@ -131,6 +132,8 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     general?.entry?.images,
   ).filter((choice) => !selectedNativeProvider(choice.provider ?? "") && (choice.key || general || !me?.needsModel)), ...nativeChoices];
   const label = recovery ? t`Change model` : (nativeEngine === "codex" ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? entry?.label ?? model ?? (me?.needsModel ? t`Choose a model` : t`Model`);
+  const headerEffort = ThinkingLevelSchema.safeParse(nativeEngine === "codex" ? bot.nativeConfig?.thinkingLevel ?? nativeModel?.defaultThinkingLevel : nativeEngine ? undefined : bot.thinkingLevel);
+  const effortLabel = headerEffort.success && headerEffort.data !== "off" ? thinkingLevelLabel(headerEffort.data) : null;
   const queryError = credentialsQuery.error ?? catalogQuery.error;
 
   async function save(apply: () => Promise<void>, close = true) {
@@ -195,13 +198,19 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     }
   }
   return (
-    <div className={recovery ? "ml-2 inline-flex" : "app-no-drag flex min-w-0 items-center gap-0.5"} data-testid={recovery ? "composer-error-model" : "chat-header-model"}>
+    <div className={recovery ? "ml-2 inline-flex" : "app-no-drag flex min-w-0 shrink-0 items-center gap-0.5"} data-testid={recovery ? "composer-error-model" : "chat-header-model"}>
       <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setEditingDefault(false); setExploring(null); setLastProvider(null); setError(null); } }}>
-        <PopoverTrigger type="button" data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
+        <PopoverTrigger type="button" title={label} data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
           ? "inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:text-foreground"
-          : "app-no-drag flex h-8 min-w-0 max-w-52 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"}>
+          : "app-no-drag flex h-8 min-w-0 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-normal text-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring @max-[32rem]:size-8 @max-[32rem]:justify-center @max-[32rem]:gap-0 @max-[32rem]:px-0"}>
           {inMenu ? <><Cpu aria-hidden /><span>{t`Model`}</span><span className="ms-auto min-w-0 truncate text-xs text-muted-foreground">{label}</span></> : (
-            <><span className="truncate">{label}</span><ChevronDown size={12} className="shrink-0" /></>
+            <>
+              {!recovery && (nativeName || provider) ? <span aria-hidden className="flex size-3.5 shrink-0 items-center justify-center [&_*]:size-3.5"><ProviderLogo name={nativeName ?? currentProvider ?? provider ?? ""} providerId={nativeEngine ?? provider} /></span> : null}
+              {!recovery && !nativeName && !provider ? <Cpu size={14} aria-hidden className="hidden @max-[32rem]:block" /> : null}
+              <span className={`min-w-0 truncate ${recovery ? "" : "@max-[32rem]:hidden"}`}>{label}</span>
+              {!recovery && effortLabel ? <span className="shrink-0 text-muted-foreground @max-[32rem]:hidden">· {effortLabel}</span> : null}
+              <ChevronDown size={12} className={`shrink-0 text-muted-foreground ${recovery ? "" : "@max-[32rem]:hidden"}`} />
+            </>
           )}
         </PopoverTrigger>
         {open ? <PopoverContent align="end" className={recovery
@@ -269,7 +278,6 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
           ) : null}
         </PopoverContent> : null}
       </Popover>
-      {!recovery && !nativeEngine && bot.thinkingLevel ? <span className="hidden shrink-0 text-xs text-muted-foreground xl:inline">· {thinkingLevelLabel(bot.thinkingLevel)}</span> : null}
     </div>
   );
 }

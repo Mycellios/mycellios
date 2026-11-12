@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentRunRequest, AgentRuntimeEvent } from "@rakazo/adapter-kit";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { builtinAgentTools } from "./builtin-tools.js";
 import { approvalPausedToolResult } from "./approval-effect.js";
 import { findNativeCommand, nativeEnvironment } from "./native-agent-process.js";
 import { codexPermissionProfile, codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
@@ -59,6 +60,18 @@ async function setup(engine: NonNullable<AgentRunRequest["agentEngine"]>, extra:
 }
 
 describe("native agent protocol integration", () => {
+  it.each(["codex", "claude", "acp"] as const)("pauses %s with a complete grouped questionnaire", async engine => {
+    const test = await setup(engine, ["--fixture-questionnaire"]);
+    test.request.tools = [builtinAgentTools.find(tool => tool.name === "ask_user")!];
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of test.runtime.run(test.request, test.context)) events.push(event);
+    const ask = events.find(event => event.type === "ask");
+    expect(ask?.type === "ask" && ask.questions?.[0]?.options[0]?.description).toBe("Museums");
+    expect(ask?.type === "ask" && ask.questions?.[1]?.question).toBe("When?");
+    expect(test.executeTool).not.toHaveBeenCalled();
+    expect(events.some(event => event.type === "text" && event.text.includes("Fixture complete"))).toBe(false);
+  }, 25000);
+
   it("discovers the OpenCode executable as an ACP command", async () => {
     const dataDir = await mkdtemp(join(tmpdir(), "rakazo-native-test-"));
     roots.push(dataDir);

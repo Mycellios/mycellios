@@ -26,6 +26,13 @@ import {
 } from "./action-approval.js";
 
 describe("toolRequiresApproval", () => {
+  it("keeps private app writes within ordinary authoring while treating read source as untrusted", () => {
+    expect(toolRequiresApproval("app_write", false)).toBe(false);
+    expect(unattendedTriggerToolRequiresApproval("webhook", "app_write", false)).toBe(true);
+    expect(unattendedTriggerToolRequiresApproval("webhook", "app_read", false)).toBe(false);
+    expect(toolResultTaintsRun("app_read")).toBe(true);
+    expect(toolResultTaintsRun("app_write")).toBe(false);
+  });
   it("requires approval for consequential builtins and connector writes", () => {
     expect(toolRequiresApproval("destination.write", true)).toBe(true);
     expect(toolRequiresApproval("secret_request", false)).toBe(true);

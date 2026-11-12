@@ -1,3 +1,5 @@
+import { useGeneralPreferences } from "../../lib/general-preferences";
+import { orderSidebarChats } from "../../lib/sidebar-chat-order";
 import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -18,6 +20,8 @@ import { ChevronDown, CircleAlert, Lock, MoreHorizontal, Pencil, Trash2 } from "
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { Suspense } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
+import { RosterReplyIndicator } from "../../components/RosterReplyIndicator";
+import { RosterMessagePreview } from "../../components/RosterMessagePreview";
 import type { BotsSidebarDensity } from "../../lib/bots-sidebar-density-pref";
 import {
   compactRosterStatusLabel,
@@ -95,9 +99,11 @@ export function SidebarRoster({
   activeSpaceId?: string | null;
 }) {
   const { t } = useLingui();
+  const { sidebarChatOrder } = useGeneralPreferences();
+  const orderedGroups = orderSidebarChats(sidebarGroups, sidebarChatOrder, t`Unread`);
   return (
     <>
-      {sidebarGroups.map((group, groupIndex) => {
+      {orderedGroups.map((group, groupIndex) => {
         const collapsed = Boolean(group.title) && collapsedSidebarSections.has(group.key);
         const currentMobileSpace = mobile && group.spaceId === activeSpaceId;
         const title = currentMobileSpace
@@ -109,7 +115,7 @@ export function SidebarRoster({
         );
         const hasSpaceActions = group.canOpenSpaceSettings;
         const headerDropTarget: RosterDropTarget | null =
-          group.spaceId === bootstrapMe?.spaceId &&
+          sidebarChatOrder === "manual" && group.spaceId === bootstrapMe?.spaceId &&
           !group.emptySpaceId &&
           (group.sectionId || group.key.endsWith("unassigned"))
             ? { kind: "section", sectionId: group.sectionId }
@@ -316,6 +322,7 @@ export function SidebarRoster({
                       identity={item.chat.id}
                       size={mini ? 46 : compact ? 38 : 52}
                       status={item.chat.status}
+                      unread={Boolean(item.chat.unread)}
                     />
                   ) : (
                     <GroupAvatar
@@ -330,7 +337,7 @@ export function SidebarRoster({
                 const chatTrigger = (
                   <ContextMenuTrigger
                     render={<button type="button" />}
-                    draggable={item.kind === "bot"}
+                    draggable={item.kind === "bot" && sidebarChatOrder === "manual"}
                     data-mico-avatar-hover=""
                     data-roster-bot-id={item.kind === "bot" ? item.chat.id : undefined}
                     data-roster-unread={item.chat.unread ? "true" : undefined}
@@ -350,10 +357,10 @@ export function SidebarRoster({
                         : undefined
                     }
                     aria-keyshortcuts={
-                      item.kind === "bot" ? "Alt+ArrowUp Alt+ArrowDown" : undefined
+                      item.kind === "bot" && sidebarChatOrder === "manual" ? "Alt+ArrowUp Alt+ArrowDown" : undefined
                     }
                     onDragStart={(event) => {
-                      if (item.kind !== "bot") return;
+                      if (item.kind !== "bot" || sidebarChatOrder !== "manual") { event.preventDefault(); return; }
                       setDraggedBotId(item.chat.id);
                       event.dataTransfer.effectAllowed = "move";
                       event.dataTransfer.setData("text/plain", item.chat.id);
@@ -379,6 +386,7 @@ export function SidebarRoster({
                     data-roster-drop={rosterDropKey === rowDropKey ? "true" : undefined}
                     onKeyDown={(event) => {
                       if (
+                        sidebarChatOrder !== "manual" ||
                         item.kind !== "bot" ||
                         !event.altKey ||
                         (event.key !== "ArrowUp" && event.key !== "ArrowDown")
@@ -394,7 +402,7 @@ export function SidebarRoster({
                     onClick={() => {
                       openSpaceChat(
                         item.chat.spaceId,
-                        item.kind === "bot" ? `/app/${item.chat.id}` : `/app/g/${item.chat.id}`,
+                        item.kind === "bot" ? `/app/${item.chat.id}${item.chat.status === "waiting_input" ? "?respond=1" : ""}` : `/app/g/${item.chat.id}`,
                       );
                     }}
                     // Focus the row so closing the menu returns focus here.
@@ -407,7 +415,7 @@ export function SidebarRoster({
                           : mobile ? "w-full min-h-[68px] gap-3 rounded-xl px-2.5 py-2"
                           : "w-full min-h-[66px] gap-3 rounded-xl px-2.5 py-[7px]"
                     } text-start ${
-                      item.kind === "bot" ? "cursor-grab active:cursor-grabbing" : ""
+                      item.kind === "bot" && sidebarChatOrder === "manual" ? "cursor-grab active:cursor-grabbing" : ""
                     } ${
                       selected || rosterDropKey === rowDropKey
                         ? "bg-sidebar-accent"
@@ -417,6 +425,7 @@ export function SidebarRoster({
                     {mini ? (
                       <span className="relative shrink-0">
                         {avatar}
+                        {item.kind === "bot" ? <RosterReplyIndicator status={item.chat.status} avatar /> : null}
                         {rowError ? (
                           <span
                             aria-hidden="true"
@@ -448,7 +457,7 @@ export function SidebarRoster({
                         ) : null}
                       </span>
                     ) : (
-                      avatar
+                      <span className="relative shrink-0">{avatar}{item.kind === "bot" ? <RosterReplyIndicator status={item.chat.status} avatar /> : null}</span>
                     )}
                     {!mini ? (
                       <div className="min-w-0 flex-1">
@@ -470,7 +479,7 @@ export function SidebarRoster({
                             ) : null}
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5">
-                            {!compact ? (
+                            {item.kind === "bot" && item.chat.status === "waiting_input" ? <RosterReplyIndicator status={item.chat.status} /> : !compact ? (
                               <span
                                 data-roster-time
                                 className={`tabular-nums ${mobile ? "text-xs text-muted-foreground" : "text-label text-faint-foreground"}`}
@@ -551,7 +560,12 @@ export function SidebarRoster({
                         )
                       }
                     >
-                      {mini ? (
+                      {item.kind === "bot" ? (
+                        <RosterMessagePreview name={item.chat.name} status={item.chat.status} preview={item.chat.preview}
+                          hasError={rowError} mini={mini} disabled={mobile || Boolean(draggedBotId) || Boolean(botMenu)}>
+                          {chatTrigger}
+                        </RosterMessagePreview>
+                      ) : mini ? (
                         <IconTooltip
                           side="inline-end"
                           label={

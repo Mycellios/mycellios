@@ -29,7 +29,7 @@ describe("Web Push navigation", () => {
   });
   it("shows the event and a generic mascot when previews are off, even with private metadata", () => {
     const parsed = parsePushPayload({
-      ...payload, title: "Private name", body: "Private answer", kind: "help", preview: false, avatar: "fox",
+      ...payload, title: "Private name", body: "Private answer", kind: "help", preview: false, avatar: "sprout",
     }, now)!;
     const notice = pushNotification(parsed, scope, "es-ES");
     expect(notice.title).toBe("Tu Mico espera una respuesta");
@@ -47,16 +47,16 @@ describe("Web Push navigation", () => {
   it("uses extended bundled artwork on new workers and keeps private previews generic", () => {
     const parsed = parsePushPayload({ ...payload, preview: true, avatarArt: "otter" }, now)!;
     expect(pushNotification(parsed, scope, "en-US").options.icon)
-      .toBe(scope + "mycellios/notification-micos/otter.png");
+      .toBe(scope + "mycellios/notification-micos/colony.png");
     expect(pushNotification({ ...parsed, preview: false }, scope, "en-US").options.icon)
       .toBe(scope + "mycellios/notification-micos/mushroom.png");
     expect(parsePushPayload({ ...payload, avatarArt: "https://external.test/track" }, now)).toBeNull();
   });
   it("shows the Mico on opt-in previews using only bundled artwork", () => {
     const preview = { ...payload, title: "Jarvis", body: "Draft ready", kind: "completion", preview: true };
-    const parsed = parsePushPayload({ ...preview, avatar: "fox" }, now)!;
+    const parsed = parsePushPayload({ ...preview, avatar: "sprout" }, now)!;
     expect(pushNotification(parsed, scope, "en-US")).toMatchObject({
-      title: "Jarvis", options: { body: "Draft ready", icon: scope + "mycellios/notification-micos/fox.png" },
+      title: "Jarvis", options: { body: "Draft ready", icon: scope + "mycellios/notification-micos/sprout.png" },
     });
     expect(parsePushPayload({ ...preview, avatar: "https://external.test/track" }, now)).toBeNull();
   });

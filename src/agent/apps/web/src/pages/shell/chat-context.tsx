@@ -76,14 +76,17 @@ export function UnreadDivider({ afterSeparator = false }: { afterSeparator?: boo
   return (
     <div
       data-testid="unread-divider"
-      className={`flex select-none items-center gap-2.5 pb-2 ${afterSeparator ? "pt-0" : "pt-3.5"}`}
+      role="separator"
+      aria-label={t`New messages`}
+      aria-orientation="horizontal"
+      className={`rk-unread-divider flex w-full select-none items-center gap-2 pb-2 ${afterSeparator ? "pt-0" : "pt-1"}`}
     >
-      <span aria-hidden="true" className="h-px flex-1 bg-unread opacity-50" />
-      <span className="text-[12px] leading-4 font-semibold uppercase tracking-[0.5px] text-unread">
+      <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-unread opacity-75" />
+      <span className="shrink-0 text-[11px] leading-3 font-bold uppercase tracking-[0.08em] text-unread">
         <span aria-hidden="true">{t`New`}</span>
         <span className="sr-only">{t`New messages`}</span>
       </span>
-      <span aria-hidden="true" className="h-px flex-1 bg-unread opacity-50" />
+      <span aria-hidden="true" className="h-px min-w-0 flex-1 bg-unread opacity-75" />
     </div>
   );
 }

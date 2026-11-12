@@ -4,7 +4,14 @@ import { ComputerUpdatingError } from "./computer-errors.js";
 
 /** A complete native stream is required; EOF is never a successful run or callback. */
 export async function* desktopAgentFrames(response: Response, signal: AbortSignal, phase: "callback" | "run" = "run"): AsyncIterable<unknown> {
-  if (!response.ok || !response.body) { await response.body?.cancel(); if (response.headers.get("x-mycellios-desktop-error") === "desktop_updating") throw new ComputerUpdatingError(false); throw Error("Desktop executor unavailable; check the PC connection before retrying"); }
+  if (!response.ok || !response.body) {
+    const code = response.headers.get("x-mycellios-desktop-error");
+    await response.body?.cancel();
+    if (code === "desktop_updating") throw new ComputerUpdatingError(false);
+    getLogger().warn("desktop.relay.request_unavailable", { "desktop.phase": phase, "http.status": response.status,
+      "desktop.reason": ["desktop_busy", "desktop_disconnected", "desktop_connection_changed", "desktop_request_too_large"].includes(code ?? "") ? code : "unavailable_response" });
+    throw Error("Desktop executor unavailable; check the PC connection before retrying");
+  }
   const reader = response.body.getReader(), decoder = new TextDecoder();
   let pending = "", done = false;
   const abort = () => { void reader.cancel().catch(() => undefined); };

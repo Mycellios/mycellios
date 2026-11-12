@@ -52,6 +52,9 @@ it("marks new messages with a visible New and a spoken New messages", () => {
   expect(divider?.querySelector('[aria-hidden="true"]:not(.h-px)')?.textContent).toBe("New");
   expect(divider?.querySelector(".sr-only")?.textContent).toBe("New messages");
   expect(divider?.className).toContain("select-none");
+  expect(divider?.getAttribute("role")).toBe("separator");
+  expect(divider?.getAttribute("aria-label")).toBe("New messages");
+  expect(divider?.getAttribute("aria-orientation")).toBe("horizontal");
   const label = divider?.querySelector(".sr-only")?.parentElement;
   expect(label?.className).toContain("text-unread");
   expect(label?.className).not.toContain("opacity-50");

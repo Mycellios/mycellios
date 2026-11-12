@@ -283,6 +283,12 @@ These rules apply to the complete repository.
   SDK at `ANTSEED_PROOF_MODULES` (as for speech proofs). Importing it must not
   announce a seller. Its isolated probe is `node scripts/check-antseed-jev-provider.mjs`;
   this verifies SDK transport/free configuration only, never real buyer delivery.
+- Optional managed Mycellios billing uses `specs/managed-provider/spec.md`.
+  AntSeed is the default operator upstream; keep its buyer identity separate
+  from customer BYOK providers. Use signed attributed spend, durable credit holds
+  and GET-only recovery for late receipts; never retry an uncertain paid request.
+  Run the managed provider/AntSeed text tests and the isolated managed-purchases
+  PostgreSQL suite for changes to that boundary. No local fixture activates it.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.

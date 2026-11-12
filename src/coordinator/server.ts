@@ -2,6 +2,10 @@ import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
 import { createInferenceSettlement } from "./settle-completed-inference.js";
 import { beginContributionUsage } from "./contribution-funding.js";
 import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
+import { initializeManagedProvider, isManagedModel } from "./managed-provider.js";
+import { mycelliosModelCatalog } from "./model-credit-pricing.js";
+import { Referrals } from "../economy/referrals.js";
+import { mountReferralRoutes } from "./referral-routes.js";
 import { AsyncTaskScope, coalesceAsync } from "../core/async-task-scope.js";
 import { flatMapAsync, mapAsync } from "../core/async-collections.js";
 import { InferenceRouteRecovery } from "./inference-route-recovery.js";
@@ -678,7 +682,10 @@ export async function createCoordinator(
     privateKey: config.economicReceiptSigningPrivateKey ?? developmentEconomicKey!,
   };
   const economicLedger = new EconomicLedger(database, { receiptSigning });
-  const creditWallet = config.contributionCreditFunding ? new ContributionCreditWallet(database, economicLedger) : null;
+  if (config.referralRewardsEnabled && !config.contributionCreditFunding) throw new Error("Referral rewards require the credit wallet");
+  const creditWallet = config.contributionCreditFunding ? new ContributionCreditWallet(database, economicLedger, config.referralRewardsEnabled) : null;
+  const referrals = config.referralRewardsEnabled ? new Referrals(database, config.referralEmailPepper ?? "") : null;
+  await referrals?.initialize();
   if (creditWallet) await creditWallet.initialize();
   const executionReceipts = new ExecutionReceiptStore(database, receiptSigning);
   const modelCertifications = config.modelCertificationPinnedKeys?.length
@@ -740,6 +747,7 @@ export async function createCoordinator(
     maxActiveKeys: config.apiMaxActiveKeys ?? 10,
   }, undefined, Boolean(creditWallet));
   const studioAgents = new StudioAgentStore(database);
+  const managedGateway = await initializeManagedProvider(config, database, creditWallet, apiAccess);
   const studioContext = new StudioContextStore(database);
   const billing = new BillingManager(database, apiAccess);
   const sellerEarnings = new SellerEarningsManager(database, new Map());
@@ -870,6 +878,7 @@ export async function createCoordinator(
         kind: "user";
         userId: string;
         email: string | null;
+        emailVerified?: boolean;
         role: AuthenticatedNetworkUser["role"];
       }
     | ApiKeyPrincipal;
@@ -888,7 +897,8 @@ export async function createCoordinator(
   app.addHook("preHandler", async (request, reply) => {
     if (request.method === "OPTIONS") return;
     const path = request.url.split("?", 1)[0] ?? request.url;
-    if (!path.startsWith("/v1/") || path === "/v1/auth/me") return;
+    if (!path.startsWith("/v1/") || path === "/v1/auth/me" ||
+        (config.referralRewardsEnabled && /^\/v1\/referrals\/visit\/[A-Za-z0-9_-]{43}$/.test(path))) return;
     if (!apiAccessEnabled && !isAccountNodeRoute(path)) return;
     const token = parseBearerToken(request.headers.authorization);
     if (!token) {
@@ -933,6 +943,7 @@ export async function createCoordinator(
         kind: "user",
         userId: user.id,
         email: user.email,
+        emailVerified: user.emailVerified === true,
         role: user.role,
       });
     } catch (error) {
@@ -948,6 +959,11 @@ export async function createCoordinator(
       });
     }
   });
+  managedGateway?.mount(app, principalFor);
+  if (referrals) mountReferralRoutes(app, { service: referrals,
+    // The receipt and Agent sign-in must share the canonical browser origin.
+    publicOrigin: "https://www.mycellios.com",
+    account: request => { const principal = principalFor(request); return principal.kind === "user" ? principal : null; } });
   const store = new MeshStore(database);
   const persistence = config.supabaseUrl && config.supabaseServiceRoleKey
     ? new SupabasePersistence(store, {
@@ -4665,18 +4681,7 @@ export async function createCoordinator(
 
   app.get("/v1/models", async () => {
     const models = (await scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() }));
-    return {
-      object: "list",
-      data: models.map((model) => ({
-        id: model.id,
-        object: "model",
-        created: 0,
-        owned_by: "mycellios",
-        x_replicas: model.replicas,
-        x_pipelines: model.pipelines,
-        ...(model.id === TRANSCRIPTION_MODEL ? { task: "transcription", max_audio_seconds: 30 } : {}),
-      })),
-    };
+    return await mycelliosModelCatalog(models, economicLedger, managedGateway);
   });
 
   const settleCompletedInference = createInferenceSettlement({
@@ -4684,6 +4689,10 @@ export async function createCoordinator(
   });
 
   app.post("/v1/chat/completions", async (request, reply) => {
+    if (isManagedModel(request.body)) {
+      if (!managedGateway) throw new ApiAccessError("managed_provider_unavailable", "This managed Mycellios model is unavailable.", 503);
+      return await managedGateway.chat(request, reply, principalFor(request));
+    }
     const parsed = parseChatRequest(request.body, config.modelRequestTimeoutsMs);
     if (parsed.model === TRANSCRIPTION_MODEL && request.headers["x-mycellios-funding"] !== "contribution-credits") {
       return reply.code(400).send({ error: { code: "transcription_funding_required", message: "Network dictation requires explicit contribution-credit funding." } });

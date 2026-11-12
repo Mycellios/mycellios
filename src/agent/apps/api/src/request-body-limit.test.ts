@@ -17,6 +17,14 @@ function testApp(maxSize: number, parse = vi.fn(async (request: Request) => requ
 }
 
 describe("API request body limits", () => {
+  it("admits the bounded 24 MB editor upload envelope without expanding other RPC limits",async()=>{
+    const app=new Hono();mountApiRequestBodyLimits(app);
+    app.post("/rpc/models/mycelliosVideoEdit",c=>c.json({ok:true}));app.post("/rpc/test",c=>c.json({ok:true}));
+    const request=(path:string,n:number)=>app.request(path,{method:"POST",headers:{"content-length":String(n)},body:"{}"});
+    expect((await request("/rpc/models/mycelliosVideoEdit",34_000_000)).status).toBe(200);
+    expect((await request("/rpc/models/mycelliosVideoEdit",35_000_001)).status).toBe(413);
+    expect((await request("/rpc/test",34_000_000)).status).toBe(413);
+  });
   it("expands the HTTP envelope for a larger configured upload", async () => {
     const limit = 25 * 1024 * 1024;
     const app = new Hono();

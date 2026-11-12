@@ -193,7 +193,7 @@ export class WebPushService {
         // This lock is also used on revocation; a late request cannot revive a logged-out session.
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`webpush:${userId}`}, 0))::text`;
         const sessions = await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "session"
-        WHERE id = ${sessionId} AND "userId" = ${userId} AND "expiresAt" > now() FOR UPDATE`;
+        WHERE id = ${sessionId} AND "userId" = ${userId} AND "expiresAt" > (now() AT TIME ZONE 'UTC') FOR UPDATE`;
         if (!sessions.length) throw new Error("Notification session ended");
         const existing = await tx.$queryRaw<
           Array<{ userId: string }>
@@ -225,7 +225,7 @@ export class WebPushService {
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`webpush:${userId}`}, 0))::text`;
         const next = nextSessionId
           ? await tx.$queryRaw<Array<{ id: string }>>`SELECT id FROM "session"
-        WHERE id = ${nextSessionId} AND "userId" = ${userId} AND "expiresAt" > now() FOR UPDATE`
+        WHERE id = ${nextSessionId} AND "userId" = ${userId} AND "expiresAt" > (now() AT TIME ZONE 'UTC') FOR UPDATE`
           : [];
         if (next.length)
           await tx.$executeRaw`UPDATE web_push_devices SET "sessionId" = ${nextSessionId!}
@@ -240,7 +240,7 @@ export class WebPushService {
     if (!focused) return;
     await system(() => this.db.$executeRaw`INSERT INTO web_push_presence ("userId", "sessionId", "clientId", "focusedUntil")
       SELECT ${userId}, ${sessionId}, ${clientId}, now() + interval '45 seconds' FROM "session"
-      WHERE id = ${sessionId} AND "userId" = ${userId} AND "expiresAt" > now()
+        WHERE id = ${sessionId} AND "userId" = ${userId} AND "expiresAt" > (now() AT TIME ZONE 'UTC')
       ON CONFLICT ("userId", "sessionId", "clientId") DO UPDATE SET "focusedUntil" = EXCLUDED."focusedUntil"`);
   }
 
@@ -317,7 +317,7 @@ export class WebPushService {
       await this.db
         .$executeRaw`DELETE FROM web_push_deliveries WHERE "expiresAt" < now() - interval '1 day'`;
       await this.db.$executeRaw`DELETE FROM web_push_devices d WHERE NOT EXISTS
-        (SELECT 1 FROM "session" s WHERE s.id = d."sessionId" AND s."userId" = d."userId" AND s."expiresAt" > now())`;
+        (SELECT 1 FROM "session" s WHERE s.id = d."sessionId" AND s."userId" = d."userId" AND s."expiresAt" > (now() AT TIME ZONE 'UTC'))`;
       const rows = await this.db.$queryRaw<
         Array<{ id: string; dueAt: Date }>
       >`SELECT id, "dueAt" FROM web_push_deliveries
@@ -351,7 +351,7 @@ export class WebPushService {
     return system(async () => {
       const rows = await this.db.$queryRaw<Array<{ clientId: string }>>`SELECT p."clientId" FROM web_push_presence p
         JOIN "session" s ON s.id = p."sessionId" AND s."userId" = p."userId"
-        WHERE p."userId" = ${userId} AND p."focusedUntil" > now() AND s."expiresAt" > now() LIMIT 1`;
+        WHERE p."userId" = ${userId} AND p."focusedUntil" > now() AND s."expiresAt" > (now() AT TIME ZONE 'UTC') LIMIT 1`;
       return rows.length > 0;
     });
   }
@@ -362,7 +362,7 @@ export class WebPushService {
         Array<{ id: string }>
       >`SELECT d.id FROM web_push_devices d
         JOIN "session" s ON s.id = d."sessionId" AND s."userId" = d."userId"
-        WHERE d."userId" = ${userId} AND s."expiresAt" > now() LIMIT 1`;
+        WHERE d."userId" = ${userId} AND s."expiresAt" > (now() AT TIME ZONE 'UTC') LIMIT 1`;
       return rows.length > 0;
     });
   }
@@ -491,8 +491,11 @@ export function notificationChannels(
     message: NotificationMessage,
     context: AdapterContext,
   ): Promise<"delivered" | "undeliverable"> => {
-    if (native.deliver) return native.deliver(message, context);
-    await native.send(message, context);
+    const settings = await web.settings(context.userId);
+    if (!notificationAllowed(settings, message.botId, message.kind)) return "undeliverable";
+    const safeMessage = { ...message, ...privateNotification(message, settings.previews) };
+    if (native.deliver) return native.deliver(safeMessage, context);
+    await native.send(safeMessage, context);
     return "delivered";
   };
   const deliver = async (

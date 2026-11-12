@@ -1,4 +1,7 @@
+import { HostedWebAgent, HostedWebCard, HostedWebDraft, HostedWebSave } from "./hosted-webs.js";
 import { TailnetConnectionInput, TailnetConnectionSchema, TailnetSuffix } from "./tailscale.js";
+import { ReferralOwnerInput, ReferralInviteSchema, ReferralRedemptionSchema } from "./referrals.js";
+import { AppCoverId, AppCoverWrite } from "./app-covers.js";
 import { NotificationSettingsSchema, WebPushSubscriptionSchema } from "./notification-settings.js";
 import { eventIterator, oc } from "@orpc/contract";
 import * as z from "zod";
@@ -212,6 +215,24 @@ const threadSendInput = threadTarget
 const spaceName = z.string().trim().min(1).max(60);
 
 export const appContract = {
+  referrals: {
+    invite: oc.input(ReferralOwnerInput).output(ReferralInviteSchema),
+    redeem: oc.input(ReferralOwnerInput).output(ReferralRedemptionSchema),
+  },
+  webs: {
+    agent: oc.input(z.object({ id: z.string() })).output(HostedWebAgent.nullable()),
+    assignAgent: oc.input(z.object({ id: z.string(), botId: z.string().nullable() })).output(HostedWebAgent.nullable()),
+    revision: oc.input(z.object({ id: z.string() })).output(z.number().int().positive()),
+    list: oc.input(z.object({ filter: z.enum(["discover", "trending", "pinned", "mine"]), query: z.string().max(100).default("") })).output(z.array(HostedWebCard)),
+    draft: oc.input(z.object({ id: z.string() })).output(HostedWebDraft),
+    save: oc.input(HostedWebSave).output(HostedWebDraft),
+    publish: oc.input(z.object({ id: z.string(), version: z.number().int().positive() })).output(HostedWebCard),
+    unpublish: oc.input(z.object({ id: z.string() })).output(z.object({ ok: z.literal(true) })),
+    pin: oc.input(z.object({ id: z.string(), pinned: z.boolean() })).output(z.object({ ok: z.literal(true) })),
+    clone: oc.input(z.object({ id: z.string(), newId: z.string().uuid() })).output(HostedWebDraft),
+    antseed: oc.input(z.object({ id: z.string().uuid() })).output(HostedWebDraft),
+    preview: oc.input(z.object({ id: z.string(), version: z.number().int().positive() })).output(z.object({ path: z.string(), expiresAt: z.string() })),
+  },
   analytics: { screen: oc.input(AnalyticsScreenInput).output(z.object({ ok: z.literal(true) })) },
   aiConsent: {
     status: oc.input(AiConsentQuerySchema).output(AiConsentStatusSchema),
@@ -329,6 +350,10 @@ export const appContract = {
     mycelliosAccount: oc.output(MycelliosAccountSchema.nullable()),
     connectMycellios: oc.output(ModelCredentialSchema),
     mycelliosModels: oc.output(z.array(ModelCatalogEntrySchema)),
+    mycelliosVideoEdit:oc.input(z.object({action:z.enum(["info","quote","execute","status","content"]),payload:z.string().max(34_000_000)})).output(z.unknown()),
+    mycelliosMedia: oc.input(z.object({ action:z.enum(["models","quote","execute","status","content","checkout"]),expectedUserId:z.string().min(1).max(128).optional(),
+      payload:z.string().max(12_000_000).optional(),key:z.string().min(8).max(200).optional() })).output(z.unknown()),
+
     forRole: oc
       .input(z.object({ role: ModelRoleSchema, expectedUserId: Id.optional() }))
       .output(z.array(ModelCatalogEntrySchema)),
@@ -1147,6 +1172,14 @@ export const appContract = {
       .input(z.object({ setting: SpaceSettingSchema, enabled: z.boolean() }))
       .output(z.array(SpaceSettingSchema)),
   },
+  appCovers: {
+    get: oc.input(z.object({ appId: AppCoverId })).output(z.object({
+      revision: z.string().nullable(), image: ArtifactWithContentSchema.nullable(),
+    })),
+    set: oc.input(AppCoverWrite).output(z.object({
+      revision: z.string().nullable(), image: ArtifactWithContentSchema.nullable(),
+    })),
+  },
   artifacts: {
     list: oc.input(botId).output(z.array(ArtifactSchema)),
     listSpace: oc
@@ -1196,7 +1229,7 @@ export const appContract = {
   },
   notifications: {
     webStatus: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ configured: z.boolean(), publicKey: z.string().nullable(), registered: z.boolean(), settings: NotificationSettingsSchema, bots: z.array(z.object({ id: z.string(), name: z.string(), notifyOnFinish: z.boolean() })) })),
-    webRegister: oc.input(z.object({ clientId: z.string().uuid(), subscription: WebPushSubscriptionSchema })).output(z.object({ ok: z.literal(true) })),
+    webRegister: oc.input(z.object({ clientId: z.string().uuid(), subscription: WebPushSubscriptionSchema, expectedUserId: z.string().min(1).max(160).optional() })).output(z.object({ ok: z.literal(true) })),
     webUnregister: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ ok: z.literal(true) })),
     webPresence: oc.input(z.object({ clientId: z.string().uuid(), focused: z.boolean() })).output(z.object({ ok: z.literal(true) })),
     settings: oc.output(NotificationSettingsSchema),

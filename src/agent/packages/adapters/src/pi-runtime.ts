@@ -1,3 +1,4 @@
+import { askUserQuestionnaire } from "./ask-user-questionnaire.js";
 import { randomUUID } from "node:crypto";
 import { withConversationStyle } from "./conversation-style.js";
 import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation } from "./work-continuation.js";
@@ -1855,14 +1856,9 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
         return { reason: String(raw.reason ?? "I need you on the screen.") };
       }
       if (tool.name === "ask_user") {
-        const options = Array.isArray(raw.options) ? raw.options.map(String) : raw.options;
-        return {
-          question: String(raw.question ?? "What should I use?"),
-          // Keep a missing/invalid options value as-is so schema minItems can reject it;
-          // do not coerce to [] (that used to look like a valid empty list upstream).
-          options,
-        };
+        return { ...raw, question: String(raw.question ?? "What should I use?") };
       }
+
       if (tool.name === "request_secret") {
         return prepareRequestSecretArguments(raw);
       }
@@ -2001,26 +1997,12 @@ function toAgentTool(tool: ConnectorTool, host: ToolHost, exposedName: string): 
                 };
               }
               if (tool.name === "ask_user") {
-                const options = Array.isArray(args.options)
-                  ? args.options.map((option) => String(option).trim())
-                  : [];
-                if (
-                  options.length < 2 ||
-                  options.length > 4 ||
-                  options.some((option) => option.length === 0 || option.length > 80) ||
-                  new Set(options).size !== options.length
-                ) {
-                  throw new Error("ask_user requires two to four unique, non-empty options");
-                }
+                const questionnaire = askUserQuestionnaire(args);
                 host.pausePending = true;
                 host.queue.push({
                   type: "ask",
                   ...(host.request.onCheckpoint ? { executionId } : {}),
-                  text: String(args.question ?? "What should I use?"),
-                  actions: options.map((label, index) => ({
-                    id: `choice-${index + 1}`,
-                    label,
-                  })),
+                  ...questionnaire,
                 });
                 return {
                   content: [{ type: "text", text: "Waiting for the user's choice." }],
@@ -2553,16 +2535,6 @@ function builtinParameters(tool: ConnectorTool) {
   }
   if (tool.name === "request_takeover") {
     return Type.Object({ reason: Type.String() });
-  }
-  if (tool.name === "ask_user") {
-    return Type.Object({
-      question: Type.String({ maxLength: 240 }),
-      options: Type.Array(Type.String({ minLength: 1, maxLength: 80 }), {
-        minItems: 2,
-        maxItems: 4,
-        uniqueItems: true,
-      }),
-    });
   }
   if (tool.name === "remember") {
     return Type.Object({ content: Type.String(), path: Type.String() });

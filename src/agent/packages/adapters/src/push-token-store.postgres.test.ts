@@ -45,6 +45,7 @@ suite("database push registrations", () => {
     });
   });
   beforeEach(async () => {
+    await runAsSystem("clear fixture notification devices", () => a.prisma.mobilePushDevice.deleteMany({ where: { userId: { startsWith: prefix } } }));
     await runAsSystem("clear fixture push registrations", () =>
       a.prisma.pushToken.deleteMany({ where: { userId: { startsWith: prefix } } }),
     );
@@ -67,6 +68,17 @@ suite("database push registrations", () => {
     expect(row.tokenDigest).toBe(credentialDigest(token("a")));
     await runAsTenant({ userId: user("b"), spaceId: "unused" }, async () => {
       expect(await a.prisma.pushToken.findMany()).toEqual([]);
+    });
+  });
+
+  it("keeps multiple mobile devices and revokes only the session that signs out", async () => {
+    await api.save(user("a"), token("phone"), session("a"));
+    await api.save(user("a"), token("tablet"), session("a2"));
+    expect((await worker.list(user("a"))).map(row => row.token).sort()).toEqual([token("phone"), token("tablet")].sort());
+    await api.endSession(user("a"), session("a"));
+    expect(await worker.list(user("a"))).toEqual([{ token: token("tablet"), sessionId: session("a2") }]);
+    await runAsTenant({ userId: user("b"), spaceId: "unused" }, async () => {
+      expect(await a.prisma.mobilePushDevice.findMany()).toEqual([]);
     });
   });
 

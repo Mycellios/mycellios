@@ -70,11 +70,9 @@ export class StripeBillingInbound {
   }
 
   verifyAndNormalize(rawBody: Buffer, signatureHeader: string): NormalizedBillingCommand | null {
-    const envelope = this.verifyEnvelope(rawBody, signatureHeader);
-    if (envelope.livemode !== this.config.expectedLivemode) {
-      throw new BillingInboundError("stripe_mode_mismatch", "The Stripe event livemode does not match this endpoint.");
-    }
+    const envelope = this.verifyEvent(rawBody, signatureHeader);
     const object = envelope.data.object;
+    if ((object.metadata as Record<string,unknown>|undefined)?.purpose === "mycellios-wallet-v1") return null;
     switch (envelope.type) {
       case "invoice.paid":
         return { kind: "paid_subscription", event: stripePaidSubscription(envelope, object) };
@@ -91,6 +89,14 @@ export class StripeBillingInbound {
       default:
         return null;
     }
+  }
+  /** Shared signature/mode boundary for separately versioned wallet-credit purchases. */
+  verifyEvent(rawBody: Buffer, signatureHeader: string): StripeEnvelope {
+    const envelope = this.verifyEnvelope(rawBody, signatureHeader);
+    if (envelope.livemode !== this.config.expectedLivemode) {
+      throw new BillingInboundError("stripe_mode_mismatch", "The Stripe event livemode does not match this endpoint.");
+    }
+    return envelope;
   }
 
   private verifyEnvelope(rawBody: Buffer, signatureHeader: string): StripeEnvelope {

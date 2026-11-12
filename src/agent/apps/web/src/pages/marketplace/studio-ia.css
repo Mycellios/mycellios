@@ -1,0 +1,14 @@
+.studio-ia { max-width: 680px; margin: 0 auto; padding: 0 0 32px; display: flex; flex-direction: column; gap: 20px; }
+.studio-ia-guide { margin: 0; color: var(--muted-foreground); font-size: 13px; }
+.studio-ia-formats { display: flex; flex-wrap: wrap; gap: 8px; }
+.studio-ia-formats button { gap: 8px; }
+.studio-ia-formats [aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.studio-ia > label { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.studio-ia textarea { min-height: 120px; }
+.studio-ia > [role="alert"] { margin: 0; border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+
+
+.studio-ia-unavailable { padding: 24px; border-radius: 14px; background: var(--muted); }
+.studio-ia-unavailable h2 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.studio-ia-unavailable p { margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.6; }
+.studio-ia-unavailable button { margin-top: 16px; }

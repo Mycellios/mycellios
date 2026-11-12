@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const fakeAgentState = vi.hoisted(() => ({
   options: ["Berlin", "Seoul", "Toronto"],
+  args: undefined as Record<string, unknown> | undefined,
   tools: [] as Array<{
     name: string;
     execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
@@ -27,6 +28,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
       await askUser.execute("call-choice-1", {
         question: "Which city should I use?",
         options: fakeAgentState.options,
+        ...fakeAgentState.args,
       });
     }
 
@@ -58,20 +60,10 @@ vi.mock("./pi-openai-compatible-provider.js", () => ({
   registerOpenAiCompatibleRuntime: (models: unknown) => models,
 }));
 
+import { builtinAgentTools } from "./builtin-tools.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
 
-const choiceTool: ConnectorTool = {
-  name: "ask_user",
-  description: "Ask a short multiple-choice question",
-  inputSchema: {
-    type: "object",
-    properties: {
-      question: { type: "string" },
-      options: { type: "array", items: { type: "string" } },
-    },
-    required: ["question", "options"],
-  },
-};
+const choiceTool: ConnectorTool = builtinAgentTools.find(tool => tool.name === "ask_user")!;
 
 const runContext = {
   operationId: "choice-pi",
@@ -94,6 +86,7 @@ const runRequest = {
 
 describe("Pi choice asks", () => {
   beforeEach(() => {
+    fakeAgentState.args = undefined;
     fakeAgentState.tools = [];
     fakeAgentState.options = ["Berlin", "Seoul", "Toronto"];
   });
@@ -116,6 +109,18 @@ describe("Pi choice asks", () => {
     expect(
       events.some((event) => event.type === "text" && event.text.includes("I finished the work.")),
     ).toBe(false);
+  });
+
+  it("preserves grouped questions and descriptions through the real model-facing schema", async () => {
+    fakeAgentState.args = { questions: [
+      { question: "Where?", options: [{ label: "Paris", description: "Museums" }, "London"], multiSelect: true },
+      { question: "When?" },
+    ] };
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of new PiAgentRuntime().run(runRequest, runContext)) events.push(event);
+    const ask = events.find(event => event.type === "ask");
+    expect(ask?.type === "ask" && ask.questions?.[0]?.options[0]?.description).toBe("Museums");
+    expect(ask?.type === "ask" && ask.questions?.[1]?.question).toBe("When?");
   });
 
   it("rejects an empty choice set before emitting an ask", async () => {

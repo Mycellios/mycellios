@@ -1462,6 +1462,15 @@ export const ModelCatalogEntrySchema = z.object({
   id: z.string(),
   label: z.string(),
   billing: z.string(),
+  /** First-party external routing remains distinct from physically distributed inference. */
+  mycelliosProcessing: z.enum(["network", "external"]).optional(),
+  mycelliosPricing: z.object({
+    currency: z.literal("credits"), unit: z.literal("token"), serviceFeeBasisPoints: z.union([z.literal(0), z.literal(400)]),
+    estimate: z.literal("maximum").optional(),
+    input: z.string().regex(/^(0|[1-9]\d*)(\.\d{1,18})?$/),
+    output: z.string().regex(/^(0|[1-9]\d*)(\.\d{1,18})?$/),
+    request: z.string().regex(/^(0|[1-9]\d*)(\.\d{1,18})?$/).optional(),
+  }).optional(),
   auth: z.enum(["api-key", "oauth", "both"]).optional(),
   oauthLabel: z.string().optional(),
   authHint: z.string().optional(),

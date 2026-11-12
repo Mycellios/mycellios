@@ -1,3 +1,4 @@
+import { StoreAppHeader } from "./marketplace/StoreAppHeader";
 import {
   Button,
   Card,
@@ -9,7 +10,7 @@ import {
   Input,
   Textarea,
 } from "@rakazo/ui-web";
-import { X, Check, LoaderCircle } from "lucide-react";
+import { Check, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
   StudioProject,
@@ -187,11 +188,9 @@ export function AppsOverlay({ onClose, scope }: { onClose(): void; scope: string
         showCloseButton={false}
         className={`flex max-h-[calc(100dvh-2rem)] w-[calc(100dvw-2rem)] max-w-5xl flex-col gap-0 overflow-hidden bg-background p-0 sm:max-w-5xl ${selected ? "h-[min(860px,calc(100dvh-2rem))]" : ""}`}
       >
-        <DialogHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
-          <DialogTitle>Estudio de vídeos</DialogTitle>
-          <Button variant="ghost" size="icon-sm" className="size-11 md:size-7" aria-label="Cerrar estudio" onClick={close}>
-            <X size={18} />
-          </Button>
+        <DialogHeader className="px-5 py-4">
+          <DialogTitle className="sr-only">Estudio de vídeos</DialogTitle>
+          <StoreAppHeader title="Estudio de vídeos" onBack={close}/>
         </DialogHeader>
         <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-8">
           {error ? (

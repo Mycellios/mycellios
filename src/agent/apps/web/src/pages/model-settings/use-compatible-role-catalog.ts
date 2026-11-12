@@ -11,7 +11,8 @@ export const compatibleRoleCatalogKey = (userId: string, spaceId: string, creden
 export async function discoverCompatibleModels(rpc: RpcClient, connection: ModelCredential, spaceId: string, signal?: AbortSignal) {
   const options = { context: { spaceId }, ...(signal ? { signal } : {}) };
   if (isMycelliosBaseUrl(connection.baseUrl)) {
-    return { models: (await rpc.models.mycelliosModels(undefined, options)).map(entry => entry.id) };
+    const entries=await rpc.models.mycelliosModels(undefined,options);
+    return {models:entries.map(entry=>entry.id),entries:entries.map(({id,label,billing})=>({id,label,billing}))};
   }
   return rpc.models.probeOpenAiCompatible({
     provider: connection.provider === ANTSEED_PROVIDER_ID ? ANTSEED_PROVIDER_ID : OPENAI_COMPATIBLE_PROVIDER_ID,

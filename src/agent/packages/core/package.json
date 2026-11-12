@@ -4,6 +4,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
+    "./node/hosted-web-bundle": "./src/node/hosted-web-bundle.ts",
     ".": {
       "types": "./src/index.ts",
       "development": "./src/index.ts",

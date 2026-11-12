@@ -6,6 +6,7 @@ import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import Account from "../app/(settings)/account";
+import { registerPushToken } from "./push";
 
 const { element } = vi.hoisted(() => ({
   element:
@@ -23,6 +24,7 @@ vi.mock("react-native", () => ({
   Alert: { alert: vi.fn() },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
   KeyboardAvoidingView: element("div"),
+  Linking: { openSettings: vi.fn(async () => undefined) },
   Modal: ({ children, visible }: { children?: ReactNode; visible?: boolean }) =>
     visible ? createElement("section", null, children) : null,
   Platform: { OS: "ios", Version: 27 },
@@ -53,7 +55,7 @@ vi.mock("../components/native-segmented-control", () => ({
 vi.mock("../components/settings-group", () => ({
   SettingsGroup: element("div"),
   SettingsLabel: element("span"),
-  SettingsRow: ({ title }: { title: string }) => createElement("button", { type: "button" }, title),
+  SettingsRow: ({ title, onPress }: { title: string; onPress?: () => void }) => createElement("button", { type: "button", onClick: onPress }, title),
   SettingsSwitch: ({ title }: { title: string }) =>
     createElement("button", { type: "button" }, title),
   useStackedSettings: () => false,
@@ -160,4 +162,15 @@ it("offers no avatar style choice in account settings", async () => {
   expect(container.textContent).not.toContain("Avatars");
   expect(container.textContent).not.toContain("Robot");
   expect(container.textContent).not.toContain("Organic");
+});
+
+it("offers an explicit iOS push opt-in without requesting permission on mount", async () => {
+  vi.mocked(registerPushToken).mockClear().mockResolvedValue(undefined);
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  container = document.createElement("div"); document.body.append(container); root = createRoot(container);
+  await act(async () => root?.render(<Account />));
+  expect(container.querySelector('[aria-label="Push notifications"]')).not.toBeNull();
+  expect(registerPushToken).not.toHaveBeenCalled();
+  await act(async () => [...container!.querySelectorAll("button")].find(button => button.textContent === "Enable notifications")!.click());
+  expect(registerPushToken).toHaveBeenCalledExactlyOnceWith({ requestPermission: true });
 });

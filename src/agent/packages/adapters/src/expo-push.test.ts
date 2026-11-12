@@ -55,6 +55,15 @@ describe("expo push tickets", () => {
 });
 
 describe("expo push", () => {
+  it("fans out to every live mobile session and keeps one expired device from blocking the others", async () => {
+    let rows = [{ token: "ExponentPushToken[phone]", sessionId: "phone" }, { token: "ExponentPushToken[tablet]", sessionId: "tablet" }, { token: "ExponentPushToken[old]", sessionId: "old" }];
+    const tokens = { load: async () => rows[0], list: async () => rows, save: async () => {}, importLegacy: async () => false,
+      remove: async () => {}, endSession: async (_user: string, sessionId: string) => { rows = rows.filter(row => row.sessionId !== sessionId); } };
+    const fetchMock = vi.fn(async () => jsonResponse({ data: { status: "ok", id: "ticket" } })); vi.stubGlobal("fetch", fetchMock);
+    const push = new ExpoPushProvider(tokens, { sessionExpiresAt: async id => new Date(id === "old" ? 0 : Date.now() + 60_000) });
+    expect(await push.deliver({ kind: "completion", title: "Done", body: "Result", botId: "b", threadId: "t" }, notifyContext)).toBe("delivered");
+    expect(fetchMock.mock.calls.map(call => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)).to).sort()).toEqual(["ExponentPushToken[phone]", "ExponentPushToken[tablet]"].sort());
+  });
   it("does not call Expo when the user has no token", async () => {
     const tokens = new MemoryPushTokenStore();
     const fetchMock = vi.fn();

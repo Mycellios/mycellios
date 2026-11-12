@@ -214,6 +214,7 @@ it("keeps an accepted question choice answered until the block updates", async (
   await render(block, undefined, onAnswer);
 
   await act(async () => button("Paris")!.click());
+  await act(async () => new Promise(resolve => setTimeout(resolve, 200)));
 
   expect(onAnswer).toHaveBeenCalledWith("paris", undefined);
   expect(container.textContent).toContain("Paris");

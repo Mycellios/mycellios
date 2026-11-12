@@ -113,7 +113,7 @@ export function CreateBotDialog({
   inline?: boolean;
 }) {
   const { t } = useLingui();
-  const nameRef = useRef<HTMLTextAreaElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const id = useId();
   const [name, setName] = useState(inline ? productBrand.companionName : "");
   const [description, setDescription] = useState("");
@@ -171,13 +171,24 @@ export function CreateBotDialog({
           <BotLookPicker compact value={look} onAutomatic={() => setLook("")} onChange={setLook} />
           <fieldset disabled={submitting} className="grid min-w-0 gap-3">
             <div className="grid gap-1.5">
+              <label htmlFor={`${id}-name`} className="text-xs font-medium"><Trans>Name</Trans></label>
+              <Input
+                id={`${id}-name`}
+                ref={nameRef}
+                autoFocus
+                required={!description.trim()}
+                placeholder={t`Name your Bot`}
+                value={name}
+                maxLength={BOT_NAME_MAX_LENGTH}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
               <label htmlFor={`${id}-description`} className="text-xs font-medium">
                 <Trans id="create-mico.purpose">What should this Mico help with?</Trans>
               </label>
               <Textarea
                 id={`${id}-description`}
-                ref={nameRef}
-                autoFocus
                 rows={3}
                 className="max-h-32"
                 value={description}
@@ -186,18 +197,7 @@ export function CreateBotDialog({
                 onChange={(event) => setDescription(event.target.value)}
               />
             </div>
-            <div className="grid gap-1.5">
-              <label htmlFor={`${id}-name`} className="text-xs font-medium"><Trans>Name</Trans></label>
-              <Input
-                id={`${id}-name`}
-                required={!description.trim()}
-                placeholder={t`Name your Bot`}
-                value={name}
-                maxLength={BOT_NAME_MAX_LENGTH}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </div>
-            {me ? <CreateBotModelPicker me={me} model={model} onChange={setModel} /> : null}
+            {me ? <Disclosure summary={t`Model · automatic`}><CreateBotModelPicker me={me} model={model} onChange={setModel} /></Disclosure> : null}
             {description.trim() ? <Disclosure summary={t`Review instructions`} open={reviewing} onOpenChange={setReviewing}>
               <p className="whitespace-pre-wrap text-sm">{normalizeCreateBotProfile({ name, title: "", description }).instructions}</p>
               <p className="mt-2 text-xs text-muted-foreground">{t`These instructions will be saved when you create the Mico. You can edit them later.`}</p>

@@ -10384,3 +10384,176 @@ msgstr "Mycellios sends recordings of up to 30 seconds to the network and uses y
 
 msgid "Device or connected provider"
 msgstr "Device or connected provider"
+
+msgid "Workspaces"
+msgstr "Workspaces"
+
+msgid "Display options"
+msgstr "Display options"
+
+msgid "Add Mico to dock"
+msgstr "Add Mico to dock"
+
+msgid "Move Mico dock"
+msgstr "Move Mico dock"
+
+msgid "New Mico"
+msgstr "New Mico"
+
+
+msgid "Mycelium sprout"
+msgstr "Sprout"
+
+
+msgid "Mycelium branch"
+msgstr "Branch"
+
+
+msgid "Mycelium node"
+msgstr "Node"
+
+
+msgid "Mycelium spore"
+msgstr "Spore"
+
+
+msgid "Mycelium colony"
+msgstr "Colony"
+
+msgid "Select to reply"
+msgstr "Select to reply"
+
+msgid "Mycelium hypha"
+msgstr "Hypha"
+
+msgid "Mycelium nexus"
+msgstr "Nexus"
+
+msgid "Mycelium bridge"
+msgstr "Bridge"
+
+msgid "Mycelium loop"
+msgstr "Loop"
+
+msgid "Mycelium crest"
+msgstr "Crest"
+
+msgid "Mycelium weave"
+msgstr "Weave"
+
+msgid "Avatar forest"
+msgstr "Forest green"
+
+msgid "Avatar pink"
+msgstr "Pink"
+
+msgid "Avatar brown"
+msgstr "Brown"
+
+msgid "Avatar yellow"
+msgstr "Yellow"
+
+msgid "Avatar blue"
+msgstr "Blue"
+
+msgid "Avatar pine"
+msgstr "Pine green"
+
+msgid "Avatar cream"
+msgstr "Cream"
+
+msgid "Skip all questions"
+msgstr "Skip all questions"
+
+msgid "Previous question"
+msgstr "Previous question"
+
+msgid "Next question"
+msgstr "Next question"
+
+msgid "Choose all that apply"
+msgstr "Choose all that apply"
+
+msgid "Something else"
+msgstr "Something else"
+
+msgid "Skipped"
+msgstr "Skipped"
+
+msgid "Next"
+msgstr "Next"
+
+msgid "Questions"
+msgstr "Questions"
+
+msgid "asks"
+msgstr "asks"
+
+msgid "Answer in Mycellios"
+msgstr "Answer in Mycellios"
+
+msgid "Or write your own answer"
+msgstr "Or write your own answer"
+
+msgid "more requests"
+msgstr "more requests"
+
+msgid "Could not confirm the answer. Open the chat before retrying."
+msgstr "Could not confirm the answer. Open the chat before retrying."
+
+msgid "Chat order"
+msgstr "Chat order"
+
+msgid "Choose how conversations are shown. Automatic orders keep your saved manual order."
+msgstr "Choose how conversations are shown. Automatic orders keep your saved manual order."
+
+msgid "Group unread"
+msgstr "Group unread"
+
+msgid "Unread first"
+msgstr "Unread first"
+
+msgid "Searching for information…"
+msgstr "Searching for information…"
+
+msgid "Reading files…"
+msgstr "Reading files…"
+
+msgid "Updating files…"
+msgstr "Updating files…"
+
+
+msgid "Use models with your Mycellios credits. No API key needed."
+msgstr "Use models with your Mycellios credits. No API key needed."
+
+
+msgid "Optional. Keep your own providers and choose which one to use for each Mico."
+msgstr "Optional. Keep your own providers and choose which one to use for each Mico."
+
+
+msgid "External models include the 4% Mycellios service fee in the displayed price."
+msgstr "External models include the 4% Mycellios service fee in the displayed price."
+
+
+msgid "Connect Mycellios"
+msgstr "Connect Mycellios"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Collapse Marketplace menu"
+msgstr "Collapse Marketplace menu"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Expand Marketplace menu"
+msgstr "Expand Marketplace menu"
+
+msgid "Hide menu"
+msgstr "Hide menu"
+
+msgid "Show menu"
+msgstr "Show menu"
+
+msgid "After this task"
+msgstr "After this task"
+
+msgid "Send when this task finishes"
+msgstr "Send when this task finishes"

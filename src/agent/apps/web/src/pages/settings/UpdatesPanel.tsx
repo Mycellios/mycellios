@@ -9,6 +9,7 @@ import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { CLIENT_BUILD } from "../../lib/client-build";
 import { clientUpdates } from "../../lib/client-update";
 import { desktopBridge } from "../../lib/desktop";
+import { playUpdateMycelium } from "../../lib/update-mycelium";
 
 export function UpdatesPanel({ onWhatsNew, onClose, onBusyChange }: {
   onWhatsNew?: () => void; onClose: () => void; onBusyChange?: (busy: boolean) => void;
@@ -87,6 +88,9 @@ export function UpdatesPanel({ onWhatsNew, onClose, onBusyChange }: {
           {message && <p role="status" className="p-4 text-sm text-muted-foreground">{message}</p>}
         </> : <div className="px-4 py-3"><DesktopUpdateSection /></div>}
       </SettingsGroup>
+      {import.meta.env.DEV && <Button variant="ghost" size="sm" className="mt-3" onClick={event => void playUpdateMycelium(event.currentTarget)}>
+        {t`Preview update animation`}
+      </Button>}
     </section>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <Disclosure summary={t`Version details`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground">

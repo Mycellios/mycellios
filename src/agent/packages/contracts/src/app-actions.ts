@@ -4,6 +4,7 @@ export const APP_ACTION_IDS = [
   "media.voice.generate",
   "media.preview.render",
   "media.video.render",
+  "media.video.edit",
 ] as const;
 
 export type AppValueType = "text" | "number" | "boolean" | "image" | "audio" | "video" | "document";
@@ -21,6 +22,10 @@ export const APP_ACTION_CONTRACTS = {
   "media.preview.render": {
     version: "1.0.0", capability: "media.render",
     inputs: { storyboard: "text" }, outputs: { image: "image" },
+  },
+  "media.video.edit": {
+    version: "1.0.0", capability: "media.render",
+    inputs: { video: "video", prompt: "text" }, outputs: { video: "video" },
   },
   "media.video.render": {
     version: "1.0.0", capability: "media.render",

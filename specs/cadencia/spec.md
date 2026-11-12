@@ -25,6 +25,15 @@ upload, remote model, paid call or production deployment.
   phoneme boundaries. Preserve short gaps and configurable edge margins.
 - Cut proposals are non-destructive, individually selectable, adjustable and
   reversible. Merge overlaps before playback/export and reject invalid ranges.
+- The loaded editor is one bounded workspace with a file toolbar, preview on the
+  left and time saved, Create/Download and a compact cut list on the right.
+  Stack the panels by available container width. Waveform and detection/codec
+  details remain in closed disclosures beside the preview. Show per-cut playback
+  only for the selected row and precise
+  bounds in a nested disclosure. Inputs use seconds at 0.001-second precision;
+  grouping/disclosure must never alter selected cuts or authorize vowel removal.
+  Closing review stops its audition; the Original/Edited switch appears once an
+  actual edited result exists. Preserve validation, cancellation and invalidation.
 - Audition original/edited context with identical selected cuts. Export audio at
   its decoded native sample rate with short boundary fades, video on a bounded
   frame grid, sharing the compacted timeline. Never speed up speech.

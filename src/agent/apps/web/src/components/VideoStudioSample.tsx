@@ -7,7 +7,7 @@ const sampleScenes = [
   { title: "Empieza con aromáticas", narration: "La menta y la albahaca crecen bien en macetas." },
 ];
 
-export function VideoStudioSample() {
+export function VideoStudioSample({ catalog = false }: { catalog?: boolean }) {
   const [frames, setFrames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -17,6 +17,19 @@ export function VideoStudioSample() {
       // The example is decorative. The studio still works without this preview.
     }
   }, []);
+
+  if (catalog) return (
+    <figure className="mycellios-app-preview">
+      <div className="mycellios-app-preview-scenes" aria-hidden="true">
+        {frames.map((src, index) => (
+          <img key={index} src={src} alt="" width={180} height={320}
+            className="mycellios-app-preview-scene" draggable={false} />
+        ))}
+        {!frames.length && <Film size={64} strokeWidth={1} aria-hidden="true" />}
+      </div>
+      <figcaption className="sr-only">Ejemplo de escenas · MP4 vertical · 6 escenas · con voz</figcaption>
+    </figure>
+  );
 
   return (
     <figure className="flex flex-wrap items-center justify-between gap-x-5 gap-y-4 rounded-xl bg-success/10 p-4 sm:p-5">

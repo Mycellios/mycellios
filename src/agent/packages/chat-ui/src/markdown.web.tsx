@@ -484,7 +484,6 @@ export const ChatMarkdown = memo(function ChatMarkdown({
             </MarkdownTableSourceContext.Provider>
           </StreamingSourceContext.Provider>
         </LinkFaviconsPausedContext.Provider>
-        {streaming ? <span aria-hidden="true" className="rk-chat-markdown-cursor" /> : null}
       </div>
     </MentionContext.Provider>
   );

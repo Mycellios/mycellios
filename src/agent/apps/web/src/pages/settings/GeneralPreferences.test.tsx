@@ -52,3 +52,12 @@ it("does not pretend a conversation preference was saved when local storage is f
   expect(div.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("true");
   expect(div.querySelector('[role="alert"]')?.textContent).toContain("Could not save");
 });
+
+it("lets the user change chat ordering without changing other preferences", async () => {
+  const div = await render(<ConversationExtras />);
+  const select = div.querySelector<HTMLSelectElement>('select[aria-label="Chat order"]')!;
+  expect(select.value).toBe("manual");
+  await act(async () => { select.value = "unread-group"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(select.value).toBe("unread-group");
+  expect(JSON.parse(localStorage.getItem("mycellios.general.v1")!).sidebarChatOrder).toBe("unread-group");
+});

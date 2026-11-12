@@ -1,4 +1,3 @@
-import { SidebarContribution } from "../SidebarContribution";
 import { getGeneralPreferences, useGeneralPreferences } from "../../lib/general-preferences";
 import type { LocalVoiceStatus } from "@rakazo/contracts";
 import { useLingui } from "@lingui/react/macro";
@@ -223,12 +222,6 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
       {needsModels ? <p className="max-w-xs text-center text-xs text-muted-foreground">{localReplies ? t`Parakeet and Supertonic 3. Download once, then process audio on this computer without credits.` : t`Download Parakeet to transcribe on this computer.`}</p> : null}
       {!canStart && !needsModels ? <p className="text-center text-sm text-muted-foreground">{t`Connect a transcription provider in Voice settings, or use local voice in Desktop.`}</p> : null}
       {!native ? <Button variant="ghost" onClick={onSettings}>{t`Voice settings`}</Button> : null}
-    </div>
-    <div className="shrink-0 border-t border-border py-3 text-sm">
-      <p className="mb-2 text-xs text-muted-foreground">{networkReplies
-        ? t`Spoken replies use the Mycellios network and your credits.`
-        : t`Contribute computing power and earn credits.`}</p>
-      <SidebarContribution expanded activationLabel={t`Activate contribution`} />
     </div>
     </div>
     <footer className="flex shrink-0 justify-center gap-3 px-6 py-4">

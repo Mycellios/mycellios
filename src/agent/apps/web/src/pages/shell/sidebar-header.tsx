@@ -2,7 +2,7 @@ import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 import { ServerConnections, ServerConnectionName } from "../../components/ServerConnections";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Space } from "@rakazo/contracts";
-import { Badge, Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
@@ -95,15 +95,15 @@ export function SidebarHeader({
       data-testid="sidebar-topbar"
       className={mobile
         ? "flex shrink-0 flex-wrap items-center gap-2 px-5 pt-3 pb-1"
-        : `${hiddenTitleBar ? "app-drag" : ""} rk-sidebar-topbar flex flex-wrap shrink-0 items-center gap-1 ${mini ? "flex-col px-1 py-2" : "px-2"} ${hiddenTitleBar ? (mini ? "pt-14" : "ps-12") : ""}`}
+        : `${hiddenTitleBar ? "app-drag" : ""} rk-sidebar-topbar shrink-0 items-center gap-1 ${mini ? "flex flex-col px-1 py-2" : "grid grid-cols-[minmax(0,1fr)_auto] px-2"} ${hiddenTitleBar ? (mini ? "pt-14" : "ps-12") : ""}`}
     >
       {mobile ? <Button variant="floating" size="icon-lg" className="size-12 rounded-full" aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><PanelLeftClose size={22} /></Button> : null}
       {!mini && !mobile && <ServerConnections rail />}
-      {!mini ? <div className={mobile ? "order-last min-w-0 basis-full" : "contents"}>
-        {mobile ? <div className="mt-2 flex items-center gap-2"><h1 className="text-3xl font-semibold tracking-tight">Mycellios</h1><Badge variant="outline" className="text-[10px] text-muted-foreground">Beta</Badge></div> : null}
+      {!mini ? <div className={mobile ? "order-last min-w-0 basis-full" : "flex min-w-0 items-center"}>
+        {mobile ? <div className="mt-2 flex items-center gap-2"><h1 className="text-3xl font-semibold tracking-tight">Mycellios</h1></div> : null}
         <Popover open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
         <PopoverTrigger
-          className={`app-no-drag flex min-w-0 max-w-full items-center gap-2 rounded-md text-sm font-medium outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "min-h-11 text-muted-foreground" : "h-8 px-1.5"}`}
+          className={`app-no-drag flex min-w-0 max-w-full items-center gap-2 rounded-md text-sm font-normal outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "min-h-11 text-muted-foreground" : "h-8 w-full justify-between px-1.5"}`}
           aria-label={t`Switch workspace`}
           aria-keyshortcuts="Shift+F10"
           onContextMenu={(event) => { event.preventDefault(); setWorkspaceOpen(true); }}
@@ -115,21 +115,21 @@ export function SidebarHeader({
         >
           <span className="truncate"><ServerConnectionName fallback={spaceName ?? "Mycellios"} /></span><ChevronsUpDown size={mobile ? 15 : 12} className="shrink-0 text-muted-foreground" />
         </PopoverTrigger>
-        {workspaceOpen ? <PopoverContent align="start" className={`app-no-drag max-h-[var(--available-height)] w-64 gap-1 overflow-y-auto p-1 ${mobile ? "[&_button]:min-h-11" : ""}`}>
+        {workspaceOpen ? <PopoverContent align="start" className={`app-no-drag max-h-[var(--available-height)] w-64 gap-1 overflow-y-auto p-1 [&_button]:font-normal ${mobile ? "[&_button]:min-h-11" : ""}`}>
           <ServerConnections />
-          <Disclosure summary={spaceName ?? t`Spaces`} summaryClassName="w-full px-3 py-2 text-sm" defaultOpen={spaces.length > 1}>
+          <Disclosure summary={t`Workspaces`} summaryClassName="w-full px-3 py-2 text-sm font-normal" contentClassName="flex flex-col gap-1" defaultOpen>
           {spaces.map(space => <Button key={space.id} variant="ghost" className="justify-start" aria-current={space.id === spaceId ? "true" : undefined} onClick={() => { setWorkspaceOpen(false); const first = space.bots[0]; const group = space.groups[0]; onSpace(space.id, first ? `/app/${first.id}` : group ? `/app/g/${group.id}` : "/onboarding"); }}>{spaceLabel(space.name)}</Button>)}
           <div className="my-1 border-t border-border" />
           {spaceId ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); onSpaceSettings(); }}><Settings size={15} />{t`Space settings`}</Button> : null}
+          <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setNewSpaceOpen(true); }}><Plus size={15} />{t`New space`}</Button>
+          <div className="my-1 border-t border-border" />
           {onRoutines ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onRoutines(); }}><Workflow size={15} />{t`Routines`}</Button> : null}
           {onWorkflows ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onWorkflows(); }}><Workflow size={15} />{t`Workflows`}</Button> : null}
           {onUsage ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onUsage(); }}><Workflow size={15} />{t`Usage`}</Button> : null}
           {onSchedule ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onSchedule(); }}><Workflow size={15} />{t`Schedule`}</Button> : null}
           {onTasks ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onTasks(); }}><Workflow size={15} />{t`Tasks`}</Button> : null}
-          <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setNewSpaceOpen(true); }}><Plus size={15} />{t`New space`}</Button>
         </Disclosure></PopoverContent> : null}
       </Popover></div> : null}
-      {!mini && !mobile ? <Badge variant="outline" className="h-4 px-1.5 text-[10px] text-muted-foreground">Beta</Badge> : null}
       <div className={`relative flex shrink-0 items-center gap-0.5 ${mini ? "flex-col" : "ms-auto"}`}>
         {!mini ? <div className="hidden items-center md:flex">
           <IconTooltip label={t`Back`}><Button variant="ghost" size="icon-sm" className="app-no-drag size-7" aria-label={t`Back`} disabled={!history.canBack} onClick={history.back}><ArrowLeft size={15} /></Button></IconTooltip>

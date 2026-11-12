@@ -11,6 +11,7 @@ export interface PushRecord {
 /** Account-wide registrations, shared by API replicas and notification workers. */
 export interface PushTokenStore {
   load(userId: string): Promise<PushRecord | undefined>;
+  list?(userId: string): Promise<PushRecord[]>;
   save(userId: string, token: string, sessionId: string): Promise<void>;
   /** Import only when neither the account nor the device is registered already. */
   importLegacy(userId: string, token: string, sessionId: string): Promise<boolean>;
@@ -42,6 +43,19 @@ export class PrismaPushTokenStore implements PushTokenStore {
         token: await this.encryption.load(row.ciphertext, `push-token:${userId}`),
         sessionId: row.sessionId,
       };
+    });
+  }
+
+  async list(userId: string): Promise<PushRecord[]> {
+    return runAsSystem("load an account's notification devices", async () => {
+      const rows = await this.prisma.mobilePushDevice.findMany({ where: { userId }, orderBy: { updatedAt: "desc" } });
+      const legacy = await this.prisma.pushToken.findUnique({ where: { userId } });
+      if (legacy && !rows.some(row => row.tokenDigest === legacy.tokenDigest)) {
+        // A token handed to another account must not be resurrected by its legacy row.
+        const owner = await this.prisma.mobilePushDevice.findUnique({ where: { tokenDigest: legacy.tokenDigest }, select: { userId: true } });
+        if (!owner || owner.userId === userId) rows.push(legacy);
+      }
+      return Promise.all(rows.map(async row => ({ token: await this.encryption.load(row.ciphertext, `push-token:${userId}`), sessionId: row.sessionId })));
     });
   }
 
@@ -84,7 +98,7 @@ export class PrismaPushTokenStore implements PushTokenStore {
           // Use the same locks as live registration so the check and insert are atomic.
           if (
             mode === "import" &&
-            (await tx.pushToken.findFirst({
+            ((await tx.mobilePushDevice.findFirst({ where: { OR: [{ userId }, { tokenDigest }] }, select: { userId: true } })) || await tx.pushToken.findFirst({
               where: { OR: [{ userId }, { tokenDigest }] },
               select: { userId: true },
             }))
@@ -94,9 +108,12 @@ export class PrismaPushTokenStore implements PushTokenStore {
           // after sign-out cannot publish a token, even when its request authenticated earlier.
           const sessions = await tx.$queryRaw<Array<{ id: string }>>`
           SELECT id FROM "session" WHERE id = ${sessionId} AND "userId" = ${userId}
-          AND "expiresAt" > CURRENT_TIMESTAMP FOR UPDATE`;
+          AND "expiresAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') FOR UPDATE`;
           if (!sessions.length) throw new PushSessionEndedError();
           const data = { ciphertext: sealed.ciphertext, tokenDigest, sessionId };
+          await tx.mobilePushDevice.upsert({ where: { tokenDigest }, create: { userId, ...data }, update: { userId, ciphertext: sealed.ciphertext, sessionId } });
+          const stale = await tx.mobilePushDevice.findMany({ where: { userId, tokenDigest: { not: tokenDigest } }, orderBy: [{ updatedAt: "desc" }, { tokenDigest: "asc" }], skip: 19, select: { tokenDigest: true } });
+          if (stale.length) await tx.mobilePushDevice.deleteMany({ where: { userId, tokenDigest: { in: stale.map(row => row.tokenDigest) } } });
           if (mode === "import") await tx.pushToken.create({ data: { userId, ...data } });
           else {
             await tx.pushToken.deleteMany({ where: { tokenDigest, userId: { not: userId } } });
@@ -120,6 +137,7 @@ export class PrismaPushTokenStore implements PushTokenStore {
           await tx.pushToken.deleteMany({
             where: { userId, ...(tokenDigest ? { tokenDigest } : {}) },
           });
+          await tx.mobilePushDevice.deleteMany({ where: { userId, ...(tokenDigest ? { tokenDigest } : {}) } });
         }),
       ),
     );
@@ -138,10 +156,15 @@ export class PrismaPushTokenStore implements PushTokenStore {
             });
             if (!session) {
               await tx.pushToken.deleteMany({ where });
+              await tx.mobilePushDevice.deleteMany({ where });
               return;
             }
             await tx.pushToken.updateMany({ where, data: { sessionId: nextSessionId } });
-          } else await tx.pushToken.deleteMany({ where });
+            await tx.mobilePushDevice.updateMany({ where, data: { sessionId: nextSessionId } });
+          } else {
+            await tx.pushToken.deleteMany({ where });
+            await tx.mobilePushDevice.deleteMany({ where });
+          }
         }),
       ),
     );

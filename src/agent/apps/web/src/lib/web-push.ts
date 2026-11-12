@@ -1,19 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { notificationPreferences, subscribeNotifications } from "./notification-preferences";
 import { rpc } from "./rpc";
+import { desktopBridge } from "./desktop";
+import { isAndroidHost } from "./android-host";
 
 const CLIENT_KEY = "mycellios:notification-device";
 const OWNER_KEY = "mycellios:notification-owner";
+let temporaryClientId: string | undefined;
+function notificationOwner() {
+  try { return localStorage.getItem(OWNER_KEY); } catch { return null; }
+}
 export function notificationClientId(): string {
+  try {
   let id = localStorage.getItem(CLIENT_KEY);
   if (!id || !/^[a-f0-9-]{36}$/.test(id)) {
     id = crypto.randomUUID();
     localStorage.setItem(CLIENT_KEY, id);
   }
   return id;
+  } catch { return temporaryClientId ??= crypto.randomUUID(); }
 }
 export function pushSupported() {
   return (
+    !desktopBridge() && !isAndroidHost() &&
     typeof Notification !== "undefined" &&
     "serviceWorker" in navigator &&
     "PushManager" in window &&
@@ -49,7 +58,7 @@ async function registration() {
   }
 }
 
-function bindAccount(worker: ServiceWorker, accountId: string) {
+function bindAccount(worker: ServiceWorker, accountId: string | null) {
   return new Promise<void>((resolve, reject) => {
     const channel = new MessageChannel();
     const complete = (error?: Error) => {
@@ -79,8 +88,8 @@ async function registerWebPush(publicKey: string, accountId: string) {
   const worker = await registration();
   const clientId = notificationClientId();
   let subscription = await worker.pushManager.getSubscription();
-  const previousOwner = localStorage.getItem(OWNER_KEY);
-  if (subscription && previousOwner && previousOwner !== accountId) {
+  const previousOwner = notificationOwner();
+  if (subscription && previousOwner !== accountId) {
     await subscription.unsubscribe();
     subscription = null;
   }
@@ -101,6 +110,7 @@ async function registerWebPush(publicKey: string, accountId: string) {
     await bindAccount(worker.active!, accountId);
     if (!notificationPreferences(accountId).enabled) throw new Error("Notifications are disabled on this device.");
     await rpc.notifications.webRegister({
+      expectedUserId: accountId,
       clientId,
       subscription: subscription.toJSON() as {
         endpoint: string;
@@ -125,10 +135,22 @@ async function disableWebPush() {
 }
 
 async function clearWebPushBinding() {
-  localStorage.removeItem(OWNER_KEY);
+  try { localStorage.removeItem(OWNER_KEY); } catch { /* Worker unbinding must still happen. */ }
   const worker = await registration();
   worker.active?.postMessage({ type: "mycellios:push-binding", accountId: null });
   await (await worker.pushManager.getSubscription())?.unsubscribe();
+}
+
+/** Explicit sign-out only: closing the app must retain its background registration. */
+export async function clearNotificationDevice() {
+  serverDelivery = false;
+  try { localStorage.removeItem(OWNER_KEY); } catch { /* Continue revoking worker/native delivery. */ }
+  await desktopBridge()?.notifications?.clear().catch(() => undefined);
+  if (!navigator.serviceWorker) return;
+  const worker = await navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL, location.href));
+  if (!worker) return;
+  try { if (worker.active) await bindAccount(worker.active, null); }
+  finally { await (await worker.pushManager.getSubscription())?.unsubscribe(); }
 }
 let serverDelivery = false;
 export function usesServerPush() {
@@ -136,10 +158,13 @@ export function usesServerPush() {
 }
 
 const registrations = new Map<string, Promise<void>>();
+let registrationQueue: Promise<void> = Promise.resolve();
 export function enableWebPush(publicKey: string, accountId: string) {
   const running = registrations.get(accountId);
   if (running) return running;
-  const next = registerWebPush(publicKey, accountId).finally(() => registrations.delete(accountId));
+  const next = registrationQueue.catch(() => undefined).then(() => registerWebPush(publicKey, accountId))
+    .finally(() => registrations.delete(accountId));
+  registrationQueue = next;
   registrations.set(accountId, next);
   return next;
 }
@@ -159,12 +184,16 @@ export function pushEnrollmentAction(input: {
 
 export function useWebPushPresence(userId?: string) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
+  const previousUser = useRef<string | undefined>(undefined);
   useEffect(() => {
     setPublicKey(null);
-    if (!userId) return;
-    const owner = localStorage.getItem(OWNER_KEY);
+    const previous = previousUser.current;
+    previousUser.current = userId;
+    if (!userId) { if (previous) void clearNotificationDevice().catch(() => undefined); return; }
+    const owner = notificationOwner();
     const clearPreviousOwner = owner && owner !== userId ? clearWebPushBinding().catch(() => undefined) : undefined;
     let disposed = false;
+    let revision = 0;
     let configured = false;
     const clientId = notificationClientId();
     const heartbeat = () => {
@@ -173,15 +202,22 @@ export function useWebPushPresence(userId?: string) {
       void rpc.notifications.webPresence({ clientId, focused }).catch(() => undefined);
     };
     const refresh = async () => {
+      const current = ++revision;
       try {
         await clearPreviousOwner;
-        if (disposed) return;
+        if (disposed || current !== revision) return;
         const state = await rpc.notifications.webStatus({ clientId });
-        if (disposed) return;
+        if (disposed || current !== revision) return;
         configured = state.configured;
         setPublicKey(state.publicKey);
         const supported = pushSupported();
-        const bound = localStorage.getItem(OWNER_KEY) === userId;
+        const worker = supported ? await navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL, location.href)) : undefined;
+        const subscription = await worker?.pushManager.getSubscription();
+        if (disposed || current !== revision) return;
+        const savedKey = subscription?.options.applicationServerKey;
+        const matchesKey = state.publicKey && savedKey &&
+          Array.from(new Uint8Array(savedKey)).join() === Array.from(vapidBytes(state.publicKey)).join();
+        const bound = notificationOwner() === userId && Boolean(subscription && matchesKey);
         const enabled = notificationPreferences(userId).enabled;
         serverDelivery = configured && state.registered && supported && Notification.permission === "granted" && enabled && bound;
         heartbeat();
@@ -190,10 +226,10 @@ export function useWebPushPresence(userId?: string) {
           registered: state.registered, bound });
         if (action === "remove") await disableWebPush();
         if (action === "register" && state.publicKey) await enableWebPush(state.publicKey, userId);
-      } catch { /* Older API: retain local delivery. */ }
+      } catch { if (!disposed && current === revision) serverDelivery = false; /* Retain local delivery after a failed reconciliation. */ }
     };
     void refresh();
-    const timer = window.setInterval(heartbeat, 20_000);
+    const timer = window.setInterval(() => void refresh(), 20_000);
     window.addEventListener("focus", refresh);
     window.addEventListener("blur", heartbeat);
     const onVisibility = () => document.visibilityState === "visible" ? void refresh() : heartbeat();

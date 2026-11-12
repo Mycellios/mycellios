@@ -1,4 +1,5 @@
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
+import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
 import { selectOfflineCloudWorkspace } from "./offline-cloud-workspace.js";
@@ -566,6 +567,7 @@ function connectorTrustKeys(
 /** Effects that got past the approval gate: approved, allowed by a rule or review, or run. */
 const PASSED_EFFECT_STATUSES = ["approved", "executing", "uncertain", "completed"];
 const READ_ONLY_AGENT_TOOLS = new Set([
+  "app_read",
   "command_status",
   "work_status",
   "computer_observe",
@@ -6354,6 +6356,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
               });
             }
           }
+          if (name === "app_read" || name === "app_write") {
+            try {
+              return finish(await executeHostedAppTool(deps.prisma, name, args, { userId: run.userId, spaceId: run.spaceId, botId: bot.id, runId: run.id, signal: context.signal }));
+            } catch (error) {
+              return finish({ error: error instanceof Error ? error.message : "App edit failed." });
+            }
+          }
           if (name === "attach_file") {
             const filePath = String(args.path ?? "");
             const failAttach = async (error: string) => {
@@ -8786,6 +8795,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 id: action.id,
                 label: redactSecrets(action.label, runSecrets),
               }));
+              const safeQuestions = event.questions?.map(question => ({
+                ...question, id: redactSecrets(question.id, runSecrets), question: redactSecrets(question.question, runSecrets),
+                options: question.options.map(option => ({ ...option,
+                  label: redactSecrets(option.label, runSecrets),
+                  ...(option.description ? { description: redactSecrets(option.description, runSecrets) } : {}),
+                })),
+              }));
               await workspaceCheckpoint.flush();
               await persistTurnCheckpoint(event.executionId);
               await settleRunningHelpers();
@@ -8804,6 +8820,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     detail: safeDetail,
                     status: "pending",
                     actions: safeActions,
+                    ...(safeQuestions ? { questions: safeQuestions } : {}),
                   },
                 ],
                 // Keep unredacted labels on the run for resume; message blocks stay redacted.

@@ -1,6 +1,6 @@
 .cd-app {
   min-width: 0;
-  max-width: 1440px;
+  max-width: 1080px;
   margin: 0 auto;
   color: var(--foreground);
 }
@@ -16,42 +16,8 @@
   outline: 2px solid var(--ring);
   outline-offset: 3px;
 }
-.cd-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 18px;
-  margin-bottom: 22px;
-}
-.cd-header > div {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.cd-header h1 {
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  margin: 0;
-}
-.cd-header h1 span {
-  display: block;
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0;
-  color: var(--muted-foreground);
-  margin-top: 4px;
-}
-.cd-private {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--muted-foreground);
-  white-space: nowrap;
-}
+.cd-app > .hifa-app-header { margin-bottom: 16px; }
+.cd-workspace { border: 1px solid var(--border); border-radius: 16px; background: var(--background); overflow: clip; container: cadencia / inline-size; }
 .cd-empty {
   min-height: 530px;
   display: flex;
@@ -106,7 +72,9 @@
 }
 .cd-projectbar {
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
 }
 .cd-projectbar > span {
   min-width: 0;
@@ -128,13 +96,14 @@
 }
 .cd-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(270px, 340px);
-  gap: 24px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: stretch;
 }
 .cd-view {
   min-width: 0;
+  padding: 16px;
 }
+.cd-edit-panel { min-width: 0; padding: 18px 16px 10px; background: var(--card); border-inline-start: 1px solid var(--border); }
 .cd-player-tools {
   display: flex;
   justify-content: space-between;
@@ -154,9 +123,9 @@
   background: var(--background);
 }
 .cd-player {
-  background: var(--foreground);
-  min-height: 200px;
-  border-radius: 12px;
+  background: var(--muted);
+  min-height: 160px;
+  border-radius: 10px;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -166,8 +135,9 @@
 .cd-player video {
   display: block;
   width: 100%;
-  max-height: min(46vh, 440px);
-  min-height: 200px;
+  max-height: 320px;
+  min-height: 160px;
+  object-fit: contain;
 }
 .cd-player-audio {
   flex-direction: column;
@@ -188,7 +158,7 @@
   font-size: 13px;
 }
 .cd-waveform {
-  padding: 18px 0 16px;
+  padding: 12px 0 0;
 }
 .cd-waveform svg {
   display: block;
@@ -250,12 +220,10 @@
 }
 .cd-summary {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-block: 16px;
-  border-block: 1px solid var(--border);
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding-bottom: 8px;
 }
 .cd-summary > div {
   display: flex;
@@ -263,7 +231,7 @@
   gap: 6px;
 }
 .cd-summary strong {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 500;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -281,11 +249,12 @@
   line-height: 1.7;
   color: var(--muted-foreground);
   max-width: 68ch;
-  margin: 12px 0 20px;
+  margin: 0 0 16px;
 }
 .cd-settings {
   border-top: 1px solid var(--border);
-  padding-top: 14px;
+  padding-top: 12px;
+  margin-top: 12px;
 }
 .cd-settings summary {
   display: flex;
@@ -327,19 +296,31 @@
   color: var(--muted-foreground);
   max-width: 65ch;
 }
-.cd-review {
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
+.cd-review-section { border-top: 1px solid var(--border); }
+.cd-review-section > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0 10px; cursor: pointer; list-style: none; font-size: 14px; font-weight: 500; }
+.cd-review-section > summary::-webkit-details-marker,
+.cd-audio-details > summary::-webkit-details-marker,
+.cd-cut-adjust > summary::-webkit-details-marker { display: none; }
+.cd-review-section > summary > span { display: flex; align-items: center; gap: 8px; }
+.cd-review-section summary small { font-size: 12px; color: var(--muted-foreground); }
+.cd-review-section > summary > svg { color: var(--muted-foreground); transition: transform 160ms ease; }
+.cd-review-section[open] > summary > svg { transform: rotate(180deg); }
+.cd-audio-details { margin-top: 14px; }
+.cd-audio-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; font-size: 12px; color: var(--muted-foreground); }
+.cd-audio-details > summary > span { display: flex; align-items: center; gap: 7px; }
+.cd-audio-details[open] > summary > svg { transform: rotate(180deg); }
+.cd-review { min-width: 0; overflow: hidden; }
+.cd-review-body { padding-bottom: 6px; }
+.cd-cut-adjust { margin: 10px 0 0 24px; }
+.cd-cut-adjust > summary { display: flex; align-items: center; gap: 8px; width: fit-content; cursor: pointer; list-style: none; font-size: 12px; color: var(--muted-foreground); }
+.cd-cut-adjust .cd-cut-bounds { padding-inline-start: 0; }
+
 .cd-review > header {
-  padding: 14px;
+  padding: 0 0 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  border-bottom: 1px solid var(--border);
 }
 .cd-review h2 {
   font-size: 14px;
@@ -355,17 +336,16 @@
   line-height: 1.6;
   color: var(--muted-foreground);
   margin: 0;
-  padding: 12px 14px;
-  background: var(--muted);
+  padding: 0 0 10px;
 }
 .cd-cut-list {
-  max-height: 570px;
+  max-height: 360px;
   overflow: auto;
   scrollbar-color: var(--border) transparent;
   scrollbar-width: thin;
 }
 .cd-cut {
-  padding: 14px;
+  padding: 10px 6px;
   border-bottom: 1px solid var(--border);
 }
 .cd-cut:last-child {
@@ -373,29 +353,36 @@
 }
 .cd-cut.is-active {
   background: var(--accent);
+  border-radius: 8px;
 }
 .cd-cut-title {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
 .cd-cut-title > [data-slot="checkbox"] {
   flex-shrink: 0;
-  margin-top: 3px;
+  margin-top: 0;
 }
-.cd-cut-title > button {
+.cd-cut-title > button:not([data-slot="checkbox"]) {
   border: 0;
   background: transparent;
   color: inherit;
   padding: 0;
   text-align: start;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  height: auto;
+  min-height: 36px;
+  min-width: 0;
   flex: 1;
   cursor: pointer;
 }
-.cd-cut-title > button > span {
+.cd-cut-label { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; flex: 1; min-width: 0; white-space: normal; }
+.cd-cut-label > span {
   font-size: 12px;
   font-weight: 500;
 }
@@ -403,7 +390,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
@@ -413,6 +400,8 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.cd-cut-open > svg { flex-shrink: 0; color: var(--muted-foreground); }
+.cd-cut-open[aria-expanded="true"] > svg { transform: rotate(180deg); }
 .cd-cut-warning {
   font-size: 10px;
   line-height: 1.65;
@@ -507,35 +496,14 @@
   background: var(--accent);
   color: var(--foreground);
 }
-@media (max-width: 1100px) {
+@container cadencia (max-width: 740px) {
   .cd-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .cd-cut-list {
-    max-height: 420px;
-  }
-  .cd-player video {
-    max-height: 42vh;
-  }
+  .cd-edit-panel { border-inline-start: 0; border-top: 1px solid var(--border); }
+  .cd-summary { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 }
 @media (max-width: 600px) {
-  .cd-header {
-    align-items: flex-start;
-  }
-  .cd-header > div {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  .cd-private {
-    font-size: 10px;
-    white-space: normal;
-    padding-top: 7px;
-    max-width: 110px;
-  }
-  .cd-header h1 {
-    font-size: 26px;
-  }
   .cd-empty {
     padding: 10px 0;
     min-height: 480px;

@@ -83,7 +83,7 @@ it("preserves the native Video Studio launcher when its capability is available"
       host.querySelector<HTMLButtonElement>('[aria-label="Abrir Estudio de vídeos"]')!.click(),
     );
     expect(open).toHaveBeenCalledOnce();
-    expect(host.textContent).toContain("Desktop · Windows");
+    expect(host.textContent).toContain("Escritorio");
   } finally {
     await act(async () => root.unmount());
     host.remove();

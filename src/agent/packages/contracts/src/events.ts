@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { AgentImportSetupItemSchema } from "./agent-import-setup.js";
 import { botSecretDestinationSchema } from "./bot-secrets.js";
+import { AgentQuestions } from "./questionnaire.js";
 import { Id } from "./ids.js";
 import { McpTransportSchema } from "./mcp.js";
 
@@ -103,6 +104,7 @@ export const MessageBlock = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("ask"),
+    questions: AgentQuestions.optional(),
     text: z.string(),
     approvalEffectId: Id.optional(),
     instructionUpdate: z

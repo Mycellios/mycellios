@@ -157,6 +157,7 @@ it("uses one category per real app and bounds unknown tabs to Apps", () => {
   ).toHaveLength(3);
   expect(marketplaceTab("settings")).toBe("apps");
   expect(marketplaceTab("skills")).toBe("skills");
+  expect(marketplaceTab("webs")).toBe("mycellios-apps");
 });
 it("every template has real bounded instructions and every guide has a unique installable recipe", () => {
   expect(new Set(SKILL_RECIPES.map((recipe) => recipe.name)).size).toBe(SKILL_RECIPES.length);

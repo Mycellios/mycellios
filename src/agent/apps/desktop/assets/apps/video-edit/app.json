@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "mycellios.app/1",
+  "id": "io.mycellios.video-edit",
+  "version": "1.0.0",
+  "name": "Editar vídeo",
+  "description": "Edita un MP4 existente con una instrucción, presupuesto y confirmación. Proyectos privados en este PC; envío externo solo tras aprobar el precio.",
+  "author": {
+    "name": "Mycellios"
+  },
+  "visibility": "private",
+  "session": "mycellios",
+  "permissions": [
+    "media.render"
+  ],
+  "assets": [
+    {
+      "id": "edit-policy",
+      "path": "prompts/edit.md",
+      "sha256": "dfa933c64b6bb38cff68ee1e1de13081c6c1fb5d8baf913cee602df1ec04d2f5"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "source",
+      "label": "Vídeo original",
+      "required": true,
+      "type": "artifact",
+      "mediaTypes": [
+        "video"
+      ]
+    },
+    {
+      "id": "prompt",
+      "label": "Qué quieres cambiar",
+      "required": true,
+      "type": "text",
+      "maxLength": 2000
+    }
+  ],
+  "workflow": {
+    "entry": "edit",
+    "steps": [
+      {
+        "id": "edit",
+        "title": "Editar vídeo",
+        "kind": "task",
+        "dependsOn": [],
+        "action": "media.video.edit",
+        "actionVersion": "1.0.0",
+        "targets": [
+          "local"
+        ],
+        "bindings": {
+          "video": {
+            "source": "input",
+            "field": "source"
+          },
+          "prompt": {
+            "source": "input",
+            "field": "prompt"
+          }
+        },
+        "instructions": [
+          "edit-policy"
+        ],
+        "recovery": "reconcile-before-retry",
+        "automaticRetries": 0
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "edit",
+      "title": "Editar vídeo",
+      "blocks": [
+        {
+          "id": "source-field",
+          "component": "field",
+          "field": "source"
+        },
+        {
+          "id": "prompt-field",
+          "component": "field",
+          "field": "prompt"
+        },
+        {
+          "id": "edit-status",
+          "component": "step",
+          "step": "edit"
+        },
+        {
+          "id": "edit-result",
+          "component": "result",
+          "step": "edit",
+          "output": "video"
+        }
+      ]
+    }
+  ],
+  "persistence": {
+    "scope": "user-space-project",
+    "schemaVersion": "1.0.0",
+    "artifacts": "private-references"
+  },
+  "updates": {
+    "existingProjects": "pinned",
+    "newVersions": "new-projects-only"
+  },
+  "execution": {
+    "runtimeProtocol": "mycellios.app-runtime/1",
+    "selection": "user-selected",
+    "environments": [
+      {
+        "target": "local",
+        "cpuCores": 2,
+        "memoryMb": 1024,
+        "gpuRequired": false,
+        "maxSeconds": 1800
+      }
+    ],
+    "cloudFallback": "explicit-consent",
+    "artifactTransfer": "explicit-consent",
+    "unavailableExecutor": "wait",
+    "maxParallelSteps": 1
+  },
+  "billing": {
+    "currency": "credits",
+    "maxMicrounitsPerRun": 1000000,
+    "requireQuote": true,
+    "modelTokens": "actual-usage",
+    "cloudCompute": "actual-usage",
+    "uncertainUsage": "pending"
+  }
+}

@@ -191,6 +191,7 @@ export function accountRoutes(ctx: RouterContext) {
         return deps.webPush.saveSettings(context.actor.userId, input);
       }),
       webRegister: authed.notifications.webRegister.handler(async ({ context, input }) => {
+        if (input.expectedUserId !== undefined && input.expectedUserId !== context.actor.userId) throw new ORPCError("FORBIDDEN");
         if (!deps.webPush?.config) throw new ORPCError("SERVICE_UNAVAILABLE");
         if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
         await deps.webPush.register(context.actor.userId, context.sessionId, input.clientId, input.subscription);
@@ -219,7 +220,8 @@ export function accountRoutes(ctx: RouterContext) {
         return { ok: true as const };
       }),
       unregisterPush: authed.notifications.unregisterPush.handler(async ({ context }) => {
-        await deps.pushTokens.remove(context.actor.userId);
+        if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
+        await deps.pushTokens.endSession(context.actor.userId, context.sessionId);
         return { ok: true as const };
       }),
     },

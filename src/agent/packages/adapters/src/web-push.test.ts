@@ -146,14 +146,14 @@ describe("native compatibility", () => {
     await notificationChannels(existing, web).send(message, context);
     expect(existing.send).toHaveBeenCalledOnce();
   });
-  it("Web Push settings do not disable native delivery", async () => {
+  it("account-wide off also silences native mobile delivery", async () => {
     const existing = native();
     const web = {
       settings: async () => NotificationSettingsSchema.parse({ level: "off" }),
       enqueue: vi.fn(async () => 0),
     } as unknown as WebPushService;
     await notificationChannels(existing, web).send(message, context);
-    expect(existing.send).toHaveBeenCalledOnce();
+    expect(existing.send).not.toHaveBeenCalled();
     expect(web.enqueue).toHaveBeenCalledOnce();
   });
 });

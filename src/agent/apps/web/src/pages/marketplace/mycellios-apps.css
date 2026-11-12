@@ -1,0 +1,139 @@
+.mycellios-apps-catalog {
+  max-width: 1120px;
+}
+.mycellios-apps-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 24px;
+}
+.mycellios-apps-toolbar .rk-market-heading { margin: 0; }
+.mycellios-apps-search { flex: 0 1 260px; }
+.mycellios-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 20px;
+}
+.mycellios-app-card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  transition: border-color 160ms ease-out;
+}
+.mycellios-app-card:hover { border-color: var(--muted-foreground); }
+.mycellios-app-card:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.mycellios-app-preview {
+  display: grid;
+  place-items: center;
+  height: 164px;
+  margin: 0;
+  padding: 12px;
+  overflow: hidden;
+  background: #dce5d3;
+  color: #19372d;
+}
+.mycellios-app-preview-scenes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+}
+.mycellios-app-preview-scene {
+  width: 76px;
+  height: auto;
+  aspect-ratio: 9 / 16;
+  border: 1px solid #19372d33;
+  border-radius: 5px;
+  transform: rotate(-7deg) translateY(-3px);
+  box-shadow: 0 7px 12px #19372d1f;
+}
+.mycellios-app-preview-scene + .mycellios-app-preview-scene { transform: rotate(7deg) translateY(4px); }
+.mycellios-app-card-copy { padding: 16px 16px 8px; }
+.mycellios-app-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mycellios-app-icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #19372d;
+  color: #e7efb8;
+}
+.mycellios-app-card-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.mycellios-app-description {
+  margin: 12px 0 6px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.mycellios-app-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mycellios-app-card-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.mycellios-app-open {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.mycellios-app-open:hover { background: var(--accent); }
+.mycellios-app-open::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+@media (prefers-reduced-motion: reduce) {
+  .mycellios-app-card { transition: none; }
+}
+
+.mycellios-app-cover-image { width: 100%; height: 100%; object-fit: cover; }
+.mycellios-app-preview:has(> .mycellios-app-cover-image) { padding: 0; }
+.mycellios-app-cover-edit {
+  position: absolute; inset-block-start: 10px; inset-inline-end: 10px; z-index: 1;
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--background); color: var(--foreground); cursor: pointer;
+}
+.mycellios-app-cover-edit:hover { background: var(--accent); }
+.mycellios-app-cover-edit:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.mycellios-app-cover-edit:disabled { opacity: .5; cursor: wait; }
+.app-cover-editor-preview {
+  display: grid; place-items: center; height: 200px; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--muted);
+}
+.app-cover-editor-preview > img { width: 100%; height: 100%; object-fit: cover; }
+.app-cover-editor-preview .mycellios-app-preview { width: 100%; height: 100%; }
+.app-cover-candidates { display: flex; flex-wrap: wrap; gap: 8px; }
