@@ -1,14 +1,39 @@
 import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { Script } from "node:vm";
 import { isBuildId } from "@rakazo/contracts/client-build";
 import { productBrand } from "@rakazo/contracts/product-brand";
 import { webDarkTokens } from "@rakazo/ui-tokens";
 import type { Plugin, Rolldown } from "vite";
+import { build } from "esbuild";
 import { CACHE_PREFIX } from "./service-worker.js";
 
 const SERVICE_WORKER_FILE = "sw.js";
 const MANIFEST_FILE = "site.webmanifest";
 const PRECACHE_PLACEHOLDER = "__RAKAZO_SW_PRECACHE__";
 const CACHE_PLACEHOLDER = "__RAKAZO_SW_CACHE__";
+
+/** Keep shared browser helpers bundled into the classic worker, never split out. */
+export async function buildClassicServiceWorker() {
+  const result = await build({
+    entryPoints: [fileURLToPath(new URL("./sw.ts", import.meta.url))],
+    bundle: true,
+    write: false,
+    format: "iife",
+    platform: "browser",
+    target: "es2022",
+    minify: true,
+    metafile: true,
+  });
+  if (result.outputFiles.length !== 1 ||
+    Object.values(result.metafile.outputs).some(output => output.imports.length)) {
+    throw new Error("The classic service worker must be one self-contained script.");
+  }
+  const code = result.outputFiles[0]!.text;
+  // Parsing as a classic script rejects accidentally emitted module syntax.
+  new Script(code, { filename: SERVICE_WORKER_FILE });
+  return { code, inputs: Object.keys(result.metafile.inputs).map(input => resolve(input)) };
+}
 
 export function webManifest(base = "/") {
   const icons = [192, 512].map((size) => ({
@@ -89,6 +114,7 @@ export function injectShell(code: string, precache: readonly string[], buildId: 
 /** Installable PWA shell: the web manifest and the service worker. */
 export function rakazoPwa(buildId: string, base = "/"): Plugin[] {
   const manifest = () => JSON.stringify(webManifest(base), null, 2);
+  let workerCode: string | undefined;
   return [
     {
       name: "rakazo-pwa-manifest",
@@ -107,33 +133,27 @@ export function rakazoPwa(buildId: string, base = "/"): Plugin[] {
       name: "rakazo-pwa-service-worker",
       apply: "build",
       enforce: "post",
-      buildStart() {
-        this.emitFile({
-          type: "chunk",
-          id: fileURLToPath(new URL("./sw.ts", import.meta.url)),
-          fileName: SERVICE_WORKER_FILE,
-        });
+      async buildStart() {
+        const worker = await buildClassicServiceWorker();
+        workerCode = worker.code;
+        worker.inputs.forEach(input => this.addWatchFile(input));
       },
       generateBundle(_options, bundle) {
         this.emitFile({ type: "asset", fileName: MANIFEST_FILE, source: manifest() });
         const html = bundle["index.html"];
         if (html?.type !== "asset") this.error("The index.html shell was not emitted.");
-        const worker = bundle[SERVICE_WORKER_FILE];
-        if (worker?.type !== "chunk") this.error("The service worker chunk was not emitted.");
-        // Registered as a classic script, so it must stay one self-contained file.
-        if (worker.imports.length || worker.dynamicImports.length || worker.exports.length) {
-          this.error("The service worker must not import or export modules.");
-        }
-        worker.code = injectShell(
-          worker.code,
+        if (workerCode === undefined) this.error("The classic service worker was not built.");
+        let code = injectShell(
+          workerCode,
           shellFiles(bundle).map((path) => `${base}${path.slice(1)}`),
           buildId,
         );
         if (base !== "/")
-          worker.code = worker.code.replace(
+          code = code.replace(
             `${CACHE_PREFIX}${buildId}`,
             `${CACHE_PREFIX}${base.slice(1, -1)}-${buildId}`,
           );
+        this.emitFile({ type: "asset", fileName: SERVICE_WORKER_FILE, source: code });
       },
     },
   ];

@@ -57,7 +57,7 @@ describe("BotAvatar", () => {
       </div>,
     );
 
-    const gradMatches = [...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
+    const gradMatches = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
     expect(gradMatches.length).toBeGreaterThanOrEqual(4);
     expect(new Set(gradMatches).size).toBe(gradMatches.length);
     for (const id of gradMatches) {

@@ -1,7 +1,8 @@
 import { webDarkTokens } from "@rakazo/ui-tokens";
+import { Script } from "node:vm";
 import type { Rolldown } from "vite";
 import { describe, expect, it } from "vitest";
-import { injectShell, shellFiles, webManifest } from "./plugin.js";
+import { buildClassicServiceWorker, injectShell, shellFiles, webManifest } from "./plugin.js";
 
 function chunk(fileName: string, imports: string[], css: string[] = [], isEntry = false) {
   return {
@@ -14,6 +15,24 @@ function chunk(fileName: string, imports: string[], css: string[] = [], isEntry 
 }
 
 describe("PWA build", () => {
+  it("bundles shared notification helpers into a standalone classic worker", async () => {
+    const worker = await buildClassicServiceWorker();
+    expect(worker.inputs.some(input => input.endsWith("notification-target.ts"))).toBe(true);
+    const listeners: string[] = [];
+    const code = injectShell(worker.code, ["/agent/", "/agent/assets/app.js"], "20261112110000");
+    new Script(code).runInNewContext({
+      self: {
+        location: { origin: "https://app.example" },
+        registration: { scope: "https://app.example/agent/" },
+        addEventListener: (name: string) => listeners.push(name),
+      },
+      URL,
+      console,
+    });
+    for (const name of ["install", "activate", "fetch", "message", "push", "notificationclick"])
+      expect(listeners).toContain(name);
+    expect(code).not.toContain("__RAKAZO_SW_");
+  });
   it("precaches the shell's static graph, styles and fonts, not lazy chunks", () => {
     const bundle = {
       "assets/index.js": chunk("assets/index.js", ["assets/react.js"], ["assets/index.css"], true),
