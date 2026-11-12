@@ -301,6 +301,8 @@ These rules apply to the complete repository.
   Gateway API keys use the separate `antseed-gateway` adapter and its scoped
   receipt session, never the local buyer control-secret field. Run its gateway
   tests too. Keep models without an enforceable upstream cost contract disabled.
+  Paid gateway admission also needs a lifetime funded envelope; count settled
+  spend and unresolved holds across restarts and UTC days before supplier POSTs.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.

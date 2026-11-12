@@ -119,6 +119,10 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
         MYCELLIOS_MANAGED_ANTSEED_GATEWAY_CONTRACT: "deepseek-bounded-v1", MYCELLIOS_MANAGED_REQUEST_LIMIT_MICROUNITS: "10000",
         MYCELLIOS_MANAGED_DAILY_LIMIT_MICROUNITS: "1000000"};
       expect(readManagedProviderConfig(env)).toMatchObject({antseedGatewayKey: gatewayKey, upstream: "antseed-gateway"});
+      expect(() => readManagedProviderConfig({...env, MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS: "2"})).toThrow("funded_envelope_required");
+      expect(readManagedProviderConfig({...env, MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS: "2", MYCELLIOS_MANAGED_TOTAL_LIMIT_MICROUNITS: "10402080"}))
+        .toMatchObject({fundingCostBasisPoints: 2, totalLimitMicrounits: 10402080});
+      expect(() => readManagedProviderConfig({...env, MYCELLIOS_MANAGED_TOTAL_LIMIT_MICROUNITS: "0"})).toThrow("budget_invalid");
       expect(() => readManagedProviderConfig({...env, MYCELLIOS_MANAGED_ANTSEED_GATEWAY_KEY: gatewayKey})).toThrow("ambiguous");
       expect(() => readManagedProviderConfig({...env, MYCELLIOS_MANAGED_MEDIA_ENABLED: "true"})).toThrow("not_qualified");
     } finally {rmSync(dir, {recursive: true});}

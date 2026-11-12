@@ -88,6 +88,13 @@ before setting it, qualify the deployed gateway's bounded DeepSeek request guard
 text-only input, explicit output limits, durable attributed spend and scoped ledger.
 Stock gateways without this guard are not qualified. Unknown funding cost still
 blocks all spend, including an advertised free offer whose price could change.
+Paid gateway configuration additionally requires
+`MYCELLIOS_MANAGED_TOTAL_LIMIT_MICROUNITS`, an audited lifetime envelope in
+wallet microcredits, including funding costs and the 4 percent markup. This is
+independent of the daily cap and includes all historical settled managed charges
+and unresolved maximum holds. Midnight, process restarts and key rotation do not
+reset it. Enforce a matching or narrower supplier-side total USD cap, allocated
+only from verified prefunding; future deposits do not extend this authorization.
 Other discovered models/modalities stay unavailable; catalog presence does not
 authorize platform spend. The public price is a maximum, not the cheapest offer.
 
