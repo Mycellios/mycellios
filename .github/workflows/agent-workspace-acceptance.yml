@@ -86,6 +86,8 @@ jobs:
         run: node scripts/verify-workspace-sync-ui.mjs --output=workspace-proof
       - name: Exercise conversation delivery, progress and reduced motion
         run: node scripts/verify-chat-fluidity.mjs --output=chat-flow-proof
+      - name: Exercise actual companion images in the deployed app namespace
+        run: node scripts/verify-companion-avatars.mjs --output=companion-avatar-proof
       - name: Exercise Cadencia local media editing with a synthetic clip
         working-directory: src/agent/apps/web
         run: npm exec -- playwright test --config playwright.integrations.config.ts --grep Cadencia
@@ -98,6 +100,7 @@ jobs:
           path: |
             src/agent/workspace-proof
             src/agent/chat-flow-proof
+            src/agent/companion-avatar-proof
             src/agent/playwright-integration-report
             src/agent/hosted-login-proof
           if-no-files-found: warn

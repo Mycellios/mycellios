@@ -42,6 +42,8 @@ jobs:
           npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
       - name: Compile coordinator and its browser surfaces
         run: npm run build
+      - name: Seal the complete native runtime with its production dependencies
+        run: npm run coordinator:release:prepare -- --revision="$GITHUB_SHA"
       - name: Compile Agent without production credentials
         working-directory: src/agent
         run: |
@@ -52,6 +54,8 @@ jobs:
       - name: Seal immutable outputs and migration inputs
         run: |
           mkdir -p release-artifact
+          tar -czf release-artifact/native.tar.gz -C build/coordinator-release .
+          node scripts/verify-coordinator-release.mjs --archive=release-artifact/native.tar.gz
           tar -czf release-artifact/payload.tar.gz dist package.json package-lock.json \
             src/agent/apps/api/dist src/agent/apps/worker/dist src/agent/apps/web/dist \
             src/agent/packages/db/prisma src/agent/package.json src/agent/package-lock.json
@@ -62,12 +66,14 @@ jobs:
           const hash = file => createHash('sha256').update(readFileSync(file)).digest('hex');
           const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
           const manifest = {
-            schemaVersion: 1,
+            schemaVersion: 2,
             revision: git('rev-parse', 'HEAD'),
             tree: git('rev-parse', 'HEAD^{tree}'),
             runId: process.env.GITHUB_RUN_ID,
             node: process.version,
             archiveSha256: hash('release-artifact/payload.tar.gz'),
+            nativeArchiveSha256: hash('release-artifact/native.tar.gz'),
+            nativeSourceId: JSON.parse(readFileSync('build/coordinator-release/mycellios-coordinator-release-manifest.json', 'utf8')).sourceId,
             rootLockSha256: hash('package-lock.json'),
             agentLockSha256: hash('src/agent/package-lock.json'),
             apiSha256: hash('src/agent/apps/api/dist/index.js'),
@@ -78,7 +84,8 @@ jobs:
             deployed: false,
             migrationsApplied: false,
             paidInference: false,
-            dependenciesIncluded: false,
+            agentDependenciesIncluded: false,
+            nativeDependenciesIncluded: true,
           };
           writeFileSync('release-artifact/candidate.json', JSON.stringify(manifest, null, 2) + '\n');
           console.log(JSON.stringify(manifest, null, 2));

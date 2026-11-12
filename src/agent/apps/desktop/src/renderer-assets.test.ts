@@ -97,6 +97,9 @@ describe("bundled desktop renderer", () => {
   it("assigns cache and content metadata", () => {
     expect(contentType("index.html")).toBe("text/html; charset=utf-8");
     expect(contentType("app.woff2")).toBe("font/woff2");
+    expect(contentType("mico.webp")).toBe("image/webp");
+    expect(bundledRendererHeaders(path.join(root, "assets/mico.webp"), `${origin}/agent/assets/mico.webp`)
+      .get("content-type")).toBe("image/webp");
     expect(immutableRendererAsset(path.join(root, "assets/app-123.js"))).toBe(true);
     expect(immutableRendererAsset(path.join(root, "index.html"))).toBe(false);
   });
