@@ -56,6 +56,7 @@ try {
     assert.ok(geometry&&geometry.x>=20&&geometry.x+geometry.width<=width-20);
     assert.ok(geometry.y>=0&&geometry.y+geometry.height<=height);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight));
     await page.screenshot({path:path.join(output,name+'.png')});
   }
   await page.getByRole('button',{name:'Create account',exact:true}).click();

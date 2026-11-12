@@ -142,5 +142,5 @@ body {
   .oauth-consent h1 { font-size: 24px; }
 }
 @media (max-height: 560px) {
-  .oauth-consent { place-items: start center; }
+  .oauth-consent { place-items: start center; padding-block: 24px; }
 }
