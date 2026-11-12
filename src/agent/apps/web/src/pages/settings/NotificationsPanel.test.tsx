@@ -4,9 +4,10 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { notificationPreferences } from "../../lib/notification-preferences";
-const api = vi.hoisted(() => ({ status: vi.fn(), save: vi.fn(), show: vi.fn(), native: null as any }));
-vi.mock("../../lib/rpc", () => ({ rpc: { notifications: { webStatus: api.status, saveSettings: api.save } } }));
+const api = vi.hoisted(() => ({ status: vi.fn(), save: vi.fn(), show: vi.fn(), android: false, androidRequest: vi.fn(), androidStatus: vi.fn(), native: null as any }));
+vi.mock("../../lib/rpc", () => ({ rpc: { notifications: { webStatus: api.status, saveSettings: api.save, androidStatus: api.androidStatus } } }));
 vi.mock("../../lib/web-push", () => ({ enableWebPush: vi.fn(), isInstalledWebApp: () => false, notificationClientId: () => "client", pushSupported: () => false }));
+vi.mock("../../lib/android-host", () => ({ isAndroidHost: () => api.android, androidNotificationRequest: api.androidRequest }));
 vi.mock("../../lib/desktop", () => ({ desktopBridge: () => api.native }));
 vi.mock("../../lib/browser-notifications", () => ({ requestBrowserNotificationPermission: vi.fn(async () => "granted"), showSystemNotification: api.show }));
 vi.mock("./SoundSettings", () => ({ SoundSettings: () => <div>Sound controls</div> }));
@@ -20,7 +21,8 @@ const state = () => ({ configured: false, publicKey: null, registered: false,
   settings: { level: "all", previews: false, mutedUntil: null, bots: {} }, bots: [{ id: "mico", name: "Research", notifyOnFinish: true }] });
 let host: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); localStorage.clear(); vi.clearAllMocks(); api.native = null;
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); localStorage.clear(); vi.clearAllMocks(); api.native = null; api.android = false; api.androidStatus.mockResolvedValue({ configured: true });
+  api.androidRequest.mockResolvedValue({ supported: true, configured: true, registered: true, permission: "granted" });
   vi.stubGlobal("Notification", { permission: "granted" });
   api.status.mockResolvedValue(state()); api.save.mockImplementation(async value => value); api.show.mockResolvedValue(undefined);
   host = document.createElement("div"); document.body.append(host); root = createRoot(host);
@@ -85,4 +87,20 @@ it("serializes saves and disables conflicting controls until the server confirms
   await act(async () => finish({ ...state().settings, level: "needs_me" }));
   expect(button("If I’m needed", group).getAttribute("aria-pressed")).toBe("true");
   expect(button("All", group).disabled).toBe(false);
+});
+
+it("keeps native Android tests on the Firebase bridge instead of browser notifications", async () => {
+  api.android = true; await render();
+  await act(async () => button("Send test").click());
+  expect(api.androidRequest).toHaveBeenCalledWith("test", { accountId: "owner" });
+  expect(api.show).not.toHaveBeenCalled();
+  expect(host.textContent).toContain("Native Android alerts use Firebase");
+});
+it("requires native registration even when Android system permission is already granted", async () => {
+  api.android = true;
+  api.androidRequest.mockImplementation(async (type: string) => ({ supported: true, configured: true, registered: type === "enable", permission: "granted" }));
+  await render();
+  expect(button("Send test").disabled).toBe(true);
+  await act(async () => button("Enable notifications").click());
+  expect(api.androidRequest).toHaveBeenCalledWith("enable", { accountId: "owner" });
 });

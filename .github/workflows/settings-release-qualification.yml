@@ -1,0 +1,43 @@
+name: Settings release qualification
+on:
+  pull_request:
+    paths:
+      - "src/agent/apps/api/src/mico-settings.ts"
+      - "src/agent/packages/adapters/src/agent-new-chat.ts"
+      - "src/agent/packages/db/prisma/migrations/20261112180000_mico_preferences/**"
+      - "src/economy/welcome-credits.ts"
+      - "tests/managed-purchases.postgres.test.ts"
+      - ".github/workflows/settings-release-qualification.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: settings-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  postgres:
+    name: Mico policies and credit admission on PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "24.22.2"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/agent/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
+      - run: npm run db:generate --prefix src/agent
+      - name: Credit grants and preserved supplier funding limits
+        run: node scripts/test-referrals-postgres.mjs tests/managed-purchases.postgres.test.ts
+      - name: Additive Mico migration and account/Space authorization
+        working-directory: src/agent
+        run: node node_modules/tsx/dist/cli.mjs scripts/verify-mico-settings-db.ts
+      - name: Hosted app ownership and isolation
+        working-directory: src/agent
+        run: node node_modules/tsx/dist/cli.mjs scripts/verify-hosted-webs-db.ts

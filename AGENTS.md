@@ -344,3 +344,8 @@ These rules apply to the complete repository.
   It uses normal process priority inside the existing Windows Job; preserve the
   pre-import barrier, owner CPU/memory quotas and kill-on-job-close behavior.
   Check the launcher with `python tests/embedding_gpu_bootstrap_test.py`.
+
+- Settings release qualification uses `.github/workflows/settings-release-qualification.yml`
+  for the additive Mico migration, account/Space policy checks, hosted-app ownership
+  and welcome-credit idempotency on isolated PostgreSQL. It never targets production
+  databases or submits paid inference; keep the supplier funding-limit regressions.
