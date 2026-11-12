@@ -486,6 +486,8 @@
   web builds before claiming up-to-date; retain guards instead of forcing reloads.
   Do not mix animation demos/raw build details into ordinary update actions.
   Desktop update choices persist transactionally in update-preferences.json.
+  The renderer shows both installPending and relaunchPending update requests;
+  cancel the controller that owns the request and surface relaunchError for retry.
   Disabling automatic downloads checks metadata without fetching the installer.
   Idle restarts require both a fresh renderer acknowledgement and an idle native
   executor check, remain cancellable and never interrupt an update download.

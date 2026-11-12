@@ -8,9 +8,10 @@ const fixture = vi.hoisted(() => ({ state: {} as DesktopUpdateState, safe: true,
 const bridge = vi.hoisted(() => ({
   state: vi.fn(async () => ({ ...fixture.state })),
   check: vi.fn(async () => ({ ...fixture.state })),
-  install: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: true })),
+  install: vi.fn(async (): Promise<DesktopUpdateState> => (fixture.state = { ...fixture.state, installPending: true })),
   forceInstall: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: true, restartMode: "now" })),
   cancelInstall: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: false })),
+  cancelRestart: vi.fn(async () => (fixture.state = { ...fixture.state, relaunchPending: false, relaunchWaitingFor: undefined })),
   onPrepare: vi.fn(() => () => {}),
 }));
 vi.mock("../lib/desktop", () => ({ desktopBridge: () => ({ update: bridge }) }));
@@ -90,4 +91,28 @@ it("hands a package-manager update to the system installer instead of announcing
   expect(action.textContent).toBe("Open installer");
   await act(async () => action.click());
   expect(bridge.install).toHaveBeenCalledOnce();
+});
+
+it("shows an accepted idle restart and cancels its native controller", async () => {
+  bridge.install.mockImplementationOnce(async () => (fixture.state = { ...fixture.state,
+    relaunchPending: true, relaunchWaitingFor: "local_work", supportsForceRestart: true }));
+  await render();
+  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.click());
+  expect(host.textContent).toContain("Waiting for local tasks and unsaved work");
+  expect(host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.textContent).toBe("Restart now");
+  expect(bridge.forceInstall).not.toHaveBeenCalled();
+  await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "Cancel update")!.click());
+  expect(bridge.cancelRestart).toHaveBeenCalledOnce();
+  expect(bridge.cancelInstall).not.toHaveBeenCalled();
+  expect(host.textContent).not.toContain("Waiting for local tasks and unsaved work");
+});
+
+it("explains a renderer refusal and a failed native restart instead of staying silently ready", async () => {
+  fixture.state = { ...fixture.state, relaunchPending: true, relaunchWaitingFor: "unsaved_work" };
+  await render();
+  expect(host.textContent).toContain("Save changes or finish the call to restart.");
+  fixture.state = { ...fixture.state, relaunchPending: false, relaunchError: true };
+  await refresh();
+  expect(host.textContent).toContain("Could not complete the update. Try again.");
+  expect(host.querySelector('button[aria-label="Install update"]')?.hasAttribute("disabled")).toBe(false);
 });
