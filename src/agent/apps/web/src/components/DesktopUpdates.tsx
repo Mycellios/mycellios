@@ -13,6 +13,13 @@ function updateRequiresAttention(state: DesktopUpdateState | null) {
   return Boolean(state?.availableVersion && ["available", "downloading", "ready", "checking", "error"].includes(state.phase));
 }
 
+/** Both native restart controllers feed the same pending-update presentation. */
+function observedUpdateState(state: DesktopUpdateState): DesktopUpdateState {
+  if (state.phase !== "ready" || state.installPending || !state.relaunchPending) return state;
+  return { ...state, installPending: true, restartMode: "whenIdle",
+    waitingFor: state.relaunchWaitingFor === "unsaved_work" ? "unsaved_work" : "local_work" };
+}
+
 function useDesktopUpdates() {
   const { t } = useLingui();
   const bridge = desktopBridge()?.update;
@@ -37,7 +44,7 @@ function useDesktopUpdates() {
     async function refresh() {
       const started = revision.current;
       try {
-        const next = await bridge!.state();
+        const next = observedUpdateState(await bridge!.state());
         if (!stopped && started === revision.current) {
           setSafeToInterrupt(updateRequiresAttention(next) && canShowDesktopUpdate());
           setCallActive(desktopUpdateHasCall());
@@ -74,8 +81,10 @@ function useDesktopUpdates() {
     try {
       if (action === "download") void playUpdateMycelium(document.activeElement, "gather");
       if (action === "install" && canRestartDesktop()) await playUpdateMycelium(document.activeElement);
-      const next = await bridge[action]?.();
-      if (!next) return;
+      const method = action === "cancelInstall" && state?.relaunchPending ? "cancelRestart" : action;
+      const result = await bridge[method]?.();
+      if (!result) throw new Error("Update action is unavailable");
+      const next = observedUpdateState(result);
       setState(next);
       setSafeToInterrupt(updateRequiresAttention(next) && canShowDesktopUpdate());
       setCallActive(desktopUpdateHasCall());
@@ -96,7 +105,7 @@ function useDesktopUpdates() {
     }
   }
   const message = error ?? (
-    state?.handoffComplete
+    state?.relaunchError ? t`Could not complete the update. Try again.` : state?.handoffComplete
       ? t`Opened the system installer. Restart Mycellios when it finishes.`
       : state?.message === UPDATE_DISK_SPACE_MESSAGE
       ? t`Free at least 6 GB of disk space before restarting to update.`
