@@ -70,3 +70,15 @@ is replayed by reconnection. Local focused tests and incremental TypeScript pass
 installed acceptance and the exact local package receipt are recorded in
 src/agent/outputs/local-access-recovery-20261101/ACCEPTANCE.md. Do not count
 transport fixtures or historical Developer tests as a new successful chat run.
+
+## Approval continuations
+
+A saved human approval or takeover checkpoint continues its parent run without
+replaying the first native start. Worker and native host derive a stable segment
+identity from that opaque server checkpoint. The relay fences each segment once,
+refuses overlapping starts, and retains the original account, Space, bot, run and
+project bindings. Native segment receipts survive process recreation; legacy
+initial-run receipts keep their original names. Neither a new session ID nor a
+reconnection authorizes replay. Test initial start, approval continuation, repeated
+continuation, process recreation and the actual HTTP native-host callback path
+without paid inference or real external effects.

@@ -37,7 +37,7 @@ import {
 import { PendingRunActivity, RunActivityStatus } from "../../components/RunActivityStatus";
 import { RunExecutionDetails } from "../../components/RunExecutionDetails";
 import { VoiceChatCard } from "../../components/call/VoiceChatCard";
-import { AuthMushroom } from "../../components/AuthMushroom";
+import { TranscriptEmptyAvatar } from "./transcript-empty-avatar";
 import type { ArtifactTarget } from "../../lib/artifact-open";
 import { quoteDraftForSelection } from "../../lib/quote-selection";
 import { messageHasVisibleBlocks } from "../../lib/tool-activity-view";
@@ -62,6 +62,7 @@ export function bubbleFrameWidth(role: ThreadMessage["role"]) {
 
 export const Transcript = memo(function Transcript({
   headerTabs = false,
+  conversationBot,
   scrollRef,
   scrollRequest,
   onScrollRequestHandled,
@@ -104,6 +105,7 @@ export const Transcript = memo(function Transcript({
   onOpenImport,
 }: {
   headerTabs?: boolean;
+  conversationBot?: { id: string; color: string };
   scrollRef: RefObject<HTMLDivElement | null>;
   scrollRequest: { messageId: string; nonce: number } | null;
   onScrollRequestHandled: () => void;
@@ -518,7 +520,7 @@ export const Transcript = memo(function Transcript({
         ) : null}
         {reactionView.visibleMessages.length === 0 && !pendingMessages.length && !running && olderCursor == null ? (
           <div className="m-auto flex max-w-sm flex-col items-center gap-3 px-4 py-12 text-center">
-            <AuthMushroom />
+            <TranscriptEmptyAvatar bot={conversationBot} />
             <h2 className="font-display text-2xl tracking-tight">{t`What shall we work on?`}</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">{t`Start with a question, an idea, or something you want to get done.`}</p>
           </div>

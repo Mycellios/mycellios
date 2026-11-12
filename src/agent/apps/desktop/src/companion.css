@@ -13,16 +13,19 @@ body[data-auto-hide=true] .dock{opacity:.12;transform:translateX(80%)}body[data-
 body[data-expanded=true] .dock{transform:none!important;opacity:1!important}
 
 /* Question island: a compact black pill grows into the same focused reply surface. */
-.surface.island{background:#000;color:#f5f5f5;padding:0;border-radius:24px;overflow:hidden;display:block;box-shadow:none}
+.surface.island{background:#101714;color:#f7f6f2;padding:0;border-radius:16px;overflow:hidden;display:block;box-shadow:none;transition:border-radius 420ms cubic-bezier(.22,1,.36,1)}
 .island button:hover{transform:none;background:transparent}
 .island button:disabled{cursor:default;opacity:.5}
-.island button:focus-visible,.island input:focus-visible{outline:2px solid #8bd5e3;outline-offset:2px}
-.island-pill{width:100%;height:100%;min-height:0;padding:0 10px;gap:7px;justify-content:center;border-radius:24px}
-.island-avatar{width:22px;height:22px;object-fit:contain;flex-shrink:0}
-.island-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;min-width:0}
-.island-question-badge{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;padding:4px 7px;border-radius:14px;background:#0d2429;color:#8bd5e3;font-size:11px;font-weight:600}
-.island-question-badge svg{width:12px;height:12px}
-.island-idle-status{color:#a0a0a0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.island button:focus-visible,.island input:focus-visible{outline:2px solid #7cc9aa;outline-offset:2px}
+.island-pill{width:100%;height:100%;min-height:0;padding:0 6px;gap:8px;justify-content:space-between;border-radius:16px}
+.island-avatar{width:20px;height:20px;object-fit:contain;flex-shrink:0}
+.island-question-badge{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;color:#8bd5e3;font-size:11px;font-weight:500}
+.island-question-badge svg{width:16px;height:16px}
+.island-greeting{display:grid;place-items:center;width:20px;flex-shrink:0;font-size:16px;line-height:20px}
+.island-working{display:flex;align-items:center;justify-content:center;gap:2px;width:20px;height:20px;color:#a0a0a0}
+.island-working i{display:block;width:2px;height:8px;border-radius:2px;background:currentColor}
+.island-working i:nth-child(2){height:14px}
+@media(prefers-reduced-motion:no-preference){.island-working i{animation:island-working 1s ease-in-out infinite alternate}.island-working i:nth-child(2){animation-delay:160ms}.island-working i:nth-child(3){animation-delay:320ms}@keyframes island-working{to{transform:scaleY(.4);opacity:.6}}}
 .surface.island[data-open=true]{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;border-radius:26px;padding:28px 20px 18px;gap:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#333 #000}
 .island-identity{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
 .island-identity>.island-avatar{width:36px;height:36px}
@@ -52,3 +55,11 @@ body[data-expanded=true] .dock{transform:none!important;opacity:1!important}
 @media(prefers-reduced-motion:no-preference){.island-identity,.island-question-options,.island-answer-form{animation:island-question-in 160ms cubic-bezier(.22,1,.36,1) both}@keyframes island-question-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
 
 @media(max-width:430px){.island-question-footer{flex-wrap:wrap}.island-question-footer .island-question-count{flex-basis:100%;min-height:20px}.island-question-footer .island-later{margin-left:auto}}
+
+.island-pill:disabled { opacity:1; cursor:default; }
+
+.dock-grip{min-height:18px;width:100%;justify-content:center;opacity:.65;cursor:grab;touch-action:none;border-radius:8px}.dock-grip:hover{opacity:1}.dock-grip:active{cursor:grabbing}.bottom .dock-grip{width:18px;min-width:18px;align-self:stretch}
+
+#root{position:relative}#root[data-kind=dock]{padding-bottom:24px}#root[data-kind=dock] .dock-grip{position:absolute;bottom:5px;left:10px;right:10px;width:calc(100% - 20px);height:18px;background:var(--surface)}body[data-edge=bottom] #root[data-kind=dock]{padding-bottom:4px;padding-right:24px}body[data-edge=bottom] #root[data-kind=dock] .dock-grip{left:auto;right:5px;top:10px;bottom:10px;width:18px;height:calc(100% - 20px)}
+
+body[data-auto-hide=true] .dock-grip{opacity:0;pointer-events:none}body[data-expanded=true] .dock-grip{opacity:.65;pointer-events:auto}

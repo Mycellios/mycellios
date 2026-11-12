@@ -1,10 +1,21 @@
 const root = document.getElementById("root");
 const surface = document.createElement("div");
 const buttons = new Map();
+const grip = document.createElement("button"); grip.type = "button"; grip.className = "dock-grip"; grip.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="4" r="1"/><circle cx="11" cy="4" r="1"/><circle cx="5" cy="8" r="1"/><circle cx="11" cy="8" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="11" cy="12" r="1"/></svg>';
+grip.setAttribute("aria-label", "Move Mico dock"); grip.title = "Move Mico dock";
+let draggingDock = false;
+grip.onpointerdown = event => { if (event.button !== 0) return; event.preventDefault(); draggingDock = true; grip.setPointerCapture(event.pointerId); window.companion.dragDock?.("start"); };
+grip.onpointermove = () => { if (draggingDock) window.companion.dragDock?.("move"); };
+grip.onpointerup = () => { if (draggingDock) { draggingDock = false; window.companion.dragDock?.("end"); } };
+grip.onkeydown = event => { if (["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"].includes(event.key)) { event.preventDefault(); window.companion.dragDock?.(["ArrowUp", "ArrowLeft"].includes(event.key) ? "previous" : "next"); } };
+grip.onlostpointercapture = () => { if (draggingDock) { draggingDock = false; window.companion.dragDock?.("cancel"); } };
+grip.onpointercancel = () => { draggingDock = false; window.companion.dragDock?.("cancel"); };
+window.companion.onDockSaved?.(ok => { grip.title = ok ? "Move Mico dock" : "Could not save position. Try again."; grip.setAttribute("aria-label", grip.title); });
 root.append(surface);
 window.companion.onHover(shown => { document.body.dataset.expanded = String(shown); });
 window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
   document.body.dataset.theme = snapshot.theme;
+  root.dataset.kind = kind;
   for (const key of ["surface", "foreground", "hover", "muted"]) {
     if (snapshot.palette?.[key]) document.body.style.setProperty("--companion-" + key, snapshot.palette[key]);
     else document.body.style.removeProperty("--companion-" + key);
@@ -13,7 +24,7 @@ window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
   document.body.dataset.edge = prefs.dock.edge;
   document.body.dataset.strip = String(prefs.dock.edgeStrip);
   surface.className = "surface " + kind + (kind === "dock" && prefs.dock.edge === "bottom" ? " bottom" : "");
-  if (kind === "island") { renderIsland({ prefs, snapshot, expanded }); return; }
+  if (kind === "island") { grip.remove(); renderIsland({ prefs, snapshot, expanded }); return; }
   const agents = kind === "island" ? [...snapshot.agents].sort((a,b) => Number(b.working || b.unread) - Number(a.working || a.unread)).slice(0, 1) : snapshot.agents;
   const ids = new Set(agents.map(agent => agent.id));
   for (const [id, button] of buttons) if (!ids.has(id)) { button.remove(); buttons.delete(id); }
@@ -32,7 +43,7 @@ window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
     button.querySelector(".avatar").style.color = agent.color;
     const img = button.querySelector("img"), source = agent.avatar || "assets/icon.png";
     if (img.getAttribute("src") !== source) img.src = source;
-    const showCopy = kind === "island" || prefs.dock.results && prefs.dock.edge !== "bottom";
+    const showCopy = kind === "island" || prefs.dock.results && prefs.dock.edge !== "bottom" && Boolean(agent.result);
     let copy = button.querySelector(".copy");
     if (showCopy) {
       if (!copy) {
@@ -46,6 +57,7 @@ window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
     } else copy?.remove();
     if (surface.children[index] !== button) surface.insertBefore(button, surface.children[index] || null);
   });
+  if (grip.parentElement !== root) root.append(grip);
 });
 
 // No app preload or tokens: this window has only its bounded companion bridge.
@@ -73,6 +85,7 @@ function icon(kind) {
 }
 function islandAvatar(agent) {
   const img = el("img", "island-avatar"); img.alt = "";
+  img.onerror = () => { img.onerror = null; img.src = "assets/icon.png"; };
   img.src = agent.avatar || "assets/icon.png"; return img;
 }
 function promptDraft(prompt) {
@@ -96,7 +109,7 @@ function renderIsland(payload) {
   const active = prompts.find(prompt => prompt.id === islandPrompt) || prompts[0];
   if (active?.id !== islandPrompt) { islandPrompt = active?.id; sendError = false; }
   const agent = snapshot.agents.find(agent => agent.id === active?.botId) ||
-    snapshot.agents.find(agent => agent.working || agent.unread) || snapshot.agents[0];
+    snapshot.agents.find(agent => agent.working || agent.unread) || snapshot.agents[0] || { id: "", name: "Mycellios", status: "", working: false, unread: false };
   const labels = snapshot.labels || { questions: "Preguntas", asks: "pregunta", later: "Más tarde", open: "Responder en Mycellios",
     placeholder: "O escribe tu propia respuesta", more: "solicitudes más", send: "Enviar respuesta", error: "No se pudo confirmar la respuesta. Abre el chat antes de reintentar.", next: "Siguiente" };
   const signature = JSON.stringify([snapshot.scope, active, agent, expanded, prompts.map(prompt => prompt.id), labels, sending, sendError, questionPages.get(active?.id)]);
@@ -109,9 +122,23 @@ function renderIsland(payload) {
   if (!expanded || !active) {
     const pill = el("button", "island-pill"); pill.type = "button";
     pill.setAttribute("aria-expanded", "false");
-    pill.append(islandAvatar(agent), el("span", "island-name", agent.name));
-    if (active) { const badge = el("span", "island-question-badge"); badge.append(icon("question"), el("span", "", labels.questions)); pill.append(badge); }
-    else pill.append(el("span", "island-idle-status", agent.status));
+    const idle = !active && !agent.working && !agent.unread;
+    const description = idle ? "Mycellios · 👋" : agent.name + " · " + (active ? labels.questions : agent.status);
+    pill.title = description; pill.setAttribute("aria-label", description);
+    pill.append(islandAvatar(idle ? { ...agent, avatar: undefined } : agent));
+    pill.disabled = !agent.id;
+    if (active) {
+      const badge = el("span", "island-question-badge"); badge.setAttribute("aria-hidden", "true");
+      badge.append(icon("question"));
+      if (prompts.length > 1) badge.append(el("span", "island-question-total", String(prompts.length)));
+      pill.append(badge);
+    } else if (agent.working) {
+      const activity = el("span", "island-working"); activity.setAttribute("aria-hidden", "true");
+      activity.append(el("i"), el("i"), el("i")); pill.append(activity);
+    } else {
+      const greeting = el("span", "island-greeting", agent.unread ? "•" : "👋");
+      greeting.setAttribute("aria-hidden", "true"); pill.append(greeting);
+    }
     pill.onclick = () => active ? window.companion.expand(true) : window.companion.select(agent.id);
     surface.append(pill); return;
   }

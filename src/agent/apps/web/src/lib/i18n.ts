@@ -2,7 +2,7 @@ import type { I18n } from "@lingui/core";
 import { i18n } from "@lingui/core";
 import { applyUiDirection } from "./apply-ui-direction";
 import { importChunk } from "./preload-recovery";
-import { persistUiLocale, resolveUiLocale, type UiLocale } from "./ui-locale";
+import { persistUiLocale, readUiLocalePreference, resolveSystemUiLocale, resolveUiLocale, type UiLocale, type UiLocalePreference } from "./ui-locale";
 import { visibleText } from "./visible-text";
 
 const guardedTranslations = new WeakSet<I18n>();
@@ -51,12 +51,14 @@ const defaultCatalogLoaders: Record<UiLocale, CatalogLoader> = {
 let catalogLoaders: Record<UiLocale, CatalogLoader> = defaultCatalogLoaders;
 let activeLocale: UiLocale | null = null;
 let activationGeneration = 0;
+let preferenceOverride: UiLocalePreference | undefined;
 
 /** Test-only: replace catalog loaders (restore with `null`). */
 export function setCatalogLoadersForTests(loaders: Record<UiLocale, CatalogLoader> | null): void {
   catalogLoaders = loaders ?? defaultCatalogLoaders;
   activeLocale = null;
   activationGeneration = 0;
+  preferenceOverride = undefined;
 }
 
 export function getActiveUiLocale(): UiLocale {
@@ -112,14 +114,22 @@ export async function bootstrapI18n(preferred: UiLocale = resolveUiLocale()): Pr
   return activateUiLocale(preferred);
 }
 
-export async function setUiLocale(locale: UiLocale): Promise<UiLocale> {
+export async function setUiLocale(locale: UiLocalePreference): Promise<UiLocale> {
+  preferenceOverride = locale;
   persistUiLocale(locale);
-  const activation = activateUiLocale(locale);
+  const activation = activateUiLocale(locale === "system" ? resolveSystemUiLocale() : locale);
   const generation = activationGeneration;
   const activated = await activation;
   // Only rewrite storage on fallback when this call is still the latest selection.
-  if (generation === activationGeneration && activated !== locale) {
+  if (generation === activationGeneration && locale !== "system" && activated !== locale) {
+    preferenceOverride = activated;
     persistUiLocale(activated);
   }
   return activated;
+}
+
+/** Device language changes must never override an explicit manual choice. */
+export async function syncSystemUiLocale(): Promise<UiLocale> {
+  return (preferenceOverride ?? readUiLocalePreference()) === "system"
+    ? activateUiLocale(resolveSystemUiLocale()) : getActiveUiLocale();
 }

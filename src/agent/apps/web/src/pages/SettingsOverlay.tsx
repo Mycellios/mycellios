@@ -1,5 +1,6 @@
 import "./settings/settings.css";
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
+import { ProfileOverview } from "./settings/ProfileOverview";
+import { Disclosure, ExpandedSettings } from "@rakazo/ui-web/components/ui/disclosure";
 import { DesktopCompanionsPanel } from "./settings/DesktopCompanionsPanel";
 import { desktopBridge } from "../lib/desktop";
 import { useLingui } from "@lingui/react/macro";
@@ -34,9 +35,8 @@ import {
   CloudDownload,
   Cpu,
   CreditCard,
-  Gauge,
   ListChecks,
-  Monitor,
+  MousePointer2,
   Search,
   Settings,
   ShieldCheck,
@@ -168,27 +168,25 @@ export function SettingsOverlay({
   const usageRef = useRef<HTMLDivElement>(null);
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [voiceBusy, setVoiceBusy] = useState(false);
+  const [localVoiceBusy, setLocalVoiceBusy] = useState(false);
   const [notificationBusy, setNotificationBusy] = useState(false);
   const [formState, setFormState] = useState({ busy: false, dirty: false });
   const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null);
   const [search, setSearch] = useState("");
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [voiceServicesOpen, setVoiceServicesOpen] = useState(false);
   const userId = useQueryUserId();
   const [, setKeepComputerRecovery] = useState(false);
   const recoveryHoldTimer = useRef<number | undefined>(undefined);
   const showComputer = true;
   const showUpdates = true;
-  // A section that isn't available yet (billing before its flag loads) shows General until it is.
+  // Keep unavailable device/developer sections out; Billing explains disabled payments in place.
   const section =
     (requestedSection === "logs" && !developerMode) ||
     (requestedSection === "computer" && !showComputer) ||
-    (requestedSection === "billing" && !billingEnabled) ||
     (requestedSection === "updates" && !showUpdates)
       ? "general"
-      : requestedSection;
+      : requestedSection === "usage" ? "profile" : requestedSection;
   const [companionBusy, setCompanionBusy] = useState(false);
-  const panelBusy = memoryBusy || voiceBusy || notificationBusy || companionBusy || formState.busy;
+  const panelBusy = memoryBusy || voiceBusy || localVoiceBusy || notificationBusy || companionBusy || formState.busy;
   const serverSettings = spaceSettingsSections.has(section);
   const spaceScoped = serverSettings || accountSectionsWithSpaceData.has(section);
   const overrideSetting =
@@ -256,11 +254,11 @@ export function SettingsOverlay({
   useEffect(() => () => window.clearTimeout(recoveryHoldTimer.current), []);
 
   useEffect(() => {
-    if (section === "usage") {
+    if (section === "profile") {
       onUsageOpen();
-      usageRef.current?.focus();
+      if (requestedSection === "usage") usageRef.current?.focus();
     }
-  }, [section, onUsageOpen]);
+  }, [section, requestedSection, onUsageOpen]);
 
   const settingsTitle = serverSettings ? t`Space settings` : t`Your settings`;
   const navItems: NavItem[] = serverSettings ? [
@@ -277,16 +275,16 @@ export function SettingsOverlay({
     { id: "models", label: t`Models`, icon: Cpu },
     { id: "notifications", label: t`Notifications`, icon: Bell },
     { id: "voice", label: t`Voice`, icon: Volume2 },
-    ...(desktopBridge() ? [{ id: "dynamic-island" as const, label: t`Dynamic Island`, icon: PanelTop }, { id: "agent-dock" as const, label: t`Mico dock`, icon: PanelRight }] : []),
+    { id: "dynamic-island" as const, label: t`Mycellios Island`, icon: PanelTop },
+    { id: "agent-dock" as const, label: t`Mico dock`, icon: PanelRight },
     { id: "confirmations", label: t`Approvals`, icon: ShieldCheck },
-    { id: "usage", label: t`Usage`, icon: Gauge },
     ...(developerMode ? [{ id: "logs" as const, label: t`Logs`, icon: ListChecks }] : []),
-    ...(showComputer ? [{ id: "computer" as const, label: t`Computer use`, icon: Monitor }] : []),
-    ...(billingEnabled ? [{ id: "billing" as const, label: t`Billing`, icon: CreditCard }] : []),
+    ...(showComputer ? [{ id: "computer" as const, label: t`Computer use`, icon: MousePointer2 }] : []),
+    { id: "billing" as const, label: t`Billing`, icon: CreditCard },
     { id: "mobile", label: t`Mobile connection`, icon: Smartphone },
     ...(showUpdates ? [{ id: "updates" as const, label: t`Updates`, icon: CloudDownload }] : []),
   ];
-  const extraSections = new Set<SettingsSection>(serverSettings ? [] : ["models", "confirmations", "usage", "logs"]);
+  const extraSections = new Set<SettingsSection>(serverSettings ? [] : ["models", "confirmations", "logs"]);
   const visibleItems = navItems.filter((item) =>
     settingsMatch({ ...item, keywords: settingsKeywords[item.id] }, search),
   );
@@ -350,9 +348,6 @@ export function SettingsOverlay({
     const row = rows.find(row => settingsMatch({ label: row.textContent ?? "" }, search));
     if (!row) return;
     row.setAttribute("data-settings-match", "");
-    const fold = row.closest('[data-slot="disclosure"]');
-    const trigger = fold?.querySelector<HTMLButtonElement>('[data-slot="collapsible-trigger"]');
-    if (trigger?.getAttribute("aria-expanded") === "false") trigger.click();
     const frame = requestAnimationFrame(() => row.scrollIntoView?.({ block: "center", behavior: "instant" }));
     return () => { cancelAnimationFrame(frame); row.removeAttribute("data-settings-match"); };
   }, [search, section, panelBusy]);
@@ -397,7 +392,7 @@ export function SettingsOverlay({
   }
 
   return (
-    <Dialog
+    <ExpandedSettings><Dialog
       open
       onOpenChange={(open, details) => {
         if (open) return;
@@ -416,7 +411,7 @@ export function SettingsOverlay({
         data-settings-scope={serverSettings ? "space" : "account"}
         showCloseButton={false}
         initialFocus={() =>
-          section === "usage" ? (usageRef.current ?? panelRef.current) : panelRef.current
+          requestedSection === "usage" ? (usageRef.current ?? panelRef.current) : panelRef.current
         }
         className="inset-0 top-0 left-0 flex h-dvh max-h-none w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none bg-background p-0 pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] ring-0 sm:max-w-none data-open:animate-none data-closed:animate-none"
       >
@@ -475,12 +470,7 @@ export function SettingsOverlay({
                 className="flex min-h-0 min-w-0 flex-1 flex-row gap-1 overflow-x-auto py-2 md:h-full md:w-full md:flex-col md:overflow-y-auto md:px-3"
               >
                 {visibleItems.filter(item => !extraSections.has(item.id)).map(renderNavItem)}
-                {visibleItems.some(item => extraSections.has(item.id)) && <Disclosure
-                  summary={t`More settings`} className="rk-settings-nav-more"
-                  open={moreOpen || extraSections.has(section) || Boolean(search.trim())}
-                  onOpenChange={setMoreOpen} summaryClassName="w-full px-2.5 py-2 text-[13px] text-muted-foreground">
-                  {visibleItems.filter(item => extraSections.has(item.id)).map(renderNavItem)}
-                </Disclosure>}
+                {visibleItems.filter(item => extraSections.has(item.id)).map(renderNavItem)}
                 {!visibleItems.length ? (
                   <p
                     role="status"
@@ -554,6 +544,10 @@ export function SettingsOverlay({
                   <GeneralSettingsPanels
                     key={section}
                     mode={section === "profile" ? "profile" : "general"}
+                    accountId={userId ?? undefined}
+                    profileOverview={(edit, busy) => <SpaceRpcProvider key={JSON.stringify([userId,space?.id ?? currentSpaceId])} spaceId={space?.id ?? currentSpaceId}>
+                      <ProfileOverview name={name} accountId={userId ?? ""} bots={shownBots} timezone={timezone} onEdit={edit} disabled={busy} />
+                    </SpaceRpcProvider>}
                     onFormStateChange={setFormState}
                     email={email}
                     name={name}
@@ -568,7 +562,7 @@ export function SettingsOverlay({
                   />
                 ) : null}
                 {section === "agent-dock" && botsBlocked ? botsReadState : (section === "dynamic-island" || section === "agent-dock") && <DesktopCompanionsPanel
-                  key={section} kind={section === "agent-dock" ? "dock" : "island"} bots={shownBots} onBusyChange={setCompanionBusy} />}
+                  key={section} kind={section === "agent-dock" ? "dock" : "island"} bots={shownBots} accountId={userId ?? undefined} spaces={spaces} currentSpaceId={currentSpaceId} onBusyChange={setCompanionBusy} />}
                 {section === "agents" && botsBlocked ? (
                   botsReadState
                 ) : section === "agents" ? (
@@ -615,12 +609,17 @@ export function SettingsOverlay({
                   <McpServersOverlay embedded onClose={requestClose} />
                 ) : null}
                 {section === "confirmations" ? <ApprovalRulesSettings scope="account" /> : null}
-                {section === "usage" ? (
-                  <UsageSettingsPanel usage={usage} panelRef={usageRef} />
+                {section === "profile" ? (
+                  <Disclosure summary={t`Usage and costs`} className="rk-settings-details mt-6">
+                    <SpaceRpcProvider key={JSON.stringify([userId,space?.id ?? currentSpaceId])} spaceId={space?.id ?? currentSpaceId}>
+                      <UsageSettingsPanel usage={usage} panelRef={usageRef} />
+                    </SpaceRpcProvider>
+                  </Disclosure>
                 ) : null}
                 {section === "logs" ? <RunLogsSettingsPanel /> : null}
                 {section === "computer" && showComputer ? (
                   <div className="space-y-4"><ComputerSettingsPanel
+                    showTechnicalDetails={developerMode}
                     sandboxProvider={sandboxProvider}
                     onSandboxProviderChange={(next) => {
                       onSandboxProviderChange?.(next);
@@ -629,7 +628,7 @@ export function SettingsOverlay({
                     onRecoveryDismissed={releaseComputerRecovery}
                   /><div className="rk-settings-shortcuts"><Button variant="outline" size="sm" onClick={() => leaveSettings(() => onSectionChange("confirmations"))}>{t`Manage approvals`}</Button></div></div>
                 ) : null}
-                {section === "billing" && billingEnabled ? <div className="space-y-4"><BillingSettingsPanel /><div className="rk-settings-shortcuts"><Button variant="outline" size="sm" onClick={() => leaveSettings(() => onSectionChange("usage"))}>{t`View usage`}</Button></div></div> : null}
+                {section === "billing" ? <div className="space-y-4"><BillingSettingsPanel enabled={billingEnabled} /><div className="rk-settings-shortcuts"><Button variant="outline" size="sm" onClick={() => leaveSettings(() => onSectionChange("usage"))}>{t`View usage`}</Button></div></div> : null}
                 {section === "updates" && showUpdates ? (
                   <UpdatesPanel
                     onWhatsNew={onWhatsNew ? () => leaveSettings(onWhatsNew) : undefined}
@@ -666,13 +665,11 @@ export function SettingsOverlay({
                 ) : null}
                 {section === "voice" ? (
                   <>
-                    <VoiceEntryPanel accountId={userId ?? undefined} previewBotId={shownBots[0]?.id}
+                    <VoiceEntryPanel onBusyChange={setLocalVoiceBusy} accountId={userId ?? undefined} previewBotId={shownBots[0]?.id}
                       onModels={() => leaveSettings(() => onSectionChange("models"))}
                       spaceId={space?.id ?? currentSpaceId}
                       onOpen={onOpenVoice ? () => leaveSettings(onOpenVoice) : undefined} />
                     <Disclosure summary={t`Connected voice services`} className="rk-settings-details"
-                      open={voiceServicesOpen || formState.dirty || voiceBusy}
-                      onOpenChange={next => { if (!voiceBusy && !formState.dirty) setVoiceServicesOpen(next); }}
                       summaryClassName="w-full py-3 text-sm font-medium">
                     <VoiceSettingsOverlay
                       onFormStateChange={setFormState}
@@ -714,6 +711,6 @@ export function SettingsOverlay({
           </AlertDialogContent>
         </AlertDialog>
       </DialogContent>
-    </Dialog>
+    </Dialog></ExpandedSettings>
   );
 }

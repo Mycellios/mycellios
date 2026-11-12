@@ -1994,3 +1994,211 @@ The changes are local on `codex/mico-workflow-concurrency-20261105`, based on
 main `6420234`; no commit, push, shared migration or deployment is implied.
 Evidence is retained in `outputs/mico-workflows-acceptance-20261105/` in Daniel's
 workspace. Other agents' original checkouts and changes were retained.
+
+
+## Mycellios creation controls and account-safe proxy (local, 2026-11-12)
+
+The creation UI keeps its existing layout and adds modality-specific advertised
+voice/duration controls, bounded batch/rerank/text-evaluation inputs and local PCM
+preparation. Media RPC credit/recovery operations now require the loaded viewer;
+uncertain requests retain their original key and use status only. Explicit free
+and paid confirmation remain separate from recharge checkout.
+
+The 16 creation/proxy tests and API/web incremental typing passed locally through
+the shared scheduler. The real component was rendered at 1280x1000 and 390x844 on
+localhost5192 with catalog/quote-only intercepted RPC fixtures. No execute,
+checkout, page error or horizontal overflow occurred. This qualifies the local
+surface, not live generation or billing. The native managed coordinator remains
+in the separate english-catalog task checkout and was NOT overlaid here. No
+API/worker restart, active DB migration, keys/flags, real payment, inference,
+production deployment, commit or push was performed. Hifa and Cadencia changes
+remain intact. Evidence and recoverable pre-change files are under the
+abierta-y-conectada-al-stack-local task outputs.
+
+
+## Collapsible Marketplace navigation (local, 2026-11-12)
+
+Marketplace has one persistent header toggle on desktop and mobile. Collapsing
+hides only its menu and releases the full sidebar width; the selected page/app
+stays mounted. A device-local preference restores the choice when reopening the
+Marketplace. The same button remains focused for keyboard use; Back to chat and
+native caption-control clearance remain available. New labels are translated in
+English and Spanish.
+
+Three focused behavior tests passed (draft/mount/focus preservation, preference
+reopening and blocked browser storage), and incremental web typing passed through
+compilar.ps1. A real browser rendered the production Marketplace/HostedWebs
+components at 1280x900 and 390x844 with read-only synthetic catalog/cover RPCs:
+280 pixels were released on desktop, reload preserved the collapsed choice,
+keyboard and mobile toggles worked, and no page errors or horizontal overflow
+occurred. The design detector returned no findings. Evidence is in the task
+outputs: marketplace-collapse-proof.json and marketplace-collapsed desktop/mobile
+screenshots. No live account/app data, payments, server restart, release build,
+commit, push or deployment was involved. Native physical window qualification
+and complete suites were not run for this scoped UI change.
+
+
+## Creator-owned covers inside apps (local, 2026-11-12)
+
+Catalog cover edit controls were removed. Community app creators now open their
+app editor and choose Carátula to upload a raster image or explicitly request an
+image from an assigned Mico. Applying a candidate changes only the private draft;
+Save and explicit Publish retain the existing CAS and ownership boundaries. One
+validated reserved raster asset is included in the immutable published bundle.
+The public catalog returns only its fixed path and revision, so other accounts
+see the published cover without accessing private artifact IDs or draft source.
+Built-in apps expose no user cover editor; historical personal cover artifacts
+remain private and their history is preserved. Legacy appCovers.set now requires
+the app's creator and Space both before replay/upload and within the transaction.
+
+36 focused tests passed across cover authorization/storage, bundle admission,
+cover generation/apply UI, editor synchronization and Store integration; API/web
+incremental types passed. The real isolated PostgreSQL hosted-web verifier passed
+11 checks, including non-owner/cross-Space denial, encrypted drafts, immutable
+public covers, deferred draft changes, revision-pinned static delivery and
+withdrawal/deletion. Its runtime role had no superuser or RLS bypass privilege.
+The actual Store/editor/cover components were checked in a browser with synthetic
+RPCs: no catalog edit controls, the creator can apply/save inside the editor,
+no automatic publication or personal-cover save occurs, and another account
+sees no Edit or Carátula control. No page errors occurred; design detector had no
+findings. The subsequent shared-header change was preserved, duplicate line
+endings normalized without dropping content, and web types/browser flow passed
+again on that combined source.
+
+The visual server was recovered on 5192 after it stopped. Before reloading the
+local API, a read-only activity check confirmed no running/queued runs and zero
+locked worker jobs. The existing local backend's SIGTERM handler was invoked for
+a graceful shutdown, then the same project-local launcher restarted it. API and
+worker readiness returned healthy. A post-restart read confirmed the same
+1 user, 1 Space, 5 Micos, 29 messages, 3 artifacts and 24 runs, including all
+3 waiting_input conversations. No debugger listener remains. The updated
+permission checks and cover projection are loaded in the local backend.
+
+Receipts/capture: task outputs author-app-cover-ui-proof.json,
+author-app-cover-desktop.png, author-cover-local-restart-proof.json, and the
+Agent outputs/hosted-webs-db-receipt.json. All accounts/app data used by behavioral
+checks were synthetic and isolated. No user app was published, no paid model or
+payment was run, no live/production schema migration, commit, push, release build
+or deployment occurred. Full suites and physical multi-device acceptance were
+not run for this scoped feature.
+
+
+## Cadencia simplified editor (local, 2026-11-12)
+
+The loaded view now uses one preview column, time saved and one Create/Download
+flow. Cut review and waveform are inside Revisar cortes, closed initially; codec
+and detection options remain under Más ajustes. Selecting a cut reveals its
+Original/Con el corte audition controls. Exact bounds are inside Ajustar este
+corte, displayed in seconds at 0.001-second precision. Original/Edited comparison
+appears only after rendering. Vowels still require explicit individual opt-in;
+file/account scoping, source preservation, validation, cancellation and result
+invalidation remain intact. The existing shared Hifa header was preserved.
+
+20 focused Cadencia tests passed across signal/state, close/cleanup, audition,
+export blocking and the new seconds-precision control. Incremental web typing
+passed. Actual production components were checked in a browser at 1280x1000 and
+390x844 with read-only synthetic Store RPCs. The real local demo imported and ran
+its DSP worker; review/waveform were initially hidden, mobile had no horizontal
+overflow, auditioning the possible vowel left it unselected, manual opt-in and
+precise time editing worked, and Original/Edited toggling remained available.
+The actual downloaded MP4 was re-imported successfully. No page errors occurred;
+the design detector returned no findings.
+
+The independent media verifier inspected the actual files: original 10.88 s,
+export 7.722667 s after explicitly opting into all five demo cuts, both 640x360
+with 48 kHz audio, retained audio/video tracks and A/V end difference about 23 ms.
+Default selection still preserves the possible vowel and proposes four pauses;
+the all-cuts export is a test choice, not a new automatic default. Evidence is
+in task outputs cadencia-simple-browser-proof.json, cadencia-simple-desktop.png,
+cadencia-simple-mobile.png and the actual original/edited MP4s; the independent
+receipt is Agent outputs/cadencia-export-receipt.json.
+
+No real user file, recording, cloud upload, paid inference, account mutation,
+server restart, commit/push, production deployment or release build was involved.
+Full suites, physical microphone/device acceptance and word-level accuracy were
+not run or claimed; the demo remains synthesized media.
+
+## Notification delivery and cross-platform qualification (2026-11-12)
+
+Source changes are local and uncommitted; no release, production migration, installer update or mobile distribution was performed.
+
+- Reviewed nightly-labs/openbot at cf722a157dccbaa8ba18e0f49444eb07ce7e92d0: native desktop retention/clicks and OS settings, account/agent levels, APNs/FCM mobile registrations and foreground policy. Mycellios reuses its existing Electron, Web Push and Expo adapters; this is not a claim of identical sealed mobile transport or cross-device delivery acknowledgement.
+- Added bounded native-main Desktop delivery, internal-chat click validation, account/window cleanup, fixed OS settings links and the stable Windows installer identity. Older Desktop builds keep browser delivery. Native binaries were not rebuilt or physically qualified.
+- Web enrollment now checks the real subscription and VAPID identity, reconciles periodically, falls back to local delivery after failures, rotates unowned subscriptions and supplies expected account identity. Account filtering and preview privacy now apply to native mobile as well as Web Push.
+- The additive mobile_push_devices migration preserves legacy rows and supports up to 20 encrypted mobile registrations per account. Unsubscribe revokes only the current session. API and worker must be released together. The developer database has not been migrated or restarted for this task.
+- Mobile boot/resume never requests permission; settings provides explicit opt-in on iOS and Android. Android initializes the stable channel. Async registration pins its original session and endpoint. Configuration failures are visible on an explicit request.
+- Actual isolated PostgreSQL testing exposed a pre-existing non-UTC session comparison bug. Native and web push session checks now compare UTC timestamp fields explicitly in UTC. The qualification script applies the actual feature migrations with a non-superuser, non-bypass runtime role in Europe/Paris, verifies Web Push registration/presence/renewal/expiry and passes 9 session/multi-device/RLS tests.
+- Affected offline tests: 138 unique tests passed (including mobile settings, explicit sign-out and worker-binding cleanup). The broader 31-test authorization suite was discovered but skipped without its full database harness. Full CI, full suites, release builds and device delivery are NOT RUN.
+- The local browser shows the new Spanish notification settings and accepted a synthetic test request; that is not proof of an OS banner or phone delivery. Local VAPID background push is not configured. No phone was connected through ADB. The separate native Android WebView host still lacks background push; the UI states this and directs users to the installed PWA. Native mobile distribution still requires an owned Expo project plus Apple/Google credentials. macOS/Linux/iOS/Android physical delivery remains unverified.
+
+Evidence: outputs/notifications-openbot in the task workspace. No subscription endpoints, bearer tokens or notification content were logged as evidence.
+## Local Desktop approval continuation qualification
+
+Approval/takeover checkpoint continuations retain their parent run and project
+identity while using a stable checkpoint hash for relay fencing and native
+receipts. Two new regressions reproduced the former duplicate-start rejection;
+48 focused relay/runtime/engine/API tests pass after the fix, including the real
+HTTP native host with a fixture engine. The Desktop build passes and the local
+native app and API/worker were restarted with the same profile and database;
+authenticated relay polling and readiness were checked. Existing waiting chats
+and messages remain present. No paid inference, failed-turn replay or production
+deployment was performed; this is not a live-provider approval acceptance claim.
+
+## Cadencia compact editor local qualification
+
+The loaded editor groups the file toolbar, preview and editing/export panel in
+one bounded workspace. Container width selects two columns or a stacked layout;
+cut rows are left aligned and expose audition/precise bounds only on selection.
+Waveform and detection details remain folded. Four affected UI tests and web
+incremental types pass; the layout detector reports no findings. Browser checks
+at 1280 and 390 pixels exercised the actual synthetic-demo import, acoustic
+analysis, explicit vowel opt-in, 0.001-second editing, render, A/B, real download
+and re-import (640x360; 7.722667 seconds with the demo vowel explicitly selected).
+No external media processing, paid provider call or deployment was used.
+
+## Managed AntSeed provider - local preparation, 2026-11-12
+
+The active local-unified checkout includes the opt-in managed purchase/wallet
+boundary and an AntSeed text backend behind the Mycellios provider. AntSeed is
+the default selected upstream; OpenRouter needs explicit operator selection.
+The adapter uses the operator's dedicated buyer sidecar, pinned seller/service/
+provider, authenticated price caps and attributed spend; no customer BYOK
+credential is used. Quotes reserve the existing shared Credits wallet and settle
+actual attributed USDC cost plus configured supplier funding costs and 4 percent.
+Late signed receipts have account-scoped, idempotent, GET-only recovery, including
+when retrying the same compatible chat. Source/control secrets stay server-side.
+
+Validation status: incremental native types passed; isolated PostgreSQL 17.11
+wallet/referral suites passed 54 tests in two files. These include AntSeed's
+one-promotional-Credit flow, actual signed-spend fixture plus 4 percent, overdraft
+rejection before inference, idempotent replay, late receipt recovery after service
+recreation, and recovery by retrying the same chat. The complementary six-file
+managed unit batch remains QUEUED for local resources, not passed yet. The existing
+Agent connection/catalog/adapter/UI selection checks passed 65 tests before this
+AntSeed adapter change. Remote offload was unavailable; it is not validation
+evidence. The local runtime has no active operator AntSeed
+buyer at ports 8377/8379 and no managed flags or keys were activated. Existing
+AntSeed configuration location is awaiting Daniel's information. No real paid
+inference, user database migration, commit, push, merge or deployment occurred.
+General AntSeed image/audio/video contracts remain unqualified by the text
+adapter; they cannot silently use OpenRouter. See specs/managed-provider/spec.md.
+
+## Detached island capsule - local validation, 2026-11-12
+
+The native companion now uses a 212 x 32 px black capsule at default settings,
+with the real Mico avatar at the leading edge and an idle greeting, activity or
+question indicator at the trailing edge. Names/status remain in the accessible
+label and expanded question panel. Companion avatar rasterization excludes
+ornamental SVG rings and embeds bounded same-origin sprite images, fixing blank
+or incomplete native thumbnails. Native avatar error fallback stays local.
+
+Validation: 17 affected companion/IPC/publisher tests passed; incremental web
+types and the Desktop build passed. A real browser exercised production companion
+DOM/CSS for idle/working/questions (212 x 32 in all three), expansion and Later,
+and rasterized four real avatar variants with visible colored pixels and no
+page errors. The rebuilt companion CSS/JS hashes match their source files.
+The normal local Dev launcher started the app with the preserved profile; the
+Mycellios Island native window was observed (PID 46192), width/height preferences
+remain 100 percent. Windows Computer Use capture was unavailable, so the visual
+captures are browser-renderer evidence, not a physical desktop screenshot.
+No production deployment, paid inference or saved permission answer occurred.

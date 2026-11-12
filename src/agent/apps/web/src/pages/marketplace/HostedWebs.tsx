@@ -1,7 +1,7 @@
+import { StoreAppHeader } from "./StoreAppHeader";
 import type { Bot, HostedWebCard, HostedWebDraft } from "@rakazo/contracts";
-import { Button, Input } from "@rakazo/ui-web";
+import { Button, Input, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@rakazo/ui-web";
 import {
-  ArrowLeft,
   ArrowUpRight,
   Code2,
   Copy,
@@ -9,6 +9,8 @@ import {
   Globe2,
   Pin,
   Plus,
+  MoreHorizontal,
+  Waves,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -20,6 +22,7 @@ import {
 } from "../../lib/hosted-web-editor-state";
 import { createSpaceRpc, selectedSpaceId } from "../../lib/rpc";
 import "./hosted-webs.css";
+import { StoreAppCard } from "./StoreAppCard";
 import { FirstPartyApps, matchingFirstPartyApps } from "./FirstPartyApps";
 import { WebEditor } from "./HostedWebEditor";
 import { encode, issue, publishedWebPath } from "./hosted-web-files";
@@ -165,7 +168,7 @@ export function HostedWebs({
       }
     });
   if (params.get("app") === "video-edit") return <Suspense fallback={<p role="status">Abriendo editor…</p>}><VideoEditor onBack={() => openTool()} /></Suspense>;
-  if (params.get("app") === "create") return <Suspense fallback={<p role="status">Abriendo creación…</p>}><MycelliosCreate onBack={() => openTool()} /></Suspense>;
+  if (["create", "ai-studio"].includes(params.get("app") ?? "")) return <Suspense fallback={<p role="status">Abriendo creación…</p>}><MycelliosCreate onBack={() => openTool()} /></Suspense>;
   if (params.get("app") === "cadencia")
     return (
       <Suspense
@@ -208,17 +211,10 @@ export function HostedWebs({
     <section className="hw-directory" aria-labelledby="webs-title">
       {open ? (
         <>
-          <header className="hw-view-bar">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setOpen(null);
-                setRefresh((value) => value + 1);
-              }}
-            >
-              <ArrowLeft /> Hifa Store
-            </Button>
-            <strong>{open.title}</strong>
+          <StoreAppHeader title={open.title} onBack={() => {
+            setOpen(null);
+            setRefresh((value) => value + 1);
+          }}>
             <div className="hw-actions">
               <Button
                 variant="secondary"
@@ -249,7 +245,7 @@ export function HostedWebs({
                 <ArrowUpRight /> Abrir web
               </Button>
             </div>
-          </header>
+          </StoreAppHeader>
           {error && (
             <p className="hw-error" role="alert">
               {error}
@@ -285,7 +281,7 @@ export function HostedWebs({
                 comunidad.
               </p>
             </div>
-            <div className="hw-actions"><Button variant="secondary" onClick={() => openTool("create")}>Crear imagen, voz o vídeo</Button><Button onClick={create}>
+            <div className="hw-actions"><Button onClick={create}>
               <Plus /> Crear app
             </Button></div>
           </header>
@@ -346,147 +342,43 @@ export function HostedWebs({
                 firstPartyMatch ? (
                   <div className="hw-grid">
                     {cadenciaMatch && (
-                      <article className="hw-card">
-                        <button
-                          type="button"
-                          className="hw-cover hw-cadencia-cover"
-                          onClick={openCadencia}
-                          aria-label="Abrir Cadencia"
-                        >
-                          <span className="hw-cadencia-mark" aria-hidden="true">
-                            {[18, 33, 52, 34, 22, 43, 28].map((height, i) => (
-                              <i key={i} style={{ height }} />
-                            ))}
-                          </span>
-                          <span>Cadencia</span>
-                          <ArrowUpRight size={20} />
-                        </button>
-                        <div className="hw-card-body">
-                          <div className="hw-card-title">
-                            <h2>Cadencia</h2>
-                          </div>
-                          <p>
-                            Recorta silencios y revisa vocales alargadas.
-                            Escucha el antes y después.
-                          </p>
-                          <div className="hw-card-footer">
-                            <span>
-                              <Globe2 size={13} /> En este navegador · privado
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={openCadencia}
-                            >
-                              Abrir
-                            </Button>
-                          </div>
-                        </div>
-                      </article>
+                      <StoreAppCard title="Cadencia"
+                        description="Recorta silencios y revisa vocales alargadas. Escucha el antes y después."
+                        icon={<Waves size={18} />} metadata={<><Globe2 size={13} aria-hidden="true" /> Navegador</>}
+                        onOpen={openCadencia} openLabel="Abrir Cadencia"
+                        cover={<img src={appPath("/mycellios/cadencia-cover-v1.png")}
+                          alt="Ondas de voz de terciopelo y tijeras de edición" width={1536} height={1024} />} />
                     )}
                     {filter === "discover" && <FirstPartyApps query={query} bots={bots} scope={scope}
-                      activeBotId={activeBotId} onOpenEdit={() => openTool("video-edit")} onOpenStudio={onOpenStudio} />}
+                      activeBotId={activeBotId} onOpenEdit={() => openTool("video-edit")} onOpenStudio={onOpenStudio} onOpenCreate={() => openTool("ai-studio")} />}
 
                     {!error && rows.map((row) => (
-                      <article className="hw-card" key={row.id}>
-                        <button
-                          type="button"
-                          className={`hw-cover ${row.title === "Antseed Radar" ? "hw-antseed" : ""}`}
-                          onClick={() =>
-                            row.published ? setOpen(row) : void edit(row.id)
-                          }
-                          aria-label={`${row.published ? "Abrir" : "Editar"} ${row.title}`}
-                        >
-                          {row.title === "Antseed Radar" ? (
-                            <>
-                              <span
-                                className="hw-radar-mark"
-                                aria-hidden="true"
-                              >
-                                <span />
-                                <span />
-                                <span />
-                                <span />
-                                <span />
-                                <span />
-                              </span>
-                              <span>
-                                Antseed
-                                <br />
-                                <b>Radar</b>
-                              </span>
-                              <ArrowUpRight size={20} />
-                            </>
-                          ) : (
-                            <>
-                              <Globe2 size={38} strokeWidth={1.2} />
-                              <span>{row.title}</span>
-                              <ArrowUpRight size={20} />
-                            </>
-                          )}
-                        </button>
-                        <div className="hw-card-body">
-                          <div className="hw-card-title">
-                            <h2>{row.title}</h2>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={
-                                row.pinned
-                                  ? `Desfijar ${row.title}`
-                                  : `Fijar ${row.title}`
-                              }
-                              aria-pressed={row.pinned}
-                              disabled={busy}
-                              onClick={() =>
-                                void act(async () => {
-                                  await client.webs.pin({
-                                    id: row.id,
-                                    pinned: !row.pinned,
-                                  });
-                                  if (alive.current)
-                                    setRefresh((value) => value + 1);
-                                })
-                              }
-                            >
-                              <Pin size={15} />
-                            </Button>
-                          </div>
-                          <p>{row.summary || "Una web creada en Mycellios."}</p>
-                          <div className="hw-card-footer">
-                            <span>
-                              <Eye size={13} /> {row.views} visitas
-                            </span>
-                            <span>
-                              {row.published
-                                ? `v${row.revision}`
-                                : "Borrador privado"}
-                            </span>
-                          </div>
-                          <div className="hw-card-controls">
-                            {row.published && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => void clone(row.id)}
-                              >
-                                <Copy /> Clonar
-                              </Button>
-                            )}
-                            {row.owned && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={busy}
-                                onClick={() => void edit(row.id)}
-                              >
-                                <Code2 /> Editar
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </article>
+                      <StoreAppCard key={row.id} title={row.title}
+                        description={row.summary || "Una web creada en Mycellios."}
+                        icon={<Globe2 size={18} />}
+                        metadata={<><Eye size={13} aria-hidden="true" /> {row.views} visitas · {row.published ? `v${row.revision}` : "Borrador privado"}</>}
+                        onOpen={() => row.published ? setOpen(row) : void edit(row.id)}
+                        openLabel={`${row.published ? "Abrir" : "Editar"} ${row.title}`}
+                        titleActions={<DropdownMenu>
+                          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Opciones de ${row.title}`} />}>
+                            <MoreHorizontal size={16} aria-hidden="true" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem disabled={busy} onClick={() => void act(async () => {
+                              await client.webs.pin({ id: row.id, pinned: !row.pinned });
+                              if (alive.current) setRefresh(value => value + 1);
+                            })}><Pin size={15} /> {row.pinned ? "Desfijar" : "Fijar"}</DropdownMenuItem>
+                            {row.published && <DropdownMenuItem disabled={busy} onClick={() => void clone(row.id)}><Copy size={15} /> Clonar</DropdownMenuItem>}
+                            {row.owned && <DropdownMenuItem disabled={busy} onClick={() => void edit(row.id)}><Code2 size={15} /> Editar</DropdownMenuItem>}
+                          </DropdownMenuContent>
+                        </DropdownMenu>}
+                        cover={row.coverPath&&row.coverRevisionId?<img className="mycellios-app-cover-image" src={`${publishedWebPath(row.slug)}_versions/${encodeURIComponent(row.coverRevisionId)}/${row.coverPath}`} alt={`Carátula de ${row.title}`} />:<div className={`hw-cover ${row.title === "Antseed Radar" ? "hw-antseed" : ""}`} aria-hidden="true">
+                          {row.title === "Antseed Radar" ? <>
+                            <span className="hw-radar-mark"><span /><span /><span /><span /><span /><span /></span>
+                            <span>Antseed<br /><b>Radar</b></span>
+                          </> : <><Globe2 size={38} strokeWidth={1.2} /><span>{row.title}</span></>}
+                        </div>}
+                      />
                     ))}
                   </div>
                 ) : (
@@ -522,16 +414,6 @@ export function HostedWebs({
                 )}
               </>
           )}
-          <footer className="hw-directory-footer">
-            <span>Apps de la comunidad · sin dominio propio</span>
-            <a
-              href={appPath("/api/published-webs/")}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Directorio público <ArrowUpRight size={13} />
-            </a>
-          </footer>
         </>
       )}
     </section>

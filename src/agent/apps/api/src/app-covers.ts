@@ -39,6 +39,10 @@ export async function getAppCover(deps: Deps, actor: Actor, appId: string) {
  * The lock and revision check prevent a late generation overwriting another device's choice.
  */
 export async function setAppCover(deps: Deps, actor: Actor, input: AppCoverWrite) {
+  const creator = {id:input.appId,userId:actor.userId,spaceId:actor.spaceId};
+  if(["cadencia","ai-studio","video-edit","video-studio"].includes(input.appId)||
+    !await deps.prisma.hostedWeb.findFirst({where:creator,select:{id:true}}))
+    throw new ORPCError("FORBIDDEN",{message:"Solo el creador puede cambiar la carátula de esta app desde su editor."});
   const nonce = `app-cover:${input.clientNonce}`;
   const replay = await deps.prisma.artifact.findFirst({ where: {
     userId: actor.userId, spaceId: actor.spaceId, clientNonce: nonce,
@@ -69,6 +73,7 @@ export async function setAppCover(deps: Deps, actor: Actor, input: AppCoverWrite
   let retained = false;
   try {
     await deps.prisma.$transaction(async tx => {
+      if(!await tx.hostedWeb.findFirst({where:creator,select:{id:true}}))throw new ORPCError("FORBIDDEN");
       await tx.$queryRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${JSON.stringify([actor.userId, actor.spaceId, input.appId])}, 0))::text AS "lock"`);
       const latest = await tx.artifact.findFirst({ where: whereFor(actor, input.appId), orderBy });
       const raced = await tx.artifact.findFirst({ where: { userId: actor.userId, spaceId: actor.spaceId, clientNonce: nonce } });

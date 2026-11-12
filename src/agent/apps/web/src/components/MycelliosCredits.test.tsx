@@ -17,11 +17,26 @@ it("shows available contribution credits as Credits using the selected language"
   readAccount.mockResolvedValue({ balanceMicrounits: 12500000, availableMicrounits: 10250000 });
   await rendered(host => { expect(host.textContent).toBe("Credits10,25"); expect(host.textContent).not.toContain("USD"); });
 });
+it("displays the actual welcome credit balance without rounding it to zero", async () => {
+  readAccount.mockResolvedValue({ balanceMicrounits: 200000, availableMicrounits: 200000 });
+  await rendered(host => expect(host.textContent).toBe("Credits0,2"));
+});
+it("opens connection settings only on explicit action when no account is connected", async () => {
+  readAccount.mockResolvedValue(null);
+  const onConnect = vi.fn();
+  const host = document.createElement("div"); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<MycelliosCredits ownerId="owner-a" onConnect={onConnect} />));
+    expect(onConnect).not.toHaveBeenCalled();
+    await act(async () => host.querySelector<HTMLButtonElement>("button")?.click());
+    expect(onConnect).toHaveBeenCalledOnce();
+  } finally { await act(async () => root.unmount()); }
+});
 it("keeps an actual zero distinct from an unavailable account", async () => {
   readAccount.mockResolvedValue({ balanceMicrounits: 0, availableMicrounits: 0 });
   await rendered(host => expect(host.textContent).toBe("Credits0"));
   readAccount.mockResolvedValue(null);
-  await rendered(host => expect(host.textContent).toBe("CreditsBalance unavailable"));
+  await rendered(host => expect(host.textContent).toBe("CreditsNot enabled"));
 });
 it("keeps the row visible while loading and on failure", async () => {
   readAccount.mockReturnValue(new Promise(() => {}));
@@ -143,7 +158,7 @@ it("aborts old identity reads and never applies their late balance to another us
     await act(async () => finish({ balanceMicrounits: 999999999 }));
     expect(host.textContent).toBe("Credits2");
     await act(async () => root.render(<MycelliosCredits ownerId="" />));
-    expect(host.textContent).toBe("CreditsBalance unavailable");
+    expect(host.textContent).toBe("CreditsNot enabled");
     expect(readAccount).toHaveBeenCalledTimes(2);
   } finally { await act(async () => root.unmount());host.remove(); }
 });
@@ -152,7 +167,7 @@ it("clears a previously verified account when the authority returns null", async
   readAccount.mockResolvedValueOnce({ balanceMicrounits: 954188 }).mockResolvedValue(null);
   await rendered(async host => {
     await act(async () => window.dispatchEvent(new Event("focus")));
-    expect(host.textContent).toBe("CreditsBalance unavailable");
+    expect(host.textContent).toBe("CreditsNot enabled");
     expect(host.firstElementChild?.getAttribute("data-balance-status")).toBe("unavailable");
   });
 });
@@ -185,7 +200,7 @@ it("keeps unavailable credits compact with one destination and an icon-only retr
   readAccount.mockRejectedValue(new Error("offline"));
   await rendered(host => {
     expect(host.textContent).toBe("CreditsBalance unavailable");
-    expect(host.querySelectorAll("a")).toHaveLength(1);
+    expect(host.querySelectorAll("a")).toHaveLength(0);
     expect(host.querySelector('[aria-label="Retry"]')?.textContent).toBe("");
     expect(host.querySelector("p")).toBeNull();
   });
@@ -216,4 +231,28 @@ it("refreshes every five seconds while contributing without inventing gains", as
   await act(async()=>vi.advanceTimersByTimeAsync(1));expect(readAccount).toHaveBeenCalledTimes(2);
   expect(host.textContent).toBe("Credits1,000001");expect(host.querySelector(".rk-credit-gain")).toBeNull();
  }); } finally {delete document.body.dataset.mycelliosContributing;vi.useRealTimers();}
+});
+
+it("refreshes verified work in bounded bursts and displays only the confirmed wallet delta", async () => {
+ vi.useFakeTimers();
+ readAccount.mockResolvedValue({balanceMicrounits:200000,contributionEarnedMicrounits:0});
+ await rendered(async host=>{
+  for(let i=0;i<20;i++) await act(async()=>window.dispatchEvent(new Event("mycellios:contribution-verified")));
+  expect(readAccount).toHaveBeenCalledOnce();
+  await act(async()=>vi.advanceTimersByTimeAsync(1000));
+  expect(readAccount).toHaveBeenCalledTimes(2);
+  expect(host.querySelector(".rk-credit-gain")).toBeNull();
+  readAccount.mockResolvedValue({balanceMicrounits:200123,contributionEarnedMicrounits:123});
+  await act(async()=>window.dispatchEvent(new Event("mycellios:contribution-verified")));
+  await act(async()=>vi.advanceTimersByTimeAsync(1000));
+  expect(host.textContent).toContain("0,200123");
+  expect(host.querySelector(".rk-credit-gain")?.textContent).toBe("+0,000123 Earned");
+ });
+ expect(vi.getTimerCount()).toBe(0);
+});
+it("cancels a pending verified-work refresh when its account unmounts",async()=>{
+ vi.useFakeTimers();readAccount.mockResolvedValue({balanceMicrounits:200000});
+ await rendered(async()=>{await act(async()=>window.dispatchEvent(new Event("mycellios:contribution-verified")));});
+ await act(async()=>vi.advanceTimersByTimeAsync(2000));
+ expect(readAccount).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
 });

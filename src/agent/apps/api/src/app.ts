@@ -486,7 +486,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
       accessToken: env.expoAccessToken,
     });
   const webPush = new WebPushService(prisma, env.encryptionKey, jobs, webPushConfig(process.env));
-  const notifications = webPush.config ? notificationChannels(nativeNotifications, webPush) : nativeNotifications;
+  const notifications = notificationsOverride ?? notificationChannels(nativeNotifications, webPush);
   const auth = createAuth(prisma, {
     sessionDurationSeconds: env.authSessionDurationSeconds,
     analytics,

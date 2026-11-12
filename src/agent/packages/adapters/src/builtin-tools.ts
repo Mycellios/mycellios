@@ -507,7 +507,7 @@ export const builtinAgentTools: ConnectorTool[] = [
       type: "object",
       properties: {
         question: { type: "string", minLength: 1, maxLength: 240 },
-        options: { type: "array", minItems: 2, maxItems: 4, items: { anyOf: [
+        options: { type: "array", minItems: 2, maxItems: 4, uniqueItems: true, items: { anyOf: [
           { type: "string", minLength: 1, maxLength: 80 },
           { type: "object", properties: { label: { type: "string", minLength: 1, maxLength: 80 }, description: { type: "string", maxLength: 160 } }, required: ["label"], additionalProperties: false },
         ] } },
@@ -515,7 +515,7 @@ export const builtinAgentTools: ConnectorTool[] = [
         questions: { type: "array", minItems: 1, maxItems: 3, items: { type: "object", properties: {
           id: { type: "string", minLength: 1, maxLength: 80 },
           question: { type: "string", minLength: 1, maxLength: 240 },
-          options: { type: "array", maxItems: 4, items: { anyOf: [
+          options: { type: "array", maxItems: 4, uniqueItems: true, items: { anyOf: [
             { type: "string", minLength: 1, maxLength: 80 },
             { type: "object", properties: { label: { type: "string", minLength: 1, maxLength: 80 }, description: { type: "string", maxLength: 160 } }, required: ["label"], additionalProperties: false },
           ] } },

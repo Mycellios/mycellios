@@ -46,7 +46,7 @@ export class DesktopRelayBroker {
   private accounts = new Map<string, DesktopExecutorOwner & {deviceId:string; generation:string; seen:number; agentExecution?:1}>();
   private bindings = new Map<string, Binding>();
   private operations = new Map<string, Operation>();
-  private runs = new Map<string, { generation: string; until: number; agentSession?: string }>();
+  private runs = new Map<string, { generation: string; until: number; agentSessions?: Record<string, string> }>();
   private sweep: ReturnType<typeof setInterval>;
   private waiting = new Map<string, Set<() => void>>();
   private polling = new Set<string>();
@@ -237,10 +237,15 @@ export class DesktopRelayBroker {
     if (input.runId) {
       const runKey = key(context, `${input.botId}:${input.runId}`);
       const previous = this.runs.get(runKey);
-      if (input.method === "agentRun" && previous?.agentSession) throw new DesktopRelayError("desktop_connection_changed", "This Desktop run was already dispatched. Check existing results before retrying.");
+      const segment = input.method === "agentRun" ? input.segmentId ?? "initial" : undefined;
+      if (segment && (previous?.agentSessions?.[segment] || open.some(op => op.binding === binding && op.method === "agentRun" && op.runId === input.runId)))
+        throw new DesktopRelayError("desktop_connection_changed", "This Desktop run was already dispatched. Check existing results before retrying.");
+      if (segment && Object.keys(previous?.agentSessions ?? {}).length >= 256)
+        throw new DesktopRelayError("desktop_busy", "The PC request queue is full. Wait for current work to finish; this operation was not dispatched.", 429);
       if (previous && previous.generation !== binding.generation) throw new DesktopRelayError("desktop_connection_changed", "This run belongs to a previous project connection. Start a new request.");
       if (!previous && this.runs.size >= 4096) throw new DesktopRelayError("desktop_busy", "The PC request queue is full. Wait for current work to finish; this operation was not dispatched.", 429);
-      this.runs.set(runKey, { ...previous, generation: binding.generation, until: this.now() + 24 * 60 * 60_000, ...(input.method === "agentRun" ? { agentSession: input.sessionId } : {}) });
+      this.runs.set(runKey, { ...previous, generation: binding.generation, until: this.now() + 24 * 60 * 60_000,
+        ...(input.method === "agentRun" ? { agentSessions: { ...previous?.agentSessions, [segment!]: input.sessionId } } : {}) });
     }
     const id = randomUUID();
     let op: Operation;

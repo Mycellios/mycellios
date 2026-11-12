@@ -37,6 +37,8 @@ vi.mock("expo-secure-store", () => ({
   deleteItemAsync: vi.fn((key: string) => native.run(() => void native.store.delete(key))),
 }));
 vi.mock("expo-notifications", () => ({
+  setNotificationChannelAsync: vi.fn(async () => undefined),
+  AndroidImportance: { DEFAULT: 3 },
   getPermissionsAsync: vi.fn(),
   requestPermissionsAsync: vi.fn(),
   getExpoPushTokenAsync: vi.fn(async () => ({ data: "ExponentPushToken[fake]" })),
@@ -76,6 +78,7 @@ beforeEach(async () => {
   vi.stubGlobal("fetch", fetch);
   fetch.mockClear();
   vi.mocked(Notifications.requestPermissionsAsync).mockClear();
+  vi.mocked(Notifications.getPermissionsAsync).mockClear();
   permission = deferred();
   // iOS answers both from the system's notification settings, which can take minutes
   // after a restart. Reading them waits on the native queue; the request does not.
@@ -95,7 +98,9 @@ afterEach(() => {
 
 describe("push registration on iOS", () => {
   it("loads the inbox while notification settings have not answered", async () => {
-    void registerPushToken();
+    await registerPushToken();
+    expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
 
     // The inbox's first load: the space list and account, then the default space.
     const loaded = Promise.all([rpc("spaces/list"), rpc<MobileMe>("me")]).then(async ([, me]) =>
@@ -106,7 +111,7 @@ describe("push registration on iOS", () => {
   });
 
   it("registers the token once permission is granted", async () => {
-    void registerPushToken();
+    void registerPushToken({ requestPermission: true });
     await settled(Promise.resolve());
     expect(fetch).not.toHaveBeenCalledWith(
       expect.stringMatching(/notifications\/registerPush$/),
@@ -134,9 +139,41 @@ describe("push registration on Android", () => {
     await registerPushToken();
 
     expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(Notifications.setNotificationChannelAsync).toHaveBeenCalledWith("default", expect.objectContaining({ importance: 3 }));
     expect(fetch).toHaveBeenCalledWith(
       expect.stringMatching(/notifications\/registerPush$/),
       expect.anything(),
     );
   });
+});
+
+it("never prompts at Android startup when permission has not been granted", async () => {
+  Platform.OS = "android";
+  vi.mocked(Notifications.getPermissionsAsync).mockResolvedValue({ granted: false } as never);
+  await registerPushToken();
+  expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+it("keeps a rejected explicit permission visible to settings", async () => {
+  const operation = registerPushToken({ requestPermission: true });
+  const rejected = expect(operation).rejects.toThrow("system settings");
+  await settled(Promise.resolve());
+  permission.resolve({ granted: false });
+  await rejected;
+  expect(fetch).not.toHaveBeenCalled();
+});
+it("does not register an old permission request after the session changes", async () => {
+  const operation = registerPushToken({ requestPermission: true });
+  await vi.waitFor(() => expect(Notifications.requestPermissionsAsync).toHaveBeenCalled());
+  await restoreSessionToken("different-session");
+  permission.resolve({ granted: true });
+  await operation;
+  expect(fetch).not.toHaveBeenCalled();
+});
+it("refreshes a remembered iOS opt-in without blocking the native permission queue", async () => {
+  native.store.set("mycellios.notifications.allowed", "1");
+  await registerPushToken();
+  expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+  expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+  expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/notifications\/registerPush$/), expect.anything());
 });

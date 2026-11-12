@@ -14,6 +14,7 @@ import {
   probeOpenAiCompatibleModels,
   providerCatalogCache,
   readMycelliosAccount,
+  MycelliosAccountAccessError,
   resolveMemberMainModel,
   selectDefaultCredentialId,
   serializeModelSecret,
@@ -189,6 +190,7 @@ export function modelsRoutes(ctx: RouterContext) {
       }),
       mycelliosMedia: authed.models.mycelliosMedia.handler(async ({context,input})=>{
         if(process.env.MYCELLIOS_MANAGED_APPS_ENABLED!=="true")throw new ORPCError("PRECONDITION_FAILED",{message:"Estas apps están en preparación. No se ha gastado ningún crédito."});
+        if(input.action!=="models"&&input.expectedUserId!==context.actor.userId)throw new ORPCError("FORBIDDEN",{message:"La cuenta ha cambiado. Vuelve a abrir la app antes de continuar."});
         const owned=await ownedMycellios(context.actor);
         const token=owned?.saved.apiKey ?? (deps.env.mycelliosSso && context.requestHeaders ? await deps.auth.oidcAccessToken(context.requestHeaders,context.actor.userId):null);
         if(!token)throw new ORPCError("UNAUTHORIZED");
@@ -197,6 +199,7 @@ export function modelsRoutes(ctx: RouterContext) {
         const response=await (deps.modelConnectionFetch??fetch)(productBrand.apiBaseUrl+path,{method:input.action==="models"?"GET":"POST",redirect:"error",signal,
           headers:{authorization:`Bearer ${token}`,"content-type":"application/json",...(input.key?{"idempotency-key":input.key}:{})},
           ...(input.action==="models"?{}:{body:input.payload??"{}"})});
+        if(input.action==="status"&&response.status===404){await response.body?.cancel();return {status:"not_submitted"};}
         if(!response.ok){await response.body?.cancel();throw new ORPCError("SERVICE_UNAVAILABLE",{message:"No se ha podido completar la operación. Consulta el estado antes de volver a enviarla."});}
         if(input.action==="content") {
           const bytes=await readBoundedResponseBytes(response,{maxBytes:67_108_864,tooLargeMessage:"El vídeo supera el límite de descarga.",read:operation=>operation()});
@@ -243,7 +246,12 @@ export function modelsRoutes(ctx: RouterContext) {
             });
           }
           return null;
-        } catch {
+        } catch (error) {
+          if (error instanceof MycelliosAccountAccessError)
+            throw new ORPCError(error.status === 401 ? "UNAUTHORIZED" : "FORBIDDEN", {
+              message: "Sign in again to see your Mycellios credits.",
+            });
+          if (error instanceof ORPCError && (error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN")) throw error;
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: "Mycellios credits are temporarily unavailable.",
           });

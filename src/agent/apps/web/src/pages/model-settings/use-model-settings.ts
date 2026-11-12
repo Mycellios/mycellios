@@ -33,7 +33,7 @@ import {
   savedCompatibleModelIds,
 } from "@rakazo/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCopyText } from "../../lib/copy-text";
 import { providerDisplayName } from "../../lib/localized-provider-hint";
 import type { ModelCatalogEntry } from "../../lib/model-auth";
@@ -88,9 +88,11 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
     queryFn: () => rpc.models.credentials(),
   };
   const meQuery = { queryKey: queries.me.queryKey(), queryFn: () => rpc.me() };
-  const catalog = useQuery(catalogQuery).data ?? NO_CATALOG;
-  const credentials = useQuery(credentialsQuery).data ?? NO_CREDENTIALS;
-  const me: Me | null = useQuery(meQuery).data ?? null;
+  const catalogRead = useQuery(catalogQuery), credentialsRead = useQuery(credentialsQuery), meRead = useQuery(meQuery);
+  const catalog = catalogRead.data ?? NO_CATALOG;
+  const credentials = credentialsRead.data ?? NO_CREDENTIALS;
+  const me: Me | null = meRead.data ?? null;
+  const hasProviderData = catalogRead.data !== undefined && credentialsRead.data !== undefined;
   const [provider, setProvider] = useState("");
   // The connection the dialog edits; null connects a new one.
   const [credentialId, setCredentialIdState] = useState<string | null>(null);
@@ -127,6 +129,9 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
   const [pending, setPending] = useState<"connect" | "settings" | "disconnect" | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloading, setReloading] = useState(false), [reloadToken, setReloadToken] = useState(0);
+  const retryLock = useRef(false), mounted = useRef(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [preflightTesting, setPreflightTesting] = useState(false);
   const [preflightTarget, setPreflightTarget] = useState<
@@ -181,6 +186,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
       fetchFresh(queryClient, meQuery, { reuse }),
     ]);
     if (refreshRevision !== refreshRevisionRef.current) return undefined;
+    setLoadError(null);
     applyLoaded(nextCatalog, nextCredentials, nextMe, selectionRevision);
     return nextCredentials;
   }
@@ -252,6 +258,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
   }
 
   useLayoutEffect(() => {
+    let active = true; mounted.current = true;
     const cachedCatalog = queryClient.getQueryData(catalogQuery.queryKey);
     const cachedCredentials = queryClient.getQueryData(credentialsQuery.queryKey);
     const cachedMe = queryClient.getQueryData(meQuery.queryKey);
@@ -260,12 +267,27 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
       applyLoaded(cachedCatalog, cachedCredentials, cachedMe, selectionRevisionRef.current);
     }
     void refresh({ reuse: true })
-      .catch((err: unknown) => setError(errorText(err, t`Could not load model settings`)))
-      .finally(() => setLoading(false));
+      .catch((err: unknown) => { if (active) setLoadError(errorText(err, t`Could not load model settings`)); })
+      .finally(() => { if (active) setLoading(false); });
     return () => {
+      active = false; mounted.current = false;
       refreshRevisionRef.current += 1;
       modelProbe.invalidate();
     };
+  }, []);
+
+  async function retryLoad() {
+    if (retryLock.current || pending || oauthPending) return;
+    retryLock.current = true; setReloading(true); setLoadError(null);
+    try { await refresh({ keepForm: true }); if (mounted.current) setReloadToken(token => token + 1); }
+    catch (err) { if (mounted.current) setLoadError(errorText(err, t`Could not load model settings`)); }
+    finally { retryLock.current = false; if (mounted.current) setReloading(false); }
+  }
+  const recovery = useRef({ loadError, retryLoad }); recovery.current = { loadError, retryLoad };
+  useEffect(() => {
+    const recover = () => { if (recovery.current.loadError && document.visibilityState !== "hidden") void recovery.current.retryLoad(); };
+    window.addEventListener("online", recover); window.addEventListener("focus", recover);
+    return () => { window.removeEventListener("online", recover); window.removeEventListener("focus", recover); };
   }, []);
 
   const groups = useMemo(() => {
@@ -750,6 +772,7 @@ export function useModelSettings(onClose: () => void, scope: SettingsScope) {
   }
 
   return {
+    loadError, reloading, retryLoad, reloadToken, hasProviderData,
     intentRef,
     refresh,
     resetOpenAiCompatibleProbe,

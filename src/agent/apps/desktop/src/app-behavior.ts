@@ -7,7 +7,7 @@ type Ports = {
   power: { onBattery: () => boolean; start: () => number; stop: (id: number) => void };
   changed: (value: DesktopBehaviorSettings) => void;
 };
-const KEYS = new Set(["launchAtLogin", "keepRunningInBackground", "keepAwake", "keepAwakeOnBattery", "externalLinkTarget"]);
+const KEYS = new Set(["launchAtLogin", "keepRunningInBackground", "keepRemoteSessions", "keepAwake", "keepAwakeOnBattery", "externalLinkTarget"]);
 
 /** Native-only effects, serialized writes and backwards-compatible profile migration. */
 export class AppBehavior {
@@ -16,7 +16,7 @@ export class AppBehavior {
   private queue = Promise.resolve();
   constructor(private ports: Ports) {
     this.value = { launchAtLogin: ports.packaged && ports.platform !== "linux" ? ports.login.get() : null,
-      keepRunningInBackground: false, keepAwake: ports.platform === "linux" ? null : false,
+      keepRunningInBackground: false, keepRemoteSessions: false, keepAwake: ports.platform === "linux" ? null : false,
       keepAwakeOnBattery: false, externalLinkTarget: "system" };
   }
   state() { return { ...this.value }; }
@@ -26,6 +26,7 @@ export class AppBehavior {
       const saved = JSON.parse(raw ?? "null");
       if (saved?.schema === 1 || saved?.schema === 2) {
         this.value.keepRunningInBackground = saved.keepRunningInBackground === true;
+        this.value.keepRemoteSessions = saved.keepRemoteSessions === true;
         if (this.value.keepAwake !== null) this.value.keepAwake = saved.keepAwake === true;
         this.value.keepAwakeOnBattery = saved.keepAwakeOnBattery === true;
         if (saved.externalLinkTarget === "app") this.value.externalLinkTarget = "app";

@@ -54,6 +54,7 @@ describe("Speaker", () => {
       },
     );
     vi.stubGlobal("window", {
+      rakazoDesktop: { localVoice: { status: vi.fn(() => { throw new Error("Explicit device preview must not use Supertonic"); }) } },
       speechSynthesis: {
         getVoices: () => [{ localService: true, lang: "es-ES" }],
         speak: (value: SpeechSynthesisUtterance) => {
@@ -265,7 +266,7 @@ describe("local speech routing", () => {
  it("does not send text to a provider when the local model is not ready", async () => {
    const fetchMock=vi.fn(); vi.stubGlobal("fetch",fetchMock);
    const speak=vi.fn(); vi.stubGlobal("window",{rakazoDesktop:{localVoice:{status:async()=>({ready:false}),speak,stop:vi.fn(async()=>{})}}});
-   const speaker=new Speaker(); const error=await speaker.speak("Hola",{browser:true});
+   const speaker=new Speaker(); const error=await speaker.speak("Hola");
    expect(error).toContain("Supertonic"); expect(fetchMock).not.toHaveBeenCalled(); expect(speak).not.toHaveBeenCalled();
  });
  it("discards an inference result after playback is cancelled without making a paid fallback request", async () => {

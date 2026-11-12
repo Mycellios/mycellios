@@ -77,7 +77,7 @@ export function parsePushPayload(value: unknown, now = Date.now()): PushPayload 
 
 export function pushNotification(p: PushPayload, scopeUrl: string, language: string) {
   const spanish = /^es(?:-|$)/i.test(language);
-  const copy = p.kind ? NOTICE_COPY[spanish ? "es" : "en"][p.kind] : undefined;
+  const copy = NOTICE_COPY[spanish ? "es" : "en"][p.kind ?? "completion"];
   const art = p.avatarArt ?? p.avatar;
   const avatar = p.preview && art && NOTIFICATION_AVATARS.has(art) ? art : undefined;
   return {
@@ -105,10 +105,25 @@ export function pushChatUrl(
   return url.href;
 }
 
+type DeviceNotificationPreferences = { enabled?: boolean; preview?: boolean; sound?: boolean; mutedUntil?: number; attentionOnly?: boolean };
+/** Device privacy and pause survive a closed PWA; the account's server policy stays authoritative. */
+export function devicePushNotification(p: Parameters<typeof pushNotification>[0], scopeUrl: string, language: string,
+  preferences: DeviceNotificationPreferences = {}, now = Date.now()) {
+  if (preferences.enabled === false || typeof preferences.mutedUntil === "number" && preferences.mutedUntil > now ||
+    preferences.attentionOnly && (!p.kind || p.kind === "completion")) return null;
+  const notice = pushNotification({ ...p, preview: p.preview === true && preferences.preview !== false }, scopeUrl, language);
+  return { ...notice, options: { ...notice.options, silent: preferences.sound === false } };
+}
+
 export function installPushWorker(scope: ServiceWorkerGlobalScope) {
   // Durable and origin-local: reject in-flight messages for a signed-out or switched account.
   const bindingCache = "mycellios-push-binding-v1";
   const bindingUrl = new URL("__push_binding", scope.registration.scope).href;
+  const preferencesUrl = new URL("__push_device_preferences", scope.registration.scope).href;
+  const getPreferences = async () => {
+    const saved = await (await scope.caches.open(bindingCache)).match(preferencesUrl);
+    try { return saved ? await saved.json() as { accountId: string; preferences: DeviceNotificationPreferences } : null; } catch { return null; }
+  };
   const getAccount = async () =>
     (await (await scope.caches.open(bindingCache)).match(bindingUrl))?.text();
   scope.addEventListener("message", (event) => {
@@ -126,13 +141,22 @@ export function installPushWorker(scope: ServiceWorkerGlobalScope) {
       (async () => {
         const cache = await scope.caches.open(bindingCache);
         const previous = await getAccount();
+        const oldPreferences = await getPreferences();
         if (typeof data.accountId === "string" && ID.test(data.accountId)) {
           await cache.put(bindingUrl, new Response(data.accountId));
+          if (data.preferences && typeof data.preferences === "object") {
+            const input = data.preferences;
+            const preferences: DeviceNotificationPreferences = { enabled: input.enabled !== false, preview: input.preview !== false, sound: input.sound !== false,
+              attentionOnly: input.attentionOnly === true, mutedUntil: typeof input.mutedUntil === "number" && Number.isFinite(input.mutedUntil) ? input.mutedUntil : 0 };
+            await cache.put(preferencesUrl, Response.json({ accountId: data.accountId, preferences }));
+          } else if (previous !== data.accountId) await cache.delete(preferencesUrl);
         } else {
           await cache.delete(bindingUrl);
+          await cache.delete(preferencesUrl);
         }
         event.ports[0]?.postMessage("bound");
-        if (previous !== data.accountId)
+        if (previous !== data.accountId || data.preferences?.enabled === false ||
+          data.preferences?.preview === false && oldPreferences?.preferences.preview !== false)
           for (const notice of await scope.registration.getNotifications()) notice.close();
         if (typeof data.botId === "string" && ID.test(data.botId)) {
           for (const notice of await scope.registration.getNotifications()) {
@@ -165,7 +189,10 @@ export function installPushWorker(scope: ServiceWorkerGlobalScope) {
         .href;
       if (await receipts.match(key)) return;
       // Foreground suppression happens in the server presence hold before transport.
-      const notice = pushNotification(p, scope.registration.scope, scope.navigator.language);
+      const device = await getPreferences();
+      const notice = devicePushNotification(p, scope.registration.scope, scope.navigator.language,
+        device?.accountId === p.accountId ? device.preferences : undefined);
+      if (!notice) return;
       await scope.registration.showNotification(notice.title, notice.options);
       await receipts.put(key, new Response(String(p.expiresAt)));
       for (const receipt of await receipts.keys()) {

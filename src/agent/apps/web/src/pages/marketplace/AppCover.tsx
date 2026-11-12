@@ -2,7 +2,7 @@ import type { Artifact, ArtifactWithContent, Bot, AppCoverWrite } from "@rakazo/
 import { APP_COVER_MAX_BYTES } from "@rakazo/contracts";
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, NativeSelect,
   NativeSelectOption, Textarea, Tabs, TabsList, TabsTrigger, TabsContent } from "@rakazo/ui-web";
-import { ImagePlus, Sparkles, Upload } from "lucide-react";
+import { Sparkles, Upload } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { VideoStudioSample } from "../../components/VideoStudioSample";
@@ -10,54 +10,35 @@ import { useSpaceRpc } from "../../lib/space-rpc";
 import { coverPrompt, readCoverGeneration, submitCoverGeneration } from "../../lib/app-cover-generation";
 import type { CoverAppInfo, CoverGeneration } from "../../lib/app-cover-generation";
 
-type Cover = { revision: string | null; image: ArtifactWithContent | null };
+type Cover = { revision: string | null; image: Pick<ArtifactWithContent,"mimeType"|"contentBase64"> | null };
+export type CoverImage = {mimeType:"image/png"|"image/jpeg"|"image/webp";contentBase64:string};
 type Candidate = { src: string; source: AppCoverWrite["source"]; botId: string };
 const raster = (type: string) => ["image/png", "image/jpeg", "image/webp"].includes(type);
-const imageSource = (image: ArtifactWithContent) => raster(image.mimeType)
+const imageSource = (image: Pick<ArtifactWithContent,"mimeType"|"contentBase64">) => raster(image.mimeType)
   ? `data:${image.mimeType};base64,${image.contentBase64}` : "";
 
-export function AppCover({ app, bots, scope, activeBotId, fallback }: {
+export function AppCover({ app, scope, fallback }: {
   app: CoverAppInfo; bots: Bot[]; scope: string; activeBotId?: string; fallback?: ReactNode;
 }) {
   const rpc = useSpaceRpc();
   const [cover, setCover] = useState<Cover>({ revision: null, image: null });
-  const [open, setOpen] = useState(false);
-  const [loadError, setLoadError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  async function edit() {
-    setLoading(true);
-    try {
-      const value = await rpc.appCovers.get({ appId: app.id });
-      if (mounted.current) { setCover(value); setLoadError(""); }
-    } catch { if (mounted.current) setLoadError("No se pudo cargar la carátula guardada. Cierra esta ventana y vuelve a intentarlo."); }
-    finally { if (mounted.current) { setLoading(false); setOpen(true); } }
-  }
+
   useEffect(() => {
     let current = true;
-    setLoading(true);
     void rpc.appCovers.get({ appId: app.id }).then(value => {
-      if (current) { setCover(value); setLoadError(""); }
-    }).catch(() => { if (current) setLoadError("No se pudo cargar la carátula guardada."); })
-      .finally(() => { if (current) setLoading(false); });
+      if (current) { setCover(value); }
+    }).catch(() => { /* Keep the bundled original when a legacy private cover is unavailable. */ });
     return () => { current = false; };
   }, [rpc, app.id, scope]);
   return <>
     {cover.image ? <div className="mycellios-app-preview"><img className="mycellios-app-cover-image"
       src={imageSource(cover.image)} alt={`Carátula de ${app.title}`} /></div> : fallback ?? <VideoStudioSample catalog />}
-    <button type="button" className="mycellios-app-cover-edit" disabled={loading}
-      aria-label={`Personalizar carátula de ${app.title}`} title="Personalizar carátula"
-      onClick={() => void edit()}><ImagePlus size={17} aria-hidden /></button>
-    {open && <AppCoverEditor key={`${scope}:${app.id}`} app={app} bots={bots} activeBotId={activeBotId}
-      scope={scope} cover={cover} initialError={loadError} onClose={() => setOpen(false)}
-      onSaved={next => { setCover(next); setOpen(false); }} />}
   </>;
 }
 
-function AppCoverEditor({ app, bots, activeBotId, scope, cover, initialError, onClose, onSaved }: {
+export function AppCoverEditor({ app, bots, activeBotId, scope, cover, initialError, onClose, onSaved, onApply }: {
   app: CoverAppInfo; bots: Bot[]; activeBotId?: string; scope: string; cover: Cover;
-  initialError: string; onClose: () => void; onSaved: (cover: Cover) => void;
+  initialError: string; onClose: () => void; onSaved: (cover: Cover) => void; onApply?: (image:CoverImage|null)=>void|Promise<void>;
 }) {
   const rpc = useSpaceRpc();
   const navigate = useNavigate();
@@ -166,9 +147,15 @@ function AppCoverEditor({ app, bots, activeBotId, scope, cover, initialError, on
     finally { if (alive.current) setBusy(false); }
   }
   async function save(reset = false) {
-    if (!selectedBot || submission.current || (!reset && !candidate) || initialError) return;
+    if ((!selectedBot && !onApply) || submission.current || (!reset && !candidate) || initialError) return;
     submission.current = true; setBusy(true); setError("");
     try {
+      if(onApply) {
+        const match=reset?null:/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(candidate!.src);
+        if(!reset&&!match)throw new Error("La imagen no es compatible.");
+        await onApply(match?{mimeType:match[1] as CoverImage["mimeType"],contentBase64:match[2]!}:null);
+        if(alive.current){localStorage.removeItem(key);onClose();}return;
+      }
       const next = await rpc.appCovers.set({ appId: app.id,
         botId: reset ? botId : candidate!.source.kind === "artifact" ? candidate!.botId : botId,
         expectedRevision: cover.revision, clientNonce: crypto.randomUUID(),
@@ -180,23 +167,23 @@ function AppCoverEditor({ app, bots, activeBotId, scope, cover, initialError, on
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
       <DialogHeader><DialogTitle>Carátula de {app.title}</DialogTitle>
-        <DialogDescription>Personal para tu cuenta en este espacio. No cambia la de los demás.</DialogDescription></DialogHeader>
+        <DialogDescription>{onApply?"Solo el creador puede cambiarla. Se actualizará para todos al publicar la app.":"Carátula de tu app. Solo su creador puede modificarla."}</DialogDescription></DialogHeader>
       <div className="app-cover-editor-preview">
         {candidate || cover.image ? <img src={candidate?.src ?? imageSource(cover.image!)} alt="Vista previa de la carátula" /> : <VideoStudioSample catalog />}
       </div>
-      <label className="grid gap-1.5 text-sm">Mico
+      {(!onApply||tab==="generate")&&<label className="grid gap-1.5 text-sm">Mico
         <NativeSelect className="w-full" aria-label="Mico para la carátula" value={botId} disabled={busy || Boolean(generation)}
           onChange={event => { imageRequest.current++; setBotId(event.target.value); setImages([]); }}>
           {bots.map(bot => <NativeSelectOption key={bot.id} value={bot.id}>{bot.name}</NativeSelectOption>)}
         </NativeSelect>
-      </label>
-      {!bots.length && <p role="status" className="text-sm text-muted-foreground">Crea un Mico para guardar o generar tu carátula.</p>}
+      </label>}
+      {!bots.length && !onApply && <p role="status" className="text-sm text-muted-foreground">Crea un Mico para guardar o generar tu carátula.</p>}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList><TabsTrigger value="upload">Subir imagen</TabsTrigger><TabsTrigger value="generate">Generar con un Mico</TabsTrigger></TabsList>
+        <TabsList><TabsTrigger value="upload">Subir imagen</TabsTrigger><TabsTrigger value="generate" disabled={!bots.length}>Generar con un Mico</TabsTrigger></TabsList>
         <TabsContent value="upload" className="space-y-2 pt-2">
           <input ref={file} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only"
             aria-label="Archivo de carátula" onChange={event => { const image = event.target.files?.[0]; event.target.value = ""; if (image) void upload(image); }} />
-          <Button variant="outline" disabled={busy || !selectedBot} onClick={() => file.current?.click()}><Upload size={16} aria-hidden />Elegir imagen</Button>
+          <Button variant="outline" disabled={busy || (!selectedBot&&!onApply)} onClick={() => file.current?.click()}><Upload size={16} aria-hidden />Elegir imagen</Button>
           <p className="text-xs text-muted-foreground">PNG, JPG o WebP · Hasta 8 MB. La carátula se recorta para llenar la tarjeta.</p>
         </TabsContent>
         <TabsContent value="generate" className="space-y-3 pt-2">
@@ -219,9 +206,9 @@ function AppCoverEditor({ app, bots, activeBotId, scope, cover, initialError, on
       {status && <p role="status" className="text-sm text-muted-foreground">{status}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
-        {cover.image && <Button variant="ghost" disabled={busy || !selectedBot || Boolean(initialError)} onClick={() => void save(true)}>Restaurar original</Button>}
+        {cover.image && <Button variant="ghost" disabled={busy || (!selectedBot&&!onApply) || Boolean(initialError)} onClick={() => void save(true)}>Restaurar original</Button>}
         <Button variant="ghost" onClick={onClose}>Cerrar</Button>
-        <Button disabled={busy || !candidate || !selectedBot || Boolean(initialError)} onClick={() => void save()}>{busy ? "Preparando…" : "Aplicar carátula"}</Button>
+        <Button disabled={busy || !candidate || (!selectedBot&&!onApply) || Boolean(initialError)} onClick={() => void save()}>{busy ? "Preparando…" : "Aplicar carátula"}</Button>
       </div>
     </DialogContent>
   </Dialog>;

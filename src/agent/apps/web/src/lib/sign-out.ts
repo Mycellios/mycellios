@@ -2,6 +2,7 @@ import { t } from "@lingui/core/macro";
 import { useRef, useState } from "react";
 import { authClient } from "./auth";
 import { signOutMycelliosHost } from "./mycellios-sign-out";
+import { clearNotificationDevice } from "./web-push";
 
 export async function signOut(): Promise<boolean> {
   try {
@@ -11,6 +12,8 @@ export async function signOut(): Promise<boolean> {
     // Ask the server directly: a later shared refresh can supersede the forced one below.
     const check = await authClient.getSession({ query: { disableCookieCache: true } });
     if (check.error || check.data) return false;
+
+    await clearNotificationDevice().catch(() => undefined);
 
     await signOutMycelliosHost();
 

@@ -27,7 +27,7 @@ import {
   Toggle,
   toast,
 } from "@rakazo/ui-web";
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
+import { Disclosure, ExpandedSettings } from "@rakazo/ui-web/components/ui/disclosure";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, LoaderCircle, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -956,7 +956,7 @@ export function McpServersOverlay({
         </div>
     </>
   );
-  if (embedded) return content;
+  if (embedded) return <ExpandedSettings>{content}</ExpandedSettings>;
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
@@ -971,7 +971,7 @@ export function McpServersOverlay({
             <X />
           </DialogClose>
         </DialogHeader>
-        {content}
+        <ExpandedSettings>{content}</ExpandedSettings>
       </DialogContent>
     </Dialog>
   );

@@ -7,6 +7,12 @@
   account/Space-scoped memory-cache/reload guards. Verify Cadencia signal, timeline,
   close/cache/UI tests and actual browser export/re-import; retain the pinned media
   dependency/license and synthetic demo provenance. No remote media fallback.
+  The loaded editor groups preview and closed waveform/detection disclosures
+  beside a compact editing panel with time saved, Create/Download and visible
+  cut review. Stack the panels by available container width. Keep per-cut
+  audition and precise bounds revealed only on selection. Display bounds
+  in seconds with 0.001-second precision; retain explicit vowel opt-in and stop
+  audition when its review panel closes.
 
 - The distributable Android host lives in apps/android and packages apps/web unchanged.
   Keep com.mycellios.android separate from the legacy Expo preview and use a durable
@@ -26,9 +32,22 @@
 # AGENTS.md
 
 - The Hifa Store library unifies hosted static apps and fixed Desktop app launchers.
+  Use marketplace/StoreAppHeader for app titles and the return to Hifa Store;
+  keep unsaved-work guards on that return action. Estudio IA distinguishes a
+  disabled service, missing account connection and temporary catalog failures;
+  catalog retries only discover models and never submit generation or checkout.
+  Render all catalog entries through marketplace/StoreAppCard so cover, title,
+  description and footer geometry stay shared; keep secondary actions in menus.
+  Estudio IA is a catalog app; reserve the Store toolbar for Crear app. Keep its
+  explicit price confirmation and hide recharge when no usable catalog is loaded.
   Keep their execution boundaries separate. Cadencia and Desktop launchers share
-  the directory; personal covers stay scoped to account/Space, and a community
-  list failure must not hide browser-local tools. Owners upload bounded static
+  the directory; legacy cover artifacts remain private to their account/Space.
+  Cover editing belongs inside the creator's app editor, never on Store cards.
+  Built-in apps expose no user cover editor. Community covers use one validated
+  raster file in the encrypted draft and become public only through the existing
+  immutable publication pointer. Keep creator/Space checks in every write path,
+  including legacy appCovers.set; an artifact ID never grants public access.
+  A community list failure must not hide browser-local tools. Owners upload bounded static
   files, edit encrypted account/Space drafts and explicitly publish immutable
   revisions. Preserve mandatory `sandbox allow-scripts` response headers without
   same-origin privileges on documents, assets, errors and previews. Public DTOs
@@ -104,6 +123,11 @@
   model menu. Do not expose a second Agent engine switch in Mico settings or
   select an unrelated CLI merely because a PC is connected. New Micos inherit
   the general connection unless the user selects an installed provider.
+  Model-read failures use the shared localized error text and explicit read-only
+  retry, including the compact default-provider selector. Failed catalog/credential
+  reads must not appear as an empty or disconnected provider directory. Recovery
+  preserves open connection fields and scoped caches, reloads the role selector,
+  and never connects/disconnects providers or changes the selected model.
   Sidebar subscription quota reads saved OAuth accounts and the authorized native
   Codex CLI through account/rateLimits/read. Recheck native account/Space grants
   before serving cached quota; forward only sanitized limit metadata, never CLI
@@ -161,6 +185,10 @@
   an owned inference stream to Desktop, never keys, OAuth material or endpoints.
   Keep approval judges on the server and preserve Team/task computer assignments.
   Native run receipts are account/server scoped and forbid replay after restarts.
+  Approval/takeover continuations use a stable hash of the server-owned saved
+  checkpoint as their execution segment. Fence and receipt each segment once,
+  preserve the parent run/project identity, and refuse concurrent or repeated
+  starts. Keep legacy initial-run receipts; reconnection alone grants no segment.
   Keep the native session open for outstanding callback replies after the engine
   ends. Report completion only after the complete stream and acknowledgements.
   Disconnects must not silently substitute a cloud run for an admitted local run.
@@ -263,7 +291,10 @@
   prepare-desktop-version tests; a signed-out packaged startup does not qualify
   account login, real video generation or physical multi-device inference.
 - Workspace navigation uses the single rail and per-account/Space pins. Marketplace
-  reuses the existing connection and skill services; preserve multi-account editors.
+  reuses the existing connection and skill services; preserve multi-account editors. Its
+  menu collapses from a persistent header control, with a device-local preference.
+  Hide only navigation; keep active apps, editors and drafts mounted. Preserve
+  keyboard focus, mobile access and the native caption-control clearance.
   Library shows chat attachments and Mico outputs from the existing artifact index.
   Preserve Space scoping, artifact deep links, version history and previews.
   Inbox entries refer to ordinary Mico task threads through taskBotId and the
@@ -362,7 +393,10 @@
 
 - Settings uses one searchable full-viewport account/Space shell, with a fixed
   section header and independently scrolling content. General contains device UI
-  preferences; Profile owns identity/security; Micos opens the existing per-Mico
+    preferences; Profile owns identity/security and its visible Usage and costs
+    section. Legacy settings=usage focuses that section in Profile; keep
+    usage bound to its selected Space RPC client and retain usage/cost search
+    aliases on Profile. Micos opens the existing per-Mico
   editor and its canonical skills editor. Keep Models, Voice, Approvals, Memory, Usage,
   Computer, Mobile and Updates connected to their existing services, with Billing
   and Logs gated by capability. Search matches field aliases and accents; Escape
@@ -380,10 +414,18 @@
   AntSeed shares the built-in provider detail layout and groups the account's
   AntSeed gateways. Its detail reuses endpoint-bound credentials and the model
   catalog editor. Changing gateway models never changes the account main role.
-  Reply-notification preferences are local per user/device; per-Mico switches save
-  through the owned Space RPC. Hidden previews never reveal reply text or names.
-  Open web clients deliver via the active service worker where available, or the
-  desktop Notification API otherwise. Suppress notices while a same-account tab is
+  Account notification levels and per-Mico overrides use notifications.saveSettings
+  and the shared notificationAllowed policy for both live and push delivery. Device
+  enable/preview/sound/pause preferences stay local; task-alert switches save through
+  the owned Space RPC and remain an additional gate. Hidden previews never reveal
+  reply text or names. The service worker persists device preferences beside its
+  account binding, applies them after restart and clears them on sign-out. Account
+  status failures must not fabricate saved defaults or report a test as delivered.
+  Desktop uses the optional named notifications bridge in native main; retain
+  at most 50 alerts, validate main-frame origin and internal chat targets, and clear
+  them on account/window changes. Keep the Windows AppUserModelID aligned with
+  the installer. Older clients retain the browser Notification API; web clients
+  use the active service worker where available. Suppress notices while a same-account tab is
   focused. Click destinations must stay inside the deployed app and the target Space.
   A focused conversation plays a short cue after a persisted reply completes.
   Honor the device sound, mute and attention settings and the Mico's preference.
@@ -394,19 +436,43 @@
   Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.
+  Explicit, confirmed sign-out clears the local worker account binding and native
+  alerts; closing a tab/app keeps its background subscription. Reconcile actual
+  subscription/key state instead of trusting only the server registration flag.
   The push worker uses event-specific copy and bundled notification artwork. Put
   later icons in avatarArt so installed workers with the original allowlist
   still deliver the notice with the generic mushroom. When
   previews are off it displays a generic mascot and hides conversation identity.
   Regenerate the small PNGs with `node packages/ui-tokens/scripts/export-notification-art.ts`.
   Qualify delivery and the destination on an installed PWA on a physical phone.
+  Mobile boot/resume only refreshes prior opt-ins; request OS consent from settings.
+  Android creates the stable default channel before registration. Pin asynchronous
+  token registration to its original account/server session. The additive
+  mobile_push_devices table retains up to 20 encrypted devices per account and the
+  legacy push_tokens row; revoke only the current session on device unsubscribe.
+  Promote API and worker together with that migration. Shared background filters
+  and preview privacy apply to native mobile and Web Push. Session DateTime fields
+  are UTC timestamps without timezone: compare raw SQL against now() AT TIME ZONE
+  'UTC', leaving timestamptz outbox fields unchanged. Verify with
+  `node --import tsx scripts/verify-notification-devices-db.ts` through the queue.
+  A native Android WebView build without push must say so; do not claim Expo,
+  APNs/FCM or closed-app delivery without owned configuration and physical proof.
   Web update checks share the existing guarded tracker; they never deploy servers
   or reload through open settings/drafts/calls. Desktop uses the installed package's
   real updater policy; do not fabricate channel/automatic-install permissions.
-  Account navigation keeps secondary tools under More settings. Models remain
+  Account navigation shows all authorized sections directly. Models remain
   reachable from Micos, approvals from Computer use and usage from Billing.
-  Font choices, notification filters, account access and connected voice services
-  use shared state-preserving disclosures; search must still reveal their fields.
+  Settings sections stay visible under headings, including advanced fields,
+  notification filters, account access, voice services, MCP and version details.
+  ExpandedSettings scopes the shared Disclosure presentation to settings and
+  their portalled subpanels; do not globally change chat/tool disclosures.
+  Preserve field state, save/leave guards and masked credentials. Skills and
+  usage load on entering their section; search can reach every visible field.
+  Updates use one compact channel/version/action group. Local Vite previews do
+  not advertise Stable or a disabled release-check button. Packaged empty-feed
+  installs retain their actual channel and may retry metadata. Compare returned
+  web builds before claiming up-to-date; retain guards instead of forcing reloads.
+  Do not mix animation demos/raw build details into ordinary update actions.
   Desktop update choices persist transactionally in update-preferences.json.
   Disabling automatic downloads checks metadata without fetching the installer.
   Idle restarts require both a fresh renderer acknowledgement and an idle native
@@ -525,6 +591,45 @@
   system browser for a runner preview. Keep the toolbar usable at narrow widths.
 
 - Source preview commands are npm run dev:local:backend and dev:local:web.
+  Application behavior reuses AppBehavior's transactional native settings and OS
+  startup/power ports. The shell owns explicit startup preferences; account
+  computer consent must not overwrite them. Quick reconnection keeps only an
+  already authorized live remote transport after the last window closes;
+  explicit Quit stops it, and a second launch reopens the UI in the same process.
+  Keep this distinct from hiding the full app in the background. Unavailable
+  native controls are disabled on web; restoring the workspace works on both.
+  Product measurement remains opt-in. New screen events use a random installation
+  identifier unless consent is bound to the currently signed-in account. The
+  server derives linked identity from the authenticated actor, strips request
+  metadata before the fixed analytics event allowlist and pseudonymizes through
+  the existing optional configured collector. Never send email, content or URLs.
+  Verify AppBehavior, account-computer-background, App analytics, native settings
+  UI and authenticated analytics route tests; physical OS acceptance is separate.
+  External-link destination lives with conversation preferences. Reuse native
+  settings.state/update and its existing isolated browser; keep pending saves
+  navigation-blocking and never show a failed save as selected. Web exposes the
+  system browser only and explains the Desktop-only integrated browser instead
+  of offering an unsupported embedded or custom executable destination.
+  Show agent steps is an expansion preference, never permission to hide a turn's
+  available tool history. Legacy off values render folded steps; expanded opens
+  them by default. Synchronize storage events across windows and retain choices
+  in memory when persistence is blocked. Manual disclosure choices survive new
+  steps; a changed default applies to live activity too. Only describe steps the
+  runtime actually supplies; do not promise missing reasoning or memory diffs.
+  UI language preferences distinguish system mode from the activated locale.
+  First visits follow navigator.languages/navigator.language, choosing the first
+  supported locale (English fallback). Keep explicit saved choices, and refresh
+  on languagechange only in system mode; catalog fallback must not persist a
+  detected language over system mode. Verify ui-locale and i18n-system tests.
+  For an already running preview, use npm run dev:local:status: parallel, bounded,
+  read-only probes check the Vite HMR client, React Refresh and API/worker readiness.
+  This is service readiness, not browser interaction or release qualification.
+  Visual-only iterations use the existing Vite/React hot reload; do not install,
+  run turbo build/check, package Desktop or restart healthy services for them.
+  Review the narrow diff and inspect the changed surface. If browser automation
+  is unavailable, report that limitation rather than repeating the same timeout.
+  Functional changes retain affected tests/types; publication retains its real
+  build, provenance and health gates. Never label omitted checks as passed.
   They use the existing embedded PostgreSQL server, a separate local worker and
   Vite; the Browser profile waits for API/database readiness and a fresh worker
   heartbeat before starting the frontend. RAKAZO_PROJECT_LOCAL prevents dotenv
@@ -595,6 +700,13 @@
   installed mobile PWA, while keeping the guide available. Describe Home Screen
   installation honestly as a web app, separate from native store/Desktop releases.
   Share only the server's Agent entry URL, never a chat URL or authorization data.
+  Mobile settings show real owned sessions as phone cards. Reads/revocations are
+  scoped to the live account and stale async results are discarded. Focus refreshes
+  the list; bounded polling runs only while adding a phone. Preserve fresh-session
+  confirmation and revoke by public session ID, never by exposing bearer tokens.
+  A permanent link/QR opens the same server and still requires sign-in; it is not
+  a single-use login credential. Block pairing/copy on loopback previews rather
+  than silently sending a user to a different cloud server.
   Keep service configuration private. The elevated helper may publish only the
   non-secret node ID under the protected runtime install root; reading that ID
   never grants ownership or replaces enrollment. Linux descriptors must be root
@@ -686,6 +798,16 @@
 - Coalesce event-driven thread/sidebar reads per subscription, retaining invalidations
   received while reading and disposing queues on navigation. A serial read timeout starts
   only when that read starts, not while it is waiting behind another read.
+- Computer-use settings recheck server health and the reported environment before
+  showing a configured state; unknown/test providers and failed refreshes never
+  inherit a cached green status. Keep local-device access distinct from a Mico
+  environment. Reading settings must not request consent or start/stop work.
+- Billing stays visible when payments are disabled, with no payment RPCs in that
+  state. Keep server connections separate from account subscriptions/model Credits;
+  adding a saved server is not buying hosting. Reuse native server-switch guards,
+  current billing owner permissions and the existing ledger/checkout controls.
+  Never infer a commercial license, free-use restriction or hosting plan from an
+  account access flag. Failed reads must not become empty or active paid plans.
 - A running computer does not prove its screen is connected. Offer screen retry and
   confirmed recovery separately, preserving the recovery dialog during background refreshes.
 
@@ -796,13 +918,36 @@
   only the owned account/Space roster, clear it on sign-out/scope exit, validate
   bounded PNG avatars and accept selections only from companion windows and the
   current roster. Result text is opt-in. Preserve click-through when auto-hidden.
+  Dock size (75–150%), edge offset, active-app visibility and display selection
+  are device-local. Missing displays fall back to the main window's screen. The
+  drag handle and arrow keys persist position through the private write queue;
+  failed writes retain confirmed preferences. Completed-result previews expire
+  after eight seconds and never replay historical results on scope entry.
+  Browser dock controls are an explicit unsaved preview, not an OS overlay.
+  Island scope filters are device-local and keyed by the full account/Space scope.
+  New-scope defaults never overwrite explicit choices; switching that default in
+  settings freezes known scopes first. Excluded scopes publish no question reads.
+  Legacy preferences acquire safe defaults without losing size/behavior. Browser
+  Island controls are an explicit unsaved preview, never an OS-overlay claim.
+  Size sliders preview while dragging and commit on release/keyboard/blur, retaining
+  confirmed values on write failures. Idle branding uses the Mycellios mark and
+  clears on sign-out, including an empty roster.
+  The detached collapsed island uses a 212 x 32 capsule at default scale, with
+  avatar and state at opposite edges; keep names and question text in its expanded
+  panel and accessible label. Rasterize the actual avatar body, excluding decorative
+  rings, and embed only bounded same-origin sprite assets before SVG-to-PNG capture.
   The question island publishes only current ordinary pending asks while enabled;
   keep credentials and approval cards in the main chat. Re-read the owned thread
   before each answer, preserve the server answer fence, bind every IPC response to
   account/Space/prompt/nonce, and revoke pending actions on scope exit. Later only
   collapses the panel. Test companion questions, renderer and trusted native bridge.
-- Device Voice preferences set dictation hints, local device voice and playback
-  speed. Model downloads require a user gesture. Optional screen-usage reporting
+- Device Voice preferences select automatic/local/provider/device dictation and
+  local/provider/device spoken output. Explicit device playback wins over an installed
+  Supertonic model and never uploads text; explicit local dictation fails closed if
+  Parakeet is unavailable. Parakeet shows automatic language detection without
+  overwriting the saved provider hint. System-default recognition keeps the actual
+  browser language region. Voice previews are scoped, cancellable and stop on
+  engine/voice/speed changes. Native preparation blocks settings navigation. Model downloads require a user gesture. Optional screen-usage reporting
   is off until this device opts in; this does not disable security/error reporting.
 - General settings retain upstream SettingsGroup/SettingsRow geometry: grouped
   rows with compact controls beside labels, wrapping on narrow screens. Keep
@@ -1159,6 +1304,8 @@
   using the actual shaded face color. The twelve velvet bodies use short frontal felt eyes with per-body scale; avoid applying a spherical head rotation to them. Frame each velvet body from its full alpha silhouette with 32 source pixels of padding; preserve source face anchors when changing crops. Keep explicit web velvet
   choices and the original-color option. Animate the eyes in web previews and
   honor reduced motion. Verify bot-avatar and create-bot-dialog tests.
+  Empty personal chats use the selected Mico's full saved color/shape encoding
+  and identity, matching its roster and dock rather than the generic brand avatar.
   Non-loading brand placeholders use AuthMushroom with the shared velvet BotAvatar; the historical mark is reserved for MycelliosLoader/loader.svg. New Mico opens with the green brand mushroom, which also starts the automatic
   avatar assignment in an empty space. Later Micos use the mycelium rotation. Web eyes use the MIT Bloub idle drift/blink math through a shared 30 fps clock, paused offscreen, on blur and under reduced motion. Verify mycelium-avatar.test.tsx.
 
@@ -1173,17 +1320,43 @@
 
 - The conversation header adapts to its own container width when a side panel opens. Keep action buttons from shrinking, collapse the model label, and retain narrow task navigation through its menu.
 
+- Profile summarizes 365 civil days from the existing Space-bound usage.dashboard
+  in the user's timezone. Never describe these account/Space totals as device-only
+  activity, count cached token buckets twice, or turn missing usage into zero.
+  Keep exact/known totals and partial coverage, account/Space async guards and
+  previous data on refresh failure. Share renders a reviewed local PNG with only
+  display name and aggregates, never email, identifiers or conversations; it does
+  not publish. Reuse the existing name/sign-out and owned-session revocation flows.
+
 - Keep the Mico settings overview compact. Open instructions, memory, computer,
   permissions and advanced controls in separate views within the same panel.
   Keep instruction drafts and their conflict baseline across that navigation.
   Verify bot-panel and InstructionSettings tests.
 
 - Busy chat sends distinguish queued messages from corrections to the live task.
+  Mico owner preferences use preferences.micos/updateMicos with revision-based
+  conflict detection. Account defaults and nullable per-Mico inheritance stay
+  separate from the device busy-message default. Bulk changes affect only owned,
+  unarchived Micos in the selected Space. Models cannot edit these permissions.
+  Local scripts additionally require a native host grant bound to server/account/
+  Space, a private bearer key and a durable per-Mico rolling hourly quota. Keep
+  the loopback listener browser-inaccessible and its fixed RPC allowlist narrow.
+  Run scripts/mico-local.mjs --connection <private-file> --request <request.json>;
+  requests contain action, botId and nonce (send also text; routine routineId;
+  answer runId/messageId/answer; approval runId/messageId/decision allow or deny).
+  Never print the connection key. Old Desktop builds and web cannot grant a host.
+  start_new_chat saves encrypted handoff notes, rotates only a long personal
+  chat after completion at an idle boundary, and invalidates old checkpoints.
+  Keep history, queued work and manual-reset guards; never create a paid follow-up
+  merely to rotate context. Plan/co-author guidance grants no action permission.
   Explicit queue entries use steering origin queued_user and are drained FIFO;
   the running turn must not claim them as steering or release a human takeover.
   Queue reads use the authenticated owned thread resolver, including side threads.
   Micos may override the device's busy-message default. A null override inherits
   the device setting. Keep group conversations and the per-message choice independent.
+  Keep delivery choices inside the composer's Add menu, not in a persistent row
+  beneath the field. Show the pending list only when saved queue entries exist;
+  Ask aside shares the Add menu and never sends or steers the main task.
   Repeat automatically opens an unsaved routine from the original user request;
   it never schedules an assistant result or starts a routine before Save.
 
@@ -1242,7 +1415,7 @@
   Network voice errors carry only allowlisted public reason codes; rejected model
   keys are 403, never a lost-login 401. Preview requests are single-flight and
   scoped to the account/Mico/Space; cancel on output changes and ignore late results.
-  Mico settings keep individual overrides in a searchable disclosure. Block
+  Mico settings keep individual overrides in a visible searchable list. Block
   navigation while an override is being saved and retain confirmed values on failure.
   Native host admission and missing-executable failures use computer recovery,
   never a generic provider error or a blind retry. Preserve native host consent.
@@ -1251,6 +1424,26 @@
   indicator requires a supported, connected, confirmed contributor and clears
   on errors or unmount. Animate only verified contribution-earned deltas; never
   mint display credits from timers, purchases, promotions or unconfirmed jobs.
+  Verified browser work requests a wallet refresh in bounded one-second bursts;
+  only authenticated wallet deltas can change the displayed earned balance.
+  Preserve sanitized authority 401/403 statuses through the adapter and RPC so
+  revoked sessions clear stale balances, without exposing response diagnostics.
+  Contribution activation uses `motion/mini`; cancel all playback controls and
+  remove the transient SVG on pause/unmount. The diffuse bottom halo follows
+  confirmed connectivity, never the activation animation or an inferred credit gain.
+  Local SSO is explicit: `.cache/local-sso-enabled` loads only the dedicated
+  Dev OAuth client from Windows DPAPI, never inherited production credentials.
+  Its registered loopback callback on 5188 forwards only the exact OAuth GET to
+  local auth; preserve issuer, nonce, PKCE and explicit account-link checks.
+  Keep project-preview data and password sessions during this opt-in upgrade.
+  Verify `node --test scripts/project-local-env.test.mjs scripts/project-local-sso.test.mjs`.
+  Browser contribution loads src/mobile/runtime only on activation, uses its signed
+  identity and the same-origin /mobile/v1 transport, and stops on account changes
+  or unmount. Embedded mode must not reload the chat or restore compute from a
+  standalone worker's update flag. Development transport targets are fixed to
+  Mycellios or loopback; never forward Agent cookies. Matrix verification is not
+  evidence of a credit award. Verify BrowserContributionControl/SidebarContribution
+  tests and the real local browser/coordinator activation-pause cycle separately.
 
 - Roster hover previews use existing scoped row messages and real run states.
   Do not fetch threads or mark messages read on hover; keep clicks, context menus
@@ -1279,3 +1472,11 @@
   questionnaire and resume only via the existing scoped, fenced answer operation.
   Skip supplies no authorization. Credentials and protected actions keep their
   dedicated cards. Verify questionnaire, AskCard, Pi/native pause and continuation tests.
+
+- Mycellios creation keeps the authenticated viewer pinned for quote, execute,
+  status, content and checkout. Keep stable purchase keys, quote-before-confirm,
+  GET-only recovery and separate checkout; no blind paid replay or personal-key
+  fallback. Voice/duration use the shared selectors; transcription is converted
+  locally to bounded PCM; batches/rerank/evaluation use bounded plain text.
+  Verify MycelliosCreate and mycellios-media tests. Local synthetic UI results
+  do not qualify live supplier inference, actual Credits or real payments.

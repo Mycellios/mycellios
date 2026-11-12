@@ -44,6 +44,7 @@ import {
 } from "../voice.js";
 import type { RouterContext } from "./context.js";
 import { meDto } from "./shared.js";
+import { micoSettingsState, updateMicoSettings, applyMicoBusyMode } from "../mico-settings.js";
 
 export function accountRoutes(ctx: RouterContext) {
   const { deps, os, authed } = ctx;
@@ -68,7 +69,9 @@ export function accountRoutes(ctx: RouterContext) {
     },
     analytics: {
       screen: authed.analytics.screen.handler(async ({ context, input }) => {
-        deps.analytics?.capture(context.actor.userId, { name: "screen_viewed", ...input });
+        const subject = input.linkAccount === true || !input.installationId
+          ? context.actor.userId : `installation:${input.installationId}`;
+        deps.analytics?.capture(subject, { name: "screen_viewed", screen: input.screen, surface: input.surface });
         return { ok: true as const };
       }),
     },
@@ -95,6 +98,9 @@ export function accountRoutes(ctx: RouterContext) {
       ),
     },
     preferences: {
+      micos: authed.preferences.micos.handler(({ context }) => micoSettingsState(deps.prisma, context.actor)),
+      updateMicos: authed.preferences.updateMicos.handler(({ context, input }) => updateMicoSettings(deps.prisma, context.actor, input)),
+      applyBusyMode: authed.preferences.applyBusyMode.handler(({ context, input }) => applyMicoBusyMode(deps.prisma, context.actor, input.mode, (id, seq) => deps.events.notify(id, seq))),
       update: authed.preferences.update.handler(async ({ context, input }): Promise<Me> => {
         await deps.prisma.user.update({
           where: { id: context.actor.userId },
@@ -191,6 +197,7 @@ export function accountRoutes(ctx: RouterContext) {
         return deps.webPush.saveSettings(context.actor.userId, input);
       }),
       webRegister: authed.notifications.webRegister.handler(async ({ context, input }) => {
+        if (input.expectedUserId !== undefined && input.expectedUserId !== context.actor.userId) throw new ORPCError("FORBIDDEN");
         if (!deps.webPush?.config) throw new ORPCError("SERVICE_UNAVAILABLE");
         if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
         await deps.webPush.register(context.actor.userId, context.sessionId, input.clientId, input.subscription);
@@ -219,7 +226,8 @@ export function accountRoutes(ctx: RouterContext) {
         return { ok: true as const };
       }),
       unregisterPush: authed.notifications.unregisterPush.handler(async ({ context }) => {
-        await deps.pushTokens.remove(context.actor.userId);
+        if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
+        await deps.pushTokens.endSession(context.actor.userId, context.sessionId);
         return { ok: true as const };
       }),
     },

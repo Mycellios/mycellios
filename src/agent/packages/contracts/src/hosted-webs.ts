@@ -25,6 +25,7 @@ export const HostedWebBundle = z
       .max(HOSTED_WEB_LIMITS.files),
   })
   .strict();
+export const HOSTED_WEB_COVER_FILES = {"image/png":"mycellios-cover.png","image/jpeg":"mycellios-cover.jpg","image/webp":"mycellios-cover.webp"} as const;
 export const HostedWebCard = z.object({
   id: z.string(),
   slug: HostedWebSlug,
@@ -38,6 +39,8 @@ export const HostedWebCard = z.object({
   owned: z.boolean(),
   updatedAt: z.string(),
   forkedFrom: z.string().nullable(),
+  coverPath:z.enum(["mycellios-cover.png","mycellios-cover.jpg","mycellios-cover.webp"]).nullable().optional(),
+  coverRevisionId:z.string().uuid().nullable().optional(),
 });
 export const HostedWebDraft = z.object({
   id: z.string(),

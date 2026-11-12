@@ -50,6 +50,12 @@ describe("static website admission", () => {
       }),
     ).toThrow();
   });
+  it("admits one genuine raster cover but rejects spoofed or ambiguous covers",()=>{
+    const cover={path:"mycellios-cover.png",base64:Buffer.from([137,80,78,71,13,10,26,10]).toString("base64")};
+    expect(admitStaticBundle({files:[file("index.html"),cover]}).bundle.files).toHaveLength(2);
+    expect(()=>admitStaticBundle({files:[file("index.html"),file("mycellios-cover.png","<svg/>")]})).toThrow();
+    expect(()=>admitStaticBundle({files:[file("index.html"),cover,{...cover,path:"mycellios-cover.jpg"}]})).toThrow();
+  });
   it("blocks recognizable credentials, including inside source", () => {
     expect(() =>
       admitStaticBundle({ files: [file("index.html", "-----BEGIN PRIVATE KEY-----")] }),

@@ -1,0 +1,14 @@
+.mobile-connection-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
+.mobile-connection-heading h3 { margin:0; font-size:14px; font-weight:500; }.mobile-connection-heading p { max-width:36ch; margin:4px 0 0; font-size:13px; color:var(--muted-foreground); }
+.mobile-connection-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }.mobile-connection-actions > span { max-width:220px; overflow-wrap:anywhere; }
+.rk-general-settings section > .mobile-device-grid { padding:0; background:transparent; }
+.mobile-device-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.mobile-device-card,.mobile-permanent-link { display:flex; gap:12px; min-width:0; align-items:flex-start; padding:16px; border:1px solid var(--border); border-radius:12px; background:var(--muted); }
+.mobile-device-icon { display:grid; place-items:center; flex-shrink:0; width:32px; height:32px; border-radius:9px; background:var(--background); color:var(--muted-foreground); }
+.mobile-device-copy { min-width:0; flex:1; }.mobile-device-copy h4,.mobile-permanent-link strong { margin:0; display:block; font-size:14px; font-weight:500; overflow-wrap:anywhere; }
+.mobile-device-copy p,.mobile-device-copy > span,.mobile-permanent-link > span > span { display:block; margin:4px 0 0; font-size:12px; line-height:1.5; color:var(--muted-foreground); overflow-wrap:anywhere; }
+.mobile-device-card > button { flex-shrink:0; margin-top:-5px; }.mobile-permanent-link { cursor:pointer; text-align:left; border-style:dashed; color:var(--foreground); font:inherit; min-height:126px; transition:background 140ms ease-out; }
+.mobile-permanent-link:hover { background:var(--accent); }.mobile-permanent-link:focus-visible { outline:2px solid var(--ring); outline-offset:3px; }
+.mobile-connection-notice { display:flex; align-items:flex-start; flex-wrap:wrap; gap:10px; padding:14px; border:1px solid var(--border); border-radius:12px; font-size:13px; color:var(--muted-foreground); }.mobile-connection-notice svg { flex-shrink:0; }.mobile-connection-notice p { margin:0; flex:1; min-width:180px; }
+@media(max-width:640px) { .mobile-device-grid { grid-template-columns:minmax(0,1fr); }.mobile-device-card { flex-wrap:wrap; }.mobile-device-copy { min-width:120px; } }
+@media(prefers-reduced-motion:reduce) { .mobile-permanent-link { transition:none; } }

@@ -107,6 +107,10 @@ export interface RakazoDesktop {
     onSelect: (listener: (target: { scope: string; botId: string; respond?: boolean }) => void) => () => void;
   };
   /** Preferences of this computer. Older releases have no settings bridge. */
+  localScripts?: {
+    state: () => Promise<{ enabled: boolean; requestsPerHour: number; endpoint: string | null; configPath: string }>;
+    configure: (patch: { enabled?: boolean; requestsPerHour?: number }) => Promise<{ enabled: boolean; requestsPerHour: number; endpoint: string | null; configPath: string }>;
+  };
   settings?: {
     state: () => Promise<DesktopBehaviorSettings>;
     update: (patch: Partial<DesktopBehaviorSettings>) => Promise<DesktopBehaviorSettings>;
@@ -150,6 +154,14 @@ export interface RakazoDesktop {
   /** Optional for compatibility with older desktop releases. */
   badge?: {
     set: (count: number) => Promise<boolean>;
+  };
+  /** Native OS delivery; absent on older installed Desktop versions. */
+  notifications?: {
+    clear: () => Promise<void>;
+    status: () => Promise<{ supported: boolean; settingsAvailable: boolean }>;
+    show: (input: { title: string; body: string; tag: string; url: string; silent: boolean }) => Promise<void>;
+    openSettings: () => Promise<boolean>;
+    onOpen: (listener: (url: string) => void) => () => void;
   };
   computer?: {
     /** Native main persists host choice through its local capability, never a user session. */
@@ -198,6 +210,7 @@ export interface RakazoDesktop {
 export interface DesktopBehaviorSettings {
   launchAtLogin: boolean | null;
   keepRunningInBackground: boolean;
+  keepRemoteSessions?: boolean;
   keepAwake: boolean | null;
   keepAwakeOnBattery: boolean;
   externalLinkTarget: "system" | "app";

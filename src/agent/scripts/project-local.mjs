@@ -6,7 +6,17 @@ import {applyProjectLocalEnvironment,projectRoot} from './project-local-env.mjs'
 
 const mode = process.argv[2];
 if (!['backend', 'web'].includes(mode)) throw new Error('Use project-local.mjs backend|web');
-const env = applyProjectLocalEnvironment();
+const env = applyProjectLocalEnvironment({account: mode === 'backend'});
+if (mode === 'web') {
+  // Apply before the child loads Rolldown/Tailwind native libraries. Keep the
+  // interactive PC responsive and return unused native pages promptly.
+  Object.assign(env, {
+    ROLLDOWN_WORKER_THREADS: '2',
+    RAYON_NUM_THREADS: '2',
+    MIMALLOC_PURGE_DELAY: '0',
+    MIMALLOC_ARENA_EAGER_COMMIT: '0',
+  });
+}
 const require = createRequire(import.meta.url);
 const args = mode === 'backend'
   ? ['--import', 'tsx', fileURLToPath(new URL('./project-local-backend.ts', import.meta.url))]

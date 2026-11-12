@@ -1255,13 +1255,8 @@ it("keeps connection and key inside one advanced section for compatible servers"
   const view = await renderSettings(false);
   try {
     await pick("Change Main model", "OpenAI-compatible");
-    for (const name of ["Advanced settings"]) {
-      const row = buttons(view.container, name)[0]!;
-      expect(row.getAttribute("aria-expanded")).toBe("false");
-      expect(row.querySelector("svg")).not.toBeNull();
-      await act(async () => row.click());
-      expect(row.getAttribute("aria-expanded")).toBe("true");
-    }
+    expect([...view.container.querySelectorAll("button")].some(button => button.textContent?.includes("Advanced settings"))).toBe(false);
+    expect([...view.container.querySelectorAll("h3")].some(heading => heading.textContent === "Advanced settings")).toBe(true);
     expect([...view.container.querySelectorAll("button")].some((button) => button.textContent === "Connection settings")).toBe(false);
     expect([...view.container.querySelectorAll("button")].some((button) => button.textContent === "API key")).toBe(false);
   } finally {
@@ -1340,7 +1335,7 @@ it.each([undefined, "api_key", "oauth"])(
   },
 );
 
-it("folds the key form behind Or paste an API key once a subscription is signed in", async () => {
+it("shows the masked key form directly beside subscription sign-in in settings", async () => {
   vi.mocked(rpc.me).mockResolvedValue(account("anthropic", "claude-fixture"));
   models.list.mockResolvedValue([
     {
@@ -1365,8 +1360,7 @@ it("folds the key form behind Or paste an API key once a subscription is signed 
   const view = await renderSettings();
   try {
     await manage();
-    expect(view.container.querySelector("#model-api-key")).toBeNull();
-    await click(buttons(view.container, "Or paste an API key")[0]);
+    expect([...view.container.querySelectorAll("button")].some(button => button.textContent?.includes("Or paste an API key"))).toBe(false);
     expect(keyField(view.container)).toBeTruthy();
     expect(buttons(view.container, "Connect API key")).toHaveLength(1);
     expect(view.container.textContent).not.toContain("Replace API key");
@@ -1540,4 +1534,43 @@ it("shows what a disconnect left, not a read sent before it", async () => {
   } finally {
     await view.unmount();
   }
+});
+
+it("recovers provider reads after a network failure without presenting an empty disconnected directory", async () => {
+  models.list.mockRejectedValue(new TypeError("Failed to fetch")); models.credentials.mockRejectedValue(new TypeError("Failed to fetch"));
+  const view = await renderSettings(true, testQueryClient(), "account", true);
+  try {
+    expect(view.container.textContent).not.toContain("Failed to fetch");
+    expect(view.container.textContent).toContain("Your providers could not be checked");
+    expect(view.container.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(view.container.textContent).not.toContain("No results"); expect(view.container.textContent).not.toContain("No model catalog is available");
+    models.list.mockResolvedValue([deepseekEntry]); models.credentials.mockResolvedValue([deepseekCredential]);
+    await click([...view.container.querySelectorAll("button")].find(button => button.textContent === "Retry"));
+    await act(async () => { await Promise.resolve(); });
+    expect(view.container.querySelector('[role="alert"]')).toBeNull();
+    expect(view.container.textContent).toContain("DeepSeek"); expect(models.connect).not.toHaveBeenCalled(); expect(models.disconnect).not.toHaveBeenCalled(); expect(models.setRole).not.toHaveBeenCalled();
+  } finally { await view.unmount(); }
+});
+it("offers a translated retry for an isolated compact default-model read failure", async () => {
+  models.role.mockRejectedValue(new TypeError("Failed to fetch"));
+  const view = await renderSettings(true, testQueryClient(), "account", true);
+  try {
+    const role = view.container.querySelector('[data-testid="default-provider"]')!;
+    expect(role.textContent).not.toContain("Failed to fetch");
+    expect(role.querySelector('[role="alert"]')).not.toBeNull();
+    models.role.mockResolvedValue({ primary: null, backups: [] });
+    await click([...role.querySelectorAll("button")].find(button => button.textContent === "Retry"));
+    expect(role.querySelector('[role="alert"]')).toBeNull(); expect(models.setRole).not.toHaveBeenCalled();
+  } finally { await view.unmount(); }
+});
+it("retries failed provider reads on reconnect without writing a provider choice", async () => {
+  const visible = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  models.list.mockRejectedValue(new TypeError("Failed to fetch"));
+  const view = await renderSettings(true, testQueryClient(), "account", true);
+  try {
+    models.list.mockResolvedValue([deepseekEntry]);
+    await act(async () => window.dispatchEvent(new Event("online")));
+    await act(async () => { await Promise.resolve(); });
+    expect(view.container.querySelector('[role="alert"]')).toBeNull(); expect(models.setDefault).not.toHaveBeenCalled(); expect(models.connect).not.toHaveBeenCalled();
+  } finally { visible.mockRestore(); await view.unmount(); }
 });

@@ -112,6 +112,23 @@ function rerenderComposer(overrides: Partial<ComponentProps<typeof Composer>>) {
   act(() => root?.render(<Composer {...composerProps} />));
 }
 
+async function openAddMenu() {
+  await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Add to message"]')!.click());
+}
+
+async function chooseDelivery(label: string) {
+  await openAddMenu();
+  const item = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(item => item.textContent === label);
+  expect(item).toBeDefined();
+  await act(async () => item!.click());
+}
+
+async function askFromAddMenu() {
+  await openAddMenu();
+  const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent === "Ask aside");
+  await act(async () => item!.click());
+}
+
 it("adds review comments and local files once to an editable draft without sending", () => {
   const send = vi.fn(async () => true);
   const attach = vi.fn(() => true);
@@ -1051,6 +1068,8 @@ it("accepts file drops in transparent padding only during file drags", () => {
 it("defaults a busy message to the durable queue and lets the user explicitly steer", async () => {
   const onSend = vi.fn().mockResolvedValue(true);
   const textarea = renderComposer(onSend, { running: true });
+  expect(container!.querySelector('select[aria-label="Send message to"]')).toBeNull();
+  expect(container!.querySelector('[data-testid="busy-message-actions"]')).toBeNull();
   const type = async (value: string) => act(async () => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, value);
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1059,10 +1078,7 @@ it("defaults a busy message to the durable queue and lets the user explicitly st
   await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Add to queue"]')!.click());
   expect(onSend).toHaveBeenLastCalledWith("Do this afterwards", [], expect.any(String), "queue");
   expect(container!.textContent).toContain("Message saved in the queue.");
-  await act(async () => {
-    const select = container!.querySelector<HTMLSelectElement>('select[aria-label="Send message to"]')!;
-    select.value = "steer"; select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await chooseDelivery("Update current task");
   await type("Use the shorter version instead");
   await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Update current task"]')!.click());
   expect(onSend).toHaveBeenLastCalledWith("Use the shorter version instead", [], expect.any(String), "steer");
@@ -1078,10 +1094,10 @@ it("uses the saved busy-message preference and still permits a per-message overr
   setGeneralPreferences({ busyMessageMode: "steer" });
   const onSend = vi.fn().mockResolvedValue(true);
   const textarea = renderComposer(onSend, { running: true });
-  const select = container!.querySelector<HTMLSelectElement>('select[aria-label="Send message to"]')!;
-  expect(select.value).toBe("steer");
+  type(textarea, "Do this later");
+  expect(container!.querySelector('[aria-label="Update current task"]')).not.toBeNull();
+  await chooseDelivery("After this task");
   await act(async () => {
-    select.value = "queue"; select.dispatchEvent(new Event("change", { bubbles: true }));
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Do this later");
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   });
@@ -1093,11 +1109,11 @@ it("uses a Mico's saved choice before the device default", async () => {
   setGeneralPreferences({ busyMessageMode: "steer" });
   const onSend = vi.fn().mockResolvedValue(true);
   const textarea = renderComposer(onSend, { running: true, busyMessageMode: "queue" });
-  expect(container!.querySelector<HTMLSelectElement>('select[aria-label="Send message to"]')?.value).toBe("queue");
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(textarea, "Do this later");
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
   });
+  expect(container!.querySelector('[aria-label="Add to queue"]')?.getAttribute("title")).toBe("Send when this task finishes");
   await act(async () => container!.querySelector<HTMLButtonElement>('[aria-label="Add to queue"]')!.click());
   expect(onSend).toHaveBeenLastCalledWith("Do this later", [], expect.any(String), "queue");
 });
@@ -1165,7 +1181,7 @@ it("dictates into a reviewable draft without recording an audio attachment or se
 
 it("moves an unattached text draft to the side pane without sending or steering the main task", async () => {
  const aside=vi.fn(),send=vi.fn();const field=renderComposer(send,{onAskAside:aside,running:true,busyMessages:true});type(field,"Question about this chat");
- await act(async()=>container!.querySelector<HTMLButtonElement>('[data-testid="busy-message-actions"] button')!.click());
+ await askFromAddMenu();
  expect(aside).toHaveBeenCalledExactlyOnceWith("Question about this chat");expect(field.value).toBe("");expect(send).not.toHaveBeenCalled();
 });
 
@@ -1183,6 +1199,6 @@ it("submits once when Send is pressed twice before React commits", async () => {
 });
 it("leaves files and their draft in the main composer when opening the side pane", async () => {
  const aside=vi.fn();const field=renderComposer(vi.fn(),{onAskAside:aside,running:true,busyMessages:true,pendingAttachments:[{id:"file",threadKey:"bot:bot-1",file:new File(["x"],"image.png",{type:"image/png"}),previewUrl:"data:image/png;base64,"}]});type(field,"Draft with a file");
- await act(async()=>container!.querySelector<HTMLButtonElement>('[data-testid="busy-message-actions"] button')!.click());
+ await askFromAddMenu();
  expect(aside).toHaveBeenCalledExactlyOnceWith("");expect(field.value).toBe("Draft with a file");
 });

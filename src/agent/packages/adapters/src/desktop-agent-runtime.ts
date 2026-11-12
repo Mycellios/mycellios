@@ -10,6 +10,7 @@ import type { HostComputerRequest } from "./host-computer-protocol.js";
 import { HOST_COMPUTER_MAX_BYTES } from "./host-computer-protocol.js";
 import { desktopModelAccess } from "./desktop-model-access.js";
 import { ComputerUpdatingError } from "./computer-errors.js";
+import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 
 const RESULT_DELIVERY_ATTEMPTS = 3;
 type DesktopImage = NonNullable<AgentRunRequest["currentTurnImages"]>[number];
@@ -193,7 +194,7 @@ export class DesktopAgentRuntime implements AgentRuntime {
     try {
       const wire = encodeRequest(await fitDesktopRequest(request));
       dispatched = true;
-      const response = await this.options.transport({ method: "agentRun", botId: request.botId, runId: request.runId, sessionId, request: wire, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
+      const response = await this.options.transport({ method: "agentRun", botId: request.botId, runId: request.runId, sessionId, segmentId: desktopAgentSegmentId(request), request: wire, ...(context.projectSessionId ? { projectSessionId: context.projectSessionId } : {}) }, owned);
       // No fallback after dispatch: a lost response can conceal real local effects.
       for await (const raw of desktopAgentFrames(response, signal)) {
         for (const usage of trustedUsage.splice(0)) yield usage;

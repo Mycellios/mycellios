@@ -46,6 +46,13 @@ function fixture(
   return { client, webPush };
 }
 describe("notification account RPC", () => {
+  it("rejects subscription enrollment after an account switch", async () => {
+    const f = fixture();
+    await expect(f.client.notifications.webRegister({ clientId: randomUUID(), expectedUserId: "previous-owner",
+      subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/fixture", keys: { p256dh: "A".repeat(87), auth: "A".repeat(22) } },
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(f.webPush.register).not.toHaveBeenCalled();
+  });
   it("does not expose notification state without authentication", async () => {
     const f = fixture(null);
     await expect(

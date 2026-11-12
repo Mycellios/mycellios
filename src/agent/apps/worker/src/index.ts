@@ -263,7 +263,7 @@ async function main() {
     accessToken: process.env.EXPO_ACCESS_TOKEN,
   });
   const webPush = new WebPushService(prisma, resolveEncryptionKey(process.env), jobs, webPushConfig(process.env));
-  const notifications = webPush.config ? notificationChannels(nativeNotifications, webPush) : nativeNotifications;
+  const notifications = notificationChannels(nativeNotifications, webPush);
   const executor = createRunExecutor({
     maxUploadSizeBytes: uploadSizeFromEnv(process.env),
     prisma,

@@ -161,7 +161,7 @@ msgstr "{commandVariable} está reservada y no puede usarse como variable de com
 
 #: src/lib/billing.ts
 msgid "{count} days"
-msgstr ""
+msgstr "{count} días"
 
 #: src/lib/billing.ts
 msgid "{count} months"
@@ -560,7 +560,7 @@ msgstr "Agregar servidor MCP remoto"
 
 #: src/pages/McpServersOverlay.tsx
 msgid "Add server"
-msgstr "Agregar servidor"
+msgstr "Añadir servidor"
 
 #: src/components/integrations/IntegrationSetup.tsx
 msgid "Add server URL"
@@ -916,7 +916,7 @@ msgstr "Token Bearer"
 
 #: src/pages/SettingsOverlay.tsx
 msgid "Billing"
-msgstr ""
+msgstr "Facturación"
 
 #: src/components/ApprovalRulesSettings.tsx
 msgid "Block"
@@ -1119,7 +1119,7 @@ msgstr "Chats"
 #: src/components/ComputersUnavailableHint.tsx
 #: src/pages/HostComputerPrompt.tsx
 msgid "Check again"
-msgstr ""
+msgstr "Volver a comprobar"
 
 #: src/pages/RoutineEditor.tsx
 msgid "Check every"
@@ -1160,7 +1160,7 @@ msgstr "Comprobado {checked}"
 
 #: src/components/ComputersUnavailableHint.tsx
 msgid "Checking computer setup…"
-msgstr ""
+msgstr "Comprobando el equipo…"
 
 #: src/components/McpServerHealthLine.tsx
 msgid "Checking connection…"
@@ -1786,7 +1786,7 @@ msgstr ""
 
 #: src/pages/BillingSettingsPanel.tsx
 msgid "Could not load billing"
-msgstr ""
+msgstr "No se ha podido cargar la facturación"
 
 #: src/pages/IntegrationSetup.tsx
 msgid "Could not load bots. Reload to try again."
@@ -1807,7 +1807,7 @@ msgstr "No se pudieron cargar los servidores MCP"
 
 #: src/pages/model-settings/use-model-settings.ts
 msgid "Could not load model settings"
-msgstr "No se pudo cargar la configuración de modelos"
+msgstr "No se han podido cargar los ajustes de modelos"
 
 #: src/pages/RoutineRunHistory.tsx
 msgid "Could not load run history"
@@ -1847,7 +1847,7 @@ msgstr "No se pudo cerrar sesión. Inténtalo de nuevo."
 #: src/pages/Onboarding.tsx
 #: src/pages/Paywall.tsx
 msgid "Could not open billing"
-msgstr ""
+msgstr "No se ha podido abrir la facturación"
 
 #: src/pages/VoiceSettingsOverlay.tsx
 msgid "Could not play a test clip"
@@ -1864,7 +1864,7 @@ msgstr "No se pudo acceder al servidor del modelo."
 #: src/pages/AccountSettingsOverlay.tsx
 #: src/pages/Auth.tsx
 msgid "Could not reach the server"
-msgstr "No se pudo alcanzar el servidor"
+msgstr "No se ha podido conectar con el servidor"
 
 #: src/pages/shell/agent-import.tsx
 msgid "Could not read these files"
@@ -2882,7 +2882,7 @@ msgstr ""
 
 #: src/pages/BillingSettingsPanel.tsx
 msgid "Inactive"
-msgstr ""
+msgstr "Inactivo"
 
 #: src/pages/shell/message-cards.tsx
 msgid "Inbox & email"
@@ -3084,7 +3084,7 @@ msgstr "Vista de lista"
 
 #: src/pages/ExternalConversationSettings.tsx
 msgid "Listen"
-msgstr ""
+msgstr "Escuchar"
 
 #: src/components/call/CallCard.tsx
 #: src/pages/ExternalConversationSettings.tsx
@@ -6226,7 +6226,7 @@ msgstr "El espacio cambió. Vuelve a abrir Modelos para guardar la lista de resp
 
 #: src/pages/shell/dialogs.tsx
 msgid "Spaces"
-msgstr ""
+msgstr "Espacios"
 
 #: src/pages/shell/transcript.tsx
 msgid "Start with a question, an idea, or something you want to get done."
@@ -7827,7 +7827,7 @@ msgstr "Buscar actualizaciones web"
 
 #: src/pages/settings/SettingsOverlay.tsx
 msgid "Could not check for updates. Try again."
-msgstr "No se han podido buscar actualizaciones. Vuelve a intentarlo."
+msgstr "No se han podido comprobar las actualizaciones. Vuelve a intentarlo."
 
 #: src/pages/settings/SettingsOverlay.tsx
 msgid "Close settings and use the update prompt. Your unfinished work remains protected."
@@ -7835,7 +7835,7 @@ msgstr "Cierra los ajustes y usa el aviso de actualización. Tu trabajo pendient
 
 #: src/pages/settings/SettingsOverlay.tsx
 msgid "Return to app"
-msgstr "Volver a la app"
+msgstr "Volver a la aplicación"
 
 #: src/pages/settings/SettingsOverlay.tsx
 msgid "Desktop updates follow the policy of your installed package. Manual installations use the published downloads."
@@ -10645,7 +10645,7 @@ msgid "Stable"
 msgstr "Estable"
 
 msgid "Could not load update settings. Try again."
-msgstr "No se han podido cargar los ajustes de actualización. Inténtalo de nuevo."
+msgstr "No se han podido cargar los ajustes de actualización. Vuelve a intentarlo."
 
 msgid "Waiting for Micos to finish. You can keep working."
 msgstr "Esperando a que terminen los Micos. Puedes seguir trabajando."
@@ -10870,7 +10870,7 @@ msgid "Floating windows"
 msgstr "Ventanas flotantes"
 
 msgid "Your phones"
-msgstr "Tus móviles"
+msgstr "Tus teléfonos"
 
 msgid "Signed-in phones"
 msgstr "Móviles con sesión iniciada"
@@ -10879,25 +10879,25 @@ msgid "Sign in on your phone using the link above. Your conversations appear wit
 msgstr "Abre el enlace en tu móvil e inicia sesión con tu cuenta para ver tus conversaciones."
 
 msgid "Could not load your phones. Try again."
-msgstr "No se pudieron cargar tus móviles. Inténtalo de nuevo."
+msgstr "No se han podido cargar tus teléfonos. Vuelve a intentarlo."
 
 msgid "Last activity · {0}"
 msgstr "Última actividad · {0}"
 
 msgid "No phones are signed in yet."
-msgstr "Todavía no has iniciado sesión en ningún móvil."
+msgstr "Todavía no hay teléfonos conectados."
 
 msgid "Disconnect this phone?"
-msgstr "¿Desconectar este móvil?"
+msgstr "¿Desconectar este teléfono?"
 
 msgid "The phone will need to sign in again. Your conversations stay in your account."
-msgstr "Tendrás que volver a iniciar sesión en el móvil. Tus conversaciones se conservan en tu cuenta."
+msgstr "El teléfono tendrá que iniciar sesión de nuevo. Tus conversaciones se conservan en tu cuenta."
 
 msgid "Could not disconnect the phone. Try again."
-msgstr "No se pudo desconectar el móvil. Inténtalo de nuevo."
+msgstr "No se ha podido desconectar el teléfono. Vuelve a intentarlo."
 
 msgid "Add phone"
-msgstr "Añadir móvil"
+msgstr "Añadir teléfono"
 
 msgid "Open Mycellios on your phone"
 msgstr "Abre Mycellios en tu móvil"
@@ -11062,7 +11062,7 @@ msgid "Confirm your account"
 msgstr "Confirma tu cuenta"
 
 msgid "Sign in again to manage your phones. Your conversations stay in your account."
-msgstr "Vuelve a iniciar sesión para gestionar tus móviles. Tus conversaciones se conservan en tu cuenta."
+msgstr "Inicia sesión de nuevo para gestionar tus teléfonos. Tus conversaciones se conservan en tu cuenta."
 
 msgid "Continue with your account"
 msgstr "Continuar con tu cuenta"
@@ -11297,3 +11297,929 @@ msgstr "El precio mostrado de los modelos externos incluye el 4 % de servicio My
 
 msgid "Connect Mycellios"
 msgstr "Conectar Mycellios"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Collapse Marketplace menu"
+msgstr "Plegar menú del Marketplace"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Expand Marketplace menu"
+msgstr "Mostrar menú del Marketplace"
+
+msgid "Delivery"
+msgstr "Entrega"
+
+msgid "Desktop"
+msgstr "Escritorio"
+
+msgid "Push connected"
+msgstr "Push conectado"
+
+msgid "Setup needed"
+msgstr "Requiere configuración"
+
+msgid "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
+msgstr "Los avisos de escritorio funcionan mientras Mycellios está en ejecución. Al salir completamente, este equipo deja de recibirlos."
+
+msgid "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
+msgstr "En iPhone o iPad, añade Mycellios a la pantalla de inicio y ábrelo desde allí para activar los avisos en segundo plano."
+
+msgid "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
+msgstr "Esta versión de Android no incluye push nativo en segundo plano. Instala la app web desde el navegador para recibir avisos con la app cerrada."
+
+msgid "Open Mycellios over HTTPS to enable system notifications."
+msgstr "Abre Mycellios mediante HTTPS para activar las notificaciones del sistema."
+
+msgid "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
+msgstr "Este dispositivo está registrado para recibir avisos con la app cerrada. La entrega también depende del sistema y la conexión."
+
+msgid "Background push is not configured on this server. Alerts are available only while the app is running."
+msgstr "Este servidor no tiene configurado el push en segundo plano. Solo recibirás avisos mientras la app esté en ejecución."
+
+msgid "Enable system permission and register this device to receive background alerts."
+msgstr "Activa el permiso del sistema y registra este dispositivo para recibir avisos en segundo plano."
+
+msgid "Could not open system notification settings."
+msgstr "No se han podido abrir los ajustes de notificaciones del sistema."
+
+msgid "Open system notification settings"
+msgstr "Abrir ajustes del sistema"
+
+msgid "If you can see this alert, system notifications are enabled."
+msgstr "Si ves este aviso, las notificaciones del sistema están activadas."
+
+msgid "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
+msgstr "Prueba solicitada. Comprueba el centro de notificaciones; el modo concentración o No molestar puede silenciarla."
+
+msgid "Background alerts across devices"
+msgstr "Avisos en segundo plano en tus dispositivos"
+
+msgid "When to notify"
+msgstr "Cuándo avisar"
+
+msgid "All activity"
+msgstr "Toda la actividad"
+
+msgid "Show push previews"
+msgstr "Mostrar contenido en los avisos push"
+
+msgid "Use account setting"
+msgstr "Usar el ajuste de la cuenta"
+
+msgid "Off"
+msgstr "Desactivado"
+
+msgid "Could not check background delivery. Alerts in the running app remain available."
+msgstr "No se ha podido comprobar la entrega en segundo plano. Los avisos de la app en ejecución siguen disponibles."
+
+msgid "Hide menu"
+msgstr "Ocultar menú"
+
+msgid "Show menu"
+msgstr "Mostrar menú"
+
+msgid "After this task"
+msgstr "Cuando termine"
+
+msgid "Send when this task finishes"
+msgstr "Enviar cuando termine esta tarea"
+
+msgid "Usage and costs"
+msgstr "Uso y costes"
+
+msgid "The built-in browser is available in Mycellios Desktop."
+msgstr "El navegador integrado está disponible en Mycellios Desktop."
+
+msgid "Open the available steps and details of each turn by default."
+msgstr "Abre por defecto los pasos y detalles disponibles de cada turno."
+
+msgid "{toolCount, plural, one {# step} other {# steps}}"
+msgstr "{toolCount, plural, one {# paso} other {# pasos}}"
+
+msgid "Quick server reconnection"
+msgstr "Conexión rápida a servidores"
+
+msgid "Keep authorized server connections alive when the last window closes. Reopening reuses the running service; Quit disconnects it."
+msgstr "Mantiene las conexiones autorizadas al cerrar la última ventana. Al volver se reutiliza el servicio; Salir lo desconecta."
+
+msgid "Computer controls require Mycellios Desktop. Workspace restoration also works on the web."
+msgstr "Los controles del equipo requieren Mycellios Desktop. Restaurar el espacio también funciona en la web."
+
+msgid "Link analytics to my account"
+msgstr "Vincular la analítica a mi cuenta"
+
+msgid "When enabled, optional screen measurements use a pseudonymous account identifier across devices. Otherwise they use a random installation identifier. No chats, files, prompts or email addresses are sent."
+msgstr "Al activarlo, las métricas opcionales de pantallas usan un identificador seudónimo de tu cuenta entre dispositivos. Si no, usan uno aleatorio de instalación. No se envían chats, archivos, prompts ni correo electrónico."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Local scripts"
+msgstr "Scripts locales"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Allow scripts on an authorized computer to send messages, run routines, answer questions and allow or deny individual approval requests."
+msgstr "Permite que los scripts de un equipo autorizado envíen mensajes, ejecuten rutinas, respondan preguntas y acepten o rechacen solicitudes de aprobación individuales."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Mico starts new chats"
+msgstr "El Mico inicia chats nuevos"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "In a long personal chat, the Mico can save handoff notes and start fresh context after finishing its task. History is kept."
+msgstr "En un chat personal largo, el Mico puede guardar notas y empezar con un contexto nuevo al terminar su tarea. El historial se conserva."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Show a plan before long tasks"
+msgstr "Mostrar el plan antes de tareas largas"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Ask the Mico to share a short plan before a long task. Simple replies stay direct. This does not grant permission to act."
+msgstr "Pide al Mico un plan breve antes de una tarea larga. Las respuestas sencillas siguen siendo directas. Esto no concede permisos para actuar."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not load Mico preferences."
+msgstr "No se han podido cargar las preferencias de los Micos."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not save. Preferences may have changed elsewhere. Review them and try again."
+msgstr "No se ha podido guardar. Las preferencias pueden haber cambiado en otra sesión. Revísalas y vuelve a intentarlo."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Back to Micos"
+msgstr "Volver a Micos"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "New Micos and Micos using the default follow this value. Defaults apply to your account; Apply to all affects only your Micos in this space."
+msgstr "Los Micos nuevos y los que usan el valor predeterminado siguen esta opción. El valor predeterminado se aplica a tu cuenta; Aplicar a todos solo afecta a tus Micos de este espacio."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Apply to all"
+msgstr "Aplicar a todos"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default (Enabled)"
+msgstr "Predeterminado (Activado)"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default (Disabled)"
+msgstr "Predeterminado (Desactivado)"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default: Enabled"
+msgstr "Predeterminado: Activado"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default: Disabled"
+msgstr "Predeterminado: Desactivado"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Enabled for {count} of {total}"
+msgstr "Activado para {count} de {total}"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Git commits"
+msgstr "Commits de Git"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Mention Mycellios in commits"
+msgstr "Mencionar a Mycellios en los commits"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "When you authorize a commit, ask the Mico to add Mycellios as a co-author. You remain the author."
+msgstr "Cuando autorices un commit, pide al Mico que añada Mycellios como coautor. Tú sigues siendo el autor."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Allow local scripts on this computer"
+msgstr "Permitir scripts locales en este equipo"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Requires Mycellios Desktop, a signed-in session and permission for each Mico. The local access key stays in a private file on this computer."
+msgstr "Requiere Mycellios Desktop, una sesión iniciada y permiso para cada Mico. La clave local se guarda en un archivo privado de este equipo."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Requests per hour"
+msgstr "Solicitudes por hora"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Maximum requests each Mico can receive from local scripts on this computer, across messages, routines and answers."
+msgstr "Máximo de solicitudes que cada Mico puede recibir de los scripts locales de este equipo, entre mensajes, rutinas y respuestas."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "{value} per hour"
+msgstr "{value} por hora"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Script connection file:"
+msgstr "Archivo de conexión para scripts:"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Open Mycellios Desktop to enable scripts on a computer. Account preferences above can be saved here."
+msgstr "Abre Mycellios Desktop para activar los scripts en un equipo. Aquí puedes guardar las preferencias de tu cuenta."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not load local script settings."
+msgstr "No se han podido cargar los ajustes de scripts locales."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not save local script settings."
+msgstr "No se han podido guardar los ajustes de scripts locales."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Apply message mode to all Micos"
+msgstr "Aplicar el modo de mensajes a todos los Micos"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "User messages · past year"
+msgstr "Mensajes de usuario · último año"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Past year"
+msgstr "Último año"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "No activity yet"
+msgstr "Aún no hay actividad"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Record day"
+msgstr "Día récord"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Current streak"
+msgstr "Racha actual"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Longest streak"
+msgstr "Racha más larga"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "1 day"
+msgstr "1 día"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "My year with Mycellios"
+msgstr "Mi año con Mycellios"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Partial recorded usage"
+msgstr "Uso registrado parcial"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Recorded activity in this space"
+msgstr "Actividad registrada en este espacio"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not prepare the image. Try again."
+msgstr "No se ha podido preparar la imagen. Vuelve a intentarlo."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Edit profile"
+msgstr "Editar perfil"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Loading your activity…"
+msgstr "Cargando tu actividad…"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not refresh. Showing the last loaded report."
+msgstr "No se ha podido actualizar. Se muestra el último informe cargado."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not load your activity."
+msgstr "No se ha podido cargar tu actividad."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Activity in this space"
+msgstr "Actividad en este espacio"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "{activeDays} active days in the past year"
+msgstr "{activeDays} días activos en el último año"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Your account's recorded AI calls in this space, across devices. Tokens include cache usage."
+msgstr "Llamadas de IA registradas de tu cuenta en este espacio, desde todos tus dispositivos. Los tokens incluyen el uso de caché."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Some usage is missing. Token totals, rankings and costs show the recorded portion."
+msgstr "Faltan algunos datos de uso. Los tokens, las clasificaciones y los costes muestran la parte registrada."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Activity calendar"
+msgstr "Calendario de actividad"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "tokens"
+msgstr "tokens"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Less"
+msgstr "Menos"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Statistics"
+msgstr "Estadísticas"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Most used provider"
+msgstr "Proveedor más usado"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Most active weekday"
+msgstr "Día más activo"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Estimated cost"
+msgstr "Coste estimado"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Most active Micos"
+msgstr "Micos más activos"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Model usage"
+msgstr "Uso de modelos"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Share your activity"
+msgstr "Compartir tu actividad"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Review this image before downloading. It contains your display name and these totals, with no email, conversations or account identifiers. Nothing is published automatically."
+msgstr "Revisa la imagen antes de descargarla. Contiene tu nombre visible y estos totales, sin correo, conversaciones ni identificadores de cuenta. No se publica nada automáticamente."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Your Mycellios activity summary"
+msgstr "Resumen de tu actividad en Mycellios"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Download image"
+msgstr "Descargar imagen"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Account sessions"
+msgstr "Sesiones de la cuenta"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Signed-in devices"
+msgstr "Dispositivos con sesión iniciada"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Sessions stay active until you sign out or disconnect them. Disconnecting ends remote actions for that session."
+msgstr "Las sesiones permanecen abiertas hasta que cierres sesión o las desconectes. Desconectarlas finaliza las acciones remotas de esa sesión."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Sign in again to manage account sessions."
+msgstr "Inicia sesión de nuevo para gestionar las sesiones de la cuenta."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not load account sessions. Try again."
+msgstr "No se han podido cargar las sesiones. Vuelve a intentarlo."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not disconnect this session. Try again."
+msgstr "No se ha podido desconectar esta sesión. Vuelve a intentarlo."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "This session"
+msgstr "Esta sesión"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "No active sessions."
+msgstr "No hay sesiones activas."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Disconnect this session?"
+msgstr "¿Desconectar esta sesión?"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "This device will need to sign in again. Your conversations stay in your account."
+msgstr "Este dispositivo tendrá que iniciar sesión de nuevo. Tus conversaciones se conservan en tu cuenta."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Signing out…"
+msgstr "Cerrando sesión…"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Messages"
+msgstr "Mensajes"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Email address"
+msgstr "Correo electrónico"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Sign out"
+msgstr "Cerrar sesión"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Share activity"
+msgstr "Compartir"
+
+msgid "Available on Desktop"
+msgstr "Disponible en escritorio"
+
+msgid "Could not connect. Try again."
+msgstr "No se pudo conectar. Inténtalo de nuevo."
+
+#: src/pages/model-settings/providers-section.tsx
+msgid "Back to providers"
+msgstr "Volver a proveedores"
+
+msgid "Generate AI"
+msgstr "Generar IA"
+
+msgid "Share computing power with the network"
+msgstr "Aporta potencia a la red"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "If I’m needed"
+msgstr "Si me necesita"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "What to notify you about"
+msgstr "Sobre qué te avisamos"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "All my devices"
+msgstr "Todos mis dispositivos"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Account notifications"
+msgstr "Notificaciones de la cuenta"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Choose for a Mico"
+msgstr "Elegir para un Mico"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Unavailable Mico"
+msgstr "Mico no disponible"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Notifications paused on all devices"
+msgstr "Avisos pausados en todos los dispositivos"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause on all devices"
+msgstr "Pausar en todos los dispositivos"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Message content in background alerts on your devices. This device can hide it too."
+msgstr "Permite mostrar el contenido en los avisos push. Este equipo también puede ocultarlo."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Could not load account notification settings."
+msgstr "No se pudieron cargar los ajustes de notificaciones de tu cuenta."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Could not refresh. Showing the last loaded settings."
+msgstr "No se pudo actualizar. Se muestran los últimos ajustes cargados."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Show an alert when a Mico replies or needs your attention."
+msgstr "Muestra un aviso cuando un Mico responde o necesita tu atención."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Request a notification now. Focus mode or Do Not Disturb may silence it."
+msgstr "Pide un aviso ahora. El modo de concentración o No molestar puede silenciarlo."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Background alerts"
+msgstr "Avisos en segundo plano"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Connect this device"
+msgstr "Conectar este dispositivo"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Paused on this device"
+msgstr "Pausado en este dispositivo"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause on this device"
+msgstr "Pausar en este dispositivo"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Legacy device filter: only when needed"
+msgstr "Filtro de este equipo: solo si me necesita"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Use the account filter above to keep the same behavior on all devices."
+msgstr "Usa el filtro de la cuenta para mantener el mismo comportamiento en todos tus dispositivos."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Task alerts by Mico"
+msgstr "Avisos de tareas por Mico"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Task alerts"
+msgstr "Avisos de tareas"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Allow this Mico to send task alerts. The account and device filters still apply."
+msgstr "Permite que este Mico envíe avisos de tareas. También se aplican los filtros de cuenta y de este equipo."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Could not save or complete this action. Try again."
+msgstr "No se pudo guardar o completar la acción. Inténtalo de nuevo."
+
+msgid "All"
+msgstr "Todo"
+
+msgid "No alerts"
+msgstr "Nada"
+
+msgid "Allow each Mico to send task alerts. Account and device filters still apply."
+msgstr "Permite que cada Mico envíe avisos de tareas. También se aplican los filtros de cuenta y de este equipo."
+
+msgid "Could not play the sound. Check your audio output."
+msgstr "No se pudo reproducir el sonido. Revisa la salida de audio."
+
+msgid "Connect account"
+msgstr "Conectar cuenta"
+
+msgid "Connect your Mycellios account to see your balance."
+msgstr "Conecta tu cuenta de Mycellios para ver el saldo."
+
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Dictation model"
+msgstr "Modelo de dictado"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Choose automatic routing, local transcription, your device or a connected service."
+msgstr "Elige detección automática, transcripción local, tu dispositivo o un servicio conectado."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Device dictation"
+msgstr "Dictado del dispositivo"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Parakeet detects the spoken language automatically. Choose a connected service to fix a language."
+msgstr "Parakeet detecta el idioma automáticamente. Para fijarlo, elige un servicio conectado."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Device voices · no credits"
+msgstr "Voces del dispositivo · sin créditos"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Configured provider voice"
+msgstr "Voz del proveedor configurado"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Uses installed device voices without uploading text."
+msgstr "Usa las voces instaladas sin enviar el texto."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Live voice"
+msgstr "Voz en directo"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Uses the dictation and spoken-reply models selected above. Start speaking to interrupt a reply."
+msgstr "Usa los modelos de dictado y respuesta elegidos arriba. Habla para interrumpir una respuesta."
+
+msgid "Local voice stays on this computer and uses no credits."
+msgstr "La voz local se procesa en este equipo y no usa créditos."
+
+msgid "Reply text is sent to your connected voice provider, which may charge your account."
+msgstr "El texto de la respuesta se envía al proveedor de voz conectado, que puede cobrar por su uso."
+
+msgid "No tasks running"
+msgstr "Sin tareas en curso"
+
+msgid "Tasks at once"
+msgstr "Tareas a la vez"
+
+msgid "Extra tasks wait their turn."
+msgstr "Las demás esperan su turno."
+
+msgid "Choose where dictation is processed. Network transcription uses credits."
+msgstr "Elige dónde se procesa el dictado. La transcripción en red consume créditos."
+
+msgid "Open a Mico and configure dictation and spoken replies to start a voice conversation."
+msgstr "Abre un Mico y configura el dictado y las respuestas habladas para iniciar una conversación de voz."
+
+msgid "Credits not enabled here"
+msgstr "Créditos no habilitados"
+
+msgid "Models with your credits"
+msgstr "Modelos con tus créditos"
+
+msgid "You are signed in. This installation does not yet have access to Mycellios credits."
+msgstr "Tu sesión está iniciada. El acceso a créditos Mycellios aún no está habilitado aquí."
+
+msgid "Use my credits"
+msgstr "Usar mis créditos"
+
+msgid "Credits are not enabled in this installation."
+msgstr "Los créditos no están habilitados en esta instalación."
+
+msgid "Not enabled"
+msgstr "Sin activar"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Mycellios Island"
+msgstr "Isla de Mycellios"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Interactive preview. Mycellios Desktop places the island above your other applications. Changes here are not saved."
+msgstr "Vista previa interactiva. Mycellios Desktop coloca la isla sobre tus otras aplicaciones. Estos cambios no se guardan."
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Show status at the top of the screen"
+msgstr "Mostrar el estado en la parte superior de la pantalla"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Choose where the island appears. It only shows activity from the selected space."
+msgstr "Elige dónde aparece la isla. Solo muestra la actividad del espacio seleccionado."
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Show island"
+msgstr "Mostrar isla"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Show spaces added later"
+msgstr "Mostrar los espacios que añadas más adelante"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "New spaces follow this preference until you choose otherwise."
+msgstr "Los espacios nuevos siguen esta preferencia hasta que la cambies."
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Island size preview"
+msgstr "Vista previa del tamaño de la isla"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Built-in display"
+msgstr "Pantalla integrada"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "External display"
+msgstr "Pantalla externa"
+
+msgid "Behavior"
+msgstr "Comportamiento"
+
+msgid "Visibility"
+msgstr "Visibilidad"
+
+msgid "Keep the dock above other apps, or only while Mycellios is active."
+msgstr "Mantén el dock sobre otras apps o solo mientras Mycellios esté activo."
+
+msgid "Above other apps"
+msgstr "Sobre otras apps"
+
+msgid "With Mycellios active"
+msgstr "Con Mycellios activo"
+
+msgid "Follow Mycellios window"
+msgstr "Seguir la ventana de Mycellios"
+
+msgid "If disconnected, the dock follows the Mycellios window’s screen."
+msgstr "Si se desconecta, el dock pasa a la pantalla de la ventana de Mycellios."
+
+msgid "Screen edge"
+msgstr "Borde de la pantalla"
+
+msgid "Drag the dock handle to move it along this edge."
+msgstr "Arrastra el asa del dock para moverlo por este borde."
+
+msgid "Dock size"
+msgstr "Tamaño del dock"
+
+msgid "Show completed work"
+msgstr "Mostrar trabajo terminado"
+
+msgid "Show new results briefly beside the dock, then return to the compact view."
+msgstr "Muestra brevemente los resultados nuevos junto al dock y vuelve a la vista compacta."
+
+msgid "Interactive preview. Use Mycellios Desktop for the dock above other applications. Changes here are not saved."
+msgstr "Vista previa interactiva. Usa Mycellios Desktop para mostrar el dock sobre otras aplicaciones. Los cambios aquí no se guardan."
+
+msgid "Dock preview"
+msgstr "Vista previa del dock"
+
+msgid "Choose Micos below"
+msgstr "Elige Micos más abajo"
+
+msgid "The work environment is configured"
+msgstr "El entorno de trabajo está configurado"
+
+msgid "Computer tools need setup"
+msgstr "Configura las herramientas del equipo"
+
+msgid "Could not verify computer setup"
+msgstr "No se ha podido comprobar el equipo"
+
+msgid "Computer access is not confirmed"
+msgstr "Acceso al equipo sin confirmar"
+
+msgid "The server reports a configured environment for your Micos. Screen access and each Mico’s connection are checked separately."
+msgstr "Tus Micos tienen un entorno de trabajo configurado. El acceso a la pantalla y la conexión de cada Mico se comprueban por separado."
+
+msgid "Chat and connected apps still work. Configure a work environment to use computer tools."
+msgstr "El chat y las apps conectadas siguen funcionando. Configura un entorno de trabajo para usar las herramientas del equipo."
+
+msgid "Checking the server connection and the environment reported for your account."
+msgstr "Comprobando la conexión con el servidor y el entorno de tu cuenta."
+
+msgid "Check your connection and try again. A previous status does not confirm current access."
+msgstr "Comprueba tu conexión y vuelve a intentarlo. El estado anterior no confirma el acceso actual."
+
+msgid "The server has not reported a supported work environment. No access is assumed."
+msgstr "El servidor no ha indicado un entorno de trabajo compatible. El acceso sigue sin confirmar."
+
+msgid "Access and connection"
+msgstr "Acceso y conexión"
+
+msgid "Local computer access is authorized when you connect a Mico in Desktop. This check does not grant new permissions."
+msgstr "El acceso local se autoriza al conectar un Mico en Desktop. Esta comprobación no concede permisos nuevos."
+
+msgid "You are using the web app. This page does not grant access to applications or files on this device."
+msgstr "Estás usando la aplicación web. Esta página no concede acceso a las aplicaciones ni a los archivos de este dispositivo."
+
+msgid "Mico work environment"
+msgstr "Entorno de trabajo de los Micos"
+
+msgid "Choose each Mico’s computer from its chat tools. A configured environment does not confirm a screen connection."
+msgstr "Elige el equipo de cada Mico en las herramientas de su chat. Tener un entorno configurado no confirma la conexión a su pantalla."
+
+msgid "Not confirmed"
+msgstr "Sin confirmar"
+
+msgid "Check connection"
+msgstr "Comprobar conexión"
+
+msgid "Refresh the status without restarting tasks or changing permissions."
+msgstr "Actualiza el estado sin reiniciar tareas ni cambiar permisos."
+
+msgid "Not configured"
+msgstr "Sin configurar"
+
+msgid "Test environment"
+msgstr "Entorno de prueba"
+
+msgid "Your plan"
+msgstr "Tu plan"
+
+msgid "Your account, model credits and server connections in one place."
+msgstr "Tu cuenta, Créditos para modelos y conexiones a servidores en un solo lugar."
+
+msgid "Mycellios account"
+msgstr "Cuenta de Mycellios"
+
+msgid "Payments are not enabled on this server. No subscription or charge is started here."
+msgstr "Los pagos no están activados en este servidor. Aquí no se inicia ninguna suscripción ni cobro."
+
+msgid "Loading billing"
+msgstr "Cargando facturación"
+
+msgid "Using your own model subscription or API key."
+msgstr "Usas tu propia suscripción o clave de API para los modelos."
+
+msgid "Models are paid with your Mycellios Credits."
+msgstr "Los modelos se pagan con tus Créditos de Mycellios."
+
+msgid "Choose how to connect your models below."
+msgstr "Elige más abajo cómo conectar tus modelos."
+
+msgid "Subscription for this account. Server connections are managed separately."
+msgstr "Suscripción de esta cuenta. Las conexiones a servidores se gestionan por separado."
+
+msgid "Your own provider"
+msgstr "Tu proveedor"
+
+msgid "Subscription"
+msgstr "Suscripción"
+
+msgid "No recurring price reported for this account."
+msgstr "Esta cuenta no tiene un precio periódico indicado."
+
+msgid "Only the account owner can change billing."
+msgstr "Solo el propietario de la cuenta puede cambiar la facturación."
+
+msgid "Each server manages its own account and billing. Adding a connection does not purchase a plan."
+msgstr "Cada servidor gestiona su cuenta y facturación. Añadir una conexión no contrata un plan."
+
+msgid "No saved servers yet."
+msgstr "Todavía no tienes servidores guardados."
+
+msgid "Current server"
+msgstr "Servidor actual"
+
+msgid "Connect another server"
+msgstr "Conectar otro servidor"
+
+msgid "Use Mycellios Desktop to save and switch between servers."
+msgstr "Usa Mycellios Desktop para guardar conexiones y cambiar de servidor."
+
+msgid "Download Desktop"
+msgstr "Descargar Desktop"
+
+msgid "Unpaid"
+msgstr "Pendiente de pago"
+
+msgid "Incomplete"
+msgstr "Sin completar"
+
+msgid "Phones signed in to this Mycellios account."
+msgstr "Teléfonos que usan Mycellios con esta cuenta."
+
+msgid "Refresh phones"
+msgstr "Actualizar teléfonos"
+
+msgid "Permanent link"
+msgstr "Enlace permanente"
+
+msgid "For a phone you sign in to regularly."
+msgstr "Para un teléfono en el que inicias sesión a menudo."
+
+msgid "This phone"
+msgstr "Este teléfono"
+
+msgid "Account session"
+msgstr "Sesión de la cuenta"
+
+msgid "Disconnecting revokes access to this account. A phone may keep its current screen visible until it refreshes or returns from the background."
+msgstr "Al desconectar se revoca el acceso a esta cuenta. El móvil puede seguir mostrando su pantalla actual hasta que se actualice o vuelva del segundo plano."
+
+msgid "This server uses a local address. A phone cannot open your computer’s localhost. Use a reachable address for this same server."
+msgstr "Este servidor usa una dirección local. El móvil no puede abrir el localhost de tu PC. Usa una dirección accesible de este mismo servidor."
+
+msgid "Scan the code, then sign in with the same Mycellios account. This link contains no password or session token."
+msgstr "Escanea el código e inicia sesión con la misma cuenta de Mycellios. El enlace no contiene contraseñas ni tokens de sesión."
+
+msgid "Connect to a reachable server before adding a phone. This preview cannot be paired from another device."
+msgstr "Conecta con un servidor accesible antes de añadir un teléfono. Esta vista local no se puede vincular desde otro dispositivo."
+
+msgid "The link stays valid. Only signing in grants access; disconnecting a phone revokes its session."
+msgstr "El enlace sigue siendo válido. Solo iniciar sesión concede acceso; desconectar un teléfono revoca su sesión."
+
+msgid "Could not copy. Use the address shown above."
+msgstr "No se ha podido copiar. Usa la dirección que aparece arriba."
+
+msgid "Copy link"
+msgstr "Copiar enlace"
+
+msgid "First give this server an HTTPS address your phone can reach. The local preview does not create a public address."
+msgstr "Primero configura una dirección HTTPS de este servidor accesible desde el móvil. La vista local no crea una dirección pública."
+
+msgid "Open that server address on your phone and sign in with the same account."
+msgstr "Abre esa dirección del servidor en tu móvil e inicia sesión con la misma cuenta."
+
+msgid "On Android, open the Chrome menu and choose Install or Add to Home Screen."
+msgstr "En Android, abre el menú de Chrome y elige Instalar o Añadir a pantalla de inicio."
+
+msgid "On iPhone or iPad, open Safari, tap Share and choose Add to Home Screen."
+msgstr "En iPhone o iPad, abre Safari, pulsa Compartir y elige Añadir a pantalla de inicio."
+
+msgid "The stable channel receives tested releases of Mycellios."
+msgstr "El canal estable recibe versiones probadas de Mycellios."
+
+msgid "Managed by the server"
+msgstr "Gestionado por el servidor"
+
+msgid "The server publishes updates for the web app."
+msgstr "El servidor publica las actualizaciones de la aplicación web."
+
+msgid "Local development"
+msgstr "Desarrollo local"
+
+msgid "Local development updates automatically as the project changes."
+msgstr "Esta versión local se actualiza automáticamente con los cambios del proyecto."
+
+msgid "The web app receives updates from this server. Your drafts and calls are protected."
+msgstr "La aplicación web recibe las actualizaciones de este servidor. Tus borradores y llamadas están protegidos."
+
+msgid "A new version is available. Return to the app to finish updating when your work is saved."
+msgstr "Hay una versión nueva. Vuelve a la aplicación para completar la actualización cuando tu trabajo esté guardado."
+
+msgid "Your work is preserved before the web app reloads."
+msgstr "Tu trabajo se conserva antes de recargar la aplicación web."
+
+msgid "The server is serving an older version. Try again later."
+msgstr "El servidor está ofreciendo una versión anterior. Vuelve a comprobarlo más tarde."
+
+msgid "No published update is available for this installation. You can check again later."
+msgstr "No hay una actualización publicada para esta instalación. Puedes volver a comprobarlo más tarde."
+
+msgid "This installation is updated from the project or its system installer."
+msgstr "Esta instalación se actualiza desde el proyecto o con su instalador del sistema."
+
+msgid "Updates are installed with your system installer. Mycellios will not restart automatically."
+msgstr "Las actualizaciones se aplican con el instalador del sistema. Mycellios no se reiniciará automáticamente."
+
+msgid "Reading desktop update status…"
+msgstr "Consultando el estado de las actualizaciones de Desktop…"
+
+msgid "Your providers could not be checked. Retry when the server is reachable."
+msgstr "No se han podido comprobar tus proveedores. Reintenta cuando el servidor esté disponible."
+
+msgid "Loading providers…"
+msgstr "Cargando proveedores…"
+
+msgid "Reconnecting to the server…"
+msgstr "Reconectando con el servidor…"
+
+msgid "Could not load models"
+msgstr "No se han podido cargar los modelos"

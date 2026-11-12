@@ -1,4 +1,5 @@
 import { HostedWebAgent, HostedWebCard, HostedWebDraft, HostedWebSave } from "./hosted-webs.js";
+import { MicoSettingsState, MicoSettingsUpdate } from "./mico-settings.js";
 import { TailnetConnectionInput, TailnetConnectionSchema, TailnetSuffix } from "./tailscale.js";
 import { ReferralOwnerInput, ReferralInviteSchema, ReferralRedemptionSchema } from "./referrals.js";
 import { AppCoverId, AppCoverWrite } from "./app-covers.js";
@@ -233,7 +234,7 @@ export const appContract = {
     antseed: oc.input(z.object({ id: z.string().uuid() })).output(HostedWebDraft),
     preview: oc.input(z.object({ id: z.string(), version: z.number().int().positive() })).output(z.object({ path: z.string(), expiresAt: z.string() })),
   },
-  analytics: { screen: oc.input(AnalyticsScreenInput).output(z.object({ ok: z.literal(true) })) },
+  analytics: { screen: oc.input(AnalyticsScreenInput.extend({ installationId: z.string().uuid().optional(), linkAccount: z.boolean().optional() }).strict()).output(z.object({ ok: z.literal(true) })) },
   aiConsent: {
     status: oc.input(AiConsentQuerySchema).output(AiConsentStatusSchema),
     allow: oc
@@ -266,6 +267,9 @@ export const appContract = {
     portal: oc.output(z.object({ url: z.string().url() })),
   },
   preferences: {
+    micos: oc.output(MicoSettingsState),
+    updateMicos: oc.input(MicoSettingsUpdate).output(MicoSettingsState),
+    applyBusyMode: oc.input(z.object({ mode: z.enum(["queue", "steer"]).nullable() })).output(z.object({ ok: z.literal(true) })),
     update: oc
       .input(
         z
@@ -351,7 +355,7 @@ export const appContract = {
     connectMycellios: oc.output(ModelCredentialSchema),
     mycelliosModels: oc.output(z.array(ModelCatalogEntrySchema)),
     mycelliosVideoEdit:oc.input(z.object({action:z.enum(["info","quote","execute","status","content"]),payload:z.string().max(34_000_000)})).output(z.unknown()),
-    mycelliosMedia: oc.input(z.object({ action:z.enum(["models","quote","execute","status","content","checkout"]),
+    mycelliosMedia: oc.input(z.object({ action:z.enum(["models","quote","execute","status","content","checkout"]),expectedUserId:z.string().min(1).max(128).optional(),
       payload:z.string().max(12_000_000).optional(),key:z.string().min(8).max(200).optional() })).output(z.unknown()),
 
     forRole: oc
@@ -1229,7 +1233,7 @@ export const appContract = {
   },
   notifications: {
     webStatus: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ configured: z.boolean(), publicKey: z.string().nullable(), registered: z.boolean(), settings: NotificationSettingsSchema, bots: z.array(z.object({ id: z.string(), name: z.string(), notifyOnFinish: z.boolean() })) })),
-    webRegister: oc.input(z.object({ clientId: z.string().uuid(), subscription: WebPushSubscriptionSchema })).output(z.object({ ok: z.literal(true) })),
+    webRegister: oc.input(z.object({ clientId: z.string().uuid(), subscription: WebPushSubscriptionSchema, expectedUserId: z.string().min(1).max(160).optional() })).output(z.object({ ok: z.literal(true) })),
     webUnregister: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ ok: z.literal(true) })),
     webPresence: oc.input(z.object({ clientId: z.string().uuid(), focused: z.boolean() })).output(z.object({ ok: z.literal(true) })),
     settings: oc.output(NotificationSettingsSchema),

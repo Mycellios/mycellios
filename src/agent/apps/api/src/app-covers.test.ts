@@ -17,7 +17,8 @@ function fixture() {
       rows.push(row); return row;
     }),
   };
-  const prisma = { artifact, $queryRaw: vi.fn(), $transaction: vi.fn(async (fn: any) => fn(prisma)) };
+  const hostedWeb={findFirst:vi.fn(async({where}:any)=>where.id==="owner-app"&&where.userId==="owner"&&where.spaceId==="space"?{id:"owner-app"}:null)};
+  const prisma = { hostedWeb,artifact, $queryRaw: vi.fn(), $transaction: vi.fn(async (fn: any) => fn(prisma)) };
   const artifacts = {
     put: vi.fn(async ({ bytes }: any) => { const id = `file-${files.size}`; files.set(id, Buffer.from(bytes)); return { id }; }),
     get: vi.fn(async (id: string) => files.get(id)!),
@@ -25,14 +26,20 @@ function fixture() {
   };
   return { rows, files, prisma, artifacts, deps: { prisma, artifacts } as unknown as Parameters<typeof setAppCover>[0] };
 }
-const upload = (revision: string | null = null): AppCoverWrite => ({ appId: "video-studio", botId: "mico",
+const upload = (revision: string | null = null): AppCoverWrite => ({ appId: "owner-app", botId: "mico",
   expectedRevision: revision, clientNonce: crypto.randomUUID(), source: { kind: "upload", mimeType: "image/png", contentBase64: png.toString("base64") } });
-describe("personal app covers", () => {
+describe("creator-owned app covers", () => {
+  it.each(["other-user","other-space","included-app"])("refuses %s before any file write or replay",async scenario=>{
+    const f=fixture(),request=upload();
+    const principal=scenario==="other-user"?{...actor,userId:"other"}:scenario==="other-space"?{...actor,spaceId:"other"}:actor;
+    await expect(setAppCover(f.deps,principal,{...request,...(scenario==="included-app"?{appId:"video-studio"}:{})})).rejects.toMatchObject({code:"FORBIDDEN"});
+    expect(f.artifacts.put).not.toHaveBeenCalled();expect(f.prisma.artifact.create).not.toHaveBeenCalled();
+  });
   it("stores a private cover and isolates user, Space and app reads", async () => {
     const f = fixture(); const result = await setAppCover(f.deps, actor, upload());
     expect(result.image?.contentBase64).toBe(png.toString("base64"));
-    expect((await getAppCover(f.deps, { ...actor, userId: "other" }, "video-studio")).image).toBeNull();
-    expect((await getAppCover(f.deps, { ...actor, spaceId: "other" }, "video-studio")).image).toBeNull();
+    expect((await getAppCover(f.deps, { ...actor, userId: "other" }, "owner-app")).image).toBeNull();
+    expect((await getAppCover(f.deps, { ...actor, spaceId: "other" }, "owner-app")).image).toBeNull();
     expect((await getAppCover(f.deps, actor, "other-app")).image).toBeNull();
   });
   it("replays the same save without another object and rejects nonce reuse for another app", async () => {

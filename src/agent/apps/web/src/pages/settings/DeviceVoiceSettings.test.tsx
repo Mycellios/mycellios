@@ -9,13 +9,16 @@ vi.mock("@rakazo/ui-web", () => ({
   Switch: () => <span />,
   OptionSelect: ({ value, options, onValueChange, ...p }: { value: string; options: { value: string; label: string }[]; onValueChange: (v: string) => void }) => <select {...p} value={value} onChange={e => onValueChange(e.target.value)}>{options.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}</select>,
 }));
+const nativeMock = vi.hoisted(() => ({ bridge: undefined as any }));
+vi.mock("../../lib/desktop", () => ({ desktopBridge: () => nativeMock.bridge }));
 const speech = vi.hoisted(() => ({ state: { messageId: "" }, speak: vi.fn(), stop: vi.fn() }));
-vi.mock("../../lib/tts", () => ({ speaker: speech }));
+vi.mock("../../lib/tts", () => ({ speaker: speech, browserSpeechAvailable: () => true }));
 import { setGeneralPreferences } from "../../lib/general-preferences";
 import { DeviceVoiceSettings } from "./DeviceVoiceSettings";
 let cleanup: () => Promise<void>;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  localStorage.clear(); nativeMock.bridge = undefined;
   speech.speak.mockReset(); speech.stop.mockReset();
   setGeneralPreferences({ networkSpeechAccount: "owner", dictationLanguage: "es" });
 });
@@ -48,4 +51,20 @@ it("clears preview state and ignores old-account results when the scope changes"
   await act(async () => settle("Previous account error"));
   expect(speech.stop).toHaveBeenCalledOnce();
   expect(div.textContent).not.toMatch(/Previous account error|Stop/);
+});
+
+it("previews installed device voices without selecting a paid network route", async () => {
+  setGeneralPreferences({ networkSpeechAccount: "", speechEngine: "device" });
+  vi.stubGlobal("speechSynthesis", { getVoices: () => [{ voiceURI: "local-es", name: "Español", lang: "es-ES", localService: true }], addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  const { div } = await mount(preview);
+  await act(async () => [...div.querySelectorAll("button")].find(button => button.textContent === "Listen")!.click());
+  expect(speech.speak).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ browser: true, networkLanguage: undefined }));
+});
+it("locks the language hint to automatic for active Parakeet without overwriting a saved provider language", async () => {
+  nativeMock.bridge = { localVoice: { status: async () => ({ ready: true, models: { asr: { ready: true }, tts: { ready: true } } }), prepareModel: vi.fn() } };
+  setGeneralPreferences({ networkTranscriptionAccount: "", dictationEngine: "local", dictationLanguage: "fr" });
+  const { div } = await mount(preview);
+  const language = div.querySelector<HTMLSelectElement>('select[aria-label="Dictation language"]')!;
+  expect(language.disabled).toBe(true); expect(language.value).toBe("auto");
+  expect(JSON.parse(localStorage.getItem("mycellios.general.v1")!).dictationLanguage).toBe("fr");
 });

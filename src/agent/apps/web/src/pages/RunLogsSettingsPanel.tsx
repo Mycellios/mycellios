@@ -265,10 +265,10 @@ function RunLogEntry({ run, locale }: { run: RunLogRow; locale: string }) {
           {issueText(run.issue)}
         </p>
       ) : null}
-      <details className="mt-3 min-w-0 text-sm">
-        <summary className="w-fit cursor-pointer rounded-sm text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+      <section className="mt-3 min-w-0 text-sm">
+        <h3 className="font-medium text-muted-foreground">
           <Trans>Diagnostic details</Trans>
-        </summary>
+        </h3>
         <dl className="mt-3 grid min-w-0 gap-x-4 gap-y-2 text-xs sm:grid-cols-[auto_minmax(0,1fr)] [&_dd]:min-w-0 [&_dd]:break-all [&_dt]:text-muted-foreground">
           <dt>
             <Trans>Execution ID</Trans>
@@ -345,7 +345,7 @@ function RunLogEntry({ run, locale }: { run: RunLogRow; locale: string }) {
             <Trans>Could not copy details. Select the execution ID instead.</Trans>
           </p>
         ) : null}
-      </details>
+      </section>
     </li>
   );
 }

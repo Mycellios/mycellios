@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { MICO_AVATAR_DEFAULT_SHAPES, MICO_AVATAR_SHAPES } from "@rakazo/contracts";
-import { avatarIdentitySeed, micoAvatarArt } from "@rakazo/core";
+import { MICO_AVATAR_DEFAULT_SHAPES, MICO_AVATAR_SHAPES, micoAvatarValue } from "@rakazo/contracts";
+import { avatarIdentitySeed, compactMicoArt, micoAvatarArt } from "@rakazo/core";
 import type { ReactNode } from "react";
 import { act, createElement } from "react";
 import type { Root } from "react-dom/client";
@@ -41,14 +41,18 @@ vi.mock("react-native-reanimated", () => {
 vi.mock("react-native-svg", () => {
   const element =
     (tag: string) =>
-    ({ children, ...props }: { children?: ReactNode; d?: string }) =>
-      createElement(tag, { "data-d": props.d }, children);
+    ({ children, ...props }: { children?: ReactNode; d?: string; viewBox?: string }) =>
+      createElement(tag, { "data-d": props.d, viewBox: props.viewBox }, children);
   return {
     default: element("svg"),
     Ellipse: element("ellipse"),
     G: element("g"),
     Path: element("path"),
     Rect: element("rect"),
+    Defs: element("defs"),
+    Filter: element("filter"),
+    FeColorMatrix: element("feColorMatrix"),
+    Image: element("image"),
   };
 });
 
@@ -85,7 +89,10 @@ describe("BotAvatar", () => {
   it("draws a plain-colour bot with a current mascot for its identity", () => {
     const view = render("#3EC5A8");
     const shape = MICO_AVATAR_DEFAULT_SHAPES[avatarIdentitySeed("bot-1") % MICO_AVATAR_DEFAULT_SHAPES.length]!;
-    expect(bodies(view)[0]).toBe(micoAvatarArt(shape.index, "#3EC5A8")!.path);
+    const [x, y, side] = compactMicoArt(shape.index)!.crop;
+    expect(view.querySelector("svg svg")?.getAttribute("viewBox")).toBe(`${x} ${y} ${side} ${side}`);
+    expect(view.querySelector("image")).not.toBeNull();
+    expect(bodies(view)).toEqual([]);
     expect(view.querySelector("img")).toBeNull();
     expect(view.querySelector("rect")).not.toBeNull();
   });
@@ -98,6 +105,14 @@ describe("BotAvatar", () => {
 
   it("replaces a legacy shape with its matching current mascot", () => {
     const view = render("#8B5CF6::shape_3");
-    expect(bodies(view)).toEqual([micoAvatarArt(MICO_AVATAR_SHAPES[3].index, "#8B5CF6")!.path]);
+    const [x, y, side] = compactMicoArt(MICO_AVATAR_SHAPES[3].index)!.crop;
+    expect(view.querySelector("svg svg")?.getAttribute("viewBox")).toBe(`${x} ${y} ${side} ${side}`);
+    expect(view.querySelector("image")).not.toBeNull();
+  });
+
+  it("keeps an explicitly selected flat appearance", () => {
+    const view = render(micoAvatarValue(1101, "#8B5CF6", { eyes: 0, finish: "flat", original: false }));
+    expect(bodies(view)).toEqual([micoAvatarArt(1101, "#8B5CF6")!.path]);
+    expect(view.querySelector("image")).toBeNull();
   });
 });

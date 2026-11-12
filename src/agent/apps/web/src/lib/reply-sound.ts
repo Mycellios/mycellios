@@ -17,10 +17,22 @@ export function unlockReplySound(): void {
   }
 }
 
-export function playReplySound(choice = getGeneralPreferences().taskSound): void {
-  if (choice === "off") return;
+/** Start in the click gesture, then wait for a suspended audio output to resume. */
+export async function previewReplySound(choice: string): Promise<boolean> {
+  unlockReplySound();
   const context = audioContext;
-  if (!context || context.state !== "running") return;
+  if (!context || choice === "off") return false;
+  try {
+    if (context.state !== "running") await context.resume();
+    if (context.state !== "running") return false;
+    return playReplySound(choice);
+  } catch { return false; }
+}
+
+export function playReplySound(choice = getGeneralPreferences().taskSound): boolean {
+  if (choice === "off") return false;
+  const context = audioContext;
+  if (!context || context.state !== "running") return false;
   try {
     const start = context.currentTime;
     const tone = context.createOscillator();
@@ -36,8 +48,10 @@ export function playReplySound(choice = getGeneralPreferences().taskSound): void
     tone.onended = () => { tone.disconnect(); volume.disconnect(); };
     tone.start(start);
     tone.stop(start + DURATION);
+    return true;
   } catch {
     // Losing the audio output cannot interrupt a chat update.
+    return false;
   }
 }
 

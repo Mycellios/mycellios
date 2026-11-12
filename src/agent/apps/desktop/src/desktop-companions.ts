@@ -9,20 +9,23 @@ import { validDesktopIcon } from "./appearance-settings.js";
 
 export function companionBounds(area: { x: number; y: number; width: number; height: number }, kind: "dock" | "island", prefs: DesktopCompanionPreferences, count: number, expanded = false) {
   if (kind === "island") {
-    const width = Math.min(area.width, Math.round((expanded ? 560 : 280) * prefs.island.width / 100));
-    return { x: Math.round(area.x + (area.width - width) / 2), y: area.y + 8, width,
-      height: Math.min(area.height, Math.round((expanded ? 400 : 44) * prefs.island.height / 100)) };
+    // Four transparent pixels on each side leave a 212 x 32 detached capsule.
+    const width = Math.min(area.width, Math.round((expanded ? 560 : 220) * prefs.island.width / 100));
+    return { x: Math.round(area.x + (area.width - width) / 2), y: area.y + 2, width,
+      height: Math.min(area.height, Math.round((expanded ? 400 : 40) * prefs.island.height / 100)) };
   }
   const horizontal = prefs.dock.edge === "bottom";
-  const length = Math.min(horizontal ? area.width - 16 : area.height - 16, Math.max(72, Math.min(count, 8) * 58 + 16));
-  const width = Math.max(1, Math.min(area.width, horizontal ? length : prefs.dock.results ? 270 : 72));
-  const height = Math.max(1, Math.min(area.height, horizontal ? 72 : length));
-  return { x: Math.round(prefs.dock.edge === "left" ? area.x + 4 : horizontal ? area.x + (area.width - width) / 2 : area.x + area.width - width - 4),
-    y: Math.round(horizontal ? area.y + area.height - height - 4 : area.y + (area.height - height) / 2), width, height };
+  const scale = prefs.dock.size / 100;
+  const length = Math.min(horizontal ? area.width - 16 : area.height - 16, Math.max(72, Math.min(count, 8) * 58 + 38) * scale);
+  const width = Math.max(1, Math.round(Math.min(Math.max(1, area.width - 8), horizontal ? length : (prefs.dock.results ? 270 : 72) * scale)));
+  const height = Math.max(1, Math.round(Math.min(Math.max(1, area.height - 8), horizontal ? 72 * scale : length)));
+  return { x: Math.round(prefs.dock.edge === "left" ? area.x + 4 : horizontal ? area.x + 4 + Math.max(0, area.width - width - 8) * prefs.dock.offset / 100 : area.x + area.width - width - 4),
+    y: Math.round(horizontal ? area.y + area.height - height - 4 : area.y + 4 + Math.max(0, area.height - height - 8) * prefs.dock.offset / 100), width, height };
 }
 
 /** Owned, sandboxed OS windows. Only the app main frame publishes their scoped data. */
 export async function installDesktopCompanions(options: {
+  mainWindow?: () => BrowserWindow | null;
   profile: string; allowed: (event: Electron.IpcMainInvokeEvent) => boolean;
   reveal: (target: { scope: string; botId: string; respond?: boolean }) => void;
   requestReply?: (request: DesktopQuestionRequest) => void;
@@ -32,12 +35,17 @@ export async function installDesktopCompanions(options: {
   let prefs = structuredClone(DEFAULT_DESKTOP_COMPANIONS);
   let snapshot: DesktopCompanionSnapshot = { scope: "", theme: "light", agents: [] };
   const windows = new Map<string, BrowserWindow>();
+  let drag: { window: BrowserWindow; scope: string; edge: string; grab: number; offset: number } | undefined;
+  let mainFingerprint = "";
+  const previousResults = new Map<string, { result: string; working: boolean }>();
+  const resultUntil = new Map<string, number>();
   const expanded = new Set<string>();
   const islandExpanded = new Set<string>();
   const resolved = new Set<string>();
   const replies = new Map<string, { signature: string; settled: boolean; promise: Promise<DesktopQuestionResult["outcome"]>;
     finish: (outcome: DesktopQuestionResult["outcome"]) => void }>();
   function resetQuestions() {
+    drag = undefined; previousResults.clear(); resultUntil.clear();
     for (const reply of replies.values()) reply.finish("stale");
     replies.clear(); resolved.clear(); islandExpanded.clear();
   }
@@ -50,22 +58,31 @@ export async function installDesktopCompanions(options: {
   const payload = (kind: "dock" | "island") => ({ kind, prefs, snapshot: { ...snapshot,
     questions: kind === "island" ? snapshot.questions?.filter(prompt => !resolved.has(prompt.id)) : [],
     agents: snapshot.agents.filter(agent => kind === "island" || prefs.dock.agents[agent.id] !== false)
-      .map(agent => ({ ...agent, result: kind === "dock" && prefs.dock.results ? agent.result : "" })) } });
+      .map(agent => ({ ...agent, result: kind === "dock" && prefs.dock.results && !agent.working && (resultUntil.get(agent.id) ?? 0) > Date.now() ? agent.result : "" })) } });
+  const windowDisplay = () => {
+    const main = options.mainWindow?.();
+    return main && !main.isDestroyed() ? screen.getDisplayMatching(main.getBounds()) : screen.getPrimaryDisplay();
+  };
   function sync() {
     const visible = new Set<string>();
     const displays = screen.getAllDisplays();
     for (const kind of ["island", "dock"] as const) {
-      if (!prefs[kind].shown || !snapshot.scope || snapshot.agents.length === 0) continue;
+      if (!prefs[kind].shown || !snapshot.scope || !snapshot.agents.length && (kind === "dock" || !prefs.island.idle)) continue;
+      if (kind === "island" && (prefs.island.scopes[snapshot.scope] ?? prefs.island.futureScopes) === false) continue;
       if (kind === "dock" && !payload(kind).snapshot.agents.length) continue;
+      const main = options.mainWindow?.();
+      if (kind === "dock" && prefs.dock.layer === "app" && (!main || main.isDestroyed() || !main.isVisible() || main.isMinimized() ||
+        !(main.isFocused() || [...windows].some(([key, win]) => key.startsWith("dock:") && !win.isDestroyed() && win.isFocused())))) continue;
       if (kind === "island" && !prefs.island.idle && !payload(kind).snapshot.questions?.length && !snapshot.agents.some(agent => agent.working || agent.unread)) continue;
       const selected = kind === "island" && prefs.island.additionalDisplays ? displays : [kind === "dock" && typeof prefs.dock.display === "number"
-        ? displays.find(display => display.id === prefs.dock.display) ?? screen.getPrimaryDisplay() : screen.getPrimaryDisplay()];
+        ? displays.find(display => display.id === prefs.dock.display) ?? windowDisplay() : kind === "dock" && prefs.dock.display === "window" ? windowDisplay() : screen.getPrimaryDisplay()];
       for (const display of selected) {
         const key = `${kind}:${display.id}`; visible.add(key);
         let win = windows.get(key);
         const data = payload(kind);
+        const layout = kind === "dock" ? { ...prefs, dock: { ...prefs.dock, results: prefs.dock.results && data.snapshot.agents.some(agent => Boolean(agent.result)), offset: drag?.scope === snapshot.scope ? drag.offset : prefs.dock.offset } } : prefs;
         if (!win || win.isDestroyed()) {
-          win = new BrowserWindow({ ...companionBounds(display.workArea, kind, prefs, data.snapshot.agents.length, islandExpanded.has(key)),
+          win = new BrowserWindow({ ...companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)),
             frame: false, transparent: true, resizable: false, maximizable: false, minimizable: false,
             alwaysOnTop: true, skipTaskbar: true, show: false, focusable: kind !== "island", title: kind === "island" ? "Mycellios · Island" : "Mycellios · Dock",
             webPreferences: { preload: path.join(import.meta.dirname, "companion-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } });
@@ -73,12 +90,13 @@ export async function installDesktopCompanions(options: {
           windows.set(key, win);
           win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
           win.webContents.on("will-navigate", event => event.preventDefault());
-          win.webContents.once("did-finish-load", () => { if (!win!.isDestroyed()) { win!.webContents.send("companion.state", { ...payload(kind), expanded: islandExpanded.has(key) }); win!.showInactive(); } });
+          win.webContents.once("did-finish-load", () => { if (!win!.isDestroyed()) { if (kind === "dock") win!.webContents.setZoomFactor(prefs.dock.size / 100); win!.webContents.send("companion.state", { ...payload(kind), expanded: islandExpanded.has(key) }); win!.showInactive(); } });
           win.on("closed", () => { if (windows.get(key) === win) windows.delete(key); });
           void win.loadFile(path.join(import.meta.dirname, "companion.html")).catch(() => { if (!win!.isDestroyed()) win!.destroy(); });
         } else {
+          if (kind === "dock") { win.setAlwaysOnTop(true); win.webContents.setZoomFactor(prefs.dock.size / 100); }
           if (kind === "island") win.setFocusable(islandExpanded.has(key));
-          win.setBounds(companionBounds(display.workArea, kind, prefs, data.snapshot.agents.length, islandExpanded.has(key)));
+          win.setBounds(companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)));
           if (kind === "dock" && !prefs.dock.autoHide) { win.setIgnoreMouseEvents(false); expanded.delete(key); }
           win.webContents.send("companion.state", { ...data, expanded: islandExpanded.has(key) });
         }
@@ -90,8 +108,12 @@ export async function installDesktopCompanions(options: {
   ipcMain.handle("desktop.companions.state", event => { check(event); return structuredClone(prefs); });
   ipcMain.handle("desktop.companions.displays", event => { check(event); return screen.getAllDisplays().map(display => ({ id: display.id, label: display.label || `${display.size.width} × ${display.size.height}` })); });
   ipcMain.handle("desktop.companions.save", (event, value: unknown) => {
-    check(event); const next = DesktopCompanionPreferencesSchema.parse(value);
-    const save = queue.then(async () => { await writePrivateFile(file, JSON.stringify(next)); prefs = next; sync(); return structuredClone(prefs); });
+    check(event); const requested = DesktopCompanionPreferencesSchema.parse(value);
+    const save = queue.then(async () => {
+      // Position is owned by the handle; an already-open settings view may be stale.
+      const next = { ...requested, dock: { ...requested.dock, offset: prefs.dock.offset } };
+      await writePrivateFile(file, JSON.stringify(next)); prefs = next; sync(); return structuredClone(prefs);
+    });
     queue = save.then(() => undefined, () => undefined); return save;
   });
   ipcMain.handle("desktop.companions.publish", (event, value: unknown) => {
@@ -100,6 +122,14 @@ export async function installDesktopCompanions(options: {
     if (next.questions?.some(prompt => !next.agents.some(agent => agent.id === prompt.botId))) throw new Error("Question owner is unavailable");
     if (next.scope !== snapshot.scope) resetQuestions();
     options.scopeChanged?.(next.scope);
+    const ids = new Set(next.agents.map(agent => agent.id));
+    for (const id of previousResults.keys()) if (!ids.has(id)) { previousResults.delete(id); resultUntil.delete(id); }
+    for (const agent of next.agents) {
+      const old = previousResults.get(agent.id);
+      if (old && agent.result && !agent.working && (old.working || old.result !== agent.result)) resultUntil.set(agent.id, Date.now() + 8000);
+      if (agent.working) resultUntil.delete(agent.id);
+      previousResults.set(agent.id, { result: agent.result, working: agent.working });
+    }
     snapshot = next; sync();
   });
   const expandIsland = (event: Electron.IpcMainEvent, open: unknown) => {
@@ -166,6 +196,7 @@ export async function installDesktopCompanions(options: {
   const select = (event: Electron.IpcMainEvent, id: unknown) => {
     if (![...windows.values()].some(win => win.webContents === event.sender && event.senderFrame === event.sender.mainFrame)) return;
     if (typeof id !== "string" || !snapshot.agents.some(agent => agent.id === id)) return;
+    if (companionWindow(event)?.[0].startsWith("dock:") && prefs.dock.agents[id] === false) return;
     const target = { scope: snapshot.scope, botId: id };
     if (prefs.dock.chatAction === "floating" && options.openChat) {
       void options.openChat(target).catch(() => options.reveal(target));
@@ -173,8 +204,43 @@ export async function installDesktopCompanions(options: {
   };
   ipcMain.on("companion.select", select);
   screen.on("display-added", sync); screen.on("display-removed", sync); screen.on("display-metrics-changed", sync);
+  const moveDock = (event: Electron.IpcMainEvent, phase: unknown) => {
+    const owned = companionWindow(event); if (!owned?.[0].startsWith("dock:") || !["start", "move", "end", "cancel", "previous", "next"].includes(String(phase))) return;
+    const win = owned[1];
+    if (phase === "previous" || phase === "next") {
+      const save = queue.then(async () => {
+        const next = { ...prefs, dock: { ...prefs.dock, offset: Math.max(0, Math.min(100, prefs.dock.offset + (phase === "next" ? 5 : -5))) } };
+        await writePrivateFile(file, JSON.stringify(next)); prefs = next; sync();
+      });
+      queue = save.then(() => undefined, () => undefined);
+      void save.then(() => { if (!win.isDestroyed()) win.webContents.send("companion.dock.saved", true); }, () => { if (!win.isDestroyed()) win.webContents.send("companion.dock.saved", false); });
+      return;
+    }
+    const point = screen.getCursorScreenPoint(), bounds = win.getBounds();
+    const horizontal = prefs.dock.edge === "bottom";
+    if (phase === "start") { drag = { window: win, scope: snapshot.scope, edge: prefs.dock.edge, grab: horizontal ? point.x - bounds.x : point.y - bounds.y, offset: prefs.dock.offset }; return; }
+    if (!drag || drag.window !== win || drag.scope !== snapshot.scope || drag.edge !== prefs.dock.edge) return;
+    if (phase === "cancel") { drag = undefined; sync(); return; }
+    const display = screen.getAllDisplays().find(d => `dock:${d.id}` === owned[0]) ?? windowDisplay();
+    const area = display.workArea;
+    const travel = Math.max(1, horizontal ? area.width - bounds.width - 8 : area.height - bounds.height - 8);
+    drag.offset = Math.max(0, Math.min(100, ((horizontal ? point.x - area.x : point.y - area.y) - drag.grab - 4) / travel * 100));
+    if (phase === "move") { sync(); return; }
+    const completedDrag = drag, offset = drag.offset;
+    const save = queue.then(async () => { const next = { ...prefs, dock: { ...prefs.dock, offset } }; await writePrivateFile(file, JSON.stringify(next)); prefs = next; if (drag === completedDrag) drag = undefined; sync(); });
+    queue = save.then(() => undefined, () => { if (drag === completedDrag) drag = undefined; sync(); });
+    void save.then(() => { if (!win.isDestroyed()) win.webContents.send("companion.dock.saved", true); }, () => { if (!win.isDestroyed()) win.webContents.send("companion.dock.saved", false); });
+  };
+  ipcMain.on("companion.dock.drag", moveDock);
   // Hidden transparent parts must not steal clicks from the application underneath.
   const hoverTimer = setInterval(() => {
+    let expired = false; for (const [id, until] of resultUntil) if (until <= Date.now()) { resultUntil.delete(id); expired = true; }
+    if (expired) sync();
+    if (prefs.dock.shown && (prefs.dock.layer === "app" || prefs.dock.display === "window" || typeof prefs.dock.display === "number")) {
+      const main = options.mainWindow?.();
+      const fingerprint = JSON.stringify(main && !main.isDestroyed() ? [main.getBounds(), main.isVisible(), main.isMinimized(), main.isFocused(), [...windows].some(([key, win]) => key.startsWith("dock:") && !win.isDestroyed() && win.isFocused())] : null);
+      if (fingerprint !== mainFingerprint) { mainFingerprint = fingerprint; sync(); }
+    }
     if (!prefs.dock.autoHide || !prefs.dock.shown) return;
     const point = screen.getCursorScreenPoint();
     for (const [key, win] of windows) {
@@ -194,7 +260,7 @@ export async function installDesktopCompanions(options: {
   return { clear: () => { resetQuestions(); options.scopeChanged?.(""); snapshot = { scope: "", theme: "light", agents: [] }; sync(); },
     dispose: () => { resetQuestions(); clearInterval(hoverTimer); for (const win of windows.values()) win.destroy(); windows.clear();
       screen.off("display-added", sync); screen.off("display-removed", sync); screen.off("display-metrics-changed", sync);
-      ipcMain.removeListener("companion.select", select);
+      ipcMain.removeListener("companion.select", select); ipcMain.removeListener("companion.dock.drag", moveDock);
       ipcMain.removeListener("companion.expand", expandIsland);
       ipcMain.removeListener("companion.question.open", openQuestion);
       ipcMain.removeHandler?.("companion.answer"); ipcMain.removeHandler?.("desktop.companions.questionResult"); } };

@@ -12,7 +12,7 @@ postgres("new-chat transaction (isolated PostgreSQL temporary tables)", () => {
   pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1, options: "-c search_path=pg_temp" }); prisma = new PrismaClient({ adapter: new PrismaPg(pool, { schema: "pg_temp" }) });
   await pool.query(`CREATE TEMP TABLE threads (id text PRIMARY KEY, "spaceId" text, "userId" text, "botId" text, "taskBotId" text,
    "nextMessageSeq" integer DEFAULT 0, "nextEventSeq" integer DEFAULT 0, "contextStartSeq" integer DEFAULT 0,
-   "historyCompactedUpToSeq" integer, "historyCompactionSummary" text, "historyCompactionGeneration" integer DEFAULT 0, unread boolean DEFAULT false);
+   "historyCompactedUpToSeq" integer, "historyCompactionSummary" text, "historyCompactionGeneration" integer DEFAULT 0, "agentContextReset" jsonb, unread boolean DEFAULT false);
    CREATE TEMP TABLE messages (id text PRIMARY KEY, "threadId" text, seq integer, role text, blocks jsonb,
    "botId" text, "replyToMessageId" text, "replyQuote" text, "runId" text, "clientNonce" text, "searchTokens" integer[] DEFAULT '{}', "createdAt" timestamptz DEFAULT now(), UNIQUE("threadId",seq), UNIQUE("threadId","clientNonce"));
    CREATE TEMP TABLE runs (id text PRIMARY KEY, "spaceId" text, "threadId" text, status text, checkpoint text, "updatedAt" timestamptz DEFAULT now());

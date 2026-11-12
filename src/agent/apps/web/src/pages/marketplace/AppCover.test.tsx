@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import type { Bot } from "@rakazo/contracts";
 import { afterEach, expect, it, vi } from "vitest";
-import { AppCover } from "./AppCover";
+import { AppCover,AppCoverEditor } from "./AppCover";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), open: vi.fn(), send: vi.fn(), status: vi.fn(), list: vi.fn(), image: vi.fn() }));
 vi.mock("../../lib/space-rpc", () => ({ useSpaceRpc: () => client }));
@@ -28,14 +28,14 @@ it("uses the chosen Mico and app context, then waits for explicit apply before s
   api.status.mockResolvedValue({ status: "completed", detail: "", error: null });
   api.list.mockResolvedValue([artifact]); api.image.mockResolvedValue(artifact);
   const host = document.createElement("div"); document.body.append(host); root = createRoot(host);
-  await act(async () => root!.render(<MemoryRouter><AppCover app={{ id: "video-studio", title: "Estudio de vídeos", description: "Vídeo con voz" }}
+  const apply=vi.fn();
+  await act(async () => root!.render(<MemoryRouter><AppCoverEditor app={{ id: "video-studio", title: "Estudio de vídeos", description: "Vídeo con voz" }}
     bots={[{ id: "mico-one", name: "Primero" }, { id: "mico-two", name: "Diseño" }] as Bot[]}
-    activeBotId="mico-one" scope="owner:space" /></MemoryRouter>));
+    activeBotId="mico-one" scope="owner:space" cover={{revision:null,image:null}} initialError="" onClose={()=>{}} onSaved={()=>{}} onApply={apply}/></MemoryRouter>));
   const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === label || b.getAttribute("aria-label") === label)!;
-  await act(async () => button("Personalizar carátula de Estudio de vídeos").click());
+  await act(async () => button("Generar con un Mico").click());
   const select = document.querySelector<HTMLSelectElement>('select[aria-label="Mico para la carátula"]')!;
   await act(async () => { select.value = "mico-two"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-  await act(async () => button("Generar con un Mico").click());
   const style = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Estilo de la carátula"]')!;
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(style, "Terciopelo verde"); style.dispatchEvent(new Event("input", { bubbles: true })); });
   await act(async () => button("Generar carátula").click());
@@ -46,6 +46,12 @@ it("uses the chosen Mico and app context, then waits for explicit apply before s
   expect(api.set).not.toHaveBeenCalled();
   expect(button("Aplicar carátula").disabled).toBe(false);
   await act(async () => button("Aplicar carátula").click());
-  expect(api.set).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ appId: "video-studio", botId: "mico-two", expectedRevision: null,
-    source: { kind: "artifact", artifactId: "generated-image" } }));
+  expect(api.set).not.toHaveBeenCalled();
+  expect(apply).toHaveBeenCalledExactlyOnceWith({mimeType:"image/png",contentBase64:png});
+});
+
+it("renders catalog covers without edit controls",async()=>{
+ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);api.get.mockResolvedValue({revision:null,image:null});const host=document.createElement("div");document.body.append(host);root=createRoot(host);
+ await act(async()=>root!.render(<AppCover app={{id:"video-studio",title:"Video",description:""}} bots={[]} scope="owner:space"/>));
+ expect(host.querySelector("button")).toBeNull();
 });

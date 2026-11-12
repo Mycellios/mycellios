@@ -4,6 +4,7 @@ import path from "node:path";
 import type { AgentRuntime } from "@rakazo/adapter-kit";
 import { NativeAgentRuntime } from "./native-agent-runtime.js";
 import { PiAgentRuntime } from "./pi-runtime.js";
+import { desktopAgentSegmentId } from "./desktop-agent-segment.js";
 
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 /** One owned native engine; account/server scopes and uncertain starts survive a restart. */
@@ -19,7 +20,10 @@ export function createDesktopAgentEngine(profile: string, accessScope: () => str
       if (!scope || !/^[a-f0-9]{64}$/.test(scope) || active.has(request.runId)) throw Error("Desktop account access is unavailable");
       const directory = path.join(profile, "agent-executor", scope), receipts = path.join(directory, "receipts");
       await mkdir(receipts, { recursive: true, mode: 0o700 });
-      const receipt = path.join(receipts, hash([request.botId, request.runId]) + ".json");
+      const segmentId = desktopAgentSegmentId(request);
+      // Keep legacy first-start receipts intact. An approved checkpoint has its
+      // own durable receipt, so reopening the app cannot replay that segment.
+      const receipt = path.join(receipts, hash(segmentId ? [request.botId, request.runId, segmentId] : [request.botId, request.runId]) + ".json");
       try { await writeFile(receipt, JSON.stringify({ version: 1, state: "started", startedAt: new Date().toISOString() }), { flag: "wx", mode: 0o600 }); }
       catch (error) {
         if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") {

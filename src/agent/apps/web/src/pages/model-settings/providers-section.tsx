@@ -14,7 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@rakazo/ui-web";
-import { ChevronRight, Network, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, ChevronRight, Network, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { ProviderLogo } from "../../components/ProviderLogo";
 import type { ReactNode, Ref } from "react";
 import { useId, useRef, useState } from "react";
@@ -56,7 +56,7 @@ export function ProvidersSection({
   onAdd: (provider: ConnectableProvider, directoryKey?: string) => void;
   onOpen: (credential: ModelCredential) => void;
   onClose?: () => void;
-  /** The connection form, shown under the connection it belongs to or after the list. */
+  /** The connection editor, shown as a separate view with guarded return navigation. */
   panel?: ReactNode;
   /** The connection id the form belongs to, or "add" for a new one. */
   panelAt?: string | null;
@@ -71,7 +71,6 @@ export function ProvidersSection({
 }) {
   const { t } = useLingui();
   const [query, setQuery] = useState("");
-  const [openRuntime, setOpenRuntime] = useState<string | null>(null);
   const matches = (...labels: string[]) => !showDirectory || !query.trim() || matchesSearchQuery(query, ...labels);
   const isCustom = (provider: ConnectableProvider) => provider.id === OPENAI_COMPATIBLE_PROVIDER_ID && !provider.baseUrl;
   const antseedCredentials = credentials.filter((credential) => credential.provider === ANTSEED_PROVIDER_ID);
@@ -107,10 +106,8 @@ export function ProvidersSection({
   ) : null;
   const showPrimary = Boolean(primary && matches("Mycellios"));
   function runtimeRow(runtime: ProviderRuntime) {
-    const expanded = openRuntime === runtime.id;
     return <li key={runtime.id}>
-      <button type="button" className={rowClass} aria-expanded={expanded} disabled={disabled}
-        onClick={() => setOpenRuntime(expanded ? null : runtime.id)}>
+      <div className={rowClass.replace("hover:bg-accent/50", "")}>
         <ProviderLogo name={runtime.name} providerId={runtime.id} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{runtime.name}</span>
@@ -118,10 +115,19 @@ export function ProvidersSection({
             {runtime.available ? t`Available on this server` : runtime.canInstall ? t`Download available` : t`Not installed`}
           </span>
         </span>
-        <ChevronRight aria-hidden className={`size-4 shrink-0 text-muted-foreground ${expanded ? "rotate-90" : "rtl:rotate-180"}`} />
-      </button>
-      {expanded ? <div className="px-3 pb-3">{runtimeDetails?.(runtime)}</div> : null}
+      </div>
+      <div className="px-3 pb-3">{runtimeDetails?.(runtime)}</div>
     </li>;
+  }
+  // Connection editors are a subview, not an accordion in the provider directory.
+  if (panelAt && panel) {
+    const credential = credentials.find(item => item.id === panelAt);
+    const provider = providers.find(item => `new:${providerKey(item)}` === panelAt);
+    return <section className="mb-8 space-y-4" data-testid="model-providers">
+      <Button variant="ghost" size="sm" disabled={disabled} onClick={onClose}><ArrowLeft size={16} /><Trans>Back to providers</Trans></Button>
+      <h3 className="text-[15px] font-medium">{credential ? nameOf(credential) : provider ? provider.name : t`Providers`}</h3>
+      {panel}
+    </section>;
   }
   return (
     <section className="mb-8" data-testid="model-providers">
@@ -153,7 +159,6 @@ export function ProvidersSection({
                 type="button"
                 disabled={disabled}
                 onClick={() => onOpen(credential)}
-                aria-expanded={panelAt === credential.id}
                 className={rowClass}
               >
                 <ProviderLogo name={nameOf(credential)} providerId={credential.provider} />
@@ -162,11 +167,10 @@ export function ProvidersSection({
                   {showDirectory ? <span className="block text-xs text-muted-foreground">{t`Connected`}</span> : null}
                 </span>
                 <ChevronRight
-                  className={`size-4 shrink-0 text-muted-foreground transition-transform ${panelAt === credential.id ? "rotate-90" : ""}`}
+                  className="size-4 shrink-0 text-muted-foreground rtl:rotate-180"
                   aria-hidden
                 />
               </button>
-              {panelAt === credential.id ? <div className="px-3 pb-3">{panel}</div> : null}
             </li>
           ))}
         {antseedConnected ? antseedRow : null}
@@ -179,7 +183,6 @@ export function ProvidersSection({
           !visibleCredentials.length && !visibleRuntimes.some((runtime) => runtime.available) ?
           <li className="px-3 py-2 text-sm text-muted-foreground">{t`No results`}</li> : null}
       </ul>
-      {panelAt === "add" ? panel : null}
       {showDirectory ? (
         <div className="mt-6">
           <h3 className="mb-2.5 text-[15px] font-medium text-foreground">{t`Other providers`}</h3>
@@ -191,15 +194,13 @@ export function ProvidersSection({
               {visibleRuntimes.filter((runtime) => !runtime.available).map(runtimeRow)}
               {available.map((provider) => {
                 const key = providerKey(provider);
-                const expanded = panelAt === `new:${key}`;
                 const custom = isCustom(provider);
                 return <li key={key}>
                   <button
                     type="button"
                     disabled={disabled}
-                    aria-expanded={expanded}
                     className={rowClass}
-                    onClick={() => expanded ? onClose?.() : onAdd(provider, key)}
+                    onClick={() => onAdd(provider, key)}
                   >
                     {custom ? <SlidersHorizontal className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                       : <ProviderLogo name={provider.name} providerId={provider.id} />}
@@ -207,9 +208,8 @@ export function ProvidersSection({
                       <span className="block truncate text-sm font-medium">{custom ? t`Custom provider` : provider.name}</span>
                       <span className="block text-xs text-muted-foreground">{custom ? t`Connect your own model endpoint` : t`Not connected`}</span>
                     </span>
-                    <ChevronRight className={`size-4 shrink-0 text-muted-foreground ${expanded ? "rotate-90" : "rtl:rotate-180"}`} aria-hidden />
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground rtl:rotate-180" aria-hidden />
                   </button>
-                  {expanded ? <div className="px-3 pb-3">{panel}</div> : null}
                 </li>;
               })}
             </ul>

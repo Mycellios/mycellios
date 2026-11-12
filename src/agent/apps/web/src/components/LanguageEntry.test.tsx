@@ -9,11 +9,11 @@ vi.mock("@lingui/react/macro",()=>({useLingui:()=>({t:(s:TemplateStringsArray)=>
 vi.mock("./AuthMushroom",()=>({AuthMushroom:()=>null}));
 import { LanguageEntry } from "./LanguageEntry";
 import {LANGUAGE_ENTRY_KEY} from "../lib/language-entry";
-beforeEach(()=>{vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);localStorage.clear();setLocale.mockReset().mockImplementation(async(locale:string)=>locale);});
+beforeEach(()=>{vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);vi.stubGlobal("navigator",{languages:["es-ES"],language:"es-ES"});localStorage.clear();setLocale.mockReset().mockImplementation(async(locale:string)=>locale==="system"?"es":locale);});
 it("keeps the app unmounted until language confirmation, then remembers it",async()=>{
  const el=document.createElement("div");document.body.append(el);const root=createRoot(el);
- try{await act(async()=>root.render(<LanguageEntry><span>Private application</span></LanguageEntry>));expect(el.textContent).not.toContain("Private application");expect(el.querySelector('[role="combobox"]')?.textContent).toContain("Español");
- await act(async()=>el.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());expect(setLocale).toHaveBeenCalledWith("es");expect(localStorage.getItem(LANGUAGE_ENTRY_KEY)).toBe("es");expect(el.textContent).toContain("Private application");}
+ try{await act(async()=>root.render(<LanguageEntry><span>Private application</span></LanguageEntry>));expect(el.textContent).not.toContain("Private application");expect(el.querySelector('[role="combobox"]')?.textContent).toContain("System default");
+ await act(async()=>el.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());expect(setLocale).toHaveBeenCalledWith("system");expect(localStorage.getItem(LANGUAGE_ENTRY_KEY)).toBe("es");expect(el.textContent).toContain("Private application");}
  finally{await act(async()=>root.unmount());el.remove();}
 });
 it("does not ask again once a valid choice has been confirmed",async()=>{

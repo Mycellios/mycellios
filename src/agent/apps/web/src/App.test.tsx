@@ -111,7 +111,7 @@ it("loads the board chunk only after bootstrap enables the route", async () => {
   try {
     await act(async () => root.render(render()));
     expect(container.textContent).toBe("Shell");
-    expect(capability.screen).toHaveBeenCalledExactlyOnceWith({ screen: "board", surface: "web" });
+    expect(capability.screen).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ screen: "board", surface: "web", linkAccount:false, installationId:expect.any(String) }));
     expect(capability.boardLoaded).not.toHaveBeenCalled();
     capability.enabled = true;
     await act(async () => {
@@ -193,8 +193,22 @@ it("reports screen usage only after the device explicitly opts in", async () => 
     await act(async () => root.render(<MemoryRouter initialEntries={["/app"]}><App /></MemoryRouter>));
     expect(capability.screen).not.toHaveBeenCalled();
     await act(async () => setGeneralPreferences({ productAnalytics: true }));
-    expect(capability.screen).toHaveBeenCalledExactlyOnceWith({ screen: "home", surface: "web" });
+    expect(capability.screen).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ screen: "home", surface: "web", linkAccount:false, installationId:expect.any(String) }));
     await act(async () => setGeneralPreferences({ productAnalytics: false }));
     expect(capability.screen).toHaveBeenCalledTimes(1);
   } finally { await act(async () => root.unmount()); vi.unstubAllGlobals(); }
+});
+
+it("does not transfer account analytics consent to a different signed-in account",async()=>{
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
+  localStorage.setItem(GENERAL_PREFERENCES_KEY,JSON.stringify({productAnalytics:true,analyticsAccountId:"user-1"}));
+  const div=document.createElement("div"),root=createRoot(div);
+  const view=()=> <MemoryRouter initialEntries={["/app"]}><App/></MemoryRouter>;
+  try {
+    capability.session=signedIn;await act(async()=>root.render(view()));
+    expect(capability.screen).toHaveBeenLastCalledWith(expect.objectContaining({linkAccount:true}));
+    capability.session={...signedIn,data:{user:{id:"user-2"}}};await act(async()=>root.render(view()));
+    expect(capability.screen).toHaveBeenLastCalledWith(expect.objectContaining({linkAccount:false}));
+    expect(capability.screen).toHaveBeenLastCalledWith(expect.not.objectContaining({email:expect.anything()}));
+  } finally {await act(async()=>root.unmount());capability.session=null;vi.unstubAllGlobals();}
 });

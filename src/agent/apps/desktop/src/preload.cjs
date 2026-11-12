@@ -5,6 +5,10 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
   servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url) },
   platform: process.platform,
+  localScripts: {
+    state: () => ipcRenderer.invoke("desktop.localScripts.state"),
+    configure: patch => ipcRenderer.invoke("desktop.localScripts.configure", patch),
+  },
   settings: {
     fonts: () => ipcRenderer.invoke("desktop.settings.fonts"),
     logo: png => ipcRenderer.invoke("desktop.settings.logo", png),
@@ -63,6 +67,17 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
   },
   badge: {
     set: (count) => ipcRenderer.invoke("desktop.badge.set", count),
+  },
+  notifications: {
+    clear: () => ipcRenderer.invoke("desktop.notifications.clear"),
+    status: () => ipcRenderer.invoke("desktop.notifications.status"),
+    show: input => ipcRenderer.invoke("desktop.notifications.show", input),
+    openSettings: () => ipcRenderer.invoke("desktop.notifications.settings"),
+    onOpen: listener => {
+      const handler = (_event, url) => listener(url);
+      ipcRenderer.on("desktop.notifications.open", handler);
+      return () => ipcRenderer.off("desktop.notifications.open", handler);
+    },
   },
   computer: {
     prepareTask: request => ipcRenderer.invoke("desktop.computer.prepareTask", request),

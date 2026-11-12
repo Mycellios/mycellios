@@ -1,0 +1,23 @@
+.island-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px 0; }
+.island-previews figure { min-width: 0; margin: 0; }
+.island-preview-screen { height: 90px; border: 1px solid var(--border); background: var(--background); border-radius: 10px; overflow: hidden; display: flex; justify-content: center; align-items: flex-start; }
+.island-preview-screen.external { align-items: center; }
+.island-preview-pill { max-width: 95%; min-width: 110px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 4px 8px; border-radius: 0 0 14px 14px; background: #101714; color: #f7f6f2; transition: width 140ms ease-out, height 140ms ease-out; }
+.external .island-preview-pill { border-radius: 22px; }
+.island-preview-pill img { width: 18px; height: 18px; object-fit: contain; border-radius: 5px; }
+.island-preview-pill span { font-size: 14px; }
+.island-previews figcaption { margin-top: 8px; text-align: center; font-size: 12px; color: var(--muted-foreground); }
+.island-scale { padding: 12px 0; }
+.island-scale > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.island-scale output { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted-foreground); }
+.island-scale input[type=range] { width: 100%; min-height: 36px; padding: 0; border: 0; box-shadow: none; background: transparent; accent-color: var(--primary); cursor: pointer; }
+.island-scale input:disabled { cursor: default; }
+@media (max-width: 480px) { .island-previews { gap: 8px; } .island-preview-pill { min-width: 80px; } }
+@media (prefers-reduced-motion: reduce) { .island-preview-pill { transition: none; } }
+
+.mico-dock-preview { position:relative; height:280px; overflow:hidden; border:1px solid var(--border); border-radius:14px; background:var(--muted); }
+.mico-dock-preview > span { display:block; padding:16px; font-size:12px; color:var(--muted-foreground); }
+.mico-dock-preview-body { position:absolute; display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px; border-radius:18px; background:var(--background); border:1px solid var(--border); top:50%; translate:0 -50%; }
+.mico-dock-preview-body.left { left:12px; transform-origin:left center; }.mico-dock-preview-body.right { right:12px; transform-origin:right center; }
+.mico-dock-preview-body.bottom { top:auto; bottom:12px; left:50%; translate:-50% 0; transform-origin:center bottom; flex-direction:row; }
+.mico-dock-preview-grip { font-size:12px; color:var(--muted-foreground); }

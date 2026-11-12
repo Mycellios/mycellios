@@ -1,3 +1,4 @@
+import { accountNotificationAllowed, accountNotificationSettings } from "../lib/account-notifications";
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { createFramePublisher } from "../lib/frame-publisher";
 import { deferThreadProgressPresentation } from "../lib/thread-events";
@@ -138,6 +139,7 @@ import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
 import { connectThisComputer, defaultComputerMode, desktopBridge, desktopDragClass } from "../lib/desktop";
+import { notificationTarget } from "../pwa/notification-target";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
@@ -1163,6 +1165,18 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       window.removeEventListener("keydown", unlock, true);
     };
   }, [userId]);
+  useEffect(() => {
+    const notifications = desktopBridge()?.notifications;
+    if (!notifications) return;
+    void notifications.clear().catch(() => undefined);
+    const remove = notifications.onOpen((value) => {
+      if (!userId) return;
+      const base = new URL(appPath("/app"), location.href).pathname.slice(0, -4);
+      const target = notificationTarget(value, location.origin, base);
+      if (target) { const url = new URL(target); navigate(url.pathname.slice(base.length) + url.search); }
+    });
+    return () => { remove(); void notifications.clear().catch(() => undefined); };
+  }, [navigate, userId]);
   const deliverBrowserNotification = useCallback((pending: PendingBrowserNotification): boolean => {
     if (usesServerPush()) return true;
     const currentBot = botsRef.current.find((bot) => bot.id === pending.botId);
@@ -1180,9 +1194,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       pending.event,
       pending.groupId ? pending.botName : currentBot?.name || pending.botName,
       {
-        enabled: preferences.enabled && preferences.mutedUntil <= Date.now() && Boolean(pending.groupId || currentBot?.notifyOnFinish) &&
+        enabled: preferences.enabled && preferences.mutedUntil <= Date.now() && accountNotificationAllowed(userId, pending.botId, pending.event) && Boolean(pending.groupId || currentBot?.notifyOnFinish) &&
           (!preferences.attentionOnly || requiresNotificationAttention(pending.event)),
-        preview: preferences.preview,
+        preview: preferences.preview && (accountNotificationSettings(userId)?.previews ?? false),
         pageVisible: true,
         windowFocused: hasFocusedNotificationTab(userId),
         permission: Notification.permission,
@@ -1215,7 +1229,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       if (!userId) return;
       const completedReply = streamReady && replySoundGate(event, subscribedThreadId, initialCursor);
       const preferences = notificationPreferences(userId);
-      if (!preferences.enabled || preferences.mutedUntil > Date.now()) return;
+      if (!preferences.enabled || preferences.mutedUntil > Date.now() || !accountNotificationAllowed(userId, botId, event)) return;
       if (typeof botId !== "string" && !notificationGroupId) return;
       if (
         enabled && preferences.sound && !preferences.attentionOnly &&
@@ -1274,7 +1288,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         const options = { signal: stop.signal };
         const [activeRuns, recentRuns] = await Promise.all([
           client.runs.list({ filter: "active" }, options),
-          preferences.attentionOnly ? null : client.runs.list({ filter: "recent" }, options),
+          client.runs.list({ filter: "recent" }, options),
         ]);
         if (stop.signal.aborted || hasFocusedNotificationTab(userId)) return;
         for (const run of [...activeRuns.runs, ...(recentRuns?.runs ?? [])].reverse()) {
@@ -3878,9 +3892,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const renderHeaderActions = (close?: () => void) => (
     <>
     {!inGroup && active ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} /> : null}
-      {active && !inGroup && !activeProject ? <MicoWorkMenu key={active.id} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
+      {active && !inGroup && !activeProject ? <MicoWorkMenu key={`work:${active.id}`} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
         onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /> : null}
-      {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
+      {!inGroup && active ? <ChatHeaderModel key={`model:${active.id}`} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
       {(active || activeGroup) ? <ChatHeaderTools triggerRef={mobileBrowserTrigger}
         open={panel === "tools"} onToggle={() => {
           close?.();
@@ -3996,8 +4010,8 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     />
   );
   const sidebarCredits = (
-    <div className="mx-3 mt-1 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border px-1 py-2">
-      <MycelliosCredits key={userId} ownerId={userId ?? ""} />
+    <div className="mx-3 mt-1 flex shrink-0 flex-col gap-1 border-t border-border py-2">
+      <div className="w-full px-2"><MycelliosCredits key={userId} ownerId={userId ?? ""} onConnect={() => openSettings("models")} /></div>
       <SidebarContribution />
     </div>
   );
@@ -4361,6 +4375,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           ) : (
             <Transcript
               headerTabs={false}
+              conversationBot={inGroup ? undefined : active}
               key={activeSnapshot?.threadId}
               scrollRef={messageScroll}
               scrollRequest={scrollRequest}

@@ -19,7 +19,7 @@ describe("collaboration transcript markers", () => {
     expect(html).toContain('class="flex justify-start"');
     expect(html).toContain('class="inline-flex max-w-full');
     expect(html).toContain('class="truncate"');
-    expect(html).toContain('data-mico-avatar="flat"');
+    expect(html).toContain('data-mico-avatar="plush"');
     expect(html).toContain("Message from Research");
     expect(html).not.toContain("{peer}");
   });
@@ -66,6 +66,6 @@ describe("collaboration transcript markers", () => {
 
     expect(html).toContain('role="status"');
     expect(html).toContain('data-working="true"');
-    expect(html).toContain("rakazo-mico-eye");
+    expect(html).toContain("data-mycelium-lid");
   });
 });

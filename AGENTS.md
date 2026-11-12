@@ -9,6 +9,11 @@ These rules apply to the complete repository.
   user agents. Preserve historical ledger identifiers, balance precision and separate
   funding sources; this naming change does not launch the token or set its price.
 
+- Verified account provisioning grants 200,000 promotional credit microunits
+  (0.20 Credits / USD) once through `src/economy/welcome-credits.ts`. Keep the
+  deterministic ledger id, verification gate and separation from referral rewards;
+  never substitute a UI default balance for an authenticated wallet summary.
+
 - Mycellios is an independent distributed inference runtime.
 - The network vision includes phones, laptops, desktop PCs and servers as
   contributing compute nodes. Illustrations must reflect that role; distinguish
@@ -283,6 +288,12 @@ These rules apply to the complete repository.
   SDK at `ANTSEED_PROOF_MODULES` (as for speech proofs). Importing it must not
   announce a seller. Its isolated probe is `node scripts/check-antseed-jev-provider.mjs`;
   this verifies SDK transport/free configuration only, never real buyer delivery.
+- Optional managed Mycellios billing uses `specs/managed-provider/spec.md`.
+  AntSeed is the default operator upstream; keep its buyer identity separate
+  from customer BYOK providers. Use signed attributed spend, durable credit holds
+  and GET-only recovery for late receipts; never retry an uncertain paid request.
+  Run the managed provider/AntSeed text tests and the isolated managed-purchases
+  PostgreSQL suite for changes to that boundary. No local fixture activates it.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.

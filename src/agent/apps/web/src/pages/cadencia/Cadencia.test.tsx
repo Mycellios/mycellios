@@ -99,7 +99,7 @@ it("explicit close removes the selected file and its reload hold, revokes URLs a
       (b) => b.textContent?.trim() === "Cerrar y descartar",
     )!;
     await act(async () => close.click());
-    expect(host.textContent).toContain("Elegir vídeo");
+    expect(host.textContent).toContain("Elegir vídeo o audio");
     expect(readCadencia("close-test").file).toBeUndefined();
     expect(hasUnsavedEditorWork()).toBe(false);
     expect(revoke).toHaveBeenCalledWith("blob:synthetic");

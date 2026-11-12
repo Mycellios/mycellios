@@ -10,7 +10,6 @@ vi.mock("@rakazo/ui-web", () => ({ BotAvatar: () => <span />, Button: ({ variant
 vi.mock("../../lib/dictation", () => ({ webSpeechAvailable: () => true, dictation: { listen: audio.listen, stop: audio.stop, subscribe: () => () => {} } }));
 vi.mock("../../lib/tts", () => ({ browserSpeechAvailable: () => true, speaker: { speak: audio.speak, stop: audio.silence, subscribe: () => () => {} } }));
 vi.mock("../../lib/call-session", () => ({ endCall: vi.fn() }));
-vi.mock("../SidebarContribution", () => ({ SidebarContribution: ({activationLabel}: {activationLabel?:string}) => <button>{activationLabel}</button> }));
 import { VoiceConversation } from "./VoiceConversation";
 
 let root: ReturnType<typeof createRoot> | undefined;

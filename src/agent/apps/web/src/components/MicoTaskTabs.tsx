@@ -121,8 +121,8 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
     </form>
   );
 
-  return <nav aria-label={t`Mico tasks`} className={inMenu ? "min-w-0" : "app-no-drag flex min-w-7 flex-1 items-center gap-0.5"}>
-    {!inMenu ? <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] @max-[24rem]:hidden">
+  return <nav aria-label={t`Mico tasks`} className={inMenu ? "min-w-0" : "app-no-drag flex min-w-0 shrink items-center gap-0.5"}>
+    {!inMenu ? <div className="flex min-w-0 shrink items-center gap-0.5 overflow-x-auto [scrollbar-width:none] @max-[24rem]:hidden">
       {visibleTabs.length || taskThreadId ? <Button size="sm" variant={!taskThreadId ? "secondary" : "ghost"} className="h-7 shrink-0 px-2" aria-current={!taskThreadId ? "page" : undefined} onClick={() => onSelect()}><Trans>Main chat</Trans></Button> : null}
       {visibleTabs.map(tab => (
         <div key={tab.threadId} data-active={tab.threadId === taskThreadId ? "" : undefined}

@@ -59,3 +59,22 @@ Focused admission, CSP/HTTP, ownership/CAS/clone/publication/view tests; actual
 PostgreSQL migration and RLS denial checks; affected contract/API/web typing and
 real browser inspection. Publishing infrastructure/build/health is a separate
 gate; a local preview is not production publication.
+
+
+## Creator-owned catalog covers
+
+Store cards are read-only; edit the cover inside the owner's app editor. Built-in
+apps have no user-owned author identity and expose no cover editing. Existing
+personal artifact histories remain private and are not promoted into public cover
+endpoints. Legacy cover writes require the current app creator and Space again,
+including before idempotent replay and inside the write transaction.
+
+Community covers use exactly one reserved raster asset, mycellios-cover.png,
+mycellios-cover.jpg or mycellios-cover.webp, in the normal encrypted static draft.
+Upload and Mico generation remain explicit; applying a candidate changes only the
+local draft. Existing save CAS, ownership, membership, total/per-file size and
+publication checks remain authoritative. Only explicit publication exposes the
+cover, and catalog DTOs contain only its fixed path and immutable revision ID,
+never the draft, owner identity or arbitrary private artifact metadata. Public
+images use the existing sandboxed, nosniff static-file route. Withdrawal and
+account deletion preserve the existing publication revocation behavior.

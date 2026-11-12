@@ -17,6 +17,10 @@ vi.mock("./MycelliosCreate", () => ({ MycelliosCreate: () => <p>Creación multim
 vi.mock("@rakazo/ui-web", () => ({
   Button: ({ variant: _v, size: _s, ...props }: ComponentProps<"button"> & { variant?: string; size?: string }) => <button {...props} />,
   Input: (props: ComponentProps<"input">) => <input {...props} />,
+  DropdownMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <button>{children}</button>,
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: (props: ComponentProps<"button">) => <button {...props} />,
 }));
 import { HostedWebs } from "./HostedWebs";
 
@@ -50,6 +54,11 @@ it("retains browser Cadencia, Desktop editors and community apps in one director
   expect(host.querySelector("output")?.textContent).toContain("app=video-edit");
   await act(async () => button("Volver del editor").click());
   expect(host.textContent).toContain("Cadencia");
+  expect(host.textContent).toContain("Estudio IA");
+  expect(button("Crear imagen, voz o vídeo")).toBeUndefined();
+  await act(async () => button("Abrir Estudio IA").click());
+  expect(host.querySelector("output")?.textContent).toContain("app=ai-studio");
+  expect(host.textContent).toContain("Creación multimedia");
 });
 
 it("keeps first-party tools usable when the community directory fails", async () => {

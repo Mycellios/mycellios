@@ -93,8 +93,10 @@ vi.mock("./AccountSettingsOverlay", () => ({
   ComputerSettingsPanel: () => null,
   GeneralSettingsPanels: () => null,
   UpdatesSettingsPanel: () => null,
-  UsageSettingsPanel: () => null,
+  UsageSettingsPanel: () => <div data-testid="profile-usage-panel" />,
 }));
+// The Mico policy RPC has its own scoped component tests; this suite tests navigation.
+vi.mock("./settings/MicoBehaviorSettings", () => ({ MicoBehaviorSettings: () => null }));
 vi.mock("./RunLogsSettingsPanel", () => ({
   RunLogsSettingsPanel: () => <p>Execution log panel</p>,
 }));
@@ -337,16 +339,30 @@ it("reports a section picked in the nav so the shell can keep it in the URL", as
   const onSectionChange = vi.fn();
   const { container, cleanup } = await render({ onSectionChange });
   try {
-    const usage = container.querySelector<HTMLButtonElement>('[data-testid="settings-nav-usage"]');
-    if (!usage) throw new Error("Missing Usage nav item");
-    await act(async () => usage.click());
-    expect(onSectionChange).toHaveBeenCalledWith("usage");
+    expect(container.querySelector('[data-testid="settings-nav-usage"]')).toBeNull();
+    const profile = container.querySelector<HTMLButtonElement>('[data-testid="settings-nav-profile"]');
+    if (!profile) throw new Error("Missing Profile nav item");
+    await act(async () => profile.click());
+    expect(onSectionChange).toHaveBeenCalledWith("profile");
   } finally {
     await cleanup();
   }
 });
 
-it("opens a linked billing section once billing turns out to be on", async () => {
+it("shows usage directly inside Profile and preserves old Usage links without a disclosure",async()=>{
+  const {container,rerender,cleanup}=await render({section:"profile"});
+  try {
+    expect(container.querySelector('[data-testid="profile-usage-panel"]')).not.toBeNull();
+    expect([...container.querySelectorAll<HTMLButtonElement>('button')].some(button=>button.textContent?.includes("Usage and costs"))).toBe(false);
+    expect(container.querySelector('[data-testid="profile-usage-panel"]')).not.toBeNull();
+    await rerender({section:"usage"});
+    expect(container.querySelector('[data-testid="settings-nav-usage"]')).toBeNull();
+    expect(container.querySelector('[data-testid="settings-nav-profile"]')?.getAttribute("aria-current")).toBe("page");
+    expect(container.querySelector('[data-testid="profile-usage-panel"]')).not.toBeNull();
+  } finally {await cleanup();}
+});
+
+it("keeps a linked billing section visible before payments are enabled", async () => {
   const { container, rerender, cleanup } = await render({
     section: "billing",
     billingEnabled: false,
@@ -354,7 +370,7 @@ it("opens a linked billing section once billing turns out to be on", async () =>
   const shown = () =>
     container.querySelector("[data-settings-section]")?.getAttribute("data-settings-section");
   try {
-    expect(shown()).toBe("general");
+    expect(shown()).toBe("billing");
     await rerender({ section: "billing", billingEnabled: true });
     expect(shown()).toBe("billing");
   } finally {
@@ -563,12 +579,11 @@ it("shows Updates in the desktop app", async () => {
   }
 });
 
-it("keeps secondary sections behind More settings while preserving direct navigation", async () => {
+it("shows secondary settings directly without a More settings fold", async () => {
   const onSectionChange = vi.fn(); const view = await render({ section: "general", onSectionChange });
   try {
-    const more = [...view.container.querySelectorAll("button")].find(button => button.textContent?.includes("More settings"))!;
-    expect(more.getAttribute("aria-expanded")).toBe("false");
-    await act(async () => more.click()); expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect([...view.container.querySelectorAll("button")].some(button => button.textContent?.includes("More settings"))).toBe(false);
+    expect(view.container.querySelector('[data-testid="settings-nav-models"]')).not.toBeNull();
     await act(async () => view.container.querySelector<HTMLButtonElement>('[data-testid="settings-nav-models"]')!.click());
     expect(onSectionChange).toHaveBeenCalledWith("models");
   } finally { await view.cleanup(); }

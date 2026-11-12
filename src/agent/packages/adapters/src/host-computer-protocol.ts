@@ -31,7 +31,7 @@ const directories = z.discriminatedUnion("action", [
 ]);
 const base = { projectSessionId: z.string().min(1).max(256).optional(), botId: z.string().min(1).max(256), runId: z.string().min(1).max(256).optional() };
 export const hostComputerRequest = z.discriminatedUnion("method", [
-  z.object({ ...base, method: z.literal("agentRun"), runId: z.string().min(1).max(256), sessionId: z.string().uuid(), request: z.unknown() }),
+  z.object({ ...base, method: z.literal("agentRun"), runId: z.string().min(1).max(256), sessionId: z.string().uuid(), segmentId: z.string().regex(/^[a-f0-9]{64}$/).optional(), request: z.unknown() }),
   z.object({ ...base, method: z.literal("agentMessage"), runId: z.string().min(1).max(256), sessionId: z.string().uuid(), message: z.unknown() }),
   z.object({
     ...base,

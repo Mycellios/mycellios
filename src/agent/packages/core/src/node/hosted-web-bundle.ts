@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { HOSTED_WEB_LIMITS, HostedWebBundle } from "@rakazo/contracts";
+import { HOSTED_WEB_LIMITS, HostedWebBundle, HOSTED_WEB_COVER_FILES } from "@rakazo/contracts";
 
 const TYPES: Record<string, string> = {
   html: "text/html; charset=utf-8",
@@ -42,6 +42,7 @@ export function admitStaticBundle(raw: unknown) {
   const parsed = HostedWebBundle.parse(raw);
   const paths = new Set<string>();
   let bytes = 0;
+  let covers = 0;
   const files = parsed.files
     .map((file) => {
       if (!staticFilePath(file.path) || paths.has(file.path.toLowerCase()))
@@ -54,6 +55,13 @@ export function admitStaticBundle(raw: unknown) {
         throw new Error("Invalid file encoding.");
       const body = Buffer.from(file.base64, "base64");
       if (body.toString("base64") !== file.base64) throw new Error("Invalid file encoding.");
+      if(Object.values(HOSTED_WEB_COVER_FILES).some(path=>path===file.path)) {
+        covers++;
+        const valid=file.path.endsWith(".png")?body.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):
+          file.path.endsWith(".jpg")?body[0]===255&&body[1]===216&&body[2]===255:
+          body.toString("ascii",0,4)==="RIFF"&&body.toString("ascii",8,12)==="WEBP";
+        if(covers>1||!valid)throw new Error("La app admite una sola carátula PNG, JPG o WebP válida.");
+      }
       bytes += body.byteLength;
       if (body.byteLength > HOSTED_WEB_LIMITS.fileBytes || bytes > HOSTED_WEB_LIMITS.totalBytes)
         throw new Error("Static website exceeds its size limit.");

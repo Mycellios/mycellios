@@ -1,3 +1,4 @@
+import { speaker } from "./tts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   combineTranscript,
@@ -1732,9 +1733,9 @@ describe("Dictation web speech", () => {
 });
 
 describe("transcriptionLanguage", () => {
-  it("uses English before the caller has selected an app language", () => {
+  it("follows the system language before the caller selects a manual app language", () => {
     vi.stubGlobal("navigator", { language: "es-ES" });
-    expect(transcriptionLanguage()).toBe("en");
+    expect(transcriptionLanguage()).toBe("es");
   });
   it("hints the provider with the language the caller picked", () => {
     vi.stubGlobal("localStorage", {
@@ -1743,4 +1744,16 @@ describe("transcriptionLanguage", () => {
     vi.stubGlobal("navigator", { language: "es-ES" });
     expect(transcriptionLanguage()).toBe("es");
   });
+});
+
+it("interrupts spoken output but does not capture or upload when the selected local model is unavailable", async () => {
+  const stopSpeech = vi.spyOn(speaker, "stop").mockImplementation(() => {});
+  const getUserMedia = vi.fn(), fetcher = vi.fn();
+  vi.stubGlobal("localStorage", { getItem: (key: string) => key === "mycellios.general.v1" ? JSON.stringify({ dictationEngine: "local" }) : null });
+  vi.stubGlobal("navigator", { language: "en", mediaDevices: { getUserMedia } });
+  vi.stubGlobal("window", { rakazoDesktop: { localVoice: { status: async () => ({ ready: false }) } } });
+  vi.stubGlobal("fetch", fetcher);
+  const capture = new Dictation(); await capture.listen({ mode: "hold", transcribe: true, onFinal: () => {} });
+  expect(stopSpeech).toHaveBeenCalledOnce();
+  expect(capture.state.error).toContain("Download Parakeet"); expect(getUserMedia).not.toHaveBeenCalled(); expect(fetcher).not.toHaveBeenCalled();
 });

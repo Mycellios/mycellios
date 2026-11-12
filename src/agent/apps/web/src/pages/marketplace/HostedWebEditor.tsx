@@ -1,4 +1,6 @@
-import type { Bot, HostedWebAgent, HostedWebDraft } from "@rakazo/contracts";
+import { StoreAppHeader } from "./StoreAppHeader";
+import {HOSTED_WEB_COVER_FILES,HOSTED_WEB_LIMITS,type Bot,type HostedWebAgent,type HostedWebDraft} from "@rakazo/contracts";
+import {AppCoverEditor,type CoverImage} from "./AppCover";
 import {
   Button,
   Input,
@@ -6,7 +8,7 @@ import {
   NativeSelectOption,
   Textarea,
 } from "@rakazo/ui-web";
-import { ArrowLeft, ArrowUpRight, Eye, RefreshCw, Upload } from "lucide-react";
+import { ArrowUpRight, Eye, RefreshCw, Upload, ImagePlus } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { appPath } from "../../lib/app-path";
 import {
@@ -41,6 +43,7 @@ export function WebEditor({
   onCreateBot,
 }: EditorProps) {
   const editorId = useId();
+  const [coverOpen,setCoverOpen]=useState(false);
   const restored = readWebEditor(scope);
   const [draft, setDraft] = useState(
     restored?.draft.id === initial.id ? restored.draft : initial,
@@ -242,28 +245,32 @@ export function WebEditor({
         setSelected("index.html");
       }
     });
+  const coverFile=draft.bundle.files.find(file=>Object.values(HOSTED_WEB_COVER_FILES).some(path=>path===file.path));
+  function applyCover(image:CoverImage|null) {
+    const files=draft.bundle.files.filter(file=>!Object.values(HOSTED_WEB_COVER_FILES).some(path=>path===file.path));
+    if(image) {
+      const bytes=atob(image.contentBase64).length;
+      if(bytes>HOSTED_WEB_LIMITS.fileBytes||files.reduce((n,file)=>n+atob(file.base64).length,bytes)>HOSTED_WEB_LIMITS.totalBytes)throw new Error("La carátula supera el límite de la app. Usa una imagen de menos de 1 MB.");
+      files.push({path:HOSTED_WEB_COVER_FILES[image.mimeType],base64:image.contentBase64});
+    }
+    if(files.length>HOSTED_WEB_LIMITS.files)throw new Error("La app ya tiene el máximo de archivos.");
+    change({bundle:{files}});setNotice("Carátula preparada. Guarda y publica la app para actualizarla en el catálogo.");
+  }
   const file = draft.bundle.files.find((file) => file.path === selected);
   const editable = /\.(html|css|m?js|json|txt|svg)$/i.test(selected);
   return (
     <section className="hw-editor" aria-label="Editor de app">
-      <header className="hw-editor-bar">
-        <Button
-          variant="ghost"
-          onClick={() => {
-            if (
-              !dirty ||
-              window.confirm("Hay cambios sin guardar. ¿Salir del editor?")
-            )
-              onBack();
-          }}
-        >
-          <ArrowLeft /> Hifa Store
-        </Button>
-        <strong>{draft.title}</strong>
+      {coverOpen&&<AppCoverEditor app={{id:draft.id,title:draft.title,description:draft.summary}} bots={bots} scope={scope}
+        cover={{revision:null,image:coverFile?{contentBase64:coverFile.base64,mimeType:Object.entries(HOSTED_WEB_COVER_FILES).find(([,path])=>path===coverFile.path)![0]}:null}}
+        initialError="" onClose={()=>setCoverOpen(false)} onSaved={()=>{}} onApply={applyCover}/>}
+      <StoreAppHeader title={draft.title} onBack={() => {
+        if (!dirty || window.confirm("Hay cambios sin guardar. ¿Salir del editor?")) onBack();
+      }}>
         <span className="hw-caption">
           {dirty ? "Cambios sin guardar" : "Borrador guardado"}
         </span>
         <div className="hw-actions">
+          <Button variant="secondary" disabled={busy||working||remoteChanged} onClick={()=>setCoverOpen(true)}><ImagePlus size={16}/>Carátula</Button>
           <Button
             variant="secondary"
             disabled={busy || !dirty}
@@ -286,7 +293,7 @@ export function WebEditor({
                 : "Publicar app"}
           </Button>
         </div>
-      </header>
+      </StoreAppHeader>
       {error && (
         <p className="hw-error" role="alert">
           {error}{" "}

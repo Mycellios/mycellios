@@ -64,6 +64,13 @@ it("closes the window and quits unless the user chose to keep running in the bac
   expect(window.hide).not.toHaveBeenCalled();
 });
 
+it("never overwrites the explicit startup preference when the app shell owns it",()=>{
+  vi.useFakeTimers();vi.mocked(app.setLoginItemSettings).mockClear();state.allowed=true;
+  installAccountComputerBackground({profile:"startup-owner",host:{} as any,localUrl:"http://127.0.0.1",localToken:"fixture",context:async()=>null,consentScope:()=>"fixture",window:()=>null,manageLoginPreference:false});
+  state.allowed=false;state.changed();state.allowed=true;state.changed();
+  expect(app.setLoginItemSettings).not.toHaveBeenCalled();
+});
+
 it("keeps a consented window and its draft alive in the background, with explicit quit and revocation", async () => {
   vi.useFakeTimers();
   state.allowed = true;

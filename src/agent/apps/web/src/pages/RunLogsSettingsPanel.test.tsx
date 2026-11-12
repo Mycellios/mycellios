@@ -124,8 +124,9 @@ it("shows the actual pre-start blocker with no fabricated start time or attempts
       expect(view.container.textContent).toContain("No virtual computer is assigned"),
     );
     expect(view.container.textContent).toContain("Blocked");
-    const details = view.container.querySelector("details");
-    expect(details?.open).toBe(false);
+    expect(view.container.querySelector("details")).toBeNull();
+    const details = [...view.container.querySelectorAll("section")].find(section => section.querySelector("h3")?.textContent === "Diagnostic details");
+    expect(details).toBeDefined();
     const metric = (label: string) => [...(details?.querySelectorAll("dt") ?? [])]
       .find(entry => entry.textContent?.startsWith(label))?.nextElementSibling?.textContent;
     expect(metric("Execution attempts")).toBe("0");

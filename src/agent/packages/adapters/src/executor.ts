@@ -1,4 +1,7 @@
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
+import { micoBehaviorInstructions } from "./mico-behavior.js";
+import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
+import { effectiveMicoSettings } from "@rakazo/contracts";
 import { executeHostedAppTool } from "./hosted-app-tools.js";
 import { shouldPublishTextProgress } from "./progress-cadence.js";
 import { executeWorkflowTool, WORKFLOW_TOOL_NAMES } from "./workflow-tools.js";
@@ -604,7 +607,7 @@ const MAX_MODEL_FILE_BYTES = 250_000;
 const TURN_ATTACHMENT_UNAVAILABLE =
   "An attachment in this message could not be loaded. Tell the user the attachment was unavailable and do not guess its contents.";
 const STEERING_ATTACHMENT_UNAVAILABLE = TURN_ATTACHMENT_UNAVAILABLE;
-const BUILTIN_AGENT_TOOL_NAMES = new Set(builtinAgentTools.map((tool) => tool.name));
+const BUILTIN_AGENT_TOOL_NAMES = new Set([...builtinAgentTools.map((tool) => tool.name), agentNewChatTool.name]);
 
 /**
  * Avoid an expensive remote workspace export when a turn never touched the computer. A failed
@@ -4502,7 +4505,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
         if (!computerAvailable) {
           for (const name of COMPUTER_REQUIRED_TOOL_NAMES) disabledBuiltinTools.add(name);
         }
+        const micoOwner = await deps.prisma.user.findUniqueOrThrow({ where: { id: run.userId }, select: { micoDefaults: true } });
         const builtins = [
+          ...(effectiveMicoSettings(micoOwner.micoDefaults, bot.micoPreferences).agentNewChat && run.trigger === "user" && thread.botId === bot.id && !thread.groupId && !disabledBuiltinTools.has("start_new_chat") ? [agentNewChatTool] : []),
           ...selectBuiltinToolsForRun({
             ticketBoardEnabled: deps.ticketBoardEnabled,
             phoneCallsEnabled: deps.phoneCallsEnabled,
@@ -6753,6 +6758,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               }
             }, finish);
           }
+          if (name === "start_new_chat") {
+            return requestAgentNewChat(deps.prisma, { userId: run.userId, spaceId: run.spaceId, botId: bot.id, threadId: thread.id },
+              { runId, owner: workerId, fence }, JSON.parse(redactSecrets(JSON.stringify(args), runSecrets)));
+          }
           if (name === "remember") {
             const path = String(args.path ?? "").trim() || "MEMORY.md";
             // A fact is added to the document, never replaces it. A concurrent save
@@ -8497,7 +8506,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               contextStrategy: deps.contextStrategy,
               instructions: [
                 ...userTurnInstructions({
-                  botInstructions: [runIdentityInstruction(bot, run.trigger),
+                  botInstructions: [runIdentityInstruction(bot, run.trigger), micoBehaviorInstructions(micoOwner.micoDefaults, bot.micoPreferences),
                     thread.contextStartSeq > 0 ? `Conversation context begins at sequence ${thread.contextStartSeq}. Earlier chat messages are outside this conversation; persistent memories and workspace files remain available.` : ""].filter(Boolean).join("\n"),
                   groupContext,
                   messagingContext,
@@ -9190,6 +9199,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
           });
           if (!completed) return;
           stopHeartbeatAfterCompletion();
+          // Never rotate while this run is live. The reset rechecks policy and locks the
+          // same thread as Send, refuses queued work and invalidates old checkpoints.
+          try {
+            const reset = await finishAgentNewChat(deps.prisma, { userId: run.userId, spaceId: run.spaceId, botId: bot.id, threadId: thread.id });
+            if (reset?.eventSeq !== null && reset?.eventSeq !== undefined) await deps.events.notify(thread.id, reset.eventSeq);
+          } catch (error) { getLogger().error("agent context handoff deferred", error); }
           if (run.trigger === "routine" && run.routineId) {
             await clearRoutineBackoff(deps, run.routineId);
           }

@@ -1,12 +1,22 @@
 /* The warm edge represents a confirmed, connected contribution setting. */
-body[data-mycellios-contributing="true"]::after { content:""; position:fixed; pointer-events:none; z-index:70; bottom:0; inset-inline:0; height:2px; background:linear-gradient(90deg,transparent,#e49b53 20%,#f2bd78 50%,#e49b53 80%,transparent); }
-body[data-mycellios-contributing="true"]::before { content:""; position:fixed; pointer-events:none; z-index:69; bottom:0; inset-inline:0; height:58px; background:radial-gradient(ellipse at 50% 110%,rgb(224 139 55 / 18%),transparent 72%); animation:contribution-breathe 4s ease-in-out infinite alternate; }
+body[data-mycellios-contributing="true"]::after { content:""; position:fixed; pointer-events:none; z-index:70; bottom:-8px; inset-inline:-3%; height:14px; background:linear-gradient(90deg,transparent 0%,#e8b84e 16%,#ffe29a 50%,#e8b84e 84%,transparent 100%); filter:blur(6px); opacity:.65; }
+body[data-mycellios-contributing="true"]::before { content:""; position:fixed; pointer-events:none; z-index:69; bottom:-26px; inset-inline:-5%; height:48px; background:radial-gradient(ellipse at 50% 100%,rgb(238 180 61 / 45%),rgb(238 180 61 / 16%) 40%,transparent 74%); filter:blur(8px); animation:contribution-breathe 4s ease-in-out infinite alternate; }
 .rk-contribution-control { width:100%; }
-.rk-contribution-button { width:100%; min-height:38px; border:1px solid var(--border); border-radius:10px; background:var(--background); color:var(--foreground); }
-[data-active="true"] .rk-contribution-button { border-color:color-mix(in srgb,#d58b43 45%,var(--border)); background:color-mix(in srgb,#db964f 9%,var(--background)); }
+.rk-contribution-button { display:flex; align-items:center; width:100%; height:auto; min-height:56px; padding-block:8px; border:0; border-radius:8px; background:transparent; color:var(--foreground); font-weight:400; }
+.rk-contribution-button > span:first-child:not(.rk-contribution-play) { display:flex; flex-direction:column; justify-content:center; gap:2px; line-height:1.25; }
+.rk-contribution-play { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; flex-shrink:0; border-radius:50%; border:1px solid var(--border); background:transparent; color:var(--foreground); }
+.rk-contribution-play-mini { width:30px; height:30px; }
+[data-active="true"] .rk-contribution-play { background:var(--muted); color:var(--foreground); }
 .rk-contribution-status { display:flex; align-items:center; gap:6px; padding:7px 8px 2px; font-size:11px; color:var(--muted-foreground); }
 .rk-contribution-status > span { width:5px; height:5px; border-radius:50%; background:#d48b43; }
 .rk-credit-gain { font-size:11px; color:var(--foreground); font-variant-numeric:tabular-nums; animation:credit-arrival .5s ease-out; }
 @keyframes contribution-breathe { from {opacity:.55} to {opacity:1} }
 @keyframes credit-arrival { from {opacity:0;transform:translateY(3px)} to {opacity:1;transform:translateY(0)} }
 @media (prefers-reduced-motion:reduce) { body[data-mycellios-contributing="true"]::before,.rk-credit-gain {animation:none;} }
+
+/* Motion Mini owns the finite flourish; the halo reflects verified live state. */
+.rk-contribution-growth { position:fixed; inset:0; width:100%; height:100%; z-index:71; pointer-events:none; overflow:hidden; }
+.rk-contribution-growth path,.rk-contribution-growth circle { fill:none; stroke:#e2b555; stroke-width:2px; stroke-linecap:round; stroke-dasharray:1; stroke-dashoffset:1; opacity:0; }
+.rk-contribution-growth path { filter:drop-shadow(0 0 4px rgb(226 181 85 / 60%)); }
+.rk-contribution-growth .rk-mycelium-wave { stroke-width:1px; stroke-dasharray:none; stroke-dashoffset:0; fill:rgb(226 181 85 / 9%); transform-box:fill-box; transform-origin:center; }
+@media (prefers-reduced-motion:reduce) { .rk-contribution-growth {display:none;} }

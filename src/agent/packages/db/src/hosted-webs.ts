@@ -29,6 +29,7 @@ export async function listHostedWebs(
           owned: boolean;
           updatedAt: Date;
           forkedFrom: string | null;
+          coverPath:Exclude<HostedWebCard["coverPath"],undefined>; coverRevisionId:string|null;
         }>
       >(Prisma.sql`
     SELECT w.id,w.slug,
@@ -39,7 +40,9 @@ export async function listHostedWebs(
       (SELECT count(*)::int FROM hosted_web_views v WHERE v."siteId"=w.id AND v."createdAt">CURRENT_TIMESTAMP-INTERVAL '7 days') AS "recentViews",
       EXISTS(SELECT 1 FROM hosted_web_pins p WHERE p."siteId"=w.id AND p."userId"=${user} AND p."spaceId"=${space}) AS pinned,
       (w."userId"=${user} AND w."spaceId"=${space}) AS owned,
-      COALESCE(r."createdAt",w."updatedAt") AS "updatedAt", w."forkedFrom"
+      COALESCE(r."createdAt",w."updatedAt") AS "updatedAt", w."forkedFrom",
+      (SELECT f->>'path' FROM jsonb_array_elements(r.bundle->'files') f WHERE f->>'path' IN ('mycellios-cover.png','mycellios-cover.jpg','mycellios-cover.webp') ORDER BY f->>'path' LIMIT 1) AS "coverPath",
+      r.id AS "coverRevisionId"
     FROM hosted_webs w LEFT JOIN hosted_web_revisions r ON r.id=w."publishedRevisionId" AND r."siteId"=w.id
     WHERE (r.id IS NOT NULL OR (${filter} IN ('mine','pinned') AND w."userId"=${user} AND w."spaceId"=${space}))
       AND (${filter}<>'mine' OR (w."userId"=${user} AND w."spaceId"=${space}))

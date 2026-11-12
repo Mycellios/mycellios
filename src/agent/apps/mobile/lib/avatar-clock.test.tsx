@@ -80,7 +80,8 @@ vi.mock("react-native-reanimated", () => {
 });
 vi.mock("react-native-svg", () => {
   const element = ({ children }: { children?: ReactNode }) => createElement("div", null, children);
-  return { default: element, Ellipse: element, G: element, Path: element, Rect: element };
+  return { default: element, Ellipse: element, G: element, Path: element, Rect: element,
+    Defs: element, Filter: element, FeColorMatrix: element, Image: element };
 });
 vi.mock("react-native", () => ({
   View: ({ children }: { children?: ReactNode }) => createElement("div", null, children),

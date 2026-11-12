@@ -155,8 +155,10 @@ try {
     });
   const service = hostedWebService(prisma);
   const id = randomUUID();
+  const coverPng=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=","base64");
   const bundle = {
     files: [
+      {path:"mycellios-cover.png",base64:coverPng.toString("base64")},
       {
         path: "index.html",
         base64: Buffer.from(
@@ -185,10 +187,10 @@ try {
         Array<{ draftBundle: unknown }>
       >`SELECT "draftBundle" FROM hosted_webs WHERE id=${id}`,
   );
-  assert.ok(!JSON.stringify(encrypted).includes(bundle.files[0]!.base64));
+  assert.ok(!JSON.stringify(encrypted).includes(bundle.files.find(file=>file.path==="index.html")!.base64));
   assert.equal(
-    (await service.draft(owner, id)).bundle.files[0]!.base64,
-    bundle.files[0]!.base64,
+    (await service.draft(owner, id)).bundle.files.find(file=>file.path==="index.html")!.base64,
+    bundle.files.find(file=>file.path==="index.html")!.base64,
   );
   assert.equal((await listHostedWebs(prisma, null, "discover")).length, 0);
   assert.equal((await service.list(owner, "discover", "")).length, 0);
@@ -220,6 +222,8 @@ try {
   assert.ok(!JSON.stringify(publicRows).includes(firstSpace));
   assert.equal(publicRows[0]!.views, 0);
   assert.equal(publicRows[0]!.revision, 1);
+  assert.equal(publicRows[0]!.coverPath,"mycellios-cover.png");
+  assert.ok(publicRows[0]!.coverRevisionId);
   const app = hostedWebHttp(
     prisma,
     randomBytes(32).toString("hex"),
@@ -241,6 +245,10 @@ try {
       : response;
   };
   const root = "/api/published-webs/synthetic-utility/";
+  const publicCover=await request(`${root}_versions/${publicRows[0]!.coverRevisionId}/mycellios-cover.png`);
+  assert.equal(publicCover.status,200);assert.equal(publicCover.headers.get("content-type"),"image/png");
+  assert.deepEqual(Buffer.from(await publicCover.arrayBuffer()),coverPng);
+  checks.push("creator-owned cover is served from the immutable published revision; foreign accounts cannot change its bundle and public DTO exposes no account identity");
   const firstRedirect = await app.request(`http://localhost${root}`);
   assert.equal(firstRedirect.status, 302);
   assert.match(
@@ -299,6 +307,7 @@ try {
     bundle: secondBundle,
   });
   assert.equal(edited.version, 2);
+  assert.equal((await listHostedWebs(prisma,null,"discover"))[0]!.coverPath,"mycellios-cover.png","unpublished cover removal must not alter the public card");
   assert.match(await (await request(root)).text(), /public-v1/);
   assert.equal(
     (await listHostedWebs(prisma, null, "discover"))[0]!.title,
@@ -315,7 +324,7 @@ try {
   const clone = await service.clone(foreign, id, randomUUID());
   assert.equal(clone.published, false);
   assert.ok(
-    Buffer.from(clone.bundle.files[0]!.base64, "base64")
+    Buffer.from(clone.bundle.files.find(file=>file.path==="index.html")!.base64, "base64")
       .toString()
       .includes("public-v1"),
   );
@@ -329,6 +338,7 @@ try {
   assert.equal((await service.list(foreign, "pinned", "")).length, 1);
   assert.equal((await service.list(owner, "pinned", "")).length, 0);
   await service.publish(owner, id, edited.version);
+  assert.equal((await listHostedWebs(prisma,null,"discover")).find(row=>row.id===id)!.coverPath,null,"explicit publication applies the creator's cover removal");
   await service.publish(owner, id, edited.version);
   assert.equal(
     (await listHostedWebs(prisma, null, "discover"))[0]!.revision,

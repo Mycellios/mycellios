@@ -8,6 +8,13 @@ function fixture(raw = "", platform = "win32", packaged = true) {
   return { ports, settings: new AppBehavior(ports), battery: (v: boolean) => { battery = v; } };
 }
 describe("native application settings", () => {
+  it("persists quick reconnection without granting background execution or changing OS startup",async()=>{
+    const f=fixture();await f.settings.load();await f.settings.update({keepRemoteSessions:true});
+    expect(f.settings.state()).toMatchObject({keepRemoteSessions:true,keepRunningInBackground:false});
+    expect(f.ports.login.set).not.toHaveBeenCalled();expect(f.ports.power.start).not.toHaveBeenCalled();
+    const restored=fixture(f.ports.write.mock.calls[0]![0]);await restored.settings.load();
+    expect(restored.settings.state().keepRemoteSessions).toBe(true);
+  });
   it("migrates the existing background preference without enabling other effects", async () => {
     const f = fixture('{"schema":1,"keepRunningInBackground":true}'); await f.settings.load();
     expect(f.settings.state()).toMatchObject({ keepRunningInBackground: true, keepAwake: false, externalLinkTarget: "system" });

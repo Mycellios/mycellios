@@ -1,5 +1,6 @@
+import { StoreAppHeader } from "./StoreAppHeader";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Film, Upload, Download, RefreshCw } from "lucide-react";
+import {  Film, Upload, Download, RefreshCw } from "lucide-react";
 import { Button, Textarea } from "@rakazo/ui-web";
 import type { VideoEditBridge, VideoEditProject } from "@rakazo/contracts";
 import { VIDEO_EDIT_MAX_BYTES } from "@rakazo/contracts";
@@ -62,7 +63,7 @@ export function VideoEditor({ onBack, bridge = desktopBridge()?.videoEdit }: { o
   const quote=project?.quote;
   const canSubmit=Boolean(quote && project?.status==="quoted" && prompt.trim()===project.prompt && Date.parse(quote.expiresAt)>Date.now() && creditsReady);
   return <section className="mx-auto w-full max-w-4xl space-y-6 pb-8" data-testid="video-editor">
-    <header className="flex items-center gap-3"><Button variant="ghost" size="icon-sm" aria-label="Volver a Apps" onClick={onBack}><ArrowLeft size={16}/></Button><div><h1 className="text-xl font-medium">Editar vídeo</h1><p className="mt-1 text-sm text-muted-foreground">Sube un clip, pide un cambio y revisa el precio antes de editar.</p></div></header>
+    <StoreAppHeader title="Editar vídeo" onBack={onBack}/><p className="text-sm text-muted-foreground">Sube un clip, pide un cambio y revisa el precio antes de editar.</p>
     {!bridge ? <p role="status" className="rounded-xl bg-muted p-4 text-sm">Abre esta app en Mycellios Desktop con el acceso a este PC conectado. Tus vídeos se guardan localmente.</p> : null}
     <input ref={file} type="file" accept="video/mp4,.mp4" className="sr-only" aria-label="Seleccionar vídeo MP4" onChange={e=>{const selected=e.target.files?.[0];e.target.value="";if(selected)void action(()=>upload(selected));}}/>
     {!project ? <div className="rounded-2xl border border-dashed border-border px-6 py-12 text-center" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const selected=e.dataTransfer.files[0];if(selected && bridge)void action(()=>upload(selected));}}>

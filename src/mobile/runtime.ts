@@ -154,11 +154,14 @@ let resumeAfterUpdate = false;
 const UPDATE_RESUME_KEY = "mycellios.updateResume";
 const UPDATE_ATTEMPT_KEY = "mycellios.updateAttempt";
 
-export function initializeMobileWorker(): void {
+export function initializeMobileWorker(options: { embedded?: boolean } = {}): void {
   if (initialized) return;
   initialized = true;
   document.addEventListener("visibilitychange", handleVisibilityChange);
   void detectBackendPreview();
+  // An embedded contributor belongs to its host's update/account lifecycle.
+  // Never reload a chat or restore compute from a standalone page's flag.
+  if (options.embedded) return;
   window.setInterval(() => { void checkAutomaticUpdate(); }, 30_000);
   try {
     if (sessionStorage.getItem(UPDATE_RESUME_KEY) === "1") {
@@ -214,6 +217,9 @@ export function getMobileWorkerSnapshot(): MobileWorkerSnapshot {
 export async function toggleMobileWorker(): Promise<void> {
   return state.running ? stop() : start();
 }
+
+export async function startMobileWorker(): Promise<void> { await start(); }
+export async function stopMobileWorker(): Promise<void> { await stop(); }
 
 export function setMobileWorkerLevel(level: MobileWorkerLevel): void {
   if (state.running || state.starting) return;

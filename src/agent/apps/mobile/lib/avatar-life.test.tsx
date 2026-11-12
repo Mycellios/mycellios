@@ -76,7 +76,10 @@ vi.mock("react-native-reanimated", () => {
 vi.mock("react-native-svg", () => {
   const element = ({ children, fill }: { children?: ReactNode; fill?: string }) =>
     createElement("div", { "data-fill": fill }, children);
-  return { default: element, Ellipse: element, G: element, Path: element, Rect: element };
+  return { default: element, Ellipse: element, G: element, Path: element, Rect: element,
+    Defs: element, Filter: element,
+    FeColorMatrix: ({ values }: { values: string }) => createElement("div", { "data-avatar-tint": values }),
+    Image: () => createElement("div", { "data-avatar-body": "" }) };
 });
 vi.mock("react-native", () => ({
   View: ({
@@ -373,10 +376,12 @@ describe("activity mark", () => {
 
   it("shows each working member of a group in turn, every 2 s", () => {
     render(<ActivityMark bots={bots} atBottom />);
-    const shown = () => container.querySelector("[data-fill]")?.getAttribute("data-fill");
-    expect(shown()).toBe("#2A92FE");
+    const shown = () => container.querySelector("[data-avatar-tint]")?.getAttribute("data-avatar-tint");
+    const firstTint = shown();
+    expect(firstTint).toBeTruthy();
     act(() => vi.advanceTimersByTime(2000));
-    expect(shown()).toBe("#FF781C");
+    expect(shown()).toBeTruthy();
+    expect(shown()).not.toBe(firstTint);
   });
 
   it("stops cycling members and pulsing photo dots on a covered screen, and resumes on return", () => {
@@ -396,7 +401,7 @@ describe("activity mark", () => {
         <ActivityMark bots={[photo, bots[0]!]} atBottom />
       </AvatarScreenFocus>,
     );
-    const drawnShown = () => container.querySelector("[data-fill]") !== null;
+    const drawnShown = () => container.querySelector("[data-avatar-body]") !== null;
     act(() => vi.advanceTimersByTime(6000));
     expect(drawnShown()).toBe(false);
     expect(pulsing()).toBe(false);
@@ -462,7 +467,7 @@ describe("activity mark", () => {
     expect(dots()).toBe(3);
     expect(container.querySelector("button")).toBeNull();
     act(() => vi.advanceTimersByTime(2000));
-    expect(container.querySelector("[data-fill]")).not.toBeNull();
+    expect(container.querySelector("[data-avatar-body]")).not.toBeNull();
     act(() => vi.advanceTimersByTime(2000));
     expect(dots()).toBe(3);
   });

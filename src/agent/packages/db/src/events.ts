@@ -30,7 +30,7 @@ import { approvalEffectKey } from "@rakazo/core/node/approval-effect-key";
 import { getLogger } from "@rakazo/logging";
 import { saveApprovalRule } from "./approval-settings.js";
 import { cancelRunsInTransaction } from "./cancel-runs.js";
-import type { Prisma, PrismaClient } from "./client.js";
+import { Prisma, type PrismaClient } from "./client.js";
 import { expireComputerExecutionLeases } from "./computers.js";
 import {
   CrossSpaceCommunicationBlockedError,
@@ -345,7 +345,7 @@ export async function clearThread(
         spaceId: input.spaceId,
         ...(input.groupId ? { groupId: input.groupId } : { OR: [{ botId: input.botId }, { taskBotId: input.botId }] }),
       },
-      data: { unread: false },
+      data: { unread: false, agentContextReset: Prisma.DbNull },
       select: { nextMessageSeq: true, historyCompactionGeneration: true },
     });
     const activeRuns = await tx.run.findMany({

@@ -31,16 +31,16 @@ function notify() {
   for (const listener of listeners) listener();
 }
 
-/** Missing or unreadable storage stays off so chats stay clean. */
+/** Legacy off means folded, not hidden: every turn's available steps stay inspectable. */
 export function normalizeToolActivityPreference(
   raw: string | null | undefined,
 ): ToolActivityPreference {
   const value = raw?.trim().toLowerCase();
-  return value === "on" || value === "expanded" ? value : "off";
+  return value === "expanded" ? "expanded" : "on";
 }
 
-export function toolActivityEnabled(preference: ToolActivityPreference = "off"): boolean {
-  return preference !== "off";
+export function toolActivityEnabled(preference: ToolActivityPreference = "on"): boolean {
+  return normalizeToolActivityPreference(preference) !== "off";
 }
 
 export function resolveToolActivityPreference(
@@ -56,12 +56,14 @@ export function resolveToolActivityPreference(
 export function persistToolActivityPreference(
   preference: ToolActivityPreference,
   storage: Pick<Storage, "setItem"> | null = getLocalStorage(),
-): void {
-  if (!storage) return;
+): boolean {
+  if (!storage) return false;
   try {
     storage.setItem(TOOL_ACTIVITY_STORAGE_KEY, preference);
+    return true;
   } catch {
     // Ignore quota / private-mode failures; the in-memory preference still applies.
+    return false;
   }
 }
 
@@ -80,15 +82,30 @@ export function getToolActivityExpanded(): boolean {
 export function setToolActivityPreference(
   preference: ToolActivityPreference,
 ): ToolActivityPreference {
-  memoryPreference = preference;
-  persistToolActivityPreference(preference);
+  const normalized = normalizeToolActivityPreference(preference);
+  memoryPreference = persistToolActivityPreference(normalized) ? null : normalized;
   notify();
-  return preference;
+  return normalized;
+}
+
+let storageWindow: Window | null = null;
+function storageChanged(event: StorageEvent) {
+  if (event.key !== null && event.key !== TOOL_ACTIVITY_STORAGE_KEY) return;
+  if (event.storageArea && event.storageArea !== getLocalStorage()) return;
+  notify();
 }
 
 export function subscribeToolActivity(listener: () => void): () => void {
   listeners.add(listener);
+  if (!storageWindow && typeof window !== "undefined") {
+    storageWindow = window;
+    storageWindow.addEventListener("storage", storageChanged);
+  }
   return () => {
     listeners.delete(listener);
+    if (!listeners.size && storageWindow) {
+      storageWindow.removeEventListener("storage", storageChanged);
+      storageWindow = null;
+    }
   };
 }

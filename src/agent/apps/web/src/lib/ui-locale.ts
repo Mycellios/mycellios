@@ -15,6 +15,7 @@ export const UI_LOCALES = [
 ] as const;
 
 export type UiLocale = (typeof UI_LOCALES)[number];
+export type UiLocalePreference = UiLocale | "system";
 
 export const UI_LOCALE_STORAGE_KEY = "rakazo.uiLocale";
 
@@ -88,21 +89,37 @@ function readStoredLocale(storage: Pick<Storage, "getItem"> | null | undefined):
 export type ResolveUiLocaleOptions = {
   stored?: string | null;
   storage?: Pick<Storage, "getItem"> | null;
+  languages?: readonly string[];
 };
 
-/** Use the customer's saved choice; first visits always start in English. */
-export function resolveUiLocale(options: ResolveUiLocaleOptions = {}): UiLocale {
+/** Keep the automatic preference separate from the currently detected language. */
+export function readUiLocalePreference(options: ResolveUiLocaleOptions = {}): UiLocalePreference {
   const stored =
     options.stored !== undefined
       ? options.stored
       : readStoredLocale(
           options.storage ?? (typeof localStorage !== "undefined" ? localStorage : null),
         );
-  return stored ? normalizeUiLocale(stored) : "en";
+  return !stored || stored === "system" ? "system" : normalizeUiLocale(stored);
+}
+
+export function resolveSystemUiLocale(languages: readonly string[] = typeof navigator === "undefined"
+  ? [] : [...(navigator.languages ?? []), navigator.language]): UiLocale {
+  for (const tag of languages) {
+    const locale = normalizeUiLocale(tag);
+    if (locale !== "en" || /^en(?:[-_]|$)/i.test(tag?.trim())) return locale;
+  }
+  return "en";
+}
+
+/** Saved manual choices win; otherwise follow the device's supported languages. */
+export function resolveUiLocale(options: ResolveUiLocaleOptions = {}): UiLocale {
+  const preference = readUiLocalePreference(options);
+  return preference === "system" ? resolveSystemUiLocale(options.languages) : preference;
 }
 
 export function persistUiLocale(
-  locale: UiLocale,
+  locale: UiLocalePreference,
   storage: Pick<Storage, "setItem"> | null = typeof localStorage !== "undefined"
     ? localStorage
     : null,

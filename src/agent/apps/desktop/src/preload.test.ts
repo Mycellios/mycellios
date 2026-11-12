@@ -24,6 +24,19 @@ function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: u
   return { invoke, on, off, send, exposeInMainWorld };
 }
 
+it("exposes bounded native notification operations and removes click listeners", async () => {
+  const f = runPreload("preload.cjs");
+  const bridge = f.exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+  await bridge.notifications!.status(); await bridge.notifications!.openSettings(); await bridge.notifications!.clear();
+  const input = { title: "Mycellios", body: "Test", url: "/app", tag: "test", silent: true };
+  await bridge.notifications!.show(input);
+  expect(f.invoke.mock.calls).toEqual([["desktop.notifications.status"], ["desktop.notifications.settings"], ["desktop.notifications.clear"], ["desktop.notifications.show", input]]);
+  const listener = vi.fn(); const remove = bridge.notifications!.onOpen(listener);
+  const handler = f.on.mock.calls.find(([name]) => name === "desktop.notifications.open")![1];
+  handler({}, "/app/bot"); expect(listener).toHaveBeenCalledWith("/app/bot");
+  remove(); expect(f.off).toHaveBeenCalledWith("desktop.notifications.open", handler);
+});
+
 describe("desktop preload bridge", () => {
   it("keeps floating chat access limited to its pinned Space and update acknowledgement", async () => {
     const { invoke, exposeInMainWorld } = runPreload("floating-chat-preload.cjs");
@@ -39,6 +52,13 @@ describe("desktop preload bridge", () => {
     await bridge.settings!.state(); await bridge.settings!.update({ keepAwake: true });
     expect(invoke.mock.calls).toEqual([["desktop.settings.state"], ["desktop.settings.update", { keepAwake: true }]]);
     expect((bridge as unknown as Record<string, unknown>).ipcRenderer).toBeUndefined();
+  });
+  it("exposes only named local script settings, never the connection key or an RPC proxy", async () => {
+    const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    await bridge.localScripts!.state(); await bridge.localScripts!.configure({ enabled: true, requestsPerHour: 30 });
+    expect(invoke.mock.calls).toEqual([["desktop.localScripts.state"], ["desktop.localScripts.configure", { enabled: true, requestsPerHour: 30 }]]);
+    expect(Object.keys(bridge.localScripts!).sort()).toEqual(["configure", "state"]);
   });
   it("acknowledges only bounded native update requests without exposing IPC events", async () => {
     const { on, off, send, exposeInMainWorld } = runPreload("preload.cjs");
@@ -82,8 +102,10 @@ describe("desktop preload bridge", () => {
       "badge",
       "companions",
       "computer",
+      "localScripts",
       "localVoice",
       "nativeWindowFrame",
+      "notifications",
       "oauth",
       "passkeys",
       "platform",

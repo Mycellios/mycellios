@@ -1,4 +1,4 @@
-import { AppearanceExtras, ConversationExtras, AppBehaviorPanel, DevicePrivacySettings } from "./settings/GeneralPreferences";
+import { AppearanceExtras, ConversationExtras, AppBehaviorPanel, DevicePrivacySettings, ExternalLinksPreference } from "./settings/GeneralPreferences";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { AccountSecurity } from "@rakazo/contracts";
 import {
@@ -20,11 +20,13 @@ import {
 } from "@rakazo/ui-web";
 import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 
-import type { RefObject } from "react";
+import type { RefObject, ReactNode } from "react";
+import { useSignOut } from "../lib/sign-out";
+import { appPath } from "../lib/app-path";
+import { MobileSessions } from "./settings/MobileSessions";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { AccountAccess } from "../components/AccountAccess";
 import { SuccessPop } from "../components/ai/primitives";
-import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint";
 import { DesktopUpdateSection } from "../components/DesktopUpdates";
 import { PasskeySettings } from "../components/PasskeySettings";
 import { SettingsGroup, SettingsLabel, SettingsRow } from "../components/SettingsRows";
@@ -43,7 +45,7 @@ import {
   setComposerEnterToSend,
   subscribeComposerEnterToSend,
 } from "../lib/composer-enter-to-send-pref";
-import { getActiveUiLocale, setUiLocale } from "../lib/i18n";
+import { setUiLocale } from "../lib/i18n";
 import { getInterfaceSize, INTERFACE_SIZES, setInterfaceSize } from "../lib/interface-size";
 import { localTimezone, sameTimeZone, timezoneOptions } from "../lib/local-timezone";
 import { usePasskeysSupported } from "../lib/passkeys";
@@ -62,11 +64,13 @@ import {
 } from "../lib/tool-activity-preference";
 import type { AppearancePreference } from "../lib/ui-appearance";
 import { getUiAppearancePreference, setUiAppearance } from "../lib/ui-appearance";
-import type { UiLocale } from "../lib/ui-locale";
-import { UI_LOCALE_LABELS, UI_LOCALES } from "../lib/ui-locale";
+import type { UiLocalePreference } from "../lib/ui-locale";
+import { readUiLocalePreference, UI_LOCALE_LABELS, UI_LOCALES } from "../lib/ui-locale";
 import { authErrorText } from "../lib/user-error";
 
 export type SettingsGeneralProps = {
+  profileOverview?: (onEdit: () => void, busy: boolean) => ReactNode;
+  accountId?: string;
   mode?: "all" | "general" | "profile";
   onFormStateChange?: (state: { busy: boolean; dirty: boolean }) => void;
   email?: string | null;
@@ -81,6 +85,8 @@ export type SettingsGeneralProps = {
 };
 
 export function GeneralSettingsPanels({
+  profileOverview,
+  accountId,
   mode = "all",
   onFormStateChange,
   email,
@@ -96,6 +102,8 @@ export function GeneralSettingsPanels({
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [namePending, setNamePending] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+  const { signingOut, logOut } = useSignOut(() => window.location.assign(appPath("/sign-in")), setSignOutError);
   const [nameError, setNameError] = useState<string | null>(null);
   const nameId = useId();
 
@@ -134,7 +142,7 @@ export function GeneralSettingsPanels({
   const [accountSecurity, setAccountSecurity] = useState<AccountSecurity | null>(null);
   const [developerMode, setDeveloperMode] = useDeveloperMode();
   const developerModeId = useId();
-  const [locale, setLocale] = useState<UiLocale>(() => getActiveUiLocale());
+  const [locale, setLocale] = useState<UiLocalePreference>(() => readUiLocalePreference());
   const localeRequestRef = useRef(0);
   const [appearance, setAppearance] = useState<AppearancePreference>(() =>
     getUiAppearancePreference(),
@@ -174,21 +182,22 @@ export function GeneralSettingsPanels({
   const passkeysSupported = usePasskeysSupported();
   const [timezonePending, setTimezonePending] = useState(false);
   const [nativePending, setNativePending] = useState(false);
+  const [externalLinksPending, setExternalLinksPending] = useState(false);
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
   const deviceTimezone = localTimezone();
   const dirtyName = editingName && nameDraft.trim() !== displayName(name, "");
   useEffect(() => {
-    onFormStateChange?.({ busy: namePending || timezonePending || nativePending, dirty: dirtyName });
-  }, [onFormStateChange, namePending, timezonePending, nativePending, dirtyName]);
+    onFormStateChange?.({ busy: namePending || timezonePending || nativePending || externalLinksPending || signingOut, dirty: dirtyName });
+  }, [onFormStateChange, namePending, timezonePending, nativePending, externalLinksPending, dirtyName, signingOut]);
   useEffect(() => () => onFormStateChange?.({ busy: false, dirty: false }), [onFormStateChange]);
 
-  function chooseLocale(next: UiLocale) {
+  function chooseLocale(next: UiLocalePreference) {
     if (next === locale) return;
     const requestId = ++localeRequestRef.current;
     setLocale(next);
     void setUiLocale(next).then((activated) => {
       if (requestId !== localeRequestRef.current) return;
-      setLocale(activated);
+      setLocale(next === "system" ? "system" : activated);
     });
   }
 
@@ -207,6 +216,9 @@ export function GeneralSettingsPanels({
 
   return (
     <div className={mode === "profile" ? "space-y-8" : "rk-general-settings space-y-6"}>
+      {mode === "profile" && profileOverview?.(() => {
+        setNameDraft(account.label === email ? "" : displayName(name, "")); setNameError(null); setEditingName(true);
+      }, namePending || signingOut)}
       {mode !== "general" ? <SettingsGroup title={<Trans>Account</Trans>} data-testid="account-card">
         {editingName ? (
           <form
@@ -262,14 +274,14 @@ export function GeneralSettingsPanels({
           <SettingsRow
             label={
               <>
-                <p className="break-words">{account.label}</p>
-                {email && account.label !== email ? (
+                <p className="break-words">{mode === "profile" ? t`Email address` : account.label}</p>
+                {email && (mode === "profile" || account.label !== email) ? (
                   <p className="mt-0.5 break-words text-[13px] text-muted-foreground">{email}</p>
                 ) : null}
               </>
             }
             control={
-              <Button
+              mode === "profile" ? <Button variant="outline" size="sm" disabled={signingOut} onClick={() => void logOut()}>{signingOut ? t`Signing out…` : t`Sign out`}</Button> : <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
@@ -294,6 +306,8 @@ export function GeneralSettingsPanels({
           />
         ) : null}
       </SettingsGroup> : null}
+      {mode === "profile" && signOutError && <p role="alert" className="text-sm text-destructive">{signOutError}</p>}
+      {mode === "profile" && accountId && <MobileSessions key={accountId} accountId={accountId} allDevices />}
 
       {mode !== "profile" ? <><SettingsGroup title={<Trans>Appearance</Trans>}>
         <SettingsRow
@@ -349,15 +363,16 @@ export function GeneralSettingsPanels({
             }
           />
         <SettingsRow label={<Label htmlFor={showToolActivityId}>{t`Show agent steps`}</Label>}
-          description={t`Open reasoning, tool steps and memory changes by default for each turn.`}
+          description={t`Open the available steps and details of each turn by default.`}
           control={<Switch id={showToolActivityId} data-testid="tool-activity-toggle" checked={toolActivity === "expanded"}
             onCheckedChange={checked => setToolActivityPreference(checked ? "expanded" : "on")} />} />
         <ConversationExtras />
+        <ExternalLinksPreference onBusyChange={setExternalLinksPending} />
       </SettingsGroup>
       <AppBehaviorPanel onBusyChange={setNativePending} />
       <DevicePrivacySettings />
 
-      <Disclosure
+      <Disclosure alwaysVisible
         data-testid="advanced-settings"
         className="rk-settings-advanced"
         summary={<Trans>Advanced</Trans>}
@@ -520,7 +535,7 @@ export function GeneralSettingsPanels({
       ) : null}
 
       {mode === "all" ? <SkillLibrarySettings /> : null}
-      {mode !== "general" ? <Disclosure summary={t`Account access`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground"><AccountAccess onSecurity={setAccountSecurity} /></Disclosure> : null}
+      {mode !== "general" ? <Disclosure alwaysVisible summary={t`Account access`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground"><AccountAccess onSecurity={setAccountSecurity} /></Disclosure> : null}
     </div>
   );
 }
@@ -539,35 +554,7 @@ export function UsageSettingsPanel({
   return <AgentUsageSettings panelRef={panelRef} />;
 }
 
-export function ComputerSettingsPanel({
-  sandboxProvider,
-  onSandboxProviderChange,
-  onRecoveryDismissed,
-}: {
-  sandboxProvider?: string | null;
-  onSandboxProviderChange?: (sandboxProvider: string) => void;
-  onRecoveryDismissed?: () => void;
-}) {
-  const { t } = useLingui();
-  return (
-    <div
-      data-testid="computers-setup-settings"
-      className="rounded-xl border border-border px-4 py-4"
-    >
-      <h3 className="text-heading3 font-medium text-foreground">
-        <SettingsLabel name={t`Computers`} help={t`The agent's virtual computer runs tools and works with files. It is separate from the device you use to open Mycellios.`}><Trans>Computers</Trans></SettingsLabel>
-      </h3>
-      <SettingsRow label={t`Current environment`} control={<span className="text-sm text-muted-foreground">{sandboxProvider ?? t`Not reported`}</span>}><p className="text-xs text-muted-foreground">{t`Manage each Mico's computer access from its chat tools. Approval rules control which actions need your confirmation.`}</p></SettingsRow>
-      <ComputersUnavailableHint
-        showTechnicalDetails
-        className="mt-3 text-[13px] leading-relaxed text-muted-foreground"
-        sandboxProvider={sandboxProvider}
-        onRecovered={onSandboxProviderChange}
-        onRecoveryDismissed={onRecoveryDismissed}
-      />
-    </div>
-  );
-}
+export { ComputerSettingsPanel } from "./settings/ComputerUseSettings";
 
 export function UpdatesSettingsPanel() {
   return (
@@ -753,8 +740,8 @@ function UiLocalePicker({
   value,
   onChange,
 }: {
-  value: UiLocale;
-  onChange: (locale: UiLocale) => void;
+  value: UiLocalePreference;
+  onChange: (locale: UiLocalePreference) => void;
 }) {
   const { t } = useLingui();
   return (
@@ -762,7 +749,7 @@ function UiLocalePicker({
       className="w-56 max-w-full"
       data-testid="ui-locale-select"
       aria-label={t`Language`}
-      options={UI_LOCALES.map((code) => ({ value: code, label: UI_LOCALE_LABELS[code] }))}
+      options={[{ value: "system", label: t`System default` }, ...UI_LOCALES.map((code) => ({ value: code, label: UI_LOCALE_LABELS[code] }))]}
       value={value}
       onValueChange={onChange}
     />

@@ -7,6 +7,8 @@ export function installAccountComputerBackground(
     window(): BrowserWindow | null;
     /** The user asked to keep the app alive in the background instead of quitting. */
     keepRunningInBackground?: () => boolean;
+    /** AppBehavior owns the explicit OS startup choice in the current shell. */
+    manageLoginPreference?: boolean;
   },
 ) {
   let quitting = false;
@@ -17,7 +19,7 @@ export function installAccountComputerBackground(
     changed: () => {
       if (quitting) return;
       const allowed = service.hasConsent();
-      if (process.platform === "win32" && app.isPackaged && !process.env.RAKAZO_PERFORMANCE_USER_DATA && login !== allowed) {
+      if (options.manageLoginPreference !== false && process.platform === "win32" && app.isPackaged && !process.env.RAKAZO_PERFORMANCE_USER_DATA && login !== allowed) {
         app.setLoginItemSettings({ openAtLogin: allowed, args: ["--background"] });
         login = allowed;
       }
