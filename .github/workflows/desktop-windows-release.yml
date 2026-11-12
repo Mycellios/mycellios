@@ -107,7 +107,7 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node -e "require('electron')"
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs apps/desktop/scripts/compact-resources.test.mjs apps/desktop/scripts/windows-install-fixture.test.mjs
+          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs apps/desktop/scripts/windows-zip32.test.mjs apps/desktop/scripts/windows-payload-blockmap.test.mjs apps/desktop/scripts/release-continuity.test.mjs apps/desktop/scripts/compact-resources.test.mjs apps/desktop/scripts/windows-install-fixture.test.mjs
           exit $LASTEXITCODE
       - name: Compile all surfaces from this candidate
         working-directory: src/agent

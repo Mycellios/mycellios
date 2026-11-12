@@ -46,6 +46,9 @@ test('bundles the verified runtime without accounts or shared-node uninstall act
     assert.equal(await readFile(path.join(destination,'local-server/node_modules/native-shim/binding.node'),'utf8'),'Native fixture');
     assert.equal(compact.extraResources.some(x=>x.to==='development-source.asar'),true);
     assert.equal(compact.nsis.include,path.join(root,'assets/fast-install.nsh'));
+    assert.equal(compact.nsis.useZip,true);
+    assert.equal(compact.nsis.differentialPackage,false);
+    assert.equal(compact.afterPack,path.join(root,'scripts/verify-windows-zip32.cjs'));
     assert.equal(JSON.parse(await readFile(path.join(root, 'out/runtime.json'))).sha256, runtimeSha256);
     const text = JSON.stringify(config);
     assert.equal(/enrollmentToken|apiKey|password|\.env/.test(text), false);

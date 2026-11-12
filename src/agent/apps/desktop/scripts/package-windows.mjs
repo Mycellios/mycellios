@@ -6,6 +6,7 @@ import { stageDevelopmentResources } from './development-resources.mjs';
 import { stageCompactResources, verifyCompactServer } from './compact-resources.mjs';
 import { prepareWindowsInstaller, writeStandaloneWindowsConfig } from './windows-installer.mjs';
 import { writeBuildIdentity } from './desktop-release.mjs';
+import { writeWindowsPayloadBlockmap } from './windows-payload-blockmap.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argument = name => { const i = process.argv.indexOf(name); return i < 0 ? undefined : process.argv[i + 1]; };
@@ -23,5 +24,8 @@ await withWindowsCopyRetry(async () => {
   const { Arch, build, Platform } = await import('electron-builder');
   await build({ targets: Platform.WINDOWS.createTarget('nsis', Arch.x64), projectDir: root, config:configFile, publish: 'never' });
 });
+// Keep the release's standard blockmap without forcing a 7z payload. This writes
+// a sidecar only; the qualified installer bytes and manual-update policy stay intact.
+await writeWindowsPayloadBlockmap(path.join(output, `Mycellios-Desktop-${version}-windows-x64-pilot.exe`));
 console.log(JSON.stringify({compactServer:await verifyCompactServer(path.join(output,'win-unpacked/resources/local-server'))}));
 

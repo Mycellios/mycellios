@@ -277,6 +277,11 @@
   uninstaller, registration and shortcut recovery, and never moves userData.
   Qualify compact-resources, fast-install, the real local server and timed NSIS
   legacy upgrades; report hosted timing separately from physical-PC acceptance.
+  Compact Windows payloads use ZIP32/Deflate; afterPack bounds the actual file
+  and directory count and total bytes before NSIS. Keep loose legacy payloads on
+  7z, reject ZIP64-sized inputs and retain the measured installation-time gate.
+  Disable differential payload generation for ZIP, then generate the standard
+  standalone blockmap with the pinned builder; never append it to the EXE.
   Windows local PostgreSQL uses bounded pg_ctl readiness and exit status with
   ignored process pipes. Keep the profile lock if shutdown fails.
   desktop-windows-release.yml builds
