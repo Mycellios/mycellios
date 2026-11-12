@@ -13,6 +13,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:local:backend": "node scripts/project-local.mjs backend",
     "dev:local:web": "node scripts/project-local.mjs web",
+    "dev:local:status": "node scripts/project-local-status.mjs",
     "build": "turbo build",
     "check": "turbo check",
     "lint": "biome check .",
