@@ -506,6 +506,46 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
     await expect(limited.reserve({ usageId: usage.id, accountId: "alice", key: "operator-second", digest: "second", provider: "mock",
       model: input.model, maximumUsd: "0.5" })).rejects.toThrow("operator_budget_exceeded");
   });
+  it("does not reset an audited lifetime envelope after midnight or restart", async () => {
+    const first=await hold("funded-yesterday","0.5");await purchases.claim(first.id,"alice");
+    await purchases.settle({id:first.id,accountId:"alice",receiptId:"funded-invoice",usd:"0.5",evidence:{}});
+    await db.raw.prepare("UPDATE economic_managed_purchases SET created_at=?,settled_at=? WHERE usage_id=?")
+      .run(Date.now()-86400000,Date.now()-86400000,first.id);
+    const limited=new ManagedPurchases(db,wallet,10000000,1000000);await limited.initialize();
+    const usage=await api.beginUsage("alice",null,{model:input.model,messages:[]},true);
+    await expect(limited.reserve({usageId:usage.id,accountId:"alice",key:"funded-today",digest:"today",provider:"mock",model:input.model,maximumUsd:"0.5"}))
+      .rejects.toThrow("operator_budget_exceeded");
+    expect(await wallet.reserved("alice")).toBe(0);
+  });
+  it("keeps uncertain prior-day spend inside the lifetime envelope across independent connections",async()=>{
+    const h=await hold("old-uncertain-envelope","0.5");await purchases.claim(h.id,"alice");await purchases.uncertain(h.id);
+    await db.raw.prepare("UPDATE economic_managed_purchases SET created_at=? WHERE usage_id=?").run(Date.now()-86400000,h.id);
+    const other=await MeshDatabase.openPostgres(url!,schema);
+    try{
+      const otherLedger=new EconomicLedger(other,{receiptSigning:{keyId:"envelope-test",privateKey:generateKeyPairSync("ed25519").privateKey}});
+      const limited=new ManagedPurchases(other,new ContributionCreditWallet(other,otherLedger,true),10000000,1000000);await limited.initialize();
+      const usage=await api.beginUsage("alice",null,{model:input.model,messages:[]},true);
+      await expect(limited.reserve({usageId:usage.id,accountId:"alice",key:"another-envelope",digest:"other",provider:"mock",model:input.model,maximumUsd:"0.5"}))
+        .rejects.toThrow("operator_budget_exceeded");
+      expect(await wallet.reserved("alice")).toBe(520000);
+    }finally{await other.close();}
+  });
+  it("serializes lifetime reservations across accounts before consuming any audited balance",async()=>{
+    await db.raw.prepare(`INSERT INTO economic_promotional_grants(id,account_id,issued_by,reason,amount_microunits,created_at,expires_at)
+      VALUES ('bob-envelope','bob','test','test-only',1000000,?,?)`).run(Date.now(),Date.now()+600000);
+    const limited=new ManagedPurchases(db,wallet,10000000,1000000);await limited.initialize();
+    const usages=await Promise.all(["alice","bob"].map(account=>api.beginUsage(account,null,{model:input.model,messages:[]},true)));
+    const other=await MeshDatabase.openPostgres(url!,schema);
+    try{
+      const otherLedger=new EconomicLedger(other,{receiptSigning:{keyId:"envelope-test",privateKey:generateKeyPairSync("ed25519").privateKey}});
+      const otherWallet=new ContributionCreditWallet(other,otherLedger,true);await otherWallet.initialize();
+      const competing=new ManagedPurchases(other,otherWallet,10000000,1000000);await competing.initialize();
+      const attempts=await Promise.allSettled([limited,competing].map((store,i)=>store.reserve({usageId:usages[i]!.id,accountId:["alice","bob"][i]!,
+        key:"envelope-account-"+i,digest:String(i),provider:"mock",model:input.model,maximumUsd:"0.5"})));
+      expect(attempts.filter(x=>x.status==="fulfilled")).toHaveLength(1);
+      expect((await wallet.reserved("alice"))+(await wallet.reserved("bob"))).toBe(520000);
+    }finally{await other.close();}
+  });
   it("shares the balance with existing native holds", async () => {
     const usage = await api.beginUsage("alice", null, { model: "native", messages: [] }, true);
     await db.raw.prepare(`INSERT INTO economic_credit_holds(id,account_id,request_digest,amount_microunits,status,created_at)

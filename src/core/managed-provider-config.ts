@@ -10,6 +10,8 @@ export interface ManagedProviderConfig {
   modelAllowlist: readonly string[];
   requestLimitMicrounits: number;
   dailyLimitMicrounits: number;
+  /** Lifetime funded envelope, including unresolved reservations; never resets at midnight. */
+  totalLimitMicrounits?: number;
   /** Effective supplier funding fee, including minimums. Unknown costs disable paid admission. */
   fundingCostBasisPoints?: number;
   mediaEnabled?:boolean;
@@ -28,6 +30,9 @@ export function readManagedProviderConfig(env: NodeJS.ProcessEnv): ManagedProvid
   try { models = JSON.parse(env.MYCELLIOS_MANAGED_MODEL_ALLOWLIST ?? '["*"]'); } catch { throw new Error("managed_configuration_invalid"); }
   const limit = Number(env.MYCELLIOS_MANAGED_REQUEST_LIMIT_MICROUNITS);
   const daily = Number(env.MYCELLIOS_MANAGED_DAILY_LIMIT_MICROUNITS);
+  const total = env.MYCELLIOS_MANAGED_TOTAL_LIMIT_MICROUNITS === undefined ? undefined : Number(env.MYCELLIOS_MANAGED_TOTAL_LIMIT_MICROUNITS);
+  if (total !== undefined && (!env.MYCELLIOS_MANAGED_TOTAL_LIMIT_MICROUNITS?.trim() || !Number.isSafeInteger(total) || total < 1 || total > 1_000_000_000_000))
+    throw new Error("managed_budget_invalid");
   if (!key || !Array.isArray(models) || !models.length || models.length > 100
     || models.some(m => typeof m !== "string" || (m!=="*"&&!/^[A-Za-z0-9._:/-]{1,180}$/.test(m)))
     || (models.includes("*")&&models.length!==1)
@@ -40,6 +45,7 @@ export function readManagedProviderConfig(env: NodeJS.ProcessEnv): ManagedProvid
   const textRoutes=env.MYCELLIOS_MANAGED_TEXT_ROUTES?JSON.parse(env.MYCELLIOS_MANAGED_TEXT_ROUTES):undefined;
   const funding=env.MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS===undefined?undefined:Number(env.MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS);
   if(funding!==undefined&&(!env.MYCELLIOS_MANAGED_FUNDING_COST_BASIS_POINTS?.trim()||!Number.isSafeInteger(funding)||funding<0||funding>100000))throw new Error("managed_funding_cost_invalid");
+  if (upstream === "antseed-gateway" && funding !== undefined && total === undefined) throw new Error("managed_funded_envelope_required");
   if(textRoutes!==undefined&&(!Array.isArray(textRoutes)||!textRoutes.length||textRoutes.length>100))throw new Error("managed_configuration_invalid");
   if (upstream !== "openrouter" && env.MYCELLIOS_MANAGED_MEDIA_ENABLED === "true") throw new Error("managed_antseed_media_not_qualified");
   if (upstream === "antseed-gateway" && (!env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_BASE_URL
@@ -48,6 +54,7 @@ export function readManagedProviderConfig(env: NodeJS.ProcessEnv): ManagedProvid
     antseedGatewayKey:key, antseedGatewayBaseUrl:env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_BASE_URL!,
     antseedGatewayContract:env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_CONTRACT!} : {antseedControlSecret:key}), modelAllowlist: models as string[], requestLimitMicrounits: limit, dailyLimitMicrounits: daily,
     mediaOffers,mediaEnabled:env.MYCELLIOS_MANAGED_MEDIA_ENABLED==="true",walletTopups:env.MYCELLIOS_WALLET_TOPUPS_ENABLED==="true",...(funding===undefined?{}:{fundingCostBasisPoints:funding}),
+    ...(total === undefined ? {} : {totalLimitMicrounits: total}),
     ...(textRoutes?{textRoutes}:{}),
     ...(env.MYCELLIOS_MANAGED_ANTSEED_EDIT_ENABLED==="true"?{antseedEditControlSecret:requiredControl(env)}:{}) };
 }

@@ -57,8 +57,9 @@ export function managedPurchasesAccessSchemaSql(runtimeRole: string): string {
 export class ManagedPurchases {
   private promotions: PromotionalCredits | null = null;
   constructor(private readonly db: MeshDatabase, private readonly wallet: ContributionCreditWallet,
-    private readonly dailyLimitMicrounits: number) {
+    private readonly dailyLimitMicrounits: number, private readonly totalLimitMicrounits?: number) {
     if (!Number.isSafeInteger(dailyLimitMicrounits) || dailyLimitMicrounits < 1) throw new Error("managed_budget_invalid");
+    if (totalLimitMicrounits !== undefined && (!Number.isSafeInteger(totalLimitMicrounits) || totalLimitMicrounits < 1)) throw new Error("managed_budget_invalid");
   }
   async initialize() {
     if (this.db.raw.dialect !== "postgres") throw new Error("managed_purchases_require_postgres");
@@ -96,6 +97,13 @@ export class ManagedPurchases {
         JOIN economic_credit_holds h ON h.id=p.usage_id
         WHERE (p.state='settled' AND COALESCE(p.settled_at,p.created_at)>=?) OR p.state IN ('reserved','submitted','uncertain')`).get(dayStart);
       if (Number(budget?.total ?? 0) + amount > this.dailyLimitMicrounits) throw new Error("managed_operator_budget_exceeded");
+      if (this.totalLimitMicrounits !== undefined) {
+        const lifetime = await this.db.raw.prepare(`SELECT COALESCE(SUM(CASE WHEN p.state='settled' THEN p.total_microunits
+          ELSE h.amount_microunits END),0) AS total FROM economic_managed_purchases p
+          JOIN economic_credit_holds h ON h.id=p.usage_id
+          WHERE p.state IN ('settled','reserved','submitted','uncertain')`).get();
+        if (Number(lifetime?.total ?? 0) + amount > this.totalLimitMicrounits) throw new Error("managed_operator_budget_exceeded");
+      }
       if ((await this.wallet.summary("account", input.accountId, now)).availableMicrounits < amount)
         throw new Error("insufficient_contribution_credits");
       await this.db.raw.prepare(`INSERT INTO economic_credit_holds
