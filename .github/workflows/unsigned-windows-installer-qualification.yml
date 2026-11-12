@@ -26,7 +26,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       PUBLISHED_VERSION: ${{ inputs.version || '0.3.46' }}
-      QUALIFICATION_OUT: ${{ runner.temp }}/published-unsigned
     defaults:
       run:
         working-directory: src/agent
@@ -38,6 +37,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.2
+      - name: Locate the isolated qualification directory
+        shell: pwsh
+        run: '"QUALIFICATION_OUT=$(Join-Path $env:RUNNER_TEMP published-unsigned)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8'
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Download and verify the exact published unsigned package
         shell: pwsh
