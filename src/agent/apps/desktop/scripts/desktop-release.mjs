@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { readFile, writeFile, mkdir, lstat } from 'node:fs/promises';
 import path from 'node:path';
 import { verifyDesktopRelease } from './release-continuity.mjs';
+import { assertWindowsSignatureReceipt } from './windows-signing.mjs';
 
 const SHA = /^[a-f0-9]{40}$/;
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -72,12 +73,21 @@ export async function writeWindowsRelease(directory, identity, smoke) {
       !['fresh','legacy-to-compact'].every(label=>installation.measurements?.some(m=>m.label===label && m.exitCode===0 && Number.isFinite(m.elapsedMs) && m.elapsedMs>0 && m.elapsedMs<60000 && m.draftsPreserved===5 && m.taskMarkersPreserved===5))))
     throw Error('Real Windows installation timing/preservation qualification is missing');
   const blockmap = {fileName: fileName + '.blockmap', ...await hashes(path.join(directory, fileName + '.blockmap'))};
+  const signatureReceipt = await readFile(path.join(directory, 'windows-signature.json'), 'utf8').then(JSON.parse).catch(error => {
+    if (error.code === 'ENOENT' && !process.env.MYCELLIOS_WINDOWS_SIGNING) return null;
+    throw error;
+  });
+  if (process.env.MYCELLIOS_WINDOWS_SIGNING && process.env.MYCELLIOS_WINDOWS_SIGNING !== 'unsigned-preview' && signatureReceipt?.mode !== 'authenticode')
+    throw Error('Publisher release is missing a trusted signing receipt');
+  if (signatureReceipt) assertWindowsSignatureReceipt(signatureReceipt, artifact.sha256,
+    signatureReceipt.mode === 'authenticode' ? process.env.MYCELLIOS_WINDOWS_PUBLISHER : undefined);
   const entry = {id: 'windows-x64', version: identity.version, format: 'EXE', fileName,
     path: `/downloads/desktop/releases/${identity.version}/${fileName}`, bytes: artifact.bytes, sha256: artifact.sha256};
   const manifest = {...identity,
     schema: 'mycellios-desktop-release-package/1', tag: releaseTag(identity.version), artifact, blockmap,
     catalogEntry: entry, qualifiedStartup: true, qualifiedInstallation:requireInstallation && !expedited,expedited,
-    ...(requireInstallation?{installation}:{}),signature: 'unsigned-preview'};
+    ...(requireInstallation?{installation}:{}),signature: signatureReceipt?.mode === 'authenticode' ? 'authenticode' : 'unsigned-preview',
+    ...(signatureReceipt ? {publisher:signatureReceipt.publisher,signatureReceiptSha256:(await hashes(path.join(directory,'windows-signature.json'))).sha256} : {})};
   const previous = await readFile(path.join(directory, 'desktop-release.json'), 'utf8').then(JSON.parse).catch(e => {
     if (e.code === 'ENOENT') return null;
     throw e;
@@ -90,6 +100,7 @@ export async function writeWindowsRelease(directory, identity, smoke) {
   let sums=`${artifact.sha256}  ${fileName}\n${blockmap.sha256}  ${blockmap.fileName}\n`;
   if(requireInstallation)for(const file of ['latest.yml','desktop-build.json','desktop-release.json','packaged-smoke.json','installer-qualification.json'])
     sums+=`${(await hashes(path.join(directory,file))).sha256}  ${file}\n`;
+  if(signatureReceipt)sums+=`${(await hashes(path.join(directory,'windows-signature.json'))).sha256}  windows-signature.json\n`;
   await writeFile(path.join(directory, 'SHA256SUMS.txt'), sums);
   return manifest;
 }

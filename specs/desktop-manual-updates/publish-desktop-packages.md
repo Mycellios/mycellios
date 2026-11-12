@@ -106,3 +106,105 @@ to the declared version.
 - A physical Fedora upgrade driven from the settings panel (0.3.41 → next).
 - The DEB path on Debian/Ubuntu.
 - The isolated Playwright settings flow for the new labels.
+# Publisher signing for Windows
+
+The pipeline is prepared, but a public-trust identity has not been provisioned.
+Existing 0.3.46 bytes remain an unsigned preview; do not replace that release or
+describe it as signed. Publish a new version only after a real signing run passes.
+
+The default `desktop-windows-release.yml` path requires a publisher signature and
+fails before dependency installation if its configuration is missing. The explicit
+manual `signing=unsigned-preview` input is the only CI exception. Promotion requires
+a signature by default too; `allow_unsigned_preview=true` is a separate deliberate
+manual exception. Automatic installation remains disabled in both cases.
+
+## Provisioning the publisher
+
+This follows OpenBot's Azure Artifact Signing design: OIDC login restricted to a
+signing stage, `win.azureSignOptions`, `forceCodeSigning`, SHA256/RFC3161 timestamp,
+then logout. Our identity and resources must be issued to our own legal publisher.
+Never copy OpenBot's publisher name, tenant, signing account or certificate profile.
+
+Before creating a paid service or granting a new signing identity, obtain the
+owner's approval for that concrete cost and narrowly scoped access. A valid CA
+identity is external approval, not something a self-signed certificate can replace.
+
+Create a GitHub environment `windows-signing` restricted to main and the owned
+Desktop release tags, with owner review for production signing. Preview runs use
+the separate `windows-preview` environment. Do not provision an Azure federation
+until those environment restrictions are verified. Configure an Entra identity
+whose only signing role is **Artifact Signing Certificate Profile Signer**, scoped
+to the one Public Trust certificate profile. Its federated subject is
+`repo:Mycellios/mycellios:environment:windows-signing`, audience
+`api://AzureADTokenExchange`; adapt only after checking the repository's actual
+OIDC subject configuration. Do not grant subscription-wide Contributor/Owner or
+store a long-lived client secret/private signing key in GitHub.
+
+Set repository variables (all public identifiers, not private keys), so both
+build and promotion resolve the same publisher before a job starts:
+
+| Variable | Value |
+| --- | --- |
+| `WINDOWS_SIGNING_PROVIDER` | `azure` |
+| `WINDOWS_SIGNING_PUBLISHER` | Exact certificate CN of the validated legal entity |
+| `WINDOWS_SIGNING_CLIENT_ID` | Scoped Entra application's client ID |
+| `WINDOWS_SIGNING_TENANT_ID` | Its tenant ID |
+| `WINDOWS_SIGNING_SUBSCRIPTION_ID` | Subscription containing the signing account |
+| `WINDOWS_SIGNING_ENDPOINT` | Matching region's HTTPS `*.codesigning.azure.net/` endpoint |
+| `WINDOWS_SIGNING_ACCOUNT` | Our own signing account |
+| `WINDOWS_SIGNING_PROFILE` | Our own validated Public Trust profile |
+
+An existing CA/HSM identity exposed through the runner's Windows certificate store
+can instead use provider `certificate-store` and `WINDOWS_SIGNING_CERTIFICATE_SHA1`.
+That is a certificate selector, not SHA1 file signing: file and timestamp digests
+remain SHA256. The runner must already have approved access to that exact private
+key; GitHub-hosted runners do not acquire a certificate merely from this variable.
+Do not import a self-signed root or disable Windows trust checks to qualify it.
+
+## Qualification and publication
+
+electron-builder signs the app, applicable EXE payloads, NSIS installer and
+uninstaller. Native DLL/NODE vendor signing and the pinned runtime MSI are not
+silently rewritten. `verify-windows-signature.ps1` checks Windows trust and a
+timestamp, requires the exact publisher for our app and installer, and records
+other trusted EXE payload publishers. `windows-signature.json` binds those
+observations to SHA256 hashes. Final installer hashing, blockmap generation,
+startup qualification and release metadata happen after signing. Promotion
+rechecks the downloaded installer on Windows without access to a signing key.
+Signing failure, wrong publisher, absent timestamp or changed bytes block release.
+
+The narrow `Windows publisher qualification` workflow uses an existing official
+Node executable only as a verification fixture. It tests valid vendor trust,
+wrong publisher, tampering and unsigned rejection; it signs no Mycellios file and
+does not qualify an unprovisioned publisher. A real CA-backed Mycellios signing run
+and physical update remain required before declaring activation complete.
+
+The custom manual updater retains its existing catalog/hash/owner/Attachment
+Services safeguards. This change does not enable the automatic-install channel.
+Keep the same legal publisher across updates; rotate certificates under that
+identity, and separately qualify a migration before changing the legal name.
+
+## Cost and eligibility researched on 2026-11-12
+
+- OpenBot documents Azure Artifact Signing. Microsoft lists approximately
+  US$9.99/month and requires identity validation. Check current regional pricing
+  before purchase; creating an account starts billing. Andorra is not in the
+  current Public Trust organization's eligibility list; do not substitute a false
+  address or assume a Spanish email/identity establishes eligible residency.
+- SignPath Foundation offers free signing to accepted open-source projects,
+  subject to its review and technical conditions. Its foundation becomes the
+  certificate publisher. Approval is not established for Mycellios; review the
+  pinned native MSI/dependencies against the no-proprietary-components rule
+  before claiming eligibility or submitting a request.
+- Certum advertises an open-source cloud option from EUR49. Confirm term, taxes,
+  entity eligibility and unattended CI/HSM access before treating that headline
+  price as the total annual cost.
+- A trusted signature removes the unknown-publisher cause. SmartScreen can still
+  warn about a new release while reputation builds, including OpenBot releases.
+
+Sources: [OpenBot release design](https://github.com/nightly-labs/openbot/blob/main/docs/RELEASING.md),
+[Microsoft setup/eligibility](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart),
+[Microsoft signing options](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options),
+[Azure billing](https://azure.microsoft.com/en-us/pricing/details/artifact-signing/),
+[SignPath conditions](https://signpath.org/terms.html),
+[Certum prices](https://shop.certum.eu/buy-a-code-signing-certyficate).
