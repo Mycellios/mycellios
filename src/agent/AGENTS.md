@@ -581,6 +581,15 @@
   system browser for a runner preview. Keep the toolbar usable at narrow widths.
 
 - Source preview commands are npm run dev:local:backend and dev:local:web.
+  For an already running preview, use npm run dev:local:status: parallel, bounded,
+  read-only probes check the Vite HMR client, React Refresh and API/worker readiness.
+  This is service readiness, not browser interaction or release qualification.
+  Visual-only iterations use the existing Vite/React hot reload; do not install,
+  run turbo build/check, package Desktop or restart healthy services for them.
+  Review the narrow diff and inspect the changed surface. If browser automation
+  is unavailable, report that limitation rather than repeating the same timeout.
+  Functional changes retain affected tests/types; publication retains its real
+  build, provenance and health gates. Never label omitted checks as passed.
   They use the existing embedded PostgreSQL server, a separate local worker and
   Vite; the Browser profile waits for API/database readiness and a fresh worker
   heartbeat before starting the frontend. RAKAZO_PROJECT_LOCAL prevents dotenv

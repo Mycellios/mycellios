@@ -255,17 +255,17 @@ infra/      local services and computer images
 docs/       architecture, operations, and release guides
 ```
 
-Common checks:
+Fast local feedback (from this directory):
 
 ```bash
-pnpm lint
-pnpm check
-pnpm test
-pnpm test:integration
-pnpm test:e2e
+npm run dev:local:backend  # keep running in one terminal
+npm run dev:local:web      # keep running in another: http://127.0.0.1:5192/app/
+npm run dev:local:status   # read-only readiness and hot-reload probe
 ```
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the development workflow and test matrix.
+Small visual changes use hot reload without a production build or reinstall.
+See [CONTRIBUTING.md](./CONTRIBUTING.md#fast-iteration-is-the-default) for the
+default feedback loop, focused checks and separate publication requirements.
 
 ## Documentation
 
