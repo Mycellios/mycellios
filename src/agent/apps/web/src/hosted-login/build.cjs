@@ -20,6 +20,7 @@ const result = buildSync({
   metafile: true,
   define: {
     "process.env.NODE_ENV": '"production"',
+    "import.meta.env.BASE_URL": '"/agent/"',
     __FIRST_PARTY_CLIENTS_PATH__: JSON.stringify(manifestPath),
   },
 });

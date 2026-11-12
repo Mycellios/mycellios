@@ -28,21 +28,22 @@ body {
 }
 .login-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 30px;
 }
 .login-mark {
   display: block;
   flex: none;
-  border-radius: 10px;
+  width: 56px;
+  height: 56px;
 }
 .login-brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 11px;
+  gap: 12px;
   color: var(--foreground);
   font-family: inherit;
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 500;
   line-height: 1.2;
   text-decoration: none;
@@ -50,8 +51,8 @@ body {
 }
 .oauth-consent h1 {
   margin: 24px 0 0;
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 500;
   line-height: 1.25;
   letter-spacing: -0.03em;
 }
@@ -138,8 +139,8 @@ body {
 @media (max-width: 420px) {
   .oauth-consent { padding: 32px 24px; }
   .login-header { margin-bottom: 28px; }
-  .oauth-consent h1 { font-size: 26px; }
+  .oauth-consent h1 { font-size: 24px; }
 }
 @media (max-height: 560px) {
-  .oauth-consent { place-items: start center; }
+  .oauth-consent { place-items: start center; padding-block: 24px; }
 }

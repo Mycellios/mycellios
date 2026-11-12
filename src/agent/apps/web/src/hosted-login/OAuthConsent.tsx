@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import loginMark from "../../public/mycellios/app-icon-v2-192.png";
 import mico from "../../public/mycellios/mico.png";
 import wordmark from "../../public/mycellios/mark.png";
 import { BrandLaunch } from "../components/BrandLaunch";
@@ -154,7 +153,15 @@ export function OAuthConsent() {
       <section>
         <header className="login-header">
         <a className="login-brand" href="/" aria-label="Mycellios">
-          <img className="login-mark" src={loginMark} width={38} height={38} alt="" />
+          {/* The same mushroom geometry as public/mycellios/loader.svg, at rest. */}
+          <svg className="login-mark" width="56" height="56" viewBox="0 0 64 64" fill="none" aria-hidden="true" focusable="false">
+            <path fill="#3f9f78" d="M26 30h12l3 21c.5 3.5-2 6-5.5 6h-7c-3.5 0-6-2.5-5.5-6l3-21Z" />
+            <path fill="#3f9f78" d="M6 28C7 16 18 7 32 7s25 9 26 21c.3 4-2.5 7-6.5 7h-39C8.5 35 5.7 32 6 28Z" />
+            <g fill="#1d2b23">
+              <rect x="26" y="40" width="3.5" height="8" rx="1.75" />
+              <rect x="34.5" y="40" width="3.5" height="8" rx="1.75" />
+            </g>
+          </svg>
           <span>Mycellios</span>
         </a>
         <h1>
