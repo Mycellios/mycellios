@@ -66,9 +66,14 @@ it("bounds vendor response size", async () => {
 
 it("retries non-JSON temporary gateway failures without treating them as expired tokens", async () => {
   let sends = 0;
-  const request = vi.fn(async (url: string | URL | Request) => String(url).includes("oauth2")
+  const ids: string[] = [];
+  const request = vi.fn(async (url: string | URL | Request, init?: RequestInit) => { if (!String(url).includes("oauth2")) ids.push(JSON.parse(String(init?.body)).message.data.deliveryId); return String(url).includes("oauth2")
     ? Response.json({ access_token: "secret", expires_in: 3600 })
-    : ++sends === 1 ? new Response("temporary gateway failure", { status: 503 }) : Response.json({ name: "ok" }));
-  await expect(new AndroidFcm(config, request as typeof fetch).send("device", message, context)).resolves.toBe("delivered");
+    : ++sends === 1 ? new Response("temporary gateway failure", { status: 503 }) : Response.json({ name: "ok" }); });
+  const sender = new AndroidFcm(config, request as typeof fetch);
+  await expect(sender.send("device", message, context)).resolves.toBe("delivered");
   expect(sends).toBe(2);
+  expect(ids[0]).toBe(ids[1]);
+  await sender.send("device", message, context);
+  expect(ids[2]).not.toBe(ids[0]);
 });

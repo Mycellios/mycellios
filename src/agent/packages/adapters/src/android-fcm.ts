@@ -1,4 +1,4 @@
-import { createHash, createPrivateKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, randomUUID, sign } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import type { AdapterContext, NotificationMessage } from "@rakazo/adapter-kit";
 
@@ -55,7 +55,9 @@ export class AndroidFcm {
     return body.access_token as string;
   }
   async send(token: string, message: NotificationMessage, context: AdapterContext): Promise<"delivered" | "unregistered"> {
-    const delivery = createHash("sha256").update([context.operationId, context.runId ?? "", message.threadId, message.kind].join(":" )).digest("hex");
+    // Unique per send, stable across its HTTP retries. A run can ask for help
+    // repeatedly with the same private copy; those are distinct notifications.
+    const delivery = createHash("sha256").update(randomUUID()).digest("hex");
     const data: Record<string, string> = { version: "1", deliveryId: delivery, accountId: context.userId,
       botId: message.botId, threadId: message.threadId, spaceId: context.spaceId, kind: message.kind,
       title: message.title.slice(0, 100), body: message.body.slice(0, 180), expiresAt: String(Date.now() + 300_000) };
