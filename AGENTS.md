@@ -98,6 +98,13 @@ These rules apply to the complete repository.
   Verify workflow changes with `node --test scripts/ci-fast-delivery.test.mjs`
   through the shared queue; do not re-enable the paused full suites implicitly.
 
+- `.github/workflows/agent-release-artifact.yml` builds release branches or an
+  explicitly dispatched revision into sealed coordinator/web/API/worker outputs.
+  Its manifest binds the source tree, lockfiles, output hashes and web build ID.
+  It does not deploy, install production dependencies, apply migrations or run
+  paid inference. Promotion still requires the integrated source tree, live
+  runtime provenance, compatible dependencies, rollback and health checks.
+
 - Reusable web controls live in `landing/src/ui`. Use the production kit in every
   surface and import the same components in Storybook; do not add parallel demo
   implementations or native controls outside the kit. Run `npm run verify:ui-kit`.
