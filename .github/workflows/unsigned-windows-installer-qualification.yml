@@ -1,0 +1,80 @@
+name: Published unsigned Windows installer qualification
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/unsigned-windows-installer-qualification.yml'
+      - 'src/agent/apps/desktop/scripts/windows-installer.mjs'
+      - 'src/agent/apps/desktop/scripts/qualify-windows-install.mjs'
+      - 'src/agent/apps/desktop/scripts/measure-windows-installer.ps1'
+      - 'src/agent/apps/desktop/src/manual-update-helper.ps1'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing immutable unsigned Windows preview to exercise
+        type: string
+        default: '0.3.46'
+permissions:
+  contents: read
+concurrency:
+  group: unsigned-installer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  install:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PUBLISHED_VERSION: ${{ inputs.version || '0.3.46' }}
+    defaults:
+      run:
+        working-directory: src/agent
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - name: Locate the isolated qualification directory
+        shell: pwsh
+        run: '"QUALIFICATION_OUT=$(Join-Path $env:RUNNER_TEMP published-unsigned)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Download and verify the exact published unsigned package
+        shell: pwsh
+        run: |
+          $version=$env:PUBLISHED_VERSION
+          if($version -notmatch '^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$'){throw 'Invalid immutable preview version'}
+          $tag="desktop-v$version-windows-preview"
+          $file="Mycellios-Desktop-$version-windows-x64-pilot.exe"
+          gh release download $tag --repo $env:GH_REPO --pattern desktop-release.json --pattern desktop-build.json --pattern $file --dir $env:QUALIFICATION_OUT
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          $manifest=Get-Content (Join-Path $env:QUALIFICATION_OUT desktop-release.json) -Raw|ConvertFrom-Json
+          $identity=Get-Content (Join-Path $env:QUALIFICATION_OUT desktop-build.json) -Raw|ConvertFrom-Json
+          if($manifest.schema -ne 'mycellios-desktop-release-package/1' -or $manifest.tag -ne $tag -or $manifest.version -ne $version -or $manifest.platform -ne 'windows-x64' -or $manifest.signature -ne 'unsigned-preview' -or $manifest.automaticUpdates -ne $false -or $manifest.qualifiedStartup -ne $true){throw 'Expected a qualified manual unsigned preview'}
+          if($manifest.revision -notmatch '^[a-f0-9]{40}$' -or $manifest.tree -notmatch '^[a-f0-9]{40}$' -or $identity.revision -ne $manifest.revision -or $identity.tree -ne $manifest.tree -or $identity.version -ne $version){throw 'Published source identities differ'}
+          git merge-base --is-ancestor $manifest.revision HEAD
+          if($LASTEXITCODE){throw 'Published source is not part of this candidate'}
+          if((git rev-parse "$($manifest.revision)^{tree}") -ne $manifest.tree){throw 'Published source tree differs'}
+          $exe=Get-Item -LiteralPath (Join-Path $env:QUALIFICATION_OUT $file)
+          if($manifest.artifact.fileName -ne $file -or $exe.Length -ne $manifest.artifact.bytes -or (Get-FileHash -LiteralPath $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.artifact.sha256){throw 'Published installer bytes differ'}
+          if([string](Get-AuthenticodeSignature -LiteralPath $exe.FullName).Status -ne 'NotSigned'){throw 'This gate exercises unsigned installers only'}
+          Copy-Item -LiteralPath (Join-Path $env:QUALIFICATION_OUT desktop-release.json) -Destination (Join-Path $env:QUALIFICATION_OUT published-desktop-release.json)
+      - name: Install and upgrade the existing EXE with isolated drafts and rollback checks
+        shell: pwsh
+        run: |
+          node node_modules/electron/install.js
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          node apps/desktop/scripts/qualify-windows-install.mjs $env:QUALIFICATION_OUT
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: published-unsigned-installer-${{ github.sha }}
+          path: |
+            ${{ env.QUALIFICATION_OUT }}/*.json
+            ${{ runner.temp }}/mycellios-install-qualification-*/**/*timing.json
+            ${{ runner.temp }}/mycellios-install-qualification-*/**/receipt.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,5 +1,31 @@
 # Desktop release: Linux and macOS packages in the publish pipeline (2026-11-11)
 
+## Windows unsigned manual updates
+
+Publisher signing is deferred. The Windows release and promotion workflows do
+not require a signing account or certificate. Packaging sets
+`forceCodeSigning:false` and `win.signExecutable:false` to avoid discovering an
+unrelated signing identity while retaining executable icons/version resources.
+The staged installer still requires the owned HTTPS source, exact byte count and
+SHA256, download-zone evidence, Windows attachment policy and explicit restart.
+The app stays open while Windows requests confirmation. A rejected check returns
+the verified download to a retryable state; it does not authorize installation.
+
+The narrow updater regression step runs even for expedited packages. It covers
+manual download/installation, refusal and retry, package feed validation and the
+native helper's isolated unsigned executable install/relaunch with draft retention.
+The native fixture has truthful local-origin evidence; it does not simulate or
+automatically approve Internet-origin SmartScreen/Attachment Services dialogs.
+An unsigned public download can still warn or be blocked by Windows policy; never
+remove its zone mark, bypass that policy or promise warning-free distribution.
+Use a new immutable version for a future installer; do not replace published bytes.
+To recheck an existing unsigned installer without recompiling, dispatch
+`unsigned-windows-installer-qualification.yml` with its exact `version`. It validates
+published source identity, byte count, SHA256 and unsigned status, then reuses the
+hosted fresh-install, legacy-upgrade, draft/task preservation and failed-uninstall
+recovery qualifier. The new receipt is separate evidence; it does not rewrite the
+published release or turn an older expedited manifest into a fully qualified one.
+
 Client versions from 0.3.40 include the Linux update path and from 0.3.44 the
 macOS one: an installed RPM, DEB or disk image queries the desktop catalog,
 verifies the exact file and SHA-256, and hands it to the system installer (or

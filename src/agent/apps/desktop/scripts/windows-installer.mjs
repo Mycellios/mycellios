@@ -74,7 +74,10 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       { from: path.join(desktopRoot, '../../infra/compose/docker-compose.images.yml'), to: 'stack/docker-compose.images.yml' },
       { from: path.join(desktopRoot, '../../infra/compose/stack-env.example'), to: 'stack/stack-env.example' },
     ],
-    win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true },
+    // Manual previews must not discover an ambient signing identity or depend on
+    // a certificate service. Keep executable resource/icon editing enabled.
+    forceCodeSigning: false,
+    win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true, signExecutable: false },
     // The legacy loose tree exceeds ZIP32's entry limit. Compact ASAR resources
     // use bounded ZIP32/Deflate to reduce install-time decompression; afterPack
     // checks the actual payload before nsisunz receives it. Never emit ZIP64.
