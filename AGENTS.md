@@ -298,6 +298,9 @@ These rules apply to the complete repository.
   and GET-only recovery for late receipts; never retry an uncertain paid request.
   Run the managed provider/AntSeed text tests and the isolated managed-purchases
   PostgreSQL suite for changes to that boundary. No local fixture activates it.
+  Gateway API keys use the separate `antseed-gateway` adapter and its scoped
+  receipt session, never the local buyer control-secret field. Run its gateway
+  tests too. Keep models without an enforceable upstream cost contract disabled.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.
