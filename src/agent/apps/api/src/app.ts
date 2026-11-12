@@ -640,7 +640,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         prisma,
         jobs,
         events,
-        notifications: nativeNotifications,
+        notifications,
         reconcileModelCredits: createModelCreditReconciler({
           prisma,
           lookup: deploymentModelUsageLookup(),

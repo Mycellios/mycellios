@@ -64,6 +64,9 @@ export function planChecks(files) {
     if (tests.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...tests, '--maxWorkers', '2'], 'Agent changed tests');
     const related = code.filter(f => f.startsWith('src/agent/') && !/\.[cm]?js$/.test(f) && !/\.test\.[jt]sx?$/.test(f) && !f.includes('.config.')).map(f => f.slice('src/agent/'.length));
     if (related.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'related', ...related, '--run', '--passWithNoTests', '--maxWorkers', '2'], 'Agent affected tests');
+    if (files.some(f => f === 'src/agent/scripts/verify-notification-devices-db.ts' || f.startsWith('src/agent/packages/db/prisma/migrations/20261112110000_mobile_push_devices/'))) {
+      add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-notification-devices-db.ts'], 'notification device migration and RLS in isolated PostgreSQL');
+    }
   }
   return commands;
 }
