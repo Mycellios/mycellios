@@ -137,6 +137,7 @@ import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
 import { connectThisComputer, defaultComputerMode, desktopBridge, desktopDragClass } from "../lib/desktop";
+import { notificationTarget } from "../pwa/notification-target";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
@@ -1162,6 +1163,18 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       window.removeEventListener("keydown", unlock, true);
     };
   }, [userId]);
+  useEffect(() => {
+    const notifications = desktopBridge()?.notifications;
+    if (!notifications) return;
+    void notifications.clear().catch(() => undefined);
+    const remove = notifications.onOpen((value) => {
+      if (!userId) return;
+      const base = new URL(appPath("/app"), location.href).pathname.slice(0, -4);
+      const target = notificationTarget(value, location.origin, base);
+      if (target) { const url = new URL(target); navigate(url.pathname.slice(base.length) + url.search); }
+    });
+    return () => { remove(); void notifications.clear().catch(() => undefined); };
+  }, [navigate, userId]);
   const deliverBrowserNotification = useCallback((pending: PendingBrowserNotification): boolean => {
     if (usesServerPush()) return true;
     const currentBot = botsRef.current.find((bot) => bot.id === pending.botId);

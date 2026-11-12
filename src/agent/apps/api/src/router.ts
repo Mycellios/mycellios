@@ -57,6 +57,8 @@ export { HEARTBEAT_MS, SESSION_RECHECK_MS } from "./routes/shared.js";
 export { callMarkerClientNonce } from "./routes/threads.js";
 
 export interface RouterDeps {
+  androidPushConfigured?: boolean;
+  androidPushProjectId?: string;
   /** True when a connected desktop host advertises agent execution for this scope. */
   desktopAgentAvailable?: (scope: { userId: string; spaceId: string }) => boolean;
   sideQuestions?: {

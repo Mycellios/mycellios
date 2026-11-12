@@ -61,6 +61,7 @@ model User {
   createdTickets              Ticket[]                     @relation("TicketCreatorUser")
   ticketComments              TicketComment[]              @relation("TicketCommentAuthorUser")
   pushToken                   PushToken?
+  mobilePushDevices           MobilePushDevice[]
   signupSurvey                SignupSurvey?
   computerRuns                ComputerRun[]
 
@@ -114,6 +115,20 @@ model PushToken {
   updatedAt DateTime @updatedAt
 
   @@map("push_tokens")
+}
+
+/// Additive per-device registrations; PushToken remains readable by older releases.
+model MobilePushDevice {
+  tokenDigest String @id
+  transport String @default("expo")
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ciphertext String
+  sessionId String
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, sessionId])
+  @@map("mobile_push_devices")
 }
 
 model Account {

@@ -9,6 +9,7 @@ import {
   Alert,
   AppState,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -147,6 +148,8 @@ export default function Account() {
   > | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<string | null>(null);
   const [notificationError, setNotificationError] = useState<string | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushMessage, setPushMessage] = useState("");
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [passkeys, setPasskeys] = useState<MobilePasskey[] | null>(null);
@@ -316,7 +319,7 @@ export default function Account() {
         if (settings.liveConnection && !(await canPostPromotedNotifications())) {
           await openPromotedNotificationSettings();
         }
-        await registerPushToken();
+        await registerPushToken({ requestPermission: true });
       },
       onError: (cause) =>
         setNotificationError(errorText(cause, t("Could not update notifications"))),
@@ -593,6 +596,21 @@ export default function Account() {
           />
         </SettingsGroup>
 
+        <SettingsGroup accessibilityLabel={t("Push notifications")} label={t("Push notifications")}>
+          <SettingsRow title={pushBusy ? t("Enabling…") : t("Enable notifications")}
+            detail={pushMessage || t("Allow this device to receive alerts when the app is in the background.")}
+            accessibilityRole="button" disabled={pushBusy}
+            onPress={() => {
+              setPushBusy(true); setNotificationError(null); setPushMessage("");
+              void registerPushToken({ requestPermission: true })
+                .then(() => setPushMessage(t("Registration requested. Check your system notification settings.")))
+                .catch(cause => setNotificationError(errorText(cause, t("Could not update notifications"))))
+                .finally(() => setPushBusy(false));
+            }} />
+          <SettingsRow title={t("Notification settings")} accessibilityRole="button" chevron="right"
+            onPress={() => { void Linking.openSettings().catch(cause => setNotificationError(errorText(cause, t("Could not update notifications")))); }}/>
+          {notificationError ? <Text accessibilityRole="alert" style={styles.error}>{notificationError}</Text> : null}
+        </SettingsGroup>
         {Platform.OS === "android" ? (
           <SettingsGroup accessibilityLabel={t("Notifications")} label={t("Notifications")}>
             {notificationPermission === "denied" ? (
@@ -647,7 +665,6 @@ export default function Account() {
               onPress={() => void openLiveNotificationSettings()}
               title={t("Notification settings")}
             />
-            {notificationError ? <Text style={styles.error}>{notificationError}</Text> : null}
           </SettingsGroup>
         ) : null}
 

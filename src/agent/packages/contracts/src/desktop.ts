@@ -148,6 +148,14 @@ export interface RakazoDesktop {
   badge?: {
     set: (count: number) => Promise<boolean>;
   };
+  /** Native OS delivery; absent on older installed Desktop versions. */
+  notifications?: {
+    clear: () => Promise<void>;
+    status: () => Promise<{ supported: boolean; settingsAvailable: boolean }>;
+    show: (input: { title: string; body: string; tag: string; url: string; silent: boolean }) => Promise<void>;
+    openSettings: () => Promise<boolean>;
+    onOpen: (listener: (url: string) => void) => () => void;
+  };
   computer?: {
     /** Native main persists host choice through its local capability, never a user session. */
     managesHostChoice?: boolean;

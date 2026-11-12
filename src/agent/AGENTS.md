@@ -9,6 +9,13 @@
   dependency/license and synthetic demo provenance. No remote media fallback.
 
 - The distributable Android host lives in apps/android and packages apps/web unchanged.
+  Native push uses data-only Firebase HTTP v1 messages, the fixed first-party session
+  registration endpoint and encrypted session-bound FCM device records. Keep Expo
+  tokens separate. Build with the four MYCELLIOS_FIREBASE_* public client values;
+  ANDROID_FCM_SERVICE_ACCOUNT_JSON belongs only to API/worker secrets. Initialize
+  Firebase in Application for background process starts. Never return tokens or
+  cookies over the WebView bridge. Preserve account/epoch checks, deduplication,
+  foreground suppression and validated internal notification destinations.
   Keep com.mycellios.android separate from the legacy Expo preview and use a durable
   release signing key, never the preview/debug certificate. Native capabilities use
   WebViewCompat messages with exact HTTPS origin, main-frame and packaged chat-route
@@ -361,8 +368,11 @@
   catalog editor. Changing gateway models never changes the account main role.
   Reply-notification preferences are local per user/device; per-Mico switches save
   through the owned Space RPC. Hidden previews never reveal reply text or names.
-  Open web clients deliver via the active service worker where available, or the
-  desktop Notification API otherwise. Suppress notices while a same-account tab is
+  Desktop uses the optional named notifications bridge in native main; retain
+  at most 50 alerts, validate main-frame origin and internal chat targets, and clear
+  them on account/window changes. Keep the Windows AppUserModelID aligned with
+  the installer. Older clients retain the browser Notification API; web clients
+  use the active service worker where available. Suppress notices while a same-account tab is
   focused. Click destinations must stay inside the deployed app and the target Space.
   A focused conversation plays a short cue after a persisted reply completes.
   Honor the device sound, mute and attention settings and the Mico's preference.
@@ -373,12 +383,27 @@
   Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.
+  Explicit, confirmed sign-out clears the local worker account binding and native
+  alerts; closing a tab/app keeps its background subscription. Reconcile actual
+  subscription/key state instead of trusting only the server registration flag.
   The push worker uses event-specific copy and bundled notification artwork. Put
   later icons in avatarArt so installed workers with the original allowlist
   still deliver the notice with the generic mushroom. When
   previews are off it displays a generic mascot and hides conversation identity.
   Regenerate the small PNGs with `node packages/ui-tokens/scripts/export-notification-art.ts`.
   Qualify delivery and the destination on an installed PWA on a physical phone.
+  Mobile boot/resume only refreshes prior opt-ins; request OS consent from settings.
+  Android creates the stable default channel before registration. Pin asynchronous
+  token registration to its original account/server session. The additive
+  mobile_push_devices table retains up to 20 encrypted devices per account and the
+  legacy push_tokens row; revoke only the current session on device unsubscribe.
+  Promote API and worker together with that migration. Shared background filters
+  and preview privacy apply to native mobile and Web Push. Session DateTime fields
+  are UTC timestamps without timezone: compare raw SQL against now() AT TIME ZONE
+  'UTC', leaving timestamptz outbox fields unchanged. Verify with
+  `node --import tsx scripts/verify-notification-devices-db.ts` through the queue.
+  A native Android WebView build without push must say so; do not claim Expo,
+  APNs/FCM or closed-app delivery without owned configuration and physical proof.
   Web update checks share the existing guarded tracker; they never deploy servers
   or reload through open settings/drafts/calls. Desktop uses the installed package's
   real updater policy; do not fabricate channel/automatic-install permissions.

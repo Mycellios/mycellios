@@ -11138,3 +11138,82 @@ msgstr "Mycellios envía grabaciones de hasta 30 segundos a la red y consume tus
 
 msgid "Device or connected provider"
 msgstr "Dispositivo o proveedor conectado"
+
+
+msgid "Delivery"
+msgstr "Entrega"
+
+msgid "Desktop"
+msgstr "Escritorio"
+
+msgid "Push connected"
+msgstr "Push conectado"
+
+msgid "Setup needed"
+msgstr "Requiere configuración"
+
+msgid "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
+msgstr "Los avisos de escritorio funcionan mientras Mycellios está en ejecución. Al salir completamente, este equipo deja de recibirlos."
+
+msgid "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
+msgstr "En iPhone o iPad, añade Mycellios a la pantalla de inicio y ábrelo desde allí para activar los avisos en segundo plano."
+
+msgid "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
+msgstr "Esta versión de Android no incluye push nativo en segundo plano. Instala la app web desde el navegador para recibir avisos con la app cerrada."
+
+msgid "Open Mycellios over HTTPS to enable system notifications."
+msgstr "Abre Mycellios mediante HTTPS para activar las notificaciones del sistema."
+
+msgid "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
+msgstr "Este dispositivo está registrado para recibir avisos con la app cerrada. La entrega también depende del sistema y la conexión."
+
+msgid "Background push is not configured on this server. Alerts are available only while the app is running."
+msgstr "Este servidor no tiene configurado el push en segundo plano. Solo recibirás avisos mientras la app esté en ejecución."
+
+msgid "Enable system permission and register this device to receive background alerts."
+msgstr "Activa el permiso del sistema y registra este dispositivo para recibir avisos en segundo plano."
+
+msgid "Could not open system notification settings."
+msgstr "No se han podido abrir los ajustes de notificaciones del sistema."
+
+msgid "Open system notification settings"
+msgstr "Abrir ajustes del sistema"
+
+msgid "If you can see this alert, system notifications are enabled."
+msgstr "Si ves este aviso, las notificaciones del sistema están activadas."
+
+msgid "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
+msgstr "Prueba solicitada. Comprueba el centro de notificaciones; el modo concentración o No molestar puede silenciarla."
+
+msgid "Background alerts across devices"
+msgstr "Avisos en segundo plano en tus dispositivos"
+
+msgid "When to notify"
+msgstr "Cuándo avisar"
+
+msgid "All activity"
+msgstr "Toda la actividad"
+
+msgid "Show push previews"
+msgstr "Mostrar contenido en los avisos push"
+
+msgid "Use account setting"
+msgstr "Usar el ajuste de la cuenta"
+
+msgid "Off"
+msgstr "Desactivado"
+
+msgid "Could not check background delivery. Alerts in the running app remain available."
+msgstr "No se ha podido comprobar la entrega en segundo plano. Los avisos de la app en ejecución siguen disponibles."
+
+msgid "Update Mycellios Android to configure native notifications."
+msgstr "Actualiza Mycellios Android para configurar las notificaciones nativas."
+
+msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+msgstr "Los avisos nativos de Android usan Firebase y abren el chat correspondiente. Activa el permiso del sistema para registrar este dispositivo."
+
+msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
+msgstr "Hay que configurar Firebase en la app de Android y en el servidor antes de activar el push nativo."
+
+msgid "Android push is not configured on this server."
+msgstr "Este servidor no tiene configurado el push de Android."

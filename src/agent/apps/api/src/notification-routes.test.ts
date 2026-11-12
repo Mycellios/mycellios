@@ -13,6 +13,7 @@ function fixture(
     isDeploymentOwner: false,
   },
   sessionId: string | undefined = "owned-session",
+  androidConfigured = true,
 ) {
   const webPush = {
     config: { publicKey: "public" },
@@ -34,6 +35,9 @@ function fixture(
     dataDir: "/notification-fixture",
     secrets: {},
     webPush,
+    androidPushConfigured: androidConfigured,
+    androidPushProjectId: "mycellios-test",
+    pushTokens: { save: vi.fn(async () => undefined) },
     env: {
       defaultProvider: "fake",
       defaultModel: "fake-model",
@@ -43,9 +47,28 @@ function fixture(
     },
   } as unknown as RouterDeps;
   const client = createRouterClient(createRouter(deps), { context: { actor, sessionId } as never });
-  return { client, webPush };
+  return { client, webPush, pushTokens: deps.pushTokens };
 }
 describe("notification account RPC", () => {
+  it("binds FCM enrollment to the current account, session and Firebase project", async () => {
+    const f = fixture();
+    const input = { token: "android-device-token-for-fixture", expectedUserId: "owner", projectId: "mycellios-test" };
+    await expect(f.client.notifications.registerAndroidPush({ ...input, expectedUserId: "other" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(f.client.notifications.registerAndroidPush({ ...input, projectId: "different-project" })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(f.pushTokens.save).not.toHaveBeenCalled();
+    await expect(f.client.notifications.registerAndroidPush(input)).resolves.toEqual({ ok: true });
+    expect(f.pushTokens.save).toHaveBeenCalledWith("owner", input.token, "owned-session", "fcm");
+    const disabled = fixture(undefined, "owned-session", false);
+    await expect(disabled.client.notifications.registerAndroidPush(input)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(fixture(null).client.notifications.androidStatus()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+  it("rejects subscription enrollment after an account switch", async () => {
+    const f = fixture();
+    await expect(f.client.notifications.webRegister({ clientId: randomUUID(), expectedUserId: "previous-owner",
+      subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/fixture", keys: { p256dh: "A".repeat(87), auth: "A".repeat(22) } },
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(f.webPush.register).not.toHaveBeenCalled();
+  });
   it("does not expose notification state without authentication", async () => {
     const f = fixture(null);
     await expect(

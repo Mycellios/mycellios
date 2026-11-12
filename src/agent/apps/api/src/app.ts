@@ -51,6 +51,8 @@ import {
   deploymentModelUsageLookup,
   EmailEmulator,
   ExpoPushProvider,
+  AndroidFcm,
+  androidFcmConfig,
   GraphileJobPublisher,
   InMemoryJobQueue,
   InMemoryRealtimeFanout,
@@ -477,15 +479,18 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
           }),
         }));
   const pushTokens = new PrismaPushTokenStore(prisma, env.encryptionKey);
+  const androidCredentials = androidFcmConfig(process.env);
+  const androidPush = androidCredentials ? new AndroidFcm(androidCredentials) : undefined;
   const nativeNotifications =
     notificationsOverride ??
     new ExpoPushProvider(pushTokens, {
+      androidPush,
       sessionExpiresAt: (sessionId) => pushSessionExpiresAt(prisma, sessionId),
       jobs,
       accessToken: env.expoAccessToken,
     });
   const webPush = new WebPushService(prisma, env.encryptionKey, jobs, webPushConfig(process.env));
-  const notifications = webPush.config ? notificationChannels(nativeNotifications, webPush) : nativeNotifications;
+  const notifications = notificationsOverride ?? notificationChannels(nativeNotifications, webPush);
   const auth = createAuth(prisma, {
     sessionDurationSeconds: env.authSessionDurationSeconds,
     analytics,
@@ -660,6 +665,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
     codexCatalog,
     prisma,
     pushTokens,
+    androidPushConfigured: Boolean(androidPush),
+    androidPushProjectId: androidCredentials?.projectId,
     webPush,
     desktopAgentAvailable: (scope) => desktopHostProbe?.(scope) ?? false,
     events,

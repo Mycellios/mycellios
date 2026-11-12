@@ -12,6 +12,33 @@ let installed: NativePort | undefined;
 export function isAndroidHost(): boolean {
   return typeof window !== "undefined" && typeof window.MycelliosNative?.postMessage === "function";
 }
+export type AndroidNotificationStatus = { supported: boolean; configured: boolean; permission: "default" | "denied" | "granted"; registered: boolean };
+/** Tokens/cookies stay in native code; web receives only status or a bounded error. */
+export function androidNotificationRequest(type: "status" | "enable" | "refresh" | "clear" | "settings" | "test" | "preferences", values: { accountId?: string; preview?: boolean; sound?: boolean; attentionOnly?: boolean; mutedUntil?: number } = {}): Promise<AndroidNotificationStatus> {
+  if (!isAndroidHost()) return Promise.reject(new Error("Open the native Android app to continue."));
+  installAndroidHost();
+  const id = crypto.randomUUID();
+  return new Promise((resolve, reject) => {
+    const finish = () => { window.clearTimeout(timer); sessions.delete(id); };
+    const timer = window.setTimeout(() => { finish(); reject(new Error("Android did not answer. Update the app or try again.")); }, type === "enable" ? 90_000 : 5000);
+    sessions.set(id, message => {
+      if (message.type !== "notification-result" && message.type !== "error") return;
+      finish();
+      if (typeof message.error === "string") { reject(new Error(message.error.slice(0, 300))); return; }
+      try {
+        const status = JSON.parse(message.text ?? "{}");
+        if (["status", "enable", "refresh"].includes(type)) {
+          if (!status || typeof status.supported !== "boolean" || typeof status.configured !== "boolean" ||
+            typeof status.registered !== "boolean" || !["default", "denied", "granted"].includes(status.permission)) throw new Error();
+          resolve({ supported: status.supported, configured: status.configured, registered: status.registered, permission: status.permission });
+        } else resolve({} as AndroidNotificationStatus);
+      }
+      catch { reject(new Error("Android returned an invalid notification status.")); }
+    });
+    try { installed!.postMessage(JSON.stringify({ type: `notification-${type}`, id, ...values })); }
+    catch { finish(); reject(new Error("Android notifications are unavailable.")); }
+  });
+}
 export function installAndroidHost() {
   if (!isAndroidHost() || installed === window.MycelliosNative) return;
   installed = window.MycelliosNative;

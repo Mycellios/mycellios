@@ -22,7 +22,7 @@ import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -33,6 +33,7 @@ import {
   updaterSupport,
 } from "./auto-update.js";
 import { createBadgeHandler } from "./badge.js";
+import { createSystemNotifications } from "./system-notifications.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
 import { computerConsentScope, prepareHostComputer } from "./host-computer.js";
@@ -1314,6 +1315,7 @@ if (!hasSingleInstanceLock) {
 
 app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
+  if (process.platform === "win32") app.setAppUserModelId("com.mycellios.agent.desktop");
   installSessionPermissions(session.defaultSession, permissionTarget);
   const userDataDir = app.getPath("userData");
   await loadBackgroundPreference(userDataDir);
@@ -1945,6 +1947,17 @@ app.whenReady().then(async () => {
     createBadgeHandler(permissionTarget, (count) => app.setBadgeCount(count)),
   );
   ipcMain.handle("desktop.platform", () => process.platform);
+  const notifications = createSystemNotifications({
+    getTarget: permissionTarget, platform: process.platform, supported: () => Notification.isSupported(),
+    create: ({ title, body, silent }) => new Notification({ title, body, silent,
+      icon: path.join(app.getAppPath(), "assets", "icon.png") }),
+    openSettings: (url) => shell.openExternal(url),
+    focus: (contents) => { const win = BrowserWindow.fromWebContents(contents); if (win?.isMinimized()) win.restore(); win?.show(); win?.focus(); },
+  });
+  ipcMain.handle("desktop.notifications.status", event => notifications.status(event));
+  ipcMain.handle("desktop.notifications.clear", event => notifications.clear(event));
+  ipcMain.handle("desktop.notifications.settings", event => notifications.openSettings(event));
+  ipcMain.handle("desktop.notifications.show", (event, input) => notifications.show(event, input));
   ipcMain.handle("desktop.passkeys.rpIds", () => passkeyRpIds);
   ipcMain.handle("desktop.window.close", (event) => {
     windowFrom(event)?.close();

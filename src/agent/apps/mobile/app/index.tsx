@@ -503,6 +503,10 @@ function Home({ embedded, onSelectSpace }: InboxPaneProps & { embedded: boolean 
   useEffect(() => {
     if (!hasSession) return;
     void registerPushToken().catch(() => undefined);
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active") void registerPushToken().catch(() => undefined);
+    });
+    return () => subscription.remove();
   }, [hasSession]);
 
   // Show the inbox saved on this device until the first live load replaces it.

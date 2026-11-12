@@ -57,6 +57,17 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
   badge: {
     set: (count) => ipcRenderer.invoke("desktop.badge.set", count),
   },
+  notifications: {
+    clear: () => ipcRenderer.invoke("desktop.notifications.clear"),
+    status: () => ipcRenderer.invoke("desktop.notifications.status"),
+    show: input => ipcRenderer.invoke("desktop.notifications.show", input),
+    openSettings: () => ipcRenderer.invoke("desktop.notifications.settings"),
+    onOpen: listener => {
+      const handler = (_event, url) => listener(url);
+      ipcRenderer.on("desktop.notifications.open", handler);
+      return () => ipcRenderer.off("desktop.notifications.open", handler);
+    },
+  },
   computer: {
     prepareTask: request => ipcRenderer.invoke("desktop.computer.prepareTask", request),
     managesHostChoice: true,
