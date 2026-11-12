@@ -38,6 +38,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
   const repository = path.resolve(agentRoot, '../..');
   return {
     beforePack: path.join(desktopRoot, 'scripts/verify-release.cjs'),
+    ...(compact ? { afterPack: path.join(desktopRoot, 'scripts/verify-windows-zip32.cjs') } : {}),
     appId: 'com.mycellios.agent.desktop',
     productName: 'Mycellios Desktop',
     artifactName: 'Mycellios-Desktop-' + version + '-windows-x64-pilot.${ext}',
@@ -74,11 +75,13 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       { from: path.join(desktopRoot, '../../infra/compose/stack-env.example'), to: 'stack/stack-env.example' },
     ],
     win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true },
-    // The resource tree exceeds ZIP32's entry limit; nsisunz rejects ZIP64.
+    // The legacy loose tree exceeds ZIP32's entry limit. Compact ASAR resources
+    // use bounded ZIP32/Deflate to reduce install-time decompression; afterPack
+    // checks the actual payload before nsisunz receives it. Never emit ZIP64.
     // An assisted first install and an explicit Finish/Open action, as upstream.
     // Updates still use /S and our confirmed same-profile relaunch. Keep the
     // installation directory fixed until alternate paths have recovery coverage.
-    nsis: { include:path.join(desktopRoot,'assets/fast-install.nsh'),useZip: false, oneClick: false,
+    nsis: { include:path.join(desktopRoot,'assets/fast-install.nsh'),useZip: Boolean(compact), oneClick: false,
       allowToChangeInstallationDirectory: false, allowElevation: false, runAfterFinish: true,
       perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
     // This only writes standard updater metadata/block maps at build time.
