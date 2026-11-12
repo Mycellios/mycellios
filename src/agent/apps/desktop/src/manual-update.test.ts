@@ -135,6 +135,20 @@ describe("official Windows manual releases", () => {
     await controller.install();
     await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(2));
   });
+  it.each(["Windows file check was cancelled", "Windows blocked the installer"])("keeps a refused Windows check retryable: %s", async (reason) => {
+    const { controller, handoff, request, directory } = await fixture();
+    handoff.mockRejectedValueOnce(new Error(reason));
+    await controller.check(true);
+    await controller.install();
+    await vi.waitFor(() => expect(controller.state()).toMatchObject({ phase: "ready", installPending: false }));
+    expect(controller.state().handoffComplete).not.toBe(true);
+    expect(controller.state().message).toBeTruthy();
+    expect(await readFile(path.join(directory, entry.fileName))).toEqual(Buffer.from(bytes));
+    const downloads = request.mock.calls.length;
+    await controller.install();
+    await vi.waitFor(() => expect(handoff).toHaveBeenCalledTimes(2));
+    expect(request).toHaveBeenCalledTimes(downloads);
+  });
   it("requires renderer acknowledgement and rechecks activity after acknowledgement", async () => {
     let ready = false, busy = false;
     const { controller, handoff } = await fixture({ busy: () => busy, prepare: async () => { busy = ready; return ready; } });

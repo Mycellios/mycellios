@@ -173,6 +173,10 @@ These rules apply to the complete repository.
   `/public/v1/desktop-downloads` and page `/downloads/desktop`; preserve the
   headless runtime catalog and platform routes. Preview upgrades are manual
   while Windows packages are unsigned; never enable unsigned automatic installs.
+  Unsigned Windows packaging explicitly disables certificate discovery with
+  `win.signExecutable:false`, retaining resource editing and manual update checks.
+  Even expedited Windows releases run the narrow manual-update/helper, published
+  feed and installer metadata regressions; keep Windows warnings owner-approved.
   The isolated page build uses `node scripts/build-desktop-downloads.mjs` and the
   same `DesktopDownloads` component as the main downloads screen. Publish the
   verified RPM builder's catalog entry as `fedora` in the `macos-all` response.
