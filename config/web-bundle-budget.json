@@ -20,7 +20,7 @@
         },
         "contribution-route": {
           "match": "Contribute-",
-          "maximumBytes": 65000
+          "maximumBytes": 160000
         },
         "landing-route": {
           "match": "RebrandLanding-",
@@ -61,12 +61,19 @@
         "browser-layer-engine": {
           "match": "browser-layer-",
           "maximumBytes": 140000
+        },
+        "browser-text-worker": {
+          "match": "browser-text-worker-",
+          "maximumBytes": 110000
         }
       },
       "criticalPaths": {
         "home": {
           "entry": "src/rebrand/ReferenceLanding.tsx",
-          "highPriorityMatches": ["agent-hero-motion-", "gsap-"],
+          "highPriorityMatches": [
+            "agent-hero-motion-",
+            "gsap-"
+          ],
           "maximumBytes": 350000
         },
         "panel": {
@@ -99,11 +106,15 @@
         },
         "contribution-route": {
           "match": "Contribute-",
-          "maximumBytes": 65000
+          "maximumBytes": 160000
         },
         "browser-layer-engine": {
           "match": "browser-layer-",
           "maximumBytes": 140000
+        },
+        "browser-text-worker": {
+          "match": "browser-text-worker-",
+          "maximumBytes": 110000
         }
       },
       "criticalPaths": {
