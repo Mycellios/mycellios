@@ -1,4 +1,4 @@
-import { BOT_COLORS, MICO_AVATAR_PALETTES, MICO_AVATAR_DEFAULT_SHAPES, micoAvatarValue } from "@rakazo/contracts";
+import { BOT_COLORS, MICO_AVATAR_PALETTES, MICO_AVATAR_DEFAULT_SHAPES, MICO_PRIMARY_AVATAR, micoAvatarValue } from "@rakazo/contracts";
 import {
   ORGANIC_AVATAR_FAMILY_COUNT,
   ORGANIC_AVATAR_HEART_FAMILY,
@@ -10,13 +10,16 @@ import { BOT_ID_ATTEMPTS, chooseBotAvatar, chooseMicoAvatar, pickLeastUsed } fro
 
 it("starts a space with the green mushroom and rotates avatars after that", () => {
   const first = chooseMicoAvatar([]);
-  expect(first.color).toBe("#3F9F78::shape_1000");
-  expect(chooseMicoAvatar([first]).color).toBe("#D47046::shape_1001");
+  expect(first.color).toBe(MICO_PRIMARY_AVATAR);
+  const next = MICO_AVATAR_DEFAULT_SHAPES[0]!;
+  expect(chooseMicoAvatar([first]).color).toBe(micoAvatarValue(next.index, next.originalColor));
 });
 
 it("assigns every branded shape and palette combination before repeating", () => {
   const existing = [{ color: "#123456::shape_0" }, { color: "data:image/png;base64,abc" }];
-  const combinations = MICO_AVATAR_DEFAULT_SHAPES.length * (MICO_AVATAR_PALETTES.length + 1);
+  // A shape's brand color may also be in the palette: that is one color, not two.
+  const combinations = MICO_AVATAR_DEFAULT_SHAPES.reduce((count, shape) =>
+    count + new Set([shape.originalColor, ...MICO_AVATAR_PALETTES.map(p => p.color)]).size, 0);
   const colors = Array.from({ length: combinations }, () => {
     const { color } = chooseMicoAvatar(existing);
     existing.push({ color });
@@ -24,8 +27,9 @@ it("assigns every branded shape and palette combination before repeating", () =>
   });
   expect(colors[0]).toBe(micoAvatarValue(MICO_AVATAR_DEFAULT_SHAPES[0]!.index, MICO_AVATAR_DEFAULT_SHAPES[0]!.originalColor));
   expect(new Set(colors).size).toBe(combinations);
-  expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[0])).size).toBe(12);
-  expect(new Set(colors.slice(0, 12).map((value) => value.split("::")[1])).size).toBe(12);
+  const shapes = MICO_AVATAR_DEFAULT_SHAPES.length;
+  expect(new Set(colors.slice(0, shapes).map((value) => value.split("::")[0])).size).toBe(shapes);
+  expect(new Set(colors.slice(0, shapes).map((value) => value.split("::")[1])).size).toBe(shapes);
   const next = chooseMicoAvatar(existing);
   expect(next.color).toBe(colors[0]);
   expect(chooseMicoAvatar([...existing, next]).color).toBe(colors[1]);

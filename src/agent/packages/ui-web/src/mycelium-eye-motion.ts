@@ -39,6 +39,10 @@ export function useMyceliumEyes(
   useEffect(() => {
     const element = root.current;
     if (!enabled || !element) return;
+    if (typeof window.matchMedia !== "function") {
+      element.setAttribute("data-mico-eye-motion", "paused");
+      return;
+    }
     const gaze = element.querySelector<SVGGElement>("[data-mycelium-gaze]");
     const lids = element.querySelectorAll<SVGElement>("[data-mycelium-lid]");
     if (!gaze) return;
