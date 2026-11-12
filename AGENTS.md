@@ -184,6 +184,10 @@ These rules apply to the complete repository.
   same `DesktopDownloads` component as the main downloads screen. Publish the
   verified RPM builder's catalog entry as `fedora` in the `macos-all` response.
   Keep it separate from legacy package arrays and retain immutable release files.
+  Installer catalog URLs may include exactly `?sha256=<matching package hash>`
+  for cache qualification; reject other queries and preserve the pinned URL.
+  `build-download-catalog-repair.mjs` builds a contract-only page repair from a
+  hash-verified served baseline, retaining runtime page overlays and old assets.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   pinned published native baseline, source provenance, explicit runtime pairing
