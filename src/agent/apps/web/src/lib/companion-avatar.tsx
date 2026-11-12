@@ -1,12 +1,11 @@
 import { BotAvatar } from "@rakazo/ui-web";
+import { companionImageUrl } from "./companion-image-url.js";
 const cache = new Map<string, Promise<string | undefined>>();
 const assets = new Map<string, Promise<string>>();
 /** SVG images loaded from a data URL cannot load sprite sheets over HTTP. */
 function embeddedImage(source: string): Promise<string> {
   if (source.startsWith("data:image/")) return Promise.resolve(source);
-  const url = new URL(source, document.baseURI);
-  if (url.origin !== location.origin || !/^\/(?:assets|@fs|src|packages)\//.test(url.pathname))
-    return Promise.reject(new Error("Unsupported companion image"));
+  const url = companionImageUrl(source, document.baseURI, import.meta.env.BASE_URL, location.origin);
   const existing = assets.get(url.href); if (existing) return existing;
   const pending = (async () => {
     const response = await fetch(url, { credentials: "omit", redirect: "error", signal: AbortSignal.timeout(10_000) });
