@@ -39,7 +39,7 @@ describe("canonical Desktop preview release boundaries", () => {
     expect(windows).toContain("perMachine: false");
     expect(windows).toContain("deleteAppDataOnUninstall: false");
     expect(windows).toContain("verifyUpdateCodeSignature: true");
-    expect(windows).toContain("publish: []");
+    expect(windows).toContain("https://www.mycellios.com/downloads/desktop/updates/windows");
     expect(read("src/agent/apps/desktop/scripts/package-windows.mjs")).toContain("publish: 'never'");
   });
 

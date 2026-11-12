@@ -18,5 +18,5 @@ it("keeps keyboard focus during activity updates and removes previews when disab
   publish({ kind: "dock", prefs: { dock: { ...prefs.dock, results: false } }, snapshot: { theme: "light", agents: [agent] } });
   expect(document.body.textContent).not.toContain("Private preview");
   button.click(); expect(select).toHaveBeenCalledWith("bot-a");
-  publish({ kind: "dock", prefs, snapshot: { theme: "light", agents: [] } }); expect(document.querySelector("button")).toBeNull();
+  publish({ kind: "dock", prefs, snapshot: { theme: "light", agents: [] } }); expect(document.querySelector(".surface button")).toBeNull(); expect(document.querySelector(".dock-grip")).not.toBeNull();
 });

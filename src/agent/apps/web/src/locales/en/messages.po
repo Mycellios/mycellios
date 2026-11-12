@@ -11564,3 +11564,513 @@ msgstr "Firebase must be configured in the Android app and on the server before 
 
 msgid "Android push is not configured on this server."
 msgstr "Android push is not configured on this server."
+
+msgid "A clear next step"
+msgstr "A clear next step"
+
+msgid "A clear picture of what moved forward."
+msgstr "A clear picture of what moved forward."
+
+msgid "A little planning."
+msgstr "A little planning."
+
+msgid "A lot already done."
+msgstr "A lot already done."
+
+msgid "A new version is available."
+msgstr "A new version is available."
+
+msgid "A short sound when a Mico finishes a reply."
+msgstr "A short sound when a Mico finishes a reply."
+
+msgid "A useful update in your chat. No extra steps."
+msgstr "A useful update in your chat. No extra steps."
+
+msgid "Access"
+msgstr "Access"
+
+msgid "Account access"
+msgstr "Account access"
+
+msgid "Action sounds"
+msgstr "Action sounds"
+
+msgid "Activating…"
+msgstr "Activating…"
+
+msgid "Add to queue"
+msgstr "Add to queue"
+
+msgid "Another update is still running. Keep using Mycellios and finish that installation before retrying."
+msgstr "Another update is still running. Keep using Mycellios and finish that installation before retrying."
+
+msgid "Ask a side question"
+msgstr "Ask a side question"
+
+msgid "Ask about this chat"
+msgstr "Ask about this chat"
+
+msgid "Attach files"
+msgstr "Attach files"
+
+msgid "Balance unavailable"
+msgstr "Balance unavailable"
+
+msgid "Behavior"
+msgstr "Behavior"
+
+msgid "Blue"
+msgstr "Blue"
+
+msgid "Browser and computer"
+msgstr "Browser and computer"
+
+msgid "Bubble"
+msgstr "Bubble"
+
+msgid "Chat background"
+msgstr "Chat background"
+
+msgid "Chat color"
+msgstr "Chat color"
+
+msgid "Choose a model to use this provider"
+msgstr "Choose a model to use this provider"
+
+msgid "Choose how to connect. Mycellios handles the model setup for you."
+msgstr "Choose how to connect. Mycellios handles the model setup for you."
+
+msgid "Choose when. Tell your Mico what to do."
+msgstr "Choose when. Tell your Mico what to do."
+
+msgid "Classic"
+msgstr "Classic"
+
+msgid "Close side question"
+msgstr "Close side question"
+
+msgid "Close workspace"
+msgstr "Close workspace"
+
+msgid "Cloud/Team"
+msgstr "Cloud/Team"
+
+msgid "Code font"
+msgstr "Code font"
+
+msgid "Come back to useful results, right in your chat."
+msgstr "Come back to useful results, right in your chat."
+
+msgid "Compact message actions"
+msgstr "Compact message actions"
+
+msgid "Computer operations remain exclusive. Changing the limit does not stop active work."
+msgstr "Computer operations remain exclusive. Changing the limit does not stop active work."
+
+msgid "Computer use"
+msgstr "Computer use"
+
+msgid "Connected voice services"
+msgstr "Connected voice services"
+
+msgid "Connected. You can start chatting."
+msgstr "Connected. You can start chatting."
+
+msgid "Connection and diagnostics"
+msgstr "Connection and diagnostics"
+
+msgid "Contribute in your browser while this page stays open."
+msgstr "Contribute in your browser while this page stays open."
+
+msgid "Could not check side questions. Try again."
+msgstr "Could not check side questions. Try again."
+
+msgid "Could not load servers."
+msgstr "Could not load servers."
+
+msgid "Could not load this account's models. Fast mode is unavailable until the catalog can be checked."
+msgstr "Could not load this account's models. Fast mode is unavailable until the catalog can be checked."
+
+msgid "Could not restart. Try again."
+msgstr "Could not restart. Try again."
+
+msgid "Could not start a new chat. Try again."
+msgstr "Could not start a new chat. Try again."
+
+msgid "Could not switch to this PC"
+msgstr "Could not switch to this PC"
+
+msgid "Create a Mico"
+msgstr "Create a Mico"
+
+msgid "Defaults"
+msgstr "Defaults"
+
+msgid "Disconnected"
+msgstr "Disconnected"
+
+msgid "Does"
+msgstr "Does"
+
+msgid "Download new versions in the background."
+msgstr "Download new versions in the background."
+
+msgid "Download update"
+msgstr "Download update"
+
+msgid "Each theme remembers its own background. Text stays readable."
+msgstr "Each theme remembers its own background. Text stays readable."
+
+msgid "Earned"
+msgstr "Earned"
+
+msgid "Effort"
+msgstr "Effort"
+
+msgid "Every morning"
+msgstr "Every morning"
+
+msgid "Everything in one place"
+msgstr "Everything in one place"
+
+msgid "Expand panel"
+msgstr "Expand panel"
+
+msgid "Export agent"
+msgstr "Export agent"
+
+msgid "Fast"
+msgstr "Fast"
+
+msgid "Find a peer ID"
+msgstr "Find a peer ID"
+
+msgid "Find the result right in your chat."
+msgstr "Find the result right in your chat."
+
+msgid "Finish active tasks, save drafts and end calls before changing servers."
+msgstr "Finish active tasks, save drafts and end calls before changing servers."
+
+msgid "Gather what matters. Turn it into a clear plan."
+msgstr "Gather what matters. Turn it into a clear plan."
+
+msgid "Give your Micos a time and a task."
+msgstr "Give your Micos a time and a task."
+
+msgid "Gold"
+msgstr "Gold"
+
+msgid "Green"
+msgstr "Green"
+
+msgid "Grey"
+msgstr "Grey"
+
+msgid "How it works"
+msgstr "How it works"
+
+msgid "Illustrative example · no tasks are running"
+msgstr "Illustrative example · no tasks are running"
+
+msgid "Illustrative schedule · no tasks are running"
+msgstr "Illustrative schedule · no tasks are running"
+
+msgid "Inbox, in order"
+msgstr "Inbox, in order"
+
+msgid "Instructions sent to the current task."
+msgstr "Instructions sent to the current task."
+
+msgid "Interface font"
+msgstr "Interface font"
+
+msgid "Knows"
+msgstr "Knows"
+
+msgid "Let your Mico take it from here."
+msgstr "Let your Mico take it from here."
+
+msgid "Light or dark colors. System follows your device."
+msgstr "Light or dark colors. System follows your device."
+
+msgid "Logo color"
+msgstr "Logo color"
+
+msgid "Manage approvals"
+msgstr "Manage approvals"
+
+msgid "Mechanical"
+msgstr "Mechanical"
+
+msgid "Memories"
+msgstr "Memories"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Menus, buttons and messages use this language."
+msgstr "Menus, buttons and messages use this language."
+
+msgid "Message saved in the queue."
+msgstr "Message saved in the queue."
+
+msgid "Model · automatic"
+msgstr "Model · automatic"
+
+msgid "More tools"
+msgstr "More tools"
+
+msgid "Morning briefing"
+msgstr "Morning briefing"
+
+msgid "Mycellios Desktop"
+msgstr "Mycellios Desktop"
+
+msgid "New chat"
+msgstr "New chat"
+
+msgid "New conversation"
+msgstr "New conversation"
+
+msgid "None"
+msgstr "None"
+
+msgid "Notify me when there are results or a problem"
+msgstr "Notify me when there are results or a problem"
+
+msgid "Open another panel"
+msgstr "Open another panel"
+
+msgid "Pause preview"
+msgstr "Pause preview"
+
+msgid "Pausing…"
+msgstr "Pausing…"
+
+msgid "Peach"
+msgstr "Peach"
+
+msgid "Personalize the Mycellios logo on this device."
+msgstr "Personalize the Mycellios logo on this device."
+
+msgid "Pin a seller"
+msgstr "Pin a seller"
+
+msgid "Pink"
+msgstr "Pink"
+
+msgid "Play preview"
+msgstr "Play preview"
+
+msgid "Preparing the summary"
+msgstr "Preparing the summary"
+
+msgid "Press"
+msgstr "Press"
+
+msgid "Preview sound"
+msgstr "Preview sound"
+
+msgid "Priorities for today"
+msgstr "Priorities for today"
+
+msgid "Profile"
+msgstr "Profile"
+
+msgid "Purple"
+msgstr "Purple"
+
+msgid "Queued messages"
+msgstr "Queued messages"
+
+msgid "Ready when you are"
+msgstr "Ready when you are"
+
+msgid "Repeat automatically"
+msgstr "Repeat automatically"
+
+msgid "Repeat this task"
+msgstr "Repeat this task"
+
+msgid "Restart when Micos are idle, after saving drafts and finishing calls."
+msgstr "Restart when Micos are idle, after saving drafts and finishing calls."
+
+msgid "Restart with the downloaded version when your Micos and this app are idle."
+msgstr "Restart with the downloaded version when your Micos and this app are idle."
+
+msgid "Restore panel size"
+msgstr "Restore panel size"
+
+msgid "Results will appear here after the first run."
+msgstr "Results will appear here after the first run."
+
+msgid "Results will appear in this Mico's chat. Nothing runs until you save."
+msgstr "Results will appear in this Mico's chat. Nothing runs until you save."
+
+msgid "Review everything before activating it."
+msgstr "Review everything before activating it."
+
+msgid "Review instructions"
+msgstr "Review instructions"
+
+msgid "Review the day's priorities and prepare a short summary."
+msgstr "Review the day's priorities and prepare a short summary."
+
+msgid "Rose"
+msgstr "Rose"
+
+msgid "Routines for this Mico"
+msgstr "Routines for this Mico"
+
+msgid "Save changes or finish the call to restart."
+msgstr "Save changes or finish the call to restart."
+
+msgid "Saved messages run in order after the current task."
+msgstr "Saved messages run in order after the current task."
+
+msgid "Select this provider from the model menu in your chat."
+msgstr "Select this provider from the model menu in your chat."
+
+msgid "Send message to"
+msgstr "Send message to"
+
+msgid "Send side question"
+msgstr "Send side question"
+
+msgid "Server view"
+msgstr "Server view"
+
+msgid "Set it up once."
+msgstr "Set it up once."
+
+msgid "Short sounds for your own actions, such as a click."
+msgstr "Short sounds for your own actions, such as a click."
+
+msgid "Show agent steps"
+msgstr "Show agent steps"
+
+msgid "Shows React, Reply and More beside a message, with the time between messages. Turn off to show actions and time below every message."
+msgstr "Shows React, Reply and More beside a message, with the time between messages. Turn off to show actions and time below every message."
+
+msgid "Side questions"
+msgstr "Side questions"
+
+msgid "Sidebar"
+msgstr "Sidebar"
+
+msgid "Sounds"
+msgstr "Sounds"
+
+msgid "Start new chat"
+msgstr "Start new chat"
+
+msgid "Start voice conversation"
+msgstr "Start voice conversation"
+
+msgid "Task completion sound"
+msgstr "Task completion sound"
+
+msgid "The Mico forgets this chat. Messages remain visible above a divider. Instructions, model, tools, memories, workspace and browser stay the same."
+msgstr "The Mico forgets this chat. Messages remain visible above a divider. Instructions, model, tools, memories, workspace and browser stay the same."
+
+msgid "The font used for menus and messages."
+msgstr "The font used for menus and messages."
+
+msgid "The font used in code blocks and the terminal."
+msgstr "The font used in code blocks and the terminal."
+
+msgid "The important messages. None of the noise."
+msgstr "The important messages. None of the noise."
+
+msgid "The result"
+msgstr "The result"
+
+msgid "The size of text and controls in Mycellios."
+msgstr "The size of text and controls in Mycellios."
+
+msgid "The update is ready to install."
+msgstr "The update is ready to install."
+
+msgid "Theme"
+msgstr "Theme"
+
+msgid "These instructions will be saved when you create the Mico. You can edit them later."
+msgstr "These instructions will be saved when you create the Mico. You can edit them later."
+
+msgid "Thinking…"
+msgstr "Thinking…"
+
+msgid "This PC"
+msgstr "This PC"
+
+msgid "This development build updates from the project. Installed apps use published releases."
+msgstr "This development build updates from the project. Installed apps use published releases."
+
+msgid "Tints your message bubbles on this device."
+msgstr "Tints your message bubbles on this device."
+
+msgid "Trial balance. No monetary value."
+msgstr "Trial balance. No monetary value."
+
+msgid "Update current task"
+msgstr "Update current task"
+
+msgid "Use an API key"
+msgstr "Use an API key"
+
+msgid "Use my account"
+msgstr "Use my account"
+
+msgid "Use peerId@model as the exact model ID. A pinned seller keeps routing and prompt caching stable."
+msgstr "Use peerId@model as the exact model ID. A pinned seller keeps routing and prompt caching stable."
+
+msgid "Use this PC"
+msgstr "Use this PC"
+
+msgid "Use this account"
+msgstr "Use this account"
+
+msgid "Uses priority processing and may use more quota."
+msgstr "Uses priority processing and may use more quota."
+
+msgid "View usage"
+msgstr "View usage"
+
+msgid "Waiting for Micos to finish. You can keep working."
+msgstr "Waiting for Micos to finish. You can keep working."
+
+msgid "Waiting for the update download to finish."
+msgstr "Waiting for the update download to finish."
+
+msgid "Warm"
+msgstr "Warm"
+
+msgid "Weekdays · 09:00"
+msgstr "Weekdays · 09:00"
+
+msgid "Weekly overview"
+msgstr "Weekly overview"
+
+msgid "What this agent does"
+msgstr "What this agent does"
+
+msgid "White"
+msgstr "White"
+
+msgid "You choose the schedule. Your Mico takes care of the rest."
+msgstr "You choose the schedule. Your Mico takes care of the rest."
+
+msgid "You receive tested releases from the stable channel."
+msgstr "You receive tested releases from the stable channel."
+
+msgid "Your Mico"
+msgstr "Your Mico"
+
+msgid "Your briefing is ready"
+msgstr "Your briefing is ready"
+
+msgid "Your priorities, ready before the day begins."
+msgstr "Your priorities, ready before the day begins."
+
+msgid "Your settings"
+msgstr "Your settings"
