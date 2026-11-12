@@ -8,7 +8,6 @@ import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { CLIENT_BUILD } from "../../lib/client-build";
 import { clientUpdates } from "../../lib/client-update";
 import { desktopBridge } from "../../lib/desktop";
-import { playUpdateMycelium } from "../../lib/update-mycelium";
 
 export function UpdatesPanel({ onWhatsNew, onClose, onBusyChange }: {
   onWhatsNew?: () => void; onClose: () => void; onBusyChange?: (busy: boolean) => void;
@@ -101,9 +100,7 @@ export function UpdatesPanel({ onWhatsNew, onClose, onBusyChange }: {
           {available && !webDevelopment && <SettingsRow label={t`Update available`} description={t`Your work is preserved before the web app reloads.`} control={<Button variant="outline" size="sm" onClick={onClose}>{t`Return to app`}</Button>} />}
         </> : <div className="px-4 py-3"><p role="status" className="text-sm text-muted-foreground">{t`Reading desktop update status…`}</p><DesktopUpdateSection /></div>}
       </SettingsGroup>
-      {import.meta.env.DEV && <Button variant="ghost" size="sm" className="mt-3" onClick={event => void playUpdateMycelium(event.currentTarget)}>
-        {t`Preview update animation`}
-      </Button>}
+
     </section>
     {error && <div role="alert" className="space-y-2 text-sm text-destructive"><p>{error}</p>{bridge?.preferences && !preferences && <Button variant="outline" size="sm" onClick={() => setAttempt(value => value + 1)}>{t`Retry`}</Button>}</div>}
     <div className="flex flex-wrap gap-x-5 gap-y-2 px-1 text-xs text-muted-foreground">
