@@ -1,5 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
-import { CREDIT_MICROUNITS, productBrand } from "@rakazo/contracts";
+import { CREDIT_MICROUNITS } from "@rakazo/contracts";
 import type { MycelliosAccount } from "@rakazo/contracts";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -24,7 +24,7 @@ function accessFailure(error: unknown): boolean {
     failure.status === 401 || failure.status === 403;
 }
 
-export function MycelliosCredits({ ownerId }: { ownerId: string }) {
+export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onConnect?: () => void }) {
   const { t, i18n } = useLingui();
   const refreshBalance = useRef<() => void>(() => undefined);
   const [state, setState] = useState<BalanceState>(() => initialState(ownerId));
@@ -52,6 +52,7 @@ export function MycelliosCredits({ ownerId }: { ownerId: string }) {
     let contributing = document.body.dataset.mycelliosContributing === "true";
     let timer: number | undefined;
     let deadline: number | undefined;
+    let verifiedRefresh: number | undefined;
     let request: AbortController | undefined;
     const schedule = (delay: number) => {
       window.clearTimeout(timer);
@@ -99,6 +100,12 @@ export function MycelliosCredits({ ownerId }: { ownerId: string }) {
       void refresh();
     };
     const onActivity = () => { contributing = document.body.dataset.mycelliosContributing === "true"; schedule(contributing ? 0 : 60_000); };
+    const onVerified = () => {
+      // Bound bursts to one read per second; late settlement is caught by polling.
+      if (verifiedRefresh !== undefined) return;
+      verifiedRefresh = window.setTimeout(() => { verifiedRefresh = undefined; void refresh(); }, 1000);
+    };
+    window.addEventListener("mycellios:contribution-verified", onVerified);
     window.addEventListener("mycellios:contribution-activity", onActivity);
     window.addEventListener("focus", onFocus);
     window.addEventListener("mycellios:contribution-changed", onFocus);
@@ -108,6 +115,8 @@ export function MycelliosCredits({ ownerId }: { ownerId: string }) {
       request?.abort();
       window.clearTimeout(timer);
       window.clearTimeout(deadline);
+      window.clearTimeout(verifiedRefresh);
+      window.removeEventListener("mycellios:contribution-verified", onVerified);
       window.removeEventListener("mycellios:contribution-activity", onActivity);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("mycellios:contribution-changed", onFocus);
@@ -124,13 +133,12 @@ export function MycelliosCredits({ ownerId }: { ownerId: string }) {
       aria-live="polite"
       aria-busy={loading}
       data-balance-status={loading ? "loading" : unavailable ? (account ? "stale" : "unavailable") : account ? "ready" : "unavailable"}
-      title={accessDenied ? t`Sign in again to see your credits.` : unavailable ? (account ? t`Last verified balance. Retrying automatically.` : t`Balance temporarily unavailable. Retrying automatically.`) : (!loading && !account) ? t`Balance unavailable` : t`Credits are your internal Mycellios balance. Adding 10 USD gives you 10 credits. Spore is a separate token.`}
+      title={accessDenied ? t`Sign in again to see your credits.` : unavailable ? (account ? t`Last verified balance. Retrying automatically.` : t`Balance temporarily unavailable. Retrying automatically.`) : (!loading && !account) ? t`Credits are not enabled in this installation.` : t`Credits are your internal Mycellios balance. Adding 10 USD gives you 10 credits. Spore is a separate token.`}
     >
-      <a className="flex min-h-8 min-w-0 flex-1 items-center justify-between gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-ring hover:text-foreground"
-        href={new URL("/dashboard", productBrand.apiBaseUrl).href} target="_blank" rel="noopener noreferrer" aria-label={t`View credits`}>
+      <div className="flex min-h-7 min-w-0 flex-1 items-center justify-between gap-3">
         <span>{account?.environment === "sandbox" ? t`Test credits` : t`Credits`}</span>
-        <span className={`min-w-0 truncate tabular-nums ${balance == null ? "text-muted-foreground" : "font-medium text-foreground"}`}>{statusLabel}</span>
-      </a>
+        {!loading && !unavailable && !account ? <button type="button" className="text-xs text-foreground hover:underline" onClick={onConnect} disabled={!onConnect} title={t`Credits are not enabled in this installation.`}>{t`Not enabled`}</button> : <span className={`min-w-0 truncate tabular-nums ${balance == null ? "text-muted-foreground" : "font-medium text-foreground"}`}>{statusLabel}</span>}
+      </div>
       {gain?.ownerId === ownerId && !unavailable && <span role="status" className="rk-credit-gain">+{new Intl.NumberFormat(i18n.locale,{maximumFractionDigits:6}).format(gain.amount/CREDIT_MICROUNITS)} {t`Earned`}</span>}
       {hasPromotion ? <span className="text-[10px] text-muted-foreground" title={t`Promotional grant, separate from earned credits`}>{t`Promo`}</span> : null}
       {unavailable && !accessDenied ? <button type="button" aria-label={t`Retry`} title={t`Retry`}

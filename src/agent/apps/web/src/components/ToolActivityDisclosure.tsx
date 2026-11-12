@@ -95,7 +95,8 @@ export function ToolActivityDisclosure({
           strokeWidth={1.8}
           className="transition-transform duration-150 group-data-panel-open:rotate-90 motion-reduce:transition-none"
         />
-        <span>{live ? <Trans>Activity</Trans> : <Trans>Done</Trans>}</span>
+        <span>{live ? <Trans>Activity</Trans> : <Plural value={toolCount} one="# step" other="# steps" />}</span>
+        {!live && duration ? <span className="tabular-nums">· {duration}</span> : null}
       </CollapsibleTrigger>
       <CollapsibleContent hiddenUntilFound>
         <div className="ms-[7px] mt-0.5 border-s border-border ps-3">

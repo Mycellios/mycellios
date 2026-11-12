@@ -1,3 +1,4 @@
+import { rememberNotificationSettings, forgetNotificationSettings } from "./account-notifications";
 import { useEffect, useRef, useState } from "react";
 import { notificationPreferences, subscribeNotifications } from "./notification-preferences";
 import { rpc } from "./rpc";
@@ -72,7 +73,7 @@ function bindAccount(worker: ServiceWorker, accountId: string | null) {
       if (event.data === "bound") complete();
     };
     try {
-      worker.postMessage({ type: "mycellios:push-binding", accountId }, [channel.port2]);
+      worker.postMessage({ type: "mycellios:push-binding", accountId, ...(accountId ? { preferences: notificationPreferences(accountId) } : {}) }, [channel.port2]);
     } catch (error) {
       complete(error instanceof Error ? error : new Error("Could not bind notifications."));
     }
@@ -233,12 +234,15 @@ export function useWebPushPresence(userId?: string) {
       try {
         await clearPreviousOwner;
         if (disposed || current !== revision) return;
-        const state = await rpc.notifications.webStatus({ clientId });
-        if (disposed || current !== revision) return;
-        configured = state.configured;
-        setPublicKey(state.publicKey);
         const supported = pushSupported();
         const worker = supported ? await navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL, location.href)) : undefined;
+        if (notificationOwner() === userId && worker?.active) await bindAccount(worker.active, userId);
+        if (disposed || current !== revision) return;
+        const state = await rpc.notifications.webStatus({ clientId });
+        if (disposed || current !== revision) return;
+        rememberNotificationSettings(userId, state.settings);
+        configured = state.configured;
+        setPublicKey(state.publicKey);
         const subscription = await worker?.pushManager.getSubscription();
         if (disposed || current !== revision) return;
         const savedKey = subscription?.options.applicationServerKey;
@@ -266,6 +270,7 @@ export function useWebPushPresence(userId?: string) {
     const unsubscribe = subscribeNotifications(userId, refresh);
     return () => {
       disposed = true;
+      forgetNotificationSettings(userId);
       serverDelivery = false;
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);

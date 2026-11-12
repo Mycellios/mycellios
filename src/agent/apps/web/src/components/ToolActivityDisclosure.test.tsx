@@ -4,6 +4,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { setToolActivityPreference } from "../lib/tool-activity-preference";
 
 // The macro compiles away in the app build; tests run the source, so expand the
 // plural by hand to assert the singular vs plural English forms.
@@ -68,22 +69,37 @@ function mountCard() {
 }
 
 describe("ToolActivityDisclosure", () => {
+  it("reacts to the saved default while preserving manual choices as steps arrive", () => {
+    const card=mountCard();
+    try {
+      flushSync(()=>setToolActivityPreference("on"));card.render(true,2);
+      expect(card.details()?.getAttribute("aria-expanded")).toBe("false");
+      flushSync(()=>setToolActivityPreference("expanded"));
+      expect(card.details()?.getAttribute("aria-expanded")).toBe("true");
+      flushSync(()=>card.summary()?.click());card.render(true,3);
+      expect(card.details()?.getAttribute("aria-expanded")).toBe("false");
+      card.render(false,3);
+      expect(card.details()?.getAttribute("aria-expanded")).toBe("true");
+      flushSync(()=>setToolActivityPreference("on"));
+      expect(card.details()?.getAttribute("aria-expanded")).toBe("false");
+    } finally {card.unmount();setToolActivityPreference("on");}
+  });
   it("labels a finished card with the tool count and duration", () => {
     const html = markup({ live: false, stepCount: 2, durationMs: 12000 });
-    expect(visibleText(html)).toContain("Done");
+    expect(visibleText(html)).toContain("2 steps");
   });
 
   it("uses the singular for one tool", () => {
     expect(visibleText(markup({ live: false, stepCount: 1, durationMs: 850 }))).toContain(
-      "Done",
+      "1 step",
     );
     expect(visibleText(markup({ live: true, stepCount: 1 }))).toContain("Activity");
   });
 
   it("omits the duration when it is not usable", () => {
     const html = markup({ live: false, stepCount: 3 });
-    expect(visibleText(html)).toContain("Done");
-    expect(visibleText(html.match(/<button[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "")).toBe("Done");
+    expect(visibleText(html)).toContain("3 steps");
+    expect(visibleText(html.match(/<button[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "")).toBe("3 steps");
   });
 
   it("shows the live label while working", () => {
@@ -111,7 +127,7 @@ describe("ToolActivityDisclosure", () => {
 
     card.render(false);
     expect(card.details()?.getAttribute("aria-expanded")).toBe("false");
-    expect(card.summary()?.textContent).toContain("Done");
+    expect(card.summary()?.textContent).toContain("2 steps");
     card.unmount();
   });
 
@@ -188,7 +204,7 @@ describe("StandaloneToolActivity", () => {
       <StandaloneToolActivity live={false} steps={stepsOf(2)} stepCount={2} durationMs={4000} />,
     );
     expect(html).toContain('data-testid="tool-activity-line"');
-    expect(visibleText(html)).toContain("Done 2 tools \u00b7 4s");
+    expect(visibleText(html)).toContain("2 steps · 4s");
     expect(html).not.toContain("bg-muted");
     expect(html).not.toContain("rounded-[20px]");
   });
@@ -230,7 +246,7 @@ describe("ToolOnlyNarration", () => {
       />,
     );
     expect(html.match(/data-testid="tool-activity-line"/g)).toHaveLength(2);
-    expect(visibleText(html)).toContain("Done 3 tools \u00b7 12s");
+    expect(visibleText(html)).toContain("3 steps · 12s");
     expect(html).not.toMatch(OPEN_TRIGGER);
   });
 });

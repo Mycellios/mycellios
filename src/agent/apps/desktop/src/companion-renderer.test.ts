@@ -59,3 +59,31 @@ it("renders question text as text, never HTML", () => {
   receive(state(true, [{ ...prompt, questions: [{ ...prompt.questions[0]!, question: '<img src=x onerror="alert(1)">' }] }]));
   expect(document.querySelector("img[src=x]")).toBeNull(); expect(document.body.textContent).toContain("<img");
 });
+
+it("uses Mycellios branding when idle, preserves the Mico during work and has no fake empty-roster action", () => {
+  receive(state(false, []));
+  expect(document.querySelector(".island-pill")?.getAttribute("aria-label")).toBe("Mycellios · 👋");
+  expect(document.querySelector(".island-pill img")?.getAttribute("src")).toBe("assets/icon.png");
+  const busy = state(false, []); Object.assign(busy.snapshot.agents[0]!, { working: true, avatar: "data:image/png;base64,AAA=" }); receive(busy);
+  expect(document.querySelector(".island-working")).not.toBeNull();
+  expect(document.querySelector(".island-pill img")?.getAttribute("src")).toBe("data:image/png;base64,AAA=");
+  const empty = state(false, []); empty.snapshot.agents = []; receive(empty);
+  expect(document.querySelector<HTMLButtonElement>(".island-pill")?.disabled).toBe(true);
+});
+
+it("provides a keyboard dock handle without exposing it in the island", () => {
+  bridge.dragDock = vi.fn(); receive({ ...state(), kind: "dock" });
+  const grip = document.querySelector<HTMLButtonElement>(".dock-grip")!;
+  grip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  expect(bridge.dragDock).toHaveBeenCalledWith("next");
+  grip.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+  expect(bridge.dragDock).toHaveBeenLastCalledWith("previous");
+  receive(state()); expect(document.querySelector(".dock-grip")).toBeNull();
+});
+
+it("retains the same drag handle through state updates", () => {
+  receive({ ...state(), kind: "dock" }); const grip = document.querySelector(".dock-grip");
+  const append = vi.spyOn(document.getElementById("root")!, "append");
+  receive({ ...state(), kind: "dock" }); expect(document.querySelector(".dock-grip")).toBe(grip);
+  expect(append).not.toHaveBeenCalled();
+});

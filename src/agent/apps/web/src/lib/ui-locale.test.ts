@@ -3,6 +3,8 @@ import {
   normalizeUiLocale,
   persistUiLocale,
   resolveUiLocale,
+  readUiLocalePreference,
+  resolveSystemUiLocale,
   UI_LOCALE_STORAGE_KEY,
 } from "./ui-locale";
 
@@ -74,11 +76,11 @@ describe("normalizeUiLocale", () => {
 describe("resolveUiLocale", () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
-  it("starts in English regardless of browser language or build defaults", () => {
+  it("detects the device language on first visit regardless of build defaults", () => {
     vi.stubEnv("VITE_DEFAULT_UI_LOCALE", "de");
     for (const language of ["es-ES", "fr-FR", "he-IL", "ja-JP"]) {
       vi.stubGlobal("navigator", { language, languages: [language] });
-      expect(resolveUiLocale({ stored: null })).toBe("en");
+      expect(resolveUiLocale({ stored: null })).toBe(normalizeUiLocale(language));
     }
   });
 
@@ -94,13 +96,28 @@ describe("resolveUiLocale", () => {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => { values.set(key, value); },
     };
-    expect(resolveUiLocale({ storage })).toBe("en");
+    expect(resolveUiLocale({ storage, languages: ["en-US"] })).toBe("en");
     persistUiLocale("es", storage);
     expect(resolveUiLocale({ storage })).toBe("es");
   });
 
-  it("starts in English when reading preferences is blocked", () => {
-    expect(resolveUiLocale({ storage: { getItem: () => { throw new Error("blocked"); } } })).toBe("en");
+  it("detects the device language when reading preferences is blocked", () => {
+    expect(resolveUiLocale({ storage: { getItem: () => { throw new Error("blocked"); } }, languages:["fr-FR"] })).toBe("fr");
+  });
+
+  it("keeps automatic mode distinct from the resolved language", () => {
+    expect(readUiLocalePreference({stored:null})).toBe("system");
+    expect(readUiLocalePreference({stored:"system"})).toBe("system");
+    expect(resolveUiLocale({stored:"system",languages:["es-MX"]})).toBe("es");
+    expect(resolveUiLocale({stored:"de",languages:["es-MX"]})).toBe("de");
+  });
+
+  it("uses the first supported device language without folding Traditional Chinese", () => {
+    expect(resolveSystemUiLocale(["ca-ES","fr-CA","es-ES"])).toBe("fr");
+    expect(resolveSystemUiLocale(["zh-Hant-TW","ja-JP"])).toBe("ja");
+    expect(resolveSystemUiLocale(["en-GB","es-ES"])).toBe("en");
+    expect(resolveSystemUiLocale([])).toBe("en");
+    expect(resolveSystemUiLocale(["ca-ES"])).toBe("en");
   });
 });
 

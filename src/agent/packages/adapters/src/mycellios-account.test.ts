@@ -3,6 +3,7 @@ import {
   configureMycelliosFunding,
   mycelliosAccountUrl,
   readMycelliosAccount,
+  MycelliosAccountAccessError,
 } from "./mycellios-account.js";
 
 const connection = { baseUrl: "https://www.mycellios.com/v1", apiKey: "test-account-key" };
@@ -15,6 +16,15 @@ const account = {
 };
 
 describe("Mycellios account integration", () => {
+  it.each([401, 403] as const)("preserves sanitized authority access status %s", async status => {
+    const failure = await readMycelliosAccount(connection, {
+      fetch: vi.fn(async () => new Response("private diagnostics test-account-key", { status })),
+    }).catch(error => error);
+    expect(failure).toBeInstanceOf(MycelliosAccountAccessError);
+    expect(failure.status).toBe(status);
+    expect(failure.message).not.toContain("test-account-key");
+    expect(JSON.stringify(failure)).not.toContain("private diagnostics");
+  });
   it("reads canonical contribution credits without a ledger write", async () => {
     const transport = vi.fn(async () => Response.json(account));
     await expect(readMycelliosAccount(connection, { fetch: transport })).resolves.toEqual(account);

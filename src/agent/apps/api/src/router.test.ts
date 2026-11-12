@@ -115,6 +115,18 @@ describe("account preferences", () => {
     expect(capture).toHaveBeenCalledTimes(1);
   });
 
+  it("analytics separates installation measurement from explicit authenticated account linking",async()=>{
+    const {deps,actor}=preferencesDeps("robot");const capture=vi.fn();deps.analytics={capture,flush:async()=>undefined};
+    const client=createRouterClient(createRouter(deps),{context:{actor} as never});
+    const installationId="f00f0000-1234-4000-8000-123456789abc";
+    await client.analytics.screen({screen:"chat",surface:"desktop",installationId,linkAccount:false});
+    expect(capture).toHaveBeenLastCalledWith(`installation:${installationId}`,{name:"screen_viewed",screen:"chat",surface:"desktop"});
+    await client.analytics.screen({screen:"chat",surface:"desktop",installationId,linkAccount:true});
+    expect(capture).toHaveBeenLastCalledWith(actor.userId,{name:"screen_viewed",screen:"chat",surface:"desktop"});
+    await expect(client.analytics.screen({screen:"chat",surface:"web",installationId:"invalid"})).rejects.toMatchObject({code:"BAD_REQUEST"});
+    await expect(client.analytics.screen({screen:"chat",surface:"web",installationId,linkAccount:true,userId:"another-user"} as never)).rejects.toMatchObject({code:"BAD_REQUEST"});
+  });
+
   it("reports model credential store outages as service unavailable", async () => {
     const { deps, actor } = preferencesDeps("robot");
     Object.assign(deps.prisma, {

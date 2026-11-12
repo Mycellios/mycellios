@@ -4,6 +4,7 @@ import { Label, OptionSelect, Switch } from "@rakazo/ui-web";
 import { useEffect, useId, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";
+import { useQueryUserId } from "../../lib/query";
 import { CHAT_COLORS, CODE_FONTS, INTERFACE_FONTS, setGeneralPreferences, useGeneralPreferences, type GeneralPreferences } from "../../lib/general-preferences";
 
 function ColorChoice({ label, value, onChange, swatches = false }: { label: string; value: string; onChange: (color: string) => void; swatches?: boolean }) {
@@ -79,21 +80,63 @@ export function ConversationExtras() {
 
 export function DevicePrivacySettings() {
   const { t } = useLingui(); const id = useId(); const value = useGeneralPreferences(); const [error, setError] = useState("");
+  const accountId=useQueryUserId();
   return <SettingsGroup title={t`Privacy`}>
     <SettingsRow label={<Label htmlFor={id}>{t`Help improve Mycellios`}</Label>}
       description={t`Share which app screens you use from this device. This optional report contains no messages, prompts or credentials.`}
       control={<Switch id={id} checked={value.productAnalytics} onCheckedChange={productAnalytics => {
         try { setGeneralPreferences({ productAnalytics }); setError(""); } catch { setError(t`Could not save this preference.`); }
       }} />} />
+    <SettingsRow label={<Label htmlFor={`${id}-account`}>{t`Link analytics to my account`}</Label>}
+      description={t`When enabled, optional screen measurements use a pseudonymous account identifier across devices. Otherwise they use a random installation identifier. No chats, files, prompts or email addresses are sent.`}
+      control={<Switch id={`${id}-account`} data-testid="analytics-account-toggle" disabled={!value.productAnalytics || !accountId}
+        checked={Boolean(value.productAnalytics && accountId && value.analyticsAccountId===accountId)} onCheckedChange={linked=>{
+          if(!accountId)return;
+          try {setGeneralPreferences({analyticsAccountId:linked?accountId:""});setError("");}catch{setError(t`Could not save this preference.`);}
+        }} />} />
     {error && <p role="alert" className="px-4 py-2 text-sm text-destructive">{error}</p>}
   </SettingsGroup>;
+}
+
+export function ExternalLinksPreference({ onBusyChange }: { onBusyChange?: (busy: boolean) => void }) {
+  const { t } = useLingui();
+  const bridge=desktopBridge()?.settings;
+  const [value,setValue]=useState<DesktopBehaviorSettings>();
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  useEffect(()=>{onBusyChange?.(busy);},[busy,onBusyChange]);
+  useEffect(()=>()=>onBusyChange?.(false),[onBusyChange]);
+  useEffect(()=>{
+    let active=true;
+    if(bridge)void bridge.state().then(next=>{if(active)setValue(next);}).catch(()=>{if(active)setError(t`Could not load application settings.`);});
+    return ()=>{active=false;};
+  },[bridge]);
+  async function choose(target: string) {
+    if(!bridge||busy||(target!=="app"&&target!=="system"))return;
+    setBusy(true);setError("");
+    try {setValue(await bridge.update({externalLinkTarget:target}));}
+    catch {setError(t`Could not save this preference.`);}
+    finally {setBusy(false);}
+  }
+  return <>
+    <SettingsRow label={t`Open external links in`}
+      description={bridge ? t`Where links from chats and settings open.` : t`The built-in browser is available in Mycellios Desktop.`}
+      control={<OptionSelect data-testid="external-link-target" aria-label={t`Open external links in`}
+        value={value?.externalLinkTarget ?? "system"} disabled={!bridge || !value || busy} className="w-48 max-w-full"
+        options={[{value:"system",label:t`Default browser`},...(bridge ? [{value:"app",label:t`Mycellios window`}] : [])]}
+        onValueChange={target=>void choose(target)} />} />
+    {error ? <p role="alert" className="px-4 py-2 text-sm text-destructive">{error}</p> : null}
+  </>;
 }
 
 export function AppBehaviorPanel({ onBusyChange }: { onBusyChange?: (busy: boolean) => void }) {
   const { t } = useLingui(); const id = useId();
   const bridge = desktopBridge()?.settings;
   const general = useGeneralPreferences();
-  const [value, setValue] = useState<DesktopBehaviorSettings>();
+  const [nativeValue, setValue] = useState<DesktopBehaviorSettings>();
+  const value = nativeValue ?? (!bridge ? {
+    launchAtLogin:false,keepRunningInBackground:false,keepRemoteSessions:false,keepAwake:false,keepAwakeOnBattery:false,externalLinkTarget:"system",
+  } : undefined);
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   useEffect(() => { let active = true;
     if (bridge) void bridge.state().then(v => { if (active) setValue(v); }).catch(() => { if (active) setError(t`Could not load application settings.`); });
@@ -107,25 +150,25 @@ export function AppBehaviorPanel({ onBusyChange }: { onBusyChange?: (busy: boole
     try { setValue(await bridge.update(patch)); } catch { setError(t`Could not save this preference.`); } finally { setBusy(false); }
   }
   return <SettingsGroup title={t`Application behavior`}>
+    {!bridge ? <p className="px-4 py-3 text-sm text-muted-foreground">{t`Computer controls require Mycellios Desktop. Workspace restoration also works on the web.`}</p> : null}
     {bridge && !value && !error && <p role="status" className="p-4 text-sm text-muted-foreground">{t`Loading…`}</p>}
     {value && <>
       {value.launchAtLogin !== null && <SettingsRow label={<Label htmlFor={`${id}-login`}>{t`Open Mycellios at login`}</Label>}
         description={t`Open the application when you sign in on this computer.`}
-        control={<Switch id={`${id}-login`} disabled={busy} checked={value.launchAtLogin} onCheckedChange={launchAtLogin => void save({ launchAtLogin })} />} />}
+        control={<Switch id={`${id}-login`} disabled={busy || !bridge} checked={value.launchAtLogin} onCheckedChange={launchAtLogin => void save({ launchAtLogin })} />} />}
+      {value.keepRemoteSessions !== undefined ? <SettingsRow label={<Label htmlFor={`${id}-connections`}>{t`Quick server reconnection`}</Label>}
+        description={t`Keep authorized server connections alive when the last window closes. Reopening reuses the running service; Quit disconnects it.`}
+        control={<Switch id={`${id}-connections`} disabled={busy || !bridge} checked={value.keepRemoteSessions} onCheckedChange={keepRemoteSessions=>void save({keepRemoteSessions})} />} /> : null}
       <SettingsRow label={<Label htmlFor={`${id}-background`}>{t`Keep Mycellios running in the background`}</Label>}
         description={t`Keep tasks active when you close the window. Use Quit to exit completely.`}
-        control={<Switch id={`${id}-background`} disabled={busy} checked={value.keepRunningInBackground} onCheckedChange={keepRunningInBackground => void save({ keepRunningInBackground })} />} />
+        control={<Switch id={`${id}-background`} disabled={busy || !bridge} checked={value.keepRunningInBackground} onCheckedChange={keepRunningInBackground => void save({ keepRunningInBackground })} />} />
       {value.keepAwake !== null && <>
         <SettingsRow label={<Label htmlFor={`${id}-awake`}>{t`Keep the computer awake`}</Label>}
           description={t`Run routines on time while plugged in. The screen can turn off.`}
-          control={<Switch id={`${id}-awake`} disabled={busy} checked={value.keepAwake} onCheckedChange={keepAwake => void save({ keepAwake })} />} />
+          control={<Switch id={`${id}-awake`} disabled={busy || !bridge} checked={value.keepAwake} onCheckedChange={keepAwake => void save({ keepAwake })} />} />
         <SettingsRow label={<Label htmlFor={`${id}-battery`}>{t`Also on battery`}</Label>} description={t`Keep the computer awake on battery too. This uses more power.`}
-          control={<Switch id={`${id}-battery`} disabled={busy || !value.keepAwake} checked={value.keepAwakeOnBattery} onCheckedChange={keepAwakeOnBattery => void save({ keepAwakeOnBattery })} />} />
+          control={<Switch id={`${id}-battery`} disabled={busy || !bridge || !value.keepAwake} checked={value.keepAwakeOnBattery} onCheckedChange={keepAwakeOnBattery => void save({ keepAwakeOnBattery })} />} />
       </>}
-      <SettingsRow label={t`Open external links in`} description={t`Where links from chats and settings open.`}
-        control={<OptionSelect aria-label={t`Open external links in`} value={value.externalLinkTarget} disabled={busy} className="w-44 max-w-full"
-          options={[{ value: "system", label: t`Default browser` }, { value: "app", label: t`Mycellios window` }]}
-          onValueChange={v => void save({ externalLinkTarget: v as "system" | "app" })} />} />
     </>}
     <SettingsRow label={<Label htmlFor={`${id}-restore`}>{t`Restore the last workspace on startup`}</Label>}
       description={t`Reopen the space and conversation you used last. Explicit chat links always take priority.`}

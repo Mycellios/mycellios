@@ -9,6 +9,7 @@ import type {ManagedModel} from "../src/contracts/managed-provider.js";
 import { WalletTopups,walletTopupsSchemaSql,walletTopupsAccessSchemaSql } from "../src/economy/wallet-topups.js";
 import { StripeBillingInbound } from "../src/coordinator/billing-inbound.js";
 import postgres from "postgres";
+import { grantWelcomeCredits, WELCOME_CREDIT_MICROUNITS } from "../src/economy/welcome-credits.js";
 import Fastify from "fastify";
 import { MeshDatabase } from "../src/storage/database.js";
 import { EconomicLedger } from "../src/economy/economic-ledger.js";
@@ -66,6 +67,15 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
       .run(Date.now(), Date.now() + 600000);
   });
   afterAll(async () => { await db?.close(); await sql.unsafe(`DROP SCHEMA ${schema} CASCADE; DROP ROLE ${nativeRole}; DROP ROLE ${browserRole}`); await sql.end(); });
+  it("grants welcome credit once only to an existing verified account under concurrent retries", async () => {
+    expect(await grantWelcomeCredits(db, { userId: "bob", emailVerified: false })).toBe(false);
+    expect(await grantWelcomeCredits(db, { userId: "missing", emailVerified: true })).toBe(false);
+    const results = await Promise.all(Array.from({ length: 4 }, () => grantWelcomeCredits(db, { userId: "bob", emailVerified: true })));
+    expect(results.filter(Boolean)).toHaveLength(1);
+    const rows = await db.raw.prepare("SELECT account_id,amount_microunits FROM economic_promotional_grants WHERE issued_by='welcome-v1'").all();
+    expect(rows).toEqual([{ account_id: "bob", amount_microunits: WELCOME_CREDIT_MICROUNITS }]);
+    expect(await grantWelcomeCredits(db, { userId: "bob", emailVerified: true })).toBe(false);
+  });
   async function hold(key: string, maximumUsd = "1", accountId = "alice") {
     const usage = await api.beginUsage(accountId, null, { model: input.model, messages: [] }, true);
     return await purchases.reserve({ usageId: usage.id, accountId, key, digest: "digest-" + key, provider: "mock", model: input.model, maximumUsd });

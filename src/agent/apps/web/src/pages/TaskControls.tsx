@@ -13,7 +13,7 @@ type Task = {
   runId: string;
   bots: Array<{ id: string; name: string }>;
 };
-export function TaskControls({ runId, autoOpen = false }: { runId: string; autoOpen?: boolean }) {
+export function TaskControls({ runId, autoOpen = false, embedded = false }: { runId: string; autoOpen?: boolean; embedded?: boolean }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
   const id = useId();
@@ -90,23 +90,21 @@ export function TaskControls({ runId, autoOpen = false }: { runId: string; autoO
       setBusy(false);
     }
   }
-  return (
-    <Disclosure
-      defaultOpen={autoOpen}
-      summary={t`Task controls`}
-      className="ms-7 pb-2 text-sm"
-      onOpenChange={(open) => void load(open)}
-    >
+  const content = (
+    <>
       {task && !delegated ? (
-        <div className="flex flex-wrap items-center gap-2 py-2">
-          <Button
+        <div className="flex flex-wrap items-center gap-2">
+          {embedded ? <span className="min-w-0 flex-1 text-xs text-muted-foreground" role="status">
+            {task.paused && task.active ? <Trans>Stopping</Trans> : task.paused ? <Trans>Paused</Trans> : task.active ? <Trans>Running</Trans> : <Trans>No tasks running</Trans>}
+          </span> : null}
+          {(!embedded || task.active || task.paused) ? <Button
             size="sm"
             variant="outline"
             disabled={busy || (!task.paused && !task.active)}
             onClick={() => void control(task.paused && !task.active ? "resume" : "pause")}
           >
             {task.paused && !task.active ? <Trans>Resume</Trans> : <Trans>Pause</Trans>}
-          </Button>
+          </Button> : null}
           {task.paused && !task.active ? (
             <>
               <label htmlFor={id} className="sr-only">
@@ -160,6 +158,11 @@ export function TaskControls({ runId, autoOpen = false }: { runId: string; autoO
           {error}
         </p>
       ) : null}
+    </>
+  );
+  return embedded ? <div className="text-sm">{!task && !error ? <p className="text-xs text-muted-foreground" role="status"><Trans>Loading…</Trans></p> : null}{content}</div> : (
+    <Disclosure defaultOpen={autoOpen} summary={t`Task controls`} className="ms-7 pb-2 text-sm" onOpenChange={(open) => void load(open)}>
+      {content}
     </Disclosure>
   );
 }

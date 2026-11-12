@@ -100,8 +100,7 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: path.join(output, "settings-mobile.png"), animations: "disabled" });
   const micos = page.getByTestId("mico-preferences-preview");
-  await expect(micos.getByRole("combobox", { name: "Messages while Investigación works" })).toBeHidden();
-  await micos.getByRole("button", { name: "Customize by Mico" }).click();
+  await expect(micos.getByRole("combobox", { name: "Messages while Investigación works" })).toBeVisible();
   await micos.getByRole("textbox", { name: "Search Micos", exact: true }).fill("investigacion");
   await expect(micos.getByRole("combobox", { name: "Messages while Mico 1 works", exact: true })).toHaveCount(0);
   await micos.getByRole("combobox", { name: "Messages while Investigación works" }).click();

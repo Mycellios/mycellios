@@ -42,7 +42,7 @@ function executorFixture(
 
     secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
 
-    user: { findUnique: vi.fn<() => Promise<{ timezone: string } | null>>(async () => null) },
+    user: { findUniqueOrThrow: async () => ({ micoDefaults: {} }), findUnique: vi.fn<() => Promise<{ timezone: string } | null>>(async () => null) },
     run: {
       findMany: vi.fn(async () => []),
 

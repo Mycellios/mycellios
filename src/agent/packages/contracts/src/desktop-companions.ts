@@ -41,16 +41,19 @@ export function desktopQuestionAnswerText(prompt: DesktopQuestionPrompt, reply: 
 
 export const DesktopCompanionPreferencesSchema = z.object({
   island: z.object({ shown: z.boolean(), idle: z.boolean(), additionalDisplays: z.boolean(),
+    scopes: z.record(z.string().min(1).max(256), z.boolean()).refine(value => Object.keys(value).length <= 256).default({}),
+    futureScopes: z.boolean().default(true),
     width: z.number().int().min(75).max(150), height: z.number().int().min(75).max(150) }).strict(),
-  dock: z.object({ shown: z.boolean(), edge: z.enum(["left", "right", "bottom"]),
+  dock: z.object({ shown: z.boolean(), layer: z.enum(["always", "app"]).default("always"),
+    size: z.number().int().min(75).max(150).default(100), offset: z.number().min(0).max(100).default(50), edge: z.enum(["left", "right", "bottom"]),
     chatAction: z.enum(["main", "floating"]).default("main"),
-    display: z.union([z.literal("primary"), z.number().int()]), autoHide: z.boolean(),
+    display: z.union([z.literal("primary"), z.literal("window"), z.number().int()]), autoHide: z.boolean(),
     edgeStrip: z.boolean(), results: z.boolean(), agents: z.record(z.string().min(1).max(128), z.boolean()).refine(value => Object.keys(value).length <= 256) }).strict(),
 }).strict();
 export type DesktopCompanionPreferences = z.infer<typeof DesktopCompanionPreferencesSchema>;
 export const DEFAULT_DESKTOP_COMPANIONS: DesktopCompanionPreferences = {
-  island: { shown: false, idle: true, additionalDisplays: false, width: 100, height: 100 },
-  dock: { shown: false, edge: "right", chatAction: "main", display: "primary", autoHide: false, edgeStrip: true, results: false, agents: {} },
+  island: { shown: false, idle: true, additionalDisplays: false, scopes: {}, futureScopes: true, width: 100, height: 100 },
+  dock: { shown: false, layer: "always", size: 100, offset: 50, edge: "right", chatAction: "main", display: "primary", autoHide: false, edgeStrip: true, results: false, agents: {} },
 };
 export const DesktopCompanionSnapshotSchema = z.object({
   scope: z.string().max(256), theme: z.enum(["light", "dark"]),

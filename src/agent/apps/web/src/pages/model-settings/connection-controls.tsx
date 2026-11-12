@@ -1,6 +1,7 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { ANTSEED_PROVIDER_ID, isMycelliosBaseUrl, isOllamaCloudBaseUrl } from "@rakazo/contracts";
 import { Button, Disclosure, Input } from "@rakazo/ui-web";
+import { useSettingsSectionsVisible } from "@rakazo/ui-web/components/ui/disclosure";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -84,7 +85,9 @@ export function ConnectionControls({
   const { t } = useLingui();
   // Signed in with a subscription, a key is an alternative, so it stays folded until asked for.
   const [keyShownFor, setKeyShownFor] = useState<string | null>(null);
+  const settingsVisible = useSettingsSectionsVisible();
   const keyFolded =
+    !settingsVisible &&
     subscriptionSignIn &&
     keyShownFor !== (selected?.provider ?? null);
   // Opening the fold swaps the summary for the form, so focus moves to the key field.

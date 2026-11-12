@@ -8,8 +8,9 @@ vi.mock("./DeviceVoiceSettings", () => ({ DeviceVoiceSettings: () => null }));
 vi.mock("./MobileSessions", () => ({ MobileSessions: () => null }));
 vi.mock("../../components/ServerLinkCode", () => ({ ServerLinkCode: () => null }));
 vi.mock("../../components/MobileInstallOffer", () => ({ MobileInstallOffer: () => null, mobileInstallUrl: () => "" }));
+vi.mock("./MicoBehaviorSettings", () => ({ MicoBehaviorSettings: () => null }));
 vi.mock("../SkillLibrarySettings", () => ({ SkillLibrarySettings: () => null }));
-vi.mock("@rakazo/ui-web/components/ui/disclosure", () => ({ Disclosure: ({ summary, children }: { summary: string; children: ReactNode }) => <details><summary>{summary}</summary>{children}</details> }));
+vi.mock("@rakazo/ui-web/components/ui/disclosure", () => ({ Disclosure: ({ summary, children, alwaysVisible }: { summary: string; children: ReactNode; alwaysVisible?: boolean }) => alwaysVisible ? <section><h3>{summary}</h3>{children}</section> : <details><summary>{summary}</summary>{children}</details> }));
 vi.mock("@rakazo/ui-web", () => ({
   BotAvatar: () => <span />,
   Input: (p: React.ComponentProps<"input">) => <input {...p} />,
@@ -26,9 +27,10 @@ async function mount(node: ReactNode) {
   cleanup = async () => { await act(async () => root.unmount()); div.remove(); };
   await act(async () => root.render(node)); return div;
 }
-it("keeps individual controls collapsed and filters accented names", async () => {
+it("shows individual controls directly and filters accented names", async () => {
   const div = await mount(<MicosSettingsPanel bots={bots} />);
-  expect(div.querySelector("details")?.open).toBe(false);
+  expect(div.querySelector("details")).toBeNull();
+  expect(div.querySelector('input[aria-label="Search Micos"]')).not.toBeNull();
   const search = div.querySelector<HTMLInputElement>('input[aria-label="Search Micos"]')!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(search, "investigacion");

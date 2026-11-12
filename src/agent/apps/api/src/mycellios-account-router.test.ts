@@ -69,6 +69,7 @@ function fixture(mycelliosSso = false) {
   };
   return {
     actor,
+    accountToken: deps.auth.oidcAccessToken as ReturnType<typeof vi.fn>,
     preference,
     credentials,
     secret,
@@ -295,6 +296,15 @@ describe("Mycellios account RPC authorization", () => {
       message: "Mycellios credits are temporarily unavailable.",
     });
   });
+  it.each([401, 403] as const)("passes authority access denial %s to the sidebar without diagnostics", async status => {
+    const f = fixture(true);
+    f.transport.mockResolvedValue(new Response("private upstream fixture-session-token", { status }));
+    await expect(f.signedInClient.models.mycelliosAccount()).rejects.toMatchObject({
+      code: status === 401 ? "UNAUTHORIZED" : "FORBIDDEN",
+      message: "Sign in again to see your Mycellios credits.",
+    });
+    expect(f.transport).toHaveBeenCalledOnce();
+  });
 });
 
 it("requires linked-account SSO for every contribution RPC and never substitutes a model key", async () => {
@@ -303,4 +313,10 @@ it("requires linked-account SSO for every contribution RPC and never substitutes
   await expect(f.client.models.contributionControl({ nodeId: "own-node", action: "resume" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   await expect(f.client.models.contributionEnrollment()).rejects.toMatchObject({ code: "FORBIDDEN" });
   expect(f.transport).not.toHaveBeenCalled();
+});
+
+it("preserves missing SSO authorization so the UI clears an old verified balance", async()=>{
+ const f=fixture(true);f.accountToken.mockResolvedValue(null);
+ await expect(f.signedInClient.models.mycelliosAccount()).rejects.toMatchObject({code:"UNAUTHORIZED"});
+ expect(f.transport).not.toHaveBeenCalled();
 });

@@ -5,6 +5,7 @@ import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.
 import { initializeManagedProvider, isManagedModel } from "./managed-provider.js";
 import { mycelliosModelCatalog } from "./model-credit-pricing.js";
 import { Referrals } from "../economy/referrals.js";
+import { grantWelcomeCredits } from "../economy/welcome-credits.js";
 import { mountReferralRoutes } from "./referral-routes.js";
 import { AsyncTaskScope, coalesceAsync } from "../core/async-task-scope.js";
 import { flatMapAsync, mapAsync } from "../core/async-collections.js";
@@ -939,6 +940,9 @@ export async function createCoordinator(
         });
       }
       (await apiAccess.getOrCreateAccount(user.id));
+      if (creditWallet) await grantWelcomeCredits(database, {
+        userId: user.id, emailVerified: user.emailVerified === true,
+      });
       apiPrincipals.set(request, {
         kind: "user",
         userId: user.id,

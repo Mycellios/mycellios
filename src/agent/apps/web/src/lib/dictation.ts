@@ -1,10 +1,12 @@
 import { authClient } from "./auth";
+import { speaker } from "./tts";
 import { prepareNetworkTranscriptionAudio } from "./transcription-audio";
 import { getGeneralPreferences } from "./general-preferences";
 import { readBoundedResponseBytes, speechLocaleTag } from "@rakazo/core";
 import { isAndroidHost, startAndroidDictation } from "./android-host";
 import { appPath } from "./app-path";
 import { getActiveUiLocale } from "./i18n.js";
+import { readUiLocalePreference } from "./ui-locale";
 import { selectedSpaceId, withSpaceHeaders } from "./rpc.js";
 import { errorText, voiceAccountErrorText } from "./user-error.js";
 
@@ -115,6 +117,7 @@ export function recognitionLanguage(): string {
   const explicit = getGeneralPreferences().dictationLanguage;
   if (explicit !== "auto") return explicit;
   const browser = navigator.language || "en-US";
+  if (readUiLocalePreference() === "system") return browser;
   const tag = speechLocaleTag(getActiveUiLocale());
   return tag && tag !== "en-US" ? tag : browser;
 }
@@ -286,6 +289,7 @@ export class Dictation {
     liveTranscript?: boolean;
   }): Promise<void> {
     this.stop("replace");
+    if (opts.mode === "hold") speaker.stop();
     const mine = this.token;
     const spaceId = opts.spaceId !== undefined ? opts.spaceId : selectedSpaceId();
     this.onFinal = opts.onFinal;
@@ -312,7 +316,18 @@ export class Dictation {
       await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
       return;
     }
-    if (isAndroidHost()) {
+    const engine = getGeneralPreferences().dictationEngine ?? "auto";
+    if (engine === "provider") {
+      if (!transcribe) { this.failListening(mine, "Configure a transcription provider in Voice settings."); return; }
+      await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
+      return;
+    }
+    if (engine === "device" && !isAndroidHost()) {
+      if (!webSpeechAvailable()) { this.failListening(mine, "Device dictation is unavailable. Choose another model in Voice settings."); return; }
+      this.listenWebSpeech(opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, mine, false, spaceId, opts.liveTranscript === true);
+      return;
+    }
+    if (isAndroidHost() && engine !== "local") {
       this.nativeCapture = startAndroidDictation({
         transcript: text => { if (this.token === mine) this.set({ status: "listening", transcript: text }); },
         final: text => this.finish(text, mine),
@@ -328,6 +343,7 @@ export class Dictation {
       await this.listenRecorder(mine, opts.mode, opts.endpointMs ?? ENDPOINT_SILENCE_MS, spaceId);
       return;
     }
+    if (engine === "local") { this.failListening(mine, "Download Parakeet in Voice settings before using local dictation."); return; }
     // An unknown capability is not a refusal: a device whose browser cannot hold the
     // microphone open goes to the server even before the voice status has loaded.
     const liveTranscript = opts.liveTranscript === true && webSpeechAvailable();

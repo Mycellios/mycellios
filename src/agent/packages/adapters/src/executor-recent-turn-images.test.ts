@@ -140,7 +140,7 @@ async function runWithModel(
   const prisma = {
     botSkillPin: { findMany: vi.fn(async () => []) },
 
-    user: { findUnique: vi.fn(async () => null) },
+    user: { findUniqueOrThrow: async () => ({ micoDefaults: {} }), findUnique: vi.fn(async () => null) },
     run: {
       findMany: vi.fn(async () => []),
 

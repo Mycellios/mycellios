@@ -5,6 +5,14 @@ import { mycelliosApiBaseUrl } from "./mycellios-api.js";
 import { createOpenAiCompatibleFetch } from "./pi-openai-compatible-provider.js";
 import { withAbort } from "./web-ssrf.js";
 
+/** Public status only. Never retain the authority's body, headers or credential. */
+export class MycelliosAccountAccessError extends Error {
+  constructor(readonly status: 401 | 403) {
+    super("Mycellios credits are temporarily unavailable. Your balance has not been changed.");
+    this.name = "MycelliosAccountAccessError";
+  }
+}
+
 /** Enable account-funded inference only when the canonical authority supports it. */
 export async function configureMycelliosFunding<
   T extends { baseUrl: string; apiKey?: string; headers?: Record<string, string> },
@@ -51,6 +59,8 @@ export async function readMycelliosAccount(
     );
     if (!response.ok) {
       void response.body?.cancel().catch(() => undefined);
+      if (response.status === 401 || response.status === 403)
+        throw new MycelliosAccountAccessError(response.status);
       throw new Error("Account lookup failed");
     }
     const bytes = await readBoundedResponseBytes(response, {
@@ -59,7 +69,8 @@ export async function readMycelliosAccount(
       read: (operation) => withAbort(operation(), signal),
     });
     return MycelliosAccountSchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
-  } catch {
+  } catch (error) {
+    if (error instanceof MycelliosAccountAccessError) throw error;
     // Provider bodies and network exceptions can contain credentials. Do not relay them.
     throw new Error(
       "Mycellios credits are temporarily unavailable. Your balance has not been changed.",

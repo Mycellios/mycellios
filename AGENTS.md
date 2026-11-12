@@ -9,6 +9,11 @@ These rules apply to the complete repository.
   user agents. Preserve historical ledger identifiers, balance precision and separate
   funding sources; this naming change does not launch the token or set its price.
 
+- Verified account provisioning grants 200,000 promotional credit microunits
+  (0.20 Credits / USD) once through `src/economy/welcome-credits.ts`. Keep the
+  deterministic ledger id, verification gate and separation from referral rewards;
+  never substitute a UI default balance for an authenticated wallet summary.
+
 - Mycellios is an independent distributed inference runtime.
 - The network vision includes phones, laptops, desktop PCs and servers as
   contributing compute nodes. Illustrations must reflect that role; distinguish
@@ -339,3 +344,13 @@ These rules apply to the complete repository.
   It uses normal process priority inside the existing Windows Job; preserve the
   pre-import barrier, owner CPU/memory quotas and kill-on-job-close behavior.
   Check the launcher with `python tests/embedding_gpu_bootstrap_test.py`.
+
+- Settings release qualification uses `.github/workflows/settings-release-qualification.yml`
+  for the additive Mico migration, account/Space policy checks, hosted-app ownership
+  and welcome-credit idempotency on isolated PostgreSQL. It never targets production
+  databases or submits paid inference; keep the supplier funding-limit regressions.
+
+- Proportional Agent CI selects changed tests plus source-directory regression siblings,
+  without repeating changed tests or recursively expanding shared contract barrels into
+  the complete workspace suite. Shared contracts still typecheck web/API/worker/Desktop;
+  keep executor sibling regressions and the dedicated PostgreSQL/native/browser gates.

@@ -10,7 +10,20 @@ const transcriptionPython = new Set(['python/distributed_runtime/transcription_e
   'python/tests/test_transcription_gpu_guard.py', 'scripts/qualify-transcription-gpu.py']);
 export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f));
 
-export function planChecks(files) {
+// Shared barrels must not expand a focused change into the complete Agent suite.
+// Keep executable tests in the source directory, including named regression siblings.
+export function agentAffectedTestFiles(sources, available) {
+  const selected = new Set();
+  for (const source of sources) {
+    const directory = path.posix.dirname(source);
+    const stem = path.posix.basename(source).replace(/\.[jt]sx?$/, '');
+    const owned = available.filter(file => path.posix.dirname(file) === directory);
+    const named = owned.filter(file => { const name = path.posix.basename(file); return name.startsWith(stem + '.test.') || name.startsWith(stem + '-') || name.startsWith(stem + '.'); });
+    for (const file of named.length ? named : owned) selected.add(file);
+  }
+  return [...selected].sort();
+}
+export function planChecks(files, availableAgentTests) {
   const code = files.filter(f => /\.[cm]?[jt]sx?$/.test(f) && !f.endsWith('.d.ts'));
   const visual = f => /\.(md|png|svg|jpg|webp|css|po)$/.test(f);
   const root = files.some(f => !visual(f) && /^(src\/(?!agent\/)|landing\/|mobile\/|tests\/|scripts\/.*\.ts$|tsconfig|vite\.|vitest\.|package(?:-lock)?\.json$)/.test(f))
@@ -66,7 +79,9 @@ export function planChecks(files) {
     const tests = code.filter(f => f.startsWith('src/agent/') && /\.test\.[jt]sx?$/.test(f)).map(f => f.slice('src/agent/'.length));
     if (tests.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...tests, '--maxWorkers', '2'], 'Agent changed tests');
     const related = code.filter(f => f.startsWith('src/agent/') && !/\.[cm]?js$/.test(f) && !/\.test\.[jt]sx?$/.test(f) && !f.includes('.config.')).map(f => f.slice('src/agent/'.length));
-    if (related.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'related', ...related, '--run', '--passWithNoTests', '--maxWorkers', '2'], 'Agent affected tests');
+    const available = availableAgentTests ?? execFileSync('git', ['ls-files', '-z', 'src/agent'], { encoding: 'utf8' }).split('\0').filter(f => /\.test\.[jt]sx?$/.test(f)).map(f => f.slice('src/agent/'.length));
+    const affected = agentAffectedTestFiles(related, available).filter(file => !tests.includes(file));
+    if (affected.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...affected, '--maxWorkers', '2'], 'Agent affected tests');
     if (files.some(f => f === 'src/agent/scripts/verify-notification-devices-db.ts' || f.startsWith('src/agent/packages/db/prisma/migrations/20261112110000_mobile_push_devices/'))) {
       add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-notification-devices-db.ts'], 'notification device migration and RLS in isolated PostgreSQL');
     }
@@ -87,7 +102,7 @@ export function runCI() {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
   const base = eventBase(process.env.GITHUB_EVENT_NAME, event, head, git);
   const files = git(['diff', '--name-only', '-z', base, head]).split('\0').filter(Boolean);
-  const receipt = { head, base, files, status: 'running', checks: [], omitted: ['full suites', 'security scans', 'cross-platform packaging', 'physical device tests', 'live provider/database qualification', 'release build', 'deployment', 'production health verification'] };
+  const receipt = { head, base, files, status: 'running', checks: [], omitted: ['full suites and global transitive Agent test discovery', 'security scans', 'cross-platform packaging', 'physical device tests', 'live provider/database qualification', 'release build', 'deployment', 'production health verification'] };
   mkdirSync('.ci', { recursive: true });
   const save = () => writeFileSync('.ci/proportional-receipt.json', JSON.stringify(receipt, null, 2) + '\n');
   save();

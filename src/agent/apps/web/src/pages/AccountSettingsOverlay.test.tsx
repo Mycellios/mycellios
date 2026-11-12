@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
+vi.mock("./SkillLibrarySettings", () => ({ SkillLibrarySettings: () => null }));
 vi.mock("./AgentUsageSettings", () => ({
   AgentUsageSettings: () => <div data-testid="agent-usage-settings" />,
 }));
@@ -135,6 +136,19 @@ import { GeneralSettingsPanels, UsageSettingsPanel } from "./AccountSettingsOver
 
 afterEach(() => {
   localStorage.clear();
+});
+
+it("shows system mode separately from a saved manual language", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const container=document.createElement("div");document.body.append(container);
+  const root=createRoot(container);
+  try {
+    await act(async()=>root.render(<GeneralSettingsPanels name="Jamie" />));
+    expect(container.querySelector('[data-testid="ui-locale-select"]')?.textContent).toContain("System default");
+    localStorage.setItem("rakazo.uiLocale","es");
+    await act(async()=>root.render(<GeneralSettingsPanels key="manual" name="Jamie" />));
+    expect(container.querySelector('[data-testid="ui-locale-select"]')?.textContent).toContain("Español");
+  } finally {await act(async()=>root.unmount());container.remove();vi.unstubAllGlobals();}
 });
 
 it("offers no avatar style choice", async () => {
@@ -516,4 +530,14 @@ it("closes the name editor before refresh finishes and ignores a refresh failure
   } finally {
     await editor.cleanup();
   }
+});
+it("profile header edits the existing name form and retains account controls", async () => {
+  const div = document.createElement("div"); document.body.append(div); const root = createRoot(div);
+  try {
+    await act(async () => root.render(<GeneralSettingsPanels mode="profile" name="Jamie" email="demo@example.com" profileOverview={edit => <button onClick={edit}>Edit profile</button>} />));
+    expect(div.textContent).toContain("Email address"); expect(div.textContent).toContain("Sign out");
+    await act(async () => [...div.querySelectorAll("button")].find(button => button.textContent === "Edit profile")!.click());
+    expect(div.querySelector<HTMLFormElement>('[data-testid="account-card"] form')).not.toBeNull();
+    expect(div.querySelector<HTMLInputElement>('[data-testid="account-card"] input')?.value).toBe("Jamie");
+  } finally { await act(async () => root.unmount()); div.remove(); }
 });

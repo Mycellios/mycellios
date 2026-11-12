@@ -20,6 +20,7 @@ vi.mock("@rakazo/ui-web", () => ({
 }));
 import { RunActivityStatus } from "./RunActivityStatus";
 import { resetLiveThreadConnection, setLiveThreadConnection } from "../lib/live-thread-connection";
+import { setToolActivityPreference } from "../lib/tool-activity-preference";
 const now = Date.parse("2026-01-01T12:00:00Z");
 const at = (minutes: number) => new Date(now + minutes * 60000).toISOString();
 const run = {
@@ -84,6 +85,18 @@ it("explains a preflight block instead of a working animation", () => {
   act(() => node.querySelector("button")!.click());
   expect(open).toHaveBeenCalledOnce();
 });
+
+it("applies a changed steps default even after native toggle events during a live run", () => {
+  setToolActivityPreference("on");mount(run);
+  act(()=>root!.render(<RunActivityStatus run={run} messages={[]} bots={[]} activity="Reading files" onRefresh={async()=>undefined} />));
+  const details=node.querySelector("details")!;
+  expect(details.open).toBe(false);
+  act(()=>setToolActivityPreference("expanded"));
+  expect(details.open).toBe(true);
+  act(()=>details.dispatchEvent(new Event("toggle")));
+  act(()=>setToolActivityPreference("on"));
+  expect(details.open).toBe(false);
+});
 it("keeps a long, silent run active and distinguishes worker contact from output", () => {
   mount(run);
   expect(node.querySelector("details")).toBeNull();
@@ -108,6 +121,18 @@ it("does not offer an empty disclosure before the first recorded step", () => {
   expect(node.querySelector("[role=status]")?.textContent).toBe("Working…");
   expect(node.querySelector("details")).toBeNull();
   expect(node.textContent).not.toContain("known-model");
+});
+it.each([
+  ["quiet", run],
+  ["unknown", { ...run, leaseExpiresAt: undefined }],
+  ["recovering", { ...run, leaseExpiresAt: at(-1) }],
+])("refreshes %s status automatically without a manual recovery action", async (_state, value) => {
+  const { refresh } = mount(value as Run);
+  expect(node.textContent).not.toContain("Refresh status");
+  expect(node.textContent).not.toContain("Checking the saved task status");
+  expect(node.querySelector("[role=status]")).not.toBeNull();
+  await act(async () => { await vi.advanceTimersByTimeAsync(31000); });
+  expect(refresh).toHaveBeenCalledTimes(2);
 });
 it("polls without overlap, pauses while hidden and disposes on unmount", async () => {
   const { refresh } = mount(run);

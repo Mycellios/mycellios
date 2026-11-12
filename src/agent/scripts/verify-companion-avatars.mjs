@@ -11,7 +11,7 @@ const root = path.resolve("apps/web");
 await mkdir(output, { recursive: true });
 process.chdir(root);
 const server = await createServer({ root, configFile: path.join(root, "vite.config.ts"),
-  base: "/agent/", cacheDir: path.join(root, "node_modules/.vite-companion-proof"), server: { host: "127.0.0.1", port: 0 } });
+  base: "/agent/", cacheDir: path.join(output, ".vite"), server: { host: "127.0.0.1", port: 0 } });
 let browser;
 try {
   await server.listen();

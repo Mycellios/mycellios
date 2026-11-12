@@ -53,6 +53,13 @@ describe("desktop preload bridge", () => {
     expect(invoke.mock.calls).toEqual([["desktop.settings.state"], ["desktop.settings.update", { keepAwake: true }]]);
     expect((bridge as unknown as Record<string, unknown>).ipcRenderer).toBeUndefined();
   });
+  it("exposes only named local script settings, never the connection key or an RPC proxy", async () => {
+    const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    await bridge.localScripts!.state(); await bridge.localScripts!.configure({ enabled: true, requestsPerHour: 30 });
+    expect(invoke.mock.calls).toEqual([["desktop.localScripts.state"], ["desktop.localScripts.configure", { enabled: true, requestsPerHour: 30 }]]);
+    expect(Object.keys(bridge.localScripts!).sort()).toEqual(["configure", "state"]);
+  });
   it("acknowledges only bounded native update requests without exposing IPC events", async () => {
     const { on, off, send, exposeInMainWorld } = runPreload("preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
@@ -95,6 +102,7 @@ describe("desktop preload bridge", () => {
       "badge",
       "companions",
       "computer",
+      "localScripts",
       "localVoice",
       "nativeWindowFrame",
       "notifications",

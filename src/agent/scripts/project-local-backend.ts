@@ -1,3 +1,4 @@
+import {startDevIdentityCallback} from './project-local-sso.mjs';
 import {spawn} from 'node:child_process';
 import {createHash,randomBytes} from 'node:crypto';
 import {mkdir,readdir,readFile,writeFile} from 'node:fs/promises';
@@ -8,6 +9,7 @@ import {applyProjectLocalEnvironment,localDataDir,projectRoot,localWorkerReady} 
 applyProjectLocalEnvironment();
 await mkdir(localDataDir,{recursive:true,mode:0o700});
 // Bind readiness first: a different project already owning this port is never adopted.
+let callbackServer: Awaited<ReturnType<typeof startDevIdentityCallback>> | undefined;
 let workerReady = false;
 let workerStartedAt = 0;
 const readiness = createServer(async(req,res)=>{
@@ -31,6 +33,7 @@ let stopping=false;
 async function stop(code=0){
   if(stopping)return;stopping=true;workerReady=false;
   readiness.close();
+  callbackServer?.close();
   if(worker?.exitCode===null){
     worker.kill('SIGTERM');
     await Promise.race([new Promise(resolve=>worker!.once('exit',resolve)),new Promise(resolve=>setTimeout(resolve,2500))]);
@@ -59,7 +62,8 @@ try {
   await writeFile(path.join(snapshot,'migrations/migration_lock.toml'),'provider = "postgresql"\n');
   const migrationConfig=path.join(snapshot,'prisma.config.mjs');
   await writeFile(migrationConfig,`export default {schema:${JSON.stringify(path.join(schema,'schema.prisma'))},migrations:{path:${JSON.stringify(path.join(snapshot,'migrations'))}},datasource:{url:process.env.DATABASE_MIGRATION_URL}};\n`);
-  server=await startDesktopLocalServer({dataDir:localDataDir,webRoot:path.join(projectRoot,'apps/web/dist'),migrationsRoot:snapshot,port:3100,token:randomBytes(32).toString('hex'),build:'project-local',projectPreview:{webOrigin:'http://127.0.0.1:5192',migrationConfig}});
+  server=await startDesktopLocalServer({dataDir:localDataDir,webRoot:path.join(projectRoot,'apps/web/dist'),migrationsRoot:snapshot,port:3100,token:randomBytes(32).toString('hex'),build:'project-local',projectPreview:{webOrigin:'http://127.0.0.1:5192',migrationConfig,...(process.env.MYCELLIOS_LOCAL_ACCOUNT_ENABLED==='1'?{authOrigin:'http://127.0.0.1:5188'}:{})}});
+  if(process.env.MYCELLIOS_LOCAL_ACCOUNT_ENABLED==='1') callbackServer=await startDevIdentityCallback();
   workerStartedAt=Date.now();
   worker=spawn(process.execPath,['--import','tsx',path.join(projectRoot,'apps/worker/src/index.ts')],{cwd:projectRoot,env:{...process.env},windowsHide:true,stdio:['ignore','pipe','pipe']});
   for(const output of [worker.stdout,worker.stderr])output?.on('data',(data:Buffer)=>{

@@ -1,4 +1,5 @@
 import { HostedWebAgent, HostedWebCard, HostedWebDraft, HostedWebSave } from "./hosted-webs.js";
+import { MicoSettingsState, MicoSettingsUpdate } from "./mico-settings.js";
 import { TailnetConnectionInput, TailnetConnectionSchema, TailnetSuffix } from "./tailscale.js";
 import { ReferralOwnerInput, ReferralInviteSchema, ReferralRedemptionSchema } from "./referrals.js";
 import { AppCoverId, AppCoverWrite } from "./app-covers.js";
@@ -233,7 +234,7 @@ export const appContract = {
     antseed: oc.input(z.object({ id: z.string().uuid() })).output(HostedWebDraft),
     preview: oc.input(z.object({ id: z.string(), version: z.number().int().positive() })).output(z.object({ path: z.string(), expiresAt: z.string() })),
   },
-  analytics: { screen: oc.input(AnalyticsScreenInput).output(z.object({ ok: z.literal(true) })) },
+  analytics: { screen: oc.input(AnalyticsScreenInput.extend({ installationId: z.string().uuid().optional(), linkAccount: z.boolean().optional() }).strict()).output(z.object({ ok: z.literal(true) })) },
   aiConsent: {
     status: oc.input(AiConsentQuerySchema).output(AiConsentStatusSchema),
     allow: oc
@@ -266,6 +267,9 @@ export const appContract = {
     portal: oc.output(z.object({ url: z.string().url() })),
   },
   preferences: {
+    micos: oc.output(MicoSettingsState),
+    updateMicos: oc.input(MicoSettingsUpdate).output(MicoSettingsState),
+    applyBusyMode: oc.input(z.object({ mode: z.enum(["queue", "steer"]).nullable() })).output(z.object({ ok: z.literal(true) })),
     update: oc
       .input(
         z

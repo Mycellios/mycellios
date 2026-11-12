@@ -107,6 +107,10 @@ export interface RakazoDesktop {
     onSelect: (listener: (target: { scope: string; botId: string; respond?: boolean }) => void) => () => void;
   };
   /** Preferences of this computer. Older releases have no settings bridge. */
+  localScripts?: {
+    state: () => Promise<{ enabled: boolean; requestsPerHour: number; endpoint: string | null; configPath: string }>;
+    configure: (patch: { enabled?: boolean; requestsPerHour?: number }) => Promise<{ enabled: boolean; requestsPerHour: number; endpoint: string | null; configPath: string }>;
+  };
   settings?: {
     state: () => Promise<DesktopBehaviorSettings>;
     update: (patch: Partial<DesktopBehaviorSettings>) => Promise<DesktopBehaviorSettings>;
@@ -206,6 +210,7 @@ export interface RakazoDesktop {
 export interface DesktopBehaviorSettings {
   launchAtLogin: boolean | null;
   keepRunningInBackground: boolean;
+  keepRemoteSessions?: boolean;
   keepAwake: boolean | null;
   keepAwakeOnBattery: boolean;
   externalLinkTarget: "system" | "app";

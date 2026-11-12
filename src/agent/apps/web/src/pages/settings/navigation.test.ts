@@ -18,4 +18,5 @@ it("finds the owner section from translated field names, accents and multiple te
     false,
   );
   expect(settingsMatch({ label: "Updates" }, "   ")).toBe(true);
+  expect(settingsMatch({label:"Profile",keywords:settingsKeywords.profile},"uso costes")).toBe(true);
 });

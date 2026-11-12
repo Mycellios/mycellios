@@ -1,3 +1,4 @@
+import { ExpandedSettings } from "@rakazo/ui-web/components/ui/disclosure";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { SettingsScope } from "@rakazo/contracts";
 import {
@@ -373,6 +374,11 @@ export function ModelSettingsOverlay({
 
   const content = (
     <>
+      {model.loadError && <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border p-4 text-sm">
+        <p className="min-w-0 flex-1 text-destructive">{model.loadError}</p>
+        <Button variant="outline" size="sm" disabled={model.reloading || busy} onClick={() => { void model.retryLoad(); if (providersOnly && scope === "account") void host.engines.refetch(); }}>{t`Retry`}</Button>
+      </div>}
+      {model.reloading && <p role="status" className="mb-3 text-sm text-muted-foreground">{t`Reconnecting to the server…`}</p>}
       {error && !connectionAt ? (
         <p className="mb-4 text-sm text-destructive" role="alert">
           {error}
@@ -414,6 +420,8 @@ export function ModelSettingsOverlay({
             scope={scope}
             credentials={credentials}
             compactPrimary={providersOnly}
+            refreshToken={model.reloadToken}
+            externalLoadError={Boolean(model.loadError) || model.reloading}
             title={providersOnly ? t`Default provider` : t`Main model`}
             defaultLabel={t`Choose a model`}
             providers={providers}
@@ -431,7 +439,7 @@ export function ModelSettingsOverlay({
               refreshKey={`${me.spaceId}:${me.defaultProvider ?? ""}:${me.defaultModel ?? ""}`}
             />
           )}
-          {scope === "space" ? null : (
+          {scope === "space" ? null : !model.hasProviderData ? <p role="status" className="my-4 text-sm text-muted-foreground">{model.loadError ? t`Your providers could not be checked. Retry when the server is reachable.` : t`Loading providers…`}</p> : (
             <ProvidersSection
               credentials={credentials.filter((entry) => !isMycelliosBaseUrl(entry.baseUrl))}
               primaryConnected={isMycelliosProviderConnected(mycelliosCredential)}
@@ -487,7 +495,7 @@ export function ModelSettingsOverlay({
         </>
       ) : loading ? (
         <Spinner aria-label={t`Loading model catalog…`} />
-      ) : catalog.length ? null : (
+      ) : catalog.length || model.loadError ? null : (
         <p className="text-[13px] leading-[1.5] text-muted-foreground">
           <Trans>No model catalog is available.</Trans>
         </p>
@@ -527,7 +535,7 @@ export function ModelSettingsOverlay({
   if (embedded) {
     return (
       <div data-testid="model-settings" className={providersOnly ? "mx-auto w-full max-w-[720px]" : "max-w-[600px]"}>
-        {content}
+        <ExpandedSettings>{content}</ExpandedSettings>
       </div>
     );
   }
@@ -554,7 +562,7 @@ export function ModelSettingsOverlay({
           </DialogClose>
         </DialogHeader>
         <div className="rk-scroll min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
-          <div className="max-w-[600px]">{content}</div>
+          <div className="max-w-[600px]"><ExpandedSettings>{content}</ExpandedSettings></div>
         </div>
       </DialogContent>
     </Dialog>

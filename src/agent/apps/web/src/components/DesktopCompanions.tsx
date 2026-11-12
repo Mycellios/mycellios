@@ -61,7 +61,8 @@ export function DesktopCompanions({ bots, spaceId, scope, onOpen }: {
       publishing = true;
       try {
       const questions: DesktopQuestionPrompt[] = [];
-      const islandEnabled = Boolean(bridge.onQuestion && (await bridge.state()).island.shown);
+      const island = bridge.onQuestion ? (await bridge.state()).island : undefined;
+      const islandEnabled = Boolean(island?.shown && (island.scopes?.[scope] ?? island.futureScopes ?? true));
       if (islandEnabled) {
         const waiting = bots.filter(bot => !bot.archivedAt && bot.spaceId === spaceId && bot.status === "waiting_input").slice(0, 20);
         for (let offset = 0; offset < waiting.length && alive; offset += 4) {

@@ -14,6 +14,7 @@ import {
   probeOpenAiCompatibleModels,
   providerCatalogCache,
   readMycelliosAccount,
+  MycelliosAccountAccessError,
   resolveMemberMainModel,
   selectDefaultCredentialId,
   serializeModelSecret,
@@ -245,7 +246,12 @@ export function modelsRoutes(ctx: RouterContext) {
             });
           }
           return null;
-        } catch {
+        } catch (error) {
+          if (error instanceof MycelliosAccountAccessError)
+            throw new ORPCError(error.status === 401 ? "UNAUTHORIZED" : "FORBIDDEN", {
+              message: "Sign in again to see your Mycellios credits.",
+            });
+          if (error instanceof ORPCError && (error.code === "UNAUTHORIZED" || error.code === "FORBIDDEN")) throw error;
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: "Mycellios credits are temporarily unavailable.",
           });

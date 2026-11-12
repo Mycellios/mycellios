@@ -5,6 +5,10 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
   servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url) },
   platform: process.platform,
+  localScripts: {
+    state: () => ipcRenderer.invoke("desktop.localScripts.state"),
+    configure: patch => ipcRenderer.invoke("desktop.localScripts.configure", patch),
+  },
   settings: {
     fonts: () => ipcRenderer.invoke("desktop.settings.fonts"),
     logo: png => ipcRenderer.invoke("desktop.settings.logo", png),
