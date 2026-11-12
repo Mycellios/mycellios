@@ -5,6 +5,7 @@ import { ContributionCreditWallet } from "../economy/contribution-credit-wallet.
 import { initializeManagedProvider, isManagedModel } from "./managed-provider.js";
 import { mycelliosModelCatalog } from "./model-credit-pricing.js";
 import { Referrals } from "../economy/referrals.js";
+import { grantWelcomeCredits } from "../economy/welcome-credits.js";
 import { mountReferralRoutes } from "./referral-routes.js";
 import { AsyncTaskScope, coalesceAsync } from "../core/async-task-scope.js";
 import { flatMapAsync, mapAsync } from "../core/async-collections.js";
@@ -109,6 +110,7 @@ import {
 } from "../support/assistant.js";
 import { MeshService, MeshServiceError, type JobStreamEvent } from "./mesh-service.js";
 import { MobileComputeHub, type MobileWorkerSnapshot } from "./mobile-compute-hub.js";
+import { initializeBrowserInference } from "./browser-inference-routes.js";
 import { queueExistingMobileArtifacts } from "./mobile-artifact-backup.js";
 import {
   verifyGitHubReleaseUploadToken,
@@ -939,6 +941,9 @@ export async function createCoordinator(
         });
       }
       (await apiAccess.getOrCreateAccount(user.id));
+      if (creditWallet) await grantWelcomeCredits(database, {
+        userId: user.id, ...(user.emailVerified === undefined ? {} : { emailVerified: user.emailVerified }),
+      });
       apiPrincipals.set(request, {
         kind: "user",
         userId: user.id,
@@ -1576,6 +1581,8 @@ export async function createCoordinator(
       : {}),
   });
   mobileHub.attach(app);
+  const browserInference = await initializeBrowserInference(app, { database, wallet: creditWallet, api: apiAccess,
+    hub: mobileHub, config: config.browserInference, apiEnabled: apiAccessEnabled, principal: principalFor });
   if (persistence && config.mobileExpertArtifactsPath) {
     (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }
@@ -4681,7 +4688,7 @@ export async function createCoordinator(
 
   app.get("/v1/models", async () => {
     const models = (await scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() }));
-    return await mycelliosModelCatalog(models, economicLedger, managedGateway);
+    return await mycelliosModelCatalog(models, economicLedger, managedGateway, browserInference);
   });
 
   const settleCompletedInference = createInferenceSettlement({

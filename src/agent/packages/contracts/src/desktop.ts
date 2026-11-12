@@ -37,6 +37,8 @@ export interface DesktopUpdateState {
   relaunchWaitingFor?: "local_work" | "unsaved_work" | "update_download";
   relaunchError?: boolean;
   autoInstallEnabled?: boolean;
+  /** Grace period for an automatic idle restart; absent during explicit restarts. */
+  automaticRestartAt?: number;
   phase: DesktopUpdatePhase;
   /** The installed desktop release, which can drift from the server this app points at. */
   currentVersion: string;
@@ -95,7 +97,12 @@ export interface RakazoDesktop {
     returnToMain: () => Promise<void>;
     onPrepare: (listener: () => boolean | Promise<boolean>) => () => void;
   };
-  servers?: { list(): Promise<{ servers: (DesktopSetup & { name: string })[]; current: string | null }>; manage(url?: string): Promise<void> };
+  servers?: {
+    list(): Promise<{ servers: (DesktopSetup & { name: string; color?: string })[]; current: string | null }>;
+    manage(url?: string): Promise<void>;
+    /** Device-local connection identity. Never changes a remote server or its permissions. */
+    updateIdentity?(url: string, identity: { name: string; color: string }): Promise<void>;
+  };
   companions?: {
     state: () => Promise<DesktopCompanionPreferences>;
     save: (value: DesktopCompanionPreferences) => Promise<DesktopCompanionPreferences>;

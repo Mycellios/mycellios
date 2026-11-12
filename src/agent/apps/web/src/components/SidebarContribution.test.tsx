@@ -8,6 +8,7 @@ vi.mock("../lib/auth-capabilities", () => ({ fetchAuthCapabilities: f.capabiliti
 vi.mock("../lib/desktop", () => ({ desktopBridge: f.bridge }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (s: TemplateStringsArray) => s.join("") }) }));
 vi.mock("@rakazo/ui-web", () => ({ Button: (props: object) => <button {...props} />, buttonVariants: () => "" }));
+vi.mock("./BrowserContributionControl", () => ({ BrowserContributionControl: () => <button data-testid="browser-contribution-control" title="Contribute">Contribute</button> }));
 import { SidebarContribution } from "./SidebarContribution";
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -33,22 +34,22 @@ it("does not start compute on mount; starts the existing identity only after a c
   });
 });
 
-it("offers browser contribution without leaving or starting the current chat", async () => {
+it("keeps unavailable browser contribution inline without starting compute or opening pages", async () => {
   f.bridge.mockReturnValue(undefined);
   await rendered(async host => {
-    const contribute = host.querySelector<HTMLAnchorElement>('[aria-label="Earn credits with your computer"]')!;
-    expect(contribute.href).toBe("https://www.mycellios.com/browser/index.html");
-    expect(contribute.target).toBe("_blank"); expect(contribute.rel).toContain("noopener");
+    const contribute = host.querySelector<HTMLButtonElement>('[data-testid="browser-contribution-control"]')!;
+    expect(contribute.disabled).toBe(false);
+    expect(host.querySelector("a")).toBeNull();
     expect(f.control).not.toHaveBeenCalled(); expect(f.enrollment).not.toHaveBeenCalled();
     expect(f.native).not.toHaveBeenCalled();
   });
 });
 
-it("keeps browser contribution accessible in the collapsed sidebar", async () => {
+it("explains unavailable contribution in the collapsed sidebar", async () => {
   f.bridge.mockReturnValue(undefined);
   await rendered(async host => {
-    expect(host.querySelectorAll("a[aria-label]")).toHaveLength(1);
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.getAttribute("title")).toBe("Earn credits with your computer");
+    expect(host.querySelectorAll("a")).toHaveLength(0);
+    expect(host.querySelector('[data-testid="browser-contribution-control"]')?.getAttribute("title")).toBe("Contribute");
   }, true);
 });
 
@@ -91,7 +92,7 @@ it("verifies the existing installation before offering a separate start action",
     expect(f.enrollment).not.toHaveBeenCalled();
     expect(f.enroll).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
+    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
     f.native.mockResolvedValue({ supported: true, enrolled: true, installed: true, nodeId: "same-node" });
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).toHaveBeenCalledExactlyOnceWith({ nodeId: "same-node", action: "resume" });
@@ -105,19 +106,17 @@ it("keeps verification read-only when another process has already repaired the i
     await act(async () => host.querySelector("button")!.click());
     expect(f.identify).not.toHaveBeenCalled();
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
+    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
   });
 });
 
 it("offers browser contribution when the protected installation is missing its runtime", async () => {
   f.native.mockResolvedValue({ supported: true, enrolled: true, installed: false, nodeId: null });
   await rendered(async host => {
-    const browser = host.querySelector<HTMLAnchorElement>('a[aria-label="Contribute in browser"]');
-    expect(browser?.href).toBe("https://www.mycellios.com/browser/index.html");
-    expect(browser?.target).toBe("_blank");
-    expect(host.textContent).toContain("The local contribution runtime is missing.");
+    expect(host.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false);
+    expect(host.querySelector('[data-testid="browser-contribution-control"]')).not.toBeNull();
+    expect(host.querySelector("a")).toBeNull();
     expect(host.querySelector('[role="alert"]')).toBeNull();
-    expect(host.querySelector("button")).toBeNull();
     expect(f.status).not.toHaveBeenCalled();
     expect(f.identify).not.toHaveBeenCalled();
     expect(f.enrollment).not.toHaveBeenCalled();
@@ -144,7 +143,7 @@ it("refreshes a rejected command instead of replaying its effect", async () => {
     expect(host.querySelector("button")!.textContent).toContain("Retry");
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
+    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
   });
 });
 it("keeps a newly enrolled contributor running instead of immediately pausing it", async () => {
@@ -201,7 +200,7 @@ it("never resumes a node when the user requested pause and it is already paused"
   await rendered(async host => {
     await act(async () => host.querySelector("button")!.click());
     expect(f.control).not.toHaveBeenCalled();
-    expect(host.querySelector('[aria-label="Earn credits with your computer"]')?.textContent).toBe("Contribute");
+    expect(host.querySelector('[aria-label="Generate AI"]')?.textContent).toBe("Generate AIShare computing power with the network");
   });
 });
 
@@ -213,11 +212,9 @@ it("offers the browser path without polling or controlling a native node on a pa
     expect(f.control).not.toHaveBeenCalled();
     expect(f.enrollment).not.toHaveBeenCalled();
     expect(host.querySelector('[role="alert"]')).toBeNull();
-    expect(host.textContent).toContain("Contribute in your browser while this page stays open.");
-    expect(host.querySelector('[aria-label="Contribute in browser"]')).not.toBeNull();
-    const dashboard = host.querySelector<HTMLAnchorElement>('a[href*="dashboard"]')!;
-    expect(dashboard.target).toBe("_blank");
-    expect(dashboard.rel).toContain("noopener");
+    expect(host.querySelector('[data-testid="browser-contribution-control"]')).not.toBeNull();
+    expect(host.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false);
+    expect(host.querySelector("a")).toBeNull();
   });
 });
 
@@ -225,7 +222,8 @@ it("exposes one direct contribution control without a disclosure", async () => {
  f.capabilities.mockResolvedValue({ sso: null });
  await rendered(host => {
    expect(host.querySelector("details")).toBeNull();
-   expect(host.querySelector('[aria-label="Contribute in browser"]')?.textContent).toContain("Contribute");
+   expect(host.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false);
+   expect(host.querySelector("a")).toBeNull();
    expect(f.control).not.toHaveBeenCalled();
  });
 });

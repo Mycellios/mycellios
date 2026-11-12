@@ -22,7 +22,7 @@ it("does not prevent update actions when graphics are unavailable", async () => 
 });
 it("removes the overlay on resize and resolves the waiting update action", async () => {
   environment();
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ scale: vi.fn() } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ scale: vi.fn() } as unknown as ReturnType<HTMLCanvasElement["getContext"]>);
   const done = playUpdateMycelium();
   expect(document.querySelector("[data-update-mycelium]")?.getAttribute("aria-hidden")).toBe("true");
   window.dispatchEvent(new Event("resize"));
@@ -31,7 +31,7 @@ it("removes the overlay on resize and resolves the waiting update action", async
 });
 it("has a finite lifetime even when animation frames are throttled", async () => {
   vi.useFakeTimers(); environment();
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ scale: vi.fn() } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ scale: vi.fn() } as unknown as ReturnType<HTMLCanvasElement["getContext"]>);
   vi.stubGlobal("requestAnimationFrame", () => 1); vi.stubGlobal("cancelAnimationFrame", vi.fn());
   const done = playUpdateMycelium();
   await vi.advanceTimersByTimeAsync(1600); await done;

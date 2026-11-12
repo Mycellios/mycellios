@@ -18,7 +18,8 @@ export const CSP_REPORTING_ENDPOINTS = `${CSP_REPORT_GROUP}="${CSP_REPORT_PATH}"
 
 const APP_DIRECTIVES: Record<string, string[]> = {
   "default-src": ["'self'"],
-  "script-src": ["'self'"],
+  // The pinned browser inference engine compiles WebAssembly; JavaScript eval stays denied.
+  "script-src": ["'self'", "'wasm-unsafe-eval'"],
   // Mermaid SVGs and some UI libraries inject <style> elements and style attributes as markup.
   "style-src": ["'self'", "'unsafe-inline'"],
   // Markdown images, link favicons and attachment previews (object URLs).

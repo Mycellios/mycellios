@@ -6,7 +6,7 @@ import {applyProjectLocalEnvironment,projectRoot} from './project-local-env.mjs'
 
 const mode = process.argv[2];
 if (!['backend', 'web'].includes(mode)) throw new Error('Use project-local.mjs backend|web');
-const env = applyProjectLocalEnvironment();
+const env = applyProjectLocalEnvironment({account: mode === 'backend'});
 const require = createRequire(import.meta.url);
 const args = mode === 'backend'
   ? ['--import', 'tsx', fileURLToPath(new URL('./project-local-backend.ts', import.meta.url))]

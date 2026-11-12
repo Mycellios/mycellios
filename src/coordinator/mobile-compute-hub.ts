@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import type {} from "@fastify/websocket";
+import { mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import type WebSocket from "ws";
 import { z } from "zod";
@@ -17,6 +18,8 @@ import {
 } from "../contracts/worker-admission.js";
 import { sha256CanonicalEvidence } from "../core/json.js";
 import { BrowserLayerHub } from "./browser-layer-hub.js";
+import { BrowserTextHub } from "./browser-text-hub.js";
+import { expertReference } from "./browser-expert-reference.js";
 import {
   WorkerAdmissionAuthority,
   WorkerAdmissionError,
@@ -205,6 +208,8 @@ const mobileMessageSchema = z.discriminatedUnion("type", [
   z.object({ v: z.literal(1), type: z.literal("layer.ready"), payload: z.unknown() }).strict(),
   z.object({ v: z.literal(1), type: z.literal("layer.result"), payload: z.unknown() }).strict(),
   z.object({ v: z.literal(1), type: z.literal("layer.fail"), payload: z.unknown() }).strict(),
+  z.object({ v: z.literal(1), type: z.literal("text.result"), payload: z.unknown() }).strict(),
+  z.object({ v: z.literal(1), type: z.literal("text.fail"), payload: z.unknown() }).strict(),
 ]);
 
 export type MobileRegistration = z.infer<typeof mobileRegistrationSchema>;
@@ -252,6 +257,7 @@ interface MatrixTask {
 }
 
 interface MobileWorkerState {
+  credentialFingerprint?: string;
   registration: MobileRegistration;
   id: string;
   token: string;
@@ -317,6 +323,7 @@ export interface ExpertExecutionResult {
 }
 
 export class MobileComputeHub {
+  private readonly fundedBusy = new Set<string>();
   private readonly workers = new Map<string, MobileWorkerState>();
   private readonly workerByClient = new Map<string, string>();
   private readonly taskTimeoutMs: number;
@@ -324,6 +331,7 @@ export class MobileComputeHub {
   private readonly expertArtifactsPath: string;
   private readonly expertManifests = new Map<string, ExpertManifest>();
   private readonly layerHub: BrowserLayerHub;
+  readonly textHub: BrowserTextHub;
 
   constructor(private readonly options: MobileComputeHubOptions = {}) {
     this.taskTimeoutMs = options.taskTimeoutMs ?? 45_000;
@@ -342,7 +350,7 @@ export class MobileComputeHub {
         visible: worker.visible,
         validated: worker.registration.backend === "webgpu"
           ? worker.gpuValidated : worker.verifiedTasks > 0,
-        busy: Boolean(worker.pendingTask || worker.pendingExpertTask),
+        busy: Boolean(worker.pendingTask || worker.pendingExpertTask || this.fundedBusy.has(worker.id)),
       })),
       send: (peerId, type, payload) => this.send(this.workers.get(peerId)?.socket ?? null, type, payload),
       onExecutionVerified: (peerId, layer, backend) => {
@@ -353,6 +361,16 @@ export class MobileComputeHub {
         this.send(worker.socket, "layer.verified", { layer, backend,
           verifiedTasks: worker.verifiedTasks });
       },
+    });
+    this.textHub = new BrowserTextHub({
+      peers: () => [...this.workers.values()].map(w => ({ id: w.id, token: w.token,
+        fingerprint: w.credentialFingerprint ?? null, available: this.usableForText(w, true) })),
+      acquire: id => { const w = this.workers.get(id); if (!w || !this.usableForText(w)) return false;
+        this.fundedBusy.add(id); this.cancelMatrixWork(w); return true; },
+      release: id => { this.fundedBusy.delete(id); },
+      send: (id, type, payload) => this.send(this.workers.get(id)?.socket ?? null, type, payload),
+      verified: id => { const w = this.workers.get(id); if (w) { w.completedTasks++; w.verifiedTasks++;
+        this.send(w.socket, "text.verified", { verifiedTasks: w.verifiedTasks }); } },
     });
   }
 
@@ -494,6 +512,7 @@ export class MobileComputeHub {
         };
       }
       const worker = this.register(registration);
+      if (admission.credentialFingerprint) worker.credentialFingerprint = admission.credentialFingerprint;
       return reply.code(201).send({
         workerId: worker.id,
         token: worker.token,
@@ -759,6 +778,7 @@ export class MobileComputeHub {
 
   close(): void {
     this.layerHub.close();
+    this.textHub.close();
     for (const worker of this.workers.values()) {
       worker.socket?.close(1001, "coordinator shutting down");
       worker.socket = null;
@@ -796,6 +816,7 @@ export class MobileComputeHub {
         if (!message.payload.visible
           || message.payload.backend !== worker.registration.backend) {
           this.layerHub.disconnect(worker.id);
+          this.textHub.disconnect(worker.id);
         }
         worker.visible = message.payload.visible;
         worker.wakeLock = message.payload.wakeLock;
@@ -838,6 +859,10 @@ export class MobileComputeHub {
       case "layer.result":
       case "layer.fail":
         this.layerHub.handleMessage(worker.id, message.type, message.payload);
+        break;
+      case "text.result":
+      case "text.fail":
+        this.textHub.handleMessage(worker.id, message.type, message.payload);
         break;
     }
   }
@@ -910,17 +935,19 @@ export class MobileComputeHub {
   private async prepareExpert(
     artifactId: string,
     excludedWorkerIds: ReadonlySet<string> = new Set(),
+    targetWorkerId?: string,
   ): Promise<MobileWorkerState> {
     const manifest = this.expertManifests.get(artifactId) ?? this.loadManifest(artifactId);
     if (!manifest) throw new Error(`expert artifact ${artifactId} is not registered`);
     const resident = [...this.workers.values()].find(
-      (worker) => !excludedWorkerIds.has(worker.id)
-        && this.usableForExpert(worker)
+      (worker) => (!targetWorkerId || worker.id === targetWorkerId) && !excludedWorkerIds.has(worker.id)
+        && this.usableForExpert(worker, targetWorkerId === worker.id)
         && worker.residentExperts.has(artifactId),
     );
     if (resident) return resident;
     const worker = [...this.workers.values()].find(
-      (candidate) => !excludedWorkerIds.has(candidate.id) && this.usableForExpert(candidate),
+      (candidate) => (!targetWorkerId || candidate.id === targetWorkerId)
+        && !excludedWorkerIds.has(candidate.id) && this.usableForExpert(candidate, targetWorkerId === candidate.id),
     );
     if (!worker) throw new Error("two distinct validated visible mobile workers are required for replicated expert consensus");
     this.cancelMatrixWork(worker);
@@ -1132,12 +1159,67 @@ export class MobileComputeHub {
     pending.reject(new Error(payload.message));
   }
 
-  private usableForExpert(worker: MobileWorkerState): boolean {
+  /** Only the credential fingerprint verified by admission can bind a payout account. */
+  contributorIdentity(workerId: string, token?: string) {
+    const worker = this.workers.get(workerId);
+    if (!worker?.connected || !worker.credentialFingerprint
+      || (token !== undefined && !constantTimeEqual(worker.token, token))) return null;
+    return { workerId, browserId: worker.registration.clientId, fingerprint: worker.credentialFingerprint };
+  }
+
+  availableContributors(kind: "expert" | "text" = "expert") {
+    return [...this.workers.values()].filter(worker => worker.credentialFingerprint
+      && (kind === "text" ? this.usableForText(worker) : this.usableForExpert(worker)))
+      .map(worker => this.contributorIdentity(worker.id)!).filter(Boolean);
+  }
+
+  private usableForText(worker: MobileWorkerState, ownFundedLease = false) {
+    return Boolean(worker.connected && worker.visible && worker.socket?.readyState === worker.socket?.OPEN
+      && worker.verifiedTasks > 0 && !worker.pendingExpertTask && !this.layerHub.isBusy(worker.id)
+      && (ownFundedLease || !this.fundedBusy.has(worker.id)));
+  }
+
+  /** A single browser is payable only after checking the entire result against trusted weights. */
+  async executeFundedExpert(workerId: string, input: z.infer<typeof expertExecuteSchema>) {
+    const worker = this.workers.get(workerId);
+    if (!worker || !this.contributorIdentity(workerId) || !this.usableForExpert(worker))
+      throw new Error("browser_contributor_unavailable");
+    const manifest = this.expertManifests.get(input.artifactId) ?? this.loadManifest(input.artifactId);
+    if (!manifest || manifest.hiddenSize !== input.hiddenSize) throw new Error("browser_model_revision_invalid");
+    this.fundedBusy.add(workerId);
+    try {
+      if (input.rows * input.hiddenSize * manifest.intermediateSize * 3 > 20_000_000
+        || statSync(this.weightPath(manifest.weightsHash)).size > 64 * 1024 * 1024)
+        throw new Error("browser_reference_bounds_or_revision_invalid");
+      const expected = expertReference(readFileSync(this.weightPath(manifest.weightsHash)), manifest.weightsHash,
+        decodeFloat32(input.activationsBase64), input.rows, input.hiddenSize, manifest.intermediateSize);
+      await this.prepareExpert(input.artifactId, new Set(), workerId);
+      const result = await this.executeExpertOnWorker(worker, input);
+      if (!floatTensorsAgree(decodeFloat32(result.outputBase64), expected)) {
+        worker.gpuValidated = false;
+        this.rejectExpertConsensus([worker], input.artifactId, "reference_mismatch");
+        throw new Error("browser_inference_reference_mismatch");
+      }
+      worker.completedTasks++; worker.verifiedTasks++;
+      this.send(worker.socket, "expert.verified", { phase: "reference", artifactId: input.artifactId,
+        verifiedTasks: worker.verifiedTasks });
+      return { ...result, evidenceDigest: sha256CanonicalEvidence({ schema: "mycellios-browser-inference/1",
+        workerId, credentialFingerprint: worker.credentialFingerprint, artifactId: input.artifactId,
+        weightsHash: manifest.weightsHash, input, outputBase64: result.outputBase64 }) };
+    } finally { this.fundedBusy.delete(workerId); }
+  }
+
+  notifyInferenceSettled(workerId: string) {
+    this.send(this.workers.get(workerId)?.socket ?? null, "inference.settled", {});
+  }
+
+  private usableForExpert(worker: MobileWorkerState, ownFundedLease = false): boolean {
     return Boolean(
       worker.connected && worker.visible && worker.socket
       && worker.socket.readyState === worker.socket.OPEN && worker.verifiedTasks > 0
       && worker.registration.backend === "webgpu" && worker.gpuValidated
-      && !worker.pendingExpertTask,
+      && !worker.pendingExpertTask
+      && (ownFundedLease || !this.fundedBusy.has(worker.id)),
     );
   }
 
@@ -1184,6 +1266,7 @@ export class MobileComputeHub {
   private disconnect(worker: MobileWorkerState, socket: WebSocket, voluntary = false): void {
     if (worker.socket !== socket) return;
     this.layerHub.disconnect(worker.id);
+    this.textHub.disconnect(worker.id);
     worker.socket = null;
     worker.connected = false;
     worker.disconnectedAt = Date.now();

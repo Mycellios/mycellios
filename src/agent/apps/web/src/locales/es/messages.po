@@ -11396,3 +11396,150 @@ msgstr "Hay que configurar Firebase en la app de Android y en el servidor antes 
 
 msgid "Android push is not configured on this server."
 msgstr "Este servidor no tiene configurado el push de Android."
+
+msgid "Available on Desktop"
+msgstr "Disponible en escritorio"
+
+msgid "Could not connect. Try again."
+msgstr "No se pudo conectar. Inténtalo de nuevo."
+
+msgid "Generate AI"
+msgstr "Generar IA"
+
+msgid "Share computing power with the network"
+msgstr "Aporta potencia a la red"
+
+msgid "Connect account"
+msgstr "Conectar cuenta"
+
+msgid "Connect your Mycellios account to see your balance."
+msgstr "Conecta tu cuenta de Mycellios para ver el saldo."
+
+msgid "No tasks running"
+msgstr "Sin tareas en curso"
+
+msgid "Tasks at once"
+msgstr "Tareas a la vez"
+
+msgid "Extra tasks wait their turn."
+msgstr "Las demás esperan su turno."
+
+msgid "Credits not enabled here"
+msgstr "Créditos no habilitados"
+
+msgid "Models with your credits"
+msgstr "Modelos con tus créditos"
+
+msgid "You are signed in. This installation does not yet have access to Mycellios credits."
+msgstr "Tu sesión está iniciada. El acceso a créditos Mycellios aún no está habilitado aquí."
+
+msgid "Use my credits"
+msgstr "Usar mis créditos"
+
+msgid "Credits are not enabled in this installation."
+msgstr "Los créditos no están habilitados en esta instalación."
+
+msgid "Not enabled"
+msgstr "Sin activar"
+
+msgid "Earnings could not be linked to your account."
+msgstr "No se han podido vincular las ganancias a tu cuenta."
+
+msgid "New update available"
+msgstr "Actualización disponible"
+
+msgid "Update needs attention"
+msgstr "No se pudo actualizar"
+
+msgid "Updating shortly"
+msgstr "Se actualizará en breve"
+
+msgid "Update waiting"
+msgstr "Actualización en espera"
+
+msgid "Restart"
+msgstr "Reiniciar"
+
+msgid "Your account could not be linked. Try again."
+msgstr "No se ha podido vincular tu cuenta. Vuelve a intentarlo."
+
+msgid "Browser earnings aren't available yet."
+msgstr "Las ganancias del navegador aún no están disponibles."
+
+msgid "Identity"
+msgstr "Identidad"
+
+msgid "Server color"
+msgstr "Color del servidor"
+
+msgid "How this connection appears on this device."
+msgstr "Cómo se muestra esta conexión en este dispositivo."
+
+msgid "Recognize each connection at a glance."
+msgstr "Distingue tus conexiones de un vistazo."
+
+msgid "Connection names and colors stay on this device. Shared Space settings and permissions are managed separately."
+msgstr "El nombre y el color se guardan en este dispositivo. Los ajustes compartidos y los permisos se gestionan en cada espacio."
+
+msgid "Connect to this server to manage notifications."
+msgstr "Conéctate a este servidor para gestionar sus notificaciones."
+
+msgid "Current server"
+msgstr "Servidor actual"
+
+msgid "Saved server"
+msgstr "Servidor guardado"
+
+msgid "Each server keeps its own sign-in, conversations and permissions."
+msgstr "Cada servidor conserva su propia sesión, conversaciones y permisos."
+
+msgid "Manage connection"
+msgstr "Gestionar conexión"
+
+msgid "Changing a connection never moves or deletes your conversations."
+msgstr "Cambiar de conexión no mueve ni borra tus conversaciones."
+
+msgid "Discard unsaved connection changes?"
+msgstr "¿Descartar los cambios de esta conexión?"
+
+msgid "Could not complete this action. Your connection has not changed."
+msgstr "No se ha podido completar la acción. Tu conexión sigue igual."
+
+msgid "For 15 minutes"
+msgstr "Durante 15 minutos"
+
+msgid "For 1 hour"
+msgstr "Durante 1 hora"
+
+msgid "For 8 hours"
+msgstr "Durante 8 horas"
+
+msgid "For 24 hours"
+msgstr "Durante 24 horas"
+
+msgid "Notification settings"
+msgstr "Ajustes de notificaciones"
+
+msgid "Open in a new tab"
+msgstr "Abrir en otra pestaña"
+
+msgid "Remove saved connection"
+msgstr "Quitar conexión guardada"
+
+msgid "Bar"
+msgstr "Barra"
+
+msgid "Connect to another Mycellios. Your current chat stays open."
+msgstr "Conecta con otro Mycellios. Tu chat actual seguirá abierto."
+
+msgid "Public servers require HTTPS. Sign in separately on the new server."
+msgstr "Los servidores públicos requieren HTTPS. Iniciarás sesión en el nuevo servidor."
+
+msgid "For 3 hours"
+msgstr "Durante 3 horas"
+
+msgid "Until I turn it back on"
+msgstr "Hasta que las vuelva a activar"
+
+msgid "Server address"
+msgstr "Dirección del servidor"

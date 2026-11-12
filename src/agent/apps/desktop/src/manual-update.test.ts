@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ManualUpdateController, ManualUpdateDiskSpaceError, catalogManualRelease, windowsManualRelease, type ManualPackageKind, type ManualRelease } from "./manual-update.js";
+import { UpdatePreferences } from "./update-preferences.js";
 
 const bytes = new Uint8Array(Buffer.from("MZcontrolled-installer-fixture"));
 const entry = { id: "windows-x64", version: "0.3.15", format: "EXE",
@@ -27,6 +28,25 @@ async function fixture(overrides: { busy?: () => boolean; prepare?: () => Promis
   return { controller, handoff, request, directory };
 }
 describe("official Windows manual releases", () => {
+  it("automates a verified staged package only after native work, renderer approval and the grace period", async () => {
+    let now = 0, busy = true;
+    const prepare = vi.fn(async () => true);
+    const { controller, request, handoff } = await fixture({ backgroundDownloads: true, autoDownload: () => false, busy: () => busy, prepare });
+    await controller.check(false);
+    expect(controller.state().phase).toBe("available");
+    const policy = new UpdatePreferences({ packaged: true, allowed: true, installSupported: true, autoInstallByDefault: true,
+      read: async () => null, write: async () => {}, state: () => controller.state(),
+      download: () => controller.download(), install: () => controller.install(), cancelInstall: () => controller.cancelInstall(),
+      busy: () => busy, prepare, relaunch: async () => {}, now: () => now });
+    await policy.load(); await policy.tick();
+    expect(request).toHaveBeenCalledTimes(2); expect(controller.state().phase).toBe("ready");
+    expect(handoff).not.toHaveBeenCalled(); expect(prepare).not.toHaveBeenCalled();
+    busy = false; await policy.tick(); expect(policy.state().automaticRestartAt).toBe(15_000);
+    now = 15_000; await policy.tick();
+    await vi.waitFor(() => expect(handoff).toHaveBeenCalledOnce());
+    await policy.tick(); expect(handoff).toHaveBeenCalledOnce();
+    expect(prepare.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
   it("checks metadata without downloading when the user disables automatic downloads", async () => {
     const { controller, request, handoff } = await fixture({ backgroundDownloads: true, autoDownload: () => false });
     expect(await controller.check(true)).toMatchObject({ phase: "available", availableVersion: entry.version });

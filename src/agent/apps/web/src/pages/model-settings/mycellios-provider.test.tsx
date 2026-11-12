@@ -23,7 +23,7 @@ afterEach(async () => {
 });
 async function render(connected = false) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  mock.caps.mockResolvedValue({ mycelliosAccount: true });
+  mock.caps.mockResolvedValue({ mycelliosAccount: accountEnabled });
   const div = document.createElement("div");
   document.body.append(div);
   const root = createRoot(div);
@@ -58,10 +58,26 @@ async function render(connected = false) {
     ),
   );
   await vi.waitFor(() => expect(div.textContent).toContain("Mycellios"));
-  if (!connected) await vi.waitFor(() => expect(div.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false));
+  if (!connected && accountEnabled) await vi.waitFor(() => expect(div.querySelector<HTMLButtonElement>("button")?.disabled).toBe(false));
   return { div, refreshed };
 }
 describe("built-in Mycellios provider", () => {
+  it("does not ask an already signed-in local user to connect or sign in to a second account", async () => {
+    const { div } = await render(false, true, false);
+    await vi.waitFor(() => expect(div.textContent).toContain("Credits not enabled here"));
+    expect(div.textContent).toContain("You are signed in");
+    expect(div.textContent).not.toContain("Sign in with Mycellios");
+    expect(div.textContent).not.toContain("Not connected");
+    expect(div.querySelector("button")).toBeNull();
+    expect(mock.connect).not.toHaveBeenCalled();
+  });
+  it("activates models with the current account instead of offering another login", async () => {
+    const { div } = await render(false, true);
+    expect(div.textContent).toContain("Use my credits");
+    expect(div.textContent).not.toContain("Connect Mycellios");
+    expect(div.textContent).not.toContain("Sign in with Mycellios");
+  });
+
   it("is offered to a new account without API-key fields or passive provisioning", async () => {
     const { div, refreshed } = await render();
     expect(div.querySelector("input")).toBeNull();

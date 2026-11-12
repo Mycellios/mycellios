@@ -2,6 +2,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { productBrand, type DesktopUpdateState } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { UpdateNotice } from "./UpdateNotice";
 import { desktopBridge } from "../lib/desktop";
 import { canRestartDesktop, canShowDesktopUpdate, desktopUpdateHasCall, endDesktopUpdateCall } from "../lib/desktop-update-work";
 import { appPath } from "../lib/app-path";
@@ -11,6 +12,13 @@ const UPDATE_DISK_SPACE_MESSAGE = "Free at least 6 GB of disk space before resta
 
 function updateRequiresAttention(state: DesktopUpdateState | null) {
   return Boolean(state?.availableVersion && ["available", "downloading", "ready", "checking", "error"].includes(state.phase));
+}
+
+/** Both native restart controllers feed the same pending-update presentation. */
+function observedUpdateState(state: DesktopUpdateState): DesktopUpdateState {
+  if (state.phase !== "ready" || state.installPending || !state.relaunchPending) return state;
+  return { ...state, installPending: true, restartMode: "whenIdle",
+    waitingFor: state.relaunchWaitingFor === "unsaved_work" ? "unsaved_work" : "local_work" };
 }
 
 function useDesktopUpdates() {
@@ -37,7 +45,7 @@ function useDesktopUpdates() {
     async function refresh() {
       const started = revision.current;
       try {
-        const next = await bridge!.state();
+        const next = observedUpdateState(await bridge!.state());
         if (!stopped && started === revision.current) {
           setSafeToInterrupt(updateRequiresAttention(next) && canShowDesktopUpdate());
           setCallActive(desktopUpdateHasCall());
@@ -72,10 +80,11 @@ function useDesktopUpdates() {
     if ((action === "install" || action === "forceInstall") && desktopUpdateHasCall()) endDesktopUpdateCall();
     if (action === "check") setConfirmedCheck(null);
     try {
-      if (action === "download") void playUpdateMycelium(document.activeElement, "gather");
       if (action === "install" && canRestartDesktop()) await playUpdateMycelium(document.activeElement);
-      const next = await bridge[action]?.();
-      if (!next) return;
+      const method = action === "cancelInstall" && state?.relaunchPending ? "cancelRestart" : action;
+      const result = await bridge[method]?.();
+      if (!result) throw new Error("Update action is unavailable");
+      const next = observedUpdateState(result);
       setState(next);
       setSafeToInterrupt(updateRequiresAttention(next) && canShowDesktopUpdate());
       setCallActive(desktopUpdateHasCall());
@@ -96,7 +105,7 @@ function useDesktopUpdates() {
     }
   }
   const message = error ?? (
-    state?.handoffComplete
+    state?.relaunchError ? t`Could not complete the update. Try again.` : state?.handoffComplete
       ? t`Opened the system installer. Restart Mycellios when it finishes.`
       : state?.message === UPDATE_DISK_SPACE_MESSAGE
       ? t`Free at least 6 GB of disk space before restarting to update.`
@@ -263,49 +272,42 @@ export function DesktopSidebarUpdate() {
   const { t } = useLingui();
   const update = useSidebarUpdate();
   const state = update.state;
+  const actionRef = useRef<HTMLButtonElement>(null);
+  const animatedVersion = useRef<string | null>(null);
+  useEffect(() => {
+    if (state?.phase !== "downloading" || !state.availableVersion || animatedVersion.current === state.availableVersion) return;
+    animatedVersion.current = state.availableVersion;
+    void playUpdateMycelium(actionRef.current, "gather");
+  }, [state?.phase, state?.availableVersion]);
+  useEffect(() => {
+    if (!state?.automaticRestartAt) return;
+    const timer = setTimeout(() => {
+      if (canRestartDesktop()) void playUpdateMycelium(actionRef.current);
+    }, Math.max(0, state.automaticRestartAt - Date.now() - 1_400));
+    return () => clearTimeout(timer);
+  }, [state?.automaticRestartAt]);
   if (!state || !updateRequiresAttention(state)) return null;
   const ready = state.phase === "ready";
-  const percent =
-    typeof state.percent === "number" && Number.isFinite(state.percent)
-      ? Math.max(0, Math.min(100, Math.round(state.percent)))
-      : null;
-  return (
-    <div className="mx-2.5 mt-2 min-w-0 rounded-xl border border-border bg-sidebar-accent p-3">
-      <p role="status" className="text-xs font-medium">
-        {state.installPending ? <PendingRestart state={state} /> : update.error ??
-          (ready ? (state.installAction === "system-installer" ? <Trans>Update ready to install</Trans> : <Trans>Restart to update</Trans>) : state.phase === "available" ? <Trans>Update available</Trans> : <Trans>Downloading…</Trans>)}
-      </p>
-      {ready ? (
-        <Button
-          aria-label={t`Install update`}
-          className="mt-2 w-full"
-          disabled={update.busy}
-          onClick={update.install}
-        >
-          {state.installAction === "system-installer" ? <Trans>Open installer</Trans>
-            : update.callActive ? <Trans>End call and restart</Trans> : state.installPending && state.supportsForceRestart ? <Trans>Restart now</Trans> : <Trans>Restart to update</Trans>}
-        </Button>
-      ) : state.phase === "error" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.check}><Trans>Try again</Trans></Button>
-        : state.phase === "available" ? <Button variant="outline" className="mt-2 w-full" disabled={update.busy} onClick={update.download}><Trans>Download update</Trans></Button> : percent !== null ? (
-        <div className="mt-2 flex items-center gap-2">
-          <progress
-            aria-label={t`Download progress`}
-            max={100}
-            value={percent}
-            className="h-1.5 min-w-0 flex-1 accent-primary"
-          />
-          <span className="text-xs tabular-nums">{percent}%</span>
-        </div>
-      ) : null}
-      {update.error && <a href={new URL("/downloads/desktop", productBrand.apiBaseUrl).href} target="_blank" rel="noopener noreferrer"
-        className="mt-2 block text-xs underline underline-offset-4"><Trans>Download the latest version</Trans></a>}
-      {state.installPending && <Button size="sm" variant="ghost" className="mt-2 w-full" disabled={update.cancelBusy} onClick={update.cancel}>
-        <Trans>Cancel update</Trans>
-      </Button>}
-    </div>
-  );
+  const downloading = state.phase === "downloading" || state.phase === "checking";
+  const failed = state.phase === "error" || Boolean(update.error);
+  const percent = typeof state.percent === "number" && Number.isFinite(state.percent)
+    ? Math.max(0, Math.min(100, Math.round(state.percent))) : null;
+  const label = failed ? t`Update needs attention` : state.automaticRestartAt ? t`Updating shortly`
+    : state.installPending ? t`Update waiting` : ready ? t`Update ready to install` : t`New update available`;
+  const actionLabel = ready ? t`Install update` : failed ? t`Try again` : t`Download update`;
+  const pendingDetails = state.installPending && !state.automaticRestartAt ? <span><PendingRestart state={state} /></span> : null;
+  return <UpdateNotice actionRef={actionRef} label={label} actionLabel={actionLabel} ready={ready} failed={failed}
+    busy={update.busy || downloading} disabled={update.busy || downloading}
+    progress={downloading ? percent : undefined} progressLabel={t`Download progress`}
+    action={downloading ? (percent === null ? state.phase === "checking" ? t`Checking…` : t`Downloading…` : `${percent}%`)
+      : ready ? state.installAction === "system-installer" ? t`Open installer`
+        : update.callActive ? t`End call and restart` : state.installPending && state.supportsForceRestart ? t`Restart now` : t`Restart`
+      : failed ? t`Try again` : t`Download`}
+    onAction={ready ? update.install : failed ? update.check : update.download}
+    details={update.error ? <span role="status">{update.error} <a href={new URL("/downloads/desktop", productBrand.apiBaseUrl).href} target="_blank" rel="noopener noreferrer"><Trans>Download the latest version</Trans></a></span> : pendingDetails}
+    secondary={state.installPending ? <button type="button" disabled={update.cancelBusy} onClick={update.cancel}><Trans>Cancel update</Trans></button> : null}
+  />;
 }
-
 export function DesktopUpdateSection() {
   const updates = useContext(UpdatesContext);
   if (!updates?.state) return null;

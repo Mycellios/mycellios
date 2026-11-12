@@ -97,6 +97,8 @@ export class BrowserLayerHub {
     mkdirSync(this.artifactDirectory, { recursive: true });
   }
 
+  isBusy(peerId: string) { return [...this.pending.values()].some(task => task.peerId === peerId); }
+
   attach(app: FastifyInstance): void {
     app.put("/internal/v1/mobile/layers/graphs/:graphSha256", {
       bodyLimit: 512 * 1024 * 1024,

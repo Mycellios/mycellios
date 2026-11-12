@@ -1,6 +1,8 @@
 import type { EconomicLedger } from "../economy/economic-ledger.js";
 import type { ManagedModel,ManagedCatalogDiscovery } from "../contracts/managed-provider.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
+import type { BrowserInference } from "./browser-inference.js";
+import { markedUpUnitPrice } from "../economy/managed-pricing.js";
 
 function credits(microunits: number): string {
   if (!Number.isSafeInteger(microunits) || microunits < 0) throw new Error("native_catalog_price_invalid");
@@ -23,7 +25,8 @@ export async function nativeCreditMetadata(ledger: EconomicLedger,
 }
 
 export async function mycelliosModelCatalog(models: Array<{ id: string; replicas: number; pipelines: number }>,
-  ledger: EconomicLedger, managed: { catalog(): Promise<ManagedModel[]>;inventory?():Promise<ManagedCatalogDiscovery[]> } | null) {
+  ledger: EconomicLedger, managed: { catalog(): Promise<ManagedModel[]>;inventory?():Promise<ManagedCatalogDiscovery[]> } | null,
+  browser?: Pick<BrowserInference, "models">) {
   const native = await Promise.all(models.map(async model => ({
     id: model.id, object: "model", created: 0, owned_by: "mycellios",
     ...await nativeCreditMetadata(ledger, model), x_replicas: model.replicas, x_pipelines: model.pipelines,
@@ -35,5 +38,10 @@ export async function mycelliosModelCatalog(models: Array<{ id: string; replicas
     object:"model",owned_by:"mycellios",modality:m.outputModalities.length===1?m.outputModalities[0]:"multimodal",
     task:m.outputModalities.length===1?m.outputModalities[0]:"multimodal",available:false,creditEligible:false,
     reason:m.available?"route_not_enabled":m.reason})):[];
-  return { object: "list", data: [...native, ...external,...discovered] };
+  const browserModels = browser?.models().filter(o => "kind" in o).map(o => ({ id: o.model, name: "GPT-2 · 124M · Browser",
+    object: "model", owned_by: "mycellios", processing: "network", task: "chat", available: true, creditEligible: true,
+    experimental: true, supports_tools: false, context_length: 160, max_input_tokens: 128, max_output_tokens: 32,
+    pricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 400, estimate: "maximum",
+      input: markedUpUnitPrice(credits(o.costMicrounitsPerToken)), output: markedUpUnitPrice(credits(o.costMicrounitsPerToken)) } })) ?? [];
+  return { object: "list", data: [...native, ...browserModels, ...external,...discovered] };
 }

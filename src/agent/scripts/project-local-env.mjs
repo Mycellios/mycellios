@@ -1,3 +1,4 @@
+import {loadDevIdentityEnvironment} from './project-local-sso.mjs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -32,8 +33,8 @@ export function projectLocalEnvironment(inherited = process.env) {
   };
 }
 
-export function applyProjectLocalEnvironment() {
-  const env = projectLocalEnvironment();
+export function applyProjectLocalEnvironment(options = {}) {
+  const env = {...projectLocalEnvironment(), ...(options.account === false ? {} : loadDevIdentityEnvironment())};
   for (const key of Object.keys(process.env)) delete process.env[key];
   Object.assign(process.env, env);
   return env;

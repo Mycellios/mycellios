@@ -1,5 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { buildNativeSourceProvenance } from "../../../../scripts/native-build-provenance.mjs";
+import { existsSync, readFileSync } from "node:fs";
 import type { ClientRequest, IncomingMessage } from "node:http";
 import http from "node:http";
 import https from "node:https";
@@ -486,6 +487,17 @@ export default defineConfig(async ({ command, mode }) => {
     ]),
   );
   const previewHost = process.env.RAKAZO_HOST ?? rootEnv.RAKAZO_HOST ?? "localhost";
+  // Browser worker transport, separate from the Agent API and its cookies.
+  const browserProfile = path.resolve(import.meta.dirname, "../../.cache/browser-coordinator-url");
+  // Private Dev override; excluded from production builds and source artifacts.
+  const localWorkerTarget = command === "serve" && existsSync(browserProfile) ? readFileSync(browserProfile, "utf8").trim() : undefined;
+  const workerTarget = new URL(process.env.MYCELLIOS_BROWSER_COORDINATOR ?? rootEnv.MYCELLIOS_BROWSER_COORDINATOR ?? localWorkerTarget ?? "https://www.mycellios.com");
+  if (workerTarget.origin !== "https://www.mycellios.com" && !(/^https?:$/.test(workerTarget.protocol) && ["127.0.0.1", "localhost", "[::1]"].includes(workerTarget.hostname))) throw new Error("Invalid browser coordinator");
+  apiProxy["/mobile/v1"] = { target: workerTarget.origin, changeOrigin: true, ws: true, configure(proxy) {
+    proxy.on("proxyReq", req => req.removeHeader("cookie"));
+    proxy.on("proxyReqWs", req => req.removeHeader("cookie"));
+  } };
+  apiProxy["/browser/ort/"] = { target: workerTarget.origin, changeOrigin: true };
   const allowedHosts = [
     previewHost,
     ...(process.env.RAKAZO_ALLOWED_HOSTS ?? rootEnv.RAKAZO_ALLOWED_HOSTS ?? "")
@@ -522,7 +534,7 @@ export default defineConfig(async ({ command, mode }) => {
     resolve: { alias: await workspaceViteAliases(path.resolve(import.meta.dirname, "../..")) },
     base: deploymentBase,
     build: { sourcemap: true },
-    define: { "import.meta.env.RAKAZO_BUILD": JSON.stringify(buildId) },
+    define: { "import.meta.env.RAKAZO_BUILD": JSON.stringify(buildId), __MYCELLIOS_BUILD_IDENTITY__: JSON.stringify((({schema,version,sourceId}) => ({schema,version,sourceId}))(buildNativeSourceProvenance(path.resolve(import.meta.dirname, "../../../..")))) },
     plugins: [
       {
         // The API reads this to name the deployed build, and a tab fetches it to confirm the
@@ -610,7 +622,9 @@ export default defineConfig(async ({ command, mode }) => {
         configurePreviewServer: (server) => attachNovncProxy(server, screenProxySecret(), api),
       },
     ],
+    worker: { format: "es" },
     server: {
+      fs: { allow: [path.resolve(import.meta.dirname, "../.."), path.resolve(import.meta.dirname, "../../../mobile"), path.resolve(import.meta.dirname, "../../../contracts")] },
       host: process.env.RAKAZO_DEV_HOST ?? rootEnv.RAKAZO_DEV_HOST ?? "127.0.0.1",
       port: webPort,
       strictPort: true,

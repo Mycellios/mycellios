@@ -1,24 +1,17 @@
+import { startContributionGrowth, stopContributionGrowth } from "../lib/contribution-growth";
 import "./contribution.css";
 import { useLingui } from "@lingui/react/macro";
-import { productBrand } from "@rakazo/contracts";
-import { Button, buttonVariants } from "@rakazo/ui-web";
-import { ArrowUpRight, Cpu, LoaderCircle, Pause, RefreshCw } from "lucide-react";
+import { Button } from "@rakazo/ui-web";
+import { LoaderCircle, Pause, Play, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { fetchAuthCapabilities } from "../lib/auth-capabilities";
 import { desktopBridge } from "../lib/desktop";
 import { rpc } from "../lib/rpc";
+import { BrowserContributionControl } from "./BrowserContributionControl";
+import { setContributionActivity } from "../lib/contribution-activity";
 
-const activeIndicators = new Set<symbol>();
-function publishActivity() {
-  const active = activeIndicators.size > 0;
-  if ((document.body.dataset.mycelliosContributing === "true") === active) return;
-  document.body.dataset.mycelliosContributing = String(active);
-  window.dispatchEvent(new Event("mycellios:contribution-activity"));
-}
 
 type Status = Awaited<ReturnType<typeof rpc.models.contributionStatus>>;
-// The worker's entry file is served directly even when directory indexes are unavailable.
-const browserWorkerUrl = new URL("/browser/index.html", productBrand.apiBaseUrl).href;
 
 /** Shared sidebar; starting compute is an explicit user action, never an effect. */
 export function SidebarContribution({ mini = false, activationLabel, expanded = false }: { mini?: boolean; activationLabel?: string; expanded?: boolean }) {
@@ -73,7 +66,7 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   }, [runtime]);
   async function toggle() {
     if (busy || operating.current || accountUnavailable) return;
-    if (!runtime || !supported) { window.location.assign(browserWorkerUrl); return; }
+    if (!runtime || !supported) return;
     const action = node?.enabled === true ? "pause" : "resume";
     revision.current++; operating.current = true;
     setRequested(true); setBusy(true); setError(false);
@@ -114,13 +107,12 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
   const confirmedActive = Boolean(runtime) && supported && active && node?.connected === true && !hasError && !incomplete && !accountUnavailable && !needsIdentity;
   useEffect(() => {
     const key = indicator.current;
-    if (!expanded && confirmedActive) activeIndicators.add(key); else activeIndicators.delete(key);
-    publishActivity();
-    return () => { activeIndicators.delete(key); publishActivity(); };
+    setContributionActivity(key, !expanded && confirmedActive);
+    return () => { setContributionActivity(key, false); };
   }, [confirmedActive, expanded]);
-  const idleLabel = activationLabel ?? t`Earn credits with your computer`;
+  const idleLabel = activationLabel ?? t`Generate AI`;
   const shortLabel = t`Earn with your computer`;
-  const browserLabel = incomplete || accountUnavailable ? t`Contribute in browser` : idleLabel;
+  const unavailable = !runtime || !supported || incomplete || accountUnavailable;
   const label = busy ? needsIdentity ? t`Verifying this computer…` : t`Setting up contribution…`
     : needsIdentity ? t`Verify this computer` : hasError ? t`Retry`
     : waiting ? t`Waiting for this computer…` : active ? t`Pause contribution` : idleLabel;
@@ -133,30 +125,21 @@ export function SidebarContribution({ mini = false, activationLabel, expanded = 
     : active ? t`Credits are added after the network verifies your work.`
     : t`Share this computer’s resources and earn credits for verified work.`;
   const spinning = busy || (waiting && !hasError);
-  const Icon = spinning ? LoaderCircle : needsIdentity || hasError ? RefreshCw : active ? Pause : Cpu;
   const actionClass = `${!expanded ? "rk-contribution-button " : ""}h-auto min-h-9 min-w-0 justify-start gap-1.5 px-2 py-1 text-start text-xs font-medium`;
   const controls = <div data-testid="contribution-control" data-active={confirmedActive ? "true" : "false"} className={mini ? "shrink-0 px-2 py-1" : "rk-contribution-control min-w-0 max-w-full"}>
     <div className="flex min-w-0 items-center">
-    {!runtime || !supported || incomplete || accountUnavailable ? <a href={browserWorkerUrl}
-      target="_blank" rel="noopener noreferrer" aria-label={browserLabel}
-      title={mini ? browserLabel : detail}
-      className={buttonVariants({ variant: "ghost", className: actionClass })}>
-      <Cpu className="size-4 shrink-0" aria-hidden="true" />
-      {!mini && <><span className="min-w-0 whitespace-normal">{expanded ? (incomplete || accountUnavailable ? browserLabel : shortLabel) : t`Contribute`}</span><ArrowUpRight className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" /></>}
-    </a> :
     <Button variant="ghost" className={actionClass}
-      onClick={() => { if (hasError && !needsIdentity) void refresh(); else void toggle(); }} disabled={busy || (waiting && !hasError)} aria-label={label} title={mini ? `${label}. ${detail}` : detail}>
-      {mini ? <Cpu className="size-4 shrink-0" /> : <Icon className={`size-4 shrink-0 ${spinning ? "animate-spin motion-reduce:animate-none" : ""}`} />}
-      {!mini && <span className="min-w-0 whitespace-normal">{expanded ? (label === idleLabel ? shortLabel : label) : busy || waiting ? (node?.pending === "pause" ? t`Pausing…` : t`Activating…`) : hasError ? t`Retry` : needsIdentity ? t`Verify this computer` : active ? t`Pause` : t`Contribute`}</span>}
-    </Button>}
+      onClick={event => { if (active) stopContributionGrowth(); else if (!hasError && !needsIdentity) startContributionGrowth(event.currentTarget); if (hasError && !needsIdentity) void refresh(); else void toggle(); }} disabled={unavailable || busy || (waiting && !hasError)} aria-label={label} title={unavailable ? t`Available on Desktop` : mini ? `${label}. ${detail}` : detail}>
+      {!mini && <span className="min-w-0 flex-1 text-start"><span className="block text-sm">{expanded ? (label === idleLabel ? shortLabel : label) : busy || waiting ? (node?.pending === "pause" ? t`Pausing…` : t`Activating…`) : t`Generate AI`}</span><span className="block text-[11px] text-muted-foreground">{hasError ? t`Retry` : needsIdentity ? t`Verify this computer` : active ? t`Pause` : t`Share computing power with the network`}</span></span>}
+      <span className={mini ? "rk-contribution-play rk-contribution-play-mini" : "rk-contribution-play"}>{spinning ? <LoaderCircle size={22} className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> : hasError || needsIdentity ? <RefreshCw size={22} className="size-5" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}</span>
+    </Button>
     </div>
-    {!mini && !expanded && confirmedActive && <p className="rk-contribution-status"><span aria-hidden="true" />{t`Contribution active`}</p>}
-    {!mini && (accountUnavailable || incomplete || hasError || (requested && (busy || needsIdentity)) || (expanded && active) || waiting) && (
+    {!mini && unavailable && <p className="px-2 text-[11px] text-muted-foreground">{t`Available on Desktop`}</p>}
+    {!mini && !unavailable && (hasError || (requested && (busy || needsIdentity)) || (expanded && active) || waiting) && (
       <div className="px-2 pb-1 text-[11px]">
         <p role={hasError ? "alert" : "status"} className={hasError ? "text-destructive" : "text-muted-foreground"}>{detail}</p>
-        {(hasError || incomplete || accountUnavailable) && <a target="_blank" rel="noopener noreferrer" className="text-muted-foreground underline underline-offset-2 hover:text-foreground" href={new URL("/dashboard?view=contribute", productBrand.apiBaseUrl).href}>{t`Open dashboard`}</a>}
       </div>
     )}
   </div>;
-  return controls;
+  return unavailable ? <BrowserContributionControl mini={mini} /> : controls;
 }

@@ -111,6 +111,15 @@
   }
 }
 
+/* Product-wide focus presentation: retain DOM focus without an outline or halo. */
+:root :is(:focus, :focus-visible, :focus-within) {
+  outline: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  --tw-inset-ring-shadow: 0 0 #0000 !important;
+}
+:root :is(:focus, :focus-visible) { box-shadow: none !important; }
+
 /* Native <details> fold-outs slide open and closed instead of snapping. */
 @media (prefers-reduced-motion: no-preference) {
   :root {

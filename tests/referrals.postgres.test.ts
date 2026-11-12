@@ -9,6 +9,7 @@ import { ContributionCreditWallet, contributionCreditSchemaSql } from "../src/ec
 import { PromotionalCredits, expiringPromotionSchemaSql } from "../src/economy/promotional-credits.js";
 import { Referrals, referralSchemaSql, referralAccessSchemaSql, type ReferralAccount } from "../src/economy/referrals.js";
 import { mountReferralRoutes, referralReceipt, REFERRAL_COOKIE } from "../src/coordinator/referral-routes.js";
+import { grantWelcomeCredits, WELCOME_CREDIT_MICROUNITS } from "../src/economy/welcome-credits.js";
 
 // The dedicated CI gate supplies real PostgreSQL; ordinary unit discovery reports this suite skipped.
 const url = process.env.MYCELLIOS_REFERRAL_TEST_POSTGRES_URL;
@@ -60,6 +61,49 @@ beforeEach(async () => {
     economic_settlements,economic_contribution_evidence,economic_accounts,economic_node_reputation CASCADE`);
 });
 afterAll(async () => { await db?.close(); await sql.unsafe(`DROP SCHEMA ${schema} CASCADE; DROP ROLE ${runtimeRole}; DROP ROLE ${deniedRole}`); await sql.end(); });
+
+describe("default welcome credits",()=>{
+  it("adds exactly 0.20 Credits / USD to a newly provisioned verified account",async()=>{
+    const newcomer=await account("welcome-new");
+    expect(WELCOME_CREDIT_MICROUNITS).toBe(200000);
+    expect(await grantWelcomeCredits(db,newcomer,now+10)).toBe(true);
+    expect(await wallet.summary("account",newcomer.userId,now+20)).toMatchObject({
+      availableMicrounits:200000,promotionalGrantedMicrounits:200000,contributionEarnedMicrounits:0,reservedMicrounits:0,
+    });
+    expect(await db.raw.prepare("SELECT reason,expires_at FROM economic_promotional_grants WHERE account_id=?").get(newcomer.userId))
+      .toMatchObject({reason:"verified-account-welcome",expires_at:null});
+  });
+  it("grants once under simultaneous login, refresh and lost-response retries",async()=>{
+    const newcomer=await account("welcome-concurrent");
+    const grants=await Promise.all(Array.from({length:20},()=>grantWelcomeCredits(db,newcomer,now+10)));
+    expect(grants.filter(Boolean)).toHaveLength(1);
+    expect(await grantWelcomeCredits(db,newcomer,now+DAY)).toBe(false);
+    expect((await wallet.summary("account",newcomer.userId,now+DAY)).availableMicrounits).toBe(200000);
+    expect((await wallet.summary("account","unrelated",now+DAY)).availableMicrounits).toBe(0);
+    expect(await db.raw.prepare("SELECT COUNT(*) AS count FROM economic_promotional_grants WHERE account_id=?").get(newcomer.userId)).toMatchObject({count:1});
+    expect(await db.raw.prepare("SELECT COUNT(*) AS count FROM economic_promotional_grants").get()).toMatchObject({count:1});
+  });
+  it("requires the verified provisioned identity and grants separately to each account",async()=>{
+    const first=await account("welcome-first"),second=await account("welcome-second");
+    expect(await grantWelcomeCredits(db,{...first,emailVerified:false},now)).toBe(false);
+    expect(await grantWelcomeCredits(db,{userId:first.userId},now)).toBe(false);
+    expect(await grantWelcomeCredits(db,{userId:"missing-account",emailVerified:true},now)).toBe(false);
+    expect(await grantWelcomeCredits(db,{userId:"",emailVerified:true},now)).toBe(false);
+    expect(await grantWelcomeCredits(db,first,now+10)).toBe(true);
+    expect(await grantWelcomeCredits(db,second,now+10)).toBe(true);
+    expect((await wallet.summary("account",first.userId,now+20)).availableMicrounits).toBe(200000);
+    expect((await wallet.summary("account",second.userId,now+20)).availableMicrounits).toBe(200000);
+  });
+  it("preserves the separate referral reward without repeating either welcome grant",async()=>{
+    const {owner,receipt}=await invitation();const newcomer=await account("welcome-referred");
+    await grantWelcomeCredits(db,owner,now);await grantWelcomeCredits(db,newcomer,now+10);
+    expect((await referrals.redeem(newcomer,receipt,now+20)).status).toBe("awarded");
+    expect(await grantWelcomeCredits(db,newcomer,now+30)).toBe(false);
+    expect((await wallet.summary("account",owner.userId,now+40)).availableMicrounits).toBe(1200000);
+    expect((await wallet.summary("account",newcomer.userId,now+40)).availableMicrounits).toBe(1200000);
+    expect((await wallet.summary("account",newcomer.userId,now+15*DAY)).availableMicrounits).toBe(200000);
+  });
+});
 
 it("only the native database role can read or create invitations, even if browser table access is accidentally granted", async () => {
   await invitation();

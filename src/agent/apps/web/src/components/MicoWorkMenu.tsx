@@ -147,15 +147,15 @@ export function MicoWorkMenu({
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="max-h-[70dvh] w-[440px] max-w-[calc(100vw-2rem)] overflow-y-auto"
+        className="max-h-[70dvh] w-80 max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto p-4"
       >
-        <PopoverTitle>{label}</PopoverTitle>
+        <PopoverTitle className="text-xs font-normal text-muted-foreground">{label}</PopoverTitle>
         <div className="space-y-3">
           {runId ? (
-            <TaskControls key={runId} runId={runId} autoOpen />
+            <TaskControls key={runId} runId={runId} autoOpen embedded />
           ) : (
             <p className="text-sm text-muted-foreground">
-              <Trans>No active work in this conversation. Earlier work remains in Activity.</Trans>
+              <Trans>No tasks running</Trans>
             </p>
           )}
           {work.length ? (
@@ -180,13 +180,14 @@ export function MicoWorkMenu({
               ))}
             </div>
           ) : null}
-          <details className="border-t pt-2">
-            <summary className="w-fit cursor-pointer rounded-sm py-1 text-xs text-muted-foreground focus-visible:outline focus-visible:outline-ring">
-              <Trans>Simultaneous tasks</Trans>
-            </summary>
-            <div className="mt-2 space-y-2">
+          <div className="space-y-2 border-t border-border pt-3">
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm" htmlFor={`task-limit-${botId}`}><Trans>Tasks at once</Trans></label>
               <NativeSelect
+                id={`task-limit-${botId}`}
+                className="w-16 shrink-0"
                 aria-label={t`Simultaneous tasks`}
+                title={t`Computer operations remain exclusive. Changing the limit does not stop active work.`}
                 value={policy?.limit ?? 1}
                 disabled={!policy || busy}
                 onChange={(event) => {
@@ -203,16 +204,11 @@ export function MicoWorkMenu({
                   <NativeSelectOption key={value} value={value}>{value}</NativeSelectOption>
                 ))}
               </NativeSelect>
-              {policy && policy.effectiveLimit !== policy.limit ? (
-                <p className="text-xs text-muted-foreground">
-                  <Trans>This runtime currently runs one task at a time.</Trans>
-                </p>
-              ) : null}
-              <p className="text-xs text-muted-foreground">
-                <Trans>Computer operations remain exclusive. Changing the limit does not stop active work.</Trans>
-              </p>
             </div>
-          </details>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {policy && policy.effectiveLimit !== policy.limit ? <Trans>This runtime currently runs one task at a time.</Trans> : <Trans>Extra tasks wait their turn.</Trans>}
+            </p>
+          </div>
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}

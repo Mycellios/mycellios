@@ -372,8 +372,8 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
 
 .rk-chat-action:focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
 
-/* Preserve real focus and keyboard navigation; only suppress pointer focus decoration. */
-:root[data-focus-input="pointer"] :focus {
+/* Shared UI policy also applies to app-specific focus decoration in every input mode. */
+:root :is(:focus, :focus-visible, :focus-within) {
   outline: none !important;
   --tw-ring-color: transparent !important;
   --tw-ring-shadow: 0 0 #0000 !important;

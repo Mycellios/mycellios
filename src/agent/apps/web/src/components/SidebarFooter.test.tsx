@@ -113,7 +113,10 @@ it.each(["unsupported", "idle", "available", "downloading", "checking", "error"]
     bridge(phase);
     await render();
     expect(document.querySelector('[aria-label="Install update"]')).toBeNull();
-    expect(document.body.textContent).not.toContain("New update available");
+    if (["available", "downloading", "checking"].includes(phase)) {
+      expect(host.querySelector(".myc-update-notice")).not.toBeNull();
+      expect(document.body.textContent).toContain("New update available");
+    }
   },
 );
 it("installs the ready update only through the footer button", async () => {
@@ -140,7 +143,7 @@ it("does not invent a percentage when download progress is unknown", async () =>
   bridge("downloading");
   await render();
   expect(host.textContent).toContain("Downloading…");
-  expect(host.querySelector("progress")).toBeNull();
+  expect(host.querySelector("progress")?.hasAttribute("value")).toBe(false);
 });
 it("shows the account image and falls back to the initial after a load error", async () => {
   await render("Ada Lovelace", "https://example.test/avatar.png");

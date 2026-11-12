@@ -98,7 +98,6 @@ export function SidebarHeader({
         : `${hiddenTitleBar ? "app-drag" : ""} rk-sidebar-topbar shrink-0 items-center gap-1 ${mini ? "flex flex-col px-1 py-2" : "grid grid-cols-[minmax(0,1fr)_auto] px-2"} ${hiddenTitleBar ? (mini ? "pt-14" : "ps-12") : ""}`}
     >
       {mobile ? <Button variant="floating" size="icon-lg" className="size-12 rounded-full" aria-label={t`Close navigation`} onClick={() => setMobileSidebarOpen(false)}><PanelLeftClose size={22} /></Button> : null}
-      {!mini && !mobile && <ServerConnections rail />}
       {!mini ? <div className={mobile ? "order-last min-w-0 basis-full" : "flex min-w-0 items-center"}>
         {mobile ? <div className="mt-2 flex items-center gap-2"><h1 className="text-3xl font-semibold tracking-tight">Mycellios</h1></div> : null}
         <Popover open={workspaceOpen} onOpenChange={setWorkspaceOpen}>

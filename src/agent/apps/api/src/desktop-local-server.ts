@@ -23,7 +23,7 @@ export interface DesktopLocalConfig {
   token: string;
   build: string;
   /** Source preview uses the same database/auth with a separate Vite origin. */
-  projectPreview?: { webOrigin: string; migrationConfig: string };
+  projectPreview?: { webOrigin: string; migrationConfig: string; authOrigin?: string };
   hostComputer?: { url: string; token: string };
 }
 
@@ -114,6 +114,8 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
     if (origin.protocol !== "http:" || origin.hostname !== "127.0.0.1" ||
         origin.origin !== config.projectPreview.webOrigin || origin.username || origin.password)
       throw new Error("Project preview requires a loopback web origin");
+    if (config.projectPreview.authOrigin && (config.projectPreview.authOrigin !== "http://127.0.0.1:5188" || config.projectPreview.webOrigin !== "http://127.0.0.1:5192"))
+      throw new Error("Invalid dedicated local authentication callback");
   }
   const identity = await localIdentity(config.dataDir);
   const databasePort = await freeLocalPort();
@@ -254,7 +256,7 @@ export async function startDesktopLocalServer(config: DesktopLocalConfig) {
       SCREEN_PROXY_SECRET: identity.screenProxySecret,
       DATA_DIR: config.dataDir,
       WEB_ORIGIN: config.projectPreview?.webOrigin ?? origin,
-      BETTER_AUTH_URL: config.projectPreview?.webOrigin ?? origin,
+      BETTER_AUTH_URL: config.projectPreview?.authOrigin ?? config.projectPreview?.webOrigin ?? origin,
       API_URL: origin,
       API_HOST: "127.0.0.1",
       API_PORT: String(config.port),

@@ -22,7 +22,7 @@ describe("app content security policy", () => {
   const policy = directives(APP_CONTENT_SECURITY_POLICY);
 
   it("runs only same-origin script files", () => {
-    expect(policy.get("script-src")).toEqual(["'self'"]);
+    expect(policy.get("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'"]);
     expect(policy.get("default-src")).toEqual(["'self'"]);
     expect(APP_CONTENT_SECURITY_POLICY).not.toContain("'unsafe-eval'");
   });
@@ -133,7 +133,7 @@ describe("operator-added origins", () => {
         connectSrc: ["https://beacon.example.com", "https://*.example.net"],
       }),
     );
-    expect(extended.get("script-src")).toEqual(["'self'", "https://static.example.com"]);
+    expect(extended.get("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'", "https://static.example.com"]);
     expect(extended.get("connect-src")).toEqual([
       "'self'",
       "https://beacon.example.com",

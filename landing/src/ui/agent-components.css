@@ -78,10 +78,9 @@
 :root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-select, .app-select-trigger) { background: var(--agent-select-surface) !important; }
 :root[data-mycellios-design="agent"] .public-panel .inference-model-picker > button { background: var(--agent-select-surface) !important; border-color: var(--agent-input-line) !important; }
 :root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-input, .ui-textarea)::placeholder { color: var(--agent-muted) !important; opacity: 1; }
-:root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.ui-input, .ui-select, .ui-textarea, .app-select-trigger):focus { border-color: var(--agent-ring) !important; }
 :root[data-mycellios-design="agent"] .public-panel option { background: var(--agent-popover) !important; color: var(--agent-fg) !important; }
 :root[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary:focus:not(:focus-visible) { outline: none; }
-:root[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary:focus-visible { outline: 1px solid var(--agent-ring); outline-offset: -3px; }
+:root[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary:focus-visible { outline: none; }
 :root[data-mycellios-design="agent"] .public-panel .panel-disclosure > summary:hover { background: var(--agent-hover) !important; }
 :root[data-mycellios-design="agent"] .public-panel .panel-disclosure-body > .api-access-panel { background: transparent !important; }
 :root[data-mycellios-design="agent"] .public-panel .inference-unavailable-icon { background: var(--agent-muted-surface) !important; color: var(--agent-muted) !important; border-color: var(--agent-card-line) !important; }
@@ -121,7 +120,6 @@
 :root[data-mycellios-design="agent"] .public-panel :is(.account-mode-tabs, .connect-platforms) .ui-button { border-bottom-color: transparent !important; }
 :root[data-mycellios-design="agent"] :is(.public-panel, .rb-page, .net, .studio-page, .earn-page, .spore-page) :is(.panel-stat > div, .global-capacity-metric > i, .panel-disclosure-icon, .overview-announcement-icon, .announcement-icon, .model-icon, .inference-unavailable-icon) { border: 0 !important; background: transparent !important; color: var(--agent-muted) !important; }
 :root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) { background: var(--agent-input-surface) !important; border: 1px solid var(--agent-input-line) !important; }
-:root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search):focus-within { border-color: var(--agent-ring) !important; }
 :root[data-mycellios-design="agent"] .public-panel :is(.hub-model-search, .system-log-search) .ui-input { border: 0 !important; background: transparent !important; }
 :root[data-mycellios-design="agent"] #mycellios-loader { background: var(--dark-canvas) !important; }
 

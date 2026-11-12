@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("rakazoDesktop", {
   videoEdit: { request: input => ipcRenderer.invoke("desktop.apps.video-edit", input) },
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
-  servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url) },
+  servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url), updateIdentity: (url, identity) => ipcRenderer.invoke("desktop.servers.updateIdentity", url, identity) },
   platform: process.platform,
   settings: {
     fonts: () => ipcRenderer.invoke("desktop.settings.fonts"),

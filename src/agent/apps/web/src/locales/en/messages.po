@@ -10635,3 +10635,150 @@ msgstr "Firebase must be configured in the Android app and on the server before 
 
 msgid "Android push is not configured on this server."
 msgstr "Android push is not configured on this server."
+
+msgid "Earn credits"
+msgstr "Earn credits"
+
+msgid "Available on Desktop"
+msgstr "Available on Desktop"
+
+msgid "Could not connect. Try again."
+msgstr "Could not connect. Try again."
+
+msgid "Generate AI"
+msgstr "Generate AI"
+
+msgid "Share computing power with the network"
+msgstr "Share computing power with the network"
+
+msgid "Connect account"
+msgstr "Connect account"
+
+msgid "Connect your Mycellios account to see your balance."
+msgstr "Connect your Mycellios account to see your balance."
+
+msgid "No tasks running"
+msgstr "No tasks running"
+
+msgid "Tasks at once"
+msgstr "Tasks at once"
+
+msgid "Extra tasks wait their turn."
+msgstr "Extra tasks wait their turn."
+
+msgid "Credits not enabled here"
+msgstr "Credits not enabled here"
+
+msgid "Models with your credits"
+msgstr "Models with your credits"
+
+msgid "You are signed in. This installation does not yet have access to Mycellios credits."
+msgstr "You are signed in. This installation does not yet have access to Mycellios credits."
+
+msgid "Use my credits"
+msgstr "Use my credits"
+
+msgid "Credits are not enabled in this installation."
+msgstr "Credits are not enabled in this installation."
+
+msgid "Not enabled"
+msgstr "Not enabled"
+
+msgid "Earnings could not be linked to your account."
+msgstr "Earnings could not be linked to your account."
+
+msgid "Browser earnings aren't available yet."
+msgstr "Browser earnings aren't available yet."
+
+msgid "Your account could not be linked. Try again."
+msgstr "Your account could not be linked. Try again."
+
+msgid "Identity"
+msgstr "Identity"
+
+msgid "Server color"
+msgstr "Server color"
+
+msgid "How this connection appears on this device."
+msgstr "How this connection appears on this device."
+
+msgid "Recognize each connection at a glance."
+msgstr "Recognize each connection at a glance."
+
+msgid "Connection names and colors stay on this device. Shared Space settings and permissions are managed separately."
+msgstr "Connection names and colors stay on this device. Shared Space settings and permissions are managed separately."
+
+msgid "Connect to this server to manage notifications."
+msgstr "Connect to this server to manage notifications."
+
+msgid "Current server"
+msgstr "Current server"
+
+msgid "Saved server"
+msgstr "Saved server"
+
+msgid "Each server keeps its own sign-in, conversations and permissions."
+msgstr "Each server keeps its own sign-in, conversations and permissions."
+
+msgid "Changing a connection never moves or deletes your conversations."
+msgstr "Changing a connection never moves or deletes your conversations."
+
+msgid "Discard unsaved connection changes?"
+msgstr "Discard unsaved connection changes?"
+
+msgid "Could not complete this action. Your connection has not changed."
+msgstr "Could not complete this action. Your connection has not changed."
+
+msgid "For 15 minutes"
+msgstr "For 15 minutes"
+
+msgid "For 1 hour"
+msgstr "For 1 hour"
+
+msgid "For 8 hours"
+msgstr "For 8 hours"
+
+msgid "For 24 hours"
+msgstr "For 24 hours"
+
+msgid "Notification settings"
+msgstr "Notification settings"
+
+msgid "More notification settings"
+msgstr "More notification settings"
+
+msgid "Open in a new tab"
+msgstr "Open in a new tab"
+
+msgid "Server settings"
+msgstr "Server settings"
+
+msgid "Remove saved connection"
+msgstr "Remove saved connection"
+
+msgid "Add a server"
+msgstr "Add a server"
+
+msgid "Servers"
+msgstr "Servers"
+
+msgid "Bar"
+msgstr "Bar"
+
+msgid "Server view"
+msgstr "Server view"
+
+msgid "Connect to another Mycellios. Your current chat stays open."
+msgstr "Connect to another Mycellios. Your current chat stays open."
+
+msgid "Public servers require HTTPS. Sign in separately on the new server."
+msgstr "Public servers require HTTPS. Sign in separately on the new server."
+
+msgid "For 3 hours"
+msgstr "For 3 hours"
+
+msgid "Until I turn it back on"
+msgstr "Until I turn it back on"
+
+msgid "Server address"
+msgstr "Server address"

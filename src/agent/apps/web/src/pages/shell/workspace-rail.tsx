@@ -37,6 +37,7 @@ import {
 import { WindowChrome } from "../WindowChrome";
 import { ProviderQuota } from "../../components/ProviderQuota";
 import { HelpMenu } from "../../components/HelpMenu";
+import { ServerConnections } from "../../components/ServerConnections";
 
 type WorkspaceRailProps = {
   scope: string;
@@ -320,6 +321,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             <Settings size={19} strokeWidth={1.6} />
           </Button>
         </IconTooltip>
+        <ServerConnections rail />
         {props.accountControls}
       </div>
     </nav>

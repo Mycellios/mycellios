@@ -55,3 +55,6 @@ body[data-expanded=true] .dock{transform:none!important;opacity:1!important}
 @media(prefers-reduced-motion:no-preference){.island-identity,.island-question-options,.island-answer-form{animation:island-question-in 160ms cubic-bezier(.22,1,.36,1) both}@keyframes island-question-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
 
 @media(max-width:430px){.island-question-footer{flex-wrap:wrap}.island-question-footer .island-question-count{flex-basis:100%;min-height:20px}.island-question-footer .island-later{margin-left:auto}}
+
+/* Product-wide focus presentation; retain keyboard behavior without a halo. */
+:is(:focus, :focus-visible, :focus-within) { outline: none !important; box-shadow: none !important; }

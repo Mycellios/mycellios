@@ -109,6 +109,18 @@ it("does not offer an empty disclosure before the first recorded step", () => {
   expect(node.querySelector("details")).toBeNull();
   expect(node.textContent).not.toContain("known-model");
 });
+it.each([
+  ["quiet", run],
+  ["unknown", { ...run, leaseExpiresAt: undefined }],
+  ["recovering", { ...run, leaseExpiresAt: at(-1) }],
+])("refreshes %s status automatically without a manual recovery action", async (_state, value) => {
+  const { refresh } = mount(value as Run);
+  expect(node.textContent).not.toContain("Refresh status");
+  expect(node.textContent).not.toContain("Checking the saved task status");
+  expect(node.querySelector("[role=status]")).not.toBeNull();
+  await act(async () => { await vi.advanceTimersByTimeAsync(31000); });
+  expect(refresh).toHaveBeenCalledTimes(2);
+});
 it("polls without overlap, pauses while hidden and disposes on unmount", async () => {
   const { refresh } = mount(run);
   await act(async () => {

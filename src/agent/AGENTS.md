@@ -38,6 +38,20 @@
 
 # AGENTS.md
 
+- ServerConnections stores only device-local connection metadata. Native reads
+  and edits require the owned main frame; labels/colors never edit a remote
+  server identity or grant administration. Preserve the native work/draft/call
+  switch guards and origin-specific sessions. Browser connections open a separate
+  tab without an opener, account data or credential copying; require HTTPS off
+  loopback. ServerConnectionDialogs lives once in Shell, outside responsive rails
+  and menus: preserve unsaved edits on resize, clear on account changes and fence
+  late closes by request ID. Current-server notification actions use the existing
+  authenticated account policy, preserving Mico overrides. Do not represent
+  Space ownership or a deprecated deployment owner field as server administration.
+  Shared server capabilities require their own authorized backend implementation.
+  Verify server-connections/dialogs, native directory/IPC and setup/preload tests.
+
+
 - The Hifa Store library unifies hosted static apps and fixed Desktop app launchers.
   Use marketplace/StoreAppHeader for app titles and the return to Hifa Store;
   keep unsaved-work guards on that return action. Estudio IA distinguishes a
@@ -216,7 +230,11 @@
   microphone/gesture acceptance remains separate from synthetic browser tests.
 
 - Windows updates check the official HTTPS catalog and stage verified packages in
-  the background; installation still requires the owner's explicit restart action.
+  the background. Eligible new Windows installations enable automatic idle updates;
+  preserve saved opt-outs and leave development/system-installer channels manual.
+  After fresh native/renderer readiness, expose a cancellable fifteen-second grace
+  period. New work, unsaved state or a changed release restarts that grace period.
+  Unreadable saved preferences disable automatic installation, never erase an opt-out.
   Downloads and ready/error states stay in the sidebar without blocking chats.
   Cover the app only after an explicit restart request and renderer readiness;
   preserve Cancel while waiting. A call continues until the owner chooses to end it and restart.
@@ -700,6 +718,8 @@
   and keep its credential server-side. Reconnection reuses the owned connection,
   preserves explicit roles/limits, and never adjusts a balance. Only an unset
   account main model receives its available default during setup.
+  Reusing an owned personal connection must not require a live SSO token; fresh
+  linked-account SSO remains mandatory when provisioning a new connection key.
   Budget native chat after serializing tool/history envelopes. A saved output
   limit is a ceiling; fit each call within its configured context without
   dropping input, changing saved limits or affecting other providers.
@@ -1325,6 +1345,36 @@
   indicator requires a supported, connected, confirmed contributor and clears
   on errors or unmount. Animate only verified contribution-earned deltas; never
   mint display credits from timers, purchases, promotions or unconfirmed jobs.
+  Verified browser work requests a wallet refresh in bounded one-second bursts;
+  only authenticated wallet deltas can change the displayed earned balance.
+  Preserve sanitized authority 401/403 statuses through the adapter and RPC so
+  revoked sessions clear stale balances, without exposing response diagnostics.
+  Contribution activation uses `motion/mini`; cancel all playback controls and
+  remove the transient SVG on pause/unmount. The diffuse bottom halo follows
+  confirmed connectivity, never the activation animation or an inferred credit gain.
+  Local SSO is explicit: `.cache/local-sso-enabled` loads only the dedicated
+  Dev OAuth client from Windows DPAPI, never inherited production credentials.
+  Its registered loopback callback on 5188 forwards only the exact OAuth GET to
+  local auth; preserve issuer, nonce, PKCE and explicit account-link checks.
+  Keep project-preview data and password sessions during this opt-in upgrade.
+  Verify `node --test scripts/project-local-env.test.mjs scripts/project-local-sso.test.mjs`.
+  Browser earnings bind the live worker proof through the linked SSO session and
+  canonical coordinator; never forward an OAuth token to browser compute or accept
+  a client account ID. Check the same worker coordinator's public contribution
+  capability before loading compute. Only confirmed payout binding activates the
+  activity indicator and verified-wallet notifications. Cache only successful
+  bindings; bound transient retries and abort them on pause/account changes.
+  Unavailable services or permanent linking failures pause compute, preserve
+  the wallet balance and offer an in-place retry with the correct failure reason.
+  Keep failed payout linking visible. Settled notifications
+  request bounded wallet reads, never directly increment the display.
+  Browser contribution loads src/mobile/runtime only on activation, uses its signed
+  identity and the same-origin /mobile/v1 transport, and stops on account changes
+  or unmount. Embedded mode must not reload the chat or restore compute from a
+  standalone worker's update flag. Development transport targets are fixed to
+  Mycellios or loopback; never forward Agent cookies. Matrix verification is not
+  evidence of a credit award. Verify BrowserContributionControl/SidebarContribution
+  tests and the real local browser/coordinator activation-pause cycle separately.
 
 - Roster hover previews use existing scoped row messages and real run states.
   Do not fetch threads or mark messages read on hover; keep clicks, context menus
