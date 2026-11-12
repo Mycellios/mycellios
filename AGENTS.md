@@ -349,3 +349,8 @@ These rules apply to the complete repository.
   for the additive Mico migration, account/Space policy checks, hosted-app ownership
   and welcome-credit idempotency on isolated PostgreSQL. It never targets production
   databases or submits paid inference; keep the supplier funding-limit regressions.
+
+- Proportional Agent CI selects changed tests plus source-directory regression siblings,
+  without repeating changed tests or recursively expanding shared contract barrels into
+  the complete workspace suite. Shared contracts still typecheck web/API/worker/Desktop;
+  keep executor sibling regressions and the dedicated PostgreSQL/native/browser gates.

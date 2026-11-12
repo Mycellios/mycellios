@@ -91,6 +91,7 @@ async function runAfterFill(
     yield { type: "done" as const, text: reply };
   });
   const prisma = {
+    user: { findUniqueOrThrow: async () => ({ micoDefaults: {} }) },
     run: {
       findUnique: vi.fn(async () => run),
       findUniqueOrThrow: vi.fn(async () => run),

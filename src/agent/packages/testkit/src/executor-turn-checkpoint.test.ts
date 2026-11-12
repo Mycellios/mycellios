@@ -51,6 +51,7 @@ function fixture(
   };
   const prisma = new Proxy(
     {
+      user: { findUniqueOrThrow: async () => ({ micoDefaults: {} }) },
       $contentEncryption: () =>
         encryptedCheckpoint
           ? {
