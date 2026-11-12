@@ -941,7 +941,7 @@ export async function createCoordinator(
       }
       (await apiAccess.getOrCreateAccount(user.id));
       if (creditWallet) await grantWelcomeCredits(database, {
-        userId: user.id, emailVerified: user.emailVerified,
+        userId: user.id, emailVerified: user.emailVerified === true,
       });
       apiPrincipals.set(request, {
         kind: "user",

@@ -15,7 +15,7 @@ ROOT="$PWD"
 OUT="${MYCELLIOS_ANDROID_OUTPUT:-/pnpm-store/mycellios-android-release/$MYCELLIOS_SOURCE_TREE}"
 export MYCELLIOS_ANDROID_RECEIPT="$OUT/build-receipt.json"
 mkdir -p "$OUT"
-test ! -e "$OUT/Mycellios-Android-1.0.1-unsigned.apk"
+test ! -e "$OUT/Mycellios-Android-1.0.2-unsigned.apk"
 tar -czf "$OUT/source.tar.gz" --exclude=node_modules --exclude='*/node_modules' --exclude=.git --exclude='*/.gradle' --exclude='*/build' --exclude='*/dist' --exclude='./outputs' .
 npm ci --ignore-scripts --no-audit --no-fund --cache /pnpm-store/npm-cache
 node node_modules/vitest/vitest.mjs run landing/src/android-downloads.test.tsx landing/src/desktop-downloads.test.tsx --maxWorkers 2
@@ -40,7 +40,7 @@ const base="apps/android/app/src/main/assets",root=base+"/web",files=[];
 function walk(dir){for(const f of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,f.name);if(f.isDirectory())walk(p);else files.push(path.relative(root,p).replaceAll("\\", "/"));}}walk(root);
 fs.writeFileSync(base+"/web-files.json",JSON.stringify(files));
 const hashes=Object.fromEntries(files.sort().map(f=>[f,crypto.createHash("sha256").update(fs.readFileSync(root+"/"+f)).digest("hex")]));
-fs.writeFileSync(process.env.MYCELLIOS_ANDROID_RECEIPT,JSON.stringify({schema:"mycellios-android-build/1",tree:process.env.MYCELLIOS_SOURCE_TREE,version:"1.0.1",versionCode:2,applicationId:"com.mycellios.android",minSdk:26,sharedWebFiles:hashes},null,2));'
+fs.writeFileSync(process.env.MYCELLIOS_ANDROID_RECEIPT,JSON.stringify({schema:"mycellios-android-build/1",tree:process.env.MYCELLIOS_SOURCE_TREE,version:"1.0.2",versionCode:3,applicationId:"com.mycellios.android",minSdk:26,sharedWebFiles:hashes},null,2));'
 cd "$ROOT/src/agent/apps/android"
 GRADLE=/pnpm-store/mycellios-gradle-8.13/gradle-8.13/bin/gradle
 if [ ! -x "$GRADLE" ]; then
@@ -50,7 +50,7 @@ if [ ! -x "$GRADLE" ]; then
   unzip -q /tmp/mycellios-gradle.zip -d /pnpm-store/mycellios-gradle-8.13
 fi
 "$GRADLE" testDebugUnitTest assembleRelease assembleDebug --no-daemon --build-cache --max-workers=2
-cp app/build/outputs/apk/release/app-release-unsigned.apk "$OUT/Mycellios-Android-1.0.1-unsigned.apk"
+cp app/build/outputs/apk/release/app-release-unsigned.apk "$OUT/Mycellios-Android-1.0.2-unsigned.apk"
 cp app/build/outputs/apk/debug/app-debug.apk "$OUT/private-qualification.apk"
 cp -r app/build/test-results "$OUT/native-test-results"
-sha256sum "$OUT/Mycellios-Android-1.0.1-unsigned.apk"
+sha256sum "$OUT/Mycellios-Android-1.0.2-unsigned.apk"
