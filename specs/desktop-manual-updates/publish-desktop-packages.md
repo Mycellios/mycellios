@@ -19,6 +19,12 @@ automatically approve Internet-origin SmartScreen/Attachment Services dialogs.
 An unsigned public download can still warn or be blocked by Windows policy; never
 remove its zone mark, bypass that policy or promise warning-free distribution.
 Use a new immutable version for a future installer; do not replace published bytes.
+To recheck an existing unsigned installer without recompiling, dispatch
+`unsigned-windows-installer-qualification.yml` with its exact `version`. It validates
+published source identity, byte count, SHA256 and unsigned status, then reuses the
+hosted fresh-install, legacy-upgrade, draft/task preservation and failed-uninstall
+recovery qualifier. The new receipt is separate evidence; it does not rewrite the
+published release or turn an older expedited manifest into a fully qualified one.
 
 Client versions from 0.3.40 include the Linux update path and from 0.3.44 the
 macOS one: an installed RPM, DEB or disk image queries the desktop catalog,
