@@ -16,7 +16,7 @@ export interface WebBundleBudgetResult {
 export function verifyWebBundleBudget(input: {
   root?: string;
   outputDirectory: string;
-  manifest: Record<string, { file?: string; imports?: string[] }>;
+  manifest: Record<string, { file?: string; imports?: string[]; assets?: string[] }>;
   definition: WebBundleSurfaceDefinition;
 }): WebBundleBudgetResult[];
 export function loadAndVerifyWebBundleBudget(root?: string, selectedSurface?: string): WebBundleBudgetResult[];

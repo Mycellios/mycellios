@@ -2204,3 +2204,190 @@ Mycellios Island native window was observed , width/height preferences
 remain 100 percent. Windows Computer Use capture was unavailable, so the visual
 captures are browser-renderer evidence, not a physical desktop screenshot.
 No production deployment, paid inference or saved permission answer occurred.
+
+### Local browser expert earnings qualification (2026-11-12)
+
+Account-funded browser expert stages are implemented behind an explicit coordinator
+opt-in and private owner-applied PostgreSQL schema. They bind signed live worker
+sessions to authenticated payout accounts and independently verify the full bounded
+SwiGLU output before atomically settling the buyer debit and contributor credit.
+They are separate from native physical-network evidence. Benchmarks and failed or
+unavailable workers receive no credits; recovery cannot replay or duplicate payment.
+
+An actual browser WebGPU run on loopback completed one synthetic-weight expert-stage
+request. Its isolated fictional ledger debited 0.001040 Credits, credited the worker
+0.001000 and retained 0.000040 as the 4% service fee. Pausing disconnected the worker;
+a subsequent dispatch was rejected and both balances remained unchanged. This is
+real GPU execution and database settlement with test money, not a pretrained full
+chat model, a customer workload, production income or multi-host qualification.
+
+Focused validation: 12 isolated PostgreSQL economic/auth/recovery tests, 11 native
+reference/hub tests and 54 Agent contribution/account/wallet tests passed. Incremental
+native/runtime/Agent component types, structure, component boundaries and architecture
+passed. Full suites, release builds, external supplier requests and deployment were
+NOT RUN. No funds were spent or customer balances written.
+
+The local profile is now linked through the dedicated Dev OAuth client. The production
+wallet allowlist admits the production OAuth client only, so an actual customer
+balance/payout remains unverified in Dev. Production trust/configuration was not
+modified. General chat-model decoding and live network admission are not qualified
+by this local expert-stage proof. See specs/agent-browser-contribution/spec.md.
+
+### Complete browser model and earned-credit pilot (2026-11-12)
+
+The earlier expert-only qualification now has an additional complete pretrained
+GPT-2 124M int8 path. Its revision-pinned tokenizer, all transformer layers and
+language head run in a browser Web Worker on CPU/WASM. Trusted regeneration runs
+in a separate terminable Node Worker; exact token IDs, signed session ownership,
+visibility and fixed deadlines gate settlement. Browser/Node event loops remain
+available for pause, heartbeat and cancellation. This is an explicitly enabled
+small text-completion pilot (128 input / 32 output tokens), not a tools-capable
+agent, WebGPU text acceleration or qualified serving of every model.
+
+Real browser qualification on the final worker path completed 24 output tokens
+from 8 input tokens. The isolated fictional buyer paid 0.001664 Credits, the
+contributor earned 0.001600, and the 4% fee was 0.000064. A second 12-output-token
+job paid 0.000884 and earned 0.000850. The resulting earned balance was 0.002450.
+The same idempotency key replayed in 8 ms without another computation or credit.
+A new generation cancelled in flight by pressing Pause was released without
+charge or award; later work while paused returned 503, with both balances and
+zero outstanding holds unchanged. Cold end-to-end settlement was 17.709 s for
+24 output tokens, including asset/session preparation and independent checking;
+a warm 12-output-token HTTP request took about 3.8 s. These are local pilot
+observations, not throughput/production latency promises.
+
+Focused worker packaging passed with an approximately 178 kB worker JS bundle;
+the fixed ORT/WASM files are served separately from the lockfile-pinned package.
+The dedicated Dev OAuth account link remains intact, but production wallet trust
+still excludes the Dev client. Thus no real-account income, cash earnings,
+production payouts or customer ledger writes were qualified. No supplier inference,
+blockchain operation, real spending or deployment occurred. The dedicated standalone
+reference cancellation probe was NOT RUN: its optional queued job never acquired
+resources. Integrated trusted reference generation and in-flight browser cancellation
+were observed; reference termination and late-exit behavior have scoped unit tests.
+Full suites and full release/Agent builds were NOT RUN. The explicit loopback
+harness and read-only evidence capture live in scripts/qualify-browser-inference-local.mts
+and scripts/capture-browser-inference-local.mts. See the browser contribution spec.
+
+### Welcome credit default verification (2026-11-12)
+
+Verified account provisioning already grants exactly 200,000 promotional
+microunits (0.20 Credits, USD-equivalent) through grantWelcomeCredits, after the
+coordinator creates the authenticated account. The deterministic welcome_v1
+ledger id prevents duplicate grants during concurrent sign-ins, refreshes and
+lost responses. The welcome grant has no expiry and is separate from earned
+credits and the existing 14-day referral reward. No UI fallback creates balance.
+The local PostgreSQL suite now verifies the default, per-account isolation,
+verification requirement, twenty concurrent attempts, repeated sign-in and
+referral coexistence. This verifies local policy; it does not publish the code,
+change production OAuth trust or create real customer grants.
+
+### Local own-account wallet access (2026-11-12)
+
+The Dev profile can now read its real canonical wallet through an account-owned
+personal Mycellios connection, encrypted server-side. The official account's
+normal SSO renewal was used to issue that personal connection; its canonical
+subject was matched to the issuer-bound local account before persistence. The
+production OAuth trust allowlist and service configuration were not changed,
+and no production OAuth client secret or operator model key was copied to Dev.
+This resolves wallet/model access for the qualified local profile without
+admitting the dedicated Dev OAuth client to production trust.
+
+The actual local sidebar balance matched the canonical wallet RPC, and the
+Mycellios selector exposed the credit-funded managed AntSeed text model. Saved
+funding headers and existing main-model choices were preserved. Reconnecting an
+existing owned key now avoids unnecessary SSO renewal; issuing a new key still
+requires the linked trusted SSO session and owner-scoped secret checks.
+
+Validation: 97 focused Agent access/catalog/adapter/sidebar tests, API incremental
+types and 43 managed-purchase tests on isolated PostgreSQL 18.6 passed. The real
+account balance did not change across connection verification. No paid inference,
+real charge/settlement, top-up, release build or deployment was run. This does not
+qualify real-account browser contribution payouts: those still require canonical
+SSO contributor authorization, which a personal model key does not substitute.
+
+### Compact update notice and automatic idle policy (2026-11-12)
+
+The existing Desktop sidebar update surface now uses one compact gold notice
+with actual download progress, a phase-dependent action and retry/cancel states.
+It respects light/dark color schemes and reduced motion and unmounts inactive
+progress UI. The existing native updater retains official origin, package size,
+SHA-256, attachment-policy, renderer acknowledgement and work/draft/call guards.
+
+Eligible fresh packaged Windows profiles default to automatic download and idle
+installation; saved manual opt-outs are preserved. A cancellable fifteen-second
+grace period requires fresh native and renderer readiness. New work, unsaved
+state or a changed release resets it; postponing defers this release rather than
+disabling future updates. Corrupt or unreadable preferences disable automatic
+installation. Development, disabled updates and system-installer-only platforms
+retain their existing restrictions. Existing users can enable installation in
+Settings / Updates without changing other preferences.
+
+Local validation: 86 focused policy/staging/catalog/UI/readiness tests plus 9
+Windows helper tests passed, as did Desktop/web incremental types. Windows helper
+qualification used controlled temporary fixtures, not the installed user app.
+Browser previews exercised the actual presentation components using a clearly
+labelled inert bridge; no real installer was launched from that preview. The
+local frontend was restored and verified serving HTTP 200. Full release builds,
+full suites, actual installed-app upgrade and deployment were NOT RUN. This does
+not change browser/server deployment policy or publish an update artifact.
+
+### Browser earnings binding and readiness (2026-11-12, local only)
+
+The sidebar now checks the same-origin browser coordinator's public contribution
+capability before loading a compute model. Payout binding is cached only after
+confirmation; transient failures retry at most three times, with cancellation on
+pause, account changes and unmount. Permanent failures pause compute. Activity
+and verified-wallet notifications require the confirmed binding; errors never
+mint or replace the authoritative balance. The API retains sanitized upstream
+401/403/404/409/501 classifications without exposing worker or account secrets.
+
+Live local diagnosis: the configured loopback worker at 5194 is the legacy matrix
+qualification service and has no paid-inference capability route (404). The
+canonical coordinator also returned 404 for browser inference discovery. The
+owned account endpoint remained accessible. The UI therefore correctly remains
+paused and reports service unavailability instead of claiming an account-link
+failure or earning credits. The actual browser retry was checked, stayed paused
+and preserved the balance. This does not qualify real-account payouts: publishing
+the paid-inference service and trusted SSO contributor authorization remain
+outstanding. No fixture ledger has replaced the user's wallet.
+
+Validation: 50 focused Agent UI/capability/API tests and 2 coordinator capability
+and user-only binding tests passed. API, web and root incremental TypeScript
+checks passed. The root check also required preserving absent email-verification
+metadata as optional and fixing the browser text contract's ESM import suffix.
+Full suites, release builds, spending, real paid inference/settlement, commits,
+pushes and deployment were NOT RUN. Screenshot and local diagnosis receipt are
+stored in the task outputs.
+### Server connection controls and scope boundaries (2026-11-13, local)
+
+ServerConnections now offers a persistent menu/rail selector, cascading actions,
+current-account notification policies and bounded mute durations, browser saved
+connections and device-local connection identity. Native identity IPC admits only
+the owned main frame, validates known records and retains transactional saves.
+Existing task/draft/call guards and origin-specific sessions remain in force.
+Browser URLs carry no account data; opening another connection preserves the chat.
+ServerConnectionDialogs is hosted once by Shell, survives responsive rail removal,
+keeps drafts and fences closes by request ID; account changes dispose the form.
+Loaded /agent/app targets normalize to their saved /agent connection identity.
+
+Validation: 144 focused tests passed in 14 files; three POSIX-only setup storage
+permission/symlink tests were skipped on Windows. Web and Desktop incremental
+TypeScript passed. Local browser qualification covered cascading keyboard menus,
+menu/rail roundtrip, identity persistence/reload, dirty-form protection, 390px
+layout continuity, authenticated notification reads and adding/removing a loopback
+connection without opening it. Authoritative wallet balance remained unchanged.
+The design detector returned no findings for the reviewed components.
+
+These controls do not implement OpenBot's complete shared server administration.
+Vault, server members/roles, administrative audit, shared identity/defaults,
+transfer, browser profiles and hosted-server lifecycle need their own authorized
+backend and product scope. Existing account/Space tools are not relabelled as
+server capabilities. Device-local names/colors do not change shared identity.
+The task output comparison records every upstream ServerSettingsModal section.
+
+A Desktop bundle was built during development; no final publication artifact or
+installer was generated. Native visual acceptance was not certified because the
+desktop controller could not activate the Dev window. The physical checks above
+are local browser checks. Two real authenticated servers, paid inference, full
+suites, commits, pushes and deployment were NOT RUN.

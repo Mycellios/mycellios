@@ -38,6 +38,11 @@ it("exposes bounded native notification operations and removes click listeners",
 });
 
 describe("desktop preload bridge", () => {
+  it("exposes only named device-local connection identity edits", async () => {
+    const f=runPreload("preload.cjs"), bridge=f.exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    await bridge.servers!.updateIdentity!("https://a.test",{name:"Team",color:"#334455"});
+    expect(f.invoke).toHaveBeenCalledWith("desktop.servers.updateIdentity","https://a.test",{name:"Team",color:"#334455"});
+  });
   it("keeps floating chat access limited to its pinned Space and update acknowledgement", async () => {
     const { invoke, exposeInMainWorld } = runPreload("floating-chat-preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;

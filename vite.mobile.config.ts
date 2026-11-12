@@ -72,6 +72,7 @@ export default defineConfig({
     __MYCELLIOS_BUILD_IDENTITY__: JSON.stringify(mobileBuildIdentity),
   },
   plugins: [react(), mobileAssets()],
+  worker: { format: "es" },
   build: {
     outDir: resolve(workspaceRoot, "mobile-dist"),
     emptyOutDir: true,

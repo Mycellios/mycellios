@@ -348,6 +348,8 @@ export const appContract = {
     contributionStatus: oc.input(ContributionNodeInput).output(ContributionStateSchema),
     contributionControl: oc.input(ContributionNodeInput.extend({ action: z.enum(["pause", "resume"]) })).output(ContributionStateSchema),
     contributionEnrollment: oc.output(ContributionEnrollmentSchema),
+    browserContributionLink: oc.input(z.object({ workerId: z.string().uuid(), token: z.string().min(32).max(256),
+      expectedUserId: z.string().min(1).max(128) }).strict()).output(z.object({ linked: z.boolean() })),
     discoverLocal: oc.output(
       z.array(z.object({ name: z.string(), baseUrl: z.string(), modelIds: z.array(z.string()) })),
     ),

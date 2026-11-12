@@ -130,6 +130,7 @@ import { notificationPreferences } from "../lib/notification-preferences";
 import { createReplySoundGate, playReplySound, unlockReplySound } from "../lib/reply-sound";
 import { ReleaseNotes } from "../components/ReleaseNotes";
 import { SidebarFooter } from "../components/SidebarFooter";
+import { ServerConnectionDialogs } from "../components/ServerConnectionDialogs";
 import { DesktopSidebarUpdate } from "../components/DesktopUpdates";
 import { WebUpdateSlot } from "../components/web-update-slot";
 import type { ActivityListFilters } from "../lib/activity-list-filters";
@@ -4037,6 +4038,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   );
   const shell = (
     <>
+    <ServerConnectionDialogs ownerId={userId ?? null} />
     <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} onOpen={openSpaceChat} />
     {userId && currentSpaceId ? <MicoEdgeDock key={JSON.stringify([userId, currentSpaceId])}
       bots={bots} spaceId={currentSpaceId} scope={JSON.stringify([userId, currentSpaceId])} activeId={active?.id}

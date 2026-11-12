@@ -1,4 +1,5 @@
 import { ServerDirectory } from "./server-directory.js";
+import { registerServerDirectoryIpc } from "./server-directory-ipc.js";
 import { LocalVoice, requireVoiceModelKind } from "./local-voice.js";
 import { AppBehavior } from "./app-behavior.js";
 import { UpdatePreferences } from "./update-preferences.js";
@@ -1327,10 +1328,7 @@ app.whenReady().then(async () => {
     write: raw => writePrivateFile(path.join(userDataDir, "servers.json"), raw),
   });
   await serverDirectory.load();
-  ipcMain.handle("desktop.servers.list", event => {
-    if (!fromUpdateWindow(event)) throw new Error("Servers require the main app window");
-    return { servers: serverDirectory.list(), current: currentTargetUrl };
-  });
+  registerServerDirectoryIpc(ipcMain, { directory: serverDirectory, fromMain: fromUpdateWindow, current: () => currentTargetUrl });
   ipcMain.handle("desktop.servers.manage", async (event, selected: unknown) => {
     if (!fromUpdateWindow(event)) throw new Error("Servers require the main app window");
     if (hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()) throw new Error("Finish active work before changing servers");
@@ -1352,9 +1350,13 @@ app.whenReady().then(async () => {
   updatePreferences = new UpdatePreferences({
     packaged: app.isPackaged,
     allowed: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1" && Boolean(manualDesktopUpdater || updaterSupport(updaterEnvironment).supported),
-    // Only a same-user Windows handoff installs unattended; a package manager needs the owner.
-    installSupported: process.platform === "win32",
-    read: () => readPrivateFile(path.join(userDataDir, "update-preferences.json"), 4096).catch(() => null),
+    // Unsigned previews require an explicit install; saved preferences cannot enable unattended restarts.
+    installSupported: false,
+    autoInstallByDefault: false,
+    read: () => readPrivateFile(path.join(userDataDir, "update-preferences.json"), 4096).catch(error => {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }),
     write: raw => writePrivateFile(path.join(userDataDir, "update-preferences.json"), raw),
     state: () => desktopUpdater.state(), download: () => desktopUpdater.download(), install: () => installUpdate(),
     cancelInstall: () => manualDesktopUpdater?.cancelInstall() ?? Promise.resolve(desktopUpdater.state()),

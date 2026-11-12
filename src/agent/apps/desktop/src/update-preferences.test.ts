@@ -2,20 +2,73 @@ import { describe, expect, it, vi } from "vitest";
 import type { DesktopUpdateState } from "@rakazo/contracts";
 import { UpdatePreferences } from "./update-preferences.js";
 
-function fixture(options: { packaged?: boolean; allowed?: boolean; saved?: string; installSupported?: boolean } = {}) {
+function fixture(options: { packaged?: boolean; allowed?: boolean; saved?: string; installSupported?: boolean; autoInstallByDefault?: boolean } = {}) {
   let state: DesktopUpdateState = { currentVersion: "0.3.27", availableVersion: "0.3.28", phase: "ready", percent: null, message: null, checkedAt: null };
   let busy = false;
+  let now = 0;
   const ports = { packaged: options.packaged ?? true, allowed: options.allowed ?? true, installSupported: options.installSupported,
+    autoInstallByDefault: options.autoInstallByDefault, now: () => now,
     read: vi.fn(async () => options.saved ?? null), write: vi.fn(async (_raw: string) => {}), state: () => state,
     download: vi.fn(async () => { state = { ...state, phase: "ready" }; return state; }),
     install: vi.fn(async () => ({ ...state, installPending: true })), cancelInstall: vi.fn(async () => state),
     busy: () => busy, prepare: vi.fn(async () => true), relaunch: vi.fn(async () => {}),
   };
   const policy = new UpdatePreferences(ports);
-  return { policy, ports, setState: (patch: Partial<DesktopUpdateState>) => { state = { ...state, ...patch }; }, setBusy: (next: boolean) => { busy = next; } };
+  return { policy, ports, advance: (ms = 15_000) => { now += ms; }, setState: (patch: Partial<DesktopUpdateState>) => { state = { ...state, ...patch }; }, setBusy: (next: boolean) => { busy = next; } };
 }
 async function settle() { for (let i = 0; i < 8; i++) await Promise.resolve(); }
 describe("native update preferences and idle restarts", () => {
+  it("automates eligible fresh installs with a cancellable fifteen-second grace period", async () => {
+    const { policy, ports, advance } = fixture({ autoInstallByDefault: true });
+    await policy.load();
+    expect(policy.preferences()).toMatchObject({ autoDownload: true, autoInstall: true });
+    await policy.tick();
+    expect(policy.state()).toMatchObject({ relaunchPending: true, automaticRestartAt: 15_000 });
+    expect(ports.install).not.toHaveBeenCalled();
+    advance(14_999); await policy.tick(); expect(ports.install).not.toHaveBeenCalled();
+    advance(1); await policy.tick(); expect(ports.install).toHaveBeenCalledOnce();
+    expect(policy.state().automaticRestartAt).toBeUndefined();
+  });
+  it("preserves saved manual preferences and never enables an unsupported installation", async () => {
+    const optedOut = fixture({ autoInstallByDefault: true, saved: '{"schema":1,"autoInstall":false}' });
+    await optedOut.policy.load(); await optedOut.policy.tick(); expect(optedOut.ports.install).not.toHaveBeenCalled();
+    for (const options of [{ packaged: false }, { allowed: false }, { installSupported: false }]) {
+      const f = fixture({ autoInstallByDefault: true, ...options });
+      await f.policy.load(); await f.policy.tick(); expect(f.policy.preferences().autoInstall).toBe(false);
+      expect(f.ports.install).not.toHaveBeenCalled();
+    }
+    const legacy = fixture({ installSupported: false, saved: '{"schema":1,"autoInstall":true}' });
+    await legacy.policy.load(); await legacy.policy.tick(); expect(legacy.ports.install).not.toHaveBeenCalled();
+  });
+  it("restarts the grace period if work, a draft or a different release appears", async () => {
+    const f = fixture({ autoInstallByDefault: true });
+    await f.policy.tick(); f.advance(14_000); f.setBusy(true); await f.policy.tick();
+    expect(f.policy.state().automaticRestartAt).toBeUndefined();
+    f.setBusy(false); f.ports.prepare.mockResolvedValueOnce(false); await f.policy.tick();
+    expect(f.policy.state().automaticRestartAt).toBeUndefined();
+    await f.policy.tick(); expect(f.policy.state().automaticRestartAt).toBe(29_000);
+    f.advance(14_000); f.setState({ availableVersion: "0.3.29" }); await f.policy.tick();
+    expect(f.policy.state().automaticRestartAt).toBe(43_000);
+    f.advance(); await f.policy.tick(); expect(f.ports.install).toHaveBeenCalledOnce();
+  });
+  it("never interprets corrupt or unreadable saved choices as permission to restart", async () => {
+    for (const saved of ['{', '{"schema":2}', '{"schema":1,"autoInstall":"yes"}']) {
+      const f = fixture({ autoInstallByDefault: true, saved });
+      await f.policy.load(); await f.policy.tick();
+      expect(f.policy.preferences().autoInstall).toBe(false); expect(f.ports.install).not.toHaveBeenCalled();
+    }
+    const f = fixture({ autoInstallByDefault: true });
+    f.ports.read.mockRejectedValueOnce(Error("access denied"));
+    await f.policy.load(); await f.policy.tick(); expect(f.policy.preferences().autoInstall).toBe(false);
+  });
+  it("postpones this release after cancelling the grace period, without disabling future updates", async () => {
+    const f = fixture({ autoInstallByDefault: true });
+    await f.policy.tick(); await f.policy.cancel(); f.advance(); await f.policy.tick();
+    expect(f.ports.install).not.toHaveBeenCalled(); expect(f.policy.preferences().autoInstall).toBe(true);
+    f.setState({ availableVersion: "0.3.29" }); await f.policy.tick();
+    expect(f.policy.state().automaticRestartAt).toBe(30_000);
+    f.policy.request("update"); await settle(); expect(f.ports.install).toHaveBeenCalledOnce();
+  });
   it("does not auto-install by default, and honors opt-out of automatic downloads", async () => {
     const { policy, ports, setState } = fixture();
     await policy.tick(); expect(ports.install).not.toHaveBeenCalled();
@@ -44,21 +97,22 @@ describe("native update preferences and idle restarts", () => {
     }
   });
   it("waits for running work and a fresh acknowledgement of saved drafts", async () => {
-    const { policy, ports, setBusy } = fixture();
+    const { policy, ports, setBusy, advance } = fixture();
     await policy.save({ autoInstall: true }); setBusy(true); await policy.tick();
     expect(ports.prepare).not.toHaveBeenCalled(); expect(policy.state().relaunchWaitingFor).toBe("local_work");
     setBusy(false); ports.prepare.mockResolvedValueOnce(false); await policy.tick();
     expect(ports.install).not.toHaveBeenCalled(); expect(policy.state().relaunchWaitingFor).toBe("unsaved_work");
-    await policy.tick(); expect(ports.install).toHaveBeenCalledOnce();
+    await policy.tick(); expect(ports.install).not.toHaveBeenCalled();
+    advance(); await policy.tick(); expect(ports.install).toHaveBeenCalledOnce();
   });
   it("cancellation during a renderer check cannot later install, and defers this release", async () => {
-    const { policy, ports, setState } = fixture();
+    const { policy, ports, setState, advance } = fixture();
     await policy.save({ autoInstall: true });
     let ready!: (value: boolean) => void;
     ports.prepare.mockImplementationOnce(() => new Promise(resolve => { ready = resolve; }));
     const pending = policy.tick(); await policy.cancel(); ready(true); await pending;
     await policy.tick(); expect(ports.install).not.toHaveBeenCalled();
-    setState({ availableVersion: "0.3.29" }); await policy.tick(); expect(ports.install).toHaveBeenCalledOnce();
+    setState({ availableVersion: "0.3.29" }); await policy.tick(); advance(); await policy.tick(); expect(ports.install).toHaveBeenCalledOnce();
   });
   it("rechecks newly started work after the renderer responds", async () => {
     const { policy, ports, setBusy } = fixture();
@@ -75,9 +129,9 @@ describe("native update preferences and idle restarts", () => {
     policy.request("relaunch"); await settle(); expect(ports.relaunch).toHaveBeenCalledOnce();
   });
   it("shows a failed automatic restart once and permits an explicit retry", async () => {
-    const { policy, ports } = fixture(); await policy.save({ autoInstall: true });
+    const { policy, ports, advance } = fixture(); await policy.save({ autoInstall: true });
     ports.install.mockRejectedValueOnce(Error("handoff failed"));
-    await policy.tick(); await policy.tick();
+    await policy.tick(); advance(); await policy.tick(); await policy.tick();
     expect(ports.install).toHaveBeenCalledOnce(); expect(policy.state().relaunchError).toBe(true);
     policy.request("update"); await settle(); expect(ports.install).toHaveBeenCalledTimes(2);
   });

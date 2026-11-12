@@ -64,6 +64,9 @@ export function planChecks(files, availableAgentTests) {
     if (files.some(f => /^(src\/economy\/(managed-|promotional-credits|referrals|wallet-topups|contribution-credit-wallet)|src\/coordinator\/(managed-|referral-routes|wallet-topup-routes)|src\/core\/managed-provider-config|tests\/(managed-|referrals\.)|scripts\/test-referrals-postgres)/.test(f))) {
       add('.', 'node', ['scripts/test-referrals-postgres.mjs', 'tests/managed-purchases.postgres.test.ts', 'tests/referrals.postgres.test.ts'], 'isolated managed wallet and referral PostgreSQL');
     }
+    if (files.some(f => /^(src\/economy\/(browser-inference|contribution-credit-wallet)|src\/coordinator\/browser-inference|tests\/browser-inference)/.test(f))) {
+      add('.', 'node', ['scripts/test-referrals-postgres.mjs', 'tests/browser-inference.postgres.test.ts'], 'isolated browser inference PostgreSQL settlement');
+    }
     if (desktopDownloads) {
       add('.', 'node', ['scripts/build-desktop-downloads.mjs'], 'Desktop downloads page build');
       add('.', 'npm', ['ci', '--prefix', 'scripts/desktop-macos', '--ignore-scripts', '--no-audit', '--no-fund'], 'Desktop browser fixture dependencies');

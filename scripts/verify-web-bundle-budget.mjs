@@ -6,7 +6,7 @@ const scriptPattern = /\.(?:m?js)$/;
 
 function manifestScripts(manifest) {
   return [...new Set(Object.values(manifest)
-    .map((entry) => entry?.file)
+    .flatMap((entry) => [entry?.file, ...(entry?.assets ?? [])])
     .filter((file) => typeof file === "string" && scriptPattern.test(file)))];
 }
 

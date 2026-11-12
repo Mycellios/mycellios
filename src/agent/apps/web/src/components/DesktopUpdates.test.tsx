@@ -11,7 +11,8 @@ const bridge = vi.hoisted(() => ({
   install: vi.fn(async (): Promise<DesktopUpdateState> => (fixture.state = { ...fixture.state, installPending: true })),
   forceInstall: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: true, restartMode: "now" })),
   cancelInstall: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: false })),
-  cancelRestart: vi.fn(async () => (fixture.state = { ...fixture.state, relaunchPending: false, relaunchWaitingFor: undefined })),
+  cancelRestart: vi.fn(async () => (fixture.state = { ...fixture.state, relaunchPending: false, relaunchWaitingFor: undefined, automaticRestartAt: undefined })),
+  download: vi.fn(async () => (fixture.state = { ...fixture.state, phase: "downloading" as const, percent: null })),
   onPrepare: vi.fn(() => () => {}),
 }));
 vi.mock("../lib/desktop", () => ({ desktopBridge: () => ({ update: bridge }) }));
@@ -41,6 +42,30 @@ afterEach(async () => {
 const render = () => act(async () => root.render(<DesktopUpdatesProvider><main>Chat draft</main><DesktopSidebarUpdate /></DesktopUpdatesProvider>));
 const gate = () => host.querySelector<HTMLDialogElement>("dialog[open]");
 const refresh = () => act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+it("shows one compact notice with real download progress and no blocking dialog", async () => {
+  fixture.state = { ...fixture.state, phase: "available", percent: null };
+  await render();
+  expect(host.querySelectorAll("aside.myc-update-notice")).toHaveLength(1);
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Download update"]')!.click());
+  expect(bridge.download).toHaveBeenCalledOnce(); expect(gate()).toBeNull();
+  expect(host.querySelector("progress")?.hasAttribute("value")).toBe(false);
+  fixture.state = { ...fixture.state, percent: 61.4 }; await refresh();
+  expect(host.querySelector("progress")?.value).toBe(61);
+  expect(host.querySelector("button")?.textContent).toBe("61%");
+  expect(host.querySelector("button")?.disabled).toBe(true);
+  fixture.state = { ...fixture.state, phase: "idle", availableVersion: null }; await refresh();
+  expect(host.querySelector(".myc-update-notice")).toBeNull();
+});
+it("keeps automatic restarts cancellable in the sidebar without covering the chat", async () => {
+  fixture.state = { ...fixture.state, autoInstallEnabled: true, relaunchPending: true,
+    automaticRestartAt: Date.now() + 15_000 };
+  await render(); expect(gate()).toBeNull();
+  expect(host.textContent).toContain("Updating shortly");
+  await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Cancel update")!.click());
+  expect(bridge.cancelRestart).toHaveBeenCalledOnce(); expect(bridge.install).not.toHaveBeenCalled();
+  expect(host.textContent).not.toContain("Updating shortly");
+  expect(gate()).toBeNull();
+});
 it("keeps downloads and staged updates in the sidebar until the owner's explicit restart", async () => {
   fixture.state.phase = "downloading"; fixture.state.percent = 72;
   await render(); expect(gate()).toBeNull();

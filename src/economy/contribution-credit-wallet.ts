@@ -44,6 +44,7 @@ export class ContributionCreditWallet {
   private promotions: PromotionalCredits | null;
   private managedPurchases = false;
   private purchasedCredits = false;
+  private browserCredits = false;
   constructor(private readonly database: MeshDatabase, private readonly ledger: EconomicLedger, expiringPromotions = false) {
     this.promotions = expiringPromotions ? new PromotionalCredits(database) : null;
   }
@@ -66,6 +67,8 @@ export class ContributionCreditWallet {
     // Accounting stays authoritative even when new managed purchases are disabled.
     this.managedPurchases = Boolean(await this.database.raw.prepare(`SELECT 1 FROM information_schema.tables
       WHERE table_schema=current_schema() AND table_name='economic_managed_purchases'`).get());
+    this.browserCredits = Boolean(await this.database.raw.prepare(`SELECT 1 FROM information_schema.tables
+      WHERE table_schema=current_schema() AND table_name='economic_browser_inference_credits'`).get());
     await this.database.raw.prepare(`UPDATE economic_credit_holds SET status='released'
       WHERE status='reserved' AND id IN (SELECT id FROM api_usage WHERE status='failed')
       ${this.managedPurchases ? "AND NOT EXISTS (SELECT 1 FROM economic_managed_purchases p WHERE p.usage_id=economic_credit_holds.id)" : ""}`).run();
@@ -107,6 +110,13 @@ export class ContributionCreditWallet {
       SELECT COALESCE(SUM(amount_microunits),0) AS total FROM economic_credit_transfers
       WHERE ${kind === "account" ? "account_id" : "node_id"}=?`).get(ownerId) as { total: number };
     const adjustment = Number(row.total) * (kind === "node" ? -1 : 1);
+    const browser = this.browserCredits && kind === "account" ? await this.database.raw.prepare(`
+      SELECT COALESCE(SUM(CASE WHEN c.account_id=? THEN c.amount_microunits ELSE 0 END),0) AS total,
+      COUNT(*) AS jobs FROM economic_browser_inference_credits c
+      JOIN economic_managed_purchases p ON p.usage_id=c.usage_id
+      WHERE (c.account_id=? OR p.account_id=?) AND p.state='settled' AND p.provider='mycellios-browser'`)
+      .get(ownerId,ownerId,ownerId) : null;
+    const browserEarned = Number(browser?.total ?? 0);
     const promotion = kind === "node" ? { total: 0 } : await this.database.raw.prepare(`
       SELECT COALESCE(SUM(amount_microunits),0) AS total FROM economic_promotional_grants
       ${kind === "account" ? "WHERE account_id=?" : ""}`).get(...(kind === "account" ? [ownerId] : [])) as { total: number };
@@ -121,15 +131,16 @@ export class ContributionCreditWallet {
       COALESCE(SUM(amount_microunits-refunded_microunits),0) AS total FROM economic_wallet_topups
       WHERE credited=true ${kind === "account" ? "AND account_id=?" : ""}`).get(...(kind === "account" ? [ownerId] : [])) : null;
     const purchased = Number(cash?.total ?? 0) * (kind === "platform" ? -1 : 1);
-    const balanceMicrounits = summary.balanceMicrounits + adjustment + managedAdjustment + purchased
+    const balanceMicrounits = summary.balanceMicrounits + adjustment + browserEarned + managedAdjustment + purchased
       + (promotionalGrantedMicrounits - (expiring?.expired ?? 0)) * (kind === "platform" ? -1 : 1);
     const reservedMicrounits = kind === "account" ? await this.reserved(ownerId) : 0;
     return { ...summary, balanceMicrounits, reservedMicrounits,
+      settledJobs: summary.settledJobs + Number(browser?.jobs ?? 0),
       availableMicrounits: Math.max(0, balanceMicrounits - reservedMicrounits),
-      promotionalGrantedMicrounits, contributionEarnedMicrounits: kind === "account" ? adjustment : 0,
+      promotionalGrantedMicrounits, contributionEarnedMicrounits: kind === "account" ? adjustment + browserEarned : 0,
       ...(expiring && kind === "account" ? { promotionalExpiredMicrounits: expiring.expired,
         nextPromotionalExpiry: expiring.nextExpiry } : {}),
-      lifetimeMicrounits: summary.lifetimeMicrounits + (kind === "account" ? adjustment : 0) };
+      lifetimeMicrounits: summary.lifetimeMicrounits + (kind === "account" ? adjustment + browserEarned : 0) };
   }
 
   async reserve(id: string, accountId: string, request: { model: string; messages: unknown[]; max_tokens?: number | undefined }, idempotencyKey?: string | null): Promise<void> {

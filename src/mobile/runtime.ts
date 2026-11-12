@@ -11,6 +11,7 @@ import type { NativeBuildIdentity } from "../contracts/build-identity";
 import { trustedExpertManifestPath } from "./expert-manifest-url";
 import { BrowserLayerWork, type LayerExecuteTask, type LayerLoadTask } from "./browser-layer-work";
 import { shouldApplyBrowserUpdate } from "./automatic-update";
+import { BrowserTextWork } from "./browser-text-work";
 
 declare const __MYCELLIOS_BUILD_IDENTITY__: NativeBuildIdentity;
 
@@ -146,6 +147,8 @@ const browserLayers = new BrowserLayerWork({
   send,
   status: setStatus,
 });
+const browserText = new BrowserTextWork({ token: () => state.token, signal: () => state.executionController.signal,
+  active: () => state.running && document.visibilityState === "visible", send, status: setStatus });
 let initialized = false;
 let backendProbeVersion = 0;
 let activeServerTasks = 0;
@@ -316,6 +319,7 @@ async function stop(log = true, preserveView = false): Promise<void> {
   state.wakeLock = null;
   state.residentExperts.clear();
   await browserLayers.close();
+  await browserText.close();
   clearGpuResidentExperts();
   state.cancelledMatrixTasks.clear();
   renderWakeLock();
@@ -678,6 +682,11 @@ async function handleServerMessage(raw: string): Promise<void> {
     if (payload.taskId) state.cancelledMatrixTasks.add(payload.taskId);
     return;
   }
+  if (message.type === "text.execute") { await browserText.execute(message.payload); return; }
+  if (message.type === "text.verified") {
+    state.verifiedTasks = (message.payload as { verifiedTasks: number }).verifiedTasks;
+    setStatus("Complete-model response verified by the coordinator."); emit(); return;
+  }
   if (message.type === "expert.load") {
     await loadExpert(message.payload as {
       taskId: string; leaseId: string; artifactId: string; manifestUrl: string; deadlineAt: number;
@@ -693,11 +702,13 @@ async function handleServerMessage(raw: string): Promise<void> {
   }
   if (message.type === "expert.verified") {
     const payload = message.payload as { phase?: string; replicas?: number; verifiedTasks?: number };
-    if (payload.phase === "consensus") {
+    if (payload.phase === "consensus" || payload.phase === "reference") {
       state.verifiedTasks = payload.verifiedTasks ?? state.verifiedTasks + 1;
       emit();
-      setStatus("Expert output matched an independent replica and was accepted by the model network.");
-      addLog(`Replicated MoE consensus accepted · ${payload.replicas ?? 2} devices.`);
+      setStatus(payload.phase === "reference" ? "Expert output matched the coordinator's independent reference."
+        : "Expert output matched an independent replica and was accepted by the model network.");
+      addLog(payload.phase === "reference" ? "Model expert inference verified against trusted weights."
+        : `Replicated MoE consensus accepted · ${payload.replicas ?? 2} devices.`);
     }
     return;
   }
@@ -729,6 +740,11 @@ async function handleServerMessage(raw: string): Promise<void> {
     state.verifiedTasks = payload.verifiedTasks ?? state.verifiedTasks + 1;
     setStatus(`Layer ${payload.layer ?? "?"} executed on ${payload.backend ?? state.backend} for the model network.`);
     emit();
+    return;
+  }
+  if (message.type === "inference.settled") {
+    // Notification is a refresh hint, never a money amount supplied by the worker.
+    window.dispatchEvent(new Event("mycellios:contribution-verified"));
     return;
   }
   if (message.type === "compute.verified") {
@@ -1461,6 +1477,7 @@ function cancelActiveExecutions(reason: string): void {
   state.executionController = new AbortController();
   clearGpuResidentExperts();
   void browserLayers.close();
+  void browserText.close();
   const device = state.device;
   state.device = null;
   state.gpu = null;
@@ -1764,6 +1781,12 @@ function currentSnapshot(): MobileWorkerSnapshot {
     wakeLockActive: Boolean(state.wakeLock && !state.wakeLock.released),
     activity: [...viewState.activity],
   };
+}
+
+/** Used only by the authenticated Agent account-link RPC. Never expose this in snapshots/logs. */
+export function getMobileWorkerAccountProof(): { workerId: string; token: string } | null {
+  return state.running && state.workerId && state.token && viewState.connection === "online"
+    ? { workerId: state.workerId, token: state.token } : null;
 }
 
 function emit(): void {

@@ -10547,6 +10547,231 @@ msgstr "After this task"
 msgid "Send when this task finishes"
 msgstr "Send when this task finishes"
 
+msgid "Delivery"
+msgstr "Delivery"
+
+msgid "Desktop"
+msgstr "Desktop"
+
+msgid "Push connected"
+msgstr "Push connected"
+
+msgid "Setup needed"
+msgstr "Setup needed"
+
+msgid "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
+msgstr "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
+
+msgid "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
+msgstr "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
+
+msgid "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
+msgstr "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
+
+msgid "Open Mycellios over HTTPS to enable system notifications."
+msgstr "Open Mycellios over HTTPS to enable system notifications."
+
+msgid "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
+msgstr "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
+
+msgid "Background push is not configured on this server. Alerts are available only while the app is running."
+msgstr "Background push is not configured on this server. Alerts are available only while the app is running."
+
+msgid "Enable system permission and register this device to receive background alerts."
+msgstr "Enable system permission and register this device to receive background alerts."
+
+msgid "Could not open system notification settings."
+msgstr "Could not open system notification settings."
+
+msgid "Open system notification settings"
+msgstr "Open system notification settings"
+
+msgid "If you can see this alert, system notifications are enabled."
+msgstr "If you can see this alert, system notifications are enabled."
+
+msgid "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
+msgstr "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
+
+msgid "Background alerts across devices"
+msgstr "Background alerts across devices"
+
+msgid "When to notify"
+msgstr "When to notify"
+
+msgid "All activity"
+msgstr "All activity"
+
+msgid "Show push previews"
+msgstr "Show push previews"
+
+msgid "Use account setting"
+msgstr "Use account setting"
+
+msgid "Off"
+msgstr "Off"
+
+msgid "Could not check background delivery. Alerts in the running app remain available."
+msgstr "Could not check background delivery. Alerts in the running app remain available."
+
+msgid "Update Mycellios Android to configure native notifications."
+msgstr "Update Mycellios Android to configure native notifications."
+
+msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+msgstr "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+
+msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
+msgstr "Firebase must be configured in the Android app and on the server before native push can be enabled."
+
+msgid "Android push is not configured on this server."
+msgstr "Android push is not configured on this server."
+
+msgid "Earn credits"
+msgstr "Earn credits"
+
+msgid "Available on Desktop"
+msgstr "Available on Desktop"
+
+msgid "Could not connect. Try again."
+msgstr "Could not connect. Try again."
+
+msgid "Generate AI"
+msgstr "Generate AI"
+
+msgid "Share computing power with the network"
+msgstr "Share computing power with the network"
+
+msgid "Connect account"
+msgstr "Connect account"
+
+msgid "Connect your Mycellios account to see your balance."
+msgstr "Connect your Mycellios account to see your balance."
+
+msgid "No tasks running"
+msgstr "No tasks running"
+
+msgid "Tasks at once"
+msgstr "Tasks at once"
+
+msgid "Extra tasks wait their turn."
+msgstr "Extra tasks wait their turn."
+
+msgid "Credits not enabled here"
+msgstr "Credits not enabled here"
+
+msgid "Models with your credits"
+msgstr "Models with your credits"
+
+msgid "You are signed in. This installation does not yet have access to Mycellios credits."
+msgstr "You are signed in. This installation does not yet have access to Mycellios credits."
+
+msgid "Use my credits"
+msgstr "Use my credits"
+
+msgid "Credits are not enabled in this installation."
+msgstr "Credits are not enabled in this installation."
+
+msgid "Not enabled"
+msgstr "Not enabled"
+
+msgid "Earnings could not be linked to your account."
+msgstr "Earnings could not be linked to your account."
+
+msgid "Browser earnings aren't available yet."
+msgstr "Browser earnings aren't available yet."
+
+msgid "Your account could not be linked. Try again."
+msgstr "Your account could not be linked. Try again."
+
+msgid "Identity"
+msgstr "Identity"
+
+msgid "Server color"
+msgstr "Server color"
+
+msgid "How this connection appears on this device."
+msgstr "How this connection appears on this device."
+
+msgid "Recognize each connection at a glance."
+msgstr "Recognize each connection at a glance."
+
+msgid "Connection names and colors stay on this device. Shared Space settings and permissions are managed separately."
+msgstr "Connection names and colors stay on this device. Shared Space settings and permissions are managed separately."
+
+msgid "Connect to this server to manage notifications."
+msgstr "Connect to this server to manage notifications."
+
+msgid "Current server"
+msgstr "Current server"
+
+msgid "Saved server"
+msgstr "Saved server"
+
+msgid "Each server keeps its own sign-in, conversations and permissions."
+msgstr "Each server keeps its own sign-in, conversations and permissions."
+
+msgid "Changing a connection never moves or deletes your conversations."
+msgstr "Changing a connection never moves or deletes your conversations."
+
+msgid "Discard unsaved connection changes?"
+msgstr "Discard unsaved connection changes?"
+
+msgid "Could not complete this action. Your connection has not changed."
+msgstr "Could not complete this action. Your connection has not changed."
+
+msgid "For 15 minutes"
+msgstr "For 15 minutes"
+
+msgid "For 1 hour"
+msgstr "For 1 hour"
+
+msgid "For 8 hours"
+msgstr "For 8 hours"
+
+msgid "For 24 hours"
+msgstr "For 24 hours"
+
+msgid "Notification settings"
+msgstr "Notification settings"
+
+msgid "More notification settings"
+msgstr "More notification settings"
+
+msgid "Open in a new tab"
+msgstr "Open in a new tab"
+
+msgid "Server settings"
+msgstr "Server settings"
+
+msgid "Remove saved connection"
+msgstr "Remove saved connection"
+
+msgid "Add a server"
+msgstr "Add a server"
+
+msgid "Servers"
+msgstr "Servers"
+
+msgid "Bar"
+msgstr "Bar"
+
+msgid "Server view"
+msgstr "Server view"
+
+msgid "Connect to another Mycellios. Your current chat stays open."
+msgstr "Connect to another Mycellios. Your current chat stays open."
+
+msgid "Public servers require HTTPS. Sign in separately on the new server."
+msgstr "Public servers require HTTPS. Sign in separately on the new server."
+
+msgid "For 3 hours"
+msgstr "For 3 hours"
+
+msgid "Until I turn it back on"
+msgstr "Until I turn it back on"
+
+msgid "Server address"
+msgstr "Server address"
+
 msgid "System default"
 msgstr "System default"
 
@@ -10935,24 +11160,9 @@ msgstr "Sign out"
 msgid "Share activity"
 msgstr "Share"
 
-msgid "Earn credits"
-msgstr "Earn credits"
-
-msgid "Available on Desktop"
-msgstr "Available on Desktop"
-
-msgid "Could not connect. Try again."
-msgstr "Could not connect. Try again."
-
 #: src/pages/model-settings/providers-section.tsx
 msgid "Back to providers"
 msgstr "Back to providers"
-
-msgid "Generate AI"
-msgstr "Generate AI"
-
-msgid "Share computing power with the network"
-msgstr "Share computing power with the network"
 
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "If I’m needed"
@@ -11062,12 +11272,6 @@ msgstr "Allow each Mico to send task alerts. Account and device filters still ap
 msgid "Could not play the sound. Check your audio output."
 msgstr "Could not play the sound. Check your audio output."
 
-msgid "Connect account"
-msgstr "Connect account"
-
-msgid "Connect your Mycellios account to see your balance."
-msgstr "Connect your Mycellios account to see your balance."
-
 #: src/pages/settings/DeviceVoiceSettings.tsx
 msgid "Spoken replies"
 msgstr "Spoken replies"
@@ -11114,38 +11318,11 @@ msgstr "Local voice stays on this computer and uses no credits."
 msgid "Reply text is sent to your connected voice provider, which may charge your account."
 msgstr "Reply text is sent to your connected voice provider, which may charge your account."
 
-msgid "No tasks running"
-msgstr "No tasks running"
-
-msgid "Tasks at once"
-msgstr "Tasks at once"
-
-msgid "Extra tasks wait their turn."
-msgstr "Extra tasks wait their turn."
-
 msgid "Choose where dictation is processed. Network transcription uses credits."
 msgstr "Choose where dictation is processed. Network transcription uses credits."
 
 msgid "Open a Mico and configure dictation and spoken replies to start a voice conversation."
 msgstr "Open a Mico and configure dictation and spoken replies to start a voice conversation."
-
-msgid "Credits not enabled here"
-msgstr "Credits not enabled here"
-
-msgid "Models with your credits"
-msgstr "Models with your credits"
-
-msgid "You are signed in. This installation does not yet have access to Mycellios credits."
-msgstr "You are signed in. This installation does not yet have access to Mycellios credits."
-
-msgid "Use my credits"
-msgstr "Use my credits"
-
-msgid "Credits are not enabled in this installation."
-msgstr "Credits are not enabled in this installation."
-
-msgid "Not enabled"
-msgstr "Not enabled"
 
 #: src/pages/settings/DesktopCompanionsPanel.tsx
 msgid "Mycellios Island"
@@ -11328,17 +11505,11 @@ msgstr "No recurring price reported for this account."
 msgid "Only the account owner can change billing."
 msgstr "Only the account owner can change billing."
 
-msgid "Servers"
-msgstr "Servers"
-
 msgid "Each server manages its own account and billing. Adding a connection does not purchase a plan."
 msgstr "Each server manages its own account and billing. Adding a connection does not purchase a plan."
 
 msgid "No saved servers yet."
 msgstr "No saved servers yet."
-
-msgid "Current server"
-msgstr "Current server"
 
 msgid "Connect another server"
 msgstr "Connect another server"
@@ -11486,84 +11657,6 @@ msgstr "Reconnecting to the server…"
 
 msgid "Could not load models"
 msgstr "Could not load models"
-
-msgid "Delivery"
-msgstr "Delivery"
-
-msgid "Desktop"
-msgstr "Desktop"
-
-msgid "Push connected"
-msgstr "Push connected"
-
-msgid "Setup needed"
-msgstr "Setup needed"
-
-msgid "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
-msgstr "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
-
-msgid "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
-msgstr "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
-
-msgid "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
-msgstr "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
-
-msgid "Open Mycellios over HTTPS to enable system notifications."
-msgstr "Open Mycellios over HTTPS to enable system notifications."
-
-msgid "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
-msgstr "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
-
-msgid "Background push is not configured on this server. Alerts are available only while the app is running."
-msgstr "Background push is not configured on this server. Alerts are available only while the app is running."
-
-msgid "Enable system permission and register this device to receive background alerts."
-msgstr "Enable system permission and register this device to receive background alerts."
-
-msgid "Could not open system notification settings."
-msgstr "Could not open system notification settings."
-
-msgid "Open system notification settings"
-msgstr "Open system notification settings"
-
-msgid "If you can see this alert, system notifications are enabled."
-msgstr "If you can see this alert, system notifications are enabled."
-
-msgid "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
-msgstr "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
-
-msgid "Background alerts across devices"
-msgstr "Background alerts across devices"
-
-msgid "When to notify"
-msgstr "When to notify"
-
-msgid "All activity"
-msgstr "All activity"
-
-msgid "Show push previews"
-msgstr "Show push previews"
-
-msgid "Use account setting"
-msgstr "Use account setting"
-
-msgid "Off"
-msgstr "Off"
-
-msgid "Could not check background delivery. Alerts in the running app remain available."
-msgstr "Could not check background delivery. Alerts in the running app remain available."
-
-msgid "Update Mycellios Android to configure native notifications."
-msgstr "Update Mycellios Android to configure native notifications."
-
-msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
-msgstr "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
-
-msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
-msgstr "Firebase must be configured in the Android app and on the server before native push can be enabled."
-
-msgid "Android push is not configured on this server."
-msgstr "Android push is not configured on this server."
 
 msgid "A clear next step"
 msgstr "A clear next step"
@@ -11936,9 +12029,6 @@ msgstr "Send message to"
 
 msgid "Send side question"
 msgstr "Send side question"
-
-msgid "Server view"
-msgstr "Server view"
 
 msgid "Set it up once."
 msgstr "Set it up once."

@@ -622,6 +622,7 @@ export default defineConfig(async ({ command, mode }) => {
         configurePreviewServer: (server) => attachNovncProxy(server, screenProxySecret(), api),
       },
     ],
+    worker: { format: "es" },
     server: {
       fs: { allow: [path.resolve(import.meta.dirname, "../.."), path.resolve(import.meta.dirname, "../../../mobile"), path.resolve(import.meta.dirname, "../../../contracts")] },
       host: process.env.RAKAZO_DEV_HOST ?? rootEnv.RAKAZO_DEV_HOST ?? "127.0.0.1",

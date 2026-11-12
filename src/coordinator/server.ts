@@ -110,6 +110,7 @@ import {
 } from "../support/assistant.js";
 import { MeshService, MeshServiceError, type JobStreamEvent } from "./mesh-service.js";
 import { MobileComputeHub, type MobileWorkerSnapshot } from "./mobile-compute-hub.js";
+import { initializeBrowserInference } from "./browser-inference-routes.js";
 import { queueExistingMobileArtifacts } from "./mobile-artifact-backup.js";
 import {
   verifyGitHubReleaseUploadToken,
@@ -1580,6 +1581,8 @@ export async function createCoordinator(
       : {}),
   });
   mobileHub.attach(app);
+  const browserInference = await initializeBrowserInference(app, { database, wallet: creditWallet, api: apiAccess,
+    hub: mobileHub, config: config.browserInference, apiEnabled: apiAccessEnabled, principal: principalFor });
   if (persistence && config.mobileExpertArtifactsPath) {
     (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }
@@ -4685,7 +4688,7 @@ export async function createCoordinator(
 
   app.get("/v1/models", async () => {
     const models = (await scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() }));
-    return await mycelliosModelCatalog(models, economicLedger, managedGateway);
+    return await mycelliosModelCatalog(models, economicLedger, managedGateway, browserInference);
   });
 
   const settleCompletedInference = createInferenceSettlement({

@@ -125,6 +125,42 @@ describe("Mycellios account RPC authorization", () => {
     expect(f.transport).toHaveBeenCalledTimes(1);
   });
 
+  it.each([false, true])("reuses only the owned connection without renewing SSO (SSO enabled: %s)", async (enabled) => {
+    const f = fixture(enabled);
+    f.connected();
+    f.secret.mockResolvedValue({ ciphertext: "encrypted-fixture" });
+    f.accountToken.mockRejectedValue(new Error("expired SSO must not block an owned key"));
+    f.transport.mockImplementation(async (url?: unknown) => Response.json(String(url).endsWith("/models")
+      ? { data: [{ id: "qwen3-8b" }] }
+      : { ...f.account, contributionFundingSupported: true }) as never);
+    const save = vi.spyOn(modelCredentials, "persistModelCredential").mockResolvedValue({
+      id: "fixture-credential", provider: "openai-compatible", label: "Mycellios", hasKey: true, isDefault: false,
+    } as never);
+    try {
+      await f.client.models.connectMycellios();
+      expect(f.accountToken).not.toHaveBeenCalled();
+      expect(f.transport).toHaveBeenCalledTimes(2);
+      for (const [, init] of f.transport.mock.calls as unknown as [unknown, RequestInit][]) {
+        expect(init.method ?? "GET").toBe("GET");
+        expect(new Headers(init.headers).get("authorization")).toBe("Bearer fixture-account-key");
+      }
+      expect(save).toHaveBeenCalledWith(expect.anything(), f.actor,
+        expect.objectContaining({ credentialId: "fixture-credential", keepExistingDefault: true, scope: "account" }), expect.anything());
+    } finally { save.mockRestore(); }
+  });
+
+  it("does not reuse a key whose secret is not owned by the signed-in account", async () => {
+    const f = fixture();
+    f.connected();
+    f.secret.mockResolvedValue(null);
+    await expect(f.client.models.connectMycellios()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(f.secret).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      id: "fixture-secret", userId: f.actor.userId, spaceId: null,
+    } }));
+    expect(f.load).not.toHaveBeenCalled();
+    expect(f.transport).not.toHaveBeenCalled();
+  });
+
   it("preserves the account's selected model when reconnecting instead of a Space preference", async () => {
     const f = fixture(true);
     f.credentials.mockResolvedValue([{
@@ -319,4 +355,25 @@ it("preserves missing SSO authorization so the UI clears an old verified balance
  const f=fixture(true);f.accountToken.mockResolvedValue(null);
  await expect(f.signedInClient.models.mycelliosAccount()).rejects.toMatchObject({code:"UNAUTHORIZED"});
  expect(f.transport).not.toHaveBeenCalled();
+});
+it("links browser payouts through SSO to the canonical service, without any client-supplied account id",async()=>{
+ const f=fixture(true);f.transport.mockResolvedValue(Response.json({linked:true}));
+ await expect(f.signedInClient.models.browserContributionLink({workerId:"32cb4b44-cd2e-45d5-966e-b876f4c4dba0",token:"w".repeat(32),expectedUserId:f.actor.userId})).resolves.toEqual({linked:true});
+ const [url,init]=f.transport.mock.calls[0] as unknown as [string,RequestInit];
+ expect(url).toBe("https://www.mycellios.com/v1/browser/contributors");
+ expect(new Headers(init.headers).get("authorization")).toBe("Bearer fixture-session-token");
+ expect(JSON.parse(String(init.body))).toEqual({workerId:"32cb4b44-cd2e-45d5-966e-b876f4c4dba0",token:"w".repeat(32)});
+});
+it("rejects a browser payout link after the account changes and never uses a model key",async()=>{
+ const f=fixture(true);
+ await expect(f.signedInClient.models.browserContributionLink({workerId:"32cb4b44-cd2e-45d5-966e-b876f4c4dba0",token:"w".repeat(32),expectedUserId:"someone-else"})).rejects.toMatchObject({code:"FORBIDDEN"});
+ expect(f.transport).not.toHaveBeenCalled();
+ f.accountToken.mockResolvedValue(null);
+ await expect(f.signedInClient.models.browserContributionLink({workerId:"32cb4b44-cd2e-45d5-966e-b876f4c4dba0",token:"w".repeat(32),expectedUserId:f.actor.userId})).rejects.toMatchObject({code:"UNAUTHORIZED"});
+ expect(f.transport).not.toHaveBeenCalled();
+});
+it.each([[401,"UNAUTHORIZED"],[403,"FORBIDDEN"],[404,"PRECONDITION_FAILED"],[501,"PRECONDITION_FAILED"],[409,"CONFLICT"],[503,"SERVICE_UNAVAILABLE"]] as const)("preserves safe browser linking denial %s without exposing worker credentials",async(status,code)=>{
+ const f=fixture(true);f.transport.mockResolvedValue(new Response("private worker proof fixture-session-token",{status}));
+ await expect(f.signedInClient.models.browserContributionLink({workerId:"32cb4b44-cd2e-45d5-966e-b876f4c4dba0",token:"w".repeat(32),expectedUserId:f.actor.userId})).rejects.toMatchObject({code,message:"Could not link browser earnings to your Mycellios account."});
+ expect(f.transport).toHaveBeenCalledOnce();
 });

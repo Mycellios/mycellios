@@ -52,6 +52,16 @@ describe("closed web bundle policy", () => {
       .toThrow("bundle_not_in_manifest:assets/unknown.js");
   });
 
+  it("checks worker scripts declared as manifest assets against the same size budget", () => {
+    const root = fixture({ "index-test.js": 1, "runtime-test.js": 1, "hero-test.js": 1, "worker-test.js": 5 });
+    const withWorker = { ...manifest, "index.html": { ...manifest["index.html"], assets: ["assets/worker-test.js", "assets/engine.wasm"] } };
+    expect(verifyWebBundleBudget({ root, outputDirectory: "out", manifest: withWorker, definition }))
+      .toEqual(expect.arrayContaining([expect.objectContaining({ file: "assets/worker-test.js", bytes: 5 })]));
+    writeFileSync(join(root, "out/assets/worker-test.js"), "xxxxxx");
+    expect(() => verifyWebBundleBudget({ root, outputDirectory: "out", manifest: withWorker, definition }))
+      .toThrow("unknown_bundle_exceeds_default:assets/worker-test.js:6>5");
+  });
+
   it("rejects public source maps", () => {
     const root = fixture({ "index-test.js": 1, "runtime-test.js": 1, "hero-test.js": 1, "index-test.js.map": "{}" });
     expect(() => verifyWebBundleBudget({ root, outputDirectory: "out", manifest, definition }))

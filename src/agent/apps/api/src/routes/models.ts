@@ -114,22 +114,52 @@ export function modelsRoutes(ctx: RouterContext) {
         if (!token) throw new ORPCError("UNAUTHORIZED");
         return contributionAccount(token, deps.modelConnectionFetch, context.signal).enroll();
       }),
+      browserContributionLink: authed.models.browserContributionLink.handler(async ({ context, input }) => {
+        if (input.expectedUserId !== context.actor.userId) throw new ORPCError("FORBIDDEN");
+        if (!deps.env.mycelliosSso || !context.requestHeaders) throw new ORPCError("FORBIDDEN");
+        const token = await deps.auth.oidcAccessToken(context.requestHeaders, context.actor.userId);
+        if (!token) throw new ORPCError("UNAUTHORIZED");
+        const signal = AbortSignal.any([AbortSignal.timeout(15_000), ...(context.signal ? [context.signal] : [])]);
+        try {
+          const response = await (deps.modelConnectionFetch ?? fetch)(productBrand.apiBaseUrl + "/browser/contributors", {
+            method: "POST", redirect: "error", cache: "no-store", signal,
+            headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+            body: JSON.stringify({ workerId: input.workerId, token: input.token }),
+          });
+          if (!response.ok) {
+            await response.body?.cancel();
+            const code = response.status === 401 ? "UNAUTHORIZED" : response.status === 403 ? "FORBIDDEN"
+              : response.status === 404 || response.status === 501 ? "PRECONDITION_FAILED"
+                : response.status === 409 ? "CONFLICT" : "SERVICE_UNAVAILABLE";
+            throw new ORPCError(code, { message: "Could not link browser earnings to your Mycellios account." });
+          }
+          const result = await readBoundedJsonResponse<{ linked?: unknown }>(response, 4096, signal);
+          if (result.linked !== true) throw new Error("link not confirmed");
+          return { linked: true };
+        } catch (error) {
+          if (error instanceof ORPCError) throw error;
+          throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Could not link browser earnings to your Mycellios account." });
+        }
+      }),
       connectMycellios: authed.models.connectMycellios.handler(async ({ context }) => {
-        if (!deps.env.mycelliosSso || !context.requestHeaders)
-          throw new ORPCError("FORBIDDEN", { message: "Sign in with Mycellios to connect this account." });
         const pending = mycelliosConnections.get(context.actor.userId);
         if (pending) return pending;
         const setup = (async () => {
-          if (!deps.env.mycelliosSso || !context.requestHeaders)
-            throw new ORPCError("FORBIDDEN", {
-              message: "Sign in with Mycellios to connect this account.",
-            });
-          const accessToken = await deps.auth.oidcAccessToken(
-            context.requestHeaders,
-            context.actor.userId,
-          );
-          if (!accessToken) throw new ORPCError("UNAUTHORIZED");
           const existing = await ownedMycellios(context.actor);
+          // An owned personal connection remains usable when this installation's
+          // SSO session expires. Only provisioning a new key requires fresh SSO.
+          let accessToken = existing?.saved.apiKey;
+          if (!accessToken) {
+            if (!deps.env.mycelliosSso || !context.requestHeaders)
+              throw new ORPCError("FORBIDDEN", {
+                message: "Sign in with Mycellios to connect this account.",
+              });
+            accessToken = await deps.auth.oidcAccessToken(
+              context.requestHeaders,
+              context.actor.userId,
+            ) ?? undefined;
+            if (!accessToken) throw new ORPCError("UNAUTHORIZED");
+          }
           const provisioned = await provisionMycelliosConnection(accessToken, {
             modelId: existing?.credential.userPreferences?.[0]?.modelId ?? deps.env.defaultModel,
             existing: existing?.saved,

@@ -1,0 +1,33 @@
+.myc-update-notice {
+  --update-surface: light-dark(#f0e4cb, #3d3322);
+  --update-ink: light-dark(#664512, #f4d99e);
+  --update-action: light-dark(#293029, #f1e5cc);
+  --update-action-ink: light-dark(#fffaf0, #352a16);
+  --update-progress: light-dark(#675021, #dfc484);
+  margin: 8px 10px 0;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 11px;
+  background: var(--update-surface);
+  color: var(--update-ink);
+  animation: myc-update-arrive 240ms cubic-bezier(.16, 1, .3, 1);
+}
+.myc-update-notice__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.myc-update-notice__label { margin: 0; padding-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 1.4; }
+.myc-update-notice__action { position: relative; isolation: isolate; overflow: hidden; display: grid; place-items: center; min-width: 88px; min-height: 30px; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--update-action); color: var(--update-action-ink); font-size: 11px; font-weight: 500; line-height: 1.35; cursor: pointer; transition: opacity 120ms ease-out; }
+.myc-update-notice__action:disabled { cursor: default; }
+.myc-update-notice__action:hover:not(:disabled) { opacity: .88; }
+.myc-update-notice__action:focus-visible { outline: 2px solid var(--update-ink); outline-offset: 2px; }
+.myc-update-notice__action-content { position: relative; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.myc-update-notice__fill { position: absolute; inset: 0 auto 0 0; background: var(--update-progress); transition: width 180ms ease-out; }
+.myc-update-notice__spinner { animation: myc-update-spin 1s linear infinite; }
+.myc-update-notice__detail { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding: 6px; font-size: 11px; line-height: 1.5; }
+.myc-update-notice__detail a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.myc-update-notice__detail button { min-height: 28px; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.myc-update-notice[data-failed] .myc-update-notice__detail { overflow-wrap: anywhere; }
+@keyframes myc-update-arrive { from { opacity: .5; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes myc-update-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .myc-update-notice, .myc-update-notice__spinner { animation: none; }
+  .myc-update-notice__fill, .myc-update-notice__action { transition: none; }
+}

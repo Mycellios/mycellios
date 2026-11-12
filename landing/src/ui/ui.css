@@ -46,7 +46,7 @@
 :root[data-mycellios-design] [data-ui="product-stories"] .ui-button:is([data-variant="primary"],[data-variant="secondary"]) {
   min-height:40px !important; padding:9px 13px !important; font:400 13px/1.4 var(--agent-font,system-ui,sans-serif) !important;
 }
-:root[data-mycellios-design] [data-ui="product-stories"] .ui-button:focus-visible { outline:2px solid var(--ui-focus); outline-offset:3px; }
+:root[data-mycellios-design] [data-ui="product-stories"] .ui-button:focus-visible { outline:none; box-shadow:none; }
 @media (max-width:760px) {
   :root[data-mycellios-design] [data-ui="product-stories"] .ui-button { min-height:44px !important; }
 }
@@ -111,7 +111,7 @@
 }
 .ui-button:disabled, .ui-button[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 .ui-button:focus-visible, .ui-link:focus-visible,
-.ui-input:is([data-control="checkbox"], [data-control="radio"], [data-control="range"], [data-control="file"]):focus-visible { outline: 2px solid var(--ui-focus) !important; outline-offset: 3px !important; }
+.ui-input:is([data-control="checkbox"], [data-control="radio"], [data-control="range"], [data-control="file"]):focus-visible { outline: none !important; box-shadow: none !important; }
 .ui-input:not([data-control="checkbox"]):not([data-control="radio"]):not([data-control="range"]):not([data-control="file"]):focus,
 .ui-select:focus, .ui-textarea:focus { outline: none !important; box-shadow: none !important; }
 .ui-input:not([data-control="checkbox"]):not([data-control="radio"]):not([data-control="range"]):not([data-control="file"]):not([data-control="hidden"]), .ui-textarea, .ui-select {
@@ -160,7 +160,7 @@
 .ui-button.marketing-option[aria-pressed="true"] { background:#e0e8da; color:#172a20; }
 .ui-button.marketing-option:disabled { opacity:.55; }
 .marketing-page :is(.ui-input,.ui-select), .compute-calculator :is(.ui-input,.ui-select) { width:100%; min-height:42px; box-sizing:border-box; padding:10px 12px; border:1px solid #c5cbbc; border-radius:8px; background:#faf9f7; color:#172a20; font:inherit; font-size:14px; }
-.marketing-page :is(.ui-input,.ui-select):focus-visible, .compute-calculator :is(.ui-input,.ui-select):focus-visible { outline:2px solid #427d6e !important; outline-offset:2px; }
+.marketing-page :is(.ui-input,.ui-select):focus-visible, .compute-calculator :is(.ui-input,.ui-select):focus-visible { outline:none !important; box-shadow:none !important; }
 .marketing-page .ui-input[aria-invalid="true"], .compute-calculator .ui-input[aria-invalid="true"] { border-color:#a34436; }
 
 /* Native FAQ disclosures share the same quiet motion on every surface. */
@@ -175,3 +175,7 @@
   .ui-animated-disclosure > summary > svg, .ui-animated-disclosure::details-content { transition:none !important; }
 }
 .ui-button.api-copy { display:inline-flex; align-items:center; justify-content:center; padding:8px; border:0; background:transparent; color:inherit; }
+
+/* Match the application: focus never adds a visual border or halo. */
+:root :is(:focus, :focus-visible, :focus-within) { outline: none !important; }
+:root :is(:focus, :focus-visible) { box-shadow: none !important; }

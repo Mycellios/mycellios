@@ -117,9 +117,11 @@ These rules apply to the complete repository.
   implementations or native controls outside the kit. Run `npm run verify:ui-kit`.
 - Primary action buttons use flat colors without decorative borders or shadows.
   Segmented controls may use the subtle selection shadow from the Agent reference.
-  Control variants, heights, radii and keyboard focus belong to
+  Control variants, heights, radii and keyboard behavior belong to
   `landing/src/ui/ui.css`. Preserve
   native form behavior, refs, disabled states and accessible names.
+  Focus must not add outlines, halos or border-color changes in pointer or keyboard
+  mode. Keep this policy in both shared UI kits and standalone Desktop sheets; retain DOM focus.
 - The default Agent profile uses Geist Variable and the Agent paper/stone palette
   through `landing/src/ui/agent-style.css`: warm off-white canvas, pale stone cards,
   subtle warm edges and deep moss actions, with a neutral gray dark mode. The previous
@@ -355,6 +357,19 @@ These rules apply to the complete repository.
   It uses normal process priority inside the existing Windows Job; preserve the
   pre-import barrier, owner CPU/memory quotas and kill-on-job-close behavior.
   Check the launcher with `python tests/embedding_gpu_bootstrap_test.py`.
+
+- Account-funded browser expert stages use `specs/agent-browser-contribution/spec.md`.
+  Keep their explicit operator opt-in, approved artifact/price bounds, signed live
+  account binding and independent full-output reference. They are not native
+  physical evidence. The explicit complete-text pilot uses pinned GPT-2 ONNX, BPE,
+  CPU/WASM generation and full independent token verification; it is not a tools
+  model or WebGPU text acceleration. Keep decoding/reference in terminable workers
+  and ORT external WASM assets under the lockfile. Check browser-text work,
+  decoder/assets tests and the focused worker bundle build.
+  Apply their private schema
+  through the migration owner; preserve atomic buyer debit/earned credit, replay
+  recovery and zero rewards for benchmarks/failures. Check browser-inference
+  PostgreSQL, browser-funded-hub/reference and Agent contribution/account tests.
 
 - Settings release qualification uses `.github/workflows/settings-release-qualification.yml`
   for the additive Mico migration, account/Space policy checks, hosted-app ownership

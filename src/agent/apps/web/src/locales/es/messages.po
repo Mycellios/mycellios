@@ -11361,6 +11361,165 @@ msgstr "Cuando termine"
 msgid "Send when this task finishes"
 msgstr "Enviar cuando termine esta tarea"
 
+msgid "Update Mycellios Android to configure native notifications."
+msgstr "Actualiza Mycellios Android para configurar las notificaciones nativas."
+
+msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+msgstr "Los avisos nativos de Android usan Firebase y abren el chat correspondiente. Activa el permiso del sistema para registrar este dispositivo."
+
+msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
+msgstr "Hay que configurar Firebase en la app de Android y en el servidor antes de activar el push nativo."
+
+msgid "Android push is not configured on this server."
+msgstr "Este servidor no tiene configurado el push de Android."
+
+msgid "Available on Desktop"
+msgstr "Disponible en escritorio"
+
+msgid "Could not connect. Try again."
+msgstr "No se pudo conectar. Inténtalo de nuevo."
+
+msgid "Generate AI"
+msgstr "Generar IA"
+
+msgid "Share computing power with the network"
+msgstr "Aporta potencia a la red"
+
+msgid "Connect account"
+msgstr "Conectar cuenta"
+
+msgid "Connect your Mycellios account to see your balance."
+msgstr "Conecta tu cuenta de Mycellios para ver el saldo."
+
+msgid "No tasks running"
+msgstr "Sin tareas en curso"
+
+msgid "Tasks at once"
+msgstr "Tareas a la vez"
+
+msgid "Extra tasks wait their turn."
+msgstr "Las demás esperan su turno."
+
+msgid "Credits not enabled here"
+msgstr "Créditos no habilitados"
+
+msgid "Models with your credits"
+msgstr "Modelos con tus créditos"
+
+msgid "You are signed in. This installation does not yet have access to Mycellios credits."
+msgstr "Tu sesión está iniciada. El acceso a créditos Mycellios aún no está habilitado aquí."
+
+msgid "Use my credits"
+msgstr "Usar mis créditos"
+
+msgid "Credits are not enabled in this installation."
+msgstr "Los créditos no están habilitados en esta instalación."
+
+msgid "Not enabled"
+msgstr "Sin activar"
+
+msgid "Earnings could not be linked to your account."
+msgstr "No se han podido vincular las ganancias a tu cuenta."
+
+msgid "New update available"
+msgstr "Actualización disponible"
+
+msgid "Update needs attention"
+msgstr "No se pudo actualizar"
+
+msgid "Updating shortly"
+msgstr "Se actualizará en breve"
+
+msgid "Update waiting"
+msgstr "Actualización en espera"
+
+msgid "Restart"
+msgstr "Reiniciar"
+
+msgid "Your account could not be linked. Try again."
+msgstr "No se ha podido vincular tu cuenta. Vuelve a intentarlo."
+
+msgid "Browser earnings aren't available yet."
+msgstr "Las ganancias del navegador aún no están disponibles."
+
+msgid "Identity"
+msgstr "Identidad"
+
+msgid "Server color"
+msgstr "Color del servidor"
+
+msgid "How this connection appears on this device."
+msgstr "Cómo se muestra esta conexión en este dispositivo."
+
+msgid "Recognize each connection at a glance."
+msgstr "Distingue tus conexiones de un vistazo."
+
+msgid "Connection names and colors stay on this device. Shared Space settings and permissions are managed separately."
+msgstr "El nombre y el color se guardan en este dispositivo. Los ajustes compartidos y los permisos se gestionan en cada espacio."
+
+msgid "Connect to this server to manage notifications."
+msgstr "Conéctate a este servidor para gestionar sus notificaciones."
+
+msgid "Current server"
+msgstr "Servidor actual"
+
+msgid "Saved server"
+msgstr "Servidor guardado"
+
+msgid "Each server keeps its own sign-in, conversations and permissions."
+msgstr "Cada servidor conserva su propia sesión, conversaciones y permisos."
+
+msgid "Manage connection"
+msgstr "Gestionar conexión"
+
+msgid "Changing a connection never moves or deletes your conversations."
+msgstr "Cambiar de conexión no mueve ni borra tus conversaciones."
+
+msgid "Discard unsaved connection changes?"
+msgstr "¿Descartar los cambios de esta conexión?"
+
+msgid "Could not complete this action. Your connection has not changed."
+msgstr "No se ha podido completar la acción. Tu conexión sigue igual."
+
+msgid "For 15 minutes"
+msgstr "Durante 15 minutos"
+
+msgid "For 1 hour"
+msgstr "Durante 1 hora"
+
+msgid "For 8 hours"
+msgstr "Durante 8 horas"
+
+msgid "For 24 hours"
+msgstr "Durante 24 horas"
+
+msgid "Notification settings"
+msgstr "Ajustes de notificaciones"
+
+msgid "Open in a new tab"
+msgstr "Abrir en otra pestaña"
+
+msgid "Remove saved connection"
+msgstr "Quitar conexión guardada"
+
+msgid "Bar"
+msgstr "Barra"
+
+msgid "Connect to another Mycellios. Your current chat stays open."
+msgstr "Conecta con otro Mycellios. Tu chat actual seguirá abierto."
+
+msgid "Public servers require HTTPS. Sign in separately on the new server."
+msgstr "Los servidores públicos requieren HTTPS. Iniciarás sesión en el nuevo servidor."
+
+msgid "For 3 hours"
+msgstr "Durante 3 horas"
+
+msgid "Until I turn it back on"
+msgstr "Hasta que las vuelva a activar"
+
+msgid "Server address"
+msgstr "Dirección del servidor"
+
 msgid "Usage and costs"
 msgstr "Uso y costes"
 
@@ -11692,21 +11851,9 @@ msgstr "Cerrar sesión"
 msgid "Share activity"
 msgstr "Compartir"
 
-msgid "Available on Desktop"
-msgstr "Disponible en escritorio"
-
-msgid "Could not connect. Try again."
-msgstr "No se pudo conectar. Inténtalo de nuevo."
-
 #: src/pages/model-settings/providers-section.tsx
 msgid "Back to providers"
 msgstr "Volver a proveedores"
-
-msgid "Generate AI"
-msgstr "Generar IA"
-
-msgid "Share computing power with the network"
-msgstr "Aporta potencia a la red"
 
 #: src/pages/settings/NotificationsPanel.tsx
 msgid "If I’m needed"
@@ -11812,12 +11959,6 @@ msgstr "Permite que cada Mico envíe avisos de tareas. También se aplican los f
 msgid "Could not play the sound. Check your audio output."
 msgstr "No se pudo reproducir el sonido. Revisa la salida de audio."
 
-msgid "Connect account"
-msgstr "Conectar cuenta"
-
-msgid "Connect your Mycellios account to see your balance."
-msgstr "Conecta tu cuenta de Mycellios para ver el saldo."
-
 #: src/pages/settings/DeviceVoiceSettings.tsx
 msgid "Dictation model"
 msgstr "Modelo de dictado"
@@ -11860,38 +12001,11 @@ msgstr "La voz local se procesa en este equipo y no usa créditos."
 msgid "Reply text is sent to your connected voice provider, which may charge your account."
 msgstr "El texto de la respuesta se envía al proveedor de voz conectado, que puede cobrar por su uso."
 
-msgid "No tasks running"
-msgstr "Sin tareas en curso"
-
-msgid "Tasks at once"
-msgstr "Tareas a la vez"
-
-msgid "Extra tasks wait their turn."
-msgstr "Las demás esperan su turno."
-
 msgid "Choose where dictation is processed. Network transcription uses credits."
 msgstr "Elige dónde se procesa el dictado. La transcripción en red consume créditos."
 
 msgid "Open a Mico and configure dictation and spoken replies to start a voice conversation."
 msgstr "Abre un Mico y configura el dictado y las respuestas habladas para iniciar una conversación de voz."
-
-msgid "Credits not enabled here"
-msgstr "Créditos no habilitados"
-
-msgid "Models with your credits"
-msgstr "Modelos con tus créditos"
-
-msgid "You are signed in. This installation does not yet have access to Mycellios credits."
-msgstr "Tu sesión está iniciada. El acceso a créditos Mycellios aún no está habilitado aquí."
-
-msgid "Use my credits"
-msgstr "Usar mis créditos"
-
-msgid "Credits are not enabled in this installation."
-msgstr "Los créditos no están habilitados en esta instalación."
-
-msgid "Not enabled"
-msgstr "Sin activar"
 
 #: src/pages/settings/DesktopCompanionsPanel.tsx
 msgid "Mycellios Island"
@@ -12080,9 +12194,6 @@ msgstr "Cada servidor gestiona su cuenta y facturación. Añadir una conexión n
 msgid "No saved servers yet."
 msgstr "Todavía no tienes servidores guardados."
 
-msgid "Current server"
-msgstr "Servidor actual"
-
 msgid "Connect another server"
 msgstr "Conectar otro servidor"
 
@@ -12200,18 +12311,6 @@ msgstr "Reconectando con el servidor…"
 msgid "Could not load models"
 msgstr "No se han podido cargar los modelos"
 
-msgid "Update Mycellios Android to configure native notifications."
-msgstr "Actualiza Mycellios Android para configurar las notificaciones nativas."
-
-msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
-msgstr "Los avisos nativos de Android usan Firebase y abren el chat correspondiente. Activa el permiso del sistema para registrar este dispositivo."
-
-msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
-msgstr "Hay que configurar Firebase en la app de Android y en el servidor antes de activar el push nativo."
-
-msgid "Android push is not configured on this server."
-msgstr "Este servidor no tiene configurado el push de Android."
-
 msgid "Access"
 msgstr "Acceso"
 
@@ -12280,9 +12379,6 @@ msgstr "Sabe"
 
 msgid "Main task"
 msgstr "Tarea principal"
-
-msgid "Manage connection"
-msgstr "Gestionar conexión"
 
 msgid "Marketplace"
 msgstr "Tienda"

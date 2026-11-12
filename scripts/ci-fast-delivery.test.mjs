@@ -120,3 +120,10 @@ test('changed Agent tests are not repeated in the affected batch', () => {
  assert.ok(affected.args.includes('packages/adapters/src/executor.test.ts'));
  assert.ok(!affected.args.includes('packages/adapters/src/executor-readonly-approval.test.ts'));
 });
+
+test("browser inference settlement changes require isolated real PostgreSQL", () => {
+  for (const file of ["src/economy/browser-inference.ts", "src/economy/contribution-credit-wallet.ts", "tests/browser-inference.postgres.test.ts"]) {
+    const check = planChecks([file]).find(c => c.label === "isolated browser inference PostgreSQL settlement");
+    assert.deepEqual(check?.args, ["scripts/test-referrals-postgres.mjs", "tests/browser-inference.postgres.test.ts"]);
+  }
+});

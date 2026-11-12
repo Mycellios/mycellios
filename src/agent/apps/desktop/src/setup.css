@@ -436,3 +436,6 @@ html[data-platform="win32"] .titlebar-quit {
 [hidden] {
   display: none;
 }
+
+/* Product-wide focus presentation; retain keyboard behavior without a halo. */
+:is(:focus, :focus-visible, :focus-within) { outline: none !important; box-shadow: none !important; }

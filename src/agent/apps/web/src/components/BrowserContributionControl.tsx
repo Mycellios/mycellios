@@ -5,7 +5,9 @@ import { useLingui } from "@lingui/react/macro";
 import { Button } from "@rakazo/ui-web";
 import { LoaderCircle, Pause, Play } from "lucide-react";
 import { authClient } from "../lib/auth";
+import { rpc } from "../lib/rpc";
 import { setContributionActivity } from "../lib/contribution-activity";
+import { browserContributionAvailability } from "../lib/browser-contribution-availability";
 import type { MobileWorkerSnapshot } from "../../../../../mobile/runtime";
 
 type Engine = typeof import("../../../../../mobile/runtime");
@@ -22,8 +24,12 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
   const pending = useRef(false);
   const indicator = useRef(Symbol("browser-contribution"));
   const activationSource = useRef<HTMLElement | null>(null);
+  const linkedWorker = useRef<string | null>(null);
+  const [linked, setLinked] = useState(false);
+  const [issue, setIssue] = useState<"service" | "account" | "offline" | null>(null);
   useEffect(() => {
     setState(null); setLoading(false); setFailed(false);
+    linkedWorker.current = null; setLinked(false); setIssue(null);
     return () => {
       epoch.current++;
       stopContributionGrowth();
@@ -35,7 +41,9 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
     };
   }, [session.data?.user.id]);
   const active = state?.running === true;
-  const preparing = loading || state?.starting === true;
+  const online = active && state?.connection === "online";
+  const connected = online && linked;
+  const preparing = loading || state?.starting === true || (online && !linked && !issue);
   async function toggle() {
     if (active || preparing) {
       epoch.current++;
@@ -47,8 +55,11 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
     if (pending.current) return;
     pending.current = true;
     const generation = ++epoch.current;
-    setLoading(true); setFailed(false);
+    setLoading(true); setFailed(false); setIssue(null);
     try {
+      const availability = await browserContributionAvailability();
+      if (generation !== epoch.current) return;
+      if (availability !== "ready") { setIssue(availability === "unavailable" ? "service" : "offline"); stopContributionGrowth(); return; }
       const module = await import("../../../../../mobile/runtime");
       if (generation !== epoch.current) return;
       engine.current = module;
@@ -67,15 +78,49 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
   useEffect(() => {
     const owner = session.data?.user.id;
     const count = state?.verifiedTasks;
-    if (!owner || !active || count === undefined) { verifiedWork.current = null; return; }
+    if (!owner || !connected || count === undefined) { verifiedWork.current = null; return; }
     const previous = verifiedWork.current;
     verifiedWork.current = { owner, count };
     // Verification requests an authoritative wallet read; it never mints a reward.
     if (previous?.owner === owner && count > previous.count)
       window.dispatchEvent(new Event("mycellios:contribution-verified"));
-  }, [session.data?.user.id, active, state?.verifiedTasks]);
+  }, [session.data?.user.id, connected, state?.verifiedTasks]);
   const label = active || preparing ? t`Pause contribution` : t`Generate AI`;
-  const connected = active && state?.connection === "online";
+  useEffect(() => {
+    const owner = session.data?.user.id;
+    if (!online || !owner) { linkedWorker.current = null; setLinked(false); return; }
+    const proof = engine.current?.getMobileWorkerAccountProof();
+    if (!proof) { setIssue("account"); void engine.current?.stopMobileWorker().catch(() => undefined); return; }
+    const key = owner + ":" + proof.workerId;
+    if (linkedWorker.current === key) return;
+    const generation = epoch.current;
+    let stopped = false, timer: ReturnType<typeof setTimeout> | undefined, wake: (() => void) | undefined;
+    const controller = new AbortController();
+    void (async () => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (stopped || generation !== epoch.current) return;
+        try {
+          const result = await rpc.models.browserContributionLink({ ...proof, expectedUserId: owner }, {
+            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]),
+          });
+          if (stopped || generation !== epoch.current) return;
+          if (result.linked !== true) throw new Error("Link not confirmed");
+          linkedWorker.current = key; setLinked(true); setIssue(null); return;
+        } catch (error) {
+          if (stopped || generation !== epoch.current) return;
+          const code = (error as { code?: string } | null)?.code;
+          const permanent = ["UNAUTHORIZED", "FORBIDDEN", "CONFLICT", "PRECONDITION_FAILED"].includes(code ?? "");
+          if (!permanent && attempt < 2) {
+            await new Promise<void>(resolve => { wake = resolve; timer = setTimeout(resolve, 750 * (attempt + 1)); }); continue;
+          }
+          setIssue(code === "PRECONDITION_FAILED" ? "service" : permanent ? "account" : "offline");
+          setLinked(false); stopContributionGrowth();
+          await engine.current?.stopMobileWorker().catch(() => undefined); return;
+        }
+      }
+    })();
+    return () => { stopped = true; controller.abort(); clearTimeout(timer); wake?.(); };
+  }, [online, session.data?.user.id]);
   useEffect(() => {
     const key = indicator.current;
     setContributionActivity(key, connected);
@@ -93,8 +138,12 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
         {preparing ? <LoaderCircle size={22} className="size-5 animate-spin motion-reduce:animate-none" aria-hidden /> : active ? <Pause size={22} className="size-5" fill="currentColor" strokeWidth={0} aria-hidden /> : <Play size={22} className="size-5 ms-0.5" aria-hidden />}
       </span>
     </Button>
-    {!mini && (failed || (active && !connected)) && <p className="px-2 text-[11px] text-muted-foreground" role={failed ? "alert" : "status"}>
+    {!mini && !issue && (failed || (active && !connected)) && <p className="px-2 text-[11px] text-muted-foreground" role={failed ? "alert" : "status"}>
       {failed ? t`Could not connect. Try again.` : t`Checking connection…`}
+    </p>}
+    {!mini && issue && <p className="px-2 text-[11px] text-muted-foreground" role="status">
+      {issue === "service" ? t`Browser earnings aren't available yet.` : issue === "account" ? t`Your account could not be linked. Try again.` : t`Could not connect. Try again.`}
+      {" "}<button type="button" className="underline underline-offset-2" onClick={() => void toggle()}>{t`Try again`}</button>
     </p>}
   </div>;
 }
