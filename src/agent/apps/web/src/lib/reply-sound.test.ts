@@ -47,3 +47,15 @@ describe("reply sound", () => {
     }
   });
 });
+
+it("waits for a suspended audio output before playing the first preview", async () => {
+  vi.resetModules(); const start = vi.fn();
+  vi.stubGlobal("AudioContext", class {
+    state = "suspended"; currentTime = 0; destination = {};
+    resume = async () => { await Promise.resolve(); this.state = "running"; };
+    createGain = () => ({ connect: vi.fn(), gain: { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() } });
+    createOscillator = () => ({ connect: (target: unknown) => target, frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() }, start, stop: vi.fn() });
+  });
+  try { const { previewReplySound } = await import("./reply-sound"); expect(await previewReplySound("classic")).toBe(true); expect(start).toHaveBeenCalledOnce(); }
+  finally { vi.unstubAllGlobals(); }
+});

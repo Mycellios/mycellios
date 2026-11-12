@@ -6,16 +6,19 @@ import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";
 import { setGeneralPreferences, useGeneralPreferences, type GeneralPreferences } from "../../lib/general-preferences";
 import { UI_LOCALES, UI_LOCALE_LABELS } from "../../lib/ui-locale";
-import { speaker } from "../../lib/tts";
+import { browserSpeechAvailable, speaker } from "../../lib/tts";
 import { errorText } from "../../lib/user-error";
 
-export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels }: {
-  accountId?: string; previewBotId?: string; spaceId?: string | null; onModels?: () => void;
+export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels, onBusyChange }: {
+  accountId?: string; previewBotId?: string; spaceId?: string | null; onModels?: () => void; onBusyChange?: (busy: boolean) => void;
 }) {
   const { t, i18n } = useLingui(); const id = useId(); const value = useGeneralPreferences();
   const native = desktopBridge()?.localVoice;
   const [status, setStatus] = useState<Awaited<ReturnType<NonNullable<typeof native>["status"]>>>();
   const [operation, setOperation] = useState<LocalVoiceModelKind | "both">();
+  const operationLock = useRef(false);
+  useEffect(() => { onBusyChange?.(Boolean(operation)); }, [operation, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   const [error, setError] = useState("");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [previewing, setPreviewing] = useState(false);
@@ -37,9 +40,10 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels
     setPreviewing(false);
   }
   async function previewNetworkVoice() {
-    if (!previewBotId || previewRunning.current) return;
+    if (previewRunning.current || operationLock.current) return;
+    const network = Boolean(accountId && value.networkSpeechAccount === accountId);
     const language = (value.dictationLanguage === "auto" ? i18n.locale : value.dictationLanguage).split("-")[0];
-    if (language !== "en" && language !== "es") {
+    if (network && language !== "en" && language !== "es") {
       setError(t`Choose Spanish or English in Dictation language to preview network voice.`);
       return;
     }
@@ -49,7 +53,8 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels
     setPreviewing(true);
     try {
       const failure = await speaker.speak(language === "es" ? "Hola, esta es la voz de Mycellios." : "Hello, this is Mycellios voice.", {
-        networkLanguage: language, botId: previewBotId, spaceId, messageId: id, speed: value.speechSpeed,
+        browser: !network && value.speechEngine === "device",
+        networkLanguage: network ? language as "es" | "en" : undefined, botId: previewBotId, spaceId, messageId: id, speed: value.speechSpeed,
       });
       if (failure && generation === previewGeneration.current) setError(failure);
     } catch (failure) {
@@ -78,12 +83,13 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels
   function save(patch: Partial<GeneralPreferences>) {
     try {
       setGeneralPreferences(patch);
-      if (patch.speechEngine !== undefined || patch.networkSpeechAccount !== undefined || patch.dictationLanguage !== undefined) stopPreview();
+      if (Object.keys(patch).some(key => ["speechEngine", "networkSpeechAccount", "dictationLanguage", "deviceVoice", "speechSpeed"].includes(key))) stopPreview();
       setError("");
     } catch { setError(t`Could not save this preference.`); }
   }
   async function changeModel(kind: LocalVoiceModelKind | "both", remove = false) {
-    if (!native || operation) return;
+    if (!native || operationLock.current) return;
+    operationLock.current = true; stopPreview();
     setOperation(kind);
     setError("");
     try {
@@ -94,7 +100,7 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels
       setError(remove ? t`Could not remove the model. Stop local voice and try again.` : t`Could not prepare local voice. Try again.`);
     } finally {
       await native.status().then(setStatus).catch(() => {});
-      setOperation(undefined);
+      operationLock.current = false; setOperation(undefined);
     }
   }
   function modelRow(kind: LocalVoiceModelKind | "both", name: string, description: string) {
@@ -113,59 +119,65 @@ export function DeviceVoiceSettings({ accountId, previewBotId, spaceId, onModels
   }
   const separateModels = Boolean(native?.prepareModel && status?.models);
   const networkSelected = Boolean(accountId && value.networkSpeechAccount === accountId);
-  const conversationOutput = networkSelected ? "network" : native ? value.speechEngine : "provider";
+  const conversationOutput = networkSelected ? "network" : value.speechEngine === "device" ? "device" : native ? value.speechEngine : "provider";
+  const localDictation = value.networkTranscriptionAccount !== accountId && Boolean(native && (value.dictationEngine === "local" || value.dictationEngine === "auto" && (status?.models?.asr.ready ?? status?.ready)));
+  const canPreview = !operation && (networkSelected ? Boolean(previewBotId) : conversationOutput === "device" ? browserSpeechAvailable() && voices.length > 0 : conversationOutput === "local" ? Boolean(status?.models?.tts.ready ?? status?.ready) : Boolean(previewBotId));
   return <div className="mb-6 space-y-6">
-    {(native || accountId) && <SettingsGroup title={t`Voice processing`}>
-      <SettingsRow label={t`Voice conversation output`}
-        description={networkSelected
-          ? t`Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings.`
-          : native ? t`Local voice stays on this computer and uses no credits. Connected providers use their own account.` : t`Connected providers use their own account.`}
-        control={<OptionSelect
-          aria-label={t`Voice conversation output`}
-          value={conversationOutput}
-          options={[
-            ...(native ? [{ value: "local", label: t`Local · Supertonic 3` }] : []),
-            { value: "provider", label: t`Connected provider` },
-            ...(accountId ? [{ value: "network", label: t`Mycellios network · uses credits` }] : []),
-          ]}
-          onValueChange={choice => {
-            if (choice === "network" && accountId) save({ networkSpeechAccount: accountId });
-            if (choice === "local" || choice === "provider") {
-              save({ speechEngine: choice, ...(networkSelected ? { networkSpeechAccount: "" } : {}) });
-            }
-          }}
-        />} />
-    </SettingsGroup>}
-    {networkSelected && <SettingsGroup>
-      <SettingsRow label="Kokoro" description={t`Preview uses your Mycellios credits.`}
-        control={<Button variant="outline" size="sm" disabled={!previewBotId}
-          onClick={() => { if (previewRunning.current) stopPreview(); else void previewNetworkVoice(); }}>{previewing ? t`Stop` : t`Listen`}</Button>} />
-    </SettingsGroup>}
     <SettingsGroup title={t`Dictation`}>
       {accountId && <SettingsRow label={t`Dictation processing`}
-        description={t`Mycellios sends recordings of up to 30 seconds to the network and uses your credits. Spanish and English.`}
+        description={value.networkTranscriptionAccount === accountId ? t`Mycellios sends recordings of up to 30 seconds to the network and uses your credits. Spanish and English.` : t`Choose where dictation is processed. Network transcription uses credits.`}
         control={<OptionSelect aria-label={t`Dictation processing`}
           value={value.networkTranscriptionAccount === accountId ? "network" : "device"}
           options={[{ value: "device", label: t`Device or connected provider` }, { value: "network", label: t`Mycellios network · uses credits` }]}
           onValueChange={choice => save({ networkTranscriptionAccount: choice === "network" ? accountId : "",
             ...(choice === "network" && !["auto", "es", "en"].includes(value.dictationLanguage) ? { dictationLanguage: "auto" } : {}) })} />} />}
 
+      <SettingsRow label={t`Dictation model`} description={t`Choose automatic routing, local transcription, your device or a connected service.`}
+        control={<OptionSelect aria-label={t`Dictation model`} value={value.dictationEngine} disabled={Boolean(operation) || value.networkTranscriptionAccount === accountId}
+          options={[{ value: "auto", label: t`Automatic` }, ...(native ? [{ value: "local", label: "Parakeet TDT 0.6B v3" }] : []),
+            { value: "device", label: t`Device dictation` }, { value: "provider", label: t`Connected provider` }]}
+          onValueChange={choice => save({ dictationEngine: choice as GeneralPreferences["dictationEngine"] })} />} />
       {native && (separateModels
         ? modelRow("asr", "Parakeet TDT 0.6B v3", t`Transcribes on this computer and detects the language automatically.`)
         : modelRow("both", "Parakeet TDT 0.6B v3 + Supertonic 3", t`Transcribe and speak on this computer.`))}
-      <SettingsRow label={t`Dictation language`} description={t`Language hint for the browser and connected transcription services.`}
-        control={<OptionSelect aria-label={t`Dictation language`} value={value.dictationLanguage} className="w-48 max-w-full"
-          options={[{ value: "auto", label: t`Automatic` }, ...UI_LOCALES.filter(locale => value.networkTranscriptionAccount !== accountId || locale === "es" || locale === "en").map(locale => ({ value: locale, label: UI_LOCALE_LABELS[locale] }))]}
+      <SettingsRow label={t`Dictation language`} description={localDictation ? t`Parakeet detects the spoken language automatically. Choose a connected service to fix a language.` : t`Language hint for the browser and connected transcription services.`}
+        control={<OptionSelect aria-label={t`Dictation language`} value={localDictation ? "auto" : value.dictationLanguage} disabled={localDictation} className="w-48 max-w-full"
+          options={[{ value: "auto", label: t`Automatic` }, ...UI_LOCALES.filter(locale => !accountId || value.networkTranscriptionAccount !== accountId || locale === "es" || locale === "en").map(locale => ({ value: locale, label: UI_LOCALE_LABELS[locale] }))]}
           onValueChange={dictationLanguage => save({ dictationLanguage })} />} />
     </SettingsGroup>
-    <SettingsGroup title={t`Read aloud`}>
+    <SettingsGroup title={t`Spoken replies`}>
+    {(native || accountId) && <>
+      <SettingsRow label={t`Voice conversation output`}
+        description={networkSelected
+          ? t`Mycellios reads replies in Spanish and English using your connected account and credits. Dictation uses your existing settings.`
+          : conversationOutput === "local" ? t`Local voice stays on this computer and uses no credits.` : conversationOutput === "device" ? t`Uses installed device voices without uploading text.` : t`Reply text is sent to your connected voice provider, which may charge your account.`}
+        control={<OptionSelect
+          aria-label={t`Voice conversation output`}
+          value={conversationOutput}
+          options={[
+            ...(native ? [{ value: "local", label: t`Local · Supertonic 3` }] : []),
+            { value: "provider", label: t`Connected provider` },
+            ...(browserSpeechAvailable() ? [{ value: "device", label: t`Device voices · no credits` }] : []),
+            ...(accountId ? [{ value: "network", label: t`Mycellios network · uses credits` }] : []),
+          ]}
+          onValueChange={choice => {
+            if (choice === "network" && accountId) save({ networkSpeechAccount: accountId });
+            if (choice === "local" || choice === "provider" || choice === "device") {
+              save({ speechEngine: choice, ...(networkSelected ? { networkSpeechAccount: "" } : {}) });
+            }
+          }}
+        />} />
+    </>}
+
       {separateModels && modelRow("tts", "Supertonic 3", t`Reads replies aloud on this computer.`)}
       <SettingsRow label={<Label htmlFor={id}>{t`Read new replies aloud`}</Label>} description={t`Read new replies in the open chat on this device. Existing Mico voice preferences still apply.`}
         control={<Switch id={id} checked={value.readReplies} onCheckedChange={readReplies => save({ readReplies })} />} />
-      {voices.length > 0 && (!native || value.speechEngine === "provider") && <SettingsRow label={t`Device voice`} description={t`Used when reading with your device instead of a connected provider.`}
-        control={<OptionSelect aria-label={t`Device voice`} value={value.deviceVoice} className="w-48 max-w-full"
+      <SettingsRow label={t`Voice`} control={<div className="flex min-w-0 items-center gap-2">
+        <Button variant="ghost" size="sm" disabled={!canPreview} onClick={() => { if (previewRunning.current) stopPreview(); else void previewNetworkVoice(); }}>{previewing ? t`Stop` : t`Listen`}</Button>
+        {conversationOutput === "device" ? <OptionSelect aria-label={t`Device voice`} value={value.deviceVoice} className="w-36 max-w-full"
           options={[{ value: "default", label: t`Automatic` }, ...voices.map(voice => ({ value: voice.voiceURI, label: `${voice.name} · ${voice.lang}` }))]}
-          onValueChange={deviceVoice => save({ deviceVoice })} />} />}
+          onValueChange={deviceVoice => save({ deviceVoice })} /> : <span className="max-w-32 truncate text-sm text-muted-foreground">{networkSelected ? "Kokoro" : conversationOutput === "local" ? "Supertonic 3" : t`Configured provider voice`}</span>}
+      </div>} description={networkSelected ? t`Preview uses your Mycellios credits.` : conversationOutput === "device" ? t`Uses installed device voices without uploading text.` : undefined} />
       <SettingsRow label={t`Playback speed`} control={<OptionSelect aria-label={t`Playback speed`} value={String(value.speechSpeed)} className="w-48 max-w-full"
         options={[0.75, 1, 1.25, 1.5, 2].map(speed => ({ value: String(speed), label: `${speed}×` }))}
         onValueChange={speed => save({ speechSpeed: Number(speed) })} />} />

@@ -118,7 +118,7 @@ export function VoiceConversation({ hidden = false, rpc, accountId, spaceId, tas
         return;
       }
       const failure = await speaker.speak(speakable(text), {
-        browser: !networkReplies && !voiceReady && browserSpeechAvailable(),
+        browser: !networkReplies && (preferences.speechEngine === "device" || !voiceReady) && browserSpeechAvailable(),
         networkLanguage: networkReplies ? language as "en" | "es" : undefined,
         botId: bot.id,
         spaceId,

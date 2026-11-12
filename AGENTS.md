@@ -175,10 +175,21 @@ These rules apply to the complete repository.
   `/public/v1/desktop-downloads` and page `/downloads/desktop`; preserve the
   headless runtime catalog and platform routes. Preview upgrades are manual
   while Windows packages are unsigned; never enable unsigned automatic installs.
+  Unsigned Windows packaging explicitly disables certificate discovery with
+  `win.signExecutable:false`, retaining resource editing and manual update checks.
+  Even expedited Windows releases run the narrow manual-update/helper, published
+  feed and installer metadata regressions; keep Windows warnings owner-approved.
+  `unsigned-windows-installer-qualification.yml` reuses an existing immutable EXE
+  for hosted fresh/legacy upgrade and recovery checks without rebuilding it;
+  its receipts do not replace physical-PC or Internet-origin prompt acceptance.
   The isolated page build uses `node scripts/build-desktop-downloads.mjs` and the
   same `DesktopDownloads` component as the main downloads screen. Publish the
   verified RPM builder's catalog entry as `fedora` in the `macos-all` response.
   Keep it separate from legacy package arrays and retain immutable release files.
+  Installer catalog URLs may include exactly `?sha256=<matching package hash>`
+  for cache qualification; reject other queries and preserve the pinned URL.
+  `build-download-catalog-repair.mjs` builds a contract-only page repair from a
+  hash-verified served baseline, retaining runtime page overlays and old assets.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   pinned published native baseline, source provenance, explicit runtime pairing
@@ -359,3 +370,13 @@ These rules apply to the complete repository.
   through the migration owner; preserve atomic buyer debit/earned credit, replay
   recovery and zero rewards for benchmarks/failures. Check browser-inference
   PostgreSQL, browser-funded-hub/reference and Agent contribution/account tests.
+
+- Settings release qualification uses `.github/workflows/settings-release-qualification.yml`
+  for the additive Mico migration, account/Space policy checks, hosted-app ownership
+  and welcome-credit idempotency on isolated PostgreSQL. It never targets production
+  databases or submits paid inference; keep the supplier funding-limit regressions.
+
+- Proportional Agent CI selects changed tests plus source-directory regression siblings,
+  without repeating changed tests or recursively expanding shared contract barrels into
+  the complete workspace suite. Shared contracts still typecheck web/API/worker/Desktop;
+  keep executor sibling regressions and the dedicated PostgreSQL/native/browser gates.

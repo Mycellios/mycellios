@@ -1,0 +1,8 @@
+.computer-use-status { display:flex; align-items:flex-start; gap:12px; padding:16px; border:1px solid var(--border); border-radius:12px; background:var(--muted); }
+.computer-use-status > svg { flex-shrink:0; margin-top:2px; color:var(--muted-foreground); }
+.computer-use-status > div { min-width:0; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.computer-use-status p { margin:0; }.computer-use-status p + p { margin-top:3px; color:var(--muted-foreground); }
+.computer-use-status[data-phase=configured] { border-color:color-mix(in srgb,var(--success) 25%,var(--border)); background:color-mix(in srgb,var(--success) 7%,var(--background)); }
+.computer-use-status[data-phase=configured] > svg { color:var(--success); }
+.computer-use-status[data-phase=error] > svg { color:var(--destructive); }
+@media(prefers-reduced-motion:reduce) { .computer-use-status .animate-spin { animation:none; } }

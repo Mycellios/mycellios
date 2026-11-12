@@ -134,7 +134,7 @@ export function RunActivityStatus({
 }) {
   const { t, i18n } = useLingui();
   const [now, setNow] = useState(Date.now);
-  const [disclosure, setDisclosure] = useState<{ runId: string; open: boolean } | null>(null);
+  const [disclosure, setDisclosure] = useState<{ runId: string; expanded: boolean; open: boolean } | null>(null);
   const isMobile = useIsMobile();
   const expanded = useSyncExternalStore(subscribeToolActivity, getToolActivityExpanded, () => false);
   const refresh = useRef(onRefresh);
@@ -279,7 +279,7 @@ export function RunActivityStatus({
   const computerAction = health.state === "blocked" && onOpenComputer ? (
     <Button variant="ghost" size="sm" onClick={onOpenComputer}>{t`View computer`}</Button>
   ) : null;
-  if (isMobile) {
+  if (isMobile && !expanded) {
     return <div className="min-w-0 px-1 py-1" data-testid="run-activity-status">
       {hasDetails ? <Sheet key={run.id}>
         <SheetTrigger className="flex min-h-12 w-full min-w-0 items-center gap-2 rounded-md px-1 text-start text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={t`Show task activity`}>
@@ -303,9 +303,9 @@ export function RunActivityStatus({
     <div className="flex min-w-0 items-start gap-2.5 px-1 py-2" data-testid="run-activity-status">
       <GroupAvatar members={bots} size={24} />
       <div className="min-w-0 max-w-full space-y-1 text-xs text-muted-foreground">
-        {hasDetails ? <details key={run.id} open={disclosure?.runId === run.id ? disclosure.open : expanded} className="group/activity" onToggle={(event) => {
+        {hasDetails ? <details key={run.id} open={disclosure?.runId === run.id && disclosure.expanded === expanded ? disclosure.open : expanded} className="group/activity" onToggle={(event) => {
           const open = event.currentTarget.open;
-          setDisclosure(previous => previous?.runId === run.id && previous.open === open ? previous : { runId: run.id, open });
+          setDisclosure(previous => previous?.runId === run.id && previous.expanded === expanded && previous.open === open ? previous : { runId: run.id, expanded, open });
         }}>
           <summary className="flex w-fit max-w-full cursor-pointer list-none items-baseline gap-2 rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden" aria-label={t`Show task activity`}>
             {status}

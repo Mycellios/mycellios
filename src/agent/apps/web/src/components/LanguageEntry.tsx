@@ -2,17 +2,17 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Field, FieldLabel, OptionSelect } from "@rakazo/ui-web";
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
-import { getActiveUiLocale, setUiLocale } from "../lib/i18n";
+import { setUiLocale } from "../lib/i18n";
 import { confirmLanguage, hasConfirmedLanguage } from "../lib/language-entry";
-import { UI_LOCALES, UI_LOCALE_LABELS } from "../lib/ui-locale";
-import type { UiLocale } from "../lib/ui-locale";
+import { readUiLocalePreference, resolveUiLocale, UI_LOCALES, UI_LOCALE_LABELS } from "../lib/ui-locale";
+import type { UiLocalePreference } from "../lib/ui-locale";
 import { AuthMushroom } from "./AuthMushroom";
 
 export function LanguageEntry({ children }: { children: ReactNode }) {
   const { t } = useLingui();
   const id = useId();
   const [confirmed, setConfirmed] = useState(hasConfirmedLanguage);
-  const [locale, setLocale] = useState<UiLocale>(getActiveUiLocale);
+  const [locale, setLocale] = useState<UiLocalePreference>(readUiLocalePreference);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   async function choose() {
@@ -20,7 +20,7 @@ export function LanguageEntry({ children }: { children: ReactNode }) {
     setBusy(true); setError(false);
     try {
       const activated = await setUiLocale(locale);
-      if (activated !== locale) { setError(true); return; }
+      if (activated !== resolveUiLocale({ stored: locale })) { setError(true); return; }
       confirmLanguage(activated); setConfirmed(true);
     } catch { setError(true); }
     finally { setBusy(false); }
@@ -34,7 +34,7 @@ export function LanguageEntry({ children }: { children: ReactNode }) {
         <FieldLabel htmlFor={id}><Trans>Language</Trans></FieldLabel>
         <OptionSelect id={id} value={locale} disabled={busy} className="w-full"
           onValueChange={setLocale}
-          options={UI_LOCALES.map(value => ({value, label: UI_LOCALE_LABELS[value]}))} />
+          options={[{value:"system",label:t`System default`}, ...UI_LOCALES.map(value => ({value, label: UI_LOCALE_LABELS[value]}))]} />
       </Field>
       {error ? <p role="alert" className="text-sm text-destructive">{t`Could not load this language. Try again.`}</p> : null}
       <Button type="submit" disabled={busy} className="w-full"><Trans>Continue</Trans></Button>

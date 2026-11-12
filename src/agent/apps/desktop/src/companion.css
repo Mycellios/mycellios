@@ -13,10 +13,10 @@ body[data-auto-hide=true] .dock{opacity:.12;transform:translateX(80%)}body[data-
 body[data-expanded=true] .dock{transform:none!important;opacity:1!important}
 
 /* Question island: a compact black pill grows into the same focused reply surface. */
-.surface.island{background:#000;color:#f5f5f5;padding:0;border-radius:16px;overflow:hidden;display:block;box-shadow:none;transition:border-radius 420ms cubic-bezier(.22,1,.36,1)}
+.surface.island{background:#101714;color:#f7f6f2;padding:0;border-radius:16px;overflow:hidden;display:block;box-shadow:none;transition:border-radius 420ms cubic-bezier(.22,1,.36,1)}
 .island button:hover{transform:none;background:transparent}
 .island button:disabled{cursor:default;opacity:.5}
-.island button:focus-visible,.island input:focus-visible{outline:2px solid #8bd5e3;outline-offset:2px}
+.island button:focus-visible,.island input:focus-visible{outline:2px solid #7cc9aa;outline-offset:2px}
 .island-pill{width:100%;height:100%;min-height:0;padding:0 6px;gap:8px;justify-content:space-between;border-radius:16px}
 .island-avatar{width:20px;height:20px;object-fit:contain;flex-shrink:0}
 .island-question-badge{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;color:#8bd5e3;font-size:11px;font-weight:500}
@@ -58,3 +58,11 @@ body[data-expanded=true] .dock{transform:none!important;opacity:1!important}
 
 /* Product-wide focus presentation; retain keyboard behavior without a halo. */
 :is(:focus, :focus-visible, :focus-within) { outline: none !important; box-shadow: none !important; }
+
+.island-pill:disabled { opacity:1; cursor:default; }
+
+.dock-grip{min-height:18px;width:100%;justify-content:center;opacity:.65;cursor:grab;touch-action:none;border-radius:8px}.dock-grip:hover{opacity:1}.dock-grip:active{cursor:grabbing}.bottom .dock-grip{width:18px;min-width:18px;align-self:stretch}
+
+#root{position:relative}#root[data-kind=dock]{padding-bottom:24px}#root[data-kind=dock] .dock-grip{position:absolute;bottom:5px;left:10px;right:10px;width:calc(100% - 20px);height:18px;background:var(--surface)}body[data-edge=bottom] #root[data-kind=dock]{padding-bottom:4px;padding-right:24px}body[data-edge=bottom] #root[data-kind=dock] .dock-grip{left:auto;right:5px;top:10px;bottom:10px;width:18px;height:calc(100% - 20px)}
+
+body[data-auto-hide=true] .dock-grip{opacity:0;pointer-events:none}body[data-expanded=true] .dock-grip{opacity:.65;pointer-events:auto}

@@ -85,7 +85,7 @@ export function parseContentSecuritySources(setting: string, value: string | und
 export function appContentSecurityPolicy(extensions: ContentSecurityPolicyExtensions = {}) {
   return serialize({
     ...APP_DIRECTIVES,
-    "script-src": ["'self'", ...(extensions.scriptSrc ?? [])],
+    "script-src": [...APP_DIRECTIVES["script-src"]!, ...(extensions.scriptSrc ?? [])],
     "connect-src": ["'self'", ...(extensions.connectSrc ?? [])],
     "frame-src": [
       ...APP_DIRECTIVES["frame-src"]!,

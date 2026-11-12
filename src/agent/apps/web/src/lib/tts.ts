@@ -116,8 +116,8 @@ export class Speaker {
   async speak(text: string, opts: SpeakOptions = {}): Promise<string | undefined> {
     this.stop();
     const network = opts.networkLanguage !== undefined;
+    if (!network && (opts.browser || getGeneralPreferences().speechEngine === "device")) return this.speakBrowser(text, opts);
     if (!network && typeof window !== "undefined" && window.rakazoDesktop?.localVoice && getGeneralPreferences().speechEngine === "local") return this.speakLocal(text, opts);
-    if (!network && opts.browser) return this.speakBrowser(text, opts);
     const mine = this.token;
     const controller = new AbortController();
     this.request = controller;

@@ -37,6 +37,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { InfoTooltip } from "../components/InfoTooltip";
 import { thinkingLevelLabel } from "../lib/model-catalog";
 import { spaceQueries } from "../lib/query";
+import { errorText } from "../lib/user-error";
 import { useSpaceRpc } from "../lib/space-rpc";
 import type { ConnectableProvider, RoleModelOption } from "./model-settings/role-model-picker";
 import { RoleModelPicker } from "./model-settings/role-model-picker";
@@ -59,6 +60,8 @@ type Props = {
   /** Keep the approval override out of the ordinary model setup. */
   advancedApproval?: boolean;
   compactPrimary?: boolean;
+  refreshToken?: number;
+  externalLoadError?: boolean;
   title: string;
   /** What runs when the first slot is empty. */
   defaultLabel: string;
@@ -93,6 +96,8 @@ export function ModelRoleSettings({
   modelRole: role = "main",
   advancedApproval = false,
   compactPrimary = false,
+  refreshToken = 0,
+  externalLoadError = false,
   title,
   defaultLabel,
   providers,
@@ -153,7 +158,7 @@ export function ModelRoleSettings({
   } | null>(null);
   useEffect(() => {
     void controller.load();
-  }, [controller, credentials]);
+  }, [controller, credentials, refreshToken]);
 
   const settings = state.settings;
   const primary = settings?.primary ?? null;
@@ -325,7 +330,7 @@ export function ModelRoleSettings({
           />
         </div>
         {current ? <p className="mt-2 text-xs text-muted-foreground">{modelLabel(current)}</p> : null}
-        {selectionError || state.error ? <p role="alert" className="mt-2 text-sm text-destructive">{selectionError ?? state.error}</p> : null}
+        {selectionError || state.error && !externalLoadError ? <div role="alert" className="mt-2 flex flex-wrap items-center gap-3 text-sm text-destructive"><p>{errorText(new Error(selectionError ?? state.error ?? t`Could not load models`), t`Could not load models`)}</p>{state.error && <Button variant="outline" size="sm" disabled={state.busy} onClick={() => void controller.load()}>{t`Retry`}</Button>}</div> : null}
         {panel}
       </section>
     );
@@ -539,9 +544,9 @@ export function ModelRoleSettings({
       {state.busy && !settings ? (
         <Spinner className="mt-3" aria-label={t`Loading model catalog…`} />
       ) : null}
-      {state.error ? (
+      {state.error && !externalLoadError ? (
         <div role="alert" className="mt-2 text-sm text-destructive">
-          {state.error}
+          {errorText(new Error(state.error), t`Could not load models`)}
           <Button variant="ghost" disabled={state.busy} onClick={() => void controller.load()}>
             <Trans>Retry</Trans>
           </Button>

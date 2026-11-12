@@ -1,3 +1,4 @@
+import { accountNotificationAllowed, accountNotificationSettings } from "../lib/account-notifications";
 import { WorkAreaHeader } from "../components/WorkAreaHeader";
 import { createFramePublisher } from "../lib/frame-publisher";
 import { deferThreadProgressPresentation } from "../lib/thread-events";
@@ -1194,9 +1195,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       pending.event,
       pending.groupId ? pending.botName : currentBot?.name || pending.botName,
       {
-        enabled: preferences.enabled && preferences.mutedUntil <= Date.now() && Boolean(pending.groupId || currentBot?.notifyOnFinish) &&
+        enabled: preferences.enabled && preferences.mutedUntil <= Date.now() && accountNotificationAllowed(userId, pending.botId, pending.event) && Boolean(pending.groupId || currentBot?.notifyOnFinish) &&
           (!preferences.attentionOnly || requiresNotificationAttention(pending.event)),
-        preview: preferences.preview,
+        preview: preferences.preview && (accountNotificationSettings(userId)?.previews ?? false),
         pageVisible: true,
         windowFocused: hasFocusedNotificationTab(userId),
         permission: Notification.permission,
@@ -1229,7 +1230,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       if (!userId) return;
       const completedReply = streamReady && replySoundGate(event, subscribedThreadId, initialCursor);
       const preferences = notificationPreferences(userId);
-      if (!preferences.enabled || preferences.mutedUntil > Date.now()) return;
+      if (!preferences.enabled || preferences.mutedUntil > Date.now() || !accountNotificationAllowed(userId, botId, event)) return;
       if (typeof botId !== "string" && !notificationGroupId) return;
       if (
         enabled && preferences.sound && !preferences.attentionOnly &&
@@ -1288,7 +1289,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         const options = { signal: stop.signal };
         const [activeRuns, recentRuns] = await Promise.all([
           client.runs.list({ filter: "active" }, options),
-          preferences.attentionOnly ? null : client.runs.list({ filter: "recent" }, options),
+          client.runs.list({ filter: "recent" }, options),
         ]);
         if (stop.signal.aborted || hasFocusedNotificationTab(userId)) return;
         for (const run of [...activeRuns.runs, ...(recentRuns?.runs ?? [])].reverse()) {

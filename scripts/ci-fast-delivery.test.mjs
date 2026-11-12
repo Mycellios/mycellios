@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { eventBase, planChecks, uncoveredNativeFiles } from './ci-proportional.mjs';
+import { eventBase, planChecks, uncoveredNativeFiles, agentAffectedTestFiles } from './ci-proportional.mjs';
 
 test('transcription has real Python checks without admitting unrelated native changes', () => {
   const files = ['python/distributed_runtime/transcription_engine.py', 'python/tests/test_transcription_engine.py'];
@@ -27,12 +27,14 @@ test('changed tests execute directly rather than relying on import discovery', (
   assert.ok(plan.some(c => c.label === 'Agent changed tests' && c.args.includes('apps/web/src/example.test.tsx')));
   assert.ok(plan.some(c => c.label === 'root changed tests' && c.args.includes('tests/example.test.ts')));
 });
-test('Agent web uses only its owned dependency graph and affected surface', () => {
-  const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx']);
-  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 1);
+test('Agent web installs its imported root runtime dependencies without unrelated typechecks', () => {
+  const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx'], ['apps/web/src/pages/Shell.test.tsx']);
+  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 2);
+  assert.ok(plan.findIndex(c => c.label === 'root locked dependencies') < plan.findIndex(c => c.label === 'Agent web types'));
+  assert.ok(!plan.some(c => ['typecheck', 'landing:typecheck', 'mobile:typecheck'].includes(c.label)));
   assert.ok(plan.some(c => c.label === 'Agent web types'));
   assert.ok(!plan.some(c => c.label === 'Agent api types'));
-  assert.ok(plan.some(c => c.label === 'Agent affected tests' && c.args.includes('apps/web/src/pages/Shell.tsx')));
+  assert.ok(plan.some(c => c.label === 'Agent affected tests' && c.args.includes('apps/web/src/pages/Shell.test.tsx')));
 });
 test('shared Agent contracts check all consumers', () => {
   const plan = planChecks(['src/agent/packages/contracts/src/rpc.ts']);
@@ -42,7 +44,7 @@ test('shared Agent contracts check all consumers', () => {
 test('mobile notification migration runs actual isolated database qualification', () => {
   const plan = planChecks(['src/agent/packages/db/prisma/migrations/20261112110000_mobile_push_devices/migration.sql']);
   assert.ok(plan.some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
-  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 1);
+  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 2);
   assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
 });
 test('Agent test files share the existing two-worker budget without serializing discovery', () => {
@@ -83,7 +85,8 @@ test('managed billing and referral changes qualify actual isolated PostgreSQL ac
 });
 test('related checks do not invoke full suites, build or deployment', () => {
   const plan = planChecks(['src/coordinator/main.ts', 'src/agent/packages/contracts/src/rpc.ts']);
-  assert.ok(plan.filter(c => c.args.includes('node_modules/vitest/vitest.mjs')).every(c => c.args.includes('related')));
+  assert.ok(plan.filter(c => c.label === 'root affected tests').every(c => c.args.includes('related')));
+  assert.ok(plan.filter(c => c.label === 'Agent affected tests').every(c => c.args[1] === 'run' && c.args.slice(2, -2).every(f => /\.test\.[jt]sx?$/.test(f))));
   assert.ok(!plan.some(c => c.args.includes('build') || c.args.includes('deploy')));
 });
 test('each event uses its actual comparison revision', () => {
@@ -104,4 +107,23 @@ test('workflow validates merge candidates read-only and preserves evidence', () 
   assert.match(workflow, /node scripts\/ci-proportional.mjs/);
   assert.match(workflow, /if: always\(\)/);
   assert.doesNotMatch(workflow, /pull_request_target|secrets\.|contents: write|checks: write/);
+});
+
+test('shared barrels stay scoped while executor regression siblings are included', () => {
+ const available=['packages/contracts/src/rpc.test.ts','packages/adapters/src/executor.test.ts','packages/adapters/src/executor-readonly-approval.test.ts','packages/adapters/src/unrelated.test.ts'];
+ assert.deepEqual(agentAffectedTestFiles(['packages/contracts/src/index.ts'],available),['packages/contracts/src/rpc.test.ts']);
+ assert.deepEqual(agentAffectedTestFiles(['packages/adapters/src/executor.ts'],available),['packages/adapters/src/executor-readonly-approval.test.ts','packages/adapters/src/executor.test.ts']);
+});
+test('changed Agent tests are not repeated in the affected batch', () => {
+ const plan=planChecks(['src/agent/packages/adapters/src/executor.ts','src/agent/packages/adapters/src/executor-readonly-approval.test.ts'],['packages/adapters/src/executor.test.ts','packages/adapters/src/executor-readonly-approval.test.ts']);
+ const affected=plan.find(c=>c.label==='Agent affected tests');
+ assert.ok(affected.args.includes('packages/adapters/src/executor.test.ts'));
+ assert.ok(!affected.args.includes('packages/adapters/src/executor-readonly-approval.test.ts'));
+});
+
+test("browser inference settlement changes require isolated real PostgreSQL", () => {
+  for (const file of ["src/economy/browser-inference.ts", "src/economy/contribution-credit-wallet.ts", "tests/browser-inference.postgres.test.ts"]) {
+    const check = planChecks([file]).find(c => c.label === "isolated browser inference PostgreSQL settlement");
+    assert.deepEqual(check?.args, ["scripts/test-referrals-postgres.mjs", "tests/browser-inference.postgres.test.ts"]);
+  }
 });

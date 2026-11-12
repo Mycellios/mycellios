@@ -66,7 +66,7 @@ export function InstructionSettings({ bot }: { bot: Bot }) {
             <PopoverContent align="end" className="max-h-96 overflow-y-auto">
               {current.instructionHistory.map((version) => (
                 <div key={version.id} className="mt-2 text-sm">
-                  <Disclosure
+                  <Disclosure alwaysVisible
                     summary={
                       <span className="inline-flex flex-wrap gap-x-2">
                         <span>{new Date(version.createdAt).toLocaleString()}</span>

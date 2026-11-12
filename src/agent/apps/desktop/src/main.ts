@@ -16,6 +16,7 @@ import { macosPackageKind } from "./macos-package.js";
 import { saveUpdateResume, restoreUpdateBinding } from "./update-resume.js";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
+import { LocalScriptsHost, type ScriptSession } from "./local-scripts.js";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { localResourcePaths } from "./local-resource-paths.js";
@@ -246,6 +247,7 @@ let keepRunningInBackground = false;
 let appBehavior: AppBehavior | undefined;
 let desktopCompanions: Awaited<ReturnType<typeof installDesktopCompanions>> | undefined;
 let floatingChats: FloatingChats | undefined;
+let reopenRetainedConnection: (() => void) | undefined;
 
 async function loadBackgroundPreference(profile: string) {
   appBehavior = new AppBehavior({
@@ -454,6 +456,7 @@ function createWindow(url: string, partition: string | null) {
     reportDesktopError(new Error("Renderer unresponsive"), "desktop.unresponsive"),
   );
   mainWindow = win;
+  accountComputer?.start();
   appWindowTargets.set(win, url);
   installWindowChrome(win, process.platform);
   const targetOrigin = safeOrigin(url);
@@ -1309,7 +1312,7 @@ if (!hasSingleInstanceLock) {
 } else {
   app.on("second-instance", () => {
     const win = secondInstanceWindow(setupWindow, mainWindow);
-    if (win === null) return;
+    if (win === null) { reopenRetainedConnection?.(); return; }
     revealSecondInstanceWindow(win);
   });
 }
@@ -1347,9 +1350,9 @@ app.whenReady().then(async () => {
   updatePreferences = new UpdatePreferences({
     packaged: app.isPackaged,
     allowed: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1" && Boolean(manualDesktopUpdater || updaterSupport(updaterEnvironment).supported),
-    // Only a same-user Windows handoff installs unattended; a package manager needs the owner.
-    installSupported: process.platform === "win32",
-    autoInstallByDefault: process.platform === "win32",
+    // Unsigned previews require an explicit install; saved preferences cannot enable unattended restarts.
+    installSupported: false,
+    autoInstallByDefault: false,
     read: () => readPrivateFile(path.join(userDataDir, "update-preferences.json"), 4096).catch(error => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
@@ -1396,6 +1399,7 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle("desktop.chat.return", event => floatingChats!.returnToMain(event.sender, event.senderFrame));
   desktopCompanions = await installDesktopCompanions({
+    mainWindow: () => mainWindow,
     profile: userDataDir, allowed: fromUpdateWindow, reveal: revealChat,
     requestReply: request => {
       if (!mainWindow || mainWindow.isDestroyed()) throw new Error("The app is unavailable");
@@ -1631,6 +1635,47 @@ app.whenReady().then(async () => {
     appWindowTargets.get(mainWindow!) === localStack.webUrl() &&
     safeOrigin(event.senderFrame.url) === safeOrigin(localStack.webUrl());
   const projectServer = () => mainWindow ? normalizeServerUrl(appWindowTargets.get(mainWindow) ?? "") : null;
+  const scriptFile = (kind: "config" | "quota") => path.join(userDataDir, `local-scripts-${kind}.json`);
+  const scriptSession = async (): Promise<ScriptSession | null> => {
+    const window = mainWindow, server = projectServer();
+    if (!window || window.isDestroyed() || !server) return null;
+    const url = window.webContents.getURL(), session = window.webContents.session;
+    const [owner, space] = await nativePreviewContext(window);
+    if (!owner || !space) return null;
+    const valid = async () => mainWindow === window && !window.isDestroyed() && projectServer() === server &&
+      window.webContents.getURL() === url && JSON.stringify(await nativePreviewContext(window)) === JSON.stringify([owner, space]);
+    return { binding: { server, owner, space }, valid, rpc: async (method, input) => {
+      if (!await valid()) throw new Error("The application session changed.");
+      const allowed = new Set(["preferences/micos", "routines/list", "routines/testRun", "threads/get", "threads/send", "threads/answer"]);
+      if (!allowed.has(method)) throw new Error("Unsupported local script action");
+      const response = await session.fetch(`${server}/rpc/${method}`, {
+        method: "POST", credentials: "include", redirect: "error", bypassCustomProtocolHandlers: true,
+        headers: { "content-type": "application/json", origin: new URL(server).origin, "x-rakazo-space-id": space },
+        body: JSON.stringify({ json: input }), signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok || !await valid()) throw new Error("Local script action was refused by the current session.");
+      const body = await response.json() as { json?: unknown }; return body.json;
+    } };
+  };
+  const localScripts = new LocalScriptsHost({ configPath: scriptFile("config"), session: scriptSession,
+    read: async kind => {
+      const raw = await readPrivateFile(scriptFile(kind), 1024 * 1024);
+      if (raw === null && existsSync(scriptFile(kind))) throw new Error("Invalid local script profile");
+      return raw;
+    },
+    write: (kind, raw) => writePrivateFile(scriptFile(kind), raw) });
+  let localScriptsReady = false;
+  try { await localScripts.start(); localScriptsReady = true; }
+  catch { await localScripts.close(); console.error("Local scripts could not start; automation remains disabled."); }
+  app.once("before-quit", () => { void localScripts.close(); });
+  ipcMain.handle("desktop.localScripts.state", event => {
+    if (!fromUpdateWindow(event) || !localScriptsReady) throw new Error("Local scripts require the main app window.");
+    return localScripts.state();
+  });
+  ipcMain.handle("desktop.localScripts.configure", (event, patch: unknown) => {
+    if (!fromUpdateWindow(event) || !localScriptsReady) throw new Error("Local scripts require the main app window.");
+    return localScripts.configure(patch);
+  });
   const isCloudComputerRequest = (event: Electron.IpcMainInvokeEvent) => {
     const server = projectServer();
     if (!server || currentSetup?.mode === "new" || !fromMainWindow(event) || event.senderFrame !== event.sender.mainFrame) return false;
@@ -1705,6 +1750,7 @@ app.whenReady().then(async () => {
     localUrl:hostComputer.connection.url.replace("host.docker.internal","127.0.0.1"),localToken:hostComputer.connection.token,
     consentScope:computerConsentScope,window:()=>mainWindow,changed:installApplicationMenu,
     keepRunningInBackground:()=>keepRunningInBackground,
+    manageLoginPreference:false,
     context:async()=>{
       if(currentSetup?.mode === "new")return null;
       const base=projectServer() ?? normalizeServerUrl(currentSetup?.serverUrl ?? currentTargetUrl ?? (target.kind === "app" ? target.url : ""));
@@ -2178,6 +2224,10 @@ app.whenReady().then(async () => {
   });
 
   // Register before startup awaits so macOS dock clicks during probe/open are handled.
+  reopenRetainedConnection = () => {
+    if (currentTargetUrl) void appOpener.open(currentTargetUrl).then(opened => { if (opened) commitPendingAppSwitch(); });
+    else showSetupWindow();
+  };
   app.on("activate", () => {
     if (setupWindow !== null && !setupWindow.isDestroyed()) {
       setupWindow.show();
@@ -2242,7 +2292,11 @@ app.on("window-all-closed", () => {
   // during startup; its teardown must not quit the app. A hidden main window is
   // still a window, so "keep running in the background" does not reach here.
   if (liveProbeWindows > 0) return;
+  // Only an already authorized, live remote transport may outlive its window.
+  // Explicit Quit still runs the normal shutdown and stops every transport.
+  if (appBehavior?.state().keepRemoteSessions && accountComputer?.hasConsent() && accountComputer.online()) return;
   if (process.platform !== "darwin") app.quit();
+  else accountComputer?.stop();
 });
 
 let localShutdownComplete = false;

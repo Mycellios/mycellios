@@ -249,6 +249,12 @@ public static class Fixture {
 `);
     const exec = promisify(execFile);
     await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", compile, installer], { windowsHide: true, timeout: 30_000 });
+    const signatureScript = path.join(root, "signature.ps1");
+    // CI starts under PowerShell 7. Load the Windows PowerShell 5.1 security
+    // module explicitly instead of inheriting an incompatible autoload path.
+    await writeFile(signatureScript, 'param([string]$File)\n$ErrorActionPreference="Stop"\nImport-Module (Join-Path $PSHOME "Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1")\n[string](Get-AuthenticodeSignature -LiteralPath $File).Status');
+    const signature = await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", signatureScript, installer], { windowsHide: true, timeout: 30_000 });
+    expect(signature.stdout.trim()).toBe("NotSigned");
     // Preserve truthful local-origin evidence for the locally compiled fixture.
     await writeFile(installer + ":Zone.Identifier", `[ZoneTransfer]\r\nZoneId=0\r\nHostUrl=${pathToFileURL(installer).href}\r\n`);
     const bytes = await readFile(installer);

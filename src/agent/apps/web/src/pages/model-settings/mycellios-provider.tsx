@@ -2,7 +2,6 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { ModelCredential } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { appPath } from "../../lib/app-path";
 import { fetchAuthCapabilities } from "../../lib/auth-capabilities";
@@ -31,24 +30,22 @@ export function MycelliosProvider({
   });
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const connected = isMycelliosProviderConnected(credential);
   const accountEnabled = capabilities.data?.mycelliosAccount === true;
   const accountUnavailable = !connected && !capabilities.isPending && !capabilities.isError && !accountEnabled;
   return (
     <li data-testid="mycellios-provider">
       {directory ? (
-        <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}
+        <div
           className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-start hover:bg-accent/50 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-ring">
           <img src={appPath("/mycellios/app-icon-v2-192.png")} alt="" className="size-4 shrink-0 rounded-sm" />
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-medium">Mycellios</span>
             <span className="block text-xs text-muted-foreground">{connected ? t`Connected with your account` : accountUnavailable ? t`Credits not enabled here` : t`Models with your credits`}</span>
           </span>
-          <ChevronRight aria-hidden className={`size-4 shrink-0 text-muted-foreground ${expanded ? "rotate-90" : "rtl:rotate-180"}`} />
-        </button>
+        </div>
       ) : null}
-      <div hidden={directory && !expanded} className={directory ? "px-3 pb-3 ps-10" : "px-3 py-3"}>
+      <div className={directory ? "px-3 pb-3 ps-10" : "px-3 py-3"}>
         {!directory ? <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[15px] font-medium">Mycellios</span>
           {connected ? (

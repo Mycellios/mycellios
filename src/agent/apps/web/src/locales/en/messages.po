@@ -7326,7 +7326,6 @@ msgstr "Task"
 msgid "Could not create task. Try again."
 msgstr "Could not create task. Try again."
 
-
 msgid "Running tests…"
 msgstr "Running tests…"
 
@@ -9791,7 +9790,6 @@ msgstr "Signing in…"
 msgid "This is taking a while."
 msgstr "This is taking a while."
 
-
 msgid "Messages while {0} works"
 msgstr "Messages while {0} works"
 
@@ -10400,22 +10398,17 @@ msgstr "Move Mico dock"
 msgid "New Mico"
 msgstr "New Mico"
 
-
 msgid "Mycelium sprout"
 msgstr "Sprout"
-
 
 msgid "Mycelium branch"
 msgstr "Branch"
 
-
 msgid "Mycelium node"
 msgstr "Node"
 
-
 msgid "Mycelium spore"
 msgstr "Spore"
-
 
 msgid "Mycelium colony"
 msgstr "Colony"
@@ -10522,18 +10515,14 @@ msgstr "Reading files…"
 msgid "Updating files…"
 msgstr "Updating files…"
 
-
 msgid "Use models with your Mycellios credits. No API key needed."
 msgstr "Use models with your Mycellios credits. No API key needed."
-
 
 msgid "Optional. Keep your own providers and choose which one to use for each Mico."
 msgstr "Optional. Keep your own providers and choose which one to use for each Mico."
 
-
 msgid "External models include the 4% Mycellios service fee in the displayed price."
 msgstr "External models include the 4% Mycellios service fee in the displayed price."
-
 
 msgid "Connect Mycellios"
 msgstr "Connect Mycellios"
@@ -10782,3 +10771,1396 @@ msgstr "Until I turn it back on"
 
 msgid "Server address"
 msgstr "Server address"
+
+msgid "System default"
+msgstr "System default"
+
+msgid "Usage and costs"
+msgstr "Usage and costs"
+
+msgid "The built-in browser is available in Mycellios Desktop."
+msgstr "The built-in browser is available in Mycellios Desktop."
+
+msgid "Open external links in"
+msgstr "Open external links in"
+
+msgid "Default browser"
+msgstr "Default browser"
+
+msgid "Mycellios window"
+msgstr "Mycellios window"
+
+msgid "Where links from chats and settings open."
+msgstr "Where links from chats and settings open."
+
+msgid "Open the available steps and details of each turn by default."
+msgstr "Open the available steps and details of each turn by default."
+
+msgid "{toolCount, plural, one {# step} other {# steps}}"
+msgstr "{toolCount, plural, one {# step} other {# steps}}"
+
+msgid "Quick server reconnection"
+msgstr "Quick server reconnection"
+
+msgid "Keep authorized server connections alive when the last window closes. Reopening reuses the running service; Quit disconnects it."
+msgstr "Keep authorized server connections alive when the last window closes. Reopening reuses the running service; Quit disconnects it."
+
+msgid "Computer controls require Mycellios Desktop. Workspace restoration also works on the web."
+msgstr "Computer controls require Mycellios Desktop. Workspace restoration also works on the web."
+
+msgid "Link analytics to my account"
+msgstr "Link analytics to my account"
+
+msgid "When enabled, optional screen measurements use a pseudonymous account identifier across devices. Otherwise they use a random installation identifier. No chats, files, prompts or email addresses are sent."
+msgstr "When enabled, optional screen measurements use a pseudonymous account identifier across devices. Otherwise they use a random installation identifier. No chats, files, prompts or email addresses are sent."
+
+msgid "Application behavior"
+msgstr "Application behavior"
+
+msgid "Open Mycellios at login"
+msgstr "Open Mycellios at login"
+
+msgid "Open the application when you sign in on this computer."
+msgstr "Open the application when you sign in on this computer."
+
+msgid "Keep Mycellios running in the background"
+msgstr "Keep Mycellios running in the background"
+
+msgid "Keep tasks active when you close the window. Use Quit to exit completely."
+msgstr "Keep tasks active when you close the window. Use Quit to exit completely."
+
+msgid "Keep the computer awake"
+msgstr "Keep the computer awake"
+
+msgid "Run routines on time while plugged in. The screen can turn off."
+msgstr "Run routines on time while plugged in. The screen can turn off."
+
+msgid "Also on battery"
+msgstr "Also on battery"
+
+msgid "Keep the computer awake on battery too. This uses more power."
+msgstr "Keep the computer awake on battery too. This uses more power."
+
+msgid "Restore the last workspace on startup"
+msgstr "Restore the last workspace on startup"
+
+msgid "Reopen the space and conversation you used last. Explicit chat links always take priority."
+msgstr "Reopen the space and conversation you used last. Explicit chat links always take priority."
+
+msgid "Privacy"
+msgstr "Privacy"
+
+msgid "Help improve Mycellios"
+msgstr "Help improve Mycellios"
+
+msgid "Share which app screens you use from this device. This optional report contains no messages, prompts or credentials."
+msgstr "Share which app screens you use from this device. This optional report contains no messages, prompts or credentials."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Local scripts"
+msgstr "Local scripts"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Allow scripts on an authorized computer to send messages, run routines, answer questions and allow or deny individual approval requests."
+msgstr "Allow scripts on an authorized computer to send messages, run routines, answer questions and allow or deny individual approval requests."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Mico starts new chats"
+msgstr "Mico starts new chats"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "In a long personal chat, the Mico can save handoff notes and start fresh context after finishing its task. History is kept."
+msgstr "In a long personal chat, the Mico can save handoff notes and start fresh context after finishing its task. History is kept."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Show a plan before long tasks"
+msgstr "Show a plan before long tasks"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Ask the Mico to share a short plan before a long task. Simple replies stay direct. This does not grant permission to act."
+msgstr "Ask the Mico to share a short plan before a long task. Simple replies stay direct. This does not grant permission to act."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not load Mico preferences."
+msgstr "Could not load Mico preferences."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not save. Preferences may have changed elsewhere. Review them and try again."
+msgstr "Could not save. Preferences may have changed elsewhere. Review them and try again."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Back to Micos"
+msgstr "Back to Micos"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "New Micos and Micos using the default follow this value. Defaults apply to your account; Apply to all affects only your Micos in this space."
+msgstr "New Micos and Micos using the default follow this value. Defaults apply to your account; Apply to all affects only your Micos in this space."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Apply to all"
+msgstr "Apply to all"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default (Enabled)"
+msgstr "Default (Enabled)"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default (Disabled)"
+msgstr "Default (Disabled)"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default: Enabled"
+msgstr "Default: Enabled"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Default: Disabled"
+msgstr "Default: Disabled"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Enabled for {count} of {total}"
+msgstr "Enabled for {count} of {total}"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Git commits"
+msgstr "Git commits"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Mention Mycellios in commits"
+msgstr "Mention Mycellios in commits"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "When you authorize a commit, ask the Mico to add Mycellios as a co-author. You remain the author."
+msgstr "When you authorize a commit, ask the Mico to add Mycellios as a co-author. You remain the author."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Allow local scripts on this computer"
+msgstr "Allow local scripts on this computer"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Requires Mycellios Desktop, a signed-in session and permission for each Mico. The local access key stays in a private file on this computer."
+msgstr "Requires Mycellios Desktop, a signed-in session and permission for each Mico. The local access key stays in a private file on this computer."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Requests per hour"
+msgstr "Requests per hour"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Maximum requests each Mico can receive from local scripts on this computer, across messages, routines and answers."
+msgstr "Maximum requests each Mico can receive from local scripts on this computer, across messages, routines and answers."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "{value} per hour"
+msgstr "{value} per hour"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Script connection file:"
+msgstr "Script connection file:"
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Open Mycellios Desktop to enable scripts on a computer. Account preferences above can be saved here."
+msgstr "Open Mycellios Desktop to enable scripts on a computer. Account preferences above can be saved here."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not load local script settings."
+msgstr "Could not load local script settings."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Could not save local script settings."
+msgstr "Could not save local script settings."
+
+#: src/pages/settings/MicoBehaviorSettings.tsx
+msgid "Apply message mode to all Micos"
+msgstr "Apply message mode to all Micos"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "User messages · past year"
+msgstr "User messages · past year"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Past year"
+msgstr "Past year"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "No activity yet"
+msgstr "No activity yet"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Record day"
+msgstr "Record day"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Current streak"
+msgstr "Current streak"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Longest streak"
+msgstr "Longest streak"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "1 day"
+msgstr "1 day"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "My year with Mycellios"
+msgstr "My year with Mycellios"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Partial recorded usage"
+msgstr "Partial recorded usage"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Recorded activity in this space"
+msgstr "Recorded activity in this space"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not prepare the image. Try again."
+msgstr "Could not prepare the image. Try again."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Edit profile"
+msgstr "Edit profile"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Loading your activity…"
+msgstr "Loading your activity…"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not refresh. Showing the last loaded report."
+msgstr "Could not refresh. Showing the last loaded report."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not load your activity."
+msgstr "Could not load your activity."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Activity in this space"
+msgstr "Activity in this space"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "{activeDays} active days in the past year"
+msgstr "{activeDays} active days in the past year"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Your account's recorded AI calls in this space, across devices. Tokens include cache usage."
+msgstr "Your account's recorded AI calls in this space, across devices. Tokens include cache usage."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Some usage is missing. Token totals, rankings and costs show the recorded portion."
+msgstr "Some usage is missing. Token totals, rankings and costs show the recorded portion."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Activity calendar"
+msgstr "Activity calendar"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "tokens"
+msgstr "tokens"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Less"
+msgstr "Less"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Statistics"
+msgstr "Statistics"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Most used provider"
+msgstr "Most used provider"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Most active weekday"
+msgstr "Most active weekday"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Estimated cost"
+msgstr "Estimated cost"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Most active Micos"
+msgstr "Most active Micos"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Model usage"
+msgstr "Model usage"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Share your activity"
+msgstr "Share your activity"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Review this image before downloading. It contains your display name and these totals, with no email, conversations or account identifiers. Nothing is published automatically."
+msgstr "Review this image before downloading. It contains your display name and these totals, with no email, conversations or account identifiers. Nothing is published automatically."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Your Mycellios activity summary"
+msgstr "Your Mycellios activity summary"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Download image"
+msgstr "Download image"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Account sessions"
+msgstr "Account sessions"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Signed-in devices"
+msgstr "Signed-in devices"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Sessions stay active until you sign out or disconnect them. Disconnecting ends remote actions for that session."
+msgstr "Sessions stay active until you sign out or disconnect them. Disconnecting ends remote actions for that session."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Sign in again to manage account sessions."
+msgstr "Sign in again to manage account sessions."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not load account sessions. Try again."
+msgstr "Could not load account sessions. Try again."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Could not disconnect this session. Try again."
+msgstr "Could not disconnect this session. Try again."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "This session"
+msgstr "This session"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "No active sessions."
+msgstr "No active sessions."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Disconnect this session?"
+msgstr "Disconnect this session?"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "This device will need to sign in again. Your conversations stay in your account."
+msgstr "This device will need to sign in again. Your conversations stay in your account."
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Signing out…"
+msgstr "Signing out…"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Messages"
+msgstr "Messages"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Email address"
+msgstr "Email address"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Sign out"
+msgstr "Sign out"
+
+#: src/pages/settings/ProfileOverview.tsx
+msgid "Share activity"
+msgstr "Share"
+
+#: src/pages/model-settings/providers-section.tsx
+msgid "Back to providers"
+msgstr "Back to providers"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "If I’m needed"
+msgstr "If I’m needed"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "What to notify you about"
+msgstr "What to notify you about"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "All my devices"
+msgstr "All my devices"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Account notifications"
+msgstr "Account notifications"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Choose for a Mico"
+msgstr "Choose for a Mico"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Unavailable Mico"
+msgstr "Unavailable Mico"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Notifications paused on all devices"
+msgstr "Notifications paused on all devices"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause on all devices"
+msgstr "Pause on all devices"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Message content in background alerts on your devices. This device can hide it too."
+msgstr "Message content in background alerts on your devices. This device can hide it too."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Could not load account notification settings."
+msgstr "Could not load account notification settings."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Could not refresh. Showing the last loaded settings."
+msgstr "Could not refresh. Showing the last loaded settings."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Desktop notifications"
+msgstr "Desktop notifications"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Show an alert when a Mico replies or needs your attention."
+msgstr "Show an alert when a Mico replies or needs your attention."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Request a notification now. Focus mode or Do Not Disturb may silence it."
+msgstr "Request a notification now. Focus mode or Do Not Disturb may silence it."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Background alerts"
+msgstr "Background alerts"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Connect this device"
+msgstr "Connect this device"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Paused on this device"
+msgstr "Paused on this device"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Pause on this device"
+msgstr "Pause on this device"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Legacy device filter: only when needed"
+msgstr "Legacy device filter: only when needed"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Use the account filter above to keep the same behavior on all devices."
+msgstr "Use the account filter above to keep the same behavior on all devices."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Task alerts by Mico"
+msgstr "Task alerts by Mico"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Task alerts"
+msgstr "Task alerts"
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Allow this Mico to send task alerts. The account and device filters still apply."
+msgstr "Allow this Mico to send task alerts. The account and device filters still apply."
+
+#: src/pages/settings/NotificationsPanel.tsx
+msgid "Could not save or complete this action. Try again."
+msgstr "Could not save or complete this action. Try again."
+
+msgid "All"
+msgstr "All"
+
+msgid "No alerts"
+msgstr "None"
+
+msgid "Allow each Mico to send task alerts. Account and device filters still apply."
+msgstr "Allow each Mico to send task alerts. Account and device filters still apply."
+
+msgid "Could not play the sound. Check your audio output."
+msgstr "Could not play the sound. Check your audio output."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Spoken replies"
+msgstr "Spoken replies"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Dictation model"
+msgstr "Dictation model"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Choose automatic routing, local transcription, your device or a connected service."
+msgstr "Choose automatic routing, local transcription, your device or a connected service."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Device dictation"
+msgstr "Device dictation"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Parakeet detects the spoken language automatically. Choose a connected service to fix a language."
+msgstr "Parakeet detects the spoken language automatically. Choose a connected service to fix a language."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Device voices · no credits"
+msgstr "Device voices · no credits"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Configured provider voice"
+msgstr "Configured provider voice"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Uses installed device voices without uploading text."
+msgstr "Uses installed device voices without uploading text."
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Live voice"
+msgstr "Live voice"
+
+#: src/pages/settings/DeviceVoiceSettings.tsx
+msgid "Uses the dictation and spoken-reply models selected above. Start speaking to interrupt a reply."
+msgstr "Uses the dictation and spoken-reply models selected above. Start speaking to interrupt a reply."
+
+msgid "Local voice stays on this computer and uses no credits."
+msgstr "Local voice stays on this computer and uses no credits."
+
+msgid "Reply text is sent to your connected voice provider, which may charge your account."
+msgstr "Reply text is sent to your connected voice provider, which may charge your account."
+
+msgid "Choose where dictation is processed. Network transcription uses credits."
+msgstr "Choose where dictation is processed. Network transcription uses credits."
+
+msgid "Open a Mico and configure dictation and spoken replies to start a voice conversation."
+msgstr "Open a Mico and configure dictation and spoken replies to start a voice conversation."
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Mycellios Island"
+msgstr "Mycellios Island"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Interactive preview. Mycellios Desktop places the island above your other applications. Changes here are not saved."
+msgstr "Interactive preview. Mycellios Desktop places the island above your other applications. Changes here are not saved."
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Show status at the top of the screen"
+msgstr "Show status at the top of the screen"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Choose where the island appears. It only shows activity from the selected space."
+msgstr "Choose where the island appears. It only shows activity from the selected space."
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Show island"
+msgstr "Show island"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Show spaces added later"
+msgstr "Show spaces added later"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "New spaces follow this preference until you choose otherwise."
+msgstr "New spaces follow this preference until you choose otherwise."
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Island size preview"
+msgstr "Island size preview"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "Built-in display"
+msgstr "Built-in display"
+
+#: src/pages/settings/DesktopCompanionsPanel.tsx
+msgid "External display"
+msgstr "External display"
+
+msgid "Visibility"
+msgstr "Visibility"
+
+msgid "Keep the dock above other apps, or only while Mycellios is active."
+msgstr "Keep the dock above other apps, or only while Mycellios is active."
+
+msgid "Above other apps"
+msgstr "Above other apps"
+
+msgid "With Mycellios active"
+msgstr "With Mycellios active"
+
+msgid "Follow Mycellios window"
+msgstr "Follow Mycellios window"
+
+msgid "If disconnected, the dock follows the Mycellios window’s screen."
+msgstr "If disconnected, the dock follows the Mycellios window’s screen."
+
+msgid "Screen edge"
+msgstr "Screen edge"
+
+msgid "Drag the dock handle to move it along this edge."
+msgstr "Drag the dock handle to move it along this edge."
+
+msgid "Dock size"
+msgstr "Dock size"
+
+msgid "Show completed work"
+msgstr "Show completed work"
+
+msgid "Show new results briefly beside the dock, then return to the compact view."
+msgstr "Show new results briefly beside the dock, then return to the compact view."
+
+msgid "Interactive preview. Use Mycellios Desktop for the dock above other applications. Changes here are not saved."
+msgstr "Interactive preview. Use Mycellios Desktop for the dock above other applications. Changes here are not saved."
+
+msgid "Dock preview"
+msgstr "Dock preview"
+
+msgid "Choose Micos below"
+msgstr "Choose Micos below"
+
+msgid "The work environment is configured"
+msgstr "The work environment is configured"
+
+msgid "Computer tools need setup"
+msgstr "Computer tools need setup"
+
+msgid "Could not verify computer setup"
+msgstr "Could not verify computer setup"
+
+msgid "Computer access is not confirmed"
+msgstr "Computer access is not confirmed"
+
+msgid "The server reports a configured environment for your Micos. Screen access and each Mico’s connection are checked separately."
+msgstr "The server reports a configured environment for your Micos. Screen access and each Mico’s connection are checked separately."
+
+msgid "Chat and connected apps still work. Configure a work environment to use computer tools."
+msgstr "Chat and connected apps still work. Configure a work environment to use computer tools."
+
+msgid "Checking the server connection and the environment reported for your account."
+msgstr "Checking the server connection and the environment reported for your account."
+
+msgid "Check your connection and try again. A previous status does not confirm current access."
+msgstr "Check your connection and try again. A previous status does not confirm current access."
+
+msgid "The server has not reported a supported work environment. No access is assumed."
+msgstr "The server has not reported a supported work environment. No access is assumed."
+
+msgid "Access and connection"
+msgstr "Access and connection"
+
+msgid "Local computer access is authorized when you connect a Mico in Desktop. This check does not grant new permissions."
+msgstr "Local computer access is authorized when you connect a Mico in Desktop. This check does not grant new permissions."
+
+msgid "You are using the web app. This page does not grant access to applications or files on this device."
+msgstr "You are using the web app. This page does not grant access to applications or files on this device."
+
+msgid "Web app"
+msgstr "Web app"
+
+msgid "Mico work environment"
+msgstr "Mico work environment"
+
+msgid "Choose each Mico’s computer from its chat tools. A configured environment does not confirm a screen connection."
+msgstr "Choose each Mico’s computer from its chat tools. A configured environment does not confirm a screen connection."
+
+msgid "Not confirmed"
+msgstr "Not confirmed"
+
+msgid "Check connection"
+msgstr "Check connection"
+
+msgid "Refresh the status without restarting tasks or changing permissions."
+msgstr "Refresh the status without restarting tasks or changing permissions."
+
+msgid "Not configured"
+msgstr "Not configured"
+
+msgid "Test environment"
+msgstr "Test environment"
+
+msgid "Your plan"
+msgstr "Your plan"
+
+msgid "Your account, model credits and server connections in one place."
+msgstr "Your account, model credits and server connections in one place."
+
+msgid "Mycellios account"
+msgstr "Mycellios account"
+
+msgid "Payments are not enabled on this server. No subscription or charge is started here."
+msgstr "Payments are not enabled on this server. No subscription or charge is started here."
+
+msgid "Loading billing"
+msgstr "Loading billing"
+
+msgid "Using your own model subscription or API key."
+msgstr "Using your own model subscription or API key."
+
+msgid "Models are paid with your Mycellios Credits."
+msgstr "Models are paid with your Mycellios Credits."
+
+msgid "Choose how to connect your models below."
+msgstr "Choose how to connect your models below."
+
+msgid "Subscription for this account. Server connections are managed separately."
+msgstr "Subscription for this account. Server connections are managed separately."
+
+msgid "Your own provider"
+msgstr "Your own provider"
+
+msgid "Subscription"
+msgstr "Subscription"
+
+msgid "No recurring price reported for this account."
+msgstr "No recurring price reported for this account."
+
+msgid "Only the account owner can change billing."
+msgstr "Only the account owner can change billing."
+
+msgid "Each server manages its own account and billing. Adding a connection does not purchase a plan."
+msgstr "Each server manages its own account and billing. Adding a connection does not purchase a plan."
+
+msgid "No saved servers yet."
+msgstr "No saved servers yet."
+
+msgid "Connect another server"
+msgstr "Connect another server"
+
+msgid "Use Mycellios Desktop to save and switch between servers."
+msgstr "Use Mycellios Desktop to save and switch between servers."
+
+msgid "Download Desktop"
+msgstr "Download Desktop"
+
+msgid "Unpaid"
+msgstr "Unpaid"
+
+msgid "Incomplete"
+msgstr "Incomplete"
+
+msgid "Phones signed in to this Mycellios account."
+msgstr "Phones signed in to this Mycellios account."
+
+msgid "Refresh phones"
+msgstr "Refresh phones"
+
+msgid "Permanent link"
+msgstr "Permanent link"
+
+msgid "For a phone you sign in to regularly."
+msgstr "For a phone you sign in to regularly."
+
+msgid "This phone"
+msgstr "This phone"
+
+msgid "Account session"
+msgstr "Account session"
+
+msgid "Disconnecting revokes access to this account. A phone may keep its current screen visible until it refreshes or returns from the background."
+msgstr "Disconnecting revokes access to this account. A phone may keep its current screen visible until it refreshes or returns from the background."
+
+msgid "This server uses a local address. A phone cannot open your computer’s localhost. Use a reachable address for this same server."
+msgstr "This server uses a local address. A phone cannot open your computer’s localhost. Use a reachable address for this same server."
+
+msgid "Scan the code, then sign in with the same Mycellios account. This link contains no password or session token."
+msgstr "Scan the code, then sign in with the same Mycellios account. This link contains no password or session token."
+
+msgid "Connect to a reachable server before adding a phone. This preview cannot be paired from another device."
+msgstr "Connect to a reachable server before adding a phone. This preview cannot be paired from another device."
+
+msgid "The link stays valid. Only signing in grants access; disconnecting a phone revokes its session."
+msgstr "The link stays valid. Only signing in grants access; disconnecting a phone revokes its session."
+
+msgid "Could not copy. Use the address shown above."
+msgstr "Could not copy. Use the address shown above."
+
+msgid "First give this server an HTTPS address your phone can reach. The local preview does not create a public address."
+msgstr "First give this server an HTTPS address your phone can reach. The local preview does not create a public address."
+
+msgid "Open that server address on your phone and sign in with the same account."
+msgstr "Open that server address on your phone and sign in with the same account."
+
+msgid "On Android, open the Chrome menu and choose Install or Add to Home Screen."
+msgstr "On Android, open the Chrome menu and choose Install or Add to Home Screen."
+
+msgid "On iPhone or iPad, open Safari, tap Share and choose Add to Home Screen."
+msgstr "On iPhone or iPad, open Safari, tap Share and choose Add to Home Screen."
+
+msgid "What's new in Mycellios"
+msgstr "What's new in Mycellios"
+
+msgid "Update channel"
+msgstr "Update channel"
+
+msgid "The stable channel receives tested releases of Mycellios."
+msgstr "The stable channel receives tested releases of Mycellios."
+
+msgid "Managed by the server"
+msgstr "Managed by the server"
+
+msgid "The server publishes updates for the web app."
+msgstr "The server publishes updates for the web app."
+
+msgid "Local development"
+msgstr "Local development"
+
+msgid "Local development updates automatically as the project changes."
+msgstr "Local development updates automatically as the project changes."
+
+msgid "The web app receives updates from this server. Your drafts and calls are protected."
+msgstr "The web app receives updates from this server. Your drafts and calls are protected."
+
+msgid "A new version is available. Return to the app to finish updating when your work is saved."
+msgstr "A new version is available. Return to the app to finish updating when your work is saved."
+
+msgid "Your work is preserved before the web app reloads."
+msgstr "Your work is preserved before the web app reloads."
+
+msgid "The server is serving an older version. Try again later."
+msgstr "The server is serving an older version. Try again later."
+
+msgid "No published update is available for this installation. You can check again later."
+msgstr "No published update is available for this installation. You can check again later."
+
+msgid "This installation is updated from the project or its system installer."
+msgstr "This installation is updated from the project or its system installer."
+
+msgid "Updates are installed with your system installer. Mycellios will not restart automatically."
+msgstr "Updates are installed with your system installer. Mycellios will not restart automatically."
+
+msgid "Could not load update settings. Try again."
+msgstr "Could not load update settings. Try again."
+
+msgid "Development"
+msgstr "Development"
+
+msgid "Stable"
+msgstr "Stable"
+
+msgid "Download updates automatically"
+msgstr "Download updates automatically"
+
+msgid "Install updates automatically"
+msgstr "Install updates automatically"
+
+msgid "Restart Mycellios"
+msgstr "Restart Mycellios"
+
+msgid "Restart when idle"
+msgstr "Restart when idle"
+
+msgid "Cancel restart"
+msgstr "Cancel restart"
+
+msgid "You are using the local development version."
+msgstr "You are using the local development version."
+
+msgid "Reading desktop update status…"
+msgstr "Reading desktop update status…"
+
+msgid "Your providers could not be checked. Retry when the server is reachable."
+msgstr "Your providers could not be checked. Retry when the server is reachable."
+
+msgid "Loading providers…"
+msgstr "Loading providers…"
+
+msgid "Reconnecting to the server…"
+msgstr "Reconnecting to the server…"
+
+msgid "Could not load models"
+msgstr "Could not load models"
+
+msgid "A clear next step"
+msgstr "A clear next step"
+
+msgid "A clear picture of what moved forward."
+msgstr "A clear picture of what moved forward."
+
+msgid "A little planning."
+msgstr "A little planning."
+
+msgid "A lot already done."
+msgstr "A lot already done."
+
+msgid "A new version is available."
+msgstr "A new version is available."
+
+msgid "A short sound when a Mico finishes a reply."
+msgstr "A short sound when a Mico finishes a reply."
+
+msgid "A useful update in your chat. No extra steps."
+msgstr "A useful update in your chat. No extra steps."
+
+msgid "Access"
+msgstr "Access"
+
+msgid "Account access"
+msgstr "Account access"
+
+msgid "Action sounds"
+msgstr "Action sounds"
+
+msgid "Activating…"
+msgstr "Activating…"
+
+msgid "Add to queue"
+msgstr "Add to queue"
+
+msgid "Another update is still running. Keep using Mycellios and finish that installation before retrying."
+msgstr "Another update is still running. Keep using Mycellios and finish that installation before retrying."
+
+msgid "Ask a side question"
+msgstr "Ask a side question"
+
+msgid "Ask about this chat"
+msgstr "Ask about this chat"
+
+msgid "Attach files"
+msgstr "Attach files"
+
+msgid "Balance unavailable"
+msgstr "Balance unavailable"
+
+msgid "Behavior"
+msgstr "Behavior"
+
+msgid "Blue"
+msgstr "Blue"
+
+msgid "Browser and computer"
+msgstr "Browser and computer"
+
+msgid "Bubble"
+msgstr "Bubble"
+
+msgid "Chat background"
+msgstr "Chat background"
+
+msgid "Chat color"
+msgstr "Chat color"
+
+msgid "Choose a model to use this provider"
+msgstr "Choose a model to use this provider"
+
+msgid "Choose how to connect. Mycellios handles the model setup for you."
+msgstr "Choose how to connect. Mycellios handles the model setup for you."
+
+msgid "Choose when. Tell your Mico what to do."
+msgstr "Choose when. Tell your Mico what to do."
+
+msgid "Classic"
+msgstr "Classic"
+
+msgid "Close side question"
+msgstr "Close side question"
+
+msgid "Close workspace"
+msgstr "Close workspace"
+
+msgid "Cloud/Team"
+msgstr "Cloud/Team"
+
+msgid "Code font"
+msgstr "Code font"
+
+msgid "Come back to useful results, right in your chat."
+msgstr "Come back to useful results, right in your chat."
+
+msgid "Compact message actions"
+msgstr "Compact message actions"
+
+msgid "Computer operations remain exclusive. Changing the limit does not stop active work."
+msgstr "Computer operations remain exclusive. Changing the limit does not stop active work."
+
+msgid "Computer use"
+msgstr "Computer use"
+
+msgid "Connected voice services"
+msgstr "Connected voice services"
+
+msgid "Connected. You can start chatting."
+msgstr "Connected. You can start chatting."
+
+msgid "Connection and diagnostics"
+msgstr "Connection and diagnostics"
+
+msgid "Contribute in your browser while this page stays open."
+msgstr "Contribute in your browser while this page stays open."
+
+msgid "Could not check side questions. Try again."
+msgstr "Could not check side questions. Try again."
+
+msgid "Could not load servers."
+msgstr "Could not load servers."
+
+msgid "Could not load this account's models. Fast mode is unavailable until the catalog can be checked."
+msgstr "Could not load this account's models. Fast mode is unavailable until the catalog can be checked."
+
+msgid "Could not restart. Try again."
+msgstr "Could not restart. Try again."
+
+msgid "Could not start a new chat. Try again."
+msgstr "Could not start a new chat. Try again."
+
+msgid "Could not switch to this PC"
+msgstr "Could not switch to this PC"
+
+msgid "Create a Mico"
+msgstr "Create a Mico"
+
+msgid "Defaults"
+msgstr "Defaults"
+
+msgid "Disconnected"
+msgstr "Disconnected"
+
+msgid "Does"
+msgstr "Does"
+
+msgid "Download new versions in the background."
+msgstr "Download new versions in the background."
+
+msgid "Download update"
+msgstr "Download update"
+
+msgid "Each theme remembers its own background. Text stays readable."
+msgstr "Each theme remembers its own background. Text stays readable."
+
+msgid "Earned"
+msgstr "Earned"
+
+msgid "Effort"
+msgstr "Effort"
+
+msgid "Every morning"
+msgstr "Every morning"
+
+msgid "Everything in one place"
+msgstr "Everything in one place"
+
+msgid "Expand panel"
+msgstr "Expand panel"
+
+msgid "Export agent"
+msgstr "Export agent"
+
+msgid "Fast"
+msgstr "Fast"
+
+msgid "Find a peer ID"
+msgstr "Find a peer ID"
+
+msgid "Find the result right in your chat."
+msgstr "Find the result right in your chat."
+
+msgid "Finish active tasks, save drafts and end calls before changing servers."
+msgstr "Finish active tasks, save drafts and end calls before changing servers."
+
+msgid "Gather what matters. Turn it into a clear plan."
+msgstr "Gather what matters. Turn it into a clear plan."
+
+msgid "Give your Micos a time and a task."
+msgstr "Give your Micos a time and a task."
+
+msgid "Gold"
+msgstr "Gold"
+
+msgid "Green"
+msgstr "Green"
+
+msgid "Grey"
+msgstr "Grey"
+
+msgid "How it works"
+msgstr "How it works"
+
+msgid "Illustrative example · no tasks are running"
+msgstr "Illustrative example · no tasks are running"
+
+msgid "Illustrative schedule · no tasks are running"
+msgstr "Illustrative schedule · no tasks are running"
+
+msgid "Inbox, in order"
+msgstr "Inbox, in order"
+
+msgid "Instructions sent to the current task."
+msgstr "Instructions sent to the current task."
+
+msgid "Interface font"
+msgstr "Interface font"
+
+msgid "Knows"
+msgstr "Knows"
+
+msgid "Let your Mico take it from here."
+msgstr "Let your Mico take it from here."
+
+msgid "Light or dark colors. System follows your device."
+msgstr "Light or dark colors. System follows your device."
+
+msgid "Logo color"
+msgstr "Logo color"
+
+msgid "Manage approvals"
+msgstr "Manage approvals"
+
+msgid "Mechanical"
+msgstr "Mechanical"
+
+msgid "Memories"
+msgstr "Memories"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Menus, buttons and messages use this language."
+msgstr "Menus, buttons and messages use this language."
+
+msgid "Message saved in the queue."
+msgstr "Message saved in the queue."
+
+msgid "Model · automatic"
+msgstr "Model · automatic"
+
+msgid "More tools"
+msgstr "More tools"
+
+msgid "Morning briefing"
+msgstr "Morning briefing"
+
+msgid "Mycellios Desktop"
+msgstr "Mycellios Desktop"
+
+msgid "New chat"
+msgstr "New chat"
+
+msgid "New conversation"
+msgstr "New conversation"
+
+msgid "None"
+msgstr "None"
+
+msgid "Notify me when there are results or a problem"
+msgstr "Notify me when there are results or a problem"
+
+msgid "Open another panel"
+msgstr "Open another panel"
+
+msgid "Pause preview"
+msgstr "Pause preview"
+
+msgid "Pausing…"
+msgstr "Pausing…"
+
+msgid "Peach"
+msgstr "Peach"
+
+msgid "Personalize the Mycellios logo on this device."
+msgstr "Personalize the Mycellios logo on this device."
+
+msgid "Pin a seller"
+msgstr "Pin a seller"
+
+msgid "Pink"
+msgstr "Pink"
+
+msgid "Play preview"
+msgstr "Play preview"
+
+msgid "Preparing the summary"
+msgstr "Preparing the summary"
+
+msgid "Press"
+msgstr "Press"
+
+msgid "Preview sound"
+msgstr "Preview sound"
+
+msgid "Priorities for today"
+msgstr "Priorities for today"
+
+msgid "Profile"
+msgstr "Profile"
+
+msgid "Purple"
+msgstr "Purple"
+
+msgid "Queued messages"
+msgstr "Queued messages"
+
+msgid "Ready when you are"
+msgstr "Ready when you are"
+
+msgid "Repeat automatically"
+msgstr "Repeat automatically"
+
+msgid "Repeat this task"
+msgstr "Repeat this task"
+
+msgid "Restart when Micos are idle, after saving drafts and finishing calls."
+msgstr "Restart when Micos are idle, after saving drafts and finishing calls."
+
+msgid "Restart with the downloaded version when your Micos and this app are idle."
+msgstr "Restart with the downloaded version when your Micos and this app are idle."
+
+msgid "Restore panel size"
+msgstr "Restore panel size"
+
+msgid "Results will appear here after the first run."
+msgstr "Results will appear here after the first run."
+
+msgid "Results will appear in this Mico's chat. Nothing runs until you save."
+msgstr "Results will appear in this Mico's chat. Nothing runs until you save."
+
+msgid "Review everything before activating it."
+msgstr "Review everything before activating it."
+
+msgid "Review instructions"
+msgstr "Review instructions"
+
+msgid "Review the day's priorities and prepare a short summary."
+msgstr "Review the day's priorities and prepare a short summary."
+
+msgid "Rose"
+msgstr "Rose"
+
+msgid "Routines for this Mico"
+msgstr "Routines for this Mico"
+
+msgid "Save changes or finish the call to restart."
+msgstr "Save changes or finish the call to restart."
+
+msgid "Saved messages run in order after the current task."
+msgstr "Saved messages run in order after the current task."
+
+msgid "Select this provider from the model menu in your chat."
+msgstr "Select this provider from the model menu in your chat."
+
+msgid "Send message to"
+msgstr "Send message to"
+
+msgid "Send side question"
+msgstr "Send side question"
+
+msgid "Set it up once."
+msgstr "Set it up once."
+
+msgid "Short sounds for your own actions, such as a click."
+msgstr "Short sounds for your own actions, such as a click."
+
+msgid "Show agent steps"
+msgstr "Show agent steps"
+
+msgid "Shows React, Reply and More beside a message, with the time between messages. Turn off to show actions and time below every message."
+msgstr "Shows React, Reply and More beside a message, with the time between messages. Turn off to show actions and time below every message."
+
+msgid "Side questions"
+msgstr "Side questions"
+
+msgid "Sidebar"
+msgstr "Sidebar"
+
+msgid "Sounds"
+msgstr "Sounds"
+
+msgid "Start new chat"
+msgstr "Start new chat"
+
+msgid "Start voice conversation"
+msgstr "Start voice conversation"
+
+msgid "Task completion sound"
+msgstr "Task completion sound"
+
+msgid "The Mico forgets this chat. Messages remain visible above a divider. Instructions, model, tools, memories, workspace and browser stay the same."
+msgstr "The Mico forgets this chat. Messages remain visible above a divider. Instructions, model, tools, memories, workspace and browser stay the same."
+
+msgid "The font used for menus and messages."
+msgstr "The font used for menus and messages."
+
+msgid "The font used in code blocks and the terminal."
+msgstr "The font used in code blocks and the terminal."
+
+msgid "The important messages. None of the noise."
+msgstr "The important messages. None of the noise."
+
+msgid "The result"
+msgstr "The result"
+
+msgid "The size of text and controls in Mycellios."
+msgstr "The size of text and controls in Mycellios."
+
+msgid "The update is ready to install."
+msgstr "The update is ready to install."
+
+msgid "Theme"
+msgstr "Theme"
+
+msgid "These instructions will be saved when you create the Mico. You can edit them later."
+msgstr "These instructions will be saved when you create the Mico. You can edit them later."
+
+msgid "Thinking…"
+msgstr "Thinking…"
+
+msgid "This PC"
+msgstr "This PC"
+
+msgid "This development build updates from the project. Installed apps use published releases."
+msgstr "This development build updates from the project. Installed apps use published releases."
+
+msgid "Tints your message bubbles on this device."
+msgstr "Tints your message bubbles on this device."
+
+msgid "Trial balance. No monetary value."
+msgstr "Trial balance. No monetary value."
+
+msgid "Update current task"
+msgstr "Update current task"
+
+msgid "Use an API key"
+msgstr "Use an API key"
+
+msgid "Use my account"
+msgstr "Use my account"
+
+msgid "Use peerId@model as the exact model ID. A pinned seller keeps routing and prompt caching stable."
+msgstr "Use peerId@model as the exact model ID. A pinned seller keeps routing and prompt caching stable."
+
+msgid "Use this PC"
+msgstr "Use this PC"
+
+msgid "Use this account"
+msgstr "Use this account"
+
+msgid "Uses priority processing and may use more quota."
+msgstr "Uses priority processing and may use more quota."
+
+msgid "View usage"
+msgstr "View usage"
+
+msgid "Waiting for Micos to finish. You can keep working."
+msgstr "Waiting for Micos to finish. You can keep working."
+
+msgid "Waiting for the update download to finish."
+msgstr "Waiting for the update download to finish."
+
+msgid "Warm"
+msgstr "Warm"
+
+msgid "Weekdays · 09:00"
+msgstr "Weekdays · 09:00"
+
+msgid "Weekly overview"
+msgstr "Weekly overview"
+
+msgid "What this agent does"
+msgstr "What this agent does"
+
+msgid "White"
+msgstr "White"
+
+msgid "You choose the schedule. Your Mico takes care of the rest."
+msgstr "You choose the schedule. Your Mico takes care of the rest."
+
+msgid "You receive tested releases from the stable channel."
+msgstr "You receive tested releases from the stable channel."
+
+msgid "Your Mico"
+msgstr "Your Mico"
+
+msgid "Your briefing is ready"
+msgstr "Your briefing is ready"
+
+msgid "Your priorities, ready before the day begins."
+msgstr "Your priorities, ready before the day begins."
+
+msgid "Your settings"
+msgstr "Your settings"

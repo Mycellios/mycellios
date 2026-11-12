@@ -4,7 +4,7 @@ import { useLingui } from "@lingui/react/macro";
 import { InputRevealLabelsProvider } from "@rakazo/ui-web";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { bootstrapI18n, getActiveUiLocale } from "../lib/i18n";
+import { bootstrapI18n, getActiveUiLocale, syncSystemUiLocale } from "../lib/i18n";
 import { resolveUiLocale } from "../lib/ui-locale";
 import { MarkdownLinkPrompt } from "./markdown-link-prompt";
 import { LanguageEntry } from "./LanguageEntry";
@@ -15,12 +15,15 @@ export function I18nBootstrap({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const languageChanged = () => { void syncSystemUiLocale(); };
+    window.addEventListener("languagechange", languageChanged);
     // activateUiLocale already falls back to English on catalog failure.
     void bootstrapI18n(resolveUiLocale()).finally(() => {
       if (!cancelled) setReady(true);
     });
     return () => {
       cancelled = true;
+      window.removeEventListener("languagechange", languageChanged);
     };
   }, []);
 

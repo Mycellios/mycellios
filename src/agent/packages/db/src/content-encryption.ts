@@ -83,7 +83,7 @@ export const ENCRYPTED_MODELS: Record<string, ModelSpec> = {
   /** The compacted summary of older history is derived message content. */
   Thread: {
     table: "threads",
-    fields: { historyCompactionSummary: {} },
+    fields: { historyCompactionSummary: {}, agentContextReset: { plainKeys: new Set() } },
     space: { column: "spaceId" },
     ownerRelation: "user",
   },

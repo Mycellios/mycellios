@@ -1,3 +1,6 @@
+import { accountNotificationAllowed, accountNotificationSettings } from "../lib/account-notifications";
+import { hasFocusedNotificationTab, showSystemNotification } from "../lib/browser-notifications";
+import { usesServerPush } from "../lib/web-push";
 import { Trans, useLingui } from "@lingui/react/macro";
 import {
   Button,
@@ -68,23 +71,20 @@ export function MicoWorkMenu({
             const preference = notificationPreferences(userId ?? "");
             if (
               row.notify &&
-              preference.enabled &&
+              preference.enabled && preference.mutedUntil <= Date.now() && !usesServerPush() &&
+              accountNotificationAllowed(userId ?? "", row.botId, { type: "run.failed", payload: {} }) &&
+              !hasFocusedNotificationTab(userId ?? "") &&
               (document.visibilityState !== "visible" || !document.hasFocus()) &&
               typeof Notification !== "undefined" &&
               Notification.permission === "granted"
             ) {
               try {
-                const notice = new Notification(t`Delegated task failed`, {
-                  body: preference.preview ? row.name : t`Open Mycellios to review the task.`,
-                  tag: `work:${row.taskId}:${row.runId}`,
-                });
-                notice.onclick = () => {
-                  if (document.documentElement.getAttribute("data-preview-owner") === userId) {
-                    window.focus();
-                    onOpenTask(row);
-                  }
-                  notice.close();
-                };
+                const preview = preference.preview && (accountNotificationSettings(userId ?? "")?.previews ?? false);
+                const query = new URLSearchParams(); if (spaceId) query.set("noticeSpace", spaceId); query.set("task", row.threadId);
+                const route = `/app/${encodeURIComponent(row.botId)}?${query}`;
+                await showSystemNotification(preview ? t`Delegated task failed` : "Mycellios",
+                  preview ? row.name : t`Open Mycellios to review the task.`, `mycellios:${userId}:${row.threadId}`, route, preference.sound,
+                  () => { if (document.documentElement.getAttribute("data-preview-owner") === userId) onOpenTask(row); });
               } catch {
                 /* Some PWA runtimes require service-worker notifications. Keep the in-app alert. */
               }

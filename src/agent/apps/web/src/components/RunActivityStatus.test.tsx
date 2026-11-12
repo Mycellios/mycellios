@@ -20,6 +20,7 @@ vi.mock("@rakazo/ui-web", () => ({
 }));
 import { RunActivityStatus } from "./RunActivityStatus";
 import { resetLiveThreadConnection, setLiveThreadConnection } from "../lib/live-thread-connection";
+import { setToolActivityPreference } from "../lib/tool-activity-preference";
 const now = Date.parse("2026-01-01T12:00:00Z");
 const at = (minutes: number) => new Date(now + minutes * 60000).toISOString();
 const run = {
@@ -83,6 +84,18 @@ it("explains a preflight block instead of a working animation", () => {
   expect(node.querySelector("[role=status]")?.textContent).not.toContain("Working");
   act(() => node.querySelector("button")!.click());
   expect(open).toHaveBeenCalledOnce();
+});
+
+it("applies a changed steps default even after native toggle events during a live run", () => {
+  setToolActivityPreference("on");mount(run);
+  act(()=>root!.render(<RunActivityStatus run={run} messages={[]} bots={[]} activity="Reading files" onRefresh={async()=>undefined} />));
+  const details=node.querySelector("details")!;
+  expect(details.open).toBe(false);
+  act(()=>setToolActivityPreference("expanded"));
+  expect(details.open).toBe(true);
+  act(()=>details.dispatchEvent(new Event("toggle")));
+  act(()=>setToolActivityPreference("on"));
+  expect(details.open).toBe(false);
 });
 it("keeps a long, silent run active and distinguishes worker contact from output", () => {
   mount(run);

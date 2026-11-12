@@ -10,11 +10,13 @@ export const DEFAULT_GENERAL_PREFERENCES = {
   chatBackgroundLight: "default", chatBackgroundDark: "default",
   compactMessageActions: true, restoreLastWorkspace: true,
   sidebarChatOrder: "manual" as "manual" | "unread-group" | "unread-first",
-  speechEngine: "local" as "local" | "provider",
+  speechEngine: "local" as "local" | "provider" | "device",
+  dictationEngine: "auto" as "auto" | "local" | "provider" | "device",
   networkSpeechAccount: "", networkTranscriptionAccount: "",
   dictationLanguage: "auto", speechSpeed: 1, deviceVoice: "default", readReplies: false,
   taskSound: "classic", actionSound: "off",
   productAnalytics: false,
+  analyticsAccountId: "",
   busyMessageMode: "queue" as "queue" | "steer",
 };
 export type GeneralPreferences = typeof DEFAULT_GENERAL_PREFERENCES;
@@ -37,7 +39,8 @@ export function parseGeneralPreferences(raw: string | null): GeneralPreferences 
       restoreLastWorkspace: value.restoreLastWorkspace !== false,
       dictationLanguage: UI_LOCALES.includes(value.dictationLanguage) ? value.dictationLanguage : "auto",
       speechSpeed: [0.75, 1, 1.25, 1.5, 2].includes(value.speechSpeed) ? value.speechSpeed : 1,
-      speechEngine: value.speechEngine === "provider" ? "provider" : "local",
+      speechEngine: value.speechEngine === "provider" ? "provider" : value.speechEngine === "device" ? "device" : "local",
+      dictationEngine: ["local", "provider", "device"].includes(value.dictationEngine) ? value.dictationEngine : "auto",
       networkSpeechAccount: typeof value.networkSpeechAccount === "string" && value.networkSpeechAccount.length <= 128
         ? value.networkSpeechAccount : "",
       networkTranscriptionAccount: typeof value.networkTranscriptionAccount === "string" && value.networkTranscriptionAccount.length <= 128 ? value.networkTranscriptionAccount : "",
@@ -46,6 +49,7 @@ export function parseGeneralPreferences(raw: string | null): GeneralPreferences 
       taskSound: ["off", "classic", "default", "mech", "bubble", "press"].includes(value.taskSound) ? value.taskSound : "classic",
       actionSound: ["off", "default", "mech", "bubble", "press"].includes(value.actionSound) ? value.actionSound : "off",
       productAnalytics: value.productAnalytics === true,
+      analyticsAccountId: typeof value.analyticsAccountId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(value.analyticsAccountId) ? value.analyticsAccountId : "",
       busyMessageMode: value.busyMessageMode === "steer" ? "steer" : "queue",
     };
   } catch { return { ...DEFAULT_GENERAL_PREFERENCES }; }

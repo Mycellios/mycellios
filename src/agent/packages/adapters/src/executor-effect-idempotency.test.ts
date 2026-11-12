@@ -156,7 +156,7 @@ function fixture(runId = "run-1") {
 
     secret: { deleteMany: vi.fn(async () => ({ count: 0 })) },
 
-    user: { findUnique: vi.fn(async () => null) },
+    user: { findUniqueOrThrow: async () => ({ micoDefaults: {} }), findUnique: vi.fn(async () => null) },
     run: {
       findMany: vi.fn(async () => []),
 

@@ -7,8 +7,8 @@ import { useSpaceRpc } from "../lib/space-rpc";
 export function SkillLibrarySettings() {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
+  const loadError = t`Could not load skills`;
   const id = useId();
-  const [open, setOpen] = useState(false);
   const [list, setList] = useState<AgentSkillCatalogEntry[]>([]);
   const [skill, setSkill] = useState<AgentSkill | null>(null);
   const [bots, setBots] = useState<Array<{ id: string; name: string }>>([]);
@@ -21,7 +21,6 @@ export function SkillLibrarySettings() {
   const generation = useRef(0);
   useEffect(() => {
     const request = ++generation.current;
-    if (!open) return;
     setBusy(true);
     void rpc.agentSkills
       .list()
@@ -29,7 +28,7 @@ export function SkillLibrarySettings() {
         if (generation.current === request) setList(rows);
       })
       .catch(() => {
-        if (generation.current === request) setError(t`Could not load skills`);
+        if (generation.current === request) setError(loadError);
       })
       .finally(() => {
         if (generation.current === request) setBusy(false);
@@ -37,7 +36,7 @@ export function SkillLibrarySettings() {
     return () => {
       ++generation.current;
     };
-  }, [open, rpc, t]);
+  }, [rpc, loadError]);
   async function pin(revision: number | null) {
     if (!skill || !botId) return;
     setBusy(true);
@@ -102,7 +101,7 @@ export function SkillLibrarySettings() {
     }
   }
   return (
-    <Disclosure summary={t`Skills`} open={open} onOpenChange={setOpen}>
+    <Disclosure alwaysVisible summary={t`Skills`}>
       <div className="space-y-3 pt-3">
         <div className="flex flex-wrap gap-2">
           {list.map((row) => (

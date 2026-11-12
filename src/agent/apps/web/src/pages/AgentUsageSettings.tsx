@@ -6,7 +6,8 @@ import type { RefObject } from "react";
 import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import { SettingsGroup, SettingsLabel, SettingsRow } from "../components/SettingsRows";
 import { getResponseCostVisible, setResponseCostVisible, subscribeResponseCost } from "../lib/response-cost-preference";
-import { rpc } from "../lib/rpc";
+import { useSpaceRpc } from "../lib/space-rpc";
+import type { RpcClient } from "../lib/rpc";
 
 export function UsageMetrics({ value }: { value: AgentUsageTotals }) {
   const { t, i18n } = useLingui();
@@ -29,21 +30,24 @@ export function UsageMetrics({ value }: { value: AgentUsageTotals }) {
 export function AgentUsageSettings({ panelRef }: { panelRef?: RefObject<HTMLDivElement | null> }) {
   const { t } = useLingui();
   const id = useId();
+  const client = useSpaceRpc();
   const show = useSyncExternalStore(subscribeResponseCost, getResponseCostVisible, () => false);
-  const [report, setReport] = useState<AgentUsageReport | null>(null);
-  const [error, setError] = useState(false);
+  const [loaded, setLoaded] = useState<{client:RpcClient;report:AgentUsageReport} | null>(null);
+  const [failedClient, setFailedClient] = useState<RpcClient | null>(null);
+  const report = loaded?.client === client ? loaded.report : null;
+  const error = failedClient === client;
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
-      try { const data = await rpc.usage.agents(); if (!cancelled) { setReport(data); setError(false); } }
-      catch { if (!cancelled) { setReport(null); setError(true); } }
+      try { const data = await client.usage.agents(); if (!cancelled) { setLoaded({client,report:data}); setFailedClient(null); } }
+      catch { if (!cancelled) { setLoaded(null); setFailedClient(client); } }
       if (!cancelled) timer = setTimeout(refresh, 15000);
     }
     void refresh();
     return () => { cancelled = true; clearTimeout(timer); };
-  },[attempt]);
+  },[attempt,client]);
   return <div ref={panelRef} tabIndex={-1} data-testid="usage-settings" className="min-w-0 space-y-6 outline-none">
     <SettingsGroup><SettingsRow label={<Label htmlFor={id}><Trans>Show cost on each response</Trans></Label>} help={{label:t`Show cost on each response`,description:t`Shows the cost below each reply when pricing is available. Hiding it does not change what you pay or remove usage from this page.`}} control={<Switch id={id} data-testid="response-cost-toggle" checked={show} onCheckedChange={setResponseCostVisible} />}/></SettingsGroup>
     {error ? <div role="alert" className="space-y-3"><p className="text-sm text-destructive">{t`Could not load agent usage`}</p><Button variant="outline" onClick={()=>setAttempt(n=>n+1)}><Trans>Retry</Trans></Button></div>

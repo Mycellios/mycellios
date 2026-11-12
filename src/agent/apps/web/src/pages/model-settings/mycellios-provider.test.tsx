@@ -21,7 +21,7 @@ afterEach(async () => {
   await act(async () => mounted.splice(0).forEach((cleanup) => cleanup()));
   vi.clearAllMocks();
 });
-async function render(connected = false) {
+async function render(connected = false, directory = false, accountEnabled = true) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   mock.caps.mockResolvedValue({ mycelliosAccount: accountEnabled });
   const div = document.createElement("div");
@@ -38,7 +38,7 @@ async function render(connected = false) {
     root.render(
       <QueryClientProvider client={query}>
         <ul>
-          <MycelliosProvider
+          <MycelliosProvider directory={directory}
             credential={
               connected
                 ? {
@@ -89,6 +89,24 @@ describe("built-in Mycellios provider", () => {
     await act(async () => (div.querySelector("button") as HTMLButtonElement).click());
     expect(mock.connect).toHaveBeenCalledTimes(1);
     expect(refreshed).toHaveBeenCalledTimes(1);
+  });
+  it("shows directory details without an accordion or automatic provisioning", async () => {
+    const { div } = await render(false, true);
+    expect(div.querySelector("[aria-expanded]")).toBeNull();
+    expect(div.textContent).toContain("4% Mycellios service fee");
+    expect(mock.connect).not.toHaveBeenCalled();
+  });
+  it("opens a connection editor as a separate view and delegates guarded return", async () => {
+    const div = document.createElement("div"); document.body.append(div);
+    const root = createRoot(div), close = vi.fn();
+    mounted.push(() => { root.unmount(); div.remove(); });
+    await act(async () => root.render(<ProvidersSection credentials={[]} providers={[]} name={c => c.label}
+      onAdd={() => {}} onOpen={() => {}} onClose={close} panelAt="add" panel={<input aria-label="Connection name" defaultValue="Draft" />} />));
+    expect(div.querySelector("ul")).toBeNull();
+    expect(div.querySelector("[aria-expanded]")).toBeNull();
+    expect(div.querySelector("input")?.value).toBe("Draft");
+    await act(async () => div.querySelector("button")!.click());
+    expect(close).toHaveBeenCalledOnce();
   });
   it("uses the connected account without exposing keys, renaming or disconnect controls", async () => {
     const { div } = await render(true);

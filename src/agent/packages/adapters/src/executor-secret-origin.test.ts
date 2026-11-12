@@ -98,6 +98,7 @@ async function requestSecretWith(origin: string) {
   });
   const prisma = recordingPrisma(
     {
+      user: { findUniqueOrThrow: async () => ({ micoDefaults: {} }) },
       run: {
         findUnique: async () => run,
         findUniqueOrThrow: async () => run,

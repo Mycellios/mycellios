@@ -6,6 +6,14 @@ import {
 import { cn } from "@rakazo/ui-web/lib/utils";
 import { ChevronDown } from "lucide-react";
 import type * as React from "react";
+import { createContext, useContext } from "react";
+
+const SettingsVisibility = createContext(false);
+/** Settings expose their sections; chat/tool disclosures retain their normal behavior. */
+export function ExpandedSettings({ children }: { children: React.ReactNode }) {
+  return <SettingsVisibility.Provider value>{children}</SettingsVisibility.Provider>;
+}
+export function useSettingsSectionsVisible() { return useContext(SettingsVisibility); }
 
 /** A shared animated fold-out that preserves its children's state while closed. */
 function Disclosure({
@@ -14,6 +22,7 @@ function Disclosure({
   contentClassName,
   className,
   children,
+  alwaysVisible = false,
   ...props
 }: Omit<React.ComponentProps<typeof Collapsible>, "children" | "className"> & {
   summary: React.ReactNode;
@@ -21,7 +30,14 @@ function Disclosure({
   contentClassName?: string;
   className?: string;
   children: React.ReactNode;
+  "data-testid"?: string;
+  alwaysVisible?: boolean;
 }) {
+  const visible = useSettingsSectionsVisible() || alwaysVisible;
+  if (visible) return <section data-slot="settings-section" id={props.id} data-testid={props["data-testid"]} className={className}>
+    <h3 className={cn("mb-2 text-sm font-medium text-start", summaryClassName)}>{summary}</h3>
+    <div className={contentClassName}>{children}</div>
+  </section>;
   return (
     <Collapsible data-slot="disclosure" className={cn("group/disclosure", className)} {...props}>
       <CollapsibleTrigger

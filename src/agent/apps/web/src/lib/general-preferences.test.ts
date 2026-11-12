@@ -34,3 +34,10 @@ it("leaves persisted choices unchanged on a storage failure", () => {
   expect(() => setGeneralPreferences({ restoreLastWorkspace: false })).toThrow("denied");
   expect(getGeneralPreferences()).toBe(before); spy.mockRestore();
 });
+
+it("persists explicit device speech and dictation models while keeping automatic safe defaults", () => {
+  expect(parseGeneralPreferences(null).dictationEngine).toBe("auto");
+  setGeneralPreferences({ speechEngine: "device", dictationEngine: "provider" });
+  expect(getGeneralPreferences()).toMatchObject({ speechEngine: "device", dictationEngine: "provider" });
+  expect(parseGeneralPreferences('{"dictationEngine":"invalid"}').dictationEngine).toBe("auto");
+});

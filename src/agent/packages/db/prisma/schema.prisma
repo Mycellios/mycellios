@@ -117,6 +117,8 @@ model User {
   createdAt                   DateTime                     @default(now())
   updatedAt                   DateTime                     @updatedAt
   avatarStyle                 String                       @default("organic")
+  micoDefaults                Json                         @default("{}")
+  micoSettingsVersion         Int                          @default(0)
   /// IANA timezone such as "Pacific/Auckland". Null until set; bots then get UTC only.
   timezone                    String?
   sessions                    Session[]
@@ -659,6 +661,7 @@ model Bot {
   agentEngine String @default("pi")
   nativeConfig Json?
   busyMessageMode String?
+  micoPreferences Json @default("{}")
   skillPins BotSkillPin[]
   screenGeneration Int @default(0)
   id                String            @id @default(cuid())
@@ -835,6 +838,7 @@ model Thread {
   nextMessageSeq              Int        @default(0)
   /// First message the agent may read; earlier messages remain visible to the user.
   contextStartSeq            Int        @default(0)
+  agentContextReset          Json?
   historyCompactedUpToSeq     Int?
   historyCompactionSummary    String?    @db.Text
   historyCompactionGeneration Int        @default(0)

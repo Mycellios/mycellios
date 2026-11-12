@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "project": {
+    "name": "mycellios",
+    "productType": null,
+    "stack": [
+      "react",
+      "vite"
+    ]
+  },
+  "sources": {
+    "tokens": [
+      "landing/src/ui/agent-style.css"
+    ],
+    "components": [
+      "src/agent/packages/ui-web/src",
+      "src/agent/apps/web/src/pages/marketplace/StoreAppCard.tsx"
+    ],
+    "assets": [
+      "assets"
+    ],
+    "instructions": [
+      "DESIGN.md",
+      "PRODUCT.md",
+      "AGENTS.md",
+      "src/agent/apps/web/PRODUCT.md"
+    ]
+  },
+  "design": {
+    "colorMode": "unknown",
+    "colors": {},
+    "typography": {},
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {},
+    "density": "compact"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [
+      "@rakazo/ui-web"
+    ],
+    "patterns": [
+      "Shared Hifa Store card for browser tools, Desktop apps and published community apps."
+    ]
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [
+    "Hifa Store uses StoreAppCard for every entry: 164px cover, 16px body padding, 32px icon/title row, 40px two-line description, 32px footer action, 10px internal gaps, 20px grid gaps and 14px corners. Secondary community actions use the existing dropdown primitive. Keep original artwork and semantic Agent tokens.",
+    "Estudio IA is a regular Hifa Store card using StoreAppCard and its own artwork. The Store toolbar has only Crear app. The studio uses a short introduction, format shortcuts and existing explicit price confirmation; hide recharge when its catalog is unavailable."
+  ],
+  "evidence": [
+    {
+      "fact": "project.instructions",
+      "source": "AGENTS.md"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "DESIGN.md"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "PRODUCT.md"
+    },
+    {
+      "fact": "project.stack:react",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:vite",
+      "source": "package.json"
+    }
+  ],
+  "generatedAt": "2026-11-12T08:56:03.431Z"
+}
