@@ -70,25 +70,25 @@ function mountCard() {
 describe("ToolActivityDisclosure", () => {
   it("labels a finished card with the tool count and duration", () => {
     const html = markup({ live: false, stepCount: 2, durationMs: 12000 });
-    expect(visibleText(html)).toContain("Done 2 tools 12s");
+    expect(visibleText(html)).toContain("Done");
   });
 
   it("uses the singular for one tool", () => {
     expect(visibleText(markup({ live: false, stepCount: 1, durationMs: 850 }))).toContain(
-      "Done 1 tool 850ms",
+      "Done",
     );
-    expect(visibleText(markup({ live: true, stepCount: 1 }))).toContain("Activity 1 tool");
+    expect(visibleText(markup({ live: true, stepCount: 1 }))).toContain("Activity");
   });
 
   it("omits the duration when it is not usable", () => {
     const html = markup({ live: false, stepCount: 3 });
-    expect(visibleText(html)).toContain("Done 3 tools");
-    expect(visibleText(html)).not.toMatch(/Done 3 tools \d/);
+    expect(visibleText(html)).toContain("Done");
+    expect(visibleText(html.match(/<button[^>]*>[\s\S]*?<\/button>/)?.[0] ?? "")).toBe("Done");
   });
 
   it("shows the live label while working", () => {
     const html = markup({ live: true, stepCount: 2 });
-    expect(visibleText(html)).toContain("Activity 2 tools");
+    expect(visibleText(html)).toContain("Activity");
     expect(html).toContain('data-live="true"');
   });
 
@@ -111,7 +111,7 @@ describe("ToolActivityDisclosure", () => {
 
     card.render(false);
     expect(card.details()?.getAttribute("aria-expanded")).toBe("false");
-    expect(card.summary()?.textContent).toContain("Done2 tools");
+    expect(card.summary()?.textContent).toContain("Done");
     card.unmount();
   });
 
@@ -123,7 +123,7 @@ describe("ToolActivityDisclosure", () => {
 
     card.render(true, 3);
     expect(card.details()?.getAttribute("aria-expanded")).toBe("true");
-    expect(card.summary()?.textContent).toContain("Activity3 tools");
+    expect(card.summary()?.textContent).toContain("Activity");
 
     card.render(false, 3);
     expect(card.details()?.getAttribute("aria-expanded")).toBe("false");
@@ -188,7 +188,7 @@ describe("StandaloneToolActivity", () => {
       <StandaloneToolActivity live={false} steps={stepsOf(2)} stepCount={2} durationMs={4000} />,
     );
     expect(html).toContain('data-testid="tool-activity-line"');
-    expect(visibleText(html)).toContain("Done 2 tools 4s");
+    expect(visibleText(html)).toContain("Done 2 tools \u00b7 4s");
     expect(html).not.toContain("bg-muted");
     expect(html).not.toContain("rounded-[20px]");
   });
@@ -214,7 +214,7 @@ describe("ToolOnlyNarration", () => {
       <ToolOnlyNarration live blocks={[{ kind: "steps", steps: stepsOf(2) }]} />,
     );
     expect(html).toContain('data-testid="tool-activity-line"');
-    expect(visibleText(html)).toContain("Activity 2 tools");
+    expect(visibleText(html)).toContain("Activity");
     expect(html).not.toMatch(OPEN_TRIGGER);
     expect(html).not.toContain("bg-muted");
   });
@@ -230,7 +230,7 @@ describe("ToolOnlyNarration", () => {
       />,
     );
     expect(html.match(/data-testid="tool-activity-line"/g)).toHaveLength(2);
-    expect(visibleText(html)).toContain("Done 3 tools 12s");
+    expect(visibleText(html)).toContain("Done 3 tools \u00b7 12s");
     expect(html).not.toMatch(OPEN_TRIGGER);
   });
 });

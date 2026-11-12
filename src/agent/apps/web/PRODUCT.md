@@ -31,6 +31,8 @@ are private to account/Space/device. Public listing, votes, cross-device sync,
 Cloud execution, generated illustrations and social publishing are not connected.
 No separate login, hidden paid provider or automatic destination fallback.
 
+Users can privately customize each app cover within their account and Space, upload a raster image, or request an image in an independent conversation with an existing Mico. Generation uses that Mico's current model and authorized image tools, preserves uncertain request identities, and requires review before applying the cover. Covers persist as private artifact versions; they are not public catalog artwork.
+
 ## Product Principles
 
 - Fixed, versioned flows make shared tools predictable.

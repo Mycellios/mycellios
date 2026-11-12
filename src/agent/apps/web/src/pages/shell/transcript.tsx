@@ -1,3 +1,4 @@
+import { joinMessageBubbles } from "../../lib/message-bubble-group";
 import { useGeneralPreferences } from "../../lib/general-preferences";
 import { NewChatDivider } from "../../components/composer/NewChatDivider";
 import { i18n } from "@lingui/core";
@@ -501,7 +502,7 @@ export const Transcript = memo(function Transcript({
             : undefined
         }
       >
-        <div ref={contentRef} className="flex min-h-full min-w-0 flex-col gap-1.5 px-3 pt-3 pb-8 md:gap-2 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pt-5 md:pb-13">
+        <div ref={contentRef} className="flex min-h-full min-w-0 rk-transcript-stack flex-col gap-0 px-3 pt-3 pb-8 md:px-[max(1.75rem,calc((100%_-_60rem)/2))] md:pt-5 md:pb-13">
         {olderCursor != null ? (
           <Button
             variant="ghost"
@@ -522,7 +523,7 @@ export const Transcript = memo(function Transcript({
             <p className="text-sm leading-relaxed text-muted-foreground">{t`Start with a question, an idea, or something you want to get done.`}</p>
           </div>
         ) : null}
-        {threadItems.map((item) => {
+        {threadItems.map((item, itemIndex) => {
           if (item.kind === "voiceChat") {
             return (
               <div key={item.key}>
@@ -553,6 +554,10 @@ export const Transcript = memo(function Transcript({
             message.id.startsWith("progress:") &&
             (message.id === `progress:${activeRun.id}` || message.runId === activeRun.id));
           if (!messageHasVisibleBlocks(message.blocks, messageToolActivity)) return null;
+          const before = threadItems[itemIndex - 1];
+          const after = threadItems[itemIndex + 1];
+          const joinsPrevious = joinMessageBubbles(before?.kind === "message" ? before.message : undefined, message, separatorIds.has(message.id) || message.id === unreadDividerId);
+          const joinsNext = joinMessageBubbles(message, after?.kind === "message" ? after.message : undefined, Boolean(after?.kind === "message" && (separatorIds.has(after.message.id) || after.message.id === unreadDividerId)));
           const peerReceipt = isPeerReceiptBlocks(message.blocks);
           const messageReactions = reactionView.reactions.get(message.id);
           const wrapMessage = (content: ReactNode) =>
@@ -571,6 +576,9 @@ export const Transcript = memo(function Transcript({
               ) : null}
               <div
                 data-message-id={message.id}
+                data-message-role={message.role}
+                data-joins-previous={joinsPrevious || undefined}
+                data-joins-next={joinsNext || undefined}
                 className={cn(peerReceipt ? "relative py-0.5" : "group/message relative hover:z-20",
                   message.id.startsWith("progress:") && "rk-chat-live-row")}
               >

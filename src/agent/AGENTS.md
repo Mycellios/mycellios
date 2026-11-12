@@ -25,6 +25,27 @@
 
 # AGENTS.md
 
+- The Hifa Store library unifies hosted static apps and fixed Desktop app launchers.
+  Keep their execution boundaries separate. Cadencia and Desktop launchers share
+  the directory; personal covers stay scoped to account/Space, and a community
+  list failure must not hide browser-local tools. Owners upload bounded static
+  files, edit encrypted account/Space drafts and explicitly publish immutable
+  revisions. Preserve mandatory `sandbox allow-scripts` response headers without
+  same-origin privileges on documents, assets, errors and previews. Public DTOs
+  omit account identity and private source; preview capabilities expire and
+  recheck membership. Relative directory links must preserve `/agent` routing.
+  Keep unsaved editor source in the existing account-scoped memory cache across
+  internal navigation, and retain web/Desktop update guards until it is saved.
+  Verify hosted-webs admission/template tests, editor-state/composer/update tests,
+  `scripts/verify-hosted-webs-db.ts` and actual browser file/module isolation.
+  App authoring uses a persisted owner/Space-scoped Mico and independent task
+  conversation. app_read/app_write resolve from the actual run and binding;
+  recheck membership, assignment, bot and run before accessing the encrypted
+  draft. CAS prevents lost edits. Reassignment revokes prior access; tools never
+  publish. Reuse thread streaming and TaskComposer; preview follows saved draft
+  versions without overwriting dirty manual edits.
+  Local qualification is not public production publication.
+
 - Contribution-funded network speech uses deployment-owned
   MYCELLIOS_NETWORK_SPEECH_IDENTITIES and the scheduler's authenticated pinned-edge
   policy. Keep placement out of HTTP input, refuse missing/invalid placement before
@@ -282,7 +303,7 @@
   installed application's Windows startup preferences.
 
 - Apps opens its catalog in Marketplace and launches Video Studio through the
-  Shell overlay. Preserve the chat draft and scope. The private Video Studio v1 definition is in Desktop assets,
+  Shell overlay. Preserve the chat draft and scope. The Apps catalog uses compact responsive app cards with real compositor scene samples; keep browser versus Desktop availability explicit. Personal app covers reuse owner/Space-scoped artifact versions with revision checks. Uploads accept bounded PNG/JPEG/WebP only. Generation opens an independent Mico task on its existing model/tools; persist and reuse admission nonces, never auto-resubmit, and require explicit application of an actual returned image. Verify app-covers and app-cover-generation tests. The private Video Studio v1 definition is in Desktop assets,
   with a fixed native driver and owner/Space/device-private projects. No app HTML,
   executable commands or paths are accepted from the renderer. Keep script/media
   revisions, review binding, actual artifact checks and existing PC consent.
@@ -775,6 +796,11 @@
   only the owned account/Space roster, clear it on sign-out/scope exit, validate
   bounded PNG avatars and accept selections only from companion windows and the
   current roster. Result text is opt-in. Preserve click-through when auto-hidden.
+  The question island publishes only current ordinary pending asks while enabled;
+  keep credentials and approval cards in the main chat. Re-read the owned thread
+  before each answer, preserve the server answer fence, bind every IPC response to
+  account/Space/prompt/nonce, and revoke pending actions on scope exit. Later only
+  collapses the panel. Test companion questions, renderer and trusted native bridge.
 - Device Voice preferences set dictation hints, local device voice and playback
   speed. Model downloads require a user gesture. Optional screen-usage reporting
   is off until this device opts in; this does not disable security/error reporting.
@@ -1128,13 +1154,13 @@
 
 - Mico avatar preferences persist together in the existing `bots.color` shape
   encoding. Keep the reserved appearance slots stable and preserve legacy
-  shapes and uploaded images. The default collection uses solid animal
-  silhouettes and capsule eyes based on the loader. Choose light or dark eyes
-  by contrast against the silhouette's fill. Keep explicit web velvet
+  shapes and uploaded images. The default collection uses twelve mycelium forms with vivid brand pairings and 24 palettes; historical animal
+  slots are decode-only and display as mycelium. Slots 4000/4400 encode the eleven new bodies without changing historical slots. Choose light or dark eyes
+  using the actual shaded face color. The twelve velvet bodies use short frontal felt eyes with per-body scale; avoid applying a spherical head rotation to them. Frame each velvet body from its full alpha silhouette with 32 source pixels of padding; preserve source face anchors when changing crops. Keep explicit web velvet
   choices and the original-color option. Animate the eyes in web previews and
   honor reduced motion. Verify bot-avatar and create-bot-dialog tests.
-  New Mico opens with the green brand mushroom, which also starts the automatic
-  avatar assignment in an empty space. Later Micos use the animal rotation.
+  Non-loading brand placeholders use AuthMushroom with the shared velvet BotAvatar; the historical mark is reserved for MycelliosLoader/loader.svg. New Mico opens with the green brand mushroom, which also starts the automatic
+  avatar assignment in an empty space. Later Micos use the mycelium rotation. Web eyes use the MIT Bloub idle drift/blink math through a shared 30 fps clock, paused offscreen, on blur and under reduced motion. Verify mycelium-avatar.test.tsx.
 
 - Mico creation lets users enter the purpose and optionally choose a connected
   model. Validate and persist the model before the intro can be queued. Keep
@@ -1144,6 +1170,8 @@
   and queue a brief greeting on the configured model or admitted engine.
   Suggestions fill the editable name, purpose and avatar in both creation
   layouts, preserving the selected model and waiting for explicit submission.
+
+- The conversation header adapts to its own container width when a side panel opens. Keep action buttons from shrinking, collapse the model label, and retain narrow task navigation through its menu.
 
 - Keep the Mico settings overview compact. Open instructions, memory, computer,
   permissions and advanced controls in separate views within the same panel.
@@ -1224,6 +1252,14 @@
   on errors or unmount. Animate only verified contribution-earned deltas; never
   mint display credits from timers, purchases, promotions or unconfirmed jobs.
 
+- Roster hover previews use existing scoped row messages and real run states.
+  Do not fetch threads or mark messages read on hover; keep clicks, context menus
+  and drag reordering intact, and suppress previews on touch and during dragging.
+
+- Keep Tasks, the model selector and a single header tools panel toggle on the
+  right of the conversation header. Put secondary actions inside the full-height resizable side panel;
+  mobile Browser return focus targets the same tools trigger.
+
 - The chat has one Browser and computer entry. Both views share WorkAreaHeader;
   secondary library, Mico settings and voice actions stay in its More menu.
   Computer recovery and per-Mico routines remain in state-preserving disclosures.
@@ -1236,3 +1272,10 @@
   immediately first, then coalesces at 80 ms, with final/tool-boundary flushes retained.
   Long replies use the same disclosure for plain text and mixed blocks. Keep streamed
   answers expanded on completion and reveal search/quote targets without losing text.
+
+- Agent clarification uses ask_user and the inline questionnaire: up to three short
+  questions, optional option descriptions and multiple selection, free text and Skip.
+  API and native runtimes share the same bounded parser. Persist/redact the whole
+  questionnaire and resume only via the existing scoped, fenced answer operation.
+  Skip supplies no authorization. Credentials and protected actions keep their
+  dedicated cards. Verify questionnaire, AskCard, Pi/native pause and continuation tests.

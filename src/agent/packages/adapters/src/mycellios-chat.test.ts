@@ -38,6 +38,55 @@ const envelope = (args = { path: "notes.txt" }) =>
 afterEach(() => vi.restoreAllMocks());
 
 describe("Mycellios tool compatibility", () => {
+  it("runs the real Pi SDK through managed tool calls and live replies without native XML rewriting", async () => {
+    const received: Array<Record<string, unknown>> = [];
+    const transport: typeof fetch = vi.fn(async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>; received.push(body);
+      const first = received.length === 1;
+      if (received.length > 2) throw new Error("Unexpected extra paid-model request");
+      const base = { id: `managed-result-${received.length}`, created: 1, model: String(body.model), object: "chat.completion.chunk" };
+      const delta = first ? { role: "assistant", tool_calls: [{ index: 0, id: "managed-call", type: "function",
+        function: { name: "read_file", arguments: '{"path":"notes.txt"}' } }] } : { role: "assistant", content: "Managed final answer" };
+      const events = [{ ...base, choices: [{ index: 0, delta, finish_reason: null }] },
+        { ...base, choices: [{ index: 0, delta: {}, finish_reason: first ? "tool_calls" : "stop" }] },
+        { ...base, choices: [], usage: { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 } }];
+      return new Response(events.map(e => `data: ${JSON.stringify(e)}\n\n`).join("") + "data: [DONE]\n\n", { headers: { "content-type": "text/event-stream" } });
+    });
+    const executeTool = vi.fn(async () => ({ text: "Fixture file content" }));
+    const run: AgentRunRequest = { runId: "managed-sdk-run", botId: "fixture-bot", threadId: "fixture-thread", prompt: "Read notes.txt",
+      instructions: "Use the available tools.", history: [], model: { provider: "openai-compatible", id: "mycellios/managed/vendor/text",
+        baseUrl: "https://www.mycellios.com/v1", apiKey: "fixture-key", contextWindow: 8192, maxTokens: 256 },
+      tools: [{ name: tool.function.name, description: tool.function.description, inputSchema: tool.function.parameters }], executeTool };
+    const events: AgentRuntimeEvent[] = [];
+    for await (const event of new PiAgentRuntime({ modelFetch: transport }).run(run)) events.push(event);
+    expect(received).toHaveLength(2); expect(executeTool).toHaveBeenCalledOnce();
+    expect(received[0]).toMatchObject({ store: false, max_tokens: 256,
+      tools: expect.arrayContaining([expect.objectContaining({ type: "function", function: expect.objectContaining({ name: "read_file" }) })]) });
+    expect(received[1]?.messages).toEqual(expect.arrayContaining([expect.objectContaining({ role: "tool", tool_call_id: "managed-call",
+      content: expect.stringContaining("Fixture file content") })]));
+    expect(JSON.stringify(received)).not.toContain("<tool_response>");
+    expect(events.some(e => e.type === "done")).toBe(true);
+  });
+  it("keeps managed tools and SSE native to the external API, with a stable per-conversation purchase key", async () => {
+    const transport = vi.fn<typeof globalThis.fetch>(async () => new Response('data: [DONE]\n\n', { headers: { "content-type": "text/event-stream" } }));
+    const fetch = createMycelliosChatFetch(transport, { requestNamespace: "conversation-a" });
+    const body = JSON.stringify({ ...request, model: "mycellios/managed/vendor/text", max_completion_tokens: 256 });
+    await fetch(endpoint, { method: "POST", body }); await fetch(endpoint, { method: "POST", body });
+    const sent = JSON.parse(String(transport.mock.calls[0]?.[1]?.body));
+    expect(sent.tools).toEqual([tool]); expect(sent.messages).toEqual(request.messages);
+    expect(sent.max_tokens).toBe(256); expect(sent.max_completion_tokens).toBeUndefined();
+    const first = new Headers(transport.mock.calls[0]?.[1]?.headers).get("idempotency-key");
+    expect(first).toMatch(/^managed-[a-f0-9]{64}$/);
+    expect(new Headers(transport.mock.calls[1]?.[1]?.headers).get("idempotency-key")).toBe(first);
+    await createMycelliosChatFetch(transport, { requestNamespace: "conversation-b" })(endpoint, { method: "POST", body });
+    expect(new Headers(transport.mock.calls[2]?.[1]?.headers).get("idempotency-key")).not.toBe(first);
+  });
+  it("does not present an unresolved managed purchase as an empty successful reply", async () => {
+    const transport = vi.fn(async () => Response.json({ status: "pending_reconciliation" }, { status: 202 }));
+    await expect(createMycelliosChatFetch(transport)(endpoint, { method: "POST", body: JSON.stringify({ ...request, model: "mycellios/managed/vendor/text" }) }))
+      .rejects.toThrow("previous paid request");
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
   it("rejects an empty native completion instead of presenting a successful reply", async () => {
     const transport = vi.fn(async () => Response.json(completion("")));
     await expect(

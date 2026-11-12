@@ -7,6 +7,7 @@ import { isApprovalAskBlock, isSecretAskBlock, selectedAskActionLabel } from "@r
 import { Button, Input, Textarea } from "@rakazo/ui-web";
 import { useState } from "react";
 import { rpc } from "../lib/rpc";
+import { QuestionnaireCard } from "./QuestionnaireCard";
 import { QuestionOption } from "./QuestionOption";
 import { errorText } from "../lib/user-error";
 import { BuiCard } from "./ai/primitives";
@@ -137,6 +138,10 @@ export function AskCard({
     } finally {
       setPendingAction(null);
     }
+  }
+
+  if (!secretInput && !block.approvalEffectId && !approvalActions && !block.instructionUpdate && (block.questions?.length || askActions?.length)) {
+    return <QuestionnaireCard key={JSON.stringify([block.text, block.questions, block.actions])} block={block} canAnswer={canAnswer} onAnswer={text => onAnswer(text, undefined)} />;
   }
 
   if (answered && !secretInput && !approvalActions && !block.instructionUpdate) {

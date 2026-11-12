@@ -1,7 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { DesktopBehaviorSettings } from "@rakazo/contracts";
 import { Label, OptionSelect, Switch } from "@rakazo/ui-web";
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 import { useEffect, useId, useState } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { desktopBridge } from "../../lib/desktop";
@@ -48,7 +47,6 @@ export function AppearanceExtras() {
       control={<ColorChoice label={t`Chat color`} value={value.chatColor} onChange={chatColor => save({ chatColor })} />} />
     <SettingsRow label={t`Chat background`} description={t`Each theme remembers its own background. Text stays readable.`}
       control={<ColorChoice label={t`Chat background`} value={value[backgroundKey]} onChange={color => save({ [backgroundKey]: color })} />} />
-    <Disclosure summary={t`Fonts`} className="py-3" summaryClassName="w-full py-1 text-sm text-muted-foreground">
     <SettingsRow label={t`Interface font`} description={t`The font used for menus and messages.`}
       control={<OptionSelect aria-label={t`Interface font`} value={value.interfaceFont} className="w-44 max-w-full"
         options={[...new Set([...INTERFACE_FONTS, ...fonts, value.interfaceFont])].map(font => ({ value: font, label: font === "system-ui" ? t`System default` : font }))}
@@ -57,7 +55,6 @@ export function AppearanceExtras() {
       control={<OptionSelect aria-label={t`Code font`} value={value.codeFont} className="w-44 max-w-full"
         options={[...new Set([...CODE_FONTS, ...fonts, value.codeFont])].map(font => ({ value: font, label: font === "monospace" ? t`System default` : font }))}
         onValueChange={codeFont => save({ codeFont })} />} />
-    </Disclosure>
     {error && <p role="alert" className="px-4 py-2 text-sm text-destructive">{error}</p>}
   </>;
 }
@@ -66,6 +63,11 @@ export function ConversationExtras() {
   const { t } = useLingui(); const id = useId();
   const value = useGeneralPreferences(); const [error, setError] = useState("");
   return <>
+    <SettingsRow label={t`Chat order`} description={t`Choose how conversations are shown. Automatic orders keep your saved manual order.`}
+      control={<OptionSelect aria-label={t`Chat order`} value={value.sidebarChatOrder} className="w-44 max-w-full"
+        options={[{ value: "manual", label: t`Manual` }, { value: "unread-group", label: t`Group unread` }, { value: "unread-first", label: t`Unread first` }]}
+        onValueChange={sidebarChatOrder => { try { setGeneralPreferences({ sidebarChatOrder: sidebarChatOrder as GeneralPreferences["sidebarChatOrder"] }); setError(""); } catch { setError(t`Could not save this preference.`); } }} />} />
+
     <SettingsRow label={<Label htmlFor={id}>{t`Compact message actions`}</Label>}
       description={t`Shows React, Reply and More beside a message, with the time between messages. Turn off to show actions and time below every message.`}
       control={<Switch id={id} checked={value.compactMessageActions} onCheckedChange={compactMessageActions => {

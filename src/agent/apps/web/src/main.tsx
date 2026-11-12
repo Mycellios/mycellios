@@ -1,3 +1,4 @@
+import { installFocusInput } from "./lib/focus-input";
 import { syncNativeLogo } from "./lib/logo-preference";
 import { installActionSounds } from "./lib/reply-sound";
 import "./lib/i18n";
@@ -29,6 +30,8 @@ import "./styles.css";
 
 markOnce("rk:renderer:module-evaluated");
 installPreloadRecovery();
+const removeFocusInput = installFocusInput();
+import.meta.hot?.dispose(removeFocusInput);
 installAndroidHost();
 if (!isAndroidHost()) { clientUpdates().install(); registerServiceWorker(); }
 applyUiDirection(resolveUiLocale());

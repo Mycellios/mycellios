@@ -1,5 +1,5 @@
 import type { DesktopRuntimeBridge } from "../../../../contracts/desktop-runtime.js";
-import type { DesktopCompanionPreferences, DesktopCompanionSnapshot } from "./desktop-companions.js";
+import type { DesktopQuestionRequest, DesktopQuestionResult, DesktopCompanionPreferences, DesktopCompanionSnapshot } from "./desktop-companions.js";
 export * from "./desktop-companions.js";
 import type { ProjectRunnerBridge } from "../../../../contracts/project-runner.js";
 export type { ProjectRunState, ProjectRunConfig, ProjectRunnerBridge } from "../../../../contracts/project-runner.js";
@@ -102,7 +102,9 @@ export interface RakazoDesktop {
     displays: () => Promise<{ id: number; label: string }[]>;
     publish: (snapshot: DesktopCompanionSnapshot) => Promise<void>;
     openChat?: (target: { scope: string; botId: string }) => Promise<void>;
-    onSelect: (listener: (target: { scope: string; botId: string }) => void) => () => void;
+    onQuestion?: (listener: (request: DesktopQuestionRequest) => void) => () => void;
+    questionResult?: (result: DesktopQuestionResult) => Promise<void>;
+    onSelect: (listener: (target: { scope: string; botId: string; respond?: boolean }) => void) => () => void;
   };
   /** Preferences of this computer. Older releases have no settings bridge. */
   settings?: {
@@ -121,6 +123,7 @@ export interface RakazoDesktop {
     stop: () => Promise<void>;
   };
 
+  videoEdit?: import("./video-edit.js").VideoEditBridge;
   appsStudio?: import("./app-studio.js").AppsStudioBridge;
   projectRunner?: ProjectRunnerBridge;
   /** Isolated native browser displayed inside the conversation's preview panel. */

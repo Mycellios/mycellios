@@ -52,6 +52,7 @@ export function FixtureTranscript({
   running,
   showToolActivity,
   activeRun,
+  unreadAfterSeq = null,
   header,
   footer,
   pendingMessages,
@@ -63,6 +64,7 @@ export function FixtureTranscript({
   header?: ReactNode;
   footer?: ReactNode;
   pendingMessages?: readonly PendingThreadSend[];
+  unreadAfterSeq?: number | null;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const transcript = useMemo(
@@ -81,7 +83,7 @@ export function FixtureTranscript({
         pendingMessages={pendingMessages}
         showToolActivity={showToolActivity}
         olderCursor={null}
-        unreadAfterSeq={null}
+        unreadAfterSeq={unreadAfterSeq}
         loadingOlder={false}
         answerableAskIds={NO_IDS}
         dismissableAskIds={NO_IDS}

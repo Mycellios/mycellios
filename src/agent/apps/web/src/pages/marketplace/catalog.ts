@@ -2,6 +2,7 @@ export const CATEGORIES = ["code", "design", "data", "documents", "productivity"
 export type Category = (typeof CATEGORIES)[number];
 export type MarketplaceTab = "apps" | "agents" | "skills" | "mycellios-apps";
 export function marketplaceTab(value: string | null): MarketplaceTab {
+  if (value === "webs") return "mycellios-apps";
   return value === "agents" || value === "skills" || value === "mycellios-apps" ? value : "apps";
 }
 export function matches(query: string, ...values: string[]) {

@@ -32,5 +32,14 @@ createRoot(document.getElementById("root")!).render(
       <BotAvatar color="#D47046::shape_1001" identity="working-fox" size={120} status="running" className="avatar-animal" />
       <span>Working animal</span>
     </div>
+    <section aria-label="Gestos de los Micos" style={{display:"flex",gap:32,flexWrap:"wrap",padding:32}}>
+      {[
+        ["idle", "En reposo"], ["running", "Trabajando"], ["waiting_input", "Espera tu respuesta"],
+        ["failed", "Necesita ayuda"], ["completed", "Respuesta nueva"], ["offline", "En pausa"],
+      ].map(([status, label]) => <div key={status} style={{textAlign:"center"}}>
+        <BotAvatar color="#D47046::shape_1001" identity={`gesture-${status}`} size={64} status={status} unread={status === "completed"} />
+        <p>{label}</p>
+      </div>)}
+    </section>
   </>,
 );

@@ -1,9 +1,8 @@
 /// <reference lib="webworker" />
 // Keep the classic worker self-contained and only allow artwork bundled with it.
 const NOTIFICATION_AVATARS = new Set([
-  "axolotl", "crab", "fish", "fox", "frog", "hedgehog",
-  "moth", "mushroom", "octopus", "owl", "snail", "turtle",
-  "raven", "hare", "otter",
+  "mushroom", "sprout", "branch", "node", "spore", "colony",
+  "hypha", "nexus", "bridge", "loop", "crest", "weave",
 ]);
 
 const NOTICE_COPY = {
@@ -43,7 +42,15 @@ type PushPayload = {
 const ID = /^[A-Za-z0-9_-]{1,160}$/;
 export function parsePushPayload(value: unknown, now = Date.now()): PushPayload | null {
   if (!value || typeof value !== "object") return null;
-  const p = value as PushPayload;
+  const p = { ...value } as PushPayload;
+  // Already queued payloads retain their privacy/identity checks and use new art.
+  const legacy: Readonly<Record<string, string>> = {
+    fox: "sprout", hedgehog: "crest", frog: "nexus", moth: "branch", snail: "loop",
+    owl: "spore", turtle: "colony", axolotl: "node", crab: "hypha", fish: "spore",
+    octopus: "weave", raven: "bridge", hare: "sprout", otter: "colony",
+  };
+  if (p.avatar && Object.hasOwn(legacy, p.avatar)) p.avatar = legacy[p.avatar];
+  if (p.avatarArt && Object.hasOwn(legacy, p.avatarArt)) p.avatarArt = legacy[p.avatarArt];
   if (
     p.version !== 1 ||
     ![p.accountId, p.botId, p.threadId, p.spaceId].every(

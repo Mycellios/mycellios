@@ -1,0 +1,39 @@
+import {useEffect,useRef,useState} from "react";
+import {Button,Textarea} from "@rakazo/ui-web";
+import {rpc} from "../../lib/rpc";
+
+type Model={id:string;name:string;modality:"image"|"speech"|"transcription"|"video";maximumCreditsMicrounits:number;voices:string[];durations:number[]};
+const names={image:"Imagen",speech:"Voz",transcription:"Transcribir audio",video:"Vídeo"};
+const credits=(v:number)=>new Intl.NumberFormat("es",{maximumFractionDigits:6}).format(v/1000000);
+type Reply={status?:string;response?:any;data?:Model[];maximumMicrounits?:number;token?:string;url?:string;requestId?:string;viewer?:string};
+export function MycelliosCreate({onBack}:{onBack:()=>void}) {
+ const [models,setModels]=useState<Model[]>([]),[id,setId]=useState(""),[prompt,setPrompt]=useState(""),[audio,setAudio]=useState<{data:string;format:"wav"|"mp3"}>();
+ const [quote,setQuote]=useState<Reply>(),[result,setResult]=useState<any>(),[busy,setBusy]=useState(false),[error,setError]=useState(""),[pending,setPending]=useState("");
+ const [payment,setPayment]=useState(""),[download,setDownload]=useState("");
+ const key=useRef(""),checkoutKey=useRef(""),lock=useRef(false),alive=useRef(true),url=useRef("");
+ const recoveryKey=useRef("");
+ const model=models.find(m=>m.id===id);
+ const call=async(action:"models"|"quote"|"execute"|"status"|"content"|"checkout",payload?:unknown)=>await rpc.models.mycelliosMedia({action,payload:JSON.stringify(payload??{}),...(action==="execute"||action==="checkout"?{key:action==="checkout"?checkoutKey.current:key.current}:{})}) as Reply;
+ async function act(work:()=>Promise<void>) {if(lock.current)return;lock.current=true;setBusy(true);setError("");try{await work();}catch(e){if(alive.current)setError(e instanceof Error?e.message:"No se pudo completar. No vuelvas a enviar si ya hay un trabajo en curso.");}finally{lock.current=false;if(alive.current)setBusy(false);}}
+ const input=()=>({model:id,kind:model!.modality,...(model!.modality==="transcription"?{audio}:{prompt}),
+  ...(model!.modality==="speech"?{voice:model!.voices[0]}:{}),...(model!.modality==="video"?{duration:model!.durations[0]}:{})});
+ function accept(reply:Reply){if(reply.status==="completed"){setResult(reply.response);setPending("");if(recoveryKey.current)sessionStorage.removeItem(recoveryKey.current);}else setPending(reply.status??"pending_reconciliation");}
+ useEffect(()=>{alive.current=true;void act(async()=>{let reply:Reply;try{reply=await call("models");}catch{throw new Error("No se ha podido cargar el servicio. No se ha gastado ningún crédito.");}if(alive.current){setModels(reply.data??[]);setId(reply.data?.[0]?.id??"");if(reply.viewer){recoveryKey.current="mycellios-create-"+reply.viewer;const saved=sessionStorage.getItem(recoveryKey.current);if(saved&&/^[a-f0-9-]{36}$/.test(saved)){key.current=saved;setPending("pending_reconciliation");}}}});return()=>{alive.current=false;if(url.current)URL.revokeObjectURL(url.current);};},[]);
+ useEffect(()=>{if(!pending)return;const timer=setInterval(()=>{if(!document.hidden)void act(async()=>{const reply=await call("status",{idempotencyKey:key.current});if(alive.current)accept(reply);});},5000);return()=>clearInterval(timer);},[pending]);
+ useEffect(()=>{setQuote(undefined);},[prompt,id,audio]);
+ return <section className="mx-auto max-w-2xl space-y-6 py-4">
+  <Button variant="ghost" onClick={onBack}>Volver a Apps</Button>
+  <div><h1 className="text-2xl font-semibold">Crear con Mycellios</h1><p className="mt-2 text-sm text-muted-foreground">Imagen, voz y vídeo. Revisa el precio antes de empezar.</p></div>
+  {error?<p role="alert" className="text-sm text-destructive">{error}</p>:null}
+  {!models.length&&!busy?<p className="text-sm text-muted-foreground">No hay modelos disponibles todavía. No se ha gastado ningún crédito.</p>:null}
+  {models.length?<>
+   <label className="block text-sm">Qué quieres crear<select className="mt-2 w-full rounded-lg border border-border bg-background p-3" disabled={busy||Boolean(pending)} value={id} onChange={e=>{setId(e.target.value);setResult(undefined);}}>{models.map(m=><option key={m.id} value={m.id}>{names[m.modality]} · {m.name}</option>)}</select></label>
+   {model?.modality==="transcription"?<label className="block text-sm">Tu audio (WAV o MP3, hasta 2 MB)<input className="mt-2 block" type="file" accept=".wav,.mp3" disabled={busy||Boolean(pending)} onChange={e=>void act(async()=>{const file=e.target.files?.[0];if(!file)return;if(file.size>2*1024*1024)throw new Error("Elige un audio de hasta 2 MB.");const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]??"");reader.onerror=reject;reader.readAsDataURL(file);});if(alive.current)setAudio({data,format:file.name.toLowerCase().endsWith(".wav")?"wav":"mp3"});})}/></label>:
+    <label className="block text-sm">{model?.modality==="speech"?"Qué quieres que diga":"Qué te gustaría crear"}<Textarea className="mt-2" value={prompt} maxLength={4000} disabled={busy||Boolean(pending)} onChange={e=>setPrompt(e.target.value)} placeholder="Describe tu idea…"/></label>}
+   {!pending?<Button disabled={busy||(!prompt&&!audio)} onClick={()=>void act(async()=>{const value=await call("quote",input());if(alive.current)setQuote(value);})}>Ver precio</Button>:<p role="status" className="text-sm">{pending==="running"?"Tu vídeo se está preparando…":"Estamos comprobando el resultado y su coste. No hace falta volver a enviarlo."}</p>}
+   {quote&&!pending?<div className="space-y-3 rounded-xl bg-muted p-4"><p>Hasta <strong>{credits(quote.maximumMicrounits??0)} créditos</strong></p><p className="text-xs text-muted-foreground">Incluye el 4 % de servicio Mycellios. Procesamiento externo. Se cobra el consumo real.</p><Button disabled={busy} onClick={()=>void act(async()=>{key.current=crypto.randomUUID();if(recoveryKey.current)sessionStorage.setItem(recoveryKey.current,key.current);setPending("submitting");const reply=await call("execute",{request:input(),quoteToken:quote.token});if(alive.current){accept(reply);setQuote(undefined);}})}>Crear y usar créditos</Button></div>:null}
+  </>:null}
+  {result?<div className="space-y-3 rounded-xl border border-border p-4"><h2>Tu resultado</h2>{result.text?<p className="whitespace-pre-wrap">{result.text}</p>:null}{result.images?.map((image:any,i:number)=>["image/png","image/jpeg","image/webp"].includes(image.media_type)?<img key={i} src={`data:${image.media_type};base64,${image.b64_json}`} alt="Imagen creada" className="w-full rounded-lg"/>:null)}{result.audio?<audio controls src={`data:audio/mpeg;base64,${result.audio.data}`}/>:null}{result.video?<Button disabled={busy} onClick={()=>void act(async()=>{const value=await call("content",{idempotencyKey:key.current}) as any;const bytes=Uint8Array.from(atob(value.data),c=>c.charCodeAt(0));if(url.current)URL.revokeObjectURL(url.current);url.current=URL.createObjectURL(new Blob([bytes],{type:"video/mp4"}));setDownload(url.current);})}>Abrir vídeo</Button>:null}{download?<><video controls src={download} className="w-full rounded-lg"/><a href={download} download="mycellios.mp4">Descargar vídeo</a></>:null}<p className="text-xs text-muted-foreground">{credits(result.mycellios?.creditsMicrounits??0)} créditos utilizados</p></div>:null}
+  <div className="border-t border-border pt-4"><p className="text-sm">¿Necesitas más créditos?</p><Button variant="secondary" disabled={busy||Boolean(pending)||!models.length} onClick={()=>void act(async()=>{checkoutKey.current ||= crypto.randomUUID();const reply=await call("checkout",{dollars:5});if(reply.url?.startsWith("https://checkout.stripe.com/"))setPayment(reply.url);})}>Recargar 5 créditos · 5 USD</Button>{payment?<a className="ml-3 text-sm underline" href={payment} target="_blank" rel="noopener noreferrer">Continuar al pago</a>:null}</div>
+ </section>;
+}

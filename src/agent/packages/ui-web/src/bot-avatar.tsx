@@ -1,11 +1,19 @@
-import { MICO_AVATAR_SHAPES, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
-import type { BotColorDef } from "@rakazo/core";
+import { MICO_AVATAR_SHAPES, micoAvatarDefaultFinish, micoAvatarDetails, micoAvatarShape, micoAvatarValue, parseBotAvatarValue } from "@rakazo/contracts";
+import type { BotColorDef, CompactMicoArt } from "@rakazo/core";
 import {
   ACTIVE_RUN_STATUSES,
   avatarIdentitySeed,
   BOT_AVATAR_COLORS,
   BOT_COLOR_LIST,
   currentMicoAvatarValue,
+  compactMicoArt,
+  compactMicoEyes,
+  compactMicoEyeColor,
+  compactMicoTint,
+  COMPACT_EYE_WIDTH,
+  COMPACT_EYE_HEIGHT,
+  COMPACT_EYE_PAD,
+  micoEyePadPieces,
   DEFAULT_BOT_AVATAR_COLOR,
   MICO_AVATAR_EYE_COLOR,
   MICO_AVATAR_VIEWBOX,
@@ -20,7 +28,8 @@ import {
 } from "@rakazo/core";
 import { tokens } from "@rakazo/ui-tokens";
 import type { CSSProperties } from "react";
-import { memo, useId, useMemo, useSyncExternalStore } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useSyncExternalStore } from "react";
+import { useMyceliumEyes } from "./mycelium-eye-motion.js";
 import { cn } from "./lib/utils.js";
 import { MICO_EYE_PATHS, MICO_PLUSH_CROPS } from "./mico-avatar-sprites.js";
 import "./styles.css";
@@ -67,10 +76,40 @@ export function defaultBotAvatarValue(rawColor: string): string {
   return DEFAULT_BOT_AVATAR_COLOR;
 }
 
+export function botAvatarMood(status?: string, unread = false) {
+  if (status === "failed") return "failed";
+  if (status === "waiting_input" || status === "waiting_takeover") return "waiting";
+  if (status === "queued" || status === "leased" || status === "running") return "working";
+  if (status === "connecting") return "connecting";
+  if (status === "offline" || status === "paused" || status === "asleep") return "asleep";
+  return unread ? "responded" : "idle";
+}
+
+// Pause CSS clocks when the avatar leaves the viewport or the app is hidden.
+function useAvatarVisibility() {
+  const ref = useRef<SVGSVGElement | HTMLDivElement>(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    let visible = true;
+    const update = () => { node.dataset.motionPaused = String(!visible || document.hidden); };
+    const observer = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver(([entry]) => {
+      visible = entry?.isIntersecting ?? false;
+      update();
+    });
+    observer?.observe(node);
+    document.addEventListener("visibilitychange", update);
+    update();
+    return () => { observer?.disconnect(); document.removeEventListener("visibilitychange", update); };
+  }, []);
+  return ref;
+}
+
 export interface BotAvatarProps {
   color: string;
   size?: number;
   status?: string;
+  unread?: boolean;
   identity?: string;
   className?: string;
 }
@@ -79,9 +118,12 @@ export const BotAvatar = memo(function BotAvatar({
   color,
   size = 36,
   status,
+  unread = false,
   identity = "",
   className,
 }: BotAvatarProps) {
+  const motionRef = useAvatarVisibility();
+  const mood = botAvatarMood(status, unread);
   const id = useId().replace(/[^a-zA-Z0-9-_]/g, "");
   const isWorking = ACTIVE_RUN_STATUSES.some((s) => s === status);
 
@@ -98,6 +140,8 @@ export const BotAvatar = memo(function BotAvatar({
     return (
       <div
         className={cn("rakazo-bot-avatar relative shrink-0 select-none", className)}
+        ref={(node) => { motionRef.current = node; }}
+        data-mood={mood}
         data-working={isWorking}
         style={{ width: size, height: size }}
       >
@@ -147,6 +191,11 @@ export const BotAvatar = memo(function BotAvatar({
   const shape = micoAvatarShape(parsed.shapeIndex);
   const shapeOrdinal = MICO_AVATAR_SHAPES.findIndex(({ index }) => index === parsed.shapeIndex);
   const mico = micoAvatarArt(parsed.shapeIndex, look.original ? shape?.originalColor ?? parsed.color : parsed.color);
+  const compact = look.finish === "plush" ? compactMicoArt(parsed.shapeIndex) : undefined;
+  if (mico && compact) {
+    return <CompactVelvetAvatar id={id} art={compact} color={mico.color} eyeColor={mico.eyeColor} look={look}
+      size={size} shape={shape?.id} mood={mood} status={status} identity={`${effectiveId}:${shape?.id}`} isWorking={isWorking} className={className} />;
+  }
   const plush = look.finish === "plush" ? MICO_PLUSH_CROPS[shapeOrdinal] : undefined;
   if (mico && !plush) {
     return (
@@ -154,6 +203,8 @@ export const BotAvatar = memo(function BotAvatar({
         className={cn("rakazo-bot-avatar shrink-0 select-none", className)}
         viewBox={MICO_AVATAR_VIEWBOX}
         aria-hidden="true"
+        ref={(node) => { motionRef.current = node; }}
+        data-mood={mood}
         data-working={isWorking}
         data-mico-avatar="flat"
         data-mico-shape={shape?.id}
@@ -193,7 +244,9 @@ export const BotAvatar = memo(function BotAvatar({
         width: size,
         height: size,
       }}
-      data-working={isWorking}
+      ref={(node) => { motionRef.current = node; }}
+        data-mood={mood}
+        data-working={isWorking}
       data-mico-avatar={plush ? "plush" : undefined}
     >
       <svg
@@ -283,31 +336,96 @@ export const BotAvatar = memo(function BotAvatar({
 const plushSheets = {
   first: new URL("./assets/micos-terciopelo-base.png", import.meta.url).href,
   second: new URL("./assets/micos-terciopelo-coleccion.png", import.meta.url).href,
+  compact: new URL("../../core/assets/micos-compact-eyeless.webp", import.meta.url).href,
+  growth: new URL("../../core/assets/micos-mycelium-growth-eyeless.png", import.meta.url).href,
+  mycelium: new URL("../../core/assets/micos-mycelium-eyeless.png", import.meta.url).href,
 };
+const eyePads = {
+  x: new URL("../../core/assets/bloub-eye-x.webp", import.meta.url).href,
+  y: new URL("../../core/assets/bloub-eye-y.webp", import.meta.url).href,
+};
+const neutralEyePieces = micoEyePadPieces(COMPACT_EYE_PAD, COMPACT_EYE_WIDTH, COMPACT_EYE_HEIGHT);
 
-function MicoPlushBody({ id, tint, firstSheet }: { id: string; tint?: string; firstSheet: boolean }) {
+function CompactVelvetAvatar({ id, art, color, eyeColor, look, size, shape, status, identity, isWorking, className, mood }: {
+  id: string; art: CompactMicoArt; color: string; eyeColor: string;
+  look: ReturnType<typeof micoAvatarDetails>; size: number; shape?: string;
+  isWorking: boolean; className?: string; status?: string; identity: string; mood: ReturnType<typeof botAvatarMood>;
+}) {
+  const root = useRef<SVGSVGElement>(null);
+  useMyceliumEyes(root, Boolean(art.collection), status, identity);
+  const [x, y, side] = art.crop;
+  const eyes = compactMicoEyes(art);
+  const ink = art.collection ? compactMicoEyeColor(color, art, look.original) : eyeColor;
+  const inkChannels = [1, 3, 5].map(offset => Number.parseInt(ink.slice(offset, offset + 2), 16) / 255);
+  return (
+    <svg ref={root} viewBox="0 0 64 64" aria-hidden="true" data-mico-avatar="plush" data-mico-compact=""
+      data-mico-mycelium={Boolean(art.collection) ? "" : undefined}
+      data-mico-shape={shape} data-mood={mood} data-working={isWorking}
+      className={cn("rakazo-bot-avatar shrink-0 select-none", className)} style={{ width: size, height: size }}>
+      <svg viewBox={`${x} ${y} ${side} ${side}`} width="64" height="64" overflow="hidden" style={{ width: 64, height: 64 }}>
+        <MicoPlushBody id={id} firstSheet={false} compact={art} tint={look.original ? undefined : color} />
+      </svg>
+      {Boolean(art.collection) && <defs><filter id={`${id}-eye-ink`} colorInterpolationFilters="sRGB">
+        {/* Felt artwork includes a dark cast shadow. At sidebar size its edge
+            becomes a stray bar; keep the light felt and the original alpha. */}
+        <feColorMatrix in="SourceGraphic" type="matrix" result="felt-luminance"
+          values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.2126 0.7152 0.0722 0 0" />
+        <feComponentTransfer in="felt-luminance" result="felt-mask">
+          <feFuncA type="linear" slope="3" intercept="-1" />
+        </feComponentTransfer>
+        <feComposite in="SourceGraphic" in2="felt-mask" operator="in" />
+        <feColorMatrix type="matrix" values={`${inkChannels[0]} 0 0 0 0 0 ${inkChannels[1]} 0 0 0 0 0 ${inkChannels[2]} 0 0 0 0 0 1 0`} />
+      </filter></defs>}
+      <g data-mycelium-gaze="">
+      {look.eyes === 0 ? (
+        <g className="rakazo-mico-gaze" data-mico-eye-source="bloub-0.6.4"
+          filter={Boolean(art.collection) ? `url(#${id}-eye-ink)` : undefined}>
+          {eyes.map((eye, i) => (
+            <g key={i} transform={`translate(${eye.x} ${eye.y}) ${eye.matrix}`}>
+              <g className="rakazo-compact-mico-eye" data-mycelium-lid={i} style={{ isolation: "isolate" }}>
+                {neutralEyePieces.map((piece, j) => (
+                  <svg key={j} x={piece.x} y={piece.y} width={piece.w} height={piece.h}
+                    viewBox={piece.viewBox} preserveAspectRatio="none" style={{ width: piece.w, height: piece.h, mixBlendMode: "plus-lighter" }}>
+                    <image href={eyePads[piece.src]} width="1" height="1" preserveAspectRatio="none" />
+                  </svg>
+                ))}
+              </g>
+            </g>
+          ))}
+        </g>
+      ) : <MicoEyes eyes={look.eyes} positions={eyes.map((eye) => [eye.x, eye.y])} scale={0.32} color={ink} />}
+      </g>
+    </svg>
+  );
+}
+
+function MicoPlushBody({ id, tint, firstSheet, compact }: {
+  id: string; tint?: string; firstSheet: boolean; compact?: CompactMicoArt;
+}) {
   const filterId = `${id}-plush`;
   const tables = tint && [1, 3, 5].map((offset) => {
     const value = Number.parseInt(tint.slice(offset, offset + 2), 16) / 255;
     return [0, 0.16 * value, 0.52 * value, 0.94 * value, 0.43 + 0.57 * value, 1].join(" ");
   });
+  const compactTint = compact && tint ? compactMicoTint(tint, compact) : undefined;
+  const activeTables = compactTint?.tables ?? tables;
   return (
     <>
-      {tables && <defs>
+      {activeTables && <defs>
         <filter id={filterId} colorInterpolationFilters="sRGB">
-          <feColorMatrix type="saturate" values="0" />
+          <feColorMatrix type={compactTint ? "matrix" : "saturate"} values={compactTint?.matrix ?? "0"} />
           <feComponentTransfer>
-            <feFuncR type="table" tableValues={tables[0]} />
-            <feFuncG type="table" tableValues={tables[1]} />
-            <feFuncB type="table" tableValues={tables[2]} />
+            <feFuncR type="table" tableValues={activeTables[0]} />
+            <feFuncG type="table" tableValues={activeTables[1]} />
+            <feFuncB type="table" tableValues={activeTables[2]} />
           </feComponentTransfer>
         </filter>
       </defs>}
       <image
-        href={firstSheet ? plushSheets.first : plushSheets.second}
-        width={firstSheet ? 2048 : 1774}
-        height={firstSheet ? 683 : 887}
-        filter={tables ? `url(#${filterId})` : undefined}
+        href={compact?.collection === "growth" ? plushSheets.growth : compact?.collection === "mycelium" ? plushSheets.mycelium : compact ? plushSheets.compact : firstSheet ? plushSheets.first : plushSheets.second}
+        width={compact ? 1536 : firstSheet ? 2048 : 1774}
+        height={compact ? 1024 : firstSheet ? 683 : 887}
+        filter={activeTables ? `url(#${filterId})` : undefined}
       />
     </>
   );
@@ -324,7 +442,7 @@ function MicoEyes({ eyes, positions, scale, color, plush = false }: {
     <g className="rakazo-mico-gaze" fill={color} stroke={plush ? "#f9ead288" : undefined}>
       {positions.map(([x, y], index) => (
         <g key={x} transform={`translate(${x} ${y}) scale(${index ? -scale : scale} ${scale})`}>
-          <path className="rakazo-mico-eye" d={MICO_EYE_PATHS[eyes] ?? MICO_EYE_PATHS[0]} />
+          <path className="rakazo-mico-eye" data-mycelium-lid={index} d={MICO_EYE_PATHS[eyes] ?? MICO_EYE_PATHS[0]} />
         </g>
       ))}
     </g>
@@ -466,14 +584,14 @@ export function BotShapePreview({
       aria-pressed={selected ?? false}
       className={cn(
         "relative flex cursor-pointer items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover",
-        compact ? "size-8 rounded-lg sm:size-[26px]" : "size-11",
+        compact ? "size-8 rounded-lg" : "size-11",
         selected
           ? cn("ring-2 ring-primary bg-white/10", compact ? "ring-inset" : "ring-offset-2 ring-offset-popover")
           : "hover:bg-white/5",
       )}
     >
       {mico ? (
-        <BotAvatar color={micoAvatarValue(mico.index, color, { eyes: 0, finish: "flat", original: false })} size={compact ? 22 : 34} />
+        <BotAvatar color={micoAvatarValue(mico.index, color, { eyes: 0, finish: micoAvatarDefaultFinish(mico.index), original: false })} size={compact ? 30 : 38} />
       ) : shapeIndex === undefined ? (
         <BotAvatar color={color} identity={identity} size={32} />
       ) : (

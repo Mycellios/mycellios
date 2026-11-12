@@ -2,6 +2,12 @@ import { appendFileSync } from "node:fs";
 import readline from "node:readline";
 
 const engine = process.argv[2];
+const toolArguments = process.argv.includes("--fixture-questionnaire") ? {
+  question: "Your trip", questions: [
+    { question: "Where?", options: [{ label: "Paris", description: "Museums" }, "London"], multiSelect: true },
+    { question: "When?" },
+  ],
+} : { path: "notes.txt" };
 const send = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
 const reply = (message, result) => send({ jsonrpc: "2.0", id: message.id, result });
 setInterval(() => {}, 1000);
@@ -78,7 +84,7 @@ lines.on("line", (line) => {
             turnId: "fixture-turn",
             callId: "call-1",
             tool: "rakazo_0",
-            arguments: { path: "notes.txt" },
+            arguments: toolArguments,
           },
         });
       } else if (message.id === 900) {
@@ -108,7 +114,7 @@ lines.on("line", (line) => {
         const listed = await client.listTools();
         if (listed.tools.length !== 2 || listed.tools[0].name !== "tool_0")
           throw new Error("Unexpected MCP tool catalog");
-        await client.callTool({ name: "tool_0", arguments: { path: "notes.txt" } });
+        await client.callTool({ name: "tool_0", arguments: toolArguments });
         await client.close();
       } else {
         const response = await fetch(bridge.url, {
@@ -121,7 +127,7 @@ lines.on("line", (line) => {
             jsonrpc: "2.0",
             id: 1,
             method: "tools/call",
-            params: { name: "tool_0", arguments: { path: "notes.txt" } },
+            params: { name: "tool_0", arguments: toolArguments },
           }),
         });
         if (!response.ok) throw new Error("MCP bridge failed");
@@ -136,7 +142,7 @@ lines.on("line", (line) => {
               jsonrpc: "2.0",
               id: 1,
               method: "tools/call",
-              params: { name: "tool_0", arguments: { path: "notes.txt" } },
+              params: { name: "tool_0", arguments: toolArguments },
             }),
           });
           if (!retried.ok) throw new Error("MCP retry failed");
@@ -170,7 +176,7 @@ lines.on("line", (line) => {
             jsonrpc: "2.0",
             id: 1,
             method: "tools/call",
-            params: { name: "tool_0", arguments: { path: "notes.txt" } },
+            params: { name: "tool_0", arguments: toolArguments },
           }),
         });
         send({

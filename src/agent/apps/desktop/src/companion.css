@@ -11,3 +11,44 @@ button:hover{background:var(--hover);transform:scale(1.04)}button:focus-visible{
 body[data-auto-hide=true] .dock{opacity:.12;transform:translateX(80%)}body[data-edge=left][data-auto-hide=true] .dock{transform:translateX(-80%)}body[data-edge=bottom][data-auto-hide=true] .dock{transform:translateY(80%)}body[data-strip=false][data-auto-hide=true] .dock{opacity:0}body[data-auto-hide=true]:hover .dock,body[data-auto-hide=true]:focus-within .dock{transform:none;opacity:1}
 @keyframes orbit{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 body[data-expanded=true] .dock{transform:none!important;opacity:1!important}
+
+/* Question island: a compact black pill grows into the same focused reply surface. */
+.surface.island{background:#000;color:#f5f5f5;padding:0;border-radius:24px;overflow:hidden;display:block;box-shadow:none}
+.island button:hover{transform:none;background:transparent}
+.island button:disabled{cursor:default;opacity:.5}
+.island button:focus-visible,.island input:focus-visible{outline:2px solid #8bd5e3;outline-offset:2px}
+.island-pill{width:100%;height:100%;min-height:0;padding:0 10px;gap:7px;justify-content:center;border-radius:24px}
+.island-avatar{width:22px;height:22px;object-fit:contain;flex-shrink:0}
+.island-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;min-width:0}
+.island-question-badge{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;padding:4px 7px;border-radius:14px;background:#0d2429;color:#8bd5e3;font-size:11px;font-weight:600}
+.island-question-badge svg{width:12px;height:12px}
+.island-idle-status{color:#a0a0a0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.surface.island[data-open=true]{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;border-radius:26px;padding:28px 20px 18px;gap:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#333 #000}
+.island-identity{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.island-identity>.island-avatar{width:36px;height:36px}
+.island-identity-copy{min-width:0;flex:1;font-size:13px;line-height:18px}
+.island-identity-copy strong{font-weight:600}
+.island-question-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.island-progress{min-height:24px;padding:3px;color:#8bd5e3;font-size:11px;flex-shrink:0}
+.island-question-options{display:flex;flex-direction:column;gap:6px}
+.island-question-option{width:100%;max-width:100%;padding:8px 10px;min-height:48px;gap:10px;border-radius:9px;background:#0d1d20;flex-shrink:0}
+.island-question-option:hover,.island-question-option[aria-pressed=true]{background:#17343b!important}
+.island-option-index{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#1c3c44;color:#8bd5e3;font-size:12px;font-weight:600;flex-shrink:0}
+.island-option-copy{min-width:0;display:flex;flex-direction:column;font-size:13px;line-height:17px;overflow-wrap:anywhere}
+.island-option-copy strong{font-weight:600}
+.island-option-description{font-size:12px;line-height:16px;color:#a6aeb0}
+.island-answer-form{display:flex;align-items:center;background:#111;border:1px solid #242424;border-radius:18px;margin-top:6px;padding:3px 4px 3px 11px;gap:6px}
+.island-answer-input{width:100%;min-width:0;flex:1;border:0;background:transparent;color:#fff;font:inherit;font-size:12px;line-height:22px;outline:none}
+.island-answer-input::placeholder{color:#b3b3b3;opacity:1}
+.island-answer-send{width:26px;height:26px;min-height:26px;padding:4px;border-radius:50%;background:#f0f0f0;color:#111;flex-shrink:0}
+.island-answer-send:hover{background:#fff!important}.island-answer-send svg{width:18px;height:18px}
+.island-question-footer{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:18px}
+.island-question-footer>button{font-size:13px;min-height:34px;padding:6px 10px;white-space:nowrap;border-radius:8px}
+.island-question-footer .island-question-count{margin-right:auto;color:#a0a0a0;font-size:12px;padding-left:0;opacity:1}
+.island-question-footer .island-later{color:#bdbdbd}
+.island-question-footer .island-open{background:#f1f1f1;color:#080808}
+.island-question-footer .island-open:hover{background:#fff}
+.island-answer-error{color:#ffa7a7;font-size:12px;line-height:16px;margin:8px 0 0}
+@media(prefers-reduced-motion:no-preference){.island-identity,.island-question-options,.island-answer-form{animation:island-question-in 160ms cubic-bezier(.22,1,.36,1) both}@keyframes island-question-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}}
+
+@media(max-width:430px){.island-question-footer{flex-wrap:wrap}.island-question-footer .island-question-count{flex-basis:100%;min-height:20px}.island-question-footer .island-later{margin-left:auto}}

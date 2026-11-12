@@ -54,6 +54,12 @@ function button(name: string) {
   return found;
 }
 
+function shapeButton(id: string) {
+  const found = [...document.querySelectorAll<HTMLButtonElement>("button[aria-pressed]")].find(element => element.querySelector(`[data-mico-shape="${id}"]`));
+  if (!found) throw new Error(`No mycelium shape ${id}`);
+  return found;
+}
+
 async function typeName(value: string) {
   const input = document.querySelector<HTMLInputElement>('input[placeholder="Name your Bot"]')!;
   await act(async () => {
@@ -74,7 +80,7 @@ describe("CreateBotDialog", () => {
     await act(async () => root.render(<CreateBotDialog inline onCreate={onCreate} />));
     const setup = document.querySelector('[data-testid="first-mico-setup"]');
     expect(setup?.querySelector("input")?.value).toBe(productBrand.companionName);
-    expect(setup?.querySelector('[data-mascot="mushroom"]')).not.toBeNull();
+    expect(setup?.querySelector('[data-mascot="mushroom"] [data-mico-avatar="plush"][data-mico-shape="mushroom"]')).not.toBeNull();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(onCreate).not.toHaveBeenCalled();
     await click(button("Create Mico"));
@@ -94,7 +100,7 @@ describe("CreateBotDialog", () => {
   it("lets the server assign an unused avatar by default", async () => {
     const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
     await render(onCreate);
-    expect(document.querySelector('[data-mascot="mushroom"]')).not.toBeNull();
+    expect(document.querySelector('[data-mascot="mushroom"] [data-mico-avatar="plush"][data-mico-shape="mushroom"]')).not.toBeNull();
     await typeName("Scout");
     await click(button("Create"));
     expect(onCreate).toHaveBeenCalledWith({ name: "Scout" });
@@ -106,7 +112,7 @@ describe("CreateBotDialog", () => {
     await click(button("Turquoise"));
     await typeName("Scout");
     await click(button("Create"));
-    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_2000" });
+    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_2001" });
   });
 
   it("saves the purpose as instructions when creating the Mico", async () => {
@@ -129,11 +135,11 @@ describe("CreateBotDialog", () => {
   it("sends a custom shape and palette together", async () => {
     const onCreate = vi.fn(async (_input: CreateBotDialogInput) => undefined);
     await render(onCreate);
-    await click(button("Fox"));
+    await click(shapeButton("sprout"));
     await click(button("Turquoise"));
     await typeName("Scout");
     await click(button("Create"));
-    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_2032" });
+    expect(onCreate).toHaveBeenCalledWith({ name: "Scout", color: "#28A99E::shape_4001" });
   });
 
   it.each([true, false])("uses a suggestion as an editable draft (inline: %s)", async (inline) => {
@@ -153,7 +159,7 @@ describe("CreateBotDialog", () => {
     const purpose = "Compare routes, accommodation and budgets, and build practical itineraries for my trips.";
     expect(onCreate).toHaveBeenCalledExactlyOnceWith({
       name: "Train planner",
-      color: "#5C84CC::shape_1004",
+      color: "#6863E8::shape_1102",
       description: purpose,
       instructions: purpose,
     });
@@ -200,22 +206,22 @@ describe("Mico avatar settings", () => {
     await renderStudio("#8650DF::shape_1000");
     await click(button("Customize bot avatar"));
     expect(button("Mushroom").getAttribute("aria-pressed")).toBe("true");
-    expect(button("Original colors").getAttribute("aria-pressed")).toBe("true");
-    expect(button("Flat").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Original colors").getAttribute("aria-pressed")).toBe("false");
+    expect(button("Velvety").getAttribute("aria-pressed")).toBe("true");
 
     await click(button("Mint"));
-    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2000");
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2001");
     await renderStudio(onChange.mock.lastCall![0]);
-    await click(button("Octopus"));
-    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_2352");
+    await click(shapeButton("weave"));
+    expect(onChange).toHaveBeenLastCalledWith("#67B793::shape_4321");
     expect(button("Upload").getAttribute("role")).toBe("tab");
     await renderStudio(onChange.mock.lastCall![0]);
-    await click(button("Hare"));
+    await click(shapeButton("crest"));
     await renderStudio(onChange.mock.lastCall![0]);
-    expect(button("Hare").getAttribute("aria-pressed")).toBe("true");
+    expect(shapeButton("crest").getAttribute("aria-pressed")).toBe("true");
     expect(button("Mint").getAttribute("aria-pressed")).toBe("true");
-    expect((button("Velvety") as HTMLButtonElement).disabled).toBe(true);
-    await click(button("Octopus"));
+    expect((button("Velvety") as HTMLButtonElement).disabled).toBe(false);
+    await click(shapeButton("weave"));
 
     await renderStudio(onChange.mock.lastCall![0]);
     await click(button("Star"));
@@ -224,7 +230,7 @@ describe("Mico avatar settings", () => {
     await renderStudio(onChange.mock.lastCall![0]);
     await click(button("Wine"));
     await renderStudio(onChange.mock.lastCall![0]);
-    expect(button("Octopus").getAttribute("aria-pressed")).toBe("true");
+    expect(shapeButton("weave").getAttribute("aria-pressed")).toBe("true");
     expect(button("Wine").getAttribute("aria-pressed")).toBe("true");
     expect(button("Star").getAttribute("aria-pressed")).toBe("true");
     expect(button("Flat").getAttribute("aria-pressed")).toBe("true");
@@ -235,7 +241,7 @@ describe("Mico avatar settings", () => {
     await click(button("Original colors"));
     await renderStudio(onChange.mock.lastCall![0]);
     expect(button("Star").getAttribute("aria-pressed")).toBe("true");
-    expect(button("Octopus").getAttribute("aria-pressed")).toBe("true");
+    expect(shapeButton("weave").getAttribute("aria-pressed")).toBe("true");
     expect(document.querySelector('[data-mico-avatar="plush"] image')?.getAttribute("filter")).toBeNull();
   });
 });

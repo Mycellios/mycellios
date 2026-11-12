@@ -93,6 +93,7 @@ describe("desktop preload bridge", () => {
       "servers",
       "settings",
       "update",
+      "videoEdit",
       "window",
     ]);
     expect(Object.keys(bridge.window).sort()).toEqual([

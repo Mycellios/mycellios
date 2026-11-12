@@ -5,6 +5,7 @@ import { createContext, type ReactNode, useContext, useEffect, useRef, useState 
 import { desktopBridge } from "../lib/desktop";
 import { canRestartDesktop, canShowDesktopUpdate, desktopUpdateHasCall, endDesktopUpdateCall } from "../lib/desktop-update-work";
 import { appPath } from "../lib/app-path";
+import { playUpdateMycelium } from "../lib/update-mycelium";
 
 const UPDATE_DISK_SPACE_MESSAGE = "Free at least 6 GB of disk space before restarting to update.";
 
@@ -71,6 +72,8 @@ function useDesktopUpdates() {
     if ((action === "install" || action === "forceInstall") && desktopUpdateHasCall()) endDesktopUpdateCall();
     if (action === "check") setConfirmedCheck(null);
     try {
+      if (action === "download") void playUpdateMycelium(document.activeElement, "gather");
+      if (action === "install" && canRestartDesktop()) await playUpdateMycelium(document.activeElement);
       const next = await bridge[action]?.();
       if (!next) return;
       setState(next);

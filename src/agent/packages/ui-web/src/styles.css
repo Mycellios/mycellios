@@ -166,6 +166,20 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  [data-mico-compact][data-working="true"] .rakazo-mico-gaze {
+    animation: rakazo-mico-look 3.2s ease-in-out infinite;
+  }
+
+  [data-mico-compact][data-working="true"] .rakazo-compact-mico-eye,
+  [data-mico-compact]:hover .rakazo-compact-mico-eye {
+    animation: rakazo-compact-mico-blink 3.2s ease-in-out infinite;
+  }
+
+  @keyframes rakazo-compact-mico-blink {
+    0%, 40%, 48%, 100% { clip-path: inset(0); }
+    44% { clip-path: inset(49% 0); }
+  }
+
   .rakazo-mico-gaze {
     transform-box: view-box;
     transition: transform 170ms ease-out;
@@ -672,3 +686,57 @@
     transition: none;
   }
 }
+
+/* Mycelium eye frames come from the shared, visibility-gated clock. */
+.rakazo-bot-avatar[data-mico-mycelium] .rakazo-mico-gaze,
+.rakazo-bot-avatar[data-mico-mycelium] .rakazo-mico-eye,
+.rakazo-bot-avatar[data-mico-mycelium] .rakazo-compact-mico-eye {
+  animation: none !important;
+  transition: none;
+}
+
+/* Runtime expressions preserve the chosen animal and eye artwork. */
+[data-mico-avatar] :is(.rakazo-mico-eye, .rakazo-compact-mico-eye) {
+  transform-box: fill-box;
+  transform-origin: center;
+  scale: var(--mico-eye-x, 1) var(--mico-eye-y, 1);
+  rotate: var(--mico-eye-tilt, 0deg);
+  transition: scale 220ms ease-out, rotate 220ms ease-out;
+}
+[data-mico-avatar][data-mood="working"] { --mico-eye-y: 1.12; }
+[data-mico-avatar][data-mood="waiting"] { --mico-eye-y: 1.18; --mico-eye-tilt: -7deg; }
+[data-mico-avatar][data-mood="waiting"] .rakazo-mico-gaze > rect:first-child,
+[data-mico-avatar][data-mood="waiting"] .rakazo-mico-gaze > g:first-child :is(.rakazo-mico-eye, .rakazo-compact-mico-eye) { --mico-eye-y: .76; }
+[data-mico-avatar][data-mood="failed"] { --mico-eye-y: .58; --mico-eye-tilt: 12deg; }
+[data-mico-avatar][data-mood="responded"] { --mico-eye-x: 1.12; --mico-eye-y: .65; --mico-eye-tilt: -8deg; }
+[data-mico-avatar][data-mood="asleep"] { --mico-eye-y: .28; }
+/* A question is waiting on a person, not still computing. */
+[data-mico-avatar][data-mood="waiting"] .rakazo-mico-gaze,
+[data-mico-avatar][data-mood="failed"] .rakazo-mico-gaze { animation: none; }
+@media (prefers-reduced-motion: no-preference) {
+  [data-mico-avatar="flat"][data-mood="working"],
+  [data-mico-avatar="flat"][data-mood="connecting"] {
+    transform-origin: center;
+    animation: rakazo-mico-attentive 2.8s ease-in-out infinite;
+  }
+  [data-mico-avatar="plush"][data-mood="working"] > svg:not(.rakazo-bot-avatar-ring) {
+    animation: rakazo-mico-attentive 2.8s ease-in-out infinite;
+  }
+  [data-mico-avatar="plush"][data-mood="working"] .rakazo-mico-gaze {
+    animation: rakazo-mico-look 3.2s ease-in-out infinite;
+  }
+  [data-mico-avatar][data-mood="waiting"] .rakazo-mico-eye {
+    animation: rakazo-mico-blink 6.7s ease-in-out var(--mico-blink-delay, -1s) infinite;
+  }
+  [data-mico-avatar][data-mood="failed"] .rakazo-mico-eye { animation: none; }
+  @keyframes rakazo-mico-attentive {
+    0%, 100% { transform: translateY(0) rotate(-1deg) scale(1); }
+    50% { transform: translateY(-1.5%) rotate(1deg) scale(1.025); }
+  }
+}
+[data-motion-paused="true"], [data-motion-paused="true"] * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+  [data-mico-avatar], [data-mico-avatar] * { animation: none !important; transition: none !important; }
+}
+
+[data-mico-eye-motion="paused"], [data-mico-eye-motion="paused"] * { animation-play-state: paused !important; }

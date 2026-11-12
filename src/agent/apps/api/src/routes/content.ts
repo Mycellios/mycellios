@@ -1,4 +1,5 @@
 import { sporeRewards, usageDashboard } from "../usage-dashboard.js";
+import { getAppCover, setAppCover } from "../app-covers.js";
 import { agentUsage } from "../agent-usage.js";
 import { agentCost } from "../agent-cost.js";
 import { taskCosts } from "../task-cost.js";
@@ -30,6 +31,13 @@ const EXPORT_MESSAGE_PAGE_SIZE = 500;
 export function contentRoutes(ctx: RouterContext) {
   const { deps, repos, favicons, groupRepos, authed } = ctx;
   return {
+    appCovers: {
+      get: authed.appCovers.get.handler(({ context, input }) => getAppCover(deps, context.actor, input.appId)),
+      set: authed.appCovers.set.handler(async ({ context, input }) => {
+        await repos.getBot(context.actor, input.botId);
+        return setAppCover({ ...deps, maxUploadSizeBytes: attachmentMaxBytes(deps.env) }, context.actor, input);
+      }),
+    },
     artifacts: {
       list: authed.artifacts.list.handler(async ({ context, input }) => {
         await repos.getBot(context.actor, input.botId);

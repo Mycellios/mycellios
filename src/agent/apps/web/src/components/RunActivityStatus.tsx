@@ -100,7 +100,7 @@ export function PendingRunActivity({ messages, bots, onRefresh }: {
   const live = messages.findLast(message => message.id.startsWith("progress:"));
   const steps = summarizeSteps(live?.blocks.flatMap(block => block.kind === "steps" ? block.steps : []) ?? [], presentActivityLabel);
   return <div className="flex min-w-0 items-start gap-2.5 px-1 py-2">
-    <GroupAvatar members={bots} size={28} />
+    <GroupAvatar members={bots} size={24} />
     <div className="min-w-0 max-w-prose text-sm text-muted-foreground">
       {steps.length ? <details>
         <summary className="w-fit cursor-pointer rounded-sm py-1">{t`Receiving activity · task status not confirmed`}</summary>
@@ -134,7 +134,7 @@ export function RunActivityStatus({
 }) {
   const { t, i18n } = useLingui();
   const [now, setNow] = useState(Date.now);
-  const [foldedRunId, setFoldedRunId] = useState<string | null>(null);
+  const [disclosure, setDisclosure] = useState<{ runId: string; open: boolean } | null>(null);
   const isMobile = useIsMobile();
   const expanded = useSyncExternalStore(subscribeToolActivity, getToolActivityExpanded, () => false);
   const refresh = useRef(onRefresh);
@@ -234,13 +234,13 @@ export function RunActivityStatus({
   const settledTool = runningTool ? undefined : toolEvents.at(-1);
   const updatesStopped = useSyncExternalStore(subscribeLiveThreadConnection, liveThreadDisconnected, () => false);
   const liveUpdatesStopped = updatesStopped && (health.state === "running" || health.state === "quiet" || health.state === "unknown" || health.state === "recovering");
-  const specificNow = runningTool
-    ? toolActivityLabel(runningTool)
-    : scopedActivity
-      ? presentActivityLabel(scopedActivity)
-      : showActivity
-        ? presentActivityLabel(latestActivity)
-        : "";
+  // Name the kind of work, never a shell command, path or raw tool payload.
+  const activityKind = (runningTool?.name || scopedActivity || latestTool || legacyActivity || "").toLowerCase();
+  const specificNow = /search|browse|web|fetch|internet/.test(activityKind) ? t`Searching for information…`
+    : /edit|write|patch|update/.test(activityKind) ? t`Updating files…`
+    : /read|file|list|inspect/.test(activityKind) ? t`Reading files…`
+    : /shell|exec|command|running:/.test(activityKind) ? t`Running a command…`
+    : "";
   const primaryLabel = liveUpdatesStopped
     ? t`Live updates stopped. The task was not cancelled.`
     : health.state === "quiet" ? t`Waiting for an activity update…`
@@ -249,7 +249,7 @@ export function RunActivityStatus({
     : labels[health.state];
   const status = liveUpdatesStopped
     ? <span role="alert" className="break-words text-destructive">{primaryLabel}</span>
-    : <span role="status" className="break-words text-foreground">{primaryLabel}</span>;
+    : <span role="status" className="break-words text-muted-foreground">{primaryLabel}</span>;
   const elapsed = health.elapsedMs >= 5000 ? <span aria-live="off" aria-label={run.startedAt ? t`Elapsed` : t`Waiting`} className="shrink-0 text-xs tabular-nums">{duration(health.elapsedMs)}</span> : null;
   const hasDetails = Boolean(visibleSteps.length || showActivity);
   const hasExecutionDetails = Boolean(run.modelId || run.modelProvider || (cost?.runId === run.id));
@@ -259,6 +259,7 @@ export function RunActivityStatus({
     toolEvents.some(tool => tool.command || tool.detail || tool.output || tool.error || tool.cwd || tool.name === "shell");
   const details = (
     <div className="mt-1 min-w-0 max-w-prose space-y-2 text-xs">
+      {elapsed ? <div className="text-muted-foreground">{elapsed}</div> : null}
       {visibleSteps.length ? <ol aria-label={t`Task activity`} className="space-y-1.5 border-s border-border py-1 ps-3">
         {visibleSteps.map((step, index) => <li key={`${index}:${step.label}`} className="min-w-0" aria-current={index === visibleSteps.length - 1 ? "step" : undefined}>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -282,9 +283,8 @@ export function RunActivityStatus({
     return <div className="min-w-0 px-1 py-1" data-testid="run-activity-status">
       {hasDetails ? <Sheet key={run.id}>
         <SheetTrigger className="flex min-h-12 w-full min-w-0 items-center gap-2 rounded-md px-1 text-start text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={t`Show task activity`}>
-          <GroupAvatar members={bots} size={36} />
+          <GroupAvatar members={bots} size={28} />
           <span className="min-w-0 flex-1 line-clamp-2">{status}</span>
-          {elapsed}
           <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-muted-foreground rtl:rotate-180" />
         </SheetTrigger>
         <SheetContent side="bottom" showCloseButton={false} className="max-h-[80dvh] gap-2 overflow-y-auto overscroll-contain rounded-t-2xl px-5 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] motion-reduce:transition-none">
@@ -295,25 +295,24 @@ export function RunActivityStatus({
           <div className="flex flex-wrap items-baseline gap-x-2 text-sm">{primaryLabel}{elapsed}</div>
           {details}
         </SheetContent>
-      </Sheet> : <div className="flex min-h-12 items-center gap-2 px-1 text-sm"><GroupAvatar members={bots} size={36} />{status}{elapsed}</div>}
+      </Sheet> : <div className="flex min-h-12 items-center gap-2 px-1 text-sm"><GroupAvatar members={bots} size={28} />{status}</div>}
       {computerAction}
     </div>;
   }
   return (
     <div className="flex min-w-0 items-start gap-2.5 px-1 py-2" data-testid="run-activity-status">
-      <GroupAvatar members={bots} size={28} />
-      <div className="min-w-0 max-w-full space-y-1 text-sm text-muted-foreground">
-        {hasDetails ? <details key={run.id} open={expanded || foldedRunId !== run.id} className="group/activity" onToggle={(event) => {
-          if (expanded) return;
-          setFoldedRunId(event.currentTarget.open ? null : run.id);
+      <GroupAvatar members={bots} size={24} />
+      <div className="min-w-0 max-w-full space-y-1 text-xs text-muted-foreground">
+        {hasDetails ? <details key={run.id} open={disclosure?.runId === run.id ? disclosure.open : expanded} className="group/activity" onToggle={(event) => {
+          const open = event.currentTarget.open;
+          setDisclosure(previous => previous?.runId === run.id && previous.open === open ? previous : { runId: run.id, open });
         }}>
           <summary className="flex w-fit max-w-full cursor-pointer list-none items-baseline gap-2 rounded-sm py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden" aria-label={t`Show task activity`}>
             {status}
-            {elapsed}
             <ChevronDown aria-hidden="true" size={14} className="shrink-0 self-center transition-transform group-open/activity:rotate-180 motion-reduce:transition-none" />
           </summary>
           {details}
-        </details> : <div className="flex items-baseline gap-2 py-1">{status}{elapsed}</div>}
+        </details> : <div className="flex items-baseline gap-2 py-1">{status}</div>}
         {health.state === "blocked" ? <p className="text-xs">{t`No model has started. Configure a virtual computer to continue.`}</p> : null}
         {liveUpdatesStopped || health.state === "unknown" || health.state === "recovering" || health.state === "quiet" ? <div className="space-y-1">
           <p className="text-xs">{t`Checking the saved task status. You do not need to send your message again.`}</p>

@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("rakazoDesktop", {
+  videoEdit: { request: input => ipcRenderer.invoke("desktop.apps.video-edit", input) },
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
   servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url) },
   platform: process.platform,
@@ -16,6 +17,12 @@ contextBridge.exposeInMainWorld("rakazoDesktop", {
     displays: () => ipcRenderer.invoke("desktop.companions.displays"),
     publish: value => ipcRenderer.invoke("desktop.companions.publish", value),
     openChat: target => ipcRenderer.invoke("desktop.companions.openChat", target),
+    onQuestion: listener => {
+      const handler = (_event, request) => listener(request);
+      ipcRenderer.on("desktop.companions.question", handler);
+      return () => ipcRenderer.off("desktop.companions.question", handler);
+    },
+    questionResult: result => ipcRenderer.invoke("desktop.companions.questionResult", result),
     onSelect: listener => {
       const handler = (_event, target) => listener(target);
       ipcRenderer.on("desktop.companions.select", handler);

@@ -25,22 +25,26 @@
   const subheading = document.getElementById("subheading");
   const recoveryMessage = document.getElementById("recovery-message");
   const recoveryDiagnostic = document.getElementById("recovery-diagnostic");
+  const diagnosticDetails = document.getElementById("diagnostic-details");
+  const welcome = document.getElementById("welcome");
+  const quickConnect = document.getElementById("quick-connect");
   let retrying = false;
   let recovering = true;
 
   function showRecoveryDiagnostic(message) {
     recoveryDiagnostic.textContent = typeof message === "string" ? message : "";
     recoveryDiagnostic.hidden = !recoveryDiagnostic.textContent;
+    diagnosticDetails.hidden = !recoveryDiagnostic.textContent;
   }
 
   const STACK_POLL_MS = 1000;
   const PHASE_LABELS = {
-    "checking-docker": "Getting ready…",
-    preparing: "Getting ready…",
-    pulling: "Downloading Mycellios…",
-    starting: "Starting Mycellios…",
-    "waiting-healthy": "Almost ready…",
-    ready: "Mycellios is ready.",
+    "checking-docker": "Preparando este equipo…",
+    preparing: "Preparando este equipo…",
+    pulling: "Descargando Mycellios…",
+    starting: "Abriendo Mycellios…",
+    "waiting-healthy": "Ya casi está…",
+    ready: "Mycellios está listo.",
   };
   const TERMINAL_PHASES = new Set([
     "idle",
@@ -88,6 +92,8 @@
     setupBusy = busy;
     checkButton.disabled = busy;
     continueButton.disabled = busy;
+    quickConnect.disabled = busy;
+    retryButton.disabled = busy || retrying;
   }
 
   /** A save in flight cannot be cancelled, so the choice it commits must not change under it. */
@@ -100,7 +106,7 @@
     panelNew.hidden = mode !== "new";
     panelExisting.hidden = mode !== "existing";
     checkButton.hidden = mode !== "existing";
-    if (mode !== "new") continueButton.textContent = document.getElementById("heading").textContent === "Servidores" ? "Conectar" : "Continue";
+    continueButton.textContent = mode === "new" ? "Preparar este equipo" : "Conectar";
     setStatus("");
   }
 
@@ -145,7 +151,7 @@
 
   function renderDetails(stack) {
     const bytes = stack.phase === "pulling" ? downloadedBytes(stack) : 0;
-    stackDetail.textContent = bytes > 0 ? `${formatBytes(bytes)} downloaded` : "";
+    stackDetail.textContent = bytes > 0 ? `${formatBytes(bytes)} descargados` : "";
 
     // A new attempt clears the output, so drop an expansion the person did not ask for.
     if (stack.phase === "checking-docker" && detailsOpenedByFailure) {
@@ -172,7 +178,7 @@
     const { phase } = stack;
     stackSection.hidden = phase === "idle";
     if (phase === "idle") {
-      continueButton.textContent = "Continue";
+      continueButton.textContent = "Preparar este equipo";
       return;
     }
     const failed = isDockerPhase(phase) || phase === "failed";
@@ -185,21 +191,21 @@
     renderDetails(stack);
     stackDockerHelp.hidden = !isDockerPhase(phase);
 
-    if (isDockerPhase(phase)) continueButton.textContent = "Check again";
-    else if (phase === "failed") continueButton.textContent = "Retry";
-    else continueButton.textContent = "Continue";
+    if (isDockerPhase(phase)) continueButton.textContent = "Comprobar de nuevo";
+    else if (phase === "failed") continueButton.textContent = "Volver a intentar";
+    else continueButton.textContent = "Preparar este equipo";
     setBusy(!TERMINAL_PHASES.has(phase));
   }
 
   async function save(mode, url) {
     setBusy(true);
     lockMode(true);
-    setStatus("Connecting…");
+    setStatus("Conectando…");
     try {
       const saved = await bridge.save({ name: document.getElementById("server-name").value, mode, serverUrl: url });
-      if (!saved.ok) setStatus(saved.error ?? "Could not save that address.", "error");
+      if (!saved.ok) { showRecoveryDiagnostic(saved.error); setStatus("No hemos podido conectar. Revisa el enlace y vuelve a intentarlo.", "error"); }
     } catch {
-      setStatus("Could not save that address. Try again.", "error");
+      setStatus("No hemos podido conectar. Vuelve a intentarlo.", "error");
     } finally {
       lockMode(false);
       setBusy(false);
@@ -248,7 +254,7 @@
         await waitForStackChange();
       }
     } catch {
-      setStatus("Could not follow the local stack. Try again.", "error");
+      setStatus("No hemos podido completar la preparación. Vuelve a intentarlo.", "error");
       setBusy(false);
     } finally {
       stackPolling = false;
@@ -263,7 +269,7 @@
       const started = await bridge.stack.start();
       if (started !== null && started.phase !== "idle") renderStack(started);
     } catch {
-      setStatus("Could not start the local stack. Try again.", "error");
+      setStatus("No hemos podido preparar este equipo. Vuelve a intentarlo.", "error");
       setBusy(false);
       return;
     }
@@ -273,23 +279,24 @@
   async function check() {
     const value = serverUrl.value;
     if (value.trim() === "") {
-      setStatus("Enter a server address first.", "error");
+      setStatus("Pega primero el enlace de conexión.", "error");
       return null;
     }
 
     setBusy(true);
-    setStatus("Checking…");
+    setStatus("Comprobando conexión…");
     try {
       const result = await bridge.test(value);
       if (result.ok) {
         serverUrl.value = result.url;
-        setStatus(`Mycellios answered at ${result.url}.`, "ok");
+        setStatus("Todo listo. Ya puedes conectar.", "ok");
       } else {
-        setStatus(result.error ?? "Could not reach that address.", "error");
+        showRecoveryDiagnostic(result.error);
+        setStatus("No hemos podido conectar. Comprueba que el enlace esté completo.", "error");
       }
       return result;
     } catch {
-      setStatus("Could not run the connection check. Try again.", "error");
+      setStatus("No hemos podido comprobar la conexión. Vuelve a intentarlo.", "error");
       return null;
     } finally {
       setBusy(false);
@@ -329,27 +336,36 @@
 
   closeButton.addEventListener("click", () => void bridge?.quit());
   retryButton.addEventListener("click", async () => {
-    if (retrying || bridge === undefined) return;
+    if (retrying || setupBusy || bridge === undefined) return;
     retrying = true;
-    retryButton.disabled = true;
-    retryButton.textContent = "Connecting…";
+    setBusy(true);
+    retryButton.textContent = "Conectando…";
+    recovery.setAttribute("aria-busy", "true");
     try {
       const result = await bridge.retry();
       if (!result.ok) {
         const state = await bridge.state();
         showRecoveryDiagnostic(state?.error);
+        recoveryMessage.textContent = "Todavía no hemos podido conectar. Vuelve a intentarlo en unos momentos.";
       }
     } catch {
-      recoveryMessage.textContent = "We couldn't connect to Mycellios.";
+      recoveryMessage.textContent = "Todavía no hemos podido conectar. Vuelve a intentarlo en unos momentos.";
     } finally {
       retrying = false;
-      retryButton.disabled = false;
-      retryButton.textContent = "Retry";
+      setBusy(false);
+      recovery.removeAttribute("aria-busy");
+      retryButton.textContent = "Volver a intentar";
     }
+  });
+
+  quickConnect.addEventListener("click", () => {
+    if (setupBusy || retrying || !cloudUrl) return;
+    void save("existing", cloudUrl);
   });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (setupBusy || retrying) return;
     recovering = false;
     const mode = selectedMode();
     if (mode === "new") void runStack();
@@ -373,7 +389,7 @@
 
   async function init() {
     if (bridge === undefined) {
-      setStatus("Setup bridge unavailable.", "error");
+      setStatus("Abre Mycellios desde la aplicación para continuar.", "error");
       setBusy(true);
       return;
     }
@@ -389,15 +405,22 @@
         savedServers.replaceChildren();
         const entries = await bridge.servers?.().catch(() => []) ?? [];
         if (!entries.length) return;
-        const heading = document.createElement("h2"); heading.textContent = "Servidores"; savedServers.append(heading);
+        const heading = document.createElement("h2"); heading.textContent = "Tus conexiones"; savedServers.append(heading);
         for (const entry of entries) {
-          const row = document.createElement("div"); row.className = "actions";
-          const button = document.createElement("button"); button.type = "button"; button.className = "button button-secondary";
-          button.textContent = entry.name; button.title = entry.serverUrl;
+          const row = document.createElement("div"); row.className = "saved-connection";
+          const button = document.createElement("button"); button.type = "button"; button.className = "saved-connection-name";
+          let name = entry.name;
+          try {
+            const address = new URL(entry.serverUrl);
+            if (!name || name === address.host || name === entry.serverUrl) name =
+              ["127.0.0.1", "localhost", "[::1]"].includes(address.hostname) ? "Este equipo" : "Mi espacio";
+          } catch { name = "Mi espacio"; }
+          button.textContent = name;
+          button.setAttribute("aria-label", `Elegir ${name}`);
           button.onclick = () => { if (setupBusy) return; document.querySelector(`input[name="mode"][value="${entry.mode}"]`).checked = true; serverUrl.value = entry.serverUrl; document.getElementById("server-name").value = entry.name; syncPanels(); continueButton.focus(); };
           row.append(button);
           if (state.activeServer !== entry.serverUrl) { const forget = document.createElement("button"); forget.type = "button"; forget.className = "link"; forget.textContent = "Quitar";
-            forget.onclick = async () => { if (setupBusy) return; try { await bridge.forgetServer(entry.serverUrl); await renderServers(); } catch { setStatus("No se ha podido quitar el servidor.", "error"); } }; row.append(forget); }
+            forget.onclick = async () => { if (setupBusy) return; try { await bridge.forgetServer(entry.serverUrl); await renderServers(); } catch { setStatus("No se ha podido quitar la conexión.", "error"); } }; row.append(forget); }
           savedServers.append(row);
         }
       }
@@ -405,21 +428,20 @@
       defaultLocalUrl = state.defaultLocalUrl;
       cloudUrl = state.cloudUrl;
       if (state.manager) {
-        document.getElementById("heading").textContent = "Servidores";
-        subheading.textContent = "Conecta otro servidor y conserva tus sesiones por separado.";
-        advanced.querySelector("summary").textContent = "Conexión del servidor";
-        checkButton.textContent = "Comprobar conexión";
+        document.getElementById("heading").textContent = "Conecta tu espacio";
+        subheading.textContent = "Abre Mycellios o usa un enlace que te hayan compartido.";
         form.querySelector("fieldset").hidden = true;
-        document.querySelector('label[for="server-url"]').textContent = "Dirección del servidor";
         document.getElementById("mode-existing").checked = true;
       }
       recovering = state.recovery === true;
       showRecoveryDiagnostic(recovering ? state.error : null);
       recovery.hidden = state.recovery !== true;
+      welcome.hidden = state.recovery === true;
+      if (state.recovery) document.getElementById("heading").textContent = "Volvamos a conectar";
       subheading.hidden = state.recovery === true;
-      advanced.open = state.recovery !== true;
-      serverUrl.value = cloudUrl;
-      if (state.saved !== null && !recovering) {
+      advanced.open = false;
+      serverUrl.value = "";
+      if (state.saved !== null && !recovering && !state.manager) {
         const mode = state.saved.mode;
         const modeInput = document.querySelector(`input[name="mode"][value="${mode}"]`);
         if (modeInput !== null) modeInput.checked = true;
@@ -436,24 +458,20 @@
       // Normal connection recovery never starts, adopts or follows a local server.
       const stack = state.recovery ? null : await bridge.stack.state();
       const attached = stack !== null && stack.phase !== "idle";
+      if (attached) advanced.open = true;
       if (attached) document.getElementById("mode-new").checked = true;
       syncPanels();
       setBusy(false);
-      if (state.error && !state.recovery) setStatus(state.error, "error");
+      if (state.error && !state.recovery) { showRecoveryDiagnostic(state.error); }
       if (state.recovery) {
-        retryButton.focus();
         return;
       }
       if (attached) {
         renderStack(stack);
         if (!TERMINAL_PHASES.has(stack.phase)) void followStack();
-      } else if (selectedMode() === "existing") {
-        serverUrl.focus();
-      } else {
-        continueButton.focus();
       }
     } catch {
-      setStatus("Setup could not start. Quit Mycellios and try again.", "error");
+      setStatus("No hemos podido abrir Mycellios. Cierra la aplicación y vuelve a intentarlo.", "error");
       setBusy(true);
     }
   }

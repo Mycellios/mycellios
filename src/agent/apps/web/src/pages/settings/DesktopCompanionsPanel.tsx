@@ -26,7 +26,7 @@ export function DesktopCompanionsPanel({ kind, bots, onBusyChange }: { kind: "do
   useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   async function save(next: DesktopCompanionPreferences) {
     if (!bridge || busy) return; setBusy(true); setError("");
-    try { setValue(await bridge.save(next)); } catch { setError(t`Could not save this preference.`); } finally { setBusy(false); }
+    try { setValue(await bridge.save(next)); window.dispatchEvent(new Event("mycellios:companion-preferences")); } catch { setError(t`Could not save this preference.`); } finally { setBusy(false); }
   }
   if (!bridge) return <p className="text-sm text-muted-foreground">{t`Restart the updated desktop app to manage computer settings here.`}</p>;
   const shown = value?.[kind].shown === true;

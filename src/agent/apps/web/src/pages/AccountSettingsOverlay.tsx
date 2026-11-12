@@ -359,11 +359,11 @@ export function GeneralSettingsPanels({
 
       <Disclosure
         data-testid="advanced-settings"
-        className="group rounded-xl border border-border"
+        className="rk-settings-advanced"
         summary={<Trans>Advanced</Trans>}
-        summaryClassName="w-full flex items-center justify-between gap-4 px-4 py-3 text-[14px] text-foreground"
+        summaryClassName="w-full flex items-center justify-between gap-4 px-1 py-3 text-[14px] text-foreground"
       >
-        <div className="divide-y divide-border border-t border-border">
+        <SettingsGroup data-testid="advanced-settings-content">
         <SettingsRow
           label={
             <span id={sidebarDensityLabelId}>
@@ -508,7 +508,7 @@ export function GeneralSettingsPanels({
               />
             }
           />
-        </div>
+        </SettingsGroup>
       </Disclosure>
       </> : null}
 

@@ -3521,7 +3521,7 @@ msgstr "No preguntar nunca"
 
 #: src/pages/shell/chat-context.tsx
 msgid "New"
-msgstr ""
+msgstr "Nuevo"
 
 #: src/pages/Shell.tsx
 #: src/pages/shell/agent-import.tsx
@@ -3540,7 +3540,7 @@ msgstr "Nuevo chat grupal"
 
 #: src/pages/shell/chat-context.tsx
 msgid "New messages"
-msgstr ""
+msgstr "Mensajes nuevos"
 
 #: src/pages/ScratchpadSection.tsx
 msgid "New open-work item"
@@ -11138,3 +11138,162 @@ msgstr "Mycellios envía grabaciones de hasta 30 segundos a la red y consume tus
 
 msgid "Device or connected provider"
 msgstr "Dispositivo o proveedor conectado"
+
+msgid "Preview update animation"
+msgstr "Ver transición de actualización"
+
+msgid "Workspaces"
+msgstr "Espacios de trabajo"
+
+msgid "Display options"
+msgstr "Opciones de vista"
+
+msgid "Add Mico to dock"
+msgstr "Añadir Mico al dock"
+
+msgid "Move Mico dock"
+msgstr "Mover dock de Micos"
+
+msgid "New Mico"
+msgstr "Nuevo Mico"
+
+
+msgid "Mycelium sprout"
+msgstr "Brote"
+
+
+msgid "Mycelium branch"
+msgstr "Rama"
+
+
+msgid "Mycelium node"
+msgstr "Nudo"
+
+
+msgid "Mycelium spore"
+msgstr "Espora"
+
+
+msgid "Mycelium colony"
+msgstr "Colonia"
+
+msgid "Select to reply"
+msgstr "Selecciona para responder"
+
+msgid "Mycelium hypha"
+msgstr "Hifa"
+
+msgid "Mycelium nexus"
+msgstr "Nexo"
+
+msgid "Mycelium bridge"
+msgstr "Puente"
+
+msgid "Mycelium loop"
+msgstr "Bucle"
+
+msgid "Mycelium crest"
+msgstr "Cresta"
+
+msgid "Mycelium weave"
+msgstr "Trama"
+
+msgid "Avatar forest"
+msgstr "Verde bosque"
+
+msgid "Avatar pink"
+msgstr "Rosa"
+
+msgid "Avatar brown"
+msgstr "Marrón"
+
+msgid "Avatar yellow"
+msgstr "Amarillo"
+
+msgid "Avatar blue"
+msgstr "Azul"
+
+msgid "Avatar pine"
+msgstr "Verde pino"
+
+msgid "Avatar cream"
+msgstr "Crema"
+
+msgid "Skip all questions"
+msgstr "Omitir todas las preguntas"
+
+msgid "Previous question"
+msgstr "Pregunta anterior"
+
+msgid "Next question"
+msgstr "Siguiente pregunta"
+
+msgid "Choose all that apply"
+msgstr "Elige todas las que correspondan"
+
+msgid "Something else"
+msgstr "Otra cosa"
+
+msgid "Skipped"
+msgstr "Omitida"
+
+msgid "Next"
+msgstr "Siguiente"
+
+msgid "Questions"
+msgstr "Preguntas"
+
+msgid "asks"
+msgstr "pregunta"
+
+msgid "Answer in Mycellios"
+msgstr "Responder en Mycellios"
+
+msgid "Or write your own answer"
+msgstr "O escribe tu propia respuesta"
+
+msgid "more requests"
+msgstr "solicitudes más"
+
+msgid "Could not confirm the answer. Open the chat before retrying."
+msgstr "No se pudo confirmar la respuesta. Abre el chat antes de reintentar."
+
+msgid "Chat order"
+msgstr "Orden de los chats"
+
+msgid "Choose how conversations are shown. Automatic orders keep your saved manual order."
+msgstr "Elige cómo se muestran las conversaciones. El orden manual se conserva."
+
+msgid "Group unread"
+msgstr "Agrupar sin leer"
+
+msgid "Unread first"
+msgstr "Sin leer primero"
+
+msgid "Unread"
+msgstr "Sin leer"
+
+msgid "Searching for information…"
+msgstr "Buscando información…"
+
+msgid "Reading files…"
+msgstr "Leyendo archivos…"
+
+msgid "Updating files…"
+msgstr "Actualizando archivos…"
+
+
+msgid "Use models with your Mycellios credits. No API key needed."
+msgstr "Usa modelos con tus créditos Mycellios. No necesitas una clave API."
+
+
+msgid "Optional. Keep your own providers and choose which one to use for each Mico."
+msgstr "Es opcional. Conserva tus proveedores y elige cuál usar con cada Mico."
+
+
+msgid "External models include the 4% Mycellios service fee in the displayed price."
+msgstr "El precio mostrado de los modelos externos incluye el 4 % de servicio Mycellios."
+
+
+msgid "Connect Mycellios"
+msgstr "Conectar Mycellios"

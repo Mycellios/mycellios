@@ -1,20 +1,28 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
-import { ArrowLeft, Blocks, BookOpen, Bot as BotIcon, LayoutGrid } from "lucide-react";
+import {
+  ArrowLeft,
+  Blocks,
+  BookOpen,
+  Bot as BotIcon,
+  LayoutGrid,
+} from "lucide-react";
 import type { connectedAppMarks } from "../../lib/connected-apps";
 import { desktopDragClass } from "../../lib/desktop";
 import { PluginsOverlay } from "../PluginsOverlay";
 import { AgentsMarketplace } from "./AgentsMarketplace";
 import { type MarketplaceTab } from "./catalog";
 import { SkillsMarketplace } from "./SkillsMarketplace";
+import { HostedWebs } from "./HostedWebs";
 import "./marketplace.css";
-import { HifaStoreCatalog } from "./HifaStoreCatalog";
+import "./mycellios-apps.css";
 
 export function MarketplaceWorkspace(props: {
   tab: MarketplaceTab;
   onTab: (tab: MarketplaceTab) => void;
   scope: string;
+  spaceId?: string | null;
   bots: Bot[];
   activeBotId?: string;
   onExit: () => void;
@@ -77,9 +85,20 @@ export function MarketplaceWorkspace(props: {
             ))}
           </nav>
         </aside>
-        <div className="rk-market-content rk-scroll" key={`${props.scope}:${props.tab}`}>
+        <div
+          className="rk-market-content rk-scroll"
+          key={`${props.scope}:${props.tab}`}
+        >
           {props.tab === "mycellios-apps" ? (
-            <HifaStoreCatalog scope={props.scope} onOpenStudio={props.onOpenStudio} />
+            <HostedWebs
+              scope={props.scope}
+              spaceId={props.spaceId}
+              bots={props.bots}
+              activeBotId={props.activeBotId}
+              onOpenStudio={props.onOpenStudio}
+              onOpenBot={props.onOpenBot}
+              onCreateBot={props.onCreateBot}
+            />
           ) : props.tab === "apps" ? (
             <PluginsOverlay
               onConnectedAppsChange={props.onConnectedAppsChange}

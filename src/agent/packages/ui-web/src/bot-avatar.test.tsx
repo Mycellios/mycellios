@@ -3,6 +3,7 @@ import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  botAvatarMood,
   BOT_AVATAR_COLORS,
   BotAvatar,
   BotShapePreview,
@@ -232,5 +233,28 @@ describe("BotAvatar", () => {
     expect(html).toContain('data-mico-avatar="flat"');
     expect(html).not.toContain("<feComponentTransfer");
     expect(html).not.toContain("#zzzzzz");
+  });
+});
+
+
+describe("runtime avatar expressions", () => {
+  it("prioritizes failure and waiting over unread replies and work", () => {
+    expect(botAvatarMood("failed", true)).toBe("failed");
+    expect(botAvatarMood("waiting_input", true)).toBe("waiting");
+    expect(botAvatarMood("waiting_takeover", true)).toBe("waiting");
+    expect(botAvatarMood("running", true)).toBe("working");
+    expect(botAvatarMood("idle", true)).toBe("responded");
+    expect(botAvatarMood("idle", false)).toBe("idle");
+    expect(botAvatarMood("offline", true)).toBe("asleep");
+  });
+  it.each(["flat", "plush"] as const)("preserves chosen %s artwork across every expression", (finish) => {
+    const value = micoAvatarValue(1001, "#8650DF", { eyes: 15, finish, original: true });
+    const idle = renderToString(<BotAvatar color={value} identity="fox" />);
+    const paths = (html: string) => [...html.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]);
+    for (const status of ["running", "waiting_input", "failed", "offline"]) {
+      const html = renderToString(<BotAvatar color={value} identity="fox" status={status} />);
+      expect(html).toContain(`data-mood="${botAvatarMood(status)}"`);
+      expect(paths(html)).toEqual(paths(idle));
+    }
   });
 });

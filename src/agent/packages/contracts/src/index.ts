@@ -60,3 +60,10 @@ export * from "./usage-dashboard.js";
 export * from "./plan-limits.js";
 
 export * from "./notification-settings.js";
+
+export * from "./questionnaire.js";
+export * from "./app-covers.js";
+
+export * from "./video-edit.js";
+export * from "./referrals.js";
+export * from "./hosted-webs.js";

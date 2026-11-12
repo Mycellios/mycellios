@@ -41,6 +41,53 @@ Real Manu recordings, linguistic/word-boundary accuracy, production promotion,
 native installer acceptance and full suites are NOT established by this evidence.
 
 
+## Unified Apps and hosted static apps — local qualification, 2026-11-11
+
+The Agent Marketplace has one Apps library for static HTML/CSS/JS/assets and
+fixed Desktop app launchers; legacy Webs URLs open that same library. Account/Space owners can upload files or a folder, edit encrypted private
+source, preview, publish frozen revisions, unpublish, pin and clone a published
+site into an independent private draft. Public projections omit account identity.
+Published document visits are deduplicated per site/day with rotating HMACs of
+the trusted client address and browser; no raw visitor addresses are stored in
+the feature's analytics tables. Trends use those visits from the last seven days.
+
+Local PostgreSQL qualification applies the actual additive migrations with a
+non-superuser runtime role. It verifies encrypted drafts, missing/foreign tenant
+denials, same-user cross-Space denials, current membership, CAS saves/publication,
+immutable revisions, independent cloning, scoped pins, public-source projection,
+unpublication and visit deduplication. A real local browser verifies Antseed Radar
+against the public Antseed indexer, including search, empty results and token
+estimates. A multi-file private preview loads relative CSS and JavaScript modules;
+browser probes confirm parent-document/storage/worker access is blocked and no
+Desktop bridge is present. Both direct serving and iframe previews enforce an
+opaque script-only sandbox; the server does not fetch author-selected URLs.
+
+Antseed Radar is a community utility with no personal owner attribution or account
+access. Prices are advertised indexer snapshots, not verified routing availability
+or purchase quotations; per-unit billing is not presented as token-free service.
+Unsaved editor work survives internal navigation in an account/Space-scoped
+memory cache, is cleared on account changes, and defers automatic reloads.
+
+The app editor assigns an owned Space Mico to a dedicated task conversation,
+reusing normal SSE streaming/recovery, send receipts, approvals and Stop. Its
+app_read/app_write tools resolve the actual active run, Mico and thread binding,
+recheck membership/archived state and update only the encrypted draft with CAS.
+Reassignment and writes share a site lock. Invalid Micos, accounts, Spaces,
+stopped runs and revoked bindings fail actual PostgreSQL qualification. A
+private preview follows saved draft versions; dirty manual edits are retained
+with a visible conflict. Focused UI tests cover both revision refresh and lost
+update prevention. App prompt/nonce recovery uses the account-scoped memory
+cache and existing reload guard. Desktop and 390px mobile captures were inspected.
+The synthetic preview Mico has no model configured: its send correctly rejects
+with the model-connection action. An authenticated provider-generated edit has
+NOT RUN; no synthetic response is presented as a real model invocation.
+API, worker and web production build commands passed locally. The final editor
+reconnect check clears transient synchronization warnings after recovery.
+
+This evidence is local and synthetic-account qualification. Production promotion,
+public-domain health, installed Desktop acceptance and backend-app hosting are
+not established by these checks. Full suites remain paused. See
+`specs/hosted-webs/spec.md` for limits and boundaries.
 
 ## Conversation responsiveness — published 2026-11-11
 

@@ -7,6 +7,86 @@ datasource db {
   provider = "postgresql"
 }
 
+model HostedWeb {
+  agent HostedWebAgent?
+  id String @id
+  spaceId String
+  userId String
+  slug String @unique
+  title String
+  summary String
+  draftBundle Json
+  version Int @default(1)
+  publishedRevisionId String?
+  forkedFrom String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  revisions HostedWebRevision[] @relation("WebRevisions")
+  publishedRevision HostedWebRevision? @relation("PublishedWeb", fields: [id, publishedRevisionId], references: [siteId, id], onDelete: NoAction, onUpdate: NoAction, map: "hosted_webs_published_revision_fk")
+  pins HostedWebPin[]
+  views HostedWebView[]
+  @@index([spaceId, userId])
+  @@unique([id, userId, spaceId])
+  @@map("hosted_webs")
+}
+
+model HostedWebAgent {
+  siteId String @id
+  userId String
+  spaceId String
+  botId String
+  threadId String @unique
+  site HostedWeb @relation(fields: [siteId, userId, spaceId], references: [id, userId, spaceId], onDelete: Cascade, onUpdate: NoAction)
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@unique([siteId, userId, spaceId])
+  @@map("hosted_web_agents")
+}
+
+model HostedWebRevision {
+  id String @id
+  siteId String
+  spaceId String
+  userId String
+  number Int
+  digest String
+  title String
+  summary String
+  bundle Json
+  createdAt DateTime @default(now())
+  site HostedWeb @relation("WebRevisions", fields: [siteId, userId, spaceId], references: [id, userId, spaceId], onDelete: Cascade, onUpdate: NoAction)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  publishedBy HostedWeb[] @relation("PublishedWeb")
+  @@unique([siteId, number])
+  @@unique([siteId, id])
+  @@map("hosted_web_revisions")
+}
+
+model HostedWebPin {
+  siteId String
+  userId String
+  spaceId String
+  site HostedWeb @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@id([siteId, userId, spaceId])
+  @@map("hosted_web_pins")
+}
+
+model HostedWebView {
+  siteId String
+  day String
+  visitor String
+  createdAt DateTime @default(now())
+  site HostedWeb @relation(fields: [siteId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  @@id([siteId, day, visitor])
+  @@index([createdAt])
+  @@map("hosted_web_views")
+}
+
 model AiDataConsent {
   userId String
   spaceId String
@@ -22,6 +102,9 @@ model AiDataConsent {
 }
 
 model User {
+  hostedWebs HostedWeb[]
+  hostedWebRevisions HostedWebRevision[]
+  hostedWebPins HostedWebPin[]
   inboxTasks InboxTask[]
   workflows Workflow[]
   workflowExecutions WorkflowExecution[]
@@ -265,6 +348,9 @@ model Member {
 }
 
 model Space {
+  hostedWebs HostedWeb[]
+  hostedWebRevisions HostedWebRevision[]
+  hostedWebPins HostedWebPin[]
   inboxTasks InboxTask[]
   workflows Workflow[]
   workflowExecutions WorkflowExecution[]
@@ -552,6 +638,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  hostedWebAgents HostedWebAgent[]
   inboxTasks InboxTask[]
   taskConcurrency Int @default(4)
   agentEngine String @default("pi")
@@ -711,6 +798,7 @@ model DevelopmentProject {
 }
 
 model Thread {
+  hostedWebAgent HostedWebAgent?
   inboxTask InboxTask?
   taskBotId String?
   taskBot Bot? @relation("MicoTaskThreads", fields: [taskBotId], references: [id], onDelete: Cascade)

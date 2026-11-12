@@ -1,3 +1,4 @@
+import { hostedWebHttp } from "./hosted-webs/http.js";
 import { tailnetServiceFromEnv } from "@rakazo/adapters";
 import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { ORPCError, onError } from "@orpc/server";
@@ -732,6 +733,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   const app = new Hono();
   app.use("*", requestLogging(logger));
   app.use("*", clientIpMiddleware(clientIp, env.clientIpHeader));
+  app.route("/", hostedWebHttp(prisma, env.screenProxySecret, requestClientIp));
   app.use(
     "*",
     cors({
