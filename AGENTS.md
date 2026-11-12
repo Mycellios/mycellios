@@ -101,8 +101,10 @@ These rules apply to the complete repository.
 - `.github/workflows/agent-release-artifact.yml` builds release branches or an
   explicitly dispatched revision into sealed coordinator/web/API/worker outputs.
   Its manifest binds the source tree, lockfiles, output hashes and web build ID.
-  It does not deploy, install production dependencies, apply migrations or run
-  paid inference. Promotion still requires the integrated source tree, live
+  Seal the native runtime through coordinator:release:prepare so its Python,
+  dependency closure, source provenance and output receipts travel together.
+  The workflow does not deploy, install dependencies on the live server, apply
+  migrations or run paid inference. Promotion still requires the integrated source tree, live
   runtime provenance, compatible dependencies, rollback and health checks.
 
 - Reusable web controls live in `landing/src/ui`. Use the production kit in every
