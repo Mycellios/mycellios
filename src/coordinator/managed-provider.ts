@@ -19,6 +19,7 @@ import type {ManagedTextRequest} from "./managed-openrouter.js";
 import type {ManagedModel} from "../contracts/managed-provider.js";
 import {ManagedMediaCatalog} from "./managed-media-catalog.js";
 import {ManagedAntseedText} from "./managed-antseed-text.js";
+import {ManagedAntseedGateway} from "./managed-antseed-gateway.js";
 
 type Principal = { kind: "system" } | { kind: "user"; userId: string } | { kind: "api_key"; userId: string; apiKeyId: string };
 const payer = (principal: Principal) => {
@@ -41,11 +42,14 @@ export async function initializeManagedProvider(config: CoordinatorConfig, datab
   await purchases.initialize();
   const settings = config.managedProvider;
   const upstream = settings.upstream ?? "antseed";
-  if (upstream === "antseed" && settings.mediaEnabled) throw new Error("managed_antseed_media_not_qualified");
+  if (upstream !== "openrouter" && settings.mediaEnabled) throw new Error("managed_antseed_media_not_qualified");
   const text = upstream === "antseed"
     ? new ManagedAntseedText(settings.antseedControlSecret ?? "", settings.modelAllowlist, fetch, settings.fundingCostBasisPoints ?? null)
-    : new ManagedOpenRouter(settings.openRouterKey ?? "", settings.modelAllowlist, fetch, settings.fundingCostBasisPoints ?? null);
-  const backend = text instanceof ManagedAntseedText ? managedTextBackend("antseed",text) : managedTextBackend("openrouter",text);
+    : upstream === "antseed-gateway" ? new ManagedAntseedGateway(settings.antseedGatewayKey ?? "", settings.antseedGatewayBaseUrl ?? "",
+      settings.modelAllowlist, settings.fundingCostBasisPoints ?? null, fetch, settings.antseedGatewayContract)
+      : new ManagedOpenRouter(settings.openRouterKey ?? "", settings.modelAllowlist, fetch, settings.fundingCostBasisPoints ?? null);
+  const backend = text instanceof ManagedAntseedText ? managedTextBackend("antseed",text)
+    : text instanceof ManagedAntseedGateway ? managedTextBackend("antseed-gateway",text) : managedTextBackend("openrouter",text);
   const provider = new ManagedTextRouter([backend],settings.textRoutes);
   // The first account sees the full current catalog, without a second-open warmup.
   // Metadata failures are isolated by the router; native inference remains available.
