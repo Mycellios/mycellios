@@ -8,7 +8,7 @@ const fixture = vi.hoisted(() => ({ state: {} as DesktopUpdateState, safe: true,
 const bridge = vi.hoisted(() => ({
   state: vi.fn(async () => ({ ...fixture.state })),
   check: vi.fn(async () => ({ ...fixture.state })),
-  install: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: true })),
+  install: vi.fn(async (): Promise<DesktopUpdateState> => (fixture.state = { ...fixture.state, installPending: true })),
   forceInstall: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: true, restartMode: "now" })),
   cancelInstall: vi.fn(async () => (fixture.state = { ...fixture.state, installPending: false })),
   cancelRestart: vi.fn(async () => (fixture.state = { ...fixture.state, relaunchPending: false, relaunchWaitingFor: undefined })),

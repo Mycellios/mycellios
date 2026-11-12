@@ -29,6 +29,8 @@ export function planChecks(files, availableAgentTests) {
   const root = files.some(f => !visual(f) && /^(src\/(?!agent\/)|landing\/|mobile\/|tests\/|scripts\/.*\.ts$|tsconfig|vite\.|vitest\.|package(?:-lock)?\.json$)/.test(f))
     || files.some(f => /^scripts\/.*\.test\.[cm]?js$/.test(f) && f !== 'scripts/ci-fast-delivery.test.mjs');
   const agent = files.some(f => f.startsWith('src/agent/') && !visual(f));
+  const agentShared = files.some(f => f.startsWith('src/agent/') && (!f.startsWith('src/agent/apps/') || f.startsWith('src/agent/apps/api/')));
+  const agentWeb = agent && (agentShared || files.some(f => f.startsWith('src/agent/apps/web/')));
   const desktopDownloadBrowserTest = 'scripts/desktop-macos/download-page.test.mjs';
   const desktopDownloads = files.some(f => ['landing/src/DesktopDownloads.tsx', 'src/contracts/desktop-downloads.ts', desktopDownloadBrowserTest].includes(f));
   const commands = [];
@@ -47,8 +49,9 @@ export function planChecks(files, availableAgentTests) {
       else add('.', 'node', ['--test', file], `test: ${file}`);
     }
   }
+  // Agent's browser contribution imports the root-owned mobile runtime and its WebGPU types.
+  if (root || agentWeb) add('.', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'root locked dependencies');
   if (root) {
-    add('.', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'root locked dependencies');
     for (const script of ['verify:structure', 'verify:architecture', 'verify:component-boundaries']) add('.', 'npm', ['run', script], script);
     const config = files.some(f => /^(package|tsconfig|vitest\.|vite\.)/.test(f));
     for (const [prefix, script] of [['src/', 'typecheck'], ['landing/', 'landing:typecheck'], ['mobile/', 'mobile:typecheck']]) {
@@ -72,7 +75,7 @@ export function planChecks(files, availableAgentTests) {
     add('src/agent', 'npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], 'Agent locked dependencies');
     for (const file of agentScriptTests) add('.', 'node', ['--test',file], `test: ${file}`);
     add('src/agent', 'npm', ['run', 'generate', '--workspace', '@rakazo/db'], 'Prisma client generation (no database connection)');
-    const shared = files.some(f => f.startsWith('src/agent/') && (!f.startsWith('src/agent/apps/') || f.startsWith('src/agent/apps/api/')));
+    const shared = agentShared;
     for (const app of ['web', 'api', 'worker', 'desktop']) {
       if (shared || files.some(f => f.startsWith(`src/agent/apps/${app}/`))) add('src/agent', 'node', ['node_modules/typescript/bin/tsc', '--noEmit', '--incremental', '--tsBuildInfoFile', `../../.ci/agent-${app}.tsbuildinfo`, '-p', `apps/${app}/tsconfig.json`], `Agent ${app} types`);
     }

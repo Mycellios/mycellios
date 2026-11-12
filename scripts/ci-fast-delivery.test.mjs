@@ -27,9 +27,11 @@ test('changed tests execute directly rather than relying on import discovery', (
   assert.ok(plan.some(c => c.label === 'Agent changed tests' && c.args.includes('apps/web/src/example.test.tsx')));
   assert.ok(plan.some(c => c.label === 'root changed tests' && c.args.includes('tests/example.test.ts')));
 });
-test('Agent web uses only its owned dependency graph and affected surface', () => {
+test('Agent web installs its imported root runtime dependencies without unrelated typechecks', () => {
   const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx'], ['apps/web/src/pages/Shell.test.tsx']);
-  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 1);
+  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 2);
+  assert.ok(plan.findIndex(c => c.label === 'root locked dependencies') < plan.findIndex(c => c.label === 'Agent web types'));
+  assert.ok(!plan.some(c => ['typecheck', 'landing:typecheck', 'mobile:typecheck'].includes(c.label)));
   assert.ok(plan.some(c => c.label === 'Agent web types'));
   assert.ok(!plan.some(c => c.label === 'Agent api types'));
   assert.ok(plan.some(c => c.label === 'Agent affected tests' && c.args.includes('apps/web/src/pages/Shell.test.tsx')));
@@ -42,7 +44,7 @@ test('shared Agent contracts check all consumers', () => {
 test('mobile notification migration runs actual isolated database qualification', () => {
   const plan = planChecks(['src/agent/packages/db/prisma/migrations/20261112110000_mobile_push_devices/migration.sql']);
   assert.ok(plan.some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
-  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 1);
+  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 2);
   assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
 });
 test('Agent test files share the existing two-worker budget without serializing discovery', () => {
