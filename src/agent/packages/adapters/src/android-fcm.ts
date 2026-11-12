@@ -1,4 +1,5 @@
 import { createHash, createPrivateKey, sign } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import type { AdapterContext, NotificationMessage } from "@rakazo/adapter-kit";
 
 type Credentials = { projectId: string; clientEmail: string; privateKey: ReturnType<typeof createPrivateKey> };
@@ -48,7 +49,8 @@ export class AndroidFcm {
       body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }) });
     if (!response.ok) { await response.body?.cancel(); throw new Error("Android push could not authenticate with Google"); }
     const body = await json(response);
-    if (typeof body.access_token !== "string" || !body.access_token || !Number.isFinite(body.expires_in)) throw new Error("Android push returned invalid authorization");
+    if (typeof body?.access_token !== "string" || !/^\S{1,8192}$/.test(body.access_token) ||
+      !Number.isFinite(body.expires_in) || body.expires_in <= 0) throw new Error("Android push returned invalid authorization");
     this.cached = { value: body.access_token, expires: Date.now() + Math.min(3600, body.expires_in) * 1000 };
     return body.access_token as string;
   }
@@ -61,19 +63,25 @@ export class AndroidFcm {
     else if (message.taskThreadId) data.taskThreadId = message.taskThreadId;
     // Data-only: the native receiver must check account binding and deduplicate before displaying.
     for (let attempt = 0; attempt < 3; attempt++) {
-      const response = await this.request(`https://fcm.googleapis.com/v1/projects/${this.credentials.projectId}/messages:send`, {
+      const accessToken = await this.token();
+      let response: Response;
+      try { response = await this.request(`https://fcm.googleapis.com/v1/projects/${this.credentials.projectId}/messages:send`, {
         method: "POST", redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(15_000), context.signal]),
-        headers: { authorization: `Bearer ${await this.token()}`, "content-type": "application/json" },
+        headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
         body: JSON.stringify({ message: { token, data, android: { priority: "high", ttl: "300s", collapse_key: createHash("sha256").update(message.threadId).digest("hex").slice(0, 32) } } }),
-      });
-      if (response.status === 401 && attempt < 2) { await response.body?.cancel(); this.cached = undefined; continue; }
-      const body = await json(response);
-      if (response.ok && typeof body.name === "string") return "delivered";
-      const codes = Array.isArray(body.error?.details) ? body.error.details.map((value: any) => value.errorCode) : [];
-      if (codes.includes("UNREGISTERED")) return "unregistered";
-      if ((response.status === 429 || response.status >= 500) && attempt < 2) {
-        await new Promise(resolve => setTimeout(resolve, 500 * (2 ** attempt))); continue;
+      }); } catch {
+        if (attempt >= 2 || context.signal.aborted) throw new Error("Android push could not reach FCM");
+        await delay(500 * (2 ** attempt), undefined, { signal: context.signal }); continue;
       }
+      if (response.status === 401 && attempt < 2) { await response.body?.cancel(); this.cached = undefined; continue; }
+      if ((response.status === 429 || response.status >= 500) && attempt < 2) {
+        await response.body?.cancel();
+        await delay(500 * (2 ** attempt), undefined, { signal: context.signal }); continue;
+      }
+      const body = await json(response);
+      if (response.ok && typeof body?.name === "string") return "delivered";
+      const codes = Array.isArray(body?.error?.details) ? body.error.details.map((value: any) => value?.errorCode) : [];
+      if (codes.includes("UNREGISTERED")) return "unregistered";
       throw new Error("Android push was not accepted by FCM");
     }
     throw new Error("Android push authentication failed");
