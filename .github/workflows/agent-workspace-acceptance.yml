@@ -89,6 +89,8 @@ jobs:
       - name: Exercise Cadencia local media editing with a synthetic clip
         working-directory: src/agent/apps/web
         run: npm exec -- playwright test --config playwright.integrations.config.ts --grep Cadencia
+      - name: Exercise the standalone hosted sign-in bundle
+        run: node scripts/verify-hosted-login-ui.mjs hosted-login-proof
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -97,5 +99,6 @@ jobs:
             src/agent/workspace-proof
             src/agent/chat-flow-proof
             src/agent/playwright-integration-report
+            src/agent/hosted-login-proof
           if-no-files-found: warn
           retention-days: 7
