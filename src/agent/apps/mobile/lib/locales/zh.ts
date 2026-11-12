@@ -1,4 +1,9 @@
 export const ZH_MESSAGES: Record<string, string> = {
+  "Push notifications": "推送通知",
+  "Enable notifications": "启用通知",
+  "Enabling…": "正在启用…",
+  "Allow this device to receive alerts when the app is in the background.": "允许此设备在应用于后台运行时接收通知。",
+  "Registration requested. Check your system notification settings.": "已请求注册。请检查系统通知设置。",
   "Check agent engines on server": "检查服务器上的智能体引擎",
   "Find local models on server": "查找服务器上的本地模型",
   "Local discovery is available to the server owner.": "仅服务器所有者可使用本地发现功能。",

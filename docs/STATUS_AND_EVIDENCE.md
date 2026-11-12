@@ -2120,7 +2120,7 @@ not run or claimed; the demo remains synthesized media.
 
 ## Notification delivery and cross-platform qualification (2026-11-12)
 
-Source changes are local and uncommitted; no release, production migration, installer update or mobile distribution was performed.
+The notification candidate is isolated on feat/native-push-20261112, based on main e3984781c622b9959f56c5037b9b161047c1addb. No release, production migration, installer update or mobile distribution has been performed. The earlier offline results below predate the new native Android transport and do not qualify that candidate.
 
 - Reviewed nightly-labs/openbot at cf722a157dccbaa8ba18e0f49444eb07ce7e92d0: native desktop retention/clicks and OS settings, account/agent levels, APNs/FCM mobile registrations and foreground policy. Mycellios reuses its existing Electron, Web Push and Expo adapters; this is not a claim of identical sealed mobile transport or cross-device delivery acknowledgement.
 - Added bounded native-main Desktop delivery, internal-chat click validation, account/window cleanup, fixed OS settings links and the stable Windows installer identity. Older Desktop builds keep browser delivery. Native binaries were not rebuilt or physically qualified.
@@ -2129,9 +2129,11 @@ Source changes are local and uncommitted; no release, production migration, inst
 - Mobile boot/resume never requests permission; settings provides explicit opt-in on iOS and Android. Android initializes the stable channel. Async registration pins its original session and endpoint. Configuration failures are visible on an explicit request.
 - Actual isolated PostgreSQL testing exposed a pre-existing non-UTC session comparison bug. Native and web push session checks now compare UTC timestamp fields explicitly in UTC. The qualification script applies the actual feature migrations with a non-superuser, non-bypass runtime role in Europe/Paris, verifies Web Push registration/presence/renewal/expiry and passes 9 session/multi-device/RLS tests.
 - Affected offline tests: 138 unique tests passed (including mobile settings, explicit sign-out and worker-binding cleanup). The broader 31-test authorization suite was discovered but skipped without its full database harness. Full CI, full suites, release builds and device delivery are NOT RUN.
-- The local browser shows the new Spanish notification settings and accepted a synthetic test request; that is not proof of an OS banner or phone delivery. Local VAPID background push is not configured. No phone was connected through ADB. The separate native Android WebView host still lacks background push; the UI states this and directs users to the installed PWA. Native mobile distribution still requires an owned Expo project plus Apple/Google credentials. macOS/Linux/iOS/Android physical delivery remains unverified.
+- The local browser shows the new Spanish notification settings and accepted a synthetic test request; that is not proof of an OS banner or phone delivery. Local VAPID background push is not configured. No phone was connected through ADB. macOS/Linux/iOS/Android physical delivery remains unverified.
+- The candidate adds direct Firebase HTTP v1/data-only push to the distributable Android WebView host, separate from Expo. Native account/epoch checks, fixed-origin session registration, background Application initialization, session renewal, OS permission/settings, persistent deduplication and internal chat destinations are implemented. New FCM tokens never enter legacy Expo rows or the renderer bridge. Added OAuth/transport, account/project admission, database transport ownership and plain-Java payload/navigation tests are pending execution. Firebase provisioning, production secrets, migration, durable signing and actual delivery are separate release gates.
 
 Evidence: outputs/notifications-openbot in the task workspace. No subscription endpoints, bearer tokens or notification content were logged as evidence.
+
 ## Local Desktop approval continuation qualification
 
 Approval/takeover checkpoint continuations retain their parent run and project

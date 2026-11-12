@@ -6,13 +6,14 @@ import { EncryptedSecretStore } from "./secrets.js";
 export interface PushRecord {
   token: string;
   sessionId?: string;
+  transport?: "expo" | "fcm";
 }
 
 /** Account-wide registrations, shared by API replicas and notification workers. */
 export interface PushTokenStore {
   load(userId: string): Promise<PushRecord | undefined>;
   list?(userId: string): Promise<PushRecord[]>;
-  save(userId: string, token: string, sessionId: string): Promise<void>;
+  save(userId: string, token: string, sessionId: string, transport?: "expo" | "fcm"): Promise<void>;
   /** Import only when neither the account nor the device is registered already. */
   importLegacy(userId: string, token: string, sessionId: string): Promise<boolean>;
   remove(userId: string, tokenDigest?: string): Promise<void>;
@@ -53,14 +54,14 @@ export class PrismaPushTokenStore implements PushTokenStore {
       if (legacy && !rows.some(row => row.tokenDigest === legacy.tokenDigest)) {
         // A token handed to another account must not be resurrected by its legacy row.
         const owner = await this.prisma.mobilePushDevice.findUnique({ where: { tokenDigest: legacy.tokenDigest }, select: { userId: true } });
-        if (!owner || owner.userId === userId) rows.push(legacy);
+        if (!owner || owner.userId === userId) rows.push({ ...legacy, transport: "expo" });
       }
-      return Promise.all(rows.map(async row => ({ token: await this.encryption.load(row.ciphertext, `push-token:${userId}`), sessionId: row.sessionId })));
+      return Promise.all(rows.map(async row => ({ token: await this.encryption.load(row.ciphertext, `push-token:${userId}`), sessionId: row.sessionId, transport: row.transport as "expo" | "fcm" })));
     });
   }
 
-  async save(userId: string, token: string, sessionId: string): Promise<void> {
-    await this.register(userId, token, sessionId, "register");
+  async save(userId: string, token: string, sessionId: string, transport: "expo" | "fcm" = "expo"): Promise<void> {
+    await this.register(userId, token, sessionId, "register", transport);
   }
 
   importLegacy(userId: string, token: string, sessionId: string): Promise<boolean> {
@@ -72,6 +73,7 @@ export class PrismaPushTokenStore implements PushTokenStore {
     token: string,
     sessionId: string,
     mode: "register" | "import",
+    transport: "expo" | "fcm" = "expo",
   ): Promise<boolean> {
     const value = token.trim();
     if (!value) throw new Error("Push token is empty");
@@ -111,11 +113,11 @@ export class PrismaPushTokenStore implements PushTokenStore {
           AND "expiresAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') FOR UPDATE`;
           if (!sessions.length) throw new PushSessionEndedError();
           const data = { ciphertext: sealed.ciphertext, tokenDigest, sessionId };
-          await tx.mobilePushDevice.upsert({ where: { tokenDigest }, create: { userId, ...data }, update: { userId, ciphertext: sealed.ciphertext, sessionId } });
+          await tx.mobilePushDevice.upsert({ where: { tokenDigest }, create: { userId, ...data, transport }, update: { userId, ciphertext: sealed.ciphertext, sessionId, transport } });
           const stale = await tx.mobilePushDevice.findMany({ where: { userId, tokenDigest: { not: tokenDigest } }, orderBy: [{ updatedAt: "desc" }, { tokenDigest: "asc" }], skip: 19, select: { tokenDigest: true } });
           if (stale.length) await tx.mobilePushDevice.deleteMany({ where: { userId, tokenDigest: { in: stale.map(row => row.tokenDigest) } } });
           if (mode === "import") await tx.pushToken.create({ data: { userId, ...data } });
-          else {
+          else if (transport === "expo") {
             await tx.pushToken.deleteMany({ where: { tokenDigest, userId: { not: userId } } });
             await tx.pushToken.upsert({
               where: { userId },

@@ -203,6 +203,7 @@ model PushToken {
 /// Additive per-device registrations; PushToken remains readable by older releases.
 model MobilePushDevice {
   tokenDigest String @id
+  transport String @default("expo")
   userId String
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   ciphertext String

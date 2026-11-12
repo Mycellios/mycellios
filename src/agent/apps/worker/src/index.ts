@@ -35,6 +35,8 @@ import {
   databaseCapacityBackoffMs,
   deploymentModelUsageLookup,
   ExpoPushProvider,
+  AndroidFcm,
+  androidFcmConfig,
   GraphileJobPublisher,
   homeStorageSweeper,
   InMemoryJobQueue,
@@ -257,7 +259,10 @@ async function main() {
   const cloudAgent = createCloudAgentConnection();
   // Shared with the reconciler so a stuck wait uses the same push path as a finish notice.
   const pushTokens = new PrismaPushTokenStore(prisma, resolveEncryptionKey(process.env));
+  const androidCredentials = androidFcmConfig(process.env);
+  const androidPush = androidCredentials ? new AndroidFcm(androidCredentials) : undefined;
   const nativeNotifications = new ExpoPushProvider(pushTokens, {
+    androidPush,
     sessionExpiresAt: (sessionId) => pushSessionExpiresAt(prisma, sessionId),
     jobs,
     accessToken: process.env.EXPO_ACCESS_TOKEN,
@@ -343,7 +348,7 @@ async function main() {
     jobs,
     sandbox,
     events,
-    notifications: nativeNotifications,
+    notifications,
     leadership: createPostgresReconciliationLeadership(pool),
     reconcileModelCredits: createModelCreditReconciler({
       prisma,

@@ -1,6 +1,7 @@
 -- Preserve the legacy table and encrypted data for rolling upgrades and rollback.
 CREATE TABLE "mobile_push_devices" (
   "tokenDigest" TEXT NOT NULL PRIMARY KEY,
+  "transport" TEXT NOT NULL DEFAULT 'expo' CHECK ("transport" IN ('expo', 'fcm')),
   "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
   "ciphertext" TEXT NOT NULL,
   "sessionId" TEXT NOT NULL,

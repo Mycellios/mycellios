@@ -1,4 +1,9 @@
 export const NL_MESSAGES: Record<string, string> = {
+  "Push notifications": "Pushmeldingen",
+  "Enable notifications": "Meldingen inschakelen",
+  "Enabling…": "Inschakelen…",
+  "Allow this device to receive alerts when the app is in the background.": "Sta toe dat dit apparaat meldingen ontvangt wanneer de app op de achtergrond draait.",
+  "Registration requested. Check your system notification settings.": "Registratie aangevraagd. Controleer de meldingsinstellingen van je systeem.",
   "Check agent engines on server": "Agent-engines op de server controleren",
   "Find local models on server": "Lokale modellen op de server zoeken",
   "Local discovery is available to the server owner.": "Lokale detectie is beschikbaar voor de servereigenaar.",

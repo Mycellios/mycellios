@@ -15,6 +15,13 @@
   audition when its review panel closes.
 
 - The distributable Android host lives in apps/android and packages apps/web unchanged.
+  Native push uses data-only Firebase HTTP v1 messages, the fixed first-party session
+  registration endpoint and encrypted session-bound FCM device records. Keep Expo
+  tokens separate. Build with the four MYCELLIOS_FIREBASE_* public client values;
+  ANDROID_FCM_SERVICE_ACCOUNT_JSON belongs only to API/worker secrets. Initialize
+  Firebase in Application for background process starts. Never return tokens or
+  cookies over the WebView bridge. Preserve account/epoch checks, deduplication,
+  foreground suppression and validated internal notification destinations.
   Keep com.mycellios.android separate from the legacy Expo preview and use a durable
   release signing key, never the preview/debug certificate. Native capabilities use
   WebViewCompat messages with exact HTTPS origin, main-frame and packaged chat-route

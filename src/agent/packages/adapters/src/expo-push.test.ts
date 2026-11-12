@@ -55,6 +55,18 @@ describe("expo push tickets", () => {
 });
 
 describe("expo push", () => {
+  it("routes native Android devices directly to FCM and removes only unregistered tokens", async () => {
+    const remove = vi.fn(async () => undefined), send = vi.fn(async () => "unregistered" as const);
+    const tokens = { load: async () => undefined, list: async () => [{ token: "native-device", sessionId: "live-session", transport: "fcm" as const }],
+      save: async () => {}, importLegacy: async () => false, remove, endSession: async () => {} };
+    const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
+    const push = new ExpoPushProvider(tokens, { sessionExpiresAt: async () => new Date(Date.now() + 60_000), androidPush: { send } as never });
+    const message = { kind: "completion" as const, title: "Done", body: "Result", botId: "b", threadId: "t" };
+    expect(await push.deliver(message, notifyContext)).toBe("undeliverable");
+    expect(send).toHaveBeenCalledWith("native-device", message, notifyContext);
+    expect(remove).toHaveBeenCalledWith("user-1", credentialDigest("native-device"));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("fans out to every live mobile session and keeps one expired device from blocking the others", async () => {
     let rows = [{ token: "ExponentPushToken[phone]", sessionId: "phone" }, { token: "ExponentPushToken[tablet]", sessionId: "tablet" }, { token: "ExponentPushToken[old]", sessionId: "old" }];
     const tokens = { load: async () => rows[0], list: async () => rows, save: async () => {}, importLegacy: async () => false,

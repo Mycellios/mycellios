@@ -177,6 +177,16 @@ export function accountRoutes(ctx: RouterContext) {
       }),
     },
     notifications: {
+      androidStatus: authed.notifications.androidStatus.handler(async () => ({ configured: deps.androidPushConfigured === true })),
+      registerAndroidPush: authed.notifications.registerAndroidPush.handler(async ({ context, input }) => {
+        if (!deps.androidPushConfigured) throw new ORPCError("PRECONDITION_FAILED", { message: "Native Android push is not configured on this server." });
+        if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");
+        if (input.expectedUserId !== context.actor.userId) throw new ORPCError("FORBIDDEN");
+        if (input.projectId !== deps.androidPushProjectId) throw new ORPCError("PRECONDITION_FAILED", { message: "This Android build uses a different Firebase project." });
+        try { await deps.pushTokens.save(context.actor.userId, input.token, context.sessionId, "fcm"); }
+        catch (error) { if (error instanceof PushSessionEndedError) throw new ORPCError("UNAUTHORIZED"); throw error; }
+        return { ok: true as const };
+      }),
       webStatus: authed.notifications.webStatus.handler(async ({ context, input }) => {
         if (!deps.webPush) throw new ORPCError("SERVICE_UNAVAILABLE");
         if (!context.sessionId) throw new ORPCError("UNAUTHORIZED");

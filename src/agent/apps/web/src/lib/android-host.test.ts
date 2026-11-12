@@ -4,6 +4,18 @@ let module: typeof import("./android-host");
 const port = { postMessage: vi.fn(), onmessage: undefined as undefined | ((event: { data: string }) => void) };
 beforeEach(async () => { vi.resetModules(); port.postMessage.mockClear(); port.onmessage=undefined; window.MycelliosNative=port; module=await import("./android-host"); });
 afterEach(() => { delete window.MycelliosNative; });
+it("returns only validated notification status without native credentials",async()=>{
+ const pending=module.androidNotificationRequest("status",{accountId:"owner"});
+ const {id,type}=JSON.parse(port.postMessage.mock.lastCall![0]);expect(type).toBe("notification-status");
+ reply({type:"notification-result",id,text:JSON.stringify({supported:true,configured:true,registered:true,permission:"granted",token:"must-not-pass"})});
+ await expect(pending).resolves.toEqual({supported:true,configured:true,registered:true,permission:"granted"});
+});
+it("rejects malformed native notification status",async()=>{
+ const pending=module.androidNotificationRequest("enable",{accountId:"owner"});
+ const {id}=JSON.parse(port.postMessage.mock.lastCall![0]);
+ reply({type:"notification-result",id,text:'{"permission":"anything"}'});
+ await expect(pending).rejects.toThrow("invalid notification status");
+});
 function reply(data: unknown) { port.onmessage!({data:JSON.stringify(data)}); }
 it("receives a shortcut without recording or sending before the owned composer is ready",()=>{
  module.installAndroidHost();reply({type:"dictate"});

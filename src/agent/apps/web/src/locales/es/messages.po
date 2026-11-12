@@ -11306,6 +11306,7 @@ msgstr "Plegar menú del Marketplace"
 msgid "Expand Marketplace menu"
 msgstr "Mostrar menú del Marketplace"
 
+
 msgid "Delivery"
 msgstr "Entrega"
 
@@ -11383,3 +11384,15 @@ msgstr "Cuando termine"
 
 msgid "Send when this task finishes"
 msgstr "Enviar cuando termine esta tarea"
+
+msgid "Update Mycellios Android to configure native notifications."
+msgstr "Actualiza Mycellios Android para configurar las notificaciones nativas."
+
+msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+msgstr "Los avisos nativos de Android usan Firebase y abren el chat correspondiente. Activa el permiso del sistema para registrar este dispositivo."
+
+msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
+msgstr "Hay que configurar Firebase en la app de Android y en el servidor antes de activar el push nativo."
+
+msgid "Android push is not configured on this server."
+msgstr "Este servidor no tiene configurado el push de Android."

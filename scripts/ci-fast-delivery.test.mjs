@@ -38,6 +38,13 @@ test('shared Agent contracts check all consumers', () => {
   const plan = planChecks(['src/agent/packages/contracts/src/rpc.ts']);
   for (const app of ['web', 'api', 'worker', 'desktop']) assert.ok(plan.some(c => c.label === `Agent ${app} types`));
 });
+
+test('mobile notification migration runs actual isolated database qualification', () => {
+  const plan = planChecks(['src/agent/packages/db/prisma/migrations/20261112110000_mobile_push_devices/migration.sql']);
+  assert.ok(plan.some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
+  assert.equal(plan.filter(c => c.args[0] === 'ci').length, 1);
+  assert.ok(!planChecks(['src/agent/apps/web/src/pages/Shell.tsx']).some(c => c.args.includes('scripts/verify-notification-devices-db.ts')));
+});
 test('Agent test files share the existing two-worker budget without serializing discovery', () => {
   const plan = planChecks(['src/agent/apps/web/src/pages/Shell.tsx', 'src/agent/apps/web/src/pages/shell/composer.test.tsx']);
   for (const check of plan.filter(c => c.label === 'Agent changed tests' || c.label === 'Agent affected tests')) {
@@ -63,6 +70,16 @@ test('root and Agent dependency graphs remain isolated', () => {
   assert.ok(plan.some(c => c.label === 'typecheck'));
   assert.ok(plan.some(c => c.label === 'landing:typecheck'));
   assert.ok(!plan.some(c => c.cwd === 'src/agent'));
+});
+
+test('managed billing and referral changes qualify actual isolated PostgreSQL accounting', () => {
+  for (const file of ['src/economy/managed-purchases.ts', 'src/coordinator/managed-antseed-text.ts', 'src/economy/referrals.ts']) {
+    const plan = planChecks([file]);
+    const check = plan.find(c => c.label === 'isolated managed wallet and referral PostgreSQL');
+    assert.deepEqual(check?.args, ['scripts/test-referrals-postgres.mjs', 'tests/managed-purchases.postgres.test.ts', 'tests/referrals.postgres.test.ts']);
+    assert.ok(plan.findIndex(c => c.label === 'root locked dependencies') < plan.indexOf(check));
+  }
+  assert.ok(!planChecks(['src/agent/apps/web/src/components/AskCard.tsx']).some(c => c.label === 'isolated managed wallet and referral PostgreSQL'));
 });
 test('related checks do not invoke full suites, build or deployment', () => {
   const plan = planChecks(['src/coordinator/main.ts', 'src/agent/packages/contracts/src/rpc.ts']);

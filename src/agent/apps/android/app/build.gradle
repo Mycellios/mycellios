@@ -3,11 +3,19 @@ android {
     namespace 'com.mycellios.android'
     compileSdk 36
     buildFeatures { buildConfig true }
-    defaultConfig { applicationId 'com.mycellios.android'; minSdk 26; targetSdk 36; versionCode 1; versionName '1.0.0' }
+    defaultConfig {
+        applicationId 'com.mycellios.android'; minSdk 26; targetSdk 36; versionCode 2; versionName '1.0.1'
+        ['PROJECT_ID','APP_ID','API_KEY','SENDER_ID'].each { key ->
+            def value = System.getenv('MYCELLIOS_FIREBASE_' + key) ?: ''
+            buildConfigField 'String', 'FIREBASE_' + key, groovy.json.JsonOutput.toJson(value)
+        }
+    }
     buildTypes { release { minifyEnabled false } }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies {
     implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'com.google.firebase:firebase-messaging:25.0.1'
+    implementation 'androidx.work:work-runtime:2.10.1'
     testImplementation 'junit:junit:4.13.2'
 }

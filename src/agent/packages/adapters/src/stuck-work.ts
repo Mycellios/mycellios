@@ -14,7 +14,6 @@ import {
 import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
 import { appendEventInTransaction, expireStuckRun, withTransactionRetry } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
-import { ExpoPushProvider } from "./expo-push.js";
 
 type StuckCursor = { at: Date; id: string };
 
@@ -226,8 +225,7 @@ async function pushCanDeliver(
   notifications: NotificationProvider,
   userId: string,
 ): Promise<boolean> {
-  if (!(notifications instanceof ExpoPushProvider)) return true;
-  return notifications.hasPushRecipient(userId);
+  return notifications.hasPushRecipient ? notifications.hasPushRecipient(userId) : true;
 }
 
 async function claimStuckReminder(
@@ -353,6 +351,7 @@ async function sendStuckNotice(
   const context = {
     operationId: "notify",
     traceId: run.botId,
+    runId: run.id,
     spaceId: run.spaceId,
     userId: run.userId,
     botId: run.botId,
@@ -361,7 +360,7 @@ async function sendStuckNotice(
   const notice = run.thread.groupId ? { ...message, groupId: run.thread.groupId }
     : run.thread.taskBotId === run.botId ? { ...message, taskThreadId: run.threadId } : message;
   try {
-    if (notifications instanceof ExpoPushProvider) {
+    if (notifications.deliver) {
       return await notifications.deliver(notice, context);
     }
     await notifications.send(notice, context);

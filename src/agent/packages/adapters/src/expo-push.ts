@@ -12,6 +12,7 @@ import { getLogger } from "@rakazo/logging";
 import { combineSignals } from "./connector-safety.js";
 import { credentialDigest } from "./credential-digest.js";
 import type { PushTokenStore } from "./push-token-store.js";
+import type { AndroidFcm } from "./android-fcm.js";
 import { readBodyCapped, withAbort } from "./web-ssrf.js";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -121,6 +122,7 @@ function expoPushReceipts(body: unknown): Record<string, ExpoPushTicket | undefi
 }
 
 export type ExpoPushOptions = {
+  androidPush?: AndroidFcm;
   sessionExpiresAt?: PushSessionExpiresAt;
   /** Schedules the receipt check; without it receipts are not read. */
   jobs?: JobPublisher;
@@ -134,6 +136,7 @@ export class ExpoPushProvider implements NotificationProvider {
   private readonly jobs?: JobPublisher;
   private readonly accessToken?: string;
   private readonly retryDelaysMs: readonly number[];
+  private readonly androidPush?: AndroidFcm;
 
   constructor(
     private readonly tokens: PushTokenStore,
@@ -143,6 +146,7 @@ export class ExpoPushProvider implements NotificationProvider {
     this.jobs = options.jobs;
     this.accessToken = options.accessToken?.trim() || undefined;
     this.retryDelaysMs = options.retryDelaysMs ?? EXPO_PUSH_RETRY_DELAYS_MS;
+    this.androidPush = options.androidPush;
   }
 
   describe() {
@@ -179,6 +183,17 @@ export class ExpoPushProvider implements NotificationProvider {
   private async deliverToToken(token: string, message: NotificationMessage, context: AdapterContext): Promise<ExpoPushDelivery> {
     // Recheck at dispatch: logout or a device handover may have happened during enumeration.
     if (!(await this.deliverableTokens(context.userId)).includes(token)) return "undeliverable";
+    const records = this.tokens.list ? await this.tokens.list(context.userId) : undefined;
+    const record = records?.find(value => value.token === token);
+    if (records && !record) return "undeliverable";
+    if (record?.transport === "fcm") {
+      if (!this.androidPush) throw new Error("Native Android push is not configured");
+      if (await this.androidPush.send(token, message, context) === "unregistered") {
+        await this.tokens.remove(context.userId, credentialDigest(token));
+        return "undeliverable";
+      }
+      return "delivered";
+    }
     const payload = {
       to: token,
       title: capped(message.title, MAX_PUSH_TITLE_CHARS),
