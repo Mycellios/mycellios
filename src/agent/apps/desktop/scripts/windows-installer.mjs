@@ -81,7 +81,10 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
     // An assisted first install and an explicit Finish/Open action, as upstream.
     // Updates still use /S and our confirmed same-profile relaunch. Keep the
     // installation directory fixed until alternate paths have recovery coverage.
-    nsis: { include:path.join(desktopRoot,'assets/fast-install.nsh'),useZip: Boolean(compact), oneClick: false,
+    nsis: { include:path.join(desktopRoot,'assets/fast-install.nsh'),useZip: Boolean(compact),
+      // Differential-aware archive generation forces 7z even with useZip=true.
+      // Retain the standalone installer blockmap separately after packaging.
+      ...(compact ? { differentialPackage: false } : {}), oneClick: false,
       allowToChangeInstallationDirectory: false, allowElevation: false, runAfterFinish: true,
       perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
     // This only writes standard updater metadata/block maps at build time.
