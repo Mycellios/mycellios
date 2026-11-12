@@ -57,9 +57,11 @@ export function MycelliosProvider({
         </div> : null}
         <p className="mt-1 text-[13.5px] text-muted-foreground">
           <Trans>
-            Use your credits on the Mycellios network. Choose a model in your Mico chat. No API key needed.
+            Use models with your Mycellios credits. No API key needed.
           </Trans>
         </p>
+        <p className="mt-2 text-[13px] text-muted-foreground"><Trans>Optional. Keep your own providers and choose which one to use for each Mico.</Trans></p>
+        <p className="mt-1 text-xs text-muted-foreground"><Trans>External models include the 4% Mycellios service fee in the displayed price.</Trans></p>
         {!connected ? (
           <Button
             type="button"
@@ -84,7 +86,7 @@ export function MycelliosProvider({
             ) : failed ? (
               <Trans>Retry connection</Trans>
             ) : (
-              <Trans>Use my Mycellios credits</Trans>
+              <Trans>Connect Mycellios</Trans>
             )}
           </Button>
         ) : null}

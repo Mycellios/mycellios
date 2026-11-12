@@ -1,3 +1,4 @@
+import { askUserQuestionnaire } from "./ask-user-questionnaire.js";
 import { nativeCodexQuota } from "./native-codex-quota.js";
 import { withConversationStyle } from "./conversation-style.js";
 import { prepareOpenCodeProfile } from "./opencode-profile.js";
@@ -439,20 +440,12 @@ export class NativeAgentRuntime implements AgentRuntime {
       const startedAt = Date.now();
       let value: unknown;
       if (name === "ask_user") {
-        const options = Array.isArray(args.options)
-          ? args.options.filter(
-              (value): value is string =>
-                typeof value === "string" && value.length > 0 && value.length <= 80,
-            )
-          : [];
-        if (options.length < 2 || options.length > 4 || new Set(options).size !== options.length)
-          throw new Error("ask_user requires two to four unique options");
+        const questionnaire = askUserQuestionnaire(args);
         paused = true;
         queue.push({
           type: "ask",
           executionId,
-          text: text(args.question),
-          actions: options.map((label, index) => ({ id: `choice-${index + 1}`, label })),
+          ...questionnaire,
         });
       } else if (name === "request_takeover") {
         paused = true;

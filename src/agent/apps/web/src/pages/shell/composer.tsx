@@ -14,7 +14,7 @@ import {
   serializeComposerPrompt,
   truncateSlashDescription,
 } from "@rakazo/core";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@rakazo/ui-web";
 import { useIsMobile } from "@rakazo/ui-web/hooks/use-mobile";
 import { ArrowUp, AudioLines, Box, File as FileIcon, MessageCircleQuestion, Paperclip, Plus, Puzzle, Settings, Square, Trash2, X } from "lucide-react";
 import type { ClipboardEvent, DragEvent, ReactNode, RefObject } from "react";
@@ -839,7 +839,7 @@ export const Composer = memo(function Composer({
         >
           <Plus size={16} strokeWidth={2} />
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-48 max-w-[calc(100vw-2rem)] p-1.5" aria-label={t`Add to message`}>
+        <DropdownMenuContent side="top" align="start" sideOffset={8} className={`${busyMessages ? "w-56" : "w-48"} max-w-[calc(100vw-2rem)] p-1.5`} aria-label={t`Add to message`}>
           <DropdownMenuItem className="min-h-8 gap-2" onClick={() => {
             setAddMenuOpen(false);
             const input = fileInputRef.current;
@@ -861,6 +861,18 @@ export const Composer = memo(function Composer({
               <AudioLines aria-hidden="true" />{t`Voice`}
             </DropdownMenuItem>
           ) : null}
+          {busyMessages ? <>
+            <DropdownMenuSeparator />
+            <DropdownMenuRadioGroup aria-label={t`Send message to`} value={delivery}
+              onValueChange={value => { setDelivery(value as "queue" | "steer"); setAddMenuOpen(false); }}>
+              <DropdownMenuRadioItem value="queue" disabled={sending || disabled} className="min-h-8">
+                {t`After this task`}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="steer" disabled={sending || disabled} className="min-h-8">
+                {t`Update current task`}
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </> : null}
         </DropdownMenuContent>
         </DropdownMenu>}
         <div
@@ -1012,6 +1024,7 @@ export const Composer = memo(function Composer({
           ) : (
             <Button type="button" size="icon"
               aria-label={busyMessages ? delivery === "queue" ? t`Add to queue` : t`Update current task` : t`Send`}
+              title={busyMessages ? delivery === "queue" ? t`Send when this task finishes` : t`Update current task` : t`Send`}
               disabled={sending || !canSend || disabled || reviewedVoice.stage !== "closed"}
               onClick={send}
               className="rk-chat-control size-10 shrink-0 rounded-full disabled:bg-primary-disabled disabled:text-foreground/30 disabled:opacity-100 md:size-7">
@@ -1021,18 +1034,7 @@ export const Composer = memo(function Composer({
         </div>
       </div>
       <QueuedMessages target={"botId" in artifactTarget ? { botId: artifactTarget.botId, ...(taskScope ? { taskThreadId: taskScope.taskThreadId } : {}) } : { groupId: artifactTarget.groupId }} running={running} sending={sending} />
-      {busyMessages ? <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-2 text-xs text-muted-foreground" data-testid="busy-message-actions">
-        <label className="flex items-center gap-2">{t`Send message to`}
-          <select aria-label={t`Send message to`} value={delivery} disabled={sending || disabled}
-            className="rounded-md border border-border bg-background px-2 py-1 text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-            onChange={event => setDelivery(event.target.value as "queue" | "steer")}>
-            <option value="queue">{t`Queue · after this task`}</option>
-            <option value="steer">{t`Current task · update instructions`}</option>
-          </select>
-        </label>
-        {sideQuestionBotId ? <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={askAside}>{t`Ask without interrupting`}</button> : null}
-        {acceptedMode ? <span role="status">{acceptedMode === "queue" ? t`Message saved in the queue.` : t`Instructions sent to the current task.`}</span> : null}
-      </div> : null}
+      {busyMessages && acceptedMode ? <span className="sr-only" role="status">{acceptedMode === "queue" ? t`Message saved in the queue.` : t`Instructions sent to the current task.`}</span> : null}
 
     </fieldset>
   );

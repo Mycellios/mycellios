@@ -12,6 +12,7 @@ import { getLogger } from "@rakazo/logging";
 import { combineSignals } from "./connector-safety.js";
 import { credentialDigest } from "./credential-digest.js";
 import type { PushTokenStore } from "./push-token-store.js";
+import type { AndroidFcm } from "./android-fcm.js";
 import { readBodyCapped, withAbort } from "./web-ssrf.js";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -121,6 +122,7 @@ function expoPushReceipts(body: unknown): Record<string, ExpoPushTicket | undefi
 }
 
 export type ExpoPushOptions = {
+  androidPush?: AndroidFcm;
   sessionExpiresAt?: PushSessionExpiresAt;
   /** Schedules the receipt check; without it receipts are not read. */
   jobs?: JobPublisher;
@@ -134,6 +136,7 @@ export class ExpoPushProvider implements NotificationProvider {
   private readonly jobs?: JobPublisher;
   private readonly accessToken?: string;
   private readonly retryDelaysMs: readonly number[];
+  private readonly androidPush?: AndroidFcm;
 
   constructor(
     private readonly tokens: PushTokenStore,
@@ -143,6 +146,7 @@ export class ExpoPushProvider implements NotificationProvider {
     this.jobs = options.jobs;
     this.accessToken = options.accessToken?.trim() || undefined;
     this.retryDelaysMs = options.retryDelaysMs ?? EXPO_PUSH_RETRY_DELAYS_MS;
+    this.androidPush = options.androidPush;
   }
 
   describe() {
@@ -155,7 +159,7 @@ export class ExpoPushProvider implements NotificationProvider {
   }
 
   async hasPushRecipient(userId: string): Promise<boolean> {
-    return Boolean(await this.deliverableToken(userId));
+    return (await this.deliverableTokens(userId)).length > 0;
   }
 
   async send(message: NotificationMessage, context: AdapterContext): Promise<void> {
@@ -168,14 +172,35 @@ export class ExpoPushProvider implements NotificationProvider {
    * Neither is an Expo acceptance, so callers must not record a reminder.
    */
   async deliver(message: NotificationMessage, context: AdapterContext): Promise<ExpoPushDelivery> {
-    const token = await this.deliverableToken(context.userId);
-    if (!token) return "undeliverable";
+    const tokens = await this.deliverableTokens(context.userId);
+    if (!tokens.length) return "undeliverable";
+    const outcomes = await Promise.allSettled(tokens.map(token => this.deliverToToken(token, message, context)));
+    const failure = outcomes.find(result => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    return outcomes.some(result => result.status === "fulfilled" && result.value === "delivered") ? "delivered" : "undeliverable";
+  }
+
+  private async deliverToToken(token: string, message: NotificationMessage, context: AdapterContext): Promise<ExpoPushDelivery> {
+    // Recheck at dispatch: logout or a device handover may have happened during enumeration.
+    if (!(await this.deliverableTokens(context.userId)).includes(token)) return "undeliverable";
+    const records = this.tokens.list ? await this.tokens.list(context.userId) : undefined;
+    const record = records?.find(value => value.token === token);
+    if (records && !record) return "undeliverable";
+    if (record?.transport === "fcm") {
+      if (!this.androidPush) throw new Error("Native Android push is not configured");
+      if (await this.androidPush.send(token, message, context) === "unregistered") {
+        await this.tokens.remove(context.userId, credentialDigest(token));
+        return "undeliverable";
+      }
+      return "delivered";
+    }
     const payload = {
       to: token,
       title: capped(message.title, MAX_PUSH_TITLE_CHARS),
       body: capped(message.body, MAX_PUSH_BODY_CHARS),
       collapseId: message.threadId,
       tag: message.threadId,
+      channelId: "default",
       ...(message.badge === undefined ? {} : { badge: message.badge }),
       data: expoPushData(message, context.spaceId, randomUUID()),
     };
@@ -256,26 +281,22 @@ export class ExpoPushProvider implements NotificationProvider {
    * row is removed. The token is read again after the lookup so a handover
    * during that wait is not sent.
    */
-  private async deliverableToken(userId: string): Promise<string | undefined> {
-    const saved = await this.tokens.load(userId);
-    if (!saved?.token) return undefined;
-    if (!saved.sessionId) return saved.token;
-    if (!this.sessionExpiresAt) return undefined;
-    let expiresAt: Date | null;
-    try {
-      expiresAt = await this.sessionExpiresAt(saved.sessionId);
-    } catch (error) {
-      getLogger().error("push session lookup failed", error);
-      return undefined;
+  private async deliverableTokens(userId: string): Promise<string[]> {
+    const load = async () => this.tokens.list ? this.tokens.list(userId) : [await this.tokens.load(userId)].filter((value): value is NonNullable<typeof value> => Boolean(value));
+    const saved = await load();
+    const eligible: typeof saved = [];
+    for (const record of saved) {
+      if (!record.token) continue;
+      if (!record.sessionId) { eligible.push(record); continue; }
+      if (!this.sessionExpiresAt) continue;
+      try {
+        const expiresAt = await this.sessionExpiresAt(record.sessionId);
+        if (expiresAt && expiresAt.getTime() > Date.now()) eligible.push(record);
+        else if (expiresAt) await this.tokens.endSession(userId, record.sessionId);
+      } catch (error) { getLogger().error("push session lookup failed", error); }
     }
-    if (!expiresAt) return undefined;
-    if (expiresAt.getTime() <= Date.now()) {
-      await this.tokens.endSession(userId, saved.sessionId);
-      return undefined;
-    }
-    const current = await this.tokens.load(userId);
-    if (current?.token !== saved.token || current.sessionId !== saved.sessionId) return undefined;
-    return current.token;
+    const current = await load();
+    return [...new Set(eligible.filter(record => current.some(row => row.token === record.token && row.sessionId === record.sessionId)).map(record => record.token))];
   }
 }
 

@@ -32,6 +32,7 @@ import type { Auth } from "@rakazo/auth";
 import type { BoardEvents, PrismaClient, ThreadEvents } from "@rakazo/db";
 import type { BillingService } from "./billing.js";
 import { accountRoutes } from "./routes/account.js";
+import { referralRoutes } from "./routes/referrals.js";
 import { boardsRoutes } from "./routes/boards.js";
 import { botsRoutes } from "./routes/bots.js";
 import { computerRoutes } from "./routes/computer.js";
@@ -49,6 +50,7 @@ import { workflowsRoutes } from "./routes/workflows.js";
 import { spacesRoutes } from "./routes/spaces.js";
 import { developmentRoutes } from "./routes/development.js";
 import { taskInboxRoutes } from "./routes/task-inbox.js";
+import { hostedWebRoutes } from "./routes/hosted-webs.js";
 import { threadsRoutes } from "./routes/threads.js";
 
 export { nextConnectionLabel } from "./model-credentials.js";
@@ -57,6 +59,8 @@ export { HEARTBEAT_MS, SESSION_RECHECK_MS } from "./routes/shared.js";
 export { callMarkerClientNonce } from "./routes/threads.js";
 
 export interface RouterDeps {
+  androidPushConfigured?: boolean;
+  androidPushProjectId?: string;
   /** True when a connected desktop host advertises agent execution for this scope. */
   desktopAgentAvailable?: (scope: { userId: string; spaceId: string }) => boolean;
   sideQuestions?: {
@@ -158,8 +162,10 @@ export function createRouter(deps: RouterDeps) {
   const { os } = ctx;
 
   return os.router({
+    ...hostedWebRoutes(ctx),
     ...localCapabilityRoutes(ctx),
     ...accountRoutes(ctx),
+    ...referralRoutes(ctx),
     ...spacesRoutes(ctx),
     ...modelsRoutes(ctx),
     ...botsRoutes(ctx),

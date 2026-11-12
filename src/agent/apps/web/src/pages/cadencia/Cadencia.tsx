@@ -1,13 +1,14 @@
+import { StoreAppHeader } from "../marketplace/StoreAppHeader";
 import { CutReview } from "./CutReview";
 import { Button, Input } from "@rakazo/ui-web";
 import {
-  ArrowLeft,
   ArrowRight,
+  AudioLines,
+  ChevronDown,
   Download,
   FileVideo,
   Headphones,
   Scissors,
-  ShieldCheck,
   SlidersHorizontal,
   Upload,
   X,
@@ -33,7 +34,7 @@ import {
 } from "./state";
 import "./cadencia.css";
 
-const seconds = (value: number) => `${value.toFixed(2).replace(".", ",")} s`;
+const seconds = (value: number) => `${value.toFixed(1).replace(".", ",")} s`;
 const clock = (value: number) =>
   `${Math.floor(value / 60)}:${(value % 60).toFixed(1).padStart(4, "0")}`;
 function useBlobUrl(blob?: Blob) {
@@ -208,7 +209,7 @@ export default function Cadencia({
     if (alive.current && !signal.aborted) {
       setMode("before");
       setPosition(0);
-      setActive(analysis.cuts[0]?.id ?? null);
+      setActive(null);
       setState({
         ...blankState(),
         settings: { ...state.settings },
@@ -302,19 +303,7 @@ export default function Cadencia({
     mode === "after" && state.rendered ? state.rendered.duration : total;
   return (
     <section className="cd-app" aria-label="Cadencia">
-      <header className="cd-header">
-        <div>
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft size={15} /> Hifa Store
-          </Button>
-          <h1>
-            Cadencia<span>Tu voz, a su ritmo.</span>
-          </h1>
-        </div>
-        <span className="cd-private">
-          <ShieldCheck size={15} /> Solo en este navegador
-        </span>
-      </header>
+      <StoreAppHeader title="Cadencia" subtitle="Recorta las pausas y conserva tu voz." onBack={onBack} />
       <input
         ref={filePicker}
         type="file"
@@ -375,12 +364,12 @@ export default function Cadencia({
             Más intención.
           </h2>
           <p>
-            Recorta silencios y revisa vocales sostenidas.
+            Elige un vídeo o audio. Detectamos las pausas.
             <br />
-            Escucha cada cambio antes de quedártelo.
+            Tú decides qué recortar.
           </p>
           <Button disabled={!!busy} onClick={() => filePicker.current?.click()}>
-            <Upload size={16} /> Elegir vídeo
+            <Upload size={16} /> Elegir vídeo o audio
           </Button>
           <Button
             variant="ghost"
@@ -408,13 +397,13 @@ export default function Cadencia({
           </small>
         </div>
       ) : (
-        <>
+        <div className="cd-workspace">
           <div className="cd-projectbar">
             <span>
               <FileVideo size={16} />
               <strong>{state.file.name}</strong>
               {state.demo && (
-                <span className="cd-demo-label">Demo sintetizada</span>
+                <span className="cd-demo-label">Archivo de ejemplo</span>
               )}
             </span>
             <Button
@@ -472,7 +461,7 @@ export default function Cadencia({
           <div className="cd-layout">
             <div className="cd-view">
               <div className="cd-player-tools">
-                <div role="group" aria-label="Comparar vídeo">
+                {state.rendered?<div role="group" aria-label="Comparar vídeo">
                   <Button
                     variant="ghost"
                     aria-pressed={mode === "before"}
@@ -482,7 +471,7 @@ export default function Cadencia({
                       setPosition(0);
                     }}
                   >
-                    Antes
+                    Original
                   </Button>
                   <Button
                     variant="ghost"
@@ -494,10 +483,10 @@ export default function Cadencia({
                       setPosition(0);
                     }}
                   >
-                    Después
+                    Editado
                   </Button>
-                </div>
-                <span>{clock(showDuration)}</span>
+                </div>:<span>Vista previa</span>}
+                <span>{seconds(showDuration)}</span>
               </div>
               <div
                 className={`cd-player ${!state.info?.video ? "cd-player-audio" : ""}`}
@@ -528,6 +517,8 @@ export default function Cadencia({
                   </span>
                 )}
               </div>
+              <details className="cd-audio-details">
+                <summary><span><AudioLines size={14} aria-hidden="true" /> Ver audio</span><ChevronDown size={14} aria-hidden="true" /></summary>
               <div
                 className="cd-waveform"
                 aria-label="Forma de onda del audio original"
@@ -577,81 +568,14 @@ export default function Cadencia({
                   </span>
                 </div>
               </div>
-              <div className="cd-summary">
-                <div>
-                  <strong>
-                    {selected
-                      ? `${seconds(validation.saved)} menos`
-                      : "El original se conserva"}
-                  </strong>
-                  <span>
-                    {selected}{" "}
-                    {selected === 1
-                      ? "corte seleccionado"
-                      : "cortes seleccionados"}{" "}
-                    · {clock(total)} <ArrowRight size={12} />{" "}
-                    {clock(Math.max(0, total - validation.saved))}
-                  </span>
-                </div>
-                {state.rendered ? (
-                  <Button
-                    render={
-                      <a
-                        href={resultUrl}
-                        download={`cadencia-${state.file.name.replace(/\.[^.]+$/, "")}.${state.rendered.extension}`}
-                      />
-                    }
-                  >
-                    <Download size={16} /> Descargar {state.rendered.format}
-                  </Button>
-                ) : (
-                  <Button
-                    disabled={!!busy || !selected || !!validation.error}
-                    onClick={() =>
-                      void work(
-                        "Creando la versión editada…",
-                        async (signal) => {
-                          const result = await renderMedia(
-                            state.file!,
-                            state.cuts,
-                            signal,
-                            (value) => {
-                              if (alive.current) setProgress(value);
-                            },
-                          );
-                          if (alive.current && !signal.aborted) {
-                            setState((previous) => ({
-                              ...previous,
-                              rendered: result,
-                            }));
-                            setMode("after");
-                            setPosition(0);
-                          }
-                        },
-                      )
-                    }
-                  >
-                    <Scissors size={15} /> Crear versión editada
-                  </Button>
-                )}
-              </div>
-              {validation.error && (
-                <p role="alert" className="cd-error">
-                  {validation.error}
-                </p>
-              )}
-              <p className="cd-footnote">
-                Exportación local · hasta 720p / 30 fps. MP4 cuando el navegador
-                lo permite; WebM como alternativa. El original nunca se
-                modifica.
-              </p>
+              </details>
               <details
                 className="cd-settings"
                 open={advanced}
                 onToggle={(event) => setAdvanced(event.currentTarget.open)}
               >
                 <summary>
-                  <SlidersHorizontal size={14} /> Ajustar detección
+                  <SlidersHorizontal size={14} /> Más ajustes
                 </summary>
                 <div>
                   <label>
@@ -728,7 +652,7 @@ export default function Cadencia({
                         const analysis = await runAnalysis(state.pcm!, signal);
                         if (alive.current && !signal.aborted) {
                           invalidate({ analysis, cuts: analysis.cuts });
-                          setActive(analysis.cuts[0]?.id ?? null);
+                          setActive(null);
                         }
                       })
                     }
@@ -736,6 +660,7 @@ export default function Cadencia({
                     Volver a detectar
                   </Button>
                 </div>
+                <p>Exportación en este navegador · hasta 720p / 30 fps. MP4 cuando es compatible; WebM como alternativa.</p>
                 <p>
                   La detección de vocales es acústica y orientativa. No reconoce
                   palabras; revisa los sonidos expresivos, la música y el ruido
@@ -743,6 +668,72 @@ export default function Cadencia({
                 </p>
               </details>
             </div>
+            <aside className="cd-edit-panel" aria-label="Edición y exportación">
+              <div className="cd-summary">
+                <div>
+                  <strong>
+                    {selected
+                      ? `${seconds(validation.saved)} menos`
+                      : "El original se conserva"}
+                  </strong>
+                  <span>
+                    {seconds(total)} <ArrowRight size={12} />{" "}
+                    {seconds(Math.max(0, total - validation.saved))}
+                  </span>
+                </div>
+                {state.rendered ? (
+                  <Button
+                    render={
+                      <a
+                        href={resultUrl}
+                        download={`cadencia-${state.file.name.replace(/\.[^.]+$/, "")}.${state.rendered.extension}`}
+                      />
+                    }
+                  >
+                    <Download size={16} /> {state.info?.video ? "Descargar vídeo" : "Descargar audio"}
+                  </Button>
+                ) : (
+                  <Button
+                    disabled={!!busy || !selected || !!validation.error}
+                    onClick={() =>
+                      void work(
+                        "Creando la versión editada…",
+                        async (signal) => {
+                          const result = await renderMedia(
+                            state.file!,
+                            state.cuts,
+                            signal,
+                            (value) => {
+                              if (alive.current) setProgress(value);
+                            },
+                          );
+                          if (alive.current && !signal.aborted) {
+                            setState((previous) => ({
+                              ...previous,
+                              rendered: result,
+                            }));
+                            setMode("after");
+                            setPosition(0);
+                          }
+                        },
+                      )
+                    }
+                  >
+                    <Scissors size={15} /> {state.info?.video ? "Crear vídeo" : "Crear audio"}
+                  </Button>
+                )}
+              </div>
+              {validation.error && (
+                <p role="alert" className="cd-error">
+                  {validation.error}
+                </p>
+              )}
+              <p className="cd-footnote">
+                {state.rendered?"Listo para descargar. ":""}El archivo original no cambia.
+              </p>
+              <details className="cd-review-section" open onToggle={event=>{if(!event.currentTarget.open){auditionGeneration.current++;void sound.current?.close().catch(()=>{});sound.current=null;setAudition("");}}}>
+                <summary><span>Recortes <small>{selected}/{state.cuts.length}</small></span><ChevronDown size={16} aria-hidden="true"/></summary>
+                <div className="cd-review-body">
             <CutReview
               cuts={state.cuts}
               total={total}
@@ -755,7 +746,7 @@ export default function Cadencia({
                   cuts: state.cuts.map((c) => ({ ...c, enabled: false })),
                 })
               }
-              onSelect={seek}
+              onSelect={cut=>active===cut.id?setActive(null):seek(cut)}
               onChange={changeCut}
               onPlay={playCut}
               onStop={() => {
@@ -765,8 +756,12 @@ export default function Cadencia({
                 setAudition("");
               }}
             />
+                </div>
+              </details>
+
+            </aside>
           </div>
-        </>
+        </div>
       )}
     </section>
   );

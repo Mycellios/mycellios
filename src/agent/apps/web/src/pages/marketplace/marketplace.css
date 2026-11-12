@@ -7,7 +7,7 @@
   background: var(--background);
 }
 .rk-market-topbar {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 12px;
   height: 36px;
@@ -15,6 +15,19 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--border);
   font-size: 13px;
+}
+.rk-market-back {
+  margin-inline-start: auto;
+}
+.rk-market-menu-toggle {
+  gap: 4px;
+  padding-inline: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.rk-market-nav[hidden] {
+  display: none;
 }
 [data-task-desktop="true"] .rk-market-topbar {
   display: flex;

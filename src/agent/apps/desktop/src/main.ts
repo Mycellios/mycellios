@@ -22,7 +22,7 @@ import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -33,6 +33,7 @@ import {
   updaterSupport,
 } from "./auto-update.js";
 import { createBadgeHandler } from "./badge.js";
+import { createSystemNotifications } from "./system-notifications.js";
 import { openBrowserAuth } from "./browser-auth.js";
 import { DOCKER_INSTALL_LINKS, isDesktopSetupLink, runDocker } from "./docker-cli.js";
 import { computerConsentScope, prepareHostComputer } from "./host-computer.js";
@@ -1314,6 +1315,7 @@ if (!hasSingleInstanceLock) {
 
 app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
+  if (process.platform === "win32") app.setAppUserModelId("com.mycellios.agent.desktop");
   installSessionPermissions(session.defaultSession, permissionTarget);
   const userDataDir = app.getPath("userData");
   await loadBackgroundPreference(userDataDir);
@@ -1371,7 +1373,7 @@ app.whenReady().then(async () => {
   await updatePreferences.load();
   const updatePolicyTimer = setInterval(() => { if (!quitting) void updatePreferences?.tick(); }, 2_000);
   updatePolicyTimer.unref(); app.once("before-quit", () => clearInterval(updatePolicyTimer));
-  const revealChat = (target: { scope: string; botId: string }) => {
+  const revealChat = (target: { scope: string; botId: string; respond?: boolean }) => {
       if (!mainWindow || mainWindow.isDestroyed()) return;
       revealSecondInstanceWindow(mainWindow);
       mainWindow.webContents.send("desktop.companions.select", target);
@@ -1393,6 +1395,10 @@ app.whenReady().then(async () => {
   ipcMain.handle("desktop.chat.return", event => floatingChats!.returnToMain(event.sender, event.senderFrame));
   desktopCompanions = await installDesktopCompanions({
     profile: userDataDir, allowed: fromUpdateWindow, reveal: revealChat,
+    requestReply: request => {
+      if (!mainWindow || mainWindow.isDestroyed()) throw new Error("The app is unavailable");
+      mainWindow.webContents.send("desktop.companions.question", request);
+    },
     openChat: target => floatingChats!.open(target),
     scopeChanged: scope => floatingChats!.account(scope),
   });
@@ -1531,6 +1537,22 @@ app.whenReady().then(async () => {
     const server = projectServer();
     if (!server || !space || JSON.stringify(identity) !== cloudComputerOwner || mainWindow !== captured || captured.isDestroyed() || event.senderFrame?.url !== captured.webContents.getURL() || !hostComputer.isEnabled()) throw new Error("La cuenta o el Space han cambiado. Reconecta el PC desde Mycellios.");
     return { owner: identity.userId, space, server };
+  },videoRequest:async(event,scope,action,payload)=>{
+    const window=mainWindow;
+    if(!window||!fromMainWindow(event)||event.senderFrame!==event.sender.mainFrame||projectServer()!==scope.server||!hostComputer?.isEnabled())throw new Error("La sesión del editor ha cambiado.");
+    const before=await nativePreviewContext(window);
+    if(before[0]!==scope.owner||before[1]!==scope.space)throw new Error("La cuenta o el espacio han cambiado.");
+    const response=await window.webContents.session.fetch(`${scope.server}/rpc/models/mycelliosVideoEdit`,{
+      method:"POST",credentials:"include",redirect:"error",bypassCustomProtocolHandlers:true,signal:AbortSignal.timeout(180000),
+      headers:{"content-type":"application/json",origin:new URL(scope.server).origin,"x-rakazo-space-id":scope.space},
+      body:JSON.stringify({json:{action,payload:JSON.stringify(payload)}}),
+    });
+    if(!response.ok){await response.body?.cancel();throw new Error("No se pudo conectar el editor al monedero Mycellios. El trabajo no se reenviará.");}
+    const {bounded}=await import("./video-edit-provider.js");
+    const value=JSON.parse(Buffer.from(await bounded(response,100_000_000)).toString("utf8"));
+    if(mainWindow!==window||window.isDestroyed()||projectServer()!==scope.server||!hostComputer?.isEnabled()
+      ||event.senderFrame?.url!==window.webContents.getURL()||JSON.stringify(await nativePreviewContext(window))!==JSON.stringify(before))throw new Error("La sesión del editor ha cambiado.");
+    if(!("json" in value))throw new Error("Respuesta del monedero no válida.");return value.json;
   } });
   ipcMain.handle("desktop.runtime.status", (event) => {
     if (!contributionRequest(event)) throw new Error("Contribution requires the Mycellios application.");
@@ -1945,6 +1967,17 @@ app.whenReady().then(async () => {
     createBadgeHandler(permissionTarget, (count) => app.setBadgeCount(count)),
   );
   ipcMain.handle("desktop.platform", () => process.platform);
+  const notifications = createSystemNotifications({
+    getTarget: permissionTarget, platform: process.platform, supported: () => Notification.isSupported(),
+    create: ({ title, body, silent }) => new Notification({ title, body, silent,
+      icon: path.join(app.getAppPath(), "assets", "icon.png") }),
+    openSettings: (url) => shell.openExternal(url),
+    focus: (contents) => { const win = BrowserWindow.fromWebContents(contents); if (win?.isMinimized()) win.restore(); win?.show(); win?.focus(); },
+  });
+  ipcMain.handle("desktop.notifications.status", event => notifications.status(event));
+  ipcMain.handle("desktop.notifications.clear", event => notifications.clear(event));
+  ipcMain.handle("desktop.notifications.settings", event => notifications.openSettings(event));
+  ipcMain.handle("desktop.notifications.show", (event, input) => notifications.show(event, input));
   ipcMain.handle("desktop.passkeys.rpIds", () => passkeyRpIds);
   ipcMain.handle("desktop.window.close", (event) => {
     windowFrom(event)?.close();

@@ -10384,3 +10384,254 @@ msgstr "Mycellios sends recordings of up to 30 seconds to the network and uses y
 
 msgid "Device or connected provider"
 msgstr "Device or connected provider"
+
+msgid "Workspaces"
+msgstr "Workspaces"
+
+msgid "Display options"
+msgstr "Display options"
+
+msgid "Add Mico to dock"
+msgstr "Add Mico to dock"
+
+msgid "Move Mico dock"
+msgstr "Move Mico dock"
+
+msgid "New Mico"
+msgstr "New Mico"
+
+
+msgid "Mycelium sprout"
+msgstr "Sprout"
+
+
+msgid "Mycelium branch"
+msgstr "Branch"
+
+
+msgid "Mycelium node"
+msgstr "Node"
+
+
+msgid "Mycelium spore"
+msgstr "Spore"
+
+
+msgid "Mycelium colony"
+msgstr "Colony"
+
+msgid "Select to reply"
+msgstr "Select to reply"
+
+msgid "Mycelium hypha"
+msgstr "Hypha"
+
+msgid "Mycelium nexus"
+msgstr "Nexus"
+
+msgid "Mycelium bridge"
+msgstr "Bridge"
+
+msgid "Mycelium loop"
+msgstr "Loop"
+
+msgid "Mycelium crest"
+msgstr "Crest"
+
+msgid "Mycelium weave"
+msgstr "Weave"
+
+msgid "Avatar forest"
+msgstr "Forest green"
+
+msgid "Avatar pink"
+msgstr "Pink"
+
+msgid "Avatar brown"
+msgstr "Brown"
+
+msgid "Avatar yellow"
+msgstr "Yellow"
+
+msgid "Avatar blue"
+msgstr "Blue"
+
+msgid "Avatar pine"
+msgstr "Pine green"
+
+msgid "Avatar cream"
+msgstr "Cream"
+
+msgid "Skip all questions"
+msgstr "Skip all questions"
+
+msgid "Previous question"
+msgstr "Previous question"
+
+msgid "Next question"
+msgstr "Next question"
+
+msgid "Choose all that apply"
+msgstr "Choose all that apply"
+
+msgid "Something else"
+msgstr "Something else"
+
+msgid "Skipped"
+msgstr "Skipped"
+
+msgid "Next"
+msgstr "Next"
+
+msgid "Questions"
+msgstr "Questions"
+
+msgid "asks"
+msgstr "asks"
+
+msgid "Answer in Mycellios"
+msgstr "Answer in Mycellios"
+
+msgid "Or write your own answer"
+msgstr "Or write your own answer"
+
+msgid "more requests"
+msgstr "more requests"
+
+msgid "Could not confirm the answer. Open the chat before retrying."
+msgstr "Could not confirm the answer. Open the chat before retrying."
+
+msgid "Chat order"
+msgstr "Chat order"
+
+msgid "Choose how conversations are shown. Automatic orders keep your saved manual order."
+msgstr "Choose how conversations are shown. Automatic orders keep your saved manual order."
+
+msgid "Group unread"
+msgstr "Group unread"
+
+msgid "Unread first"
+msgstr "Unread first"
+
+msgid "Searching for information…"
+msgstr "Searching for information…"
+
+msgid "Reading files…"
+msgstr "Reading files…"
+
+msgid "Updating files…"
+msgstr "Updating files…"
+
+
+msgid "Use models with your Mycellios credits. No API key needed."
+msgstr "Use models with your Mycellios credits. No API key needed."
+
+
+msgid "Optional. Keep your own providers and choose which one to use for each Mico."
+msgstr "Optional. Keep your own providers and choose which one to use for each Mico."
+
+
+msgid "External models include the 4% Mycellios service fee in the displayed price."
+msgstr "External models include the 4% Mycellios service fee in the displayed price."
+
+
+msgid "Connect Mycellios"
+msgstr "Connect Mycellios"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Collapse Marketplace menu"
+msgstr "Collapse Marketplace menu"
+
+#: src/pages/marketplace/MarketplaceWorkspace.tsx
+msgid "Expand Marketplace menu"
+msgstr "Expand Marketplace menu"
+
+msgid "Hide menu"
+msgstr "Hide menu"
+
+msgid "Show menu"
+msgstr "Show menu"
+
+msgid "After this task"
+msgstr "After this task"
+
+msgid "Send when this task finishes"
+msgstr "Send when this task finishes"
+
+msgid "Delivery"
+msgstr "Delivery"
+
+msgid "Desktop"
+msgstr "Desktop"
+
+msgid "Push connected"
+msgstr "Push connected"
+
+msgid "Setup needed"
+msgstr "Setup needed"
+
+msgid "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
+msgstr "Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer."
+
+msgid "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
+msgstr "On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications."
+
+msgid "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
+msgstr "This Android build has no native background push. Install the web app from your browser for closed-app alerts."
+
+msgid "Open Mycellios over HTTPS to enable system notifications."
+msgstr "Open Mycellios over HTTPS to enable system notifications."
+
+msgid "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
+msgstr "This device is registered for closed-app alerts. Delivery also depends on your system and network settings."
+
+msgid "Background push is not configured on this server. Alerts are available only while the app is running."
+msgstr "Background push is not configured on this server. Alerts are available only while the app is running."
+
+msgid "Enable system permission and register this device to receive background alerts."
+msgstr "Enable system permission and register this device to receive background alerts."
+
+msgid "Could not open system notification settings."
+msgstr "Could not open system notification settings."
+
+msgid "Open system notification settings"
+msgstr "Open system notification settings"
+
+msgid "If you can see this alert, system notifications are enabled."
+msgstr "If you can see this alert, system notifications are enabled."
+
+msgid "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
+msgstr "Test requested. Check your notification center; system focus or Do Not Disturb may silence it."
+
+msgid "Background alerts across devices"
+msgstr "Background alerts across devices"
+
+msgid "When to notify"
+msgstr "When to notify"
+
+msgid "All activity"
+msgstr "All activity"
+
+msgid "Show push previews"
+msgstr "Show push previews"
+
+msgid "Use account setting"
+msgstr "Use account setting"
+
+msgid "Off"
+msgstr "Off"
+
+msgid "Could not check background delivery. Alerts in the running app remain available."
+msgstr "Could not check background delivery. Alerts in the running app remain available."
+
+msgid "Update Mycellios Android to configure native notifications."
+msgstr "Update Mycellios Android to configure native notifications."
+
+msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+msgstr "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+
+msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
+msgstr "Firebase must be configured in the Android app and on the server before native push can be enabled."
+
+msgid "Android push is not configured on this server."
+msgstr "Android push is not configured on this server."

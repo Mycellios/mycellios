@@ -42,9 +42,13 @@ public class MainActivity extends Activity {
   private boolean foreground, awaitingPermission, permissionReady, chatReady;
   private ValueCallback<Uri[]> files;
   private PermissionRequest webPermission;
+  private String pushRequest,pushAccount,pendingNotification,pendingNotificationOwner;
+  private long pushEpoch;
+  private final java.util.concurrent.ExecutorService pushExecutor=java.util.concurrent.Executors.newSingleThreadExecutor();
 
   @Override public void onCreate(Bundle state) {
     super.onCreate(state);
+    NativePush.initialize(this);
     getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     web=new WebView(this);
     FrameLayout frame=new FrameLayout(this);frame.setBackgroundColor(0xfff8f6f2);
@@ -79,9 +83,12 @@ public class MainActivity extends Activity {
       String data=message.getData();if(data==null || data.length()>4096)return;
       try {
         JSONObject msg=new JSONObject(data);String type=msg.optString("type"),id=msg.optString("id");
-        if(type.equals("ready")){page=reply;return;}
+        if(type.equals("ready")){page=reply;dispatchNotification();return;}
         if(type.equals("chat-ready")){page=reply;chatReady=true;dispatchShortcut();return;}
         if(type.equals("chat-not-ready")){chatReady=false;finishSpeech();return;}
+        if(type.startsWith("notification-") && id.matches("[a-zA-Z0-9-]{1,64}")){
+          page=reply;if((foreground || type.equals("notification-clear") || type.equals("notification-status") || type.equals("notification-preferences")) && web.getUrl()!=null && URIpath(web.getUrl()).startsWith("/agent/app"))handlePush(type,id,msg);return;
+        }
         if(!NavigationPolicy.mayRecord(web.getUrl()) || !id.matches("[a-zA-Z0-9-]{1,64}"))return;
         page=reply;
         if(type.equals("start") && foreground){
@@ -162,9 +169,63 @@ public class MainActivity extends Activity {
     getSystemService(ShortcutManager.class).setDynamicShortcuts(Collections.singletonList(new ShortcutInfo.Builder(this,"dictate").setShortLabel(es?"Dictar":"Dictate").setLongLabel(es?"Dictar a un Mico":"Dictate to a Mico").setIcon(Icon.createWithResource(this,com.mycellios.android.R.drawable.ic_mycellios)).setIntent(intent).build()));
   }
   private void consumeIntent(Intent intent){
+    if(NativePush.CLICK.equals(intent.getAction())){
+      String url=intent.getStringExtra(NativePush.URL),owner=intent.getStringExtra(NativePush.OWNER);
+      if((intent.getFlags()&Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)==0 && owner!=null && owner.equals(NativePush.owner(this)) && NotificationPolicy.clickTarget(url)){pendingNotification=url;pendingNotificationOwner=owner;dispatchNotification();}
+      intent.setAction(Intent.ACTION_MAIN);intent.removeExtra(NativePush.URL);intent.removeExtra(NativePush.OWNER);return;
+    }
     if(ACTION.equals(intent.getAction()) && (intent.getFlags()&Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)==0){shortcutUntil=android.os.SystemClock.elapsedRealtime()+30000;intent.setAction(Intent.ACTION_MAIN);dispatchShortcut();}
   }
   private void dispatchShortcut(){if(foreground && chatReady && page!=null && NavigationPolicy.mayRecord(web.getUrl()) && shortcutUntil>android.os.SystemClock.elapsedRealtime()){shortcutUntil=0;emit("dictate",null,null,null);}}
+  private String URIpath(String url){try{return java.net.URI.create(url).getRawPath();}catch(Exception e){return "";}}
+  private void dispatchNotification(){
+    if(!foreground || page==null || pendingNotification==null || !NavigationPolicy.appRoute(web.getUrl()))return;
+    String url=pendingNotification;pendingNotification=null;
+    if(pendingNotificationOwner!=null && pendingNotificationOwner.equals(NativePush.owner(this)) && NotificationPolicy.clickTarget(url))web.loadUrl(url);
+    pendingNotificationOwner=null;
+  }
+  private void pushStatus(String id,String account){
+    try {
+      // A signed-in web account change invalidates the previous native binding and
+      // any registration still in flight before another account can see its alerts.
+      if(!account.isEmpty() && !NativePush.owner(this).isEmpty() && !account.equals(NativePush.owner(this)))NativePush.clear(this);
+      boolean asked=getSharedPreferences("mycellios-native-push",MODE_PRIVATE).getBoolean("asked",false);
+      String permission=NativePush.allowed(this)?"granted":asked && android.os.Build.VERSION.SDK_INT>=33 && !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)?"denied":"default";
+      emit("notification-result",id,new JSONObject().put("supported",true).put("configured",NativePush.configured()).put("permission",permission).put("registered",!account.isEmpty()&&account.equals(NativePush.owner(this))).toString(),null);
+    }catch(Exception ignored){}
+  }
+  private void handlePush(String type,String id,JSONObject msg){
+    String account=msg.optString("accountId","");
+    try {
+      if(type.equals("notification-status")){pushStatus(id,account);return;}
+      if(type.equals("notification-settings")){startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,getPackageName()));emit("notification-result",id,"{}",null);return;}
+      if(type.equals("notification-clear")){if(!account.isEmpty() && !account.equals(NativePush.owner(this))){pushStatus(id,account);return;}pushRequest=null;NativePush.clear(this);emit("notification-result",id,"{}",null);return;}
+      if(type.equals("notification-preferences")){if(!account.equals(NativePush.owner(this))){pushStatus(id,account);return;}NativePush.preferences(this,msg);emit("notification-result",id,"{}",null);return;}
+      if(type.equals("notification-test")){if(!account.equals(NativePush.owner(this)))throw new Exception();NativePush.test(this);emit("notification-result",id,"{}",null);return;}
+      if(!account.matches("[a-zA-Z0-9_-]{1,160}"))throw new Exception();
+      if(type.equals("notification-refresh")){if(account.equals(NativePush.owner(this)))NativePush.scheduleRefresh(this);pushStatus(id,account);return;}
+      if(!type.equals("notification-enable"))return;
+      if(!NativePush.configured()){emit("error",id,null,"Firebase is not configured in this Android build.");return;}
+      if(pushRequest!=null){emit("error",id,null,"A notification request is already running.");return;}
+      pushRequest=id;pushAccount=account;pushEpoch=NativePush.begin(this,account);
+      if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
+        getSharedPreferences("mycellios-native-push",MODE_PRIVATE).edit().putBoolean("asked",true).apply();
+        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},4);
+      }else finishPushPermission();
+    }catch(Exception e){emit("error",id,null,"Could not update Android notifications.");}
+  }
+  private void finishPushPermission(){
+    final String id=pushRequest,account=pushAccount;final long epoch=pushEpoch;
+    if(id==null)return;
+    if(!NativePush.allowed(this)){pushRequest=null;emit("error",id,null,"Allow notifications in Android Settings, then try again.");return;}
+    pushExecutor.execute(()->{
+      String error=null;
+      try{if(!NativePush.register(getApplicationContext(),account,epoch))error="The account changed. Open notifications settings again.";}
+      catch(SecurityException e){error="Sign in again before enabling notifications.";}
+      catch(Exception e){error="Could not register Android push. Check the server configuration and your connection.";}
+      final String result=error;handler.post(()->{if(!id.equals(pushRequest))return;pushRequest=null;if(result!=null)emit("error",id,null,result);else pushStatus(id,account);});
+    });
+  }
   private void emit(String type,String id,String text,String error){
     if(page==null || !NavigationPolicy.appRoute(web.getUrl()))return;
     try{JSONObject msg=new JSONObject().put("type",type);if(id!=null)msg.put("id",id);if(text!=null)msg.put("text",text);if(error!=null)msg.put("error",error);page.postMessage(msg.toString());}catch(Exception ignored){}
@@ -192,12 +253,12 @@ public class MainActivity extends Activity {
   private void speechError(String message){String id=captureId;stopSpeech();emit("error",id,null,message);}
   private void stopSpeech(){captureId=null;partial="";permissionReady=false;awaitingPermission=false;if(web!=null)web.setKeepScreenOn(false);if(speech!=null){speech.cancel();speech.destroy();speech=null;}}
   @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);consumeIntent(intent);}
-  @Override protected void onResume(){super.onResume();foreground=true;if(web!=null){web.onResume();if(permissionReady){permissionReady=false;if(captureId!=null && captureDeadline>android.os.SystemClock.elapsedRealtime())startSpeech();else finishSpeech();}dispatchShortcut();}}
-  @Override protected void onPause(){foreground=false;if(!awaitingPermission)finishSpeech();if(webPermission!=null){webPermission.deny();webPermission=null;}if(web!=null){CookieManager.getInstance().flush();web.onPause();}super.onPause();}
-  @Override protected void onDestroy(){stopSpeech();if(web!=null){web.removeAllViews();web.destroy();}super.onDestroy();}
+  @Override protected void onResume(){super.onResume();foreground=true;NativePush.foreground(true);NativePush.scheduleRefresh(this);dispatchNotification();if(web!=null){web.onResume();if(permissionReady){permissionReady=false;if(captureId!=null && captureDeadline>android.os.SystemClock.elapsedRealtime())startSpeech();else finishSpeech();}dispatchShortcut();}}
+  @Override protected void onPause(){foreground=false;NativePush.foreground(false);if(!awaitingPermission)finishSpeech();if(webPermission!=null){webPermission.deny();webPermission=null;}if(web!=null){CookieManager.getInstance().flush();web.onPause();}super.onPause();}
+  @Override protected void onDestroy(){pushRequest=null;pushExecutor.shutdownNow();NativePush.foreground(false);stopSpeech();if(web!=null){web.removeAllViews();web.destroy();}super.onDestroy();}
   @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);web.saveState(state);}
   @Override public void onBackPressed(){if(captureId!=null){finishSpeech();return;}if(web.canGoBack())web.goBack();else super.onBackPressed();}
-  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);awaitingPermission=false;
+  @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==4){finishPushPermission();return;}awaitingPermission=false;
     boolean granted=grants.length>0 && grants[0]==PackageManager.PERMISSION_GRANTED;
     if(request==1 && captureId!=null){if(granted){if(foreground)startSpeech();else permissionReady=true;}else speechError("Microphone permission is required. Try again after allowing it.");}
     if(request==2 && webPermission!=null){if(granted && foreground && NavigationPolicy.mayRecord(web.getUrl()))webPermission.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});else webPermission.deny();webPermission=null;}

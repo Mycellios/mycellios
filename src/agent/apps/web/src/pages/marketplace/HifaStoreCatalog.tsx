@@ -77,7 +77,7 @@ export function HifaStoreCatalog({
               <div className="hf-footer">
                 <span>
                   <Globe size={13} aria-hidden="true" />
-                  En este navegador · privado
+                  Navegador
                 </span>
                 <Button variant="ghost" size="sm" onClick={() => openCadencia(true)}>
                   Abrir
@@ -104,7 +104,7 @@ export function HifaStoreCatalog({
               <div className="hf-footer">
                 <span>
                   <Monitor size={13} aria-hidden="true" />
-                  Desktop · Windows
+                  Escritorio
                 </span>
                 <Button variant="ghost" size="sm" onClick={onOpenStudio}>
                   Abrir

@@ -48,6 +48,21 @@ function notifications() {
 }
 
 describe("reconcileStuckWork", () => {
+  it("preserves admission and delivery outcomes through a combined notification provider", async () => {
+    const run = candidate("waiting_takeover", 5);
+    const stamps: Array<{ id?: string; runId: string | null; payload: unknown }> = [];
+    const prisma = noticePrisma(run, stamps);
+    const { jobs } = publisher();
+    const deliver = vi.fn(async () => "undeliverable" as "undeliverable" | "delivered");
+    const provider = { hasPushRecipient: async () => true, deliver, send: vi.fn() } as unknown as NotificationProvider;
+    await reconcileStuckWork({ prisma, jobs, notifications: provider, now, batchSize: 100 });
+    expect(stamps).toHaveLength(0);
+    expect(deliver).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ runId: run.id, userId: run.userId }));
+    deliver.mockResolvedValue("delivered");
+    await reconcileStuckWork({ prisma, jobs, notifications: provider, now, batchSize: 100 });
+    expect(stamps).toHaveLength(1);
+    expect(provider.send).not.toHaveBeenCalled();
+  });
   it("ignores a young queue and a row the scan cannot classify", async () => {
     const eventFindMany = vi.fn(async () => []);
     const prisma = {

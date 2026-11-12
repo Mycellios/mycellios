@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readBoundedResponseBytes } from "@rakazo/core";
 import { z } from "zod";
 import { mycelliosApiBaseUrl } from "./mycellios-api.js";
@@ -272,7 +272,7 @@ export function budgetMycelliosChat(request: Record<string, unknown>, contextWin
 /** Keep translation inside the provider adapter; transport still owns URL and DNS guards. */
 export function createMycelliosChatFetch(
   transport: typeof globalThis.fetch,
-  options: { contextWindow?: number } = {},
+  options: { contextWindow?: number; requestNamespace?: string | undefined } = {},
 ): typeof globalThis.fetch {
   return async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -282,6 +282,27 @@ export function createMycelliosChatFetch(
     if (typeof raw !== "string" || new TextEncoder().encode(raw).byteLength > MAX_REQUEST_BYTES)
       throw new Error("Unsupported or oversized Mycellios chat request.");
     const body = z.record(z.string(), z.unknown()).parse(JSON.parse(raw));
+    if (typeof body.model === "string" && body.model.startsWith("mycellios/managed/")) {
+      // Managed models speak ordinary OpenAI tools/SSE; never add the native Qwen envelope.
+      const managed = { ...body };
+      if (body.max_completion_tokens !== undefined) {
+        if (body.max_tokens !== undefined && body.max_tokens !== body.max_completion_tokens) throw new Error("Conflicting output limits.");
+        managed.max_tokens = body.max_completion_tokens; delete managed.max_completion_tokens;
+      }
+      delete managed.stream_options; // The server requests and validates the final usage receipt.
+      const payload = JSON.stringify(managed);
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+      headers.delete("content-length"); headers.delete("transfer-encoding");
+      headers.set("content-type", "application/json");
+      if (!headers.has("idempotency-key")) headers.set("idempotency-key", "managed-" + createHash("sha256")
+        .update(JSON.stringify([options.requestNamespace ?? "", managed])).digest("hex"));
+      const response = await transport(input, { ...init, headers, body: payload });
+      if (response.status === 202) {
+        await response.body?.cancel();
+        throw new Error("Mycellios is checking the previous paid request. Do not start another paid request.");
+      }
+      return response;
+    }
     const prepared = prepareMycelliosChat(body);
     const nativeRequest = budgetMycelliosChat(prepared.request, options.contextWindow);
     const callerSignal = init?.signal ?? (input instanceof Request ? input.signal : undefined);

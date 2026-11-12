@@ -7,8 +7,21 @@
   account/Space-scoped memory-cache/reload guards. Verify Cadencia signal, timeline,
   close/cache/UI tests and actual browser export/re-import; retain the pinned media
   dependency/license and synthetic demo provenance. No remote media fallback.
+  The loaded editor groups preview and closed waveform/detection disclosures
+  beside a compact editing panel with time saved, Create/Download and visible
+  cut review. Stack the panels by available container width. Keep per-cut
+  audition and precise bounds revealed only on selection. Display bounds
+  in seconds with 0.001-second precision; retain explicit vowel opt-in and stop
+  audition when its review panel closes.
 
 - The distributable Android host lives in apps/android and packages apps/web unchanged.
+  Native push uses data-only Firebase HTTP v1 messages, the fixed first-party session
+  registration endpoint and encrypted session-bound FCM device records. Keep Expo
+  tokens separate. Build with the four MYCELLIOS_FIREBASE_* public client values;
+  ANDROID_FCM_SERVICE_ACCOUNT_JSON belongs only to API/worker secrets. Initialize
+  Firebase in Application for background process starts. Never return tokens or
+  cookies over the WebView bridge. Preserve account/epoch checks, deduplication,
+  foreground suppression and validated internal notification destinations.
   Keep com.mycellios.android separate from the legacy Expo preview and use a durable
   release signing key, never the preview/debug certificate. Native capabilities use
   WebViewCompat messages with exact HTTPS origin, main-frame and packaged chat-route
@@ -24,6 +37,40 @@
   external-provider flow and verify packages/auth/src/oidc.test.ts for both routes.
 
 # AGENTS.md
+
+- The Hifa Store library unifies hosted static apps and fixed Desktop app launchers.
+  Use marketplace/StoreAppHeader for app titles and the return to Hifa Store;
+  keep unsaved-work guards on that return action. Estudio IA distinguishes a
+  disabled service, missing account connection and temporary catalog failures;
+  catalog retries only discover models and never submit generation or checkout.
+  Render all catalog entries through marketplace/StoreAppCard so cover, title,
+  description and footer geometry stay shared; keep secondary actions in menus.
+  Estudio IA is a catalog app; reserve the Store toolbar for Crear app. Keep its
+  explicit price confirmation and hide recharge when no usable catalog is loaded.
+  Keep their execution boundaries separate. Cadencia and Desktop launchers share
+  the directory; legacy cover artifacts remain private to their account/Space.
+  Cover editing belongs inside the creator's app editor, never on Store cards.
+  Built-in apps expose no user cover editor. Community covers use one validated
+  raster file in the encrypted draft and become public only through the existing
+  immutable publication pointer. Keep creator/Space checks in every write path,
+  including legacy appCovers.set; an artifact ID never grants public access.
+  A community list failure must not hide browser-local tools. Owners upload bounded static
+  files, edit encrypted account/Space drafts and explicitly publish immutable
+  revisions. Preserve mandatory `sandbox allow-scripts` response headers without
+  same-origin privileges on documents, assets, errors and previews. Public DTOs
+  omit account identity and private source; preview capabilities expire and
+  recheck membership. Relative directory links must preserve `/agent` routing.
+  Keep unsaved editor source in the existing account-scoped memory cache across
+  internal navigation, and retain web/Desktop update guards until it is saved.
+  Verify hosted-webs admission/template tests, editor-state/composer/update tests,
+  `scripts/verify-hosted-webs-db.ts` and actual browser file/module isolation.
+  App authoring uses a persisted owner/Space-scoped Mico and independent task
+  conversation. app_read/app_write resolve from the actual run and binding;
+  recheck membership, assignment, bot and run before accessing the encrypted
+  draft. CAS prevents lost edits. Reassignment revokes prior access; tools never
+  publish. Reuse thread streaming and TaskComposer; preview follows saved draft
+  versions without overwriting dirty manual edits.
+  Local qualification is not public production publication.
 
 - Contribution-funded network speech uses deployment-owned
   MYCELLIOS_NETWORK_SPEECH_IDENTITIES and the scheduler's authenticated pinned-edge
@@ -140,6 +187,10 @@
   an owned inference stream to Desktop, never keys, OAuth material or endpoints.
   Keep approval judges on the server and preserve Team/task computer assignments.
   Native run receipts are account/server scoped and forbid replay after restarts.
+  Approval/takeover continuations use a stable hash of the server-owned saved
+  checkpoint as their execution segment. Fence and receipt each segment once,
+  preserve the parent run/project identity, and refuse concurrent or repeated
+  starts. Keep legacy initial-run receipts; reconnection alone grants no segment.
   Keep the native session open for outstanding callback replies after the engine
   ends. Report completion only after the complete stream and acknowledgements.
   Disconnects must not silently substitute a cloud run for an admitted local run.
@@ -242,7 +293,10 @@
   prepare-desktop-version tests; a signed-out packaged startup does not qualify
   account login, real video generation or physical multi-device inference.
 - Workspace navigation uses the single rail and per-account/Space pins. Marketplace
-  reuses the existing connection and skill services; preserve multi-account editors.
+  reuses the existing connection and skill services; preserve multi-account editors. Its
+  menu collapses from a persistent header control, with a device-local preference.
+  Hide only navigation; keep active apps, editors and drafts mounted. Preserve
+  keyboard focus, mobile access and the native caption-control clearance.
   Library shows chat attachments and Mico outputs from the existing artifact index.
   Preserve Space scoping, artifact deep links, version history and previews.
   Inbox entries refer to ordinary Mico task threads through taskBotId and the
@@ -282,7 +336,7 @@
   installed application's Windows startup preferences.
 
 - Apps opens its catalog in Marketplace and launches Video Studio through the
-  Shell overlay. Preserve the chat draft and scope. The private Video Studio v1 definition is in Desktop assets,
+  Shell overlay. Preserve the chat draft and scope. The Apps catalog uses compact responsive app cards with real compositor scene samples; keep browser versus Desktop availability explicit. Personal app covers reuse owner/Space-scoped artifact versions with revision checks. Uploads accept bounded PNG/JPEG/WebP only. Generation opens an independent Mico task on its existing model/tools; persist and reuse admission nonces, never auto-resubmit, and require explicit application of an actual returned image. Verify app-covers and app-cover-generation tests. The private Video Studio v1 definition is in Desktop assets,
   with a fixed native driver and owner/Space/device-private projects. No app HTML,
   executable commands or paths are accepted from the renderer. Keep script/media
   revisions, review binding, actual artifact checks and existing PC consent.
@@ -361,8 +415,11 @@
   catalog editor. Changing gateway models never changes the account main role.
   Reply-notification preferences are local per user/device; per-Mico switches save
   through the owned Space RPC. Hidden previews never reveal reply text or names.
-  Open web clients deliver via the active service worker where available, or the
-  desktop Notification API otherwise. Suppress notices while a same-account tab is
+  Desktop uses the optional named notifications bridge in native main; retain
+  at most 50 alerts, validate main-frame origin and internal chat targets, and clear
+  them on account/window changes. Keep the Windows AppUserModelID aligned with
+  the installer. Older clients retain the browser Notification API; web clients
+  use the active service worker where available. Suppress notices while a same-account tab is
   focused. Click destinations must stay inside the deployed app and the target Space.
   A focused conversation plays a short cue after a persisted reply completes.
   Honor the device sound, mute and attention settings and the Mico's preference.
@@ -373,12 +430,27 @@
   Web Push is backed by encrypted,
   session-bound subscriptions and a durable outbox. Configure the same stable VAPID
   identity on API and worker. Never record subscription endpoints or payloads in logs.
+  Explicit, confirmed sign-out clears the local worker account binding and native
+  alerts; closing a tab/app keeps its background subscription. Reconcile actual
+  subscription/key state instead of trusting only the server registration flag.
   The push worker uses event-specific copy and bundled notification artwork. Put
   later icons in avatarArt so installed workers with the original allowlist
   still deliver the notice with the generic mushroom. When
   previews are off it displays a generic mascot and hides conversation identity.
   Regenerate the small PNGs with `node packages/ui-tokens/scripts/export-notification-art.ts`.
   Qualify delivery and the destination on an installed PWA on a physical phone.
+  Mobile boot/resume only refreshes prior opt-ins; request OS consent from settings.
+  Android creates the stable default channel before registration. Pin asynchronous
+  token registration to its original account/server session. The additive
+  mobile_push_devices table retains up to 20 encrypted devices per account and the
+  legacy push_tokens row; revoke only the current session on device unsubscribe.
+  Promote API and worker together with that migration. Shared background filters
+  and preview privacy apply to native mobile and Web Push. Session DateTime fields
+  are UTC timestamps without timezone: compare raw SQL against now() AT TIME ZONE
+  'UTC', leaving timestamptz outbox fields unchanged. Verify with
+  `node --import tsx scripts/verify-notification-devices-db.ts` through the queue.
+  A native Android WebView build without push must say so; do not claim Expo,
+  APNs/FCM or closed-app delivery without owned configuration and physical proof.
   Web update checks share the existing guarded tracker; they never deploy servers
   or reload through open settings/drafts/calls. Desktop uses the installed package's
   real updater policy; do not fabricate channel/automatic-install permissions.
@@ -775,6 +847,15 @@
   only the owned account/Space roster, clear it on sign-out/scope exit, validate
   bounded PNG avatars and accept selections only from companion windows and the
   current roster. Result text is opt-in. Preserve click-through when auto-hidden.
+  The detached collapsed island uses a 212 x 32 capsule at default scale, with
+  avatar and state at opposite edges; keep names and question text in its expanded
+  panel and accessible label. Rasterize the actual avatar body, excluding decorative
+  rings, and embed only bounded same-origin sprite assets before SVG-to-PNG capture.
+  The question island publishes only current ordinary pending asks while enabled;
+  keep credentials and approval cards in the main chat. Re-read the owned thread
+  before each answer, preserve the server answer fence, bind every IPC response to
+  account/Space/prompt/nonce, and revoke pending actions on scope exit. Later only
+  collapses the panel. Test companion questions, renderer and trusted native bridge.
 - Device Voice preferences set dictation hints, local device voice and playback
   speed. Model downloads require a user gesture. Optional screen-usage reporting
   is off until this device opts in; this does not disable security/error reporting.
@@ -1128,13 +1209,15 @@
 
 - Mico avatar preferences persist together in the existing `bots.color` shape
   encoding. Keep the reserved appearance slots stable and preserve legacy
-  shapes and uploaded images. The default collection uses solid animal
-  silhouettes and capsule eyes based on the loader. Choose light or dark eyes
-  by contrast against the silhouette's fill. Keep explicit web velvet
+  shapes and uploaded images. The default collection uses twelve mycelium forms with vivid brand pairings and 24 palettes; historical animal
+  slots are decode-only and display as mycelium. Slots 4000/4400 encode the eleven new bodies without changing historical slots. Choose light or dark eyes
+  using the actual shaded face color. The twelve velvet bodies use short frontal felt eyes with per-body scale; avoid applying a spherical head rotation to them. Frame each velvet body from its full alpha silhouette with 32 source pixels of padding; preserve source face anchors when changing crops. Keep explicit web velvet
   choices and the original-color option. Animate the eyes in web previews and
   honor reduced motion. Verify bot-avatar and create-bot-dialog tests.
-  New Mico opens with the green brand mushroom, which also starts the automatic
-  avatar assignment in an empty space. Later Micos use the animal rotation.
+  Empty personal chats use the selected Mico's full saved color/shape encoding
+  and identity, matching its roster and dock rather than the generic brand avatar.
+  Non-loading brand placeholders use AuthMushroom with the shared velvet BotAvatar; the historical mark is reserved for MycelliosLoader/loader.svg. New Mico opens with the green brand mushroom, which also starts the automatic
+  avatar assignment in an empty space. Later Micos use the mycelium rotation. Web eyes use the MIT Bloub idle drift/blink math through a shared 30 fps clock, paused offscreen, on blur and under reduced motion. Verify mycelium-avatar.test.tsx.
 
 - Mico creation lets users enter the purpose and optionally choose a connected
   model. Validate and persist the model before the intro can be queued. Keep
@@ -1144,6 +1227,8 @@
   and queue a brief greeting on the configured model or admitted engine.
   Suggestions fill the editable name, purpose and avatar in both creation
   layouts, preserving the selected model and waiting for explicit submission.
+
+- The conversation header adapts to its own container width when a side panel opens. Keep action buttons from shrinking, collapse the model label, and retain narrow task navigation through its menu.
 
 - Keep the Mico settings overview compact. Open instructions, memory, computer,
   permissions and advanced controls in separate views within the same panel.
@@ -1156,6 +1241,9 @@
   Queue reads use the authenticated owned thread resolver, including side threads.
   Micos may override the device's busy-message default. A null override inherits
   the device setting. Keep group conversations and the per-message choice independent.
+  Keep delivery choices inside the composer's Add menu, not in a persistent row
+  beneath the field. Show the pending list only when saved queue entries exist;
+  Ask aside shares the Add menu and never sends or steers the main task.
   Repeat automatically opens an unsaved routine from the original user request;
   it never schedules an assistant result or starts a routine before Save.
 
@@ -1224,6 +1312,14 @@
   on errors or unmount. Animate only verified contribution-earned deltas; never
   mint display credits from timers, purchases, promotions or unconfirmed jobs.
 
+- Roster hover previews use existing scoped row messages and real run states.
+  Do not fetch threads or mark messages read on hover; keep clicks, context menus
+  and drag reordering intact, and suppress previews on touch and during dragging.
+
+- Keep Tasks, the model selector and a single header tools panel toggle on the
+  right of the conversation header. Put secondary actions inside the full-height resizable side panel;
+  mobile Browser return focus targets the same tools trigger.
+
 - The chat has one Browser and computer entry. Both views share WorkAreaHeader;
   secondary library, Mico settings and voice actions stay in its More menu.
   Computer recovery and per-Mico routines remain in state-preserving disclosures.
@@ -1236,3 +1332,18 @@
   immediately first, then coalesces at 80 ms, with final/tool-boundary flushes retained.
   Long replies use the same disclosure for plain text and mixed blocks. Keep streamed
   answers expanded on completion and reveal search/quote targets without losing text.
+
+- Agent clarification uses ask_user and the inline questionnaire: up to three short
+  questions, optional option descriptions and multiple selection, free text and Skip.
+  API and native runtimes share the same bounded parser. Persist/redact the whole
+  questionnaire and resume only via the existing scoped, fenced answer operation.
+  Skip supplies no authorization. Credentials and protected actions keep their
+  dedicated cards. Verify questionnaire, AskCard, Pi/native pause and continuation tests.
+
+- Mycellios creation keeps the authenticated viewer pinned for quote, execute,
+  status, content and checkout. Keep stable purchase keys, quote-before-confirm,
+  GET-only recovery and separate checkout; no blind paid replay or personal-key
+  fallback. Voice/duration use the shared selectors; transcription is converted
+  locally to bounded PCM; batches/rerank/evaluation use bounded plain text.
+  Verify MycelliosCreate and mycellios-media tests. Local synthetic UI results
+  do not qualify live supplier inference, actual Credits or real payments.

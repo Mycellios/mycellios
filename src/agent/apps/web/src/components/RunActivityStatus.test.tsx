@@ -169,7 +169,7 @@ it("shows real tool activity without claiming the worker is connected or opening
   mount({ ...run, leaseExpiresAt: undefined, observedAt: undefined }, false, [message]);
   expect(node.querySelector('ol[aria-label="Task activity"]')?.textContent).toContain("List files");
   expect(node.querySelector("[role=status]")?.textContent).toBe("Status not confirmed");
-  expect(node.querySelector("details")?.open).toBe(true);
+  expect(node.querySelector("details")?.open).toBe(false);
   expect(node.querySelector("details")?.contains(node.querySelector('ol[aria-label="Task activity"]'))).toBe(true);
   expect(node.textContent).not.toContain("Technical details");
 });
@@ -187,8 +187,9 @@ it("keeps commands and paths inside details and preserves the disclosure choice 
   const render = () => root!.render(<RunActivityStatus run={run} messages={[]} bots={[]} activity={activity} onRefresh={async () => undefined} />);
   act(render);
   const details = node.querySelector("details")!;
-  expect(details.open).toBe(true);
+  expect(details.open).toBe(false);
   expect(details.textContent).toContain(activity);
+  act(() => { details.open = true; details.dispatchEvent(new Event("toggle")); });
   const summary = details.querySelector("summary");
   expect(summary?.textContent).toContain("Waiting for an activity update");
   expect(summary?.textContent).not.toContain("ssh");
@@ -236,13 +237,13 @@ it("shows the command, its output and elapsed time while the run is active", () 
   mount({ ...run, startedAt: new Date(now - 8000).toISOString() }, false, [message]);
   const status = node.querySelector("[role=status]")?.textContent ?? "";
   const timeline = node.querySelector('ol[aria-label="Task activity"]')?.textContent ?? "";
-  expect(status).toContain("git status --short");
+  expect(status).toContain("Reading files");
   expect(status).not.toContain("Running a command");
   expect(timeline).toContain("git status --short");
   expect(timeline).toContain("M README.md");
   expect(timeline).not.toContain("×2");
   expect(node.querySelector("pre")?.textContent).toContain("M README.md");
-  expect(node.querySelector("details")?.open).toBe(true);
+  expect(node.querySelector("details")?.open).toBe(false);
 });
 it("keeps different file steps separate", () => {
   const message = {
@@ -265,11 +266,22 @@ it("keeps different file steps separate", () => {
   expect(timeline).toContain("Reading src/a.ts");
   expect(timeline).toContain("Reading src/b.ts");
   expect(timeline).not.toContain("×");
-  expect(node.querySelector("[role=status]")?.textContent).toContain("Reading src/b.ts");
+  expect(node.querySelector("[role=status]")?.textContent).toContain("Reading files");
 });
 it("shows seconds instead of zero minutes and omits the initial timer noise", () => {
   mount({...run, startedAt: new Date(now - 1000).toISOString()});
   expect(node.querySelector('[aria-label="Elapsed"]')).toBeNull();
   act(() => root!.render(<RunActivityStatus run={{...run, startedAt: new Date(now - 12000).toISOString()}} messages={[]} bots={[]} onRefresh={async () => undefined} />));
-  expect(node.querySelector('[aria-label="Elapsed"]')?.textContent).toContain("12 sec");
+  expect(node.querySelector('[aria-label="Elapsed"]')).toBeNull();
+});
+
+it("summarizes a write tool without exposing its path or input", () => {
+  const message = { id: "progress:run", runId: "run", threadId: "thread", seq: 2,
+    role: "bot", createdAt: at(0), blocks: [{ kind: "steps", steps: [{ label: "write_file /private/a.ts", count: 1 }],
+      tools: [{ id: "write-1", name: "write_file", outcome: "running", updatedAt: at(0), detail: "/private/a.ts" }] }],
+  } as import("@rakazo/contracts").ThreadMessage;
+  mount({ ...run, startedAt: new Date(now - 8000).toISOString() }, false, [message]);
+  expect(node.querySelector("[role=status]")?.textContent).toContain("Updating files");
+  expect(node.querySelector("summary")?.textContent).not.toContain("/private");
+  expect(node.querySelector("details")?.open).toBe(false);
 });

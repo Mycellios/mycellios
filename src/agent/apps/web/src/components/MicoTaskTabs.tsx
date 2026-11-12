@@ -121,8 +121,8 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
     </form>
   );
 
-  return <nav aria-label={t`Mico tasks`} className={inMenu ? "min-w-0" : "app-no-drag flex min-w-0 items-center gap-0.5"}>
-    {!inMenu ? <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+  return <nav aria-label={t`Mico tasks`} className={inMenu ? "min-w-0" : "app-no-drag flex min-w-7 flex-1 items-center gap-0.5"}>
+    {!inMenu ? <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] @max-[24rem]:hidden">
       {visibleTabs.length || taskThreadId ? <Button size="sm" variant={!taskThreadId ? "secondary" : "ghost"} className="h-7 shrink-0 px-2" aria-current={!taskThreadId ? "page" : undefined} onClick={() => onSelect()}><Trans>Main chat</Trans></Button> : null}
       {visibleTabs.map(tab => (
         <div key={tab.threadId} data-active={tab.threadId === taskThreadId ? "" : undefined}
@@ -142,7 +142,7 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
       ))}
     </div> : null}
     {!inMenu ? <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t`New conversation`} />}><Plus size={16} aria-hidden="true" /></PopoverTrigger>
+      <PopoverTrigger render={<Button size="icon-sm" variant="ghost" className="@max-[24rem]:hidden" aria-label={t`New conversation`} />}><Plus size={16} aria-hidden="true" /></PopoverTrigger>
       <PopoverContent align="end" className="w-72 max-w-[calc(100vw-2rem)]">
         {taskForm}
       </PopoverContent>
@@ -151,7 +151,7 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
       <PopoverTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t`Mico tasks`} title={t`Mico tasks`} data-mobile-chat-action={inMenu || undefined} />}>
         {inMenu ? <><MessageCircle aria-hidden /><Trans>Mico tasks</Trans></> : <ChevronDown size={15} aria-hidden="true" />}
       </PopoverTrigger>
-      <PopoverContent align="start" className="max-h-[60dvh] w-72 max-w-[calc(100vw-2rem)] gap-1 overflow-y-auto p-1">
+      <PopoverContent align="start" className="max-h-[60dvh] w-72 max-w-[calc(100vw-2rem)] gap-1 overflow-y-auto p-1 [&_button]:font-normal">
         {inMenu && open ? <div className="p-2">{taskForm}</div> : <>
         <Button size="sm" variant={!taskThreadId ? "secondary" : "ghost"} className="justify-start" onClick={() => { setThreadPickerOpen(false); onSelect(); }}><Trans>Main chat</Trans></Button>
         {tabs.map(tab => (

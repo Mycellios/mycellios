@@ -1,3 +1,4 @@
+import { readBoundedJsonResponse,readBoundedResponseBytes } from "@rakazo/core";
 import { createModelPlanLimits } from "../model-plan-limits.js";
 import { discoverLocalModels } from "../local-model-discovery.js";
 import { nativeHostAccess } from "@rakazo/adapters";
@@ -167,6 +168,44 @@ export function modelsRoutes(ctx: RouterContext) {
         mycelliosConnections.set(context.actor.userId, setup);
         try { return await setup; }
         finally { mycelliosConnections.delete(context.actor.userId); }
+      }),
+      mycelliosVideoEdit:authed.models.mycelliosVideoEdit.handler(async({context,input})=>{
+        if(process.env.MYCELLIOS_MANAGED_APPS_ENABLED!=="true")throw new ORPCError("PRECONDITION_FAILED",{message:"El editor con monedero está en preparación. No se ha enviado ni cobrado nada."});
+        const owned=await ownedMycellios(context.actor);
+        const token=owned?.saved.apiKey??(deps.env.mycelliosSso&&context.requestHeaders?await deps.auth.oidcAccessToken(context.requestHeaders,context.actor.userId):null);
+        if(!token)throw new ORPCError("UNAUTHORIZED");
+        const signal=AbortSignal.any([AbortSignal.timeout(170000),...(context.signal?[context.signal]:[])]);
+        const response=await(deps.modelConnectionFetch??fetch)(productBrand.apiBaseUrl+"/managed/video-edit/"+input.action,{
+          method:input.action==="info"?"GET":"POST",redirect:"error",signal,headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},
+          ...(input.action==="info"?{}:{body:input.payload}),
+        });
+        if(!response.ok){await response.body?.cancel();throw new ORPCError("SERVICE_UNAVAILABLE",{message:"No se pudo completar la operación del editor. Consulta el trabajo antes de volver a enviarlo."});}
+        if(input.action==="content"){
+          if(!response.headers.get("content-type")?.startsWith("video/mp4")){await response.body?.cancel();throw new ORPCError("SERVICE_UNAVAILABLE");}
+          const bytes=await readBoundedResponseBytes(response,{maxBytes:67_108_864,tooLargeMessage:"El vídeo supera el límite permitido.",read:operation=>operation()});
+          return {data:Buffer.from(bytes).toString("base64"),mediaType:"video/mp4"};
+        }
+        return await readBoundedJsonResponse(response,2_000_000,signal);
+      }),
+      mycelliosMedia: authed.models.mycelliosMedia.handler(async ({context,input})=>{
+        if(process.env.MYCELLIOS_MANAGED_APPS_ENABLED!=="true")throw new ORPCError("PRECONDITION_FAILED",{message:"Estas apps están en preparación. No se ha gastado ningún crédito."});
+        if(input.action!=="models"&&input.expectedUserId!==context.actor.userId)throw new ORPCError("FORBIDDEN",{message:"La cuenta ha cambiado. Vuelve a abrir la app antes de continuar."});
+        const owned=await ownedMycellios(context.actor);
+        const token=owned?.saved.apiKey ?? (deps.env.mycelliosSso && context.requestHeaders ? await deps.auth.oidcAccessToken(context.requestHeaders,context.actor.userId):null);
+        if(!token)throw new ORPCError("UNAUTHORIZED");
+        const path=input.action==="checkout"?"/wallet/checkout":"/managed/media/"+input.action;
+        const signal=AbortSignal.any([AbortSignal.timeout(150000),...(context.signal?[context.signal]:[])]);
+        const response=await (deps.modelConnectionFetch??fetch)(productBrand.apiBaseUrl+path,{method:input.action==="models"?"GET":"POST",redirect:"error",signal,
+          headers:{authorization:`Bearer ${token}`,"content-type":"application/json",...(input.key?{"idempotency-key":input.key}:{})},
+          ...(input.action==="models"?{}:{body:input.payload??"{}"})});
+        if(input.action==="status"&&response.status===404){await response.body?.cancel();return {status:"not_submitted"};}
+        if(!response.ok){await response.body?.cancel();throw new ORPCError("SERVICE_UNAVAILABLE",{message:"No se ha podido completar la operación. Consulta el estado antes de volver a enviarla."});}
+        if(input.action==="content") {
+          const bytes=await readBoundedResponseBytes(response,{maxBytes:67_108_864,tooLargeMessage:"El vídeo supera el límite de descarga.",read:operation=>operation()});
+          return {data:Buffer.from(bytes).toString("base64"),mediaType:"video/mp4"};
+        }
+        const value=await readBoundedJsonResponse<Record<string,unknown>>(response,24_000_000,signal);
+        return input.action==="models"?{...value,viewer:context.actor.userId}:value;
       }),
       mycelliosModels: authed.models.mycelliosModels.handler(async ({ context }) => {
         const owned = await ownedMycellios(context.actor);

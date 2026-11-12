@@ -1,12 +1,15 @@
 import { SoundSettings } from "./SoundSettings";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, NotificationSettings } from "@rakazo/contracts";
-import { Button, Label, Switch } from "@rakazo/ui-web";
+import { Button, Label, Switch, NativeSelect } from "@rakazo/ui-web";
 import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
 import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { rpc } from "../../lib/rpc";
-import { enableWebPush, notificationClientId, pushSupported } from "../../lib/web-push";
+import { enableWebPush, isInstalledWebApp, notificationClientId, pushSupported } from "../../lib/web-push";
+import { desktopBridge } from "../../lib/desktop";
+import { androidNotificationRequest, isAndroidHost, type AndroidNotificationStatus } from "../../lib/android-host";
+import { notificationEnvironment } from "../../lib/notification-environment";
 import { requestBrowserNotificationPermission, showSystemNotification } from "../../lib/browser-notifications";
 import {
   notificationPreferences,
@@ -44,22 +47,46 @@ export function NotificationsPanel({
     return () => window.clearTimeout(timer);
   }, [paused, value.mutedUntil]);
   const supported = typeof Notification !== "undefined";
+  const android = isAndroidHost();
+  const [androidStatus, setAndroidStatus] = useState<AndroidNotificationStatus>();
+  const [androidServer, setAndroidServer] = useState<boolean | null>(null);
   const [permission, setPermission] = useState(() =>
     supported ? Notification.permission : "unsupported",
   );
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const native = desktopBridge()?.notifications;
+  const [nativeStatus, setNativeStatus] = useState<{ supported: boolean; settingsAvailable: boolean }>();
+  const [pushConfigured, setPushConfigured] = useState<boolean | null>(null);
+  const [pushError, setPushError] = useState(false);
+  useEffect(() => {
+    if (!android || !scope) return;
+    let disposed = false;
+    const sync = () => void Promise.all([androidNotificationRequest("status", { accountId: scope }), rpc.notifications.androidStatus()]).then(([status, service]) => {
+      if (!disposed) { setAndroidStatus(status); setPermission(status.permission); setAndroidServer(service.configured); }
+    }).catch(() => { if (!disposed) setError(t`Update Mycellios Android to configure native notifications.`); });
+    sync(); window.addEventListener("focus", sync); window.addEventListener("mycellios:notifications-changed", sync);
+    return () => { disposed = true; window.removeEventListener("focus", sync); window.removeEventListener("mycellios:notifications-changed", sync); };
+  }, [android, scope]);
+  const environment = notificationEnvironment({ userAgent: navigator.userAgent, platform: navigator.platform,
+    maxTouchPoints: navigator.maxTouchPoints, secure: window.isSecureContext, installed: isInstalledWebApp(),
+    push: pushSupported(), androidHost: isAndroidHost(), nativeDesktop: Boolean(desktopBridge()) });
+  useEffect(() => { let disposed = false;
+    void native?.status().then(state => { if (!disposed) setNativeStatus(state); }).catch(() => undefined);
+    return () => { disposed = true; };
+  }, [native]);
   const [push, setPush] = useState<{ publicKey: string | null; registered: boolean; settings: NotificationSettings }>();
   useEffect(() => {
-    if (!scope || !pushSupported()) return;
+    if (!scope) return;
     let cancelled = false;
     const refresh = () => void rpc.notifications.webStatus({ clientId: notificationClientId() })
-      .then((state) => { if (!cancelled && state.configured) setPush(state); })
-      .catch(() => undefined);
+      .then((state) => { if (!cancelled) { setPushError(false); setPushConfigured(state.configured); setPush(state); } })
+      .catch(() => { if (!cancelled) { setPushError(true); setPushConfigured(null); setPush(undefined); } });
     refresh();
     window.addEventListener("mycellios:notifications-changed", refresh);
-    return () => { cancelled = true; window.removeEventListener("mycellios:notifications-changed", refresh); };
+    window.addEventListener("focus", refresh);
+    return () => { cancelled = true; window.removeEventListener("mycellios:notifications-changed", refresh); window.removeEventListener("focus", refresh); };
   }, [scope]);
   async function savePushSettings(patch: Partial<NotificationSettings>) {
     if (!push || busy) return;
@@ -68,6 +95,7 @@ export function NotificationsPanel({
     try {
       const settings = await rpc.notifications.saveSettings({ ...push.settings, ...patch });
       setPush({ ...push, settings });
+      window.dispatchEvent(new Event("mycellios:notifications-changed"));
     } catch {
       setError(t`Could not save this preference.`);
     } finally {
@@ -80,10 +108,10 @@ export function NotificationsPanel({
   useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   useEffect(() => {
     const sync = () =>
-      setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+      { if (!android) setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission); };
     window.addEventListener("focus", sync);
     return () => window.removeEventListener("focus", sync);
-  }, []);
+  }, [android]);
   function save(patch: Partial<typeof value>) {
     try {
       saveNotificationPreferences(scope, { ...value, ...patch });
@@ -96,13 +124,20 @@ export function NotificationsPanel({
     setBusy("permission");
     setError("");
     try {
+      if (android) {
+        const service = await rpc.notifications.androidStatus();
+        if (!service.configured) throw new Error(t`Android push is not configured on this server.`);
+        const status = await androidNotificationRequest("enable", { accountId: scope });
+        setAndroidStatus(status); setPermission(status.permission);
+        window.dispatchEvent(new Event("mycellios:notifications-changed")); return;
+      }
       const next = await requestBrowserNotificationPermission();
       setPermission(next ?? "unsupported");
       if (next === "granted" && push?.publicKey) {
         await enableWebPush(push.publicKey, scope);
       }
-    } catch {
-      setError(t`Could not enable notifications.`);
+    } catch (cause) {
+      setError(android && cause instanceof Error ? cause.message : t`Could not enable notifications.`);
     } finally {
       setBusy(null);
     }
@@ -125,9 +160,10 @@ export function NotificationsPanel({
     setMessage("");
     setError("");
     try {
-      await showSystemNotification("Mycellios", t`Notifications are working on this device.`,
+      if (android) await androidNotificationRequest("test", { accountId: scope });
+      else await showSystemNotification("Mycellios", t`If you can see this alert, system notifications are enabled.`,
         "mycellios-settings-test", "/app", value.sound);
-      setMessage(t`Test notification sent.`);
+      setMessage(t`Test requested. Check your notification center; system focus or Do Not Disturb may silence it.`);
     } catch {
       setError(t`Could not show the test notification.`);
     } finally {
@@ -137,6 +173,24 @@ export function NotificationsPanel({
   return (
     <div className="rk-general-settings space-y-6">
       <SettingsGroup title={t`This device`}>
+        <SettingsRow label={t`Delivery`} control={<span className="text-sm text-muted-foreground">{
+          environment === "desktop" ? t`Desktop` : android ? androidStatus?.registered && androidServer ? t`Push connected` : t`Setup needed` : pushError ? t`Unavailable` : push?.registered ? t`Push connected` : t`Setup needed`
+        }</span>}>
+          <p className="text-xs text-muted-foreground">{
+            environment === "desktop" ? t`Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer.` :
+            environment === "ios-install" ? t`On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications.` :
+            environment === "android-host" ? androidStatus?.configured && androidServer ? t`Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device.` : t`Firebase must be configured in the Android app and on the server before native push can be enabled.` :
+            environment === "insecure" ? t`Open Mycellios over HTTPS to enable system notifications.` :
+            pushError ? t`Could not check background delivery. Alerts in the running app remain available.` :
+            push?.registered ? t`This device is registered for closed-app alerts. Delivery also depends on your system and network settings.` :
+            pushConfigured === false ? t`Background push is not configured on this server. Alerts are available only while the app is running.` :
+            t`Enable system permission and register this device to receive background alerts.`
+          }</p>
+          {nativeStatus?.settingsAvailable && <Button variant="ghost" size="sm" className="mt-2" onClick={() => {
+            void native?.openSettings().catch(() => setError(t`Could not open system notification settings.`));
+          }}>{t`Open system notification settings`}</Button>}
+          {android && <Button variant="ghost" size="sm" className="mt-2" onClick={() => { void androidNotificationRequest("settings").catch(() => setError(t`Could not open system notification settings.`)); }}>{t`Open system notification settings`}</Button>}
+        </SettingsRow>
         <SettingsRow
           label={<Label htmlFor={`${id}-enabled`}>{t`Reply notifications`}</Label>}
           control={
@@ -177,10 +231,10 @@ export function NotificationsPanel({
             />
           }
         />
-        {permission !== "granted" && <SettingsRow
+        {(permission !== "granted" || android && !androidStatus?.registered) && <SettingsRow
           label={t`System permission`}
           control={
-            permission === "default" ? (
+            permission === "default" || android && permission === "granted" && !androidStatus?.registered ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -207,7 +261,7 @@ export function NotificationsPanel({
           </p>
         </SettingsRow>
         }
-        {permission === "granted" ? (
+        {(permission === "granted" && (!android || androidStatus?.registered)) || nativeStatus?.supported ? (
           <SettingsRow
             label={t`Test notification`}
             control={
@@ -239,15 +293,31 @@ export function NotificationsPanel({
               save({ mutedUntil: paused ? 0 : Date.now() + 3_600_000 });
             }}>{paused ? t`Resume notifications` : t`Pause for 1 hour`}</Button>}
         />
-        {push?.registered && <SettingsRow
-          label={<Label htmlFor={`${id}-push-attention`}>{t`Push alerts only when I’m needed`}</Label>}
-          control={<Switch id={`${id}-push-attention`} checked={push.settings.level === "needs_me"}
-            disabled={busy !== null} onCheckedChange={(on) => void savePushSettings({ level: on ? "needs_me" : "all" })} />}
-        >
-          <p className="text-xs text-muted-foreground">{t`Applies to all devices where you enabled closed-app notifications.`}</p>
-        </SettingsRow>}
         </SettingsGroup>
       </Disclosure>
+      {push && <Disclosure summary={t`Background alerts across devices`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground">
+        <SettingsGroup>
+          <SettingsRow label={<Label htmlFor={`${id}-push-level`}>{t`When to notify`}</Label>} control={
+            <NativeSelect id={`${id}-push-level`} value={push.settings.level} disabled={busy !== null}
+              onChange={event => void savePushSettings({ level: event.target.value as NotificationSettings["level"] })}>
+              <option value="all">{t`All activity`}</option><option value="needs_me">{t`Only when I’m needed`}</option><option value="off">{t`Off`}</option>
+            </NativeSelect>}>
+            <p className="text-xs text-muted-foreground">{t`Applies to all devices where you enabled closed-app notifications.`}</p>
+          </SettingsRow>
+          <SettingsRow label={<Label htmlFor={`${id}-push-preview`}>{t`Show push previews`}</Label>} control={
+            <Switch id={`${id}-push-preview`} checked={push.settings.previews} disabled={busy !== null}
+              onCheckedChange={previews => void savePushSettings({ previews })}/>} />
+          <SettingsRow label={t`Pause notifications`} control={<Button variant="outline" size="sm" disabled={busy !== null}
+            onClick={() => void savePushSettings({ mutedUntil: push.settings.mutedUntil && Date.parse(push.settings.mutedUntil) > Date.now() ? null : new Date(Date.now() + 3_600_000).toISOString() })}>
+            {push.settings.mutedUntil && Date.parse(push.settings.mutedUntil) > now ? t`Resume notifications` : t`Pause for 1 hour`}
+          </Button>}/>
+          {bots.map(bot => <SettingsRow key={bot.id} label={<Label htmlFor={`${id}-push-${bot.id}`}>{bot.name}</Label>} control={
+            <NativeSelect id={`${id}-push-${bot.id}`} disabled={busy !== null} value={push.settings.bots[bot.id] ?? "inherit"}
+              onChange={event => { const overrides = { ...push.settings.bots }; if (event.target.value === "inherit") delete overrides[bot.id]; else overrides[bot.id] = event.target.value as NotificationSettings["level"]; void savePushSettings({ bots: overrides }); }}>
+              <option value="inherit">{t`Use account setting`}</option><option value="all">{t`All activity`}</option><option value="needs_me">{t`Only when I’m needed`}</option><option value="off">{t`Off`}</option>
+            </NativeSelect>} />)}
+        </SettingsGroup>
+      </Disclosure>}
       <Disclosure summary={t`Notifications by Mico`} className="rk-settings-details" summaryClassName="w-full py-2 text-sm text-muted-foreground">
       <SettingsGroup>
         {bots.length ? (

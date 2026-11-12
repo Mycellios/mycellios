@@ -1,0 +1,13 @@
+.hifa-app-header { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 44px; }
+.hifa-app-header .hifa-app-header-back { flex: 0 0 36px; width: 36px; height: 36px; border-radius: 10px; background: var(--muted); color: var(--foreground); }
+.hifa-app-header .hifa-app-header-back:hover { background: var(--accent); }
+.hifa-app-header-back:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.hifa-app-header-identity { display: flex; align-items: baseline; gap: 16px; min-width: 0; flex: 1; }
+.hifa-app-header-identity h1 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -.03em; }
+.hifa-app-header-identity p { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 18px; }
+.hifa-app-header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .hifa-app-header { flex-wrap: wrap; }
+  .hifa-app-header-identity { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .hifa-app-header-actions { width: 100%; padding-left: 48px; }
+}

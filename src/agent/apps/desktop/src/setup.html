@@ -1,7 +1,8 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="es" data-theme="light">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; form-action 'none'; base-uri 'none'"
@@ -13,35 +14,40 @@
   <body>
     <header class="titlebar">
       <span class="titlebar-name">Mycellios</span>
-      <button id="quit" class="titlebar-quit" type="button" title="Quit Mycellios">Quit</button>
+      <button id="quit" class="titlebar-quit" type="button" title="Salir de Mycellios">Salir</button>
     </header>
 
     <main class="shell">
-      <h1 id="heading" class="heading">Mycellios</h1>
-      <p id="subheading" class="subheading">Connection settings</p>
+      <img class="connection-mark" src="assets/icon.png" width="48" height="48" alt="" />
+      <h1 id="heading" class="heading">Tu espacio en Mycellios</h1>
+      <p id="subheading" class="subheading">Entra en tu cuenta y continúa con tus Micos.</p>
+      <section id="welcome" hidden>
+        <button id="quick-connect" class="button button-primary main-action" type="button">Abrir Mycellios</button>
+      </section>
 
       <section id="recovery" hidden aria-labelledby="heading">
-        <p id="recovery-message" class="subheading" role="alert">We couldn't connect to Mycellios.</p>
+        <p id="recovery-message" class="subheading" role="alert">No hemos podido abrir tu espacio. Vuelve a intentarlo en unos momentos.</p>
         <div class="actions recovery-actions">
-          <button id="retry" class="button button-primary" type="button">Retry</button>
-          <button id="close" class="button button-secondary" type="button">Close</button>
+          <button id="retry" class="button button-primary main-action" type="button">Volver a intentar</button>
+          <button id="close" class="button button-quiet" type="button">Salir</button>
         </div>
       </section>
 
+      <p id="status" class="status" role="status" aria-live="polite"></p>
       <details id="advanced">
-        <summary>Advanced</summary>
-        <p id="recovery-diagnostic" class="recovery-diagnostic" hidden></p>
-      <section id="saved-servers" aria-label="Servidores"></section>
+        <summary>Opciones de conexión</summary>
+        <p class="connection-help">¿Te han compartido un enlace para conectar con otro espacio? Puedes añadirlo aquí.</p>
+      <section id="saved-servers" aria-label="Tus conexiones"></section>
       <form id="setup" novalidate>
           <fieldset class="choices">
-            <legend class="sr-only">Instance</legend>
+            <legend class="sr-only">Cómo quieres conectar</legend>
             <label class="choice" for="mode-new">
               <input id="mode-new" type="radio" name="mode" value="new" />
-              <span class="choice-title">Run a self-hosted server on this computer</span>
+              <span class="choice-title">Preparar en este equipo<span class="choice-description">Para configurar tu propia instalación.</span></span>
             </label>
             <label class="choice" for="mode-existing">
               <input id="mode-existing" type="radio" name="mode" value="existing" checked />
-              <span class="choice-title">Connect to a server</span>
+              <span class="choice-title">Usar un enlace<span class="choice-description">Para un espacio que ya está preparado.</span></span>
             </label>
           </fieldset>
 
@@ -55,8 +61,8 @@
                 type="button"
                 aria-controls="stack-output"
                 aria-expanded="false"
-                aria-label="Technical details"
-                title="Technical details"
+                aria-label="Detalles técnicos"
+                title="Detalles técnicos"
               >
                 <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
                   <path d="M3.5 4.5 7 8l-3.5 3.5M8.5 11.5H13" />
@@ -67,7 +73,7 @@
               id="stack-progress"
               class="progress"
               role="progressbar"
-              aria-label="Setup progress"
+              aria-label="Progreso de preparación"
               aria-valuemin="0"
               aria-valuemax="100"
               aria-valuenow="0"
@@ -85,26 +91,28 @@
           </div>
         </section>
 
-        <label class="field-label" for="server-name">Nombre del servidor</label><input id="server-name" class="field" maxlength="80" autocomplete="off" placeholder="Mi servidor" />
+        <label class="field-label" for="server-name">Nombre <span class="optional-label">(opcional)</span></label><input id="server-name" class="field" maxlength="80" autocomplete="off" placeholder="Por ejemplo, Trabajo" />
         <section id="panel-existing" class="panel" hidden>
-          <label class="field-label" for="server-url">Server address</label>
+          <label class="field-label" for="server-url">Enlace de conexión</label>
           <input
             id="server-url"
             class="field"
             type="text"
             spellcheck="false"
             autocomplete="off"
-            placeholder="https://www.mycellios.com/agent"
+            placeholder="Pega aquí el enlace que te han compartido"
           />
         </section>
 
-        <p id="status" class="status" role="status" aria-live="polite"></p>
-
         <div class="actions">
-          <button id="check" class="button button-secondary" type="button">Check connection</button>
-          <button id="continue" class="button button-primary" type="submit">Continue</button>
+          <button id="check" class="button button-quiet" type="button">Probar conexión</button>
+          <button id="continue" class="button button-primary" type="submit">Conectar</button>
         </div>
       </form>
+        <details id="diagnostic-details" class="diagnostic-details" hidden>
+          <summary>Detalles técnicos</summary>
+          <p id="recovery-diagnostic" class="recovery-diagnostic" hidden></p>
+        </details>
       </details>
     </main>
 

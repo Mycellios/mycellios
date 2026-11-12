@@ -49,6 +49,12 @@ interface ModelSpec {
 
 /** Further content columns (external messages, steering, skills, …) add an entry here. */
 export const ENCRYPTED_MODELS: Record<string, ModelSpec> = {
+  HostedWeb: {
+    table: "hosted_webs",
+    fields: { draftBundle: { plainKeys: new Set() } },
+    space: { column: "spaceId" },
+    ownerRelation: "user",
+  },
   Message: {
     table: "messages",
     fields: { blocks: { plainKeys: MESSAGE_BLOCK_PLAIN_KEYS } },

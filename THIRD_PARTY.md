@@ -93,3 +93,11 @@ its build toolchain, including npm's Artistic-2.0 license in the copied npm
 resource directory. The managed source copy retains this repository's GPL-3.0
 and Agent's upstream Apache-2.0 notices. Development dependencies are installed
 separately into per-device app data; they do not replace the stable application.
+
+## Bloub eye artwork and motion
+
+Mycellios avatars adapt the eye geometry, felt pads and pure idle gaze/blink math from
+NorbertBodziony/bloub 0.6.4, revision 7983de0bb7e868ac84881581eaa8c2e1f459dd30.
+Copyright (c) 2026 Jérémy Perret, MIT License. Full notice:
+`src/agent/packages/core/assets/Bloub-LICENSE.txt`. No SolidJS runtime or OpenBot
+application code is included. The mycelium body artwork is generated for Mycellios.

@@ -45,6 +45,7 @@ suite("database push registrations", () => {
     });
   });
   beforeEach(async () => {
+    await runAsSystem("clear fixture notification devices", () => a.prisma.mobilePushDevice.deleteMany({ where: { userId: { startsWith: prefix } } }));
     await runAsSystem("clear fixture push registrations", () =>
       a.prisma.pushToken.deleteMany({ where: { userId: { startsWith: prefix } } }),
     );
@@ -68,6 +69,28 @@ suite("database push registrations", () => {
     await runAsTenant({ userId: user("b"), spaceId: "unused" }, async () => {
       expect(await a.prisma.pushToken.findMany()).toEqual([]);
     });
+  });
+
+  it("keeps multiple mobile devices and revokes only the session that signs out", async () => {
+    await api.save(user("a"), token("phone"), session("a"));
+    await api.save(user("a"), token("tablet"), session("a2"));
+    expect((await worker.list(user("a"))).map(row => row.token).sort()).toEqual([token("phone"), token("tablet")].sort());
+    await api.endSession(user("a"), session("a"));
+    expect(await worker.list(user("a"))).toEqual([{ token: token("tablet"), sessionId: session("a2"), transport: "expo" }]);
+    await runAsTenant({ userId: user("b"), spaceId: "unused" }, async () => {
+      expect(await a.prisma.mobilePushDevice.findMany()).toEqual([]);
+    });
+  });
+
+  it("keeps native FCM tokens out of legacy Expo registrations and binds their transport", async () => {
+    await api.save(user("a"), "native-fcm-fixture-token", session("a"), "fcm");
+    expect(await worker.list(user("a"))).toEqual([{ token: "native-fcm-fixture-token", sessionId: session("a"), transport: "fcm" }]);
+    await runAsSystem("inspect legacy Expo registrations", async () => {
+      expect(await a.prisma.pushToken.findMany({ where: { userId: user("a") } })).toEqual([]);
+    });
+    await worker.save(user("b"), "native-fcm-fixture-token", session("b"), "fcm");
+    expect(await api.list(user("a"))).toEqual([]);
+    expect(await api.list(user("b"))).toEqual([{ token: "native-fcm-fixture-token", sessionId: session("b"), transport: "fcm" }]);
   });
 
   it("serializes concurrent device handovers so only one account owns a token", async () => {

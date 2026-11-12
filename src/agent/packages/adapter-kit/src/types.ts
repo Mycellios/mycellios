@@ -1,4 +1,5 @@
 import type {
+  AgentQuestion,
   CacheCapabilities as ConnectionCacheCapabilities,
   ConnectionCatalogItem,
   SandboxKind,
@@ -623,6 +624,7 @@ export type AgentRuntimeEvent =
   | { type: "tool"; name: string; args: Record<string, unknown>; executionId: string }
   | {
       type: "ask";
+      questions?: AgentQuestion[];
       executionId?: string;
       text: string;
       detail?: string;

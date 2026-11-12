@@ -2,7 +2,8 @@ import { useLingui } from "@lingui/react/macro";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
 import { AudioLines, Ellipsis, FolderOpen, Monitor, PanelRightOpen, Settings, X } from "lucide-react";
 
-import { type ReactNode, useState } from "react";
+import type { ReactNode, Ref } from "react";
+import { useState } from "react";
 import { desktopDragClass } from "../../lib/desktop";
 
 export type ChatToolsActions = {
@@ -11,6 +12,20 @@ export type ChatToolsActions = {
   onSettings: () => void;
   onVoice?: () => void;
 };
+
+export function ChatHeaderTools({ open, onToggle, triggerRef }: {
+  open: boolean;
+  onToggle: () => void;
+  triggerRef?: Ref<HTMLButtonElement>;
+}) {
+  const { t } = useLingui();
+  return <Button ref={triggerRef} variant="ghost" size="icon-sm"
+    className="app-no-drag size-8 shrink-0 rounded-lg text-muted-foreground"
+    aria-label={t`Chat tools`} aria-expanded={open} aria-controls="chat-tools-sidebar"
+    onClick={onToggle}>
+    <PanelRightOpen size={17} strokeWidth={1.75} aria-hidden />
+  </Button>;
+}
 
 export function ChatToolsMenu(props: ChatToolsActions) {
   const { t } = useLingui();
@@ -68,8 +83,9 @@ export function MobileChatToolLinks({ onFiles, onSettings, onVoice, close }: Omi
   );
 }
 
-export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClose }: ChatToolsActions & {
+export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClose, children }: ChatToolsActions & {
   onClose: () => void;
+  children?: (close: () => void) => ReactNode;
 }) {
   const { t } = useLingui();
   const actions = [
@@ -79,13 +95,14 @@ export function ChatToolsPanel({ onBrowser, onFiles, onSettings, onVoice, onClos
     ...(onVoice ? [{ label: t`Open voice`, icon: AudioLines, onClick: onVoice }] : []),
   ];
   return (
-    <aside data-testid="chat-tools-panel" className="rk-chat-tools-panel" aria-label={t`Chat tools`}>
+    <section id="chat-tools-sidebar" data-testid="chat-tools-panel" className="flex h-full min-h-0 w-full flex-col" aria-label={t`Chat tools`}>
       <div className={`${desktopDragClass()} flex h-[51px] shrink-0 items-center justify-end px-2`}>
         <Button variant="ghost" size="icon-sm" className="app-no-drag" aria-label={t`Close tools`} onClick={onClose}><X size={15} /></Button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col justify-center gap-1.5 px-6 pb-[51px]">
         {actions.map(({ label, icon: Icon, onClick }) => <Button key={label} variant="ghost" className="h-9 justify-start gap-3 rounded-md bg-muted/50 text-sm font-normal" onClick={onClick}><Icon size={15} strokeWidth={1.6} className="text-muted-foreground" />{label}</Button>)}
+        {children ? <div className="mt-3 space-y-1.5 border-t border-border pt-3 [&_[data-mobile-chat-action]]:h-9 [&_[data-mobile-chat-action]]:w-full [&_[data-mobile-chat-action]]:max-w-none [&_[data-mobile-chat-action]]:justify-start [&_[data-mobile-chat-action]]:gap-3 [&_[data-mobile-chat-action]]:rounded-md [&_[data-mobile-chat-action]]:px-3 [&_[data-mobile-chat-action]]:text-sm [&_[data-mobile-chat-action]]:font-normal">{children(onClose)}</div> : null}
       </div>
-    </aside>
+    </section>
   );
 }

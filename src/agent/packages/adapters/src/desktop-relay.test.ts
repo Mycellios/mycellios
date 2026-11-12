@@ -286,3 +286,19 @@ it("fences a second agent start even when later callbacks share the same run",as
  expect(()=>broker.dispatch({...run,sessionId:crypto.randomUUID()},context())).toThrow("already dispatched");
  broker.close();await Promise.all([first.text(),callback.text()]);
 });
+
+it("admits an approval continuation once, without admitting simultaneous or repeated segments", async () => {
+  broker = new DesktopRelayBroker(); broker.register(owner, { ...binding, agentExecution: 1 }); broker.connectAccountBot(owner, "bot");
+  const run = { method: "agentRun" as const, botId: "bot", runId: "approval-run", sessionId: crypto.randomUUID(), request: {} };
+  const first = broker.dispatch(run, context());
+  const resumed = { ...run, segmentId: "a".repeat(64), sessionId: crypto.randomUUID() };
+  expect(() => broker.dispatch(resumed, context())).toThrow();
+  const [operation] = broker.poll(owner, "device").operations;
+  broker.result(owner, "device", operation!.id, 0, Buffer.from('{"done":true}\n').toString("base64"), true);
+  await first.text();
+  const next = broker.dispatch(resumed, context());
+  expect(broker.poll(owner, "device").operations[0]?.request).toMatchObject({ runId: run.runId, segmentId: resumed.segmentId });
+  expect(() => broker.dispatch({ ...resumed, sessionId: crypto.randomUUID() }, context())).toThrow("already dispatched");
+  expect(() => broker.dispatch({ ...run, sessionId: crypto.randomUUID() }, context())).toThrow("already dispatched");
+  broker.close(); await next.text();
+});

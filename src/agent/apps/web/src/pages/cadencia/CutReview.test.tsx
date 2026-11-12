@@ -110,3 +110,13 @@ it("blocks editing and auditioning during an in-flight export", async () => {
     ),
   ).toBe(true);
 });
+
+it("keeps per-cut playback hidden until selection and preserves millisecond precision in seconds",async()=>{
+ const onChange=vi.fn(),cut={id:"precise",kind:"silence" as const,start:1.234,end:2.345,enabled:true};
+ const props={cuts:[cut],total:4,busy:"",active:null,audition:"",error:"",onClear:()=>{},onSelect:()=>{},onChange,onPlay:async()=>{},onStop:()=>{}};
+ await act(async()=>root.render(<CutReview {...props}/>));expect(host.querySelector('[aria-label="Escuchar antes del corte 1"]')).toBeNull();
+ await act(async()=>root.render(<CutReview {...props} active="precise"/>));const field=host.querySelector<HTMLInputElement>('[aria-label="Inicio del corte 1 en segundos"]')!;
+ expect(field.value).toBe("1.234");expect(field.step).toBe("0.001");
+ await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,"1.235");field.dispatchEvent(new Event("input",{bubbles:true}));});
+ expect(onChange).toHaveBeenCalledWith("precise",{start:1.235});
+});

@@ -74,6 +74,17 @@ export function BotLookPicker({
     raven: t({ id: "Raven", message: "Raven" }),
     hare: t({ id: "Hare", message: "Hare" }),
     otter: t({ id: "Otter", message: "Otter" }),
+    sprout: t({ id: "Mycelium sprout", message: "Brote" }),
+    branch: t({ id: "Mycelium branch", message: "Rama" }),
+    node: t({ id: "Mycelium node", message: "Nudo" }),
+    spore: t({ id: "Mycelium spore", message: "Espora" }),
+    hypha: t({ id: "Mycelium hypha", message: "Hifa" }),
+    nexus: t({ id: "Mycelium nexus", message: "Nexo" }),
+    bridge: t({ id: "Mycelium bridge", message: "Puente" }),
+    loop: t({ id: "Mycelium loop", message: "Bucle" }),
+    crest: t({ id: "Mycelium crest", message: "Cresta" }),
+    weave: t({ id: "Mycelium weave", message: "Trama" }),
+    colony: t({ id: "Mycelium colony", message: "Colonia" }),
   };
   const paletteLabels = {
     violet: t({ id: "Violet", message: "Violet" }),
@@ -92,6 +103,13 @@ export function BotLookPicker({
     navy: t`Navy blue`,
     sand: t`Sand`,
     wine: t`Wine`,
+    forest: t({ id: "Avatar forest", message: "Forest green" }),
+    pink: t({ id: "Avatar pink", message: "Pink" }),
+    brown: t({ id: "Avatar brown", message: "Brown" }),
+    yellow: t({ id: "Avatar yellow", message: "Yellow" }),
+    blue: t({ id: "Avatar blue", message: "Blue" }),
+    pine: t({ id: "Avatar pine", message: "Pine green" }),
+    cream: t({ id: "Avatar cream", message: "Cream" }),
     gray: t`Gray`,
   };
   const eyeLabels = [
@@ -121,7 +139,7 @@ export function BotLookPicker({
           ) : null}
         </div>
         <div className={compact
-          ? "mx-auto flex max-w-72 flex-wrap justify-center gap-y-1 sm:max-w-none"
+          ? "mx-auto grid w-full max-w-72 grid-cols-6 place-items-center gap-y-1 sm:max-w-none sm:grid-cols-12"
           : "grid grid-cols-6 place-items-center gap-y-2 max-[359px]:grid-cols-4"}>
           {MICO_AVATAR_SHAPES.map(({ id, index, originalColor }) => {
             const next = withMicoAvatarShape(choiceValue, index);
@@ -213,7 +231,7 @@ export function BotLookPicker({
             <Button
               key={finish}
               type="button"
-              disabled={finish === "plush" && activeShape !== undefined && activeShape.index >= 1012}
+              disabled={finish === "plush" && activeShape !== undefined && activeShape.index >= 1012 && activeShape.index < 1100}
               size="sm"
               variant={details.finish === finish && !parsed.isImage ? "secondary" : "ghost"}
               aria-pressed={details.finish === finish && !parsed.isImage}

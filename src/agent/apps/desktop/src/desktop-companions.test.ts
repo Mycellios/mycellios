@@ -9,7 +9,7 @@ vi.mock("electron", () => ({
   screen: { getAllDisplays: () => mocks.displays, getPrimaryDisplay: () => mocks.displays[0], getCursorScreenPoint: () => ({ x: 0, y: 0 }), on: vi.fn(), off: vi.fn() },
   BrowserWindow: class extends EventEmitter {
     webContents = Object.assign(new EventEmitter(), { send: vi.fn(), setWindowOpenHandler: vi.fn(), mainFrame: {} });
-    destroyed = false; setBounds = vi.fn(); showInactive = vi.fn(); setIgnoreMouseEvents = vi.fn();
+    destroyed = false; setAlwaysOnTop = vi.fn(); setHasShadow = vi.fn(); setFocusable = vi.fn(); focus = vi.fn(); setBounds = vi.fn(); showInactive = vi.fn(); setIgnoreMouseEvents = vi.fn();
     getBounds() { return this.options; }
     constructor(public options: any) { super(); mocks.windows.push(this); }
     isDestroyed() { return this.destroyed; }
@@ -27,7 +27,8 @@ it("positions dock and island inside offset display work areas", () => {
   const bounds = companionBounds(area, "dock", DEFAULT_DESKTOP_COMPANIONS, 3);
   expect(bounds.x).toBe(-76); expect(bounds.y).toBeGreaterThanOrEqual(-200);
   const island = companionBounds(area, "island", DEFAULT_DESKTOP_COMPANIONS, 1);
-  expect(island.x).toBe(-1130); expect(island.y).toBe(-192);
+  expect(island.x).toBe(-1070); expect(island.y).toBe(-198);
+  expect(island.width).toBe(220); expect(island.height).toBe(40);
 });
 it("requires a trusted main frame, validates payloads and never exposes native capabilities to an external page", async () => {
   const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal: vi.fn() });
@@ -72,4 +73,70 @@ it("opens only a Mico in the current snapshot and supports the floating dock pre
     dock: { shown: false, edge: "right", display: "primary", autoHide: false, edgeStrip: true, results: false, agents: {} },
   }).dock.chatAction).toBe("main");
   host.dispose();
+});
+
+const question = { id: "run:message:0", botId: "bot-a", runId: "run", messageId: "message", legacy: true,
+  questions: [{ id: "q", question: "Which city?", options: [{ id: "a", label: "Paris" }, { id: "b", label: "London" }] }] };
+const answer = { scope: snapshot.scope, promptId: question.id, nonce: "reply-1", answers: [{ questionId: "q", optionIds: ["a"], text: "" }] };
+async function islandHost() {
+  const requestReply = vi.fn(); const reveal = vi.fn();
+  const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal, requestReply });
+  await call("save", { ...DEFAULT_DESKTOP_COMPANIONS, island: { ...DEFAULT_DESKTOP_COMPANIONS.island, shown: true } });
+  call("publish", { ...snapshot, questions: [question] });
+  const window = mocks.windows[0]!;
+  const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
+  return { host, requestReply, reveal, window, event };
+}
+it("answers only from its own island, validates scope/options and resolves through the trusted app", async () => {
+  const test = await islandHost(); const reply = mocks.handlers.get("companion.answer")!;
+  try {
+    expect(() => reply({ sender: {}, senderFrame: null }, answer)).toThrow();
+    expect(() => reply(test.event, { ...answer, scope: "foreign" })).toThrow();
+    expect(() => reply(test.event, { ...answer, answers: [{ questionId: "q", optionIds: ["admin"], text: "" }] })).toThrow();
+    const pending = reply(test.event, answer);
+    expect(test.requestReply).toHaveBeenCalledExactlyOnceWith({ ...answer, prompt: question });
+    expect(reply(test.event, answer)).toBe(pending);
+    expect(() => reply(test.event, { ...answer, answers: [{ questionId: "q", optionIds: ["b"], text: "" }] })).toThrow();
+    expect(() => call("questionResult", { nonce: answer.nonce, scope: snapshot.scope, outcome: "ok" }, {} as typeof good)).toThrow();
+    call("questionResult", { nonce: answer.nonce, scope: snapshot.scope, outcome: "ok" });
+    expect(await pending).toBe("ok");
+    expect(test.window.webContents.send.mock.calls.at(-1)[1].snapshot.questions).toEqual([]);
+  } finally { test.host.dispose(); }
+});
+it("collapses with Later without discarding the question and opens the correct chat", async () => {
+  const test = await islandHost();
+  try {
+    mocks.listeners.get("companion.expand")!(test.event, true);
+    expect(test.window.setBounds.mock.calls.at(-1)[0]).toMatchObject({ width: 560, height: 400 });
+    mocks.listeners.get("companion.expand")!(test.event, false);
+    expect(test.window.setBounds.mock.calls.at(-1)[0]).toMatchObject({ width: 220, height: 40 });
+    expect(test.window.webContents.send.mock.calls.at(-1)[1].snapshot.questions).toHaveLength(1);
+    expect(test.requestReply).not.toHaveBeenCalled();
+    mocks.listeners.get("companion.question.open")!(test.event, question.id);
+    expect(test.reveal).toHaveBeenCalledWith({ scope: snapshot.scope, botId: "bot-a", respond: true });
+  } finally { test.host.dispose(); }
+});
+it("revokes in-flight replies on account exit and rejects foreign question owners", async () => {
+  const test = await islandHost();
+  try {
+    expect(() => call("publish", { ...snapshot, questions: [{ ...question, botId: "foreign" }] })).toThrow();
+    const pending = mocks.handlers.get("companion.answer")!(test.event, answer);
+    test.host.clear(); expect(await pending).toBe("stale");
+    call("questionResult", { nonce: answer.nonce, scope: snapshot.scope, outcome: "ok" });
+    expect(test.window.destroyed).toBe(true);
+  } finally { test.host.dispose(); }
+});
+
+it("does not exhaust the in-flight limit after successive completed answers", async () => {
+  const test = await islandHost();
+  try {
+    for (let index = 0; index < 12; index++) {
+      const nextQuestion = { ...question, id: `question-${index}` };
+      call("publish", { ...snapshot, questions: [nextQuestion] });
+      const nextAnswer = { ...answer, nonce: `nonce-${index}`, promptId: nextQuestion.id };
+      const pending = mocks.handlers.get("companion.answer")!(test.event, nextAnswer);
+      call("questionResult", { nonce: nextAnswer.nonce, scope: snapshot.scope, outcome: "ok" });
+      expect(await pending).toBe("ok");
+    }
+  } finally { test.host.dispose(); }
 });

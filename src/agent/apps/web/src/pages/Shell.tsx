@@ -4,6 +4,7 @@ import { deferThreadProgressPresentation } from "../lib/thread-events";
 import { usePendingThreadSends } from "./shell/use-pending-thread-sends";
 import { DesktopCompanions } from "../components/DesktopCompanions";
 import { FloatingChatButton } from "../components/FloatingChatButton";
+import { MicoEdgeDock } from "../components/MicoEdgeDock";
 import { getGeneralPreferences } from "../lib/general-preferences";
 import { SideQuestion, type SideQuestionTarget } from "./shell/side-question";
 import { isInstalledWebApp, pushSupported, useWebPushPresence, usesServerPush } from "../lib/web-push";
@@ -137,6 +138,7 @@ import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
 import { connectThisComputer, defaultComputerMode, desktopBridge, desktopDragClass } from "../lib/desktop";
+import { notificationTarget } from "../pwa/notification-target";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
 import { useProjects } from "../lib/use-projects";
@@ -235,7 +237,7 @@ import { marketplaceTab, type MarketplaceTab } from "./marketplace/catalog";
 import { WorkspaceRail } from "./shell/workspace-rail";
 import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
-import { MobileChatActions, MobileChatToolLinks } from "./shell/chat-tools-panel";
+import { ChatHeaderTools, ChatToolsPanel, MobileChatActions } from "./shell/chat-tools-panel";
 import { VoiceConversation } from "../components/call/VoiceConversation";
 import { ProviderQuota } from "../components/ProviderQuota";
 import { HelpMenu } from "../components/HelpMenu";
@@ -1162,6 +1164,18 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       window.removeEventListener("keydown", unlock, true);
     };
   }, [userId]);
+  useEffect(() => {
+    const notifications = desktopBridge()?.notifications;
+    if (!notifications) return;
+    void notifications.clear().catch(() => undefined);
+    const remove = notifications.onOpen((value) => {
+      if (!userId) return;
+      const base = new URL(appPath("/app"), location.href).pathname.slice(0, -4);
+      const target = notificationTarget(value, location.origin, base);
+      if (target) { const url = new URL(target); navigate(url.pathname.slice(base.length) + url.search); }
+    });
+    return () => { remove(); void notifications.clear().catch(() => undefined); };
+  }, [navigate, userId]);
   const deliverBrowserNotification = useCallback((pending: PendingBrowserNotification): boolean => {
     if (usesServerPush()) return true;
     const currentBot = botsRef.current.find((bot) => bot.id === pending.botId);
@@ -2360,6 +2374,16 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   }, []);
   const currentRuns = activeThreadRuns(activeSnapshot);
   const answerableAskIds = useMemo(() => answerableAskMessageIds(activeSnapshot), [activeSnapshot]);
+  useEffect(() => {
+    if (searchParams.get("respond") !== "1" || inGroup || !activeSnapshot) return;
+    const question = activeSnapshot.messages.findLast(message => answerableAskIds.has(message.id));
+    // Wait for the pending card to arrive if a roster refresh preceded its message.
+    if (!question && activeSnapshot.run?.status === "waiting_input") return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("respond");
+    if (question) next.set("m", question.id);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, inGroup, activeSnapshot, answerableAskIds, setSearchParams]);
   const dismissableAskIds = useMemo(
     () => dismissableAskMessageIds(activeSnapshot, userId),
     [activeSnapshot, userId],
@@ -3850,68 +3874,32 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     /> : null}
     </>
   );
+  const renderToolsExtras = (dismiss: () => void) => {
+          const closeTools = () => { dismiss(); };
+          return <>
+            {isMobileSidebar ? renderTaskTabs(closeTools) : null}
+            {active && !inGroup && !activeProject ? <LocalProject key={JSON.stringify([userId, shellSpaceId, active.id])} botId={active.id} rpc={rpc} inMenu
+              onTask={threadId => { closeTools(); projectCollection.refresh(); navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: `task=${encodeURIComponent(threadId)}` }); }} /> : null}
+            {!inGroup && active && !taskScope && (bootstrapMe?.phoneCallsEnabled || call?.botId === active.id) ? <Button variant="ghost" data-mobile-chat-action
+              data-testid="call-button" aria-label={call?.botId === active.id ? t`Open call` : t`Call`}
+              onClick={() => { closeTools(); if (call?.botId === active.id) setCallMinimized(false); else callBot(active); }}>
+              <Phone size={16} aria-hidden />{call?.botId === active.id ? t`Open call` : t`Call`}
+            </Button> : null}
+            {!taskScope ? <InviteFriends key={userId} userId={userId} inMenu /> : null}
+          </>;
+        };
   const renderHeaderActions = (close?: () => void) => (
     <>
     {!inGroup && active ? <FloatingChatButton userId={userId} spaceId={currentSpaceId} botId={active.id} /> : null}
-    {active && !inGroup && !activeProject ? <>
-      <MicoWorkMenu key={active.id} inMenu={isMobileSidebar} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
-        onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} />
-      <LocalProject key={JSON.stringify([userId, shellSpaceId, active.id])} botId={active.id} rpc={rpc} inMenu={isMobileSidebar}
-        onTask={threadId => {
+      {active && !inGroup && !activeProject ? <MicoWorkMenu key={active.id} botId={active.id} runId={activeSnapshot?.run?.id} userId={userId} threadId={activeSnapshot?.threadId}
+        onOpenTask={task => { close?.(); navigate({ pathname: task.groupId ? `/app/g/${encodeURIComponent(task.groupId)}` : `/app/${encodeURIComponent(task.botId)}`, search: task.taskThreadId ? `task=${encodeURIComponent(task.taskThreadId)}` : "" }); }} /> : null}
+      {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
+      {(active || activeGroup) ? <ChatHeaderTools triggerRef={mobileBrowserTrigger}
+        open={panel === "tools"} onToggle={() => {
           close?.();
-          projectCollection.refresh();
-          navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: `task=${encodeURIComponent(threadId)}` });
-        }} />
-    </> : null}
-    {!inGroup && active ? <ChatHeaderModel key={active.id} bot={active} me={bootstrapMe} inMenu={isMobileSidebar} onConnections={() => openSettings("models")} onSave={patch => saveChatModel(active.id, patch)} /> : null}
-    {!inGroup && active && !taskScope ? (
-      <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
-        <Button
-          variant={isMobileSidebar ? "ghost" : "floating"}
-          data-mobile-chat-action={isMobileSidebar || undefined}
-          size="icon-lg"
-          data-testid="call-button"
-          aria-label={call?.botId === active.id ? t`Open call` : t`Call`}
-          onClick={() => {
-            close?.();
-            if (call?.botId === active.id) {
-              setCallMinimized(false);
-              return;
-            }
-            if (bootstrapMe?.phoneCallsEnabled) callBot(active);
-            else chatTools.onVoice?.();
-          }}
-          data-active={call?.botId === active.id ? "" : undefined}
-          className={`app-no-drag ${isMobileSidebar ? "" : "rk-chat-action"}`}
-        >
-          <Phone strokeWidth={1.75} className="size-[18px]" aria-hidden />
-          {isMobileSidebar ? (call?.botId === active.id ? t`Open call` : t`Call`) : null}
-        </Button>
-      </IconTooltip>
-    ) : null}
-
-    {((!inGroup && active) || (!isMobileSidebar && activeGroup)) ? (
-      <IconTooltip label={inGroup ? t`Browser` : isMobileSidebar ? t`Agent computer` : t`Browser and computer`}>
-        <Button
-          variant={isMobileSidebar ? "ghost" : "floating"}
-          data-mobile-chat-action={isMobileSidebar || undefined}
-          size="icon-lg"
-          aria-label={inGroup ? t`Browser` : isMobileSidebar ? t`Agent computer` : t`Browser and computer`}
-          aria-pressed={panel === "computer" || Boolean(reviewWorkspace?.open)}
-          onClick={() => {
-            close?.();
-            if (panel === "computer" || reviewWorkspace?.open) { setPanel(null); reviewWorkspace?.hide(); }
-            else if (isMobileSidebar) openComputerWorkspace(); else chatTools.onBrowser();
-          }}
-          className={`app-no-drag ${isMobileSidebar ? "" : "rk-chat-action"}`}
-        >
-          <Monitor strokeWidth={1.75} className="size-[18px]" aria-hidden />
-          {isMobileSidebar ? t`Agent computer` : null}
-        </Button>
-      </IconTooltip>
-    ) : null}
-
-    {!taskScope ? <InviteFriends inMenu={isMobileSidebar} className={isMobileSidebar ? undefined : "rk-chat-action"} /> : null}
+          if (panel === "tools") setPanel(null);
+          else { hideAside(); setVoiceConversation(null); reviewWorkspace?.hide(); setComputerOpen(false); setPanel("tools"); }
+        }} /> : null}
     </>
   );
   const sidebarSearch = miniSidebar ? null : (
@@ -4049,6 +4037,9 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const shell = (
     <>
     <DesktopCompanions bots={bots} spaceId={currentSpaceId} scope={userId ? JSON.stringify([userId, currentSpaceId]) : ""} onOpen={openSpaceChat} />
+    {userId && currentSpaceId ? <MicoEdgeDock key={JSON.stringify([userId, currentSpaceId])}
+      bots={bots} spaceId={currentSpaceId} scope={JSON.stringify([userId, currentSpaceId])} activeId={active?.id}
+      onOpen={id => openSpaceChat(currentSpaceId, `/app/${encodeURIComponent(id)}`)} onCreate={() => setCreateBotOpen(true)} /> : null}
     <ReleaseNotes open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen} />
     <BotsSidebarLayout
       userId={userId}
@@ -4295,7 +4286,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           />
         ) : null}
         <CallReturnBar />
-        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onOpenBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onOpenBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /> : routineView && active && !inGroup ? <RoutineWorkspace
+        {libraryView ? <ArtifactsPage workspaceBots={bots} onOpenNavigation={() => setMobileSidebarOpen(true)} /> : marketplaceView ? <MarketplaceWorkspace onConnectedAppsChange={setFooterLogos} spaceId={currentSpaceId} key={JSON.stringify([userId,currentSpaceId])} tab={activeMarketplaceTab} onTab={showMarketplace} onOpenStudio={appsEnabled ? () => setOverlay({kind:"apps"}) : undefined} scope={JSON.stringify([userId,currentSpaceId])} bots={bots.filter(bot=>!currentSpaceId||bot.spaceId===currentSpaceId)} activeBotId={active?.id} onExit={exitRoutineView} onMcp={()=>setOverlay({kind:"mcp"})} onOpenBot={id=>navigate(`/app/${id}`)} onCreateBot={()=>setCreateBotOpen(true)} onBotsChanged={refreshBots} onCreated={bot=>{botsRefreshEpoch.current+=1;setBots(current=>current.some(item=>item.id===bot.id)?current:[bot,...current]);navigate(`/app/${bot.id}`);setPanel(null);}}/> : usageView ? <UsageWorkspace key={JSON.stringify([userId, currentSpaceId, usageBotId])} initialBotId={usageBotId} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onPreferences={() => openSettings("usage")} /> : scheduleView ? <ScheduleWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onOpenRoutine={routine => navigate(`/app/${routine.botId}?view=schedule&routine=${routine.id}`)} onOpenBot={id => navigate(`/app/${id}`)} onCreateRoutine={id => navigate(`/app/${id}?view=schedule&routine=new`)} /> : taskView ? <TasksWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} initialBotId={active?.id ?? bots[0]?.id ?? ""} selectedId={searchParams.get("inbox")} onSelect={id => { const next = new URLSearchParams(searchParams); if (id) next.set("inbox", id); else next.delete("inbox"); setSearchParams(next, { replace: true }); }} onExit={exitRoutineView} agentsOpen={taskAgentsOpen || mobileSidebarOpen} onToggleAgents={() => { if (window.matchMedia("(max-width: 767px)").matches) setMobileSidebarOpen(value => !value); else setTaskAgentsOpen(value => !value); }} transcribe={voiceStatus?.transcribe} /> : workflowView ? <WorkflowWorkspace key={JSON.stringify([userId, currentSpaceId])} client={rpc} scope={JSON.stringify([userId, currentSpaceId])} bots={bots} spaces={spaces} spaceId={currentSpaceId} onSpace={openSpaceChat} onExit={exitRoutineView} onNavigation={() => setMobileSidebarOpen(true)} /> : routineView && active && !inGroup ? <RoutineWorkspace
           key={JSON.stringify([userId, currentSpaceId, active.id])}
           bot={active}
           client={rpc}
@@ -4361,32 +4352,10 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 </span>
               </span>
             </Button>}
-            {isMobileSidebar ? (active || activeGroup) && (
-              <div className="ms-auto flex shrink-0 gap-1.5">
-                {reviewWorkspace && (
-                  <Button ref={mobileBrowserTrigger} variant="floating" size="icon-lg" className="size-12 shrink-0 rounded-full"
-                    aria-label={t`Open browser`} onClick={chatTools.onBrowser}>
-                    <Globe className="size-6" aria-hidden />
-                  </Button>
-                )}
-                <MobileChatActions>
-                  {close => (
-                    <>
-                      {renderTaskTabs(close)}
-                      {renderHeaderActions(close)}
-                      <MobileChatToolLinks {...chatTools} close={close} />
-                    </>
-                  )}
-                </MobileChatActions>
-              </div>
-            ) : (
-              <>
-                {renderTaskTabs()}
-                <div className="app-no-drag ms-auto flex min-w-0 items-center gap-1">
-                  {renderHeaderActions()}
-                </div>
-              </>
-            )}
+            {!isMobileSidebar ? renderTaskTabs() : null}
+            <div className="app-no-drag ms-auto flex shrink-0 items-center gap-1">
+              {renderHeaderActions()}
+            </div>
           </div>
           {firstMicoSetup ? (
             <CreateBotDialog
@@ -4405,6 +4374,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           ) : (
             <Transcript
               headerTabs={false}
+              conversationBot={inGroup ? undefined : active}
               key={activeSnapshot?.threadId}
               scrollRef={messageScroll}
               scrollRequest={scrollRequest}
@@ -4646,9 +4616,14 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         panel={panel ?? "closed"}
       >
         {panel && (active || activeGroup || panel === "import-agent") ? (
-          <div className={panel === "computer" ? "rk-scroll flex h-full w-full flex-col overflow-y-auto" : "rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]"}>
+          <div className={(panel === "computer" || panel === "tools") ? "rk-scroll flex h-full w-full flex-col overflow-y-auto" : "rk-scroll h-full w-full overflow-y-auto px-5 py-[17px]"}>
+            {panel === "tools" ? <ChatToolsPanel {...chatTools}
+              onBrowser={reviewWorkspace ? chatTools.onBrowser : openComputerWorkspace}
+              onClose={() => { setPanel(null); requestAnimationFrame(() => mobileBrowserTrigger.current?.focus({ preventScroll: true })); }}>
+              {renderToolsExtras}
+            </ChatToolsPanel> : null}
             {panel === "computer" && workAreaHeader("computer")}
-            {panel !== "computer" && panel !== "routine" &&
+            {panel !== "tools" && panel !== "computer" && panel !== "routine" &&
             panel !== "create-group" &&
             panel !== "group-settings" &&
             panel !== "import-agent" ? (

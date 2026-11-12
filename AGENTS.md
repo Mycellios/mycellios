@@ -98,6 +98,13 @@ These rules apply to the complete repository.
   Verify workflow changes with `node --test scripts/ci-fast-delivery.test.mjs`
   through the shared queue; do not re-enable the paused full suites implicitly.
 
+- `.github/workflows/agent-release-artifact.yml` builds release branches or an
+  explicitly dispatched revision into sealed coordinator/web/API/worker outputs.
+  Its manifest binds the source tree, lockfiles, output hashes and web build ID.
+  It does not deploy, install production dependencies, apply migrations or run
+  paid inference. Promotion still requires the integrated source tree, live
+  runtime provenance, compatible dependencies, rollback and health checks.
+
 - Reusable web controls live in `landing/src/ui`. Use the production kit in every
   surface and import the same components in Storybook; do not add parallel demo
   implementations or native controls outside the kit. Run `npm run verify:ui-kit`.
@@ -283,6 +290,12 @@ These rules apply to the complete repository.
   SDK at `ANTSEED_PROOF_MODULES` (as for speech proofs). Importing it must not
   announce a seller. Its isolated probe is `node scripts/check-antseed-jev-provider.mjs`;
   this verifies SDK transport/free configuration only, never real buyer delivery.
+- Optional managed Mycellios billing uses `specs/managed-provider/spec.md`.
+  AntSeed is the default operator upstream; keep its buyer identity separate
+  from customer BYOK providers. Use signed attributed spend, durable credit holds
+  and GET-only recovery for late receipts; never retry an uncertain paid request.
+  Run the managed provider/AntSeed text tests and the isolated managed-purchases
+  PostgreSQL suite for changes to that boundary. No local fixture activates it.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.

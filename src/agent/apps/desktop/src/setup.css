@@ -84,20 +84,36 @@ html[data-platform="win32"] .titlebar-quit {
 .shell {
   flex: 1;
   width: 100%;
-  max-width: 620px;
+  max-width: 496px;
   margin: 0 auto;
-  padding: 24px 28px 32px;
+  padding: 32px 28px 48px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 .heading {
-  margin: 0 0 8px;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 550;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  text-wrap: balance;
 }
+
+.connection-mark { width: 48px; height: 48px; object-fit: contain; margin-bottom: 24px; }
+.main-action { width: 100%; min-height: 44px; }
+.connection-help { margin: 4px 0 24px; color: var(--muted-foreground); font-size: 13px; }
+.choice-description { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted-foreground); }
+.optional-label { font-weight: 400; color: var(--muted-foreground); }
+.saved-connection { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.saved-connection-name { flex: 1; min-width: 0; text-align: left; font: inherit; color: var(--foreground); background: none; border: 0; padding: 4px 0; cursor: pointer; overflow-wrap: anywhere; }
+.saved-connection-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.saved-connection-name:focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; border-radius: 4px; }
+#saved-servers:not(:empty) { margin-bottom: 24px; }
+#saved-servers h2 { font-size: 13px; font-weight: 500; color: var(--muted-foreground); margin: 0 0 6px; }
+.diagnostic-details { margin-top: 24px; font-size: 12px; color: var(--muted-foreground); }
+.diagnostic-details summary { cursor: pointer; min-height: 36px; padding: 8px 0; }
 
 .subheading {
   margin: 0 0 20px;
@@ -144,7 +160,7 @@ html[data-platform="win32"] .titlebar-quit {
 }
 
 .choice-title {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .panel {
@@ -154,11 +170,10 @@ html[data-platform="win32"] .titlebar-quit {
 .field-label {
   display: block;
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 500;
   color: var(--muted-foreground);
   margin-bottom: 6px;
+  margin-top: 16px;
 }
 
 .field {
@@ -169,7 +184,6 @@ html[data-platform="win32"] .titlebar-quit {
   background: var(--background);
   color: var(--foreground);
   font: inherit;
-  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, monospace;
   font-size: 13px;
 }
 
@@ -324,6 +338,7 @@ html[data-platform="win32"] .titlebar-quit {
   font-size: 13px;
   color: var(--muted-foreground);
 }
+.status:empty { display: none; }
 
 .status[data-tone="ok"] {
   color: var(--success);
@@ -342,8 +357,10 @@ html[data-platform="win32"] .titlebar-quit {
 }
 
 .recovery-actions {
-  justify-content: flex-start;
-  margin-bottom: 28px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 24px;
 }
 
 .recovery-diagnostic {
@@ -360,6 +377,7 @@ html[data-platform="win32"] .titlebar-quit {
   color: var(--muted-foreground);
   cursor: pointer;
 }
+#advanced { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 10px; }
 
 #advanced > summary:focus-visible {
   outline: 2px solid var(--ring);
@@ -368,11 +386,21 @@ html[data-platform="win32"] .titlebar-quit {
 
 .button {
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   padding: 9px 18px;
   border-radius: calc(var(--radius) - 3px);
   cursor: pointer;
   border: 1px solid transparent;
+}
+.button-quiet { background: none; color: var(--muted-foreground); border: 0; }
+.button-quiet:hover:not(:disabled) { background: var(--secondary); color: var(--foreground); }
+
+@media (max-width: 440px) {
+  .shell { padding: 20px 24px 32px; }
+  .heading { font-size: 26px; }
+}
+@media (max-height: 600px) {
+  .shell { justify-content: flex-start; }
 }
 
 .button:disabled {

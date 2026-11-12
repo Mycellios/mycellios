@@ -1,10 +1,13 @@
-import { readFileSync } from "node:fs";
+import { readFileSync as readCatalogFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { i18n, setupI18n, type Messages } from "@lingui/core";
 import { messages as englishMessages } from "../locales/en/messages.po";
 import { RUN_ERROR_LIMIT_MESSAGES } from "@rakazo/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { UI_LOCALES } from "./ui-locale";
+
+// Gettext catalogs may use Windows or Unix line endings.
+const readFileSync=(file:string|URL,encoding:"utf8")=>readCatalogFileSync(file,encoding).replace(/\r\n?/g,"\n");
 
 describe("lingui catalogs", () => {
   it.each([

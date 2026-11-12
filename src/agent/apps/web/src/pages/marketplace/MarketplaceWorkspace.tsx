@@ -1,20 +1,33 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
-import { ArrowLeft, Blocks, BookOpen, Bot as BotIcon, LayoutGrid } from "lucide-react";
+import { useId, useState } from "react";
+import {
+  ArrowLeft,
+  Blocks,
+  BookOpen,
+  Bot as BotIcon,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+} from "lucide-react";
 import type { connectedAppMarks } from "../../lib/connected-apps";
 import { desktopDragClass } from "../../lib/desktop";
 import { PluginsOverlay } from "../PluginsOverlay";
 import { AgentsMarketplace } from "./AgentsMarketplace";
 import { type MarketplaceTab } from "./catalog";
 import { SkillsMarketplace } from "./SkillsMarketplace";
+import { HostedWebs } from "./HostedWebs";
 import "./marketplace.css";
-import { HifaStoreCatalog } from "./HifaStoreCatalog";
+import "./mycellios-apps.css";
+
+const MENU_PREFERENCE = "mycellios:marketplace:menu-collapsed";
 
 export function MarketplaceWorkspace(props: {
   tab: MarketplaceTab;
   onTab: (tab: MarketplaceTab) => void;
   scope: string;
+  spaceId?: string | null;
   bots: Bot[];
   activeBotId?: string;
   onExit: () => void;
@@ -27,6 +40,18 @@ export function MarketplaceWorkspace(props: {
   onConnectedAppsChange?: (apps: ReturnType<typeof connectedAppMarks>) => void;
 }) {
   const { t } = useLingui();
+  const navigationId = useId();
+  const [menuCollapsed, setMenuCollapsed] = useState(() => {
+    try { return localStorage.getItem(MENU_PREFERENCE) === "1"; }
+    catch { return false; }
+  });
+  const menuLabel = menuCollapsed ? t`Expand Marketplace menu` : t`Collapse Marketplace menu`;
+  function toggleMenu() {
+    const next = !menuCollapsed;
+    setMenuCollapsed(next);
+    try { localStorage.setItem(MENU_PREFERENCE, next ? "1" : "0"); }
+    catch { /* The menu still works when browser storage is unavailable. */ }
+  }
   const tabs = [
     { id: "mycellios-apps" as const, label: "Hifa Store", icon: LayoutGrid },
     { id: "apps" as const, label: t`Integrations`, icon: Blocks },
@@ -39,30 +64,33 @@ export function MarketplaceWorkspace(props: {
         className={`rk-market-topbar ${desktopDragClass()}`}
         data-testid="conversation-header"
       >
+        <span>Marketplace</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="app-no-drag rk-market-menu-toggle"
+          aria-label={menuLabel}
+          title={menuLabel}
+          aria-expanded={!menuCollapsed}
+          aria-controls={navigationId}
+          onClick={toggleMenu}
+        >
+          {menuCollapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronLeft size={14} aria-hidden="true" />}
+          {menuCollapsed ? t`Show menu` : t`Hide menu`}
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"
-          className="app-no-drag"
+          className="app-no-drag rk-market-back"
           aria-label={t`Back to chat`}
+          title={t`Back to chat`}
           onClick={props.onExit}
         >
           <ArrowLeft size={16} />
         </Button>
-        <span>Marketplace</span>
       </header>
       <div className="rk-market-layout">
-        <aside className="rk-market-nav">
-          <div className="rk-market-nav-title">
-            <h2>Marketplace</h2>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t`Back to chat`}
-              onClick={props.onExit}
-            >
-              <ArrowLeft size={15} />
-            </Button>
-          </div>
+        <aside className="rk-market-nav" id={navigationId} hidden={menuCollapsed}>
           <nav aria-label={t`Marketplace sections`}>
             {tabs.map(({ id, label, icon: Icon }) => (
               <Button
@@ -77,9 +105,20 @@ export function MarketplaceWorkspace(props: {
             ))}
           </nav>
         </aside>
-        <div className="rk-market-content rk-scroll" key={`${props.scope}:${props.tab}`}>
+        <div
+          className="rk-market-content rk-scroll"
+          key={`${props.scope}:${props.tab}`}
+        >
           {props.tab === "mycellios-apps" ? (
-            <HifaStoreCatalog scope={props.scope} onOpenStudio={props.onOpenStudio} />
+            <HostedWebs
+              scope={props.scope}
+              spaceId={props.spaceId}
+              bots={props.bots}
+              activeBotId={props.activeBotId}
+              onOpenStudio={props.onOpenStudio}
+              onOpenBot={props.onOpenBot}
+              onCreateBot={props.onCreateBot}
+            />
           ) : props.tab === "apps" ? (
             <PluginsOverlay
               onConnectedAppsChange={props.onConnectedAppsChange}

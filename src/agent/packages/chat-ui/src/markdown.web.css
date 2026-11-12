@@ -275,38 +275,6 @@
   accent-color: var(--primary);
 }
 
-.rk-chat-markdown-streaming {
-  position: relative;
-}
-
-/* The cursor is an extra DOM child, not another paragraph. Keep the real
-   last block's spacing identical before and after streaming finishes. */
-.rk-chat-markdown-streaming > :nth-last-child(2),
-.rk-chat-markdown-streaming > :nth-last-child(2) > :last-child {
-  margin-bottom: 0;
-}
-
-.rk-chat-markdown-cursor {
-  position: absolute;
-  inset-inline-end: -0.4em;
-  bottom: 0.24em;
-  width: 0.16em;
-  height: 1em;
-  border-radius: 999px;
-  background: var(--muted-foreground);
-  animation: rkMarkdownCursor 1s steps(2, jump-none) infinite;
-}
-
-@keyframes rkMarkdownCursor {
-  50% {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rk-chat-markdown-cursor { animation: none; }
-}
-
 /* A website link: its site icon, then the label. The icon never ends a line on its own. */
 a.rk-chat-link {
   color: inherit;

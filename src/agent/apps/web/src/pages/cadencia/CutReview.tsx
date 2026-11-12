@@ -1,5 +1,5 @@
 import { Button, Checkbox, Input } from "@rakazo/ui-web";
-import { ArrowRight, Check, Pause, Play } from "lucide-react";
+import { ArrowRight, Check, Pause, Play,ChevronDown } from "lucide-react";
 import type { Cut } from "./analysis";
 const seconds = (n: number) => `${n.toFixed(2).replace(".", ",")} s`;
 const clock = (n: number) =>
@@ -34,10 +34,7 @@ export function CutReview({
   return (
     <aside className="cd-review" aria-label="Revisar cortes">
       <header>
-        <div>
-          <h2>Revisa los cortes</h2>
-          <span>{cuts.length} propuestas</span>
-        </div>
+        <span>{cuts.filter(cut => cut.enabled).length} seleccionados</span>
         <Button variant="ghost" size="sm" disabled={!!busy} onClick={onClear}>
           Desmarcar todos
         </Button>
@@ -53,7 +50,7 @@ export function CutReview({
         </div>
       )}
       <p className="cd-review-note">
-        Las posibles vocales se quedan sin marcar. Escúchalas antes de decidir.
+        Las posibles vocales se conservan hasta que las marques.
       </p>
       <div className="cd-cut-list">
         {cuts.map((cut, index) => (
@@ -70,27 +67,32 @@ export function CutReview({
               />
               <Button
                 variant="ghost"
+                className="cd-cut-open"
                 onClick={() => onSelect(cut)}
+                aria-expanded={active===cut.id}
                 disabled={!!busy}
               >
+                <span className="cd-cut-label">
                 <span>
                   {cut.kind === "silence"
-                    ? "Silencio"
+                    ? "Pausa"
                     : "Posible vocal alargada"}
                 </span>
                 <small>
                   {clock(cut.start)} <ArrowRight size={11} /> {clock(cut.end)}
                 </small>
+                </span>
+                <ChevronDown size={13} aria-hidden="true" />
               </Button>
               <strong>−{seconds(cut.end - cut.start)}</strong>
             </div>
-            {cut.kind === "vowel" && (
+            {active===cut.id&&cut.kind === "vowel" && (
               <p className="cd-cut-warning">
                 Puede ser intencionada. Conservamos el arranque y el final del
                 sonido.
               </p>
             )}
-            <div className="cd-cut-listen">
+            {active===cut.id&&<div className="cd-cut-listen">
               <Button
                 variant="ghost"
                 size="sm"
@@ -99,7 +101,7 @@ export function CutReview({
                 aria-pressed={audition === `${cut.id}:before`}
                 onClick={() => void onPlay(cut, false)}
               >
-                <Play size={12} /> Antes
+                <Play size={12} /> Original
               </Button>
               <Button
                 variant="ghost"
@@ -109,7 +111,7 @@ export function CutReview({
                 aria-pressed={audition === `${cut.id}:after`}
                 onClick={() => void onPlay(cut, true)}
               >
-                <Play size={12} /> Después
+                <Play size={12} /> Con el corte
               </Button>
               {audition.startsWith(`${cut.id}:`) && (
                 <Button
@@ -121,45 +123,44 @@ export function CutReview({
                   <Pause size={12} />
                 </Button>
               )}
-            </div>
+            </div>}
             {active === cut.id && (
-              <div className="cd-cut-bounds">
+              <details className="cd-cut-adjust"><summary>Ajustar este corte <ChevronDown size={13} aria-hidden="true"/></summary><div className="cd-cut-bounds">
                 <label>
-                  Desde
+                  Inicio (s)
                   <Input
-                    aria-label={`Inicio del corte ${index + 1} en milisegundos`}
+                    aria-label={`Inicio del corte ${index + 1} en segundos`}
                     type="number"
                     min={0}
-                    max={Math.round(total * 1000)}
-                    step={1}
-                    value={Math.round(cut.start * 1000)}
+                    max={total}
+                    step={0.001}
+                    value={Number(cut.start.toFixed(3))}
                     disabled={!!busy}
                     onChange={(event) =>
                       onChange(cut.id, {
-                        start: Number(event.target.value) / 1000,
+                        start: Number(event.target.value),
                       })
                     }
                   />
                 </label>
                 <label>
-                  Hasta
+                  Final (s)
                   <Input
-                    aria-label={`Final del corte ${index + 1} en milisegundos`}
+                    aria-label={`Final del corte ${index + 1} en segundos`}
                     type="number"
                     min={0}
-                    max={Math.round(total * 1000)}
-                    step={1}
-                    value={Math.round(cut.end * 1000)}
+                    max={total}
+                    step={0.001}
+                    value={Number(cut.end.toFixed(3))}
                     disabled={!!busy}
                     onChange={(event) =>
                       onChange(cut.id, {
-                        end: Number(event.target.value) / 1000,
+                        end: Number(event.target.value),
                       })
                     }
                   />
                 </label>
-                <small>ms</small>
-              </div>
+              </div></details>
             )}
           </article>
         ))}

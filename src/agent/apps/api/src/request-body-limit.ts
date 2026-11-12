@@ -73,5 +73,6 @@ export function mountApiRequestBodyLimits(
     rpcRequestMaxBytes(maxUploadSizeBytes),
     `Request body is too large. Upload limit: ${attachmentSizeLabel(maxUploadSizeBytes)} per file.`,
   );
-  app.use("/rpc/*", rpcLimit);
+  const editLimit=requestBodyLimit(35_000_000,"Video edit request is too large.");
+  app.use("/rpc/*",(c,next)=>c.req.path==="/rpc/models/mycelliosVideoEdit"?editLimit(c,next):rpcLimit(c,next));
 }

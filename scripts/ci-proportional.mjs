@@ -45,6 +45,9 @@ export function planChecks(files) {
     const tests = code.filter(f => /^(tests\/|landing\/)/.test(f) && /\.test\.[jt]sx?$/.test(f));
     if (tests.length) add('.', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...tests, '--maxWorkers', '2', '--no-file-parallelism'], 'root changed tests');
     if (related.length) add('.', 'node', ['node_modules/vitest/vitest.mjs', 'related', ...related, '--run', '--passWithNoTests', '--maxWorkers', '2', '--no-file-parallelism'], 'root affected tests');
+    if (files.some(f => /^(src\/economy\/(managed-|promotional-credits|referrals|wallet-topups|contribution-credit-wallet)|src\/coordinator\/(managed-|referral-routes|wallet-topup-routes)|src\/core\/managed-provider-config|tests\/(managed-|referrals\.)|scripts\/test-referrals-postgres)/.test(f))) {
+      add('.', 'node', ['scripts/test-referrals-postgres.mjs', 'tests/managed-purchases.postgres.test.ts', 'tests/referrals.postgres.test.ts'], 'isolated managed wallet and referral PostgreSQL');
+    }
     if (desktopDownloads) {
       add('.', 'node', ['scripts/build-desktop-downloads.mjs'], 'Desktop downloads page build');
       add('.', 'npm', ['ci', '--prefix', 'scripts/desktop-macos', '--ignore-scripts', '--no-audit', '--no-fund'], 'Desktop browser fixture dependencies');
@@ -64,6 +67,9 @@ export function planChecks(files) {
     if (tests.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...tests, '--maxWorkers', '2'], 'Agent changed tests');
     const related = code.filter(f => f.startsWith('src/agent/') && !/\.[cm]?js$/.test(f) && !/\.test\.[jt]sx?$/.test(f) && !f.includes('.config.')).map(f => f.slice('src/agent/'.length));
     if (related.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'related', ...related, '--run', '--passWithNoTests', '--maxWorkers', '2'], 'Agent affected tests');
+    if (files.some(f => f === 'src/agent/scripts/verify-notification-devices-db.ts' || f.startsWith('src/agent/packages/db/prisma/migrations/20261112110000_mobile_push_devices/'))) {
+      add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-notification-devices-db.ts'], 'notification device migration and RLS in isolated PostgreSQL');
+    }
   }
   return commands;
 }

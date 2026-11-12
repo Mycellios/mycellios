@@ -1,4 +1,9 @@
 export const DE_MESSAGES: Record<string, string> = {
+  "Push notifications": "Push-Mitteilungen",
+  "Enable notifications": "Mitteilungen aktivieren",
+  "Enabling…": "Wird aktiviert…",
+  "Allow this device to receive alerts when the app is in the background.": "Erlaube diesem Gerät, Mitteilungen zu empfangen, wenn die App im Hintergrund läuft.",
+  "Registration requested. Check your system notification settings.": "Registrierung angefordert. Prüfe die Mitteilungseinstellungen deines Systems.",
   "Check agent engines on server": "Agent-Engines auf dem Server prüfen",
   "Find local models on server": "Lokale Modelle auf dem Server suchen",
   "Local discovery is available to the server owner.": "Die lokale Erkennung steht dem Serverbesitzer zur Verfügung.",

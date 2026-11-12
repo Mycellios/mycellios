@@ -2,6 +2,7 @@ import type { ProductEvent } from "@rakazo/contracts";
 import { displayName, plainTextFromMarkdown } from "@rakazo/core";
 import { appPath } from "./app-path";
 import { i18n } from "./i18n";
+import { desktopBridge } from "./desktop";
 
 export type BrowserNotificationPermission = "default" | "denied" | "granted";
 
@@ -63,6 +64,11 @@ export async function showSystemNotification(
   onOpen?: () => void,
 ): Promise<void> {
   const url = appPath(route);
+  const native = desktopBridge()?.notifications;
+  if (native) {
+    await native.show({ title: title.slice(0, 160), body: body.slice(0, 280), tag, url, silent: !sound });
+    return;
+  }
   const options: NotificationOptions = {
     body: body.slice(0, 280),
     tag,

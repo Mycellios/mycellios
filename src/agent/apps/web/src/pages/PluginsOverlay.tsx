@@ -839,7 +839,7 @@ export function PluginsOverlay({
           <div className="rk-market-heading">
             <div>
               <h1>
-                <Trans>Apps</Trans>
+                <Trans>Integrations</Trans>
               </h1>
               <p>
                 <Trans>Connect the tools and services your Micos work with.</Trans>
@@ -855,7 +855,7 @@ export function PluginsOverlay({
                   setQuery(event.target.value);
                   setVisibleCount(CONNECTION_CATALOG_PAGE_SIZE);
                 }}
-                aria-label={t`Search apps`}
+                aria-label={t`Search`}
                 placeholder={t`Search`}
               />
             </div>

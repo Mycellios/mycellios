@@ -111,7 +111,7 @@ function openAiCompatibleProvider(
         ...options,
         fetch: createMycelliosChatFetch(
           createOpenAiCompatibleFetch(options?.fetch, undefined, policy),
-          { contextWindow: model.contextWindow },
+          { contextWindow: model.contextWindow, requestNamespace: options?.sessionId },
         ),
       }),
     streamSimple: (model, context, options) =>
@@ -125,7 +125,7 @@ function openAiCompatibleProvider(
         ...options,
         fetch: createMycelliosChatFetch(
           createOpenAiCompatibleFetch(options?.fetch, undefined, policy),
-          { contextWindow: model.contextWindow },
+          { contextWindow: model.contextWindow, requestNamespace: options?.sessionId },
         ),
       }),
   };

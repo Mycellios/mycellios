@@ -1,5 +1,6 @@
 import type { ConnectorTool } from "@rakazo/adapter-kit";
 import { workflowTools } from "./workflow-tools.js";
+import { hostedAppTools } from "./hosted-app-tools.js";
 import {
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
@@ -221,6 +222,7 @@ const fleetGroupTargetProperties = {
 };
 
 export const builtinAgentTools: ConnectorTool[] = [
+  ...hostedAppTools,
   ...workflowTools,
   {
     name: "generate_image",
@@ -500,20 +502,28 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "ask_user",
     description:
-      "Ask one short multiple-choice question only when essential information is missing and you cannot reasonably answer or continue without it, then wait for the selection. Answer requests for explanations, comparisons and recommendations directly first; do not replace the answer with a menu of next tasks. Use tappable options when two to four concise choices are enough. Address the person directly in their language; never refer to them as the user. Do not ask for information already provided.",
+      "Ask using a short interactive form, then wait. Use this whenever you need the person's preferences, missing information or a decision; never leave a blocking question only in prose. Offer two to four real, concise options with optional descriptions, or omit options for a free-text answer. Group one to three related questions in questions so they can answer them together; use multiSelect only when several answers can apply. A custom answer and Skip are built in: do not add Other or Skip options. Do not ask again for known information or interrupt straightforward reversible work. Speak directly in their language. This form is not authorization for a protected action and must not collect credentials.",
     inputSchema: {
       type: "object",
       properties: {
-        question: { type: "string", maxLength: 240 },
-        options: {
-          type: "array",
-          items: { type: "string", minLength: 1, maxLength: 80 },
-          minItems: 2,
-          maxItems: 4,
-          uniqueItems: true,
-        },
+        question: { type: "string", minLength: 1, maxLength: 240 },
+        options: { type: "array", minItems: 2, maxItems: 4, uniqueItems: true, items: { anyOf: [
+          { type: "string", minLength: 1, maxLength: 80 },
+          { type: "object", properties: { label: { type: "string", minLength: 1, maxLength: 80 }, description: { type: "string", maxLength: 160 } }, required: ["label"], additionalProperties: false },
+        ] } },
+        multiSelect: { type: "boolean" },
+        questions: { type: "array", minItems: 1, maxItems: 3, items: { type: "object", properties: {
+          id: { type: "string", minLength: 1, maxLength: 80 },
+          question: { type: "string", minLength: 1, maxLength: 240 },
+          options: { type: "array", maxItems: 4, uniqueItems: true, items: { anyOf: [
+            { type: "string", minLength: 1, maxLength: 80 },
+            { type: "object", properties: { label: { type: "string", minLength: 1, maxLength: 80 }, description: { type: "string", maxLength: 160 } }, required: ["label"], additionalProperties: false },
+          ] } },
+          multiSelect: { type: "boolean" },
+        }, required: ["question"], additionalProperties: false } },
       },
-      required: ["question", "options"],
+      required: ["question"],
+      additionalProperties: false,
     },
   },
   {

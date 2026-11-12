@@ -55,6 +55,7 @@ const EXPLICIT_APPROVAL_BUILTIN_TOOLS = new Set([
 ]);
 
 const UNATTENDED_SAFE_BUILTIN_TOOLS = new Set([
+  "app_read",
   "command_status",
   "work_status",
   "delegate_task",
@@ -183,6 +184,7 @@ export function unattendedTriggerToolRequiresApproval(
  * and taints the run. New tools taint by default.
  */
 const OWN_STATE_RESULT_TOOLS = new Set([
+  "app_write",
   "ask_user",
   "connect_app",
   "attach_file",

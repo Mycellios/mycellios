@@ -85,7 +85,7 @@ export function ToolActivityDisclosure({
       className="group"
     >
       <CollapsibleTrigger
-        className={`flex min-h-6 w-fit cursor-pointer list-none items-center gap-1 rounded-md py-0.5 pe-1.5 text-[13px] font-medium outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+        className={`flex min-h-6 w-fit cursor-pointer list-none items-center gap-1 rounded-md py-0.5 pe-1.5 text-[12px] font-normal outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
           live ? "text-foreground/75" : "text-muted-foreground"
         }`}
       >
@@ -95,16 +95,13 @@ export function ToolActivityDisclosure({
           strokeWidth={1.8}
           className="transition-transform duration-150 group-data-panel-open:rotate-90 motion-reduce:transition-none"
         />
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span>{live ? <Trans>Activity</Trans> : <Trans>Done</Trans>}</span>
-          <span className="whitespace-nowrap">
-            <Plural value={toolCount} one="# tool" other="# tools" />
-          </span>
-          {!live && duration ? <span>{duration}</span> : null}
-        </span>
+        <span>{live ? <Trans>Activity</Trans> : <Trans>Done</Trans>}</span>
       </CollapsibleTrigger>
       <CollapsibleContent hiddenUntilFound>
-        <div className="ms-[7px] mt-0.5 border-s border-border ps-3">{children}</div>
+        <div className="ms-[7px] mt-0.5 border-s border-border ps-3">
+          <div className="mb-1 text-xs text-muted-foreground"><Plural value={toolCount} one="# tool" other="# tools" />{duration ? ` · ${duration}` : ""}</div>
+          {children}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );
