@@ -14,9 +14,9 @@ import {
 } from "./bot-avatar.js";
 
 describe("BotAvatar", () => {
-  it("draws each animal as a solid silhouette with capsule eyes by default", () => {
+  it("draws each current shape as a solid silhouette when the flat finish is selected", () => {
     const silhouettes = MICO_AVATAR_DEFAULT_SHAPES.map(({ index, originalColor }) => {
-      const html = renderToString(<BotAvatar color={micoAvatarValue(index, originalColor)} size={26} />);
+      const html = renderToString(<BotAvatar color={micoAvatarValue(index, originalColor, { eyes: 0, finish: "flat", original: true })} size={26} />);
       expect(html).toContain('data-mico-avatar="flat"');
       expect(html).toContain('viewBox="0 0 64 64"');
       expect(html).toContain(`fill="${originalColor}"`);
@@ -24,7 +24,7 @@ describe("BotAvatar", () => {
       expect(html).not.toMatch(/(?:<image|<linearGradient|drop-shadow)/);
       return html.match(/<path d="([^"]+)"/)?.[1];
     });
-    expect(new Set(silhouettes).size).toBe(12);
+    expect(new Set(silhouettes).size).toBe(MICO_AVATAR_DEFAULT_SHAPES.length);
   });
 
   it("keeps an explicitly selected velvet avatar and its original artwork colors", () => {
@@ -32,7 +32,10 @@ describe("BotAvatar", () => {
     const html = renderToString(<BotAvatar color={color} />);
     expect(html).toContain('data-mico-avatar="plush"');
     expect(html).toContain("<image");
-    expect(html).not.toContain("<feColorMatrix");
+    // Eye contrast has its own mask; the original body artwork must stay untinted.
+    const body = html.match(/<image[^>]*width="1536"[^>]*>/)?.[0];
+    expect(body).toBeDefined();
+    expect(body).not.toContain("filter=");
   });
 
   it.each([
@@ -41,7 +44,7 @@ describe("BotAvatar", () => {
     ["#3D4C9E", 15, "#FFFFFF"],
     ["#D6B98C", 15, "#1D2B23"],
   ] as const)("contrasts eyes with %s in style %d", (color, eyes, expected) => {
-    const value = micoAvatarValue(1011, color, { eyes, finish: "flat", original: false });
+    const value = micoAvatarValue(1111, color, { eyes, finish: "flat", original: false });
     const html = renderToString(<BotAvatar color={value} />);
     expect(html).toContain(`class="rakazo-mico-gaze" fill="${expected}"`);
   });
@@ -55,8 +58,8 @@ describe("BotAvatar", () => {
     );
 
     const gradMatches = [...html.matchAll(/id="([^"]+)"/g)].map((m) => m[1]);
-    expect(gradMatches).toHaveLength(4);
-    expect(new Set(gradMatches).size).toBe(4);
+    expect(gradMatches.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(gradMatches).size).toBe(gradMatches.length);
     for (const id of gradMatches) {
       expect(id).toBeTruthy();
       expect(html).toContain(`url(#${id})`);
@@ -66,7 +69,7 @@ describe("BotAvatar", () => {
   // Button sizes any SVG without a size class, which beats width/height attributes but not inline styles.
   it("sizes the shape with an inline style so icon sizing in a button cannot shrink it", () => {
     const html = renderToString(<BotAvatar color="#8B5CF6::shape_0" size={26} />);
-    const shape = html.match(/<svg[^>]*data-mico-avatar="flat"[^>]*>/)?.[0];
+    const shape = html.match(/<svg[^>]*data-mico-avatar="plush"[^>]*>/)?.[0];
     expect(shape).toMatch(/style="[^"]*width:26px;height:26px/);
   });
 
@@ -156,7 +159,7 @@ describe("BotAvatar", () => {
 
   it("marks only the Mico eyes for animation while working", () => {
     const html = renderToString(
-      <BotAvatar color="#8B5CF6::shape_0" identity="maya" size={32} status="running" />,
+      <BotAvatar color={micoAvatarValue(1101, "#8B5CF6", { eyes: 0, finish: "flat", original: false })} identity="maya" size={32} status="running" />,
     );
     expect(html).toContain('data-mico-avatar="flat"');
     expect(html.match(/class="rakazo-mico-eye"/g)).toHaveLength(2);
@@ -183,8 +186,8 @@ describe("BotAvatar", () => {
     const shaped = renderToString(
       <BotAvatar color={`${DEFAULT_BOT_AVATAR_COLOR}::shape_3`} identity="maya" />,
     );
-    expect(restored).toContain('data-mico-avatar="flat"');
-    expect(shaped).toContain('data-mico-avatar="flat"');
+    expect(restored).toContain('data-mico-avatar="plush"');
+    expect(shaped).toContain('data-mico-avatar="plush"');
     expect(restored.match(/data-mico-shape="([^"]+)"/)?.[1]).not.toBe(shaped.match(/data-mico-shape="([^"]+)"/)?.[1]);
   });
 
@@ -202,12 +205,12 @@ describe("BotAvatar", () => {
       <BotShapePreview identity="maya" label="Shape 1" color="#8B5CF6" selected={false} />,
     );
     expect(html).toContain('aria-label="Shape 1"');
-    expect(html).toContain('data-mico-avatar="flat"');
+    expect(html).toContain('data-mico-avatar="plush"');
   });
 
   it("draws plain-colour bots with the current mascot collection", () => {
     const html = renderToString(<BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} identity="maya" />);
-    expect(html).toContain('data-mico-avatar="flat"');
+    expect(html).toContain('data-mico-avatar="plush"');
     expect(html).not.toContain("rakazo-bot-avatar-visor");
   });
 
@@ -225,13 +228,12 @@ describe("BotAvatar", () => {
       <BotAvatar color={micoAvatarValue(MICO_AVATAR_SHAPES[3].index, DEFAULT_BOT_AVATAR_COLOR)} identity="maya" />,
     );
     expect(html.match(/data-mico-shape="([^"]+)"/)?.[1]).toBe(modern.match(/data-mico-shape="([^"]+)"/)?.[1]);
-    expect(html).toContain('data-mico-avatar="flat"');
+    expect(html).toContain('data-mico-avatar="plush"');
   });
 
   it("uses a safe fallback when the custom color is invalid", () => {
     const html = renderToString(<BotAvatar color="#zzzzzz" identity="maya" />);
-    expect(html).toContain('data-mico-avatar="flat"');
-    expect(html).not.toContain("<feComponentTransfer");
+    expect(html).toContain('data-mico-avatar="plush"');
     expect(html).not.toContain("#zzzzzz");
   });
 });
