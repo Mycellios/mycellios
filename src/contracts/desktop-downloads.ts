@@ -43,7 +43,15 @@ export function isDesktopDownloadCatalog(value: unknown): value is DesktopDownlo
   };
   const safeInstaller = (p: Record<string, unknown>, extension: string, release: string) =>
     typeof p.fileName === "string" && p.fileName.endsWith(extension)
-    && safePath(p.path, release) && (p.path as string).endsWith("/" + p.fileName)
+    && typeof p.path === "string"
+    && (() => {
+      // The publisher pins the cache key to these exact immutable installer bytes.
+      // Accept only that checksum query, never arbitrary parameters or redirects.
+      const path = p.path as string;
+      const suffix = `?sha256=${p.sha256}`;
+      const installerPath = path.endsWith(suffix) ? path.slice(0, -suffix.length) : path;
+      return safePath(installerPath, release) && installerPath.endsWith("/" + p.fileName);
+    })()
     && typeof p.sha256 === "string" && /^[a-f0-9]{64}$/.test(p.sha256)
     && typeof p.bytes === "number" && Number.isSafeInteger(p.bytes) && p.bytes > 0;
   if (c.fedora !== undefined) {
