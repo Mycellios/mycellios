@@ -2,6 +2,10 @@ name: Publish qualified Windows Desktop
 on:
   workflow_dispatch:
     inputs:
+      allow_unsigned_preview:
+        description: Explicitly publish an unsigned manual preview, never a signed release
+        type: boolean
+        default: false
       run_id:
         description: Successful Desktop Windows release package run to promote
         required: true
@@ -14,7 +18,8 @@ concurrency:
 jobs:
   publish:
     if: github.repository == 'Mycellios/mycellios' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: windows-2025
+    environment: ${{ inputs.allow_unsigned_preview && 'windows-preview' || 'windows-signing' }}
     timeout-minutes: 10
     permissions:
       contents: write
@@ -23,6 +28,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       SOURCE_RUN: ${{ inputs.run_id }}
+      EXPECTED_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -49,6 +55,23 @@ jobs:
           run-id: ${{ inputs.run_id }}
           github-token: ${{ github.token }}
           path: release
+      - name: Independently verify the downloaded installer publisher
+        shell: pwsh
+        env:
+          ALLOW_UNSIGNED_PREVIEW: ${{ inputs.allow_unsigned_preview && '1' || '0' }}
+        run: |
+          $manifest=Get-Content release/desktop-release.json -Raw|ConvertFrom-Json
+          $options=@{Directory=(Resolve-Path release).Path;Version=$manifest.version;InstallerOnly=$true;Receipt=(Join-Path $env:RUNNER_TEMP 'publisher-recheck.json')}
+          if($manifest.signature -eq 'authenticode'){
+            if(!$env:EXPECTED_PUBLISHER -or $manifest.publisher -cne $env:EXPECTED_PUBLISHER){throw 'Expected verified publisher is not configured or does not match'}
+            $options.Publisher=$env:EXPECTED_PUBLISHER
+          }elseif($manifest.signature -eq 'unsigned-preview' -and $env:ALLOW_UNSIGNED_PREVIEW -eq '1'){
+            $options.Preview=$true
+          }else{throw 'Publication requires a publisher-signed installer'}
+          & ./src/agent/apps/desktop/scripts/verify-windows-signature.ps1 @options
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          $verified=Get-Content $options.Receipt -Raw|ConvertFrom-Json
+          if($verified.files[0].sha256 -ne $manifest.artifact.sha256){throw 'Verified installer differs from the qualified artifact'}
       - name: Publish the exact qualified artifact once
         shell: bash
         env:
@@ -69,5 +92,5 @@ jobs:
           gh api "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$REVISION"
           printf 'Compact Windows update from `%s`.\n\nReal build and isolated packaged startup passed. See installer-qualification.json: an operator-expedited release explicitly records optional installer benchmarks and preservation qualification as NOT RUN. No installation-time claim is made for that mode. Explicit restart consent is retained.\n' "$REVISION" > notes.md
           gh release create "$tag" --verify-tag --target "$REVISION" --draft --prerelease --latest=false --title "Mycellios Desktop $version" --notes-file notes.md
-          gh release upload "$tag" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json SHA256SUMS.txt
+          gh release upload "$tag" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json windows-signature.json SHA256SUMS.txt
           gh release edit "$tag" --draft=false --prerelease --latest=false

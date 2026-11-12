@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { windowsSigningConfiguration } from './windows-signing.mjs';
 
 // electron-builder concatenates resource arrays from package.json and API
 // options. Load one complete file instead, preserving base settings (voice
@@ -74,7 +75,8 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       { from: path.join(desktopRoot, '../../infra/compose/docker-compose.images.yml'), to: 'stack/docker-compose.images.yml' },
       { from: path.join(desktopRoot, '../../infra/compose/stack-env.example'), to: 'stack/stack-env.example' },
     ],
-    win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true },
+    ...windowsSigningConfiguration().build,
+    win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: path.join(desktopRoot, 'assets/icon.ico'), verifyUpdateCodeSignature: true, ...windowsSigningConfiguration().build.win },
     // The legacy loose tree exceeds ZIP32's entry limit. Compact ASAR resources
     // use bounded ZIP32/Deflate to reduce install-time decompression; afterPack
     // checks the actual payload before nsisunz receives it. Never emit ZIP64.

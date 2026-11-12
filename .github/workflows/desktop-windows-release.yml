@@ -5,6 +5,11 @@ on:
     branches: ['codex/desktop-release-*']
   workflow_dispatch:
     inputs:
+      signing:
+        description: Publisher signature required; unsigned preview is an explicit manual exception
+        type: choice
+        options: [publisher, unsigned-preview]
+        default: publisher
       expedited:
         description: Operator-requested build and startup only; installer timing and optional tests NOT RUN
         type: boolean
@@ -16,13 +21,24 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
+    if: inputs.signing == 'unsigned-preview' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/desktop-v')
     runs-on: windows-2025
+    environment: ${{ inputs.signing == 'unsigned-preview' && 'windows-preview' || 'windows-signing' }}
+    permissions:
+      contents: read
+      id-token: write
     timeout-minutes: 60
     outputs:
       version: ${{ steps.identity.outputs.version }}
       revision: ${{ steps.identity.outputs.revision }}
       tag: ${{ steps.identity.outputs.tag }}
     env:
+      MYCELLIOS_WINDOWS_SIGNING: ${{ inputs.signing == 'unsigned-preview' && 'unsigned-preview' || vars.WINDOWS_SIGNING_PROVIDER || 'azure' }}
+      MYCELLIOS_WINDOWS_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
+      MYCELLIOS_WINDOWS_AZURE_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
+      MYCELLIOS_WINDOWS_AZURE_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
+      MYCELLIOS_WINDOWS_AZURE_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
+      MYCELLIOS_WINDOWS_CERTIFICATE_SHA1: ${{ vars.WINDOWS_SIGNING_CERTIFICATE_SHA1 }}
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
@@ -35,6 +51,27 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.2
+      - name: Require publisher configuration before building
+        shell: pwsh
+        env:
+          PREVIEW_REQUESTED: ${{ inputs.signing == 'unsigned-preview' && '1' || '0' }}
+          SIGNING_CLIENT_ID: ${{ vars.WINDOWS_SIGNING_CLIENT_ID }}
+          SIGNING_TENANT_ID: ${{ vars.WINDOWS_SIGNING_TENANT_ID }}
+          SIGNING_SUBSCRIPTION_ID: ${{ vars.WINDOWS_SIGNING_SUBSCRIPTION_ID }}
+        run: |
+          if($env:MYCELLIOS_WINDOWS_SIGNING -eq 'unsigned-preview' -and $env:PREVIEW_REQUESTED -ne '1'){throw 'Unsigned previews require an explicit manual input'}
+          node src/agent/apps/desktop/scripts/windows-signing.mjs
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          if($env:MYCELLIOS_WINDOWS_SIGNING -eq 'azure'){
+            foreach($name in @('SIGNING_CLIENT_ID','SIGNING_TENANT_ID','SIGNING_SUBSCRIPTION_ID')){
+              $value=[Environment]::GetEnvironmentVariable($name)
+              if($value -notmatch '^[a-fA-F0-9]{8}(-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}$'){throw "Missing or invalid $name"}
+            }
+          }
+          if($env:MYCELLIOS_WINDOWS_SIGNING -eq 'certificate-store'){
+            $certificate=Get-Item -LiteralPath "Cert:/CurrentUser/My/$env:MYCELLIOS_WINDOWS_CERTIFICATE_SHA1"
+            if(!$certificate.HasPrivateKey){throw 'The configured certificate cannot sign on this runner'}
+          }
       - name: Bind the release to its source and version
         id: identity
         shell: pwsh
@@ -121,6 +158,17 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           npm run build:local-server --workspace @rakazo/desktop
           exit $LASTEXITCODE
+      - name: Authenticate only the publisher signing stage
+        if: env.MYCELLIOS_WINDOWS_SIGNING == 'azure'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0; no persistent client secret
+        with:
+          client-id: ${{ vars.WINDOWS_SIGNING_CLIENT_ID }}
+          tenant-id: ${{ vars.WINDOWS_SIGNING_TENANT_ID }}
+          subscription-id: ${{ vars.WINDOWS_SIGNING_SUBSCRIPTION_ID }}
+      - name: Cache the scoped signing token without printing it
+        if: env.MYCELLIOS_WINDOWS_SIGNING == 'azure'
+        shell: pwsh
+        run: az account get-access-token --resource https://codesigning.azure.net --output none
       - name: Package and qualify the immutable installer
         id: package
         working-directory: src/agent
@@ -130,6 +178,10 @@ jobs:
           if($LASTEXITCODE){exit $LASTEXITCODE}
           & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
           exit $LASTEXITCODE
+      - name: Clear the signing session
+        if: always() && env.MYCELLIOS_WINDOWS_SIGNING == 'azure'
+        shell: pwsh
+        run: az account clear
       - name: Qualify rollback helper
         if: inputs.expedited != true
         working-directory: src/agent
@@ -183,6 +235,7 @@ jobs:
             ${{ env.DESKTOP_RELEASE_OUT }}/floating-chats-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/SHA256SUMS.txt
+            ${{ env.DESKTOP_RELEASE_OUT }}/windows-signature.json
           if-no-files-found: error
           retention-days: 14
   publish:
@@ -198,6 +251,10 @@ jobs:
       RELEASE_TAG: ${{ needs.package.outputs.tag }}
       RELEASE_REVISION: ${{ needs.package.outputs.revision }}
     steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
         with:
           name: desktop-windows-${{ needs.package.outputs.revision }}
@@ -209,11 +266,15 @@ jobs:
           cd release
           sha256sum --check --strict SHA256SUMS.txt
           jq -e --arg rev "$RELEASE_REVISION" --arg tag "$RELEASE_TAG" '.revision == $rev and .tag == $tag and .qualifiedStartup == true and .qualifiedInstallation == true and .automaticUpdates == false' desktop-release.json
+          jq -e '.signature == "authenticode" and (.publisher | length > 0) and (.signatureReceiptSha256 | length == 64)' desktop-release.json
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$RELEASE_REVISION" origin/main
+          test "$(git rev-parse "$RELEASE_REVISION^{tree}")" = "$(git rev-parse 'origin/main^{tree}')"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo 'This release already exists. Never replace an existing version; prepare a new version.' >&2
             exit 1
           fi
           printf 'Versioned Windows preview from commit `%s`.\n\nVerified package, source identity and update manifests are attached. Installation requires an explicit restart.\n' "$RELEASE_REVISION" > notes.md
           gh release create "$RELEASE_TAG" --verify-tag --target "$RELEASE_REVISION" --draft --prerelease --latest=false --title "Mycellios Desktop $RELEASE_TAG" --notes-file notes.md
-          gh release upload "$RELEASE_TAG" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" ./*.exe ./*.blockmap latest.yml desktop-build.json desktop-release.json packaged-smoke.json installer-qualification.json windows-signature.json SHA256SUMS.txt
           gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false

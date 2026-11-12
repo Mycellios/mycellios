@@ -7,6 +7,8 @@ import { stageCompactResources, verifyCompactServer } from './compact-resources.
 import { prepareWindowsInstaller, writeStandaloneWindowsConfig } from './windows-installer.mjs';
 import { writeBuildIdentity } from './desktop-release.mjs';
 import { writeWindowsPayloadBlockmap } from './windows-payload-blockmap.mjs';
+import { execFileSync } from 'node:child_process';
+import { windowsSigningConfiguration } from './windows-signing.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argument = name => { const i = process.argv.indexOf(name); return i < 0 ? undefined : process.argv[i + 1]; };
@@ -15,6 +17,7 @@ const runtimeSha256 = argument('--sha256');
 if (!runtimeMsi || !runtimeSha256) throw new Error('Use --runtime <verified MSI> --sha256 <pinned hash>');
 const version = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
 const output = argument('--out') ?? path.join(root, 'release');
+const signing = windowsSigningConfiguration();
 const buildIdentity = await writeBuildIdentity(root, output);
 const development = await stageDevelopmentResources(root);
 const compact = await stageCompactResources(root, development, output);
@@ -24,6 +27,9 @@ await withWindowsCopyRetry(async () => {
   const { Arch, build, Platform } = await import('electron-builder');
   await build({ targets: Platform.WINDOWS.createTarget('nsis', Arch.x64), projectDir: root, config:configFile, publish: 'never' });
 });
+execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', path.join(root,'scripts/verify-windows-signature.ps1'),
+  '-Directory', path.resolve(output), '-Version', version,
+  ...(signing.mode === 'unsigned-preview' ? ['-Preview'] : ['-Publisher', signing.publisher])], {stdio:'inherit',windowsHide:true,timeout:300_000});
 // Keep the release's standard blockmap without forcing a 7z payload. This writes
 // a sidecar only; the qualified installer bytes and manual-update policy stay intact.
 await writeWindowsPayloadBlockmap(path.join(output, `Mycellios-Desktop-${version}-windows-x64-pilot.exe`));

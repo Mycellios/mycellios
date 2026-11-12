@@ -173,6 +173,12 @@ These rules apply to the complete repository.
   `/public/v1/desktop-downloads` and page `/downloads/desktop`; preserve the
   headless runtime catalog and platform routes. Preview upgrades are manual
   while Windows packages are unsigned; never enable unsigned automatic installs.
+  Windows publisher builds use the protected `windows-signing` environment and
+  require the validated publisher identity. `windows-signing.mjs` configures Azure
+  Artifact Signing or an exact certificate-store identity; verify Authenticode,
+  timestamp and final-byte receipts before hashing/promotion. Unsigned previews
+  require explicit workflow inputs and remain manual. See the publisher-signing
+  section of `specs/desktop-manual-updates/publish-desktop-packages.md`.
   The isolated page build uses `node scripts/build-desktop-downloads.mjs` and the
   same `DesktopDownloads` component as the main downloads screen. Publish the
   verified RPM builder's catalog entry as `fedora` in the `macos-all` response.
