@@ -522,7 +522,8 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
     await db.raw.prepare("UPDATE economic_managed_purchases SET created_at=? WHERE usage_id=?").run(Date.now()-86400000,h.id);
     const other=await MeshDatabase.openPostgres(url!,schema);
     try{
-      const limited=new ManagedPurchases(other,new ContributionCreditWallet(other,new EconomicLedger(other)),10000000,1000000);await limited.initialize();
+      const otherLedger=new EconomicLedger(other,{receiptSigning:{keyId:"envelope-test",privateKey:generateKeyPairSync("ed25519").privateKey}});
+      const limited=new ManagedPurchases(other,new ContributionCreditWallet(other,otherLedger,true),10000000,1000000);await limited.initialize();
       const usage=await api.beginUsage("alice",null,{model:input.model,messages:[]},true);
       await expect(limited.reserve({usageId:usage.id,accountId:"alice",key:"another-envelope",digest:"other",provider:"mock",model:input.model,maximumUsd:"0.5"}))
         .rejects.toThrow("operator_budget_exceeded");
@@ -534,10 +535,16 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
       VALUES ('bob-envelope','bob','test','test-only',1000000,?,?)`).run(Date.now(),Date.now()+600000);
     const limited=new ManagedPurchases(db,wallet,10000000,1000000);await limited.initialize();
     const usages=await Promise.all(["alice","bob"].map(account=>api.beginUsage(account,null,{model:input.model,messages:[]},true)));
-    const attempts=await Promise.allSettled(["alice","bob"].map((account,i)=>limited.reserve({usageId:usages[i]!.id,accountId:account,
-      key:"envelope-"+account,digest:account,provider:"mock",model:input.model,maximumUsd:"0.5"})));
-    expect(attempts.filter(x=>x.status==="fulfilled")).toHaveLength(1);
-    expect((await wallet.reserved("alice"))+(await wallet.reserved("bob"))).toBe(520000);
+    const other=await MeshDatabase.openPostgres(url!,schema);
+    try{
+      const otherLedger=new EconomicLedger(other,{receiptSigning:{keyId:"envelope-test",privateKey:generateKeyPairSync("ed25519").privateKey}});
+      const otherWallet=new ContributionCreditWallet(other,otherLedger,true);await otherWallet.initialize();
+      const competing=new ManagedPurchases(other,otherWallet,10000000,1000000);await competing.initialize();
+      const attempts=await Promise.allSettled([limited,competing].map((store,i)=>store.reserve({usageId:usages[i]!.id,accountId:["alice","bob"][i]!,
+        key:"envelope-account-"+i,digest:String(i),provider:"mock",model:input.model,maximumUsd:"0.5"})));
+      expect(attempts.filter(x=>x.status==="fulfilled")).toHaveLength(1);
+      expect((await wallet.reserved("alice"))+(await wallet.reserved("bob"))).toBe(520000);
+    }finally{await other.close();}
   });
   it("shares the balance with existing native holds", async () => {
     const usage = await api.beginUsage("alice", null, { model: "native", messages: [] }, true);
