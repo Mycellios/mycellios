@@ -20,6 +20,8 @@ import { ManagedGateway } from "../src/coordinator/managed-gateway.js";
 import { ManagedOpenRouter, MANAGED_MODEL_PREFIX } from "../src/coordinator/managed-openrouter.js";
 import { ManagedAntseedText } from "../src/coordinator/managed-antseed-text.js";
 import { antseedFixture, operatorSecret } from "./fixtures/managed-antseed.js";
+import {ManagedAntseedGateway} from "../src/coordinator/managed-antseed-gateway.js";
+import {antseedGatewayFixture,gatewayKey,gatewayModel} from "./fixtures/managed-antseed-gateway.js";
 import { mountManagedProviderRoutes, handleManagedChat } from "../src/coordinator/managed-provider-routes.js";
 import {ManagedMedia,type MediaRequest,type MediaQuote} from "../src/coordinator/managed-media.js";
 import {Referrals,referralSchemaSql,referralAccessSchemaSql} from "../src/economy/referrals.js";
@@ -79,6 +81,54 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
     return new Response(`{"id":"${id}","choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"stop"}],"usage":{"cost":${cost},"prompt_tokens":2,"completion_tokens":3}}`);
   }
 
+  it("connects an operator gateway key to the real wallet, funds a new account and debits actual cost plus funding plus 4 percent once", async () => {
+    const f=antseedGatewayFixture(),adapter=new ManagedAntseedGateway(gatewayKey,"http://127.0.0.1:8379",["*"],100,f.transport,"deepseek-bounded-v1");
+    const service=new ManagedGateway(db,purchases,api,new ManagedTextRouter([managedTextBackend("antseed-gateway",adapter)]),1000000);
+    const request={model:gatewayModel,messages:[{role:"user",content:"Hello"}],max_tokens:10};
+    const app=Fastify(),headers={"x-mycellios-funding":"contribution-credits","idempotency-key":"gateway-first-credit"};
+    app.post("/v1/chat/completions",(req,reply)=>handleManagedChat(req,reply,service,{userId:"bob",apiKeyId:null}));
+    try {
+      expect((await app.inject({method:"POST",url:"/v1/chat/completions",headers:{...headers,"idempotency-key":"gateway-no-funds"},payload:request})).statusCode).toBe(402);
+      expect(f.inference()).toHaveLength(0);
+      await db.raw.prepare(`INSERT INTO economic_promotional_grants
+        (id,account_id,issued_by,reason,amount_microunits,created_at,expires_at)
+        VALUES ('bob-gateway-credit','bob','test','test-only',1000000,?,?)`).run(Date.now(),Date.now()+14*86400000);
+      const response=await app.inject({method:"POST",url:"/v1/chat/completions",headers,payload:request});
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({model:gatewayModel,mycellios:{creditsMicrounits:6,fundingCostBasisPoints:100,serviceFeeBasisPoints:400}});
+      expect((await wallet.summary("account","bob")).availableMicrounits).toBe(999994);
+      expect(JSON.stringify(response.json())).not.toContain(gatewayKey);
+      expect((await app.inject({method:"POST",url:"/v1/chat/completions",headers,payload:request})).statusCode).toBe(200);
+      expect(f.inference()).toHaveLength(1);expect(await wallet.reserved("bob")).toBe(0);
+      expect((await purchases.find("bob",headers["idempotency-key"]))?.provider).toBe("antseed-gateway");
+    } finally {await app.close();}
+  });
+  it("retains the gateway credit hold on partial cost, recovers after restart and rejects an unrelated account",async()=>{
+    const f=antseedGatewayFixture();f.pending(true);
+    const make=()=>new ManagedGateway(db,purchases,api,new ManagedTextRouter([managedTextBackend("antseed-gateway",
+      new ManagedAntseedGateway(gatewayKey,"http://127.0.0.1:8379",["*"],100,f.transport,"deepseek-bounded-v1"))]),1000000);
+    const service=make(),request={model:gatewayModel,messages:[{role:"user",content:"Hello"}],max_tokens:10};
+    const q=await service.quote("alice",request),key="gateway-late-invoice";
+    expect(await service.execute("alice",null,key,request,q.token)).toMatchObject({status:"pending_reconciliation"});
+    expect(await wallet.reserved("alice")).toBeGreaterThan(0);
+    await expect(make().reconcile("bob",key)).rejects.toThrow("receipt_missing");
+    f.pending(false);f.row.inputTokens=1;
+    expect(await make().reconcile("alice",key)).toMatchObject({status:"pending_reconciliation"});
+    f.row.inputTokens=3;
+    expect(await make().reconcile("alice",key)).toMatchObject({status:"completed",response:{mycellios:{creditsMicrounits:6}}});
+    expect(f.inference()).toHaveLength(1);expect(await wallet.reserved("alice")).toBe(0);
+  });
+  it("persists gateway overcharges as a safety stop rather than clearing the hold or allowing more spend",async()=>{
+    const f=antseedGatewayFixture();f.row.spent="1";
+    const provider=new ManagedTextRouter([managedTextBackend("antseed-gateway",
+      new ManagedAntseedGateway(gatewayKey,"http://127.0.0.1:8379",["*"],100,f.transport,"deepseek-bounded-v1"))]);
+    const service=new ManagedGateway(db,purchases,api,provider,1000000),request={model:gatewayModel,messages:[{role:"user",content:"Hello"}],max_tokens:10};
+    const q=await service.quote("alice",request);
+    expect(await service.execute("alice",null,"gateway-overcharge",request,q.token)).toMatchObject({status:"pending_reconciliation"});
+    expect(await purchases.find("alice","gateway-overcharge")).toMatchObject({safety_stop:true,state:"uncertain"});
+    expect(await wallet.reserved("alice")).toBeGreaterThan(0);
+    await expect(service.quote("bob",request)).rejects.toThrow("safety_stop");expect(f.inference()).toHaveLength(1);
+  });
   it("spends one promotional Credit through AntSeed, charges actual signed cost plus 4 percent once and blocks overdrafts before inference", async () => {
     await db.raw.prepare(`INSERT INTO economic_promotional_grants
       (id,account_id,issued_by,reason,amount_microunits,created_at,expires_at)
@@ -455,6 +505,46 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
     const usage = await api.beginUsage("alice", null, { model: input.model, messages: [] }, true);
     await expect(limited.reserve({ usageId: usage.id, accountId: "alice", key: "operator-second", digest: "second", provider: "mock",
       model: input.model, maximumUsd: "0.5" })).rejects.toThrow("operator_budget_exceeded");
+  });
+  it("does not reset an audited lifetime envelope after midnight or restart", async () => {
+    const first=await hold("funded-yesterday","0.5");await purchases.claim(first.id,"alice");
+    await purchases.settle({id:first.id,accountId:"alice",receiptId:"funded-invoice",usd:"0.5",evidence:{}});
+    await db.raw.prepare("UPDATE economic_managed_purchases SET created_at=?,settled_at=? WHERE usage_id=?")
+      .run(Date.now()-86400000,Date.now()-86400000,first.id);
+    const limited=new ManagedPurchases(db,wallet,10000000,1000000);await limited.initialize();
+    const usage=await api.beginUsage("alice",null,{model:input.model,messages:[]},true);
+    await expect(limited.reserve({usageId:usage.id,accountId:"alice",key:"funded-today",digest:"today",provider:"mock",model:input.model,maximumUsd:"0.5"}))
+      .rejects.toThrow("operator_budget_exceeded");
+    expect(await wallet.reserved("alice")).toBe(0);
+  });
+  it("keeps uncertain prior-day spend inside the lifetime envelope across independent connections",async()=>{
+    const h=await hold("old-uncertain-envelope","0.5");await purchases.claim(h.id,"alice");await purchases.uncertain(h.id);
+    await db.raw.prepare("UPDATE economic_managed_purchases SET created_at=? WHERE usage_id=?").run(Date.now()-86400000,h.id);
+    const other=await MeshDatabase.openPostgres(url!,schema);
+    try{
+      const otherLedger=new EconomicLedger(other,{receiptSigning:{keyId:"envelope-test",privateKey:generateKeyPairSync("ed25519").privateKey}});
+      const limited=new ManagedPurchases(other,new ContributionCreditWallet(other,otherLedger,true),10000000,1000000);await limited.initialize();
+      const usage=await api.beginUsage("alice",null,{model:input.model,messages:[]},true);
+      await expect(limited.reserve({usageId:usage.id,accountId:"alice",key:"another-envelope",digest:"other",provider:"mock",model:input.model,maximumUsd:"0.5"}))
+        .rejects.toThrow("operator_budget_exceeded");
+      expect(await wallet.reserved("alice")).toBe(520000);
+    }finally{await other.close();}
+  });
+  it("serializes lifetime reservations across accounts before consuming any audited balance",async()=>{
+    await db.raw.prepare(`INSERT INTO economic_promotional_grants(id,account_id,issued_by,reason,amount_microunits,created_at,expires_at)
+      VALUES ('bob-envelope','bob','test','test-only',1000000,?,?)`).run(Date.now(),Date.now()+600000);
+    const limited=new ManagedPurchases(db,wallet,10000000,1000000);await limited.initialize();
+    const usages=await Promise.all(["alice","bob"].map(account=>api.beginUsage(account,null,{model:input.model,messages:[]},true)));
+    const other=await MeshDatabase.openPostgres(url!,schema);
+    try{
+      const otherLedger=new EconomicLedger(other,{receiptSigning:{keyId:"envelope-test",privateKey:generateKeyPairSync("ed25519").privateKey}});
+      const otherWallet=new ContributionCreditWallet(other,otherLedger,true);await otherWallet.initialize();
+      const competing=new ManagedPurchases(other,otherWallet,10000000,1000000);await competing.initialize();
+      const attempts=await Promise.allSettled([limited,competing].map((store,i)=>store.reserve({usageId:usages[i]!.id,accountId:["alice","bob"][i]!,
+        key:"envelope-account-"+i,digest:String(i),provider:"mock",model:input.model,maximumUsd:"0.5"})));
+      expect(attempts.filter(x=>x.status==="fulfilled")).toHaveLength(1);
+      expect((await wallet.reserved("alice"))+(await wallet.reserved("bob"))).toBe(520000);
+    }finally{await other.close();}
   });
   it("shares the balance with existing native holds", async () => {
     const usage = await api.beginUsage("alice", null, { model: "native", messages: [] }, true);

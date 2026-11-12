@@ -15,6 +15,13 @@
   audition when its review panel closes.
 
 - The distributable Android host lives in apps/android and packages apps/web unchanged.
+  Native push uses data-only Firebase HTTP v1 messages, the fixed first-party session
+  registration endpoint and encrypted session-bound FCM device records. Keep Expo
+  tokens separate. Build with the four MYCELLIOS_FIREBASE_* public client values;
+  ANDROID_FCM_SERVICE_ACCOUNT_JSON belongs only to API/worker secrets. Initialize
+  Firebase in Application for background process starts. Never return tokens or
+  cookies over the WebView bridge. Preserve account/epoch checks, deduplication,
+  foreground suppression and validated internal notification destinations.
   Keep com.mycellios.android separate from the legacy Expo preview and use a durable
   release signing key, never the preview/debug certificate. Native capabilities use
   WebViewCompat messages with exact HTTPS origin, main-frame and packaged chat-route
@@ -275,6 +282,11 @@
   uninstaller, registration and shortcut recovery, and never moves userData.
   Qualify compact-resources, fast-install, the real local server and timed NSIS
   legacy upgrades; report hosted timing separately from physical-PC acceptance.
+  Compact Windows payloads use ZIP32/Deflate; afterPack bounds the actual file
+  and directory count and total bytes before NSIS. Keep loose legacy payloads on
+  7z, reject ZIP64-sized inputs and retain the measured installation-time gate.
+  Disable differential payload generation for ZIP, then generate the standard
+  standalone blockmap with the pinned builder; never append it to the EXE.
   Windows local PostgreSQL uses bounded pg_ctl readiness and exit status with
   ignored process pipes. Keep the profile lock if shutdown fails.
   desktop-windows-release.yml builds
@@ -1444,6 +1456,14 @@
   Mycellios or loopback; never forward Agent cookies. Matrix verification is not
   evidence of a credit award. Verify BrowserContributionControl/SidebarContribution
   tests and the real local browser/coordinator activation-pause cycle separately.
+
+- Roster hover previews use existing scoped row messages and real run states.
+  Do not fetch threads or mark messages read on hover; keep clicks, context menus
+  and drag reordering intact, and suppress previews on touch and during dragging.
+
+- Keep Tasks, the model selector and a single header tools panel toggle on the
+  right of the conversation header. Put secondary actions inside the full-height resizable side panel;
+  mobile Browser return focus targets the same tools trigger.
 
 - Roster hover previews use existing scoped row messages and real run states.
   Do not fetch threads or mark messages read on hover; keep clicks, context menus

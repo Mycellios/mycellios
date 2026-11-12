@@ -73,6 +73,42 @@ automatic fallbacks or mixed funding sources. Personal BYOK connections remain
 independent. Enabling AntSeed does not start or fund a buyer, copy a user's
 identity, or enable paid inference as part of local qualification.
 
+An operator gateway API key has a different authentication and billing contract.
+Select `MYCELLIOS_MANAGED_UPSTREAM=antseed-gateway`, set
+`MYCELLIOS_MANAGED_ANTSEED_GATEWAY_KEY_FILE` to the private server secret file,
+and `MYCELLIOS_MANAGED_ANTSEED_GATEWAY_BASE_URL` to its fixed HTTPS base (without
+`/v1`; HTTP is allowed only on loopback). An in-process key is supported through
+`MYCELLIOS_MANAGED_ANTSEED_GATEWAY_KEY`; specifying both sources is rejected.
+Never put either credential in a browser provider, repository or receipt.
+
+This adapter requires `MYCELLIOS_MANAGED_ANTSEED_GATEWAY_CONTRACT=deepseek-bounded-v1`.
+This is an operator attestation, not a capability discovered from a model name:
+before setting it, qualify the deployed gateway's bounded DeepSeek request guard,
+0.5/0.5/1 USD-per-million input/cache/output caps, pinned 40-hex seller routing,
+text-only input, explicit output limits, durable attributed spend and scoped ledger.
+Stock gateways without this guard are not qualified. Unknown funding cost still
+blocks all spend, including an advertised free offer whose price could change.
+Paid gateway configuration additionally requires
+`MYCELLIOS_MANAGED_TOTAL_LIMIT_MICROUNITS`, an audited lifetime envelope in
+wallet microcredits, including funding costs and the 4 percent markup. This is
+independent of the daily cap and includes all historical settled managed charges
+and unresolved maximum holds. Midnight, process restarts and key rotation do not
+reset it. Enforce a matching or narrower supplier-side total USD cap, allocated
+only from verified prefunding; future deposits do not extend this authorization.
+Other discovered models/modalities stay unavailable; catalog presence does not
+authorize platform spend. The public price is a maximum, not the cheapest offer.
+
+Gateway authentication opens a key-scoped console session using the operator key;
+it never creates a management token or changes the existing key's policy. Persist
+an opaque end-user nonce before the one inference POST, then its gateway tag and
+compatible response. Recover with scoped ledger GETs only. Require exact key,
+nonce, tag, model, seller, route and complete input/cache/output token coverage.
+The gateway's `costPending=false` alone does not prove a complete invoice.
+Missing responses/receipts, partial token coverage and ambiguous logs retain the
+hold; an explicit verified free receipt bills zero. An invoice above the accepted
+maximum persists a safety stop across accounts and restarts. This limits exposure;
+it cannot guarantee that an upstream provider will never violate its contract.
+
 `MYCELLIOS_MANAGED_MODEL_ALLOWLIST` is optional: default `["*"]` discovers the
 current compatible selected-upstream chat catalog automatically. An explicit named
 list (up to 100 IDs) restricts admission; mixing wildcard and names is rejected.

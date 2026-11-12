@@ -1,0 +1,48 @@
+name: Android push native qualification
+on:
+  pull_request:
+    paths:
+      - src/agent/apps/android/**
+      - .github/workflows/android-push-qualification.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-push-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  android:
+    name: Android push compile and policy tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Compile native host and test notification boundaries
+        env:
+          MYCELLIOS_FIREBASE_PROJECT_ID: ${{ vars.MYCELLIOS_FIREBASE_PROJECT_ID }}
+          MYCELLIOS_FIREBASE_APP_ID: ${{ vars.MYCELLIOS_FIREBASE_APP_ID }}
+          MYCELLIOS_FIREBASE_API_KEY: ${{ vars.MYCELLIOS_FIREBASE_API_KEY }}
+          MYCELLIOS_FIREBASE_SENDER_ID: ${{ vars.MYCELLIOS_FIREBASE_SENDER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          curl -fL --retry 2 https://downloads.gradle.org/distributions/gradle-8.13-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          echo "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78  $RUNNER_TEMP/gradle.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP/gradle"
+          mkdir -p src/agent/apps/android/app/src/main/res/drawable
+          cp src/agent/apps/web/public/mycellios/app-icon-v2-512.png src/agent/apps/android/app/src/main/res/drawable/ic_mycellios.png
+          cd src/agent/apps/android
+          "$RUNNER_TEMP/gradle/gradle-8.13/bin/gradle" testDebugUnitTest assembleRelease --no-daemon --max-workers=2
+      - name: Preserve native test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: android-push-tests-${{ github.sha }}
+          path: src/agent/apps/android/app/build/test-results
+          if-no-files-found: error
+          retention-days: 14
+      # No APK is published: this job qualifies Java/resources, not packaged web,
+      # durable release signing, upgrade continuity or physical push delivery.

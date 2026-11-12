@@ -2398,7 +2398,6 @@ msgstr ""
 msgid "Download {0}"
 msgstr "Descargar {0}"
 
-#: src/components/ArtifactFileCard.tsx
 msgid "Download {name}"
 msgstr "Descargar {name}"
 
@@ -9989,14 +9988,11 @@ msgstr "Está tardando un poco."
 msgid "Select this provider from the model menu in your chat."
 msgstr "Elige este proveedor en el selector de modelos del chat."
 
-
 msgid "Mycellios credits need a linked account."
 msgstr "Vincula tu cuenta Mycellios para consultar los créditos."
 
-
 msgid "View credits"
 msgstr "Ver créditos"
-
 
 msgid "Computer contribution needs a linked Mycellios account. You can contribute in the browser."
 msgstr "La contribución desde el PC requiere una cuenta Mycellios vinculada. Puedes contribuir desde el navegador."
@@ -10082,18 +10078,14 @@ msgstr "Elige una opción para usar este proveedor"
 msgid "Use this account"
 msgstr "Usar esta cuenta"
 
-
 msgid "Fast"
 msgstr "Rápido"
-
 
 msgid "Effort"
 msgstr "Esfuerzo"
 
-
 msgid "Uses priority processing and may use more quota."
 msgstr "Usa procesamiento prioritario y puede consumir más cuota."
-
 
 msgid "Could not load this account's models. Fast mode is unavailable until the catalog can be checked."
 msgstr "No se pudieron consultar los modelos de esta cuenta. El modo rápido estará disponible al verificar el catálogo."
@@ -10167,14 +10159,11 @@ msgstr "Reanudar animación"
 msgid "Results will appear here after the first run."
 msgstr "El resultado aparecerá aquí tras la primera ejecución."
 
-
 msgid "Balance unavailable"
 msgstr "No disponible"
 
-
 msgid "Contribution active"
 msgstr "Contribuyendo"
-
 
 msgid "Contribute in your browser while this page stays open."
 msgstr "Contribuye desde el navegador mientras la página esté abierta."
@@ -10815,9 +10804,6 @@ msgstr "No se pudo quitar el modelo. Detén la voz local e inténtalo de nuevo."
 msgid "Remove {name}"
 msgstr "Quitar {name}"
 
-msgid "Download {name}"
-msgstr "Descargar {name}"
-
 msgid "Transcribes on this computer and detects the language automatically."
 msgstr "Transcribe en este ordenador y detecta el idioma automáticamente."
 
@@ -11157,22 +11143,17 @@ msgstr "Mover dock de Micos"
 msgid "New Mico"
 msgstr "Nuevo Mico"
 
-
 msgid "Mycelium sprout"
 msgstr "Brote"
-
 
 msgid "Mycelium branch"
 msgstr "Rama"
 
-
 msgid "Mycelium node"
 msgstr "Nudo"
 
-
 msgid "Mycelium spore"
 msgstr "Espora"
-
 
 msgid "Mycelium colony"
 msgstr "Colonia"
@@ -11282,18 +11263,14 @@ msgstr "Leyendo archivos…"
 msgid "Updating files…"
 msgstr "Actualizando archivos…"
 
-
 msgid "Use models with your Mycellios credits. No API key needed."
 msgstr "Usa modelos con tus créditos Mycellios. No necesitas una clave API."
-
 
 msgid "Optional. Keep your own providers and choose which one to use for each Mico."
 msgstr "Es opcional. Conserva tus proveedores y elige cuál usar con cada Mico."
 
-
 msgid "External models include the 4% Mycellios service fee in the displayed price."
 msgstr "El precio mostrado de los modelos externos incluye el 4 % de servicio Mycellios."
-
 
 msgid "Connect Mycellios"
 msgstr "Conectar Mycellios"
@@ -11841,7 +11818,6 @@ msgstr "Conectar cuenta"
 msgid "Connect your Mycellios account to see your balance."
 msgstr "Conecta tu cuenta de Mycellios para ver el saldo."
 
-
 #: src/pages/settings/DeviceVoiceSettings.tsx
 msgid "Dictation model"
 msgstr "Modelo de dictado"
@@ -12223,3 +12199,15 @@ msgstr "Reconectando con el servidor…"
 
 msgid "Could not load models"
 msgstr "No se han podido cargar los modelos"
+
+msgid "Update Mycellios Android to configure native notifications."
+msgstr "Actualiza Mycellios Android para configurar las notificaciones nativas."
+
+msgid "Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device."
+msgstr "Los avisos nativos de Android usan Firebase y abren el chat correspondiente. Activa el permiso del sistema para registrar este dispositivo."
+
+msgid "Firebase must be configured in the Android app and on the server before native push can be enabled."
+msgstr "Hay que configurar Firebase en la app de Android y en el servidor antes de activar el push nativo."
+
+msgid "Android push is not configured on this server."
+msgstr "Este servidor no tiene configurado el push de Android."

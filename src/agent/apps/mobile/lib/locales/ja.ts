@@ -1,4 +1,9 @@
 export const JA_MESSAGES: Record<string, string> = {
+  "Push notifications": "プッシュ通知",
+  "Enable notifications": "通知を有効にする",
+  "Enabling…": "有効化中…",
+  "Allow this device to receive alerts when the app is in the background.": "アプリがバックグラウンドにあるときも、この端末で通知を受け取れるようにします。",
+  "Registration requested. Check your system notification settings.": "登録をリクエストしました。システムの通知設定を確認してください。",
   "Check agent engines on server": "サーバー上のエージェントエンジンを確認",
   "Find local models on server": "サーバー上のローカルモデルを探す",
   "Local discovery is available to the server owner.": "ローカル検索はサーバーの所有者が利用できます。",

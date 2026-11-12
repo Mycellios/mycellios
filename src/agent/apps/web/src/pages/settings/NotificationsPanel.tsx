@@ -8,7 +8,7 @@ import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { rpc } from "../../lib/rpc";
 import { enableWebPush, isInstalledWebApp, notificationClientId, pushSupported } from "../../lib/web-push";
 import { desktopBridge } from "../../lib/desktop";
-import { isAndroidHost } from "../../lib/android-host";
+import { androidNotificationRequest, isAndroidHost, type AndroidNotificationStatus } from "../../lib/android-host";
 import { notificationEnvironment } from "../../lib/notification-environment";
 import { requestBrowserNotificationPermission, showSystemNotification } from "../../lib/browser-notifications";
 import { rememberNotificationSettings } from "../../lib/account-notifications";
@@ -42,14 +42,29 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
   const accountPaused = Boolean(push?.settings.mutedUntil && Date.parse(push.settings.mutedUntil) > now);
   const native = desktopBridge()?.notifications;
   const [nativeStatus, setNativeStatus] = useState<{ supported: boolean; settingsAvailable: boolean }>();
+  const android = isAndroidHost();
+  const [androidStatus, setAndroidStatus] = useState<AndroidNotificationStatus>();
+  const [androidServer, setAndroidServer] = useState<boolean | null>(null);
   const [permission, setPermission] = useState(() => typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const environment = notificationEnvironment({ userAgent: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints,
     secure: window.isSecureContext, installed: isInstalledWebApp(), push: pushSupported(), androidHost: isAndroidHost(), nativeDesktop: Boolean(desktopBridge()) });
   useEffect(() => {
     let disposed = false;
-    const sync = () => { setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission); void native?.status().then(state => { if (!disposed) setNativeStatus(state); }).catch(() => undefined); };
+    const sync = () => { if (!android) setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission); void native?.status().then(state => { if (!disposed) setNativeStatus(state); }).catch(() => undefined); };
     sync(); window.addEventListener("focus", sync); return () => { disposed = true; window.removeEventListener("focus", sync); };
-  }, [native]);
+  }, [native, android]);
+  useEffect(() => {
+    if (!android || !scope) return;
+    let disposed = false;
+    const sync = async () => {
+      try {
+        const [status, service] = await Promise.all([androidNotificationRequest("status", { accountId: scope }), rpc.notifications.androidStatus()]);
+        if (!disposed) { setAndroidStatus(status); setPermission(status.permission); setAndroidServer(service.configured); }
+      } catch { if (!disposed) setError(t`Update Mycellios Android to configure native notifications.`); }
+    };
+    void sync(); window.addEventListener("focus", sync); window.addEventListener("mycellios:notifications-changed", sync);
+    return () => { disposed = true; window.removeEventListener("focus", sync); window.removeEventListener("mycellios:notifications-changed", sync); };
+  }, [android, scope]);
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
@@ -98,7 +113,7 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
     const next = { ...push.settings.bots }; if (level === null) delete next[botId]; else next[botId] = level;
     void saveAccount({ bots: next });
   };
-  const canTest = nativeStatus?.supported || permission === "granted";
+  const canTest = nativeStatus?.supported || permission === "granted" && (!android || androidStatus?.registered);
   return <div className="rk-general-settings space-y-6">
     <SettingsGroup title={<span className="flex flex-wrap items-center gap-2">{t`What to notify you about`}<span className="rounded-full bg-accent px-2 py-0.5 text-xs font-normal">{t`All my devices`}</span></span>}>
       {!push ? <div className="px-4 py-3" role={loadError ? "alert" : "status"}>{loadError ? <>{t`Could not load account notification settings.`} <Button size="sm" variant="outline" onClick={() => setRetry(v => v + 1)}>{t`Retry`}</Button></> : t`Loading…`}</div> : <>
@@ -128,15 +143,24 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
         description={t`Hide previews to keep message content out of system notifications.`}
         control={<Switch id={`${id}-preview`} data-testid="notification-preview" checked={value.preview} disabled={!value.enabled || busy !== null} onCheckedChange={preview => save({ preview })} />} />
       <SettingsRow label={t`Test notification`} description={t`Request a notification now. Focus mode or Do Not Disturb may silence it.`}
-        control={<>{nativeStatus?.settingsAvailable && <Button variant="ghost" size="sm" disabled={busy !== null}
+        control={<>{android && <Button variant="ghost" size="sm" disabled={busy !== null} onClick={() => void action("system", async () => { await androidNotificationRequest("settings"); })}>{t`Open system notification settings`}</Button>}{nativeStatus?.settingsAvailable && <Button variant="ghost" size="sm" disabled={busy !== null}
           onClick={() => void action("system", async () => { if (!await native?.openSettings()) throw Error("Settings unavailable"); })}>{t`Open system notification settings`}</Button>}
           <Button variant="outline" size="sm" disabled={!canTest || !value.enabled || busy !== null} onClick={() => void action("test", async () => {
-            await showSystemNotification("Mycellios", t`If you can see this alert, system notifications are enabled.`, "mycellios-settings-test", "/app", value.sound);
+            if (android) await androidNotificationRequest("test", { accountId: scope });
+            else await showSystemNotification("Mycellios", t`If you can see this alert, system notifications are enabled.`, "mycellios-settings-test", "/app", value.sound);
             if (activeScope.current === scope) setMessage(t`Test requested. Check your notification center; system focus or Do Not Disturb may silence it.`);
           })}>{t`Send test`}</Button></>} />
-      {!nativeStatus?.supported && permission !== "granted" && <SettingsRow label={t`System permission`}
+      {!nativeStatus?.supported && (permission !== "granted" || android && !androidStatus?.registered) && <SettingsRow label={t`System permission`}
         description={permission === "denied" ? t`Allow notifications in your browser or system settings, then return here.` : t`Permission is requested only when you choose to enable notifications.`}
-        control={permission === "default" ? <Button variant="outline" size="sm" disabled={!value.enabled || busy !== null} onClick={() => void action("permission", async () => {
+        control={permission === "default" || android && permission === "granted" && !androidStatus?.registered ? <Button variant="outline" size="sm" disabled={!value.enabled || busy !== null} onClick={() => void action("permission", async () => {
+          if (android) {
+            const service = await rpc.notifications.androidStatus();
+            if (!service.configured) throw Error("Android push unavailable");
+            const status = await androidNotificationRequest("enable", { accountId: scope });
+            if (activeScope.current !== scope) return;
+            setAndroidStatus(status); setPermission(status.permission);
+            window.dispatchEvent(new Event("mycellios:notifications-changed")); return;
+          }
           const next = await requestBrowserNotificationPermission(); if (activeScope.current !== scope) return;
           setPermission(next ?? "unsupported"); if (next !== "granted") throw Error("Permission unavailable");
           if (push?.publicKey) await enableWebPush(push.publicKey, scope);
@@ -154,7 +178,7 @@ function NotificationControls({ scope, bots = [], onUpdate, onBusyChange }: Noti
     <p className="px-1 text-xs text-muted-foreground" role="status">{
       environment === "desktop" ? t`Desktop alerts work while Mycellios is running. Fully quitting the app stops delivery on this computer.` :
       environment === "ios-install" ? t`On iPhone or iPad, add Mycellios to your Home Screen and open it there to enable background notifications.` :
-      environment === "android-host" ? t`This Android build has no native background push. Install the web app from your browser for closed-app alerts.` :
+      environment === "android-host" ? androidStatus?.configured && androidServer ? t`Native Android alerts use Firebase and open the corresponding chat. Enable system permission to register this device.` : t`Firebase must be configured in the Android app and on the server before native push can be enabled.` :
       environment === "insecure" ? t`Open Mycellios over HTTPS to enable system notifications.` :
       push?.registered ? t`This device is registered for closed-app alerts. Delivery also depends on your system and network settings.` :
       push && !push.configured ? t`Background push is not configured on this server. Alerts are available only while the app is running.` : t`Enable system permission and register this device to receive background alerts.`

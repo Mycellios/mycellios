@@ -18,7 +18,7 @@ test("Cadencia opens without Desktop, analyzes synthetic media and exports befor
     contentType: "image/png",
   });
   await page.getByRole("button", { name: "Probar con la demo", exact: true }).click();
-  await expect(page.getByText("Demo sintetizada", { exact: true })).toBeVisible({
+  await expect(page.getByText("Archivo de ejemplo", { exact: true })).toBeVisible({
     timeout: 60_000,
   });
   // Native codec availability changes tiny gaps (AAC here, Opus on Linux CI).
@@ -26,8 +26,8 @@ test("Cadencia opens without Desktop, analyzes synthetic media and exports befor
   const vowel = page.locator(".cd-cut").filter({ hasText: "Posible vocal alargada" });
   await expect(vowel).toHaveCount(1);
   await expect(vowel.getByRole("checkbox")).not.toBeChecked();
-  await page.getByRole("button", { name: "Crear versión editada", exact: true }).click();
-  const download = page.getByRole("link", { name: /Descargar (MP4|WebM|M4A)/ });
+  await page.getByRole("button", { name: "Crear vídeo", exact: true }).click();
+  const download = page.getByRole("link", { name: "Descargar vídeo", exact: true });
   await expect(download).toBeVisible({ timeout: 60_000 });
   await expect.poll(() => page.locator("video").evaluate(
     video => Number.isFinite(video.duration) && video.duration < 10,

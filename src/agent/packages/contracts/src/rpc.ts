@@ -1232,6 +1232,8 @@ export const appContract = {
     bot: oc.input(botId).output(ExportManifestSchema),
   },
   notifications: {
+    androidStatus: oc.output(z.object({ configured: z.boolean() })),
+    registerAndroidPush: oc.input(z.object({ token: z.string().min(20).max(4096).regex(/^\S+$/), expectedUserId: z.string().min(1).max(160), projectId: z.string().regex(/^[a-z][a-z0-9-]{4,62}$/) })).output(z.object({ ok: z.literal(true) })),
     webStatus: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ configured: z.boolean(), publicKey: z.string().nullable(), registered: z.boolean(), settings: NotificationSettingsSchema, bots: z.array(z.object({ id: z.string(), name: z.string(), notifyOnFinish: z.boolean() })) })),
     webRegister: oc.input(z.object({ clientId: z.string().uuid(), subscription: WebPushSubscriptionSchema, expectedUserId: z.string().min(1).max(160).optional() })).output(z.object({ ok: z.literal(true) })),
     webUnregister: oc.input(z.object({ clientId: z.string().uuid() })).output(z.object({ ok: z.literal(true) })),

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { notificationPreferences, subscribeNotifications } from "./notification-preferences";
 import { rpc } from "./rpc";
 import { desktopBridge } from "./desktop";
-import { isAndroidHost } from "./android-host";
+import { androidNotificationRequest, isAndroidHost } from "./android-host";
 
 const CLIENT_KEY = "mycellios:notification-device";
 const OWNER_KEY = "mycellios:notification-owner";
@@ -147,6 +147,7 @@ export async function clearNotificationDevice() {
   serverDelivery = false;
   try { localStorage.removeItem(OWNER_KEY); } catch { /* Continue revoking worker/native delivery. */ }
   await desktopBridge()?.notifications?.clear().catch(() => undefined);
+  if (isAndroidHost()) await androidNotificationRequest("clear").catch(() => undefined);
   if (!navigator.serviceWorker) return;
   const worker = await navigator.serviceWorker.getRegistration(new URL(import.meta.env.BASE_URL, location.href));
   if (!worker) return;
@@ -191,6 +192,32 @@ export function useWebPushPresence(userId?: string) {
     const previous = previousUser.current;
     previousUser.current = userId;
     if (!userId) { if (previous) void clearNotificationDevice().catch(() => undefined); return; }
+    if (isAndroidHost()) {
+      let stopped = false;
+      const sync = async () => {
+        try {
+          const status = await androidNotificationRequest("status", { accountId: userId });
+          if (stopped) return;
+          const preferences = notificationPreferences(userId);
+          if (!preferences.enabled) {
+            if (status.registered) {
+              await androidNotificationRequest("clear", { accountId: userId });
+              if (!stopped) await rpc.notifications.unregisterPush({});
+            }
+            return;
+          }
+          if (status.registered) {
+            await androidNotificationRequest("preferences", { accountId: userId, ...preferences });
+            if (!stopped && status.permission === "granted") await androidNotificationRequest("refresh", { accountId: userId });
+          }
+        } catch { /* Settings exposes configuration/permission failures; background refresh never prompts. */ }
+      };
+      void sync();
+      const unsubscribe = subscribeNotifications(userId, () => void sync());
+      const refresh = () => void sync();
+      window.addEventListener("focus", refresh); window.addEventListener("mycellios:notifications-changed", refresh);
+      return () => { stopped = true; unsubscribe(); window.removeEventListener("focus", refresh); window.removeEventListener("mycellios:notifications-changed", refresh); };
+    }
     const owner = notificationOwner();
     const clearPreviousOwner = owner && owner !== userId ? clearWebPushBinding().catch(() => undefined) : undefined;
     let disposed = false;
