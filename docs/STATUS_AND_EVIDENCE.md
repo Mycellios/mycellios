@@ -2446,9 +2446,9 @@ remain manual-install releases; ad-hoc Mac integrity is not notarization.
 - Local focused controller/preferences/helper fixtures passed through the shared
   scheduler, including real Windows helper processes with synthetic installations.
   The 20 policy tests cover forced ownership, late acknowledgement, asynchronous
-  failure, newer-release recovery and unsupported packages. PR CI passed for each integrated fix; native
-  workspace acceptance passed for PRs #270 and #271; full suites remain
-  paused. These checks do not qualify a physical owner-session restart.
+  failure, newer-release recovery and unsupported packages. PR CI passed for each
+  integrated fix; native workspace acceptance passed for PRs #270 and #271.
+  Full suites remain paused. These checks do not qualify a physical owner-session restart.
 - PR #272 retains strict codesign verification, reports bounded error details and
   retries the identical check once only on an explicit ETIMEDOUT. Invalid signatures
   and repeated timeouts still fail. The 8 focused tests passed. A separate read-only
@@ -2476,4 +2476,3 @@ remain manual-install releases; ad-hoc Mac integrity is not notarization.
   and hash-verified locally with its Internet zone evidence retained, but not
   executed. The installed owner profile remained at 0.3.46; Windows UI automation
   returned Access denied, so that real upgrade and restart remain unverified.
-
