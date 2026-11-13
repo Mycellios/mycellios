@@ -1,26 +1,14 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import {writeStandaloneInstallerConfig} from './standalone-installer-config.mjs';
 
 // electron-builder concatenates resource arrays from package.json and API
 // options. Load one complete file instead, preserving base settings (voice
 // unpacking, platform defaults) while replacing the Windows resource layout.
 export async function writeStandaloneWindowsConfig(desktopRoot, overrides, output) {
-  const base = JSON.parse(await readFile(path.join(desktopRoot,'package.json'),'utf8')).build ?? {};
-  function merge(left,right) {
-    const result={...left};
-    for(const [key,value] of Object.entries(right)) {
-      result[key]=value && !Array.isArray(value) && typeof value==='object'
-        ? merge(left?.[key] && !Array.isArray(left[key]) ? left[key] : {},value) : value;
-    }
-    return result;
-  }
-  const configuration={...merge(base,overrides),extends:null};
-  await mkdir(output,{recursive:true});
-  const file=path.resolve(output,'windows-installer-config.json');
-  await writeFile(file,JSON.stringify(configuration,null,2));
-  return file;
+  return writeStandaloneInstallerConfig(desktopRoot,overrides,output,'windows-installer-config.json');
 }
 
 export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity }) {
