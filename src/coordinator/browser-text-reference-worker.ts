@@ -18,5 +18,6 @@ async function load(){
 parentPort!.on("message",message=>{
   if(busy)return;busy=true;
   void(async()=>{try{decoder??=load();const result=await(await decoder).generate(message.request,AbortSignal.timeout(100000));parentPort!.postMessage({id:message.id,result});}
-    catch{parentPort!.postMessage({id:message.id,error:"browser_text_reference_failed"});}finally{busy=false;}})();
+    catch(error){parentPort!.postMessage({id:message.id,error:"browser_text_reference_failed",
+      diagnostic:error instanceof Error?error.message.slice(0,1500):"unknown_reference_error"});}finally{busy=false;}})();
 });

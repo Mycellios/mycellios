@@ -97,7 +97,8 @@ try {
   }
   const executeText = hub.textHub.execute.bind(hub.textHub);
   hub.textHub.execute = async (...args) => { try { return await executeText(...args); }
-    catch(error) { diagnostics.push({reference:(error as Error).message}); throw error; } };
+    catch(error) { const cause=(error as Error).cause;
+      diagnostics.push({reference:(error as Error).message,cause:cause instanceof Error?cause.message:cause}); throw error; } };
   const errors: string[] = []; contributor.on("pageerror", error => errors.push(error.message)); buyer.on("pageerror", error => errors.push(error.message));
   const entry = "http://127.0.0.1:5198/__event_demo_real";
   await contributor.goto(entry); await expect(contributor.getByRole("textbox", { name: "Message Mico", exact: true })).toBeEnabled();
@@ -111,7 +112,9 @@ try {
   assert.equal(syntheticProviderCalls, 0);
   await buyer.getByText("Your browser in the network", { exact: true }).click();
   await buyer.getByRole("button", { name: /Test the network/ }).click();
-  await expect(buyer.getByRole("button", { name: "Real inference completed", exact: true })).toBeVisible({ timeout: 120_000 });
+  const complete = buyer.getByRole("button", { name: "Real inference completed", exact: true });
+  await expect(complete.or(buyer.getByRole("status").filter({ hasText: "No available browser completed the work." }))).toBeVisible({ timeout: 120_000 });
+  await expect(complete).toBeVisible({ timeout: 1000 });
   const after = await service.network(config.presenterSecret);
   assert.equal(after.inferences, 1); assert.ok(after.earnedMicrounits > 0);
   const rows = await db.raw.prepare(`SELECT p.account_id AS buyer,c.account_id AS contributor,p.total_microunits,

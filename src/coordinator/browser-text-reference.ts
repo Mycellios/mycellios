@@ -18,9 +18,9 @@ export class BrowserTextReference {
     worker.on("message",message=>{
       const pending=this.pending;if(!pending||message.id!==pending.id)return;
       this.pending=null;const result=browserTextResultSchema.safeParse(message.result);
-      if(!result.success)pending.reject(new Error("browser_text_reference_failed"));else pending.resolve(result.data);
+      if(!result.success)pending.reject(new Error("browser_text_reference_failed",{cause:message.diagnostic}));else pending.resolve(result.data);
     });
-    const fail=()=>{if(this.worker!==worker)return;this.worker=null;this.pending?.reject(new Error("browser_text_reference_failed"));this.pending=null;};
+    const fail=(cause:unknown)=>{if(this.worker!==worker)return;this.worker=null;this.pending?.reject(new Error("browser_text_reference_failed",{cause}));this.pending=null;};
     worker.on("error",fail);worker.on("exit",fail);this.worker=worker;
   }
   async generate(request:BrowserTextRequest,signal:AbortSignal){
