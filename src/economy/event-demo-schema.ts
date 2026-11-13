@@ -22,6 +22,11 @@ ALTER TABLE economic_demo_guests ENABLE ROW LEVEL SECURITY;
 export function eventDemoAccessSql(role: string): string {
   if (!/^[a-z_][a-z_0-9]{0,62}$/.test(role)) throw new Error("demo_runtime_role_invalid");
   return ["economic_demo_campaigns", "economic_demo_guests"].map(table => `
+    DO $access$ DECLARE r text; BEGIN
+      FOR r IN SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role') LOOP
+        EXECUTE format('REVOKE ALL ON ${table} FROM %I',r);
+      END LOOP;
+    END;$access$;
     DROP POLICY IF EXISTS demo_native_access ON ${table};
     CREATE POLICY demo_native_access ON ${table} TO "${role}" USING (true) WITH CHECK (true);
     GRANT SELECT,INSERT,UPDATE ON ${table} TO "${role}";`).join("\n");

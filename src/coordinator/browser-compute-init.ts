@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CoordinatorConfig } from "../core/config.js";
+import { eventDemoBudget } from "../core/event-demo-config.js";
 import type { MeshDatabase } from "../storage/database.js";
 import type { SupabasePersistence } from "../storage/supabase-sync.js";
 import type { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
@@ -30,7 +31,8 @@ export async function initializeBrowserCompute(app: FastifyInstance, deps: {
   });
   mobileHub.attach(app);
   const browserInference = await initializeBrowserInference(app, { database: deps.database, wallet: deps.wallet,
-    api: deps.api, hub: mobileHub, config: config.browserInference, apiEnabled: deps.apiEnabled, principal: deps.principal });
+    api: deps.api, hub: mobileHub, config: config.browserInference, apiEnabled: deps.apiEnabled, principal: deps.principal,
+    eventBudget: eventDemoBudget(config.eventDemo) });
   if (config.eventDemo) {
     if (!deps.wallet || !deps.gateway || !browserInference?.models().length)
       throw new Error("demo_requires_managed_credit_provider_and_browser_inference");

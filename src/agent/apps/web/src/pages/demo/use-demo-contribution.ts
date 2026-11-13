@@ -16,6 +16,11 @@ export function useDemoContribution(id: string, open: boolean, refresh: () => vo
     await runtime.current?.stopMobileWorker().catch(() => undefined);
     await demoApi(id).pause().catch(() => undefined);
   }, [id]);
+  useEffect(() => {
+    if (!linked) return;
+    window.addEventListener("mycellios:contribution-verified", refresh);
+    return () => window.removeEventListener("mycellios:contribution-verified", refresh);
+  }, [linked, refresh]);
   useEffect(() => () => {
     epoch.current++; unsubscribe.current?.();
     void runtime.current?.stopMobileWorker().catch(() => undefined);

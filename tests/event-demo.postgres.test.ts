@@ -28,7 +28,7 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
     endsAt: now + 3_600_000, model: "mycellios/managed/antseed/deepseek-v4-flash", cookieSecret: "a".repeat(43),
     presenterSecret: "b".repeat(43), publicOrigin: "https://demo.invalid" });
   const provider = { provider: "fictional-test", ensureFresh: vi.fn(async () => {}), catalog: () => [],
-    quote: vi.fn(() => ({ maximumUsd: "0.001", maximumMicrounits: 1042, expiresAt: Date.now() + 60_000,
+    quote: vi.fn(() => ({ maximumUsd: "0.001", maximumMicrounits: 1041, expiresAt: Date.now() + 60_000,
       body: { max_tokens: 256 }, fundingCostBasisPoints: 2 })),
     execute: vi.fn(async () => ({ receiptId: "test-receipt-" + randomUUID(), usd: "0.0001", inputTokens: 10,
       outputTokens: 5, response: { id: "test-only", model: config().model,
@@ -50,7 +50,8 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
     await sql.unsafe(`SET search_path TO ${schema}; CREATE TABLE schema_meta(version integer); INSERT INTO schema_meta VALUES(33);
       CREATE TABLE api_operator_funded_usage(usage_id text);` + contributionCreditSchemaSql + expiringPromotionSchemaSql
       + managedPurchasesSchemaSql + browserInferenceCreditsSchemaSql + eventDemoSchemaSql);
-    await sql.unsafe(`CREATE ROLE ${role} NOLOGIN; SET search_path TO ${schema}; ` + eventDemoAccessSql(role));
+    await sql.unsafe(`CREATE ROLE ${role} NOLOGIN; CREATE ROLE ${role}_guest NOLOGIN;
+      GRANT USAGE ON SCHEMA ${schema} TO ${role},${role}_guest; SET search_path TO ${schema}; ` + eventDemoAccessSql(role));
     db = await MeshDatabase.openPostgres(url!, schema);
     wallet = new ContributionCreditWallet(db, new EconomicLedger(db, { receiptSigning: {
       keyId: "test-only", privateKey: generateKeyPairSync("ed25519").privateKey } }), true);
@@ -70,7 +71,7 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
       hub as unknown as MobileComputeHub, () => now);
     await service.initialize();
   });
-  afterAll(async () => { await db?.close(); await sql.unsafe(`DROP SCHEMA ${schema} CASCADE; DROP ROLE ${role}`); await sql.end(); });
+  afterAll(async () => { await db?.close(); await sql.unsafe(`DROP SCHEMA ${schema} CASCADE; DROP ROLE ${role}; DROP ROLE ${role}_guest`); await sql.end(); });
   const enter = (nonce = randomBytes(32).toString("base64url")) => service.enter(nonce, "mobile");
   const chat = () => ({ key: randomUUID(), messages: [{ role: "user", content: "Una pregunta de prueba" }] });
   it("admits exactly the first 50 concurrent browser identities and conserves the 10 Credit grant ceiling", async () => {
@@ -94,13 +95,13 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
   it("reserves the conservative maximum, charges the actual full cost +4% once and preserves the response", async () => {
     const { guest } = await enter(); const input = chat();
     provider.execute.mockImplementationOnce(async () => {
-      expect((await wallet.summary("account", guest.accountId)).reservedMicrounits).toBe(1042);
+      expect((await wallet.summary("account", guest.accountId)).reservedMicrounits).toBe(1041);
       return { receiptId: "test-only-actual-cost", usd: "0.0001", inputTokens: 10, outputTokens: 5,
         response: { id: "test-only", model: config().model, choices: [{ index: 0, message: { role: "assistant", content: "Test only response" }, finish_reason: "stop" }] } };
     });
     const result = await service.chat(guest, input);
-    expect(result).toMatchObject({ status: "completed", response: { mycellios: { creditsMicrounits: 106, serviceFeeMicrounits: 5, fundingCostMicrounits: 1 } } });
-    expect(await service.session(guest)).toMatchObject({ creditsMicrounits: 199894, reservedMicrounits: 0 });
+    expect(result).toMatchObject({ status: "completed", response: { mycellios: { creditsMicrounits: 105, serviceFeeMicrounits: 4, fundingCostMicrounits: 1 } } });
+    expect(await service.session(guest)).toMatchObject({ creditsMicrounits: 199895, reservedMicrounits: 0 });
     expect(await service.chat(guest, input)).toEqual(result); expect(await service.recover(guest, input.key)).toEqual(result);
     expect(provider.execute).toHaveBeenCalledOnce();
     await expect(service.chat(guest, { ...input, messages: [{ role: "user", content: "Changed" }] })).rejects.toThrow("idempotency_conflict");
@@ -109,7 +110,7 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
     const { guest } = await enter(), input = chat(); provider.execute.mockRejectedValueOnce(new Error("fictional timeout"));
     expect(await service.chat(guest, input)).toMatchObject({ status: "pending_reconciliation" });
     expect(await service.chat(guest, input)).toMatchObject({ status: "pending_reconciliation" });
-    expect((await service.session(guest)).reservedMicrounits).toBe(1042);
+    expect((await service.session(guest)).reservedMicrounits).toBe(1041);
     expect(provider.execute).toHaveBeenCalledOnce();
   });
   it("expires guest admission and new work without changing the normal verified-account welcome gate", async () => {
@@ -139,9 +140,42 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
     await expect(service.networkTest(guest, randomUUID(), 1)).rejects.toThrow("demo_request_too_large");
     expect(browser.execute).not.toHaveBeenCalled();
   });
+  it("keeps the event lifetime budget separate from ordinary daily limits and preserves the global funded ceiling", async () => {
+    const first = await enter(), second = await enter();
+    await api.getOrCreateAccount("ordinary-test-user");
+    await db.raw.prepare(`INSERT INTO economic_promotional_grants
+      (id,account_id,issued_by,reason,amount_microunits,created_at,expires_at) VALUES ('ordinary-test','ordinary-test-user','test','fictional',200000,?,?)`)
+      .run(now, now + 3_600_000);
+    const policy = { campaignId: config().id, maximumMicrounits: 2000, startsAt: config().startsAt, endsAt: config().endsAt };
+    const purchases = new ManagedPurchases(db, wallet, 1000, 10_000, policy); await purchases.initialize();
+    const reserve = (accountId: string, maximumUsd: string, manager = purchases) => db.transaction(async () => {
+      const usage = await api.beginUsage(accountId, null, { model: config().model, messages: [] }, true);
+      return manager.reserve({ usageId: usage.id, accountId, key: randomUUID(), digest: "test-digest", provider: "fictional-test", model: config().model, maximumUsd });
+    });
+    await reserve(first.guest.accountId, "0.001"); // 1040: above normal daily limit, inside the separate event budget.
+    await expect(reserve(second.guest.accountId, "0.001")).rejects.toThrow("managed_operator_budget_exceeded");
+    await reserve("ordinary-test-user", "0.0005"); // 520: event work does not consume ordinary daily allowance.
+    await expect(reserve("ordinary-test-user", "0.0005")).rejects.toThrow("managed_operator_budget_exceeded");
+    const capped = new ManagedPurchases(db, wallet, 1000, 1600, policy); await capped.initialize();
+    await expect(reserve(second.guest.accountId, "0.0001", capped)).rejects.toThrow("managed_operator_budget_exceeded");
+    expect((await service.session(first.guest)).reservedMicrounits).toBe(1040);
+    expect((await service.session(second.guest)).reservedMicrounits).toBe(0);
+  });
   it("rejects mutated campaign budgets rather than changing grants on a restart", async () => {
     const replacement = new EventDemo({ ...config(), maxGuests: 49 }, db, wallet, api, {} as never, undefined, hub as unknown as MobileComputeHub);
     await expect(replacement.initialize()).rejects.toThrow("demo_campaign_configuration_changed");
+  });
+  it("denies untrusted database roles and exposes event records only through the private native policy", async () => {
+    await enter();
+    await expect(sql.begin(async tx => {
+      await tx.unsafe(`SET LOCAL ROLE ${role}_guest; SET LOCAL search_path TO ${schema}`);
+      return tx.unsafe("SELECT * FROM economic_demo_guests");
+    })).rejects.toThrow(/permission denied/);
+    const rows = await sql.begin(async tx => {
+      await tx.unsafe(`SET LOCAL ROLE ${role}; SET LOCAL search_path TO ${schema}`);
+      return tx.unsafe("SELECT ordinal FROM economic_demo_guests");
+    });
+    expect(rows).toMatchObject([{ ordinal: 1 }]);
   });
   it("enforces cookie scope, Origin, guest/model isolation, bounded bodies and presenter authorization over HTTP", async () => {
     const app = Fastify(); mountEventDemo(app, service); const base = "/mobile/v1/demo/" + config().id;

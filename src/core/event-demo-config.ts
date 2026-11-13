@@ -22,6 +22,10 @@ export const eventDemoConfigSchema = z.object({
     ctx.addIssue({ code: "custom", message: "Presenter and guest capabilities must be separate" });
 });
 export type EventDemoConfig = z.infer<typeof eventDemoConfigSchema>;
+export function eventDemoBudget(config: EventDemoConfig | undefined) {
+  return config ? { campaignId: config.id, maximumMicrounits: config.maxGuests * config.grantMicrounits,
+    startsAt: config.startsAt, endsAt: config.endsAt } : undefined;
+}
 export function readEventDemoConfig(env: NodeJS.ProcessEnv): EventDemoConfig | undefined {
   if (env.MYCELLIOS_EVENT_DEMO_ENABLED !== "true") return undefined;
   return eventDemoConfigSchema.parse(JSON.parse(env.MYCELLIOS_EVENT_DEMO_CONFIG_JSON ?? "null"));
