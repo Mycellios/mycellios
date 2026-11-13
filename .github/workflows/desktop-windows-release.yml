@@ -207,7 +207,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   publish:
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'Mycellios/mycellios'
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'Mycellios/mycellios' && vars.MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE == 'true'
     needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -46,6 +46,8 @@ def validate_manifest(m):
         raise ValueError('Source archive differs')
     a = m.get('android', {})
     asset(a.get('input'))
+    if a['input']['bytes'] >= 499_000_000:
+        raise ValueError('Android build exceeds its public download contract')
     asset(a.get('buildReceipt'))
     if a['buildReceipt']['fileName'] != 'android-build.json' or a['buildReceipt']['bytes'] > 4_000_000:
         raise ValueError('Invalid Android web receipt')
@@ -277,6 +279,8 @@ def once(config):
         web_receipt = json.loads((stage/'android-build.json').read_text())
         verify_android_web(stage/'android-build-input.apk', web_receipt, m)
         apk = sign_android(config, stage, m['android'])
+        if apk.stat().st_size >= 500_000_000:
+            raise ValueError('Signed APK exceeds its public download contract')
         verify_android_web(apk, web_receipt, m)
         for p in m['platforms']+[m['source']]:
             public_file(stage/p['fileName'], desktop/'releases'/m['version']/p['fileName'])

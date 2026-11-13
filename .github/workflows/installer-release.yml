@@ -81,7 +81,13 @@ jobs:
           pattern: desktop-*-${{ needs.admit.outputs.revision }}
           path: release-inputs
       - name: Publish only the exact qualified platform set
-        run: node scripts/publish-installer-release.mjs release-inputs
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if node scripts/publish-installer-release.mjs release-inputs; then exit 0; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep 20
+          done
   verify-promotion:
     needs: [admit, publish]
     if: needs.admit.outputs.ready == 'true'
