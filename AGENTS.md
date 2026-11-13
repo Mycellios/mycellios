@@ -209,6 +209,8 @@ These rules apply to the complete repository.
   are replaced, and verify the packaged server has no duplicate loose tree.
   Windows/Mac share `compact-resource-layout.mjs`, including the explicit native
   node_modules mapping; keep the real builder copy test for both platforms.
+  Keep extensionless Mach-O/ELF engines (including Prisma migrations) outside
+  ASAR with their complete package; executable JS scripts alone do not qualify.
   Normal releases use this common publisher, never separate Windows promotion.
   The old Windows-only publisher requires both an explicit emergency recovery
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.

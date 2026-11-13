@@ -57,3 +57,27 @@ test('real Windows Electron resolves ESM/CJS across native packages and its migr
     assert.match(stdout,/"esm":true/);assert.match(stdout,/"nativeDependency":true/);assert.match(stdout,/"exportsDenied":true/);assert.match(stdout,/"migrationCli":true/);
   }finally{await rm(f.root,{recursive:true,force:true});}
 });
+
+test('extensionless Mach-O and ELF engines stay executable outside ASAR with their package metadata',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'mycellios-unix-compact-'));
+ try{
+  const source=path.join(root,'source'),target=path.join(root,'target');
+  const files={
+   'package.json':'{"name":"fixture"}',
+   'node_modules/@prisma/engines/package.json':'{"name":"@prisma/engines"}',
+   'node_modules/@prisma/engines/schema-engine-darwin-arm64':Buffer.from('cffaedfe01020304','hex'),
+   'node_modules/@prisma/engines/LICENSE':'Engine license',
+   'node_modules/unix-tool/bin/tool':Buffer.from('7f454c4601020304','hex'),
+   'node_modules/plain/LICENSE':'Plain license',
+   'node_modules/plain/bin/cli':'#!/usr/bin/env node\nconsole.log("plain JavaScript");',
+  };
+  for(const [name,bytes] of Object.entries(files)){await mkdir(path.dirname(path.join(source,name)),{recursive:true});await writeFile(path.join(source,name),bytes);}
+  const receipt=await compactServer(source,target);
+  assert.deepEqual(receipt.nativeRoots,['node_modules/unix-tool','node_modules/@prisma/engines']);
+  for(const name of ['node_modules/@prisma/engines/schema-engine-darwin-arm64','node_modules/@prisma/engines/LICENSE','node_modules/@prisma/engines/package.json','node_modules/unix-tool/bin/tool'])
+   assert.deepEqual(await readFile(path.join(target,name)),Buffer.from(files[name]));
+  assert.equal(asar.extractFile(path.join(target,'runtime.asar'),path.normalize('node_modules/plain/bin/cli')).toString(),files['node_modules/plain/bin/cli']);
+  await assert.rejects(access(path.join(target,'node_modules/plain')));
+  assert.deepEqual(await verifyCompactServer(target),receipt);
+ }finally{await rm(root,{recursive:true,force:true});}
+});

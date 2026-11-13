@@ -1,11 +1,24 @@
 import {createRequire} from 'node:module';
-import {cp, mkdir, readdir, readFile, writeFile} from 'node:fs/promises';
+import {cp, mkdir, open, readdir, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 const require = createRequire(import.meta.url);
 const asar = require('@electron/asar');
 const binary = /\.(?:node|exe|dll|so(?:\.\d+)*|dylib|wasm)$/i;
+const unixExecutableHeaders=new Set(['7f454c46','feedface','feedfacf','cefaedfe','cffaedfe','cafebabe','bebafeca','cafebabf','bfbafeca']);
+
+async function nativeFile(root,file) {
+  if(binary.test(file))return true;
+  // Prisma's schema-engine and other Unix tools have no executable extension.
+  // Inspect their format, not execute permission (JS CLIs also have that bit).
+  if(path.posix.extname(file)!=='')return false;
+  const handle=await open(path.join(root,file),'r');
+  try{
+    const header=Buffer.alloc(4),{bytesRead}=await handle.read(header,0,4,0);
+    return bytesRead===4&&unixExecutableHeaders.has(header.toString('hex'));
+  }finally{await handle.close();}
+}
 
 async function filesIn(root) {
   const files = [];
@@ -28,7 +41,9 @@ function packageRoot(file) {
 
 export async function compactPlan(source) {
   const files = await filesIn(source);
-  const nativeRoots = [...new Set(files.filter(f=>binary.test(f)).map(packageRoot))]
+  const nativeFiles=[];
+  for(const file of files)if(await nativeFile(source,file))nativeFiles.push(file);
+  const nativeRoots = [...new Set(nativeFiles.map(packageRoot))]
     .sort((a,b)=>a.length-b.length)
     .filter((p,i,all)=>!all.slice(0,i).some(parent=>p.startsWith(parent+'/')));
   const external = file => file==='package.json' || file==='prisma.config.mjs' ||
