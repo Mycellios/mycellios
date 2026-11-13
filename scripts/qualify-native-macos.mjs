@@ -1,21 +1,19 @@
 import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
-import {mkdtemp,mkdir,writeFile,access} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import assert from 'node:assert/strict';
 import {checkPreviewSignature} from './desktop-macos/signature-check.mjs';
+import {verifyMacPackagedResources} from './macos-packaged-resources.mjs';
 if(process.platform!=='darwin'||!['arm64','x64'].includes(process.arch))throw Error('Native Mac runner required');
 const [appRoot,out]=process.argv.slice(2).map(p=>path.resolve(p));
 const binary=path.join(appRoot,'Contents/MacOS/Mycellios Desktop');
 assert.equal(execFileSync('/usr/bin/lipo',['-archs',binary],{encoding:'utf8'}).trim(),process.arch==='arm64'?'arm64':'x86_64');
 const signature=checkPreviewSignature(appRoot);
-await access(path.join(appRoot,'Contents/Resources/local-server/dist/desktop-local-entry.js'));
-await access(path.join(appRoot,'Contents/Resources/web/first-party/index.html'));
-await access(path.join(appRoot,'Contents/Resources/development-source/src/agent/apps/desktop/package.json'));
-await access(path.join(appRoot,'Contents/Resources/development-tools/npm/bin/npm-cli.js'));
 const require=createRequire(new URL('../src/agent/apps/desktop/package.json',import.meta.url));
+await verifyMacPackagedResources(appRoot,require('@electron/asar').extractFile);
 const {_electron,expect}=await import(pathToFileURL(require.resolve('@playwright/test')).href);
 for(let launch=0;launch<2;launch++){
  const profile=await mkdtemp(path.join(tmpdir(),'mycellios-macos-release-'));
