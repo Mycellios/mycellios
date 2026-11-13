@@ -13,7 +13,7 @@ const server = await createServer({ root, configFile: path.join(root, "vite.conf
   name: "isolated-builtin-provider", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
       if (!req.url?.startsWith("/__builtin_provider")) return next();
-      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/builtin-provider.tsx"></script></body></html>');
+      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en" data-theme="light"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/builtin-provider.tsx"></script></body></html>');
       res.setHeader("content-type", "text/html"); res.end(html);
     });
   },
@@ -41,7 +41,7 @@ try {
     return providers;
   }
   const providers = await open();
-  await expect(page.getByRole("button", { name: "Use my credits", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use my credits", exact: true })).toBeEnabled();
   await expect(page.getByText("No matching models", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Disconnect", exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(output, "unconfigured-light.png") });

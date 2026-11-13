@@ -241,7 +241,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 heading={editingDefault ? t`Choose the general model` : undefined}
                 catalogProviders={me ? [...sources.keys()] : undefined}
                 providerContent={name => name === "Mycellios" && !sources.get(name)?.connection ? (
-                  <ul><MycelliosProvider onConnected={async () => {
+                  <ul><MycelliosProvider embedded onConnected={async () => {
                     await Promise.all([
                       credentialsQuery.refetch(), catalogQuery.refetch(),
                       queryClient.invalidateQueries({ queryKey: queries.me.queryKey() }),

@@ -17,10 +17,12 @@ export function MycelliosProvider({
   credential,
   onConnected,
   directory = false,
+  embedded = false,
 }: {
   credential?: ModelCredential;
   onConnected: () => void | Promise<void>;
   directory?: boolean;
+  embedded?: boolean;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
@@ -45,8 +47,8 @@ export function MycelliosProvider({
           </span>
         </div>
       ) : null}
-      <div className={directory ? "px-3 pb-3 ps-10" : "px-3 py-3"}>
-        {!directory ? <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={directory ? "px-3 pb-3 ps-10" : embedded ? "px-1 py-1" : "px-3 py-3"}>
+        {!directory && !embedded ? <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[15px] font-medium">Mycellios</span>
           {connected ? (
             <span className="text-[13px] text-success">
