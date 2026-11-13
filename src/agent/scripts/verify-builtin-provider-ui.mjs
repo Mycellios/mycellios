@@ -9,7 +9,7 @@ process.env.RAKAZO_PROJECT_LOCAL = "1";
 const output = path.resolve(process.argv.find(arg => arg.startsWith("--output="))?.slice(9) ?? "builtin-provider-proof");
 await mkdir(output, { recursive: true });
 const root = path.resolve("apps/web"); process.chdir(root);
-const server = await createServer({ root, configFile: path.join(root, "vite.config.ts"), server: { host: "127.0.0.1", port: 0 }, plugins: [{
+const server = await createServer({ root, configFile: path.join(root, "vite.config.ts"), optimizeDeps: { entries: [path.join(root, "e2e/fixtures/builtin-provider.tsx")] }, server: { host: "127.0.0.1", port: 0 }, plugins: [{
   name: "isolated-builtin-provider", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
       if (!req.url?.startsWith("/__builtin_provider")) return next();
@@ -48,7 +48,7 @@ try {
   await providers.getByRole("button", { name: "ChatGPT", exact: true }).click();
   await expect(page.getByRole("option", { name: "ChatGPT", exact: true })).toBeVisible();
   await open("?connected=1");
-  await expect(page.getByRole("option", { name: /Fixture credit model/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /fixture-credit-model/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Use my credits", exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(output, "connected-light.png") });
   await page.evaluate(() => { document.documentElement.classList.add("dark"); document.documentElement.dataset.theme = "dark"; });

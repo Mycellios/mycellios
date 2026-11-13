@@ -69,6 +69,9 @@ jobs:
           cache: npm
           cache-dependency-path: src/agent/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install shared browser contract dependencies
+        working-directory: .
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run db:generate
       - name: Check owned source boundaries
         working-directory: .
