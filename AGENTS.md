@@ -205,6 +205,8 @@ These rules apply to the complete repository.
   Mac packages use the existing compact local-server/development ASAR resources;
   preserve isolated packaged-server checks and strict final-DMG verification.
   Qualify archived runtime/npm entries and the bundled source/app version match.
+  Load the native Playwright API through `electron-qualification-runtime.mjs`;
+  check its CommonJS launcher before packaging and retain actual app launches.
   Normal releases use this common publisher, never separate Windows promotion.
   The old Windows-only publisher requires both an explicit emergency recovery
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.
