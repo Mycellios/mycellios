@@ -257,6 +257,8 @@
   An asynchronously failed helper defers that release until an explicit retry or
   a newer package; never relaunch it on every idle tick. Preserve the bounded
   local handoff-error.json process receipt when PowerShell exits without logs.
+  Restart now transfers the queued policy intent to the manual controller before
+  handoff, so its failure cannot leave a second idle restart waiting or retrying.
   A pending restart is cancellable. The hidden same-user helper waits for normal
   exit, snapshots session/installation state, installs and reopens the same profile.
   Never force-stop another process, use Restart Manager shutdown or clear user data.

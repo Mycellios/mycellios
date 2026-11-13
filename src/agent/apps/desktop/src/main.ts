@@ -1358,7 +1358,7 @@ app.whenReady().then(async () => {
       throw error;
     }),
     write: raw => writePrivateFile(path.join(userDataDir, "update-preferences.json"), raw),
-    state: () => desktopUpdater.state(), download: () => desktopUpdater.download(), install: () => installUpdate(),
+    state: () => desktopUpdater.state(), download: () => desktopUpdater.download(), install: force => installUpdate(force),
     cancelInstall: () => manualDesktopUpdater?.cancelInstall() ?? Promise.resolve(desktopUpdater.state()),
     busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
     prepare: prepareRendererUpdate,
@@ -2078,7 +2078,7 @@ app.whenReady().then(async () => {
     fromUpdateWindow(event) ? desktopUpdater.download() : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.update.forceInstall", (event) =>
-    fromUpdateWindow(event) && manualDesktopUpdater ? installUpdate(true) : desktopUpdater.state(),
+    fromUpdateWindow(event) && manualDesktopUpdater ? updatePreferences!.forceInstall() : desktopUpdater.state(),
   );
   ipcMain.handle("desktop.update.install", (event) =>
     fromUpdateWindow(event) ? updatePreferences!.request("update") : desktopUpdater.state(),
