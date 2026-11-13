@@ -66,6 +66,7 @@ jobs:
           npm run build --workspace @rakazo/web -- --desktop
           npm run build --workspace @rakazo/desktop
           npm run build:local-server --workspace @rakazo/desktop
+          node node_modules/electron/install.js
           if [ '${{ matrix.arch }}' = arm64 ]; then
             npm exec --workspace @rakazo/desktop -- node scripts/package-macos.mjs --arch arm64 --runtime "$RUNNER_TEMP/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$RUNNER_TEMP/desktop-release"
           else
