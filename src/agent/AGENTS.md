@@ -46,7 +46,9 @@
   native grant and guest. Its tab header selects only its separate HttpOnly
   cookie; expiry and worker admission are enforced server-side. Guest balance and
   Play/Pause stay in the normal sidebar. Keep the visible guest heartbeat read-only
-  while SessionApp is open; never reenroll or start inference from polling. The presenter receives pseudonymous telemetry only.
+  while SessionApp is open; never reenroll or start inference from polling. The presenter receives pseudonymous telemetry only. Its live count and grid show
+  current presence or connected work, not cumulative admissions; hide stale live
+  state on read failure. Keep inference totals separate from online attendance.
   Preserve stable message IDs, read-only recovery and explicit opt-in for the
   small browser model test. Never portray managed DeepSeek chat as browser work.
   Verify event-demo client/proxy tests and actual mobile/desktop guest/presenter

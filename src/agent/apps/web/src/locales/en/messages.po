@@ -12408,3 +12408,23 @@ msgstr "Your temporary access has ended"
 #: src/App.tsx
 msgid "Sign in with your own account to keep using Mycellios."
 msgstr "Sign in with your own account to keep using Mycellios."
+
+#: src/pages/demo/Presenter.tsx
+msgid "Connected now"
+msgstr "Connected now"
+
+#: src/pages/demo/Presenter.tsx
+msgid "Generating AI"
+msgstr "Generating AI"
+
+#: src/pages/demo/Presenter.tsx
+msgid "In the app"
+msgstr "In the app"
+
+#: src/pages/demo/Presenter.tsx
+msgid "No one is connected right now."
+msgstr "No one is connected right now."
+
+#: src/pages/demo/Presenter.tsx
+msgid "Live status is unavailable. Reconnecting…"
+msgstr "Live status is unavailable. Reconnecting…"

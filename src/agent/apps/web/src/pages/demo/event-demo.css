@@ -47,7 +47,7 @@
 .event-demo-device > span:nth-child(2) { font-size: 12px; }
 .event-demo-device small { font-size: 10px; text-align: center; }
 .event-demo-device[data-connected="true"] { background: var(--accent); color: var(--foreground); }
-.event-demo-device[data-connected="true"] i { background: var(--primary); }
+.event-demo-device[data-present="true"] i { background: var(--primary); }
 .event-demo-device[data-working="true"] .event-demo-device-glyph { animation: event-demo-working 1s ease-in-out infinite alternate; }
 .event-demo-network-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; color: var(--muted-foreground); font-size: 11px; margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); }
 .event-demo-join { border-left: 1px solid var(--border); padding-left: 32px; }
