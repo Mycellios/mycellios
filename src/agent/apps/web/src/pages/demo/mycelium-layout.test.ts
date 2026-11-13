@@ -6,6 +6,7 @@ it("keeps every guest at the same bounded position across arrivals, departures a
     const point = myceliumPoint(n);
     expect(point.x).toBeGreaterThan(45); expect(point.x).toBeLessThan(955);
     expect(point.y).toBeGreaterThan(40); expect(point.y).toBeLessThan(600);
+    expect(Math.hypot(point.x - 500, point.y - 320)).toBeGreaterThan(100);
     expect(myceliumLayout([50, n, 1]).points.find(p => p.number === n)).toEqual(point);
   }
 });

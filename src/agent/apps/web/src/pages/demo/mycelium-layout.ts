@@ -6,7 +6,7 @@ const goldenAngle = Math.PI * (3 - Math.sqrt(5));
 
 // Admission ordinal owns the location. Polling, departures and input order cannot move peers.
 export function myceliumPoint(number: number): MyceliumPoint {
-  const radius = 110 + Math.sqrt(number - 1) * 46;
+  const radius = 170 + Math.sqrt(number - 1) * 38;
   const angle = number * goldenAngle - 0.8;
   return { number, x: round(500 + Math.cos(angle) * radius), y: round(320 + Math.sin(angle) * radius * .62) };
 }
