@@ -74,11 +74,12 @@ try {
   page.on("pageerror", e => errors.push(e.message));
   page.on("response", r => { if (r.url().includes("/rpc/") && r.status() >= 400) rpcFailures.push({ path: new URL(r.url()).pathname, status: r.status() }); });
   await context.addInitScript(() => { localStorage.setItem("rakazo.uiLocale", "en"); localStorage.setItem("mycellios.uiLocaleConfirmed", "en"); });
+  let presenceReads = 0;
   const guest = randomUUID(), endsAt = Date.now() + 3600_000;
   // Only the native admission authority is a fixture here; Agent auth/RPC/database/UI are real.
   await context.route("**/mobile/v1/demo/test-only-event/**", route => {
     const suffix = new URL(route.request().url()).pathname.split(event)[1];
-    if (suffix === "/session") return route.fulfill({ json: { open: true, endsAt, creditsMicrounits: 200000, guest: { number: 1, name: "Invitado 01" } } });
+    if (suffix === "/session") { presenceReads++; return route.fulfill({ json: { open: true, endsAt, creditsMicrounits: 200000, guest: { number: 1, name: "Invitado 01" } } }); }
     if (suffix === "/agent-ticket") return route.fulfill({ json: { ticket: sealEventAgentTicket(key, {
       event, guest, accountId: `demo:${event}:${guest}`, origin, issuedAt: Date.now(), endsAt, name: "Invitado 01", model,
       apiKey: "myc_live_abcdefghij_" + "a".repeat(43),
@@ -90,6 +91,7 @@ try {
   const composer = page.getByRole("combobox", { name: "Message Mico", exact: true });
   await expect(composer).toBeVisible({ timeout: 60_000 });
   await expect(composer).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Model", exact: true })).toContainText("DeepSeek V4 Flash");
   await expect(page.getByTestId("mycellios-micos")).toHaveAttribute("data-balance-status", "ready");
   await expect(page.getByTestId("mycellios-micos")).toContainText("0.2");
   assert.equal(await page.getByText("Your own Mico. No registration.", { exact: true }).count(), 0);
@@ -97,6 +99,8 @@ try {
   assert.equal(token.id, event);
   assert.ok((await context.cookies()).some(c => c.name.includes("mycellios-agent-demo") && c.httpOnly));
   await page.screenshot({ path: path.join(output, "normal-agent-desktop.png") });
+  const initialPresence = presenceReads;
+  await expect.poll(() => presenceReads, { timeout: 15_000 }).toBeGreaterThan(initialPresence);
   await composer.fill("quote markdown fixture demo-normal");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("list-a", { exact: true })).toBeVisible({ timeout: 60_000 });
@@ -106,7 +110,7 @@ try {
   await page.screenshot({ path: path.join(output, "normal-agent-mobile.png") });
   assert.deepEqual(errors, []);
   const proof = { realAgentPanel: true, realAgentApi: true, realDatabase: true, realJobExecutor: true,
-    normalThreadPersistence: true, temporaryCookie: true, registrationRequired: false, nativeAdmission: "separately qualified",
+    normalThreadPersistence: true, temporaryCookie: true, readOnlyPresenceHeartbeat: true, registrationRequired: false, nativeAdmission: "separately qualified",
     model: "scripted fixture", supplierSpend: false, modelReads, rpcFailures };
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2));
   console.log(JSON.stringify(proof));

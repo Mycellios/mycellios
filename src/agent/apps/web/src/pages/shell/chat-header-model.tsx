@@ -1,3 +1,4 @@
+import { modelDisplayName } from "../model-settings/model-display-name";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
 import { ThinkingLevelSchema, isMycelliosBaseUrl, isOpenAiCompatibleProvider, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
@@ -101,9 +102,9 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
       ?? namedCredentials.find(entry => entry.provider === choice.provider);
     const label = connection?.label ?? choice.providerLabel ?? choice.provider;
     const source = sources.get(label) ?? { label, provider: choice.provider, models: [] };
-    source.models.push({ id: choice.modelId, label: choice.modelLabel ?? choice.modelId });
+    source.models.push({ id: choice.modelId, label: modelDisplayName(choice.modelId, choice.modelLabel) });
     sources.set(label, source);
-    return { ...choice, providerLabel: label, label: `${choice.modelLabel ?? choice.modelId} (${label})` };
+    return { ...choice, modelLabel: modelDisplayName(choice.modelId, choice.modelLabel), providerLabel: label, label: `${modelDisplayName(choice.modelId, choice.modelLabel)} (${label})` };
   });
   const explorer = exploring ? sources.get(exploring) : undefined;
   const defaultKey = general ? modelOptionKey(general.provider, resolveSelectableModelId(catalog, general.provider, general.modelId)) : "";
@@ -131,10 +132,10 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const choices = editingDefault ? connected : [...chatModelChoices(
     recovery ? connected : quickChoices,
     value,
-    general ? `${inheritLabel} · ${general.label}` : inheritLabel,
+    general ? `${inheritLabel} · ${modelDisplayName(general.modelId, general.label)}` : inheritLabel,
     general?.entry?.images,
   ).filter((choice) => !selectedNativeProvider(choice.provider ?? "") && (choice.key || general || !me?.needsModel)), ...nativeChoices];
-  const label = recovery ? t`Change model` : (nativeEngine === "codex" ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? entry?.label ?? model ?? (me?.needsModel ? t`Choose a model` : t`Model`);
+  const label = recovery ? t`Change model` : (nativeEngine === "codex" ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? (model ? modelDisplayName(model, entry?.label) : undefined) ?? (me?.needsModel ? t`Choose a model` : t`Model`);
   const headerEffort = ThinkingLevelSchema.safeParse(nativeEngine === "codex" ? bot.nativeConfig?.thinkingLevel ?? nativeModel?.defaultThinkingLevel : nativeEngine ? undefined : bot.thinkingLevel);
   const effortLabel = headerEffort.success && headerEffort.data !== "off" ? thinkingLevelLabel(headerEffort.data) : null;
   const queryError = credentialsQuery.error ?? catalogQuery.error;
