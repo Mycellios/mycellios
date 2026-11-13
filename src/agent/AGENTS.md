@@ -1524,3 +1524,9 @@
   locally to bounded PCM; batches/rerank/evaluation use bounded plain text.
   Verify MycelliosCreate and mycellios-media tests. Local synthetic UI results
   do not qualify live supplier inference, actual Credits or real payments.
+
+- Desktop sidebar updates use one compact status/action row: download, progress,
+  restart, retry, or postpone an accepted restart. Keep recovery text and manual
+  download links in update settings, not stacked beneath the sidebar action.
+  Preserve native draft/call/work guards and explicit install consent; waiting
+  for those guards must not cover the chat with a full-screen update dialog.

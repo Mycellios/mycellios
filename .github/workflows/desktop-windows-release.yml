@@ -23,7 +23,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: desktop-windows-release
+  group: desktop-windows-release-${{ inputs.revision || github.sha }}
   cancel-in-progress: false
   queue: max
 jobs:

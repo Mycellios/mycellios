@@ -202,12 +202,16 @@ These rules apply to the complete repository.
   input. The active Mac workflow packages canonical Agent source and local server.
   Its pinned osx-sign 1.3.3 adapter scans binaries sequentially to avoid exhausting
   file descriptors on large bundles; review the adapter when that dependency changes.
+  Mac packages use the existing compact local-server/development ASAR resources;
+  preserve isolated packaged-server checks and strict final-DMG verification.
   Normal releases use this common publisher, never separate Windows promotion.
   The old Windows-only publisher requires both an explicit emergency recovery
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.
+  Stable `/downloads/desktop/latest/<platform>` links resolve the current verified
+  catalog without caching an old installer in the web page.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
-  pinned published native baseline, source provenance, explicit runtime pairing
+  current-source Desktop builds, source provenance, hash-pinned runtime pairing
   and unsigned-preview update policy. Qualify packaging and launch on macOS;
   runner checks do not substitute for physical Mac inference evidence.
   Preview bundles use explicit ad-hoc signing, never identity:null. Require strict

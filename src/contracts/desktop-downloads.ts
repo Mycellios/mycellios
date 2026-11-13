@@ -78,3 +78,9 @@ export function isDesktopDownloadCatalog(value: unknown): value is DesktopDownlo
   const source = c.source as Record<string, unknown>;
   return safePath(source.path) && typeof source.sha256 === "string" && /^[a-f0-9]{64}$/.test(source.sha256);
 }
+
+export type DesktopLatestPlatform = DesktopDownloadCatalog["packages"][number]["id"] | "fedora-x64";
+/** Stable public routes resolve against the last verified per-platform artifact. */
+export function desktopLatestDownloadPath(platform: DesktopLatestPlatform) {
+  return `/downloads/desktop/latest/${platform}`;
+}

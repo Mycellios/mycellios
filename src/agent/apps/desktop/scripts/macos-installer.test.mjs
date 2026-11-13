@@ -26,3 +26,10 @@ test('Intel packages the current local server and excludes the incompatible ARM 
  assert.ok(config.beforePack.endsWith('verify-release.cjs'));
  await assert.rejects(prepareMacInstaller({desktopRoot:'/fixture',arch:'x64',version:'0.3.48',runtimePkg:'arm.pkg'}),/ARM/);
 });
+
+test('compact Mac resources retain development and server payloads without duplicate loose trees',async()=>{
+ const config=await prepareMacInstaller({desktopRoot:'/fixture/desktop',arch:'x64',output:'/fixture/output',version:'0.3.49',development:{source:'/fixture/source',npm:'/fixture/npm'},compact:{server:'/compact/server',source:'/compact/source.asar',npm:'/compact/npm.asar'}});
+ for(const [to,from] of [['local-server','/compact/server'],['development-source.asar','/compact/source.asar'],['development-tools/npm.asar','/compact/npm.asar']])assert.deepEqual(config.extraResources.filter(r=>r.to===to),[{to,from}]);
+ assert.equal(config.extraResources.some(r=>['local-server/node_modules','development-source','development-tools/npm'].includes(r.to)),false);
+ assert.equal(config.mac.identity,'-');assert.equal(config.mac.notarize,false);
+});

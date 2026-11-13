@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: desktop-linux-release
+  group: desktop-linux-release-${{ inputs.revision || github.sha }}
   cancel-in-progress: false
   queue: max
 jobs:
@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
+      RELEASE_REVISION: ${{ inputs.revision || github.sha }}
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
@@ -56,6 +57,7 @@ jobs:
           npm run build --workspace @rakazo/desktop
           npm run build:local-server --workspace @rakazo/desktop
           npm exec --workspace @rakazo/desktop -- node scripts/package-linux.mjs --runtime "$RUNNER_TEMP/runtime.deb" --sha256 fff304aa909775d0098e5837a3cbdb986a87cdfefa0ffcb4cedfb4d67f8d6d09 --out "$RUNNER_TEMP/desktop-release"
+          node node_modules/electron/install.js
           node -e 'require("electron")'
           electron_bin="$(node -p 'require("electron")')"
           test -x "$electron_bin"
@@ -98,7 +100,7 @@ jobs:
           sudo apt-get install -y rpm zstd
           out="$RUNNER_TEMP/desktop-release"
           version="$(node -p 'require("./src/agent/apps/desktop/package.json").version')"
-          source="$out/Mycellios-Desktop-$version-source-${GITHUB_SHA:0:8}.tar.gz"
+          source="$out/Mycellios-Desktop-$version-source-${RELEASE_REVISION:0:8}.tar.gz"
           git archive --format=tar.gz --prefix=mycellios/ --output="$source" HEAD
           export DESKTOP_SOURCE_REVISION="$(git rev-parse HEAD)"
           export DESKTOP_RELEASE_OUT="$out" DESKTOP_VERSION="$version" DESKTOP_SOURCE="$source"

@@ -132,3 +132,22 @@ to the declared version.
 - A physical Fedora upgrade driven from the settings panel (0.3.41 → next).
 - The DEB path on Debian/Ubuntu.
 - The isolated Playwright settings flow for the new labels.
+
+
+## Automatic cross-platform delivery
+
+The common `installer-release.yml` builds reviewed current main for Windows,
+Apple Silicon, Intel, Linux, Fedora and Android after proportional CI succeeds.
+All native receipts and immutable package hashes precede publication. The
+host-side publisher remains the only writer of public catalogs and retains its
+promotion lock, pointer journal, Android signing authority and public probes.
+
+`/downloads/desktop/latest/<platform>` is a read-only redirect to that qualified
+catalog. It uses no-store and the per-package version, so links advance when the
+publisher promotes a complete set without changing the web bundle. Keep the
+headless runtime routes separate.
+
+Windows and Mac previews still download in the background and ask the owner to
+approve their system installer. Official distribution certificates/notarization
+are not configured; do not enable unattended unsigned installation or remove
+OS quarantine. An older installed binary may need one initial manual upgrade.

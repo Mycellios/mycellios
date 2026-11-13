@@ -3,6 +3,17 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { eventBase, planChecks, uncoveredNativeFiles, agentAffectedTestFiles } from './ci-proportional.mjs';
 
+test('isolated native revisions do not block newer builds and common publication stays serialized',()=>{
+ const release=readFileSync('.github/workflows/installer-release.yml','utf8');
+ assert.ok(release.includes('group: installer-release-${{ github.event.workflow_run.head_sha || github.sha }}'));
+ assert.match(release,/publish:[\s\S]*?concurrency:\s+group: installer-publication\s+cancel-in-progress: false\s+queue: max/);
+ for(const platform of ['macos','linux-release','windows-release']) {
+  const workflow=readFileSync(`.github/workflows/desktop-${platform}.yml`,'utf8');
+  assert.ok(workflow.includes('${{ inputs.revision || github.sha }}'));
+  assert.ok(!workflow.includes('cancel-in-progress: true'));
+ }
+});
+
 test('transcription has real Python checks without admitting unrelated native changes', () => {
   const files = ['python/distributed_runtime/transcription_engine.py', 'python/tests/test_transcription_engine.py'];
   const plan = planChecks(files);

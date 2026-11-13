@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: installer-release
+  group: installer-release-${{ github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: false
   queue: max
 jobs:
@@ -60,6 +60,10 @@ jobs:
       revision: ${{ needs.admit.outputs.revision }}
   publish:
     needs: [admit, windows, linux, macos, android]
+    concurrency:
+      group: installer-publication
+      cancel-in-progress: false
+      queue: max
     if: needs.admit.outputs.ready == 'true'
     runs-on: ubuntu-latest
     permissions:

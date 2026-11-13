@@ -25,7 +25,7 @@ vi.mock("../lib/desktop-update-work", () => ({
 }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({ t: (strings: TemplateStringsArray) => strings[0] }), Trans: ({ children }: { children: ReactNode }) => children }));
 vi.mock("@rakazo/ui-web", () => ({ Button: (props: ComponentProps<"button">) => <button {...props} /> }));
-import { DesktopSidebarUpdate, DesktopUpdatesProvider } from "./DesktopUpdates";
+import { DesktopSidebarUpdate, DesktopUpdateSection, DesktopUpdatesProvider } from "./DesktopUpdates";
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 beforeEach(() => {
@@ -61,7 +61,7 @@ it("keeps automatic restarts cancellable in the sidebar without covering the cha
     automaticRestartAt: Date.now() + 15_000 };
   await render(); expect(gate()).toBeNull();
   expect(host.textContent).toContain("Updating shortly");
-  await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Cancel update")!.click());
+  await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Later")!.click());
   expect(bridge.cancelRestart).toHaveBeenCalledOnce(); expect(bridge.install).not.toHaveBeenCalled();
   expect(host.textContent).not.toContain("Updating shortly");
   expect(gate()).toBeNull();
@@ -73,16 +73,17 @@ it("keeps downloads and staged updates in the sidebar until the owner's explicit
   fixture.state.phase = "ready"; await refresh();
   expect(gate()).toBeNull(); expect(bridge.install).not.toHaveBeenCalled();
   await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.click());
-  expect(bridge.install).toHaveBeenCalledExactlyOnceWith(); expect(gate()).not.toBeNull();
+  expect(bridge.install).toHaveBeenCalledExactlyOnceWith(); expect(gate()).toBeNull();
   expect(host.querySelector("main")?.textContent).toBe("Chat draft");
-  await act(async () => [...gate()!.querySelectorAll("button")].find(b => b.textContent === "Cancel update")!.click());
+  await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Later")!.click());
   expect(bridge.cancelInstall).toHaveBeenCalledOnce(); expect(gate()).toBeNull();
 });
 it("leaves failures actionable without trapping the user on reopening", async () => {
   fixture.state.phase = "error"; fixture.state.message = "Download failed";
   await render(); expect(gate()).toBeNull();
   expect(host.textContent).toContain("Download failed");
-  expect(host.querySelector("a")?.href).toBe("https://www.mycellios.com/downloads/desktop");
+  expect(host.querySelector("a")).toBeNull();
+  expect(host.querySelectorAll("aside.myc-update-notice button")).toHaveLength(1);
   await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Try again")!.click());
   expect(bridge.check).toHaveBeenCalledOnce();
 });
@@ -97,9 +98,10 @@ it("waits for unsaved work and preserves explicit checkpointed restart of native
   fixture.safe = false;
   fixture.state = { ...fixture.state, installPending: true, supportsForceRestart: true, restartMode: "whenIdle", waitingFor: "local_work" };
   await render(); expect(gate()).toBeNull();
-  expect([...host.querySelectorAll("button")].find(b => b.textContent === "Cancel update")?.disabled).toBe(false);
+  expect([...host.querySelectorAll("button")].find(b => b.textContent === "Later")?.disabled).toBe(false);
   fixture.safe = true; await refresh();
-  await act(async () => [...gate()!.querySelectorAll("button")].find(b => b.textContent === "Restart now")!.click());
+  await act(async () => root.render(<DesktopUpdatesProvider><DesktopUpdateSection /></DesktopUpdatesProvider>));
+  await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Restart now")!.click());
   expect(bridge.forceInstall).toHaveBeenCalledOnce();
 });
 it("keeps audio running until the user requests restart and ends it before handoff", async () => {
@@ -123,13 +125,13 @@ it("shows an accepted idle restart and cancels its native controller", async () 
     relaunchPending: true, relaunchWaitingFor: "local_work", supportsForceRestart: true }));
   await render();
   await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.click());
-  expect(host.textContent).toContain("Waiting for local tasks and unsaved work");
-  expect(host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.textContent).toBe("Restart now");
+  expect(host.textContent).toContain("Update waiting");
+  expect(host.querySelector<HTMLButtonElement>('button[aria-label="Later"]')!.textContent).toBe("Later");
   expect(bridge.forceInstall).not.toHaveBeenCalled();
-  await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "Cancel update")!.click());
+  await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "Later")!.click());
   expect(bridge.cancelRestart).toHaveBeenCalledOnce();
   expect(bridge.cancelInstall).not.toHaveBeenCalled();
-  expect(host.textContent).not.toContain("Waiting for local tasks and unsaved work");
+  expect(host.textContent).not.toContain("Update waiting");
 });
 
 it("explains a renderer refusal and a failed native restart instead of staying silently ready", async () => {
@@ -139,5 +141,42 @@ it("explains a renderer refusal and a failed native restart instead of staying s
   fixture.state = { ...fixture.state, relaunchPending: false, relaunchError: true };
   await refresh();
   expect(host.textContent).toContain("Could not complete the update. Try again.");
-  expect(host.querySelector('button[aria-label="Install update"]')?.hasAttribute("disabled")).toBe(false);
+  expect(host.querySelector('button[aria-label="Try again"]')?.hasAttribute("disabled")).toBe(false);
+});
+
+
+it("uses a single postpone action for unsaved work without forcing a restart", async () => {
+  fixture.safe = false;
+  fixture.state = { ...fixture.state, installPending: true, waitingFor: "unsaved_work", supportsForceRestart: true };
+  await render();
+  const notice = host.querySelector("aside.myc-update-notice")!;
+  expect(notice.querySelectorAll("button")).toHaveLength(1);
+  expect(notice.querySelector("a")).toBeNull();
+  expect(notice.textContent).toContain("Save changes or finish the call to restart.");
+  await act(async () => notice.querySelector<HTMLButtonElement>("button")!.click());
+  expect(bridge.cancelInstall).toHaveBeenCalledOnce();
+  expect(bridge.install).not.toHaveBeenCalled();
+  expect(bridge.forceInstall).not.toHaveBeenCalled();
+  expect(host.querySelector("main")?.textContent).toBe("Chat draft");
+});
+
+it("does not treat a successful system-installer handoff as an error or offer it twice", async () => {
+  fixture.state = { ...fixture.state, handoffComplete: true, installAction: "system-installer" };
+  await render();
+  const notice = host.querySelector("aside.myc-update-notice")!;
+  expect(notice.hasAttribute("data-failed")).toBe(false);
+  expect(notice.textContent).toContain("Opened the system installer");
+  expect(notice.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
+  expect(notice.querySelectorAll("button")).toHaveLength(1);
+  expect(notice.querySelector("a")).toBeNull();
+});
+
+it("keeps manual download recovery in update settings instead of competing sidebar actions", async () => {
+  fixture.state = { ...fixture.state, phase: "error", message: "Download failed" };
+  await act(async () => root.render(<DesktopUpdatesProvider><DesktopSidebarUpdate /><DesktopUpdateSection /></DesktopUpdatesProvider>));
+  expect(host.querySelector("aside.myc-update-notice a")).toBeNull();
+  expect(host.querySelectorAll("aside.myc-update-notice button")).toHaveLength(1);
+  const settings = host.querySelector('[data-testid="desktop-update-settings"]')!;
+  expect(settings.textContent).toContain("Download failed");
+  expect(settings.querySelector("a")?.href).toBe("https://www.mycellios.com/downloads/desktop");
 });
