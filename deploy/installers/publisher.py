@@ -1,5 +1,5 @@
 """Promote qualified first-party installers; the Android key stays on its host."""
-import argparse, base64, copy, errno, fcntl, hashlib, json, os, re, shutil, subprocess, tempfile, urllib.request, zipfile
+import argparse, base64, copy, errno, fcntl, hashlib, json, os, re, shutil, subprocess, tempfile, time, urllib.request, zipfile
 from pathlib import Path
 
 REPO = 'Mycellios/mycellios'
@@ -196,11 +196,20 @@ def public_file(source, target):
     target.chmod(0o644)
 
 def probe_public(url, original):
-    req = urllib.request.Request(url, headers={'Range':'bytes=0-1023', 'User-Agent':'MycelliosInstallerPublisher/1'})
-    with urllib.request.build_opener(SafeRedirect()).open(req, timeout=45) as r, original.open('rb') as f:
+    with original.open('rb') as f:
         expected = f.read(1024)
-        if r.status != 206 or r.headers.get('Content-Range') != f'bytes 0-{len(expected)-1}/{original.stat().st_size}' or r.read(1025) != expected:
-            raise ValueError('Public installer bytes did not pass the download probe')
+    for attempt in range(3):
+        req = urllib.request.Request(url, headers={'Range':'bytes=0-1023', 'User-Agent':'MycelliosInstallerPublisher/1'})
+        with urllib.request.build_opener(SafeRedirect()).open(req, timeout=45) as r:
+            if r.status == 200:
+                pass  # Close an ignored Range immediately, without reading the installer.
+            elif r.status != 206 or r.headers.get('Content-Range') != f'bytes 0-{len(expected)-1}/{original.stat().st_size}' or r.read(1025) != expected:
+                raise ValueError('Public installer bytes did not pass the download probe: '+url)
+            else:
+                return
+        if attempt < 2:
+            time.sleep(1)
+    raise ValueError('Public installer ignored Range after 3 attempts: '+url)
 
 def sign_android(config, stage, a):
     jar, keys = Path(config['signerJar']), Path(config['signingKeys'])

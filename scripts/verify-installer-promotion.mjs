@@ -1,7 +1,10 @@
 import {readFile} from 'node:fs/promises';import {execFileSync} from 'node:child_process';
 import {platformVersions} from './installer-version.mjs';
+import {verifyPublicInstallerRange} from './installer-public-probe.mjs';
 const versions=platformVersions(JSON.parse(await readFile('src/agent/apps/desktop/package.json','utf8')).version);
-const revision=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+const revision=process.env.MYCELLIOS_PUBLISHED_REVISION||execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+if(!/^[a-f0-9]{40}$/.test(revision))throw Error('Invalid published source revision');
+execFileSync('git',['merge-base','--is-ancestor',revision,'HEAD']);
 const base='https://www.mycellios.com';
 const request=async url=>{const r=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(15000)});if(!r.ok)throw Error('Release surface not available');return r;};
 const manifest=await(await request(`https://github.com/Mycellios/mycellios/releases/download/desktop-v${versions.desktop}-windows-preview/installer-release.json`)).json();
@@ -19,8 +22,6 @@ while(Date.now()<until){
 }
 if(!admitted)throw Error('Public promotion deadline exceeded; previous catalog is retained');
 for(const file of admitted){
- if(typeof file.path!=='string'||!file.path.startsWith('/downloads/'))throw Error('Invalid download route');
- const r=await fetch(base+file.path,{headers:{Range:'bytes=0-1023'},signal:AbortSignal.timeout(30000)});
- if(r.status!==206||r.headers.get('content-range')!==`bytes 0-1023/${file.bytes}`||(await r.arrayBuffer()).byteLength!==1024)throw Error('Actual public download failed');
+ await verifyPublicInstallerRange(file);
 }
 console.log(JSON.stringify({published:true,revision,desktop:versions.desktop,android:versions.android,verifiedDownloads:admitted.length,physicalDeviceInstallation:false}));
