@@ -4,7 +4,9 @@ on:
     paths:
       - "src/coordinator/event-demo*.ts"
       - "src/coordinator/browser-compute-init.ts"
-      - "src/core/event-demo-config.ts"
+      - "src/core/event-demo*.ts"
+      - "src/agent/apps/api/src/event-demo-agent*.ts"
+      - "src/agent/apps/web/src/lib/event-demo-agent*.ts"
       - "src/economy/event-demo-schema.ts"
       - "src/economy/managed-event-budget.ts"
       - "src/economy/managed-purchases.ts"
@@ -50,6 +52,15 @@ jobs:
       - name: Install the existing browser workspace
         run: npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
       - run: npm run db:generate --prefix src/agent
+      - name: Exercise the real Agent authentication, temporary spaces and expiry without suppliers
+        working-directory: src/agent
+        env:
+          VERIFY_DATABASE: "1"
+          DATABASE_URL: postgres://postgres:ephemeral_demo_fixture@127.0.0.1:5432/postgres
+          DATABASE_MIGRATION_URL: postgres://postgres:ephemeral_demo_fixture@127.0.0.1:5432/postgres
+        run: |
+          npm exec -- prisma db push --config packages/db/prisma.config.ts
+          npm exec -- vitest run apps/api/src/event-demo-agent.postgres.test.ts apps/web/src/lib/event-demo-agent.test.ts
       - name: Install the real browser
         working-directory: src/agent
         run: npm exec -- playwright install --with-deps chromium

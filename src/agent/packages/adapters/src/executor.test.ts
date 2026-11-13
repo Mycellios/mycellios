@@ -2798,6 +2798,7 @@ description: Prepare standup notes
 
         findUnique: vi.fn(async () => ({
           id: "run-1",
+          userId: "user-1",
           botId: "bot-1",
           status: "queued",
           checkpoint: "takeover-skipped",
@@ -2864,6 +2865,7 @@ description: Prepare standup notes
 
         findUnique: vi.fn(async () => ({
           id: "run-1",
+          userId: "user-1",
           botId: "bot-1",
           status: "waiting_takeover",
           checkpoint: null,
@@ -2928,6 +2930,7 @@ description: Prepare standup notes
 
         findUnique: vi.fn(async () => ({
           id: "run-1",
+          userId: "user-1",
           botId: "bot-1",
           status: "waiting_takeover",
           checkpoint: null,

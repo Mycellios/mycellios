@@ -1,3 +1,4 @@
+import { eventAgentContext, eventAgentSpace, withEventAgentHeaders } from "./event-demo-agent";
 import { getGeneralPreferences } from "./general-preferences";
 import { shouldRestoreSavedSpace } from "./startup-space";
 import { createORPCClient, RECURSIVE_CLIENT_UNWRAP_KEYS } from "@orpc/client";
@@ -23,6 +24,7 @@ let restoreSavedSpace = shouldRestoreSavedSpace(getGeneralPreferences().restoreL
 type RpcClientContext = { spaceId?: string | null };
 
 export function selectedSpaceId(): string | null {
+  if (eventAgentContext()) return eventAgentSpace();
   const floatingSpace = typeof window === "undefined" ? undefined : window.rakazoDesktop?.chatWindow?.spaceId;
   if (floatingSpace) return floatingSpace;
   if (typeof window === "undefined" || !restoreSavedSpace) return null;
@@ -34,6 +36,7 @@ export function selectedSpaceId(): string | null {
 }
 
 export function selectSpace(id: string): boolean {
+  if (eventAgentContext()) { eventAgentSpace(id); return true; }
   const floatingSpace = typeof window === "undefined" ? undefined : window.rakazoDesktop?.chatWindow?.spaceId;
   if (floatingSpace) return id === floatingSpace;
   restoreSavedSpace = true;
@@ -51,6 +54,7 @@ export function selectSpace(id: string): boolean {
 }
 
 export function clearSpaceSelection(): void {
+  if (eventAgentContext()) return;
   if (typeof window !== "undefined" && window.rakazoDesktop?.chatWindow) return;
   try {
     window.localStorage.removeItem(SPACE_STORAGE_KEY);
@@ -64,7 +68,7 @@ export function withSpaceHeaders(
   init?: HeadersInit,
   spaceId: string | null = selectedSpaceId(),
 ): Headers {
-  const headers = new Headers(init);
+  const headers = withEventAgentHeaders(init);
   if (spaceId) headers.set("x-rakazo-space-id", spaceId);
   else headers.delete("x-rakazo-space-id");
   return headers;

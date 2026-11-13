@@ -1,3 +1,4 @@
+import { eventAgentFetch } from "./event-demo-agent";
 import { passkeyClient } from "@better-auth/passkey/client";
 import type { OrganizationClientOptions } from "better-auth/client/plugins";
 import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
@@ -13,6 +14,7 @@ export const authClient: ReactAuthClient<{
   ];
 }> = createAuthClient({
   basePath: appPath("/api/auth"),
+  fetchOptions: { customFetchImpl: eventAgentFetch },
   sessionOptions: {
     refetchInterval: 30 * 60,
     refetchOnWindowFocus: true,

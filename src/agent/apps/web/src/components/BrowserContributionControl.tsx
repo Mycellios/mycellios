@@ -1,3 +1,5 @@
+import { eventAgentContext } from "../lib/event-demo-agent";
+import { demoApi } from "../lib/event-demo";
 import { startContributionGrowth, stopContributionGrowth } from "../lib/contribution-growth";
 /// <reference types="@webgpu/types" />
 import { useEffect, useRef, useState } from "react";
@@ -40,6 +42,16 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
       pending.current = false;
     };
   }, [session.data?.user.id]);
+  useEffect(() => {
+    const demo = eventAgentContext();
+    if (!demo) return;
+    const timer = window.setTimeout(() => {
+      epoch.current++; pending.current = false; setLoading(false); stopContributionGrowth();
+      void engine.current?.stopMobileWorker().catch(() => undefined);
+      void demoApi(demo.id).pause().catch(() => undefined);
+    }, Math.max(0, demo.endsAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [session.data?.user.id]);
   const active = state?.running === true;
   const online = active && state?.connection === "online";
   const connected = online && linked;
@@ -49,7 +61,7 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
       epoch.current++;
       pending.current = false;
       setLoading(false);
-      try { await engine.current?.stopMobileWorker(); } catch { setFailed(true); }
+      try { await engine.current?.stopMobileWorker(); const demo = eventAgentContext(); if (demo) await demoApi(demo.id).pause(); } catch { setFailed(true); }
       return;
     }
     if (pending.current) return;
@@ -100,9 +112,11 @@ export function BrowserContributionControl({ mini = false }: { mini?: boolean })
       for (let attempt = 0; attempt < 3; attempt++) {
         if (stopped || generation !== epoch.current) return;
         try {
-          const result = await rpc.models.browserContributionLink({ ...proof, expectedUserId: owner }, {
-            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]),
-          });
+          const demo = eventAgentContext();
+          const result = demo ? await demoApi(demo.id).link(proof)
+            : await rpc.models.browserContributionLink({ ...proof, expectedUserId: owner }, {
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]),
+            });
           if (stopped || generation !== epoch.current) return;
           if (result.linked !== true) throw new Error("Link not confirmed");
           linkedWorker.current = key; setLinked(true); setIssue(null); return;

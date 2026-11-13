@@ -499,7 +499,7 @@ export function apiUsageJson(usage: ApiUsageRecord): Record<string, unknown> {
   };
 }
 
-function hashApiKey(token: string): string {
+export function hashApiKey(token: string): string {
   const salt = randomBytes(16);
   const digest = scryptSync(token, salt, 32);
   return `scrypt$${salt.toString("hex")}$${digest.toString("hex")}`;

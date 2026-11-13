@@ -1,3 +1,4 @@
+import { eventAgentAccess } from "./event-demo-agent-access.js";
 import { TRANSCRIPTION_MODEL } from "../contracts/transcription.js";
 import { createInferenceSettlement } from "./settle-completed-inference.js";
 import { beginContributionUsage } from "./contribution-funding.js";
@@ -922,6 +923,8 @@ export async function createCoordinator(
           error: { code: "invalid_api_key", message: "The Mycellios API key is invalid or revoked." },
         });
       }
+      if (!(await eventAgentAccess(config.eventDemo, database, principal, request)))
+        return reply.code(403).send({ error: { code: "demo_access_expired_or_unavailable" } });
       apiPrincipals.set(request, principal);
       return;
     }
@@ -4675,9 +4678,12 @@ export async function createCoordinator(
     },
   );
 
-  app.get("/v1/models", async () => {
+  app.get("/v1/models", async request => {
     const models = (await scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() }));
-    return await mycelliosModelCatalog(models, economicLedger, managedGateway, browserInference);
+    const catalog = await mycelliosModelCatalog(models, economicLedger, managedGateway, browserInference);
+    const principal = apiAccessEnabled ? principalFor(request) : { kind: "system" as const };
+    return principal.kind !== "system" && principal.userId.startsWith("demo:")
+      ? { ...catalog, data: catalog.data.filter(model => model.id === config.eventDemo?.model) } : catalog;
   });
 
   const settleCompletedInference = createInferenceSettlement({

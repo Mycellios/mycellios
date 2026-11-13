@@ -1,3 +1,4 @@
+import { eventDemoSessionActive } from "@rakazo/db";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { micoBehaviorInstructions } from "./mico-behavior.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
@@ -3744,6 +3745,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
         data: { status: "running" },
       });
       if (started.count !== 1) return;
+      if (!(await eventDemoSessionActive(deps.prisma, run.userId))) {
+        const attempt = await deps.prisma.attempt.create({ data: { runId, fence, status: "running" } });
+        await failRunBeforeTurn(deps, run, "Mico", { attemptId: attempt.id, workerId, fence }, "This temporary event has ended. No model was called.");
+        return;
+      }
       const leaseTarget = await deps.prisma.bot.findUniqueOrThrow({
         where: { id: run.botId },
         select: {
@@ -10977,9 +10983,12 @@ async function modelCreditBillingEnabled(deps: ExecutorDeps): Promise<boolean> {
 
 async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMaterial>) {
   const [deps, userId, spaceId, , provider] = args;
+  if (userId.startsWith("ed_") && (!(await eventDemoSessionActive(deps.prisma, userId))
+    || !args[3]))
+    throw new Error("Temporary event access is unavailable. No model was called.");
   const billingEnabled = await modelCreditBillingEnabled(deps);
   const scope = { userId, spaceId };
-  if (billingEnabled && (await hasHostedModelCredits(deps.prisma, scope, provider))) {
+  if (!userId.startsWith("ed_") && billingEnabled && (await hasHostedModelCredits(deps.prisma, scope, provider))) {
     args[3] = null;
     // Funded managed backups use deployment credentials just like the primary.
     args[7] = { ...args[7], requireStoredSecret: false };
@@ -10996,7 +11005,7 @@ async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMateria
     (!credential && deployment.provider === provider && deployment.hostCredentials);
   // Match Pi's OpenRouter fallback only when no explicit key overrides it.
   const runtimeKey =
-    material.apiKey === undefined && (provider === "openrouter" || provider === "scripted")
+    !userId.startsWith("ed_") && material.apiKey === undefined && (provider === "openrouter" || provider === "scripted")
       ? process.env.OPENROUTER_API_KEY
       : undefined;
   if (!material.apiKey?.trim() && !runtimeKey?.trim() && !keyless) {

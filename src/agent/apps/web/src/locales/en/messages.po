@@ -12396,3 +12396,15 @@ msgstr "Your remaining demo balance"
 #: src/pages/demo/EventDemo.tsx
 msgid "credits"
 msgstr "credits"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "We couldn't open your demo. It may have ended or all places may be taken."
+msgstr "We couldn't open your demo. It may have ended or all places may be taken."
+
+#: src/App.tsx
+msgid "Your temporary access has ended"
+msgstr "Your temporary access has ended"
+
+#: src/App.tsx
+msgid "Sign in with your own account to keep using Mycellios."
+msgstr "Sign in with your own account to keep using Mycellios."

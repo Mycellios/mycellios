@@ -17,7 +17,9 @@ These rules apply to the complete repository.
 - Registration-free event demos are separately operator-enabled and expire within
   48 hours. `EventDemo` owns at most 50 cookie-scoped guests and one expiring 0.20
   Credit grant per admission, independently of verified-account welcome/referrals.
-  Guest capabilities authorize only event routes; preserve ordinary account auth,
+  Guest cookies authorize only event routes. The optional operator-keyed Agent
+  bridge creates a separate expiring profile and restricted native model key;
+  never replace regular SSO cookies or grant verified-account rewards. Preserve
   model/output caps, real managed price/holds/receipts, private chat isolation and
   the separate read-only presenter capability. Apply `eventDemoSchemaSql` with the
   migration owner and verify `tests/event-demo.postgres.test.ts` on isolated PG.

@@ -1,3 +1,5 @@
+import { eventDemoAgentKey } from "../../../../core/event-demo-agent-ticket.js";
+import { EventDemoAgent, DEMO_AGENT_HEADER } from "./event-demo-agent.js";
 import { hostedWebHttp } from "./hosted-webs/http.js";
 import { tailnetServiceFromEnv } from "@rakazo/adapters";
 import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
@@ -276,6 +278,9 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
         })
       : new InMemoryRealtimeFanout());
   const secrets = createSecretStore(env.encryptionKey, process.env, realtime);
+  const demoAgentKey = eventDemoAgentKey();
+  const demoAgent = demoAgentKey ? new EventDemoAgent(prisma, secrets, demoAgentKey,
+    new URL(env.webOrigin).origin, new URL(env.authUrl).pathname.replace(/\/api\/auth\/?$/, "")) : undefined;
   await secrets.start();
   if (secrets.describe().capabilities.degraded)
     logger.warn("Secret storage degraded; encrypted credentials remain available");
@@ -810,8 +815,16 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   ] as const) {
     app.use(path, (_c, next) => runAsSystem(reason, next));
   }
+  app.post("/api/demo/enter", async c => {
+    if (!demoAgent) return c.json({ error: { code: "demo_agent_unavailable" } }, 503);
+    try {
+      const { cookie, ...result } = await demoAgent.enter(c.req.raw);
+      return c.json(result, 200, { "set-cookie": cookie, "cache-control": "private, no-store" });
+    } catch { return c.json({ error: { code: "demo_agent_access_required" } }, 403); }
+  });
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
     const path = new URL(c.req.url).pathname.replace("/api/auth", "");
+    if (c.req.raw.headers.has(DEMO_AGENT_HEADER)) return demoAgent ? demoAgent.auth(c.req.raw, path) : c.json(null, 401);
     if (isBlockedAuthPath(path)) {
       return c.json({ error: "Not available in version 1" }, 404);
     }
@@ -830,7 +843,8 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   });
   const requestSession = async (request: Request) => {
     // The bearer plugin turns a signed `Authorization: Bearer` into the session cookie.
-    const session = await auth.api.getSession({ headers: request.headers });
+    const session = request.headers.has(DEMO_AGENT_HEADER)
+      ? await demoAgent?.session(request) : await auth.api.getSession({ headers: request.headers });
     if (!session?.user) return null;
     const actor = await actorFromMembership(
       requireMembership(prisma, session.user.id, request.headers.get("x-rakazo-space-id")),
