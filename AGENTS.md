@@ -218,6 +218,8 @@ These rules apply to the complete repository.
   catalog without caching an old installer in the web page.
   Public download probes close cold-edge HTTP 200 responses and retry at most three
   times; only exact HTTP 206 ranges qualify. Wrong sizes or bytes remain hard failures.
+  `installer-public-health.yml` rechecks an already published integrated revision
+  with the current verifier, without rebuilding, signing or promoting installers.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   current-source Desktop builds, source provenance, hash-pinned runtime pairing

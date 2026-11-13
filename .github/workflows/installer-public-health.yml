@@ -1,0 +1,30 @@
+name: Verify published Mycellios installers
+on:
+  workflow_dispatch:
+    inputs:
+      published_revision:
+        description: Exact integrated revision of the already published native installers
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: installer-public-health-${{ inputs.published_revision }}
+  cancel-in-progress: false
+  queue: max
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - name: Verify existing qualified source, public catalogs and actual download ranges
+        env:
+          MYCELLIOS_PUBLISHED_REVISION: ${{ inputs.published_revision }}
+        run: node scripts/verify-installer-promotion.mjs
