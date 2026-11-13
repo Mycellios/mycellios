@@ -1,0 +1,77 @@
+name: Android release package
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      revision:
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+  queue: max
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      MYCELLIOS_FIREBASE_PROJECT_ID: ${{ vars.MYCELLIOS_FIREBASE_PROJECT_ID }}
+      MYCELLIOS_FIREBASE_APP_ID: ${{ vars.MYCELLIOS_FIREBASE_APP_ID }}
+      MYCELLIOS_FIREBASE_API_KEY: ${{ vars.MYCELLIOS_FIREBASE_API_KEY }}
+      MYCELLIOS_FIREBASE_SENDER_ID: ${{ vars.MYCELLIOS_FIREBASE_SENDER_ID }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.revision || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - name: Derive Android upgrade identity from the common Desktop version
+        run: node scripts/installer-version.mjs >> "$GITHUB_ENV"
+      - name: Build the exact shared application
+        run: |
+          set -euo pipefail
+          test -n "$MYCELLIOS_FIREBASE_PROJECT_ID"
+          test -n "$MYCELLIOS_FIREBASE_APP_ID"
+          test -n "$MYCELLIOS_FIREBASE_API_KEY"
+          test -n "$MYCELLIOS_FIREBASE_SENDER_ID"
+          npm ci --ignore-scripts --no-audit --no-fund
+          cd src/agent
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run db:generate
+          npm exec -- vitest run apps/web/src/lib/android-host.test.ts apps/web/src/pages/shell/reviewed-voice.test.tsx apps/web/src/pages/shell/use-android-shortcut.test.tsx --maxWorkers=2
+          APP_BASE_PATH=/agent/ npm run build --workspace @rakazo/web
+          cd ../..
+          node scripts/prepare-android-web.mjs "$RUNNER_TEMP/android-release"
+      - name: Build and test the native package without exporting its signing key
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          curl -fL --retry 2 https://downloads.gradle.org/distributions/gradle-8.13-bin.zip -o "$RUNNER_TEMP/gradle.zip"
+          echo "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78  $RUNNER_TEMP/gradle.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP/gradle"
+          mkdir -p src/agent/apps/android/app/src/main/res/drawable
+          cp src/agent/apps/web/public/mycellios/app-icon-v2-512.png src/agent/apps/android/app/src/main/res/drawable/ic_mycellios.png
+          cd src/agent/apps/android
+          "$RUNNER_TEMP/gradle/gradle-8.13/bin/gradle" testDebugUnitTest assembleRelease --no-daemon --max-workers=2
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/android-release/android-build-input.apk"
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          "$aapt" dump badging "$RUNNER_TEMP/android-release/android-build-input.apk" > "$RUNNER_TEMP/android-release/apk-badging.txt"
+          grep -q "name='com.mycellios.android'" "$RUNNER_TEMP/android-release/apk-badging.txt"
+          cd "$RUNNER_TEMP/android-release"
+          sha256sum android-build-input.apk > SHA256SUMS-android.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: desktop-android-${{ inputs.revision || github.sha }}
+          path: ${{ runner.temp }}/android-release/
+          if-no-files-found: error
+          retention-days: 14

@@ -5,8 +5,19 @@ on:
     branches: ['codex/desktop-release-*']
   workflow_dispatch:
     inputs:
+      revision:
+        type: string
+        default: ""
       expedited:
         description: Operator-requested build and startup only; installer timing and optional tests NOT RUN
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      revision:
+        type: string
+        required: true
+      expedited:
         type: boolean
         default: false
 permissions:
@@ -14,6 +25,7 @@ permissions:
 concurrency:
   group: desktop-windows-release
   cancel-in-progress: false
+  queue: max
 jobs:
   package:
     runs-on: windows-2025
@@ -26,11 +38,12 @@ jobs:
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
-      DESKTOP_EXPEDITED_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.expedited && '1' || '0' }}
+      DESKTOP_EXPEDITED_RELEASE: ${{ inputs.expedited && '1' || '0' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
+          ref: ${{ inputs.revision || github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:

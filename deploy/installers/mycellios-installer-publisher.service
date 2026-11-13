@@ -1,0 +1,21 @@
+[Unit]
+Description=Promote qualified Mycellios installers and preserve Android signing continuity
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/mycellios-installer-publisher/publisher.py --config /etc/mycellios-installer-publisher.json
+TimeoutStartSec=40min
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/srv/mycellios-installer-publisher /srv/nc-prod-data/mycellios-desktop-linux-e25994ba3a56c5bb7ab43c7b8594342ff233e09b/downloads /srv/nc-prod-data/mycellios-android-dd4bb652f09db75a73b26e60e67897b252425202/release/android /srv/mycellios-production-all-audit-20261102
+
+[Install]
+WantedBy=multi-user.target

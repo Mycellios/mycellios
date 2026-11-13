@@ -190,6 +190,16 @@ These rules apply to the complete repository.
   for cache qualification; reject other queries and preserve the pinned URL.
   `build-download-catalog-repair.mjs` builds a contract-only page repair from a
   hash-verified served baseline, retaining runtime page overlays and old assets.
+  `installer-release.yml` admits a successful current-main CI revision and builds
+  Windows, Linux, both native Mac architectures and Android from that revision.
+  A Desktop version bump owns the release; Android's versionCode is derived by
+  `installer-version.mjs`. Native receipts, immutable assets and current-main
+  comparison precede publication. `deploy/installers/publisher.py` promotes the
+  verified public release with the original host-side Android signer, a shared
+  promotion lock, a recoverable pointer journal and real public download probes.
+  Release publication is automatic; unsigned installation remains owner-approved.
+  The historical Mac `assemble.mjs` is recovery tooling, never a current release
+  input. The active Mac workflow packages canonical Agent source and local server.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   pinned published native baseline, source provenance, explicit runtime pairing

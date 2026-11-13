@@ -7,10 +7,20 @@ test('Apple Silicon packaging pins the PKG, preserves identity and keeps unsigne
   const options={desktopRoot:root,runtimePkg,runtimeSha256,output:path.join(root,'out'),version:'0.3.9'};
   const config=await prepareMacInstaller(options);
   assert.equal(config.appId,'com.mycellios.agent.desktop');assert.deepEqual(config.mac.target,[{target:'dmg',arch:['arm64']},{target:'zip',arch:['arm64']}]);
-  assert.equal(config.mac.notarize,false);assert.equal(config.mac.identity,null);assert.deepEqual(config.publish,[]);
+  assert.equal(config.mac.notarize,false);assert.equal(config.mac.identity,'-');assert.deepEqual(config.publish,[]);
   assert.equal(config.extraResources.some(r=>r.to==='contribution/mycellios-runtime.pkg'),true);assert.equal(config.extraResources.filter(r=>r.to.startsWith('licenses/')).length,3);
   assert.equal(JSON.parse(await readFile(path.join(root,'out/runtime.json'))).sha256,runtimeSha256);
   await assert.rejects(prepareMacInstaller({...options,runtimeSha256:'0'.repeat(64)}),/hash mismatch/);
   await assert.rejects(prepareMacInstaller({...options,version:'../wrong'}),/version/);
  }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('Intel packages the current local server and excludes the incompatible ARM runtime',async()=>{
+ const config=await prepareMacInstaller({desktopRoot:'/fixture/desktop',arch:'x64',output:'/fixture/output',version:'0.3.48'});
+ assert.equal(config.mac.identity,'-');assert.equal(config.mac.minimumSystemVersion,'13.0');
+ assert.deepEqual(config.mac.target,[{target:'dmg',arch:['x64']},{target:'zip',arch:['x64']}]);
+ assert.equal(config.extraResources.some(r=>r.to.startsWith('contribution/')),false);
+ assert.equal(config.extraResources.some(r=>r.to==='local-server'),true);
+ assert.ok(config.beforePack.endsWith('verify-release.cjs'));
+ await assert.rejects(prepareMacInstaller({desktopRoot:'/fixture',arch:'x64',version:'0.3.48',runtimePkg:'arm.pkg'}),/ARM/);
 });
