@@ -49,3 +49,19 @@ jobs:
           path: build/desktop-downloads/web
           if-no-files-found: error
           retention-days: 14
+  macos-signature-diagnostic:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-26-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - name: Verify the immutable published Intel DMG without installation or launch
+        run: |
+          set -euo pipefail
+          curl -fL --retry 2 --max-time 300 https://www.mycellios.com/downloads/desktop/releases/0.3.50/Mycellios-Desktop-0.3.50-macos-x64-preview.dmg -o "$RUNNER_TEMP/published-intel.dmg"
+          node scripts/desktop-macos/diagnose-public-signature.mjs "$RUNNER_TEMP/published-intel.dmg"
