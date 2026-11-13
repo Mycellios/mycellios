@@ -1,0 +1,12 @@
+[Unit]
+Description=Discover successful Mycellios installer releases automatically
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=20
+Persistent=true
+Unit=mycellios-installer-publisher.service
+
+[Install]
+WantedBy=timers.target

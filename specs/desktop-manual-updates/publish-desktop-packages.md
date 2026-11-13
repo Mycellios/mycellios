@@ -136,23 +136,18 @@ to the declared version.
 
 ## Automatic cross-platform delivery
 
-The owner now requests automatic release delivery for every Desktop platform.
-Build Windows, native Apple Silicon, native Intel and Linux from the same reviewed
-main revision and version. A Mac build must compile the current web, native host
-and local server; the old 0.3.9 input capsule is not a source for new app releases.
-Keep the independently qualified contribution runtime payloads hash-pinned.
-Publish the immutable release only after platform startup, integrity and package
-qualification; expose permanent latest URLs backed by the verified release index.
-Catalog ingestion must verify all bytes before swapping pointers, reject an older
-release and retain the prior catalogs for rollback. Preserve the separate runtime
-catalog and the legacy Desktop catalog subsets.
+The common `installer-release.yml` builds reviewed current main for Windows,
+Apple Silicon, Intel, Linux, Fedora and Android after proportional CI succeeds.
+All native receipts and immutable package hashes precede publication. The
+host-side publisher remains the only writer of public catalogs and retains its
+promotion lock, pointer journal, Android signing authority and public probes.
 
-Automatic installation defaults on only in a qualified packaged update channel.
-Windows and macOS channels require actual distribution signature verification;
-Mac also requires notarization. An unsigned/adhoc preview is never relabelled as
-signed. Linux AppImage owns its updater; DEB and RPM retain package-manager
-ownership. Missing signing credentials are an explicit release limitation, not a
-successful automatic-install qualification. Preserve saved opt-outs, native work,
-call and draft guards, visible idle-restart countdown and postponement. Browser/PWA
-updates retain their existing guarded refresh. Existing clients without an updater
-need a one-time bootstrap installer; a web redirect cannot rewrite their binaries.
+`/downloads/desktop/latest/<platform>` is a read-only redirect to that qualified
+catalog. It uses no-store and the per-package version, so links advance when the
+publisher promotes a complete set without changing the web bundle. Keep the
+headless runtime routes separate.
+
+Windows and Mac previews still download in the background and ask the owner to
+approve their system installer. Official distribution certificates/notarization
+are not configured; do not enable unattended unsigned installation or remove
+OS quarantine. An older installed binary may need one initial manual upgrade.

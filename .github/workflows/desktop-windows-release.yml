@@ -3,15 +3,21 @@ on:
   push:
     tags: ['desktop-v*.*.*-windows-preview']
     branches: ['codex/desktop-release-*']
+  workflow_dispatch:
+    inputs:
+      revision:
+        type: string
+        default: ""
+      expedited:
+        description: Operator-requested build and startup only; installer timing and optional tests NOT RUN
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       revision:
-        required: true
         type: string
-  workflow_dispatch:
-    inputs:
+        required: true
       expedited:
-        description: Operator-requested build and startup only; installer timing and optional tests NOT RUN
         type: boolean
         default: false
 permissions:
@@ -19,6 +25,7 @@ permissions:
 concurrency:
   group: desktop-windows-release
   cancel-in-progress: false
+  queue: max
 jobs:
   package:
     runs-on: windows-2025
@@ -28,19 +35,16 @@ jobs:
       revision: ${{ steps.identity.outputs.revision }}
       tag: ${{ steps.identity.outputs.tag }}
     env:
-      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
-      MYCELLIOS_SIGNED_RELEASE: ${{ secrets.WINDOWS_CSC_LINK != '' && secrets.WINDOWS_CSC_KEY_PASSWORD != '' && '1' || '0' }}
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
-      DESKTOP_EXPEDITED_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.expedited && '1' || '0' }}
+      DESKTOP_EXPEDITED_RELEASE: ${{ inputs.expedited && '1' || '0' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
-          persist-credentials: false
           ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.2
@@ -203,7 +207,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   publish:
-    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'Mycellios/mycellios'
+    if: github.event_name == 'push' && github.ref_type == 'tag' && github.repository == 'Mycellios/mycellios' && vars.MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE == 'true'
     needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 10

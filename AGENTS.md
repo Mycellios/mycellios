@@ -190,13 +190,21 @@ These rules apply to the complete repository.
   for cache qualification; reject other queries and preserve the pinned URL.
   `build-download-catalog-repair.mjs` builds a contract-only page repair from a
   hash-verified served baseline, retaining runtime page overlays and old assets.
-- Unified Desktop releases use `.github/workflows/desktop-release.yml` after actual
-  successful main validation. All platform installers and feeds must qualify before
-  publishing the immutable index; the host channel ingests every verified asset
-  before switching catalogs. Stable `/downloads/desktop/latest/<platform>` links
-  never pin the web page to an old installer. Keep signed Windows/notarized Mac
-  installation gates and native idle/draft/call/binding preservation. AppImage
-  owns its update; DEB/RPM remain system-installer managed.
+  `installer-release.yml` admits a successful current-main CI revision and builds
+  Windows, Linux, both native Mac architectures and Android from that revision.
+  A Desktop version bump owns the release; Android's versionCode is derived by
+  `installer-version.mjs`. Native receipts, immutable assets and current-main
+  comparison precede publication. `deploy/installers/publisher.py` promotes the
+  verified public release with the original host-side Android signer, a shared
+  promotion lock, a recoverable pointer journal and real public download probes.
+  Release publication is automatic; unsigned installation remains owner-approved.
+  The historical Mac `assemble.mjs` is recovery tooling, never a current release
+  input. The active Mac workflow packages canonical Agent source and local server.
+  Normal releases use this common publisher, never separate Windows promotion.
+  The old Windows-only publisher requires both an explicit emergency recovery
+  input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.
+  Stable `/downloads/desktop/latest/<platform>` links resolve the current verified
+  catalog without caching an old installer in the web page.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   current-source Desktop builds, source provenance, hash-pinned runtime pairing

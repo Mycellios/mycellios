@@ -1,16 +1,21 @@
 name: Mycellios Desktop macOS
 on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        type: string
+        default: ""
   workflow_call:
     inputs:
       revision:
-        required: true
         type: string
-  workflow_dispatch:
+        required: true
 permissions:
   contents: read
 concurrency:
-  group: desktop-macos-${{ inputs.revision || github.sha }}
+  group: desktop-macos
   cancel-in-progress: false
+  queue: max
 jobs:
   package:
     strategy:
@@ -26,73 +31,62 @@ jobs:
             machine: x86_64
             app_dir: mac
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    timeout-minutes: 50
     env:
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
-      CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-      APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
-      MYCELLIOS_SIGNED_RELEASE: ${{ secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != '' && secrets.APPLE_API_KEY_BASE64 != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' && '1' || '0' }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
-          ref: ${{ inputs.revision || github.sha }}
           persist-credentials: false
+          ref: ${{ inputs.revision || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.2
-      - name: Install locked current-source dependencies
+      - name: Retrieve only the pinned contribution runtime
         run: |
           set -euo pipefail
           test "$(uname -m)" = '${{ matrix.machine }}'
+          mkdir -p "$RUNNER_TEMP/desktop-release/evidence"
+          if [ '${{ matrix.arch }}' = arm64 ]; then
+            curl -fL --retry 2 https://www.mycellios.com/downloads/macos-arm64 -o "$RUNNER_TEMP/runtime.pkg"
+            echo "66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  $RUNNER_TEMP/runtime.pkg" | shasum -a 256 -c
+          fi
+      - name: Build current source and qualify its packaged local server
+        run: |
+          set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
-          npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
-          npm run db:generate --prefix src/agent
-      - name: Prepare notarization key when configured
-        if: env.MYCELLIOS_SIGNED_RELEASE == '1'
-        run: |
-          node --input-type=module <<'NODE'
-          import {writeFileSync} from 'node:fs';
-          const file=process.env.RUNNER_TEMP+'/AuthKey_'+process.env.APPLE_API_KEY_ID+'.p8';
-          writeFileSync(file,Buffer.from(process.env.APPLE_API_KEY_BASE64,'base64'),{mode:0o600});
-          writeFileSync(process.env.GITHUB_ENV,'APPLE_API_KEY='+file+'\n',{flag:'a'});
-          NODE
-      - name: Retrieve pinned contribution runtime for Apple Silicon
-        if: matrix.arch == 'arm64'
-        run: |
-          set -euo pipefail
-          curl -fLsS --retry 2 https://www.mycellios.com/downloads/macos-arm64 --output "$RUNNER_TEMP/runtime.pkg"
-          echo "66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  $RUNNER_TEMP/runtime.pkg" | shasum -a 256 -c
-      - name: Compile current web, native host and isolated local server
-        working-directory: src/agent
-        run: |
-          set -euo pipefail
-          node --test apps/desktop/scripts/release-continuity.test.mjs
+          cd src/agent
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run db:generate
+          node --test apps/desktop/scripts/macos-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs
           npm run build --workspace @rakazo/web -- --desktop
           npm run build --workspace @rakazo/desktop
           npm run build:local-server --workspace @rakazo/desktop
-      - name: Package the current source for this Mac architecture
-        working-directory: src/agent
+          if [ '${{ matrix.arch }}' = arm64 ]; then
+            npm exec --workspace @rakazo/desktop -- node scripts/package-macos.mjs --arch arm64 --runtime "$RUNNER_TEMP/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$RUNNER_TEMP/desktop-release"
+          else
+            npm exec --workspace @rakazo/desktop -- node scripts/package-macos.mjs --arch x64 --out "$RUNNER_TEMP/desktop-release"
+          fi
+          node apps/desktop/scripts/verify-local-server.mjs --server-root "$RUNNER_TEMP/desktop-release/${{ matrix.app_dir }}/Mycellios Desktop.app/Contents/Resources/local-server" --web-root "$RUNNER_TEMP/desktop-release/${{ matrix.app_dir }}/Mycellios Desktop.app/Contents/Resources/web"
+      - name: Qualify packaged launch and the distributed DMG signature
         run: |
           set -euo pipefail
-          out="$RUNNER_TEMP/desktop-macos-${{ matrix.arch }}"
-          if [ '${{ matrix.arch }}' = arm64 ]; then
-            node apps/desktop/scripts/package-macos-current.mjs --runtime "$RUNNER_TEMP/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$out"
-          else
-            node apps/desktop/scripts/package-macos-current.mjs --out "$out"
-          fi
-          node apps/desktop/scripts/qualify-current-macos.mjs "$out" "$(git rev-parse HEAD)"
+          out="$RUNNER_TEMP/desktop-release"
+          app="$out/${{ matrix.app_dir }}/Mycellios Desktop.app"
+          version="$(node -p 'require("./src/agent/apps/desktop/package.json").version')"
+          node scripts/qualify-native-macos.mjs "$app" "$out/evidence"
+          node scripts/desktop-macos/qualify-dmg.mjs "$app" "$out/Mycellios-Desktop-$version-macos-${{ matrix.arch }}-preview.dmg" "$out/evidence/dmg-signature.json"
+          node scripts/write-platform-release.mjs "$out" macos-${{ matrix.arch }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: desktop-macos-${{ matrix.arch }}-${{ inputs.revision || github.sha }}
           path: |
-            ${{ runner.temp }}/desktop-macos-${{ matrix.arch }}/*.dmg
-            ${{ runner.temp }}/desktop-macos-${{ matrix.arch }}/*.zip
-            ${{ runner.temp }}/desktop-macos-${{ matrix.arch }}/*.yml
-            ${{ runner.temp }}/desktop-macos-${{ matrix.arch }}/desktop-build.json
-            ${{ runner.temp }}/desktop-macos-${{ matrix.arch }}/platform-qualification.json
+            ${{ runner.temp }}/desktop-release/*.dmg
+            ${{ runner.temp }}/desktop-release/platform-release-*.json
+            ${{ runner.temp }}/desktop-release/evidence/
           if-no-files-found: error
           retention-days: 14

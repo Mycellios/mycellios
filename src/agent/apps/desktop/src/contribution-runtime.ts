@@ -22,7 +22,7 @@ export class ContributionRuntime {
   private installing = false;
   constructor(private readonly options: {
     platform: NodeJS.Platform;
-    arch?: string;
+    arch?: NodeJS.Architecture;
     resources: string;
     userData: string;
     programFiles: string;
@@ -36,8 +36,8 @@ export class ContributionRuntime {
   }) {}
 
   private supported() {
-    return ["win32", "linux", "darwin"].includes(this.options.platform)
-      && (this.options.platform !== "darwin" || (this.options.arch ?? process.arch) === "arm64");
+    return ["win32", "linux", "darwin"].includes(this.options.platform) &&
+      (this.options.platform !== "darwin" || (this.options.arch ?? process.arch) === "arm64");
   }
 
   private layout() {

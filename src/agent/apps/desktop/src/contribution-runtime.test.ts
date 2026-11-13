@@ -124,11 +124,11 @@ it("keeps Mac identity lookup separate from enrollment and never installs an unv
  await expect(manager.enroll(bundle())).rejects.toThrow("verified");expect(run).not.toHaveBeenCalled();
 });
 
-it("refuses ARM contribution setup on Intel Macs before requesting privileges", async () => {
- const f=await fixture();const run=vi.fn(async()=>0);
- const manager=new ContributionRuntime({...f.options,platform:"darwin",arch:"x64",run});
- expect((await manager.status()).supported).toBe(false);
- await expect(manager.identify()).rejects.toThrow("not available");
- await expect(manager.enroll(bundle())).rejects.toThrow("not available");
+it("blocks Intel Mac ARM contribution before installing or reading identity",async()=>{
+ const f=await fixture(),run=vi.fn(async()=>0);
+ const runtime=new ContributionRuntime({...f.options,platform:"darwin",arch:"x64",run});
+ expect((await runtime.status()).supported).toBe(false);
+ await expect(runtime.enroll(bundle())).rejects.toThrow("not available");
+ await expect(runtime.identify()).rejects.toThrow("not available");
  expect(run).not.toHaveBeenCalled();
 });

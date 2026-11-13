@@ -13,14 +13,8 @@ export interface DesktopDownloadCatalog {
     sha256: string;
     bytes: number;
     version?: string;
-    automaticUpdates?: boolean;
     source?: { path: string; sha256: string };
   }>;
-  appImage?: {
-    id: "linux-appimage-x64"; format: "AppImage"; fileName: string; path: string;
-    sha256: string; bytes: number; version: string; automaticUpdates: boolean;
-    source: { path: string; sha256: string };
-  };
   fedora?: {
     id: "fedora-x64";
     format: "RPM";
@@ -60,12 +54,6 @@ export function isDesktopDownloadCatalog(value: unknown): value is DesktopDownlo
     })()
     && typeof p.sha256 === "string" && /^[a-f0-9]{64}$/.test(p.sha256)
     && typeof p.bytes === "number" && Number.isSafeInteger(p.bytes) && p.bytes > 0;
-  if (c.appImage !== undefined) {
-    if (!c.appImage || typeof c.appImage !== "object") return false;
-    const p = c.appImage as Record<string, unknown>;
-    if (p.id !== "linux-appimage-x64" || p.format !== "AppImage" || typeof p.version !== "string" || !/^\d+\.\d+\.\d+$/.test(p.version)
-      || typeof p.automaticUpdates !== "boolean" || !safeInstaller(p, ".AppImage", p.version) || !safeSource(p.source, p.version)) return false;
-  }
   if (c.fedora !== undefined) {
     if (!c.fedora || typeof c.fedora !== "object") return false;
     const fedora = c.fedora as Record<string, unknown>;
@@ -91,7 +79,7 @@ export function isDesktopDownloadCatalog(value: unknown): value is DesktopDownlo
   return safePath(source.path) && typeof source.sha256 === "string" && /^[a-f0-9]{64}$/.test(source.sha256);
 }
 
-export type DesktopLatestPlatform = DesktopDownloadCatalog["packages"][number]["id"] | "fedora-x64" | "linux-appimage-x64";
+export type DesktopLatestPlatform = DesktopDownloadCatalog["packages"][number]["id"] | "fedora-x64";
 /** Stable public routes resolve against the last verified per-platform artifact. */
 export function desktopLatestDownloadPath(platform: DesktopLatestPlatform) {
   return `/downloads/desktop/latest/${platform}`;

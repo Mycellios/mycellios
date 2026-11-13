@@ -4,7 +4,7 @@ import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /** Apple Silicon preview: one shared UI and the pinned existing native runtime. */
-export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,output,version,arch='arm64',scriptsRoot=path.join(desktopRoot,'scripts')}) {
+export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,output,version,arch='arm64'}) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw Error('Invalid Desktop version');
   if(!['arm64','x64'].includes(arch))throw Error('Unsupported Mac architecture');
   if(arch==='x64'&&(runtimePkg||runtimeSha256))throw Error('Intel Desktop must not bundle an ARM runtime');
@@ -17,7 +17,7 @@ export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,
   if(hash.digest('hex')!==runtimeSha256)throw Error('Runtime payload hash mismatch');
   await mkdir(output,{recursive:true});const manifest=path.join(output,'runtime.json');
   await writeFile(manifest,JSON.stringify({schema:'mycellios-desktop-runtime/1',file:'mycellios-runtime.pkg',sha256:runtimeSha256},null,2));
-  contribution=[{from:path.resolve(runtimePkg),to:'contribution/mycellios-runtime.pkg'},{from:manifest,to:'contribution/runtime.json'},...['install-runtime-macos.sh','describe-runtime-macos.sh','runtime-public-status.cjs'].map(name=>({from:path.join(scriptsRoot,name),to:'contribution/'+name}))];
+  contribution=[{from:path.resolve(runtimePkg),to:'contribution/mycellios-runtime.pkg'},{from:manifest,to:'contribution/runtime.json'},...['install-runtime-macos.sh','describe-runtime-macos.sh','runtime-public-status.cjs'].map(name=>({from:path.join(desktopRoot,'scripts',name),to:'contribution/'+name}))];
   }
   const agent=path.resolve(desktopRoot,'../..');
   const repository=path.resolve(agent,'../..');

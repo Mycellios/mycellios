@@ -2,7 +2,6 @@ import { ServerDirectory } from "./server-directory.js";
 import { registerServerDirectoryIpc } from "./server-directory-ipc.js";
 import { LocalVoice, requireVoiceModelKind } from "./local-voice.js";
 import { AppBehavior } from "./app-behavior.js";
-import { automaticUpdatePolicy } from "./automatic-update-policy.js";
 import { UpdatePreferences } from "./update-preferences.js";
 import { installedFonts, validDesktopIcon } from "./appearance-settings.js";
 import { installDesktopCompanions } from "./desktop-companions.js";
@@ -16,7 +15,7 @@ import { linuxPackageKind } from "./linux-package.js";
 import { macosPackageKind } from "./macos-package.js";
 import { saveUpdateResume, restoreUpdateBinding } from "./update-resume.js";
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { LocalScriptsHost, type ScriptSession } from "./local-scripts.js";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -158,26 +157,16 @@ async function openSystemInstaller(file: string): Promise<void> {
   if (failure) throw Error(failure);
 }
 
-const automaticPolicy = (() => {
-  try { return automaticUpdatePolicy(JSON.parse(readFileSync(path.join(process.resourcesPath, "desktop-update-policy.json"), "utf8")), {
-    packaged: app.isPackaged, platform: process.platform, arch: process.arch,
-    appImage: process.env.APPIMAGE, disabled: process.env.RAKAZO_DISABLE_AUTO_UPDATE === "1",
-  }); } catch { return { enabled: false }; }
-})();
-
 const updaterEnvironment = {
   packaged: app.isPackaged,
   version: app.getVersion(),
-  disabled: !automaticPolicy.enabled || process.env.RAKAZO_DISABLE_AUTO_UPDATE === "1",
+  disabled: process.env.MYCELLIOS_AGENT_UPDATES_ENABLED !== "1" || process.env.RAKAZO_DISABLE_AUTO_UPDATE === "1",
 };
 const automaticDesktopUpdater = new DesktopUpdateController(
   updaterEnvironment,
   async () => {
     const module = await import("electron-updater");
-    const updater = (module.default ?? module).autoUpdater as unknown as ElectronAutoUpdater;
-    if (!automaticPolicy.enabled || !automaticPolicy.feedUrl || typeof updater.setFeedURL !== "function") throw Error("Automatic release channel unavailable");
-    updater.setFeedURL({ provider: "generic", url: automaticPolicy.feedUrl });
-    return updater;
+    return (module.default ?? module).autoUpdater as unknown as ElectronAutoUpdater;
   },
   undefined,
   () => {
@@ -186,7 +175,7 @@ const automaticDesktopUpdater = new DesktopUpdateController(
 );
 // Fedora RPM, Debian DEB and macOS disk images update from the same catalog as
 // Windows; AppImages and unpackaged builds own no package and get no offer.
-const catalogPackage: ManualPackageKind | null = automaticPolicy.enabled ? null :
+const catalogPackage: ManualPackageKind | null =
   process.platform === "win32" && process.arch === "x64" ? "windows-x64"
     : process.platform === "linux" && process.arch === "x64" ? linuxPackageKind(process.execPath)
       : process.platform === "darwin" ? macosPackageKind(process.arch)
@@ -852,31 +841,11 @@ async function installUpdate(force = false) {
     ...desktopUpdater.state(), message: "A local task is still running. Install the update when it finishes.",
   };
   if (!await prepareRendererUpdate()) return { ...desktopUpdater.state(), message: "Save changes or finish the call to restart." };
-  const win = mainWindow;
-  if (!win || win.isDestroyed()) return desktopUpdater.state();
-  win.setEnabled(false);
-  let state;
-  try {
-    await win.webContents.session.cookies.flushStore();
-    await win.webContents.session.flushStorageData();
-    await accountComputer?.freezeForUpdate();
-    await saveUpdateResume(app.getPath("userData"), app.getVersion(), desktopUpdater.state().availableVersion ?? app.getVersion(),
-      [...(accountComputer?.resumeBindings() ?? []), ...(cloudComputer?.resumeBindings() ?? [])]);
-    await Promise.all([accountComputer?.beginUpdate(), cloudComputer?.beginUpdate()]);
-    await hostComputer?.prepareUpdate();
-    quitting = true;
-    state = await desktopUpdater.install();
-  } catch (error) {
-    state = { ...desktopUpdater.state(), message: "The update could not be completed. Try again later." };
-    reportDesktopError(error, "desktop.update");
-  }
+  quitting = true;
+  const state = await desktopUpdater.install();
   // A failed install stays ready for retry but reports a message. Restore normal
   // window behavior while the user keeps working after that failure.
-  if (state.phase !== "ready" || state.message !== null) {
-    quitting = false;
-    if (!win.isDestroyed()) win.setEnabled(true);
-    hostComputer?.cancelUpdate(); cloudComputer?.cancelUpdate(); accountComputer?.cancelUpdate(); accountComputer?.start();
-  }
+  if (state.phase !== "ready" || state.message !== null) quitting = false;
   return state;
 }
 
@@ -1381,9 +1350,9 @@ app.whenReady().then(async () => {
   updatePreferences = new UpdatePreferences({
     packaged: app.isPackaged,
     allowed: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1" && Boolean(manualDesktopUpdater || updaterSupport(updaterEnvironment).supported),
-    // Qualified channels install when idle; native draft/call checks and user opt-outs still apply.
-    installSupported: automaticPolicy.enabled,
-    autoInstallByDefault: automaticPolicy.enabled,
+    // Unsigned previews require an explicit install; saved preferences cannot enable unattended restarts.
+    installSupported: false,
+    autoInstallByDefault: false,
     read: () => readPrivateFile(path.join(userDataDir, "update-preferences.json"), 4096).catch(error => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;

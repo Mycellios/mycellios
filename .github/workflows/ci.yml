@@ -40,6 +40,13 @@ jobs:
           name: proportional-validation-${{ github.sha }}
           path: .ci/proportional-receipt.json
           if-no-files-found: error
+      - name: Preserve the qualified download page without rebuilding it
+        if: success() && hashFiles('build/desktop-downloads/web/desktop-downloads.html') != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: desktop-downloads-${{ github.sha }}
+          path: build/desktop-downloads/web/
+          if-no-files-found: error
           retention-days: 14
       - name: Preserve the Desktop downloads page build
         if: success() && hashFiles('build/desktop-downloads/web/desktop-downloads.html') != ''

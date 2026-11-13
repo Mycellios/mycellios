@@ -13,6 +13,14 @@ test('transcription has real Python checks without admitting unrelated native ch
     ['python/distributed_runtime/decision_actor.py', 'native/unknown.cpp']);
 });
 
+test('installer publishing changes execute real signing, catalog and recovery boundaries', () => {
+ const files=['deploy/installers/publisher.py','deploy/installers/test_publisher.py'];
+ const plan=planChecks(files);
+ assert.ok(plan.some(c=>c.bin==='python3'&&c.args.includes('unittest')&&c.args.includes('deploy/installers')));
+ assert.deepEqual(uncoveredNativeFiles(files),[]);
+ assert.deepEqual(uncoveredNativeFiles(['deploy/installers/new-native.py']),['deploy/installers/new-native.py']);
+});
+
 test('documentation requires no dependency installation', () => {
   const plan = planChecks(['docs/DEVELOPMENT.md', 'AGENTS.md']);
   assert.ok(plan.some(c => c.label === 'CI policy tests'));

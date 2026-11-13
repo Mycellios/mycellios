@@ -5,7 +5,6 @@ import { withWindowsCopyRetry } from './windows-copy-retry.mjs';
 import { stageDevelopmentResources } from './development-resources.mjs';
 import { stageCompactResources, verifyCompactServer } from './compact-resources.mjs';
 import { prepareWindowsInstaller, writeStandaloneWindowsConfig } from './windows-installer.mjs';
-import {writeUpdatePolicy} from './update-policy.mjs';
 import { writeBuildIdentity } from './desktop-release.mjs';
 import { writeWindowsPayloadBlockmap } from './windows-payload-blockmap.mjs';
 
@@ -16,14 +15,10 @@ const runtimeSha256 = argument('--sha256');
 if (!runtimeMsi || !runtimeSha256) throw new Error('Use --runtime <verified MSI> --sha256 <pinned hash>');
 const version = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
 const output = argument('--out') ?? path.join(root, 'release');
-const signed=process.env.MYCELLIOS_SIGNED_RELEASE==='1';
-if(signed&&(!process.env.CSC_LINK||!process.env.CSC_KEY_PASSWORD))throw Error('Signed Windows release requires its distribution certificate');
-const buildIdentity = await writeBuildIdentity(root, output,'windows-x64',signed);
+const buildIdentity = await writeBuildIdentity(root, output);
 const development = await stageDevelopmentResources(root);
 const compact = await stageCompactResources(root, development, output);
 const config = await prepareWindowsInstaller({ desktopRoot: root, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity });
-config.extraResources.push(await writeUpdatePolicy(output,'win32','x64',signed));
-if(signed){config.forceCodeSigning=true;config.win.signExecutable=true;}
 const configFile = await writeStandaloneWindowsConfig(root,config,output);
 await withWindowsCopyRetry(async () => {
   const { Arch, build, Platform } = await import('electron-builder');
