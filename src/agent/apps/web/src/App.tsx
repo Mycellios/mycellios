@@ -20,7 +20,7 @@ import { LoadingState } from "./components/ai/primitives";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PageLoading } from "./components/PageLoading";
 import { SubscriptionGate } from "./components/SubscriptionGate";
-import { appRoute } from "./lib/app-path";
+import { appPath, appRoute } from "./lib/app-path";
 import { authClient } from "./lib/auth";
 import { getTicketBoardEnabled, subscribeTicketBoardEnabled } from "./lib/bootstrap";
 import { desktopBridge } from "./lib/desktop";
@@ -102,7 +102,7 @@ function EventAccessEnded() {
   return <main className="grid h-dvh place-items-center bg-background p-6 text-center"><div className="max-w-sm space-y-4">
     <h1 className="text-xl font-medium">{t`Your temporary access has ended`}</h1>
     <p className="text-sm text-muted-foreground">{t`Sign in with your own account to keep using Mycellios.`}</p>
-    <Button onClick={() => { leaveEventAgent(); window.location.assign(window.location.pathname.replace(/\/app(?:\/.*)?$/, "/sign-in")); }}>{t`Sign in`}</Button>
+    <Button onClick={() => { leaveEventAgent(); window.location.assign(appPath("/sign-in")); }}>{t`Sign in`}</Button>
   </div></main>;
 }
 

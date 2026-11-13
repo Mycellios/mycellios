@@ -824,7 +824,7 @@ async function buildApp(overrides: CreateAppOverrides): Promise<AppHandles> {
   });
   app.on(["GET", "POST"], "/api/auth/*", async (c) => {
     const path = new URL(c.req.url).pathname.replace("/api/auth", "");
-    if (c.req.header(DEMO_AGENT_HEADER)) return demoAgent ? demoAgent.auth(c.req.raw, path) : c.json(null, 401);
+    if (c.req.raw.headers.has(DEMO_AGENT_HEADER)) return demoAgent ? demoAgent.auth(c.req.raw, path) : c.json(null, 401);
     if (isBlockedAuthPath(path)) {
       return c.json({ error: "Not available in version 1" }, 404);
     }

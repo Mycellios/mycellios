@@ -52,6 +52,7 @@ it.skipIf(process.env.VERIFY_DATABASE !== "1" || !process.env.DATABASE_URL)("ope
     expect((await request("/api/auth/sign-up/email", {}, headers)).status).toBe(403);
     const absent = await app.app.request("/api/auth/get-session", { headers: { cookie: personalCookie, "x-mycellios-demo-event": event } });
     expect(await absent.json()).toBeNull();
+    expect(await (await app.app.request("/api/auth/get-session", { headers: { cookie: personalCookie, "x-mycellios-demo-event": "" } })).json()).toBeNull();
     expect((await request("/api/demo/enter", { ticket: sealed }, { origin: "https://hostile.invalid" })).status).toBe(403);
     await runAsSystem("test temporary event persistence", async () => {
       expect(await app.prisma.bot.count({ where: { userId: guestSession.user.id } })).toBe(1);
