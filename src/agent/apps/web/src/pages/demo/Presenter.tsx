@@ -25,6 +25,7 @@ export function DemoPresenter({ id }: { id: string }) {
     void refresh(); const timer = window.setInterval(() => { void refresh(); }, 2000);
     return () => { stopped = true; clearInterval(timer); };
   }, [api]);
+  const devices = network?.open && !failed ? network.devices.filter(device => device.present || device.connected || device.working) : [];
   return <main className="event-demo event-demo-presenter">
     <header className="event-demo-header"><div className="event-demo-brand"><BotAvatar color={MICO_PRIMARY_AVATAR} size={34} /><span>Mycellios</span></div>
       <span className="event-demo-live" data-online={!failed && Boolean(network)}><span />{failed ? t`Connection interrupted` : t`Live`}</span></header>
@@ -33,17 +34,17 @@ export function DemoPresenter({ id }: { id: string }) {
         <p>{t`Scan. Ask Mico. Press Play to join the network.`}</p></div>
         {!network ? <div className="event-demo-empty" role={failed ? "alert" : "status"}>
           {failed ? t`Open your presenter link to see this event.` : <><LoaderCircle className="animate-spin motion-reduce:animate-none" />{t`Connecting…`}</>}</div>
-          : <><dl className="event-demo-stats"><div><dt>{t`Guests`}</dt><dd>{network.joined}<small> / {network.maxGuests}</small></dd></div>
-            <div><dt>{t`In the network`}</dt><dd>{network.connected}</dd></div>
+          : <><dl className="event-demo-stats"><div><dt>{t`Connected now`}</dt><dd data-testid="demo-present-count">{failed ? "—" : devices.length}</dd></div>
+            <div><dt>{t`Generating AI`}</dt><dd data-testid="demo-compute-count">{failed ? "—" : network.connected}</dd></div>
             <div><dt>{t`Verified inference`}</dt><dd>{network.inferences}</dd></div></dl>
             {!network.open && <p className="event-demo-notice">{t`This event is closed.`}</p>}
-            {failed && <p className="event-demo-notice" role="status">{t`Connection interrupted. Showing the last confirmed state.`}</p>}
+            {failed && <p className="event-demo-notice" role="status">{t`Live status is unavailable. Reconnecting…`}</p>}
             <div className="event-demo-devices" aria-label={t`Event devices`} aria-live="polite">
-              {!network.devices.length && <div className="event-demo-empty"><BotAvatar color={MICO_PRIMARY_AVATAR} size={78} /><p>{t`Your guests will appear here as they join.`}</p></div>}
-              {network.devices.map(device => {
+              {!failed && !devices.length && <div className="event-demo-empty"><BotAvatar color={MICO_PRIMARY_AVATAR} size={78} /><p>{t`No one is connected right now.`}</p></div>}
+              {devices.map(device => {
                 const Icon = device.kind === "mobile" ? Smartphone : device.kind === "tablet" ? Tablet : Laptop;
-                const state = device.working ? t`Running inference` : device.connected ? t`Available for inference` : device.present ? t`Chatting` : t`Disconnected`;
-                return <div className="event-demo-device" data-connected={device.connected} data-working={device.working} key={device.number} title={state}>
+                const state = device.working ? t`Running inference` : device.connected ? t`Available for inference` : t`In the app`;
+                return <div className="event-demo-device" data-present="true" data-connected={device.connected} data-working={device.working} key={device.number} title={state}>
                   <span className="event-demo-device-glyph"><Icon size={30} strokeWidth={1.5} /><i /></span>
                   <span>{t`Guest`} {String(device.number).padStart(2, "0")}</span><small>{state}</small>
                 </div>;
