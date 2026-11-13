@@ -10,23 +10,29 @@ const seed = myceliumSeed();
 export function MyceliumNetwork({ devices, unavailable = false }: { devices: EventDemoNetwork["devices"]; unavailable?: boolean }) {
   const { t } = useLingui();
   const host = useRef<HTMLDivElement>(null);
+  const syncVisibility = useRef(() => {});
   const [paused, setPaused] = useState(false), [visible, setVisible] = useState(true);
   useEffect(() => {
-    let intersecting = true;
-    const update = () => setVisible(intersecting && document.visibilityState !== "hidden");
-    const observer = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver(entries => {
-      intersecting = entries[0]?.isIntersecting ?? true; update();
-    });
+    // Recheck current geometry, rather than retaining an obsolete observer entry
+    // after viewport changes (including full-page capture and returning to a tab).
+    const update = () => {
+      const r = host.current?.getBoundingClientRect();
+      setVisible(document.visibilityState !== "hidden" && Boolean(r && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth));
+    };
+    syncVisibility.current = update;
+    const observer = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver(update);
     if (host.current) observer?.observe(host.current);
-    document.addEventListener("visibilitychange", update); update();
-    return () => { observer?.disconnect(); document.removeEventListener("visibilitychange", update); };
+    document.addEventListener("visibilitychange", update);
+    window.addEventListener("resize", update); window.addEventListener("focus", update); update();
+    return () => { observer?.disconnect(); document.removeEventListener("visibilitychange", update);
+      window.removeEventListener("resize", update); window.removeEventListener("focus", update); syncVisibility.current = () => {}; };
   }, []);
   const geometry = useMemo(() => myceliumLayout(devices.map(d => d.number)), [devices]);
   const byNumber = new Map(devices.map(device => [device.number, device]));
   return <div ref={host} className="mycelium-scene" data-motion={paused || !visible ? "paused" : "running"} data-dense={devices.length > 20}>
     <div className="mycelium-scene-caption"><span>{t`Every connection makes us grow.`}</span>
       <Button variant="ghost" size="icon" aria-label={paused ? t`Resume animation` : t`Pause animation`} aria-pressed={paused}
-        onClick={() => setPaused(value => !value)}>{paused ? <Play size={14} /> : <Pause size={14} />}</Button></div>
+        onClick={() => { syncVisibility.current(); setPaused(value => !value); }}>{paused ? <Play size={14} /> : <Pause size={14} />}</Button></div>
     <div className="mycelium-pan"><div className="mycelium-field">
       <svg className="mycelium-branches" viewBox="0 0 1000 640" preserveAspectRatio="none" fill="none" aria-hidden="true">
         <g className="mycelium-seed">{seed.map((path, index) => <path d={path} key={index} />)}</g>

@@ -2,13 +2,35 @@
 export interface MyceliumPoint { number: number; x: number; y: number }
 export interface MyceliumBranch { key: string; a: number; b: number; path: string; filaments: string[] }
 const round = (n: number) => Math.round(n * 100) / 100;
-const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+// Allocate a fixed space-filling sequence once. The first 15 devices already use
+// the whole field; later arrivals fill its gaps without moving existing guests.
+function slots() {
+  const candidates: { x: number; y: number }[] = [];
+  for (let row = 0; row < 9; row++) for (let col = 0; col < 13; col++) {
+    const x = 80 + col * 70 + Math.sin(row * 8 + col * 3) * 8;
+    const y = 70 + row * 62.5 + Math.cos(col * 6 + row * 2) * 7;
+    if (((x - 500) / 450) ** 2 + ((y - 320) / 265) ** 2 <= 1 && Math.hypot(x - 500, y - 320) > 125) candidates.push({ x, y });
+  }
+  const selected: MyceliumPoint[] = [];
+  for (let n = 1; n <= 50; n++) {
+    let best = 0, score = -Infinity;
+    for (let i = 0; i < candidates.length; i++) {
+      const p = candidates[i]!;
+      const distance = selected.length ? Math.min(...selected.map(q => Math.hypot(p.x - q.x, (p.y - q.y) * .8))) : -Math.hypot(p.x - 510, p.y - 100);
+      if (distance > score) { best = i; score = distance; }
+    }
+    const point = candidates.splice(best, 1)[0]!;
+    selected.push({ number: n, x: round(point.x), y: round(point.y) });
+  }
+  return selected;
+}
+const positions = slots();
 
 // Admission ordinal owns the location. Polling, departures and input order cannot move peers.
 export function myceliumPoint(number: number): MyceliumPoint {
-  const radius = 170 + Math.sqrt(number - 1) * 38;
-  const angle = number * goldenAngle - 0.8;
-  return { number, x: round(500 + Math.cos(angle) * radius), y: round(320 + Math.sin(angle) * radius * .62) };
+  const point = positions[number - 1];
+  if (!point) throw new RangeError("Invalid event guest ordinal");
+  return point;
 }
 function branch(a: MyceliumPoint, b: MyceliumPoint): MyceliumBranch {
   const dx = b.x - a.x, dy = b.y - a.y;

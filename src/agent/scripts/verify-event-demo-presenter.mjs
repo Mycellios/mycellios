@@ -65,4 +65,13 @@ try {
   const proof = { realPresenter: true, fixturesOnly: true, supplierSpend: false, states: [0, 1, 15, 50, "offline", 0],
     stablePositions: true, noIdleTrafficAnimation: true, pauseResume: true, reducedMotion: true, mobileBodyOverflow: false, requests: requests.length };
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2)); console.log(JSON.stringify(proof));
+} catch (error) {
+  const page = browser?.contexts()[0]?.pages()[0];
+  if (page) {
+    await page.screenshot({ path: path.join(output, "failure.png"), fullPage: true }).catch(() => {});
+    await writeFile(path.join(output, "failure.json"), JSON.stringify(await page.evaluate(() => ({ visibility: document.visibilityState,
+      viewport: [innerWidth, innerHeight], scene: document.querySelector('.mycelium-scene')?.getBoundingClientRect().toJSON(),
+      motion: document.querySelector('.mycelium-scene')?.getAttribute('data-motion') })), null, 2));
+  }
+  throw error;
 } finally { await browser?.close(); await server.close(); }
