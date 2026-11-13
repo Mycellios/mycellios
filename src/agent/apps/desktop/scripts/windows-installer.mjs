@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {writeStandaloneInstallerConfig} from './standalone-installer-config.mjs';
+import {compactResourceLayout} from './compact-resource-layout.mjs';
 
 // electron-builder concatenates resource arrays from package.json and API
 // options. Load one complete file instead, preserving base settings (voice
@@ -38,14 +39,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       // Koffi 3 uses a platform optional package. Dependency collection can miss
       // it; its loader also supports this explicit unpacked resources location.
       { from: path.join(agentRoot, 'node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node'), to: 'koffi/win32_x64/koffi.node' },
-      ...(compact ? [
-        {from:compact.server,to:'local-server',filter:['**/*','!node_modules{,/**/*}']},
-        // The builder always excludes a resource root's node_modules directory.
-        // Map this root explicitly; it contains native packages only.
-        {from:path.join(compact.server,'node_modules'),to:'local-server/node_modules',filter:['**/*']},
-        {from:compact.source,to:'development-source.asar'},
-        {from:compact.npm,to:'development-tools/npm.asar'},
-      ] : [
+      ...(compact ? compactResourceLayout(compact) : [
         { from: path.join(desktopRoot, 'local-server'), to: 'local-server', filter: ['**/*', '!node_modules{,/**/*}'] },
         { from: path.join(desktopRoot, 'local-server/node_modules'), to: 'local-server/node_modules', filter: ['**/*', '!**/.bin{,/**/*}'] },
         ...(development ? [{from:development.source,to:'development-source'}, {from:development.npm,to:'development-tools/npm'}] : []),
