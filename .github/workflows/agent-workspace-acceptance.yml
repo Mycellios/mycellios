@@ -91,6 +91,8 @@ jobs:
         run: node scripts/verify-builtin-provider-ui.mjs --output=builtin-provider-proof
       - name: Exercise the actual Agent panel, guest authentication and durable messages
         run: npm exec -- tsx scripts/verify-event-demo-agent-ui.ts --output=event-demo-proof
+      - name: Exercise the live mycelium presenter with isolated devices
+        run: node scripts/verify-event-demo-presenter.mjs --output=event-presenter-proof
       - name: Exercise conversation delivery, progress and reduced motion
         run: node scripts/verify-chat-fluidity.mjs --output=chat-flow-proof
       - name: Exercise actual companion images in the deployed app namespace
@@ -108,6 +110,7 @@ jobs:
             src/agent/workspace-proof
             src/agent/builtin-provider-proof
             src/agent/event-demo-proof
+            src/agent/event-presenter-proof
             src/agent/chat-flow-proof
             src/agent/companion-avatar-proof
             src/agent/playwright-integration-report
