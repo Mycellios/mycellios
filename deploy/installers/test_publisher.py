@@ -1,6 +1,6 @@
 import copy, json, tempfile, unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import publisher as p
 
 def manifest():
@@ -21,6 +21,34 @@ def catalogs():
     return dict(zip(['catalog.json','catalog-macos.json','catalog-macos-all.json'],[base,mac,allmac]))
 
 class PublisherTests(unittest.TestCase):
+    def test_cold_range_is_closed_and_retried_without_weakening_byte_checks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original=Path(tmp)/'installer';original.write_bytes(b'x'*4096)
+            def response(status=206, body=b'x'*1024, total=4096):
+                r=MagicMock();r.status=status;r.headers={'Content-Range':f'bytes 0-1023/{total}'};r.read.return_value=body;r.__enter__.return_value=r
+                return r
+            first=response(200);second=response();opener=MagicMock();opener.open.side_effect=[first,second]
+            with patch.object(p.urllib.request,'build_opener',return_value=opener),patch.object(p.time,'sleep') as sleep:
+                p.probe_public('https://www.mycellios.com/downloads/installer',original)
+                first.read.assert_not_called();sleep.assert_called_once_with(1)
+            for bad in [response(total=8192),response(body=b'y'*1024),response(body=b'x'*1025)]:
+                opener.open.side_effect=[bad]
+                with patch.object(p.urllib.request,'build_opener',return_value=opener),patch.object(p.time,'sleep') as sleep:
+                    with self.assertRaises(ValueError):p.probe_public('https://www.mycellios.com/downloads/installer',original)
+                    sleep.assert_not_called()
+
+    def test_ignored_ranges_have_a_strict_retry_limit_and_never_read_full_installers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            original=Path(tmp)/'installer';original.write_bytes(b'x'*4096)
+            responses=[]
+            for _ in range(3):
+                r=MagicMock();r.status=200;r.__enter__.return_value=r;responses.append(r)
+            opener=MagicMock();opener.open.side_effect=responses
+            with patch.object(p.urllib.request,'build_opener',return_value=opener),patch.object(p.time,'sleep') as sleep:
+                with self.assertRaisesRegex(ValueError,'after 3 attempts'):p.probe_public('https://www.mycellios.com/downloads/installer',original)
+                self.assertEqual(opener.open.call_count,3);self.assertEqual(sleep.call_count,2)
+                for response in responses:response.read.assert_not_called()
+
     def test_common_source_and_signing_identity_are_required(self):
         self.assertIs(p.validate_manifest(manifest())['automaticUpdates'],False)
         for key,value in [('revision','unknown'),('tree','unknown'),('automaticUpdates',True)]:

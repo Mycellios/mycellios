@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises';import {execFileSync} from 'node:child_process';
 import {platformVersions} from './installer-version.mjs';
+import {verifyPublicInstallerRange} from './installer-public-probe.mjs';
 const versions=platformVersions(JSON.parse(await readFile('src/agent/apps/desktop/package.json','utf8')).version);
 const revision=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 const base='https://www.mycellios.com';
@@ -19,8 +20,6 @@ while(Date.now()<until){
 }
 if(!admitted)throw Error('Public promotion deadline exceeded; previous catalog is retained');
 for(const file of admitted){
- if(typeof file.path!=='string'||!file.path.startsWith('/downloads/'))throw Error('Invalid download route');
- const r=await fetch(base+file.path,{headers:{Range:'bytes=0-1023'},signal:AbortSignal.timeout(30000)});
- if(r.status!==206||r.headers.get('content-range')!==`bytes 0-1023/${file.bytes}`||(await r.arrayBuffer()).byteLength!==1024)throw Error('Actual public download failed');
+ await verifyPublicInstallerRange(file);
 }
 console.log(JSON.stringify({published:true,revision,desktop:versions.desktop,android:versions.android,verifiedDownloads:admitted.length,physicalDeviceInstallation:false}));

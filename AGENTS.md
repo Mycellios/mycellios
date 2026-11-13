@@ -216,6 +216,8 @@ These rules apply to the complete repository.
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.
   Stable `/downloads/desktop/latest/<platform>` links resolve the current verified
   catalog without caching an old installer in the web page.
+  Public download probes close cold-edge HTTP 200 responses and retry at most three
+  times; only exact HTTP 206 ranges qualify. Wrong sizes or bytes remain hard failures.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   current-source Desktop builds, source provenance, hash-pinned runtime pairing
