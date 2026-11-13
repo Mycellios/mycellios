@@ -13,6 +13,8 @@ assert.equal(execFileSync('/usr/bin/lipo',['-archs',binary],{encoding:'utf8'}).t
 const signature=checkPreviewSignature(appRoot);
 await access(path.join(appRoot,'Contents/Resources/local-server/dist/desktop-local-entry.js'));
 await access(path.join(appRoot,'Contents/Resources/web/first-party/index.html'));
+await access(path.join(appRoot,'Contents/Resources/development-source/src/agent/apps/desktop/package.json'));
+await access(path.join(appRoot,'Contents/Resources/development-tools/npm/bin/npm-cli.js'));
 const require=createRequire(new URL('../src/agent/apps/desktop/package.json',import.meta.url));
 const {_electron,expect}=await import(pathToFileURL(require.resolve('@playwright/test')).href);
 for(let launch=0;launch<2;launch++){

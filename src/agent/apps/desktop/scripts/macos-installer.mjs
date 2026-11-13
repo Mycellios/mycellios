@@ -4,7 +4,7 @@ import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /** Apple Silicon preview: one shared UI and the pinned existing native runtime. */
-export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,output,version,arch='arm64'}) {
+export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,output,version,arch='arm64',development}) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw Error('Invalid Desktop version');
   if(!['arm64','x64'].includes(arch))throw Error('Unsupported Mac architecture');
   if(arch==='x64'&&(runtimePkg||runtimeSha256))throw Error('Intel Desktop must not bundle an ARM runtime');
@@ -31,6 +31,7 @@ export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,
     extraResources:[
       {from:path.join(desktopRoot,'local-server'),to:'local-server',filter:['**/*','!node_modules{,/**/*}']},
       {from:path.join(desktopRoot,'local-server/node_modules'),to:'local-server/node_modules',filter:['**/*','!**/.bin{,/**/*}']},
+      ...(development?[{from:development.source,to:'development-source'},{from:development.npm,to:'development-tools/npm'}]:[]),
       ...contribution,
       {from:path.join(agent,'apps/web/dist'),to:'web',filter:['**/*','!**/*.map']},
       {from:path.join(agent,'infra/compose/docker-compose.images.yml'),to:'stack/docker-compose.images.yml'},

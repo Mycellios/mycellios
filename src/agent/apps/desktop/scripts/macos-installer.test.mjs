@@ -16,11 +16,13 @@ test('Apple Silicon packaging pins the PKG, preserves identity and keeps unsigne
 });
 
 test('Intel packages the current local server and excludes the incompatible ARM runtime',async()=>{
- const config=await prepareMacInstaller({desktopRoot:'/fixture/desktop',arch:'x64',output:'/fixture/output',version:'0.3.48'});
+ const config=await prepareMacInstaller({desktopRoot:'/fixture/desktop',arch:'x64',output:'/fixture/output',version:'0.3.48',development:{source:'/fixture/source',npm:'/fixture/npm'}});
  assert.equal(config.mac.identity,'-');assert.equal(config.mac.minimumSystemVersion,'13.0');
  assert.deepEqual(config.mac.target,[{target:'dmg',arch:['x64']},{target:'zip',arch:['x64']}]);
  assert.equal(config.extraResources.some(r=>r.to.startsWith('contribution/')),false);
  assert.equal(config.extraResources.some(r=>r.to==='local-server'),true);
+ assert.equal(config.extraResources.some(r=>r.to==='development-source'),true);
+ assert.equal(config.extraResources.some(r=>r.to==='development-tools/npm'),true);
  assert.ok(config.beforePack.endsWith('verify-release.cjs'));
  await assert.rejects(prepareMacInstaller({desktopRoot:'/fixture',arch:'x64',version:'0.3.48',runtimePkg:'arm.pkg'}),/ARM/);
 });
