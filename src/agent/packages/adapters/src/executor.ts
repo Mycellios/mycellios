@@ -1,5 +1,4 @@
 import { eventDemoSessionActive } from "@rakazo/db";
-import { OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { micoBehaviorInstructions } from "./mico-behavior.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
@@ -10985,11 +10984,11 @@ async function modelCreditBillingEnabled(deps: ExecutorDeps): Promise<boolean> {
 async function resolveModelKey(...args: Parameters<typeof resolveModelKeyMaterial>) {
   const [deps, userId, spaceId, , provider] = args;
   if (userId.startsWith("ed_") && (!(await eventDemoSessionActive(deps.prisma, userId))
-    || !args[3] || provider !== OPENAI_COMPATIBLE_PROVIDER_ID || args[5] !== "mycellios/managed/antseed/deepseek-v4-flash"))
+    || !args[3]))
     throw new Error("Temporary event access is unavailable. No model was called.");
   const billingEnabled = await modelCreditBillingEnabled(deps);
   const scope = { userId, spaceId };
-  if (billingEnabled && (await hasHostedModelCredits(deps.prisma, scope, provider))) {
+  if (!userId.startsWith("ed_") && billingEnabled && (await hasHostedModelCredits(deps.prisma, scope, provider))) {
     args[3] = null;
     // Funded managed backups use deployment credentials just like the primary.
     args[7] = { ...args[7], requireStoredSecret: false };

@@ -12396,3 +12396,7 @@ msgstr "Your remaining demo balance"
 #: src/pages/demo/EventDemo.tsx
 msgid "credits"
 msgstr "credits"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "We couldn't open your demo. It may have ended or all places may be taken."
+msgstr "We couldn't open your demo. It may have ended or all places may be taken."

@@ -4681,7 +4681,7 @@ export async function createCoordinator(
   app.get("/v1/models", async request => {
     const models = (await scheduler.listAvailableModels({ connectedWorkerIds: hub.connectedWorkerIds() }));
     const catalog = await mycelliosModelCatalog(models, economicLedger, managedGateway, browserInference);
-    const principal = principalFor(request);
+    const principal = apiAccessEnabled ? principalFor(request) : { kind: "system" as const };
     return principal.kind !== "system" && principal.userId.startsWith("demo:")
       ? { ...catalog, data: catalog.data.filter(model => model.id === config.eventDemo?.model) } : catalog;
   });

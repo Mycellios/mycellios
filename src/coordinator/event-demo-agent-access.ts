@@ -19,5 +19,5 @@ export async function eventAgentAccess(config: EventDemoConfig | undefined, db: 
     if ((path === "/v1/managed/execute" ? body?.request?.model : body?.model) !== config.model) return false;
   }
   return Boolean(await db.raw.prepare("SELECT id FROM economic_demo_guests WHERE campaign_id=? AND id=? AND account_id=?")
-    .get(config.id, match[2], principal.userId));
+    .get(config.id, match[2]!, principal.userId));
 }

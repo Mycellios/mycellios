@@ -75,7 +75,7 @@ try {
   const webRoot = join(root, "src/agent/apps/web");
   process.chdir(webRoot); // Lingui resolves its own config from the workspace, as the deployed build does.
   vite = await createServer({ root: webRoot, configFile: join(webRoot, "vite.config.ts"),
-    optimizeDeps: { entries: [join(webRoot, "e2e/fixtures/event-demo.tsx")] }, server: { host: "127.0.0.1", port: 5198, strictPort: true },
+    optimizeDeps: { entries: [join(webRoot, "e2e/fixtures/event-demo-network.tsx")] }, server: { host: "127.0.0.1", port: 5198, strictPort: true },
     plugins: [{ name: "isolated-real-demo", enforce: "pre",
       transform(code, id) {
         // Test-only diagnostics: production keeps errors sanitized on the wire.
@@ -83,7 +83,7 @@ try {
           return code.replace('}catch{self.postMessage', '}catch(error){console.warn("ISOLATED_MODEL_FAILURE",error);self.postMessage');
       }, configureServer(server) { server.middlewares.use(async (req, res, next) => {
       if (!req.url?.startsWith("/__event_demo_real")) return next();
-      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en" data-theme="light"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/event-demo.tsx"></script></body></html>');
+      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en" data-theme="light"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/event-demo-network.tsx"></script></body></html>');
       res.setHeader("content-type", "text/html"); res.end(html);
     }); } }],
   }); await vite.listen();
