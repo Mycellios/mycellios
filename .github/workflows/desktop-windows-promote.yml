@@ -6,6 +6,10 @@ on:
         description: Successful Desktop Windows release package run to promote
         required: true
         type: string
+      windows_only_recovery:
+        description: Owner-approved emergency recovery only; normal releases use installer-release.yml
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -24,6 +28,15 @@ jobs:
       GH_REPO: ${{ github.repository }}
       SOURCE_RUN: ${{ inputs.run_id }}
     steps:
+      - name: Keep normal publication on the qualified cross-platform path
+        env:
+          RECOVERY_REQUESTED: ${{ inputs.windows_only_recovery }}
+          RECOVERY_ENABLED: ${{ vars.MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE }}
+        run: |
+          if [ "$RECOVERY_REQUESTED" != true ] || [ "$RECOVERY_ENABLED" != true ]; then
+            echo 'Windows-only publication is recovery-only. Normal releases are published by installer-release.yml after all native platforms qualify.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0

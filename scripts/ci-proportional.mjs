@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 const transcriptionPython = new Set(['python/distributed_runtime/transcription_engine.py',
   'python/distributed_runtime/replica_gpu_guard.py', 'python/tests/test_transcription_engine.py',
   'python/tests/test_transcription_gpu_guard.py', 'scripts/qualify-transcription-gpu.py']);
-export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f));
+const installerPython = new Set(['deploy/installers/publisher.py', 'deploy/installers/test_publisher.py']);
+export const uncoveredNativeFiles = files => files.filter(f => /\.(py|cpp|cc|c|h|hpp|rs)$/.test(f) && !transcriptionPython.has(f) && !installerPython.has(f));
 
 // Shared barrels must not expand a focused change into the complete Agent suite.
 // Keep executable tests in the source directory, including named regression siblings.
@@ -37,6 +38,10 @@ export function planChecks(files, availableAgentTests) {
   const agentScriptTests = [];
   const add = (cwd, bin, args, label) => commands.push({ cwd, bin, args, label });
   add('.', 'node', ['--test', 'scripts/ci-fast-delivery.test.mjs'], 'CI policy tests');
+  if (files.some(f => installerPython.has(f))) {
+    add('.', 'python3', ['-B', '-m', 'unittest', 'discover', '-s', 'deploy/installers', '-p', 'test_*.py'], 'installer promotion ownership, signing and recovery boundaries');
+    add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...installerPython], 'installer publisher Python syntax');
+  }
   if (files.some(f => transcriptionPython.has(f) || f === 'python/transcription-artifacts.json')) {
     add('.', 'python3', ['-I', '-B', '-m', 'unittest', 'discover', '-s', 'python/tests', '-p', 'test_transcription_*.py'], 'native transcription Python boundaries (no model or GPU)');
     add('.', 'python3', ['-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding="utf8"),filename=p) for p in sys.argv[1:]]', ...[...transcriptionPython].filter(f => existsSync(f))], 'native transcription Python syntax');

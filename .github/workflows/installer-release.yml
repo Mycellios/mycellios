@@ -1,0 +1,105 @@
+name: Publish all Mycellios installers
+on:
+  workflow_run:
+    workflows: [Proportional remote validation]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: installer-release
+  cancel-in-progress: false
+  queue: max
+jobs:
+  admit:
+    if: github.repository == 'Mycellios/mycellios'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.release.outputs.ready }}
+      revision: ${{ steps.release.outputs.revision }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/installer-release-admission.mjs
+  windows:
+    needs: admit
+    if: needs.admit.outputs.ready == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/desktop-windows-release.yml
+    with:
+      revision: ${{ needs.admit.outputs.revision }}
+      expedited: false
+  linux:
+    needs: admit
+    if: needs.admit.outputs.ready == 'true'
+    uses: ./.github/workflows/desktop-linux-release.yml
+    with:
+      revision: ${{ needs.admit.outputs.revision }}
+  macos:
+    needs: admit
+    if: needs.admit.outputs.ready == 'true'
+    uses: ./.github/workflows/desktop-macos.yml
+    with:
+      revision: ${{ needs.admit.outputs.revision }}
+  android:
+    needs: admit
+    if: needs.admit.outputs.ready == 'true'
+    uses: ./.github/workflows/android-release.yml
+    with:
+      revision: ${{ needs.admit.outputs.revision }}
+  publish:
+    needs: [admit, windows, linux, macos, android]
+    if: needs.admit.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.admit.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          pattern: desktop-*-${{ needs.admit.outputs.revision }}
+          path: release-inputs
+      - name: Publish only the exact qualified platform set
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if node scripts/publish-installer-release.mjs release-inputs; then exit 0; fi
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            sleep 20
+          done
+  verify-promotion:
+    needs: [admit, publish]
+    if: needs.admit.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.admit.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - name: Verify public catalogs, original Android signer and actual downloads
+        run: node scripts/verify-installer-promotion.mjs

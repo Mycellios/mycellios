@@ -1,14 +1,21 @@
 name: Mycellios Desktop macOS
 on:
-  push:
-    branches: [codex/desktop-macos-arm64-20261102]
-    paths: [scripts/desktop-macos/**, .github/workflows/desktop-macos.yml]
   workflow_dispatch:
+    inputs:
+      revision:
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      revision:
+        type: string
+        required: true
 permissions:
   contents: read
 concurrency:
   group: desktop-macos
   cancel-in-progress: false
+  queue: max
 jobs:
   package:
     strategy:
@@ -24,61 +31,62 @@ jobs:
             machine: x86_64
             app_dir: mac
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 35
+    timeout-minutes: 50
+    env:
+      RAKAZO_PROJECT_LOCAL: '1'
+      NODE_OPTIONS: --max-old-space-size=4096
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.revision || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: '24'
-      - name: Authenticate immutable build inputs
-        env:
-          GH_TOKEN: ${{ github.token }}
+          node-version: 24.22.2
+      - name: Retrieve only the pinned contribution runtime
         run: |
           set -euo pipefail
           test "$(uname -m)" = '${{ matrix.machine }}'
-          mkdir -p build/input build/evidence
-          gh release download desktop-v0.3.9-macos-preview --repo Mycellios/mycellios --pattern macos-build-input.tar.gz --dir build
-          echo 'c9021cf6378aa832b2f1f396c98cc4adcfe39e773aa82b515b964f3370946f0d  build/macos-build-input.tar.gz' | shasum -a 256 -c
-          tar -xzf build/macos-build-input.tar.gz -C build/input
+          mkdir -p "$RUNNER_TEMP/desktop-release/evidence"
           if [ '${{ matrix.arch }}' = arm64 ]; then
-            curl --fail --location --proto '=https' --retry 2 https://www.mycellios.com/downloads/macos-arm64 --output build/runtime.pkg
-            echo '66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  build/runtime.pkg' | shasum -a 256 -c
+            curl -fL --retry 2 https://www.mycellios.com/downloads/macos-arm64 -o "$RUNNER_TEMP/runtime.pkg"
+            echo "66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608  $RUNNER_TEMP/runtime.pkg" | shasum -a 256 -c
           fi
-      - name: Build locally qualified Mac adaptation
+      - name: Build current source and qualify its packaged local server
         run: |
           set -euo pipefail
-          npm ci --prefix scripts/desktop-macos --ignore-scripts --no-audit --no-fund
-          node --test scripts/desktop-macos/macos-installer.test.mjs scripts/desktop-macos/signature-check.test.mjs scripts/desktop-macos/runtime-support.test.mjs
-          node scripts/desktop-macos/assemble.mjs build/input build/payload '${{ matrix.arch }}'
-          ln -s "$PWD/scripts/desktop-macos/node_modules" build/payload/node_modules
-          npm ci --prefix build/payload/src/agent/apps/desktop --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+          cd src/agent
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run db:generate
+          node --test apps/desktop/scripts/macos-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs
+          npm run build --workspace @rakazo/web -- --desktop
+          npm run build --workspace @rakazo/desktop
+          npm run build:local-server --workspace @rakazo/desktop
           if [ '${{ matrix.arch }}' = arm64 ]; then
-            node build/payload/src/agent/apps/desktop/scripts/package-macos.mjs --arch arm64 --runtime "$PWD/build/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$PWD/build/release"
+            npm exec --workspace @rakazo/desktop -- node scripts/package-macos.mjs --arch arm64 --runtime "$RUNNER_TEMP/runtime.pkg" --sha256 66d48aaee92bd50233d37c901fbcfee92228d9cdeb0981bf2483ca68cc28f608 --out "$RUNNER_TEMP/desktop-release"
           else
-            node build/payload/src/agent/apps/desktop/scripts/package-macos.mjs --arch x64 --out "$PWD/build/release"
+            npm exec --workspace @rakazo/desktop -- node scripts/package-macos.mjs --arch x64 --out "$RUNNER_TEMP/desktop-release"
           fi
-          cp build/payload/build-inputs.json build/evidence/
-          printf '%s\n' "$GITHUB_SHA" > build/evidence/candidate-sha.txt
-          shasum -a 256 build/release/*.dmg build/release/*.zip > build/evidence/SHA256SUMS
-      - name: Launch and reopen the native Mac package
-        run: node scripts/desktop-macos/qualify.mjs 'build/release/${{ matrix.app_dir }}/Mycellios Desktop.app' build/evidence
-      - name: Verify signature inside the final read-only disk image
-        run: node scripts/desktop-macos/qualify-dmg.mjs 'build/release/${{ matrix.app_dir }}/Mycellios Desktop.app' 'build/release/Mycellios-Desktop-0.3.9-macos-${{ matrix.arch }}-preview.dmg' build/evidence/dmg-signature.json
-      - name: Install bundled runtime without enrolling any account
-        if: matrix.arch == 'arm64'
+          node apps/desktop/scripts/verify-local-server.mjs --server-root "$RUNNER_TEMP/desktop-release/${{ matrix.app_dir }}/Mycellios Desktop.app/Contents/Resources/local-server" --web-root "$RUNNER_TEMP/desktop-release/${{ matrix.app_dir }}/Mycellios Desktop.app/Contents/Resources/web"
+      - name: Qualify packaged launch and the distributed DMG signature
         run: |
           set -euo pipefail
-          sudo /usr/sbin/installer -pkg build/runtime.pkg -target / | tee build/evidence/runtime-install.log
-          '/Library/Application Support/Mycellios/Product/bin/node' -e 'if(process.platform!=="darwin"||process.arch!=="arm64")process.exit(1);console.log(JSON.stringify({platform:process.platform,arch:process.arch,version:process.version,enrolled:false,physicalInference:false}))' > build/evidence/runtime-architecture.json
-          test -f '/Library/Application Support/Mycellios/Product/app/node/install-main.js'
-      - name: Preserve packages and qualification evidence
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+          out="$RUNNER_TEMP/desktop-release"
+          app="$out/${{ matrix.app_dir }}/Mycellios Desktop.app"
+          version="$(node -p 'require("./src/agent/apps/desktop/package.json").version')"
+          node scripts/qualify-native-macos.mjs "$app" "$out/evidence"
+          node scripts/desktop-macos/qualify-dmg.mjs "$app" "$out/Mycellios-Desktop-$version-macos-${{ matrix.arch }}-preview.dmg" "$out/evidence/dmg-signature.json"
+          node scripts/write-platform-release.mjs "$out" macos-${{ matrix.arch }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: mycellios-desktop-macos-${{ matrix.arch }}-preview
+          name: desktop-macos-${{ matrix.arch }}-${{ inputs.revision || github.sha }}
           path: |
-            build/release/*.dmg
-            build/release/*.zip
-            build/evidence/
+            ${{ runner.temp }}/desktop-release/*.dmg
+            ${{ runner.temp }}/desktop-release/platform-release-*.json
+            ${{ runner.temp }}/desktop-release/evidence/
           if-no-files-found: error
           retention-days: 14
