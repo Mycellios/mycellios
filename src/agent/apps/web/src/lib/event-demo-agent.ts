@@ -23,3 +23,5 @@ export function eventAgentSpace(next?: string | null): string | null {
   if (typeof next === "string") saveEventAgentContext({ ...context, spaceId: next });
   return next ?? context.spaceId;
 }
+
+export function leaveEventAgent() { sessionStorage.removeItem(key); }

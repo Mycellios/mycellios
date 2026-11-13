@@ -1,3 +1,6 @@
+import { eventDemoRoute } from "../lib/event-demo";
+import { eventAgentContext } from "../lib/event-demo-agent";
+import { appRoute } from "../lib/app-path";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button, Field, FieldLabel, OptionSelect } from "@rakazo/ui-web";
 import type { ReactNode } from "react";
@@ -25,7 +28,7 @@ export function LanguageEntry({ children }: { children: ReactNode }) {
     } catch { setError(true); }
     finally { setBusy(false); }
   }
-  if (confirmed) return children;
+  if (confirmed || eventDemoRoute(appRoute(window.location.pathname)) || eventAgentContext()) return children;
   return <main className="grid min-h-dvh place-items-center bg-background px-6 py-10" data-testid="language-entry">
     <form className="w-full max-w-sm space-y-6" onSubmit={event => { event.preventDefault(); void choose(); }}>
       <div className="flex justify-center"><AuthMushroom /></div>

@@ -1,3 +1,4 @@
+import { eventAgentContext, leaveEventAgent } from "./lib/event-demo-agent";
 import { getGeneralPreferences, useGeneralPreferences } from "./lib/general-preferences";
 import { analyticsInstallationId } from "./lib/analytics-installation";
 import { StartupScreen } from "./components/StartupScreen";
@@ -96,6 +97,15 @@ export function App() {
   );
 }
 
+function EventAccessEnded() {
+  const { t } = useLingui();
+  return <main className="grid h-dvh place-items-center bg-background p-6 text-center"><div className="max-w-sm space-y-4">
+    <h1 className="text-xl font-medium">{t`Your temporary access has ended`}</h1>
+    <p className="text-sm text-muted-foreground">{t`Sign in with your own account to keep using Mycellios.`}</p>
+    <Button onClick={() => { leaveEventAgent(); window.location.assign(window.location.pathname.replace(/\/app(?:\/.*)?$/, "/sign-in")); }}>{t`Sign in`}</Button>
+  </div></main>;
+}
+
 function SessionApp() {
   const [searchParams] = useSearchParams();
   const signInDestination =
@@ -106,6 +116,13 @@ function SessionApp() {
     () => false,
   );
   const session = authClient.useSession();
+  const demo = eventAgentContext();
+  const [demoExpired, setDemoExpired] = useState(false);
+  useEffect(() => {
+    if (!demo) return;
+    const timer = window.setTimeout(() => setDemoExpired(true), Math.max(0, demo.endsAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [demo?.endsAt]);
   const pathname = useLocation().pathname;
   const screen = analyticsScreen(pathname);
   const analyticsUserId = session.data?.user.id;
@@ -149,6 +166,7 @@ function SessionApp() {
     markAfterPaint("rk:renderer:session-painted");
   }, [session.isPending]);
 
+  if (demo && (demoExpired || (!session.isPending && !session.error && !session.data?.user))) return <EventAccessEnded />;
   if (showSessionUnavailable(gate, nextHolding)) {
     return <SessionUnavailable refetch={session.refetch} />;
   }
