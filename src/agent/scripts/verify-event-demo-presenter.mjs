@@ -45,6 +45,11 @@ try {
   await page.getByRole("button", { name: "Pause animation", exact: true }).click();
   await expect(page.locator(".mycelium-scene")).toHaveAttribute("data-motion", "paused");
   assert.equal(await page.locator(".mycelium-work").count(), 0, "Idle ready browsers must not simulate inference traffic");
+  const peersFit = await page.locator(".mycelium-peer").evaluateAll(nodes => {
+    const pan = document.querySelector(".mycelium-pan").getBoundingClientRect();
+    return nodes.every(node => { const r = node.getBoundingClientRect(); return r.top >= pan.top && r.bottom <= pan.bottom; });
+  });
+  assert.equal(peersFit, true, "Peer names and statuses must not be clipped by the map viewport");
   await page.screenshot({ path: path.join(output, "mycelium-15-desktop.png"), fullPage: true });
   await page.getByRole("button", { name: "Resume animation", exact: true }).click();
   await expect(page.locator(".mycelium-scene")).toHaveAttribute("data-motion", "running");
