@@ -1,5 +1,4 @@
 import {createRequire} from 'node:module';
-import {pathToFileURL} from 'node:url';
 import {mkdtemp,mkdir,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -14,7 +13,7 @@ assert.equal(execFileSync('/usr/bin/lipo',['-archs',binary],{encoding:'utf8'}).t
 const signature=checkPreviewSignature(appRoot);
 const require=createRequire(new URL('../src/agent/apps/desktop/package.json',import.meta.url));
 await verifyMacPackagedResources(appRoot,require('@electron/asar').extractFile);
-const {_electron,expect}=await import(pathToFileURL(require.resolve('@playwright/test')).href);
+const {_electron,expect}=require('@playwright/test');
 for(let launch=0;launch<2;launch++){
  const profile=await mkdtemp(path.join(tmpdir(),'mycellios-macos-release-'));
  const instance=await _electron.launch({executablePath:binary,env:{...process.env,RAKAZO_PERFORMANCE_USER_DATA:profile,RAKAZO_DISABLE_AUTO_UPDATE:'1',RAKAZO_WEB_URL:'data:text/html,<main>Mycellios native release</main>'}});
