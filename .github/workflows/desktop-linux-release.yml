@@ -15,7 +15,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: desktop-linux-release
+  group: desktop-linux-release-${{ inputs.revision || github.sha }}
   cancel-in-progress: false
   queue: max
 jobs:
