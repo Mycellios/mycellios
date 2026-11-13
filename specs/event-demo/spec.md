@@ -16,12 +16,26 @@ their sessions and their model choices are untouched.
   admission idempotent. Its hash is stored; the server issues a scoped HttpOnly,
   SameSite cookie. A separate view capability exposes only aggregate event telemetry.
 - Slot allocation and the expiring 0.20 grant share the serialized wallet writer
-  transaction. No other route accepts this guest capability; no API key is issued.
+  transaction. No ordinary route accepts this guest cookie directly.
+- The optional operator-keyed AES-GCM handoff expires after 60 seconds. It provisions
+  a real isolated Agent user, workspace, Mico, thread and encrypted owned model key,
+  reusing the admitted guest wallet. Its separate HttpOnly cookie and tab-local
+  selector never replace personal SSO cookies or browser-wide workspace selection.
+  Native keys accept only approved-model inference and wallet/catalog reads, during
+  the same event window. They cannot create keys, fund checkout or administer nodes.
+- The invitation opens the existing SessionApp/Shell and ordinary tenant-scoped
+  RPCs, persistence, questionnaires, menus and job executor. No second demo chat UI.
+  Temporary profiles remain unverified and never obtain signup/referral grants.
+  Account-security authentication actions require a registered account. Worker
+  admission and model resolution also enforce temporary-session expiry and deny
+  deployment-credential fallbacks; explicit owned providers retain their funding.
 - Chat accepts bounded text-only history and the fixed approved managed model;
   server-owned instructions, output limits, price quotes, holds, real-cost +4%
   settlement and uncertain-result recovery reuse the normal managed gateway.
-- No automatic paid retries, media, tools, checkout, privileged Agent RPC or
-  account/provider management. Stop new work at campaign expiry or disabled flag.
+- No automatic paid retries or unmetered supplier/deployment fallback. The approved
+  Mycellios model retains its wallet caps and cannot fund media or checkout. Normal
+  Agent tools keep their existing tenant isolation, consent and review boundaries.
+  Stop event-model work at campaign expiry or disabled flag.
 - Joining alone does not spend credits. Reloading does not allocate another slot.
 - Browser Play reuses the existing signed mobile runtime, explicit activation,
   pause/visibility cancellation and verified worker binding. Connected, loading,

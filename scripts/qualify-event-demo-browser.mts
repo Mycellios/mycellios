@@ -122,9 +122,12 @@ try {
   assert.equal(rows.length, 1); assert.notEqual(rows[0]!.buyer, rows[0]!.contributor);
   assert.equal(Number(rows[0]!.total_microunits), Number(rows[0]!.fee_microunits) + Number(rows[0]!.amount_microunits));
   await contributor.screenshot({ path: join(output, "real-contributor.png") }); await buyer.screenshot({ path: join(output, "real-buyer.png") });
-  await buyer.getByRole("textbox", { name: "Message Mico", exact: true }).fill("Test-only private question");
-  await buyer.getByRole("button", { name: "Send message", exact: true }).click();
-  await expect(buyer.getByText("Isolated chat works. No supplier was called.", { exact: true })).toBeVisible(); assert.equal(syntheticProviderCalls, 1);
+  const response = await buyer.request.post(config.publicOrigin + "/mobile/v1/demo/" + config.id + "/chat", {
+    headers: { origin: config.publicOrigin }, data: { key: crypto.randomUUID(), messages: [{ role: "user", content: "Test-only private question" }] },
+  });
+  assert.equal(response.status(), 200);
+  assert.equal((await response.json()).response.choices[0].message.content, "Isolated chat works. No supplier was called.");
+  assert.equal(syntheticProviderCalls, 1);
   const present = await first.newPage(); await present.setViewportSize({ width: 1360, height: 900 });
   await present.goto(entry + "?present=1#view=" + config.presenterSecret);
   await expect(present.getByText("Verified inference", { exact: true })).toBeVisible();

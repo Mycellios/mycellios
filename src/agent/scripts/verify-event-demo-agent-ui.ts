@@ -87,9 +87,11 @@ try {
   });
   await page.goto(origin + "/demo/" + event);
   await expect(page).toHaveURL(/\/app\/[^/]+$/, { timeout: 60_000 });
-  const composer = page.getByRole("textbox", { name: "Message Mico", exact: true });
+  const composer = page.getByRole("combobox", { name: "Message Mico", exact: true });
   await expect(composer).toBeVisible({ timeout: 60_000 });
   await expect(composer).toBeEnabled();
+  await expect(page.getByTestId("mycellios-micos")).toHaveAttribute("data-balance-status", "ready");
+  await expect(page.getByTestId("mycellios-micos")).toContainText("0.2");
   assert.equal(await page.getByText("Your own Mico. No registration.", { exact: true }).count(), 0);
   const token = await page.evaluate(() => JSON.parse(sessionStorage.getItem("mycellios:event-agent-tab")!));
   assert.equal(token.id, event);
@@ -108,7 +110,12 @@ try {
     model: "scripted fixture", supplierSpend: false, modelReads, rpcFailures };
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2));
   console.log(JSON.stringify(proof));
-} catch (error) { diagnostics.push({ error: String(error) }); throw error; }
+} catch (error) {
+  const page = browser?.contexts()[0]?.pages()[0];
+  if (page) { await page.screenshot({ path: path.join(output, "failure.png") }).catch(() => {});
+    diagnostics.push({ url: page.url(), text: (await page.locator("body").innerText()).slice(0, 10000) }); }
+  diagnostics.push({ error: String(error) }); throw error;
+}
 finally {
   await writeFile(path.join(output, "diagnostics.json"), JSON.stringify(diagnostics, null, 2));
   await browser?.close(); await vite?.close();
