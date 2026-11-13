@@ -14,6 +14,14 @@ These rules apply to the complete repository.
   deterministic ledger id, verification gate and separation from referral rewards;
   never substitute a UI default balance for an authenticated wallet summary.
 
+- Registration-free event demos are separately operator-enabled and expire within
+  48 hours. `EventDemo` owns at most 50 cookie-scoped guests and one expiring 0.20
+  Credit grant per admission, independently of verified-account welcome/referrals.
+  Guest capabilities authorize only event routes; preserve ordinary account auth,
+  model/output caps, real managed price/holds/receipts, private chat isolation and
+  the separate read-only presenter capability. Apply `eventDemoSchemaSql` with the
+  migration owner and verify `tests/event-demo.postgres.test.ts` on isolated PG.
+
 - Mycellios is an independent distributed inference runtime.
 - The network vision includes phones, laptops, desktop PCs and servers as
   contributing compute nodes. Illustrations must reflect that role; distinguish

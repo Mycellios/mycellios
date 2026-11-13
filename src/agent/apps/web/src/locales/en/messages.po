@@ -12164,3 +12164,235 @@ msgstr "Your priorities, ready before the day begins."
 
 msgid "Your settings"
 msgstr "Your settings"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "0.20 credits per guest"
+msgstr "0.20 credits per guest"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "A network built together."
+msgstr "A network built together."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "All 50 demo places have been taken."
+msgstr "All 50 demo places have been taken."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Ask a question, explore an idea or try something new."
+msgstr "Ask a question, explore an idea or try something new."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Available for inference"
+msgstr "Available for inference"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Browser contribution"
+msgstr "Browser contribution"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Chatting"
+msgstr "Chatting"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Check response"
+msgstr "Check response"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connected does not mean busy. Only completed and verified inference earns credits."
+msgstr "Connected does not mean busy. Only completed and verified inference earns credits."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connecting your browser…"
+msgstr "Connecting your browser…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connection interrupted"
+msgstr "Connection interrupted"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connection interrupted. Showing the last confirmed state."
+msgstr "Connection interrupted. Showing the last confirmed state."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Conversation"
+msgstr "Conversation"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Copy invitation"
+msgstr "Copy invitation"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Could not connect. Try Play again."
+msgstr "Could not connect. Try Play again."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Earned by verified work"
+msgstr "Earned by verified work"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Event devices"
+msgstr "Event devices"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Explain Mycellios in one sentence"
+msgstr "Explain Mycellios in one sentence"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "First 50 guests · 48 hours"
+msgstr "First 50 guests · 48 hours"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Give me an idea for my business"
+msgstr "Give me an idea for my business"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Guest"
+msgstr "Guest"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Guests"
+msgstr "Guests"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Help me prepare a presentation"
+msgstr "Help me prepare a presentation"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "In the network"
+msgstr "In the network"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Live"
+msgstr "Live"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Message Mico"
+msgstr "Message Mico"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Mico is thinking…"
+msgstr "Mico is thinking…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Mycellios demo"
+msgstr "Mycellios demo"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "No available browser completed the work. No credits are awarded for failed work."
+msgstr "No available browser completed the work. No credits are awarded for failed work."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "No registration. Your own chat and 0.20 demo credits."
+msgstr "No registration. Your own chat and 0.20 demo credits."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Open your presenter link to see this event."
+msgstr "Open your presenter link to see this event."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Preparing your Mico…"
+msgstr "Preparing your Mico…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Private chats stay off this screen. Connected devices and real verified work only."
+msgstr "Private chats stay off this screen. Connected devices and real verified work only."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Real consumption +4%. Temporary demo balance."
+msgstr "Real consumption +4%. Temporary demo balance."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Real inference completed"
+msgstr "Real inference completed"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Running inference"
+msgstr "Running inference"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Running inference…"
+msgstr "Running inference…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Scan. Ask Mico. Press Play to join the network."
+msgstr "Scan. Ask Mico. Press Play to join the network."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Send message"
+msgstr "Send message"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Send this saved message"
+msgstr "Send this saved message"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Share your browser's computing power."
+msgstr "Share your browser's computing power."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Start contribution"
+msgstr "Start contribution"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Test the network"
+msgstr "Test the network"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "The browser uses a small local model. DeepSeek chat uses Mycellios external processing."
+msgstr "The browser uses a small local model. DeepSeek chat uses Mycellios external processing."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "This demo has ended. Thank you for joining us."
+msgstr "This demo has ended. Thank you for joining us."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "This demo has ended. Your conversation remains visible here."
+msgstr "This demo has ended. Your conversation remains visible here."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "This event is closed."
+msgstr "This event is closed."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Try Mycellios"
+msgstr "Try Mycellios"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Verified inference"
+msgstr "Verified inference"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "We are checking this response. Your message has been saved; it will not be charged twice."
+msgstr "We are checking this response. Your message has been saved; it will not be charged twice."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "We could not connect. Check your connection and try again."
+msgstr "We could not connect. Check your connection and try again."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "You have used your demo credits."
+msgstr "You have used your demo credits."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your browser in the network"
+msgstr "Your browser in the network"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your browser is available to the network."
+msgstr "Your browser is available to the network."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your guests will appear here as they join."
+msgstr "Your guests will appear here as they join."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your own Mico. No registration."
+msgstr "Your own Mico. No registration."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your remaining demo balance"
+msgstr "Your remaining demo balance"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "credits"
+msgstr "credits"

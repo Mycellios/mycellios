@@ -50,7 +50,7 @@ try {
     url = `postgresql://postgres:${password}@127.0.0.1:${port}/postgres`;
   }
   const suites = process.argv.slice(2);
-  if (suites.some(suite => !['tests/referrals.postgres.test.ts', 'tests/managed-purchases.postgres.test.ts', 'tests/browser-inference.postgres.test.ts'].includes(suite)))
+  if (suites.some(suite => !['tests/referrals.postgres.test.ts', 'tests/managed-purchases.postgres.test.ts', 'tests/browser-inference.postgres.test.ts', 'tests/event-demo.postgres.test.ts'].includes(suite)))
     throw new Error('Unsupported isolated PostgreSQL suite');
   code = spawnSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...(suites.length ? suites : ['tests/referrals.postgres.test.ts']), '--maxWorkers=1'], {
     stdio: 'inherit', env: { ...process.env, MYCELLIOS_REFERRAL_TEST_POSTGRES_URL: url },

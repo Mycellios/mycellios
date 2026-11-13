@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { readManagedProviderConfig, type ManagedProviderConfig } from "./managed-provider-config.js";
 import { readBrowserInferenceConfig, type BrowserInferenceConfig } from "./browser-inference-config.js";
+import { readEventDemoConfig, type EventDemoConfig } from "./event-demo-config.js";
 import { createPublicKey } from "node:crypto";
 import { isIP } from "node:net";
 import { resolve } from "node:path";
@@ -46,6 +47,7 @@ export interface CoordinatorConfig {
   contributionCreditFunding?: boolean | undefined;
   managedProvider?: ManagedProviderConfig | undefined;
   browserInference?: BrowserInferenceConfig | undefined;
+  eventDemo?: EventDemoConfig | undefined;
   referralRewardsEnabled?: boolean | undefined;
   referralEmailPepper?: string | undefined;
   apiStarterTokens?: number | undefined;
@@ -374,6 +376,7 @@ export function loadCoordinatorConfig(
     contributionCreditFunding: environment.MYCELLIOS_CONTRIBUTION_CREDITS_ENABLED === "true",
     managedProvider: readManagedProviderConfig(environment),
     browserInference: readBrowserInferenceConfig(environment),
+    eventDemo: readEventDemoConfig(environment),
     referralRewardsEnabled: environment.MYCELLIOS_REFERRALS_ENABLED === "true",
     referralEmailPepper: environment.MYCELLIOS_REFERRAL_EMAIL_PEPPER,
     supabaseTrustedOAuthClientIds,

@@ -38,6 +38,16 @@
 
 # AGENTS.md
 
+- `/demo/<event>` is a bounded public guest surface, outside the normal SessionApp
+  gate. Keep its coordinator cookie scoped to `/mobile/v1/demo/<event>`; the Dev
+  proxy forwards only this cookie and strips all Agent cookies. It never creates
+  a normal Agent/SSO session or exposes provider keys. Guest chats, balance and
+  Play/Pause stay in place; the presenter receives pseudonymous telemetry only.
+  Preserve stable message IDs, read-only recovery and explicit opt-in for the
+  small browser model test. Never portray managed DeepSeek chat as browser work.
+  Verify event-demo client/proxy tests and actual mobile/desktop guest/presenter
+  browser fixtures, plus the separate pinned-model inference qualification.
+
 - ServerConnections stores only device-local connection metadata. Native reads
   and edits require the owned main frame; labels/colors never edit a remote
   server identity or grant administration. Preserve the native work/draft/call

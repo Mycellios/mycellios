@@ -110,7 +110,7 @@ import {
 } from "../support/assistant.js";
 import { MeshService, MeshServiceError, type JobStreamEvent } from "./mesh-service.js";
 import { MobileComputeHub, type MobileWorkerSnapshot } from "./mobile-compute-hub.js";
-import { initializeBrowserInference } from "./browser-inference-routes.js";
+import { initializeBrowserCompute } from "./browser-compute-init.js";
 import { queueExistingMobileArtifacts } from "./mobile-artifact-backup.js";
 import {
   verifyGitHubReleaseUploadToken,
@@ -1569,20 +1569,9 @@ export async function createCoordinator(
     runtimeLinkObservations: () => hub.runtimeLinkObservations(),
     strictRuntimeLinks: true,
   });
-  const mobileHub = new MobileComputeHub({
-    joinToken: config.mobileJoinToken,
-    expertArtifactsPath: config.mobileExpertArtifactsPath,
-    disconnectedRetentionMs: options.mobileDisconnectedRetentionMs,
-    admissionAuthority: workerAdmission,
-    isTrustedLocalRequest,
-    ...(persistence
-      ? { onArtifactStored: async (artifact: Parameters<SupabasePersistence["registerArtifactBackup"]>[0]) =>
-          (await persistence.registerArtifactBackup(artifact)) }
-      : {}),
-  });
-  mobileHub.attach(app);
-  const browserInference = await initializeBrowserInference(app, { database, wallet: creditWallet, api: apiAccess,
-    hub: mobileHub, config: config.browserInference, apiEnabled: apiAccessEnabled, principal: principalFor });
+  const { mobileHub, browserInference } = await initializeBrowserCompute(app, { config, database, wallet: creditWallet,
+    api: apiAccess, apiEnabled: apiAccessEnabled, principal: principalFor, workerAdmission, trusted: isTrustedLocalRequest,
+    disconnectedRetentionMs: options.mobileDisconnectedRetentionMs, persistence, gateway: managedGateway?.textGateway });
   if (persistence && config.mobileExpertArtifactsPath) {
     (await queueExistingMobileArtifacts(persistence, config.mobileExpertArtifactsPath));
   }

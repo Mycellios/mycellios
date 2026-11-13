@@ -41,6 +41,9 @@ import { IntegrationCallbackPage } from "./pages/IntegrationCallback";
 import { IntegrationSetupPage } from "./pages/IntegrationSetup";
 import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
 import { ShellPage } from "./pages/Shell";
+import { eventDemoRoute } from "./lib/event-demo";
+
+const EventDemoPage = lazyComponent(() => import("./pages/demo/EventDemo").then(module => module.EventDemoPage));
 
 const AuthPage = lazyComponent(() => import("./pages/Auth").then((module) => module.AuthPage));
 const PasswordResetPage = lazyComponent(() =>
@@ -70,6 +73,7 @@ const linkFavicons: LinkFavicons = {
 };
 
 export function App() {
+  const demo = eventDemoRoute(appRoute(window.location.pathname));
   const loadRemoteImages = useSyncExternalStore(
     subscribeRemoteImages,
     getRemoteImagesEnabled,
@@ -79,7 +83,7 @@ export function App() {
     <RemoteImagesContext.Provider value={loadRemoteImages}>
       <LinkFaviconsContext.Provider value={linkFavicons}>
         <ErrorBoundary fallback={<AppFailed />}>
-          {appRoute(window.location.pathname) === SSO_CALLBACK_PATH ? (
+          {demo ? <Suspense fallback={<PageLoading />}><EventDemoPage id={demo.id} presenter={demo.presenter} /></Suspense> : appRoute(window.location.pathname) === SSO_CALLBACK_PATH ? (
             <SsoCallbackPage />
           ) : appRoute(window.location.pathname) === "/integrations/callback" ? (
             <IntegrationCallbackPage />

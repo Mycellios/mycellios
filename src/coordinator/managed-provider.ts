@@ -67,6 +67,7 @@ export async function initializeManagedProvider(config: CoordinatorConfig, datab
     await topups.initialize();
   }
   return {
+    textGateway: gateway,
     catalog: () => gateway.catalog(),
     inventory: async () => text.inventory(),
     mount: (app: FastifyInstance, principalFor: (request: FastifyRequest) => Principal) => {
