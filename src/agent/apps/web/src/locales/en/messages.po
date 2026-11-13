@@ -12428,3 +12428,51 @@ msgstr "No one is connected right now."
 #: src/pages/demo/Presenter.tsx
 msgid "Live status is unavailable. Reconnecting…"
 msgstr "Live status is unavailable. Reconnecting…"
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "One connection."
+msgstr "One connection."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "A network that grows."
+msgstr "A network that grows."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Together, we give AI more possibilities."
+msgstr "Together, we give AI more possibilities."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Every connection makes us grow."
+msgstr "Every connection makes us grow."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Pause animation"
+msgstr "Pause animation"
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Resume animation"
+msgstr "Resume animation"
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "The next connection starts here."
+msgstr "The next connection starts here."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Illustrative connections · real devices"
+msgstr "Illustrative connections · real devices"
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Be part of the network."
+msgstr "Be part of the network."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Scan and open your Mico."
+msgstr "Scan and open your Mico."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Ask anything to get started."
+msgstr "Ask anything to get started."
+
+#: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
+msgid "Press Play to contribute."
+msgstr "Press Play to contribute."

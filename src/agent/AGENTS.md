@@ -48,7 +48,11 @@
   Play/Pause stay in the normal sidebar. Keep the visible guest heartbeat read-only
   while SessionApp is open; never reenroll or start inference from polling. The presenter receives pseudonymous telemetry only. Its live count and grid show
   current presence or connected work, not cumulative admissions; hide stale live
-  state on read failure. Keep inference totals separate from online attendance.
+  state on read failure. Keep inference totals separate from online attendance. The presenter mycelium is
+  an illustrative peer mesh with stable ordinal positions, never measured routes.
+  Only real working state animates traffic; pause visual motion independently of
+  compute, and respect hidden/offscreen/reduced-motion states. Verify its focused
+  layout/component tests and `scripts/verify-event-demo-presenter.mjs`.
   Preserve stable message IDs, read-only recovery and explicit opt-in for the
   small browser model test. Never portray managed DeepSeek chat as browser work.
   Verify event-demo client/proxy tests and actual mobile/desktop guest/presenter

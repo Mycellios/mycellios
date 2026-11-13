@@ -51,7 +51,8 @@
   },
   "decisions": [
     "Hifa Store uses StoreAppCard for every entry: 164px cover, 16px body padding, 32px icon/title row, 40px two-line description, 32px footer action, 10px internal gaps, 20px grid gaps and 14px corners. Secondary community actions use the existing dropdown primitive. Keep original artwork and semantic Agent tokens.",
-    "Estudio IA is a regular Hifa Store card using StoreAppCard and its own artwork. The Store toolbar has only Crear app. The studio uses a short introduction, format shortcuts and existing explicit price confirmation; hide recharge when its catalog is unavailable."
+    "Estudio IA is a regular Hifa Store card using StoreAppCard and its own artwork. The Store toolbar has only Crear app. The studio uses a short introduction, format shortcuts and existing explicit price confirmation; hide recharge when its catalog is unavailable.",
+    "Event presenter: a dark moss community canvas with flat botanical SVG strands, stable guest-ordinal positions and gold for confirmed compute availability; keep the invitation and QR on paper. Mesh links illustrate community, never physical topology. Animate arrivals once and traffic only during confirmed work; pause offscreen and support reduced motion."
   ],
   "evidence": [
     {

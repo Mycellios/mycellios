@@ -2,9 +2,10 @@ import { MICO_PRIMARY_AVATAR } from "@rakazo/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { BotAvatar, Button } from "@rakazo/ui-web";
-import { Check, Copy, Laptop, LoaderCircle, Smartphone, Tablet } from "lucide-react";
+import { Check, Copy, LoaderCircle, ScanLine } from "lucide-react";
 import { demoApi, type EventDemoNetwork } from "../../lib/event-demo";
 import { ServerLinkCode } from "../../components/ServerLinkCode";
+import { MyceliumNetwork } from "./MyceliumNetwork";
 
 export function DemoPresenter({ id }: { id: string }) {
   const { t } = useLingui();
@@ -30,8 +31,8 @@ export function DemoPresenter({ id }: { id: string }) {
     <header className="event-demo-header"><div className="event-demo-brand"><BotAvatar color={MICO_PRIMARY_AVATAR} size={34} /><span>Mycellios</span></div>
       <span className="event-demo-live" data-online={!failed && Boolean(network)}><span />{failed ? t`Connection interrupted` : t`Live`}</span></header>
     <div className="event-demo-stage">
-      <section className="event-demo-network"><div className="event-demo-network-heading"><h1>{t`A network built together.`}</h1>
-        <p>{t`Scan. Ask Mico. Press Play to join the network.`}</p></div>
+      <section className="event-demo-network"><div className="event-demo-network-heading"><h1>{t`One connection.`}<br /><span>{t`A network that grows.`}</span></h1>
+        <p>{t`Together, we give AI more possibilities.`}</p></div>
         {!network ? <div className="event-demo-empty" role={failed ? "alert" : "status"}>
           {failed ? t`Open your presenter link to see this event.` : <><LoaderCircle className="animate-spin motion-reduce:animate-none" />{t`Connecting…`}</>}</div>
           : <><dl className="event-demo-stats"><div><dt>{t`Connected now`}</dt><dd data-testid="demo-present-count">{failed ? "—" : devices.length}</dd></div>
@@ -39,26 +40,17 @@ export function DemoPresenter({ id }: { id: string }) {
             <div><dt>{t`Verified inference`}</dt><dd>{network.inferences}</dd></div></dl>
             {!network.open && <p className="event-demo-notice">{t`This event is closed.`}</p>}
             {failed && <p className="event-demo-notice" role="status">{t`Live status is unavailable. Reconnecting…`}</p>}
-            <div className="event-demo-devices" aria-label={t`Event devices`} aria-live="polite">
-              {!failed && !devices.length && <div className="event-demo-empty"><BotAvatar color={MICO_PRIMARY_AVATAR} size={78} /><p>{t`No one is connected right now.`}</p></div>}
-              {devices.map(device => {
-                const Icon = device.kind === "mobile" ? Smartphone : device.kind === "tablet" ? Tablet : Laptop;
-                const state = device.working ? t`Running inference` : device.connected ? t`Available for inference` : t`In the app`;
-                return <div className="event-demo-device" data-present="true" data-connected={device.connected} data-working={device.working} key={device.number} title={state}>
-                  <span className="event-demo-device-glyph"><Icon size={30} strokeWidth={1.5} /><i /></span>
-                  <span>{t`Guest`} {String(device.number).padStart(2, "0")}</span><small>{state}</small>
-                </div>;
-              })}
-            </div>
+            <MyceliumNetwork devices={devices} unavailable={failed} />
             <footer className="event-demo-network-footer"><span>{t`Earned by verified work`}: {(network.earnedMicrounits / 1_000_000).toLocaleString("es-ES", { maximumFractionDigits: 6 })} {t`credits`}</span>
               <time dateTime={new Date(network.at).toISOString()}>{t`Updated`} {new Date(network.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time></footer>
           </>}
       </section>
-      <aside className="event-demo-join"><h2>{t`Try Mycellios`}</h2><p>{t`Your own Mico. No registration.`}</p>
-        {network && <><ServerLinkCode url={network.inviteUrl} /><Button variant="outline" onClick={() => {
+      <aside className="event-demo-join"><div className="event-demo-join-heading"><ScanLine size={23} strokeWidth={1.5} /><h2>{t`Be part of the network.`}</h2></div><p>{t`Your own Mico. No registration.`}</p>
+        {network && <><div className="event-demo-qr"><ServerLinkCode url={network.inviteUrl} /></div><Button variant="outline" onClick={() => {
           void navigator.clipboard.writeText(network.inviteUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => undefined);
         }}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? t`Copied` : t`Copy invitation`}</Button>
           <p className="event-demo-grant">{t`0.20 credits per guest`}<small>{t`First 50 guests · 48 hours`}</small></p>
+          <ol className="event-demo-steps"><li>{t`Scan and open your Mico.`}</li><li>{t`Ask anything to get started.`}</li><li>{t`Press Play to contribute.`}</li></ol>
           <p className="event-demo-privacy">{t`Private chats stay off this screen. Connected devices and real verified work only.`}</p></>}
       </aside>
     </div>
