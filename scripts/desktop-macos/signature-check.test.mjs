@@ -20,3 +20,18 @@ test('a local approval does not remove the preview manual-approval requirement',
 test('invalid tool arguments are not confused with a policy rejection',()=>{
  const responses=[result(0),result(0,'Signature=adhoc'),result(2,'invalid argument')];assert.throws(()=>checkPreviewSignature('/fixture',()=>responses.shift()),/trust decision/);
 });
+test('a timed out strict read retries the identical verification once and still needs a valid signature',()=>{
+ const calls=[];const responses=[{status:null,error:{code:'ETIMEDOUT'},signal:'SIGTERM'},result(0),result(0,'Signature=adhoc'),result(3,'rejected')];
+ const receipt=checkPreviewSignature('/readonly/fixture',(file,args,options)=>{calls.push({file,args,options});return responses.shift();});
+ assert.equal(receipt.integrityVerified,true);assert.deepEqual(calls[0],calls[1]);assert.equal(calls.length,4);
+});
+test('a signature rejection fails immediately with the actual codesign diagnostic',()=>{
+ let calls=0;
+ assert.throws(()=>checkPreviewSignature('/fixture',()=>{calls++;return result(1,'sealed resource is missing or invalid');}),/status=1.*sealed resource is missing or invalid/);
+ assert.equal(calls,1);
+});
+test('repeated timeouts remain a failure with a bounded attempt count and explicit cause',()=>{
+ let calls=0;
+ assert.throws(()=>checkPreviewSignature('/fixture',()=>{calls++;return{status:null,error:{code:'ETIMEDOUT'},signal:'SIGTERM'};}),/code=ETIMEDOUT.*signal=SIGTERM/);
+ assert.equal(calls,2);
+});
