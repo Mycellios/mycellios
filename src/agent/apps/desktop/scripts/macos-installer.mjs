@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import {compactResourceLayout} from './compact-resource-layout.mjs';
 
 /** Apple Silicon preview: one shared UI and the pinned existing native runtime. */
 export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,output,version,arch='arm64',development,compact}) {
@@ -29,11 +30,7 @@ export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,
     files:['dist/**/*','!dist/**/*.map','package.json'],
     extraMetadata:{name:'mycellios-desktop',version,main:'dist/main.js',homepage:'https://www.mycellios.com'},
     extraResources:[
-      ...(compact ? [
-        {from:compact.server,to:'local-server'},
-        {from:compact.source,to:'development-source.asar'},
-        {from:compact.npm,to:'development-tools/npm.asar'},
-      ] : [
+      ...(compact ? compactResourceLayout(compact) : [
       {from:path.join(desktopRoot,'local-server'),to:'local-server',filter:['**/*','!node_modules{,/**/*}']},
       {from:path.join(desktopRoot,'local-server/node_modules'),to:'local-server/node_modules',filter:['**/*','!**/.bin{,/**/*}']},
       ...(development?[{from:development.source,to:'development-source'},{from:development.npm,to:'development-tools/npm'}]:[]),

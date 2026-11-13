@@ -207,6 +207,8 @@ These rules apply to the complete repository.
   Qualify archived runtime/npm entries and the bundled source/app version match.
   Use a standalone builder config for compact packages so legacy resource arrays
   are replaced, and verify the packaged server has no duplicate loose tree.
+  Windows/Mac share `compact-resource-layout.mjs`, including the explicit native
+  node_modules mapping; keep the real builder copy test for both platforms.
   Normal releases use this common publisher, never separate Windows promotion.
   The old Windows-only publisher requires both an explicit emergency recovery
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.

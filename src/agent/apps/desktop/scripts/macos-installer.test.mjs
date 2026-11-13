@@ -1,4 +1,5 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,writeFile,readFile,rm}from'node:fs/promises';import {tmpdir}from'node:os';import path from'node:path';import {createHash}from'node:crypto';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,mkdir,writeFile,readFile,rm}from'node:fs/promises';import {tmpdir}from'node:os';import path from'node:path';import {createHash}from'node:crypto';
+import {createRequire} from 'node:module';
 import {prepareMacInstaller}from'./macos-installer.mjs';
 test('Apple Silicon packaging pins the PKG, preserves identity and keeps unsigned updates disabled',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'mycellios-mac-test-'));
@@ -29,7 +30,26 @@ test('Intel packages the current local server and excludes the incompatible ARM 
 
 test('compact Mac resources retain development and server payloads without duplicate loose trees',async()=>{
  const config=await prepareMacInstaller({desktopRoot:'/fixture/desktop',arch:'x64',output:'/fixture/output',version:'0.3.49',development:{source:'/fixture/source',npm:'/fixture/npm'},compact:{server:'/compact/server',source:'/compact/source.asar',npm:'/compact/npm.asar'}});
- for(const [to,from] of [['local-server','/compact/server'],['development-source.asar','/compact/source.asar'],['development-tools/npm.asar','/compact/npm.asar']])assert.deepEqual(config.extraResources.filter(r=>r.to===to),[{to,from}]);
- assert.equal(config.extraResources.some(r=>['local-server/node_modules','development-source','development-tools/npm'].includes(r.to)),false);
+ for(const [to,from] of [['local-server','/compact/server'],['development-source.asar','/compact/source.asar'],['development-tools/npm.asar','/compact/npm.asar']])assert.equal(config.extraResources.find(r=>r.to===to)?.from,from);
+ assert.equal(config.extraResources.find(r=>r.to==='local-server/node_modules')?.from,path.join('/compact/server','node_modules'));
+ assert.equal(config.extraResources.some(r=>['development-source','development-tools/npm'].includes(r.to)),false);
  assert.equal(config.mac.identity,'-');assert.equal(config.mac.notarize,false);
+});
+
+test('actual Mac builder copies native packages alongside the compact archive',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'mycellios-mac-resource-copy-'));
+ try{
+  const server=path.join(root,'compact-server');
+  await mkdir(path.join(server,'node_modules/native-shim'),{recursive:true});
+  await writeFile(path.join(server,'runtime.asar'),'Archive fixture');
+  await writeFile(path.join(server,'node_modules/native-shim/binding.node'),'Native fixture');
+  const config=await prepareMacInstaller({desktopRoot:root,arch:'x64',output:path.join(root,'out'),version:'0.3.50',compact:{server,source:path.join(root,'source.asar'),npm:path.join(root,'npm.asar')}});
+  const require=createRequire(import.meta.url);
+  const {getFileMatchers,copyFiles}=require('app-builder-lib/out/fileMatcher.js');
+  const destination=path.join(root,'copied');
+  const matchers=getFileMatchers({extraResources:config.extraResources.filter(r=>r.to.startsWith('local-server'))},'extraResources',destination,{defaultSrc:root,globalOutDir:path.join(root,'out'),macroExpander:x=>x,customBuildOptions:{}});
+  await copyFiles(matchers);
+  assert.equal(await readFile(path.join(destination,'local-server/runtime.asar'),'utf8'),'Archive fixture');
+  assert.equal(await readFile(path.join(destination,'local-server/node_modules/native-shim/binding.node'),'utf8'),'Native fixture');
+ }finally{await rm(root,{recursive:true,force:true});}
 });
