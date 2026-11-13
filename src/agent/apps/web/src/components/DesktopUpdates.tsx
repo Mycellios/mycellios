@@ -193,7 +193,7 @@ export function DesktopSidebarUpdate() {
     busy={waiting ? update.cancelBusy : update.busy || downloading}
     disabled={waiting ? update.cancelBusy : update.busy || downloading || handedOff}
     progress={downloading ? percent : undefined} progressLabel={t`Download progress`}
-    action={action} onAction={waiting ? update.cancel : failed ? update.check : ready ? update.install : update.download}
+    action={action} onAction={waiting ? update.cancel : ready ? update.install : failed ? update.check : update.download}
   />;
 
 }

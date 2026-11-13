@@ -94,6 +94,15 @@ it("keeps the chat accessible if another helper or disk capacity blocks installa
   await refresh(); expect(gate()).toBeNull(); expect(host.textContent).toContain("6 GB");
   expect(bridge.install).not.toHaveBeenCalled();
 });
+it("retries a staged installer after a handoff failure instead of only checking its unchanged feed", async () => {
+  fixture.state = { ...fixture.state, message: "Could not complete the update. Try again.", relaunchError: true };
+  await render();
+  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Try again"]')!.click());
+  expect(bridge.install).toHaveBeenCalledOnce();
+  expect(bridge.check).not.toHaveBeenCalled();
+  expect(gate()).toBeNull();
+  expect(host.querySelector("main")?.textContent).toBe("Chat draft");
+});
 it("waits for unsaved work and preserves explicit checkpointed restart of native tasks", async () => {
   fixture.safe = false;
   fixture.state = { ...fixture.state, installPending: true, supportsForceRestart: true, restartMode: "whenIdle", waitingFor: "local_work" };

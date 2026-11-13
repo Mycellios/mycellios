@@ -84,9 +84,17 @@ export class UpdatePreferences {
     try {
       let state = this.ports.state();
       if (this.value.supported && this.value.autoDownload && state.phase === "available") state = await this.ports.download();
+      // install() accepts a pending handoff immediately. Its helper may fail later,
+      // after that request has settled. Do not silently start the same helper on
+      // every tick: retain the failure until an explicit retry or a new release.
+      if (!this.intent && state.phase === "ready" && !state.installPending &&
+          !state.handoffComplete && state.message) {
+        this.deferredVersion = state.availableVersion;
+        this.failed = true;
+      }
       if (!this.intent && this.value.supported && this.installSupported && this.value.autoInstall && state.phase === "ready" &&
           !state.installPending && state.availableVersion !== this.deferredVersion) {
-        this.intent = "update"; this.automaticIntent = true; ++this.revision;
+        this.intent = "update"; this.automaticIntent = true; this.failed = false; ++this.revision;
       }
       if (!this.intent || state.installPending) return;
       if (state.phase === "checking" || state.phase === "downloading") { this.automaticRestartAt = undefined; this.waiting = "update_download"; return; }

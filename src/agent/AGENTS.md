@@ -254,6 +254,9 @@
   as uncertain checkpoint results; reconcile their command receipts before mutation.
   A planned restart may restore a relay generation only from bounded private
   version/account/server/Space/session metadata after fresh identity and consent.
+  An asynchronously failed helper defers that release until an explicit retry or
+  a newer package; never relaunch it on every idle tick. Preserve the bounded
+  local handoff-error.json process receipt when PowerShell exits without logs.
   A pending restart is cancellable. The hidden same-user helper waits for normal
   exit, snapshots session/installation state, installs and reopens the same profile.
   Never force-stop another process, use Restart Manager shutdown or clear user data.
