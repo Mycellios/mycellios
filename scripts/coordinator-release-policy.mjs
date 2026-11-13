@@ -630,6 +630,8 @@ function relativeJavaScriptImports(source) {
     /\bfrom\s*["'](\.{1,2}\/[^"']+)["']/g,
     /^\s*import\s*["'](\.{1,2}\/[^"']+)["']/gm,
     /\bimport\s*\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/g,
+    // Worker-thread entries are runtime dependencies even without an import.
+    /\bnew\s+URL\(\s*["'](\.{1,2}\/[^"']+\.js)["']\s*,\s*import\.meta\.url\s*\)/g,
   ];
   for (const pattern of patterns) {
     let match;

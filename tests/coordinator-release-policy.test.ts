@@ -27,6 +27,20 @@ afterEach(() => {
 });
 
 describe("native coordinator release staging", () => {
+  it("seals worker-thread entries and their imports and rejects a missing runtime worker", () => {
+    const fixture = createFixture();
+    write(fixture, "dist/coordinator/main.js", 'new Worker(new URL("./reference.js", import.meta.url));\n');
+    expect(() => writeCoordinatorOutputReceipt(fixture)).toThrow("missing: coordinator/reference.js");
+    write(fixture, "dist/coordinator/reference.js", 'import "../core/config.js";\n');
+    const receipt = writeCoordinatorOutputReceipt(fixture);
+    expect(receipt.outputs[0]!.files.map(file => file.path)).toContain("coordinator/reference.js");
+    const destination = join(fixture, "release"); mkdirSync(destination);
+    const manifest = prepareCoordinatorRelease(fixture, destination, {
+      revision: "a".repeat(40), populateProductionDependencies: writeProductionDependencies,
+    });
+    expect(manifest.files.map(file => file.path)).toContain("dist/coordinator/reference.js");
+    expect(() => verifyCoordinatorReleaseDirectory(destination)).not.toThrow();
+  });
   it("ships only the coordinator JS closure, native Python and production drop-ins", () => {
     const fixture = createFixture();
     const destination = join(fixture, "release");

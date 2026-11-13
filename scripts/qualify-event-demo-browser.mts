@@ -32,6 +32,7 @@ const schema = "demo_browser_" + randomBytes(5).toString("hex"), sql = postgres(
 const directory = mkdtempSync(join(tmpdir(), "mycellios-demo-model-")), output = resolve("event-demo-model-proof");
 await mkdir(output, { recursive: true });
 let db: MeshDatabase | undefined, admission: MeshDatabase | undefined, browser: any, vite: any, hub: MobileComputeHub | undefined;
+const diagnostics: unknown[] = [];
 const app = Fastify({ logger: false });
 try {
   await sql.unsafe(`CREATE SCHEMA ${schema}`);
@@ -75,7 +76,12 @@ try {
   process.chdir(webRoot); // Lingui resolves its own config from the workspace, as the deployed build does.
   vite = await createServer({ root: webRoot, configFile: join(webRoot, "vite.config.ts"),
     optimizeDeps: { entries: [join(webRoot, "e2e/fixtures/event-demo.tsx")] }, server: { host: "127.0.0.1", port: 5198, strictPort: true },
-    plugins: [{ name: "isolated-real-demo", configureServer(server) { server.middlewares.use(async (req, res, next) => {
+    plugins: [{ name: "isolated-real-demo", enforce: "pre",
+      transform(code, id) {
+        // Test-only diagnostics: production keeps errors sanitized on the wire.
+        if (id.replaceAll("\\", "/").endsWith("/src/mobile/browser-text-worker.ts"))
+          return code.replace('}catch{self.postMessage', '}catch(error){console.warn("ISOLATED_MODEL_FAILURE",error);self.postMessage');
+      }, configureServer(server) { server.middlewares.use(async (req, res, next) => {
       if (!req.url?.startsWith("/__event_demo_real")) return next();
       const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en" data-theme="light"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/event-demo.tsx"></script></body></html>');
       res.setHeader("content-type", "text/html"); res.end(html);
@@ -85,6 +91,13 @@ try {
   browser = await chromium.launch(executablePath ? { executablePath } : {});
   const first = await browser.newContext({ viewport: { width: 390, height: 844 } }), second = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const contributor = await first.newPage(), buyer = await second.newPage();
+  for (const page of [contributor,buyer]) {
+    page.on("console", message => { if (["error","warning"].includes(message.type())) diagnostics.push({console:message.text().slice(0,1500)}); });
+    page.on("response", response => { if (response.status()>=400) diagnostics.push({status:response.status(),path:new URL(response.url()).pathname}); });
+  }
+  const executeText = hub.textHub.execute.bind(hub.textHub);
+  hub.textHub.execute = async (...args) => { try { return await executeText(...args); }
+    catch(error) { diagnostics.push({reference:(error as Error).message}); throw error; } };
   const errors: string[] = []; contributor.on("pageerror", error => errors.push(error.message)); buyer.on("pageerror", error => errors.push(error.message));
   const entry = "http://127.0.0.1:5198/__event_demo_real";
   await contributor.goto(entry); await expect(contributor.getByRole("textbox", { name: "Message Mico", exact: true })).toBeEnabled();
@@ -126,6 +139,8 @@ try {
     inferences: after.inferences, earnedMicrounits: after.earnedMicrounits };
   await writeFile(join(output, "qualification.json"), JSON.stringify(proof, null, 2)); console.log(JSON.stringify(proof));
 } finally {
+  await writeFile(join(output, "diagnostics.json"), JSON.stringify(diagnostics,null,2));
+  if (diagnostics.length) console.log("ISOLATED_DIAGNOSTICS="+JSON.stringify(diagnostics));
   await browser?.close(); await vite?.close(); hub?.close(); await app.close();
   await db?.close(); await admission?.close(); await sql.unsafe(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await sql.end();
 }
