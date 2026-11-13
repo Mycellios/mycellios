@@ -1,3 +1,5 @@
+import { startEventAgentPresence } from "./lib/event-agent-presence";
+import { demoApi } from "./lib/event-demo";
 import { eventAgentContext, leaveEventAgent } from "./lib/event-demo-agent";
 import { getGeneralPreferences, useGeneralPreferences } from "./lib/general-preferences";
 import { analyticsInstallationId } from "./lib/analytics-installation";
@@ -118,6 +120,10 @@ function SessionApp() {
   const session = authClient.useSession();
   const demo = eventAgentContext();
   const [demoExpired, setDemoExpired] = useState(false);
+  useEffect(() => {
+    if (!demo) return;
+    return startEventAgentPresence(() => demoApi(demo.id).session(), () => setDemoExpired(true));
+  }, [demo?.id]);
   useEffect(() => {
     if (!demo) return;
     const timer = window.setTimeout(() => setDemoExpired(true), Math.max(0, demo.endsAt - Date.now()));
