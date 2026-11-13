@@ -2429,3 +2429,51 @@ workflow, so verification does not require another native build.
 Physical-device installation, Internet-origin OS approval prompts, live paid
 inference and the paused full suites were **NOT RUN**. Windows and Mac previews
 remain manual-install releases; ad-hoc Mac integrity is not notarization.
+
+### Desktop restart request recovery (2026-11-13)
+
+- PRs #270 and #271 preserve native and renderer readiness guards while fixing
+  asynchronous installer handoff recovery. A failed helper leaves its verified
+  package staged, clears obsolete waiting flags and defers unattended retries for
+  that release. The sidebar retry requests installation instead of rechecking an
+  unchanged feed. Restart now transfers the queued idle intent before requesting
+  the same manual controller, so a late acknowledgement or a failed forced
+  handoff cannot revive another queued restart.
+- The private handoff-error.json records only bounded process facts when the
+  launcher exits without logs. The original maintainer-session launcher failure
+  was not diagnosed conclusively; no owner-profile upgrade or forced exit was
+  performed during this investigation.
+- Local focused controller/preferences/helper fixtures passed through the shared
+  scheduler, including real Windows helper processes with synthetic installations.
+  The 20 policy tests cover forced ownership, late acknowledgement, asynchronous
+  failure, newer-release recovery and unsupported packages. PR CI passed for each integrated fix; native
+  workspace acceptance passed for PRs #270 and #271; full suites remain
+  paused. These checks do not qualify a physical owner-session restart.
+- PR #272 retains strict codesign verification, reports bounded error details and
+  retries the identical check once only on an explicit ETIMEDOUT. Invalid signatures
+  and repeated timeouts still fail. The 8 focused tests passed. A separate read-only
+  Intel runner verified the hash-pinned public 0.3.50 DMG (run 43423055993): strict
+  integrity passed in 41.109 seconds; Gatekeeper rejected its ad-hoc trust as expected.
+  That diagnostic did not install or execute the app and does not qualify 0.3.52.
+
+- Desktop **0.3.52** (Windows, Linux DEB, Fedora RPM, Apple Silicon and Intel)
+  and Android **1.3.52**, versionCode **103052**, were built from
+  `2de17be32117f032caaabd5d6716a482abb9b1c0`, tree
+  `8f08ab520bce9b2357a3626a189d3fb778d074cb`, retaining the concurrent built-in
+  provider change from PR #269. All native jobs, publication and real public
+  catalog/download verification passed in run
+  [43422807211](https://github.com/Mycellios/mycellios/actions/runs/43422807211).
+  The five stable latest Desktop links also passed exact 1-KiB HTTP 206 checks.
+  Android retained its original signer
+  `55121c1851944597566e2ccd0f87590cf2fa7e36acded7c8003627edcb39016c`.
+- The existing production publisher promoted that release automatically; its
+  service returned success and its timer remains active. Earlier versioned files
+  and the publisher's rollback mechanism remain in place. The prior 0.3.51
+  attempt stopped at the Intel DMG signature gate and was not published; do not
+  count that older workflow as passing.
+- Physical owner-device upgrades, Internet-origin approval prompts, paid inference
+  and full suites were **NOT RUN**. A qualified Windows installer was downloaded
+  and hash-verified locally with its Internet zone evidence retained, but not
+  executed. The installed owner profile remained at 0.3.46; Windows UI automation
+  returned Access denied, so that real upgrade and restart remain unverified.
+
