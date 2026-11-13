@@ -62,7 +62,7 @@ jobs:
           cd src/agent
           npm ci --ignore-scripts --no-audit --no-fund
           npm run db:generate
-          node --test apps/desktop/scripts/macos-installer.test.mjs apps/desktop/scripts/release-continuity.test.mjs
+          node --test apps/desktop/scripts/macos-installer.test.mjs apps/desktop/scripts/macos-sign-walk.test.mjs apps/desktop/scripts/release-continuity.test.mjs
           npm run build --workspace @rakazo/web -- --desktop
           npm run build --workspace @rakazo/desktop
           npm run build:local-server --workspace @rakazo/desktop

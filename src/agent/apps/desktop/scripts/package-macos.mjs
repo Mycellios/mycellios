@@ -1,11 +1,13 @@
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readFile} from 'node:fs/promises';
-import {Arch,build,Platform} from 'electron-builder';
+import {installBoundedMacSigningWalk} from './macos-sign-walk.mjs';
 import {prepareMacInstaller} from './macos-installer.mjs';
 import {stageDevelopmentResources} from './development-resources.mjs';
 import {stageCompactResources} from './compact-resources.mjs';
 if(process.platform!=='darwin')throw Error('Build and qualify the macOS installer on macOS.');
+await installBoundedMacSigningWalk();
+const {Arch,build,Platform}=await import('electron-builder');
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const argument=name=>{const i=process.argv.indexOf(name);return i<0?undefined:process.argv[i+1];};
 const runtimePkg=argument('--runtime'),runtimeSha256=argument('--sha256'),arch=argument('--arch')??process.arch;
