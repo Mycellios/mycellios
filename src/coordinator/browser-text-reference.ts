@@ -12,7 +12,7 @@ export class BrowserTextReference {
     const entry=development?new URL("./browser-text-reference-worker.ts",import.meta.url)
       :new URL("./browser-text-reference-worker.js",import.meta.url);
     // Source checkouts use the existing dev loader; release workers execute compiled JS directly.
-    const worker=development?new Worker(`import(${JSON.stringify(import.meta.resolve("tsx/esm/api"))}).then(m=>m.tsImport(${JSON.stringify(entry.href)},${JSON.stringify(import.meta.url)})).catch(()=>process.exit(1));`,{
+    const worker=development?new Worker(`import(${JSON.stringify(import.meta.resolve("tsx/esm/api"))}).then(m=>m.tsImport(${JSON.stringify(entry.href)},${JSON.stringify(import.meta.url)}));`,{
       eval:true,workerData:{directory:this.directory},resourceLimits:{maxOldGenerationSizeMb:512,stackSizeMb:4},
     }):new Worker(entry,{workerData:{directory:this.directory},resourceLimits:{maxOldGenerationSizeMb:512,stackSizeMb:4}});
     worker.on("message",message=>{

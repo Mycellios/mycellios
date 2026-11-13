@@ -41,6 +41,8 @@ jobs:
           node-version: "24.22.2"
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile the actual coordinator and its reference worker
+        run: npm exec -- tsc -p tsconfig.build.json
       - name: Exercise actual guest grants, holds, expiry, receipts and cookie isolation
         env:
           MYCELLIOS_REFERRAL_TEST_POSTGRES_URL: postgres://postgres:ephemeral_demo_fixture@127.0.0.1:5432/postgres
