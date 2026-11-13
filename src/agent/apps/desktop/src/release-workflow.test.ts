@@ -43,11 +43,13 @@ describe("canonical Desktop preview release boundaries", () => {
     expect(read("src/agent/apps/desktop/scripts/package-windows.mjs")).toContain("publish: 'never'");
   });
 
-  it("retains the separately pinned Apple Silicon publication inputs", () => {
+  it("builds current Mac sources while retaining pinned contribution runtime integrity", () => {
     const workflow = read(".github/workflows/desktop-macos.yml");
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).not.toMatch(/^\s*pull_request:/m);
-    expect(workflow).toContain("desktop-v0.3.9-macos-preview");
+    expect(workflow).not.toContain("macos-build-input.tar.gz");
+    expect(workflow).toContain("package-macos-current.mjs");
+    expect(workflow).toContain("Compile current web, native host and isolated local server");
     expect(workflow).toContain("shasum -a 256 -c");
     expect(workflow).toContain("permissions:\n  contents: read");
   });

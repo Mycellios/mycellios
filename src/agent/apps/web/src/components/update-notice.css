@@ -17,14 +17,10 @@
 .myc-update-notice__action { position: relative; isolation: isolate; overflow: hidden; display: grid; place-items: center; min-width: 88px; min-height: 30px; padding: 5px 9px; border: 0; border-radius: 7px; background: var(--update-action); color: var(--update-action-ink); font-size: 11px; font-weight: 500; line-height: 1.35; cursor: pointer; transition: opacity 120ms ease-out; }
 .myc-update-notice__action:disabled { cursor: default; }
 .myc-update-notice__action:hover:not(:disabled) { opacity: .88; }
-.myc-update-notice__action:focus-visible { outline: 2px solid var(--update-ink); outline-offset: 2px; }
-.myc-update-notice__action-content { position: relative; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.myc-update-notice__action:focus-visible { opacity: .88; }
+.myc-update-notice__action-content { position: relative; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .myc-update-notice__fill { position: absolute; inset: 0 auto 0 0; background: var(--update-progress); transition: width 180ms ease-out; }
 .myc-update-notice__spinner { animation: myc-update-spin 1s linear infinite; }
-.myc-update-notice__detail { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding: 6px; font-size: 11px; line-height: 1.5; }
-.myc-update-notice__detail a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-.myc-update-notice__detail button { min-height: 28px; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.myc-update-notice[data-failed] .myc-update-notice__detail { overflow-wrap: anywhere; }
 @keyframes myc-update-arrive { from { opacity: .5; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes myc-update-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {

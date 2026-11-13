@@ -2,6 +2,11 @@ name: Desktop Linux release package
 on:
   push:
     branches: ['codex/desktop-linux-release-*']
+  workflow_call:
+    inputs:
+      revision:
+        required: true
+        type: string
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,6 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
+      RELEASE_REVISION: ${{ inputs.revision || github.sha }}
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
@@ -20,6 +26,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           persist-credentials: false
+          ref: ${{ inputs.revision || github.sha }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.2
@@ -45,6 +52,7 @@ jobs:
           npm run build --workspace @rakazo/desktop
           npm run build:local-server --workspace @rakazo/desktop
           npm exec --workspace @rakazo/desktop -- node scripts/package-linux.mjs --runtime "$RUNNER_TEMP/runtime.deb" --sha256 fff304aa909775d0098e5837a3cbdb986a87cdfefa0ffcb4cedfb4d67f8d6d09 --out "$RUNNER_TEMP/desktop-release"
+          node node_modules/electron/install.js
           node -e 'require("electron")'
           electron_bin="$(node -p 'require("electron")')"
           test -x "$electron_bin"
@@ -87,13 +95,13 @@ jobs:
           sudo apt-get install -y rpm zstd
           out="$RUNNER_TEMP/desktop-release"
           version="$(node -p 'require("./src/agent/apps/desktop/package.json").version')"
-          source="$out/Mycellios-Desktop-$version-source-${GITHUB_SHA:0:8}.tar.gz"
+          source="$out/Mycellios-Desktop-$version-source-${RELEASE_REVISION:0:8}.tar.gz"
           git archive --format=tar.gz --prefix=mycellios/ --output="$source" HEAD
           export DESKTOP_RELEASE_OUT="$out" DESKTOP_VERSION="$version" DESKTOP_SOURCE="$source"
           node --input-type=module <<'NODE'
           import { basename, join } from "node:path";
           import { buildDesktopRpm, sha256 } from "./scripts/build-desktop-rpm.mjs";
-          const { DESKTOP_RELEASE_OUT: out, DESKTOP_VERSION: version, DESKTOP_SOURCE: source, GITHUB_SHA: baseline } = process.env;
+          const { DESKTOP_RELEASE_OUT: out, DESKTOP_VERSION: version, DESKTOP_SOURCE: source, RELEASE_REVISION: baseline } = process.env;
           const deb = join(out, `Mycellios-Desktop-${version}-linux-x64-pilot.deb`);
           const artifact = async file => ({
             url: `https://www.mycellios.com/downloads/desktop/releases/${version}/${basename(file)}`,
@@ -107,15 +115,17 @@ jobs:
           rpm="$out/fedora/Mycellios-Desktop-$version-fedora-x86_64.rpm"
           docker run --rm -v "$rpm:/tmp/mycellios.rpm:ro" fedora:44             bash -ec 'dnf install -y /tmp/mycellios.rpm >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }; rpm -q mycellios-desktop; test -x "/opt/Mycellios Desktop/mycellios-desktop"; test -s "/opt/Mycellios Desktop/resources/app.asar"; test -s /usr/share/applications/mycellios-desktop.desktop'
           (cd "$out"; sha256sum *.deb *.AppImage *.tar.gz fedora/*.rpm > SHA256SUMS.txt)
-          printf '%s\n' "$GITHUB_SHA" > "$out/candidate-sha.txt"
+          printf '%s\n' "$RELEASE_REVISION" > "$out/candidate-sha.txt"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: desktop-linux-${{ github.sha }}
+          name: desktop-linux-${{ inputs.revision || github.sha }}
           path: |
             ${{ runner.temp }}/desktop-release/*.deb
             ${{ runner.temp }}/desktop-release/*.AppImage
             ${{ runner.temp }}/desktop-release/*.tar.gz
             ${{ runner.temp }}/desktop-release/candidate-sha.txt
+            ${{ runner.temp }}/desktop-release/desktop-build.json
+            ${{ runner.temp }}/desktop-release/latest-linux.yml
             ${{ runner.temp }}/desktop-release/SHA256SUMS.txt
             ${{ runner.temp }}/desktop-release/fedora/*.rpm
             ${{ runner.temp }}/desktop-release/fedora/*.json

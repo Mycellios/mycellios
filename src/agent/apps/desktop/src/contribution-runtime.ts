@@ -22,6 +22,7 @@ export class ContributionRuntime {
   private installing = false;
   constructor(private readonly options: {
     platform: NodeJS.Platform;
+    arch?: string;
     resources: string;
     userData: string;
     programFiles: string;
@@ -33,6 +34,11 @@ export class ContributionRuntime {
     run?: (executable: string, args: string[]) => Promise<number>;
     now?: () => number;
   }) {}
+
+  private supported() {
+    return ["win32", "linux", "darwin"].includes(this.options.platform)
+      && (this.options.platform !== "darwin" || (this.options.arch ?? process.arch) === "arm64");
+  }
 
   private layout() {
     const mac = this.options.platform === "darwin";
@@ -89,11 +95,11 @@ export class ContributionRuntime {
       const value = JSON.parse(raw ?? "null");
       if (typeof value?.version === "string" && /^\d+\.\d+\.\d+$/.test(value.version)) version = value.version;
     } catch {}
-    return { supported: ["win32", "linux", "darwin"].includes(this.options.platform), installed, enrolled, nodeId, version, installing: this.installing };
+    return { supported: this.supported(), installed, enrolled, nodeId, version, installing: this.installing };
   }
 
   async identify(): Promise<DesktopRuntimeStatus> {
-    if (!["win32", "linux", "darwin"].includes(this.options.platform)) throw new Error("Contribution setup is not available on this platform.");
+    if (!this.supported()) throw new Error("Contribution setup is not available on this platform.");
     if (this.installing) throw new Error("Contribution setup is already running.");
     const before = await this.status();
     if (!before.installed || !before.enrolled) return before;
@@ -108,7 +114,7 @@ export class ContributionRuntime {
   }
 
   async enroll(value: unknown): Promise<DesktopRuntimeStatus> {
-    if (!["win32", "linux", "darwin"].includes(this.options.platform)) throw new Error("Contribution setup is not available on this platform.");
+    if (!this.supported()) throw new Error("Contribution setup is not available on this platform.");
     if (this.installing) throw new Error("Contribution setup is already running.");
     const parsed = nodeEnrollmentBundleSchema.safeParse(value);
     if (!parsed.success) throw new Error("Invalid contribution pairing request.");

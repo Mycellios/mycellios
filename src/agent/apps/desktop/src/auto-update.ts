@@ -210,6 +210,7 @@ export function shouldCheck(
 }
 
 export interface ElectronAutoUpdater {
+  setFeedURL?: (options: { provider: "generic"; url: string }) => void;
   autoDownload: boolean;
   autoInstallOnAppQuit: boolean;
   allowDowngrade: boolean;

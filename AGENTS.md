@@ -190,9 +190,16 @@ These rules apply to the complete repository.
   for cache qualification; reject other queries and preserve the pinned URL.
   `build-download-catalog-repair.mjs` builds a contract-only page repair from a
   hash-verified served baseline, retaining runtime page overlays and old assets.
+- Unified Desktop releases use `.github/workflows/desktop-release.yml` after actual
+  successful main validation. All platform installers and feeds must qualify before
+  publishing the immutable index; the host channel ingests every verified asset
+  before switching catalogs. Stable `/downloads/desktop/latest/<platform>` links
+  never pin the web page to an old installer. Keep signed Windows/notarized Mac
+  installation gates and native idle/draft/call/binding preservation. AppImage
+  owns its update; DEB/RPM remain system-installer managed.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
-  pinned published native baseline, source provenance, explicit runtime pairing
+  current-source Desktop builds, source provenance, hash-pinned runtime pairing
   and unsigned-preview update policy. Qualify packaging and launch on macOS;
   runner checks do not substitute for physical Mac inference evidence.
   Preview bundles use explicit ad-hoc signing, never identity:null. Require strict

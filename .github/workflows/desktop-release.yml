@@ -1,0 +1,116 @@
+name: Automatic Desktop release
+on:
+  workflow_run:
+    workflows: [Proportional remote validation]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-unified-release
+  cancel-in-progress: false
+jobs:
+  source:
+    if: github.repository == 'Mycellios/mycellios' && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      revision: ${{ steps.source.outputs.revision }}
+      tree: ${{ steps.source.outputs.tree }}
+      version: ${{ steps.source.outputs.version }}
+      build: ${{ steps.source.outputs.build }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: source
+        name: Bind validated current main and a new immutable version
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision=$(git rev-parse HEAD)
+          export RELEASE_REVISION="$revision"
+          git fetch origin main --no-tags
+          test "$revision" = "$(git rev-parse origin/main)"
+          version=$(node -p 'require("./src/agent/apps/desktop/package.json").version')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if gh release view "desktop-v$version" >/dev/null 2>&1; then
+            gh release download "desktop-v$version" --pattern desktop-release-index.json --dir "$RUNNER_TEMP/released-index"
+            test "$(node -p 'require(process.env.RUNNER_TEMP+"/released-index/desktop-release-index.json").revision')" = "$revision" || { echo 'Desktop source changed: increment its release version before merging.' >&2; exit 1; }
+            echo 'build=false' >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # A manual rerun needs the same actual successful proportional validation.
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$revision&status=success&per_page=10" > checks.json
+          test "$(node -p 'JSON.parse(require("fs").readFileSync("checks.json")).workflow_runs.some(r=>r.head_sha===process.env.RELEASE_REVISION && r.conclusion==="success")')" = true
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo 'build=true' >> "$GITHUB_OUTPUT"
+  windows:
+    permissions:
+      contents: write
+      actions: read
+    needs: source
+    if: needs.source.outputs.build == 'true'
+    uses: ./.github/workflows/desktop-windows-release.yml
+    with:
+      revision: ${{ needs.source.outputs.revision }}
+    secrets: inherit
+  macos:
+    needs: source
+    if: needs.source.outputs.build == 'true'
+    uses: ./.github/workflows/desktop-macos.yml
+    with:
+      revision: ${{ needs.source.outputs.revision }}
+    secrets: inherit
+  linux:
+    needs: source
+    if: needs.source.outputs.build == 'true'
+    uses: ./.github/workflows/desktop-linux-release.yml
+    with:
+      revision: ${{ needs.source.outputs.revision }}
+    secrets: inherit
+  publish:
+    needs: [source, windows, macos, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_REVISION: ${{ needs.source.outputs.revision }}
+      RELEASE_TREE: ${{ needs.source.outputs.tree }}
+      RELEASE_VERSION: ${{ needs.source.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.source.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          pattern: desktop-*-${{ needs.source.outputs.revision }}
+          path: input
+      - name: Qualify the complete release and preserve immutable source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/desktop-release-index.mjs input release "$RELEASE_REVISION" "$RELEASE_TREE" "$RELEASE_VERSION" "$GITHUB_RUN_ID"
+          git fetch origin main --no-tags
+          test "$RELEASE_REVISION" = "$(git rev-parse origin/main)"
+          test "$RELEASE_TREE" = "$(git rev-parse origin/main^{tree})"
+          tag="desktop-v$RELEASE_VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then echo 'Never replace an immutable release.' >&2; exit 1; fi
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="$RELEASE_REVISION"
+          printf 'Windows, Apple Silicon, Intel and Linux from `%s`.\n\nNative qualification, hashes and update eligibility are recorded in desktop-release-index.json. Unsigned previews do not claim unattended signed installation.\n' "$RELEASE_REVISION" > notes.md
+          gh release create "$tag" --verify-tag --target "$RELEASE_REVISION" --draft --prerelease --latest=false --title "Mycellios Desktop $RELEASE_VERSION" --notes-file notes.md
+          gh release upload "$tag" release/*
+          gh release edit "$tag" --draft=false --prerelease --latest=false

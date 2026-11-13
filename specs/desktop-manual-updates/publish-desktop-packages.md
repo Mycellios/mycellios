@@ -132,3 +132,27 @@ to the declared version.
 - A physical Fedora upgrade driven from the settings panel (0.3.41 → next).
 - The DEB path on Debian/Ubuntu.
 - The isolated Playwright settings flow for the new labels.
+
+
+## Automatic cross-platform delivery
+
+The owner now requests automatic release delivery for every Desktop platform.
+Build Windows, native Apple Silicon, native Intel and Linux from the same reviewed
+main revision and version. A Mac build must compile the current web, native host
+and local server; the old 0.3.9 input capsule is not a source for new app releases.
+Keep the independently qualified contribution runtime payloads hash-pinned.
+Publish the immutable release only after platform startup, integrity and package
+qualification; expose permanent latest URLs backed by the verified release index.
+Catalog ingestion must verify all bytes before swapping pointers, reject an older
+release and retain the prior catalogs for rollback. Preserve the separate runtime
+catalog and the legacy Desktop catalog subsets.
+
+Automatic installation defaults on only in a qualified packaged update channel.
+Windows and macOS channels require actual distribution signature verification;
+Mac also requires notarization. An unsigned/adhoc preview is never relabelled as
+signed. Linux AppImage owns its updater; DEB and RPM retain package-manager
+ownership. Missing signing credentials are an explicit release limitation, not a
+successful automatic-install qualification. Preserve saved opt-outs, native work,
+call and draft guards, visible idle-restart countdown and postponement. Browser/PWA
+updates retain their existing guarded refresh. Existing clients without an updater
+need a one-time bootstrap installer; a web redirect cannot rewrite their binaries.

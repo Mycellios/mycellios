@@ -3,6 +3,11 @@ on:
   push:
     tags: ['desktop-v*.*.*-windows-preview']
     branches: ['codex/desktop-release-*']
+  workflow_call:
+    inputs:
+      revision:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       expedited:
@@ -23,6 +28,9 @@ jobs:
       revision: ${{ steps.identity.outputs.revision }}
       tag: ${{ steps.identity.outputs.tag }}
     env:
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+      MYCELLIOS_SIGNED_RELEASE: ${{ secrets.WINDOWS_CSC_LINK != '' && secrets.WINDOWS_CSC_KEY_PASSWORD != '' && '1' || '0' }}
       RAKAZO_PROJECT_LOCAL: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ELECTRON_BUILDER_COMPRESSION_LEVEL: '1'
@@ -32,6 +40,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ inputs.revision || github.sha }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 24.22.2

@@ -13,8 +13,8 @@ export function releaseTag(version) {
 }
 export function assertReleaseIdentity(identity, version) {
   if (!VERSION.test(version) || identity?.schema !== 'mycellios-desktop-build/1' || identity.version !== version ||
-      identity.platform !== 'windows-x64' || !SHA.test(identity.revision) || !SHA.test(identity.tree) ||
-      !/^[a-f0-9]{64}$/.test(identity.sourceHash) || identity.automaticUpdates !== false)
+      !['windows-x64','linux-x64','macos-arm64','macos-x64'].includes(identity.platform) || !SHA.test(identity.revision) || !SHA.test(identity.tree) ||
+      !/^[a-f0-9]{64}$/.test(identity.sourceHash) || (identity.automaticUpdates !== false && !(identity.automaticUpdates === true && identity.updateTrust === (identity.platform === 'linux-x64' ? 'appimage' : 'signed'))))
     throw Error('Invalid Desktop build identity');
   for (const surface of ['web', 'desktop', 'local-server']) {
     const r = identity.surfaces?.[surface];
@@ -25,7 +25,7 @@ export function assertReleaseIdentity(identity, version) {
 }
 
 /** Executed before packaging: all three compiled surfaces must belong to this exact source. */
-export async function writeBuildIdentity(desktopRoot, output) {
+export async function writeBuildIdentity(desktopRoot, output, platform = 'windows-x64', automaticUpdates = false) {
   const agent = path.resolve(desktopRoot, '../..');
   await verifyDesktopRelease(desktopRoot);
   const git = (...args) => execFileSync('git', args, {cwd: agent, encoding: 'utf8'}).trim();
@@ -38,7 +38,7 @@ export async function writeBuildIdentity(desktopRoot, output) {
     surfaces[surface] = JSON.parse(await readFile(path.join(directory, 'release-inputs.json'), 'utf8'));
   }
   const identity = {schema: 'mycellios-desktop-build/1', version, revision: git('rev-parse', 'HEAD'),
-    tree: git('rev-parse', 'HEAD^{tree}'), platform: 'windows-x64', automaticUpdates: false,
+    tree: git('rev-parse', 'HEAD^{tree}'), platform, automaticUpdates, ...(automaticUpdates ? {updateTrust:platform==='linux-x64'?'appimage':'signed'} : {}),
     sourceHash: surfaces.desktop.sourceHash, surfaces};
   assertReleaseIdentity(identity, version);
   await mkdir(output, {recursive: true});
@@ -58,6 +58,7 @@ export async function hashes(file) {
 /** Produces a complete immutable package/manifest pair; never publishes it or changes a channel. */
 export async function writeWindowsRelease(directory, identity, smoke) {
   assertReleaseIdentity(identity, identity?.version);
+  if(identity.platform!=='windows-x64')throw Error('Windows release requires a Windows build');
   if (!smoke?.passed || smoke.version !== identity.version || smoke.revision !== identity.revision || !smoke.isolatedProfile)
     throw Error('Packaged startup qualification is missing or belongs to another build');
   const fileName = `Mycellios-Desktop-${identity.version}-windows-x64-pilot.exe`;
@@ -71,13 +72,16 @@ export async function writeWindowsRelease(directory, identity, smoke) {
       installation.revision!==identity.revision || installation.installerSha256!==artifact.sha256 ||
       !['fresh','legacy-to-compact'].every(label=>installation.measurements?.some(m=>m.label===label && m.exitCode===0 && Number.isFinite(m.elapsedMs) && m.elapsedMs>0 && m.elapsedMs<60000 && m.draftsPreserved===5 && m.taskMarkersPreserved===5))))
     throw Error('Real Windows installation timing/preservation qualification is missing');
+  if(identity.automaticUpdates){
+    execFileSync('pwsh',['-NoProfile','-NonInteractive','-Command',"$s=Get-AuthenticodeSignature -LiteralPath '"+path.join(directory,fileName).replaceAll("'","''")+"'; if($s.Status -ne 'Valid'){exit 1}"],{stdio:'pipe'});
+  }
   const blockmap = {fileName: fileName + '.blockmap', ...await hashes(path.join(directory, fileName + '.blockmap'))};
   const entry = {id: 'windows-x64', version: identity.version, format: 'EXE', fileName,
     path: `/downloads/desktop/releases/${identity.version}/${fileName}`, bytes: artifact.bytes, sha256: artifact.sha256};
   const manifest = {...identity,
     schema: 'mycellios-desktop-release-package/1', tag: releaseTag(identity.version), artifact, blockmap,
     catalogEntry: entry, qualifiedStartup: true, qualifiedInstallation:requireInstallation && !expedited,expedited,
-    ...(requireInstallation?{installation}:{}),signature: 'unsigned-preview'};
+    ...(requireInstallation?{installation}:{}),signature: identity.automaticUpdates ? 'authenticode' : 'unsigned-preview'};
   const previous = await readFile(path.join(directory, 'desktop-release.json'), 'utf8').then(JSON.parse).catch(e => {
     if (e.code === 'ENOENT') return null;
     throw e;

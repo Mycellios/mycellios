@@ -112,14 +112,23 @@ it("pairs an Apple Silicon PKG through the native administrator prompt without e
     await mkdir(path.join(macRoot,"bin"),{recursive:true});await writeFile(path.join(macRoot,"bin/node"),"fixture");
     await mkdir(path.join(macRoot,"app"),{recursive:true});await writeFile(path.join(macRoot,"app/manifest.json"),JSON.stringify({version:"0.2.95"}));return 0;
   });
-  const manager=new ContributionRuntime({...f.options,platform:"darwin",macRoot,macConfig,run});
+  const manager=new ContributionRuntime({...f.options,platform:"darwin",arch:"arm64",macRoot,macConfig,run});
   expect(await manager.enroll(bundle())).toMatchObject({supported:true,installed:true,enrolled:true,nodeId:"mac-existing-identity",version:"0.2.95"});
   await expect(manager.enroll(bundle())).rejects.toThrow("already has a runtime identity");expect(run).toHaveBeenCalledOnce();
   await expect(readFile(path.join(f.options.userData,"runtime-pairing",`${bundle().enrollmentId}.json`))).rejects.toMatchObject({code:"ENOENT"});
 });
 
 it("keeps Mac identity lookup separate from enrollment and never installs an unverified PKG",async()=>{
- const f=await fixture();const run=vi.fn(async()=>0);const manager=new ContributionRuntime({...f.options,platform:"darwin",macRoot:path.join(f.root,"none"),macConfig:path.join(f.root,"absent.json"),run});
+ const f=await fixture();const run=vi.fn(async()=>0);const manager=new ContributionRuntime({...f.options,platform:"darwin",arch:"arm64",macRoot:path.join(f.root,"none"),macConfig:path.join(f.root,"absent.json"),run});
  expect((await manager.identify()).installed).toBe(false);expect(run).not.toHaveBeenCalled();
  await expect(manager.enroll(bundle())).rejects.toThrow("verified");expect(run).not.toHaveBeenCalled();
+});
+
+it("refuses ARM contribution setup on Intel Macs before requesting privileges", async () => {
+ const f=await fixture();const run=vi.fn(async()=>0);
+ const manager=new ContributionRuntime({...f.options,platform:"darwin",arch:"x64",run});
+ expect((await manager.status()).supported).toBe(false);
+ await expect(manager.identify()).rejects.toThrow("not available");
+ await expect(manager.enroll(bundle())).rejects.toThrow("not available");
+ expect(run).not.toHaveBeenCalled();
 });
