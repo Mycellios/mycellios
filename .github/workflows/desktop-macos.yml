@@ -59,6 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
+          node --test scripts/macos-packaged-resources.test.mjs
           cd src/agent
           npm ci --ignore-scripts --no-audit --no-fund
           npm run db:generate
