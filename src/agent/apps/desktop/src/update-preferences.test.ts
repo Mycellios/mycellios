@@ -156,6 +156,38 @@ describe("native update preferences and idle restarts", () => {
     expect(ports.install).toHaveBeenCalledOnce();
     expect(policy.state().relaunchError).toBe(false);
   });
+  it("transfers a queued busy restart before Restart now and does not revive it after failure", async () => {
+    const { policy, ports, setState, setBusy, advance } = fixture({ autoInstallByDefault: true });
+    setState({ supportsForceRestart: true }); setBusy(true);
+    policy.request("update"); await settle();
+    expect(policy.state().relaunchPending).toBe(true);
+    await policy.forceInstall();
+    expect(ports.cancelInstall).toHaveBeenCalledBefore(ports.install);
+    expect(ports.install).toHaveBeenCalledExactlyOnceWith(true);
+    expect(policy.state().relaunchPending).toBe(false);
+    setState({ installPending: false, message: "Could not complete the update. Try again." });
+    await policy.tick(); setBusy(false);
+    for (let i = 0; i < 3; i++) { advance(); await policy.tick(); }
+    expect(ports.install).toHaveBeenCalledOnce();
+    expect(policy.state()).toMatchObject({ relaunchPending: false, relaunchError: true });
+  });
+  it("does not force an unsupported package or cancel its pending work", async () => {
+    const { policy, ports } = fixture({ installSupported: false });
+    await policy.forceInstall();
+    expect(ports.cancelInstall).not.toHaveBeenCalled();
+    expect(ports.install).not.toHaveBeenCalled();
+  });
+  it("does not revive an earlier renderer acknowledgement after Restart now takes ownership", async () => {
+    const { policy, ports, setState } = fixture();
+    setState({ supportsForceRestart: true });
+    let ready!: (value: boolean) => void;
+    ports.prepare.mockImplementationOnce(() => new Promise<boolean>(resolve => { ready = resolve; }));
+    policy.request("update"); await settle();
+    await policy.forceInstall();
+    ready(true); await settle();
+    expect(ports.install).toHaveBeenCalledExactlyOnceWith(true);
+    expect(policy.state().relaunchPending).toBe(false);
+  });
 });
 
 describe("installs applied by the system package manager", () => {

@@ -4,7 +4,7 @@ type Ports = {
   packaged: boolean; allowed: boolean;
   read(): Promise<string | null>; write(raw: string): Promise<void>;
   state(): DesktopUpdateState; download(): Promise<DesktopUpdateState>;
-  install(): Promise<DesktopUpdateState>; cancelInstall(): Promise<DesktopUpdateState>;
+  install(force?: boolean): Promise<DesktopUpdateState>; cancelInstall(): Promise<DesktopUpdateState>;
   busy(): boolean; prepare(): Promise<boolean>; relaunch(): Promise<void>;
   /** Package-manager installs are explicit only; unattended installation stays off. */
   installSupported?: boolean;
@@ -71,6 +71,14 @@ export class UpdatePreferences {
     ++this.revision; this.intent = kind; this.waiting = "local_work"; this.failed = false;
     this.automaticIntent = false; this.automaticRestartAt = undefined;
     void this.tick(); return this.state();
+  }
+  async forceInstall() {
+    const state = this.ports.state();
+    if (state.phase !== "ready" || state.supportsForceRestart !== true) return this.state();
+    // Transfer ownership to the manual controller. Otherwise a queued idle
+    // restart can remain pending (or retry again) after this handoff fails.
+    await this.cancel();
+    return this.ports.install(true);
   }
   async cancel() {
     ++this.revision; this.intent = null; this.waiting = undefined; this.failed = false;
