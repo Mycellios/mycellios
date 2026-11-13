@@ -42,7 +42,7 @@ export class EventDemoAgent {
         }), { operationId: "event-model", traceId: "event-model", userId, spaceId, signal: request.signal });
         await this.prisma.$transaction(async tx => {
           // Serialize repeated handoffs without holding a connection during secret storage.
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${credentialId}))`;
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${credentialId}, 0))::text AS lock`;
           if (await tx.userModelCredential.findUnique({ where: { id: credentialId } })) return;
           await tx.secret.create({ data: { id: stored.id, userId, spaceId: null, kind: "model", ciphertext: stored.ciphertext } });
           await tx.userModelCredential.create({ data: { id: credentialId, userId,
