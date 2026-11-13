@@ -227,6 +227,9 @@ These rules apply to the complete repository.
   runner checks do not substitute for physical Mac inference evidence.
   Preview bundles use explicit ad-hoc signing, never identity:null. Require strict
   deep codesign verification on both the app and its final read-only DMG. Record
+  Retry that identical strict verification at most once on an explicit read
+  timeout; report status, signal and bounded stderr for failures. A rejected
+  signature must fail immediately, never be retried or treated as a timeout.
   Gatekeeper assessment separately: ad-hoc integrity is not notarization or an
   automatically trusted browser download. Keep manual updates and never remove
   quarantine or disable Gatekeeper as part of qualification.
