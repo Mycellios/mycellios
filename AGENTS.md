@@ -200,6 +200,8 @@ These rules apply to the complete repository.
   Release publication is automatic; unsigned installation remains owner-approved.
   The historical Mac `assemble.mjs` is recovery tooling, never a current release
   input. The active Mac workflow packages canonical Agent source and local server.
+  Its pinned osx-sign 1.3.3 adapter scans binaries sequentially to avoid exhausting
+  file descriptors on large bundles; review the adapter when that dependency changes.
   Normal releases use this common publisher, never separate Windows promotion.
   The old Windows-only publisher requires both an explicit emergency recovery
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.
