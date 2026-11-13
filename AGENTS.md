@@ -202,6 +202,8 @@ These rules apply to the complete repository.
   input. The active Mac workflow packages canonical Agent source and local server.
   Its pinned osx-sign 1.3.3 adapter scans binaries sequentially to avoid exhausting
   file descriptors on large bundles; review the adapter when that dependency changes.
+  Mac packages use the existing compact local-server/development ASAR resources;
+  preserve isolated packaged-server checks and strict final-DMG verification.
   Normal releases use this common publisher, never separate Windows promotion.
   The old Windows-only publisher requires both an explicit emergency recovery
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.
