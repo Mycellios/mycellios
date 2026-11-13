@@ -8,11 +8,13 @@ import type { ApiAccessManager } from "./api-access.js";
 import type { MobileComputeHub } from "./mobile-compute-hub.js";
 import type { BrowserInferenceConfig } from "../core/browser-inference-config.js";
 import { browserTextChat } from "./browser-text-chat.js";
+import type { ManagedEventBudget } from "../economy/managed-event-budget.js";
 
 type Principal = (request: FastifyRequest) => { kind: string; userId?: string; apiKeyId?: string };
 export async function initializeBrowserInference(app: FastifyInstance, deps: {
   database: MeshDatabase; wallet: ContributionCreditWallet | null; api: ApiAccessManager;
   hub: MobileComputeHub; config: BrowserInferenceConfig | undefined; apiEnabled: boolean; principal: Principal;
+  eventBudget?: ManagedEventBudget | undefined;
 }) {
   if (deps.config && (!deps.wallet || !deps.apiEnabled)) throw new Error("browser_inference_requires_account_wallet");
   if (!deps.wallet) return;
@@ -24,7 +26,7 @@ export async function initializeBrowserInference(app: FastifyInstance, deps: {
     await deps.hub.textHub.enable(app, deps.config.textModelsPath);
   }
   const service = new BrowserInference(deps.database, deps.wallet, deps.api, deps.hub,
-    deps.config?.offers ?? [], deps.config?.dailyLimitMicrounits ?? 1);
+    deps.config?.offers ?? [], deps.config?.dailyLimitMicrounits ?? 1, deps.eventBudget);
   await service.initialize();
   // Closing new work must not strand reservations or already verified receipts.
   mountBrowserInference(app, service, deps.principal);

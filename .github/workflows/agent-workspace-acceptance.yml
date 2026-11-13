@@ -89,6 +89,8 @@ jobs:
         run: node scripts/verify-workspace-sync-ui.mjs --output=workspace-proof
       - name: Exercise the permanent Mycellios picker without paid inference
         run: node scripts/verify-builtin-provider-ui.mjs --output=builtin-provider-proof
+      - name: Exercise guest demo, mobile layout, pause and read-only response recovery
+        run: node scripts/verify-event-demo-ui.mjs --output=event-demo-proof
       - name: Exercise conversation delivery, progress and reduced motion
         run: node scripts/verify-chat-fluidity.mjs --output=chat-flow-proof
       - name: Exercise actual companion images in the deployed app namespace
@@ -105,6 +107,7 @@ jobs:
           path: |
             src/agent/workspace-proof
             src/agent/builtin-provider-proof
+            src/agent/event-demo-proof
             src/agent/chat-flow-proof
             src/agent/companion-avatar-proof
             src/agent/playwright-integration-report

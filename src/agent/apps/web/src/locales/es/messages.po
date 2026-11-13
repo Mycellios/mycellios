@@ -12445,3 +12445,235 @@ msgstr "Qué hace este agente"
 
 msgid "Yes"
 msgstr "Sí"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "0.20 credits per guest"
+msgstr "0,20 créditos por invitado"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "A network built together."
+msgstr "Una red que construimos juntos."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "All 50 demo places have been taken."
+msgstr "Ya se han ocupado los 50 accesos de la demo."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Ask a question, explore an idea or try something new."
+msgstr "Haz una pregunta, explora una idea o prueba algo nuevo."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Available for inference"
+msgstr "Disponible para inferencia"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Browser contribution"
+msgstr "Aportar desde el navegador"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Chatting"
+msgstr "En el chat"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Check response"
+msgstr "Comprobar respuesta"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connected does not mean busy. Only completed and verified inference earns credits."
+msgstr "Estar conectado no significa estar trabajando. Solo las inferencias completadas y verificadas generan créditos."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connecting your browser…"
+msgstr "Conectando tu navegador…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connection interrupted"
+msgstr "Conexión interrumpida"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Connection interrupted. Showing the last confirmed state."
+msgstr "Conexión interrumpida. Mostramos el último estado confirmado."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Conversation"
+msgstr "Conversación"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Copy invitation"
+msgstr "Copiar invitación"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Could not connect. Try Play again."
+msgstr "No se pudo conectar. Pulsa Play para intentarlo de nuevo."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Earned by verified work"
+msgstr "Ganado con trabajo verificado"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Event devices"
+msgstr "Dispositivos del evento"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Explain Mycellios in one sentence"
+msgstr "Explica Mycellios en una frase"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "First 50 guests · 48 hours"
+msgstr "Primeros 50 accesos · 48 horas"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Give me an idea for my business"
+msgstr "Dame una idea para mi negocio"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Guest"
+msgstr "Invitado"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Guests"
+msgstr "Invitados"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Help me prepare a presentation"
+msgstr "Ayúdame a preparar una presentación"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "In the network"
+msgstr "En la red"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Live"
+msgstr "En directo"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Message Mico"
+msgstr "Mensaje a Mico"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Mico is thinking…"
+msgstr "Mico está pensando…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Mycellios demo"
+msgstr "Demo de Mycellios"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "No available browser completed the work. No credits are awarded for failed work."
+msgstr "Ningún navegador pudo completar el trabajo. Los trabajos fallidos no generan créditos."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "No registration. Your own chat and 0.20 demo credits."
+msgstr "Sin registro. Tu propio chat y 0,20 créditos para probarlo."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Open your presenter link to see this event."
+msgstr "Abre tu enlace de presentador para ver este evento."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Preparing your Mico…"
+msgstr "Preparando tu Mico…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Private chats stay off this screen. Connected devices and real verified work only."
+msgstr "Los chats son privados. Aquí solo se muestran los dispositivos conectados y el trabajo real verificado."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Real consumption +4%. Temporary demo balance."
+msgstr "Consumo real +4 %. Saldo temporal de la demo."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Real inference completed"
+msgstr "Inferencia real completada"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Running inference"
+msgstr "Ejecutando inferencia"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Running inference…"
+msgstr "Ejecutando inferencia…"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Scan. Ask Mico. Press Play to join the network."
+msgstr "Escanea. Pregunta a Mico. Pulsa Play para unirte a la red."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Send message"
+msgstr "Enviar mensaje"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Send this saved message"
+msgstr "Enviar este mensaje guardado"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Share your browser's computing power."
+msgstr "Aporta la potencia de tu navegador."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Start contribution"
+msgstr "Activar"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Test the network"
+msgstr "Probar la red"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "The browser uses a small local model. DeepSeek chat uses Mycellios external processing."
+msgstr "El navegador ejecuta un modelo pequeño. El chat con DeepSeek usa procesamiento externo a través de Mycellios."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "This demo has ended. Thank you for joining us."
+msgstr "La demo ha terminado. Gracias por participar."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "This demo has ended. Your conversation remains visible here."
+msgstr "La demo ha terminado. Tu conversación sigue visible aquí."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "This event is closed."
+msgstr "Este evento ha terminado."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Try Mycellios"
+msgstr "Prueba Mycellios"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Verified inference"
+msgstr "Inferencias verificadas"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "We are checking this response. Your message has been saved; it will not be charged twice."
+msgstr "Estamos comprobando la respuesta. Tu mensaje está guardado y no se cobrará dos veces."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "We could not connect. Check your connection and try again."
+msgstr "No hemos podido conectar. Revisa tu conexión y vuelve a intentarlo."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "You have used your demo credits."
+msgstr "Has utilizado los créditos de tu demo."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your browser in the network"
+msgstr "Tu navegador en la red"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your browser is available to the network."
+msgstr "Tu navegador está disponible en la red."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your guests will appear here as they join."
+msgstr "Tus invitados aparecerán aquí cuando entren."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your own Mico. No registration."
+msgstr "Tu propio Mico. Sin registro."
+
+#: src/pages/demo/EventDemo.tsx
+msgid "Your remaining demo balance"
+msgstr "Tu saldo disponible para la demo"
+
+#: src/pages/demo/EventDemo.tsx
+msgid "credits"
+msgstr "créditos"

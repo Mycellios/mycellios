@@ -42,6 +42,7 @@ import {
 import { rakazoPwa } from "./src/pwa/plugin.js";
 import { workspaceViteAliases } from "../desktop/scripts/workspace-aliases.mjs";
 import type { ScreenTargetFailure } from "./src/screen-proxy.js";
+import { eventDemoProxyCookie } from "./src/event-demo-proxy.js";
 import {
   checkScreenAuthorization,
   novncRequestPath,
@@ -494,7 +495,10 @@ export default defineConfig(async ({ command, mode }) => {
   const workerTarget = new URL(process.env.MYCELLIOS_BROWSER_COORDINATOR ?? rootEnv.MYCELLIOS_BROWSER_COORDINATOR ?? localWorkerTarget ?? "https://www.mycellios.com");
   if (workerTarget.origin !== "https://www.mycellios.com" && !(/^https?:$/.test(workerTarget.protocol) && ["127.0.0.1", "localhost", "[::1]"].includes(workerTarget.hostname))) throw new Error("Invalid browser coordinator");
   apiProxy["/mobile/v1"] = { target: workerTarget.origin, changeOrigin: true, ws: true, configure(proxy) {
-    proxy.on("proxyReq", req => req.removeHeader("cookie"));
+    proxy.on("proxyReq", (req, incoming) => {
+      const scoped = eventDemoProxyCookie(incoming.url ?? "", incoming.headers.cookie);
+      if (scoped) req.setHeader("cookie", scoped); else req.removeHeader("cookie");
+    });
     proxy.on("proxyReqWs", req => req.removeHeader("cookie"));
   } };
   apiProxy["/browser/ort/"] = { target: workerTarget.origin, changeOrigin: true };

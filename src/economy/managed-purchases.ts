@@ -1,4 +1,5 @@
 import type { MeshDatabase } from "../storage/database.js";
+import { managedAdmissionBudget, type ManagedEventBudget } from "./managed-event-budget.js";
 import type { ContributionCreditWallet } from "./contribution-credit-wallet.js";
 import { PromotionalCredits } from "./promotional-credits.js";
 import { managedCharge, usdAtoms } from "./managed-pricing.js";
@@ -57,9 +58,15 @@ export function managedPurchasesAccessSchemaSql(runtimeRole: string): string {
 export class ManagedPurchases {
   private promotions: PromotionalCredits | null = null;
   constructor(private readonly db: MeshDatabase, private readonly wallet: ContributionCreditWallet,
-    private readonly dailyLimitMicrounits: number, private readonly totalLimitMicrounits?: number) {
+    private readonly dailyLimitMicrounits: number, private readonly totalLimitMicrounits?: number,
+    private readonly eventBudget?: ManagedEventBudget) {
     if (!Number.isSafeInteger(dailyLimitMicrounits) || dailyLimitMicrounits < 1) throw new Error("managed_budget_invalid");
     if (totalLimitMicrounits !== undefined && (!Number.isSafeInteger(totalLimitMicrounits) || totalLimitMicrounits < 1)) throw new Error("managed_budget_invalid");
+    if (eventBudget && (!/^[a-z0-9-]{8,64}$/.test(eventBudget.campaignId) || !Number.isSafeInteger(eventBudget.maximumMicrounits)
+      || eventBudget.maximumMicrounits < 1 || eventBudget.maximumMicrounits > 10_000_000
+      || !Number.isSafeInteger(eventBudget.startsAt) || !Number.isSafeInteger(eventBudget.endsAt)
+      || eventBudget.endsAt <= eventBudget.startsAt || eventBudget.endsAt - eventBudget.startsAt > 48 * 3_600_000))
+      throw new Error("managed_budget_invalid");
   }
   async initialize() {
     if (this.db.raw.dialect !== "postgres") throw new Error("managed_purchases_require_postgres");
@@ -91,12 +98,8 @@ export class ManagedPurchases {
       }
       await this.assertAdmitting(input.provider);
       const now = Date.now();
-      const dayStart = now - now % 86_400_000;
-      const budget = await this.db.raw.prepare(`SELECT COALESCE(SUM(CASE WHEN p.state='settled' THEN p.total_microunits
-        ELSE h.amount_microunits END),0) AS total FROM economic_managed_purchases p
-        JOIN economic_credit_holds h ON h.id=p.usage_id
-        WHERE (p.state='settled' AND COALESCE(p.settled_at,p.created_at)>=?) OR p.state IN ('reserved','submitted','uncertain')`).get(dayStart);
-      if (Number(budget?.total ?? 0) + amount > this.dailyLimitMicrounits) throw new Error("managed_operator_budget_exceeded");
+      const budget = await managedAdmissionBudget(this.db, input.accountId, now, this.dailyLimitMicrounits, this.eventBudget);
+      if (budget.used + amount > budget.limit) throw new Error("managed_operator_budget_exceeded");
       if (this.totalLimitMicrounits !== undefined) {
         const lifetime = await this.db.raw.prepare(`SELECT COALESCE(SUM(CASE WHEN p.state='settled' THEN p.total_microunits
           ELSE h.amount_microunits END),0) AS total FROM economic_managed_purchases p

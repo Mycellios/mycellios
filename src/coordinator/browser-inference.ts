@@ -6,6 +6,7 @@ import { sha256CanonicalEvidence } from "../core/json.js";
 import { managedCharge } from "../economy/managed-pricing.js";
 import { browserTextResultSchema } from "../contracts/browser-text.js";
 import { ManagedPurchases } from "../economy/managed-purchases.js";
+import type { ManagedEventBudget } from "../economy/managed-event-budget.js";
 import type { MeshDatabase } from "../storage/database.js";
 import type { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
 import type { ApiAccessManager } from "./api-access.js";
@@ -28,11 +29,11 @@ export class BrowserInference {
   private contributorCursor = 0;
   constructor(private readonly db: MeshDatabase, wallet: ContributionCreditWallet,
     private readonly usage: ApiAccessManager, private readonly hub: MobileComputeHub,
-    offers: BrowserInferenceOffer[], dailyLimitMicrounits: number) {
+    offers: BrowserInferenceOffer[], dailyLimitMicrounits: number, eventBudget?: ManagedEventBudget) {
     // An empty catalog closes admission while retaining receipt/lease recovery.
     this.offers = z.array(browserInferenceOfferSchema).max(32).parse(offers);
     if (new Set(this.offers.map(o => o.model)).size !== this.offers.length) throw new Error("browser_offer_duplicate");
-    this.purchases = new ManagedPurchases(db, wallet, dailyLimitMicrounits);
+    this.purchases = new ManagedPurchases(db, wallet, dailyLimitMicrounits, undefined, eventBudget);
   }
   async initialize() {
     await this.purchases.initialize();

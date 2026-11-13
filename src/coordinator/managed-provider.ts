@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { CoordinatorConfig } from "../core/config.js";
+import { eventDemoBudget } from "../core/event-demo-config.js";
 import type { MeshDatabase } from "../storage/database.js";
 import type { ContributionCreditWallet } from "../economy/contribution-credit-wallet.js";
 import { ManagedPurchases } from "../economy/managed-purchases.js";
@@ -38,7 +39,8 @@ export async function initializeManagedProvider(config: CoordinatorConfig, datab
   // unit contracts may enter the managed media catalog; legacy offers are fixtures.
   if(config.managedProvider.mediaOffers?.length)throw new Error("managed_media_cost_contract_not_qualified");
   if (!config.apiAccessEnabled || !wallet) throw new Error("managed_provider_requires_accounts_and_credit_funding");
-  const purchases = new ManagedPurchases(database, wallet, config.managedProvider.dailyLimitMicrounits, config.managedProvider.totalLimitMicrounits);
+  const purchases = new ManagedPurchases(database, wallet, config.managedProvider.dailyLimitMicrounits,
+    config.managedProvider.totalLimitMicrounits, eventDemoBudget(config.eventDemo));
   await purchases.initialize();
   const settings = config.managedProvider;
   const upstream = settings.upstream ?? "antseed";
@@ -67,6 +69,7 @@ export async function initializeManagedProvider(config: CoordinatorConfig, datab
     await topups.initialize();
   }
   return {
+    textGateway: gateway,
     catalog: () => gateway.catalog(),
     inventory: async () => text.inventory(),
     mount: (app: FastifyInstance, principalFor: (request: FastifyRequest) => Principal) => {

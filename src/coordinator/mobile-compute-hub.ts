@@ -743,6 +743,11 @@ export class MobileComputeHub {
     return this.listWorkers().filter((worker) => worker.connected).length;
   }
 
+  /** Read-only telemetry. Benchmarks and a merely connected socket are not inference. */
+  isFundedInferenceActive(workerId: string): boolean {
+    return this.fundedBusy.has(workerId);
+  }
+
   onlineCount(): number {
     return this.listWorkers().filter((worker) => worker.status === "online").length;
   }

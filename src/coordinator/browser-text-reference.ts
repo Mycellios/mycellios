@@ -9,17 +9,18 @@ export class BrowserTextReference {
   constructor(private readonly directory:string){}
   private start(){
     const development=import.meta.url.endsWith(".ts");
-    const entry=new URL(`./browser-text-reference-worker.${development?"ts":"js"}`,import.meta.url);
+    const entry=development?new URL("./browser-text-reference-worker.ts",import.meta.url)
+      :new URL("./browser-text-reference-worker.js",import.meta.url);
     // Source checkouts use the existing dev loader; release workers execute compiled JS directly.
-    const worker=development?new Worker(`import(${JSON.stringify(import.meta.resolve("tsx/esm/api"))}).then(m=>m.tsImport(${JSON.stringify(entry.href)},${JSON.stringify(import.meta.url)})).catch(()=>process.exit(1));`,{
+    const worker=development?new Worker(`import(${JSON.stringify(import.meta.resolve("tsx/esm/api"))}).then(m=>m.tsImport(${JSON.stringify(entry.href)},${JSON.stringify(import.meta.url)}));`,{
       eval:true,workerData:{directory:this.directory},resourceLimits:{maxOldGenerationSizeMb:512,stackSizeMb:4},
     }):new Worker(entry,{workerData:{directory:this.directory},resourceLimits:{maxOldGenerationSizeMb:512,stackSizeMb:4}});
     worker.on("message",message=>{
       const pending=this.pending;if(!pending||message.id!==pending.id)return;
       this.pending=null;const result=browserTextResultSchema.safeParse(message.result);
-      if(!result.success)pending.reject(new Error("browser_text_reference_failed"));else pending.resolve(result.data);
+      if(!result.success)pending.reject(new Error("browser_text_reference_failed",{cause:message.diagnostic}));else pending.resolve(result.data);
     });
-    const fail=()=>{if(this.worker!==worker)return;this.worker=null;this.pending?.reject(new Error("browser_text_reference_failed"));this.pending=null;};
+    const fail=(cause:unknown)=>{if(this.worker!==worker)return;this.worker=null;this.pending?.reject(new Error("browser_text_reference_failed",{cause}));this.pending=null;};
     worker.on("error",fail);worker.on("exit",fail);this.worker=worker;
   }
   async generate(request:BrowserTextRequest,signal:AbortSignal){
