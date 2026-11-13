@@ -35,13 +35,13 @@ function DemoChat({ id }: { id: string }) {
         let current: EventDemoSession;
         try { current = await api.session(); }
         catch (error) { if ((error as Error).message !== "demo_session_required") throw error; current = await api.enter(); }
-        if (!stopped) { setMeta(metadata); setSession(current); setIssue(null); }
+        if (!stopped) { setMeta(metadata); setSession(current); setIssue(initial.pending ? "demo_request_unconfirmed" : null); }
       } catch (error) { if (!stopped) setIssue((error as Error).message); }
       finally { if (!stopped) setStarting(false); }
     })();
     const poll = window.setInterval(refresh, 10_000);
     return () => { stopped = true; clearInterval(poll); controller.current?.abort(); };
-  }, [api, refresh]);
+  }, [api, refresh, initial.pending]);
   useEffect(() => { cache.save(messages, pending); }, [cache, messages, pending]);
   useEffect(() => {
     if (!session?.open) return;

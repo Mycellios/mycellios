@@ -81,6 +81,10 @@ export function demoCache(id: string) {
         const value = JSON.parse(raw);
         if (!Array.isArray(value.messages) || value.messages.some((m: DemoMessage) =>
           !["user", "assistant"].includes(m?.role) || typeof m.content !== "string" || m.content.length > 16_384)) throw new Error();
+        if (value.pending && (typeof value.pending.key !== "string" || !/^[a-f0-9-]{36}$/i.test(value.pending.key)
+          || !Array.isArray(value.pending.messages) || !value.pending.messages.length || value.pending.messages.length > 12
+          || value.pending.messages.some((m: DemoMessage) => !["user", "assistant"].includes(m?.role)
+            || typeof m.content !== "string" || m.content.length > 2000))) throw new Error();
         return { messages: value.messages.slice(-40), pending: value.pending ?? null };
       } catch { return { messages: [], pending: null }; }
     },

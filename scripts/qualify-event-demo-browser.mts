@@ -72,6 +72,7 @@ try {
   const { chromium, expect } = await import("../src/agent/node_modules/@playwright/test/index.mjs");
   process.env.RAKAZO_PROJECT_LOCAL = "1"; process.env.MYCELLIOS_BROWSER_COORDINATOR = "http://127.0.0.1:5197";
   const webRoot = join(root, "src/agent/apps/web");
+  process.chdir(webRoot); // Lingui resolves its own config from the workspace, as the deployed build does.
   vite = await createServer({ root: webRoot, configFile: join(webRoot, "vite.config.ts"),
     optimizeDeps: { entries: [join(webRoot, "e2e/fixtures/event-demo.tsx")] }, server: { host: "127.0.0.1", port: 5198, strictPort: true },
     plugins: [{ name: "isolated-real-demo", configureServer(server) { server.middlewares.use(async (req, res, next) => {
