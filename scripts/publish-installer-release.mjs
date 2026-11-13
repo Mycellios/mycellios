@@ -47,11 +47,11 @@ if(!bound(android)||android.applicationId!=='com.mycellios.android'||!/^\d+\.\d+
 const badging=await fs.readFile(path.join(androidFolder,'apk-badging.txt'),'utf8');
 if(!badging.includes("name='com.mycellios.android'")||!badging.includes(`versionCode='${android.versionCode}'`)||!badging.includes(`versionName='${android.version}'`))throw Error('APK metadata differs');
 const apk=await stage(path.join(androidFolder,'android-build-input.apk'));
-await stage(path.join(androidFolder,'android-build.json'));await stage(path.join(androidFolder,'apk-badging.txt'));
+const androidReceipt=await stage(path.join(androidFolder,'android-build.json'));await stage(path.join(androidFolder,'apk-badging.txt'));
 const sourceName=`Mycellios-Desktop-${version}-source-${revision.slice(0,8)}.tar.gz`;
 git('archive','--format=tar.gz','--prefix=mycellios/',`--output=${path.join(out,sourceName)}`,'HEAD');
 const sourceStat=await fs.stat(path.join(out,sourceName)),source={fileName:sourceName,sha256:await digest(path.join(out,sourceName)),bytes:sourceStat.size};artifacts.push(source);
-const manifest={schema:'mycellios-installer-release/1',version,revision,tree,workflowRun:Number(process.env.GITHUB_RUN_ID),automaticUpdates:false,platforms,source,android:{version:android.version,versionCode:android.versionCode,applicationId:android.applicationId,minSdk:26,input:apk,signing:'original-host-required',signerSha256:'55121c1851944597566e2ccd0f87590cf2fa7e36acded7c8003627edcb39016c'},artifacts:[...artifacts]};
+const manifest={schema:'mycellios-installer-release/1',version,revision,tree,workflowRun:Number(process.env.GITHUB_RUN_ID),automaticUpdates:false,platforms,source,android:{version:android.version,versionCode:android.versionCode,applicationId:android.applicationId,minSdk:26,input:apk,buildReceipt:androidReceipt,signing:'original-host-required',signerSha256:'55121c1851944597566e2ccd0f87590cf2fa7e36acded7c8003627edcb39016c'},artifacts:[...artifacts]};
 await fs.writeFile(path.join(out,'installer-release.json'),JSON.stringify(manifest,null,2));
 const m=path.join(out,'installer-release.json');artifacts.push({fileName:'installer-release.json',sha256:await digest(m),bytes:(await fs.stat(m)).size});
 await fs.writeFile(path.join(out,'SHA256SUMS-all.txt'),artifacts.map(a=>`${a.sha256}  ${a.fileName}`).join('\n')+'\n');

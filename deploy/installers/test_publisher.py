@@ -9,7 +9,7 @@ def manifest():
     return {'schema':'mycellios-installer-release/1','version':version,'revision':revision,'tree':'c'*40,'workflowRun':1,'automaticUpdates':False,
             'platforms':[dict(item('Mycellios-Desktop-'+version+'-'+suffix),id=identity,format=fmt,version=version) for identity,(fmt,suffix) in p.IDS.items()],
             'source':item('Mycellios-Desktop-'+version+'-source-'+revision[:8]+'.tar.gz'),
-            'android':{'version':'1.3.48','versionCode':103048,'applicationId':'com.mycellios.android','minSdk':26,'signerSha256':p.SIGNER,'input':item('android-build-input.apk')}}
+            'android':{'version':'1.3.48','versionCode':103048,'applicationId':'com.mycellios.android','minSdk':26,'signerSha256':p.SIGNER,'input':item('android-build-input.apk'),'buildReceipt':item('android-build.json')}}
 
 def catalogs():
     windows={'id':'windows-x64','version':'0.3.47','operatorMetadata':'retained'}
@@ -79,5 +79,19 @@ class PublisherTests(unittest.TestCase):
             text='Signer #1 certificate SHA-256 digest: '+'f'*64+'\nVerified using v2 scheme (APK Signature Scheme v2): true\nVerified using v3 scheme (APK Signature Scheme v3): true'
             with patch.object(p.subprocess,'check_output',return_value=text):
                 with self.assertRaises(ValueError):p.sign_android(config,stage,manifest()['android'])
+
+    def test_actual_apk_web_must_match_the_current_source_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            apk=Path(tmp)/'fixture.apk';m=manifest();data=b'qualified application'
+            receipt={'revision':m['revision'],'tree':m['tree'],'version':m['android']['version'],'versionCode':m['android']['versionCode'],'applicationId':'com.mycellios.android','sharedWebFiles':{'index.html':p.hashlib.sha256(data).hexdigest()}}
+            def write(body, extra=False):
+                with p.zipfile.ZipFile(apk,'w') as z:
+                    z.writestr('assets/web/index.html',body);z.writestr('assets/web-files.json','["index.html"]')
+                    if extra:z.writestr('assets/web/stale.js','stale source')
+            write(data);p.verify_android_web(apk,receipt,m)
+            write(b'previous release')
+            with self.assertRaises(ValueError):p.verify_android_web(apk,receipt,m)
+            write(data,True)
+            with self.assertRaises(ValueError):p.verify_android_web(apk,receipt,m)
 
 if __name__=='__main__':unittest.main()

@@ -1,5 +1,5 @@
 """Promote qualified first-party installers; the Android key stays on its host."""
-import argparse, base64, copy, fcntl, hashlib, json, os, re, shutil, subprocess, urllib.request
+import argparse, base64, copy, fcntl, hashlib, json, os, re, shutil, subprocess, urllib.request, zipfile
 from pathlib import Path
 
 REPO = 'Mycellios/mycellios'
@@ -46,6 +46,9 @@ def validate_manifest(m):
         raise ValueError('Source archive differs')
     a = m.get('android', {})
     asset(a.get('input'))
+    asset(a.get('buildReceipt'))
+    if a['buildReceipt']['fileName'] != 'android-build.json' or a['buildReceipt']['bytes'] > 4_000_000:
+        raise ValueError('Invalid Android web receipt')
     if a.get('applicationId') != 'com.mycellios.android' or a.get('minSdk') != 26 \
        or a.get('version') != f'{major+1}.{minor}.{patch}' \
        or a.get('versionCode') != 100_000 + major * 1_000_000 + minor * 1000 + patch \
@@ -192,6 +195,35 @@ def sign_android(config, stage, a):
         raise ValueError('APK does not preserve the original release signer')
     return apk
 
+def verify_android_web(apk, receipt, manifest):
+    a = manifest['android']
+    if receipt.get('revision') != manifest['revision'] or receipt.get('tree') != manifest['tree'] \
+       or receipt.get('version') != a['version'] or receipt.get('versionCode') != a['versionCode'] \
+       or receipt.get('applicationId') != 'com.mycellios.android':
+        raise ValueError('APK web receipt belongs to another source')
+    files = receipt.get('sharedWebFiles', {})
+    if not isinstance(files, dict) or not 1 <= len(files) <= 20_000:
+        raise ValueError('APK has no qualified web assets')
+    for name, sha in files.items():
+        if not isinstance(name, str) or name.startswith('/') or '\\' in name or '..' in name.split('/') or not re.fullmatch('[a-f0-9]{64}', sha):
+            raise ValueError('Invalid APK web asset path')
+    with zipfile.ZipFile(apk) as z:
+        entries = [i for i in z.infolist() if i.filename.startswith('assets/web/') and not i.is_dir()]
+        if len(entries) != len(files) or len({i.filename for i in entries}) != len(entries) or sum(i.file_size for i in entries) > 268_435_456:
+            raise ValueError('APK includes stale or unqualified web resources')
+        for i in entries:
+            name = i.filename[len('assets/web/'):]
+            if name not in files or i.file_size > 67_108_864:
+                raise ValueError('APK web resource exceeds its bound')
+            h = hashlib.sha256()
+            with z.open(i) as f:
+                while block := f.read(1_048_576): h.update(block)
+            if h.hexdigest() != files[name]:
+                raise ValueError('APK does not contain the qualified shared application')
+        index = z.getinfo('assets/web-files.json')
+        if index.file_size > 4_000_000 or json.loads(z.read(index)) != sorted(files):
+            raise ValueError('APK asset index differs')
+
 def once(config):
     state, desktop, android = (Path(config[k]) for k in ['state', 'desktopRoot', 'androidRoot'])
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -215,10 +247,14 @@ def once(config):
         if completed.exists():
             return
         run = json_url(f"https://api.github.com/repos/{REPO}/actions/runs/{m['workflowRun']}")
-        if run.get('status') != 'completed':
+        if run.get('conclusion') == 'cancelled':
             return
-        if run.get('conclusion') != 'success' or run.get('head_sha') != m['revision'] or run.get('path') != '.github/workflows/installer-release.yml' or run.get('head_repository', {}).get('full_name') != REPO:
-            raise ValueError('Only the successful trusted release workflow may promote')
+        if run.get('head_sha') != m['revision'] or run.get('path', '').split('@')[0] != '.github/workflows/installer-release.yml' or run.get('head_repository', {}).get('full_name') != REPO:
+            raise ValueError('Only the trusted release workflow may promote')
+        jobs = json_url(f"https://api.github.com/repos/{REPO}/actions/runs/{m['workflowRun']}/jobs?per_page=100")
+        published = [j for j in jobs.get('jobs', []) if j.get('name') == 'publish']
+        if len(published) != 1 or published[0].get('conclusion') != 'success':
+            return  # The final workflow health job waits for this host's promotion.
         ref = json_url(f'https://api.github.com/repos/{REPO}/git/ref/tags/{tag}')
         if ref.get('object', {}).get('type') != 'commit' or ref['object']['sha'] != m['revision']:
             raise ValueError('Published source tag moved')
@@ -227,17 +263,21 @@ def once(config):
             raise ValueError('Release source is not integrated')
         originals = {n: json.loads((desktop/n).read_text()) for n in names}
         plan = catalog_plan(m, originals)
-        for p in m['platforms']+[m['source'], m['android']['input']]:
+        inputs = m['platforms']+[m['source'], m['android']['input'], m['android']['buildReceipt']]
+        for p in inputs:
             remote = [a for a in release['assets'] if a['name']==p['fileName']]
             if len(remote)!=1 or remote[0].get('size')!=p['bytes'] or remote[0].get('digest')!='sha256:'+p['sha256']:
                 raise ValueError('GitHub artifact receipt differs')
         stage = state/m['revision']; stage.mkdir(mode=0o700, exist_ok=True)
-        missing = sum(p['bytes'] for p in m['platforms']+[m['source'], m['android']['input']] if not (stage/p['fileName']).exists())
+        missing = sum(p['bytes'] for p in inputs if not (stage/p['fileName']).exists())
         if shutil.disk_usage(state).free < missing*2+536_870_912:
             raise ValueError('Insufficient space for staging and retained rollback')
-        for p in m['platforms']+[m['source'], m['android']['input']]:
+        for p in inputs:
             download(base+p['fileName'], stage/p['fileName'], p)
+        web_receipt = json.loads((stage/'android-build.json').read_text())
+        verify_android_web(stage/'android-build-input.apk', web_receipt, m)
         apk = sign_android(config, stage, m['android'])
+        verify_android_web(apk, web_receipt, m)
         for p in m['platforms']+[m['source']]:
             public_file(stage/p['fileName'], desktop/'releases'/m['version']/p['fileName'])
         for p in m['platforms']:

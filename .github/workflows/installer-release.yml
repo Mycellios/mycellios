@@ -82,3 +82,18 @@ jobs:
           path: release-inputs
       - name: Publish only the exact qualified platform set
         run: node scripts/publish-installer-release.mjs release-inputs
+  verify-promotion:
+    needs: [admit, publish]
+    if: needs.admit.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ needs.admit.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+      - name: Verify public catalogs, original Android signer and actual downloads
+        run: node scripts/verify-installer-promotion.mjs
