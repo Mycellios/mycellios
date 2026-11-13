@@ -44,6 +44,7 @@ import { createAgentSkillsService } from "../agent-skills.js";
 import { createBotRemoval } from "../bot-removal.js";
 import { createMcpServers } from "../mcp-servers.js";
 import { createModelConnector, prepareAllowedThinkingLevels } from "../model-credentials.js";
+import { createMycelliosProvider } from "../mycellios-provider.js";
 import type { RouterDeps } from "../router.js";
 import { createRoutineAnnouncer } from "../routines.js";
 import { procedureSecurityEvent } from "../security-audit.js";
@@ -103,6 +104,7 @@ export function createRouterContext(deps: RouterDeps) {
   } = createMcpServers(deps, onboardingDeps, mcpOAuth);
   const announceRoutine = createRoutineAnnouncer(deps);
   const codexCatalog = deps.codexCatalog ?? new CodexCatalogCache();
+  const mycelliosProvider = createMycelliosProvider(deps, codexCatalog);
   const { verifyModelConnection, connectModelCredential } = createModelConnector(
     deps,
     codexCatalog,
@@ -358,6 +360,13 @@ export function createRouterContext(deps: RouterDeps) {
       if (!actor) throw new ORPCError("UNAUTHORIZED");
       return asTenant(actor, () => next({ context: { ...context, actor } }));
     })
+    .use(async ({ context, next, path }) => {
+      if (path.length === 1 && (path[0] === "me" || path[0] === "bootstrap") ||
+          path.length === 2 && path[0] === "models" && path[1] === "credentials") {
+        await mycelliosProvider.ensure(context.actor, context.requestHeaders, context.signal);
+      }
+      return next();
+    })
     .use(async ({ context, next, path }, input) => {
       const result = await next();
       const event = procedureSecurityEvent(path, input, context.actor);
@@ -401,6 +410,7 @@ export function createRouterContext(deps: RouterDeps) {
     announceMcpServer,
     announceRoutine,
     codexCatalog,
+    mycelliosProvider,
     connectModelCredential,
     favicons,
     refreshExpiredCredential,

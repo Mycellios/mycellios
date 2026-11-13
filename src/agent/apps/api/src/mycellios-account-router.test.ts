@@ -68,6 +68,7 @@ function fixture(mycelliosSso = false) {
     });
   };
   return {
+    deps,
     actor,
     accountToken: deps.auth.oidcAccessToken as ReturnType<typeof vi.fn>,
     preference,
@@ -86,6 +87,43 @@ function fixture(mycelliosSso = false) {
 }
 
 describe("Mycellios account RPC authorization", () => {
+  it("keeps the built-in connection and its roles during a legacy bulk disconnect", async () => {
+    const f = fixture(true); f.connected(); f.secret.mockResolvedValue({ ciphertext: "encrypted-fixture" });
+    const remove = vi.fn().mockResolvedValue({ count: 1 });
+    const accountRoles = vi.fn().mockResolvedValue({ count: 1 });
+    const spaceRoles = vi.fn().mockResolvedValue({ count: 1 });
+    const removeSecret = vi.fn().mockResolvedValue({ count: 1 });
+    const tx = {
+      $queryRaw: vi.fn().mockResolvedValue([{ bypass: "off" }]),
+      userModelCredential: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: "fixture-credential", secretId: "fixture-secret" },
+          { id: "personal-gateway", secretId: "personal-secret" },
+        ]),
+        deleteMany: remove, count: vi.fn().mockResolvedValue(0),
+      },
+      userVoiceCredential: { count: vi.fn().mockResolvedValue(0) },
+      userModelRoleChoice: { deleteMany: accountRoles },
+      spaceModelRoleChoice: { deleteMany: spaceRoles }, secret: { deleteMany: removeSecret },
+    };
+    f.deps.prisma.$transaction = vi.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)) as never;
+    f.deps.oauthLogins = { cancelProvider: vi.fn().mockResolvedValue(undefined) } as never;
+    await f.signedInClient.models.disconnect({ provider: "openai-compatible" });
+    expect(remove).toHaveBeenCalledExactlyOnceWith({ where: { userId: f.actor.userId, id: { in: ["personal-gateway"] } } });
+    for (const cleanup of [accountRoles, spaceRoles]) expect(cleanup).toHaveBeenCalledExactlyOnceWith({
+      where: { userId: f.actor.userId, provider: expect.anything(), OR: [{ credentialId: { in: ["personal-gateway"] } }] },
+    });
+    expect(removeSecret).toHaveBeenCalledExactlyOnceWith({ where: { id: "personal-secret" } });
+  });
+  it.each(["disconnect", "rename"] as const)("rejects %s of the built-in provider before changing credentials", async (operation) => {
+    const f = fixture(true); f.connected();
+    f.secret.mockResolvedValue({ ciphertext: "encrypted-fixture" });
+    const result = operation === "disconnect"
+      ? f.signedInClient.models.disconnect({ provider: "openai-compatible", credentialId: "fixture-credential" })
+      : f.signedInClient.models.rename({ credentialId: "fixture-credential", label: "Replacement" });
+    await expect(result).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(f.transport).not.toHaveBeenCalled();
+  });
   it("discovers models for the signed-in account without creating a key or spending credits", async () => {
     const f = fixture(true);
     f.transport.mockImplementation(async (url?: unknown) => Response.json(String(url).endsWith("/models")

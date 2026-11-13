@@ -59,10 +59,6 @@ import {
   throwIfAborted,
 } from "../model-credentials.js";
 import { assertCompatibleDefaultChange } from "../model-pins.js";
-import {
-  MycelliosConnectionUnavailable,
-  provisionMycelliosConnection,
-} from "../mycellios-sso-connection.js";
 import { withSerializableRetry } from "../serializable-retry.js";
 import type { RouterContext } from "./context.js";
 import { readMycelliosChatModels } from "../mycellios-model-catalog.js";
@@ -80,10 +76,7 @@ export function modelsRoutes(ctx: RouterContext) {
     validateRoleChoices,
     authed,
   } = ctx;
-  // Coalesce simultaneous setup clicks in this API instance; never rotate a key
-  // because two views of the same member finish onboarding together.
   const planLimits = createModelPlanLimits(deps);
-  const mycelliosConnections = new Map<string, ReturnType<typeof persistModelCredential>>();
   // A compatible provider can now have several independent connections.
   // Select an owned Mycellios endpoint, never the newest arbitrary gateway.
   const ownedMycellios = (actor: Actor) => ownedMycelliosConnection(deps, actor.userId);
@@ -141,65 +134,9 @@ export function modelsRoutes(ctx: RouterContext) {
           throw new ORPCError("SERVICE_UNAVAILABLE", { message: "Could not link browser earnings to your Mycellios account." });
         }
       }),
-      connectMycellios: authed.models.connectMycellios.handler(async ({ context }) => {
-        const pending = mycelliosConnections.get(context.actor.userId);
-        if (pending) return pending;
-        const setup = (async () => {
-          const existing = await ownedMycellios(context.actor);
-          // An owned personal connection remains usable when this installation's
-          // SSO session expires. Only provisioning a new key requires fresh SSO.
-          let accessToken = existing?.saved.apiKey;
-          if (!accessToken) {
-            if (!deps.env.mycelliosSso || !context.requestHeaders)
-              throw new ORPCError("FORBIDDEN", {
-                message: "Sign in with Mycellios to connect this account.",
-              });
-            accessToken = await deps.auth.oidcAccessToken(
-              context.requestHeaders,
-              context.actor.userId,
-            ) ?? undefined;
-            if (!accessToken) throw new ORPCError("UNAUTHORIZED");
-          }
-          const provisioned = await provisionMycelliosConnection(accessToken, {
-            modelId: existing?.credential.userPreferences?.[0]?.modelId ?? deps.env.defaultModel,
-            existing: existing?.saved,
-            fetch: deps.modelConnectionFetch,
-            signal: context.signal,
-          }).catch((error: unknown) => {
-            if (error instanceof MycelliosConnectionUnavailable)
-              throw new ORPCError("SERVICE_UNAVAILABLE", { message: error.message });
-            throw error;
-          });
-          try {
-            return await persistModelCredential(
-              deps,
-              context.actor,
-              {
-                provider: OPENAI_COMPATIBLE_PROVIDER_ID,
-                credentialId: existing?.credential.id ?? null,
-                plaintext: serializeModelSecret({
-                  ...provisioned.connection,
-                  maxTokens: existing?.saved.maxTokens ?? deps.env.defaultModelMaxTokens,
-                  contextWindow: existing?.saved.contextWindow ?? deps.env.defaultModelContextWindow,
-                  enabledModelIds: [...new Set([...(existing?.saved.enabledModelIds ?? []), provisioned.modelId])],
-                }),
-                label: existing?.credential.label ?? "Mycellios",
-                modelId: provisioned.modelId,
-                keepExistingDefault: true,
-                scope: "account",
-                signal: context.signal,
-              },
-              codexCatalog,
-            );
-          } catch (error) {
-            await provisioned.revoke();
-            throw error;
-          }
-        })();
-        mycelliosConnections.set(context.actor.userId, setup);
-        try { return await setup; }
-        finally { mycelliosConnections.delete(context.actor.userId); }
-      }),
+      connectMycellios: authed.models.connectMycellios.handler(({ context }) =>
+        ctx.mycelliosProvider.connect(context.actor, context.requestHeaders, context.signal),
+      ),
       mycelliosVideoEdit:authed.models.mycelliosVideoEdit.handler(async({context,input})=>{
         if(process.env.MYCELLIOS_MANAGED_APPS_ENABLED!=="true")throw new ORPCError("PRECONDITION_FAILED",{message:"El editor con monedero está en preparación. No se ha enviado ni cobrado nada."});
         const owned=await ownedMycellios(context.actor);
@@ -770,6 +707,9 @@ export function modelsRoutes(ctx: RouterContext) {
         return { ok: true as const };
       }),
       rename: authed.models.rename.handler(async ({ context, input }) => {
+        const builtin = await ownedMycellios(context.actor);
+        if (builtin?.credential.id === input.credentialId)
+          throw new ORPCError("FORBIDDEN", { message: "Mycellios is included with your account and cannot be renamed." });
         const renamed = await deps.prisma.userModelCredential.updateMany({
           where: { id: input.credentialId, userId: context.actor.userId },
           data: { label: input.label },
@@ -779,6 +719,10 @@ export function modelsRoutes(ctx: RouterContext) {
         return { ok: true as const };
       }),
       disconnect: authed.models.disconnect.handler(async ({ context, input }) => {
+        const builtin = canonicalPiProviderId(input.provider) === OPENAI_COMPATIBLE_PROVIDER_ID
+          ? await ownedMycellios(context.actor) : null;
+        if (builtin && input.credentialId === builtin.credential.id)
+          throw new ORPCError("FORBIDDEN", { message: "Mycellios is included with your account and cannot be removed." });
         // Retire pending sign-ins in every space first — the credentials are
         // account-wide, so a finishing OAuth session anywhere could otherwise
         // re-persist a credential the delete below just removed. Removing one
@@ -796,9 +740,10 @@ export function modelsRoutes(ctx: RouterContext) {
                 where: { userId: context.actor.userId, provider },
               });
               // Older apps disconnect every connection of the provider.
+              const removable = connections.filter((row) => row.id !== builtin?.credential.id);
               const existing = input.credentialId
-                ? connections.filter((row) => row.id === input.credentialId)
-                : connections;
+                ? removable.filter((row) => row.id === input.credentialId)
+                : removable;
               if (input.credentialId && existing.length === 0) return;
               const ids = existing.map((row) => row.id);
               const lastConnection = existing.length === connections.length;

@@ -57,7 +57,6 @@ export function MycelliosProvider({
         <p className="mt-1 text-[13.5px] text-muted-foreground">
           {accountUnavailable ? <Trans>You are signed in. This installation does not yet have access to Mycellios credits.</Trans> : <Trans>Use models with your Mycellios credits. No API key needed.</Trans>}
         </p>
-        <p className="mt-2 text-[13px] text-muted-foreground"><Trans>Optional. Keep your own providers and choose which one to use for each Mico.</Trans></p>
         <p className="mt-1 text-xs text-muted-foreground"><Trans>External models include the 4% Mycellios service fee in the displayed price.</Trans></p>
         {!connected && !accountUnavailable ? (
           <Button

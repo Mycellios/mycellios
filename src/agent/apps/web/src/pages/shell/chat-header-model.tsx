@@ -1,6 +1,6 @@
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
-import { ThinkingLevelSchema, isMycelliosBaseUrl, isOpenAiCompatibleProvider } from "@rakazo/contracts";
+import { ThinkingLevelSchema, isMycelliosBaseUrl, isOpenAiCompatibleProvider, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
 import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey, resolveSelectableModelId } from "@rakazo/core";
 import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@rakazo/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import { enableCompatibleModel, savedModelIds } from "../model-settings/enable-c
 import { ChatModelCatalog, type ChatModelCatalogSource } from "./chat-model-catalog";
 import { ChatModelPicker } from "./chat-model-picker";
 import { ProviderLogo } from "../../components/ProviderLogo";
+import { MycelliosProvider } from "../model-settings/mycellios-provider";
 
 const EMPTY_CREDENTIALS: ModelCredential[] = [];
 const EMPTY_CATALOG: ModelCatalogEntry[] = [];
@@ -86,9 +87,11 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     : bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, resolveSelectableModelId(catalog, bot.modelProvider, bot.modelId)) : "";
   const inheritLabel = t`Use general model`;
   const sources = new Map<string, ChatModelCatalogSource>();
+  sources.set("Mycellios", { label: "Mycellios", provider: OPENAI_COMPATIBLE_PROVIDER_ID, models: [] });
   const namedCredentials = credentials.map(connection => {
     const name = connectionName(connection);
-    const label = sources.has(name) ? `${name} · ${connection.label}` : name;
+    const label = sources.has(name) && (name !== "Mycellios" || sources.get(name)?.connection)
+      ? `${name} · ${connection.label}` : name;
     sources.set(label, { label, provider: connection.provider, connection, models: [] });
     return { ...connection, label };
   });
@@ -236,7 +239,15 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 onManage={() => { setOpen(false); setEditingDefault(false); onConnections(); }}
                 onChange={choose}
                 heading={editingDefault ? t`Choose the general model` : undefined}
-                catalogProviders={!editingDefault && !recovery && me ? [...sources.keys()] : undefined}
+                catalogProviders={me ? [...sources.keys()] : undefined}
+                providerContent={name => name === "Mycellios" && !sources.get(name)?.connection ? (
+                  <ul><MycelliosProvider onConnected={async () => {
+                    await Promise.all([
+                      credentialsQuery.refetch(), catalogQuery.refetch(),
+                      queryClient.invalidateQueries({ queryKey: queries.me.queryKey() }),
+                    ]);
+                  }} /></ul>
+                ) : null}
                 providerIds={Object.fromEntries([...sources].map(([name, source]) => [name, source.provider]))}
                 initialProvider={editingDefault ? undefined : lastProvider}
                 onProviderChange={setLastProvider}

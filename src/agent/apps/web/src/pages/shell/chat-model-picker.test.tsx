@@ -75,6 +75,20 @@ describe("ChatModelPicker", () => {
       root.render(<ChatModelPicker id="model" choices={list} value={value} onChange={onChange} />),
     );
   const options = () => [...document.querySelectorAll('[role="option"]')];
+  it("shows built-in account setup instead of an empty catalog without selecting a paid model", async () => {
+    const explore = vi.fn();
+    await act(async () => root.render(<ChatModelPicker id="builtin" inline choices={choices(1)} value="" onChange={onChange}
+      catalogProviders={["Mycellios", "OpenRouter"]} initialProvider="Mycellios" onExplore={explore}
+      providerContent={name => name === "Mycellios" ? <p role="status">Use my credits</p> : null} />));
+    expect(container.querySelector('[aria-label="Mycellios"]')).not.toBeNull();
+    expect(container.textContent).toContain("Use my credits");
+    expect(container.textContent).not.toContain("No matching models");
+    expect(container.textContent).not.toContain("Explore catalog");
+    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="OpenRouter"]')!.click());
+    expect(container.textContent).not.toContain("Use my credits");
+    expect(container.textContent).toContain("Explore catalog");
+    expect(explore).not.toHaveBeenCalled(); expect(onChange).not.toHaveBeenCalled();
+  });
   const search = (text: string) =>
     act(() => {
       const input = document.querySelector<HTMLInputElement>('input[aria-label="Search models"]')!;

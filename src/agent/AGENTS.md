@@ -1015,13 +1015,18 @@
 - In the Mycellios-only browser deployment, login and registration enter the
   configured first-party identity flow automatically. Keep explicit retries after
   cancellation/failure and require a user gesture for desktop OAuth popups.
-- Mycellios SSO reuses the configured OIDC provider. The explicit account-connect
-  action resolves only the current user's linked issuer, creates an owned native
+- Mycellios SSO reuses the configured OIDC provider. Authenticated bootstrap/me
+  and provider-directory setup resolves only the current user's linked issuer, creates an owned native
   key server-side and requires contribution funding. Never return OAuth tokens
   or model keys to the browser, or select identity by email alone. Operator model
   defaults set the initial limits; saved connection settings remain authoritative.
   Setup has a bounded sixty-second overall deadline for public authority round trips;
   keep individual service limits, cancellation and unused-key revocation intact.
+  Mycellios stays pinned in the model picker without a saved key. Automatic setup
+  chooses its available default only for an unset account main role; retain personal
+  providers and explicit Mico/Space choices. Outages leave a read-only unavailable
+  state and explicit retry. Reject deletion, renaming or replacing its account
+  key/endpoint through generic provider RPCs; legacy bulk disconnect preserves it.
 - Native account-service failures return an unavailable response without exposing
   diagnostics or switching funding sources. Preserve revocation of unused keys.
 - Browser saved-login fills must check the current origin and focused input type
