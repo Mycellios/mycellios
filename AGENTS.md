@@ -205,6 +205,8 @@ These rules apply to the complete repository.
   Mac packages use the existing compact local-server/development ASAR resources;
   preserve isolated packaged-server checks and strict final-DMG verification.
   Qualify archived runtime/npm entries and the bundled source/app version match.
+  Use a standalone builder config for compact packages so legacy resource arrays
+  are replaced, and verify the packaged server has no duplicate loose tree.
   Normal releases use this common publisher, never separate Windows promotion.
   The old Windows-only publisher requires both an explicit emergency recovery
   input and `MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE=true`; keep it unset normally.
