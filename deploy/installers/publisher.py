@@ -1,5 +1,5 @@
 """Promote qualified first-party installers; the Android key stays on its host."""
-import argparse, base64, copy, fcntl, hashlib, json, os, re, shutil, subprocess, urllib.request, zipfile
+import argparse, base64, copy, errno, fcntl, hashlib, json, os, re, shutil, subprocess, tempfile, urllib.request, zipfile
 from pathlib import Path
 
 REPO = 'Mycellios/mycellios'
@@ -107,10 +107,12 @@ def recover_journal(journal, allowed):
         atomic_json(target, json.loads(base64.b64decode(item['after'])))
     saved['state'] = 'committed'; atomic_json(journal, saved)
 
-def promote_pointers(journal, values):
+def promote_pointers(journal, values, expected=None):
     pointers = []
     for target, after in values.items():
         target = Path(target); before = target.read_bytes()
+        if expected is not None and hashlib.sha256(before).hexdigest() != expected[str(target)]:
+            raise ValueError('A pointer changed before promotion')
         encoded = (json.dumps(after, indent=2) + '\n').encode()
         pointers.append({'path': str(target), 'before': base64.b64encode(before).decode(), 'beforeHash': hashlib.sha256(before).hexdigest(),
                          'after': base64.b64encode(encoded).decode(), 'afterHash': hashlib.sha256(encoded).hexdigest()})
@@ -164,15 +166,33 @@ def download(url, target, expected):
     os.replace(tmp, target)
 
 def public_file(source, target):
+    if source.is_symlink() or target.is_symlink() or target.parent.is_symlink():
+        raise ValueError('Immutable installer paths must not be symlinks')
     if target.exists():
         if digest(source) != digest(target):
             raise ValueError('Refusing to replace a published release file')
+        target.parent.chmod(0o755)
         return
-    target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    # The service uses UMask=0077. Public release directories need an explicit
+    # mode, while the existing authority and all staging/signing paths stay private.
+    target.parent.mkdir(mode=0o755, exist_ok=True); target.parent.chmod(0o755)
     try:
         os.link(source, target)
-    except OSError:
-        shutil.copyfile(source, target)
+    except OSError as error:
+        if error.errno != errno.EXDEV:
+            raise
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.'+target.name+'.', delete=False) as f, source.open('rb') as original:
+                temporary = Path(f.name)
+                shutil.copyfileobj(original, f, 1_048_576); f.flush(); os.fsync(f.fileno())
+            if digest(temporary) != digest(source):
+                raise ValueError('Staged public copy differs')
+            temporary.chmod(0o644)
+            os.link(temporary, target)  # Exclusive: never overwrite a concurrent file.
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
     target.chmod(0o644)
 
 def probe_public(url, original):
@@ -263,7 +283,20 @@ def once(config):
         comparison = json_url(f"https://api.github.com/repos/{REPO}/compare/{m['revision']}...main")
         if comparison.get('status') not in ['ahead', 'identical']:
             raise ValueError('Release source is not integrated')
-        originals = {n: json.loads((desktop/n).read_text()) for n in names}
+        original_bytes = {n:(desktop/n).read_bytes() for n in names}
+        originals = {n:json.loads(raw) for n,raw in original_bytes.items()}
+        android_before = (android/'latest.json').read_bytes()
+        old_android = json.loads(android_before); a = m['android']
+        if old_android['signerSha256'] != SIGNER:
+            raise ValueError('Android current signing authority changed')
+        old_source = old_android.get('integratedMain', old_android.get('revision', ''))
+        if not re.fullmatch('[a-f0-9]{40}', old_source):
+            raise ValueError('Current Android source provenance is unavailable')
+        lineage = json_url(f"https://api.github.com/repos/{REPO}/compare/{old_source}...{m['revision']}")
+        if lineage.get('status') not in ['ahead', 'identical'] or lineage.get('base_commit', {}).get('commit', {}).get('tree', {}).get('sha') != old_android.get('tree'):
+            raise ValueError('Current Android contains another source; do not lose its changes')
+        if a['versionCode'] < old_android['versionCode'] or a['versionCode'] == old_android['versionCode'] and (a['version'] != old_android['version'] or old_android.get('revision') != m['revision']):
+            raise ValueError('Current Android version must not be replaced or downgraded')
         plan = catalog_plan(m, originals)
         inputs = m['platforms']+[m['source'], m['android']['input'], m['android']['buildReceipt']]
         for p in inputs:
@@ -289,9 +322,6 @@ def once(config):
             if p['id'] == 'windows-x64':
                 url += '?sha256='+p['sha256']
             probe_public(url, stage/p['fileName'])
-        old_android = json.loads((android/'latest.json').read_text()); a = m['android']
-        if old_android['signerSha256'] != SIGNER:
-            raise ValueError('Android current signing authority changed')
         values = {desktop/n:c for n,c in plan.items()}
         if a['versionCode'] > old_android['versionCode']:
             public_file(apk, android/'releases'/a['version']/apk.name)
@@ -299,9 +329,11 @@ def once(config):
             probe_public(f"https://www.mycellios.com/downloads/android/releases/{a['version']}/{apk.name}", apk)
             values[android/'latest.json'] = {'schema':'mycellios-android-download/1', 'version':a['version'], 'versionCode':a['versionCode'], 'applicationId':'com.mycellios.android', 'minSdk':26, 'fileName':apk.name, 'path':f"/downloads/android/releases/{a['version']}/{apk.name}", 'sourcePath':f"/downloads/android/releases/{a['version']}/source.tar.gz", 'sha256':digest(apk), 'bytes':apk.stat().st_size, 'signerSha256':SIGNER, 'revision':m['revision'], 'tree':m['tree'], 'automaticUpdates':False, 'sourceSha256':m['source']['sha256']}
         # The shared promotion lock and durable CAS journal preserve other publishers.
-        if originals != {n:json.loads((desktop/n).read_text()) for n in names}:
+        if original_bytes != {n:(desktop/n).read_bytes() for n in names} or (android/'latest.json').read_bytes() != android_before:
             raise ValueError('Catalog changed during staging')
-        promote_pointers(state/'promotion.json', values)
+        expected = {str(desktop/n):hashlib.sha256(raw).hexdigest() for n,raw in original_bytes.items()}
+        expected[str(android/'latest.json')] = hashlib.sha256(android_before).hexdigest()
+        promote_pointers(state/'promotion.json', values, expected)
         try:
             for target,c in values.items():
                 if json.loads(target.read_text()) != c:

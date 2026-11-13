@@ -94,4 +94,43 @@ class PublisherTests(unittest.TestCase):
             write(data,True)
             with self.assertRaises(ValueError):p.verify_android_web(apk,receipt,m)
 
+    def test_private_service_umask_does_not_block_public_installers_or_overwrite_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source';source.write_bytes(b'qualified installer')
+            releases=root/'releases';releases.mkdir();target=releases/'0.3.48/installer'
+            mask=p.os.umask(0o077)
+            try:p.public_file(source,target)
+            finally:p.os.umask(mask)
+            self.assertEqual(target.parent.stat().st_mode&0o777,0o755)
+            self.assertEqual(target.read_bytes(),b'qualified installer')
+            other=root/'other';other.write_bytes(b'changed installer')
+            with self.assertRaises(ValueError):p.public_file(other,target)
+            self.assertEqual(target.read_bytes(),b'qualified installer')
+
+    def test_pointer_change_before_admission_is_preserved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);pointer=root/'latest.json';pointer.write_text('{"version":1}')
+            expected={str(pointer):p.digest(pointer)};pointer.write_text('{"version":3}')
+            with self.assertRaises(ValueError):p.promote_pointers(root/'journal.json',{pointer:{'version':2}},expected)
+            self.assertEqual(json.loads(pointer.read_text())['version'],3)
+
+    def test_cross_mount_copy_is_atomic_and_a_concurrent_file_is_not_clobbered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source';source.write_bytes(b'qualified bytes')
+            parent=root/'public';parent.mkdir();target=parent/'release/installer'
+            original=p.os.link;calls=[]
+            def cross_mount(a,b):
+                calls.append((a,b))
+                if len(calls)==1:raise OSError(p.errno.EXDEV,'synthetic distinct mount')
+                return original(a,b)
+            with patch.object(p.os,'link',side_effect=cross_mount):p.public_file(source,target)
+            self.assertEqual(target.read_bytes(),source.read_bytes())
+            self.assertEqual(list(target.parent.iterdir()),[target])
+            raced=parent/'next/installer'
+            def concurrent(a,b):
+                raced.write_bytes(b'external publication');raise FileExistsError(p.errno.EEXIST,'synthetic race')
+            with patch.object(p.os,'link',side_effect=concurrent):
+                with self.assertRaises(FileExistsError):p.public_file(source,raced)
+            self.assertEqual(raced.read_bytes(),b'external publication')
+
 if __name__=='__main__':unittest.main()
