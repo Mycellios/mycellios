@@ -21,6 +21,7 @@ import {
 } from "@rakazo/ui-web";
 import { ChevronDownIcon, Circle, CircleCheck, Plus, Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { TextOnlyMark } from "../../components/TextOnlyMark";
 import { ProviderLogo } from "../../components/ProviderLogo";
 
@@ -40,6 +41,7 @@ export function ChatModelPicker({
   onExplore,
   initialProvider,
   onProviderChange,
+  providerContent,
 }: {
   id: string;
   choices: readonly ChatModelChoice[];
@@ -55,6 +57,7 @@ export function ChatModelPicker({
   onExplore?: (provider: string) => void;
   initialProvider?: string | null;
   onProviderChange?: (provider: string) => void;
+  providerContent?: (provider: string) => ReactNode;
 }) {
   const { t } = useLingui();
   const imagesHintId = useId();
@@ -65,6 +68,7 @@ export function ChatModelPicker({
     initialProvider ?? choices.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? null,
   );
   const activeProvider = provider && providers.includes(provider) ? provider : providers[0];
+  const selectedProviderContent = inline && activeProvider ? providerContent?.(activeProvider) : null;
   const inheritedProvider = choices.find(choice => choice.key === defaultKey)?.providerLabel;
   const sections = useMemo(() => groupModelChoices(
     inline && activeProvider ? choices.filter((choice) => choice.providerLabel ? choice.providerLabel === activeProvider : !defaultKey || !inheritedProvider || activeProvider === inheritedProvider) : choices,
@@ -190,8 +194,8 @@ export function ChatModelPicker({
             </p>
           ) : null}
           {heading && activeProvider ? <p className="mb-1 truncate px-1 text-xs text-muted-foreground">{activeProvider}</p> : null}
-          {options}
-          {activeProvider && catalogProviders?.includes(activeProvider) && onExplore ? (
+          {selectedProviderContent ?? options}
+          {!selectedProviderContent && activeProvider && catalogProviders?.includes(activeProvider) && onExplore ? (
             <Button type="button" variant="ghost" size="sm" className="mt-1 w-full justify-start gap-2" onClick={() => onExplore(activeProvider)}>
               <Search aria-hidden />{t`Explore catalog`}
             </Button>

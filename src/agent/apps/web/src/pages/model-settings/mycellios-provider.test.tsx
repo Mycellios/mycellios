@@ -81,8 +81,8 @@ describe("built-in Mycellios provider", () => {
   it("is offered to a new account without API-key fields or passive provisioning", async () => {
     const { div, refreshed } = await render();
     expect(div.querySelector("input")).toBeNull();
-    expect(div.textContent).toContain("Optional");
-    expect(div.textContent).toContain("Keep your own providers");
+    expect(div.textContent).toContain("No API key needed");
+    expect(div.textContent).not.toContain("Optional");
     expect(div.textContent).toContain("4% Mycellios service fee");
     expect(mock.connect).not.toHaveBeenCalled();
     mock.connect.mockResolvedValue({});

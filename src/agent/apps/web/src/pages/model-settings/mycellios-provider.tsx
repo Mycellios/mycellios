@@ -17,10 +17,12 @@ export function MycelliosProvider({
   credential,
   onConnected,
   directory = false,
+  embedded = false,
 }: {
   credential?: ModelCredential;
   onConnected: () => void | Promise<void>;
   directory?: boolean;
+  embedded?: boolean;
 }) {
   const { t } = useLingui();
   const rpc = useSpaceRpc();
@@ -45,8 +47,8 @@ export function MycelliosProvider({
           </span>
         </div>
       ) : null}
-      <div className={directory ? "px-3 pb-3 ps-10" : "px-3 py-3"}>
-        {!directory ? <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className={directory ? "px-3 pb-3 ps-10" : embedded ? "px-1 py-1" : "px-3 py-3"}>
+        {!directory && !embedded ? <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[15px] font-medium">Mycellios</span>
           {connected ? (
             <span className="text-[13px] text-success">
@@ -57,7 +59,6 @@ export function MycelliosProvider({
         <p className="mt-1 text-[13.5px] text-muted-foreground">
           {accountUnavailable ? <Trans>You are signed in. This installation does not yet have access to Mycellios credits.</Trans> : <Trans>Use models with your Mycellios credits. No API key needed.</Trans>}
         </p>
-        <p className="mt-2 text-[13px] text-muted-foreground"><Trans>Optional. Keep your own providers and choose which one to use for each Mico.</Trans></p>
         <p className="mt-1 text-xs text-muted-foreground"><Trans>External models include the 4% Mycellios service fee in the displayed price.</Trans></p>
         {!connected && !accountUnavailable ? (
           <Button

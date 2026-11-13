@@ -19,6 +19,7 @@ import type { Actor, ModelConnectInput, SettingsScope, ThinkingLevel } from "@ra
 import {
   canonicalPiProviderId,
   isOpenAiCompatibleProvider,
+  isMycelliosBaseUrl,
   storedPiProviderIds,
   usableModelId,
 } from "@rakazo/contracts";
@@ -248,7 +249,7 @@ async function writeModelCredential(
   const becomesMain =
     input.makeDefault !== false &&
     Boolean(defaultModel) &&
-    (!input.keepExistingDefault || !mainRole.primary);
+    (!input.keepExistingDefault || !mainRole.primary && mainRole.backups.length === 0);
   // A main-model connect keeps the effort its model already had.
   const ownThinking = becomesMain
     ? ((
@@ -317,7 +318,14 @@ export function createModelConnector(deps: RouterDeps, codexCatalog: CodexLiveCa
         if (secret) {
           try {
             previousPlaintext = await deps.secrets.load(secret.ciphertext, credential.secretId);
+            const previous = parseModelSecret(previousPlaintext);
+            if (previous.kind === "openai_compatible" && isMycelliosBaseUrl(previous.baseUrl) && (
+              input.baseUrl !== undefined && !isMycelliosBaseUrl(input.baseUrl) ||
+              input.apiKey !== undefined && input.apiKey !== previous.apiKey ||
+              input.headers !== undefined && JSON.stringify([...new Headers(input.headers)]) !== JSON.stringify([...new Headers(previous.headers)])
+            )) throw new ORPCError("FORBIDDEN", { message: "Mycellios uses your account connection. Add a separate provider to use another key or address." });
           } catch (error) {
+            if (error instanceof ORPCError) throw error;
             // Explicit key replacement must still succeed when the prior
             // ciphertext is unreadable. For OpenAI-compatible connections,
             // omit visionModelIds so a partial one-model list does not wipe
@@ -367,6 +375,7 @@ export function createModelConnector(deps: RouterDeps, codexCatalog: CodexLiveCa
         }
       }
     } catch (error) {
+      if (error instanceof ORPCError) throw error;
       throw new ORPCError("BAD_REQUEST", {
         message: error instanceof Error ? error.message : "Invalid model connection",
       });

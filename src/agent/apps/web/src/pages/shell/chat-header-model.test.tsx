@@ -3,7 +3,7 @@ import { i18n } from "@lingui/core";
 import type { Bot, Me } from "@rakazo/contracts";
 import type { ChatModelChoice } from "@rakazo/core";
 import type { ReactNode } from "react";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ChatHeaderModel } from "./chat-header-model";
@@ -17,7 +17,7 @@ const fixtures = vi.hoisted(() => ({
 }));
 vi.mock("@lingui/react/macro", () => ({ useLingui: () => ({
   t: (parts: TemplateStringsArray, ...values: unknown[]) => parts.reduce((text, part, i) => `${text}${i ? values[i - 1] : ""}${part}`, ""),
-}) }));
+}), Trans: ({ children }: { children: ReactNode }) => children }));
 vi.mock("../../lib/query", () => {
   const query = (key: string) => ({ queryOptions: () => ({ queryKey: [key] }), queryKey: () => [key] });
   return { useSpaceQueries: () => ({ me: query("me"), models: { credentials: query("credentials"), list: query("catalog") }, engines: { list: query("engines"), codexModels: query("nativeModels") } }) };
@@ -28,8 +28,10 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 vi.mock("./chat-model-catalog", () => ({ ChatModelCatalog: () => null }));
-vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, onChange }: { choices: ChatModelChoice[]; onChange: (key: string) => void }) =>
-  <div>{choices.map(choice => <button key={choice.key} data-choice={choice.key} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
+vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, onChange, catalogProviders, providerContent }: { choices: ChatModelChoice[]; onChange: (key: string) => void; catalogProviders?: string[]; providerContent?: (name: string) => ReactNode }) => {
+  const [provider, setProvider] = useState("");
+  return <div>{catalogProviders?.map(name => <button key={name} data-provider={name} onClick={() => setProvider(name)}>{name}</button>)}{providerContent?.(provider)}{choices.map(choice => <button key={choice.key} data-choice={choice.key} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>;
+},
 }));
 vi.mock("@rakazo/ui-web", () => ({
   Popover: ({ children, onOpenChange }: { children: ReactNode; onOpenChange: (open: boolean) => void }) => <div><button data-open onClick={() => onOpenChange(true)}>Open</button>{children}</div>,
@@ -60,6 +62,23 @@ it("shows the installed provider instead of the unrelated general model", async 
   expect(container.querySelector("[data-trigger]")?.textContent).toBe("ChatGPT");
   expect(container.querySelector('[aria-label="Thinking"]')).toBeNull();
   expect(container.querySelector('[data-choice="native-opencode::default"]')).toBeNull();
+});
+it("pins Mycellios first even when only a personal provider is connected", async () => {
+  await render("codex");
+  expect(container.querySelector("[data-provider]")?.getAttribute("data-provider")).toBe("Mycellios");
+  expect(container.querySelector('[data-provider="OpenCode Go"]')).not.toBeNull();
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-provider="Mycellios"]')!.click());
+  expect(container.querySelector('[data-testid="mycellios-provider"]')).not.toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
+it("keeps Mycellios available when no API provider has been saved", async () => {
+  const previous = fixtures.credentials; fixtures.credentials = [];
+  try {
+    await render("codex");
+    expect(container.querySelector('[data-provider="Mycellios"]')).not.toBeNull();
+    expect(container.querySelector('[data-choice="native-codex::default"]')).not.toBeNull();
+    expect(save).not.toHaveBeenCalled();
+  } finally { fixtures.credentials = previous; }
 });
 it("changes executor and saved model together when leaving a native provider", async () => {
   await render();

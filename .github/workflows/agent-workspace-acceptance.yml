@@ -69,6 +69,9 @@ jobs:
           cache: npm
           cache-dependency-path: src/agent/package-lock.json
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install shared browser contract dependencies
+        working-directory: .
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm run db:generate
       - name: Check owned source boundaries
         working-directory: .
@@ -84,6 +87,8 @@ jobs:
           PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "120000"
       - name: Exercise real workspace controls with synthetic RPC fixtures
         run: node scripts/verify-workspace-sync-ui.mjs --output=workspace-proof
+      - name: Exercise the permanent Mycellios picker without paid inference
+        run: node scripts/verify-builtin-provider-ui.mjs --output=builtin-provider-proof
       - name: Exercise conversation delivery, progress and reduced motion
         run: node scripts/verify-chat-fluidity.mjs --output=chat-flow-proof
       - name: Exercise actual companion images in the deployed app namespace
@@ -99,6 +104,7 @@ jobs:
           name: agent-workspace-proof-${{ github.sha }}
           path: |
             src/agent/workspace-proof
+            src/agent/builtin-provider-proof
             src/agent/chat-flow-proof
             src/agent/companion-avatar-proof
             src/agent/playwright-integration-report
