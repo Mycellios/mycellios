@@ -1,6 +1,7 @@
+import { MICO_PRIMARY_AVATAR } from "@rakazo/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { BotAvatar, Button, DEFAULT_BOT_AVATAR_COLOR } from "@rakazo/ui-web";
+import { BotAvatar, Button } from "@rakazo/ui-web";
 import { Check, Copy, Laptop, LoaderCircle, Smartphone, Tablet } from "lucide-react";
 import { demoApi, type EventDemoNetwork } from "../../lib/event-demo";
 import { ServerLinkCode } from "../../components/ServerLinkCode";
@@ -25,7 +26,7 @@ export function DemoPresenter({ id }: { id: string }) {
     return () => { stopped = true; clearInterval(timer); };
   }, [api]);
   return <main className="event-demo event-demo-presenter">
-    <header className="event-demo-header"><div className="event-demo-brand"><BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} size={34} /><span>Mycellios</span></div>
+    <header className="event-demo-header"><div className="event-demo-brand"><BotAvatar color={MICO_PRIMARY_AVATAR} size={34} /><span>Mycellios</span></div>
       <span className="event-demo-live" data-online={!failed && Boolean(network)}><span />{failed ? t`Connection interrupted` : t`Live`}</span></header>
     <div className="event-demo-stage">
       <section className="event-demo-network"><div className="event-demo-network-heading"><h1>{t`A network built together.`}</h1>
@@ -38,7 +39,7 @@ export function DemoPresenter({ id }: { id: string }) {
             {!network.open && <p className="event-demo-notice">{t`This event is closed.`}</p>}
             {failed && <p className="event-demo-notice" role="status">{t`Connection interrupted. Showing the last confirmed state.`}</p>}
             <div className="event-demo-devices" aria-label={t`Event devices`} aria-live="polite">
-              {!network.devices.length && <div className="event-demo-empty"><BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} size={78} /><p>{t`Your guests will appear here as they join.`}</p></div>}
+              {!network.devices.length && <div className="event-demo-empty"><BotAvatar color={MICO_PRIMARY_AVATAR} size={78} /><p>{t`Your guests will appear here as they join.`}</p></div>}
               {network.devices.map(device => {
                 const Icon = device.kind === "mobile" ? Smartphone : device.kind === "tablet" ? Tablet : Laptop;
                 const state = device.working ? t`Running inference` : device.connected ? t`Available for inference` : device.present ? t`Chatting` : t`Disconnected`;

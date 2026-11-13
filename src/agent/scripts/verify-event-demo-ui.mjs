@@ -68,6 +68,7 @@ try {
   assert.equal(paid, 0);
   const present = await context.newPage(); await present.goto(base + "?present=1#view=" + "v".repeat(43));
   await expect(present.getByText("Available for inference", { exact: true })).toBeVisible();
+  await expect(present.getByRole("img", { name: "Scan to open Mycellios on your phone", exact: true })).toBeVisible();
   await present.screenshot({ path: path.join(output, "presenter-desktop.png") });
   assert.equal(await present.getByText("Synthetic response, no paid inference.", { exact: true }).count(), 0);
   await page.getByRole("button", { name: "Pause contribution", exact: true }).click();

@@ -113,6 +113,7 @@ try {
   await present.goto(entry + "?present=1#view=" + config.presenterSecret);
   await expect(present.getByText("Verified inference", { exact: true })).toBeVisible();
   assert.equal(await present.getByText("Test-only private question", { exact: true }).count(), 0);
+  await expect(present.getByRole("img", { name: "Scan to open Mycellios on your phone", exact: true })).toBeVisible();
   await present.screenshot({ path: join(output, "real-presenter.png") });
   await contributor.getByRole("button", { name: "Pause contribution", exact: true }).click();
   await buyer.getByRole("button", { name: "Pause contribution", exact: true }).click();

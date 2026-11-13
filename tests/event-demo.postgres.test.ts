@@ -36,7 +36,7 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
   };
   const browser = { models: () => [{ kind: "text", model: "mycellios-browser/test-only" }],
     bind: vi.fn(async () => ({ linked: true })), quote: vi.fn(() => ({ creditsMicrounits: 20, token: "fictional-quote" })),
-    execute: vi.fn(async () => ({ status: "completed" })), unbind: vi.fn() };
+    status: vi.fn(async () => ({ status: "pending" })), execute: vi.fn(async () => ({ status: "completed" })), unbind: vi.fn() };
   const hub = { listWorkers: vi.fn(() => []), isFundedInferenceActive: vi.fn(() => false) };
   beforeAll(async () => {
     await sql.unsafe(`CREATE SCHEMA ${schema}`);
@@ -137,6 +137,9 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
   it("has no paid GET or automatic browser task: quotes do not invoke inference", async () => {
     const { guest } = await enter(); service.networkQuote(guest);
     expect(browser.execute).not.toHaveBeenCalled(); expect(provider.execute).not.toHaveBeenCalled();
+    const key = randomUUID();
+    expect(await service.networkStatus(guest, key)).toEqual({ status: "pending" });
+    expect(browser.status).toHaveBeenCalledWith(guest.accountId, "demo-network:" + key);
     await expect(service.networkTest(guest, randomUUID(), 1)).rejects.toThrow("demo_request_too_large");
     expect(browser.execute).not.toHaveBeenCalled();
   });

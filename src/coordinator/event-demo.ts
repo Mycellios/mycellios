@@ -153,6 +153,10 @@ export class EventDemo {
     if (quote.creditsMicrounits > maximum) throw new Error("demo_request_too_large");
     return this.browser!.execute(guest.accountId, null, "demo-network:" + key, request, quote.token);
   }
+  networkStatus(guest: DemoGuest, key: string) {
+    z.string().uuid().parse(key);
+    return this.browser?.status(guest.accountId, "demo-network:" + key) ?? null;
+  }
   async unlink(guest: DemoGuest) {
     // Pause disconnects the actual runtime. Keep its verified ownership so the
     // same browser can resume; permanent revocation is a different operation.

@@ -1,6 +1,7 @@
+import { MICO_PRIMARY_AVATAR } from "@rakazo/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { BotAvatar, Button, DEFAULT_BOT_AVATAR_COLOR, Textarea } from "@rakazo/ui-web";
+import { BotAvatar, Button, Textarea } from "@rakazo/ui-web";
 import { ChatMarkdown, LinkFaviconsContext, RemoteImagesContext } from "@rakazo/chat-ui/web";
 import { ArrowUp, Check, LoaderCircle, Pause, Play, RefreshCw, Wifi } from "lucide-react";
 import { demoApi, demoCache, type DemoPending, type DemoResult, type EventDemoMetadata, type EventDemoSession } from "../../lib/event-demo";
@@ -22,7 +23,7 @@ function DemoChat({ id }: { id: string }) {
   const [draft, setDraft] = useState(""), [live, setLive] = useState(""), [sending, setSending] = useState(false);
   const [issue, setIssue] = useState<string | null>(null), [starting, setStarting] = useState(true);
   const [checking, setChecking] = useState(false), [quote, setQuote] = useState<{ maximumMicrounits: number } | null>(null);
-  const [probe, setProbe] = useState<"running" | "completed" | "failed" | null>(null);
+  const [probe, setProbe] = useState<"running" | "completed" | "failed" | "pending" | null>(null);
   const probeKey = useRef<string | null>(null), sendingRef = useRef(false), controller = useRef<AbortController | null>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const refresh = useCallback(() => { void api.session().then(setSession).catch(() => undefined); }, [api]);
@@ -94,10 +95,12 @@ function DemoChat({ id }: { id: string }) {
     probeKey.current ??= crypto.randomUUID();
     setProbe("running");
     try {
-      const result = await api.networkTest(probeKey.current, quote.maximumMicrounits);
-      setProbe(result.status === "completed" ? "completed" : "failed");
-      if (result.status === "failed") probeKey.current = null;
-    } catch { setProbe("failed"); }
+      const result = probe === "pending"
+        ? await api.networkStatus(probeKey.current)
+        : await api.networkTest(probeKey.current, quote.maximumMicrounits);
+      setProbe(result?.status === "completed" ? "completed" : !result || result.status === "failed" ? "failed" : "pending");
+      if (!result || result.status === "failed") probeKey.current = null;
+    } catch { setProbe("pending"); }
     finally { refresh(); }
   }
   const problem = issue === "demo_full" ? t`All 50 demo places have been taken.`
@@ -106,14 +109,14 @@ function DemoChat({ id }: { id: string }) {
     : pending ? t`We are checking this response. Your message has been saved; it will not be charged twice.`
     : t`We could not connect. Check your connection and try again.`;
   if (!session) return <main className="event-demo event-demo-entry">
-    <BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} size={76} status={starting ? "connecting" : "idle"} />
+    <BotAvatar color={MICO_PRIMARY_AVATAR} size={76} status={starting ? "connecting" : "idle"} />
     <h1>{starting ? t`Preparing your Mico…` : t`Mycellios demo`}</h1>
     <p role={issue ? "alert" : "status"}>{issue ? problem : t`No registration. Your own chat and 0.20 demo credits.`}</p>
     {!starting && !["demo_full", "demo_closed"].includes(issue ?? "") && <Button onClick={() => window.location.reload()}>{t`Try again`}</Button>}
   </main>;
   return <main className="event-demo event-demo-chat">
     <header className="event-demo-header">
-      <div className="event-demo-brand"><BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} size={34} /><span>Mycellios</span></div>
+      <div className="event-demo-brand"><BotAvatar color={MICO_PRIMARY_AVATAR} size={34} /><span>Mycellios</span></div>
       <span className="event-demo-balance" title={t`Your remaining demo balance`}><strong>{credits(session.creditsMicrounits)}</strong> {t`credits`}</span>
     </header>
     <section className="event-demo-contribution" aria-label={t`Browser contribution`} data-active={contribution.linked}>
@@ -125,7 +128,7 @@ function DemoChat({ id }: { id: string }) {
       </Button>
     </section>
     <div className="event-demo-history" ref={scroll} aria-label={t`Conversation`}>
-      {!messages.length && <div className="event-demo-welcome"><BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} size={76} />
+      {!messages.length && <div className="event-demo-welcome"><BotAvatar color={MICO_PRIMARY_AVATAR} size={76} />
         <h1>{t`What shall we work on?`}</h1><p>{t`Ask a question, explore an idea or try something new.`}</p>
         <div className="event-demo-suggestions">{[t`Explain Mycellios in one sentence`, t`Give me an idea for my business`, t`Help me prepare a presentation`].map(text =>
           <Button variant="outline" key={text} onClick={() => setDraft(text)}>{text}</Button>)}</div>
@@ -135,7 +138,7 @@ function DemoChat({ id }: { id: string }) {
           <ChatMarkdown>{message.content}</ChatMarkdown></article>)}
         {live && <article className="event-demo-message" data-role="assistant"><ChatMarkdown streaming>{live}</ChatMarkdown></article>}
       </RemoteImagesContext.Provider></LinkFaviconsContext.Provider>
-      {sending && <p className="event-demo-working" role="status"><BotAvatar color={DEFAULT_BOT_AVATAR_COLOR} size={22} status="running" />{t`Mico is thinking…`}</p>}
+      {sending && <p className="event-demo-working" role="status"><BotAvatar color={MICO_PRIMARY_AVATAR} size={22} status="running" />{t`Mico is thinking…`}</p>}
       {!session.open && <p className="event-demo-notice" role="status">{t`This demo has ended. Your conversation remains visible here.`}</p>}
       {issue && <div className="event-demo-notice" role="alert"><p>{problem}</p>{pending && <Button variant="ghost" size="sm" disabled={checking || sending} onClick={() => { void recover(); }}>
         <RefreshCw size={14} />{t`Check response`}</Button>}{issue === "demo_not_submitted" && pending && <Button variant="ghost" size="sm" disabled={sending} onClick={() => { void transmit(pending); }}>{t`Send this saved message`}</Button>}</div>}
@@ -145,7 +148,8 @@ function DemoChat({ id }: { id: string }) {
       <p>{t`The browser uses a small local model. DeepSeek chat uses Mycellios external processing.`}</p>
       {quote && <Button size="sm" variant="outline" disabled={probe === "running" || probe === "completed" || !session.open} onClick={() => { void testNetwork(); }}>
         {probe === "running" ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : probe === "completed" ? <Check size={14} /> : <Play size={14} />}
-        {probe === "completed" ? t`Real inference completed` : probe === "running" ? t`Running inference…` : <>{t`Test the network`} · ≤ {credits(quote.maximumMicrounits)} {t`credits`}</>}</Button>}
+        {probe === "completed" ? t`Real inference completed` : probe === "running" ? t`Running inference…` : probe === "pending" ? t`Check response` : <>{t`Test the network`} · ≤ {credits(quote.maximumMicrounits)} {t`credits`}</>}</Button>}
+      {probe === "pending" && <p role="status">{t`We are checking this response. Your message has been saved; it will not be charged twice.`}</p>}
       {probe === "failed" && <p role="status">{t`No available browser completed the work. No credits are awarded for failed work.`}</p>}
       <p>{t`Earned`}: {credits(session.earnedMicrounits)} {t`credits`}</p>
     </details>}

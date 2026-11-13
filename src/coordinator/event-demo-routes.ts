@@ -87,6 +87,10 @@ export function mountEventDemo(app: FastifyInstance, service: EventDemo) {
     const body = z.object({ key: z.string().uuid(), maximumMicrounits: z.number().int().positive().max(1000) }).strict().parse(request.body);
     return service.networkTest(await auth(request), body.key, body.maximumMicrounits);
   }));
+  app.get(base + "/network-test/:key", handle(async request => {
+    const { key } = z.object({ key: z.string().uuid() }).parse(request.params);
+    return service.networkStatus(await auth(request), key);
+  }));
   app.get(base + "/network", handle(async request => {
     const header = request.headers.authorization;
     return service.network(header?.startsWith("DemoView ") ? header.slice(9) : undefined);

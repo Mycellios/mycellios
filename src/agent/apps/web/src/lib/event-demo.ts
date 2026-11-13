@@ -39,6 +39,7 @@ export function demoApi(id: string) {
     recover: (key: string) => read<DemoResult>("/chat/" + encodeURIComponent(key)),
     network: (secret: string) => read<EventDemoNetwork>("/network", { headers: { authorization: "DemoView " + secret } }),
     networkQuote: () => read<{ maximumMicrounits: number; modelName: string }>("/network-quote"),
+    networkStatus: (key: string) => read<{ status: string } | null>("/network-test/" + encodeURIComponent(key)),
     networkTest: (key: string, maximumMicrounits: number) => read<{ status: string }>("/network-test", {
       method: "POST", body: JSON.stringify({ key, maximumMicrounits }), signal: AbortSignal.timeout(120_000) }),
     async chat(input: DemoPending, onText: (text: string) => void, signal: AbortSignal): Promise<DemoResult> {
