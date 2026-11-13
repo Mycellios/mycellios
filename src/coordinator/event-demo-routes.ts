@@ -1,9 +1,11 @@
+import { eventDemoAgentKey } from "../core/event-demo-agent-ticket.js";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { EventDemo, demoChatSchema } from "./event-demo.js";
 
-/** Separate guest surface: no normal user/API-key principal is created or widened. */
+/** Event cookie stays separate from ordinary account authentication. */
 export function mountEventDemo(app: FastifyInstance, service: EventDemo) {
+  const bridgeKey = eventDemoAgentKey();
   const base = "/mobile/v1/demo/" + service.config.id;
   const secure = service.config.publicOrigin.startsWith("https:");
   const cookie = secure ? "__Secure-mycellios-demo" : "mycellios-demo-local";
@@ -40,6 +42,8 @@ export function mountEventDemo(app: FastifyInstance, service: EventDemo) {
     reply.header("set-cookie", `${cookie}=${result.token}; Path=${base}; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? "; Secure" : ""}`);
     return service.session(result.guest);
   }));
+  if (bridgeKey) app.post(base + "/agent-ticket", { bodyLimit: 1024 }, handle(async request =>
+    service.agentTicket(await auth(request), bridgeKey)));
   app.get(base + "/session", handle(async request => service.session(await auth(request))));
   app.post(base + "/chat", { bodyLimit: 32_768 }, handle(async (request, reply) => {
     const guest = await auth(request);

@@ -69,6 +69,7 @@ export function mountApiRequestBodyLimits(
   maxUploadSizeBytes = ATTACHMENT_MAX_BYTES,
 ): void {
   app.use("/api/auth/*", requestBodyLimit(MAX_AUTH_REQUEST_BYTES));
+  app.use("/api/demo/enter", requestBodyLimit(8192));
   const rpcLimit = requestBodyLimit(
     rpcRequestMaxBytes(maxUploadSizeBytes),
     `Request body is too large. Upload limit: ${attachmentSizeLabel(maxUploadSizeBytes)} per file.`,

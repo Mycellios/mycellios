@@ -31,6 +31,7 @@ export function demoApi(id: string) {
     return value as T;
   }
   return {
+    agentTicket: () => read<{ ticket: string }>("/agent-ticket", { method: "POST", body: "{}" }),
     metadata: () => read<EventDemoMetadata>(""),
     session: () => read<EventDemoSession>("/session"),
     enter: () => read<EventDemoSession>("/enter", { method: "POST", body: JSON.stringify({ nonce: nonce(id) }) }),

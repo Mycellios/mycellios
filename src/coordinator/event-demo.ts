@@ -1,3 +1,5 @@
+import { hashApiKey } from "./api-access.js";
+import { sealEventAgentTicket } from "../core/event-demo-agent-ticket.js";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import type { EventDemoConfig } from "../core/event-demo-config.js";
@@ -20,7 +22,7 @@ const equal = (a: string, b: string) => a.length === b.length && timingSafeEqual
 const guestFrom = (row: Record<string, unknown>): DemoGuest => ({ id: String(row.id), accountId: String(row.account_id),
   ordinal: Number(row.ordinal), device: String(row.device_kind), workerId: row.worker_id === null ? null : String(row.worker_id) });
 
-/** An event capability is deliberately not a normal user, SSO session or API key. */
+/** Event admission owns the grant; the optional Agent bridge keeps that same guest. */
 export class EventDemo {
   private readonly active = new Set<string>();
   constructor(readonly config: EventDemoConfig, private readonly db: MeshDatabase,
@@ -50,6 +52,19 @@ export class EventDemo {
   isOpen() { return this.now() >= this.config.startsAt && this.now() < this.config.endsAt; }
   private requireOpen() { if (!this.isOpen()) throw new Error("demo_closed"); }
   private signed(id: string) { return id + "." + createHmac("sha256", this.config.cookieSecret).update(this.config.id + ":" + id).digest("base64url"); }
+  async agentTicket(guest: DemoGuest, bridgeKey: string) {
+    this.requireOpen();
+    const digest = createHmac("sha256", this.config.cookieSecret).update("agent-key:" + guest.accountId).digest("base64url");
+    const prefix = hash("agent-prefix:" + guest.accountId).slice(0, 10);
+    const token = "myc_live_" + prefix + "_" + digest;
+    await this.db.raw.prepare(`INSERT INTO api_keys
+      (id,user_id,name,prefix,secret_hash,created_at,last_used_at,revoked_at) VALUES (?,?,?,?,?,?,NULL,NULL)
+      ON CONFLICT(id) DO NOTHING`).run("demo-agent:" + guest.id, guest.accountId, "Temporary event Agent", prefix, hashApiKey(token), this.now());
+    return { ticket: sealEventAgentTicket(bridgeKey, { event: this.config.id, guest: guest.id,
+      accountId: guest.accountId, name: "Invitado " + String(guest.ordinal).padStart(2, "0"),
+      endsAt: this.config.endsAt, issuedAt: this.now(), origin: this.config.publicOrigin,
+      model: this.config.model, apiKey: token }) };
+  }
   async metadata() {
     const row = await this.db.raw.prepare("SELECT COUNT(*) AS count FROM economic_demo_guests WHERE campaign_id=?").get(this.config.id);
     const joined = Number(row?.count ?? 0);

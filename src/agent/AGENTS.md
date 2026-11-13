@@ -41,8 +41,11 @@
 - `/demo/<event>` is a bounded public guest surface, outside the normal SessionApp
   gate. Keep its coordinator cookie scoped to `/mobile/v1/demo/<event>`; the Dev
   proxy forwards only this cookie and strips all Agent cookies. It never creates
-  a normal Agent/SSO session or exposes provider keys. Guest chats, balance and
-  Play/Pause stay in place; the presenter receives pseudonymous telemetry only.
+  an SSO session or exposes supplier keys. An operator-keyed handoff may create
+  an isolated temporary Agent profile in the normal panel, retaining the same
+  native grant and guest. Its tab header selects only its separate HttpOnly
+  cookie; expiry and worker admission are enforced server-side. Guest balance and
+  Play/Pause stay in the normal sidebar; the presenter receives pseudonymous telemetry only.
   Preserve stable message IDs, read-only recovery and explicit opt-in for the
   small browser model test. Never portray managed DeepSeek chat as browser work.
   Verify event-demo client/proxy tests and actual mobile/desktop guest/presenter
