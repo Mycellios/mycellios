@@ -120,7 +120,8 @@ export class ManualUpdateController {
   }
   state() { return { ...this.current }; }
   private fail(error?: unknown) { this.committed = false; this.current = { ...this.current, phase: this.file ? "ready" : "error",
-    installPending: false, message: error instanceof ManualUpdateDiskSpaceError || error instanceof ManualUpdateInProgressError ? error.message : "Could not complete the update. Try again." }; }
+    installPending: false, restartMode: undefined, waitingFor: undefined,
+    message: error instanceof ManualUpdateDiskSpaceError || error instanceof ManualUpdateInProgressError ? error.message : "Could not complete the update. Try again." }; }
   check(userInitiated: boolean): Promise<DesktopUpdateState> {
     if ((!userInitiated && !this.options.backgroundDownloads) || this.current.installPending) return Promise.resolve(this.state());
     if (userInitiated) this.checkRequested = true;

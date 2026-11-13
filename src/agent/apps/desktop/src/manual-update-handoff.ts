@@ -63,26 +63,41 @@ export async function launchManualUpdate(options: {
       void output.close().catch(() => undefined);
     }
   })();
-  await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
-  child.unref();
   // A successful spawn is not a successful handoff: wait for the exact worker's acknowledgement.
   // Windows scans and any owner file confirmation happen while Desktop stays open.
   const deadline = Date.now() + 120_000;
-  while (Date.now() < deadline) {
-    const phase = await readFile(path.join(directory, "progress.json"), "utf8")
-      .then(manualUpdatePhase).catch(() => null);
-    if (child.exitCode !== null || child.signalCode !== null) {
-      const failure = await readFile(path.join(directory, "result.json"), "utf8")
-        .then(contents => JSON.parse(contents.replace(/^\uFEFF/, "")) as { error?: unknown })
-        .catch(() => null);
-      const detail = typeof failure?.error === "string" ? `: ${failure.error.slice(0, 500)}` : "";
-      throw Error(`The update helper exited before handoff (${child.exitCode ?? child.signalCode})${detail}`);
+  let lastPhase: string | null = null;
+  try {
+    await new Promise<void>((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+    child.unref();
+    while (Date.now() < deadline) {
+      const phase = await readFile(path.join(directory, "progress.json"), "utf8")
+        .then(manualUpdatePhase).catch(() => null);
+      if (phase) lastPhase = phase;
+      if (child.exitCode !== null || child.signalCode !== null) {
+        const failure = await readFile(path.join(directory, "result.json"), "utf8")
+          .then(contents => JSON.parse(contents.replace(/^\uFEFF/, "")) as { error?: unknown })
+          .catch(() => null);
+        const detail = typeof failure?.error === "string" ? `: ${failure.error.slice(0, 500)}` : "";
+        throw Error(`The update helper exited before handoff (${child.exitCode ?? child.signalCode})${detail}`);
+      }
+      if (phase === "waiting-for-app") {
+        await writePrivateFile(path.join(directory, "commit.json"), JSON.stringify({ approved: true }));
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
-    if (phase === "waiting-for-app") {
-      await writePrivateFile(path.join(directory, "commit.json"), JSON.stringify({ approved: true }));
-      return;
-    }
-    await new Promise(resolve => setTimeout(resolve, 100));
+    throw Error("The update helper did not acknowledge the handoff");
+  } catch (error) {
+    // An early launcher failure can leave both PowerShell logs empty. Record
+    // bounded process facts locally so it can be diagnosed without user content,
+    // credentials, an installer retry or a forced application shutdown.
+    const code = (error as NodeJS.ErrnoException | null)?.code;
+    await writePrivateFile(path.join(directory, "handoff-error.json"), JSON.stringify({
+      schema: "mycellios-update-handoff-error/1", at: new Date().toISOString(),
+      phase: lastPhase, exitCode: child.exitCode, signal: child.signalCode,
+      spawnErrorCode: typeof code === "string" && /^[A-Z0-9_]{1,40}$/.test(code) ? code : null,
+    })).catch(() => undefined);
+    throw error;
   }
-  throw Error("The update helper did not acknowledge the handoff");
 }

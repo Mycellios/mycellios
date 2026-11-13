@@ -135,6 +135,27 @@ describe("native update preferences and idle restarts", () => {
     expect(ports.install).toHaveBeenCalledOnce(); expect(policy.state().relaunchError).toBe(true);
     policy.request("update"); await settle(); expect(ports.install).toHaveBeenCalledTimes(2);
   });
+  it("does not restart the same helper after an accepted installation fails asynchronously", async () => {
+    const { policy, ports, advance, setState } = fixture({ autoInstallByDefault: true });
+    await policy.tick(); advance(); await policy.tick();
+    expect(ports.install).toHaveBeenCalledOnce();
+    setState({ phase: "ready", installPending: false, message: "Could not complete the update. Try again." });
+    for (let i = 0; i < 5; i++) { advance(); await policy.tick(); }
+    expect(ports.install).toHaveBeenCalledOnce();
+    expect(policy.state()).toMatchObject({ relaunchPending: false, relaunchError: true });
+    policy.request("update"); await settle();
+    expect(ports.install).toHaveBeenCalledTimes(2);
+  });
+  it("admits a newer ready release after deferring a failed helper", async () => {
+    const { policy, ports, advance, setState } = fixture({ autoInstallByDefault: true });
+    setState({ message: "Could not complete the update. Try again." });
+    await policy.tick(); advance(); await policy.tick();
+    expect(ports.install).not.toHaveBeenCalled();
+    setState({ availableVersion: "0.3.99", message: null });
+    await policy.tick(); advance(); await policy.tick();
+    expect(ports.install).toHaveBeenCalledOnce();
+    expect(policy.state().relaunchError).toBe(false);
+  });
 });
 
 describe("installs applied by the system package manager", () => {

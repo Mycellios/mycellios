@@ -85,6 +85,10 @@ it.runIf(process.platform === "win32")("starts the hidden helper and keeps a rej
     expect((failure as Error).message).toContain("The update helper exited before handoff");
     const result = await readFile(path.join(updates, job!.name, "result.json"), "utf8");
     expect(JSON.parse(result.replace(/^\uFEFF/, ""))).toMatchObject({ installed: false, phase: "preflight" });
+    const diagnostic = JSON.parse(await readFile(path.join(updates, job!.name, "handoff-error.json"), "utf8"));
+    expect(diagnostic).toMatchObject({ schema: "mycellios-update-handoff-error/1", signal: null });
+    expect(diagnostic.exitCode).not.toBeNull();
+    expect(Object.keys(diagnostic).sort()).toEqual(["at", "exitCode", "phase", "schema", "signal", "spawnErrorCode"]);
   } finally {
     await rm(profile, { recursive: true, force: true });
   }
