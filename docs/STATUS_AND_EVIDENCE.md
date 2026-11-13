@@ -2391,3 +2391,41 @@ installer was generated. Native visual acceptance was not certified because the
 desktop controller could not activate the Dev window. The physical checks above
 are local browser checks. Two real authenticated servers, paid inference, full
 suites, commits, pushes and deployment were NOT RUN.
+
+### Automatic cross-platform installer publication (2026-11-13)
+
+Desktop **0.3.50** is published for Windows x64, native Apple Silicon and Intel
+Mac, Linux DEB and Fedora RPM. Android **1.3.50**, versionCode **103050**, uses
+the same integrated source, `2d852347329356138245007abcd65c45833c3efd`.
+The immutable release is [desktop-v0.3.50-windows-preview](https://github.com/Mycellios/mycellios/releases/tag/desktop-v0.3.50-windows-preview).
+
+All native packaging jobs and the publication job passed in
+[run 43401878664](https://github.com/Mycellios/mycellios/actions/runs/43401878664).
+Its original public-range check failed on cold-edge HTTP 200 responses; that
+failure is not reported as passing. The current bounded verifier subsequently
+passed [public health run 43411106281](https://github.com/Mycellios/mycellios/actions/runs/43411106281),
+checking the published source, catalog hashes/sizes, original Android signer and
+six actual 1024-byte HTTP 206 downloads without rebuilding or republishing.
+
+Windows qualification installed fresh and upgraded isolated legacy profiles,
+preserving five drafts and task markers, and checked packaged startup. Linux
+qualification included the Fedora installation. Each native Mac qualified its
+relocated local server, schema migrations, signup, skill restoration, clean stop
+and restart retaining data, two packaged launches, strict deep ad-hoc signature
+verification and the final read-only DMG. Android compiled the current shared
+web assets and native package with focused web/Java checks; its original signing
+key remained on the signing host.
+
+The production publisher promoted this set automatically at 10:30:56 UTC,
+retaining previous immutable packages and the recoverable catalog journal.
+Its enabled timer is healthy. The deployed publisher SHA-256 is
+`2c4ccf091e3ec6804f715cc11961fc4528d52abdd387be9090e39e0a8096d508`, matching
+automation revision `069c58728c0ef5d59d3696d74cad0dcbfe38d145`. That revision adds
+bounded cold-range retries; exact status, size and bytes remain required.
+A new Desktop version on validated main triggers the common platform matrix
+and publication. Existing-release health checks have a separate read-only
+workflow, so verification does not require another native build.
+
+Physical-device installation, Internet-origin OS approval prompts, live paid
+inference and the paused full suites were **NOT RUN**. Windows and Mac previews
+remain manual-install releases; ad-hoc Mac integrity is not notarization.
