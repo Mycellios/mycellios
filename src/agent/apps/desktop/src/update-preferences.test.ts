@@ -154,6 +154,7 @@ describe("native update preferences and idle restarts", () => {
     setState({ availableVersion: "0.3.99", message: null });
     await policy.tick(); advance(); await policy.tick();
     expect(ports.install).toHaveBeenCalledOnce();
+    expect(policy.state().relaunchError).toBe(false);
   });
 });
 

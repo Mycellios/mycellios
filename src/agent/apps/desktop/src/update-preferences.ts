@@ -94,7 +94,7 @@ export class UpdatePreferences {
       }
       if (!this.intent && this.value.supported && this.installSupported && this.value.autoInstall && state.phase === "ready" &&
           !state.installPending && state.availableVersion !== this.deferredVersion) {
-        this.intent = "update"; this.automaticIntent = true; ++this.revision;
+        this.intent = "update"; this.automaticIntent = true; this.failed = false; ++this.revision;
       }
       if (!this.intent || state.installPending) return;
       if (state.phase === "checking" || state.phase === "downloading") { this.automaticRestartAt = undefined; this.waiting = "update_download"; return; }
