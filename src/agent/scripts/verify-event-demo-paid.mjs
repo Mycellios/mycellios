@@ -63,12 +63,17 @@ try {
     if (index || resume) await botButton(name).click();
     const composer = page.getByRole("combobox", { name: "Message " + name, exact: true }); await expect(composer).toBeVisible();
     await expect(page.getByRole("button", { name: "Model", exact: true })).toContainText("DeepSeek V4 Flash");
-    const marker = ["Demo Mycellios lista: 2 + 2 = 4.", "Demo CEO lista: prioridades claras.", "Demo Inventor lista: ideas en marcha."][index];
+    const marker = ["Demo Mycellios lista: 2 + 2 = 4.", "Demo CEO lista: prioridades claras.", "Demo Inventor lista: ideas en marcha."][index]
+      + " Prueba " + process.env.GITHUB_RUN_ID + ".";
     const attempt = { bot: name, status: "started", beforeMicrounits: balance.creditsMicrounits, startedAt: new Date().toISOString() };
     result.replies.push(attempt); await save(); const started = performance.now();
     await composer.fill("Prueba de la demo: responde exactamente «" + marker + "». No uses herramientas, no busques en internet ni hagas preguntas.");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.getByText(marker, { exact: true })).toBeVisible({ timeout: 120000 });
+    attempt.replyElapsedMs = Math.round(performance.now() - started);
+    // Streaming content may precede the signed supplier invoice. Verify final
+    // settlement independently rather than mistaking an in-flight hold for cost.
+    await expect.poll(async () => (await wallet()).reservedMicrounits, {timeout: 45000}).toBe(priorReserved);
     const after = await wallet(); assert.equal(after.reservedMicrounits, priorReserved); assert.ok(after.creditsMicrounits <= balance.creditsMicrounits);
     assert.ok(limit - after.creditsMicrounits <= limit);
     Object.assign(attempt, { status: "completed", response: marker, afterMicrounits: after.creditsMicrounits,
