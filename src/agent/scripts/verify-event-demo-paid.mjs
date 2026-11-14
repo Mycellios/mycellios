@@ -46,6 +46,12 @@ try {
   page.on("response", response => { const url = new URL(response.url()); if (url.origin === origin && response.status() >= 400) result.diagnostic.push({ path: url.pathname, status: response.status() }); });
   await page.goto(origin + "/agent/demo/" + event, { waitUntil: "domcontentloaded", timeout: 60000 });
   await expect(page).toHaveURL(/\/agent\/app\/[^/]+$/, { timeout: 60000 });
+  // A resumed guest has seen an earlier deployed build. Acknowledge the real
+  // update notice like a user; do not hide dialogs or alter stored balances.
+  const releaseNotice = page.getByTestId("release-notes-dialog");
+  await expect.poll(async () => await releaseNotice.isVisible() ||
+    await page.getByRole("combobox", {name:"Message Mico",exact:true}).isVisible(), {timeout:60000}).toBe(true);
+  if (await releaseNotice.isVisible()) await releaseNotice.getByRole("button", {name:"Got it",exact:true}).click();
   await expect(page.getByRole("combobox", { name: "Message Mico", exact: true })).toBeVisible({ timeout: 60000 });
   const before = await wallet();
   if (resume) {
@@ -72,7 +78,7 @@ try {
     if (verifyExisting) {
       await expect(page.getByTestId("transcript").getByText(marker, {exact:true})).toBeVisible({timeout:30000});
       const after=await wallet(); assert.equal(after.creditsMicrounits,balance.creditsMicrounits); assert.equal(after.reservedMicrounits,priorReserved);
-      await expect(page.getByTestId("mycellios-micos")).toContainText(String(after.creditsMicrounits/1000000));
+      await expect(page.getByTestId("mycellios-micos")).toContainText(String(after.creditsMicrounits/1000000), {timeout:30000});
       Object.assign(attempt,{status:"verified-existing",sourceRunId:verifyExisting,response:marker,afterMicrounits:after.creditsMicrounits,chargedNowMicrounits:0});
       await save();await page.screenshot({path:path.join(output,"existing-reply-"+index+".png")});continue;
     }
