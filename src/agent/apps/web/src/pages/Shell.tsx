@@ -1812,6 +1812,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         applyThreadEvent(event, commitSnapshot, commitComputer, snapshotRef, computerRef);
       },
       onEvent: (event, initial) => {
+        if (isRunTerminalEvent(event) && event.seq > initial.cursor) window.dispatchEvent(new Event("mycellios:wallet-changed"));
         const currentBot = botsRef.current.find((bot) => bot.id === active.id);
         notifyBrowserForEvent(
           event,
@@ -1949,6 +1950,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         );
       },
       onEvent: (event, initial) => {
+        if (isRunTerminalEvent(event) && event.seq > initial.cursor) window.dispatchEvent(new Event("mycellios:wallet-changed"));
         notifyBrowserForEvent(
           event,
           initial.threadId,

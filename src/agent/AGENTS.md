@@ -48,8 +48,10 @@
   existing Mico ids, edits and archived roles on repeat admission; never start
   greetings, delegated work or additional credit grants from provisioning. Its tab header selects only its separate HttpOnly
   cookie; expiry and worker admission are enforced server-side. Guest balance and
-  Play/Pause stay in the normal sidebar. Keep the visible guest heartbeat read-only
-  while SessionApp is open; never reenroll or start inference from polling. The presenter receives pseudonymous telemetry only. Its live count and grid show
+  Play/Pause stay in the normal sidebar. Refresh the authoritative wallet after
+  live terminal chat events with bounded reads, never client-predicted debits or
+  balances. Keep the visible guest heartbeat read-only while SessionApp is open;
+  never reenroll or start inference from polling. The presenter receives pseudonymous telemetry only. Its live count and grid show
   current presence or connected work, not cumulative admissions; hide stale live
   state on read failure. Keep inference totals separate from online attendance. The presenter mycelium is
   an illustrative peer mesh with stable ordinal positions, never measured routes.

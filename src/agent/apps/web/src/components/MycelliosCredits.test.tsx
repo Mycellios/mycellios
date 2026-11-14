@@ -256,3 +256,17 @@ it("cancels a pending verified-work refresh when its account unmounts",async()=>
  await act(async()=>vi.advanceTimersByTimeAsync(2000));
  expect(readAccount).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
 });
+it("refreshes the real debit after a completed turn without predicting charges or earned credits",async()=>{
+ vi.useFakeTimers();
+ readAccount.mockResolvedValueOnce({availableMicrounits:200000,contributionEarnedMicrounits:0})
+   .mockResolvedValue({availableMicrounits:199448,contributionEarnedMicrounits:0});
+ await rendered(async host=>{
+  expect(host.textContent).toContain("0,2");
+  for(let i=0;i<10;i++)await act(async()=>window.dispatchEvent(new Event("mycellios:wallet-changed")));
+  expect(readAccount).toHaveBeenCalledOnce();
+  await act(async()=>vi.advanceTimersByTimeAsync(1000));
+  expect(host.textContent).toContain("0,199448");expect(readAccount).toHaveBeenCalledTimes(2);
+  expect(host.querySelector(".rk-credit-gain")).toBeNull();
+ });
+ expect(vi.getTimerCount()).toBe(0);
+});

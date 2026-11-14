@@ -40,6 +40,17 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     expect(a.catalog()).toEqual([]); expect(a.inventory()[0]?.reason).toBe("funding_cost_not_configured");
     expect(() => a.quote(input)).toThrow("unavailable"); expect(f.inference()).toHaveLength(0);
   });
+  it("keeps a stable public model when discovery adds the known vendor namespace",async()=>{
+    const f=antseedGatewayFixture();f.model.id="deepseek/deepseek-v4-flash";
+    const a=new ManagedAntseedGateway(gatewayKey,"http://127.0.0.1:8379",["deepseek-v4-flash"],100,f.transport,"deepseek-bounded-v1");
+    await a.refresh();expect(a.catalog()[0]?.id).toBe(gatewayModel);
+    expect(a.quote(input).body.model).toBe(gatewaySeller+"@deepseek-v4-flash");
+    expect((await a.execute(a.quote(input),undefined,async()=>{})).usd).toBe("0.000005");expect(f.inference()).toHaveLength(1);
+  });
+  it("does not treat a namespaced-only seller as the exact bounded service",async()=>{
+    const f=antseedGatewayFixture();f.model.id="deepseek/deepseek-v4-flash";f.model.peers[0]!.serviceId=f.model.id;
+    const a=create(f);await a.refresh();expect(a.catalog()).toEqual([]);expect(f.inference()).toHaveLength(0);
+  });
   it("selects current effective quality among cost-qualified peers and pins the quote across refreshes", async () => {
     const f = antseedGatewayFixture(), a = create(f);
     Object.assign(f.model.peers[0]!, {peerId: "0".repeat(40), effectiveReputationScore: 57});
@@ -166,7 +177,7 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     "blocks unbudgeted routing, user attribution and paid tools %j", async extra => {
       const f = antseedGatewayFixture(), a = create(f); await a.refresh(); expect(() => a.quote({...input, ...extra})).toThrow(); expect(f.inference()).toHaveLength(0);
     });
-  it.each(["other-model", "deepseek/deepseek-v4-flash"]) ("does not sell an unqualified model %s", async name => {
+  it.each(["other-model", "other/deepseek-v4-flash"]) ("does not sell an unqualified model %s", async name => {
     const f = antseedGatewayFixture(); f.model.id = name; const a = create(f); await a.refresh(); expect(a.catalog()).toEqual([]);
   });
   it("rejects unsafe transports, wrong secrets and an unqualified gateway contract", () => {

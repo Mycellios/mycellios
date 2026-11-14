@@ -17,6 +17,10 @@ on:
         description: "Resume the same preserved Guest 04; never grant another test wallet"
         type: boolean
         default: false
+      verifyExistingRun:
+        description: "Read-only: verify the saved replies of this prior run; send no messages"
+        required: false
+        default: ""
 permissions:
   contents: read
 concurrency:
@@ -48,6 +52,7 @@ jobs:
           MYCELLIOS_DEMO_STATE_PUBLIC_KEY: ${{ inputs.statePublicKey }}
           MYCELLIOS_DEMO_BROWSER_STATE: ${{ inputs.resumeGuest && secrets.EVENT_DEMO_CANARY_GUEST_STATE || '' }}
           MYCELLIOS_DEMO_RESUME: ${{ inputs.resumeGuest }}
+          MYCELLIOS_DEMO_VERIFY_EXISTING: ${{ inputs.verifyExistingRun }}
         run: node scripts/verify-event-demo-paid.mjs
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()

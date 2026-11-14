@@ -8,6 +8,8 @@ import { chromium, expect } from "@playwright/test";
 
 const limit = 200000;
 const resume = process.env.MYCELLIOS_DEMO_RESUME === "true";
+const verifyExisting = process.env.MYCELLIOS_DEMO_VERIFY_EXISTING || "";
+assert.ok(!verifyExisting || (resume && /^\d{6,14}$/.test(verifyExisting)), "Read-only verification needs the preserved guest and a prior run id");
 const savedState = process.env.MYCELLIOS_DEMO_BROWSER_STATE;
 assert.ok(!resume || savedState, "Resume requires the same encrypted-recovered guest session");
 assert.ok(resume || !savedState, "An existing guest cannot accidentally enter the fresh-guest path");
@@ -64,12 +66,19 @@ try {
     const composer = page.getByRole("combobox", { name: "Message " + name, exact: true }); await expect(composer).toBeVisible();
     await expect(page.getByRole("button", { name: "Model", exact: true })).toContainText("DeepSeek V4 Flash");
     const marker = ["Demo Mycellios lista: 2 + 2 = 4.", "Demo CEO lista: prioridades claras.", "Demo Inventor lista: ideas en marcha."][index]
-      + " Prueba " + process.env.GITHUB_RUN_ID + ".";
+      + " Prueba " + (verifyExisting || process.env.GITHUB_RUN_ID) + ".";
     const attempt = { bot: name, status: "started", beforeMicrounits: balance.creditsMicrounits, startedAt: new Date().toISOString() };
     result.replies.push(attempt); await save(); const started = performance.now();
+    if (verifyExisting) {
+      await expect(page.getByTestId("transcript").getByText(marker, {exact:true})).toBeVisible({timeout:30000});
+      const after=await wallet(); assert.equal(after.creditsMicrounits,balance.creditsMicrounits); assert.equal(after.reservedMicrounits,priorReserved);
+      await expect(page.getByTestId("mycellios-micos")).toContainText(String(after.creditsMicrounits/1000000));
+      Object.assign(attempt,{status:"verified-existing",sourceRunId:verifyExisting,response:marker,afterMicrounits:after.creditsMicrounits,chargedNowMicrounits:0});
+      await save();await page.screenshot({path:path.join(output,"existing-reply-"+index+".png")});continue;
+    }
     await composer.fill("Prueba de la demo: responde exactamente «" + marker + "». No uses herramientas, no busques en internet ni hagas preguntas.");
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(page.getByText(marker, { exact: true })).toBeVisible({ timeout: 120000 });
+    await expect(page.getByTestId("transcript").getByText(marker, { exact: true })).toBeVisible({ timeout: 120000 });
     attempt.replyElapsedMs = Math.round(performance.now() - started);
     // Streaming content may precede the signed supplier invoice. Verify final
     // settlement independently rather than mistaking an in-flight hold for cost.
@@ -80,7 +89,10 @@ try {
       chargedMicrounits: balance.creditsMicrounits - after.creditsMicrounits, elapsedMs: Math.round(performance.now() - started) });
     await save(); await page.screenshot({ path: path.join(output, "reply-" + index + ".png") });
   }
-  result.finalWallet = await wallet(); result.spentMicrounits = limit - result.finalWallet.creditsMicrounits; result.ok = true;
+  result.finalWallet = await wallet(); result.committedMicrounits = limit - result.finalWallet.creditsMicrounits;
+  result.settledMicrounits = result.committedMicrounits - result.finalWallet.reservedMicrounits;
+  result.newChargeMicrounits = result.initialWallet.creditsMicrounits - result.finalWallet.creditsMicrounits;
+  result.readOnly = Boolean(verifyExisting); result.ok = true;
 } catch (error) {
   result.ok = false; result.error = String(error);
   if (page) { result.pageText = (await page.locator("body").innerText()).slice(-20000); await page.screenshot({ path: path.join(output, "failure.png") }).catch(() => {}); }

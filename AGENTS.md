@@ -373,6 +373,8 @@ These rules apply to the complete repository.
   Its stream may also wrap vendor chunks with a separate empty role/usage id.
   Accept only that paired envelope in the AntSeed adapter; keep payload identities,
   terminal markers and complete usage strict, and other providers unchanged.
+  Normalize only the known DeepSeek vendor discovery namespace to its stable
+  public id; selected peers must still advertise the literal bounded service.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.
