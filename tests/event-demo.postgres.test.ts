@@ -106,6 +106,54 @@ describe.skipIf(!url)("bounded event guests on isolated PostgreSQL, no supplier 
     expect(provider.execute).toHaveBeenCalledOnce();
     await expect(service.chat(guest, { ...input, messages: [{ role: "user", content: "Changed" }] })).rejects.toThrow("idempotency_conflict");
   });
+  it("settles 30 simultaneous guests without stranded reservations, duplicate calls or crossing the funded event ceiling", async () => {
+    const policy = { campaignId: config().id, maximumMicrounits: 10_000_000,
+      startsAt: config().startsAt, endsAt: config().endsAt };
+    const purchases = new ManagedPurchases(db, wallet, 1_000_000, 10_402_080, policy);
+    await purchases.initialize();
+    const gateway = new ManagedGateway(db, purchases, api, provider, 100_000);
+    const concurrent = new EventDemo(config(), db, wallet, api, gateway,
+      browser as unknown as BrowserInference, hub as unknown as MobileComputeHub, () => now);
+    await concurrent.initialize();
+    const guests = await Promise.all(Array.from({ length: 30 }, () => enter()));
+    const requests = guests.map(() => chat());
+    const originalQuote = provider.quote.getMockImplementation()!;
+    const originalExecute = provider.execute.getMockImplementation()!;
+    // All 30 fixture supplier calls remain in flight together, above the normal
+    // 1 Credit daily budget. Only the separately bounded event can admit them.
+    provider.quote.mockImplementation(() => ({ maximumUsd: "0.04", maximumMicrounits: 41_609,
+      expiresAt: Date.now() + 60_000, body: { max_tokens: 256 }, fundingCostBasisPoints: 2 }));
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    provider.execute.mockImplementation(async () => {
+      await gate;
+      return { receiptId: "test-receipt-" + randomUUID(), usd: "0.0001", inputTokens: 10, outputTokens: 5,
+        response: { id: "test-only", model: config().model,
+          choices: [{ index: 0, message: { role: "assistant", content: "Test only response" }, finish_reason: "stop" }] } };
+    });
+    const pending = guests.map(({ guest }, index) => concurrent.chat(guest, requests[index]));
+    const outcomes = Promise.allSettled(pending);
+    try {
+      await vi.waitFor(() => expect(provider.execute).toHaveBeenCalledTimes(30), { timeout: 15_000 });
+      expect(await db.raw.prepare("SELECT SUM(amount_microunits) AS total,COUNT(*) AS count FROM economic_credit_holds WHERE status='reserved'").get())
+        .toEqual({ total: 1_248_270, count: 30 });
+    } finally {
+      release();
+      provider.quote.mockImplementation(originalQuote);
+      provider.execute.mockImplementation(originalExecute);
+    }
+    const results = await outcomes;
+    expect(results.every(result => result.status === "fulfilled" && result.value.status === "completed")).toBe(true);
+    for (let index = 0; index < guests.length; index++) {
+      const guest = guests[index]!.guest;
+      expect(await concurrent.session(guest)).toMatchObject({ creditsMicrounits: 199_895, reservedMicrounits: 0 });
+      expect(await concurrent.chat(guest, requests[index])).toMatchObject({ status: "completed" });
+    }
+    expect(provider.execute).toHaveBeenCalledTimes(30);
+    expect(await db.raw.prepare("SELECT COUNT(*) AS count,SUM(total_microunits) AS charged FROM economic_managed_purchases WHERE state='settled'").get())
+      .toEqual({ count: 30, charged: 3150 });
+    expect(await db.raw.prepare("SELECT COUNT(*) AS count FROM economic_credit_holds WHERE status='reserved'").get()).toEqual({ count: 0 });
+  }, 30_000);
   it("never reissues a supplier call or invents a refund when the result or charge is uncertain", async () => {
     const { guest } = await enter(), input = chat(); provider.execute.mockRejectedValueOnce(new Error("fictional timeout"));
     expect(await service.chat(guest, input)).toMatchObject({ status: "pending_reconciliation" });
