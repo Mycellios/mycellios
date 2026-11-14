@@ -367,6 +367,9 @@ These rules apply to the complete repository.
   Rank eligible gateway peers by bounded effective reputation, with stable peer-id
   ties; quality never relaxes price/capability admission. Keep each quote pinned
   through execution and never reroute or replay an uncertain supplier POST.
+  Gateway 0.1.196 may omit its response tag header: retain the seller-attributed
+  answer and resolve the tag from exactly one authenticated key/nonce/seller/model
+  ledger match. Missing tags never waive signed token coverage or actual cost.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.
