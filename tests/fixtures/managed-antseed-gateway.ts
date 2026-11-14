@@ -4,7 +4,7 @@ export const gatewaySeller = "a".repeat(40);
 export const gatewayModel = "mycellios/managed/antseed/deepseek-v4-flash";
 export function antseedGatewayFixture() {
   const model = {id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", type: "text", peers: [{
-    peerId: gatewaySeller, provider: "openai", serviceId: "deepseek-v4-flash", type: "text", protocols: ["openai-chat-completions"],
+    peerId: gatewaySeller, effectiveReputationScore: 50, provider: "openai", serviceId: "deepseek-v4-flash", type: "text", protocols: ["openai-chat-completions"],
     inputUsdPerMillion: 0.1, cachedInputUsdPerMillion: 0.02, outputUsdPerMillion: 0.2,
     capabilities: {inputs: ["text"], outputs: ["text"], contextWindow: 131072, maxOutputTokens: 8192},
   }]};

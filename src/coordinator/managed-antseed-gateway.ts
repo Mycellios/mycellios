@@ -109,7 +109,7 @@ export class ManagedAntseedGateway {
         // This deployment enforces these caps ONLY for the exact text DeepSeek route.
         if (row.id !== "deepseek-v4-flash" || row.type !== "text" || !Array.isArray(row.peers) || row.peers.length > 1000) continue;
         if (this.funding === null) {entry.reason = "funding_cost_not_configured"; continue;}
-        const candidates: Offer[] = [];
+        const candidates: (Offer & {quality: number})[] = [];
         for (const rawPeer of row.peers) {
           try {
             const p = object(rawPeer), caps = object(p.capabilities);
@@ -123,14 +123,22 @@ export class ManagedAntseedGateway {
             for (const [value, maximum] of [[p.inputUsdPerMillion, "0.5"], [p.cachedInputUsdPerMillion ?? p.inputUsdPerMillion, "0.5"], [p.outputUsdPerMillion, "1"]]) {
               if (typeof value !== "string" || usdAtoms(value) > usdAtoms(maximum)) throw new Error("antseed_price_invalid");
             }
-            candidates.push({seller: p.peerId, provider: p.provider, context: caps.contextWindow, output: Math.min(8192, caps.maxOutputTokens),
+            // Rank only already-qualified offers. Effective reputation includes the
+            // gateway's availability penalties; an arbitrary peer id says nothing
+            // about its ability to answer. Missing/invalid scores carry no trust.
+            const score = p.effectiveReputationScore;
+            const quality = typeof score === "number" && Number.isFinite(score) && score >= 0 && score <= 100 ? score : 0;
+            candidates.push({quality, seller: p.peerId, provider: p.provider, context: caps.contextWindow, output: Math.min(8192, caps.maxOutputTokens),
               public: {id: publicId, name: entry.name, owned_by: "mycellios", processing: "external", modality: "text",
                 pricing: {currency: "credits", unit: "token", serviceFeeBasisPoints: 400, fundingCostBasisPoints: this.funding,
                   input: markedUpUnitPrice(INPUT_CAP, this.funding), output: markedUpUnitPrice(OUTPUT_CAP, this.funding), estimate: "maximum"}}});
           } catch { /* Unpriced or unsupported offers cannot spend platform funds. */ }
         }
-        candidates.sort((a, b) => a.seller.localeCompare(b.seller));
-        if (candidates[0]) {offers.set(publicId, candidates[0]); entry.available = true; entry.reason = "ready"; entry.pricing = candidates[0].public.pricing;}
+        candidates.sort((a, b) => b.quality - a.quality || a.seller.localeCompare(b.seller));
+        if (candidates[0]) {
+          const {quality: _quality, ...offer} = candidates[0];
+          offers.set(publicId, offer); entry.available = true; entry.reason = "ready"; entry.pricing = offer.public.pricing;
+        }
       } catch { /* Invalid discovery entries cannot authorize spend. */ }
     }
     this.offers = offers; this.discovered = discovered; this.refreshedAt = Date.now();

@@ -364,6 +364,9 @@ These rules apply to the complete repository.
   tests too. Keep models without an enforceable upstream cost contract disabled.
   Paid gateway admission also needs a lifetime funded envelope; count settled
   spend and unresolved holds across restarts and UTC days before supplier POSTs.
+  Rank eligible gateway peers by bounded effective reputation, with stable peer-id
+  ties; quality never relaxes price/capability admission. Keep each quote pinned
+  through execution and never reroute or replay an uncertain supplier POST.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.

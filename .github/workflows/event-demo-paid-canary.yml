@@ -13,6 +13,10 @@ on:
       statePublicKey:
         description: "Base64 RSA public recovery key; never provide a private key"
         required: true
+      resumeGuest:
+        description: "Resume the same preserved Guest 04; never grant another test wallet"
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -42,6 +46,8 @@ jobs:
           MYCELLIOS_DEMO_PAID_CONFIRM: ${{ inputs.confirmation }}
           MYCELLIOS_DEMO_PAID_DEADLINE: ${{ inputs.deadline }}
           MYCELLIOS_DEMO_STATE_PUBLIC_KEY: ${{ inputs.statePublicKey }}
+          MYCELLIOS_DEMO_BROWSER_STATE: ${{ inputs.resumeGuest && secrets.EVENT_DEMO_CANARY_GUEST_STATE || '' }}
+          MYCELLIOS_DEMO_RESUME: ${{ inputs.resumeGuest }}
         run: node scripts/verify-event-demo-paid.mjs
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
