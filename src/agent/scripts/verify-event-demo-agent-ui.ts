@@ -95,6 +95,9 @@ try {
   await expect(page.getByTestId("mycellios-micos")).toHaveAttribute("data-balance-status", "ready");
   await expect(page.getByTestId("mycellios-micos")).toContainText("0.2");
   assert.equal(await page.getByText("Your own Mico. No registration.", { exact: true }).count(), 0);
+  await expect(page.locator('button[data-roster-bot-id]')).toHaveCount(10);
+  await expect(page.locator('button[data-roster-bot-id]').filter({ has: page.getByText("El CEO", { exact: true }) })).toBeVisible();
+  await expect(page.locator('button[data-roster-bot-id]').filter({ has: page.getByText("El Inventor", { exact: true }) })).toBeVisible();
   const token = await page.evaluate(() => JSON.parse(sessionStorage.getItem("mycellios:event-agent-tab")!));
   assert.equal(token.id, event);
   assert.ok((await context.cookies()).some(c => c.name.includes("mycellios-agent-demo") && c.httpOnly));
@@ -110,7 +113,7 @@ try {
   await page.screenshot({ path: path.join(output, "normal-agent-mobile.png") });
   assert.deepEqual(errors, []);
   const proof = { realAgentPanel: true, realAgentApi: true, realDatabase: true, realJobExecutor: true,
-    normalThreadPersistence: true, temporaryCookie: true, readOnlyPresenceHeartbeat: true, registrationRequired: false, nativeAdmission: "separately qualified",
+    seededCompanyRoles: 10, noPaidWelcomeCalls: true, normalThreadPersistence: true, temporaryCookie: true, readOnlyPresenceHeartbeat: true, registrationRequired: false, nativeAdmission: "separately qualified",
     model: "scripted fixture", supplierSpend: false, modelReads, rpcFailures };
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2));
   console.log(JSON.stringify(proof));
