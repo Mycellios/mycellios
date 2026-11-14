@@ -40,6 +40,28 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     expect(a.catalog()).toEqual([]); expect(a.inventory()[0]?.reason).toBe("funding_cost_not_configured");
     expect(() => a.quote(input)).toThrow("unavailable"); expect(f.inference()).toHaveLength(0);
   });
+  it("selects current effective quality among cost-qualified peers and pins the quote across refreshes", async () => {
+    const f = antseedGatewayFixture(), a = create(f);
+    Object.assign(f.model.peers[0]!, {peerId: "0".repeat(40), effectiveReputationScore: 57});
+    const healthy = {...f.model.peers[0]!, peerId: "9".repeat(40), effectiveReputationScore: 78};
+    f.model.peers.push(healthy);
+    f.model.peers.push({...healthy, peerId: "f".repeat(40), effectiveReputationScore: 99, outputUsdPerMillion: 2});
+    await a.refresh(); const q = a.quote(input);
+    expect(q.body.model).toBe(healthy.peerId + "@deepseek-v4-flash");
+    expect(q.billingContext).toMatchObject({seller: healthy.peerId, input: "0.0000005", output: "0.000001"});
+    Object.assign(healthy, {effectiveReputationScore: 2}); await a.refresh();
+    expect(a.quote(input).body.model).toBe("0".repeat(40) + "@deepseek-v4-flash");
+    expect(q.body.model).toBe("9".repeat(40) + "@deepseek-v4-flash");
+    expect(f.inference()).toHaveLength(0);
+  });
+  it.each([undefined, null, "99", -1, 101, Number.NaN, Number.POSITIVE_INFINITY])(
+    "does not trust missing or malformed effective quality %s", async score => {
+      const f = antseedGatewayFixture(), a = create(f);
+      Object.assign(f.model.peers[0]!, {effectiveReputationScore: score});
+      f.model.peers.push({...f.model.peers[0]!, peerId: "b".repeat(40), effectiveReputationScore: 1} as any);
+      await a.refresh(); expect(a.quote(input).body.model).toBe("b".repeat(40) + "@deepseek-v4-flash");
+      expect(f.inference()).toHaveLength(0);
+    });
   it("reserves the gateway-enforced upper bound including USDC rounding, funding fees and 4 percent", async () => {
     const f = antseedGatewayFixture(), a = create(f); await a.refresh();
     const q = a.quote(input), body = JSON.stringify(q.body);
