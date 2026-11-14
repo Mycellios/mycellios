@@ -195,7 +195,7 @@ export class ManagedAntseedGateway {
     // Its authenticated key-scoped ledger still binds our durable unique nonce.
     // Preserve the answer; billing below must resolve exactly one matching tag.
     if (tag !== null) {job.tag = tag; await submitted(job);}
-    const value = object(q.body.stream ? await readManagedTextStream(r, signal, parseManagedProviderJson, q.offer.public.id, chunk) : await this.json(r, signal, 4_194_304));
+    const value = object(q.body.stream ? await readManagedTextStream(r, signal, parseManagedProviderJson, q.offer.public.id, chunk, true) : await this.json(r, signal, 4_194_304));
     const usage = object(value.usage);
     if (typeof value.id !== "string" || !value.id || !Array.isArray(value.choices) || value.choices.length !== 1
       || ![usage.prompt_tokens, usage.completion_tokens].every(n => Number.isSafeInteger(n) && n >= 0)

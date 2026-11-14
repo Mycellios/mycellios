@@ -94,6 +94,20 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     expect((await a.recover(jobs[1]))?.receiptId).toBe(result.receiptId);
     expect(f.inference()).toHaveLength(1);
   });
+  it("settles the paired legacy envelope against the actual token receipt without replaying inference", async () => {
+    const f=antseedGatewayFixture();f.omitGatewayTag();
+    const transport:typeof fetch=async(u,init)=>{
+      const r=await f.transport(u,init);
+      if(!String(u).endsWith("/v1/chat/completions"))return r;
+      const rows=(await r.text()).split("\n").filter(l=>l.startsWith("data: {")).map(l=>JSON.parse(l.slice(6)));
+      rows.unshift({id:"envelope",choices:[{index:0,delta:{role:"assistant",content:""},finish_reason:null}]});
+      rows.at(-1)!.id="envelope";
+      return new Response(rows.map(v=>`data: ${JSON.stringify(v)}\n\n`).join("")+"data: [DONE]\n\n",{headers:r.headers});
+    };
+    const a=new ManagedAntseedGateway(gatewayKey,"http://127.0.0.1:8379",["*"],100,transport,"deepseek-bounded-v1");await a.refresh();
+    const result=await a.execute(a.quote({...input,stream:true}),undefined,async()=>{});
+    expect(result.response.choices[0].message.content).toBe("Hi");expect(result.usd).toBe("0.000005");expect(f.inference()).toHaveLength(1);
+  });
   it.each([{tag: "not-a-gateway-tag"}, {keyId: "other"}, {sellerPeerId: "b".repeat(40)}, {model: "other"}])(
     "still rejects a mismatched legacy receipt %j", async patch => {
       const f = antseedGatewayFixture(), a = create(f); f.omitGatewayTag(); await a.refresh(); Object.assign(f.row,patch);
