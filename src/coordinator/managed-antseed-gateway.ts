@@ -91,13 +91,18 @@ export class ManagedAntseedGateway {
     await this.receipts("mycellios-preflight-" + randomUUID(), signal);
     const data = await this.json(await this.request("/v1/models", signal, {headers: {authorization: "Bearer " + this.key}}), signal);
     if (!Array.isArray(data.data) || data.data.length > 10000) throw new Error("antseed_catalog_invalid");
+    const hasLiteralDeepseek = data.data.some(v => v?.id === "deepseek-v4-flash");
     const offers = new Map<string, Offer>(), discovered: ManagedCatalogDiscovery[] = [], seen = new Set<string>();
     for (const raw of data.data) {
       try {
         const row = object(raw);
+        // Discovery may name the same group with its vendor namespace. The
+        // selected peer must still advertise the exact bounded service below.
+        const modelId = row.id === "deepseek/deepseek-v4-flash" ? "deepseek-v4-flash" : row.id;
+        if (row.id !== modelId && hasLiteralDeepseek) continue;
         if (typeof row.id !== "string" || !/^[A-Za-z0-9._:/-]{1,180}$/.test(row.id)
-          || (!this.allowed.includes("*") && !this.allowed.includes(row.id))) continue;
-        const publicId = MANAGED_MODEL_PREFIX + "antseed/" + row.id;
+          || (!this.allowed.includes("*") && !this.allowed.includes(row.id) && !this.allowed.includes(modelId))) continue;
+        const publicId = MANAGED_MODEL_PREFIX + "antseed/" + modelId;
         if (seen.has(publicId)) {
           offers.delete(publicId); const prior = discovered.find(r => r.id === publicId);
           if (prior) {prior.available = false; prior.reason = "duplicate_model"; prior.pricing = null;} continue;
@@ -108,13 +113,13 @@ export class ManagedAntseedGateway {
           available: false, reason: "cost_contract_not_qualified", provider: "Mycellios", processing: "external", pricing: null};
         discovered.push(entry);
         // This deployment enforces these caps ONLY for the exact text DeepSeek route.
-        if (row.id !== "deepseek-v4-flash" || row.type !== "text" || !Array.isArray(row.peers) || row.peers.length > 1000) continue;
+        if (modelId !== "deepseek-v4-flash" || row.type !== "text" || !Array.isArray(row.peers) || row.peers.length > 1000) continue;
         if (this.funding === null) {entry.reason = "funding_cost_not_configured"; continue;}
         const candidates: (Offer & {quality: number})[] = [];
         for (const rawPeer of row.peers) {
           try {
             const p = object(rawPeer), caps = object(p.capabilities);
-            if (typeof p.peerId !== "string" || !/^[a-f0-9]{40}$/.test(p.peerId) || p.serviceId !== row.id
+            if (typeof p.peerId !== "string" || !/^[a-f0-9]{40}$/.test(p.peerId) || p.serviceId !== "deepseek-v4-flash"
               || p.provider !== "openai" || p.type !== "text" || p.unitBillingModels !== undefined
               || !Array.isArray(p.protocols) || !p.protocols.includes("openai-chat-completions")
               || !Array.isArray(caps.inputs) || caps.inputs.length !== 1 || caps.inputs[0] !== "text"

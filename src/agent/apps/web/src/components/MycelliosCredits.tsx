@@ -106,6 +106,7 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
       verifiedRefresh = window.setTimeout(() => { verifiedRefresh = undefined; void refresh(); }, 1000);
     };
     window.addEventListener("mycellios:contribution-verified", onVerified);
+    window.addEventListener("mycellios:wallet-changed", onVerified);
     window.addEventListener("mycellios:contribution-activity", onActivity);
     window.addEventListener("focus", onFocus);
     window.addEventListener("mycellios:contribution-changed", onFocus);
@@ -117,6 +118,7 @@ export function MycelliosCredits({ ownerId, onConnect }: { ownerId: string; onCo
       window.clearTimeout(deadline);
       window.clearTimeout(verifiedRefresh);
       window.removeEventListener("mycellios:contribution-verified", onVerified);
+      window.removeEventListener("mycellios:wallet-changed", onVerified);
       window.removeEventListener("mycellios:contribution-activity", onActivity);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("mycellios:contribution-changed", onFocus);
