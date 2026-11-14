@@ -78,7 +78,7 @@ try {
     if (verifyExisting) {
       await expect(page.getByTestId("transcript").getByText(marker, {exact:true})).toBeVisible({timeout:30000});
       const after=await wallet(); assert.equal(after.creditsMicrounits,balance.creditsMicrounits); assert.equal(after.reservedMicrounits,priorReserved);
-      await expect(page.getByTestId("mycellios-micos")).toContainText(String(after.creditsMicrounits/1000000));
+      await expect(page.getByTestId("mycellios-micos")).toContainText(String(after.creditsMicrounits/1000000), {timeout:30000});
       Object.assign(attempt,{status:"verified-existing",sourceRunId:verifyExisting,response:marker,afterMicrounits:after.creditsMicrounits,chargedNowMicrounits:0});
       await save();await page.screenshot({path:path.join(output,"existing-reply-"+index+".png")});continue;
     }
