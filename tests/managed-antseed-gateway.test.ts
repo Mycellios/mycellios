@@ -106,7 +106,7 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     };
     const a=new ManagedAntseedGateway(gatewayKey,"http://127.0.0.1:8379",["*"],100,transport,"deepseek-bounded-v1");await a.refresh();
     const result=await a.execute(a.quote({...input,stream:true}),undefined,async()=>{});
-    expect(result.response.choices[0].message.content).toBe("Hi");expect(result.usd).toBe("0.000005");expect(f.inference()).toHaveLength(1);
+    expect(result.response.choices).toMatchObject([{message:{content:"Hi"}}]);expect(result.usd).toBe("0.000005");expect(f.inference()).toHaveLength(1);
   });
   it.each([{tag: "not-a-gateway-tag"}, {keyId: "other"}, {sellerPeerId: "b".repeat(40)}, {model: "other"}])(
     "still rejects a mismatched legacy receipt %j", async patch => {
