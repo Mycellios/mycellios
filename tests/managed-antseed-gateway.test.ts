@@ -120,6 +120,17 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     expect(await a.recover(saved)).toBeNull(); f.pending(false);
     expect(await a.recover(saved)).toMatchObject({usd: "0.000005"}); expect(f.inference()).toHaveLength(1);
   });
+  it("waits for the signed spend feed after the final text frame using GETs only",async()=>{
+    const f=antseedGatewayFixture();f.pending(true);let reads=0;
+    const transport:typeof fetch=async(u,init)=>{
+      const r=await f.transport(u,init);
+      if(String(u).includes("/console/api/requests?q=mycellios-")&&!String(u).includes("preflight")&&++reads===1)f.pending(false);
+      return r;
+    };
+    const a=new ManagedAntseedGateway(gatewayKey,"http://127.0.0.1:8379",["*"],100,transport,"deepseek-bounded-v1");await a.refresh();
+    expect((await a.execute(a.quote({...input,stream:true}),undefined,async()=>{})).usd).toBe("0.000005");
+    expect(reads).toBe(2);expect(f.inference()).toHaveLength(1);
+  });
   it("leaves a lost response uncertain without inventing a refund or another paid request", async () => {
     const f = antseedGatewayFixture(), a = create(f); await a.refresh(); f.fail(); let saved: unknown;
     await expect(a.execute(a.quote(input), undefined, async j => {saved = structuredClone(j);})).rejects.toThrow("connection lost");
