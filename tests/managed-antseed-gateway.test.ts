@@ -84,6 +84,22 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     await expect(a.execute(a.quote(input), undefined, async () => {throw Error("db down");})).rejects.toThrow("db down");
     expect(f.inference()).toHaveLength(0);
   });
+  it("keeps a legacy gateway answer and settles its unique key/nonce/seller ledger receipt without a tag header", async () => {
+    const f = antseedGatewayFixture(), a = create(f); f.omitGatewayTag(); await a.refresh(); const jobs: any[] = [];
+    const result = await a.execute(a.quote({...input,stream:true}), undefined, async j => {jobs.push(structuredClone(j));});
+    expect(jobs).toHaveLength(2); expect(jobs[1].tag).toBeUndefined();
+    expect(jobs[1].response.choices[0].message.content).toBe("Hi");
+    expect(result.receiptId).toBe("antseed-gateway:key-fixture:" + f.row.tag);
+    expect(result.usd).toBe("0.000005"); expect(f.inference()).toHaveLength(1);
+    expect((await a.recover(jobs[1]))?.receiptId).toBe(result.receiptId);
+    expect(f.inference()).toHaveLength(1);
+  });
+  it.each([{tag: "not-a-gateway-tag"}, {keyId: "other"}, {sellerPeerId: "b".repeat(40)}, {model: "other"}])(
+    "still rejects a mismatched legacy receipt %j", async patch => {
+      const f = antseedGatewayFixture(), a = create(f); f.omitGatewayTag(); await a.refresh(); Object.assign(f.row,patch);
+      await expect(a.execute(a.quote(input),undefined,async()=>{})).rejects.toThrow("receipt_mismatch");
+      expect(f.inference()).toHaveLength(1);
+    });
   it("recovers late billing with ledger GETs and never repeats inference", async () => {
     const f = antseedGatewayFixture(), a = create(f); await a.refresh(); f.pending(true); let saved: unknown;
     await expect(a.execute(a.quote(input), undefined, async j => {saved = structuredClone(j);})).rejects.toThrow("receipt_pending");

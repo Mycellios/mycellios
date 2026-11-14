@@ -190,8 +190,11 @@ export class ManagedAntseedGateway {
       headers: {authorization: "Bearer " + this.key, "content-type": "application/json", "x-antseed-end-user": job.nonce,
         "x-antseed-provider": q.offer.provider}, body: JSON.stringify(q.body)});
     const tag = r.headers.get("x-antseed-gateway-tag"), seller = r.headers.get("x-antseed-peer-id");
-    if (!tag || !/^gw_[a-f0-9-]{36}$/.test(tag) || seller !== q.offer.seller) {await r.body?.cancel(); throw new Error("antseed_attribution_missing");}
-    job.tag = tag; await submitted(job);
+    if ((tag !== null && !/^gw_[a-f0-9-]{36}$/.test(tag)) || seller !== q.offer.seller) {await r.body?.cancel(); throw new Error("antseed_attribution_missing");}
+    // Gateway 0.1.196 forwards the seller header but omits its own request tag.
+    // Its authenticated key-scoped ledger still binds our durable unique nonce.
+    // Preserve the answer; billing below must resolve exactly one matching tag.
+    if (tag !== null) {job.tag = tag; await submitted(job);}
     const value = object(q.body.stream ? await readManagedTextStream(r, signal, parseManagedProviderJson, q.offer.public.id, chunk) : await this.json(r, signal, 4_194_304));
     const usage = object(value.usage);
     if (typeof value.id !== "string" || !value.id || !Array.isArray(value.choices) || value.choices.length !== 1
@@ -213,7 +216,8 @@ export class ManagedAntseedGateway {
     if (!matches.length) return null;
     if (matches.length !== 1) throw new Error("antseed_receipts_ambiguous");
     const row = object(matches[0]);
-    if (row.keyId !== job.keyId || row.tag !== job.tag || row.sellerPeerId !== job.offer.seller
+    if (row.keyId !== job.keyId || typeof row.tag !== "string" || !/^gw_[a-f0-9-]{36}$/.test(row.tag)
+      || (job.tag !== undefined && row.tag !== job.tag) || row.sellerPeerId !== job.offer.seller
       || row.model !== "deepseek-v4-flash" || row.method !== "POST" || row.path !== "/v1/chat/completions") throw new Error("antseed_receipt_mismatch");
     if (row.costPending || !row.finishedAt || row.status !== 200 || row.spent === null) return null;
     const prompt = job.response.usage.prompt_tokens, output = job.response.usage.completion_tokens;
@@ -223,7 +227,7 @@ export class ManagedAntseedGateway {
     const cost = usdAtoms(row.spent);
     if (cost === 0n && row.servedFree !== true) return null;
     // The gateway's costPending flag alone is insufficient: require the complete signed token coverage above.
-    return {response: job.response, receiptId: "antseed-gateway:" + job.keyId + ":" + job.tag,
+    return {response: job.response, receiptId: "antseed-gateway:" + job.keyId + ":" + row.tag,
       usd: row.spent, inputTokens: prompt, outputTokens: output};
   }
 }
