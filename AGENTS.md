@@ -370,6 +370,9 @@ These rules apply to the complete repository.
   Gateway 0.1.196 may omit its response tag header: retain the seller-attributed
   answer and resolve the tag from exactly one authenticated key/nonce/seller/model
   ledger match. Missing tags never waive signed token coverage or actual cost.
+  Its stream may also wrap vendor chunks with a separate empty role/usage id.
+  Accept only that paired envelope in the AntSeed adapter; keep payload identities,
+  terminal markers and complete usage strict, and other providers unchanged.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.

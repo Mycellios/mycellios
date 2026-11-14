@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as receiptDelay } from "node:timers/promises";
 import type { ManagedCatalogDiscovery, ManagedModel } from "../contracts/managed-provider.js";
 import { managedCharge, markedUpUnitPrice, tokenCost, usdAtoms } from "../economy/managed-pricing.js";
 import { MANAGED_MODEL_PREFIX, parseManagedProviderJson, type ManagedTextRequest, type ManagedTextResult } from "./managed-openrouter.js";
@@ -195,7 +196,7 @@ export class ManagedAntseedGateway {
     // Its authenticated key-scoped ledger still binds our durable unique nonce.
     // Preserve the answer; billing below must resolve exactly one matching tag.
     if (tag !== null) {job.tag = tag; await submitted(job);}
-    const value = object(q.body.stream ? await readManagedTextStream(r, signal, parseManagedProviderJson, q.offer.public.id, chunk) : await this.json(r, signal, 4_194_304));
+    const value = object(q.body.stream ? await readManagedTextStream(r, signal, parseManagedProviderJson, q.offer.public.id, chunk, true) : await this.json(r, signal, 4_194_304));
     const usage = object(value.usage);
     if (typeof value.id !== "string" || !value.id || !Array.isArray(value.choices) || value.choices.length !== 1
       || ![usage.prompt_tokens, usage.completion_tokens].every(n => Number.isSafeInteger(n) && n >= 0)
@@ -204,13 +205,19 @@ export class ManagedAntseedGateway {
       choices: value.choices, usage: {prompt_tokens: usage.prompt_tokens, completion_tokens: usage.completion_tokens,
         total_tokens: usage.prompt_tokens + usage.completion_tokens}};
     await submitted(job);
-    const result = await this.recover(job); if (!result) throw new Error("antseed_receipt_pending"); return result;
+    // The signed spend feed may follow the final token frame. Wait briefly using
+    // receipt GETs only, under the same execution deadline; never repeat the POST.
+    for (const delay of [0, 100, 200, 400, 800]) {
+      if (delay) await receiptDelay(delay, undefined, {signal});
+      const result = await this.recover(job, signal); if (result) return result;
+    }
+    throw new Error("antseed_receipt_pending");
   }
-  async recover(value: unknown): Promise<ManagedTextResult | null> {
+  async recover(value: unknown, signal = AbortSignal.timeout(12_000)): Promise<ManagedTextResult | null> {
     const job = object(value) as Job;
     if (job.kind !== "antseed-gateway-v1" || !job.response) return null;
     if (!/^mycellios-[a-f0-9-]{36}$/.test(job.nonce)) throw new Error("antseed_job_invalid");
-    const rows = await this.receipts(job.nonce, AbortSignal.timeout(12_000));
+    const rows = await this.receipts(job.nonce, signal);
     if (rows.keyId !== job.keyId) throw new Error("antseed_payer_changed");
     const matches = rows.requests.filter(v => object(v).endUser === job.nonce);
     if (!matches.length) return null;

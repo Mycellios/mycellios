@@ -1,12 +1,14 @@
 /** Bounded OpenAI-compatible SSE. A terminal marker alone is not a billing receipt. */
 export async function readManagedTextStream(response: Response, signal: AbortSignal,
-  parse: (text: string) => unknown, publicModel: string, onChunk?: (value: Record<string, unknown>) => void) {
+  parse: (text: string) => unknown, publicModel: string, onChunk?: (value: Record<string, unknown>) => void,
+  legacyAntseedEnvelope = false) {
   if (!response.ok) { await response.body?.cancel(); throw new Error("managed_upstream_unavailable"); }
   const reader = response.body?.getReader();
   if (!reader) throw new Error("managed_response_missing");
   const decoder = new TextDecoder(); let buffer = "", bytes = 0, terminal = false;
   let id: string | null = null, usage: unknown = null, created: unknown = undefined, finish: unknown = null;
   let content = "";
+  let envelopeId: string | null = null;
   const tools = new Map<number, { id: string; type: "function"; function: { name: string; arguments: string } }>();
   function frame(text: string) {
     const data = text.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trimStart()).join("\n");
@@ -15,9 +17,24 @@ export async function readManagedTextStream(response: Response, signal: AbortSig
     if (terminal) throw new Error("managed_stream_after_terminal");
     const value = parse(data) as Record<string, unknown>;
     if (!value || typeof value !== "object" || value.error) throw new Error("managed_stream_error");
+    const choices = value.choices;
+    const first = Array.isArray(choices) && choices.length === 1 ? choices[0] : null;
+    const prelude = first?.delta;
+    // AntSeed 0.1.196 wraps vendor chunks with its own empty role prelude and
+    // final usage frame. Only that exact envelope may have a separate id.
+    // Every content/tool/reasoning chunk must still share one vendor identity.
+    if (legacyAntseedEnvelope && !id && !envelopeId && typeof value.id === "string" && first?.index === 0
+      && first.finish_reason == null && !value.usage && prelude?.role === "assistant"
+      && Object.keys(prelude).every(k => ["role", "content", "reasoning_content", "tool_calls"].includes(k))
+      && [prelude.content, prelude.reasoning_content].every(v => v == null || v === "")
+      && (prelude.tool_calls == null || (Array.isArray(prelude.tool_calls) && prelude.tool_calls.length === 0))) {
+      envelopeId = value.id; return;
+    }
+    const envelopeUsage = legacyAntseedEnvelope && envelopeId === value.id && Boolean(value.usage)
+      && Array.isArray(choices) && choices.length === 0 && finish !== null;
     if (typeof value.id === "string") {
-      if (id && id !== value.id) throw new Error("managed_stream_identity_changed");
-      id = value.id;
+      if (id && id !== value.id && !envelopeUsage) throw new Error("managed_stream_identity_changed");
+      if (!envelopeUsage) id = value.id;
     }
     created ??= typeof value.created === "number" ? value.created : Math.floor(Date.now() / 1000);
     if (value.usage) usage = value.usage;
