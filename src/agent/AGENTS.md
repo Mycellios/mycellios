@@ -43,7 +43,10 @@
   proxy forwards only this cookie and strips all Agent cookies. It never creates
   an SSO session or exposes supplier keys. An operator-keyed handoff may create
   an isolated temporary Agent profile in the normal panel, retaining the same
-  native grant and guest. Its tab header selects only its separate HttpOnly
+  native grant and guest. Each guest receives the idempotent ten-role demo company
+  once, with fixed free welcome messages and one shared wallet/connection. Preserve
+  existing Mico ids, edits and archived roles on repeat admission; never start
+  greetings, delegated work or additional credit grants from provisioning. Its tab header selects only its separate HttpOnly
   cookie; expiry and worker admission are enforced server-side. Guest balance and
   Play/Pause stay in the normal sidebar. Keep the visible guest heartbeat read-only
   while SessionApp is open; never reenroll or start inference from polling. The presenter receives pseudonymous telemetry only. Its live count and grid show

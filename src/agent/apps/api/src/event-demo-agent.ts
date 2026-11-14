@@ -5,6 +5,7 @@ import { bootstrapUserSpace, createRepos, runAsSystem, runAsTenant, saveModelPre
 import { OPENAI_COMPATIBLE_PROVIDER_ID, productBrand } from "@rakazo/contracts";
 import { serializeModelSecret } from "@rakazo/adapters";
 import { eventAgentDigest, openEventAgentTicket } from "../../../../core/event-demo-agent-ticket.js";
+import { EVENT_DEMO_COMPANY, EVENT_DEMO_COMPANY_VERSION, eventCompanyInstructions, eventCompanySpawnKey } from "./event-demo-company.js";
 
 export const DEMO_AGENT_HEADER = "x-mycellios-demo-event";
 const validEvent = /^[a-z0-9-]{8,64}$/;
@@ -52,13 +53,27 @@ export class EventDemoAgent {
             provider: OPENAI_COMPATIBLE_PROVIDER_ID, modelId: ticket.model, credentialId } });
         });
       }
-      const bot = await runAsTenant(actor, () => createRepos(this.prisma).createBot(actor, {
-        name: "Mico", title: "", description: "", instructions: "", notifyOnFinish: true,
-        spawnKey: "event-demo-initial", agentEngine: "pi",
-      }));
       const id = "event-session-" + identity;
+      const previous = await this.prisma.session.findUnique({ where: { id } });
+      const seeded = previous?.userAgent && JSON.parse(previous.userAgent).companyVersion === EVENT_DEMO_COMPANY_VERSION;
+      const existing = await this.prisma.bot.findMany({ where: { userId, spaceId,
+        spawnKey: { in: EVENT_DEMO_COMPANY.map(role => eventCompanySpawnKey(role.key)) } }, select: { id: true, spawnKey: true, archivedAt: true } });
+      let bot = existing.find(row => row.spawnKey === "event-demo-initial" && !row.archivedAt);
+      await runAsTenant(actor, async () => {
+        const repos = createRepos(this.prisma);
+        for (const role of EVENT_DEMO_COMPANY) {
+          if (role.key === "initial" ? Boolean(bot) : seeded || existing.some(row => row.spawnKey === eventCompanySpawnKey(role.key))) continue;
+          const created = await repos.createBot(actor, { name: role.name, title: role.title, description: role.description,
+            instructions: eventCompanyInstructions(role.purpose), notifyOnFinish: true, fleetManagement: false,
+            spawnKey: eventCompanySpawnKey(role.key), agentEngine: "pi",
+            initialMessage: { role: "bot", blocks: [{ kind: "text", text: role.welcome }] },
+          });
+          if (role.key === "initial") bot = { id: created.id, spawnKey: eventCompanySpawnKey(role.key), archivedAt: null };
+        }
+      });
+      if (!bot) throw new Error("demo_agent_profile_unavailable");
       const session = { token: eventAgentDigest(token), expiresAt: new Date(ticket.endsAt), activeOrganizationId: spaceId,
-        userAgent: JSON.stringify({ kind: "event-demo", event: ticket.event, spaceId }), userId };
+        userAgent: JSON.stringify({ kind: "event-demo", event: ticket.event, spaceId, companyVersion: EVENT_DEMO_COMPANY_VERSION }), userId };
       await this.prisma.session.upsert({ where: { id }, create: { id, ...session }, update: session });
       return { cookie: this.cookie(ticket.event, token, ticket.endsAt), id: ticket.event, spaceId,
         botId: bot.id, endsAt: ticket.endsAt };
