@@ -169,6 +169,9 @@
   model menu. Do not expose a second Agent engine switch in Mico settings or
   select an unrelated CLI merely because a PC is connected. New Micos inherit
   the general connection unless the user selects an installed provider.
+  The account catalog resolves expired managed metadata with one owned GET refresh
+  and a reread of the canonical enabled list. Inventory never authorizes models;
+  retain the shared deadline, native results and fail-closed price filtering.
   Model-read failures use the shared localized error text and explicit read-only
   retry, including the compact default-provider selector. Failed catalog/credential
   reads must not appear as an empty or disconnected provider directory. Recovery

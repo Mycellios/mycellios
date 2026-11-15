@@ -36,9 +36,8 @@ export async function readMycelliosChatModels(
     AbortSignal.timeout(12_000),
     ...(options.signal ? [options.signal] : []),
   ]);
-  const response = await createOpenAiCompatibleFetch(options.fetch)(
-    `${productBrand.apiBaseUrl}/models`,
-    {
+  const fetcher = createOpenAiCompatibleFetch(options.fetch);
+  const init: RequestInit = {
       method: "GET",
       redirect: "error",
       cache: "no-store",
@@ -48,13 +47,26 @@ export async function readMycelliosChatModels(
         accept: "application/json",
         "x-mycellios-funding": "contribution-credits",
       },
-    },
-  );
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error("Mycellios model catalog is temporarily unavailable.");
+  };
+  const readModels = async () => {
+    const response = await fetcher(`${productBrand.apiBaseUrl}/models`, init);
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error("Mycellios model catalog is temporarily unavailable.");
+    }
+    return readBoundedJsonResponse<{ data?: unknown }>(response, 4_194_304, signal);
+  };
+  let body = await readModels();
+  // Native discovery refreshes external metadata without blocking native callers.
+  // At its TTL boundary, wait once for owned metadata, then reread the canonical
+  // enabled catalog. Inventory entries and expired prices never grant admission.
+  if (Array.isArray(body.data) && body.data.some(item => item && typeof item === "object"
+    && item.processing === "external" && item.available === false && item.reason === "ready")) {
+    const refreshed = await fetcher(`${productBrand.apiBaseUrl}/managed/catalog`, init);
+    const ready = refreshed.ok;
+    await refreshed.body?.cancel();
+    if (ready) body = await readModels();
   }
-  const body = await readBoundedJsonResponse<{ data?: unknown }>(response, 4_194_304, signal);
   if (!Array.isArray(body.data)) throw new Error("Invalid Mycellios model catalog.");
   const seen = new Set<string>();
   const result: ModelCatalogEntry[] = [];
