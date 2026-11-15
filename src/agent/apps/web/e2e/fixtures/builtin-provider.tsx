@@ -24,6 +24,7 @@ const queries = spaceQueries(userId, spaceId);
 client.setQueryData(queries.me.queryKey(), me);
 client.setQueryData(queries.models.credentials.queryKey(), credentials);
 client.setQueryData(queries.models.list.queryKey(), models);
+client.setQueryData(["mycellios-chat-catalog", userId, spaceId, connected ? "fixture-owned" : undefined], models);
 client.setQueryData(queries.engines.list.queryKey(), [{ id: "codex", name: "Codex", available: true }]);
 client.setQueryData(queries.engines.codexModels.queryKey(), []);
 const bot = { id: "fixture-bot", agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null } as Bot;

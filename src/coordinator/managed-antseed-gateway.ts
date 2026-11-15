@@ -27,7 +27,6 @@ export interface AntseedGatewayQuote {
 interface Job {
   kind: "antseed-gateway-v1"; keyId: string; nonce: string; offer: Offer; tag?: string;
   response?: Record<string, any>;
-  maximumUsd?: string;
 }
 
 /** Gateway API keys are not buyer control secrets. Use the key's own scoped ledger session.
@@ -213,7 +212,7 @@ export class ManagedAntseedGateway {
     if (!submitted || q.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
     const signal = AbortSignal.timeout(120_000), auth = await this.authenticate(signal);
     if ((q.billingContext as any).keyId !== auth.keyId) throw new Error("antseed_payer_changed");
-    const job: Job = {kind: "antseed-gateway-v1", keyId: auth.keyId, nonce: "mycellios-" + randomUUID(), offer: q.offer, maximumUsd: q.maximumUsd};
+    const job: Job = {kind: "antseed-gateway-v1", keyId: auth.keyId, nonce: "mycellios-" + randomUUID(), offer: q.offer};
     await submitted(job); // Durable intent before the single potentially billable POST.
     const r = await this.request("/v1/chat/completions", signal, {method: "POST",
       headers: {authorization: "Bearer " + this.key, "content-type": "application/json", "x-antseed-end-user": job.nonce,
@@ -260,7 +259,8 @@ export class ManagedAntseedGateway {
     if (!counts.every(n => Number.isSafeInteger(n) && n >= 0) || row.inputTokens + row.cachedInputTokens !== prompt || row.outputTokens !== output) return null;
     if (typeof row.spent !== "string") throw new Error("antseed_receipt_invalid");
     const cost = usdAtoms(row.spent);
-    if (job.maximumUsd !== undefined && cost > usdAtoms(job.maximumUsd)) throw new Error("antseed_cost_bound_exceeded");
+    // Return the authoritative invoice even for an overcharge. ManagedPurchases
+    // must persist its safety stop and retain the hold, not lose that evidence.
     if (cost === 0n && row.servedFree !== true) return null;
     // The gateway's costPending flag alone is insufficient: require the complete signed token coverage above.
     return {response: job.response, receiptId: "antseed-gateway:" + job.keyId + ":" + row.tag,

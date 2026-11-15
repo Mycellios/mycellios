@@ -43,9 +43,9 @@ describe('generic bounded gateway text',()=>{
   await expect(adapter.execute(adapter.quote(input),undefined,async value=>{job=value})).rejects.toThrow('receipt_pending');
   f.pending(false);expect((await adapter.recover(job))?.usd).toBe('0.000005');expect(f.inference()).toHaveLength(1);
  });
- it('does not settle a bill above the accepted maximum',async()=>{
+ it('returns authoritative overcharge evidence to the durable wallet safety stop',async()=>{
   const {f,adapter,input}=fixture();await adapter.refresh();f.row.spent='1';
-  await expect(adapter.execute(adapter.quote(input),undefined,async()=>{})).rejects.toThrow('cost_bound_exceeded');expect(f.inference()).toHaveLength(1);
+  expect((await adapter.execute(adapter.quote(input),undefined,async()=>{})).usd).toBe('1');expect(f.inference()).toHaveLength(1);
  });
  it('never accepts a receipt for another model under the same nonce',async()=>{
   const {f,adapter,input}=fixture();await adapter.refresh();f.row.model='other';
