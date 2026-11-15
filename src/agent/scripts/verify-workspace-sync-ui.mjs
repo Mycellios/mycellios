@@ -75,7 +75,12 @@ try {
   await expect(page.getByRole("combobox", { name: "Usage period" })).toBeVisible();
   await page.getByRole("combobox", { name: "Usage period" }).selectOption("7");
   await page.screenshot({ path: path.join(output, "usage-dashboard.png"), animations: "disabled" });
-  await rail.getByRole("button", { name: "Marketplace", exact: true }).click();
+  await expect(rail.getByRole("button", { name: "Marketplace", exact: true })).toHaveCount(0);
+  // Marketplace is intentionally absent from product navigation. Its retained
+  // workspace is reached through the synthetic fixture's own page selector.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("navigation", { name: "Fixture pages" }).getByRole("button", { name: "marketplace", exact: true }).click();
+  await page.setViewportSize({ width: 1280, height: 900 });
   await expect(page.getByTestId("marketplace-apps")).toContainText("GitHub");
   await page.getByRole("navigation", { name: "Marketplace sections" }).getByRole("button", { name: "Skills", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Skills", exact: true })).toBeVisible();

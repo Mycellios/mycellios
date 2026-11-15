@@ -37,7 +37,10 @@ it("pins from the message menu, jumps to the original and unpins without deletin
   await act(()=>document.querySelector<HTMLButtonElement>('button[aria-label="Unpin message"]')!.click());
   await act(()=>client.invalidateQueries());
   expect(set).toHaveBeenLastCalledWith({botId:"mico",taskThreadId:"thread",messageId:"message",pinned:false});
-  expect(document.body.textContent).toContain("Pin a message from its menu to find it here.");
+  await vi.waitFor(async()=>{
+    await act(async()=>{});
+    expect(document.body.textContent).toContain("Pin a message from its menu to find it here.");
+  });
   client.clear();
 });
 
