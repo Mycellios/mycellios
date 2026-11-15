@@ -7,6 +7,17 @@ import {
 } from "../src/contracts/activation-incident.js";
 
 describe("activation incident classification", () => {
+  it("replans a rejected initial runtime topology within the existing retry bound", () => {
+    const message = "no_feasible_runtime_pipeline";
+    expect(classifyActivationIncident({ message, maximumAttempts: 5, nextRetryAt: 1000 })).toMatchObject({
+      code: "executor_pool_not_ready", scope: "network", retryable: true,
+      automaticAction: "rebuild_route", repairState: "scheduled", maximumAttempts: 5,
+    });
+    expect(activationFailureIsTransient(message)).toBe(true);
+    expect(classifyActivationIncident({ message, maximumAttempts: 0 })).toMatchObject({ retryable: false, automatic: false });
+    expect(activationFailureIsTransient(formatExhaustedActivationFailure(5, "1.0.0", message))).toBe(false);
+    expect(activationFailureIsTransient("no_feasible_runtime_pipeline:unclassified_failure")).toBe(false);
+  });
   it("retries while two connected desktops finish executor verification", () => {
     const incident = classifyActivationIncident({
       message: "distributed_activation_requires_two_connected_shard_executors",

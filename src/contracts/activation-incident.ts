@@ -178,6 +178,18 @@ export function activationFailureMessageAfterRuntimeChange(
 
 function incidentDefinition(message: string): IncidentDefinition {
     const normalized = message.toLowerCase();
+    if (normalized.trim() === "no_feasible_runtime_pipeline") {
+        return {
+            code: "executor_pool_not_ready",
+            scope: "network",
+            title: "No verified route currently fits the requested workload",
+            summary: "The planner could not find an admissible combination of executors, capacity and links. The model remains unpublished.",
+            remedy: "Mycellios refreshes verified capacity and replans within its bounded recovery policy; it never relaxes workload, resource or runtime requirements.",
+            steps: ROUTE_REBUILD_STEPS,
+            automaticAction: "rebuild_route",
+            intrinsicallyRetryable: true,
+        };
+    }
     if (normalized.includes("route_capacity_conflict:")) {
         return {
             code: "executor_pool_not_ready",
