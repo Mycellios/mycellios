@@ -104,6 +104,20 @@ describe("official Windows manual releases", () => {
     expect(await controller.check(true)).toMatchObject({ phase: "error" });
     expect(request).toHaveBeenCalledTimes(4);
   });
+  it("downloads and verifies the checksum-qualified catalog URL", async () => {
+    const pinned = `${entry.path}?sha256=${entry.sha256}`;
+    const { controller, request, handoff } = await fixture({ catalog: { packages: [{ ...entry, path: pinned }] } });
+    expect(await controller.check(true)).toMatchObject({ phase: "ready", availableVersion: entry.version });
+    expect(request.mock.calls[1]?.[0]).toBe("https://www.mycellios.com" + pinned);
+    expect(handoff).not.toHaveBeenCalled();
+  });
+  it("preserves only a catalog query matching the pinned checksum", () => {
+    const withPath = (path: string) => ({ packages: [{ ...entry, path }] });
+    const pinned = `${entry.path}?sha256=${entry.sha256}`;
+    expect(windowsManualRelease(withPath(pinned), "0.3.13")?.url).toBe("https://www.mycellios.com" + pinned);
+    for (const query of [`?sha256=${"a".repeat(64)}`, `?sha256=${entry.sha256}&extra=1`, "?other=1", "#fragment"])
+      expect(() => windowsManualRelease(withPath(entry.path + query), "0.3.13")).toThrow();
+  });
   it("rejects unsafe paths, hashes, sizes, versions and duplicate platform offers", () => {
     for (const patch of [{ path: "https://other.invalid/app.exe" }, { path: "/downloads/../other.exe" },
       { fileName: "../app.exe" }, { sha256: "wrong" }, { bytes: 2_000_000_001 }, { bytes: -1 },
@@ -283,6 +297,19 @@ const macosCatalog = {
 };
 
 describe("official macOS disk images", () => {
+  it.each(["macos-arm64", "macos-x64"] as const)("accepts the unified preview catalog for %s, including the installed version", async kind => {
+    const fileName = `Mycellios-Desktop-0.3.52-${kind}-preview.dmg`;
+    const item = { ...macosCatalog.packages.at(-1)!, id: kind, version: "0.3.52", fileName,
+      path: `/downloads/desktop/releases/0.3.52/${fileName}` };
+    const feed = { packages: [item] };
+    expect(catalogManualRelease(feed, "0.3.51", kind)).toMatchObject({ version: "0.3.52", fileName });
+    expect(catalogManualRelease(feed, "0.3.52", kind)).toBeNull();
+    const { controller, handoff } = await fixture({ packageKind: kind, catalog: feed, autoDownload: () => false });
+    expect(await controller.check(true)).toMatchObject({ phase: "available", availableVersion: "0.3.52" });
+    expect(handoff).not.toHaveBeenCalled();
+    expect(() => catalogManualRelease({ packages: [{ ...item, id: kind === "macos-arm64" ? "macos-x64" : "macos-arm64" }] }, "0.3.51", kind)).toThrow();
+  });
+
   it("selects the disk image for the running architecture", () => {
     expect(catalogManualRelease(macosCatalog, "0.3.40", "macos-arm64")).toMatchObject({
       version: "0.3.41", fileName: dmgName,
