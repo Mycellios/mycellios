@@ -90,13 +90,13 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
       setTabs(rows => rows.some(row => row.threadId === result.threadId)
         ? rows : [...rows, { threadId: result.threadId, title }]);
       if (select) onSelect(result.threadId); else setRevision(value => value + 1);
-    } catch { if (alive.current) setError(t`Could not create task. Try again.`); }
+    } catch { if (alive.current) setError(t`Could not create the conversation. Try again.`); }
     finally { creating.current = false; if (alive.current) setBusy(false); }
   }
   const tabIds = taskThreadId && !openIds.includes(taskThreadId) ? [...openIds, taskThreadId] : openIds;
   const visibleTabs = tabIds.flatMap(threadId => {
     const tab = tabs.find(row => row.threadId === threadId);
-    return tab ? [tab] : threadId === taskThreadId ? [{ threadId, title: t`Task` }] : [];
+    return tab ? [tab] : threadId === taskThreadId ? [{ threadId, title: t`Conversation` }] : [];
   });
 
   useEffect(() => {
@@ -113,17 +113,20 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
 
   const taskForm = (
     <form onSubmit={event => { event.preventDefault(); void create(); }} className="space-y-3">
-      <label htmlFor={id} className="block text-sm font-medium"><Trans>New conversation</Trans></label>
-      <p className="text-xs text-muted-foreground"><Trans>Work on another topic with this Mico without interrupting the current conversation.</Trans></p>
-      <Input id={id} value={name} maxLength={100} autoFocus disabled={busy} onChange={event => setName(event.target.value)} />
+      <h3 className="text-sm font-medium"><Trans>New conversation</Trans></h3>
+      <p className="text-xs leading-5 text-muted-foreground"><Trans>A separate task with the same Mico. Your other conversations stay where they are.</Trans></p>
+      <div className="space-y-1.5">
+        <label htmlFor={id} className="block text-xs font-medium"><Trans>Conversation title</Trans></label>
+        <Input id={id} value={name} maxLength={100} autoFocus placeholder={t`For example: migrate Kuma`} disabled={busy} onChange={event => setName(event.target.value)} />
+      </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" size="sm" disabled={busy || !name.trim()}><Trans>Create</Trans></Button>
+      <Button type="submit" size="sm" disabled={busy || !name.trim()}>{busy ? t`Creating…` : t`Create conversation`}</Button>
     </form>
   );
 
-  return <nav aria-label={t`Mico tasks`} className={inMenu ? "min-w-0" : "app-no-drag flex min-w-0 shrink items-center gap-0.5"}>
-    {!inMenu ? <div className="flex min-w-0 shrink items-center gap-0.5 overflow-x-auto [scrollbar-width:none] @max-[24rem]:hidden">
-      {visibleTabs.length || taskThreadId ? <Button size="sm" variant={!taskThreadId ? "secondary" : "ghost"} className="h-7 shrink-0 px-2" aria-current={!taskThreadId ? "page" : undefined} onClick={() => onSelect()}><Trans>Main chat</Trans></Button> : null}
+  return <nav aria-label={t`Conversations`} className={inMenu ? "min-w-0" : "app-no-drag flex min-w-0 shrink items-center gap-0.5"}>
+    {!inMenu ? <div className="flex min-w-0 shrink items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">
+      <Button size="sm" variant={!taskThreadId ? "secondary" : "ghost"} className="h-7 shrink-0 px-2" aria-current={!taskThreadId ? "page" : undefined} onClick={() => onSelect()}><Trans>General</Trans></Button>
       {visibleTabs.map(tab => (
         <div key={tab.threadId} data-active={tab.threadId === taskThreadId ? "" : undefined}
           className="group/task-tab relative flex h-7 max-w-40 shrink-0 items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground data-[active]:bg-accent data-[active]:text-foreground @max-[32rem]:not-data-[active]:hidden">
@@ -132,9 +135,9 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
             aria-current={tab.threadId === taskThreadId ? "page" : undefined} title={tab.title}
             onClick={() => onSelect(tab.threadId)}>
             <MessageCircle size={14} aria-hidden="true" />
-            <span className="min-w-0 truncate" dir="auto">{tab.title || t`Task`}</span>
+            <span className="min-w-0 truncate" dir="auto">{tab.title || t`Conversation`}</span>
           </Button>
-          <Button size="icon-sm" variant="ghost" className="absolute inset-y-0 start-0 my-auto size-7 bg-accent opacity-0 focus-visible:opacity-100 group-hover/task-tab:opacity-100 [@media(hover:none)]:opacity-100"
+          <Button size="icon-sm" variant="ghost" className="size-6 shrink-0 opacity-0 focus-visible:opacity-100 group-hover/task-tab:opacity-100 [@media(hover:none)]:opacity-100"
             aria-label={t`Close tab`} onClick={() => closeTab(tab.threadId)}>
             <X size={13} aria-hidden="true" />
           </Button>
@@ -142,24 +145,25 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
       ))}
     </div> : null}
     {!inMenu ? <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button size="icon-sm" variant="ghost" className="@max-[24rem]:hidden" aria-label={t`New conversation`} />}><Plus size={16} aria-hidden="true" /></PopoverTrigger>
+      <PopoverTrigger render={<Button size="sm" variant="ghost" className="h-7 shrink-0 gap-1.5 px-2" aria-label={t`New conversation`} title={t`New conversation`} />}><Plus size={15} aria-hidden="true" /><span className="@max-[40rem]:hidden"><Trans>New conversation</Trans></span></PopoverTrigger>
       <PopoverContent align="end" className="w-72 max-w-[calc(100vw-2rem)]">
         {taskForm}
       </PopoverContent>
     </Popover> : null}
     <Popover open={threadPickerOpen} onOpenChange={next => { setThreadPickerOpen(next); if (inMenu && !next) setOpen(false); }}>
-      <PopoverTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t`Mico tasks`} title={t`Mico tasks`} data-mobile-chat-action={inMenu || undefined} />}>
-        {inMenu ? <><MessageCircle aria-hidden /><Trans>Mico tasks</Trans></> : <ChevronDown size={15} aria-hidden="true" />}
+      <PopoverTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t`Conversations`} title={t`Conversations`} data-mobile-chat-action={inMenu || undefined} />}>
+        {inMenu ? <><MessageCircle aria-hidden /><Trans>Conversations</Trans></> : <ChevronDown size={15} aria-hidden="true" />}
       </PopoverTrigger>
       <PopoverContent align="start" className="max-h-[60dvh] w-72 max-w-[calc(100vw-2rem)] gap-1 overflow-y-auto p-1 [&_button]:font-normal">
         {inMenu && open ? <div className="p-2">{taskForm}</div> : <>
-        <Button size="sm" variant={!taskThreadId ? "secondary" : "ghost"} className="justify-start" onClick={() => { setThreadPickerOpen(false); onSelect(); }}><Trans>Main chat</Trans></Button>
+        <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground"><Trans>Conversations</Trans></p>
+        <Button size="sm" variant={!taskThreadId ? "secondary" : "ghost"} className="justify-start" onClick={() => { setThreadPickerOpen(false); onSelect(); }}><Trans>General</Trans></Button>
         {tabs.map(tab => (
           <Button key={tab.threadId} size="sm" variant={tab.threadId === taskThreadId ? "secondary" : "ghost"}
             className="justify-start gap-2" aria-current={tab.threadId === taskThreadId ? "page" : undefined}
             onClick={() => { setThreadPickerOpen(false); onSelect(tab.threadId); }}>
             <MessageCircle size={14} aria-hidden="true" />
-            <span className="min-w-0 truncate" title={tab.title} dir="auto">{tab.title || t`Task`}</span>
+            <span className="min-w-0 truncate" title={tab.title} dir="auto">{tab.title || t`Conversation`}</span>
           </Button>
         ))}
         {loadFailed ? <Button size="sm" variant="ghost" onClick={() => setRevision(value => value + 1)}><Trans>Retry</Trans></Button> : null}

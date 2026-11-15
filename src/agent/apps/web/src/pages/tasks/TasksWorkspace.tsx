@@ -21,6 +21,8 @@ import {
   CircleDashed,
   LoaderCircle,
   PanelLeft,
+  Pin,
+  Bell,
   Search,
   X,
 } from "lucide-react";
@@ -33,6 +35,7 @@ import { errorText } from "../../lib/user-error";
 import { TaskAgentSelect, TaskComposer } from "./TaskComposer";
 import { TaskDetail } from "./TaskDetail";
 import { TaskEmptyBoard, TaskEmptyPitch } from "./TaskEmpty";
+import { reminderTime } from "./TaskFollowUp";
 import { TASK_SECTIONS, type TaskSection, taskSection } from "./task-sections";
 import { useTaskInbox } from "./use-task-inbox";
 import "./tasks.css";
@@ -48,6 +51,7 @@ export function TasksWorkspace({
   selectedId,
   onSelect,
   onExit,
+  onOpenConversation,
   agentsOpen,
   onToggleAgents,
   transcribe,
@@ -62,6 +66,7 @@ export function TasksWorkspace({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onExit: () => void;
+  onOpenConversation: (item: InboxTask) => void;
   agentsOpen: boolean;
   onToggleAgents: () => void;
   transcribe?: boolean;
@@ -80,19 +85,22 @@ export function TasksWorkspace({
     if (state.receipt) setFiles([]);
   }, [state.receipt?.id]);
   const labels: Record<TaskSection, string> = {
+    pinned: t`Pinned conversations`,
+    newReplies: t`New replies`,
+    pending: t`To continue`,
     needsYou: t`Needs you`,
     working: t`Working`,
     waiting: t`Waiting`,
-    unread: t`New answers`,
-    read: t`Read`,
     archived: t`Archived`,
   };
-  const empty = state.available !== null && !state.items.length && !state.pending;
+  const empty = state.available === true && !state.items.length && !state.pending;
   useEffect(() => {
     if (!state.botId && bots[0]) state.setBotId(bots[0].id);
   }, [bots, state.botId]);
   function status(item: InboxTask) {
-    if (item.status === "completed") return t({ context: "task status", message: "Answered" });
+    if(item.remindAt && Date.parse(item.remindAt)<=Date.now())return t`Reminder due`;
+    if (item.status === null) return t`Not started`;
+    if (item.status === "completed") return item.unread ? t`New reply` : t`To continue`;
     if (item.status === "cancelled") return t`Stopped`;
     if (item.status === "failed") return t`Failed`;
     if (item.status === "waiting_input" || item.status === "waiting_takeover")
@@ -216,6 +224,7 @@ export function TasksWorkspace({
                   ) : null}
                 </div>
               ) : null}
+              {!empty ? <p className="rk-tasks-description">{t`Task conversations from all your Micos in this workspace. They stay here until you archive them.`}</p> : null}
               <div className="rk-task-compose-wrap">
                 <TaskComposer
                   value={state.draft}
@@ -373,7 +382,7 @@ export function TasksWorkspace({
                                 ? CircleCheck
                                 : item.status === "failed" || item.status === "waiting_input"
                                   ? CircleAlert
-                                  : item.status === "queued"
+                                  : item.status === "queued" || item.status === null
                                     ? CircleDashed
                                     : LoaderCircle;
                           return (
@@ -382,25 +391,26 @@ export function TasksWorkspace({
                                 type="button"
                                 className="rk-task-row"
                                 aria-pressed={item.id === selectedId}
+                                aria-label={`${item.title} · ${bot?.name ?? "Mico"} · ${status(item)}`}
                                 onClick={() => onSelect(item.id === selectedId ? null : item.id)}
                               >
                                 <Icon
                                   size={14}
-                                  className={section === "working" ? "rk-task-spinner" : ""}
+                                  className={item.status === "running" || item.status === "leased" ? "rk-task-spinner" : ""}
                                 />
                                 <span className="rk-task-row-title" title={item.title}>
-                                  {item.title}
+                                  {item.pinned?<Pin size={11}/>:null}{item.title}
+                                  {item.remindAt?<small><Bell size={10}/>{reminderTime(item.remindAt)}</small>:null}
                                 </span>
                                 <span
                                   className={`rk-task-status ${item.unread || section === "needsYou" ? "rk-task-answered" : ""}`}
                                 >
                                   {status(item)}
                                 </span>
-                                <BotAvatar
-                                  identity={item.botId}
-                                  color={bot?.color ?? botColors[3]}
-                                  size={18}
-                                />
+                                <span className="rk-task-agent" title={bot?.name}>
+                                  <BotAvatar identity={item.botId} color={bot?.color ?? botColors[3]} size={18} />
+                                  <span>{bot?.name ?? t`Mico`}</span>
+                                </span>
                               </button>
                             </li>
                           );
@@ -437,6 +447,7 @@ export function TasksWorkspace({
             onChanged={() => void state.reload()}
             expanded={expanded}
             onExpand={() => expand((value) => !value)}
+            onOpenChat={() => onOpenConversation(selected)}
             transcribe={transcribe}
           />
         ) : null}

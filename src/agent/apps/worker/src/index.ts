@@ -1,5 +1,5 @@
 import { tailnetServiceFromEnv } from "@rakazo/adapters";
-import { WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
+import { reconcileTaskReminders, WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { JobPublisher, JobWorkerHost } from "@rakazo/adapter-kit";
 import { ComposioConnector, IntegrationProviderSettings } from "@rakazo/adapters";
@@ -366,6 +366,7 @@ async function main() {
       securityEventRetentionDays(),
     ),
     reconcileHomeStorage: homeStorageSweeper(home),
+    reconcileTaskReminders: () => reconcileTaskReminders({prisma,notifications}),
   });
   let stopHealth: (() => Promise<void>) | undefined;
   const shutdown = new AbortController();

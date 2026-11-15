@@ -11,6 +11,8 @@ export const InboxTaskSchema = z.object({
   error: z.string().nullable(),
   progress: z.string().nullable(),
   unread: z.boolean(),
+  pinned: z.boolean().optional(),
+  remindAt: IsoDate.nullable().optional(),
   archivedAt: IsoDate.nullable(),
   createdAt: IsoDate,
   updatedAt: IsoDate,

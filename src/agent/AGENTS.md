@@ -203,6 +203,13 @@
   Side-question generations are ephemeral: meter usage, but do not write a chat
   message or a Pi session transcript. Verify scoped pane/composer/API tests.
 
+- Mico task conversations use MicoTaskTabs: one Mico keeps independent named
+  conversations behind New conversation and the Conversations picker. Closing a
+  tab never deletes its history. Keep Create Mico separate from these actions.
+  Reset context is a confirmed secondary action for the main chat only; never
+  expose that endpoint from an independent task or label it New conversation.
+  Verify the task navigation and NewChatControl regression tests.
+
 - New chat is distinct from Clear: retain messages with a context_reset divider,
   advance Thread.contextStartSeq, invalidate local summaries/checkpoints and rotate
   the native session binding while keeping the same workspace and Mico settings.
@@ -361,6 +368,18 @@
   mico-task key namespace, never a parallel execution engine. Keep ?task= for
   owned task conversations and ?inbox= for the inbox selection. Archive and sends
   share the exact thread lock; uncertain sends retain their original nonce.
+  Discover existing named task conversations into inbox metadata in bounded,
+  owner/Space-scoped batches without starting Runs or replacing archive/read state.
+  Exclude routine/workflow/main threads and interrupted inbox starts. Completed
+  turns remain reviewable until archived. Verify verify-task-conversations-db.ts
+  and the task section/navigation tests when changing this bridge.
+  Follow-up uses InboxTask.pinned/remindAt and existing read cursors. Separate new
+  replies from read conversations awaiting continuation. The existing worker
+  reconciler claims due reminders; no model Run or Credit charge. Archive cancels
+  reminders, rescheduling invalidates queued notices, and delivery rechecks owner,
+  membership and notification/privacy policy. Preserve UTC instants through Web
+  Push outbox SQL and epoch-based job scheduling. Verify the focused route/DB
+  verifier, follow-up UI, notification and section tests for changes.
   Calendar and usage queries remain bounded and owner/Space scoped; unknown cost
   stays unknown. Workflow condition branches retain the existing worker semantics.
   Verify scripts/verify-workspace-sync-db.ts and verify-workspace-sync-ui.mjs;

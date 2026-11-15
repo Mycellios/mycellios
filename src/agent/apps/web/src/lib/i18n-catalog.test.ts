@@ -14,6 +14,7 @@ describe("lingui catalogs", () => {
     ["{name} reads this chat to answer. Nothing here goes back to the chat.", { name: "Mico QA" }, "Mico QA reads this chat to answer. Nothing here goes back to the chat."],
     ["Times in {zone}", { zone: "Europe/Madrid" }, "Times in Europe/Madrid"],
     ["New conversation in {0}", { 0: "Research" }, "New conversation in Research"],
+    ["Reset {name}'s main chat context?", { name: "Infra" }, "Reset Infra's main chat context?"],
   ])("formats compiled English values without a development message fallback: %s", (id, values, expected) => {
     const production = setupI18n({ locale: "en", messages: { en: englishMessages as Messages } });
     expect(production._(id as string, values as Record<string, string>)).toBe(expected);

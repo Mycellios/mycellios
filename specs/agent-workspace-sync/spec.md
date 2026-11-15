@@ -6,6 +6,16 @@ This is a source integration, not a replacement with an older working tree.
 
 ## Scope
 
+- Tasks is the shared inbox of named Mico conversations in the current owner/Space,
+  regardless of whether they were opened from the Mico or Tasks. Discover existing
+  ordinary task threads into the existing inbox metadata, idempotently and in
+  bounded batches. Exclude main/group chats, routine/workflow threads, archived
+  Micos and interrupted inbox starts. Discovery never creates or starts a Run.
+  Preserve per-conversation archive/read state. Classify completed turns as
+  needing review, never implicitly archived or business-goal completed. Reuse
+  the existing task detail, explicit archive/restore, and exact bot/thread chat
+  navigation. SQL isolation and actual local browser checks qualify this bridge.
+
 - Integrate the workspace rail and per-account/Space pins, unified integration,
   Mico and skill marketplace, help and provider menus.
 - Integrate the routine diagram, editable workflow canvas, task inbox, schedule
@@ -51,3 +61,11 @@ source snapshots and recovery refs. Clean only branches whose changes are proven
 absorbed, are not checked out by another task and have no active unmerged PR;
 retain unfinished candidates and concurrent work. Capability qualification is
 recorded in the canonical status document when achieved.
+
+### Conversation follow-up
+
+- New bot replies remain distinct from read conversations awaiting continuation.
+- Pins are stored on existing owner/Space inbox metadata, rendered once at the top.
+- Optional one-shot reminders persist as UTC instants; date entry uses device local time. The existing worker reconciler claims bounded due batches and uses the existing privacy-aware native/Web Push channels, with explicit task-thread links. No inference or billing is performed. A due marker remains until dismissed or rescheduled; absent/disabled delivery does not consume the reminder.
+- Archive cancels reminders and unpins. Cancellation/rescheduling invalidates pending Web Push delivery. A worker crash can retry an expired claim; native network acceptance is at-least-once across a crash, while the Web Push outbox deduplicates device/reminder/date.
+- Local qualification uses the additive migration and scripts/verify-task-conversations-route-db.ts with real SQL/RLS, synthetic notification transport, scoped UI tests and browser checks. Physical OS delivery requires a configured recipient and is a separate qualification.

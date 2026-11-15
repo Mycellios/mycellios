@@ -146,3 +146,9 @@ test("browser inference settlement changes require isolated real PostgreSQL", ()
     assert.deepEqual(check?.args, ["scripts/test-referrals-postgres.mjs", "tests/browser-inference.postgres.test.ts"]);
   }
 });
+
+test('conversation follow-up retains an isolated real database and delivery gate',()=>{
+ const plan=planChecks(['src/agent/packages/db/prisma/migrations/20261115100000_task_followup/migration.sql','src/agent/packages/adapters/src/task-reminders.ts'],[]);
+ assert.ok(plan.some(c=>c.args.includes('scripts/verify-task-conversations-route-db.ts')));
+ assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-task-conversations-route-db.ts')));
+});

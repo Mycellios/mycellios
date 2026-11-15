@@ -1,20 +1,24 @@
 import type { InboxTask } from "@rakazo/contracts";
-export type TaskSection = "needsYou" | "working" | "waiting" | "unread" | "read" | "archived";
+export type TaskSection = "pinned" | "needsYou" | "newReplies" | "working" | "waiting" | "pending" | "archived";
 export const TASK_SECTIONS: TaskSection[] = [
+  "pinned",
   "needsYou",
+  "newReplies",
   "working",
   "waiting",
-  "unread",
-  "read",
+  "pending",
   "archived",
 ];
 export function taskSection(item: InboxTask): TaskSection {
   if (item.archivedAt && !taskIsActive(item)) return "archived";
+  if(item.pinned && !item.archivedAt)return "pinned";
+  if (item.remindAt && Date.parse(item.remindAt)<=Date.now()) return "needsYou";
   if (["waiting_input", "waiting_takeover", "failed"].includes(item.status ?? ""))
     return "needsYou";
   if (["leased", "running"].includes(item.status ?? "")) return "working";
-  if (item.status === "queued" || item.status === null) return "waiting";
-  return item.unread ? "unread" : "read";
+  if (item.status === "queued") return "waiting";
+  if(item.status === "completed" && item.unread)return "newReplies";
+  return "pending";
 }
 export function taskIsActive(item: InboxTask) {
   return [
