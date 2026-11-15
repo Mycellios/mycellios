@@ -2549,7 +2549,7 @@ function builtinParameters(tool: ConnectorTool) {
     return Type.Object({ reason: Type.String() });
   }
   if (tool.name === "remember") {
-    return Type.Object({ content: Type.String(), path: Type.String() });
+    return Type.Object({ content: Type.String(), path: Type.String(), scope: Type.Optional(stringEnum(["mico","task"],{})) });
   }
   if (tool.name === "shell") {
     return Type.Object({
