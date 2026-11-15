@@ -29,7 +29,8 @@ export function installRuntimeBarrier(port,profile) {
 }
 export function runtimeBarrierStatus(port) {
   const value=installed.get(port);if(!value)throw new Error('barrier_not_installed');
-  const activeHttp=process._getActiveHandles().filter(handle=>handle.localPort===port&&handle._httpMessage&&!handle._httpMessage.writableEnded).length;
-  return {profile:value.profile,port,refused:value.blocked(),activeHttp,installed:true};
+  const active=process._getActiveHandles().filter(handle=>handle.localPort===port&&handle._httpMessage&&!handle._httpMessage.writableEnded);
+  const activeAdmissions=active.filter(handle=>isNewAdmission(handle._httpMessage.req.method,handle._httpMessage.req.url,value.profile)).length;
+  return {profile:value.profile,port,refused:value.blocked(),activeHttp:active.length,activeAdmissions,installed:true};
 }
 export function restoreRuntimeBarrier(port){const value=installed.get(port);if(!value)throw new Error('barrier_not_installed');value.restore();installed.delete(port);return{restored:true,port};}
