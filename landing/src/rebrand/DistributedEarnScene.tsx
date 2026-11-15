@@ -7,9 +7,10 @@ import "./distributed-earn-scene.css";
 
 const artwork = distributedEarnArtwork();
 const avatars = ["mico", "planning", "research", "writing"] as const;
-const devices = [Monitor, Smartphone, Cpu] as const;
 
 export function DistributedEarnScene({ running = true }: { running?: boolean }) {
+  // Shared icons may live in another chunk. Read their live bindings after load.
+  const devices = [Monitor, Smartphone, Cpu] as const;
   const root = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false), [hidden, setHidden] = useState(false), [paused, setPaused] = useState(false);
   useEffect(() => {
