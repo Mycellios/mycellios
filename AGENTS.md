@@ -150,6 +150,34 @@ These rules apply to the complete repository.
 - The panel has no built-in chat. Mycellios Agent owns the conversation UI; keep
   legacy `view=chat` and `view=inference` links mapped to Overview, without removing
   the coordinator API used by Agent and other clients.
+- The contribution chapter after the landing opening uses DistributedEarnScene,
+  ContributionEntry and
+  the shared UI kit. Browser points to the account-bound Agent Generate AI control;
+  Desktop points to `/downloads/desktop`. Keep the Earn page consistent, explain
+  verified-work Credits separately from Spore, and never auto-start compute or
+  display simulated earnings. Preserve the remaining landing composition.
+  Terminal downloads use stable published native-node routes, with explicit platform
+  selection and copy-only commands; installing still requires account pairing.
+  Do not offer unavailable installers or execute downloaded scripts from the page.
+  The distributed scene is deterministic conceptual artwork, not telemetry or a
+  wallet. Its money symbols represent AI Credits, not cash payouts. Pause motion
+  offscreen, in hidden tabs, for reduced motion and with page/scene controls.
+- The landing startup mark mirrors Agent's `public/mycellios/loader.svg` in
+  `landing/public/brand/agent-loader.svg`; keep the assets identical and retain
+  reduced-motion support. Check `forest-bootstrap.test.ts` when updating it.
+- Landing Mico illustrations use Agent's current eyeless mycelium atlas and compact
+  face anchors, not the old geometric demo SVGs. `mico-avatar.test.tsx` checks crop
+  and anchor parity; retain the greeting, pause and reduced-motion behavior.
+- The landing download split button reads the validated Desktop release catalog,
+  preserves checksum query parameters and falls back to the downloads page. Never
+  guess Mac CPU architecture or advertise unsupported installers. Keep the platform
+  picker dismissible with Escape/outside click and separate browser entry available.
+- The Agent opening uses GoldenMycelium: original WebGL2 gold hyphae on deep moss,
+  measured around the real download action and paper workspace. Keep its geometry
+  and pixel ratio bounded, content exclusion masks, lazy graphics loading, static
+  reduced-motion/unsupported fallback, and shared playback/visibility pause.
+  Check golden-mycelium tests for clock pause, GPU cleanup and failure paths.
+  This is conceptual brand artwork, never evidence of network work or earnings.
 - `ReferenceLanding` is the default network-first marketing page: a centered
   introduction, a large computing-fabric illustration and API/device entry points
   in the network chapter. `NetworkPrint` applies a bounded WebGL print treatment
@@ -181,6 +209,15 @@ These rules apply to the complete repository.
 - Shared-link previews use the versioned 1200 × 630 PNG declared in
   `landing/index.html` and `landing/src/seo.ts`. Keep static and runtime metadata
   aligned; verify `tests/landing-seo.test.ts` when changing social cards.
+- Public discovery paths share `src/contracts/marketing-pages.ts`; translated
+  guides live in `src/contracts/marketing-guides.ts`. Keep self canonicals and
+  reciprocal language links only for actual translations. Both coordinator and
+  static sitemaps must include the same public product paths and exclude previews.
+  `scripts/generate-landing-seo.ts` writes route HTML, Markdown and AI references;
+  `--resources-only` syncs the public reference sources. Check landing-discovery,
+  landing-marketing-routes and content-hub tests when changing this contract.
+  Private console variants remain noindex; references must never contain account data.
+
 - Desktop installer availability has a separate catalog at
   `/public/v1/desktop-downloads` and page `/downloads/desktop`; preserve the
   headless runtime catalog and platform routes. Preview upgrades are manual
@@ -395,6 +432,18 @@ These rules apply to the complete repository.
   terminal markers and complete usage strict, and other providers unchanged.
   Normalize only the known DeepSeek vendor discovery namespace to its stable
   public id; selected peers must still advertise the literal bounded service.
+- Account-funded browser expert stages use `specs/agent-browser-contribution/spec.md`.
+  Keep their explicit operator opt-in, approved artifact/price bounds, signed live
+  account binding and independent full-output reference. They are not native
+  physical evidence. The explicit complete-text pilot uses pinned GPT-2 ONNX, BPE,
+  CPU/WASM generation and full independent token verification; it is not a tools
+  model or WebGPU text acceleration. Keep decoding/reference in terminable workers
+  and ORT external WASM assets under the lockfile. Check browser-text work,
+  decoder/assets tests and the focused worker bundle build.
+  Apply their private schema
+  through the migration owner; preserve atomic buyer debit/earned credit, replay
+  recovery and zero rewards for benchmarks/failures. Check browser-inference
+  PostgreSQL, browser-funded-hub/reference and Agent contribution/account tests.
 - Optional private AntSeed ingress uses `MYCELLIOS_PRIVATE_BASE_URL` and the
   same authenticated API/key limits. It binds loopback only, accepts only `jev`,
   and retries only explicit account-concurrency rejection for at most 30 seconds.
@@ -427,6 +476,10 @@ These rules apply to the complete repository.
   five seconds per CPU sample, coalesce overlapping observations and reset the
   startup baseline only when monitoring begins. Keep thermal/RAM/disk checks and
   snapshot reconciliation ordering intact.
+- Contribution reconciliation may pause a node but must not resume a persisted
+  owner pause. Resume requires a fresh explicit control command; component activation
+  must also read the current persisted state. Verify node-command-applicator and
+  node-command-client tests, including pause persistence across restart.
 - The managed CUDA embedding launcher is `scripts/embedding-gpu-bootstrap.py`.
   It uses normal process priority inside the existing Windows Job; preserve the
   pre-import barrier, owner CPU/memory quotas and kill-on-job-close behavior.

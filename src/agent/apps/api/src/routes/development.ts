@@ -73,7 +73,7 @@ export function developmentRoutes(ctx: RouterContext) {
             taskBotId: input.botId,
             projectKey: input.projectKey,
             taskKey: input.taskKey,
-            title: input.title,
+            title: input.title ?? null,
           },
           update: {},
         });
@@ -82,6 +82,20 @@ export function developmentRoutes(ctx: RouterContext) {
             message: "This task already belongs to a different Mico or project.",
           });
         return { threadId: row.id };
+      }),
+      rename: authed.development.rename.handler(async ({ context, input }) => {
+        const actor = context.actor;
+        await createRepos(deps.prisma).getBot(actor, input.botId);
+        const result = await deps.prisma.thread.updateMany({
+          where: {
+            id: input.taskThreadId, userId: actor.userId, spaceId: actor.spaceId,
+            taskBotId: input.botId, projectKey: `mico:${input.botId}`,
+            taskKey: { startsWith: `mico-task:${input.botId}:` },
+          },
+          data: { title: input.title },
+        });
+        if (!result.count) throw new ORPCError("NOT_FOUND");
+        return { threadId: input.taskThreadId, title: input.title };
       }),
       list: authed.development.list.handler(async ({ context, input }) => {
         const actor = context.actor;

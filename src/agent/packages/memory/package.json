@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "@rakazo/adapter-kit": "*",
-    "@rakazo/db": "*"
+    "@rakazo/db": "*",
+    "@rakazo/core": "*"
   },
   "devDependencies": {
     "typescript": "7.0.2",

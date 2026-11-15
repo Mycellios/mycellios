@@ -9,7 +9,7 @@ import "./lib/native-pc-bootstrap";
 import { Toaster, TooltipProvider } from "@rakazo/ui-web";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode, useEffect, useLayoutEffect, useRef } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { App } from "./App";
 import { DesktopUpdatesProvider } from "./components/DesktopUpdates";
@@ -29,7 +29,8 @@ import { registerServiceWorker } from "./pwa/register";
 import "./styles.css";
 
 markOnce("rk:renderer:module-evaluated");
-installPreloadRecovery();
+const removePreloadRecovery = installPreloadRecovery();
+import.meta.hot?.dispose(removePreloadRecovery);
 const removeFocusInput = installFocusInput();
 import.meta.hot?.dispose(removeFocusInput);
 installAndroidHost();
@@ -40,7 +41,8 @@ applyInterfaceSize();
 applyGeneralPreferences();
 installActionSounds();
 void syncNativeLogo().catch(() => undefined);
-subscribeGeneralPreferences(() => { void syncNativeLogo().catch(() => undefined); });
+const removeLogoPreference = subscribeGeneralPreferences(() => { void syncNativeLogo().catch(() => undefined); });
+import.meta.hot?.dispose(removeLogoPreference);
 
 function PerformanceProbe() {
   useLayoutEffect(() => {
@@ -67,7 +69,12 @@ function AppearanceSync() {
   return null;
 }
 
-createRoot(document.getElementById("root")!, { onCaughtError: reportCaughtReactError }).render(
+// HMR can re-evaluate the entry module. A second React root on the same DOM
+// container corrupts updates and can strand the page on its loading screen.
+const root: Root = import.meta.hot?.data.mycelliosRoot ??
+  createRoot(document.getElementById("root")!, { onCaughtError: reportCaughtReactError });
+if (import.meta.hot) import.meta.hot.data.mycelliosRoot = root;
+root.render(
   <StrictMode>
     <PerformanceProbe />
     <AppearanceSync />

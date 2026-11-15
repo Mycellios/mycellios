@@ -1,7 +1,6 @@
 import { lazy, StrictMode, Suspense, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { loadMushroomStage, wantsMushroom } from "./rebrand/HeroMushroom";
-import { applySeoMetadata } from "./seo";
 import { resolveLandingSurface, retiredMarketingDestination } from "./routing";
 import "./button-style.css";
 import "./logo-style.css";
@@ -20,6 +19,7 @@ const ReferenceLanding = lazy(() => import("./rebrand/ReferenceLanding").then((m
 const StatsDashboard = lazy(() => import("./StatsDashboard").then((module) => ({ default: module.StatsDashboard })));
 const PricingPage = lazy(() => import("./rebrand/PricingPage").then((module) => ({ default: module.PricingPage })));
 const ComparePage = lazy(() => import("./rebrand/ComparePage").then((module) => ({ default: module.ComparePage })));
+const GuidePage = lazy(() => import("./rebrand/GuidePage").then((module) => ({ default: module.GuidePage })));
 const ChangelogPage = lazy(() => import("./rebrand/ChangelogPage").then((module) => ({ default: module.ChangelogPage })));
 const EarnStudio = lazy(() => import("./rebrand/EarnStudio").then((module) => ({ default: module.EarnStudio })));
 const SporeStudio = lazy(() => import("./rebrand/SporeStudio").then((module) => ({ default: module.SporeStudio })));
@@ -78,7 +78,11 @@ if (["inference", "chat"].includes(retiredChatUrl.searchParams.get("view") ?? ""
   retiredChatUrl.searchParams.set("view", "overview");
   window.history.replaceState({}, "", `${retiredChatUrl.pathname}${retiredChatUrl.search}${retiredChatUrl.hash}`);
 }
-applySeoMetadata();
+// Public production routes already ship their own metadata and content as HTML.
+// Keep the complete editorial catalog off the initial application bundle.
+if (import.meta.env.DEV || ["stats.mycellios.com", "stats.localhost"].includes(window.location.hostname) || new URLSearchParams(window.location.search).has("view")) {
+  void import("./seo").then(({ applySeoMetadata }) => applySeoMetadata());
+}
 
 const path = window.location.pathname.length > 1
   ? window.location.pathname.replace(/\/+$/, "")
@@ -96,6 +100,7 @@ const rootedLanding = new URLSearchParams(window.location.search).get("landing")
 const assemblageLanding = new URLSearchParams(window.location.search).get("landing") === "assemblage";
 
 const page = surface === "stats" ? <StatsDashboard />
+  : surface === "guide" ? <GuidePage />
   : surface === "pricing" ? <PricingPage />
   : surface === "compare" ? <ComparePage />
   : surface === "changelog" ? <ChangelogPage />

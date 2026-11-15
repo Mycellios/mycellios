@@ -10,3 +10,10 @@ it("a partial save does not reset unrelated defaults or accept model-supplied po
   expect(MicoSettingsUpdate.parse({ revision: 2, kind: "defaults", patch: { gitCoauthor: false } })).toEqual({ revision: 2, kind: "defaults", patch: { gitCoauthor: false } });
   expect(MicoSettingsUpdate.safeParse({ revision: 0, kind: "bot", botId: "b", key: "gitCoauthor", value: true }).success).toBe(false);
 });
+
+it("accepts response styles only in owned defaults without changing automation flags", () => {
+  expect(MicoSettingsUpdate.parse({revision: 1, kind: "defaults", patch: {responseStyle: "classic"}})).toMatchObject({patch: {responseStyle: "classic"}});
+  expect(effectiveMicoSettings({responseStyle: "classic", localScripts: true}, {}).responseStyle).toBe("classic");
+  expect(effectiveMicoSettings({responseStyle: "classic", localScripts: true}, {}).localScripts).toBe(true);
+  expect(MicoSettingsUpdate.safeParse({revision: 1, kind: "defaults", patch: {responseStyle: "verbose"}}).success).toBe(false);
+});

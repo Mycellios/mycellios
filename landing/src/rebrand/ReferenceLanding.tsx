@@ -11,6 +11,8 @@ import { AgentProductHero } from "./AgentProductHero";
 import { AgentUseCasesEntry } from "./AgentUseCasesEntry";
 import { AgentNetworkThread } from "./AgentNetworkThread";
 import { AgentClosing } from "./AgentClosing";
+import { ContributionEntry } from "./ContributionEntry";
+import { DistributedEarnScene } from "./DistributedEarnScene";
 import "./assemblage-landing.css";
 import "./reference-landing.css";
 import "./agent-product.css";
@@ -31,6 +33,8 @@ export function ReferenceLanding({ initialArtwork, networkOpening = false }: { i
   useEffect(() => { applySeoMetadata("/"); }, []);
   return <main className="mycellios-assemblage mycellios-reference" id="reference-top" data-journey-running={journeyRunning}><ForestIntroControl /><Link className="assembly-skip" href="#reference-content">Skip to content</Link>{showNetworkOpening ? <><ReferenceHeader />
     <section className="reference-hero reference-shell" id="reference-content" aria-labelledby="reference-title"><Heading as="h1" id="reference-title">Many machines. <br />One shared network.</Heading><Text>Open infrastructure for distributed AI. <br />Work with Agent, build with the API, or bring your compute.</Text><div className="reference-hero-actions"><Link href="#network" variant="primary" size="xl">How it works<ArrowDown size={17} aria-hidden="true" /></Link></div></section></> : <AgentProductHero header={<ReferenceHeader />} onPlaybackChange={setJourneyRunning} />}
+    <DistributedEarnScene running={journeyRunning} />
+    <ContributionEntry />
     {showNetworkOpening ? <NetworkStory artwork={artwork} /> : <div className="agent-journey-body"><AgentNetworkThread /><AgentUseCasesEntry /><Suspense fallback={<section className="reference-shell"><Link href="/compare">Compare agent apps</Link></section>}><ComparePreview /></Suspense><NetworkStory artwork={artwork} /></div>}
     {showNetworkOpening && <section className="reference-agent reference-shell" id="agent" aria-labelledby="reference-agent-title"><Heading as="h2" id="reference-agent-title">Meet Mycellios Agent.</Heading><Text>Conversations, models and tools in one workspace.</Text><Link variant="primary" size="xl" href={AGENT_URL}>Open Mycellios Agent<ArrowRight size={17} /></Link><AssemblageAgent expanded /></section>}
     {showNetworkOpening ? <><Suspense fallback={null}><LegacyLowerContent /></Suspense><ReferenceFooter /></> : <AgentClosing footer={<ReferenceFooter />} />}

@@ -58,6 +58,26 @@ export function spaceSeedKey(userId: string | null, spaceId: string | null, task
   return spaceQueries(userId, spaceId, taskScope).bootstrap.queryKey({ input: {} });
 }
 
+/** Paint navigation immediately, retaining the destination's own snapshot only.
+ * The scoped shell still refreshes/subscribes with its immutable client. Sharing
+ * sidebar metadata must never copy the departing conversation into another task.
+ */
+export function primeConversationSeed(
+  userId: string | null,
+  spaceId: string | null,
+  latest: Omit<AppBootstrap, "thread" | "routines">,
+  botId: string,
+  taskScope?: TaskThreadScope,
+): void {
+  const key = spaceSeedKey(userId, spaceId, taskScope);
+  const previous = queryClient.getQueryData(key);
+  const cached = queryClient.getQueryData(spaceQueries(userId, spaceId, taskScope)
+    .threads.get.queryKey({ input: { botId } })) ?? previous?.thread;
+  const thread = cached && !cached.groupId && cached.botId === botId &&
+    (!taskScope || cached.threadId === taskScope.taskThreadId) ? cached : null;
+  queryClient.setQueryData(key, { ...latest, thread, routines: [] });
+}
+
 /** A bot chat or a group chat. */
 export type ChatTarget =
   | { botId: string; groupId?: undefined }

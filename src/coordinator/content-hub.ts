@@ -1,3 +1,5 @@
+import { MARKETING_INDEXABLE_PATHS } from "../contracts/marketing-pages.js";
+import { MARKETING_GUIDES, GUIDE_INDEXES } from "../contracts/marketing-guides.js";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -17,18 +19,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
 const WEBHOOK_REPLAY_TTL_MS = 24 * 60 * 60 * 1_000;
 const MAX_WEBHOOK_EVENTS = 1_000;
 const MAX_SITEMAP_PAGES = 200;
-const PUBLIC_PRODUCT_SITEMAP_ROUTES = [
-  { path: "/", changeFrequency: "weekly", priority: "1.0" },
-  { path: "/network", changeFrequency: "daily", priority: "0.9" },
-  { path: "/pricing", changeFrequency: "weekly", priority: "0.8" },
-  { path: "/changelog", changeFrequency: "weekly", priority: "0.7" },
-  { path: "/compare", changeFrequency: "weekly", priority: "0.8" },
-  { path: "/spore/rewards", changeFrequency: "weekly", priority: "0.7" },
-  { path: "/stats", changeFrequency: "daily", priority: "0.9" },
-  { path: "/earn", changeFrequency: "weekly", priority: "0.8" },
-  { path: "/downloads", changeFrequency: "weekly", priority: "0.9" },
-  { path: "/browser/", changeFrequency: "weekly", priority: "0.7" },
-] as const;
+const PUBLIC_PRODUCT_SITEMAP_ROUTES = [...MARKETING_INDEXABLE_PATHS, "/downloads/desktop"].map(path => ({ path, changeFrequency: "weekly", priority: path === "/" ? "1.0" : "0.7" }));
 
 const localeSchema = z.string().regex(/^[a-z]{2}(?:-[A-Z]{2})?$/);
 
@@ -744,6 +735,7 @@ function renderSitemap(posts: readonly BlogPostSummary[]): string {
         undefined,
         route.changeFrequency,
         route.priority,
+        [...GUIDE_INDEXES, ...MARKETING_GUIDES].find(page => page.path === route.path),
       ),
     ),
     sitemapEntry(`${SITE_ORIGIN}${BLOG_PATH}`, undefined, "daily", "0.8"),
@@ -757,7 +749,7 @@ function renderSitemap(posts: readonly BlogPostSummary[]): string {
     ),
   ];
   return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
 ${urls.join("\n")}
 </urlset>`;
 }
@@ -767,9 +759,11 @@ function sitemapEntry(
   lastModified: string | undefined,
   changeFrequency: string,
   priority: string,
+  translation?: { path: string; language: string; alternate: string },
 ): string {
   return `  <url>
     <loc>${escapeXml(location)}</loc>
+    ${translation ? [ { language: translation.language, path: translation.path }, { language: translation.language === "es" ? "en" : "es", path: translation.alternate }, { language: "x-default", path: translation.language === "en" ? translation.path : translation.alternate } ].map(item => `<xhtml:link rel="alternate" hreflang="${item.language}" href="${escapeXml(SITE_ORIGIN + item.path)}"/>`).join("") : ""}
     ${lastModified ? `<lastmod>${escapeXml(lastModified)}</lastmod>\n    ` : ""}<changefreq>${changeFrequency}</changefreq>
     <priority>${priority}</priority>
   </url>`;

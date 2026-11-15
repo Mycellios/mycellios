@@ -102,6 +102,8 @@ model AiDataConsent {
 }
 
 model User {
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewUser")
+  messagePins MessagePin[]
   hostedWebs HostedWeb[]
   hostedWebRevisions HostedWebRevision[]
   hostedWebPins HostedWebPin[]
@@ -365,6 +367,8 @@ model Member {
 }
 
 model Space {
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewSpace")
+  messagePins MessagePin[]
   hostedWebs HostedWeb[]
   hostedWebRevisions HostedWebRevision[]
   hostedWebPins HostedWebPin[]
@@ -655,6 +659,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewBot")
   hostedWebAgents HostedWebAgent[]
   inboxTasks InboxTask[]
   taskConcurrency Int @default(4)
@@ -743,6 +748,9 @@ model BotSection {
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
+  parentId  String?
+  parent    BotSection? @relation("SidebarFolderTree", fields: [parentId, spaceId, userId], references: [id, spaceId, userId], onDelete: NoAction, onUpdate: NoAction)
+  children  BotSection[] @relation("SidebarFolderTree")
   position  Int         @default(0)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -750,6 +758,8 @@ model BotSection {
   groups    ChatGroup[]
 
   @@unique([spaceId, userId, name])
+  @@unique([id, spaceId, userId])
+  @@index([spaceId, userId, parentId])
   @@index([spaceId, userId, position, createdAt])
   @@map("bot_sections")
 }
@@ -816,6 +826,9 @@ model DevelopmentProject {
 }
 
 model Thread {
+  taskMemories MemoryDocument[] @relation("TaskMemory")
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewThread")
+  messagePins MessagePin[]
   hostedWebAgent HostedWebAgent?
   inboxTask InboxTask?
   taskBotId String?
@@ -853,11 +866,28 @@ model Thread {
 
   @@index([spaceId])
   @@unique([spaceId, userId, taskKey])
+  @@unique([id, spaceId, userId])
   @@index([taskBotId, projectKey])
   @@map("threads")
 }
 
+model MessagePin {
+  messageId String
+  threadId String
+  spaceId String
+  userId String
+  pinnedAt DateTime @default(now())
+  message Message @relation(fields:[messageId,threadId],references:[id,threadId],onDelete:Cascade)
+  thread Thread @relation(fields:[threadId,spaceId,userId],references:[id,spaceId,userId],onDelete:Cascade,onUpdate:NoAction)
+  space Space @relation(fields:[spaceId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  @@id([messageId,userId])
+  @@index([spaceId,userId,threadId,pinnedAt])
+  @@map("message_pins")
+}
+
 model Message {
+  pins MessagePin[]
   id               String    @id @default(cuid())
   threadId         String
   thread           Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -879,6 +909,7 @@ model Message {
   createdAt        DateTime  @default(now())
 
   @@unique([threadId, seq])
+  @@unique([id, threadId])
   @@unique([threadId, clientNonce])
   @@index([threadId, seq])
   @@index([replyToMessageId])
@@ -1333,6 +1364,10 @@ model MemoryDocument {
   scope     String
   path      String
   content   String
+  inclusion String @default("searchable")
+  userControlled Boolean @default(false)
+  taskThreadId String?
+  taskThread Thread? @relation("TaskMemory",fields:[taskThreadId,spaceId,userId],references:[id,spaceId,userId],onDelete:Cascade,onUpdate:NoAction,map:"memory_task_owner")
   revision  Int              @default(1)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
@@ -1340,6 +1375,7 @@ model MemoryDocument {
 
   @@unique([spaceId, scope, botId, path])
   @@index([spaceId, userId])
+  @@index([spaceId,userId,botId,taskThreadId],map:"memory_task_scope")
   @@map("memory_documents")
 }
 
@@ -2309,4 +2345,30 @@ model WebPushDelivery {
   finishedAt DateTime? @db.Timestamptz(6)
   @@unique([deviceId, eventKey])
   @@map("web_push_deliveries")
+}
+
+// Durable admission/receipt record: a submitted review is only reconciled, never replayed.
+model LocalMemoryReview {
+  thread Thread @relation("ReviewThread",fields:[threadId,spaceId,userId],references:[id,spaceId,userId],onDelete:Cascade,onUpdate:NoAction)
+  bot Bot @relation("ReviewBot",fields:[botId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  space Space @relation("ReviewSpace",fields:[spaceId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  user User @relation("ReviewUser",fields:[userId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  id String @id
+  threadId String
+  botId String
+  spaceId String
+  userId String
+  generation Int
+  lastSeq Int
+  status String
+  maximumMicrounits Int @default(0)
+  chargedMicrounits Int?
+  idempotencyKey String @unique
+  connectionDigest String
+  result Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([threadId, generation, lastSeq])
+  @@index([userId, spaceId, createdAt],map:"review_daily_budget")
+  @@map("local_memory_reviews")
 }

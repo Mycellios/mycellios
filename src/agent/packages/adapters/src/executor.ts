@@ -1,4 +1,5 @@
 import { eventDemoSessionActive } from "@rakazo/db";
+import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { micoBehaviorInstructions } from "./mico-behavior.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
@@ -584,6 +585,8 @@ const READ_ONLY_AGENT_TOOLS = new Set([
   "run_subagent",
   "task_catalog",
   "recall_memory",
+  "search_local_memory",
+  "read_local_memory",
   "schedule_list",
   "scratchpad_list",
   "board_tickets",
@@ -4097,6 +4100,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
         const semanticMemory: SemanticMemoryProvider | null = configuredMemory?.provider ?? null;
+        const localMemoryScope=effectiveMemoryScope(bot.memoryScope,configuredMemory?.defaultScope??"shared");
 
         await deps.events.append({
           spaceId: run.spaceId,
@@ -4197,7 +4201,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           messagingChannelRun
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context),
+            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
           messagingChannelRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
@@ -6768,13 +6772,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return requestAgentNewChat(deps.prisma, { userId: run.userId, spaceId: run.spaceId, botId: bot.id, threadId: thread.id },
               { runId, owner: workerId, fence }, JSON.parse(redactSecrets(JSON.stringify(args), runSecrets)));
           }
+          if(messagingChannelRun && ["search_local_memory","read_local_memory"].includes(name))return finish({error:"Personal memories are not available in messaging channels"});
+          if (name === "search_local_memory") return finish(await deps.memory.search({scope:"all",botId:bot.id,taskThreadId:thread.id,includeGeneral:localMemoryScope==="shared",query:String(args.query??""),limit:5},context));
+          if (name === "read_local_memory") {
+            const doc=await deps.prisma.memoryDocument.findFirst({where:{id:String(args.id??""),spaceId:run.spaceId,userId:run.userId,
+              OR:[{scope:"bot",botId:bot.id},...(localMemoryScope==="shared"?[{scope:"user",botId:null}]:[])],
+              AND:[{OR:[{taskThreadId:null},{taskThreadId:thread.id}]}]}});
+            return finish(doc?{id:doc.id,path:doc.path,revision:doc.revision,scope:doc.taskThreadId?"task":doc.scope==="user"?"general":"mico",untrusted:true,content:redactSecrets(doc.content.slice(0,8000),runSecrets)}:{error:"Memory unavailable in this conversation"});
+          }
           if (name === "remember") {
-            const path = String(args.path ?? "").trim() || "MEMORY.md";
+            const taskThreadId=args.scope==="task"?thread.id:undefined;
+            const namePath = String(args.path ?? "").trim() || "MEMORY.md";
+            const path=taskThreadId?`tasks/${taskThreadId}/${namePath}`:namePath;
             // A fact is added to the document, never replaces it. A concurrent save
             // changes the revision, so re-read and append again.
             for (let attempt = 1; ; attempt += 1) {
               const snapshot = await deps.memory.read(
-                { scope: "bot", botId: bot.id, path },
+                { scope: "bot", botId: bot.id, path, ...(taskThreadId?{taskThreadId}:{}) },
                 context,
               );
               const existing = snapshot.documents[0];
@@ -6788,6 +6802,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     path,
                     content,
                     expectedRevision: existing?.revision ?? 0,
+                    ...(taskThreadId?{taskThreadId}:{}),
                     sourceRunId: runId,
                     sourceThreadId: thread.id,
                   },
@@ -6801,6 +6816,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
           }
           if (name === "save_shared_memory") {
+            if(localMemoryScope==="isolated") return finish({error:"General memory is disabled for this Mico. Keep this fact in individual or task memory."});
             const invalid = sharedMemorySaveError(args);
             if (invalid) return finish({ error: invalid });
             const path = String(args.path ?? "").trim();
@@ -7983,7 +7999,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             if (!canPublishDurableProgress()) {
               return finish({
                 ok: true,
-                note: "This update was not posted. The turn is still fresh, or the chat already has enough interim messages for this run. Do not send more progress updates — keep working and put everything in your final reply.",
+                note: "This update was not posted. The turn is still fresh, or the chat already has enough interim messages for this run. Do not send more progress updates — keep working and give a concise final result with any required next action or important blocker.",
               });
             }
             await publishMessage(
@@ -9272,6 +9288,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           } catch (error) {
             getLogger().error("history.compact enqueue failed", error);
           }
+          if(!messagingChannelRun)await scheduleLocalMemoryReview({prisma:deps.prisma,jobs:deps.jobs},thread.id).catch(error=>getLogger().error("memory.review enqueue failed",error));
         } catch (caughtError) {
           if (desktopUpdateRequested || deps.shutdownSignal?.aborted) { await pauseForRestart(); return; }
           let error = caughtError;
@@ -9873,6 +9890,8 @@ export function selectBuiltinToolsForRun(options: {
           "save_shared_memory",
           "save_memory",
           "recall_memory",
+  "search_local_memory",
+  "read_local_memory",
           "forget_memory",
           "task_catalog",
           "board_tickets",
@@ -10362,7 +10381,7 @@ export const LIVE_TURN_NARRATION =
   "Before the first tool call, write one short sentence in the user's language saying what you are about to do. Write another sentence only when the plan changes, something fails, or you need the user. Do not narrate every tool call, and do not send a sentence only to say you are still working. Keep chain-of-thought out of the reply; the host shows a short thinking summary.";
 
 export function longWorkProgressGuidance(maxLength = messageUserMaxLength()): string {
-  return `${LIVE_TURN_NARRATION} During long computer tasks or multi-step jobs, keep the user informed with message_user: after roughly a minute of work, explain briefly what you have checked, what you found, and what comes next. Send another short update when a meaningful result or blocker changes the next step. Base updates on observed actions and results, in the user's language; do not invent progress, percentages or completion estimates. Do not interrupt a running tool just to send an update. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.`;
+  return `${LIVE_TURN_NARRATION} During long computer tasks or multi-step jobs, use message_user only when a material finding, changed plan or blocker is useful to the user. Do not send updates merely because time has passed. Base updates on observed actions and results, in the user's language; do not invent progress, percentages or completion estimates. Do not interrupt a running tool just to send an update. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Put a concise, self-contained final answer in your normal reply: the result, any required next action and important limits. Do not repeat the investigation or progress log. Provide a full report only when requested.`;
 }
 
 export const ROUTINE_SILENT_REPLY_GUIDANCE = `This run was scheduled, not asked in chat. Report only what changed since your previous report, in one short paragraph. When nothing material changed — the same blockers, the same commits, the same counts, the same next step — the entire final assistant reply must be exactly ${NO_RESPONSE}: no all-clear, no "nothing new" summary, no repeated baseline, and no meta note that you are staying silent. Do not restate hashes, paths, worktrees or counts that did not change. Do not call message_user unless you have something to report.`;

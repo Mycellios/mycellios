@@ -16,6 +16,6 @@ export const ContributionEnrollmentSchema = z.object({
 export const ContributionOwnerSchema = z.object({ user_id: z.string().min(1).max(256) });
 export const ContributionOwnedNodesSchema = z.object({ data: z.array(z.object({
   nodeId: z.string(), status: z.enum(["active", "revoked"]), generation: z.number().int().positive(),
-  connected: z.boolean(), observed: z.object({ contributionEnabled: z.boolean() }).passthrough().nullable(),
-  commands: z.array(z.object({ type: z.string(), state: z.string() }).passthrough()),
+  connected: z.boolean(), observed: z.object({ contributionEnabled: z.boolean(), observedAt: z.string().datetime().optional() }).passthrough().nullable(),
+  commands: z.array(z.object({ type: z.string(), state: z.string(), completedAt: z.string().datetime().nullable().optional() }).passthrough()),
 }).passthrough()).max(10_000) });

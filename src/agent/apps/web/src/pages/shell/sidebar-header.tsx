@@ -1,9 +1,8 @@
-import { Disclosure } from "@rakazo/ui-web/components/ui/disclosure";
-import { ServerConnections, ServerConnectionName } from "../../components/ServerConnections";
+import { ServerConnections } from "../../components/ServerConnections";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Space } from "@rakazo/contracts";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@rakazo/ui-web";
-import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings, Workflow } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search, FolderPlus, Bell, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Plus, Settings } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { desktopHidesTitleBar } from "../../lib/desktop";
@@ -32,8 +31,10 @@ export function useCreateMenu() {
 
 export function SidebarHeader({
   mini = false,
+  search,
   onSearch,
   onCreateProject,
+  onCreateFolder,
   createMenuOpen,
   setCreateMenuOpen,
   activityMode,
@@ -50,16 +51,13 @@ export function SidebarHeader({
   onSpace,
   onSpaceSettings,
   history,
-  onRoutines,
-  onWorkflows,
-  onTasks,
-  onSchedule,
-  onUsage,
   mobileMenu,
 }: {
   mini?: boolean;
+  search?: ReactNode;
   onSearch?: () => void;
   onCreateProject?: () => void;
+  onCreateFolder?: () => void;
   createMenuOpen: boolean;
   setCreateMenuOpen: (open: boolean) => void;
   activityMode: boolean;
@@ -90,7 +88,54 @@ export function SidebarHeader({
   const mobile = mobileMenu != null;
   const currentSpace = spaces.find(space => space.id === spaceId);
   const spaceName = currentSpace ? spaceLabel(currentSpace.name) : null;
+  const createMenu = (
+        <Popover open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
+          <IconTooltip label={t`Create`}>
+            <PopoverTrigger
+              className={`app-no-drag flex items-center justify-center rounded-full outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "size-12 bg-muted text-foreground" : "size-7 text-muted-foreground/70"}`}
+              aria-label={t`Create`}
+              data-testid="create-menu-trigger"
+            >
+              <Plus size={mobile ? 22 : 15} strokeWidth={1.8} aria-hidden="true" />
+            </PopoverTrigger>
+          </IconTooltip>
+          {/* Unmount with the state change so the panel it opens never coexists with the menu. */}
+          {createMenuOpen ? (
+            <PopoverContent
+              align="end"
+              className="app-no-drag w-auto gap-0 overflow-hidden p-0 data-closed:animate-none"
+            >
+              <BotCreatePicker
+                bots={bots}
+                onCreateFolder={onCreateFolder ? () => { setCreateMenuOpen(false); setMobileSidebarOpen(false); onCreateFolder(); } : undefined}
+                onCreateBot={() => {
+                  setCreateMenuOpen(false);
+                  setMobileSidebarOpen(false);
+                  setCreateBotOpen(true);
+                }}
+                onOpenBot={(id) => {
+                  setCreateMenuOpen(false);
+                  setMobileSidebarOpen(false);
+                  navigate(`/app/${id}`);
+                }}
+                onCreateGroup={() => {
+                  setCreateMenuOpen(false);
+                  setMobileSidebarOpen(false);
+                  setPanel("create-group");
+                }}
+                onCreateSpace={() => {
+                  setCreateMenuOpen(false);
+                  setMobileSidebarOpen(false);
+                  setNewSpaceOpen(true);
+                }}
+              />
+              {onCreateProject ? <Button variant="ghost" className="w-full justify-start rounded-none" onClick={() => { setCreateMenuOpen(false); onCreateProject(); }}><FolderPlus size={16} />{t`New project`}</Button> : null}
+            </PopoverContent>
+          ) : null}
+        </Popover>
+  );
   return (
+    <>
     <div
       data-testid="sidebar-topbar"
       className={mobile
@@ -112,22 +157,16 @@ export function SidebarHeader({
             setWorkspaceOpen(true);
           }}
         >
-          <span className="truncate"><ServerConnectionName fallback={spaceName ?? "Mycellios"} /></span><ChevronsUpDown size={mobile ? 15 : 12} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">{spaceName ?? t`Workspaces`}</span><ChevronsUpDown size={mobile ? 15 : 12} className="shrink-0 text-muted-foreground" />
         </PopoverTrigger>
         {workspaceOpen ? <PopoverContent align="start" className={`app-no-drag max-h-[var(--available-height)] w-64 gap-1 overflow-y-auto p-1 [&_button]:font-normal ${mobile ? "[&_button]:min-h-11" : ""}`}>
-          <ServerConnections />
-          <Disclosure summary={t`Workspaces`} summaryClassName="w-full px-3 py-2 text-sm font-normal" contentClassName="flex flex-col gap-1" defaultOpen>
+          <p className="px-3 py-2 text-xs text-muted-foreground">{t`Workspaces`}</p>
           {spaces.map(space => <Button key={space.id} variant="ghost" className="justify-start" aria-current={space.id === spaceId ? "true" : undefined} onClick={() => { setWorkspaceOpen(false); const first = space.bots[0]; const group = space.groups[0]; onSpace(space.id, first ? `/app/${first.id}` : group ? `/app/g/${group.id}` : "/onboarding"); }}>{spaceLabel(space.name)}</Button>)}
           <div className="my-1 border-t border-border" />
           {spaceId ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); onSpaceSettings(); }}><Settings size={15} />{t`Space settings`}</Button> : null}
           <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setNewSpaceOpen(true); }}><Plus size={15} />{t`New space`}</Button>
-          <div className="my-1 border-t border-border" />
-          {onRoutines ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onRoutines(); }}><Workflow size={15} />{t`Routines`}</Button> : null}
-          {onWorkflows ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onWorkflows(); }}><Workflow size={15} />{t`Workflows`}</Button> : null}
-          {onUsage ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onUsage(); }}><Workflow size={15} />{t`Usage`}</Button> : null}
-          {onSchedule ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onSchedule(); }}><Workflow size={15} />{t`Schedule`}</Button> : null}
-          {onTasks ? <Button variant="ghost" className="justify-start" onClick={() => { setWorkspaceOpen(false); setMobileSidebarOpen(false); onTasks(); }}><Workflow size={15} />{t`Tasks`}</Button> : null}
-        </Disclosure></PopoverContent> : null}
+          {mobile ? <div className="mt-1 border-t border-border pt-1"><ServerConnections /></div> : null}
+        </PopoverContent> : null}
       </Popover></div> : null}
       <div className={`relative flex shrink-0 items-center gap-0.5 ${mini ? "flex-col" : "ms-auto"}`}>
         {!mini ? <div className="hidden items-center md:flex">
@@ -186,51 +225,11 @@ export function SidebarHeader({
             )}
           </Button>
         </IconTooltip>
-        <Popover open={createMenuOpen} onOpenChange={setCreateMenuOpen}>
-          <IconTooltip label={t`Create`}>
-            <PopoverTrigger
-              className={`app-no-drag flex items-center justify-center rounded-full outline-none hover:text-foreground/75 focus-visible:ring-2 focus-visible:ring-ring ${mobile ? "size-12 bg-muted text-foreground" : "size-7 text-muted-foreground/70"}`}
-              aria-label={t`Create`}
-              data-testid="create-menu-trigger"
-            >
-              <Plus size={mobile ? 22 : 15} strokeWidth={1.8} aria-hidden="true" />
-            </PopoverTrigger>
-          </IconTooltip>
-          {/* Unmount with the state change so the panel it opens never coexists with the menu. */}
-          {createMenuOpen ? (
-            <PopoverContent
-              align="end"
-              className="app-no-drag w-auto gap-0 overflow-hidden p-0 data-closed:animate-none"
-            >
-              <BotCreatePicker
-                bots={bots}
-                onCreateBot={() => {
-                  setCreateMenuOpen(false);
-                  setMobileSidebarOpen(false);
-                  setCreateBotOpen(true);
-                }}
-                onOpenBot={(id) => {
-                  setCreateMenuOpen(false);
-                  setMobileSidebarOpen(false);
-                  navigate(`/app/${id}`);
-                }}
-                onCreateGroup={() => {
-                  setCreateMenuOpen(false);
-                  setMobileSidebarOpen(false);
-                  setPanel("create-group");
-                }}
-                onCreateSpace={() => {
-                  setCreateMenuOpen(false);
-                  setMobileSidebarOpen(false);
-                  setNewSpaceOpen(true);
-                }}
-              />
-              {onCreateProject ? <Button variant="ghost" className="w-full justify-start rounded-none" onClick={() => { setCreateMenuOpen(false); onCreateProject(); }}><FolderPlus size={16} />{t`New project`}</Button> : null}
-            </PopoverContent>
-          ) : null}
-        </Popover>
+        {mini || mobile || !search ? createMenu : null}
         {mobileMenu}
       </div>
     </div>
+    {search && !mini && !mobile ? <div data-testid="sidebar-search-row" className="mx-2.5 my-2.5 flex shrink-0 items-center gap-1.5">{search}{createMenu}</div> : null}
+    </>
   );
 }

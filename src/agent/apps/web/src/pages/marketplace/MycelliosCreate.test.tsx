@@ -21,6 +21,16 @@ it("loads the real service catalog without spending or preselecting a paid confi
  expect(call.mock.calls.map(([v])=>v.action)).toEqual(["models"]);
 });
 
+it("distinguishes an authenticated empty catalog and retries without purchases",async()=>{
+ call.mockResolvedValue({viewer:"alice",data:[]});await mount();
+ expect(node.textContent).toContain("Aún no hay modelos creativos disponibles");
+ expect(node.textContent).toContain("Tu cuenta está conectada");
+ expect(node.textContent).not.toContain("Recargar 5 créditos");
+ expect(node.querySelector("textarea")).toBeNull();
+ await click("Reintentar");
+ expect(call.mock.calls.map(([v])=>v.action)).toEqual(["models","models"]);
+});
+
 it("explains a disabled service instead of reporting a loading failure",async()=>{
  call.mockRejectedValue(Object.assign(new Error("disabled"),{code:"PRECONDITION_FAILED"}));await mount();
  expect(node.textContent).toContain("Estudio IA aún no está activado");
@@ -89,13 +99,13 @@ it("quotes the selected voice and duration instead of always using the first opt
  call.mockImplementation(async(v)=>v.action==="models"?{viewer:"alice",data:[{...imageCatalog.data[0],id:"voice",modality:"speech",voices:["one","two"]},{...imageCatalog.data[0],id:"video",modality:"video",durations:[3,8]}]}:{token:"q",maximumMicrounits:100});
  await mount();await enterPrompt("Hola");await select("Voz","two");await click("Ver precio");
  expect(JSON.parse(call.mock.calls.at(-1)![0].payload)).toMatchObject({voice:"two"});expect(call.mock.calls.at(-1)![0].expectedUserId).toBe("alice");
- await select("Qué quieres crear","video");await select("Duración","8");expect(node.textContent).not.toContain("Crear y usar créditos");await click("Ver precio");
+ await select("Modelo","video");await select("Duración","8");expect(node.textContent).not.toContain("Crear y usar créditos");await click("Ver precio");
  expect(JSON.parse(call.mock.calls.at(-1)![0].payload)).toMatchObject({duration:8});
 });
 it("collects each batch line and rerank document without automatic execution",async()=>{
  call.mockImplementation(async(v)=>v.action==="models"?{viewer:"alice",data:[{...imageCatalog.data[0],id:"batch",modality:"batch"},{...imageCatalog.data[0],id:"rank",modality:"rerank"}]}:{token:"q",maximumMicrounits:100});
  await mount();await enterPrompt("uno\ndos");await click("Ver precio");expect(JSON.parse(call.mock.calls.at(-1)![0].payload)).toMatchObject({prompts:["uno","dos"]});
- await select("Qué quieres crear","rank");await enterPrompt("consulta");
+ await select("Modelo","rank");await enterPrompt("consulta");
  await act(async()=>{const field=node.querySelectorAll("textarea")[1]!;Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(field,"a\nb");field.dispatchEvent(new Event("input",{bubbles:true}));});
  await click("Ver precio");expect(JSON.parse(call.mock.calls.at(-1)![0].payload)).toMatchObject({prompt:"consulta",documents:["a","b"]});expect(call.mock.calls.some(([v])=>v.action==="execute")).toBe(false);
 });

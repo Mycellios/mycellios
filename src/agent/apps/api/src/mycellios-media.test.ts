@@ -18,7 +18,15 @@ function setup() {
  }};
 }
 it("keeps managed media off before reading credentials or spending",async()=>{
- vi.stubEnv("MYCELLIOS_MANAGED_APPS_ENABLED","false");const f=setup();expect((await f.call("execute","alice")).status).toBe(412);expect(f.lookup).not.toHaveBeenCalled();expect(f.upstream).not.toHaveBeenCalled();
+ vi.stubEnv("MYCELLIOS_MANAGED_APPS_ENABLED","false");vi.stubEnv("MYCELLIOS_MEDIA_STUDIO_ENABLED","false");const f=setup();expect((await f.call("execute","alice")).status).toBe(412);expect(f.lookup).not.toHaveBeenCalled();expect(f.upstream).not.toHaveBeenCalled();
+});
+it("can enable only the media studio and retains account ownership before any payment",async()=>{
+ vi.stubEnv("MYCELLIOS_MANAGED_APPS_ENABLED","false");vi.stubEnv("MYCELLIOS_MEDIA_STUDIO_ENABLED","true");
+ const f=setup();expect((await f.call("models")).status).toBe(200);
+ expect(f.upstream).toHaveBeenCalledTimes(1);expect(f.upstream.mock.calls[0]?.[1]?.method).toBe("GET");
+ f.lookup.mockClear();f.upstream.mockClear();expect((await f.call("execute","bob")).status).toBe(403);
+ expect(f.lookup).not.toHaveBeenCalled();expect(f.upstream).not.toHaveBeenCalled();
+ expect((await f.call("execute","alice",null)).status).toBe(401);expect(f.upstream).not.toHaveBeenCalled();
 });
 it.each([undefined,"bob"])("rejects a missing or changed account before any credential lookup: %s",async owner=>{
  vi.stubEnv("MYCELLIOS_MANAGED_APPS_ENABLED","true");const f=setup();expect((await f.call("execute",owner)).status).toBe(403);expect(f.lookup).not.toHaveBeenCalled();expect(f.upstream).not.toHaveBeenCalled();

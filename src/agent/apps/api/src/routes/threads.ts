@@ -1,5 +1,6 @@
 import { resetThreadContext, ThreadContextBusyError } from "@rakazo/db";
 import { answerSideQuestion } from "../side-question.js";
+import { messagePinRoutes } from "./message-pins.js";
 import { ORPCError } from "@orpc/server";
 import { runContinueJob, runJobKey } from "@rakazo/adapter-kit";
 import { settleCallRequest } from "@rakazo/adapters";
@@ -75,6 +76,7 @@ export function threadsRoutes(ctx: RouterContext) {
   const { deps, authed, callsEnabled } = ctx;
   return {
     threads: {
+      ...messagePinRoutes(ctx),
       sideQuestionAvailable: authed.threads.sideQuestionAvailable.handler(async ({ context, input }) => {
         await resolveThreadTarget(deps.prisma, context.actor, input);
         return { available: Boolean(deps.sideQuestions) };

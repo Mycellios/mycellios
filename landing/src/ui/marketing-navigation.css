@@ -3,6 +3,7 @@ html { scrollbar-gutter:stable; --marketing-motion-fast:180ms; --marketing-motio
 .marketing-header, .marketing-footer { width:min(1150px,calc(100% - 80px)); margin-inline:auto; color:#16221b; font-family:"Geist Variable",Geist,system-ui,sans-serif; font-size:14px; line-height:1.5; color-scheme:light; }
 :where(.marketing-header,.marketing-footer) *, :where(.marketing-header,.marketing-footer) *::before, :where(.marketing-header,.marketing-footer) *::after { box-sizing:border-box; }
 .marketing-header a, .marketing-footer a { color:inherit; text-decoration:none; text-underline-offset:4px; }
+.marketing-navigation-surface a.ui-link, .marketing-footer a.ui-link { text-decoration:none !important; }
 .marketing-header { position:relative; z-index:10; display:flex; align-items:center; gap:28px; min-height:calc(86px + env(safe-area-inset-top)); padding-top:env(safe-area-inset-top); }
 .marketing-brand { display:inline-flex; align-items:center; flex-shrink:0; gap:10px; font-size:22px; font-weight:500; letter-spacing:-.035em; white-space:nowrap; }
 .marketing-navigation-surface .marketing-header .marketing-brand, .marketing-footer .marketing-brand.ui-link { font-weight:500 !important; }
@@ -37,12 +38,10 @@ html { scrollbar-gutter:stable; --marketing-motion-fast:180ms; --marketing-motio
 .marketing-footer { display:flex; align-items:center; flex-wrap:wrap; gap:26px; padding-block:38px calc(38px + env(safe-area-inset-bottom)); }
 .marketing-footer > nav { display:flex; align-items:center; flex-wrap:wrap; gap:20px; margin-left:auto; }
 .marketing-footer nav a { display:inline-flex; align-items:center; gap:4px; min-height:44px; font-size:12px; }
-.marketing-footer nav a:hover { text-decoration:underline; }
+.marketing-footer nav a:hover { color:#467c66; }
 .marketing-footer > small { font-size:11px; color:#59635d; }
 .marketing-header :is(nav > a,.marketing-explore > summary) { position:relative; transition:color var(--marketing-motion-fast) var(--marketing-ease-out); }
-.marketing-header :is(nav > a,.marketing-explore > summary)::after { content:""; position:absolute; inset:auto 0 7px; height:2px; background:currentColor; opacity:0; transform:scaleX(.65); transform-origin:center; transition:transform var(--marketing-motion-state) var(--marketing-ease-out),opacity var(--marketing-motion-fast) var(--marketing-ease-out); }
 .marketing-header :is(nav > a,.marketing-explore > summary):is(:hover,:focus-visible) { text-decoration:none; color:#467c66; }
-.marketing-header :is(nav > a,.marketing-explore > summary):is(:hover,:focus-visible)::after { opacity:.65; transform:scaleX(1); }
 .marketing-header :is(.marketing-stats,.marketing-social a,.marketing-menu), .marketing-popover a { transition:color var(--marketing-motion-fast) var(--marketing-ease-out),background-color var(--marketing-motion-fast) var(--marketing-ease-out); }
 .marketing-header :is(.marketing-social a,.marketing-menu):is(:hover,:focus-visible) { color:#467c66; }
 .marketing-header .marketing-brand > img { transition:opacity var(--marketing-motion-fast) var(--marketing-ease-out); }
@@ -70,3 +69,22 @@ html { scrollbar-gutter:stable; --marketing-motion-fast:180ms; --marketing-motio
  .marketing-header :is(a,summary):is(:hover,:focus-visible), .marketing-header .marketing-brand:is(:hover,:focus-visible) > img { transform:none; }
  .marketing-explore[open] > summary svg { transform:rotate(180deg); }
 }
+
+/* Shared directory footer: the same contract serves React and editorial HTML. */
+.marketing-footer--directory { display:grid; grid-template-columns:1fr 3fr; align-items:start; gap:48px; padding-top:64px; border-top:1px solid #d9d6d0; }
+.marketing-footer-intro > p { margin-top:20px; max-width:25ch; color:#59635d; font-size:14px; line-height:1.6; }
+.marketing-footer--directory > nav { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); align-items:start; gap:28px; margin:0; width:100%; }
+.marketing-footer-group { display:flex; flex-direction:column; align-items:flex-start; }
+.marketing-footer .marketing-footer-group h2 { margin:0 0 16px; font-size:13px; font-weight:500; color:#59635d; line-height:1.5; }
+.marketing-footer-group a { font-size:13px; min-height:36px; padding-block:6px; line-height:1.5; }
+.marketing-footer-bottom { grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; padding-top:24px; border-top:1px solid #d9d6d0; color:#59635d; }
+@media(max-width:1000px) { .marketing-footer--directory { grid-template-columns:1fr; gap:32px; } }
+@media(max-width:600px) { .marketing-footer--directory > nav { grid-template-columns:repeat(2,minmax(0,1fr)); gap:32px 20px; } .marketing-footer--directory { padding-top:40px; } }
+
+.marketing-footer-bottom { flex-wrap:wrap; gap:16px; }
+.marketing-footer-meta { display:flex; align-items:center; flex-wrap:wrap; gap:12px 28px; margin-left:auto; }
+.marketing-footer-meta > small { font-size:11px; }
+.marketing-footer-meta .marketing-footer-made { display:inline-flex; align-items:center; gap:7px; font-size:9px; letter-spacing:.09em; text-transform:uppercase; white-space:nowrap; }
+.marketing-footer-made > span { display:inline-flex; color:#b38a43; }
+.marketing-footer-made svg { fill:currentColor; }
+@media(max-width:600px) { .marketing-footer-meta { width:100%; margin-left:0; justify-content:space-between; } }

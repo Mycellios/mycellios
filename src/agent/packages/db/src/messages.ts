@@ -1,4 +1,5 @@
 import type { MessageBlock } from "@rakazo/contracts";
+import { isMicoTaskThread } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "./client.js";
 import { withTransactionRetry } from "./transaction-retry.js";
 
@@ -87,9 +88,18 @@ export async function createThreadMessageInTransaction(
       nextMessageSeq: { increment: 1 },
       unread: (input.markUnread ?? input.role === "bot") ? true : undefined,
     },
-    select: { nextMessageSeq: true },
+    select: { nextMessageSeq: true, title: true, taskBotId: true, projectKey: true, taskKey: true },
   });
   await assertRunCanWriteHistory(tx, input.runId, { allowCancelled: input.allowCancelledRun });
+  if (input.role === "user" && thread.title === null && isMicoTaskThread(thread)) {
+    const text = input.blocks.flatMap(block => block.kind === "text" ? [block.text]
+      : block.kind === "file" ? [block.name] : []).join(" ").replace(/[\s\u0000-\u001f\u007f]+/gu, " ").trim();
+    const characters = Array.from(text);
+    const title = characters.length > 80 ? `${characters.slice(0, 79).join("").trimEnd()}…` : text;
+    if (title) await tx.thread.updateMany({
+      where: { id: input.threadId, title: null }, data: { title },
+    });
+  }
   return tx.message.create({
     data: {
       threadId: input.threadId,

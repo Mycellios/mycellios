@@ -54,6 +54,30 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+it("shows preparation without a fabricated percentage and keeps cancellation available", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("fetch", vi.fn((_url: unknown, options: {signal: AbortSignal}) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")), {once: true});
+  })));
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<Cadencia scope="preparation-test" onBack={() => {}} />));
+    await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent?.includes("Probar con la demo"))!.click());
+    const status = host.querySelector('[role="status"]')!;
+    expect(status.textContent).toContain("Preparando la demo");
+    expect(status.textContent).not.toContain("%");
+    expect(status.querySelector("progress")).toBeNull();
+    await act(async () => [...status.querySelectorAll("button")].find(button => button.textContent === "Cancelar")!.click());
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect([...host.querySelectorAll("button")].find(button => button.textContent?.includes("Elegir vídeo o audio"))!.disabled).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
 it("explicit close removes the selected file and its reload hold, revokes URLs and preserves the original file", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const revoke = vi.fn();

@@ -1,4 +1,5 @@
 export * from "./action-approval.js";
+export * from "./sidebar-folders.js";
 export * from "./run-health.js";
 export * from "./agent-import/index.js";
 export * from "./agent-skill.js";
@@ -96,3 +97,5 @@ export * from "./voice-chat-groups.js";
 export * from "./tool-observations.js";
 export * from "./work-resources.js";
 export * from "./agent-provider-selection.js";
+
+export * from "./memory-ranking.js";

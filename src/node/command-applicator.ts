@@ -30,6 +30,15 @@ export class NodeCommandApplicator {
     await this.reconcileDrain(true);
   }
 
+  async reconcileContribution(enabled: boolean, draining: boolean): Promise<void> {
+    // Reconciliation may remove permission, but cannot undo a locally persisted
+    // pause. A fresh resume command (or explicit native control) persists true
+    // before the next snapshot. This also survives restarts and legacy controls.
+    if (!enabled) await this.controlStore.setContributionEnabled(false);
+    const current = await this.controlStore.load();
+    await this.agent.setContributionEnabled(current.contributionEnabled && enabled && !draining);
+  }
+
   async reconcileDrain(draining: boolean): Promise<void> {
     if (draining) {
       await this.controlStore.setDraining(true);

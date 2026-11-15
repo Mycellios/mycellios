@@ -57,6 +57,8 @@ export const BUILTIN_TOOL_NAMES = [
   "read_history",
   "save_memory",
   "recall_memory",
+  "search_local_memory",
+  "read_local_memory",
   "forget_memory",
   "task_catalog",
   "scratchpad_list",

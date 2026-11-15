@@ -504,8 +504,10 @@ export const appContract = {
   },
   botSections: {
     list: oc.output(z.array(BotSectionSchema)),
-    create: oc.input(threadTarget.safeExtend({ name: BotSectionName })).output(BotSectionSchema),
-    update: oc.input(z.object({ sectionId: Id, name: BotSectionName })).output(BotSectionSchema),
+    create: oc.input(z.object({ botId: Id.optional(), groupId: Id.optional(), name: BotSectionName, parentId: Id.nullable().optional() })
+      .refine(input => !(input.botId && input.groupId), "Choose one chat")).output(BotSectionSchema),
+    update: oc.input(z.object({ sectionId: Id, name: BotSectionName.optional(), parentId: Id.nullable().optional() })
+      .refine(input => input.name !== undefined || input.parentId !== undefined, "Choose a folder change")).output(BotSectionSchema),
     remove: oc.input(z.object({ sectionId: Id })).output(
       z.object({
         id: Id,
@@ -520,10 +522,13 @@ export const appContract = {
     saveProject: oc.input(z.object({ id: ProjectId, name: ProjectName })).output(z.object({ id: ProjectId })),
     projectTask: oc.input(z.object({ botId: Id, taskThreadId: Id })).output(z.object({ projectId: ProjectId, name: ProjectName, userId: Id, spaceId: Id }).nullable()),
     status: oc.input(z.object({botId:Id,taskThreadId:Id,runId:Id})).output(z.object({status:z.string(),detail:z.string().max(128000),error:z.string().nullable()})),
-    open: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240),taskKey:z.string().min(1).max(240),title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id})),
+    open: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240),taskKey:z.string().min(1).max(240),title:z.string().trim().min(1).max(240).optional()})).output(z.object({threadId:Id})),
+    rename: oc.input(z.object({botId:Id,taskThreadId:Id,title:z.string().trim().min(1).max(240)})).output(z.object({threadId:Id,title:z.string()})),
     list: oc.input(z.object({botId:Id,projectKey:z.string().min(1).max(240).optional()})).output(z.array(z.object({threadId:Id,projectKey:z.string(),taskKey:z.string(),title:z.string()}))),
   },
   threads: {
+    pinned: oc.input(threadTarget).output(z.object({threadId:Id,pins:z.array(z.object({messageId:Id,seq:z.number().int().nonnegative(),role:z.enum(["user","bot"]),preview:z.string().max(800),createdAt:z.string(),pinnedAt:z.string()}))})),
+    setPin: oc.input(threadTarget.safeExtend({messageId:Id,pinned:z.boolean()})).output(z.object({ok:z.literal(true)})),
     sideQuestionAvailable: oc.input(threadTarget).output(z.object({ available: z.boolean() })),
     sideQuestion: oc.input(threadTarget.safeExtend({
       question: z.string().trim().min(1).max(8000),
@@ -734,14 +739,16 @@ export const appContract = {
     heartbeat: oc.input(botId).output(z.object({ ok: z.literal(true) })),
   },
   memory: {
+    reviewStatus: oc.output(z.object({reservedMicrounits:z.number().int(),chargedMicrounits:z.number().int(),pending:z.number().int()})),
     list: oc
-      .input(z.object({ botId: Id.optional(), scope: z.enum(["bot", "user"]).optional() }))
+      .input(z.object({ botId: Id.optional(), scope: z.enum(["bot", "user"]).optional(), taskThreadId: Id.optional() }))
       .output(z.array(MemoryDocumentSchema)),
     update: oc
       .input(
         z.object({
           documentId: Id,
           content: z.string(),
+          inclusion: z.enum(["essential","searchable"]).optional(),
           expectedRevision: z.number().int().positive().optional(),
         }),
       )

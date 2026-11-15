@@ -1,69 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://www.mycellios.com/</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/network</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/earn</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/downloads</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/browser/</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/pricing</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/stats</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/changelog</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/grok-bot</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/hermes-agent</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/muse</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/openclaw</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/claude-cowork</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/chatgpt-dots</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/manus</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/devin</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/paperclip</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/viktor</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/instinct</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/compare/best-ai-agent-apps</loc>
-  </url>
-  <url>
-    <loc>https://www.mycellios.com/blog</loc>
-  </url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<url><loc>https://www.mycellios.com/</loc></url>
+<url><loc>https://www.mycellios.com/network</loc></url>
+<url><loc>https://www.mycellios.com/earn</loc></url>
+<url><loc>https://www.mycellios.com/downloads</loc></url>
+<url><loc>https://www.mycellios.com/browser/</loc></url>
+<url><loc>https://www.mycellios.com/pricing</loc></url>
+<url><loc>https://www.mycellios.com/compare</loc></url>
+<url><loc>https://www.mycellios.com/stats</loc></url>
+<url><loc>https://www.mycellios.com/changelog</loc></url>
+<url><loc>https://www.mycellios.com/compare/openbot</loc></url>
+<url><loc>https://www.mycellios.com/compare/grok-bot</loc></url>
+<url><loc>https://www.mycellios.com/compare/hermes-agent</loc></url>
+<url><loc>https://www.mycellios.com/compare/muse</loc></url>
+<url><loc>https://www.mycellios.com/compare/openclaw</loc></url>
+<url><loc>https://www.mycellios.com/compare/claude-cowork</loc></url>
+<url><loc>https://www.mycellios.com/compare/chatgpt-dots</loc></url>
+<url><loc>https://www.mycellios.com/compare/manus</loc></url>
+<url><loc>https://www.mycellios.com/compare/devin</loc></url>
+<url><loc>https://www.mycellios.com/compare/paperclip</loc></url>
+<url><loc>https://www.mycellios.com/compare/viktor</loc></url>
+<url><loc>https://www.mycellios.com/compare/instinct</loc></url>
+<url><loc>https://www.mycellios.com/compare/best-ai-agent-apps</loc></url>
+<url><loc>https://www.mycellios.com/guides</loc><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides"/><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides"/></url>
+<url><loc>https://www.mycellios.com/es/guias</loc><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias"/><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides"/></url>
+<url><loc>https://www.mycellios.com/guides/get-started</loc><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides/get-started"/><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias/empezar"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides/get-started"/></url>
+<url><loc>https://www.mycellios.com/es/guias/empezar</loc><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias/empezar"/><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides/get-started"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides/get-started"/></url>
+<url><loc>https://www.mycellios.com/guides/models-and-credits</loc><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides/models-and-credits"/><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias/modelos-y-creditos"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides/models-and-credits"/></url>
+<url><loc>https://www.mycellios.com/es/guias/modelos-y-creditos</loc><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias/modelos-y-creditos"/><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides/models-and-credits"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides/models-and-credits"/></url>
+<url><loc>https://www.mycellios.com/guides/contribute-compute</loc><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides/contribute-compute"/><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias/aportar-potencia"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides/contribute-compute"/></url>
+<url><loc>https://www.mycellios.com/es/guias/aportar-potencia</loc><xhtml:link rel="alternate" hreflang="es" href="https://www.mycellios.com/es/guias/aportar-potencia"/><xhtml:link rel="alternate" hreflang="en" href="https://www.mycellios.com/guides/contribute-compute"/><xhtml:link rel="alternate" hreflang="x-default" href="https://www.mycellios.com/guides/contribute-compute"/></url>
+<url><loc>https://www.mycellios.com/downloads/desktop</loc></url>
+<url><loc>https://www.mycellios.com/blog</loc></url>
 </urlset>

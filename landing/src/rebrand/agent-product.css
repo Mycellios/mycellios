@@ -17,7 +17,7 @@
 .agent-signal-halo { fill:var(--signal-ink); opacity:.16; }
 .agent-signal-core { fill:var(--signal-light); stroke:var(--signal-ink); }
 .agent-signal-center { fill:#fff; }
-.agent-product-hero, .agent-product-benefits { position:relative; z-index:1; }
+.agent-product-hero { position:relative; z-index:1; }
 @keyframes agent-backdrop-drift { 0% { opacity:0; transform:translate(6px,18px); } 40%,60% { opacity:.65; } 100% { opacity:0; transform:translate(-6px,-22px); } }
 @keyframes agent-network-breathe { from { transform:translateY(2px) scale(1); } to { transform:translateY(-3px) scale(1.008); } }
 .agent-product-opening .reference-header { position:sticky; top:0; z-index:30; background:#faf9f7; width:min(1150px,calc(100% - 64px)); min-height:calc(76px + env(safe-area-inset-top)); gap:28px; }
@@ -29,11 +29,18 @@
 .agent-product-opening .reference-header .reference-explore > summary { font-size:13px; }
 .agent-product-opening .reference-header .reference-header-login { font-size:13px; }
 .agent-product-hero { padding:110px 24px 0; text-align:center; }
-.agent-product-hero h1 { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; column-gap:.2em; row-gap:0; min-height:1.15em; margin:0 auto; font-size:60px; font-weight:500 !important; line-height:1.05; letter-spacing:-.045em; }
+.agent-product-hero h1 { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; column-gap:.2em; row-gap:0; min-height:1.15em; margin:0 auto; font-size:clamp(60px,5.3vw,76px); font-weight:500 !important; line-height:1.05; letter-spacing:-.035em; }
 .agent-product-hero h1 > span { display:inline-flex; align-items:center; gap:.16em; }
-.agent-product-hero h1 .mico-avatar { width:60px; height:60px; }
+.agent-product-hero h1 .mico-avatar { width:72px; height:72px; }
 .agent-product-hero > p { max-width:660px; margin:22px auto 0; color:#5e625e; font-size:19px; line-height:1.5; text-wrap:pretty; }
-.agent-product-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:12px; margin-top:24px; }
+.agent-product-actions { position:relative; z-index:6; display:flex; justify-content:center; flex-wrap:wrap; gap:12px; margin-top:24px; }
+:root[data-mycellios-design] .mycellios-reference .agent-product-actions > .agent-product-browser.ui-link { min-height:56px !important; padding:14px 22px !important; border-radius:999px !important; font-size:14px !important; font-weight:400 !important; }
+.agent-product-earn { max-width:520px; margin:24px auto 0; }
+.mycellios-reference .agent-product-earn .agent-product-earn-link { display:inline-flex; align-items:center; flex-wrap:wrap; justify-content:center; gap:5px; min-height:32px; color:#59635d; font-size:14px; font-weight:400; line-height:1.5; text-decoration:none !important; }
+.mycellios-reference .agent-product-earn-link > span:nth-child(2) { color:#346b53; font-weight:500; }
+.mycellios-reference .agent-product-earn-link:hover { color:#16221b; }
+.mycellios-reference .agent-product-earn > p { max-width:470px; margin:3px auto 0; color:#59635d; font-size:13px; line-height:1.6; text-wrap:pretty; }
+.agent-product-earn + .agent-product-stage { margin-top:40px; }
 .agent-product-stage { width:min(980px,100%); margin:64px auto 0; }
 .agent-demo-figure { margin:0; min-width:0; text-align:left; }
 .agent-demo-window { position:relative; display:flex; height:510px; overflow:hidden; border-radius:16px; background:#faf9f7; color:#242b26; border:1px solid #d9d8d1; box-shadow:0 12px 34px rgba(32,37,25,.11); --ui-control-height:30px; --ui-accent:#26332a; --ui-accent-hover:#36493c; --ui-on-accent:#f8f5f0; --ui-foreground:#242b26; --ui-surface:#eae6de; --ui-focus:#427d6e; } /* taste-skill-ignore: Actual app window edge and depth from the supplied reference, inside data-ui. */
@@ -105,13 +112,6 @@
 .agent-demo-figure figcaption { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:34px; color:#74776e; font-size:10px; line-height:1.5; }
 .agent-demo-figure figcaption > span, .agent-demo-figure figcaption > div { background:#faf9f7; }
 .agent-demo-figure figcaption > div { display:flex; flex-shrink:0; gap:2px; }
-.agent-product-benefits { width:min(1120px,calc(100% - 64px)); margin:0 auto; padding:26px 0 40px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:42px; }
-.agent-product-benefits > a { display:flex; align-items:flex-start; gap:20px; }
-.agent-product-benefits > a > svg, .agent-product-benefits > a > img { flex-shrink:0; margin-top:2px; }
-.agent-product-benefits > a:first-child > svg { color:#409c80; }
-.agent-product-benefits > a:nth-child(2) > svg { color:#b28a45; }
-.mycellios-reference .agent-product-benefits h2 { font-size:20px; line-height:1.25; letter-spacing:-.025em; }
-.agent-product-benefits p { margin-top:6px; color:#62665d; font-size:14px; line-height:1.55; }
 @media (max-width:1100px) {
   .agent-product-opening .reference-header-actions { margin-left:0; }
   .agent-product-opening .reference-header .reference-header-download { margin-left:auto; }
@@ -123,16 +123,13 @@
 @media (min-width:761px) and (max-width:1023px) {
   .agent-product-hero h1 { font-size:60px; }
   .agent-product-hero h1 .mico-avatar { width:62px; height:62px; }
-  .agent-product-benefits { gap:22px; }
-  .agent-product-benefits > a { gap:12px; }
-  .agent-product-benefits > a > svg, .agent-product-benefits > a > img { width:32px; height:32px; }
 }
 @media (max-width:760px) {
   .agent-backdrop-wide { display:none; }
   .agent-backdrop-compact { display:block; top:260px; height:650px; }
   .agent-signal-point:nth-of-type(2) { display:none; }
   .agent-product-backdrop { max-height:980px; }
-  .agent-living-network { top:275px; left:-20%; width:140%; height:auto; }
+  .agent-living-network { top:600px; left:-20%; width:140%; height:auto; }
   .agent-network-depth, .agent-network-breath, .agent-network-breath > img { height:auto; }
   .agent-product-opening .reference-header { width:calc(100% - 32px); min-height:calc(64px + env(safe-area-inset-top)); gap:12px; }
   .agent-product-opening .reference-brand { font-size:18px; }
@@ -156,9 +153,6 @@
   .agent-demo-preview { position:absolute; inset:56px 0 0; border:0; background:#faf8f4; }
   .agent-demo-preview > div:first-child { height:40px; }
   .agent-demo-preview pre { font-size:13px; }
-  .agent-product-benefits { width:calc(100% - 40px); padding:25px 0 40px; gap:24px; grid-template-columns:1fr; }
-  .agent-product-benefits > a { gap:18px; }
-  .agent-product-benefits p { font-size:14px; }
 }
 @media (prefers-reduced-motion:reduce) {
   .agent-network-signals { display:none; }

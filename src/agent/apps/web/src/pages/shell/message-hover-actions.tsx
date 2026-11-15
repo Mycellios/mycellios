@@ -14,8 +14,9 @@ import {
   PopoverTrigger,
 } from "@rakazo/ui-web";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@rakazo/ui-web/components/ui/sheet";
-import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Reply, Smile, X } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Repeat2, Copy, MessageSquareDot, MoreHorizontal, Pin, PinOff, Reply, Smile, X } from "lucide-react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { MessagePinsContext } from "../../components/PinnedMessages";
 import { MessageHoverMetadata } from "../../components/MessageHoverMetadata";
 import { copyableMessageText } from "../../lib/message-text";
 
@@ -37,6 +38,9 @@ export function MessageTouchActions({
   message, onReply, onMarkUnread, markedUnread, onReact, onAddRoutine, children,
 }: MessageActions & { children: ReactNode }) {
   const { t } = useLingui();
+  const pins=useContext(MessagePinsContext);
+  const pinnable=Boolean(pins && !message.id.includes(":") && (message.role==="user"||message.role==="bot"));
+  const pinned=pins?.ids.has(message.id)??false;
   const [open, setOpen] = useState(false);
   const press = useRef<{ timer: number; x: number; y: number } | null>(null);
   const cancelHold = () => {
@@ -99,6 +103,7 @@ export function MessageTouchActions({
           </div>
         ) : null}
         <div className="flex flex-col [&_button]:min-h-12 [&_button]:justify-start">
+          {pinnable?<SheetClose render={<Button variant="ghost" disabled={pins!.busy} />} onClick={()=>pins!.set(message.id,!pinned)}>{pinned?<PinOff/>:<Pin/>}{pinned?t`Unpin message`:t`Pin message`}</SheetClose>:null}
           <SheetClose render={<Button variant="ghost" />} onClick={() => onReply(message)}><Reply />{t`Reply`}</SheetClose>
           {onAddRoutine && message.role === "user" && copyableMessageText(message) ? <SheetClose render={<Button variant="ghost" />} onClick={() => onAddRoutine(copyableMessageText(message).slice(0, 80), copyableMessageText(message))}><Repeat2 />{t`Repeat automatically`}</SheetClose> : null}
           {copyableMessageText(message) ? <SheetClose render={<Button variant="ghost" />} onClick={() => copyMessage(message)}><Copy />{t`Copy`}</SheetClose> : null}
@@ -121,6 +126,9 @@ export function MessageHoverActions({
   onAddRoutine,
 }: MessageActions & { side: "start" | "end" }) {
   const { t, i18n } = useLingui();
+  const pins=useContext(MessagePinsContext);
+  const pinnable=Boolean(pins && !message.id.includes(":") && (message.role==="user"||message.role==="bot"));
+  const pinned=pins?.ids.has(message.id)??false;
   const { compactMessageActions } = useGeneralPreferences();
   const [moreOpen, setMoreOpen] = useState(false);
   const [reactionsOpen, setReactionsOpen] = useState(false);
@@ -176,6 +184,7 @@ export function MessageHoverActions({
             <MoreHorizontal size={15} strokeWidth={1.7} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align={side === "end" ? "start" : "end"} className="w-auto">
+            {pinnable?<DropdownMenuItem disabled={pins!.busy} onClick={()=>{setMoreOpen(false);pins!.set(message.id,!pinned);}}>{pinned?<PinOff size={14}/>:<Pin size={14}/>}<span>{pinned?t`Unpin message`:t`Pin message`}</span></DropdownMenuItem>:null}
             <DropdownMenuItem
               onClick={() => {
                 setMoreOpen(false);

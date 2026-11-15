@@ -3,16 +3,17 @@ import type { Bot } from "@rakazo/contracts";
 import { Button } from "@rakazo/ui-web";
 import { useId, useState } from "react";
 import {
-  ArrowLeft,
   Blocks,
   BookOpen,
   Bot as BotIcon,
+  MessageSquare,
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
 } from "lucide-react";
 import type { connectedAppMarks } from "../../lib/connected-apps";
 import { desktopDragClass } from "../../lib/desktop";
+import { hifaStoreEnabled } from "../../lib/hifa-store";
 import { PluginsOverlay } from "../PluginsOverlay";
 import { AgentsMarketplace } from "./AgentsMarketplace";
 import { type MarketplaceTab } from "./catalog";
@@ -40,6 +41,7 @@ export function MarketplaceWorkspace(props: {
   onConnectedAppsChange?: (apps: ReturnType<typeof connectedAppMarks>) => void;
 }) {
   const { t } = useLingui();
+  const storeAvailable = hifaStoreEnabled();
   const navigationId = useId();
   const [menuCollapsed, setMenuCollapsed] = useState(() => {
     try { return localStorage.getItem(MENU_PREFERENCE) === "1"; }
@@ -86,7 +88,8 @@ export function MarketplaceWorkspace(props: {
           title={t`Back to chat`}
           onClick={props.onExit}
         >
-          <ArrowLeft size={16} />
+          <MessageSquare size={14} aria-hidden="true" />
+          {t`Back to chat`}
         </Button>
       </header>
       <div className="rk-market-layout">
@@ -97,10 +100,12 @@ export function MarketplaceWorkspace(props: {
                 variant="ghost"
                 key={id}
                 aria-current={id === props.tab ? "page" : undefined}
+                disabled={id === "mycellios-apps" && !storeAvailable}
                 onClick={() => props.onTab(id)}
               >
                 <Icon size={16} strokeWidth={1.6} />
                 <span>{label}</span>
+                {id === "mycellios-apps" && !storeAvailable ? <span className="rk-market-soon-badge">{t`Coming soon`}</span> : null}
               </Button>
             ))}
           </nav>
@@ -110,7 +115,12 @@ export function MarketplaceWorkspace(props: {
           key={`${props.scope}:${props.tab}`}
         >
           {props.tab === "mycellios-apps" ? (
-            <HostedWebs
+            !storeAvailable ? <section className="rk-market-coming-soon" aria-labelledby="hifa-store-title">
+              <LayoutGrid size={28} strokeWidth={1.4} aria-hidden="true" />
+              <h1 id="hifa-store-title">Hifa Store</h1>
+              <p className="rk-market-coming-soon-status">{t`Coming soon`}</p>
+              <p>Estamos preparando la tienda de apps de Mycellios.</p>
+            </section> : <HostedWebs
               scope={props.scope}
               spaceId={props.spaceId}
               bots={props.bots}

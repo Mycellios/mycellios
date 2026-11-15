@@ -40,6 +40,7 @@ export function ChatModelPicker({
   onProviderChange,
   modelOrigins,
   providerContent,
+  mycelliosCatalogReady = true,
 }: {
   id: string;
   choices: readonly (ChatModelChoice & { unavailable?: boolean })[];
@@ -55,6 +56,7 @@ export function ChatModelPicker({
   onProviderChange?: (provider: string) => void;
   modelOrigins?: Readonly<Record<string, "network" | "antseed">>;
   providerContent?: (provider: string) => ReactNode;
+  mycelliosCatalogReady?: boolean;
 }) {
   const { t } = useLingui();
   const imagesHintId = useId();
@@ -73,12 +75,14 @@ export function ChatModelPicker({
   ), [choices, inline, activeProvider, inheritedProvider, defaultKey, query]);
   const networkHeading = t`Mycellios network`;
   const antseedHeading = "AntSeed";
-  const sections = inline && modelOrigins && grouped.some(section => section.data.some(choice => modelOrigins[choice.key]))
+  const showNetworkSection = inline && activeProvider === "Mycellios" && modelOrigins !== undefined;
+  const keepNetworkSection = showNetworkSection && !query.trim();
+  const sections = showNetworkSection
     ? [
       { key: "mycellios-network", heading: networkHeading, data: grouped.flatMap(section => section.data.filter(choice => modelOrigins[choice.key] === "network")) },
       { key: "mycellios-antseed", heading: antseedHeading, data: grouped.flatMap(section => section.data.filter(choice => modelOrigins[choice.key] === "antseed")) },
       ...grouped.map(section => ({ ...section, data: section.data.filter(choice => !modelOrigins[choice.key]) })),
-    ].filter(section => section.data.length)
+    ].filter(section => section.data.length || keepNetworkSection && section.key === "mycellios-network")
     : grouped;
   const selected = choices.find((choice) => choice.key === value) ?? choices[0];
   const textOnly = selected?.images === false;
@@ -127,11 +131,15 @@ export function ChatModelPicker({
         aria-label={t`Search models`}
       />
       <CommandList className="min-h-0 max-h-80 flex-1 overflow-y-auto">
-        <CommandEmpty>
+        {!keepNetworkSection ? <CommandEmpty>
           <Trans>No matching models</Trans>
-        </CommandEmpty>
+        </CommandEmpty> : null}
         {sections.map((section) => (
-          <CommandGroup key={section.key} className={inline ? "p-0 pt-1" : undefined} heading={inline && section.heading === activeProvider ? undefined : section.heading}>
+          <CommandGroup key={section.key} forceMount={keepNetworkSection && section.key === "mycellios-network"}
+            className={inline ? "p-0 pt-1" : undefined} heading={inline && section.heading === activeProvider ? undefined : section.heading}>
+            {section.key === "mycellios-network" && section.data.length === 0 && mycelliosCatalogReady ? (
+              <p role="status" className="px-2.5 py-2 text-xs text-muted-foreground">{t`No chat models available right now.`}</p>
+            ) : null}
             {section.data.map((choice) => (
               <CommandItem
                 key={choice.key}

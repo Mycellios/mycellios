@@ -77,11 +77,78 @@
   Verify server-connections/dialogs, native directory/IPC and setup/preload tests.
 
 
+- Local memory keeps existing Markdown documents/revisions. General notes are owned
+  by user and Space; Mico notes span that Mico's conversations; task notes require
+  the current main/task thread and use a tasks/<thread>/ path. Isolated scope excludes
+  general notes in context, search and tools, including inherited Space defaults.
+  Messaging channels must never receive personal memory tools or background reviews.
+  Essential selection is revision-guarded and capped at 8 KiB per scope; searchable
+  memories use local lexical relevance and bounded snippets, with no embeddings.
+- memory.review runs outside the answering turn after 20 turns or 15 idle minutes
+  with at least three new user messages (configurable/off). It uses only the Mico's
+  existing first-party model with a verifiable Credit quote; no unpriced fallback.
+  Defaults reserve at most 0.01 Credits per Space/UTC day, 0.002 per review. Claim
+  worst-case cost transactionally before a single paid POST, retain uncertain
+  reservations and reconcile the same key without replay or payer/model switching.
+  Review snapshots/results use Space content encryption and owner RLS; automatic
+  changes must respect user-controlled notes, edits/deletions and context resets.
+  Verify scoped memory/review/UI tests and scripts/verify-local-memory-db.mjs
+  (MEMORY_TEST_EPHEMERAL=1 inside disposable Linux CI; local uses an isolated DB/role
+  on project-preview, never live memory). Keep full suites paused.
+
+- Web entry keeps its React root in HMR data and disposes entry listeners on
+  replacement; never create a second root on the existing container.
+- Cold-start session/bootstrap/navigation reads use startup-fetch with a 15-second
+  deadline so a stalled connection reaches existing retry/error handling. Preserve
+  caller cancellation and keep auth writes, paid requests and event streams outside
+  that deadline. Qualify first language entry and returning-user Settings navigation.
+
+- Desktop navigation keeps server connections in the narrow rail footer and the
+  active workspace in the sidebar header. Keep server management out of the
+  desktop workspace picker; mobile retains server access in its navigation menu.
+
+- Mico response style (natural by default, or classic) is stored in account
+  Mico defaults and delivered on each run. Checkpoint resumes use current supplied
+  instructions, preserving visible history/tool results and dropping old signed
+  reasoning when the system prefix changes; never replay completed effects.
+- Everyday Mico replies use the shared compact policy in
+  `packages/adapters/src/conversation-style.ts`. Deliver it with each run through
+  `mico-behavior.ts` and refresh its known legacy paragraph on runtime resume,
+  preserving user instructions and tool guidance. Explicit requests for detailed
+  work override the default. Keep approvals, costs, failures and unfinished work
+  visible; never enforce brevity by truncating replies or lowering output limits.
+  Check the focused conversation-style/Mico behavior tests and provider delivery
+  fixtures; a fake provider verifies delivery, not a live model's compliance.
+
 - The Hifa Store library unifies hosted static apps and fixed Desktop app launchers.
+  The Store is temporarily paused by default: only `VITE_MYCELLIOS_HIFA_STORE=true`
+  reactivates it. Keep its navigation visible with Coming soon, disable entry
+  actions and render the same placeholder for direct Store links without mounting
+  HostedWebs or opening the legacy Studio overlay. Preserve the apps and independent
+  Integrations/Micos/Skills sections. Verify hifa-store and MarketplaceWorkspace tests.
+  Routines UI is also paused by default; `VITE_MYCELLIOS_ROUTINES=true` explicitly
+  reactivates it. Keep rail/overflow entries visible with Coming soon, and gate
+  direct routine links/editors before mounting them. The computer panel shows the
+  same notice. Preserve saved routines and backend scheduling; this is a UI gate,
+  not a cancellation of existing jobs. Verify RoutinesAvailability tests.
+  Workflows uses the same paused UI pattern, enabled only with
+  `VITE_MYCELLIOS_WORKFLOWS=true`. Gate direct workflow links before mounting
+  WorkflowWorkspace, and keep navigation visible with Coming soon. Preserve
+  saved workflows and backend execution. Verify WorkflowsAvailability tests.
+  Marketplace has no workspace-rail or More-menu entry, including the unpinned
+  footer fallback. Preserve its routes/features and legacy pin preferences;
+  a saved Marketplace pin must not restore a visible navigation entry.
   Use marketplace/StoreAppHeader for app titles and the return to Hifa Store;
   keep unsaved-work guards on that return action. Estudio IA distinguishes a
   disabled service, missing account connection and temporary catalog failures;
   catalog retries only discover models and never submit generation or checkout.
+  `MYCELLIOS_MEDIA_STUDIO_ENABLED=true` enables only the authenticated media proxy;
+  project-local sets it explicitly. Catalog admission, quotes, reservations and
+  settlement remain on the canonical user's Credit wallet. Never substitute a
+  personal provider key, fixture model or operator-written price for admission.
+  Respect the configured AntSeed upstream without a fallback to OpenRouter.
+  Public network advertisements do not authorize paid media: the gateway's own
+  key scope, enforced supplier bounds and complete attributed receipts must qualify.
   Render all catalog entries through marketplace/StoreAppCard so cover, title,
   description and footer geometry stay shared; keep secondary actions in menus.
   Estudio IA is a catalog app; reserve the Store toolbar for Crear app. Keep its
@@ -206,8 +273,32 @@
   Side-question generations are ephemeral: meter usage, but do not write a chat
   message or a Pi session transcript. Verify scoped pane/composer/API tests.
 
+- Pinned messages are personal per account/Space/exact thread. Store references,
+  not copied message text; preserve encrypted reads and transcript visibility.
+  Resolve the thread and message before writes. Header pins use existing jump
+  paging; message menus and touch actions share MessagePinsContext. Unpin never
+  deletes history or starts inference. Check message-pins API/UI tests and
+  `node --import tsx scripts/verify-message-pins-db.ts` for the real migration,
+  isolation, FK cleanup and concurrent limits; see specs/agent-message-pins/spec.md
+  at the repository root. Never activate its migration outside an authorized scope.
+
 - Mico task conversations use MicoTaskTabs: one Mico keeps independent named
-  conversations behind New conversation and the Conversations picker. Closing a
+  conversations behind the compact + action and the Conversations picker.
+  Size the visible tab subset to the measured available width, always keeping
+  the active conversation readable. Overflow stays in the picker; never close
+  or delete history to make it fit. Keep New conversation first in that picker.
+  The + opens an untitled conversation directly. Its first committed user message
+  supplies a bounded title in the same transaction, without a model request;
+  later messages preserve it. Manual rename is owner/Space/Mico-scoped and remains
+  available by clicking the selected title, from a tab's context menu or the picker.
+  Edit inline: Enter/blur saves and Escape cancels; retain failed edits for retry.
+  Before task navigation, prime the destination's account/Space-scoped shell metadata
+  and only its own cached transcript. Keep immutable RPC/draft isolation, tab titles
+  and open-tab state across the scoped remount without a whole-page loading frame.
+  Verify MicoTaskTabs, query cache isolation,
+  development-conversations and DB messages tests plus
+  `node --import tsx scripts/verify-conversation-titles-db.ts` for atomicity/isolation.
+  The Mico name returns to the main chat; do not duplicate it with a General tab. Closing a
   tab never deletes its history. Keep Create Mico separate from these actions.
   Reset context is a confirmed secondary action for the main chat only; never
   expose that endpoint from an independent task or label it New conversation.
@@ -608,7 +699,10 @@
   never implicit sends. The web fallback requires a cooperating, frameable page;
   do not strip framing/TLS protections or proxy arbitrary sites. Generic project
   folders and local-computer consent remain independent of the browser. Do not add
-  a Mycellios-only development launcher or automatic managed-copy admission.
+  a renderer-owned source path or command. Developer mode may open an isolated
+  Mycellios Dev window through native admission from the current main chat;
+  keep the original chat bound to its preserved source copy and do not copy
+  normal account cookies or provider credentials into the development profile.
   Preview toolbars and comment actions must wrap at narrow widths and enlarged
   text sizes; do not hide selection instructions or the draft action to make them fit.
   Preserve any existing local source copies; code changes stay in their chosen
@@ -812,11 +906,24 @@
   > Models manages provider connections. Preserve saved account and Space model
   defaults and fallbacks. A specific choice updates only that Mico and can run
   with its own connection even if the account has no general model. The header
-  can also change the general model in the effective account/Space scope.
+  lists each actual model once and marks the effective selection; inherited
+  defaults resolve to that same row without writing an override on open. Shared
+  defaults stay in Settings > Models, not in a second header editor. Preserve
+  the inherit option in Mico settings and existing saved defaults.
   If its primary slot is empty, chat may start on the first saved backup with
   an owned connection. Preserve the backup order and the existing funding checks.
-  Keep the chat picker compact by connection. Fetch compatible server catalogs
-  on demand with the saved credential, and add only the model explicitly enabled.
+  Keep the chat picker compact by connection and list all already authorized
+  models directly, without a separate quick-list filter or catalog screen.
+  Mycellios reads its live account catalog rather than saved enabled IDs; retain
+  an absent saved selection as unavailable without silently replacing it. Exclude
+  catalog services explicitly lacking tool support from Mico selection. The +
+  manages providers. Enable a newly selected compatible model with the owned
+  connection before saving the Mico, preserving shared defaults and limits.
+  Order live Mycellios network chat models before AntSeed and label both groups;
+  keep the network group visible above AntSeed when it has no compatible chat
+  capacity. Show an empty state only after successful discovery, and omit empty
+  groups while searching or viewing a different provider.
+  speech/transcription services and tool-less demos are not Mico chat capacity.
   A native provider whose connection already grants catalog access can select
   its models directly. Keep enabling a model separate from selecting it.
 - Provider forms manage connections and keys; model selection belongs to the role
@@ -1150,6 +1257,10 @@
   Preserve the separate native-credit and compatible-provider setup paths.
   Routine account failures back off only the user's own refused connection, never
   an operator outage; a successful run restores cadence. Keep its schema change additive.
+- Mycellios chat discovery uses the owned canonical `/models` catalog. When external
+  metadata expires, wait once on the owned `/managed/catalog` read and reread
+  canonical admission under one deadline. Do not expose expired prices as available,
+  admit raw inventory, start inference or switch payers while refreshing.
 - Compatible model settings show the full catalog in the searchable model picker.
   Keep connection, keys, limits and additional-model management in one advanced
   section without nested configuration disclosures. Searching and the enabled-only
@@ -1549,10 +1660,22 @@
 - Roster hover previews use existing scoped row messages and real run states.
   Do not fetch threads or mark messages read on hover; keep clicks, context menus
   and drag reordering intact, and suppress previews on touch and during dragging.
+  In the expanded desktop roster, place the existing Create menu beside Search;
+  keep one trigger, Ctrl/Cmd-N, and the mobile/collapsed header entry intact.
+  Call sections Folders in UI while preserving `botSections`/`sectionId` contracts.
+  Folder parents stay within the same user/Space; scope-locked mutations enforce
+  three levels and reject cycles or overflowing subtrees. Deletion promotes chats
+  and child folders to the parent (or Unassigned), never deletes their contents.
+  Keep path labels, ancestor collapse and closed-folder unread counts consistent.
+  Verify `sidebar-folders.test.ts`, roster/grouping tests and
+  `node --import tsx scripts/verify-sidebar-folders-db.ts` in its isolated database.
 
 - Keep Tasks, the model selector and a single header tools panel toggle on the
   right of the conversation header. Put secondary actions inside the full-height resizable side panel;
   mobile Browser return focus targets the same tools trigger.
+  Load selected-model metadata before opening its picker; saved Mycellios model
+  IDs must already show a readable name and the Mycellios logo during discovery.
+  Display fallbacks never change the saved model or admit an unavailable model.
 
 - The chat has one Browser and computer entry. Both views share WorkAreaHeader;
   secondary library, Mico settings and voice actions stay in its More menu.

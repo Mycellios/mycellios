@@ -49,6 +49,7 @@ interface ModelSpec {
 
 /** Further content columns (external messages, steering, skills, …) add an entry here. */
 export const ENCRYPTED_MODELS: Record<string, ModelSpec> = {
+  LocalMemoryReview: {table:"local_memory_reviews",fields:{result:{plainKeys:new Set()}},space:{column:"spaceId"},ownerRelation:"user"},
   HostedWeb: {
     table: "hosted_webs",
     fields: { draftBundle: { plainKeys: new Set() } },

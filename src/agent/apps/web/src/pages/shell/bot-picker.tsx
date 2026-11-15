@@ -9,7 +9,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@rakazo/ui-web";
-import { Info, Lock, Plus, Users } from "lucide-react";
+import { FolderPlus, Info, Lock, Plus, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 
@@ -19,12 +19,14 @@ export function BotCreatePicker({
   onOpenBot,
   onCreateGroup,
   onCreateSpace,
+  onCreateFolder,
 }: {
   bots: Bot[];
   onCreateBot: () => void;
   onOpenBot: (botId: string) => void;
   onCreateGroup: () => void;
   onCreateSpace: () => void;
+  onCreateFolder?: () => void;
 }) {
   const { t } = useLingui();
   const [query, setQuery] = useState("");
@@ -76,6 +78,10 @@ export function BotCreatePicker({
                 <Trans>New bot</Trans>
               </CommandItem>
             ) : null}
+            {onCreateFolder ? <CommandItem value="create-folder" data-testid="create-new-folder" onSelect={onCreateFolder} className="gap-2">
+              <span className="flex size-[22px] shrink-0 items-center justify-center"><FolderPlus size={16} strokeWidth={1.8} aria-hidden="true" /></span>
+              <Trans>New folder</Trans>
+            </CommandItem> : null}
             <CommandItem
               value="create-group"
               data-testid="create-new-group"

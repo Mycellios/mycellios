@@ -235,6 +235,7 @@ export const BotSectionName = z.string().trim().min(1).max(60);
 export const BotSectionSchema = z.object({
   id: Id,
   name: z.string(),
+  parentId: Id.nullable().optional(),
   position: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -725,6 +726,9 @@ export const UpdateAgentSkillInput = z
   });
 
 export const MemoryDocumentSchema = z.object({
+  inclusion: z.enum(["essential", "searchable"]).optional(),
+  userControlled: z.boolean().optional(),
+  taskThreadId: Id.nullable().optional(),
   id: Id,
   scope: MemoryScope,
   botId: Id.nullable(),

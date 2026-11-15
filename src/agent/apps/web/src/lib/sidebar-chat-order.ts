@@ -27,7 +27,7 @@ export function orderSidebarChats<T extends { key: string; spaceId: string; bots
     if (unread.length && !inserted.has(group.spaceId) && !pinnedSection) {
       inserted.add(group.spaceId);
       result.push({ ...group, key: `space:${group.spaceId}:unread`, title: unreadLabel, subtitle: undefined,
-        sectionId: null, emptySpaceId: undefined, canOpenSpaceSettings: false, canRenameSpace: false, canDeleteSpace: false,
+        sectionId: null, ancestorKeys: [], emptySpaceId: undefined, canOpenSpaceSettings: false, canRenameSpace: false, canDeleteSpace: false,
         bots: [...unread].sort((a, b) => activity(b) - activity(a)),
       });
     }

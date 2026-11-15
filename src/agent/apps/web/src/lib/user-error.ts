@@ -5,6 +5,11 @@ import { authErrorMessage, MAX_PASSWORD_LENGTH, userErrorMessage } from "@rakazo
 
 /** Text for a failure: human messages pass through; network and implementation detail become copy. */
 export function errorText(error: unknown, fallback = t`Something went wrong. Try again.`): string {
+  const message = error instanceof Error ? error.message : undefined;
+  if (message === "You can pin up to 100 messages per conversation.") return t`You can pin up to 100 messages per conversation.`;
+  if (message === "Folders support up to three levels.") return t`Folders support up to three levels.`;
+  if (message === "A folder cannot be moved into itself or one of its subfolders.") return t`A folder cannot be moved into itself or one of its subfolders.`;
+  if (message === "Folder name already used") return t`Folder name already used`;
   return (
     voiceAccountErrorText(error) ??
     userErrorMessage(error, {

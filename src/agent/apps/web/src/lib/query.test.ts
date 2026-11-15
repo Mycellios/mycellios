@@ -1,4 +1,5 @@
 import { QueryObserver } from "@tanstack/react-query";
+import type { AppBootstrap } from "@rakazo/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./rpc", () => {
@@ -18,6 +19,7 @@ import {
   lastChatKey,
   lastChatOf,
   queryClient,
+  primeConversationSeed,
   seedOnLeave,
   setQueryUser,
   spaceQueries,
@@ -131,6 +133,50 @@ describe("the chat a space reopens with", () => {
       spaceSeedKey("user-a", "space-a"),
     ].map((key) => JSON.stringify(key));
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("conversation navigation without a whole-page loading frame", () => {
+  const latest = { me: { spaceId: "space" }, bots: [{ id: "mico" }], groups: [],
+    botSections: [], archivedBots: [], archivedGroups: [], spaces: [] } as unknown as Omit<AppBootstrap, "thread" | "routines">;
+  const a = { botId: "mico", taskThreadId: "one" };
+  const b = { botId: "mico", taskThreadId: "two" };
+
+  it("primes an unseen conversation with the sidebar, never the departing transcript", () => {
+    queryClient.setQueryData(spaceSeedKey("owner", "space", a), {
+      ...latest, thread: { botId: "mico", threadId: "one", messages: ["private A"] }, routines: ["A"],
+    } as never);
+    primeConversationSeed("owner", "space", latest, "mico", b);
+    const seed = queryClient.getQueryData(spaceSeedKey("owner", "space", b))!;
+    expect(seed.bots).toEqual([{ id: "mico" }]);
+    expect(seed.thread).toBeNull(); expect(seed.routines).toEqual([]);
+    expect(queryClient.getQueryData(spaceSeedKey("owner", "space", a))?.thread?.threadId).toBe("one");
+  });
+
+  it("reopens an already visited task with its own cached messages immediately", () => {
+    const thread = { botId: "mico", threadId: "two", messages: ["B"] } as never;
+    queryClient.setQueryData(spaceQueries("owner", "space", b).threads.get.queryKey({input:{botId:"mico"}}), thread);
+    primeConversationSeed("owner", "space", latest, "mico", b);
+    expect(queryClient.getQueryData(spaceSeedKey("owner", "space", b))?.thread).toBe(thread);
+  });
+
+  it("discards an incorrectly scoped cached snapshot and leaves other accounts/spaces untouched", () => {
+    const key = spaceQueries("owner", "space", b).threads.get.queryKey({input:{botId:"mico"}});
+    queryClient.setQueryData(key, {botId:"mico", threadId:"one"} as never);
+    primeConversationSeed("owner", "space", latest, "mico", b);
+    expect(queryClient.getQueryData(spaceSeedKey("owner", "space", b))?.thread).toBeNull();
+    expect(queryClient.getQueryData(spaceSeedKey("other", "space", b))).toBeUndefined();
+    expect(queryClient.getQueryData(spaceSeedKey("owner", "other", b))).toBeUndefined();
+  });
+
+  it("returns to the main chat without borrowing a task or group transcript", () => {
+    primeConversationSeed("owner", "space", latest, "mico", a);
+    primeConversationSeed("owner", "space", latest, "mico");
+    expect(queryClient.getQueryData(spaceSeedKey("owner", "space"))?.thread).toBeNull();
+    queryClient.setQueryData(spaceSeedKey("owner", "space"), { ...latest,
+      thread: {botId:"mico",groupId:"group"} } as never);
+    primeConversationSeed("owner", "space", latest, "mico");
+    expect(queryClient.getQueryData(spaceSeedKey("owner", "space"))?.thread).toBeNull();
   });
 });
 

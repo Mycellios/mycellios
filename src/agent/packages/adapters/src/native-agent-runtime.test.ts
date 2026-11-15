@@ -10,6 +10,7 @@ import { findNativeCommand, nativeEnvironment } from "./native-agent-process.js"
 import { codexPermissionProfile, codexToolContent, discoverNativeEngines, NativeAgentRuntime, nativeToolContent } from "./native-agent-runtime.js";
 import { ScriptedAgentRuntime } from "./scripted-runtime.js";
 import { restoreTurnCheckpoint } from "./turn-checkpoint.js";
+import { CONVERSATION_STYLE } from "./conversation-style.js";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -134,6 +135,7 @@ describe("native agent protocol integration", () => {
       const [capture] = test.onCheckpoint.mock.calls[0]!;
       const saved = restoreTurnCheckpoint(capture(), test.request.model);
       expect(saved.systemPrompt).toContain("Mycellios conversation style:");
+      expect(saved.systemPrompt).toContain(CONVERSATION_STYLE);
       expect(saved.systemPrompt).toContain(test.request.instructions);
       expect(saved.messages.at(-1)).toMatchObject({
         role: "assistant",

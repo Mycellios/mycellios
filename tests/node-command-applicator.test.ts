@@ -15,6 +15,29 @@ const cleanup: string[] = [];
 afterEach(async () => Promise.all(cleanup.splice(0).map((path) => rm(path, { recursive: true, force: true }))));
 
 describe("NodeCommandApplicator", () => {
+  it("does not resume a persisted pause on stale reconciliation, including after restart", async () => {
+    const fixture = await setup();
+    // Both account commands and the legacy native control persist the owner's pause here.
+    await fixture.control.setContributionEnabled(false);
+    await fixture.applicator.reconcileContribution(true, false);
+    expect(await fixture.control.load()).toMatchObject({ contributionEnabled: false });
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(false);
+    const reloaded = new NodeControlStateStore(fixture.control.path);
+    const restarted = new NodeCommandApplicator(fixture.agent, reloaded, fixture.configStore, (await fixture.configStore.load()).config);
+    await restarted.reconcileContribution(true, false);
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(false);
+    await restarted.apply(application(command("resume", { version: 1 })));
+    await restarted.reconcileContribution(true, false);
+    expect(await reloaded.load()).toMatchObject({ contributionEnabled: true });
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(true);
+    await restarted.reconcileContribution(true, true);
+    expect(await reloaded.load()).toMatchObject({ contributionEnabled: true });
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(false);
+    await restarted.reconcileContribution(true, false);
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(true);
+    await restarted.reconcileContribution(false, false);
+    expect(fixture.agent.setContributionEnabled).toHaveBeenLastCalledWith(false);
+  });
   it("persists pause, drain and resume while keeping drain idempotent", async () => {
     const fixture = await setup();
     await fixture.applicator.apply(application(command("pause", { version: 1 })));

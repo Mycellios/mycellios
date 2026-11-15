@@ -232,6 +232,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 providerContent={name => name === "Mycellios" && !mycelliosConnection ? <ul><MycelliosProvider embedded onConnected={async () => {
                   await Promise.all([credentialsQuery.refetch(), catalogQuery.refetch(), queryClient.invalidateQueries({queryKey:queries.me.queryKey()})]);
                 }} /></ul> : null}
+                mycelliosCatalogReady={mycelliosCatalog.isSuccess}
                 modelOrigins={Object.fromEntries((mycelliosCatalog.data ?? []).map(entry => [modelOptionKey(entry.provider, entry.id), entry.mycelliosProcessing === "external" ? "antseed" : "network"]))}
               />
             </fieldset>}
