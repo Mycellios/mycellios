@@ -19,7 +19,7 @@ await new Promise<void>(resolve => socket.close(() => resolve()));
 const directory = await mkdtemp(path.join(tmpdir(), "mycellios-conversation-titles-"));
 const password = randomBytes(24).toString("hex");
 const postgres = new EmbeddedPostgres({ databaseDir: path.join(directory,"pg"), port, user:"postgres", password,
-  persistent:true, createPostgresUser:false, initdbFlags:["--encoding=UTF8","--locale=C"], onLog:()=>{}, onError:()=>{} });
+  persistent:true, createPostgresUser:false, autoRehydrateSymlinks:true, initdbFlags:["--encoding=UTF8","--locale=C"], onLog:()=>{}, onError:()=>{} });
 let db: ReturnType<typeof createDb> | undefined;
 try {
   await postgres.initialise(); await postgres.start();

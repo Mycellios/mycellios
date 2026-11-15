@@ -13,7 +13,7 @@ const {messagePinRoutes}=await import("../apps/api/src/routes/message-pins.js");
 const socket=createServer();await new Promise<void>(resolve=>socket.listen(0,"127.0.0.1",resolve));
 const port=(socket.address() as {port:number}).port;await new Promise<void>(resolve=>socket.close(()=>resolve()));
 const directory=await mkdtemp(path.join(tmpdir(),"mycellios-message-pins-")),password=randomBytes(24).toString("hex");
-const postgres=new EmbeddedPostgres({databaseDir:path.join(directory,"pg"),port,user:"postgres",password,persistent:true,createPostgresUser:false,initdbFlags:["--encoding=UTF8","--locale=C"],onLog:()=>{},onError:()=>{}});
+const postgres=new EmbeddedPostgres({databaseDir:path.join(directory,"pg"),port,user:"postgres",password,persistent:true,createPostgresUser:false,autoRehydrateSymlinks:true,initdbFlags:["--encoding=UTF8","--locale=C"],onLog:()=>{},onError:()=>{}});
 let db:ReturnType<typeof createDb>|undefined;
 try{
   await postgres.initialise();await postgres.start();
