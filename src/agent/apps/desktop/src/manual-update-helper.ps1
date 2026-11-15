@@ -62,7 +62,11 @@ if($Launch){
  # PowerShell 5.1 needs a console to initialize. The hidden launcher starts
  # another process so the update worker outlives Electron's direct-child job.
  $argsForWorker=@('-NoLogo','-NoProfile','-NonInteractive','-File',('"' + $PSCommandPath + '"'),'-ConfigFile',('"' + $ConfigFile + '"'))
- $worker=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsForWorker -WindowStyle Hidden -WorkingDirectory $env:TEMP -RedirectStandardOutput (Join-Path $job 'helper.log') -RedirectStandardError (Join-Path $job 'helper-error.log') -PassThru
+ # Redirecting output without a readable input makes PowerShell 5.1 exit with
+ # "Stream was not readable" when Desktop starts it without a console.
+ $stdin=Join-Path $job 'helper-stdin.txt'
+ Set-Content -LiteralPath $stdin -Value '' -Encoding Ascii
+ $worker=Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsForWorker -WindowStyle Hidden -WorkingDirectory $env:TEMP -RedirectStandardInput $stdin -RedirectStandardOutput (Join-Path $job 'helper.log') -RedirectStandardError (Join-Path $job 'helper-error.log') -PassThru
  # Windows PowerShell can lose the native process handle returned by
  # Start-Process. Retain it before waiting so exit/acknowledgement is real.
  $null=$worker.Handle

@@ -41,6 +41,7 @@ it.runIf(process.platform === "win32")("parses the real helper and requires the 
   const text = await readFile(source, "utf8");
   expect(text).not.toMatch(/Stop-Process|taskkill|ExecutionPolicy|RmShutdown|legacyShutdown/);
   expect(text).toContain("The previous app has not finished saving; update was not applied");
+  expect(text).toContain("-RedirectStandardInput $stdin");
   expect(text).toContain("$start.UseShellExecute=$false");
   expect(text.indexOf("[MycelliosAttachment]::Approve($installer,$source,$owner)")).toBeLessThan(text.indexOf("Progress 'waiting-for-app'"));
   expect(text).toContain("if(action!=2)throw new OperationCanceledException");
