@@ -49,7 +49,7 @@ export function readManagedProviderConfig(env: NodeJS.ProcessEnv): ManagedProvid
   if(textRoutes!==undefined&&(!Array.isArray(textRoutes)||!textRoutes.length||textRoutes.length>100))throw new Error("managed_configuration_invalid");
   if (upstream !== "openrouter" && env.MYCELLIOS_MANAGED_MEDIA_ENABLED === "true") throw new Error("managed_antseed_media_not_qualified");
   if (upstream === "antseed-gateway" && (!env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_BASE_URL
-    || env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_CONTRACT !== "deepseek-bounded-v1")) throw new Error("managed_antseed_gateway_configuration_invalid");
+    || !["deepseek-bounded-v1", "token-bounded-v2"].includes(env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_CONTRACT ?? ""))) throw new Error("managed_antseed_gateway_configuration_invalid");
   return { upstream, ...(upstream === "openrouter" ? {openRouterKey:key} : upstream === "antseed-gateway" ? {
     antseedGatewayKey:key, antseedGatewayBaseUrl:env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_BASE_URL!,
     antseedGatewayContract:env.MYCELLIOS_MANAGED_ANTSEED_GATEWAY_CONTRACT!} : {antseedControlSecret:key}), modelAllowlist: models as string[], requestLimitMicrounits: limit, dailyLimitMicrounits: daily,

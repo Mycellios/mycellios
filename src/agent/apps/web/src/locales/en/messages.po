@@ -12604,3 +12604,12 @@ msgstr "Choose a future date and time."
 #: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
 msgid "Saved with this conversation. Device alerts follow your notification settings."
 msgstr "Saved with this conversation. Device alerts follow your notification settings."
+
+msgid "Manage providers"
+msgstr "Manage providers"
+
+msgid "No Mycellios agent models are available right now. Retrying automatically."
+msgstr "No Mycellios agent models are available right now. Retrying automatically."
+
+msgid "Mycellios network"
+msgstr "Mycellios network"

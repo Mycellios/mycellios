@@ -75,26 +75,29 @@ describe("ChatModelPicker", () => {
       root.render(<ChatModelPicker id="model" choices={list} value={value} onChange={onChange} />),
     );
   const options = () => [...document.querySelectorAll('[role="option"]')];
-  it("shows built-in account setup instead of an empty catalog without selecting a paid model", async () => {
-    const explore = vi.fn();
-    await act(async () => root.render(<ChatModelPicker id="builtin" inline choices={choices(1)} value="" onChange={onChange}
-      catalogProviders={["Mycellios", "OpenRouter"]} initialProvider="Mycellios" onExplore={explore}
-      providerContent={name => name === "Mycellios" ? <p role="status">Use my credits</p> : null} />));
-    expect(container.querySelector('[aria-label="Mycellios"]')).not.toBeNull();
-    expect(container.textContent).toContain("Use my credits");
-    expect(container.textContent).not.toContain("No matching models");
-    expect(container.textContent).not.toContain("Explore catalog");
-    await act(async () => container.querySelector<HTMLButtonElement>('[aria-label="OpenRouter"]')!.click());
-    expect(container.textContent).not.toContain("Use my credits");
-    expect(container.textContent).toContain("Explore catalog");
-    expect(explore).not.toHaveBeenCalled(); expect(onChange).not.toHaveBeenCalled();
-  });
   const search = (text: string) =>
     act(() => {
       const input = document.querySelector<HTMLInputElement>('input[aria-label="Search models"]')!;
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, text);
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
+
+  it("groups distributed capacity before AntSeed without changing the selected model", async () => {
+    const list = [
+      { key: "openai-compatible::external", label: "External (Mycellios)", title: "External", provider: "openai-compatible", providerLabel: "Mycellios", modelId: "external" },
+      { key: "openai-compatible::network", label: "Network (Mycellios)", title: "Network", provider: "openai-compatible", providerLabel: "Mycellios", modelId: "network" },
+    ];
+    act(() => root.render(<ChatModelPicker id="model" inline choices={list} value={list[0]!.key} onChange={onChange}
+      modelOrigins={{ [list[0]!.key]: "antseed", [list[1]!.key]: "network" }} />));
+    expect([...container.querySelectorAll("[cmdk-group-heading]")].map(node => node.textContent)).toEqual(["Mycellios network", "AntSeed"]);
+    expect(options().map(node => node.getAttribute("aria-label"))).toEqual(["Network (Mycellios)", "External (Mycellios)"]);
+    expect(options()[1]?.getAttribute("data-checked")).toBe("true");
+    expect(onChange).not.toHaveBeenCalled();
+    search("Network");
+    expect(options()).toHaveLength(1);
+    await act(async () => (options()[0] as HTMLElement).click());
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(list[1]!.key);
+  });
 
   it("uses the themed menu for a short list and preserves the inherited option", async () => {
     render(choices(9), "openrouter::vendor/model-1");

@@ -2,6 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 import { readMycelliosChatModels } from "./mycellios-model-catalog.js";
 
 describe("Mycellios account chat catalog", () => {
+  it("puts available distributed models before AntSeed, regardless of the upstream order", async () => {
+    const entries = await readMycelliosChatModels("fixture", { fetch: vi.fn(async () => Response.json({ data: [
+      { id: "mycellios/managed/antseed/deepseek-v4-flash", name: "DeepSeek", modality: "text", processing: "external", task: "chat",
+        pricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 400, input: "0.000001", output: "0.000002" } },
+      { id: "network-chat", name: "Network chat", processing: "network", x_replicas: 1, x_pipelines: 0 },
+    ] })) });
+    expect(entries.map(entry => entry.id)).toEqual(["network-chat", "mycellios/managed/antseed/deepseek-v4-flash"]);
+  });
+  it("excludes tool-less browser demos while retaining available managed agent models", async () => {
+    const entries = await readMycelliosChatModels("fixture", { fetch: vi.fn(async () => Response.json({ data: [
+      { id: "gpt2", name: "GPT-2 · 124M · Browser", task: "chat", supports_tools: false, available: true },
+      { id: "mycellios/managed/antseed/deepseek-v4-flash", modality: "text", processing: "external", task: "chat", supports_tools: true,
+        pricing: { currency: "credits", unit: "token", serviceFeeBasisPoints: 400, input: "0.000001", output: "0.000002" } },
+    ] })) });
+    expect(entries.map(entry => entry.id)).toEqual(["mycellios/managed/antseed/deepseek-v4-flash"]);
+  });
   it("shows zero Credits only for all-zero prices, keeps fixed fees visible and excludes unqualified services",async()=>{
     const pricing={currency:"credits",unit:"token",serviceFeeBasisPoints:400,input:"0",output:"0",request:"0"};
     const entries=await readMycelliosChatModels("fixture",{fetch:vi.fn(async()=>Response.json({data:[

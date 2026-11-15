@@ -362,6 +362,12 @@ These rules apply to the complete repository.
   Gateway API keys use the separate `antseed-gateway` adapter and its scoped
   receipt session, never the local buyer control-secret field. Run its gateway
   tests too. Keep models without an enforceable upstream cost contract disabled.
+  `token-bounded-v2` expands only verified text/tool offers behind an advertised
+  gateway reservation contract. Preserve `deepseek-bounded-v1` and recovery of
+  its existing jobs. The protected operator key requires bounded paid admission;
+  quoted per-offer rates narrow upstream policy without changing wallet budgets.
+  Run `node --test scripts/antseed-gateway/text-cost-contract.test.mjs` and the
+  gateway V1/V2 plus isolated managed-purchases tests for this boundary.
   Paid gateway admission also needs a lifetime funded envelope; count settled
   spend and unresolved holds across restarts and UTC days before supplier POSTs.
   Rank eligible gateway peers by bounded effective reputation, with stable peer-id
