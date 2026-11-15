@@ -12791,4 +12791,3 @@ msgstr "New folder inside"
 
 msgid "Delete folder"
 msgstr "Delete folder"
-
