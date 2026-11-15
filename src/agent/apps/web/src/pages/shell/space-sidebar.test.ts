@@ -8,7 +8,7 @@ function chat(id: string, name: string) {
     title: "",
     preview: "",
     pinned: false,
-    sectionId: null,
+    sectionId: null as string | null,
     parentBotId: null,
   };
 }
@@ -30,6 +30,21 @@ function space(
 }
 
 describe("sidebarGroupsForSpaces", () => {
+  it("keeps empty nested folders in tree order with paths and ancestor collapse keys", () => {
+    const input = { ...space("space-1", "Personal"), botSections: [
+      {id:"a",name:"Finanzas"},{id:"c",name:"2026",parentId:"b"},{id:"b",name:"Contabilidad",parentId:"a"},
+    ] };
+    const folders = sidebarGroupsForSpaces([input], "").filter(group => group.sectionId);
+    expect(folders.map(group => group.sectionId)).toEqual(["a","b","c"]);
+    expect(folders[2]).toMatchObject({title:"Finanzas / Contabilidad / 2026",ancestorKeys:["section:a","section:b"]});
+  });
+  it("lets search reveal a matching Mico in a collapsed ancestor and scopes folder keys per Space", () => {
+    const input = { ...space("space-1", "Personal"), bots:[{...chat("a","Find me"),sectionId:"child"}],
+      botSections:[{id:"root",name:"Finance"},{id:"child",name:"Accounts",parentId:"root"}] };
+    expect(sidebarGroupsForSpaces([input], "Find")[0]).toMatchObject({ancestorKeys:[],sectionId:"child"});
+    expect(sidebarGroupsForSpaces([input,space("other","Other")], "").find(group=>group.sectionId==="child"))
+      .toMatchObject({ancestorKeys:["space:space-1:section:root"]});
+  });
   it("does not list an opaque space id as the space name", () => {
     const id = "550e8400-e29b-41d4-a716-446655440000";
     const [group] = sidebarGroupsForSpaces([space(id, id)], "");
@@ -77,9 +92,9 @@ describe("sidebarGroupsForSpaces", () => {
       ],
     };
     expect(sidebarGroupsForSpaces([input], "").map((group) => group.key)).toEqual([
+      "unassigned",
       "section:s1",
       "section:s2",
-      "unassigned",
     ]);
     expect(sidebarGroupsForSpaces([input], "Alpha").map((group) => group.key)).toEqual([
       "section:s1",

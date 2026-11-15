@@ -110,6 +110,38 @@ describe("ChatModelPicker", () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith("");
   });
 
+  it("keeps the empty own-network section above external models without adding a selectable placeholder", async () => {
+    const list = [{ key: "openai-compatible::external", label: "External (Mycellios)", provider: "openai-compatible", providerLabel: "Mycellios", modelId: "external" }];
+    act(() => root.render(<ChatModelPicker id="model" inline choices={list} value={list[0]!.key} onChange={onChange}
+      modelOrigins={{ [list[0]!.key]: "antseed" }} />));
+    const network = container.querySelector('[cmdk-group]')!;
+    expect([...container.querySelectorAll("[cmdk-group-heading]")].map(node => node.textContent)).toEqual(["Mycellios network", "AntSeed"]);
+    expect(network.hasAttribute("hidden")).toBe(false);
+    expect(network.textContent).toContain("No chat models available right now.");
+    expect(options().map(node => node.getAttribute("aria-label"))).toEqual(["External (Mycellios)"]);
+    expect(onChange).not.toHaveBeenCalled();
+    search("External");
+    expect([...container.querySelectorAll("[cmdk-group-heading]")].map(node => node.textContent)).toEqual(["AntSeed"]);
+    expect(options()).toHaveLength(1);
+    await act(async () => (options()[0] as HTMLElement).click());
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(list[0]!.key);
+  });
+
+  it("does not claim an empty network while discovery is pending or unsuccessful", () => {
+    const list = [{ key: "openai-compatible::external", label: "External (Mycellios)", provider: "openai-compatible", providerLabel: "Mycellios", modelId: "external" }];
+    act(() => root.render(<ChatModelPicker id="model" inline choices={list} value={list[0]!.key} onChange={onChange}
+      mycelliosCatalogReady={false} modelOrigins={{ [list[0]!.key]: "antseed" }} />));
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    expect(options()).toHaveLength(1);
+  });
+
+  it("does not add an empty Mycellios group to other providers", () => {
+    act(() => root.render(<ChatModelPicker id="model" inline choices={choices(3)} value="openrouter::vendor/model-1" onChange={onChange}
+      modelOrigins={{}} />));
+    expect(container.textContent).not.toContain("Mycellios network");
+    expect(container.textContent).not.toContain("No chat models available right now.");
+  });
+
   it("marks a short list's selected model when it cannot read images", () => {
     const list = choices(2).map((choice, index) =>
       index === 1 ? { ...choice, images: false } : { ...choice, images: true },

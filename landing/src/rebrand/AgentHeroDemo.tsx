@@ -1,3 +1,4 @@
+import { loadAgentMotion } from "./deferred-agent-motion";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Bell, Check, ChevronDown, FileText, Folder, Mic, Monitor, MousePointer2, PanelLeftClose, PanelRight, Pause, Play, Plus, Search, ShieldCheck } from "lucide-react";
 import { Button, IconButton, Input, Link, Select, Text } from "../ui/primitives";
@@ -6,8 +7,23 @@ import { agentExamples, projectNotes } from "./agent-demo-content";
 import "./mico-avatar.css";
 
 export function MicoAvatar({ name = "mico", className = "" }: { name?: string; className?: string }) {
-  return <span className={`mico-avatar ${className}`} data-mico={name} aria-hidden="true"><img src={`/assets/agent-demo/${name}.svg`} alt="" draggable="false" /><i className="mico-face" /></span>;
+  const art = marketingMicos[name as keyof typeof marketingMicos] ?? marketingMicos.mico;
+  return <span className={`mico-avatar ${className}`} data-mico={name} aria-hidden="true">
+    <svg viewBox="0 0 64 64" data-mico-avatar="plush" data-mico-shape={art.shape}>
+      <svg viewBox={art.crop} width="64" height="64" overflow="hidden"><image href={micoAtlas} width="1536" height="1024" /></svg>
+      <g className="mico-face">{[-1, 1].map(side => <g key={side} transform={`translate(${art.face[0] + side * 4 * art.scale} ${art.face[1]}) scale(${art.scale})`}><rect className="mico-eye" x="-1.6" y="-3.6" width="3.2" height="7.2" rx="1.6" /></g>)}</g>
+    </svg>
+  </span>;
 }
+
+// The same eyeless atlas and compact face anchors as Agent's CompactVelvetAvatar.
+const micoAtlas = new URL("../../../src/agent/packages/core/assets/micos-mycelium-eyeless.png", import.meta.url).href;
+export const marketingMicos = {
+  mico: { shape: "mushroom", index: 1000, crop: "43.5 45 480 480", face: [32.3333, 42.8333], scale: 0.92 },
+  planning: { shape: "sprout", index: 1101, crop: "521 44.5 480 480", face: [30.7, 42.5], scale: 1 },
+  research: { shape: "branch", index: 1102, crop: "1003.5 44 492 492", face: [29.7561, 41.4309], scale: 0.92 },
+  writing: { shape: "spore", index: 1104, crop: "509 526.5 480 480", face: [31.8333, 40], scale: 1 },
+} as const;
 
 /** A synthetic product illustration. No model, file, permission or account API is called. */
 export function AgentHeroDemo({ onPlaybackChange }: { onPlaybackChange: (playing: boolean) => void }) {
@@ -42,7 +58,7 @@ export function AgentHeroDemo({ onPlaybackChange }: { onPlaybackChange: (playing
   useEffect(() => {
     let active = true;
     setPreview(null); setPermission("pending");
-    void import("./agent-hero-motion").then(({ animateAgentDemo }) => {
+    void loadAgentMotion().then(({ animateAgentDemo }) => {
       if (!active || !root.current) return;
       motion.current = animateAgentDemo(root.current, example.request, () => {
         if (active) setPreview("notes");

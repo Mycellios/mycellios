@@ -16,6 +16,9 @@ async function site() {
   writeFileSync(join(root, "stats", "index.html"), "<h1>Mycellios Stats</h1>");
   writeFileSync(join(root, "changelog", "index.html"), "<h1>Mycellios Changelog</h1>");
   writeFileSync(join(root, "compare", "grok-bot", "index.html"), "<h1>Mycellios vs Grok Bot</h1>");
+  mkdirSync(join(root, "es", "guias", "empezar"), { recursive: true });
+  writeFileSync(join(root, "es", "guias", "empezar", "index.html"), '<html lang="es"><h1>Tu primer Mico</h1></html>');
+  writeFileSync(join(root, "es", "guias", "empezar.md"), "# Tu primer Mico\nContenido en español");
   const app = Fastify();
   await app.register(fastifyStatic, { root });
   registerLandingEntryRoutes(app, root);
@@ -24,6 +27,20 @@ async function site() {
   return app;
 }
 describe("marketing route entries", () => {
+  it("serves translated HTML and Markdown, with canonical redirects and no duplicate indexing", async () => {
+    const app = await site();
+    expect((await app.inject("/es/guias/empezar")).body).toContain('lang="es"');
+    const markdown = await app.inject("/es/guias/empezar.md");
+    expect(markdown.statusCode).toBe(200);
+    expect(markdown.headers["content-type"]).toContain("text/markdown");
+    expect(markdown.headers["x-robots-tag"]).toBe("noindex, follow");
+    expect(markdown.headers.link).toContain("https://www.mycellios.com/es/guias/empezar");
+    expect((await app.inject("/es/guias/empezar/?from=footer")).headers.location).toBe("/es/guias/empezar?from=footer");
+    expect((await app.inject("/es/guias/nonexistent")).statusCode).toBe(404);
+    expect((await app.inject("/guides/models-and-credits")).statusCode).toBe(404); // Missing build must not serve home as a guide.
+    expect((await app.inject("/account")).headers["x-robots-tag"]).toContain("noindex");
+    expect((await app.inject("/network?view=jobs")).headers["x-robots-tag"]).toContain("noindex");
+  });
   it("selects the Stats document only on the exact Stats host and leaves APIs intact", async () => {
     const app = await site();
     expect((await app.inject({ url: "/", headers: { host: "stats.mycellios.com" } })).body).toContain("Mycellios Stats");

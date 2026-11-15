@@ -5,10 +5,10 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');const
 let identity,port;
 if(process.env.MEMORY_TEST_EPHEMERAL==='1'){
  assert(process.platform==='linux','Ephemeral CI database is Linux-only');
- await readFile('/.dockerenv');const {default:EmbeddedPostgres}=await import('embedded-postgres');
+ if(process.env.GITHUB_ACTIONS!=='true')await readFile('/.dockerenv');const {default:EmbeddedPostgres}=await import('embedded-postgres');
  const net=await import('node:net');const listener=net.createServer();await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));port=listener.address().port;await new Promise(resolve=>listener.close(resolve));
  identity={databasePassword:randomUUID().replaceAll('-',''),encryptionKey:'memory-review-ci-test-key-not-a-production-secret'};
- embedded=new EmbeddedPostgres({databaseDir:'/tmp/memory-review-'+randomUUID(),user:'postgres',password:identity.databasePassword,port,persistent:false,createPostgresUser:true,autoRehydrateSymlinks:true});await embedded.initialise();await embedded.start();
+ embedded=new EmbeddedPostgres({databaseDir:'/tmp/memory-review-'+randomUUID(),user:'postgres',password:identity.databasePassword,port,persistent:false,createPostgresUser:process.getuid()===0,autoRehydrateSymlinks:true});await embedded.initialise();await embedded.start();
 }else{identity=JSON.parse(await readFile(path.join(data,'identity.json'),'utf8'));port=Number((await readFile(path.join(data,'postgres/postmaster.pid'),'utf8')).split(/\r?\n/)[3]);}assert(port>1024);
 const suffix=randomUUID().replaceAll('-','');const name='memory_test_'+suffix;const role='memory_role_'+suffix;const password=randomUUID().replaceAll('-','');assert(/^[a-z0-9_]+$/.test(name+role));
 const admin=new Client({host:'127.0.0.1',port,user:'postgres',password:identity.databasePassword,database:'postgres'});await admin.connect();let created=false,roleCreated=false;

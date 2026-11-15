@@ -61,3 +61,13 @@ it("web can save account policy but native computer controls remain unavailable"
   expect(el.querySelector<HTMLButtonElement>('[aria-label="Allow local scripts on this computer"]')!.disabled).toBe(true);
   expect(el.querySelector<HTMLSelectElement>('[aria-label="Requests per hour"]')!.disabled).toBe(true);
 });
+
+it("saves the response style with revision protection and displays the returned value", async () => {
+  let state=initial();const updateMicos=vi.fn(async(input)=>{state={...state,revision:2,defaults:{...state.defaults,...input.patch}};return state;});
+  mocked.client={preferences:{micos:vi.fn(async()=>state),updateMicos}} as unknown as RpcClient;
+  await render();const select=el.querySelector<HTMLSelectElement>('[aria-label="Response style"]')!;
+  expect(select.value).toBe("natural");
+  await act(async()=>{select.value="classic";select.dispatchEvent(new Event("change",{bubbles:true}));});
+  expect(updateMicos).toHaveBeenCalledWith({kind:"defaults",revision:1,patch:{responseStyle:"classic"}});
+  expect(select.value).toBe("classic");
+});

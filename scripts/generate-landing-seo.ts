@@ -6,10 +6,15 @@ import {
   LANDING_SEO_PATHS,
   SEO_PAGES,
   seoPageForPath,
+  seoLanguageLinks,
+  seoMarkdownPath,
   type SeoPath,
 } from "../landing/src/seo.js";
 
-const outputRoot = join(process.cwd(), "landing-dist");
+import { publicSeoResources } from "../landing/src/seo-resources.js";
+
+const resourcesOnly = process.argv.includes("--resources-only");
+const outputRoot = join(process.cwd(), resourcesOnly ? "landing/public" : "landing-dist");
 const templatePath = join(outputRoot, "index.html");
 const routeOutputPaths = Object.fromEntries(LANDING_SEO_PATHS.map(path => [path, path === "/" ? "index.html" : `${path.slice(1)}/index.html`])) as Record<(typeof LANDING_SEO_PATHS)[number], string>;
 
@@ -41,13 +46,20 @@ function renderStaticSeoContent(page: (typeof SEO_PAGES)[SeoPath]): string {
     .map(({ href, label }) => `<li><a href="${escapeAttribute(href)}">${escapeAttribute(label)}</a></li>`)
     .join("");
 
-  return `<main class="seo-static-fallback"><h1>${escapeAttribute(content.heading)}</h1>${paragraphs}<nav aria-label="Related Mycellios pages"><ul>${links}</ul></nav></main>`;
+  const sections = (content.sections ?? []).map(section => `<section><h2>${escapeAttribute(section.title)}</h2>${section.paragraphs.map(paragraph => `<p>${escapeAttribute(paragraph)}</p>`).join("")}</section>`).join("");
+  const languages = seoLanguageLinks(page).filter(item => item.language !== "x-default").map(item => `<a href="${item.href}" hreflang="${item.language}">${item.language === "es" ? "Español" : "English"}</a>`).join(" · ");
+  return `<main class="seo-static-fallback">${languages ? `<nav aria-label="Language">${languages}</nav>` : ""}<h1>${escapeAttribute(content.heading)}</h1>${paragraphs}${sections}<nav aria-label="Related Mycellios pages"><ul>${links}</ul></nav></main>`;
 }
 
 function renderSeoDocument(template: string, path: (typeof LANDING_SEO_PATHS)[number]): string {
   const page = seoPageForPath(path);
   const url = canonicalUrl(page);
-  let html = template;
+  let html = template.replace(/<html\b[^>]*>/i, `<html lang="${page.language ?? "en"}">`);
+  html = html.replace(/<link\b[^>]*data-seo-alternate[^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*property=["']og:locale["'][^>]*>/i, metaTag("property", "og:locale", page.language === "es" ? "es_ES" : "en_US"));
+  const alternates = seoLanguageLinks(page).map(item => `<link rel="alternate" hreflang="${item.language}" href="${escapeAttribute(item.href)}" data-seo-alternate="language">`).join("\n");
+  const markdown = page.robots.startsWith("index") ? `<link rel="alternate" type="text/markdown" href="https://www.mycellios.com${seoMarkdownPath(page)}" data-seo-alternate="markdown">` : "";
+  html = html.replace("</head>", `${alternates}\n${markdown}\n</head>`);
 
   html = replaceRequired(html, /<title>[\s\S]*?<\/title>/i, `<title>${escapeAttribute(page.title)}</title>`, "title");
   html = replaceRequired(
@@ -152,6 +164,14 @@ function verifyDocument(path: (typeof LANDING_SEO_PATHS)[number], html: string):
       throw new Error(`Generated SEO document for ${path} is missing static page content`);
     }
   }
+  for (const section of page.staticContent?.sections ?? []) {
+    if (!staticBody.includes(`<h2>${escapeAttribute(section.title)}</h2>`)) throw new Error(`Missing static section on ${path}`);
+    for (const paragraph of section.paragraphs) if (!staticBody.includes(`<p>${escapeAttribute(paragraph)}</p>`)) throw new Error(`Missing static section body on ${path}`);
+  }
+  if (!html.includes(`<html lang="${page.language ?? "en"}">`)) throw new Error(`Wrong document language on ${path}`);
+  for (const alternate of seoLanguageLinks(page)) {
+    if (!html.includes(`hreflang="${alternate.language}" href="${escapeAttribute(alternate.href)}"`)) throw new Error(`Missing language alternate on ${path}`);
+  }
   if (countMatches(html, /<link\b[^>]*\brel=["']canonical["'][^>]*>/gi) !== 1) {
     throw new Error(`Generated SEO document for ${path} must contain exactly one canonical URL`);
   }
@@ -170,7 +190,8 @@ function verifySitemap(): void {
   const sitemap = readFileSync(join(outputRoot, "sitemap.xml"), "utf8");
   const actual = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]);
   const expected = [
-    ...INDEXABLE_SEO_PATHS.map((path) => canonicalUrl(SEO_PAGES[path])),
+    ...INDEXABLE_SEO_PATHS.map((path) => canonicalUrl(SEO_PAGES[path]!)),
+    `${canonicalUrl(SEO_PAGES["/"])}downloads/desktop`,
     `${canonicalUrl(SEO_PAGES["/"])}blog`,
   ];
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -195,8 +216,14 @@ function verifyRouteContract(): void {
 }
 
 verifyRouteContract();
-const template = readFileSync(templatePath, "utf8");
-for (const path of LANDING_SEO_PATHS) {
+for (const [path, resource] of publicSeoResources()) {
+  if (resourcesOnly && !["/llms.txt", "/llms-full.txt", "/sitemap.xml"].includes(path)) continue;
+  const destination = join(outputRoot, path.slice(1));
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, resource.body);
+}
+const template = resourcesOnly ? "" : readFileSync(templatePath, "utf8");
+for (const path of resourcesOnly ? [] : LANDING_SEO_PATHS) {
   const outputPath = join(outputRoot, routeOutputPaths[path]);
   const html = renderSeoDocument(template, path);
   mkdirSync(dirname(outputPath), { recursive: true });
@@ -205,4 +232,4 @@ for (const path of LANDING_SEO_PATHS) {
 }
 verifySitemap();
 
-console.log(`Generated and verified ${LANDING_SEO_PATHS.length} route-specific landing documents.`);
+console.log(resourcesOnly ? "Synced public search and AI reference files." : `Generated and verified ${LANDING_SEO_PATHS.length} route-specific landing documents.`);

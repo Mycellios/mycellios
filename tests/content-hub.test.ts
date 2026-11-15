@@ -158,7 +158,7 @@ describe("Content Hub blog integration", () => {
     expect(listing.body).toContain(`src="/marketing-navigation.js?v=20261104"`);
     expect(listing.body).toContain(`href="https://www.mycellios.com/agent">Agent</a>`);
     expect(listing.body).toContain(`href="/blog" aria-current="page">Journal</a>`);
-    expect(listing.body).toContain(`href="/dashboard">Stats</a>`);
+    expect(listing.body).toContain(`href="/stats">Stats</a>`);
     expect(listing.body).not.toContain(`href="/create"`);
     expect(listing.body).not.toContain(`>Login</a>`);
     expect(listing.body).toContain(`src="/assets/brand/favicon.png"`);
@@ -295,7 +295,7 @@ describe("Content Hub blog integration", () => {
     });
     expect(dynamicSitemap.statusCode).toBe(200);
     expect(dynamicSitemap.headers["content-type"]).toContain("application/xml");
-    for (const path of ["/", "/network", "/pricing", "/compare", "/spore/rewards", "/stats", "/earn", "/downloads", "/browser/", "/blog"]) {
+    for (const path of ["/", "/network", "/pricing", "/compare", "/compare/openbot", "/guides/get-started", "/es/guias/empezar", "/downloads/desktop", "/stats", "/earn", "/downloads", "/browser/", "/blog"]) {
       expect(dynamicSitemap.body).toContain(
         `<loc>https://www.mycellios.com${path}</loc>`,
       );
@@ -306,6 +306,7 @@ describe("Content Hub blog integration", () => {
     );
     expect(dynamicSitemap.body).toContain(`<lastmod>${post.updatedAt}</lastmod>`);
 
+    expect(dynamicSitemap.body).not.toContain("<loc>https://www.mycellios.com/spore/rewards</loc>");
     const fallbackPath = resolve("landing/public/sitemap.xml");
     const fallbackApp = Fastify();
     apps.push(fallbackApp);

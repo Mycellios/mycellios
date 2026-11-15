@@ -235,6 +235,7 @@ export const BotSectionName = z.string().trim().min(1).max(60);
 export const BotSectionSchema = z.object({
   id: Id,
   name: z.string(),
+  parentId: Id.nullable().optional(),
   position: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),

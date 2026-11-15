@@ -42,6 +42,10 @@ jobs:
           npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
       - name: Compile coordinator and its browser surfaces
         run: npm run build
+      - name: Qualify wallet, gateway and speech boundaries without paid inference
+        run: |
+          node node_modules/vitest/vitest.mjs run tests/managed-antseed-gateway.test.ts tests/managed-antseed-gateway-v2.test.ts tests/managed-text-stream.test.ts tests/managed-provider.test.ts tests/managed-media.test.ts tests/browser-funded-hub.test.ts tests/transcription.test.ts --maxWorkers=2 --no-file-parallelism
+          node scripts/test-referrals-postgres.mjs tests/managed-purchases.postgres.test.ts tests/referrals.postgres.test.ts tests/browser-inference.postgres.test.ts
       - name: Seal the complete native runtime with its production dependencies
         run: npm run coordinator:release:prepare -- --revision="$GITHUB_SHA"
       - name: Compile Agent without production credentials

@@ -4,6 +4,7 @@ import { i18n } from "@lingui/core";
 import { t } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { Bot, BotSection, Group, Me, Space, ThreadSnapshot } from "@rakazo/contracts";
+import { assertSidebarFolderParent, sidebarFolderTree } from "@rakazo/core";
 import {
   BotAvatar,
   Button,
@@ -13,12 +14,15 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
   GroupAvatar,
 } from "@rakazo/ui-web";
-import { ChevronDown, CircleAlert, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Check, ChevronDown, CircleAlert, Folder, FolderOpen, FolderPlus, Lock, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { IconTooltip } from "../../components/IconTooltip";
 import { RosterReplyIndicator } from "../../components/RosterReplyIndicator";
 import { RosterMessagePreview } from "../../components/RosterMessagePreview";
@@ -46,6 +50,8 @@ export function SidebarRoster({
   setSpaceMenu,
   setRenameSectionTarget,
   setDeleteSectionTarget,
+  onCreateFolder,
+  onMoveFolder,
   toggleSidebarSection,
   inGroup,
   active,
@@ -80,6 +86,8 @@ export function SidebarRoster({
   setSpaceMenu: (menu: { id: string; position: { x: number; y: number } }) => void;
   setRenameSectionTarget: (target: { section: BotSection; spaceId: string }) => void;
   setDeleteSectionTarget: (target: { section: BotSection; spaceId: string }) => void;
+  onCreateFolder: (parentId: string | null, spaceId: string) => void;
+  onMoveFolder: (section: BotSection, parentId: string | null, spaceId: string) => void;
   toggleSidebarSection: (key: string) => void;
   inGroup: boolean;
   active: Pick<Bot, "id"> | undefined;
@@ -100,7 +108,13 @@ export function SidebarRoster({
 }) {
   const { t } = useLingui();
   const { sidebarChatOrder } = useGeneralPreferences();
-  const orderedGroups = orderSidebarChats(sidebarGroups, sidebarChatOrder, t`Unread`);
+  const folderTrees = useMemo(() => {
+    const trees = new Map(spaces.map(space => [space.id, sidebarFolderTree(space.botSections)] as const));
+    if (bootstrapMe?.spaceId) trees.set(bootstrapMe.spaceId, sidebarFolderTree(botSections));
+    return trees;
+  }, [spaces, botSections, bootstrapMe?.spaceId]);
+  const allGroups = orderSidebarChats(sidebarGroups, sidebarChatOrder, t`Unread`);
+  const orderedGroups = allGroups.filter(group => mini || !group.ancestorKeys.some(key => collapsedSidebarSections.has(key)));
   return (
     <>
       {orderedGroups.map((group, groupIndex) => {
@@ -127,6 +141,13 @@ export function SidebarRoster({
               : (spaces.find((space) => space.id === group.spaceId)?.botSections ?? [])
             ).find((item) => item.id === group.sectionId)
           : undefined;
+        const folders = folderTrees.get(group.spaceId) ?? [];
+        const folderDepth = folders.find(folder => folder.id === section?.id)?.depth ?? 0;
+        const destinations = section ? [null, ...folders].filter(parent => {
+          try { assertSidebarFolderParent(folders, section.id, parent?.id ?? null); return true; } catch { return false; }
+        }) : [];
+        const unread = section ? allGroups.filter(item => item.key === group.key || item.ancestorKeys.includes(group.key))
+          .reduce((count,item) => count + item.bots.filter(row => row.chat.unread).length,0) : 0;
         return (
           <Collapsible
             key={group.key}
@@ -144,9 +165,9 @@ export function SidebarRoster({
                 data-roster-drop={rosterDropKey === headerDropKey ? "true" : undefined}
                 className={`${
                   group.title && hasSpaceActions
-                    ? "grid pt-3 pb-0.5"
-                    : `flex items-center pt-3 pb-0.5${group.title ? "" : " justify-end"}`
-                } rounded-lg ${rosterDropKey === headerDropKey ? "bg-sidebar-accent" : ""}`}
+                    ? "grid"
+                    : `flex items-center${group.title ? "" : " justify-end"}`
+                } sticky top-0 z-10 pb-0.5 ${section ? folderDepth > 0 ? "pt-0" : "pt-2" : "pt-3"} rounded-lg ${rosterDropKey === headerDropKey ? "bg-sidebar-accent" : "bg-sidebar"}`}
                 onDragOver={(event) => {
                   if (!headerDropTarget || !rosterDropAction(headerDropTarget, false)) return;
                   event.preventDefault();
@@ -170,7 +191,7 @@ export function SidebarRoster({
                       render={
                         group.emptySpaceId ? <button type="button" /> : <CollapsibleTrigger />
                       }
-                      className={`flex min-w-0 items-center gap-2 rounded-lg px-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring ${mobile ? "min-h-11 justify-start text-sm font-medium text-muted-foreground" : "justify-between py-1 text-[11px] font-semibold tracking-wider uppercase text-foreground"} ${hasSpaceActions ? "col-start-1 row-start-1 w-full" : "flex-1"}`}
+                      className={`flex min-w-0 items-center gap-2 rounded-lg px-2.5 ${mobile ? "min-h-11 justify-start text-sm font-medium text-muted-foreground" : `justify-between py-1 text-xs ${section ? "font-medium text-foreground" : "font-normal text-muted-foreground"}`} ${hasSpaceActions ? "col-start-1 row-start-1 w-full" : "flex-1"}`}
                       onClick={() => {
                         if (group.emptySpaceId) {
                           openSpaceChat(group.emptySpaceId, "/onboarding");
@@ -211,7 +232,10 @@ export function SidebarRoster({
                           </span>
                         ) : null}
                       </span>
-                      {group.emptySpaceId ? null : (
+                      {section ? <span className="ms-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
+                        {collapsed && unread > 0 ? <span className="text-[11px] tabular-nums">{unread}</span> : null}
+                        {collapsed ? <Folder size={14} aria-hidden="true" /> : <FolderOpen size={14} aria-hidden="true" />}
+                      </span> : group.emptySpaceId ? null : (
                         <ChevronDown
                           size={14}
                           strokeWidth={1.8}
@@ -227,13 +251,25 @@ export function SidebarRoster({
                         aria-label={t`Actions for ${section.name}`}
                         className="w-[220px]"
                       >
+                        <ContextMenuItem disabled={folderDepth >= 2} onClick={() => onCreateFolder(section.id, group.spaceId)}>
+                          <FolderPlus />{t`New folder inside`}
+                        </ContextMenuItem>
+                        <ContextMenuSub>
+                          <ContextMenuSubTrigger><Folder />{t`Move to`}</ContextMenuSubTrigger>
+                          <ContextMenuSubContent className="max-h-72 min-w-48 overflow-y-auto">
+                            {destinations.map(parent => <ContextMenuItem key={parent?.id ?? "root"} onClick={() => onMoveFolder(section, parent?.id ?? null, group.spaceId)}>
+                              <span>{parent?.path ?? t`Top level`}</span>
+                              {(section.parentId ?? null) === (parent?.id ?? null) ? <Check className="ms-auto" /> : null}
+                            </ContextMenuItem>)}
+                          </ContextMenuSubContent>
+                        </ContextMenuSub>
                         <ContextMenuItem
                           onClick={() =>
                             setRenameSectionTarget({ section, spaceId: group.spaceId })
                           }
                         >
                           <Pencil />
-                          {t`Rename section`}
+                          {t`Rename folder`}
                         </ContextMenuItem>
                         <ContextMenuItem
                           variant="destructive"
@@ -242,7 +278,7 @@ export function SidebarRoster({
                           }
                         >
                           <Trash2 />
-                          {t`Delete section`}
+                          {t`Delete folder`}
                         </ContextMenuItem>
                       </ContextMenuContent>
                     ) : null}
@@ -273,7 +309,7 @@ export function SidebarRoster({
               </div>
             ) : null}
             <CollapsibleContent className="flex flex-col gap-0.5">
-              {mobile && group.sectionId && group.bots.length === 0 ? (
+              {mobile && group.sectionId && group.bots.length === 0 && !allGroups.some(item => item.ancestorKeys.includes(group.key)) ? (
                 <p className="px-2.5 pb-2 text-sm text-muted-foreground">{t`No chats in this folder`}</p>
               ) : null}
               {group.bots.map((item) => {

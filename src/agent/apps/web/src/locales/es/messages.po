@@ -12891,90 +12891,168 @@ msgstr "Ahora no hay modelos de Mycellios disponibles para los Micos. Volvemos a
 msgid "Mycellios network"
 msgstr "Red Mycellios"
 
-
 msgid "General memory"
 msgstr "Memoria general"
-
 
 msgid "Your Micos in this space can use these notes. Micos set to isolated memory do not read them."
 msgstr "Tus Micos de este espacio pueden usar estas notas. Los Micos con memoria aislada no las leen."
 
-
 msgid "Task memory"
 msgstr "Memoria de la tarea"
-
 
 msgid "Mico memory"
 msgstr "Memoria del Mico"
 
-
 msgid "Always include"
 msgstr "Incluir siempre"
-
 
 msgid "Always included"
 msgstr "Se incluye siempre"
 
-
 msgid "Include when relevant"
 msgstr "Incluir cuando sea relevante"
-
 
 msgid "Local memory"
 msgstr "Memoria local"
 
-
 msgid "Automatic memory review"
 msgstr "Revisión automática de memoria"
-
 
 msgid "Learn from completed conversations in the background. Uses a model with a bounded Credit quote; otherwise waits."
 msgstr "Aprende de las conversaciones en segundo plano. Usa un modelo con presupuesto máximo en Créditos; si no está disponible, espera."
 
-
 msgid "Daily limit per space"
 msgstr "Límite diario por espacio"
-
 
 msgid "Maximum reserved Credits each day. Pending reviews count toward the limit and are never sent again."
 msgstr "Máximo de Créditos reservados cada día. Las revisiones pendientes cuentan para el límite y no se vuelven a enviar."
 
-
 msgid "No spending"
 msgstr "Sin gasto"
-
 
 msgid "Review frequency"
 msgstr "Frecuencia de revisión"
 
-
 msgid "Also reviews after 15 minutes of inactivity when there are at least three new messages from you."
 msgstr "También revisa tras 15 minutos de inactividad si hay al menos tres mensajes tuyos nuevos."
-
 
 msgid "10 turns"
 msgstr "10 turnos"
 
-
 msgid "20 turns"
 msgstr "20 turnos"
-
 
 msgid "40 turns"
 msgstr "40 turnos"
 
-
 msgid "Isolated uses only Mico and task notes. Shared also uses general notes from this space."
 msgstr "Aislada usa solo notas del Mico y de la tarea. Compartida incluye también las notas generales de este espacio."
-
 
 msgid "Reserved today"
 msgstr "Reservado hoy"
 
-
 msgid "Daily budget resets at 00:00 UTC."
 msgstr "El presupuesto diario se restablece a las 00:00 UTC."
 
-
 msgid "Pending reviews"
 msgstr "Revisiones pendientes"
+
+
+msgid "Open Mycellios Dev"
+msgstr "Abrir Mycellios Dev"
+
+msgid "Preparing Mycellios Dev…"
+msgstr "Preparando Mycellios Dev…"
+
+msgid "Could not open Mycellios Dev. Try again."
+msgstr "No se pudo abrir Mycellios Dev. Inténtalo de nuevo."
+
+msgid "Explore models"
+msgstr "Explorar modelos"
+
+msgid "No chat models available right now."
+msgstr "Sin modelos de chat disponibles ahora."
+
+msgid "New folder"
+msgstr "Nueva carpeta"
+
+msgid "New folder inside"
+msgstr "Nueva carpeta dentro"
+
+msgid "Rename folder"
+msgstr "Renombrar carpeta"
+
+msgid "Delete folder"
+msgstr "Eliminar carpeta"
+
+msgid "Could not create folder"
+msgstr "No se ha podido crear la carpeta"
+
+msgid "Could not rename folder"
+msgstr "No se ha podido renombrar la carpeta"
+
+msgid "Could not delete folder"
+msgstr "No se ha podido eliminar la carpeta"
+
+msgid "Could not move folder"
+msgstr "No se ha podido mover la carpeta"
+
+msgid "Organize your Micos in one place."
+msgstr "Organiza tus Micos en un mismo lugar."
+
+msgid "Create a folder and move {0} into it."
+msgstr "Crea una carpeta y mueve a {0} a ella."
+
+msgid "Top level"
+msgstr "Nivel principal"
+
+msgid "Location"
+msgstr "Ubicación"
+
+msgid "Its Micos, groups and subfolders are kept and moved to the parent folder, or to Unassigned."
+msgstr "Sus Micos, grupos y subcarpetas se conservan y pasan a la carpeta superior o a Sin asignar."
+
+msgid "Folders support up to three levels."
+msgstr "Puedes organizar las carpetas hasta en tres niveles."
+
+msgid "A folder cannot be moved into itself or one of its subfolders."
+msgstr "No puedes mover una carpeta dentro de sí misma ni de sus subcarpetas."
+
+msgid "Folder name already used"
+msgstr "Ya tienes una carpeta con ese nombre en este espacio."
+
+msgid "Rename conversation"
+msgstr "Renombrar conversación"
+
+msgid "Could not rename the conversation. Try again."
+msgstr "No se ha podido renombrar la conversación. Inténtalo de nuevo."
+
+msgid "Pinned messages"
+msgstr "Mensajes fijados"
+
+msgid "Pin message"
+msgstr "Fijar mensaje"
+
+msgid "Unpin message"
+msgstr "Quitar de fijados"
+
+msgid "Could not update pinned messages."
+msgstr "No se han podido actualizar los mensajes fijados."
+
+msgid "Could not load pinned messages."
+msgstr "No se han podido cargar los mensajes fijados."
+
+msgid "Pin a message from its menu to find it here."
+msgstr "Fija un mensaje desde su menú para encontrarlo aquí."
+
+msgid "You can pin up to 100 messages per conversation."
+msgstr "Puedes fijar hasta 100 mensajes por conversación."
+
+msgid "Response style"
+msgstr "Estilo de respuesta"
+
+msgid "Natural"
+msgstr "Natural"
+
+msgid "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
+msgstr "Natural indica brevemente el primer paso. Clásico va directo al resultado. Ambos responden de forma breve, salvo que pidas más detalle."

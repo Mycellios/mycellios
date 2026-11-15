@@ -276,10 +276,6 @@ export function HostedWebs({
           <header className="rk-market-heading hw-heading">
             <div>
               <h1 id="webs-title">Hifa Store</h1>
-              <p>
-                Crea con tus Micos. Abre, comparte y haz tuyas las apps de la
-                comunidad.
-              </p>
             </div>
             <div className="hw-actions"><Button onClick={create}>
               <Plus /> Crear app

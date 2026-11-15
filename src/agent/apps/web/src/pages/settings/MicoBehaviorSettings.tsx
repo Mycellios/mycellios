@@ -68,6 +68,11 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
       })}{!rows.length && <p className="px-4 py-3 text-sm text-muted-foreground">{t`No Micos in this space.`}</p>}</SettingsGroup>
       {chosen.key === "localScripts" && <LocalScriptsSettings scope={client} onBusyChange={setHostBusy} />}
     </> : <>
+      <SettingsGroup title={t`Conversation`}><SettingsRow label={t`Response style`}
+        description={t`Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail.`}
+        control={<OptionSelect aria-label={t`Response style`} value={state.defaults.responseStyle ?? "natural"} disabled={saving}
+          options={[{ value: "natural", label: t`Natural` }, { value: "classic", label: t`Classic` }]}
+          onValueChange={value => { if (value === "natural" || value === "classic") void save({ kind: "defaults", patch: { responseStyle: value } }); }} />} /></SettingsGroup>
       <SettingsGroup title={t`Local memory`}>
         {memoryUsage?<SettingsRow label={t`Reserved today`} description={t`Daily budget resets at 00:00 UTC.`}
           control={<span className="text-sm tabular-nums">{new Intl.NumberFormat(undefined,{maximumFractionDigits:6}).format(memoryUsage.reservedMicrounits/1_000_000)} {t`Credits`}{memoryUsage.pending ? ` · ${memoryUsage.pending} ${t`Pending reviews`}`:""}</span>} />:null}

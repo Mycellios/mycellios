@@ -1,3 +1,4 @@
+import { createBotFolderRepos } from "./bot-folders.js";
 import type { Actor, Bot, BotSection, MessageBlock, SpaceBot } from "@rakazo/contracts";
 import {
   canonicalPiProviderId,
@@ -171,6 +172,7 @@ export function createRepos(
       id: section.id,
       spaceId: section.spaceId,
       name: section.name,
+      parentId: section.parentId,
       position: section.position,
       createdAt: section.createdAt.toISOString(),
       updatedAt: section.updatedAt.toISOString(),
@@ -236,129 +238,7 @@ export function createRepos(
 
     listBotSectionsForSpaces,
 
-    async createBotSection(
-      actor: Actor,
-      input: { botId?: string; groupId?: string; name: string },
-    ) {
-      const { name } = input;
-      return prisma.$transaction(async (tx) => {
-        const target = input.botId
-          ? await tx.bot.findFirst({
-              where: {
-                id: input.botId,
-                spaceId: actor.spaceId,
-                userId: actor.userId,
-                archivedAt: null,
-              },
-              select: { id: true },
-            })
-          : await tx.chatGroup.findFirst({
-              where: {
-                id: input.groupId,
-                spaceId: actor.spaceId,
-                userId: actor.userId,
-                archivedAt: null,
-              },
-              select: { id: true },
-            });
-        if (!target) throw new IsolationError();
-
-        const aggregate = await tx.botSection.aggregate({
-          where: { spaceId: actor.spaceId, userId: actor.userId },
-          _max: { position: true },
-        });
-        await tx.botSection.createMany({
-          data: {
-            spaceId: actor.spaceId,
-            userId: actor.userId,
-            name,
-            position: (aggregate._max.position ?? -1) + 1,
-          },
-          skipDuplicates: true,
-        });
-        const section = await tx.botSection.findUniqueOrThrow({
-          where: {
-            spaceId_userId_name: {
-              spaceId: actor.spaceId,
-              userId: actor.userId,
-              name,
-            },
-          },
-        });
-        if (input.botId) {
-          await tx.bot.update({ where: { id: target.id }, data: { sectionId: section.id } });
-        } else {
-          await tx.chatGroup.update({
-            where: { id: target.id },
-            data: { sectionId: section.id },
-          });
-        }
-        return {
-          id: section.id,
-          name: section.name,
-          position: section.position,
-          createdAt: section.createdAt.toISOString(),
-          updatedAt: section.updatedAt.toISOString(),
-        } satisfies BotSection;
-      });
-    },
-
-    async updateBotSection(actor: Actor, input: { sectionId: string; name: string }) {
-      const existing = await prisma.botSection.findFirst({
-        where: {
-          id: input.sectionId,
-          spaceId: actor.spaceId,
-          userId: actor.userId,
-        },
-      });
-      if (!existing) throw new IsolationError();
-      if (existing.name === input.name) {
-        return {
-          id: existing.id,
-          name: existing.name,
-          position: existing.position,
-          createdAt: existing.createdAt.toISOString(),
-          updatedAt: existing.updatedAt.toISOString(),
-        } satisfies BotSection;
-      }
-      try {
-        const section = await prisma.botSection.update({
-          where: { id: existing.id },
-          data: { name: input.name },
-        });
-        return {
-          id: section.id,
-          name: section.name,
-          position: section.position,
-          createdAt: section.createdAt.toISOString(),
-          updatedAt: section.updatedAt.toISOString(),
-        } satisfies BotSection;
-      } catch (error) {
-        if (isUniqueViolation(error)) throw new BotSectionNameConflictError();
-        throw error;
-      }
-    },
-
-    /** Delete one of the actor's sections; its bots and groups stay, unsectioned (FK SetNull). */
-    async deleteBotSection(actor: Actor, input: { sectionId: string }) {
-      return prisma.$transaction(async (tx) => {
-        // The row lock blocks concurrent moves into this section until the delete commits.
-        const locked = await tx.$queryRaw<Array<{ id: string }>>`
-          SELECT id
-          FROM bot_sections
-          WHERE id = ${input.sectionId}
-            AND "spaceId" = ${actor.spaceId}
-            AND "userId" = ${actor.userId}
-          FOR UPDATE
-        `;
-        if (locked.length !== 1) throw new IsolationError();
-        const where = { sectionId: input.sectionId };
-        const releasedBots = await tx.bot.count({ where });
-        const releasedGroups = await tx.chatGroup.count({ where });
-        await tx.botSection.delete({ where: { id: input.sectionId } });
-        return { id: input.sectionId, releasedBots, releasedGroups };
-      });
-    },
+    ...createBotFolderRepos(prisma),
 
     async listBots(actor: Actor, options: { archived?: boolean } = {}): Promise<Bot[]> {
       const bots = await withNewestThreadMessages(

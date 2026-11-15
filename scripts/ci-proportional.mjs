@@ -97,6 +97,16 @@ export function planChecks(files, availableAgentTests) {
     const available = availableAgentTests ?? execFileSync('git', ['ls-files', '-z', 'src/agent'], { encoding: 'utf8' }).split('\0').filter(f => /\.test\.[jt]sx?$/.test(f)).map(f => f.slice('src/agent/'.length));
     const affected = agentAffectedTestFiles(related, available).filter(file => !tests.includes(file));
     if (affected.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...affected, '--maxWorkers', '2'], 'Agent affected tests');
+    for (const [pattern, script, label] of [
+      [/sidebar.fold|bot-folders|20261115130000_sidebar_folders/, 'verify-sidebar-folders-db.ts', 'folder migration, isolation and hierarchy'],
+      [/message-pins|20261115160000_message_pins/, 'verify-message-pins-db.ts', 'message pin migration and account/thread isolation'],
+      [/conversation-titles|routes\/development\.ts|packages\/db\/src\/messages\.ts/, 'verify-conversation-titles-db.ts', 'atomic conversation titles and ownership'],
+    ]) {
+      if (files.some(file => file.startsWith('src/agent/') && pattern.test(file)))
+        add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', `scripts/${script}`], label);
+    }
+    if (files.some(file => file.startsWith('src/agent/') && /local-memory|packages\/memory\/src|20261115180000/.test(file)))
+      add('src/agent', 'env', ['MEMORY_TEST_EPHEMERAL=1', 'node', 'scripts/verify-local-memory-db.mjs'], 'isolated memory migration, RLS and bounded review reservations');
     if (files.some(f => /^src\/agent\/(?:scripts\/verify-task-conversations|apps\/api\/src\/(?:routes\/task-inbox|task-inbox-conversations)|packages\/adapters\/src\/task-reminders|packages\/db\/prisma\/migrations\/20261115100000_task_followup)/.test(f))) {
       add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-task-conversations-route-db.ts'], 'conversation follow-up migration, reminders and RLS in isolated PostgreSQL');
     }

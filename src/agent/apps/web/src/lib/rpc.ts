@@ -1,4 +1,5 @@
 import { eventAgentContext, eventAgentSpace, withEventAgentHeaders } from "./event-demo-agent";
+import { startupFetch } from "./startup-fetch";
 import { getGeneralPreferences } from "./general-preferences";
 import { shouldRestoreSavedSpace } from "./startup-space";
 import { createORPCClient, RECURSIVE_CLIENT_UNWRAP_KEYS } from "@orpc/client";
@@ -100,7 +101,7 @@ const link = new RPCLink<RpcClientContext>({
     for (const [key, value] of Object.entries(correlation)) headers.set(key, value);
     let response: Response;
     try {
-      response = await fetch(request, {
+      response = await startupFetch(request, {
         headers,
         credentials: "include",
         // Keep cancellation attached directly to fetch rather than only a cloned Request.

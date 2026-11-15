@@ -1,0 +1,33 @@
+// @vitest-environment jsdom
+import {act} from "react";
+import {createRoot} from "react-dom/client";
+import {beforeEach,afterEach,expect,it,vi} from "vitest";
+import {OpenMycelliosDev} from "./OpenMycelliosDev";
+const state=vi.hoisted(()=>({enabled:true,open:vi.fn(),connect:vi.fn(),native:true,dev:false}));
+vi.mock("../lib/developer-mode",()=>({useDeveloperMode:()=>[state.enabled,vi.fn()]}));
+vi.mock("../lib/desktop",()=>({connectThisComputer:state.connect,desktopBridge:()=>state.native?{development:{open:state.open,isDevelopment:state.dev}}:undefined}));
+vi.mock("@lingui/react/macro",()=>({Trans:({children}:{children:string})=>children,useLingui:()=>({t:(parts:TemplateStringsArray)=>parts.join("")})}));
+let host:HTMLDivElement,root:ReturnType<typeof createRoot>;
+beforeEach(()=>{vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);vi.clearAllMocks();state.enabled=true;state.native=true;state.dev=false;state.open.mockResolvedValue({opened:true});state.connect.mockResolvedValue(undefined);host=document.createElement("div");document.body.append(host);root=createRoot(host);});
+afterEach(async()=>{await act(()=>root.unmount());host.remove();vi.unstubAllGlobals();});
+const render=()=>act(()=>root.render(<OpenMycelliosDev botId="mico"/>));
+it("is absent outside developer mode, browser-only sessions and Dev itself",async()=>{
+  state.enabled=false;await render();expect(host.querySelector("button")).toBeNull();
+  state.enabled=true;state.native=false;await render();expect(host.querySelector("button")).toBeNull();
+  state.native=true;state.dev=true;await render();expect(host.querySelector("button")).toBeNull();
+});
+it("connects the current Mico before opening the separate application",async()=>{
+  await render();await act(async()=>host.querySelector("button")!.click());
+  expect(state.connect).toHaveBeenCalledWith("mico");expect(state.open).toHaveBeenCalledWith("mico");
+  expect(state.connect.mock.invocationCallOrder[0]).toBeLessThan(state.open.mock.invocationCallOrder[0]!);
+});
+it("does not open Dev when local computer consent is denied",async()=>{
+  state.connect.mockRejectedValue(Error("Permission denied"));await render();await act(async()=>host.querySelector("button")!.click());
+  expect(state.open).not.toHaveBeenCalled();expect(host.querySelector('[role="alert"]')?.textContent).toBe("Permission denied");
+});
+it("coalesces clicks while preparing and displays a startup failure",async()=>{
+  let finish!:(value:{opened:boolean;error:string})=>void;state.open.mockReturnValue(new Promise(resolve=>{finish=resolve;}));
+  await render();await act(async()=>{host.querySelector("button")!.click();host.querySelector("button")!.click();});
+  expect(state.open).toHaveBeenCalledTimes(1);expect(host.querySelector("button")?.disabled).toBe(true);
+  await act(()=>finish({opened:false,error:"Could not start"}));expect(host.querySelector('[role="alert"]')?.textContent).toBe("Could not start");expect(host.querySelector("button")?.disabled).toBe(false);
+});

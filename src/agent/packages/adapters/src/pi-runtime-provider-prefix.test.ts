@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import type { ConnectorTool } from "@rakazo/adapter-kit";
 import sharp from "sharp";
 import { describe, expect, it, vi } from "vitest";
-import { userTurnInstructions } from "./executor.js";
+import { longWorkProgressGuidance, userTurnInstructions } from "./executor.js";
+import { CONVERSATION_STYLE } from "./conversation-style.js";
 import { PiAgentRuntime, resolveRuntimeModel } from "./pi-runtime.js";
 
 describe("Pi outgoing provider prefixes", () => {
@@ -119,7 +120,7 @@ describe("Pi outgoing provider prefixes", () => {
           threadId: "thread-fixture",
           runId: "run-clamped-output",
           prompt: "Continue",
-          instructions: "Answer briefly.",
+          instructions: `Answer briefly.\n\n${longWorkProgressGuidance()}`,
           history: [{ role: "user", content: historyContent }],
           tools: [],
           model: {
@@ -139,6 +140,10 @@ describe("Pi outgoing provider prefixes", () => {
       expect(requests).toHaveLength(1);
       expect(requests[0]!.max_completion_tokens ?? requests[0]!.max_tokens).toBe(8192);
       expect(JSON.stringify(requests[0]!.messages)).toContain(historyContent);
+      expect(JSON.stringify(requests[0]!.messages)).toContain(CONVERSATION_STYLE.replaceAll("\n", "\\n"));
+      expect(JSON.stringify(requests[0]!.messages)).toContain("Do not send updates merely because time has passed.");
+      expect(JSON.stringify(requests[0]!.messages)).toContain("Do not repeat the investigation or progress log.");
+      expect(JSON.stringify(requests[0]!.messages)).not.toContain("after roughly a minute");
     } finally {
       server.close();
       server.closeAllConnections();

@@ -1,0 +1,53 @@
+.mycellios-reference .contribution-entry {
+  --contribution-ink: var(--assembly-ink);
+  --contribution-muted: var(--assembly-muted);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(40px, 6vw, 88px);
+  padding-block: 88px;
+  color: var(--contribution-ink);
+}
+.mycellios-reference .contribution-entry h2 { margin: 0; font-size: clamp(36px, 4vw, 56px); font-weight: 500; line-height: 1.06; letter-spacing: -.035em; }
+.mycellios-reference .contribution-entry-copy > p { max-width: 40ch; margin: 20px 0 0; font-size: 18px; line-height: 1.55; }
+.mycellios-reference .contribution-entry-visual { margin: 24px 0 0; }
+.mycellios-reference .contribution-entry-visual img { display: block; width: 100%; height: auto; border-radius: 12px; mix-blend-mode: multiply; }
+.mycellios-reference .contribution-entry-visual figcaption { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 14px; color: var(--contribution-muted); font-size: 13px; }
+.mycellios-reference .contribution-entry-visual figcaption span:last-child { color: var(--contribution-ink); }
+.mycellios-reference .contribution-entry-copy > .contribution-entry-note { margin-top: 24px; color: var(--contribution-muted); font-size: 14px; line-height: 1.6; }
+.mycellios-reference .contribution-entry-learn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 4px; font-size: 14px; }
+.mycellios-reference .contribution-entry-setup { min-width: 0; padding: clamp(22px, 2.8vw, 32px); background: var(--assembly-stone); border-radius: 16px; }
+.mycellios-reference .contribution-entry-modes { display: flex; gap: 4px; margin-bottom: 26px; }
+.mycellios-reference .contribution-entry .contribution-entry-modes > button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; gap: 8px; padding-inline: 14px; font-size: 14px; font-weight: 400; border: 0; box-shadow: none; }
+.mycellios-reference .contribution-entry .contribution-entry-modes > button[aria-pressed="false"] { background: transparent; color: var(--contribution-ink); }
+.mycellios-reference .contribution-entry .contribution-entry-modes > button[aria-pressed="true"] { background: var(--contribution-ink); color: var(--assembly-paper); }
+.mycellios-reference .contribution-entry h3 { margin: 0; font-size: 26px; font-weight: 500; line-height: 1.2; letter-spacing: -.025em; }
+.mycellios-reference .contribution-entry-instructions > p { margin: 10px 0 22px; color: var(--contribution-muted); font-size: 15px; line-height: 1.6; }
+.mycellios-reference .contribution-entry-connect { display: inline-flex; justify-content: center; gap: 12px; width: 100%; min-height: 48px; border: 0; box-shadow: none; }
+.mycellios-reference .contribution-entry-steps { margin-top: 10px; }
+.mycellios-reference .contribution-entry-steps > summary { display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0; font-size: 14px; list-style: none; }
+.mycellios-reference .contribution-entry-steps > summary::-webkit-details-marker { display: none; }
+.mycellios-reference .contribution-entry-steps[open] > summary svg { transform: rotate(180deg); }
+.mycellios-reference .contribution-entry-steps ol { display: grid; gap: 8px; margin: 0 0 16px; padding-left: 20px; color: var(--contribution-muted); font-size: 14px; line-height: 1.55; }
+.mycellios-reference .contribution-entry-setup > .contribution-entry-consent { display: block; margin-top: 0; color: var(--contribution-muted); font-size: 12px; line-height: 1.6; }
+.mycellios-reference .contribution-terminal { margin-top: 24px; padding: 18px; border-radius: 12px; background: var(--contribution-ink); color: #f5f6ed; }
+.mycellios-reference .contribution-terminal header { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; }
+.mycellios-reference .contribution-terminal header > span:first-child { display: inline-flex; gap: 8px; align-items: center; }
+.mycellios-reference .contribution-terminal header > span:last-child { color: #b9c6b5; font-size: 11px; }
+.mycellios-reference .contribution-terminal-platforms { display: flex; flex-wrap: wrap; gap: 4px; margin: 14px 0 12px; }
+.mycellios-reference .contribution-entry .contribution-terminal-platforms > button { min-height: 44px; padding: 0 10px; background: transparent; color: #b9c6b5; font-size: 12px; font-weight: 400; border: 0; box-shadow: none; }
+.mycellios-reference .contribution-entry .contribution-terminal-platforms > button[aria-pressed="true"] { background: #354438; color: #f5f6ed; }
+.mycellios-reference .contribution-terminal-code { display: flex; align-items: flex-start; gap: 4px; padding-top: 12px; border-top: 1px solid #415044; }
+.mycellios-reference .contribution-terminal-code pre { flex: 1; min-width: 0; margin: 0; padding-block: 8px; background: transparent; color: #d0e7b9; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.8; }
+.mycellios-reference .contribution-terminal-code code { font: inherit; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.mycellios-reference .contribution-entry .contribution-terminal-code > button { flex: 0 0 44px; min-height: 44px; padding: 0; color: #f5f6ed; background: transparent; border: 0; box-shadow: none; }
+.mycellios-reference .contribution-entry .contribution-terminal-code > button:hover { background: #354438; }
+.mycellios-reference .contribution-terminal .contribution-terminal-status { display: block; margin-top: 12px; color: #b9c6b5; font-size: 11px; line-height: 1.6; }
+.mycellios-reference .contribution-terminal-next { display: block; margin-top: 12px; color: var(--contribution-muted); font-size: 12px; line-height: 1.65; }
+.mycellios-reference .contribution-terminal-next a { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 760px) {
+  .mycellios-reference .contribution-entry { grid-template-columns: 1fr; gap: 28px; padding-block: 64px; }
+  .mycellios-reference .contribution-entry-copy > p { font-size: 17px; }
+  .mycellios-reference .contribution-entry-visual { max-width: 480px; }
+  .mycellios-reference .contribution-entry-modes > button { flex: 1; }
+}

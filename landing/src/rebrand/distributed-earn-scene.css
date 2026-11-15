@@ -1,0 +1,35 @@
+.mycellios-reference .distributed-earn-scene { --mesh-paper:#f6f3e9; --mesh-muted:#b6c4b9; --mesh-gold:#ddbd72; margin-top:52px; padding:76px 0 20px; overflow:hidden; background:#14251d; color:var(--mesh-paper); }
+.mycellios-reference .distributed-earn-intro { position:relative; z-index:1; text-align:center; }
+.mycellios-reference .distributed-earn-intro h2 { margin:0; color:var(--mesh-paper); font-size:clamp(38px,4.3vw,62px); font-weight:500; line-height:1.08; letter-spacing:-.035em; }
+.mycellios-reference .distributed-earn-intro h2 > span { color:var(--mesh-gold); }
+.mycellios-reference .distributed-earn-intro > p { max-width:600px; margin:22px auto 0; color:var(--mesh-muted); font-size:17px; line-height:1.6; text-wrap:pretty; }
+.mycellios-reference .distributed-earn-connect.ui-link { display:inline-flex; align-items:center; gap:10px; min-height:44px; margin-top:14px; color:var(--mesh-paper); font-size:14px; text-decoration:none !important; }
+.mycellios-reference .distributed-earn-connect:hover { color:var(--mesh-gold); }
+.mycellios-reference .distributed-earn-art { margin:10px 0 0; }
+.distributed-earn-mesh { position:relative; width:min(1420px,100%); height:530px; margin:auto; }
+.distributed-earn-edges { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.distributed-earn-edges path { fill:none; stroke:#91a392; stroke-width:1; stroke-opacity:.28; stroke-linecap:round; stroke-dasharray:2 7; vector-effect:non-scaling-stroke; }
+.distributed-earn-edges path[data-credit="true"] { stroke:var(--mesh-gold); stroke-opacity:.7; stroke-dasharray:1 6; }
+.distributed-earn-node { position:absolute; display:block; width:var(--node-size); height:var(--node-size); translate:-50% -50%; }
+.mycellios-reference .distributed-earn-node .mico-avatar { width:var(--node-size); height:var(--node-size); }
+.distributed-earn-device, .distributed-earn-credit { position:absolute; display:grid; place-items:center; right:-7px; top:-3px; width:22px; height:22px; border-radius:50%; background:#263d2e; color:#cbd9ca; }
+.distributed-earn-credit { right:-13px; top:auto; bottom:-7px; width:24px; height:24px; background:#ddbd72; color:#243620; }
+.mycellios-reference .distributed-earn-art figcaption { display:flex; align-items:center; justify-content:space-between; gap:20px; color:var(--mesh-muted); font-size:11px; line-height:1.6; }
+:root[data-mycellios-design] .mycellios-reference .distributed-earn-art .distributed-earn-motion.ui-button { display:grid; place-items:center; flex:0 0 44px; width:44px; min-height:44px; padding:0; color:var(--mesh-paper); background:transparent; border:0; }
+.distributed-earn-scene[data-ambient-running="false"] :is(.distributed-earn-edges path,.distributed-earn-credit) { animation-play-state:paused; }
+@media(prefers-reduced-motion:no-preference) {
+  .distributed-earn-edges path[data-credit="true"] { animation:distributed-earn-flow 6s linear infinite; animation-delay:var(--edge-delay); }
+  .distributed-earn-credit { animation:distributed-earn-float 4s ease-in-out infinite alternate; animation-delay:var(--coin-delay); }
+}
+@keyframes distributed-earn-flow { to { stroke-dashoffset:-70; } }
+@keyframes distributed-earn-float { to { transform:translateY(-3px); } }
+@media(max-width:760px) {
+  .mycellios-reference .distributed-earn-scene { margin-top:28px; padding-top:56px; }
+  .mycellios-reference .distributed-earn-intro > p { font-size:15px; }
+  .distributed-earn-mesh { width:calc(100% - 32px); height:430px; }
+  .distributed-earn-node[data-mobile="false"], .distributed-earn-edges path[data-mobile="false"] { display:none; }
+  .mycellios-reference .distributed-earn-node .mico-avatar, .distributed-earn-node { width:32px; height:32px; }
+  .distributed-earn-device { width:18px; height:18px; }
+  .distributed-earn-credit { right:-12px; }
+}
+@media(prefers-reduced-motion:reduce) { .distributed-earn-motion { display:none !important; } }

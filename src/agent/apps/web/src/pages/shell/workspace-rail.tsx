@@ -20,7 +20,6 @@ import {
   Pin,
   Settings,
   SquareKanban,
-  Store,
   Waypoints,
   Workflow,
 } from "lucide-react";
@@ -38,6 +37,9 @@ import { WindowChrome } from "../WindowChrome";
 import { ProviderQuota } from "../../components/ProviderQuota";
 import { HelpMenu } from "../../components/HelpMenu";
 import { ServerConnections } from "../../components/ServerConnections";
+import { hifaStoreEnabled } from "../../lib/hifa-store";
+import { routinesAvailable } from "../../lib/routines-availability";
+import { workflowsAvailable } from "../../lib/workflows-availability";
 
 type WorkspaceRailProps = {
   scope: string;
@@ -73,6 +75,7 @@ export function WorkspaceRail(props: WorkspaceRailProps) {
 
 function WorkspaceRailContent(props: WorkspaceRailProps) {
   const { t } = useLingui();
+  const storeAvailable = hifaStoreEnabled();
   const desktop = desktopBridge();
   const [pins, setPins] = useState(() => readRailPins(props.scope));
   const [menuOpen, setMenuOpen] = useState(false);
@@ -93,6 +96,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
     action: () => void;
     current?: boolean;
     extra?: boolean;
+    unavailable?: boolean;
   }[] = [
     ...(props.onRoutines
       ? [
@@ -102,6 +106,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             icon: Workflow,
             action: props.onRoutines,
             current: props.routines,
+            unavailable: !routinesAvailable(),
           },
         ]
       : []),
@@ -113,6 +118,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             icon: Waypoints,
             action: props.onWorkflows,
             current: props.workflows,
+            unavailable: !workflowsAvailable(),
           },
         ]
       : []),
@@ -148,14 +154,6 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
       extra: true,
     },
     { id: "files", label: t`Library`, icon: Archive, action: props.onArtifacts, current: props.library, extra: true },
-    {
-      id: "marketplace",
-      label: t`Marketplace`,
-      icon: Store,
-      action: props.onIntegrations,
-      current: props.marketplace,
-      extra: true,
-    },
     ...(props.onBoard
       ? [
           {
@@ -197,28 +195,14 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             size="icon"
             className="app-no-drag rk-rail-button"
             aria-label={t`Micos`}
-            aria-current={(props.onApps && props.apps) || pages.some((page) => page.current) ? undefined : "page"}
+            aria-current={(props.onApps && props.apps) || props.marketplace || pages.some((page) => page.current) ? undefined : "page"}
             onClick={props.onChats}
           >
             <Bot size={19} strokeWidth={1.6} aria-hidden="true" />
           </Button>
         </IconTooltip>
-        {props.onApps ? (
-          <IconTooltip label="Hifa Store">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="app-no-drag rk-rail-button"
-              aria-label="Hifa Store"
-              aria-current={props.apps ? "page" : undefined}
-              onClick={props.onApps}
-            >
-              <LayoutGrid size={19} strokeWidth={1.6} aria-hidden="true" />
-            </Button>
-          </IconTooltip>
-        ) : null}
         {pages
-          .filter((page) => pins.includes(page.id))
+          .filter((page) => page.id === "tasks" && pins.includes(page.id))
           .map(({ id, label, icon: Icon, action, current }) => (
             <IconTooltip key={id} label={label}>
               <Button
@@ -228,6 +212,42 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
                 aria-label={label}
                 aria-current={current ? "page" : undefined}
                 onClick={action}
+              >
+                <Icon size={19} strokeWidth={1.6} aria-hidden="true" />
+              </Button>
+            </IconTooltip>
+          ))}
+        {props.onApps ? (
+          <IconTooltip label={storeAvailable ? "Hifa Store" : `Hifa Store · ${t`Coming soon`}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="app-no-drag rk-rail-button"
+              aria-label="Hifa Store"
+              aria-disabled={!storeAvailable || undefined}
+              title={storeAvailable ? "Hifa Store" : `Hifa Store · ${t`Coming soon`}`}
+              style={!storeAvailable ? { opacity: 0.5, cursor: "default" } : undefined}
+              aria-current={props.apps ? "page" : undefined}
+              onClick={storeAvailable ? props.onApps : undefined}
+            >
+              <LayoutGrid size={19} strokeWidth={1.6} aria-hidden="true" />
+            </Button>
+          </IconTooltip>
+        ) : null}
+        {pages
+          .filter((page) => page.id !== "tasks" && pins.includes(page.id))
+          .map(({ id, label, icon: Icon, action, current, unavailable }) => (
+            <IconTooltip key={id} label={unavailable ? `${label} · ${t`Coming soon`}` : label}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="app-no-drag rk-rail-button"
+                aria-label={label}
+                aria-disabled={unavailable || undefined}
+                title={unavailable ? `${label} · ${t`Coming soon`}` : label}
+                style={unavailable ? { opacity: 0.5, cursor: "default" } : undefined}
+                aria-current={current ? "page" : undefined}
+                onClick={unavailable ? undefined : action}
               >
                 <Icon size={19} strokeWidth={1.6} aria-hidden="true" />
               </Button>
@@ -249,7 +269,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             aria-label={t`More`}
             aria-current={
               pages.some(
-                (page) => page.id !== "marketplace" && page.current && !pins.includes(page.id),
+                (page) => page.current && !pins.includes(page.id),
               )
                 ? "page"
                 : undefined
@@ -265,7 +285,7 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
             className="app-no-drag rk-rail-more-menu"
             aria-label={t`More`}
           >
-            {pages.map(({ id, label, icon: Icon, action, current, extra }, index) => (
+            {pages.map(({ id, label, icon: Icon, action, current, extra, unavailable }, index) => (
               <div key={id} role="none">
                 {extra && !pages[index - 1]?.extra ? <DropdownMenuSeparator /> : null}
                 <div
@@ -273,9 +293,10 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
                   className="rk-rail-more-row"
                   data-pinned={pins.includes(id) ? "" : undefined}
                 >
-                  <DropdownMenuItem onClick={action} aria-current={current ? "page" : undefined}>
+                  <DropdownMenuItem disabled={unavailable} onClick={unavailable ? undefined : action} aria-current={current ? "page" : undefined}>
                     <Icon size={16} strokeWidth={1.6} aria-hidden="true" />
-                    <span>{label}</span>
+                    <span className="whitespace-nowrap">{label}</span>
+                    {unavailable ? <span className="ms-auto whitespace-nowrap text-xs font-normal text-muted-foreground">{t`Coming soon`}</span> : null}
                   </DropdownMenuItem>
                   <DropdownMenuCheckboxItem
                     className="rk-rail-more-pin"
@@ -295,20 +316,6 @@ function WorkspaceRailContent(props: WorkspaceRailProps) {
       </div>
       <div className="mt-auto flex flex-col items-center gap-1 pb-2">
         {props.onModels ? <ProviderQuota scope={props.scope} onModels={props.onModels} onUsage={props.onUsage} /> : null}
-        {!pins.includes("marketplace") ? (
-          <IconTooltip label={t`Marketplace`}>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="app-no-drag rk-rail-button"
-              aria-label={t`Marketplace`}
-              aria-current={props.marketplace ? "page" : undefined}
-              onClick={props.onIntegrations}
-            >
-              <Store size={19} strokeWidth={1.6} />
-            </Button>
-          </IconTooltip>
-        ) : null}
         <HelpMenu onWhatsNew={props.onWhatsNew ?? props.onSettings} />
         <IconTooltip label={t`Settings`}>
           <Button
