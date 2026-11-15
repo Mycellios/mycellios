@@ -260,6 +260,11 @@ These rules apply to the complete repository.
 
 ## Execution route admission
 
+- An initial `no_feasible_runtime_pipeline` rejection uses bounded activation
+  recovery with fresh verified topology. Preserve exhausted-attempt limits and
+  all planner constraints; the error alone does not identify memory or link
+  failure and must not authorize looser admission.
+
 - Session affinity must be revalidated and rescored from current worker capacity,
   exact deployments and measured forward/return links. Cached scores are not
   current capacity evidence. Respect disabled pipeline dispatch on cached routes.
