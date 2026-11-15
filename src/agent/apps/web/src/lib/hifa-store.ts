@@ -1,4 +1,4 @@
-/** Temporary launch gate. Preserve the Store implementation for explicit reactivation. */
+/** Store launch default; an operator may still explicitly pause it. */
 export function hifaStoreEnabled(): boolean {
-  return import.meta.env.VITE_MYCELLIOS_HIFA_STORE === "true";
+  return import.meta.env.VITE_MYCELLIOS_HIFA_STORE !== "false";
 }

@@ -121,11 +121,13 @@
   fixtures; a fake provider verifies delivery, not a live model's compliance.
 
 - The Hifa Store library unifies hosted static apps and fixed Desktop app launchers.
-  The Store is temporarily paused by default: only `VITE_MYCELLIOS_HIFA_STORE=true`
-  reactivates it. Keep its navigation visible with Coming soon, disable entry
-  actions and render the same placeholder for direct Store links without mounting
-  HostedWebs or opening the legacy Studio overlay. Preserve the apps and independent
-  Integrations/Micos/Skills sections. Verify hifa-store and MarketplaceWorkspace tests.
+  Hifa Store is available by default for the independent app launch.
+  `VITE_MYCELLIOS_HIFA_STORE=false` explicitly pauses it, retaining the disabled
+  navigation and direct-link placeholder without mounting HostedWebs. Preserve
+  independent Integrations/Micos/Skills sections and the separate paused routine
+  and workflow gates. New app implementations ship as independent static bundles,
+  outside the host repository, through the existing owner-scoped publication API.
+  Verify hifa-store and MarketplaceWorkspace tests.
   Routines UI is also paused by default; `VITE_MYCELLIOS_ROUTINES=true` explicitly
   reactivates it. Keep rail/overflow entries visible with Coming soon, and gate
   direct routine links/editors before mounting them. The computer panel shows the
