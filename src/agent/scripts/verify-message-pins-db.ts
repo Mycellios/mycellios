@@ -35,7 +35,9 @@ try{
   await system.message.create({data:{id:"first",threadId:thread.id,seq:0,role:"user",blocks:[{kind:"text",text:"Mensaje importante"}]}});
   await system.message.create({data:{id:"other",threadId:bot.thread!.id,seq:0,role:"bot",blocks:[{kind:"text",text:"Otro chat"}]}});
   const sql=await db.pool.connect();
-  try{await sql.query('DROP TABLE message_pins; DROP INDEX "threads_id_spaceId_userId_key"; DROP INDEX "messages_id_threadId_key"');await sql.query(await readFile("packages/db/prisma/migrations/20261115160000_message_pins/migration.sql","utf8"));}finally{sql.release();}
+  // The current baseline already has memory's independently owned thread key.
+  // Remove only the pin-owned objects; preserve memory foreign-key dependencies.
+  try{await sql.query('DROP TABLE message_pins; DROP INDEX IF EXISTS "threads_id_spaceId_userId_key"; DROP INDEX "messages_id_threadId_key"');await sql.query(await readFile("packages/db/prisma/migrations/20261115160000_message_pins/migration.sql","utf8"));}finally{sql.release();}
   assert.equal(await system.message.count(),2);
   const handler={handler:(fn:unknown)=>fn};
   const routes=messagePinRoutes({deps:{prisma},authed:{threads:{pinned:handler,setPin:handler}}} as never);
