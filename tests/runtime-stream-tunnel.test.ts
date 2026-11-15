@@ -1,5 +1,6 @@
 import { createServer, connect, type AddressInfo, type Socket } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
+import { createDirectSessionGrant } from "../src/transport/direct-secure-channel.js";
 import type { PythonPipelineLaunchDescription } from "../src/distribution/python-launcher.js";
 import {
   RuntimeStreamTunnel,
@@ -7,6 +8,51 @@ import {
 } from "../src/worker/runtime-stream-tunnel.js";
 
 const cleanup: Array<() => Promise<void>> = [];
+
+it("isolates a root API from an occupied local port while retaining logical authorization", async () => {
+  let unrelatedConnections = 0;
+  const unrelated = createServer((socket) => { unrelatedConnections++; socket.destroy(); });
+  await listen(unrelated);
+  cleanup.push(() => closeServer(unrelated));
+  const logicalPort = (unrelated.address() as AddressInfo).port;
+  const sent: Array<{ type: string; payload: unknown }> = [];
+  const tunnel = new RuntimeStreamTunnel("root-node", (type, payload) => { sent.push({ type, payload }); }, {
+    directTransport: { enabled: true, listenHost: "127.0.0.1", candidateHosts: ["127.0.0.1"] },
+  });
+  cleanup.push(() => tunnel.close());
+  await tunnel.startDirectTransport();
+  const description = launchDescription(19_850);
+  const root = description.launchOrder.find((process) => process.kind === "root-engine")!;
+  root.apiEndpoint.port = logicalPort;
+  root.command.args.push("--port", String(logicalPort));
+  await tunnel.prepare(description);
+  const rewritten = tunnel.rewriteProcess(root);
+  const localPort = Number(flag(rewritten.command.args, "--port"));
+  expect(localPort).not.toBe(logicalPort);
+  expect(root.apiEndpoint.port).toBe(logicalPort);
+  const received: Buffer[] = [];
+  const api = createServer((socket) => socket.on("data", (data) => received.push(Buffer.from(data))));
+  await new Promise<void>((resolve, reject) => { api.once("error", reject); api.listen(localPort, "127.0.0.1", resolve); });
+  cleanup.push(() => closeServer(api));
+  const grant = createDirectSessionGrant({ connectionId: "mapped-api", sourceNodeId: "stage-node",
+    destinationNodeId: "root-node", targetPort: logicalPort, expiresAt: Date.now() + 60_000 });
+  await tunnel.handle({ type: "runtime.direct.offer", payload: { streamId: "mapped-api", grant } });
+  expect(sent).toContainEqual({ type: "runtime.direct.fallback", payload: {
+    streamId: "mapped-api", connectionId: "mapped-api", reason: "direct_target_not_authorized",
+  } });
+  await tunnel.handle({ type: "runtime.stream.open", payload: { streamId: "mapped-api", targetPort: logicalPort } });
+  await tunnel.handle({ type: "runtime.stream.data", payload: { streamId: "mapped-api", sequence: 0,
+    data: Buffer.from("native-api").toString("base64") } });
+  await waitUntil(() => received.length > 0);
+  expect(Buffer.concat(received).toString()).toBe("native-api");
+  expect(unrelatedConnections).toBe(0);
+  expect(unrelated.listening).toBe(true);
+  await tunnel.reset();
+  await tunnel.handle({ type: "runtime.stream.open", payload: { streamId: "revoked", targetPort: logicalPort } });
+  expect(sent).toContainEqual({ type: "runtime.stream.error", payload: {
+    streamId: "revoked", message: `runtime_stream_target_is_not_authorized:${logicalPort}`,
+  } });
+});
 
 afterEach(async () => {
   await Promise.all(cleanup.splice(0).map((close) => close()));

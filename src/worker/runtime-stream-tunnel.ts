@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createServer, type AddressInfo, type Server, type Socket } from "node:net";
-import { connectPreparedLoopback } from "./loopback-connect.js";
+import { availableRuntimeApiPort, connectPreparedLoopback, listenLoopback } from "./loopback-connect.js";
 import { MAX_RUNTIME_STREAM_CHUNK_BYTES } from "../contracts/worker-protocol.js";
 import type {
   PythonLaunchProcess,
@@ -206,6 +206,7 @@ export class RuntimeStreamTunnel {
     recovery: { generation: number; recoveryToken: string } | undefined;
   }>();
   private readonly allowedTargetPorts = new Set<number>();
+  private readonly localApiPorts = new Map<number, number>();
   private readonly rewrites = new Map<string, CommandRewrite>();
   private readonly maxReplayBytes: number;
   private readonly replayHighWaterBytes: number;
@@ -239,7 +240,9 @@ export class RuntimeStreamTunnel {
       nodeId,
       {
         send: (type, payload) => this.sendEnvelope(type, payload),
-        isTargetPortAuthorized: (targetPort) => this.allowedTargetPorts.has(targetPort),
+        // Remapped APIs use the existing authenticated relay; a direct grant
+        // must never reach the unrelated service on the original local port.
+        isTargetPortAuthorized: (targetPort) => this.allowedTargetPorts.has(targetPort) && !this.localApiPorts.has(targetPort),
         onSourceCommitted: (streamId) => {
           const session = this.sessions.get(streamId);
           if (!session || session.transportMode !== "negotiating") return;
@@ -283,6 +286,12 @@ export class RuntimeStreamTunnel {
       if (process.kind === "root-engine") {
         this.allowedTargetPorts.add(process.apiEndpoint.port);
         this.allowedTargetPorts.add(process.returnEndpoint.port);
+        const apiPort = await availableRuntimeApiPort(process.apiEndpoint.port);
+        if (apiPort !== process.apiEndpoint.port) {
+          if (apiPort === process.anchor.endpoint.port || apiPort === process.returnEndpoint.port) throw new Error("runtime_api_port_conflicts_with_stage");
+          this.localApiPorts.set(process.apiEndpoint.port, apiPort);
+          values.set("--port", String(apiPort));
+        }
         values.set("--host", LOOPBACK);
         if (process.firstRemoteStage) {
           const firstStage = await this.createEgressProxy(
@@ -543,6 +552,7 @@ export class RuntimeStreamTunnel {
     this.proxyServers.clear();
     await Promise.all(servers.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
     this.allowedTargetPorts.clear();
+    this.localApiPorts.clear();
     this.rewrites.clear();
   }
 
@@ -616,7 +626,7 @@ export class RuntimeStreamTunnel {
     this.pendingIncoming.set(streamId, pending);
     pending.finished = (async () => {
       try {
-        const socket = await connectPreparedLoopback(targetPort, CONNECT_TIMEOUT_MS,
+        const socket = await connectPreparedLoopback(this.localApiPorts.get(targetPort) ?? targetPort, CONNECT_TIMEOUT_MS,
           pending.controller.signal, () => this.allowedTargetPorts.has(targetPort));
         if (pending.controller.signal.aborted || !this.allowedTargetPorts.has(targetPort)) {
           socket.destroy(); return;
@@ -1252,22 +1262,6 @@ function replaceFlagValue(args: string[], flag: string, value: string): void {
   const index = args.indexOf(flag);
   if (index < 0 || index + 1 >= args.length) throw new Error(`runtime_command_flag_is_missing:${flag}`);
   args[index + 1] = value;
-}
-
-function listenLoopback(server: Server): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const fail = (error: Error) => {
-      server.off("listening", ready);
-      reject(error);
-    };
-    const ready = () => {
-      server.off("error", fail);
-      resolve();
-    };
-    server.once("error", fail);
-    server.once("listening", ready);
-    server.listen(0, LOOPBACK);
-  });
 }
 
 function shortNodeId(nodeId: string): string {

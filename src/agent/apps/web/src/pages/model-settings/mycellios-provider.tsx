@@ -60,6 +60,9 @@ export function MycelliosProvider({
           {accountUnavailable ? <Trans>You are signed in. This installation does not yet have access to Mycellios credits.</Trans> : <Trans>Use models with your Mycellios credits. No API key needed.</Trans>}
         </p>
         <p className="mt-1 text-xs text-muted-foreground"><Trans>External models include the 4% Mycellios service fee in the displayed price.</Trans></p>
+        <a href="https://www.mycellios.com/network" target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm underline underline-offset-4">
+          <Trans>View network status</Trans>
+        </a>
         {!connected && !accountUnavailable ? (
           <Button
             type="button"
