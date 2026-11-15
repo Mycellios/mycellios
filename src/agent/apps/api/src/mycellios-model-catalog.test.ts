@@ -2,6 +2,39 @@ import { describe, expect, it, vi } from "vitest";
 import { readMycelliosChatModels } from "./mycellios-model-catalog.js";
 
 describe("Mycellios account chat catalog", () => {
+  it("refreshes expired owned metadata once and rereads enabled models without admitting inventory", async () => {
+    const pricing = { currency: "credits", unit: "token", serviceFeeBasisPoints: 400, input: "0.000001", output: "0.000002" };
+    const model = { id: "mycellios/managed/antseed/gpt-4o-mini", modality: "text", processing: "external", pricing };
+    const transport = vi.fn()
+      .mockResolvedValueOnce(Response.json({ data: [{ ...model, available: false, reason: "ready" }] }))
+      .mockResolvedValueOnce(Response.json({ data: [{ id: "must-not-admit-inventory", available: true }] }))
+      .mockResolvedValueOnce(Response.json({ data: [{ ...model, available: true }] }));
+    const result = await readMycelliosChatModels("owned-key", { fetch: transport, credentialId: "owned" });
+    expect(result.map(m => m.id)).toEqual([model.id]);
+    expect(result[0]?.credentialIds).toEqual(["owned"]);
+    expect(transport.mock.calls.map(([url]) => String(url))).toEqual([
+      "https://www.mycellios.com/v1/models", "https://www.mycellios.com/v1/managed/catalog", "https://www.mycellios.com/v1/models",
+    ]);
+    for (const [, init] of transport.mock.calls) {
+      expect(init).toMatchObject({ method: "GET", redirect: "error", cache: "no-store" });
+      expect(new Headers(init.headers).get("authorization")).toBe("Bearer owned-key");
+    }
+  });
+  it("keeps native capacity and refuses expired external prices when metadata refresh fails", async () => {
+    const transport = vi.fn().mockResolvedValueOnce(Response.json({ data: [
+      { id: "native-chat", processing: "network", x_replicas: 1, x_pipelines: 0 },
+      { id: "mycellios/managed/antseed/expired", processing: "external", available: false, reason: "ready" },
+    ] })).mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+    expect((await readMycelliosChatModels("owned-key", { fetch: transport })).map(m => m.id)).toEqual(["native-chat"]);
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+  it("does not refresh or enable services excluded by their cost contract", async () => {
+    const transport = vi.fn(async () => Response.json({ data: [
+      { id: "mycellios/managed/antseed/unqualified", processing: "external", available: false, reason: "cost_contract_not_qualified" },
+    ] }));
+    expect(await readMycelliosChatModels("owned-key", { fetch: transport })).toEqual([]);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
   it("puts available distributed models before AntSeed, regardless of the upstream order", async () => {
     const entries = await readMycelliosChatModels("fixture", { fetch: vi.fn(async () => Response.json({ data: [
       { id: "mycellios/managed/antseed/deepseek-v4-flash", name: "DeepSeek", modality: "text", processing: "external", task: "chat",
