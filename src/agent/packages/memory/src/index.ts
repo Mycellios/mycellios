@@ -1,3 +1,4 @@
+import { rankLocalMemories, localMemorySnippet } from "@rakazo/core";
 import type {
   AdapterContext,
   MemoryCommitRequest,
@@ -29,13 +30,7 @@ export class MarkdownMemoryStore implements MemoryStore {
 
   async read(request: MemoryReadRequest, context: AdapterContext): Promise<MemorySnapshot> {
     const documents = await this.prisma.memoryDocument.findMany({
-      where: {
-        spaceId: context.spaceId,
-        userId: context.userId,
-        scope: request.scope,
-        ...(request.botId ? { botId: request.botId } : {}),
-        ...(request.path ? { path: request.path } : {}),
-      },
+      where: memoryWhere(request, context),
       orderBy: [{ updatedAt: "desc" }, { path: "asc" }],
     });
     return {
@@ -45,6 +40,7 @@ export class MarkdownMemoryStore implements MemoryStore {
         content: doc.content,
         revision: doc.revision,
         updatedAt: doc.updatedAt.toISOString(),
+        ...(doc.inclusion ? {inclusion:doc.inclusion as "essential"|"searchable",userControlled:doc.userControlled,taskThreadId:doc.taskThreadId}:{}),
       })),
     };
   }
@@ -53,22 +49,11 @@ export class MarkdownMemoryStore implements MemoryStore {
     request: MemorySearchRequest,
     context: AdapterContext,
   ): Promise<MemorySearchResult[]> {
-    const documents = await this.prisma.memoryDocument.findMany({
-      where: {
-        spaceId: context.spaceId,
-        userId: context.userId,
-        ...(request.scope === "all" ? {} : { scope: request.scope }),
-        ...(request.botId ? { botId: request.botId } : {}),
-      },
-    });
-    const q = request.query.toLowerCase();
-    return documents
-      .filter((doc) => doc.content.toLowerCase().includes(q) || doc.path.toLowerCase().includes(q))
-      .map((doc) => ({
-        path: doc.path,
-        snippet: snippet(doc.content, q),
-        score: 1,
-      }));
+    const documents = await this.prisma.memoryDocument.findMany({where:memoryWhere(request,context)});
+    return rankLocalMemories(documents,request.query).slice(0,Math.min(10,request.limit??5)).map(({document,score})=>({
+      id:document.id,path:document.path,snippet:localMemorySnippet(document.content,request.query),score,
+      scope:document.scope as "bot"|"user",taskThreadId:document.taskThreadId,
+    }));
   }
 
   async commit(request: MemoryCommitRequest, context: AdapterContext): Promise<MemoryRevision> {
@@ -77,6 +62,14 @@ export class MarkdownMemoryStore implements MemoryStore {
     return withTransactionRetry(() =>
       this.prisma.$transaction(
         async (tx) => {
+          if(context.botId && request.botId && context.botId!==request.botId) throw new Error("A Mico cannot access another Mico's memory");
+          if (request.scope === "bot") {
+            if (!request.botId || !await tx.bot.findFirst({where:{id:request.botId,spaceId:context.spaceId,userId:context.userId},select:{id:true}})) throw new Error("Memory Mico unavailable");
+          }
+          if (request.taskThreadId) {
+            if(request.scope!=="bot" || !await tx.thread.findFirst({where:{id:request.taskThreadId,OR:[{botId:request.botId},{taskBotId:request.botId}],spaceId:context.spaceId,userId:context.userId},select:{id:true}})) throw new Error("Memory task unavailable");
+            if(!request.path.startsWith(`tasks/${request.taskThreadId}/`)) throw new Error("Task memory path must be namespaced");
+          } else if(request.path.startsWith("tasks/")) throw new Error("Task memory needs its conversation");
           const existing = await tx.memoryDocument.findFirst({
             where: {
               spaceId: context.spaceId,
@@ -90,10 +83,19 @@ export class MarkdownMemoryStore implements MemoryStore {
             const live = existing?.revision ?? 0;
             if (live !== request.expectedRevision) throw new Error(MEMORY_REVISION_CONFLICT_ERROR);
           }
+          if(existing?.taskThreadId && existing.taskThreadId!==request.taskThreadId) throw new Error("Memory task mismatch");
+          if(existing?.userControlled && request.sourceRunId && !request.selectionByUser && request.inclusion!==undefined && request.inclusion!==existing.inclusion) throw new Error("Memory selection is user controlled");
+          const inclusion=request.inclusion??existing?.inclusion??"searchable";
+          if(inclusion==="essential") {
+            const others=await tx.memoryDocument.findMany({where:{spaceId:context.spaceId,userId:context.userId,scope:request.scope,botId:request.botId??null,taskThreadId:request.taskThreadId??null,inclusion:"essential",...(existing?{id:{not:existing.id}}:{})},select:{content:true,path:true}});
+            const bytes=others.reduce((n,d)=>n+Buffer.byteLength(d.path+"\n"+d.content,"utf8")+100,0)+Buffer.byteLength(request.path+"\n"+request.content,"utf8")+100;
+            if(bytes>8192)throw new Error("Essential memory limit: 8 KB per scope. Keep the rest searchable.");
+          }
+          const metadata={inclusion,taskThreadId:request.taskThreadId??null,...(request.selectionByUser?{userControlled:true}:{})};
           const doc = existing
             ? await tx.memoryDocument.update({
                 where: { id: existing.id },
-                data: { content: request.content, revision: existing.revision + 1 },
+                data: { content: request.content, revision: existing.revision + 1, ...metadata },
               })
             : await tx.memoryDocument.create({
                 data: {
@@ -101,6 +103,7 @@ export class MarkdownMemoryStore implements MemoryStore {
                   userId: context.userId,
                   botId: request.botId,
                   scope: request.scope,
+                  ...metadata,
                   path: request.path,
                   content: request.content,
                 },
@@ -176,4 +179,16 @@ function snippet(content: string, q: string): string {
   const idx = content.toLowerCase().indexOf(q);
   if (idx < 0) return content.slice(0, 140);
   return content.slice(Math.max(0, idx - 40), idx + q.length + 80);
+}
+
+function memoryWhere(request:MemoryReadRequest|MemorySearchRequest,context:AdapterContext) {
+ const scope=request.scope;
+ if(context.botId && request.botId && context.botId!==request.botId)throw new Error("A Mico cannot access another Mico's memory");
+ if(scope!=="user"&&!request.botId)throw new Error("A Mico is required to read individual memory");
+ const general=request.includeGeneral!==false;
+ return {spaceId:context.spaceId,userId:context.userId,
+  ...(scope==="all"?{OR:[{scope:"bot",botId:request.botId},...(general?[{scope:"user",botId:null}]:[])]}:scope==="user"?{scope,botId:null}:{scope,botId:request.botId}),
+  AND:[{OR:[{taskThreadId:null},...(request.taskThreadId?[{taskThreadId:request.taskThreadId}]:[])]}],
+  ...("path" in request && request.path?{path:request.path}:{}),
+ };
 }

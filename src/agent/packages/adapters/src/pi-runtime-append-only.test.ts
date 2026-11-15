@@ -250,3 +250,24 @@ describe("Pi runtime transcript sent to a provider that binds thinking to its co
     expect(JSON.stringify(last)).not.toContain("truncated");
   });
 });
+
+it("refreshes resumed instructions without replaying completed tools or stale thinking signatures", async () => {
+  const {contexts, rejected} = bindingProvider(0);
+  const input = request();
+  input.instructions = "CURRENT POLICY: require approval and answer in Spanish.";
+  input.turnCheckpoint = JSON.stringify({version:1, provider:claude.provider, model:claude.id,
+    systemPrompt:"OLD POLICY: answer in English.",pendingToolCallId:"completed-call", messages:[
+      {role:"system",content:"OLD POLICY: answer in English.",toolsAdded:[{name:"fetch_logs",description:"Fetch logs",parameters:{type:"object",properties:{step:{type:"number"}},required:["step"]}}],sections:{runtimeNote:"Preserve runtime guidance"},timestamp:0},
+      {role:"user",content:"Earlier request",timestamp:1},
+      {...reply([{type:"thinking",thinking:"private",thinkingSignature:"old-prefix"},{type:"toolCall",id:"completed-call",name:"fetch_logs",arguments:{step:0}}])},
+      {role:"toolResult",toolCallId:"completed-call",toolName:"fetch_logs",content:[{type:"text",text:"Saved verified result"}],isError:false,timestamp:2}
+    ]});
+  await run(input);
+  expect(rejected).toEqual([]);
+  expect(contexts[0]!.messages.find(message => message.role === "system")?.content).toContain("CURRENT POLICY");
+  expect(JSON.stringify(contexts[0]!.messages)).not.toContain("OLD POLICY");
+  expect(JSON.stringify(contexts[0]!.messages)).toContain("Saved verified result");
+  expect(JSON.stringify(contexts[0]!.messages)).not.toContain("old-prefix");
+  expect(JSON.stringify(contexts[0]!.messages)).toContain("Preserve runtime guidance");
+  expect(input.executeTool).not.toHaveBeenCalled();
+});

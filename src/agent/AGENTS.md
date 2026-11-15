@@ -1587,3 +1587,22 @@
   download links in update settings, not stacked beneath the sidebar action.
   Preserve native draft/call/work guards and explicit install consent; waiting
   for those guards must not cover the chat with a full-screen update dialog.
+
+- Local memory keeps existing Markdown documents/revisions. General notes are owned
+  by user and Space; Mico notes span that Mico's conversations; task notes require
+  the current main/task thread and use a tasks/<thread>/ path. Isolated scope excludes
+  general notes in context, search and tools, including inherited Space defaults.
+  Messaging channels must never receive personal memory tools or background reviews.
+  Essential selection is revision-guarded and capped at 8 KiB per scope; searchable
+  memories use local lexical relevance and bounded snippets, with no embeddings.
+- memory.review runs outside the answering turn after 20 turns or 15 idle minutes
+  with at least three new user messages (configurable/off). It uses only the Mico's
+  existing first-party model with a verifiable Credit quote; no unpriced fallback.
+  Defaults reserve at most 0.01 Credits per Space/UTC day, 0.002 per review. Claim
+  worst-case cost transactionally before a single paid POST, retain uncertain
+  reservations and reconcile the same key without replay or payer/model switching.
+  Review snapshots/results use Space content encryption and owner RLS; automatic
+  changes must respect user-controlled notes, edits/deletions and context resets.
+  Verify scoped memory/review/UI tests and scripts/verify-local-memory-db.mjs
+  (MEMORY_TEST_EPHEMERAL=1 inside disposable Linux CI; local uses an isolated DB/role
+  on project-preview, never live memory). Keep full suites paused.

@@ -4771,6 +4771,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               <BotSettings
                 key={active.id}
                 bot={active}
+                threadId={taskScope?.taskThreadId ?? activeSnapshot?.threadId}
                 focusModel={modelFocusRequest}
                 onOpenConnections={() => openSettings("models")}
                 onOpenFiles={() => showLibrary(active.id)}

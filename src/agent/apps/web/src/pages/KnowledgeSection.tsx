@@ -5,12 +5,12 @@ import { isDeletableMemoryDocument, isEmptyBotMemory } from "@rakazo/contracts";
 import { Badge, Button, Skeleton, Textarea } from "@rakazo/ui-web";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@rakazo/ui-web/components/ui/tooltip";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Plus } from "lucide-react";
+import { Download, Plus, Pin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { downloadArtifactBytes } from "../lib/artifact-open";
 import { fetchFresh, useSpaceQueries, writeSaved } from "../lib/query";
-import { useSpaceRpc } from "../lib/space-rpc";
+import { useBoundTaskThreadScope, useSpaceRpc } from "../lib/space-rpc";
 
 const NO_DOCS: MemoryDocument[] = [];
 const NO_SKILLS: AgentSkillCatalogEntry[] = [];
@@ -28,12 +28,16 @@ function rowClass(open: boolean): string {
 export function KnowledgeSection({
   botId,
   skillsOnly = false,
+  threadId,
 }: {
   botId: string;
+  threadId?: string;
   /** Unused: skills are read from and saved to the shared cached list. */
   onSkillsChange?: (skills: AgentSkillCatalogEntry[]) => void;
   skillsOnly?: boolean;
 }) {
+  const task=useBoundTaskThreadScope();
+  const memoryThreadId=threadId??(task?.botId===botId?task.taskThreadId:undefined);
   if (skillsOnly)
     return (
       <section data-testid="bot-knowledge">
@@ -46,12 +50,10 @@ export function KnowledgeSection({
       </section>
     );
   return (
-    <MemoryDocumentList
-      key={botId}
-      input={{ botId, scope: "bot" }}
-      testId="bot-knowledge-memory"
-      compact
-    />
+    <>
+      <MemoryDocumentList key={botId} input={{ botId, scope: "bot" }} testId="bot-knowledge-memory" compact />
+      {memoryThreadId ? <MemoryDocumentList key={memoryThreadId} input={{botId,scope:"bot",taskThreadId:memoryThreadId}} testId="task-knowledge-memory" compact />:null}
+    </>
   );
 }
 
@@ -63,10 +65,10 @@ export function SpaceMemorySection() {
       data-testid="space-memory-documents"
     >
       <SettingsSectionHeading className="mb-0">
-        <Trans>Shared memory</Trans>
+        <Trans>General memory</Trans>
       </SettingsSectionHeading>
       <p className="mt-1 text-[13px] text-muted-foreground">
-        <Trans>Every bot in this space reads these notes and keeps them up to date.</Trans>
+        <Trans>Your Micos in this space can use these notes. Micos set to isolated memory do not read them.</Trans>
       </p>
       <div className="mt-3">
         <MemoryDocumentList input={{ scope: "user" }} testId="space-memory-list" />
@@ -80,7 +82,7 @@ function MemoryDocumentList({
   testId,
   compact = false,
 }: {
-  input: { botId?: string; scope: "bot" | "user" };
+  input: { botId?: string; scope: "bot" | "user"; taskThreadId?: string };
   testId: string;
   compact?: boolean;
 }) {
@@ -175,6 +177,13 @@ function MemoryDocumentList({
     }
   }
 
+  async function toggleEssential(doc:MemoryDocument) {
+    if(busy)return;setBusy(true);setError(null);
+    try {const updated=await rpc.memory.update({documentId:doc.id,content:doc.content,expectedRevision:doc.revision,inclusion:doc.inclusion==="essential"?"searchable":"essential"});
+      await setDocs(rows=>rows.map(row=>row.id===updated.id?updated:row));
+    }catch(error){setError(error instanceof Error?error.message:t`Could not save`);try{await fetchFresh(queryClient,list);}catch{}}
+    finally{setBusy(false);}
+  }
   async function downloadDocument(doc: MemoryDocument) {
     if (busy) return;
     setBusy(true);
@@ -199,7 +208,7 @@ function MemoryDocumentList({
     <section className={compact ? "mt-6" : undefined}>
       {compact ? (
         <h3 className="mb-2 text-xs font-medium text-muted-foreground">
-          <Trans>Memory</Trans>
+          {input.taskThreadId ? t`Task memory` : t`Mico memory`}
         </h3>
       ) : null}
       <div data-testid={testId} className={compact ? "rounded-xl bg-muted/50 p-4" : undefined}>
@@ -233,6 +242,8 @@ function MemoryDocumentList({
                     {doc.path}
                   </span>
                 </Button>
+                <Button variant="ghost" size="icon-sm" aria-label={t`Always include`} title={doc.inclusion==="essential"?t`Always included`:t`Include when relevant`} aria-pressed={doc.inclusion==="essential"}
+                  disabled={busy||(openId===doc.id&&draft!==doc.content)} onClick={()=>void toggleEssential(doc)}><Pin className="size-4" fill={doc.inclusion==="essential"?"currentColor":"none"} /></Button>
                 <Tooltip>
                   <TooltipTrigger
                     render={<Button variant="ghost" size="icon-sm" />}

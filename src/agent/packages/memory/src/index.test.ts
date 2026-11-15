@@ -37,6 +37,7 @@ describe("memory store contract shape", () => {
         userId: "user-1",
         scope: "bot",
         botId: "bot-1",
+        AND:[{OR:[{taskThreadId:null}]}],
       },
       orderBy: [{ updatedAt: "desc" }, { path: "asc" }],
     });

@@ -734,14 +734,16 @@ export const appContract = {
     heartbeat: oc.input(botId).output(z.object({ ok: z.literal(true) })),
   },
   memory: {
+    reviewStatus: oc.output(z.object({reservedMicrounits:z.number().int(),chargedMicrounits:z.number().int(),pending:z.number().int()})),
     list: oc
-      .input(z.object({ botId: Id.optional(), scope: z.enum(["bot", "user"]).optional() }))
+      .input(z.object({ botId: Id.optional(), scope: z.enum(["bot", "user"]).optional(), taskThreadId: Id.optional() }))
       .output(z.array(MemoryDocumentSchema)),
     update: oc
       .input(
         z.object({
           documentId: Id,
           content: z.string(),
+          inclusion: z.enum(["essential","searchable"]).optional(),
           expectedRevision: z.number().int().positive().optional(),
         }),
       )

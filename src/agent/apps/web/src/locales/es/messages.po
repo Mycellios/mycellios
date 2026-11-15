@@ -12890,3 +12890,91 @@ msgstr "Ahora no hay modelos de Mycellios disponibles para los Micos. Volvemos a
 
 msgid "Mycellios network"
 msgstr "Red Mycellios"
+
+
+msgid "General memory"
+msgstr "Memoria general"
+
+
+msgid "Your Micos in this space can use these notes. Micos set to isolated memory do not read them."
+msgstr "Tus Micos de este espacio pueden usar estas notas. Los Micos con memoria aislada no las leen."
+
+
+msgid "Task memory"
+msgstr "Memoria de la tarea"
+
+
+msgid "Mico memory"
+msgstr "Memoria del Mico"
+
+
+msgid "Always include"
+msgstr "Incluir siempre"
+
+
+msgid "Always included"
+msgstr "Se incluye siempre"
+
+
+msgid "Include when relevant"
+msgstr "Incluir cuando sea relevante"
+
+
+msgid "Local memory"
+msgstr "Memoria local"
+
+
+msgid "Automatic memory review"
+msgstr "Revisión automática de memoria"
+
+
+msgid "Learn from completed conversations in the background. Uses a model with a bounded Credit quote; otherwise waits."
+msgstr "Aprende de las conversaciones en segundo plano. Usa un modelo con presupuesto máximo en Créditos; si no está disponible, espera."
+
+
+msgid "Daily limit per space"
+msgstr "Límite diario por espacio"
+
+
+msgid "Maximum reserved Credits each day. Pending reviews count toward the limit and are never sent again."
+msgstr "Máximo de Créditos reservados cada día. Las revisiones pendientes cuentan para el límite y no se vuelven a enviar."
+
+
+msgid "No spending"
+msgstr "Sin gasto"
+
+
+msgid "Review frequency"
+msgstr "Frecuencia de revisión"
+
+
+msgid "Also reviews after 15 minutes of inactivity when there are at least three new messages from you."
+msgstr "También revisa tras 15 minutos de inactividad si hay al menos tres mensajes tuyos nuevos."
+
+
+msgid "10 turns"
+msgstr "10 turnos"
+
+
+msgid "20 turns"
+msgstr "20 turnos"
+
+
+msgid "40 turns"
+msgstr "40 turnos"
+
+
+msgid "Isolated uses only Mico and task notes. Shared also uses general notes from this space."
+msgstr "Aislada usa solo notas del Mico y de la tarea. Compartida incluye también las notas generales de este espacio."
+
+
+msgid "Reserved today"
+msgstr "Reservado hoy"
+
+
+msgid "Daily budget resets at 00:00 UTC."
+msgstr "El presupuesto diario se restablece a las 00:00 UTC."
+
+
+msgid "Pending reviews"
+msgstr "Revisiones pendientes"
