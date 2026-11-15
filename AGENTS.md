@@ -254,6 +254,10 @@ These rules apply to the complete repository.
   comparison precede publication. `deploy/installers/publisher.py` promotes the
   verified public release with the original host-side Android signer, a shared
   promotion lock, a recoverable pointer journal and real public download probes.
+  Keep publisher staging on the mounted data volume; the legacy state path may
+  remain a compatibility symlink. Match its configured state directory in the
+  service's `ReadWritePaths`. Relocations preserve and hash-verify existing files,
+  completed receipts and the pointer journal before retiring the source copy.
   Release publication is automatic; unsigned installation remains owner-approved.
   The historical Mac `assemble.mjs` is recovery tooling, never a current release
   input. The active Mac workflow packages canonical Agent source and local server.
