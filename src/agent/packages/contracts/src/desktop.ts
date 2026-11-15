@@ -90,6 +90,12 @@ export interface RakazoDesktopOAuthCallback {
 }
 
 export interface RakazoDesktop {
+  /** Small launcher. It can close itself and name the conversation the main window should open. */
+  quickAsk?: {
+    shortcut: string;
+    close: () => Promise<void>;
+    sent: (path: string) => Promise<void>;
+  };
   /** Chat-only window. Native settings and execution remain in the main window. */
   chatWindow?: {
     kind: "floating";

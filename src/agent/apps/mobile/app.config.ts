@@ -1,6 +1,6 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-const RELEASE_PROFILES = new Set(["production", "android-apk", "diagnostic"]);
+const RELEASE_PROFILES = new Set(["production", "android-apk", "diagnostic", "testflight"]);
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   if (RELEASE_PROFILES.has(process.env.EAS_BUILD_PROFILE ?? "")) {

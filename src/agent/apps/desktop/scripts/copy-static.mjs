@@ -10,7 +10,7 @@ import {fetchNodeRuntimeLicense} from './node-runtime-license.mjs';
 // window's static assets have to be copied into dist alongside them.
 const STATIC_FILES = ["preload.cjs", "setup-preload.cjs", "setup.html", "setup.css", "setup.js"];
 STATIC_FILES.push("companion-preload.cjs", "companion.html", "companion.css", "companion.js");
-STATIC_FILES.push("floating-chat-preload.cjs");
+STATIC_FILES.push("floating-chat-preload.cjs", "quick-ask-preload.cjs");
 const TOKENS_FILE = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../../packages/ui-tokens/src/tokens.css",

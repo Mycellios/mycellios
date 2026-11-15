@@ -78,6 +78,12 @@ describe("mobile app config", () => {
     });
   });
 
+  it("rejects a TestFlight build that is not served over HTTPS", () => {
+    vi.stubEnv("EAS_BUILD_PROFILE", "testflight");
+    vi.stubEnv("EXPO_PUBLIC_API_URL", "http://app.example.com");
+    expect(() => appConfig(context(config))).toThrow(/HTTPS/);
+  });
+
   it.each([
     "http://app.example.com",
     "https://localhost:3100",

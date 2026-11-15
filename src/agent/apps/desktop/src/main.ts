@@ -6,6 +6,7 @@ import { UpdatePreferences } from "./update-preferences.js";
 import { installedFonts, validDesktopIcon } from "./appearance-settings.js";
 import { installDesktopCompanions } from "./desktop-companions.js";
 import { FloatingChats } from "./floating-chats.js";
+import { QuickAsk, QUICK_ASK_ACCELERATOR, registerQuickAskShortcut } from "./quick-ask.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
 import { DESKTOP_CATALOG_ALL_URL, ManualUpdateController, requireManualUpdateSpace, type ManualPackageKind } from "./manual-update.js";
@@ -24,7 +25,7 @@ import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, screen, session, shell, utilityProcess } from "electron";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -251,6 +252,7 @@ let keepRunningInBackground = false;
 let appBehavior: AppBehavior | undefined;
 let desktopCompanions: Awaited<ReturnType<typeof installDesktopCompanions>> | undefined;
 let floatingChats: FloatingChats | undefined;
+let quickAsk: QuickAsk | undefined;
 let reopenRetainedConnection: (() => void) | undefined;
 
 async function loadBackgroundPreference(profile: string) {
@@ -914,6 +916,11 @@ function installApplicationMenu() {
     label: "Keep Running in the Background",
     click: (item) => setKeepRunningInBackground(item.checked),
   };
+  const askMico: Electron.MenuItemConstructorOptions = {
+    label: "Quick Ask",
+    toolTip: "Ask a Mico from any app. Command+Shift+Space on macOS, Ctrl+Shift+Space on Windows and Linux.",
+    click: () => quickAsk?.toggle(),
+  };
   const changeServer: Electron.MenuItemConstructorOptions = {
     id: "change-rakazo-server",
     label: "Advanced: change server…",
@@ -957,6 +964,7 @@ function installApplicationMenu() {
             label: app.name,
             submenu: [
               { role: "about" },
+              askMico,
               checkForUpdates,
               { type: "separator" },
               computerAccess,
@@ -990,6 +998,7 @@ function installApplicationMenu() {
           {
             label: "File",
             submenu: [
+              askMico,
               computerAccess,
               contribute,
               revokeComputerAccess,
@@ -1427,6 +1436,27 @@ app.whenReady().then(async () => {
     },
   });
   ipcMain.handle("desktop.chat.return", event => floatingChats!.returnToMain(event.sender, event.senderFrame));
+  quickAsk = new QuickAsk({
+    main: () => mainWindow,
+    load: loadAppUrl,
+    reveal: revealSecondInstanceWindow,
+    external: destination => {
+      const safe = safeExternalUrl(destination);
+      if (safe) openExternalLink(safe);
+    },
+    focusApp: () => { if (process.platform === "darwin") app.focus({ steal: true }); },
+    now: () => Date.now(),
+    display: () => {
+      const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+      return { x: area.x, y: area.y, width: area.width, height: area.height };
+    },
+  });
+  ipcMain.handle("desktop.quickAsk.close", event => quickAsk!.closeFrom(event.sender, event.senderFrame));
+  ipcMain.handle("desktop.quickAsk.sent", (event, requested: unknown) => quickAsk!.sent(event.sender, event.senderFrame, requested));
+  if (!registerQuickAskShortcut(globalShortcut, () => quickAsk?.toggle())) {
+    console.warn("Quick ask shortcut is already used by another application.");
+  }
+  app.on("will-quit", () => globalShortcut.unregister(QUICK_ASK_ACCELERATOR));
   desktopCompanions = await installDesktopCompanions({
     mainWindow: () => mainWindow,
     profile: userDataDir, allowed: fromUpdateWindow, reveal: revealChat,
@@ -2379,6 +2409,7 @@ app.on("before-quit", (event) => {
   appBehavior?.dispose();
   desktopCompanions?.dispose();
   floatingChats?.clear();
+  quickAsk?.reset();
   cloudComputer?.stop();
   quitting = true;
   clearTimeout(warmWindowTimer);

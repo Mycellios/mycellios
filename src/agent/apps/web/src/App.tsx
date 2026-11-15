@@ -43,6 +43,7 @@ import { completeSsoCallback, SSO_CALLBACK_PATH } from "./lib/sso-flow";
 import { IntegrationCallbackPage } from "./pages/IntegrationCallback";
 import { IntegrationSetupPage } from "./pages/IntegrationSetup";
 import { McpOAuthCallbackPage } from "./pages/McpOAuthCallback";
+import { QuickAskPage } from "./pages/QuickAsk";
 import { ShellPage } from "./pages/Shell";
 import { eventDemoRoute } from "./lib/event-demo";
 
@@ -210,6 +211,7 @@ function SessionApp() {
               }
             />
             <Route path="/reset-password" element={<PasswordResetPage />} />
+            <Route path="/quick-ask" element={<QuickAskPage />} />
             <Route
               path="/mcp/oauth/callback"
               element={user ? <McpOAuthCallbackPage /> : <Navigate to="/sign-in" replace />}
