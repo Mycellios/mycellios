@@ -42,6 +42,10 @@ jobs:
           npm ci --prefix src/agent --ignore-scripts --no-audit --no-fund
       - name: Compile coordinator and its browser surfaces
         run: npm run build
+      - name: Qualify the compiled landing and platform picker in a real browser
+        run: |
+          node src/agent/node_modules/playwright/cli.js install --with-deps chromium
+          node scripts/verify-built-landing.mjs
       - name: Qualify wallet, gateway and speech boundaries without paid inference
         run: |
           node node_modules/vitest/vitest.mjs run tests/managed-antseed-gateway.test.ts tests/managed-antseed-gateway-v2.test.ts tests/managed-text-stream.test.ts tests/managed-provider.test.ts tests/managed-media.test.ts tests/browser-funded-hub.test.ts tests/transcription.test.ts --maxWorkers=2 --no-file-parallelism
