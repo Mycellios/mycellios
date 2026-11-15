@@ -284,8 +284,9 @@ verified package with the system installer — or mounts the verified image — 
 asks for a restart after it finishes. Publish Linux packages with
 `desktop:publish:linux`, adding `--deb` and `--macos` for those artifacts. Keep that boundary; do not add a package-manager call, elevation or
 unattended install to the app. An AppImage or unpackaged build must keep receiving
-no offer. A published version is only visible once its catalog entry exists, so
-release must publish the RPM and its `fedora` entry together.
+no offer. The website mirror publishes the RPM and its `fedora` entry together.
+New Desktop clients can also discover the integrated qualified GitHub release
+before mirror promotion finishes.
 
 The separate `/downloads/desktop` page is built from
 `landing/src/DesktopDownloads.tsx` with `node scripts/build-desktop-downloads.mjs`
@@ -887,3 +888,26 @@ install action waits for local work and renderer saving, normally quits Desktop,
 installs the staged package and reopens the same profile. There is no unattended
 installation of unsigned previews. The signed electron-updater channel remains
 separately opt-in and must be qualified with the owner's signing credentials.
+
+
+### Direct Desktop delivery and optional contribution installers
+
+The direct feed reads the owned integrated GitHub release and its native platform
+receipt. A matching source revision/tree, platform file, SHA-256 and asset size
+are required. The website catalog remains a compatible mirror; its promotion and
+Android host signing keep their existing gates without delaying Desktop offers.
+All native builders still qualify their packages before the shared release is
+published. Ad-hoc/unsigned previews retain explicit system installation.
+
+Native contribution installers are separately published under
+`desktop-runtime-<sha256>`. Builders verify the original pinned payload and
+package its descriptor and installation helpers. The publisher verifies and
+reuses immutable component assets before exposing the Desktop release. Enrollment
+alone downloads missing bytes, verifies a bounded transfer, caches by hash and
+rechecks both the cached hash and pairing expiry before invoking the existing
+privileged installer. Status queries and Desktop upgrades never enroll a node.
+Legacy bundled runtime manifests remain supported. The essential local backend
+and development resources stay bundled for offline startup and project work.
+
+Qualify native release packages separately from offline fixture tests. Do not
+claim reduced build/download times until a real package and upgrade are measured.

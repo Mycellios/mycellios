@@ -1,3 +1,4 @@
+import { contributionComponent } from "./contribution-component.js";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -33,6 +34,7 @@ export class ContributionRuntime {
     macConfig?: string;
     run?: (executable: string, args: string[]) => Promise<number>;
     now?: () => number;
+    fetch?: typeof fetch;
   }) {}
 
   private supported() {
@@ -131,16 +133,19 @@ export class ContributionRuntime {
       const mac = this.options.platform === "darwin";
       const expectedFile = mac ? "mycellios-runtime.pkg" : linux ? "mycellios-runtime.deb" : "mycellios-runtime.msi";
       const manifest = JSON.parse(await readFile(path.join(root, "runtime.json"), "utf8"));
-      if (manifest.schema !== "mycellios-desktop-runtime/1" ||
+      if (!["mycellios-desktop-runtime/1", "mycellios-desktop-runtime/2"].includes(manifest.schema) ||
         manifest.file !== expectedFile || !/^[a-f0-9]{64}$/.test(manifest.sha256))
         throw new Error("The bundled runtime could not be verified.");
-      const msi = path.join(root, manifest.file);
+      const msi = manifest.schema === "mycellios-desktop-runtime/2"
+        ? await contributionComponent(manifest, expectedFile, path.join(this.options.userData, "runtime-components"), this.options.fetch)
+        : path.join(root, manifest.file);
       const info = await lstat(msi);
       if (!info.isFile() || info.isSymbolicLink()) throw new Error("The bundled runtime could not be verified.");
       const hash = createHash("sha256");
       for await (const chunk of createReadStream(msi)) hash.update(chunk);
       const digest = hash.digest("hex");
       if (digest !== manifest.sha256) throw new Error("The bundled runtime could not be verified.");
+      if (Date.parse(bundle.expiresAt) <= (this.options.now?.() ?? Date.now())) throw new Error("This pairing request expired. Request a new pairing before installation.");
       const grants = path.join(this.options.userData, "runtime-pairing");
       await mkdir(grants, { recursive: true, mode: 0o700 });
       grantPath = path.join(grants, `${bundle.enrollmentId}.json`);

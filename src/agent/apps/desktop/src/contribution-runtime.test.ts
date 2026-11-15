@@ -132,3 +132,26 @@ it("blocks Intel Mac ARM contribution before installing or reading identity",asy
  await expect(runtime.identify()).rejects.toThrow("not available");
  expect(run).not.toHaveBeenCalled();
 });
+
+
+it("fetches an optional runtime only on explicit enrollment and keeps the existing privileged flow", async () => {
+  const f=await fixture();
+  const bytes=Buffer.from("optional MSI fixture"),sha256=createHash("sha256").update(bytes).digest("hex");
+  const c={schema:"mycellios-desktop-runtime/2",file:"mycellios-runtime.msi",sha256,bytes:bytes.length,
+    url:`https://github.com/Mycellios/mycellios/releases/download/desktop-runtime-${sha256}/mycellios-runtime.msi`};
+  await rm(path.join(f.resource,c.file));await writeFile(path.join(f.resource,"runtime.json"),JSON.stringify(c));
+  const fetcher=vi.fn<typeof fetch>(async()=>new Response(bytes));
+  const manager=new ContributionRuntime({...f.options,run:f.run,fetch:fetcher});
+  await manager.status();expect(fetcher).not.toHaveBeenCalled();
+  expect(await manager.enroll(bundle())).toMatchObject({installed:true,enrolled:true});
+  expect(fetcher).toHaveBeenCalledOnce();expect(f.run).toHaveBeenCalledOnce();
+  const args=f.run.mock.calls[0]![1];expect(await readFile(args[args.indexOf("-Msi")+1]!)).toEqual(bytes);
+});
+it("does not invoke the installer if pairing expires during the component download",async()=>{
+  const f=await fixture();const bytes=Buffer.from("component"),sha256=createHash("sha256").update(bytes).digest("hex");
+  await writeFile(path.join(f.resource,"runtime.json"),JSON.stringify({schema:"mycellios-desktop-runtime/2",file:"mycellios-runtime.msi",sha256,bytes:bytes.length,
+    url:`https://github.com/Mycellios/mycellios/releases/download/desktop-runtime-${sha256}/mycellios-runtime.msi`}));
+  let now=Date.parse("2029-01-01T00:00:00Z");
+  const manager=new ContributionRuntime({...f.options,run:f.run,now:()=>now,fetch:vi.fn(async()=>{now=Date.parse("2031-01-01T00:00:00Z");return new Response(bytes);})});
+  await expect(manager.enroll(bundle())).rejects.toThrow(/expired/);expect(f.run).not.toHaveBeenCalled();
+});
