@@ -45,6 +45,7 @@ try {
     assert.match((await sql.query("SHOW listen_addresses")).rows[0].listen_addresses, /^(localhost|127\.0\.0\.1|::1)$/);
     await sql.query('DROP TABLE "task_inbox"');
     await sql.query(await readFile("packages/db/prisma/migrations/20261106110000_task_inbox/migration.sql", "utf8"));
+    await sql.query(await readFile("packages/db/prisma/migrations/20261115100000_task_followup/migration.sql", "utf8"));
     // Prisma db push omits these published ownership constraints. Exercise the real constraints too.
     const ownership = await readFile("packages/db/prisma/migrations/20261103170000_mico_project_conversations/migration.sql", "utf8");
     await sql.query(ownership.split("ALTER TABLE \"threads\" ADD CONSTRAINT \"threads_owner_chk\"")[1]!.split(";")[0]!.replace(/^/, 'ALTER TABLE "threads" ADD CONSTRAINT "threads_owner_chk"') + ";");
@@ -69,7 +70,7 @@ try {
   await system.space.create({ data: { id: actor.spaceId, name: "Synthetic", organizationId: id } });
   const bot = await system.bot.create({ data: { ...actor, name: "Fixture Mico", color: "#10B981", agentEngine: "codex", thread: { create: actor } }, include: { thread: true } });
   const handler = { handler: (fn: unknown) => fn };
-  const taskInbox = Object.fromEntries(["available", "list", "start", "messages", "read", "send", "markRead", "archive", "stop", "answer"].map(name => [name, handler]));
+  const taskInbox = Object.fromEntries(["followUp", "available", "list", "start", "messages", "read", "send", "markRead", "archive", "stop", "answer"].map(name => [name, handler]));
   const jobs = { enqueue: async () => undefined };
   const deps = { prisma, events: createThreadEvents(prisma), jobs, sandbox: {} };
   const routes = taskInboxRoutes({ deps, repos: createRepos(prisma), authed: { taskInbox } } as never).taskInbox as unknown as Record<string, (v: unknown) => Promise<any>>;

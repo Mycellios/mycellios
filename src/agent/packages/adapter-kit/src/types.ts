@@ -782,6 +782,8 @@ export interface ArtifactPut {
 }
 
 export interface NotificationMessage {
+  /** Explicit scheduled follow-up, independent of model execution. */
+  taskReminder?: { id: string; at: string };
   kind: "completion" | "failure" | "help" | "takeover";
   title: string;
   body: string;

@@ -246,12 +246,18 @@ export class WebPushService {
 
   /** Existing executor notices cover completed/failed runs, questions, approvals and takeovers. */
   async enqueue(message: NotificationMessage, context: AdapterContext) {
-    const runId = context.runId;
-    if (!this.config || !runId) return 0;
+    const runId = message.taskReminder ? `task-reminder:${message.taskReminder.id}` : context.runId;
+    if (!this.config || !runId || (message.taskReminder && (!Number.isFinite(Date.parse(message.taskReminder.at)) || Date.parse(message.taskReminder.at)>Date.now()))) return 0;
     const settings = await this.settings(context.userId);
     if (!notificationAllowed(settings, message.botId, message.kind)) return 0;
     return system(async () => {
-      const run = await this.db.run.findFirst({
+      const reminder = message.taskReminder ? await this.db.inboxTask.findFirst({
+        where:{id:message.taskReminder.id,userId:context.userId,spaceId:context.spaceId,botId:message.botId,threadId:message.threadId,
+          archivedAt:null,remindAt:new Date(message.taskReminder.at),bot:{archivedAt:null},
+          space:{memberships:{some:{userId:context.userId}}}},
+        select:{bot:{select:{name:true,color:true}},thread:{select:{group:{select:{name:true}}}}},
+      }) : null;
+      const run = message.taskReminder ? reminder : await this.db.run.findFirst({
         where: {
           id: runId,
           userId: context.userId,
@@ -265,10 +271,10 @@ export class WebPushService {
         },
       });
       if (!run) return 0;
-      const event = await this.notificationEvent(runId, message.kind);
+      const event = message.taskReminder ? {id:message.taskReminder.at,createdAt:new Date()} : await this.notificationEvent(runId, message.kind);
       if (!event || event.createdAt.getTime() < Date.now() - 300_000) return 0;
       const expiresAt = event.createdAt.getTime() + 300_000;
-      const eventKey = event.id;
+      const eventKey = message.taskReminder ? `${runId}:${event.id}` : event.id;
       const name = run.thread.group?.name ?? run.bot.name;
       const appearance = parseBotAvatarValue(currentMicoAvatarValue(run.bot.color, message.botId));
       const art = settings.previews && !message.groupId && appearance.kind === "shape"
@@ -286,7 +292,7 @@ export class WebPushService {
           version: 1,
           id: eventKey,
           accountId: context.userId,
-          ...privateNotification({ ...message, title: name }, settings.previews),
+          ...privateNotification({ ...message, title: message.taskReminder ? message.title : name }, settings.previews),
           kind: message.kind,
           preview: settings.previews,
           avatar: legacyArt ? art.id : undefined,
@@ -302,7 +308,7 @@ export class WebPushService {
         const ciphertext = await this.seal(JSON.stringify(payload), id, context.userId);
         await this.db.$executeRaw`INSERT INTO web_push_deliveries
           (id, "deviceId", "eventKey", ciphertext, "spaceId", "botId", "runId", kind, "eventId", "dueAt", "expiresAt")
-          VALUES (${id}, ${device.id}, ${eventKey}, ${ciphertext}, ${context.spaceId}, ${message.botId}, ${runId}, ${message.kind}, ${event.id}, ${new Date(Date.now() + 3_000)}, ${new Date(expiresAt)})
+          VALUES (${id}, ${device.id}, ${eventKey}, ${ciphertext}, ${context.spaceId}, ${message.botId}, ${runId}, ${message.kind}, ${event.id}, ${new Date(Date.now() + 3_000).toISOString()}::timestamptz, ${new Date(expiresAt).toISOString()}::timestamptz)
           ON CONFLICT ("deviceId", "eventKey") DO NOTHING`;
       }
       await this.drain();
@@ -319,15 +325,15 @@ export class WebPushService {
       await this.db.$executeRaw`DELETE FROM web_push_devices d WHERE NOT EXISTS
         (SELECT 1 FROM "session" s WHERE s.id = d."sessionId" AND s."userId" = d."userId" AND s."expiresAt" > (now() AT TIME ZONE 'UTC'))`;
       const rows = await this.db.$queryRaw<
-        Array<{ id: string; dueAt: Date }>
-      >`SELECT id, "dueAt" FROM web_push_deliveries
+        Array<{ id: string; dueAtMs: string }>
+      >`SELECT id, (extract(epoch FROM "dueAt")*1000)::text AS "dueAtMs" FROM web_push_deliveries
         WHERE "finishedAt" IS NULL AND "expiresAt" > now() AND ("leaseUntil" IS NULL OR "leaseUntil" < now())
         ORDER BY "dueAt" LIMIT 100`;
       for (const row of rows)
         await this.jobs.enqueue({
           name: "webpush.deliver",
           payload: { id: row.id },
-          availableAt: row.dueAt,
+          availableAt: new Date(Number(row.dueAtMs)),
           replaceKey: `webpush:${row.id}`,
           keepExisting: true,
           maxAttempts: 5,
@@ -419,7 +425,7 @@ export class WebPushService {
           await this.db.$executeRaw`DELETE FROM web_push_devices WHERE id = ${device.id}`;
         } else if ((status === 0 || status === 429 || status >= 500) && row.attempts < 4) {
           await this.db.$executeRaw`UPDATE web_push_deliveries SET "leaseUntil" = NULL,
-            "dueAt" = ${new Date(Date.now() + [0, 10_000, 60_000, 120_000][row.attempts]!)} WHERE id = ${id}`;
+            "dueAt" = ${new Date(Date.now() + [0, 10_000, 60_000, 120_000][row.attempts]!).toISOString()}::timestamptz WHERE id = ${id}`;
         } else {
           await finish();
         }
@@ -433,6 +439,13 @@ export class WebPushService {
     });
     if (!session || !notificationAllowed(await this.settings(device.userId), row.botId, row.kind))
       return false;
+    if(row.runId.startsWith("task-reminder:")) {
+      return Boolean(await this.db.inboxTask.findFirst({where:{
+        id:row.runId.slice("task-reminder:".length),userId:device.userId,spaceId:row.spaceId,botId:row.botId,
+        archivedAt:null,remindAt:new Date(row.eventId),bot:{archivedAt:null},
+        space:{memberships:{some:{userId:device.userId}}},
+      },select:{id:true}}));
+    }
     const run = await this.db.run.findFirst({
       where: { id: row.runId, userId: device.userId, botId: row.botId, spaceId: row.spaceId },
       select: {

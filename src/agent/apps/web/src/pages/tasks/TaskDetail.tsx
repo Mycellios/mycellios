@@ -2,12 +2,13 @@ import { useLingui } from "@lingui/react/macro";
 import { ChatMarkdown } from "@rakazo/chat-ui/web";
 import type { Bot, InboxTask, ThreadSnapshot } from "@rakazo/contracts";
 import { Button, Spinner } from "@rakazo/ui-web";
-import { Archive, ArchiveRestore, ArrowLeft, Maximize2, Square, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, Maximize2, MessageCircle, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AskCard } from "../../components/AskCard";
 import type { RpcClient } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { TaskComposer } from "./TaskComposer";
+import { TaskFollowUp } from "./TaskFollowUp";
 import { taskIsActive } from "./task-sections";
 
 export function TaskDetail({
@@ -18,6 +19,7 @@ export function TaskDetail({
   onChanged,
   expanded,
   onExpand,
+  onOpenChat,
   transcribe,
   scope,
 }: {
@@ -28,6 +30,7 @@ export function TaskDetail({
   onChanged: () => void;
   expanded: boolean;
   onExpand: () => void;
+  onOpenChat: () => void;
   transcribe?: boolean;
   scope: string;
 }) {
@@ -169,7 +172,7 @@ export function TaskDetail({
             <ArrowLeft size={15} />
           </Button>
         ) : null}
-        <h2 title={item.title}>{item.title}</h2>
+        <div className="rk-task-detail-title"><h2 title={item.title}>{item.title}</h2><p>{bot?.name ?? t`Mico`}</p></div>
         {taskIsActive(current) ? (
           <Button
             variant="ghost"
@@ -197,16 +200,20 @@ export function TaskDetail({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={t`Open task in chat`}
+          aria-label={t`Expand conversation`}
           aria-pressed={expanded}
           onClick={onExpand}
         >
           <Maximize2 size={15} />
         </Button>
+        <Button variant="ghost" size="icon-sm" aria-label={t`Open conversation`} title={t`Open conversation`} onClick={onOpenChat}>
+          <MessageCircle size={15} />
+        </Button>
         <Button variant="ghost" size="icon-sm" aria-label={t`Close task`} onClick={onClose}>
           <X size={16} />
         </Button>
       </header>
+      <TaskFollowUp item={current} client={client} onChanged={()=>{refresh(value=>value+1);onChanged();}}/>
       <div className="rk-task-detail-scroll rk-scroll" data-testid="task-conversation-messages">
         {typeof olderCursor === "number" ? (
           <Button

@@ -1269,6 +1269,7 @@ export const appContract = {
     messages: oc.input(z.object({ id: Id, before: z.number().int().nonnegative() })).output(ThreadMessagePageSchema),
     send: oc.input(TaskInboxSendSchema.extend({ id: Id })).output(z.object({ ok: z.literal(true) })),
     markRead: oc.input(z.object({ id: Id, seq: z.number().int().min(-1) })).output(z.object({ ok: z.literal(true) })),
+    followUp: oc.input(z.object({ id: Id, pinned: z.boolean().optional(), remindAt: IsoDate.nullable().optional() }).refine(v => v.pinned !== undefined || v.remindAt !== undefined)).output(z.object({ ok: z.literal(true) })),
     archive: oc.input(z.object({ id: Id, archived: z.boolean() })).output(z.object({ ok: z.literal(true) })),
     stop: oc.input(z.object({ id: Id })).output(z.object({ ok: z.literal(true) })),
     answer: oc.input(z.object({ id: Id, runId: Id, messageId: Id, answer: z.string().max(16000), username: z.string().min(1).max(512).optional(), dismiss: z.literal(true).optional() }).refine(value => value.dismiss ? value.answer === "" && !value.username : value.answer.length > 0)).output(z.object({ ok: z.literal(true) })),

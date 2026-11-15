@@ -12476,3 +12476,131 @@ msgstr "Ask anything to get started."
 #: src/pages/demo/Presenter.tsx src/pages/demo/MyceliumNetwork.tsx
 msgid "Press Play to contribute."
 msgstr "Press Play to contribute."
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "A separate task with the same Mico. Your other conversations stay where they are."
+msgstr "A separate task with the same Mico. Your other conversations stay where they are."
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "For example: migrate Kuma"
+msgstr "For example: migrate Kuma"
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "Create conversation"
+msgstr "Create conversation"
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "Conversation options"
+msgstr "Conversation options"
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "Reset context…"
+msgstr "Reset context…"
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "Reset {name}'s main chat context?"
+msgstr "Reset {name}'s main chat context?"
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "Previous messages stay visible. The Mico keeps its memories, instructions and tools. To work on another task, choose New conversation."
+msgstr "Previous messages stay visible. The Mico keeps its memories, instructions and tools. To work on another task, choose New conversation."
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "Could not reset the context. Try again."
+msgstr "Could not reset the context. Try again."
+
+#: src/components/MicoTaskTabs.tsx src/components/composer/NewChatControl.tsx
+msgid "Reset context"
+msgstr "Reset context"
+
+#: src/pages/tasks/TasksWorkspace.tsx src/pages/tasks/TaskDetail.tsx
+msgid "Not started"
+msgstr "Not started"
+
+#: src/pages/tasks/TasksWorkspace.tsx src/pages/tasks/TaskDetail.tsx
+msgid "Task conversations from all your Micos in this workspace. They stay here until you archive them."
+msgstr "Task conversations from all your Micos in this workspace. They stay here until you archive them."
+
+#: src/pages/tasks/TasksWorkspace.tsx src/pages/tasks/TaskDetail.tsx
+msgid "Expand conversation"
+msgstr "Expand conversation"
+
+#: src/pages/tasks/TasksWorkspace.tsx src/pages/tasks/TaskDetail.tsx
+msgid "Open conversation"
+msgstr "Open conversation"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Pinned conversations"
+msgstr "Pinned conversations"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "New replies"
+msgstr "New replies"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "New reply"
+msgstr "New reply"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "To continue"
+msgstr "To continue"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Reminder due"
+msgstr "Reminder due"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Unpin conversation"
+msgstr "Unpin conversation"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Pin conversation"
+msgstr "Pin conversation"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Remind me"
+msgstr "Remind me"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Dismiss reminder"
+msgstr "Dismiss reminder"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Time to continue"
+msgstr "Time to continue"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Reminder set"
+msgstr "Reminder set"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "When should we remind you?"
+msgstr "When should we remind you?"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "In 10 minutes"
+msgstr "In 10 minutes"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "In 1 hour"
+msgstr "In 1 hour"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Tomorrow at 9"
+msgstr "Tomorrow at 9"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Or choose a date and time"
+msgstr "Or choose a date and time"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Save reminder"
+msgstr "Save reminder"
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Choose a future date and time."
+msgstr "Choose a future date and time."
+
+#: src/pages/tasks/TaskFollowUp.tsx src/pages/tasks/TasksWorkspace.tsx
+msgid "Saved with this conversation. Device alerts follow your notification settings."
+msgstr "Saved with this conversation. Device alerts follow your notification settings."

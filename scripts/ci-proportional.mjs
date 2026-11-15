@@ -93,6 +93,9 @@ export function planChecks(files, availableAgentTests) {
     const available = availableAgentTests ?? execFileSync('git', ['ls-files', '-z', 'src/agent'], { encoding: 'utf8' }).split('\0').filter(f => /\.test\.[jt]sx?$/.test(f)).map(f => f.slice('src/agent/'.length));
     const affected = agentAffectedTestFiles(related, available).filter(file => !tests.includes(file));
     if (affected.length) add('src/agent', 'node', ['node_modules/vitest/vitest.mjs', 'run', ...affected, '--maxWorkers', '2'], 'Agent affected tests');
+    if (files.some(f => /^src\/agent\/(?:scripts\/verify-task-conversations|apps\/api\/src\/(?:routes\/task-inbox|task-inbox-conversations)|packages\/adapters\/src\/task-reminders|packages\/db\/prisma\/migrations\/20261115100000_task_followup)/.test(f))) {
+      add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-task-conversations-route-db.ts'], 'conversation follow-up migration, reminders and RLS in isolated PostgreSQL');
+    }
     if (files.some(f => f === 'src/agent/scripts/verify-notification-devices-db.ts' || f.startsWith('src/agent/packages/db/prisma/migrations/20261112110000_mobile_push_devices/'))) {
       add('src/agent', 'node', ['node_modules/tsx/dist/cli.mjs', 'scripts/verify-notification-devices-db.ts'], 'notification device migration and RLS in isolated PostgreSQL');
     }
