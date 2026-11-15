@@ -33,4 +33,3 @@ export function runtimeBarrierStatus(port) {
   return {profile:value.profile,port,refused:value.blocked(),activeHttp,installed:true};
 }
 export function restoreRuntimeBarrier(port){const value=installed.get(port);if(!value)throw new Error('barrier_not_installed');value.restore();installed.delete(port);return{restored:true,port};}
-
