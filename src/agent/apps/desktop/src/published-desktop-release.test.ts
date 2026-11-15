@@ -58,6 +58,18 @@ describe("published Desktop packages", () => {
       await expect(fetchDesktopArtifact(fetcher, target, AbortSignal.timeout(1000))).rejects.toThrow();
     expect(fetcher).not.toHaveBeenCalled();
   });
+  it("allows only an official query matching the caller's pinned checksum", async () => {
+    const hash = "c".repeat(64), url = "https://www.mycellios.com/downloads/desktop/releases/0.3.54/app.exe";
+    const fetcher = vi.fn<typeof fetch>(async () => new Response("installer"));
+    await fetchDesktopArtifact(fetcher, `${url}?sha256=${hash}`, AbortSignal.timeout(1000), hash);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    fetcher.mockClear();
+    for (const suffix of [`?sha256=${"b".repeat(64)}`, `?sha256=${hash}&extra=1`, "?other=1"])
+      await expect(fetchDesktopArtifact(fetcher, url + suffix, AbortSignal.timeout(1000), hash)).rejects.toThrow();
+    await expect(fetchDesktopArtifact(fetcher, `${url}?sha256=${hash}`, AbortSignal.timeout(1000))).rejects.toThrow();
+    await expect(fetchDesktopArtifact(fetcher, publishedWindowsArtifact(manifest, version).url + `?sha256=${hash}`, AbortSignal.timeout(1000), hash)).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("bounds release metadata before parsing", async () => {
     await expect(publishedWindowsRelease("0.3.15", vi.fn<typeof fetch>(async () => new Response(" ".repeat(512_001))))).rejects.toThrow(/limit/);
   });

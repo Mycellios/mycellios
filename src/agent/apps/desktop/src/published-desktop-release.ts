@@ -7,14 +7,16 @@ const VERSION = "(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})\\.(0|[1-9]\\d{0,5})";
 const TAG = new RegExp(`^desktop-v${VERSION}-windows-preview$`);
 
 /** Only the owned release URL may redirect, and only to GitHub's release-asset CDN. */
-export async function fetchDesktopArtifact(fetcher: typeof fetch, url: string, signal: AbortSignal): Promise<Response> {
+export async function fetchDesktopArtifact(fetcher: typeof fetch, url: string, signal: AbortSignal, expectedSha256?: string): Promise<Response> {
   if (url.includes("..") || url.includes("%")) throw Error("Invalid Desktop artifact path");
   const initial = new URL(url);
   const github = initial.origin === "https://github.com" &&
     /^\/Mycellios\/mycellios\/releases\/download\/desktop-v[0-9.]+-windows-preview\/[A-Za-z0-9._-]+$/.test(initial.pathname);
   const official = initial.origin === "https://www.mycellios.com" &&
     /^\/downloads\/desktop\/releases\/[0-9.]+\/[A-Za-z0-9._-]+$/.test(initial.pathname);
-  if (initial.username || initial.password || initial.search || initial.hash || (!github && !official))
+  const pinnedQuery = official && typeof expectedSha256 === "string" && /^[a-f0-9]{64}$/.test(expectedSha256) &&
+    initial.search === `?sha256=${expectedSha256}`;
+  if (initial.username || initial.password || (initial.search && !pinnedQuery) || initial.hash || (!github && !official))
     throw Error("Invalid Desktop artifact origin");
   let target = initial;
   for (let attempt = 0; attempt < 4; attempt++) {

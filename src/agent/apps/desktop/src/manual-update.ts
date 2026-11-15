@@ -192,7 +192,7 @@ export class ManualUpdateController {
       const temporary = destination + ".part";
       this.current = { ...this.current, phase: "downloading", percent: 0 };
       try {
-        const response = await fetchDesktopArtifact(this.options.fetch ?? fetch, release.url, AbortSignal.timeout(15 * 60_000));
+        const response = await fetchDesktopArtifact(this.options.fetch ?? fetch, release.url, AbortSignal.timeout(15 * 60_000), release.sha256);
         if (!response.ok || !response.body) throw Error("Installer unavailable");
         let bytes = 0;
         const hash = createHash("sha256");

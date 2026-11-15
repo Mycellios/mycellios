@@ -104,6 +104,13 @@ describe("official Windows manual releases", () => {
     expect(await controller.check(true)).toMatchObject({ phase: "error" });
     expect(request).toHaveBeenCalledTimes(4);
   });
+  it("downloads and verifies the checksum-qualified catalog URL", async () => {
+    const pinned = `${entry.path}?sha256=${entry.sha256}`;
+    const { controller, request, handoff } = await fixture({ catalog: { packages: [{ ...entry, path: pinned }] } });
+    expect(await controller.check(true)).toMatchObject({ phase: "ready", availableVersion: entry.version });
+    expect(request.mock.calls[1]?.[0]).toBe("https://www.mycellios.com" + pinned);
+    expect(handoff).not.toHaveBeenCalled();
+  });
   it("preserves only a catalog query matching the pinned checksum", () => {
     const withPath = (path: string) => ({ packages: [{ ...entry, path }] });
     const pinned = `${entry.path}?sha256=${entry.sha256}`;
