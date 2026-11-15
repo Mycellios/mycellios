@@ -176,8 +176,10 @@ These rules apply to the complete repository.
 - Landing Mico illustrations use Agent's current eyeless mycelium atlas and compact
   face anchors, not the old geometric demo SVGs. `mico-avatar.test.tsx` checks crop
   and anchor parity; retain the greeting, pause and reduced-motion behavior.
-- The landing download split button reads the validated Desktop release catalog,
-  preserves checksum query parameters and falls back to the downloads page. Never
+- The landing download split button reads the validated Desktop release catalog
+  for availability and uses stable latest routes, whose redirects preserve the
+  current artifact checksum. Do not pin old filenames in `download` attributes.
+  It falls back to the downloads page. Never
   guess Mac CPU architecture or advertise unsupported installers. Keep the platform
   picker dismissible with Escape/outside click and separate browser entry available.
 - The Agent opening uses GoldenMycelium: original WebGL2 gold hyphae on deep moss,

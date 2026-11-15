@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Apple, ArrowDownToLine, ChevronDown, Monitor, Smartphone, Terminal } from "lucide-react";
-import { isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../../../src/contracts/desktop-downloads";
+import { desktopLatestDownloadPath, isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../../../src/contracts/desktop-downloads";
 import { Button, Link, Text } from "../ui/primitives";
 import "./agent-download-action.css";
 
@@ -45,7 +45,7 @@ export function AgentDownloadAction() {
   const preferred = catalog?.packages.find(pkg => pkg.id === suggested.id);
   return <div className="agent-download" ref={root}>
     <div className="agent-download-split">
-      <Link variant="primary" size="xl" className="agent-download-primary" href={preferred?.path ?? "/downloads/desktop"} download={preferred?.fileName}>
+      <Link variant="primary" size="xl" className="agent-download-primary" href={preferred ? desktopLatestDownloadPath(preferred.id) : "/downloads/desktop"}>
         <ArrowDownToLine size={19} aria-hidden="true" />Download{suggested.label ? ` for ${suggested.label}` : " Mycellios"}
       </Link>
       <Button ref={toggle} variant="primary" size="xl" className="agent-download-toggle" aria-label="Choose a download platform" aria-expanded={open} aria-controls="agent-download-platforms" onClick={() => setOpen(value => !value)}><ChevronDown size={17} aria-hidden="true" /></Button>
@@ -56,7 +56,7 @@ export function AgentDownloadAction() {
         // Avoid capturing an uninitialised icon from a shared chunk at module load.
         const Icon = id === "windows-x64" ? Monitor : id.startsWith("macos-") ? Apple : Terminal;
         const pkg = id === "fedora-x64" ? catalog?.fedora : catalog?.packages.find(item => item.id === id);
-        return pkg ? <Link key={id} href={pkg.path} download={pkg.fileName} onClick={() => setOpen(false)}><Icon size={18} aria-hidden="true" /><span>{label}<small>{detail}</small></span><ArrowDownToLine size={15} aria-hidden="true" /></Link> : null;
+        return pkg ? <Link key={id} href={desktopLatestDownloadPath(id)} onClick={() => setOpen(false)}><Icon size={18} aria-hidden="true" /><span>{label}<small>{detail}</small></span><ArrowDownToLine size={15} aria-hidden="true" /></Link> : null;
       })}
       <Link href="/downloads/desktop#android-title"><Smartphone size={18} aria-hidden="true" /><span>Android<small>App &amp; installation details</small></span></Link>
       <Link className="agent-download-all" href="/downloads/desktop">All downloads &amp; installation details</Link>
