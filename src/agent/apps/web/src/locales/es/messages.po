@@ -12891,7 +12891,6 @@ msgstr "Ahora no hay modelos de Mycellios disponibles para los Micos. Volvemos a
 msgid "Mycellios network"
 msgstr "Red Mycellios"
 
-
 msgid "Open Mycellios Dev"
 msgstr "Abrir Mycellios Dev"
 

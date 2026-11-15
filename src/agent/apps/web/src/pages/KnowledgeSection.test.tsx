@@ -269,7 +269,7 @@ it("downloads only each row’s saved markdown with its own filename", async () 
       "text/markdown",
       new TextEncoder().encode("Other document"),
     );
-    expect(container.querySelector("h3")?.textContent).toBe("Memory");
+    expect(container.querySelector("h3")?.textContent).toBe("Mico memory");
     expect(container.querySelector("textarea")).toBeNull();
   } finally {
     await act(async () => root.unmount());

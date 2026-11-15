@@ -41,6 +41,8 @@ export function ChatModelPicker({
   modelOrigins,
   providerContent,
   mycelliosCatalogReady = true,
+  catalogProviders,
+  onExplore,
 }: {
   id: string;
   choices: readonly (ChatModelChoice & { unavailable?: boolean })[];
@@ -57,6 +59,8 @@ export function ChatModelPicker({
   modelOrigins?: Readonly<Record<string, "network" | "antseed">>;
   providerContent?: (provider: string) => ReactNode;
   mycelliosCatalogReady?: boolean;
+  catalogProviders?: readonly string[];
+  onExplore?: (provider: string) => void;
 }) {
   const { t } = useLingui();
   const imagesHintId = useId();
@@ -211,6 +215,11 @@ export function ChatModelPicker({
           ) : null}
           {heading && activeProvider ? <p className="mb-1 truncate px-1 text-xs text-muted-foreground">{activeProvider}</p> : null}
           {providerContent?.(activeProvider ?? "") ?? options}
+          {activeProvider && catalogProviders?.includes(activeProvider) && onExplore ? (
+            <Button type="button" variant="ghost" size="sm" className="mt-1 w-full justify-start gap-2" onClick={() => onExplore(activeProvider)}>
+              {t`Explore catalog`}
+            </Button>
+          ) : null}
         </div>
       </div>
     );
