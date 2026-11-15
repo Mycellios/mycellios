@@ -70,10 +70,7 @@
       "criticalPaths": {
         "home": {
           "entry": "src/rebrand/ReferenceLanding.tsx",
-          "highPriorityMatches": [
-            "agent-hero-motion-",
-            "gsap-"
-          ],
+          "highPriorityMatches": [],
           "maximumBytes": 350000
         },
         "panel": {

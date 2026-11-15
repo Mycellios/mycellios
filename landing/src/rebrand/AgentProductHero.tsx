@@ -1,3 +1,4 @@
+import { loadAgentMotion } from "./deferred-agent-motion";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Button, Heading, Link, Text } from "../ui/primitives";
@@ -19,7 +20,7 @@ export function AgentProductHero({ header, onPlaybackChange }: { header: ReactNo
   }, []);
   useEffect(() => {
     let active = true, destroy: (() => void) | undefined;
-    void import("./agent-hero-motion").then(({ animateAgentHero }) => {
+    void loadAgentMotion().then(({ animateAgentHero }) => {
       if (active && root.current) destroy = animateAgentHero(root.current);
     }).catch(() => { /* The complete hero remains visible if motion cannot load. */ });
     return () => { active = false; destroy?.(); };

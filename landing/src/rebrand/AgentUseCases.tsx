@@ -1,3 +1,4 @@
+import { loadAgentMotion } from "./deferred-agent-motion";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, FileText, ShieldCheck } from "lucide-react";
 import { Button, Card, Heading, Link, Text } from "../ui/primitives";
@@ -31,7 +32,7 @@ export default function AgentUseCases() {
   const example = examples[selected]!;
   useEffect(() => {
     let active = true, destroy: (() => void) | undefined;
-    void import("./agent-hero-motion").then(({ animateCasePreview }) => {
+    void loadAgentMotion().then(({ animateCasePreview }) => {
       if (active && preview.current) destroy = animateCasePreview(preview.current);
     }).catch(() => {});
     return () => { active = false; destroy?.(); };

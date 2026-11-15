@@ -1,3 +1,4 @@
+import { loadAgentMotion } from "./deferred-agent-motion";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Bell, Check, ChevronDown, FileText, Folder, Mic, Monitor, MousePointer2, PanelLeftClose, PanelRight, Pause, Play, Plus, Search, ShieldCheck } from "lucide-react";
 import { Button, IconButton, Input, Link, Select, Text } from "../ui/primitives";
@@ -57,7 +58,7 @@ export function AgentHeroDemo({ onPlaybackChange }: { onPlaybackChange: (playing
   useEffect(() => {
     let active = true;
     setPreview(null); setPermission("pending");
-    void import("./agent-hero-motion").then(({ animateAgentDemo }) => {
+    void loadAgentMotion().then(({ animateAgentDemo }) => {
       if (!active || !root.current) return;
       motion.current = animateAgentDemo(root.current, example.request, () => {
         if (active) setPreview("notes");
