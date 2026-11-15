@@ -725,6 +725,9 @@ export const UpdateAgentSkillInput = z
   });
 
 export const MemoryDocumentSchema = z.object({
+  inclusion: z.enum(["essential", "searchable"]).optional(),
+  userControlled: z.boolean().optional(),
+  taskThreadId: Id.nullable().optional(),
   id: Id,
   scope: MemoryScope,
   botId: Id.nullable(),

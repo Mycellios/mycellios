@@ -23,6 +23,7 @@ const payloadSchemas = {
   "skill.teaching-expire": z.object({ skillId: z.string().min(1) }),
   "call.expire": z.object({ threadId: z.string().min(1), callId: z.string().min(1) }),
   "history.compact": z.object({ threadId: z.string().min(1) }),
+  "memory.review": z.object({ threadId: z.string().min(1) }),
   "messaging.deliver": z.object({ runId: z.string().min(1).optional() }),
   "messaging.credential-cleanup": z.object({
     installationId: z.string().min(1),
@@ -201,3 +202,5 @@ export function cloudAgentPollJob(
     ...(availableAt ? { availableAt } : {}),
   };
 }
+
+export function memoryReviewJob(threadId:string,availableAt?:Date):BackgroundJob{return {name:"memory.review",payload:{threadId},replaceKey:`memory.review:${threadId}`,maxAttempts:1,...(availableAt?{availableAt}:{})};}

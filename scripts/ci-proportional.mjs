@@ -20,7 +20,11 @@ export function agentAffectedTestFiles(sources, available) {
     const stem = path.posix.basename(source).replace(/\.[jt]sx?$/, '');
     const owned = available.filter(file => path.posix.dirname(file) === directory);
     const named = owned.filter(file => { const name = path.posix.basename(file); return name.startsWith(stem + '.test.') || name.startsWith(stem + '-') || name.startsWith(stem + '.'); });
-    for (const file of named.length ? named : owned) selected.add(file);
+    // A registry has cross-cutting consumers, not every adapter implementation.
+    // Retain its wire-schema, exposure and executor regressions explicitly.
+    const registry = source === 'packages/adapters/src/builtin-tools.ts'
+      ? owned.filter(file => ['pi-runtime-field-descriptions.test.ts','pi-runtime.test.ts','executor.test.ts','index.test.ts'].includes(path.posix.basename(file))) : null;
+    for (const file of registry ?? (named.length ? named : stem === 'index' ? [] : owned)) selected.add(file);
   }
   return [...selected].sort();
 }

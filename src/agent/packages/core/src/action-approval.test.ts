@@ -718,3 +718,5 @@ it("requires human confirmation to approve an agent connection", () => {
   expect(toolRequiresExplicitApproval("respond_agent_connection")).toBe(true);
   expect(toolRequiresApproval("respond_agent_connection", false)).toBe(true);
 });
+
+it("local memory reads stay within the existing owned-state policy",()=>{for(const name of ["search_local_memory","read_local_memory"]){expect(toolRequiresApproval(name,false,true)).toBe(false);expect(unattendedTriggerToolRequiresApproval("webhook",name,false,true)).toBe(false);expect(toolResultTaintsRun(name)).toBe(false);}});

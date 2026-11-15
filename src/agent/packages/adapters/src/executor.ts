@@ -1,4 +1,5 @@
 import { eventDemoSessionActive } from "@rakazo/db";
+import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
 import { micoBehaviorInstructions } from "./mico-behavior.js";
 import { agentNewChatTool, requestAgentNewChat, finishAgentNewChat } from "./agent-new-chat.js";
@@ -354,7 +355,7 @@ import {
 import { createMediaGenerationProvider } from "./media-generation-factory.js";
 import { generateMediaFromTool } from "./media-generation-tools.js";
 import { selectRunMediaGeneration } from "./native-image-generation.js";
-import { loadAgentMemoryContext } from "./memory-context.js";
+import { loadAgentMemoryContext, resolveLocalMemoryScope } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { appendMemoryFact, selectMemoryTools } from "./memory-tools.js";
 import {
@@ -584,6 +585,8 @@ const READ_ONLY_AGENT_TOOLS = new Set([
   "run_subagent",
   "task_catalog",
   "recall_memory",
+  "search_local_memory",
+  "read_local_memory",
   "schedule_list",
   "scratchpad_list",
   "board_tickets",
@@ -4097,6 +4100,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
         const semanticMemory: SemanticMemoryProvider | null = configuredMemory?.provider ?? null;
+        const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
 
         await deps.events.append({
           spaceId: run.spaceId,
@@ -4197,7 +4201,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           loadCurrentTurnImages(deps, turnBlocks, context),
           messagingChannelRun
             ? Promise.resolve("")
-            : loadAgentMemoryContext(deps.memory, bot.id, context),
+            : loadAgentMemoryContext(deps.memory, bot.id, context, undefined, {query:task.prompt, taskThreadId:thread.id, includeGeneral:localMemoryScope==="shared"}),
           messagingChannelRun
             ? Promise.resolve("")
             : loadAgentScratchpadContext(deps, {
@@ -6768,13 +6772,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return requestAgentNewChat(deps.prisma, { userId: run.userId, spaceId: run.spaceId, botId: bot.id, threadId: thread.id },
               { runId, owner: workerId, fence }, JSON.parse(redactSecrets(JSON.stringify(args), runSecrets)));
           }
+          if(messagingChannelRun && ["search_local_memory","read_local_memory"].includes(name))return finish({error:"Personal memories are not available in messaging channels"});
+          if (name === "search_local_memory") return finish(await deps.memory.search({scope:"all",botId:bot.id,taskThreadId:thread.id,includeGeneral:localMemoryScope==="shared",query:String(args.query??""),limit:5},context));
+          if (name === "read_local_memory") {
+            const doc=await deps.prisma.memoryDocument.findFirst({where:{id:String(args.id??""),spaceId:run.spaceId,userId:run.userId,
+              OR:[{scope:"bot",botId:bot.id},...(localMemoryScope==="shared"?[{scope:"user",botId:null}]:[])],
+              AND:[{OR:[{taskThreadId:null},{taskThreadId:thread.id}]}]}});
+            return finish(doc?{id:doc.id,path:doc.path,revision:doc.revision,scope:doc.taskThreadId?"task":doc.scope==="user"?"general":"mico",untrusted:true,content:redactSecrets(doc.content.slice(0,8000),runSecrets)}:{error:"Memory unavailable in this conversation"});
+          }
           if (name === "remember") {
-            const path = String(args.path ?? "").trim() || "MEMORY.md";
+            const taskThreadId=args.scope==="task"?thread.id:undefined;
+            const namePath = String(args.path ?? "").trim() || "MEMORY.md";
+            const path=taskThreadId?`tasks/${taskThreadId}/${namePath}`:namePath;
             // A fact is added to the document, never replaces it. A concurrent save
             // changes the revision, so re-read and append again.
             for (let attempt = 1; ; attempt += 1) {
               const snapshot = await deps.memory.read(
-                { scope: "bot", botId: bot.id, path },
+                { scope: "bot", botId: bot.id, path, ...(taskThreadId?{taskThreadId}:{}) },
                 context,
               );
               const existing = snapshot.documents[0];
@@ -6788,6 +6802,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     path,
                     content,
                     expectedRevision: existing?.revision ?? 0,
+                    ...(taskThreadId?{taskThreadId}:{}),
                     sourceRunId: runId,
                     sourceThreadId: thread.id,
                   },
@@ -6801,6 +6816,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             }
           }
           if (name === "save_shared_memory") {
+            if(localMemoryScope==="isolated") return finish({error:"General memory is disabled for this Mico. Keep this fact in individual or task memory."});
             const invalid = sharedMemorySaveError(args);
             if (invalid) return finish({ error: invalid });
             const path = String(args.path ?? "").trim();
@@ -9272,6 +9288,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           } catch (error) {
             getLogger().error("history.compact enqueue failed", error);
           }
+          if(!messagingChannelRun)await scheduleLocalMemoryReview({prisma:deps.prisma,jobs:deps.jobs},thread.id).catch(error=>getLogger().error("memory.review enqueue failed",error));
         } catch (caughtError) {
           if (desktopUpdateRequested || deps.shutdownSignal?.aborted) { await pauseForRestart(); return; }
           let error = caughtError;
@@ -9873,6 +9890,8 @@ export function selectBuiltinToolsForRun(options: {
           "save_shared_memory",
           "save_memory",
           "recall_memory",
+  "search_local_memory",
+  "read_local_memory",
           "forget_memory",
           "task_catalog",
           "board_tickets",

@@ -102,6 +102,7 @@ model AiDataConsent {
 }
 
 model User {
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewUser")
   hostedWebs HostedWeb[]
   hostedWebRevisions HostedWebRevision[]
   hostedWebPins HostedWebPin[]
@@ -365,6 +366,7 @@ model Member {
 }
 
 model Space {
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewSpace")
   hostedWebs HostedWeb[]
   hostedWebRevisions HostedWebRevision[]
   hostedWebPins HostedWebPin[]
@@ -655,6 +657,7 @@ model WorkflowExecution {
 }
 
 model Bot {
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewBot")
   hostedWebAgents HostedWebAgent[]
   inboxTasks InboxTask[]
   taskConcurrency Int @default(4)
@@ -816,6 +819,8 @@ model DevelopmentProject {
 }
 
 model Thread {
+  taskMemories MemoryDocument[] @relation("TaskMemory")
+  localMemoryReviews LocalMemoryReview[] @relation("ReviewThread")
   hostedWebAgent HostedWebAgent?
   inboxTask InboxTask?
   taskBotId String?
@@ -854,6 +859,7 @@ model Thread {
   @@index([spaceId])
   @@unique([spaceId, userId, taskKey])
   @@index([taskBotId, projectKey])
+  @@unique([id,spaceId,userId],map:"memory_thread_identity_scope_key")
   @@map("threads")
 }
 
@@ -1333,6 +1339,10 @@ model MemoryDocument {
   scope     String
   path      String
   content   String
+  inclusion String @default("searchable")
+  userControlled Boolean @default(false)
+  taskThreadId String?
+  taskThread Thread? @relation("TaskMemory",fields:[taskThreadId,spaceId,userId],references:[id,spaceId,userId],onDelete:Cascade,onUpdate:NoAction,map:"memory_task_owner")
   revision  Int              @default(1)
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
@@ -1340,6 +1350,7 @@ model MemoryDocument {
 
   @@unique([spaceId, scope, botId, path])
   @@index([spaceId, userId])
+  @@index([spaceId,userId,botId,taskThreadId],map:"memory_task_scope")
   @@map("memory_documents")
 }
 
@@ -2309,4 +2320,30 @@ model WebPushDelivery {
   finishedAt DateTime? @db.Timestamptz(6)
   @@unique([deviceId, eventKey])
   @@map("web_push_deliveries")
+}
+
+// Durable admission/receipt record: a submitted review is only reconciled, never replayed.
+model LocalMemoryReview {
+  thread Thread @relation("ReviewThread",fields:[threadId,spaceId,userId],references:[id,spaceId,userId],onDelete:Cascade,onUpdate:NoAction)
+  bot Bot @relation("ReviewBot",fields:[botId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  space Space @relation("ReviewSpace",fields:[spaceId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  user User @relation("ReviewUser",fields:[userId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  id String @id
+  threadId String
+  botId String
+  spaceId String
+  userId String
+  generation Int
+  lastSeq Int
+  status String
+  maximumMicrounits Int @default(0)
+  chargedMicrounits Int?
+  idempotencyKey String @unique
+  connectionDigest String
+  result Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([threadId, generation, lastSeq])
+  @@index([userId, spaceId, createdAt],map:"review_daily_budget")
+  @@map("local_memory_reviews")
 }

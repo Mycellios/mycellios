@@ -285,6 +285,8 @@ export interface ConnectorCapabilities {
 export type ConnectorCatalogItem = ConnectionCatalogItem;
 
 export interface MemoryReadRequest {
+  taskThreadId?: string;
+  includeGeneral?: boolean;
   scope: "bot" | "user";
   botId?: string;
   path?: string;
@@ -297,16 +299,25 @@ export interface MemorySnapshot {
     content: string;
     revision: number;
     updatedAt?: string;
+    inclusion?: "essential" | "searchable";
+    taskThreadId?: string | null;
+    userControlled?: boolean;
   }>;
 }
 
 export interface MemorySearchRequest {
+  taskThreadId?: string;
+  includeGeneral?: boolean;
+  limit?: number;
   query: string;
   scope: "bot" | "user" | "all";
   botId?: string;
 }
 
 export interface MemorySearchResult {
+  id?: string;
+  scope?: "bot" | "user";
+  taskThreadId?: string | null;
   path: string;
   snippet: string;
   score: number;
@@ -317,6 +328,9 @@ export const MEMORY_REVISION_CONFLICT_ERROR =
   "Shared memory changed since it was read. Read the latest version and save again.";
 
 export interface MemoryCommitRequest {
+  inclusion?: "essential" | "searchable";
+  selectionByUser?: boolean;
+  taskThreadId?: string | null;
   scope: "bot" | "user";
   botId?: string;
   path: string;
@@ -716,6 +730,7 @@ export interface BackgroundJobPayloads {
   /** The bot's call rang out: mark it missed if nobody answered. */
   "call.expire": { threadId: string; callId: string };
   "history.compact": { threadId: string };
+  "memory.review": { threadId: string };
   "messaging.deliver": { runId?: string };
   "messaging.credential-cleanup": { installationId: string; ref: string };
   /** Reconcile durable remote-agent intent; scope is loaded from the database. */

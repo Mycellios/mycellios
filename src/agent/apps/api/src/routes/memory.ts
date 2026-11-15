@@ -15,6 +15,11 @@ export function memoryRoutes(ctx: RouterContext) {
   const { deps, repos, taughtSkills, agentSkills, authed } = ctx;
   return {
     memory: {
+      reviewStatus: authed.memory.reviewStatus.handler(async({context})=>{
+        const day=new Date();day.setUTCHours(0,0,0,0);const owner={userId:context.actor.userId,spaceId:context.actor.spaceId};
+        const [totals,pending]=await Promise.all([deps.prisma.localMemoryReview.aggregate({where:{...owner,createdAt:{gte:day}},_sum:{maximumMicrounits:true,chargedMicrounits:true}}),deps.prisma.localMemoryReview.count({where:{...owner,status:{in:["reserved","submitted","pending","ready"]}}})]);
+        return {reservedMicrounits:totals._sum.maximumMicrounits??0,chargedMicrounits:totals._sum.chargedMicrounits??0,pending};
+      }),
       list: authed.memory.list.handler(async ({ context, input }) => {
         const docs = await deps.prisma.memoryDocument.findMany({
           where: {
@@ -22,11 +27,13 @@ export function memoryRoutes(ctx: RouterContext) {
             userId: context.actor.userId,
             ...(input.botId ? { botId: input.botId } : {}),
             ...(input.scope ? { scope: input.scope } : {}),
+            taskThreadId:input.taskThreadId??null,
           },
         });
         return docs.map((doc) => ({
           id: doc.id,
           scope: doc.scope as "bot" | "user",
+          inclusion:doc.inclusion as "essential"|"searchable",userControlled:doc.userControlled,taskThreadId:doc.taskThreadId,
           botId: doc.botId,
           path: doc.path,
           content: doc.content,
@@ -43,6 +50,7 @@ export function memoryRoutes(ctx: RouterContext) {
           },
         });
         if (!doc) throw new IsolationError();
+        if(input.inclusion && input.expectedRevision===undefined)throw new ORPCError("BAD_REQUEST",{message:"Reopen this memory before changing its inclusion."});
         const updated = await deps.memory
           .commit(
             {
@@ -51,6 +59,9 @@ export function memoryRoutes(ctx: RouterContext) {
               path: doc.path,
               content: input.content,
               expectedRevision: input.expectedRevision,
+              taskThreadId:doc.taskThreadId,
+              selectionByUser:true,
+              ...(input.inclusion ? {inclusion:input.inclusion} : {}),
             },
             {
               operationId: "mem",
@@ -64,10 +75,12 @@ export function memoryRoutes(ctx: RouterContext) {
             if (error instanceof Error && error.message === MEMORY_REVISION_CONFLICT_ERROR) {
               throw new ORPCError("CONFLICT", { message: error.message });
             }
+            if(error instanceof Error && error.message.startsWith("Essential memory limit"))throw new ORPCError("BAD_REQUEST",{message:error.message});
             throw error;
           });
         return {
           id: updated.id,
+          inclusion:(input.inclusion??doc.inclusion) as "essential"|"searchable",userControlled:true,taskThreadId:doc.taskThreadId,
           scope: doc.scope as "bot" | "user",
           botId: doc.botId,
           path: updated.path,

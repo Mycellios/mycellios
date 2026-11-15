@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
-import { effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
+import { DEFAULT_MEMORY_REVIEW_POLICY, effectiveMicoSettings, type Bot, type MicoBehaviorKey, type MicoSettingsState, type MicoSettingsUpdate } from "@rakazo/contracts";
 import { BotAvatar, Button, Input, OptionSelect, Switch } from "@rakazo/ui-web";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRows";
 import { useSpaceRpc } from "../../lib/space-rpc";
@@ -14,6 +14,8 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
   const [view, setView] = useState<MicoBehaviorKey | null>(null);
   const [search, setSearch] = useState(""), [error, setError] = useState("");
   const [saving, setSaving] = useState(false), lock = useRef(false);
+  const [memoryUsage,setMemoryUsage]=useState<Awaited<ReturnType<RpcClient["memory"]["reviewStatus"]>>|null>(null);
+  useEffect(()=>{let gone=false;setMemoryUsage(null);if(client.memory?.reviewStatus)void client.memory.reviewStatus().then(value=>{if(!gone)setMemoryUsage(value);},()=>{});return()=>{gone=true;};},[client,loaded?.state.revision]);
   const [hostBusy, setHostBusy] = useState(false);
   const [retry, setRetry] = useState(0);
   const state = loaded?.client === client ? loaded.state : null;
@@ -66,6 +68,21 @@ export function MicoBehaviorSettings({ bots, onBusyChange }: { bots: Bot[]; onBu
       })}{!rows.length && <p className="px-4 py-3 text-sm text-muted-foreground">{t`No Micos in this space.`}</p>}</SettingsGroup>
       {chosen.key === "localScripts" && <LocalScriptsSettings scope={client} onBusyChange={setHostBusy} />}
     </> : <>
+      <SettingsGroup title={t`Local memory`}>
+        {memoryUsage?<SettingsRow label={t`Reserved today`} description={t`Daily budget resets at 00:00 UTC.`}
+          control={<span className="text-sm tabular-nums">{new Intl.NumberFormat(undefined,{maximumFractionDigits:6}).format(memoryUsage.reservedMicrounits/1_000_000)} {t`Credits`}{memoryUsage.pending ? ` · ${memoryUsage.pending} ${t`Pending reviews`}`:""}</span>} />:null}
+        <SettingsRow label={t`Automatic memory review`} description={t`Learn from completed conversations in the background. Uses a model with a bounded Credit quote; otherwise waits.`}
+          control={<Switch aria-label={t`Automatic memory review`} checked={(state.defaults.memoryReview??DEFAULT_MEMORY_REVIEW_POLICY).enabled} disabled={saving}
+            onCheckedChange={enabled=>void save({kind:"defaults",patch:{memoryReview:{...(state.defaults.memoryReview??DEFAULT_MEMORY_REVIEW_POLICY),enabled}}})} />} />
+        <SettingsRow label={t`Daily limit per space`} description={t`Maximum reserved Credits each day. Pending reviews count toward the limit and are never sent again.`}
+          control={<OptionSelect aria-label={t`Daily limit per space`} value={String((state.defaults.memoryReview??DEFAULT_MEMORY_REVIEW_POLICY).dailyLimitMicrounits)} disabled={saving}
+            options={[{value:"0",label:t`No spending`},{value:"1000",label:"0.001 Credits"},{value:"10000",label:"0.01 Credits"},{value:"50000",label:"0.05 Credits"}]}
+            onValueChange={value=>void save({kind:"defaults",patch:{memoryReview:{...(state.defaults.memoryReview??DEFAULT_MEMORY_REVIEW_POLICY),dailyLimitMicrounits:Number(value)}}})} />} />
+        <SettingsRow label={t`Review frequency`} description={t`Also reviews after 15 minutes of inactivity when there are at least three new messages from you.`}
+          control={<OptionSelect aria-label={t`Review frequency`} value={String((state.defaults.memoryReview??DEFAULT_MEMORY_REVIEW_POLICY).interval)} disabled={saving}
+            options={[{value:"10",label:t`10 turns`},{value:"20",label:t`20 turns`},{value:"40",label:t`40 turns`}]}
+            onValueChange={value=>void save({kind:"defaults",patch:{memoryReview:{...(state.defaults.memoryReview??DEFAULT_MEMORY_REVIEW_POLICY),interval:Number(value) as 10|20|40}}})} />} />
+      </SettingsGroup>
       <SettingsGroup title={t`Defaults`}>{settings.map(setting => {
         const count = rows.filter(bot => effectiveMicoSettings(state.defaults, state.bots.find(item => item.id === bot.id)?.preferences)[setting.key]).length;
         return <SettingsRow key={setting.key} label={setting.title} description={state.defaults[setting.key] ? t`Default: Enabled` : t`Default: Disabled`}

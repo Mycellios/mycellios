@@ -1,3 +1,4 @@
+import { reconcileLocalMemoryReviews } from "@rakazo/adapters";
 import { tailnetServiceFromEnv } from "@rakazo/adapters";
 import { reconcileTaskReminders, WebPushService, webPushConfig, notificationChannels } from "@rakazo/adapters";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -269,6 +270,7 @@ async function main() {
   });
   const webPush = new WebPushService(prisma, resolveEncryptionKey(process.env), jobs, webPushConfig(process.env));
   const notifications = notificationChannels(nativeNotifications, webPush);
+  const localMemory = new MarkdownMemoryStore(prisma);
   const executor = createRunExecutor({
     maxUploadSizeBytes: uploadSizeFromEnv(process.env),
     prisma,
@@ -276,7 +278,7 @@ async function main() {
     // Live per-account Codex catalog; never refreshes or writes credentials.
     codexCatalog: new CodexCatalogCache(),
     sandbox,
-    memory: new MarkdownMemoryStore(prisma),
+    memory: localMemory,
     memoryProviders,
     home,
     artifacts,
@@ -325,6 +327,7 @@ async function main() {
     );
 
   const jobHandlers = createBackgroundJobHandlers({
+    memory:localMemory,
     executor,
     prisma,
     sandbox,
@@ -367,6 +370,7 @@ async function main() {
     ),
     reconcileHomeStorage: homeStorageSweeper(home),
     reconcileTaskReminders: () => reconcileTaskReminders({prisma,notifications}),
+    reconcileLocalMemoryReviews: () => reconcileLocalMemoryReviews(prisma,jobs),
   });
   let stopHealth: (() => Promise<void>) | undefined;
   const shutdown = new AbortController();

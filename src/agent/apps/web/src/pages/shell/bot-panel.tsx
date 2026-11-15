@@ -105,6 +105,7 @@ export function ComputerModePicker({
 export function BotSettings({
   bot,
   memoryProviderConfigured,
+  threadId,
   onSave,
   onExport,
   onClear,
@@ -117,6 +118,7 @@ export function BotSettings({
   onUseThisComputer,
 }: {
   bot: Bot;
+  threadId?: string;
   focusModel?: number;
   onOpenConnections?: () => void;
   onOpenFiles?: () => void;
@@ -734,7 +736,7 @@ export function BotSettings({
           </ErrorBoundary>
           <ErrorBoundary fallback={<SectionLoadFailed />}>
             <Suspense fallback={null}>
-              <KnowledgeSection botId={bot.id} />
+              <KnowledgeSection botId={bot.id} threadId={threadId} />
             </Suspense>
           </ErrorBoundary>
         </div>
@@ -777,9 +779,10 @@ export function BotSettings({
               permission.
             </Trans>
           </p>
-          {memoryProviderConfigured ? (
+
             <div className="mt-4 text-sm text-foreground">
               <Trans>Memory scope</Trans>
+              <p className="mt-1 text-xs text-muted-foreground"><Trans>Isolated uses only Mico and task notes. Shared also uses general notes from this space.</Trans></p>
               <div className="mt-2 flex gap-2">
                 {(
                   [
@@ -803,7 +806,7 @@ export function BotSettings({
                 ))}
               </div>
             </div>
-              ) : null}
+
             </SettingsGroup>
       ) : null}
       {page === "permissions" ? (

@@ -1,3 +1,5 @@
+import { reviewLocalMemory } from "./local-memory-review.js";
+import type { MemoryStore } from "@rakazo/adapter-kit";
 import type { WebPushService } from "./web-push.js";
 import type {
   AgentHomeStore,
@@ -61,6 +63,7 @@ export function createBackgroundJobHandlers(deps: {
   runtime: AgentRuntime;
   secretStore: SecretStore;
   memoryProviders: MemoryProviderResolver;
+  memory?: MemoryStore;
   deploymentModelKey?: string;
   deploymentModelConfigured?: boolean;
   messaging?: MessagingSurface;
@@ -182,6 +185,9 @@ export function createBackgroundJobHandlers(deps: {
     "push.receipt": async (payload) => {
       await runAsSystem("check a push receipt", () => deps.notifications?.checkReceipt(payload));
     },
+    "memory.review": asOwner(thread, async (payload) => {
+      if(deps.memory && deps.executor.resolveModel)await reviewLocalMemory({prisma:deps.prisma,memory:deps.memory,jobs:deps.jobs,resolveModel:deps.executor.resolveModel},payload.threadId);
+    }),
     "history.compact": asOwner(thread, async (payload) => {
       // Retrieval policies use stored context without paid message-count compaction.
       // Skip legacy backlog work after a policy change.

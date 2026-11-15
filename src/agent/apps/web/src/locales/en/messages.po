@@ -12613,3 +12613,91 @@ msgstr "No Mycellios agent models are available right now. Retrying automaticall
 
 msgid "Mycellios network"
 msgstr "Mycellios network"
+
+
+msgid "General memory"
+msgstr "General memory"
+
+
+msgid "Your Micos in this space can use these notes. Micos set to isolated memory do not read them."
+msgstr "Your Micos in this space can use these notes. Micos set to isolated memory do not read them."
+
+
+msgid "Task memory"
+msgstr "Task memory"
+
+
+msgid "Mico memory"
+msgstr "Mico memory"
+
+
+msgid "Always include"
+msgstr "Always include"
+
+
+msgid "Always included"
+msgstr "Always included"
+
+
+msgid "Include when relevant"
+msgstr "Include when relevant"
+
+
+msgid "Local memory"
+msgstr "Local memory"
+
+
+msgid "Automatic memory review"
+msgstr "Automatic memory review"
+
+
+msgid "Learn from completed conversations in the background. Uses a model with a bounded Credit quote; otherwise waits."
+msgstr "Learn from completed conversations in the background. Uses a model with a bounded Credit quote; otherwise waits."
+
+
+msgid "Daily limit per space"
+msgstr "Daily limit per space"
+
+
+msgid "Maximum reserved Credits each day. Pending reviews count toward the limit and are never sent again."
+msgstr "Maximum reserved Credits each day. Pending reviews count toward the limit and are never sent again."
+
+
+msgid "No spending"
+msgstr "No spending"
+
+
+msgid "Review frequency"
+msgstr "Review frequency"
+
+
+msgid "Also reviews after 15 minutes of inactivity when there are at least three new messages from you."
+msgstr "Also reviews after 15 minutes of inactivity when there are at least three new messages from you."
+
+
+msgid "10 turns"
+msgstr "10 turns"
+
+
+msgid "20 turns"
+msgstr "20 turns"
+
+
+msgid "40 turns"
+msgstr "40 turns"
+
+
+msgid "Isolated uses only Mico and task notes. Shared also uses general notes from this space."
+msgstr "Isolated uses only Mico and task notes. Shared also uses general notes from this space."
+
+
+msgid "Reserved today"
+msgstr "Reserved today"
+
+
+msgid "Daily budget resets at 00:00 UTC."
+msgstr "Daily budget resets at 00:00 UTC."
+
+
+msgid "Pending reviews"
+msgstr "Pending reviews"
