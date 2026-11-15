@@ -264,7 +264,7 @@ export function botsRoutes(ctx: RouterContext) {
         return found;
       }),
       create: authed.bots.create.handler(async ({ context, input }) => {
-        const { model, ...profile } = input;
+        const { model, skipIntro, ...profile } = input;
         if (profile.agentEngine) {
           if (model) throw new ORPCError("BAD_REQUEST", { message: "Choose a model or an installed agent." });
           await requireNativeEngine(deps, context.actor, profile.agentEngine);
@@ -295,9 +295,11 @@ export function botsRoutes(ctx: RouterContext) {
         } catch (error) {
           throw mapSpaceLifecycleError(error);
         }
-        await enqueueBotIntroRun(deps, context.actor, bot, context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined).catch((error) => {
-          getLogger().error("bot intro run enqueue", error);
-        });
+        if (!skipIntro) {
+          await enqueueBotIntroRun(deps, context.actor, bot, context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined).catch((error) => {
+            getLogger().error("bot intro run enqueue", error);
+          });
+        }
         return bot;
       }),
       importPreview: authed.bots.importPreview.handler(async ({ context, input }) =>
