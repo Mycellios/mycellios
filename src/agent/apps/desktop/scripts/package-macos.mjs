@@ -18,7 +18,7 @@ const version=JSON.parse(await readFile(path.join(root,'package.json'),'utf8')).
 const output=argument('--out')??path.join(root,'release');
 const development=await stageDevelopmentResources(root);
 const compact=await stageCompactResources(root,development,output);
-const config=await prepareMacInstaller({separateRuntime:true,desktopRoot:root,runtimePkg,runtimeSha256,arch,output,version,development,compact});
+const config=await prepareMacInstaller({separateRuntime:!process.argv.includes('--bundle-runtime'),desktopRoot:root,runtimePkg,runtimeSha256,arch,output,version,development,compact});
 const configFile=await writeStandaloneInstallerConfig(root,config,output,'macos-installer-config.json');
 await build({targets:Platform.MAC.createTarget(['dmg','zip'],arch==='arm64'?Arch.arm64:Arch.x64),projectDir:root,config:configFile,publish:'never'});
 await verifyCompactServer(path.join(output,arch==='arm64'?'mac-arm64':'mac','Mycellios Desktop.app/Contents/Resources/local-server'));

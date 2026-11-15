@@ -9,6 +9,6 @@ const argument = name => { const i = process.argv.indexOf(name); return i < 0 ? 
 const runtimeDeb = argument('--runtime'), runtimeSha256 = argument('--sha256');
 if (!runtimeDeb || !runtimeSha256) throw new Error('Use --runtime <verified Linux x64 DEB> --sha256 <pinned hash>');
 const version = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
-const config = await prepareLinuxInstaller({separateRuntime:true, desktopRoot: root, runtimeDeb, runtimeSha256, output: argument('--out') ?? path.join(root, 'release'), version, development: await stageDevelopmentResources(root) });
+const config = await prepareLinuxInstaller({separateRuntime:!process.argv.includes('--bundle-runtime'), desktopRoot: root, runtimeDeb, runtimeSha256, output: argument('--out') ?? path.join(root, 'release'), version, development: await stageDevelopmentResources(root) });
 await build({ targets: Platform.LINUX.createTarget(['AppImage', 'deb'], Arch.x64), projectDir: root, config, publish: 'never' });
 

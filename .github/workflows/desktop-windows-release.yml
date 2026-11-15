@@ -151,7 +151,9 @@ jobs:
         working-directory: src/agent
         shell: pwsh
         run: |
-          node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc --out $env:DESKTOP_RELEASE_OUT
+          $bundle=@()
+          if('${{ github.event_name == 'push' && github.ref_type == 'tag' && vars.MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE == 'true' }}' -eq 'true'){$bundle=@('--bundle-runtime')}
+          node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc --out $env:DESKTOP_RELEASE_OUT @bundle
           if($LASTEXITCODE){exit $LASTEXITCODE}
           & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
           exit $LASTEXITCODE

@@ -906,7 +906,9 @@ reuses immutable component assets before exposing the Desktop release. Enrollmen
 alone downloads missing bytes, verifies a bounded transfer, caches by hash and
 rechecks both the cached hash and pairing expiry before invoking the existing
 privileged installer. Status queries and Desktop upgrades never enroll a node.
-Legacy bundled runtime manifests remain supported. The essential local backend
+Legacy bundled runtime manifests remain supported. Recovery packaging can use
+`--bundle-runtime`; the explicitly enabled legacy Windows tag release retains
+its bundled runtime and does not depend on component publication. The essential local backend
 and development resources stay bundled for offline startup and project work.
 
 Qualify native release packages separately from offline fixture tests. Do not
