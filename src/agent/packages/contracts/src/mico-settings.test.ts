@@ -17,3 +17,9 @@ it("accepts response styles only in owned defaults without changing automation f
   expect(effectiveMicoSettings({responseStyle: "classic", localScripts: true}, {}).localScripts).toBe(true);
   expect(MicoSettingsUpdate.safeParse({revision: 1, kind: "defaults", patch: {responseStyle: "verbose"}}).success).toBe(false);
 });
+
+it("validates bounded memory-review policy only in owned defaults",()=>{
+ for(const dailyLimitMicrounits of [0,1000,10000,50000])expect(MicoSettingsUpdate.safeParse({revision:1,kind:"defaults",patch:{memoryReview:{enabled:true,interval:20,dailyLimitMicrounits}}}).success).toBe(true);
+ expect(MicoSettingsUpdate.safeParse({revision:1,kind:"defaults",patch:{memoryReview:{enabled:true,interval:20,dailyLimitMicrounits:100001}}}).success).toBe(false);
+ expect(MicoSettingsUpdate.safeParse({revision:1,kind:"defaults",patch:{memoryReview:{enabled:true,interval:1,dailyLimitMicrounits:1000}}}).success).toBe(false);
+});

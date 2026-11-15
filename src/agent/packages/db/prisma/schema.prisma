@@ -868,6 +868,7 @@ model Thread {
   @@unique([spaceId, userId, taskKey])
   @@unique([id, spaceId, userId])
   @@index([taskBotId, projectKey])
+  @@unique([id,spaceId,userId],map:"memory_thread_identity_scope_key")
   @@map("threads")
 }
 

@@ -423,3 +423,16 @@ it("opens skills from the composer's cached list and saves back into it", async 
     vi.unstubAllGlobals();
   }
 });
+
+it("loads the active conversation separately from the Mico's shared notes",async()=>{
+ vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
+ memoryApi.list.mockReset().mockResolvedValue([{id:"visible",path:"facts.md",content:"A fact",revision:1}] as never);
+ const host=document.createElement("div"),root=createRoot(host);
+ try{
+  await show(root,<KnowledgeSection botId="fixture" threadId="thread-main" />);
+  expect(host.querySelector('[data-testid="task-knowledge-memory"]')).not.toBeNull();
+  expect(memoryApi.list.mock.calls).toEqual(expect.arrayContaining([expect.arrayContaining([expect.objectContaining({botId:"fixture",scope:"bot",taskThreadId:"thread-main"})])]));
+  await show(root,<KnowledgeSection botId="fixture" threadId="thread-other" />);
+  expect(memoryApi.list.mock.calls).toEqual(expect.arrayContaining([expect.arrayContaining([expect.objectContaining({taskThreadId:"thread-other"})])]));
+ }finally{await act(async()=>root.unmount());vi.unstubAllGlobals();}
+});

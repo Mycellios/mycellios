@@ -80,7 +80,7 @@ export function memoryRoutes(ctx: RouterContext) {
           });
         return {
           id: updated.id,
-          inclusion:(input.inclusion??doc.inclusion) as "essential"|"searchable",userControlled:input.inclusion?true:doc.userControlled,taskThreadId:doc.taskThreadId,
+          inclusion:(input.inclusion??doc.inclusion) as "essential"|"searchable",userControlled:true,taskThreadId:doc.taskThreadId,
           scope: doc.scope as "bot" | "user",
           botId: doc.botId,
           path: updated.path,

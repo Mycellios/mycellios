@@ -12614,48 +12614,6 @@ msgstr "No Mycellios agent models are available right now. Retrying automaticall
 msgid "Mycellios network"
 msgstr "Mycellios network"
 
-msgid "Open Mycellios Dev"
-msgstr "Open Mycellios Dev"
-
-msgid "Preparing Mycellios Dev…"
-msgstr "Preparing Mycellios Dev…"
-
-msgid "Could not open Mycellios Dev. Try again."
-msgstr "Could not open Mycellios Dev. Try again."
-
-msgid "Explore models"
-msgstr "Explore models"
-
-msgid "No chat models available right now."
-msgstr "No chat models available right now."
-
-msgid "Rename conversation"
-msgstr "Rename conversation"
-
-msgid "Could not rename the conversation. Try again."
-msgstr "Could not rename the conversation. Try again."
-
-msgid "Pinned messages"
-msgstr "Pinned messages"
-
-msgid "Pin message"
-msgstr "Pin message"
-
-msgid "Unpin message"
-msgstr "Unpin message"
-
-msgid "Could not update pinned messages."
-msgstr "Could not update pinned messages."
-
-msgid "Could not load pinned messages."
-msgstr "Could not load pinned messages."
-
-msgid "Pin a message from its menu to find it here."
-msgstr "Pin a message from its menu to find it here."
-
-msgid "You can pin up to 100 messages per conversation."
-msgstr "You can pin up to 100 messages per conversation."
-
 msgid "General memory"
 msgstr "General memory"
 
@@ -12721,6 +12679,49 @@ msgstr "Daily budget resets at 00:00 UTC."
 
 msgid "Pending reviews"
 msgstr "Pending reviews"
+
+
+msgid "Open Mycellios Dev"
+msgstr "Open Mycellios Dev"
+
+msgid "Preparing Mycellios Dev…"
+msgstr "Preparing Mycellios Dev…"
+
+msgid "Could not open Mycellios Dev. Try again."
+msgstr "Could not open Mycellios Dev. Try again."
+
+msgid "Explore models"
+msgstr "Explore models"
+
+msgid "No chat models available right now."
+msgstr "No chat models available right now."
+
+msgid "Rename conversation"
+msgstr "Rename conversation"
+
+msgid "Could not rename the conversation. Try again."
+msgstr "Could not rename the conversation. Try again."
+
+msgid "Pinned messages"
+msgstr "Pinned messages"
+
+msgid "Pin message"
+msgstr "Pin message"
+
+msgid "Unpin message"
+msgstr "Unpin message"
+
+msgid "Could not update pinned messages."
+msgstr "Could not update pinned messages."
+
+msgid "Could not load pinned messages."
+msgstr "Could not load pinned messages."
+
+msgid "Pin a message from its menu to find it here."
+msgstr "Pin a message from its menu to find it here."
+
+msgid "You can pin up to 100 messages per conversation."
+msgstr "You can pin up to 100 messages per conversation."
 
 msgid "Update needs attention"
 msgstr "Update needs attention"
@@ -12790,3 +12791,4 @@ msgstr "New folder inside"
 
 msgid "Delete folder"
 msgstr "Delete folder"
+

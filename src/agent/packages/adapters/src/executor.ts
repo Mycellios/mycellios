@@ -355,7 +355,7 @@ import {
 import { createMediaGenerationProvider } from "./media-generation-factory.js";
 import { generateMediaFromTool } from "./media-generation-tools.js";
 import { selectRunMediaGeneration } from "./native-image-generation.js";
-import { loadAgentMemoryContext } from "./memory-context.js";
+import { loadAgentMemoryContext, resolveLocalMemoryScope } from "./memory-context.js";
 import type { MemoryProviderResolver } from "./memory-provider-factory.js";
 import { appendMemoryFact, selectMemoryTools } from "./memory-tools.js";
 import {
@@ -4100,7 +4100,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
         const semanticMemory: SemanticMemoryProvider | null = configuredMemory?.provider ?? null;
-        const localMemoryScope=effectiveMemoryScope(bot.memoryScope,configuredMemory?.defaultScope??"shared");
+        const localMemoryScope=await resolveLocalMemoryScope(deps.prisma,run.spaceId,bot.memoryScope,configuredMemory?.defaultScope);
 
         await deps.events.append({
           spaceId: run.spaceId,

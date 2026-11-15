@@ -105,6 +105,7 @@ export function ComputerModePicker({
 export function BotSettings({
   bot,
   memoryProviderConfigured,
+  threadId,
   onSave,
   onExport,
   onClear,
@@ -117,6 +118,7 @@ export function BotSettings({
   onUseThisComputer,
 }: {
   bot: Bot;
+  threadId?: string;
   focusModel?: number;
   onOpenConnections?: () => void;
   onOpenFiles?: () => void;
@@ -734,7 +736,7 @@ export function BotSettings({
           </ErrorBoundary>
           <ErrorBoundary fallback={<SectionLoadFailed />}>
             <Suspense fallback={null}>
-              <KnowledgeSection botId={bot.id} />
+              <KnowledgeSection botId={bot.id} threadId={threadId} />
             </Suspense>
           </ErrorBoundary>
         </div>

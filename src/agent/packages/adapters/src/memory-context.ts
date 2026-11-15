@@ -1,8 +1,15 @@
 import { rankLocalMemories, localMemorySnippet, escapePromptData } from "@rakazo/core";
 import type { AdapterContext, MemorySnapshot, MemoryStore } from "@rakazo/adapter-kit";
 import { byteLength, truncateUtf8 } from "./utf8.js";
+import { effectiveMemoryScope, type PrismaClient } from "@rakazo/db";
 
 const MAX_AGENT_MEMORY_BYTES = 32 * 1024;
+
+/** A disabled external provider must never relax the Space's local memory policy. */
+export async function resolveLocalMemoryScope(prisma:Pick<PrismaClient,"spaceMemoryConfig">,spaceId:string,botScope:string|null,providerScope?:string){
+  const config=await prisma.spaceMemoryConfig?.findUnique({where:{spaceId},select:{defaultMemoryScope:true}});
+  return effectiveMemoryScope(botScope,config?.defaultMemoryScope??providerScope??"shared");
+}
 
 type ScopedMemoryDocument = MemorySnapshot["documents"][number] & {
   scope: "bot" | "user";

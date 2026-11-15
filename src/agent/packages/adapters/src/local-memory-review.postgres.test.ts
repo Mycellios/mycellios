@@ -90,4 +90,11 @@ suite("local memory on PostgreSQL and actual tenant policies",()=>{
   const row=await system.localMemoryReview.findFirst({where:{threadId:thread}});expect(row!.status).toBe("failed");expect(row!.chargedMicrounits).toBe(500);
  });
 
-});
+ it("clears a reservation only after the gateway confirms release without replaying the purchase",async()=>{
+  const deps=fixture("pending");await runAsTenant(scope,()=>reviewLocalMemory(deps,thread));
+  const original=deps.transport.getMockImplementation()!;
+  deps.transport.mockImplementation(async(input,init)=>String(input).endsWith('/reconcile')?Response.json({status:"released"},{status:202}):original(input,init));
+  await runAsTenant(scope,()=>reviewLocalMemory(deps,thread));await runAsTenant(scope,()=>reviewLocalMemory(deps,thread));
+  const row=await system.localMemoryReview.findFirst({where:{threadId:thread}});expect(row!.status).toBe("failed");expect(row!.maximumMicrounits).toBe(0);expect(row!.chargedMicrounits).toBe(0);
+  expect(deps.transport.mock.calls.filter(([input])=>String(input).endsWith('/execute'))).toHaveLength(1);
+ });});

@@ -1,3 +1,5 @@
+-- Self-contained task identity: do not depend on unpublished message-pin migrations.
+CREATE UNIQUE INDEX memory_thread_identity_scope_key ON threads(id,"spaceId","userId");
 ALTER TABLE memory_documents ADD COLUMN inclusion TEXT NOT NULL DEFAULT 'searchable',
  ADD COLUMN "userControlled" BOOLEAN NOT NULL DEFAULT false, ADD COLUMN "taskThreadId" TEXT;
 ALTER TABLE memory_documents ADD CONSTRAINT memory_inclusion_valid CHECK(inclusion IN ('essential','searchable')),

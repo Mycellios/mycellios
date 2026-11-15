@@ -130,8 +130,15 @@ test('workflow validates merge candidates read-only and preserves evidence', () 
 
 test('shared barrels stay scoped while executor regression siblings are included', () => {
  const available=['packages/contracts/src/rpc.test.ts','packages/adapters/src/executor.test.ts','packages/adapters/src/executor-readonly-approval.test.ts','packages/adapters/src/unrelated.test.ts'];
- assert.deepEqual(agentAffectedTestFiles(['packages/contracts/src/index.ts'],available),['packages/contracts/src/rpc.test.ts']);
+ assert.deepEqual(agentAffectedTestFiles(['packages/contracts/src/index.ts'],available),[]);
  assert.deepEqual(agentAffectedTestFiles(['packages/adapters/src/executor.ts'],available),['packages/adapters/src/executor-readonly-approval.test.ts','packages/adapters/src/executor.test.ts']);
+});
+
+test('tool registries keep wire and exposure checks without selecting the whole adapter suite',()=>{
+ const files=['executor.test.ts','pi-runtime-field-descriptions.test.ts','pi-runtime.test.ts','index.test.ts','slack-messaging.test.ts'].map(name=>'packages/adapters/src/'+name);
+ const selected=agentAffectedTestFiles(['packages/adapters/src/builtin-tools.ts'],files);
+ assert.equal(selected.length,4);assert.ok(selected.includes('packages/adapters/src/pi-runtime-field-descriptions.test.ts'));
+ assert.ok(!selected.includes('packages/adapters/src/slack-messaging.test.ts'));
 });
 test('changed Agent tests are not repeated in the affected batch', () => {
  const plan=planChecks(['src/agent/packages/adapters/src/executor.ts','src/agent/packages/adapters/src/executor-readonly-approval.test.ts'],['packages/adapters/src/executor.test.ts','packages/adapters/src/executor-readonly-approval.test.ts']);

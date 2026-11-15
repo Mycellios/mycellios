@@ -1,6 +1,6 @@
 import type { AdapterContext, MemorySnapshot, MemoryStore } from "@rakazo/adapter-kit";
 import { describe, expect, it, vi } from "vitest";
-import { loadAgentMemoryContext } from "./memory-context.js";
+import { loadAgentMemoryContext, resolveLocalMemoryScope } from "./memory-context.js";
 
 const context: AdapterContext = {
   operationId: "run-1",
@@ -124,4 +124,11 @@ it("keeps essentials and retrieves relevant older notes without unrelated recent
  const result=await loadAgentMemoryContext({read} as never,"bot-1",context,undefined,{query:"Migrar Kuma de Railway",taskThreadId:"task",includeGeneral:false});
  expect(result).toContain("Answer briefly");expect(result).toContain("Kuma is on Railway");expect(result).not.toContain("Buy bread");
  expect(read).toHaveBeenCalledOnce();expect(read).toHaveBeenCalledWith({scope:"bot",botId:"bot-1",taskThreadId:"task"},context);
+});
+
+it("keeps inherited isolation when the external provider is unavailable",async()=>{
+ const findUnique=vi.fn(async()=>({defaultMemoryScope:"isolated"}));const db={spaceMemoryConfig:{findUnique}} as never;
+ expect(await resolveLocalMemoryScope(db,"space",null)).toBe("isolated");
+ expect(await resolveLocalMemoryScope(db,"space","shared")).toBe("shared");
+ expect(findUnique).toHaveBeenCalledWith({where:{spaceId:"space"},select:{defaultMemoryScope:true}});
 });

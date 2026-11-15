@@ -28,13 +28,16 @@ function rowClass(open: boolean): string {
 export function KnowledgeSection({
   botId,
   skillsOnly = false,
+  threadId,
 }: {
   botId: string;
+  threadId?: string;
   /** Unused: skills are read from and saved to the shared cached list. */
   onSkillsChange?: (skills: AgentSkillCatalogEntry[]) => void;
   skillsOnly?: boolean;
 }) {
   const task=useBoundTaskThreadScope();
+  const memoryThreadId=threadId??(task?.botId===botId?task.taskThreadId:undefined);
   if (skillsOnly)
     return (
       <section data-testid="bot-knowledge">
@@ -49,7 +52,7 @@ export function KnowledgeSection({
   return (
     <>
       <MemoryDocumentList key={botId} input={{ botId, scope: "bot" }} testId="bot-knowledge-memory" compact />
-      {task?.botId===botId ? <MemoryDocumentList key={task.taskThreadId} input={{botId,scope:"bot",taskThreadId:task.taskThreadId}} testId="task-knowledge-memory" compact />:null}
+      {memoryThreadId ? <MemoryDocumentList key={memoryThreadId} input={{botId,scope:"bot",taskThreadId:memoryThreadId}} testId="task-knowledge-memory" compact />:null}
     </>
   );
 }
