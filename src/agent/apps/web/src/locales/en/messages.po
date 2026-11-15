@@ -12794,3 +12794,27 @@ msgstr "New folder inside"
 
 msgid "Delete folder"
 msgstr "Delete folder"
+
+msgid "Ask {name}"
+msgstr "Ask {name}"
+
+msgid "Ask a Mico"
+msgstr "Ask a Mico"
+
+msgid "Could not open the chat."
+msgstr "Could not open the chat."
+
+msgid "Could not send. Try again."
+msgstr "Could not send. Try again."
+
+msgid "Sign in to Mycellios to ask a Mico."
+msgstr "Sign in to Mycellios to ask a Mico."
+
+msgid "Open Mycellios"
+msgstr "Open Mycellios"
+
+msgid "Could not load Micos. Try again."
+msgstr "Could not load Micos. Try again."
+
+msgid "No Mico is available yet."
+msgstr "No Mico is available yet."

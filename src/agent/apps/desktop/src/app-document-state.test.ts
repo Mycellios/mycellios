@@ -30,6 +30,14 @@ describe("app document state", () => {
     ).toBe("ready");
   });
 
+  it("accepts the quick ask field once the session is ready", () => {
+    expect(
+      stateOf(
+        '<div id="root"><div data-rakazo-app-state="ready"><main data-rakazo-surface="quick-ask"><textarea></textarea></main></div></div>',
+      ),
+    ).toBe("ready");
+  });
+
   it("reports the web app's error screen so launch keeps its Refresh", () => {
     expect(
       stateOf(

@@ -30,9 +30,22 @@
     "diagnostic": {
       "extends": "production",
       "channel": "diagnostic"
+    },
+    "testflight": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "environment": "production",
+      "channel": "production",
+      "ios": {
+        "image": "macos-tahoe-26.6-xcode-27.1",
+        "simulator": false
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "testflight": {
+      "ios": {}
+    }
   }
 }

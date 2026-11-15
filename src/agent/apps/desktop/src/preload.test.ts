@@ -51,6 +51,16 @@ describe("desktop preload bridge", () => {
     await bridge.chatWindow!.returnToMain();
     expect(invoke).toHaveBeenCalledWith("desktop.chat.return");
   });
+  it("exposes only quick ask close and conversation handoff", async () => {
+    const { invoke, exposeInMainWorld } = runPreload("quick-ask-preload.cjs");
+    const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
+    expect(Object.keys(bridge).sort()).toEqual(["nativeWindowFrame", "platform", "quickAsk"]);
+    expect(bridge.quickAsk?.shortcut).toBe("CommandOrControl+Shift+Space");
+    await bridge.quickAsk!.close();
+    await bridge.quickAsk!.sent("/app/mico");
+    expect(invoke.mock.calls).toEqual([["desktop.quickAsk.close"], ["desktop.quickAsk.sent", "/app/mico"]]);
+    expect((bridge as unknown as Record<string, unknown>).ipcRenderer).toBeUndefined();
+  });
   it("exposes settings as named IPC methods without a raw IPC capability", async () => {
     const { invoke, exposeInMainWorld } = runPreload("preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;

@@ -1,12 +1,85 @@
 # Mobile builds and store releases
 
+Mycellios Agent for iPhone is the Expo app in `apps/mobile`. It is the native
+client inherited from Rakazo: inbox, threads, voice, attachments, and a
+self-hosted server chosen on the sign-in screen. The public product still tells
+iPhone users to add the web app to the Home Screen. That guide stays until a
+person uploads this binary to TestFlight. This repository cannot produce an IPA
+on its own: the build needs Apple signing, and a local Xcode archive needs a Mac.
+EAS can compile the store build on its macOS builders.
+
+The App Store bundle id is `com.mycellios.agent`. The URL scheme stays `rakazo`
+because sign-in, passkeys, and in-app links already use `rakazo://`. A phone can
+keep the upstream Rakazo app installed beside this one. Over-the-air updates
+stay off until this app is linked to an Expo project owned by Mycellios.
+
+Store application IDs, team IDs, signing keys, and tokens stay out of Git.
+
+## TestFlight
+
+A person with the Apple and Expo accounts does this once:
+
+1. Join the Apple Developer Program with the account that will own the app.
+2. In App Store Connect, create an iOS app named Mycellios Agent with bundle ID
+   `com.mycellios.agent`. On App Information, copy the Apple ID number. That
+   number is `ASC_APP_ID`. Do not commit it.
+3. In App Store Connect, open Users and Access, then Integrations, then App
+   Store Connect API. Create a key with the App Manager role. Download the
+   `.p8` file once. The key id is `ASC_KEY_ID`, the issuer id is
+   `ASC_ISSUER_ID`, and the file contents are `ASC_PRIVATE_KEY`.
+4. Create an Expo account for Mycellios. Create an access token and store it as
+   the `EXPO_TOKEN` repository secret, together with the four Apple secrets.
+5. From `src/agent/apps/mobile`, sign in and link a new Expo project. Commit the
+   public `extra.eas.projectId` that `eas project:init` writes. Do not point
+   this app at another product's Expo project.
+
+   ```sh
+   npx eas-cli@27.10.0 login
+   npx eas-cli@27.10.0 project:init
+   ```
+
+6. Set the HTTPS origin of the Agent server in the EAS production environment:
+
+   ```sh
+   npx eas-cli@27.10.0 env:create --environment production --name EXPO_PUBLIC_API_URL --value https://app.example.com --visibility plaintext
+   ```
+
+7. Create the iOS distribution certificate and provisioning profile. EAS can
+   create them with the Apple account, or you can upload certificates you
+   already have. This step is interactive and needs the Apple account:
+
+   ```sh
+   npx eas-cli@27.10.0 credentials --platform ios
+   ```
+
+8. Dispatch the `iOS TestFlight` workflow from `main`, or build and upload
+   locally. EAS compiles on its macOS builders, so this command does not need a
+   Mac. A local Xcode archive does.
+
+   ```sh
+   npx eas-cli@27.10.0 build --platform ios --profile testflight --auto-submit
+   ```
+
+9. When Apple finishes processing the build, open TestFlight in App Store
+   Connect. People on the App Store Connect team can install it with the
+   TestFlight app. Anyone else needs a test group, beta information, and
+   Apple's Beta App Review. The workflow only uploads the build. It does not
+   submit the app for public App Store review.
+
+`apps/mobile/eas.json` profile `testflight` is a store distribution build.
+`submit.testflight.ios` is empty on purpose. The workflow fills the App Store
+Connect app id and API key on the runner, then restores the file.
+
+## Inherited release notes
+
+Self-hosters normally do not need to publish their own mobile app: the client
+can select a compatible server from the sign-in screen. Run the commands below
+with npm from `src/agent`. Replace any upstream Expo project, application ids,
+and download URLs with the Mycellios account before using them.
+
 Rakazo's public repository does not contain production App Store Connect,
 Google Play, Apple team, or private EAS submission identifiers. Those values
 belong in the release operator's private configuration.
-
-Self-hosters normally do not need to publish their own mobile app: the Rakazo
-client can select a compatible server from the sign-in screen. If you distribute
-your own branded build, use your own Expo and store accounts.
 
 ## Configure a build
 
@@ -17,10 +90,11 @@ your own branded build, use your own Expo and store accounts.
 4. Keep store application IDs, team IDs, signing credentials, API keys, and
    review-account credentials out of Git.
 5. Before a native iOS or Android build, run
-   `pnpm --filter @rakazo/mobile exec expo install --check`. Attachment pickers
-   and other Expo native modules must match the SDK (SDK 57 needs
-   `expo-image-picker@~57.0.11`, not 17.x). Use `pnpm exec expo install --fix`
-   from `apps/mobile` if that check fails.
+   `npm exec --workspace @rakazo/mobile -- expo install --check` from `src/agent`.
+   Attachment pickers and other Expo native modules must match the SDK (SDK 57
+   needs `expo-image-picker@~57.0.11`, not 17.x). Use
+   `npm exec --workspace @rakazo/mobile -- expo install --fix` from `src/agent`
+   if that check fails.
 
 From `apps/mobile`:
 

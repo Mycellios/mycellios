@@ -30,7 +30,8 @@ export const APP_DOCUMENT_STATE_SCRIPT = `(() => {
         '[aria-label="Model"], [aria-label="Model id"], [aria-label="Models from server"]',
       ),
   );
-  const surfaceReady = shellBootstrapped || authOrWelcomeSurface;
+  const quickAsk = Boolean(document.querySelector('[data-rakazo-surface="quick-ask"]'));
+  const surfaceReady = shellBootstrapped || authOrWelcomeSurface || quickAsk;
   const sessionReady =
     appState === "ready" ||
     performance.getEntriesByName("rk:renderer:session-committed").length > 0;

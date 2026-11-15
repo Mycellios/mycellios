@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Desktop Quick Ask opens from any app with Command+Shift+Space on macOS, or Ctrl+Shift+Space on Windows and Linux, and sends the question to a Mico. The answer stays in that chat.
+- The iPhone app can be built for TestFlight from the existing Expo client. Apple account setup, signing, and the upload remain a person's steps.
+
 - Ollama Cloud preset in Models settings on web and mobile, using an OpenAI-compatible connection with model discovery and no deployment configuration.
 
 ### Fixed
