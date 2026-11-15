@@ -169,5 +169,16 @@ export default defineConfig({
     emptyOutDir: true,
     manifest: true,
     sourcemap: false,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{
+            name: "agent-network-entry",
+            test: /\/rebrand\/(?:ContributionEntry|DistributedEarnScene|distributed-earn-model|AgentDownloadAction|GoldenMycelium)\./,
+            includeDependenciesRecursively: false,
+          }],
+        },
+      },
+    },
   },
 });

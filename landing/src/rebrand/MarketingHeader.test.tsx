@@ -19,7 +19,7 @@ describe("shared public marketing navigation", () => {
       expect(markup).toContain('class="marketing-mobile-menu"');
       expect(markup).toContain('aria-label="Open Explore menu"');
       expect(markup).toContain('data-variant="navigation"');
-      expect(markup).toContain('href="/dashboard"');
+      expect(markup).toContain('href="/stats"');
       expect(markup).not.toContain('>Login</a>');
       expect(markup).not.toContain('href="/create"');
     }

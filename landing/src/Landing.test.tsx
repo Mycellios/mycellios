@@ -80,7 +80,7 @@ describe("Landing", () => {
     expect(header).toContain('aria-label="Mycellios on GitHub"');
     expect(header).toContain('href="https://x.com/mycellios"');
     expect(header).toContain('href="https://t.me/mycellios"');
-    expect(header).toMatch(/<a\b[^>]*href="\/dashboard"[^>]*>Stats<\/a>/);
+    expect(header).toMatch(/<a\b[^>]*href="\/stats"[^>]*>Stats<\/a>/);
     expect(header).not.toContain(">Login</a>");
     expect(header).not.toContain(">Download</a>");
     expect(header).not.toContain('href="/create"');
