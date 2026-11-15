@@ -372,7 +372,11 @@ These rules apply to the complete repository.
   while admitted responses and worker completion traffic drain, including on
   keepalive sockets. Install only through an authorized local process channel;
   never expose a debugger or a public maintenance endpoint. Check its focused
-  test, active HTTP requests and durable jobs before replacing either runtime.
+  test, active inference admissions and durable jobs before replacing either
+  runtime; open telemetry subscriptions are counted separately. Build gateway
+  overlays with `scripts/antseed-gateway/Dockerfile` from the inspected immutable
+  image and exact upstream hashes. Its production-UID imports must pass before
+  promotion; root-only fixture imports do not qualify runtime file permissions.
   Paid gateway admission also needs a lifetime funded envelope; count settled
   spend and unresolved holds across restarts and UTC days before supplier POSTs.
   Rank eligible gateway peers by bounded effective reputation, with stable peer-id
