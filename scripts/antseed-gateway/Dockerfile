@@ -6,8 +6,9 @@ ARG UPSTREAM_SERVER_SHA256
 ARG UPSTREAM_RESERVATION_SHA256
 ARG PROTECTED_KEY_IDS_JSON
 ARG FEATURE_REVISION
-COPY --chmod=0644 scripts/antseed-gateway/patch-gateway.mjs /opt/mycellios-bounded-text/patch-gateway.mjs
-COPY --chmod=0644 scripts/antseed-gateway/text-cost-contract.mjs /opt/mycellios-bounded-text/text-cost-contract.mjs
+COPY scripts/antseed-gateway/patch-gateway.mjs /opt/mycellios-bounded-text/patch-gateway.mjs
+COPY scripts/antseed-gateway/text-cost-contract.mjs /opt/mycellios-bounded-text/text-cost-contract.mjs
+RUN chmod 0644 /opt/mycellios-bounded-text/patch-gateway.mjs /opt/mycellios-bounded-text/text-cost-contract.mjs
 RUN node --input-type=module -e 'import fs from "node:fs"; import crypto from "node:crypto"; import assert from "node:assert/strict"; for (const [name,variable] of [["server.js","UPSTREAM_SERVER_SHA256"],["request-reservation.js","UPSTREAM_RESERVATION_SHA256"]]) { const expected=process.env[variable]; assert.match(expected ?? "",/^[a-f0-9]{64}$/); assert.equal(crypto.createHash("sha256").update(fs.readFileSync("/opt/antseed/node_modules/@antseed/cli/dist/gateway/"+name)).digest("hex"),expected,"Upstream source changed"); }'
 RUN node /opt/mycellios-bounded-text/patch-gateway.mjs /opt/antseed/node_modules/@antseed/cli/dist/gateway/server.js /tmp/server.bounded.js "$PROTECTED_KEY_IDS_JSON" \
  && cp /opt/antseed/node_modules/@antseed/cli/dist/gateway/request-reservation.js /opt/antseed/node_modules/@antseed/cli/dist/gateway/request-reservation.legacy.js \
