@@ -53,3 +53,17 @@
   .public-panel .minimal-screen .network-history-chart svg text { font-size: 24px; }
   .public-panel .minimal-screen .network-history-chart .history-x-label:not(.history-edge-label) { display: none; }
 }
+.public-panel .model-readiness {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.public-panel .model-readiness p {
+  margin: 0;
+  max-width: 65ch;
+  color: var(--text-secondary);
+}
+.public-panel .model-readiness strong {
+  color: var(--text-primary);
+}

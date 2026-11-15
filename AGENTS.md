@@ -147,6 +147,11 @@ These rules apply to the complete repository.
 - Overview shows one network summary and active models. Keep setup, device tables,
   topology, runtime telemetry and activity in closed detail groups; use
   `landing/src/overview.css` and the production Overview stories for this layout.
+- Models readiness summaries consume the coordinator's requested-model status
+  and canonical activation incident. Never infer readiness from GPU totals alone:
+  bounded CPU placement can be preparing while GPU capacity is insufficient.
+  Keep detailed metrics, recovery and progress in the existing disclosure; the
+  Agent provider links to the public network overview without granting operator access.
 - The panel has no built-in chat. Mycellios Agent owns the conversation UI; keep
   legacy `view=chat` and `view=inference` links mapped to Overview, without removing
   the coordinator API used by Agent and other clients.
@@ -260,6 +265,20 @@ These rules apply to the complete repository.
 
 ## Execution route admission
 
+- Native RTT probes keep one outstanding ping and terminate silent sockets after
+  the bounded pong grace period. Reuse the existing reconnect and offset-ACK
+  recovery path; never replay a whole request to recover a transport. Check
+  `tests/worker-connection-liveness.test.ts` with the runtime-stream recovery tests.
+- Artifact preparation passes its owning connection's AbortSignal through to the
+  existing headless preparer. Cancel superseded/disconnected preparations, keep
+  their queue serial, and reject stale results without stopping running stages.
+  Check the preparation-queue, runtime-start-race and headless-worker tests.
+- If a prepared root API port belongs to another local service, select a free
+  loopback API port and translate only its authorized logical relay target.
+  Reject direct offers for that remapped API; keep tensor routes unchanged and
+  clear mappings on runtime reset. Verify occupied-port isolation, revocation
+  and existing direct/relay tests before native installation.
+
 - An initial `no_feasible_runtime_pipeline` rejection uses bounded activation
   recovery with fresh verified topology. Preserve exhausted-attempt limits and
   all planner constraints; the error alone does not identify memory or link
@@ -286,6 +305,10 @@ These rules apply to the complete repository.
 - Keep worker heartbeats bounded independently of adapter and hardware probes.
   Missing adapter observations close admission without cancelling active leases;
   do not reuse late readiness or launch duplicate probes while one is pending.
+  Model-free contributors do not drain merely because the native control
+  adapter advertises no loaded model. Retain false model-ready metrics and
+  explicit contribution/update/work-policy guards; test both native control
+  availability and unavailable advertised deployments in worker-hardening.
 - Native embedding/speech qualification requires both operator credentials, three
   normal completed leases, validated outputs and current session/build/activation
   binding. Preserve zero generated-text tokens and strip worker-declared evidence.

@@ -1,5 +1,24 @@
 # Development
 
+## Model readiness diagnostics
+
+The network panel's Models screen presents each requested model's readiness and
+next step above its existing capacity, activation incident and progress disclosure.
+`landing/src/model-readiness.tsx` only presents `RequestedModelCapacity`; the
+coordinator remains the owner of placement, readiness and bounded recovery.
+An active status, missing GPU capacity and an incident are not interchangeable:
+CPU host-memory placement can still be preparing with insufficient advertised VRAM.
+Use the canonical incident title/remedy instead of classifying error text again.
+
+Agent Settings > Models exposes one public network-status link under Mycellios.
+It opens a separate tab, preserving the current conversation and drafts. Operator
+model controls remain subject to the panel's existing access policy. This does
+not create another diagnostic API, run inference from a settings read, or certify
+a route between physical computers. Validate the summary with
+`landing/src/model-readiness.test.tsx`, the existing model-catalog and incident
+tests, and Agent's provider/catalog tests. Real two-host evidence remains governed
+by `TWO_HOST_QUICKSTART.md` and `STATUS_AND_EVIDENCE.md`.
+
 ## Private MCP connections through Tailscale
 
 The optional Tailscale connection lives in Agent's existing Conexiones surface.
@@ -565,6 +584,15 @@ npm run dev:launch-agent -- --node-id node-a
 ```
 
 ### Two-host preparation and evidence
+
+The native worker's existing WebSocket RTT probe also detects a silent transport.
+Only one ping may remain outstanding, so delayed pongs retain their actual RTT.
+After at least 45 seconds (three probe intervals for a slower configured probe),
+the worker terminates the unresponsive socket and uses the existing reconnect
+and offset-acknowledged stream recovery. This does not grant request replay,
+relax placement evidence, or establish physical inference qualification. Verify
+with `tests/worker-connection-liveness.test.ts` and
+`tests/runtime-stream-recovery.test.ts`.
 
 ```bash
 npm run preflight:two-host -- --config <file> --json

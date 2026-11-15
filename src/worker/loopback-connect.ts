@@ -1,4 +1,32 @@
-import { createConnection, type Socket } from "node:net";
+import { createConnection, createServer, type AddressInfo, type Server, type Socket } from "node:net";
+
+export function listenLoopback(server: Server, port = 0): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const fail = (error: Error) => { server.off("listening", ready); reject(error); };
+    const ready = () => { server.off("error", fail); resolve(); };
+    server.once("error", fail);
+    server.once("listening", ready);
+    server.listen(port, "127.0.0.1");
+  });
+}
+
+/** Select a private API port without disturbing an existing local service. */
+export async function availableRuntimeApiPort(preferred: number): Promise<number> {
+  const probe = async (port: number) => {
+    const server = createServer();
+    try {
+      await listenLoopback(server, port);
+      return (server.address() as AddressInfo).port;
+    } finally {
+      if (server.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  };
+  try { return await probe(preferred); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
+    return await probe(0);
+  }
+}
 
 /** Retry refused connections before sending any bytes, within one fixed deadline. */
 export async function connectPreparedLoopback(

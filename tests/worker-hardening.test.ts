@@ -28,6 +28,29 @@ const CELL_ACTIVATION_ID = "pipeline-activation-7";
 describe("worker boundary hardening", () => {
   const servers: Server[] = [];
 
+  it("keeps a hardware-only contributor available without claiming a loaded model", async () => {
+    const agent = new WorkerAgent({ ...baseConfig(), adapter: { kind: "mycellios-native", model: "mycellios-native-control" } }, {
+      coordinatorUrl: "http://127.0.0.1:8080",
+      advertiseDeployment: false,
+    });
+    const harness = agent as unknown as AgentHarness;
+    const sent: Array<{ type: string; payload: unknown }> = [];
+    harness.registeredWorkerId = "worker-native-control";
+    harness.capabilities = { ...capabilities(), deployments: [] };
+    harness.socket = { readyState: 1, send: (value) => sent.push(JSON.parse(value)) };
+    await harness.sendHeartbeat();
+    expect(sent.at(-1)).toMatchObject({ payload: {
+      heartbeat: { draining: false, deployments: [] },
+      metrics: { ready: false, loadedModels: [] },
+    } });
+    await agent.setContributionEnabled(false);
+    await harness.sendHeartbeat();
+    expect(sent.at(-1)).toMatchObject({ payload: {
+      heartbeat: { draining: true, pausedReason: "Contribution paused", deployments: [] },
+      metrics: { ready: false, loadedModels: [] },
+    } });
+  });
+
   it("keeps heartbeats alive while probes hang, closes admission and recovers with fresh metrics", async () => {
     vi.useFakeTimers();
     try {

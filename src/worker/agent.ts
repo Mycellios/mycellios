@@ -1,5 +1,7 @@
 import { MAX_TRANSCRIPTION_RESULT_BYTES } from "../contracts/transcription.js";
 import WebSocket from "ws";
+import { CoordinatorRttProbe } from "./coordinator-rtt-probe.js";
+import { RuntimePreparationQueue } from "./runtime-preparation-queue.js";
 import { MAX_DECISION_RESPONSE_BYTES } from "../contracts/decision.js";
 import { MAX_EMBEDDING_RESPONSE_BYTES } from "../contracts/embedding.js";
 import { z } from "zod";
@@ -203,15 +205,6 @@ const MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 const RECENT_JOB_LIMIT = 2_048;
 const MAX_WEBSOCKET_BUFFERED_BYTES = 8 * 1024 * 1024;
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-/** Tags our own RTT probes so unsolicited pongs cannot corrupt the estimate. */
-const RTT_PROBE_PAYLOAD = Buffer.from("gdlp-rtt");
-/**
- * peer runtime uses 0.2 for the same job (`overhead_delay` / EMA over peer pings) and
- * it is a reasonable default: fast enough to follow a route change, slow enough
- * that one scheduling hiccup does not move placement.
- */
-const RTT_EMA_ALPHA = 0.2;
-
 const envelopeFields = {
   v: z.literal(1),
 };
@@ -541,9 +534,7 @@ export class WorkerAgent {
   private registeredNodeGeneration: number | undefined;
   private capabilities: WorkerCapabilities | null = null;
   private socket: WebSocket | null = null;
-  private rttProbeTimer: NodeJS.Timeout | null = null;
-  private pendingRttProbe: bigint | null = null;
-  private lastRttSampleMs: number | null = null;
+  private readonly coordinatorRttProbe: CoordinatorRttProbe;
   private stopped = false;
   private readonly startupAbortController = new AbortController();
   private directTransportStartPromise: Promise<DirectTransportAdvertisement | null> | null = null;
@@ -554,8 +545,7 @@ export class WorkerAgent {
   private readonly authorizedRuntimeProcesses = new Map<string, string>();
   private readonly preparedRuntimeProcesses = new Map<string, import("../distribution/python-launcher.js").PythonLaunchProcess>();
   private readonly preparedRuntimeModels = new Map<string, string>();
-  private runtimePreparationGeneration = 0;
-  private runtimePreparationTail: Promise<void> = Promise.resolve();
+  private readonly runtimePreparations = new RuntimePreparationQueue();
   private preparedRuntimeFormation: {
     launchId: string;
     pipelineId: string;
@@ -594,6 +584,12 @@ export class WorkerAgent {
     }
     this.adapter = createAdapter(config);
     this.logger = options.logger ?? console;
+    this.coordinatorRttProbe = new CoordinatorRttProbe({
+      intervalMs: options.rttProbeIntervalMs ?? 15_000,
+      previousRttMs: () => this.capabilities?.network.coordinatorRttMs,
+      onSample: (value) => { if (this.capabilities) this.capabilities.network.coordinatorRttMs = value; },
+      warn: (message) => this.logger.warn(message),
+    });
     this.contributionEnabled = options.contributionControl?.initialEnabled ?? true;
     this.runtimeTunnel = options.distributedExecutor
       ? new RuntimeStreamTunnel(
@@ -1285,6 +1281,7 @@ export class WorkerAgent {
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
         this.heartbeatTimer = null;
         this.stopRttProbe();
+        if (this.socket === socket) this.runtimePreparations.cancel("coordinator_disconnected");
         if (this.socket === socket) this.socket = null;
         this.clearRuntimeLinkProbes();
         this.clearActivationCheckpointRestores();
@@ -1323,53 +1320,12 @@ export class WorkerAgent {
    * application queueing. Samples are smoothed with an EMA so one scheduling
    * hiccup does not move placement.
    */
-  private startRttProbe(socket: WebSocket): void {
-    this.stopRttProbe();
-    const probe = (): void => {
-      if (socket.readyState !== WebSocket.OPEN) return;
-      // An outstanding probe means the previous pong never came back. Leaving
-      // the old timestamp in place would turn a lost pong into an absurd RTT.
-      this.pendingRttProbe = process.hrtime.bigint();
-      try {
-        socket.ping(RTT_PROBE_PAYLOAD);
-      } catch {
-        this.pendingRttProbe = null;
-      }
-    };
-    probe();
-    this.rttProbeTimer = setInterval(probe, this.options.rttProbeIntervalMs ?? 15_000);
-    this.rttProbeTimer.unref?.();
-  }
+  private startRttProbe(socket: WebSocket): void { this.coordinatorRttProbe.start(socket); }
+  private stopRttProbe(): void { this.coordinatorRttProbe.stop(); }
+  private recordRttSample(payload: Buffer): void { this.coordinatorRttProbe.recordSample(payload); }
 
-  private stopRttProbe(): void {
-    if (this.rttProbeTimer) clearInterval(this.rttProbeTimer);
-    this.rttProbeTimer = null;
-    this.pendingRttProbe = null;
-  }
-
-  private recordRttSample(payload: Buffer): void {
-    const sentAt = this.pendingRttProbe;
-    // Only answer our own probes: `ws` also emits `pong` for unsolicited frames
-    // and for the library's own keepalive, which would corrupt the estimate.
-    if (sentAt === null || !payload.equals(RTT_PROBE_PAYLOAD)) return;
-    this.pendingRttProbe = null;
-    const sampleMs = Number(process.hrtime.bigint() - sentAt) / 1_000_000;
-    if (!Number.isFinite(sampleMs) || sampleMs < 0) return;
-    const previous = this.capabilities?.network.coordinatorRttMs;
-    const smoothed = previous === undefined || previous <= 0
-      ? sampleMs
-      : previous * (1 - RTT_EMA_ALPHA) + sampleMs * RTT_EMA_ALPHA;
-    // Report the rounded value: sub-microsecond precision is noise, and the
-    // wire schema only promises a non-negative number.
-    const rounded = Math.round(smoothed * 100) / 100;
-    if (this.capabilities) this.capabilities.network.coordinatorRttMs = rounded;
-    this.lastRttSampleMs = sampleMs;
-  }
-
-  /** Última muestra cruda de RTT, sin suavizar. Diagnóstico y pruebas. */
-  get measuredRttMs(): number | null {
-    return this.lastRttSampleMs;
-  }
+  /** Latest unsmoothed, physically measured coordinator RTT. */
+  get measuredRttMs(): number | null { return this.coordinatorRttProbe.measuredRttMs; }
 
   private requestHeaders(initial: Record<string, string> = {}): Record<string, string> {
     if (!this.options.networkToken) return initial;
@@ -1453,18 +1409,17 @@ export class WorkerAgent {
           break;
         }
         {
-          const generation = ++this.runtimePreparationGeneration;
           this.authorizedRuntimeProcesses.clear();
           this.preparedRuntimeProcesses.clear();
           this.preparedRuntimeFormation = null;
-          const preparation = this.runtimePreparationTail.then(() =>
+          const preparation = this.runtimePreparations.run((generation, signal) =>
             this.prepareDistributedRuntime(
               message.payload.requestId,
               message.payload.description,
               generation,
+              signal,
             )
           );
-          this.runtimePreparationTail = preparation.catch(() => undefined);
           await this.runRuntimeOperation(() => preparation);
         }
         break;
@@ -2099,6 +2054,7 @@ export class WorkerAgent {
     requestId: string,
     input: unknown,
     generation: number,
+    signal?: AbortSignal,
   ): Promise<void> {
     try {
       this.assertCurrentRuntimePreparation(generation);
@@ -2118,6 +2074,7 @@ export class WorkerAgent {
               requestId,
               ...event,
             }),
+            signal,
           )
         : local;
       const preparedById = new Map(prepared.map((process) => [process.processId, process]));
@@ -2242,7 +2199,7 @@ export class WorkerAgent {
 
   private async resetDistributedRuntime(reason: string): Promise<void> {
     this.clearRuntimeDisconnectTimer();
-    this.runtimePreparationGeneration += 1;
+    this.runtimePreparations.cancel(reason);
     for (const controller of this.runtimeStartControllers.values()) controller.abort(new Error(reason));
     this.runtimeStartControllers.clear();
     const handles = [...this.runtimeProcesses.values()];
@@ -2257,9 +2214,7 @@ export class WorkerAgent {
   }
 
   private assertCurrentRuntimePreparation(generation: number): void {
-    if (generation !== this.runtimePreparationGeneration) {
-      throw new Error("distributed_runtime_preparation_superseded");
-    }
+    this.runtimePreparations.assertCurrent(generation);
   }
 
   private scheduleRuntimeDisconnectReset(): void {
@@ -2524,7 +2479,7 @@ export class WorkerAgent {
       };
     }
     const heartbeat: WorkerHeartbeat = {
-      draining: !this.acceptsNewWork() || !metrics.ready,
+      draining: !this.acceptsNewWork() || (this.capabilities.deployments.length > 0 && !metrics.ready),
       pausedReason: !this.contributionEnabled
         ? "Contribution paused"
         : this.updateDraining

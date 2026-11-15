@@ -113,6 +113,11 @@ describe("built-in Mycellios provider", () => {
     expect(div.textContent).toContain("No API key needed");
     expect(div.querySelector("input")).toBeNull();
     expect(div.querySelector("button")).toBeNull();
+    const statusLink = div.querySelector<HTMLAnchorElement>('a[href="https://www.mycellios.com/network"]');
+    expect(statusLink?.textContent).toContain("View network status");
+    expect(statusLink?.target).toBe("_blank");
+    expect(statusLink?.rel).toContain("noopener");
+    expect(mock.connect).not.toHaveBeenCalled();
   });
   it("offers a retry after failed setup without claiming a successful connection", async () => {
     const { div } = await render();

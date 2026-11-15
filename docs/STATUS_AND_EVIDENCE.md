@@ -1,5 +1,37 @@
 # Status and evidence
 
+## Model diagnostics and native transport recovery, 2026-11-15
+
+Models presents the coordinator's requested-model readiness and next step, with
+existing diagnostics folded below. Agent's Mycellios provider links to the
+public network overview. No planner, retry controller, endpoint or operator
+permission was duplicated. Browser fixtures covered desktop and narrow layouts;
+fixtures do not qualify real inference.
+
+Native workers retain one outstanding RTT ping and recover silent sockets through
+the existing reconnect/offset-ACK path. Artifact preparation is cancelled when
+its owning connection is superseded. Model-free contributors remain available
+without claiming a loaded model. An occupied root HTTP port receives a private
+loopback port through the existing authenticated relay; unrelated listeners and
+tensor routes remain unchanged.
+
+A remotely built private native candidate passed structure, architecture, native
+TypeScript and 55 focused regressions. The installed candidate on two physical
+Windows computers completed pinned SmolLM2-360M-Instruct generation across CUDA
+RTX 2060 and DirectML Iris Xe, with GPU execution and no CPU fallback. An internal
+API request returned `2 + 2 = 4` in 2297.7 ms. The temporary activation was removed
+normally; original requested models, settings and runtime files were preserved.
+Cold preparation required verified cache prepopulation because one peer's weak
+Wi-Fi repeatedly congested downloads. This is not proof of uninterrupted Wi-Fi,
+chat/AntSeed delivery, public-model steady serving or full-model output parity.
+
+A separate database outage was recovered using the original container, image,
+data mount and cluster identity. The private relay now derives its device number
+from the original filesystem UUID and live mount instead of pinning a reboot-
+sensitive number; seven isolated guard cases passed. No restore, migration or
+data deletion was performed. Private operational receipts remain outside Git.
+Full suites and public Desktop packaging were not run for that private candidate.
+
 ## Cadencia — local browser speech editing, 2026-11-11
 
 Hifa Store includes the first-party Cadencia app. It reads an explicitly selected

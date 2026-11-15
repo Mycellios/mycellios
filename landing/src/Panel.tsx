@@ -82,6 +82,7 @@ import type {
   WorkerCredentialSummary,
 } from "../../src/contracts/dashboard";
 import { isAvailableInferenceWorker } from "./inference-selection";
+import { ModelReadiness, friendlyActivationFailure } from "./model-readiness";
 import type { NetworkExecutionTrace } from "../../src/contracts/types";
 import { projectObservedTopology } from "./network-topology";
 import { type ProductStatePresentation } from "./product-state";
@@ -3397,7 +3398,7 @@ export function Models({ snapshot, onSearch, onRequest, onRemove, adminToken: in
       {formError && <div className="model-form-error" role="alert"><CircleAlert size={16} />{formError}</div>}
     </UiForm>
 
-    {snapshot.requestedModels.length > 0 && <PanelDisclosure icon={Boxes} title={snapshot.requestedModels.some((model) => model.status === "failed") ? "Requested models · needs attention" : "Requested models"}><div className="model-request-list">
+    {snapshot.requestedModels.length > 0 && <PanelDisclosure icon={Boxes} title={snapshot.requestedModels.some((model) => model.status === "failed") ? "Requested models · needs attention" : "Requested models"} defaultOpen><div className="model-request-list">
       <div className="model-request-list-heading"><div><strong>Requests</strong></div><small>{snapshot.requestedModels.length} {snapshot.requestedModels.length === 1 ? "model" : "models"}</small></div>
       {snapshot.requestedModels.map((model) => <RequestedModelCard key={model.id} model={model} onRemove={(modelId) => onRemove(modelId, adminToken)} />)}
     </div></PanelDisclosure>}
@@ -3428,12 +3429,13 @@ function RequestedModelCard({ model, onRemove }: { model: RequestedModelCapacity
   }
   return <UiCard className={`model-request-card ${model.status}`}>
     <div className="model-request-head"><div className="model-request-icon"><Boxes /></div><div><span>{model.source}</span><UiHeading as="h2">{model.id}</UiHeading><small>{model.adapterId ?? "Checking architecture"}</small></div><ModelStatus status={model.status} /></div>
-    <UiText className="model-request-message">{model.status === "failed" ? friendlyActivationFailure(model.message) : model.message}</UiText>
+    <ModelReadiness model={model} />
     <div className="model-capacity-bar"><i style={{ width: `${progress}%` }} /></div>
     <div className="model-request-quick"><span><MemoryStick size={14} />{formatMemory(model.availableVramMiB)} available</span><span><Server size={14} />{model.availableNodes} / {model.requiredNodes} nodes</span><span><Activity size={14} />{model.activationProgress?.length ?? 0} events</span></div>
     <UiDisclosure className="model-request-details" onToggle={(event) => setDetailsOpen(event.currentTarget.open)}>
       <UiDisclosureSummary><Activity size={15} />Capacity and diagnostics<ChevronDown size={15} /></UiDisclosureSummary>
       {detailsOpen && <div className="model-request-details-body">
+      <UiText className="model-request-message">{model.status === "failed" ? friendlyActivationFailure(model.message) : model.message}</UiText>
       <div className="model-capacity-grid">
         <Metric label="Estimated need" value={model.requiredVramMiB === null ? "Calculating" : formatMemory(model.requiredVramMiB)} />
         <Metric label="Available" value={formatMemory(model.availableVramMiB)} />
@@ -4384,23 +4386,6 @@ function activationDetailIsReadable(detail: string): boolean {
     && !detail.includes("managed_launch_agent_")
     && !detail.includes("distributed_activation_")
     && !detail.includes("distributed_worker_disconnected:");
-}
-
-function friendlyActivationFailure(message: string): string {
-  const exhausted = /automatic_activation_retries_exhausted:(\d+):/i.exec(message);
-  if (exhausted && message.includes("distributed_activation_requires_two_connected_shard_executors")) {
-    return `Automatic activation paused after ${exhausted[1]} attempts because the two-PC execution route was still not verified. Keep both PCs online, then run activation again.`;
-  }
-  if (message.includes("distributed_activation_requires_two_connected_shard_executors")) {
-    return "Two verified shard executors are not ready yet. The model remains unpublished while Mycellios rebuilds the route.";
-  }
-  if (exhausted) {
-    return "Automatic activation stopped after repeated temporary node disconnections. The model was not published.";
-  }
-  if (message.includes("3221225477")) {
-    return "A Windows accelerator process crashed while loading the model stage. Capacity was available, but the runtime could not complete the load.";
-  }
-  return message.includes("launch_process_exited:") ? "A model stage stopped during activation. Open capacity and diagnostics for the reported cause." : message.replace(/^Automatic activation failed:\s*/i, "") || "The model runtime stopped before activation completed.";
 }
 
 function fallbackActivationDetails(message: string): string[] {

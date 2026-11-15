@@ -13,6 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+msgid "View network status"
+msgstr "View network status"
+
 #: src/pages/shell/sidebar-roster.tsx
 msgid " (unread)"
 msgstr " (unread)"

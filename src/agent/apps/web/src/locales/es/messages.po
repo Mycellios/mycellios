@@ -13,6 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "View network status"
+msgstr "Ver estado de la red"
+
 msgid "Computer tools are unavailable. Chat and connected apps still work."
 msgstr "Las herramientas del ordenador no están disponibles. Puedes seguir conversando y usando las aplicaciones conectadas."
 
