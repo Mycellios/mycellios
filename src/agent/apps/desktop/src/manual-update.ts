@@ -26,9 +26,9 @@ const PACKAGES: Record<ManualPackageKind, { format: "EXE" | "RPM" | "DEB" | "DMG
   "linux-x64": { format: "DEB", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-linux-x64-pilot\\.deb$`) },
   // The RPM builder appends its own build revision after the first one.
   "fedora-x64": { format: "RPM", entry: "fedora", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}(-\\d+)?-fedora-x86_64\\.rpm$`) },
-  // Mac previews record their ad-hoc signature in the file name.
-  "macos-arm64": { format: "DMG", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-macos-arm64-adhoc-[a-f0-9]+\\.dmg$`) },
-  "macos-x64": { format: "DMG", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-macos-x64-adhoc-[a-f0-9]+\\.dmg$`) },
+  // Current unified releases use preview; retain earlier ad-hoc package names.
+  "macos-arm64": { format: "DMG", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-macos-arm64-(?:preview|adhoc-[a-f0-9]+)\\.dmg$`) },
+  "macos-x64": { format: "DMG", entry: "packages", fileName: version => new RegExp(`^Mycellios-Desktop-${escapeVersion(version)}-macos-x64-(?:preview|adhoc-[a-f0-9]+)\\.dmg$`) },
 };
 
 export class ManualUpdateDiskSpaceError extends Error {
@@ -73,7 +73,8 @@ export function catalogManualRelease(catalog: unknown, current: string, kind: Ma
   if (typeof item.version !== "string" || !VERSION.test(item.version)) throw Error("Invalid release version");
   const version = item.version;
   if (typeof item.fileName !== "string" || !spec.fileName(version).test(item.fileName) || item.format !== spec.format ||
-      item.path !== `/downloads/desktop/releases/${version}/${item.fileName}` ||
+      (item.path !== `/downloads/desktop/releases/${version}/${item.fileName}` &&
+       item.path !== `/downloads/desktop/releases/${version}/${item.fileName}?sha256=${item.sha256}`) ||
       typeof item.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(item.sha256) ||
       !Number.isSafeInteger(item.bytes) || (item.bytes as number) <= 0 || (item.bytes as number) > MAX_BYTES)
     throw Error(`Invalid ${kind} release artifact`);
