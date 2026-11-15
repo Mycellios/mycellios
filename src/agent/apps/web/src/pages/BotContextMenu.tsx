@@ -1,4 +1,5 @@
 import { useLingui } from "@lingui/react/macro";
+import { sidebarFolderTree } from "@rakazo/core";
 import type { Bot, BotSection } from "@rakazo/contracts";
 import {
   ContextMenuContent,
@@ -70,10 +71,10 @@ export function BotContextMenu({
           {t`Move to`}
         </ContextMenuSubTrigger>
         <ContextMenuSubContent className="max-h-[min(420px,calc(100vh-16px))] min-w-[180px] overflow-y-auto">
-          {sections.map((section) => (
+          {sidebarFolderTree(sections).map((section) => (
             <ContextMenuItem key={section.id} onClick={() => onMoveToSection(section.id)}>
               <Folder />
-              <span dir="auto">{section.name}</span>
+              <span dir="auto">{section.path}</span>
               {bot.sectionId === section.id ? <Check className="ms-auto" /> : null}
             </ContextMenuItem>
           ))}
@@ -85,12 +86,12 @@ export function BotContextMenu({
           <ContextMenuSeparator />
           <ContextMenuItem onClick={onCreateSection}>
             <FolderPlus />
-            {t`New section`}
+            {t`New folder`}
           </ContextMenuItem>
           {bot.sectionId && onRenameSection ? (
             <ContextMenuItem onClick={() => onRenameSection(bot.sectionId!)}>
               <Pencil />
-              {t`Rename section`}
+              {t`Rename folder`}
             </ContextMenuItem>
           ) : null}
         </ContextMenuSubContent>

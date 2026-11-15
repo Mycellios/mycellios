@@ -195,7 +195,7 @@ try {
     await componentLifecycle.markActivationHealthy();
     pendingComponentActivation = false;
     await controlStore.setDraining(false);
-    if (controlState.contributionEnabled) await agent.setContributionEnabled(true);
+    await commandApplicator.reconcileContribution(true, false);
   }
   const controlSession = agent.nodeControlSession;
   if (controlSession) {
@@ -264,10 +264,7 @@ try {
           }
           const currentControl = await controlStore.load();
           if (desiredState.drain !== currentControl.draining) await commandApplicator.reconcileDrain(desiredState.drain);
-          if (currentControl.contributionEnabled !== desiredState.contributionEnabled) {
-            await controlStore.setContributionEnabled(desiredState.contributionEnabled);
-          }
-          await agent?.setContributionEnabled(desiredState.contributionEnabled && !desiredState.drain);
+          await commandApplicator.reconcileContribution(desiredState.contributionEnabled, desiredState.drain);
           const current = await store.load();
           const limitsChanged = JSON.stringify(current.config.limits) !== JSON.stringify(desiredState.limits);
           const policyChanged = JSON.stringify(current.config.policy) !== JSON.stringify(desiredState.policy);

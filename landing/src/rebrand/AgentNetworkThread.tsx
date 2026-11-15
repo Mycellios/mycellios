@@ -1,10 +1,11 @@
+import { loadAgentMotion } from "./deferred-agent-motion";
 import { useEffect, useRef } from "react";
 
 export function AgentNetworkThread() {
   const root = useRef<SVGSVGElement>(null);
   useEffect(() => {
     let active = true, destroy: (() => void) | undefined;
-    void import("./agent-hero-motion").then(({ animateNetworkThread }) => {
+    void loadAgentMotion().then(({ animateNetworkThread }) => {
       if (active && root.current) destroy = animateNetworkThread(root.current);
     }).catch(() => {});
     return () => { active = false; destroy?.(); };

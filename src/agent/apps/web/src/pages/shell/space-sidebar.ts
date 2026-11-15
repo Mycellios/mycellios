@@ -1,4 +1,4 @@
-import { groupBotsForSidebar, userFacingLabel } from "@rakazo/core";
+import { groupBotsForSidebar, userFacingLabel, sidebarFolderTree } from "@rakazo/core";
 
 type SidebarChat = {
   id: string;
@@ -16,7 +16,7 @@ type SidebarSpace<TBot extends SidebarChat, TGroup extends SidebarChat> = {
   canDelete?: boolean;
   bots: readonly TBot[];
   groups: readonly TGroup[];
-  botSections: readonly { id: string; name: string }[];
+  botSections: readonly { id: string; name: string; parentId?: string | null }[];
 };
 
 function spaceHeaderMenu(space: { canRename?: boolean; canDelete?: boolean }, hostsMenu: boolean) {
@@ -48,6 +48,9 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
   const showSpaceNames = spaces.length > 1;
   return spaces.flatMap((space) => {
     const label = userFacingLabel({ name: space.name }, unnamedSpace);
+    const folders = sidebarFolderTree(space.botSections);
+    const folderById = new Map(folders.map(folder => [folder.id, folder]));
+    const folderKey = (id: string) => showSpaceNames ? `space:${space.id}:section:${id}` : `section:${id}`;
     const visibleBots = space.bots.filter((bot) =>
       `${bot.name} ${bot.title ?? ""} ${bot.preview ?? ""}`.toLowerCase().includes(needle),
     );
@@ -64,13 +67,13 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
         pinned: item.chat.pinned,
         sectionId: item.chat.sectionId,
       })),
-      space.botSections,
+      folders,
       { labels },
     );
     // Keep destinations visible after their last bot is dragged out. Search
     // still hides empty lists, and spaces without sections keep their old layout.
-    if (!needle && space.botSections.length > 0 && grouped.length > 0) {
-      for (const section of space.botSections) {
+    if (!needle && folders.length > 0 && grouped.length > 0) {
+      for (const section of folders) {
         const key = `section:${section.id}`;
         if (!grouped.some((group) => group.key === key)) {
           grouped.push({ key, title: section.name, bots: [] });
@@ -81,24 +84,29 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
       }
       const order = [
         "pinned",
-        ...space.botSections.map((section) => `section:${section.id}`),
         "unassigned",
+        ...folders.map((section) => `section:${section.id}`),
       ];
       grouped.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
     }
-    const sections = grouped.map((group, index) => ({
-      ...group,
-      sectionId: group.key.startsWith("section:") ? group.key.slice("section:".length) : null,
-      key: showSpaceNames ? `space:${space.id}:${group.key}` : group.key,
-      // A header holding the space menu is never blank, even for the only space.
-      title: showSpaceNames ? label : index === 0 && !group.title ? label : group.title,
-      subtitle: showSpaceNames && group.title ? group.title : undefined,
-      showLock: showSpaceNames,
-      emptySpaceId: undefined as string | undefined,
-      spaceId: space.id,
-      spaceName: label,
-      ...spaceHeaderMenu(space, index === 0),
-    }));
+    const sections = grouped.map((group, index) => {
+      const folder = group.key.startsWith("section:") ? folderById.get(group.key.slice(8)) : undefined;
+      const folderTitle = folder?.path ?? group.title;
+      return {
+        ...group,
+        sectionId: group.key.startsWith("section:") ? group.key.slice("section:".length) : null,
+        key: showSpaceNames ? `space:${space.id}:${group.key}` : group.key,
+        // A header holding the space menu is never blank, even for the only space.
+        title: showSpaceNames ? label : index === 0 && !group.title ? label : folderTitle,
+        subtitle: showSpaceNames && folderTitle ? folderTitle : undefined,
+        ancestorKeys: needle ? [] : (folder?.ancestorIds.map(folderKey) ?? []),
+        showLock: showSpaceNames,
+        emptySpaceId: undefined as string | undefined,
+        spaceId: space.id,
+        spaceName: label,
+        ...spaceHeaderMenu(space, index === 0),
+      };
+    });
     if (sections.length > 0) return sections;
     // Keep empty spaces selectable; chat clicks are the only switch control.
     if (needle && (space.bots.length > 0 || space.groups.length > 0)) return [];
@@ -106,10 +114,11 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
     // renamed or deleted after their last chat leaves.
     const emptySections = needle
       ? []
-      : space.botSections.map((section) => ({
+      : folders.map((section) => ({
           key: showSpaceNames ? `space:${space.id}:section:${section.id}` : `section:${section.id}`,
-          title: showSpaceNames ? label : section.name,
-          subtitle: showSpaceNames ? section.name : undefined,
+          title: showSpaceNames ? label : section.path,
+          subtitle: showSpaceNames ? section.path : undefined,
+          ancestorKeys: needle ? [] : section.ancestorIds.map(folderKey),
           bots: [] as (typeof sections)[number]["bots"],
           sectionId: section.id as string | null,
           showLock: showSpaceNames,
@@ -129,6 +138,7 @@ export function sidebarGroupsForSpaces<TBot extends SidebarChat, TGroup extends 
         title: label,
         subtitle: undefined,
         bots: [],
+        ancestorKeys: [] as string[],
         sectionId: null,
         showLock: showSpaceNames,
         emptySpaceId: showSpaceNames ? space.id : undefined,

@@ -12617,90 +12617,180 @@ msgstr "No Mycellios agent models are available right now. Retrying automaticall
 msgid "Mycellios network"
 msgstr "Mycellios network"
 
-
 msgid "General memory"
 msgstr "General memory"
-
 
 msgid "Your Micos in this space can use these notes. Micos set to isolated memory do not read them."
 msgstr "Your Micos in this space can use these notes. Micos set to isolated memory do not read them."
 
-
 msgid "Task memory"
 msgstr "Task memory"
-
 
 msgid "Mico memory"
 msgstr "Mico memory"
 
-
 msgid "Always include"
 msgstr "Always include"
-
 
 msgid "Always included"
 msgstr "Always included"
 
-
 msgid "Include when relevant"
 msgstr "Include when relevant"
-
 
 msgid "Local memory"
 msgstr "Local memory"
 
-
 msgid "Automatic memory review"
 msgstr "Automatic memory review"
-
 
 msgid "Learn from completed conversations in the background. Uses a model with a bounded Credit quote; otherwise waits."
 msgstr "Learn from completed conversations in the background. Uses a model with a bounded Credit quote; otherwise waits."
 
-
 msgid "Daily limit per space"
 msgstr "Daily limit per space"
-
 
 msgid "Maximum reserved Credits each day. Pending reviews count toward the limit and are never sent again."
 msgstr "Maximum reserved Credits each day. Pending reviews count toward the limit and are never sent again."
 
-
 msgid "No spending"
 msgstr "No spending"
-
 
 msgid "Review frequency"
 msgstr "Review frequency"
 
-
 msgid "Also reviews after 15 minutes of inactivity when there are at least three new messages from you."
 msgstr "Also reviews after 15 minutes of inactivity when there are at least three new messages from you."
-
 
 msgid "10 turns"
 msgstr "10 turns"
 
-
 msgid "20 turns"
 msgstr "20 turns"
-
 
 msgid "40 turns"
 msgstr "40 turns"
 
-
 msgid "Isolated uses only Mico and task notes. Shared also uses general notes from this space."
 msgstr "Isolated uses only Mico and task notes. Shared also uses general notes from this space."
-
 
 msgid "Reserved today"
 msgstr "Reserved today"
 
-
 msgid "Daily budget resets at 00:00 UTC."
 msgstr "Daily budget resets at 00:00 UTC."
 
-
 msgid "Pending reviews"
 msgstr "Pending reviews"
+
+
+msgid "Open Mycellios Dev"
+msgstr "Open Mycellios Dev"
+
+msgid "Preparing Mycellios Dev…"
+msgstr "Preparing Mycellios Dev…"
+
+msgid "Could not open Mycellios Dev. Try again."
+msgstr "Could not open Mycellios Dev. Try again."
+
+msgid "Explore models"
+msgstr "Explore models"
+
+msgid "No chat models available right now."
+msgstr "No chat models available right now."
+
+msgid "Rename conversation"
+msgstr "Rename conversation"
+
+msgid "Could not rename the conversation. Try again."
+msgstr "Could not rename the conversation. Try again."
+
+msgid "Pinned messages"
+msgstr "Pinned messages"
+
+msgid "Pin message"
+msgstr "Pin message"
+
+msgid "Unpin message"
+msgstr "Unpin message"
+
+msgid "Could not update pinned messages."
+msgstr "Could not update pinned messages."
+
+msgid "Could not load pinned messages."
+msgstr "Could not load pinned messages."
+
+msgid "Pin a message from its menu to find it here."
+msgstr "Pin a message from its menu to find it here."
+
+msgid "You can pin up to 100 messages per conversation."
+msgstr "You can pin up to 100 messages per conversation."
+
+msgid "Update needs attention"
+msgstr "Update needs attention"
+
+msgid "Updating shortly"
+msgstr "Updating shortly"
+
+msgid "Update waiting"
+msgstr "Update waiting"
+
+msgid "New update available"
+msgstr "New update available"
+
+msgid "End call and restart"
+msgstr "End call and restart"
+
+msgid "Restart"
+msgstr "Restart"
+
+msgid "Folders support up to three levels."
+msgstr "Folders support up to three levels."
+
+msgid "A folder cannot be moved into itself or one of its subfolders."
+msgstr "A folder cannot be moved into itself or one of its subfolders."
+
+msgid "Folder name already used"
+msgstr "Folder name already used"
+
+msgid "New folder"
+msgstr "New folder"
+
+msgid "Rename folder"
+msgstr "Rename folder"
+
+msgid "Could not move folder"
+msgstr "Could not move folder"
+
+msgid "Mycellios"
+msgstr "Mycellios"
+
+msgid "Response style"
+msgstr "Response style"
+
+msgid "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
+msgstr "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
+
+msgid "Natural"
+msgstr "Natural"
+
+msgid "Could not create folder"
+msgstr "Could not create folder"
+
+msgid "Location"
+msgstr "Location"
+
+msgid "Top level"
+msgstr "Top level"
+
+msgid "Could not rename folder"
+msgstr "Could not rename folder"
+
+msgid "Could not delete folder"
+msgstr "Could not delete folder"
+
+msgid "New folder inside"
+msgstr "New folder inside"
+
+msgid "Delete folder"
+msgstr "Delete folder"

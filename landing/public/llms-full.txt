@@ -1,0 +1,865 @@
+# mycellios
+
+> Mycellios is an AI agent workspace with optional model connections and a distributed compute network.
+
+Micos are user agents. Use a supported personal provider or the optional Mycellios provider with AI Credits. One Credit corresponds to one USD for paid top-ups. Managed pricing is the complete upstream cost plus a 4% service fee. Availability depends on account, models, tools and operator configuration.
+
+Approved, independently verified contribution work can earn Credits. Connection time, animations and benchmarks do not imply earnings. Credits are not the proposed Spore token, cash payouts or a guaranteed return. Multi-host GPU performance and combined-memory execution are not established as general production capabilities; consult the evidence record.
+
+Each public page below has a Markdown version linked beside it. Spanish guides are full translations, not a separate product. [Full reference](https://www.mycellios.com/llms-full.txt).
+
+## Product, guides and comparisons
+
+- [Mycellios — AI agents, your models & shared compute](https://www.mycellios.com/): Work with AI agents in one workspace. Connect your models or use Mycellios Credits, and contribute compatible compute to earn Credits for verified work. [Markdown](https://www.mycellios.com/index.md).
+- [Live distributed AI network | mycellios](https://www.mycellios.com/network): Inspect the public mycellios network snapshot: connected workers, available models, and recorded inference activity when data is available. [Markdown](https://www.mycellios.com/network.md).
+- [Contribute compute and earn AI Credits | Mycellios](https://www.mycellios.com/earn): Activate compatible compute from your Mycellios account. Earn AI Credits for approved, independently verified work and pause contribution whenever you choose. [Markdown](https://www.mycellios.com/earn.md).
+- [Native package availability | mycellios](https://www.mycellios.com/downloads): Check which mycellios native packages are published for Windows, macOS, and Linux, or contribute from your browser without installing software. [Markdown](https://www.mycellios.com/downloads.md).
+- [Browser contribution | Mycellios](https://www.mycellios.com/browser/): Connect a desktop, tablet, or phone browser to mycellios and contribute voluntary, measurable compute that you can pause anytime. [Markdown](https://www.mycellios.com/browser.md).
+- [AI Credits, costs & pricing | Mycellios](https://www.mycellios.com/pricing): Understand Mycellios Credits and optional model providers. Estimate your own provider and hosting costs, and check current model prices before use. [Markdown](https://www.mycellios.com/pricing.md).
+- [Compare AI agent apps | Mycellios](https://www.mycellios.com/compare): Compare Mycellios with other agent apps, with original guidance and current product sources. [Markdown](https://www.mycellios.com/compare.md).
+- [Mycellios Stats — network observations](https://www.mycellios.com/stats): Inspect observed node capacity, models, jobs and persisted history from Mycellios's public coordinator. [Markdown](https://www.mycellios.com/stats.md).
+- [Changelog & release notes | Mycellios](https://www.mycellios.com/changelog): Follow Mycellios Desktop and Agent updates, with dated release notes, improvements, fixes and links to the original publications. [Markdown](https://www.mycellios.com/changelog.md).
+- [Mycellios vs OpenBot](https://www.mycellios.com/compare/openbot): Compare agent workflows, deployment and costs. Original guidance with links to OpenBot's product sources. [Markdown](https://www.mycellios.com/compare/openbot.md).
+- [Mycellios vs Grok Bot](https://www.mycellios.com/compare/grok-bot): Compare agent workflows, deployment and costs. Original guidance with links to Grok Bot's product sources. [Markdown](https://www.mycellios.com/compare/grok-bot.md).
+- [Mycellios vs Hermes Agent](https://www.mycellios.com/compare/hermes-agent): Compare agent workflows, deployment and costs. Original guidance with links to Hermes Agent's product sources. [Markdown](https://www.mycellios.com/compare/hermes-agent.md).
+- [Mycellios vs Muse](https://www.mycellios.com/compare/muse): Compare agent workflows, deployment and costs. Original guidance with links to Muse's product sources. [Markdown](https://www.mycellios.com/compare/muse.md).
+- [Mycellios vs OpenClaw](https://www.mycellios.com/compare/openclaw): Compare agent workflows, deployment and costs. Original guidance with links to OpenClaw's product sources. [Markdown](https://www.mycellios.com/compare/openclaw.md).
+- [Mycellios vs Claude Cowork](https://www.mycellios.com/compare/claude-cowork): Compare agent workflows, deployment and costs. Original guidance with links to Claude Cowork's product sources. [Markdown](https://www.mycellios.com/compare/claude-cowork.md).
+- [Mycellios vs ChatGPT dots](https://www.mycellios.com/compare/chatgpt-dots): Compare agent workflows, deployment and costs. Original guidance with links to ChatGPT dots's product sources. [Markdown](https://www.mycellios.com/compare/chatgpt-dots.md).
+- [Mycellios vs Manus](https://www.mycellios.com/compare/manus): Compare agent workflows, deployment and costs. Original guidance with links to Manus's product sources. [Markdown](https://www.mycellios.com/compare/manus.md).
+- [Mycellios vs Devin](https://www.mycellios.com/compare/devin): Compare agent workflows, deployment and costs. Original guidance with links to Devin's product sources. [Markdown](https://www.mycellios.com/compare/devin.md).
+- [Mycellios vs Paperclip](https://www.mycellios.com/compare/paperclip): Compare agent workflows, deployment and costs. Original guidance with links to Paperclip's product sources. [Markdown](https://www.mycellios.com/compare/paperclip.md).
+- [Mycellios vs Viktor](https://www.mycellios.com/compare/viktor): Compare agent workflows, deployment and costs. Original guidance with links to Viktor's product sources. [Markdown](https://www.mycellios.com/compare/viktor.md).
+- [Mycellios vs Instinct](https://www.mycellios.com/compare/instinct): Compare agent workflows, deployment and costs. Original guidance with links to Instinct's product sources. [Markdown](https://www.mycellios.com/compare/instinct.md).
+- [Choose your next AI agent | Mycellios](https://www.mycellios.com/compare/best-ai-agent-apps): Compare agent workflows, deployment and costs. Original guidance with links to Best AI agent apps's product sources. [Markdown](https://www.mycellios.com/compare/best-ai-agent-apps.md).
+- [Mycellios guides | Mycellios](https://www.mycellios.com/guides): Practical guides to Micos, model providers, AI Credits and contributing compute. Choose a workflow and understand its requirements. [Markdown](https://www.mycellios.com/guides.md).
+- [Guías de Mycellios | Mycellios](https://www.mycellios.com/es/guias): Guías prácticas sobre Micos, proveedores de modelos, Créditos para IA y contribución de potencia. Elige cómo trabajar y conoce sus requisitos. [Markdown](https://www.mycellios.com/es/guias.md).
+- [Get started with Mycellios and your first Mico | Mycellios](https://www.mycellios.com/guides/get-started): Open Mycellios in your browser or on desktop, create a Mico and choose a model connection. A practical guide to your first AI task. [Markdown](https://www.mycellios.com/guides/get-started.md).
+- [Cómo empezar con Mycellios y tu primer Mico | Mycellios](https://www.mycellios.com/es/guias/empezar): Abre Mycellios en el navegador o en escritorio, crea un Mico y elige un modelo. Guía práctica para completar tu primera tarea con IA. [Markdown](https://www.mycellios.com/es/guias/empezar.md).
+- [Mycellios models, providers and Credits explained | Mycellios](https://www.mycellios.com/guides/models-and-credits): Understand Mycellios Credits, the optional managed provider, your own model connections and the difference between Credits and Spore. [Markdown](https://www.mycellios.com/guides/models-and-credits.md).
+- [Modelos, proveedores y Créditos de Mycellios | Mycellios](https://www.mycellios.com/es/guias/modelos-y-creditos): Entiende los Créditos, el proveedor opcional Mycellios y tus propias conexiones de modelos. Conoce los costes y la diferencia con Spore. [Markdown](https://www.mycellios.com/es/guias/modelos-y-creditos.md).
+- [Contribute compute and earn AI Credits with Mycellios | Mycellios](https://www.mycellios.com/guides/contribute-compute): Learn how to activate and pause browser contribution, check real earnings and use verified-work Credits for eligible AI models in Mycellios. [Markdown](https://www.mycellios.com/guides/contribute-compute.md).
+- [Aporta potencia y gana Créditos para IA en Mycellios | Mycellios](https://www.mycellios.com/es/guias/aportar-potencia): Aprende a activar y pausar la contribución desde el navegador, comprobar las ganancias reales y usar Créditos de trabajo verificado para IA. [Markdown](https://www.mycellios.com/es/guias/aportar-potencia.md).
+- [Desktop downloads](https://www.mycellios.com/downloads/desktop): Published platform installers and current availability.
+- [Journal](https://www.mycellios.com/blog): Published project notes.
+
+## Documentation and evidence
+
+- [Status and evidence](https://github.com/Mycellios/mycellios/blob/main/docs/STATUS_AND_EVIDENCE.md): Authoritative implementation and qualification record.
+- [Source](https://github.com/Mycellios/mycellios): Source code, setup and license.
+- [Security](https://github.com/Mycellios/mycellios/blob/main/SECURITY.md): Security reporting.
+
+---
+
+# Meet Mycellios
+
+Mycellios Agent brings AI agents called Micos, conversations, files and supported model connections into one workspace. Open it in a browser or download the desktop app.
+
+Use your own supported provider or the optional Mycellios provider with Credits. Contribute compatible compute to earn Credits only for accepted, independently verified work; availability and earnings are not guaranteed.
+
+The project is under active development. Multi-host GPU performance, models that need combined host memory, and recovery after a worker fails have not been demonstrated as general production capabilities.
+
+
+
+## Links
+
+- [Open Mycellios Agent](https://www.mycellios.com/agent)
+- [Inspect the public network snapshot](https://www.mycellios.com/network)
+- [Contribute compute for verified-work Credits](https://www.mycellios.com/earn)
+- [Get started with Mycellios](https://www.mycellios.com/guides)
+- [Guías en español](https://www.mycellios.com/es/guias)
+- [Compare AI agent workspaces](https://www.mycellios.com/compare)
+- [Download Mycellios Desktop](https://www.mycellios.com/downloads/desktop)
+- [View the open-source project](https://github.com/Mycellios/mycellios)
+
+Source: https://www.mycellios.com/
+
+---
+
+# Mycellios public network status
+
+This page reads a public snapshot from the Mycellios coordinator and reports registered or connected workers, available models, and recorded activity when that data is available.
+
+Values are observed or derived from the snapshot. Revenue, rewards, and throughput remain unpublished unless an auditable public source is available.
+
+
+
+## Links
+
+- [About the Mycellios project](https://www.mycellios.com/)
+- [Read Mycellios research and field notes](https://www.mycellios.com/blog)
+
+Source: https://www.mycellios.com/network
+
+---
+
+# Contribute compute to the Mycellios test network
+
+Join the Mycellios test network with a compatible browser worker or native client. You choose what your device shares and can pause it at any time.
+
+Account-bound, approved work can earn AI Credits after independent verification. Connection time and benchmarks do not earn Credits; demand and earnings are not guaranteed. Spore token rewards and cash payouts remain separate, planned features.
+
+
+
+## Links
+
+- [Open Agent and activate Generate AI](https://www.mycellios.com/agent)
+- [How verified-work Credits work](https://www.mycellios.com/guides/contribute-compute)
+- [Check native package availability](https://www.mycellios.com/downloads)
+
+Source: https://www.mycellios.com/earn
+
+---
+
+# Mycellios native package availability
+
+Check published native releases for Windows, macOS, and Linux. Download links appear only for packages found in the public release store.
+
+If a package is unavailable, review the public releases or try the browser worker on a compatible device without installing a native client.
+
+
+
+## Links
+
+- [Open Agent and activate Generate AI](https://www.mycellios.com/agent)
+- [How verified-work Credits work](https://www.mycellios.com/guides/contribute-compute)
+- [View published releases](https://github.com/Mycellios/mycellios/releases)
+
+Source: https://www.mycellios.com/downloads
+
+---
+
+# Connect a browser to Mycellios
+
+An opt-in worker lets compatible desktop, tablet, or phone browsers contribute measurable compute to the Mycellios test network. You can pause it at any time.
+
+Available tasks depend on browser capabilities and network state. This standalone worker does not attribute earnings to your account. For verified-work Credits, use the account-bound Generate AI control in Mycellios Agent.
+
+
+
+## Links
+
+- [Learn about contributing compute](https://www.mycellios.com/earn)
+- [Inspect the public network snapshot](https://www.mycellios.com/network)
+
+Source: https://www.mycellios.com/browser/
+
+---
+
+# Understand your AI costs
+
+Mycellios supports your own model connections and an optional managed provider using Credits. One Credit corresponds to one USD for paid top-ups. Managed pricing includes the complete upstream cost plus a 4% Mycellios service fee.
+
+The provider-cost calculator is a separate estimate from your own inputs, not a live model quote or a subscription purchase. Check your wallet and the chosen model's price before paid work.
+
+
+
+## Links
+
+- [How models and Credits work](https://www.mycellios.com/guides/models-and-credits)
+- [Earn Credits from verified work](https://www.mycellios.com/guides/contribute-compute)
+
+Source: https://www.mycellios.com/pricing
+
+---
+
+# Find your kind of agent
+
+Explore workspaces, personal assistants and coding agents.
+
+Compare how they run, what they connect to and how you pay. Start with your own task rather than a universal ranking.
+
+
+
+## Links
+
+- [Mycellios vs OpenBot](https://www.mycellios.com/compare/openbot)
+- [Mycellios vs Grok Bot](https://www.mycellios.com/compare/grok-bot)
+- [Mycellios vs Hermes Agent](https://www.mycellios.com/compare/hermes-agent)
+- [Mycellios vs Muse](https://www.mycellios.com/compare/muse)
+- [Mycellios vs OpenClaw](https://www.mycellios.com/compare/openclaw)
+- [Mycellios vs Claude Cowork](https://www.mycellios.com/compare/claude-cowork)
+- [Mycellios vs ChatGPT dots](https://www.mycellios.com/compare/chatgpt-dots)
+- [Mycellios vs Manus](https://www.mycellios.com/compare/manus)
+- [Mycellios vs Devin](https://www.mycellios.com/compare/devin)
+- [Mycellios vs Paperclip](https://www.mycellios.com/compare/paperclip)
+- [Mycellios vs Viktor](https://www.mycellios.com/compare/viktor)
+- [Mycellios vs Instinct](https://www.mycellios.com/compare/instinct)
+- [Best AI agent apps](https://www.mycellios.com/compare/best-ai-agent-apps)
+
+Source: https://www.mycellios.com/compare
+
+---
+
+# Mycellios Stats — network observations
+
+Inspect observed node capacity, models, jobs and persisted history from Mycellios's public coordinator.
+
+Review the linked product sources and implementation status before choosing a workflow. Mycellios is in active development; model and tool availability depend on the current configuration.
+
+
+
+## Links
+
+- [Mycellios](https://www.mycellios.com/)
+- [Open Agent](https://www.mycellios.com/agent)
+
+Source: https://www.mycellios.com/stats
+
+---
+
+# What’s new in Mycellios.
+
+Read dated notes for Mycellios Desktop previews and Agent web updates.
+
+Browse new features, improvements and fixes, with original publication sources and guidance for manual preview updates.
+
+
+
+## Links
+
+- [Desktop downloads](https://www.mycellios.com/downloads/desktop)
+- [Mycellios Journal](https://www.mycellios.com/blog)
+
+Source: https://www.mycellios.com/changelog
+
+---
+
+# Mycellios vs OpenBot
+
+A local-first workspace for persistent AI teammates.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where OpenBot fits
+
+OpenBot keeps agent workspaces and conversations across provider changes and supports agent collaboration.
+
+Its desktop app uses supported subscriptions, API keys or your own model server; mobile clients connect to your computer.
+
+You want a desktop-centered team of agents using existing model connections.
+
+## What to check before choosing
+
+Which provider plan covers your tasks, and where should your team server and computer tools run?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [OpenBot: official product source](https://openbot.run/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/openbot
+
+---
+
+# Mycellios vs Grok Bot
+
+AI teammates in the Grok ecosystem.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Grok Bot fits
+
+Grok Bot presents teammates that use tools, retain context and work on assigned projects.
+
+A bot has its own working computer and is accessed through the Grok Bot experience.
+
+You want a managed teammate within Grok's product and plan structure.
+
+## What to check before choosing
+
+Which apps can the bot access, and what does its plan include?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Grok Bot: official product source](https://x.ai/bot)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/grok-bot
+
+---
+
+# Mycellios vs Hermes Agent
+
+Memory and automation from Nous Research.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Hermes Agent fits
+
+Hermes combines persistent memory, learned skills, scheduling and messaging integrations.
+
+The official project offers desktop, terminal and cloud deployment entry points.
+
+You want to configure an assistant around its memory, gateway and automation features.
+
+## What to check before choosing
+
+Where will the gateway run, and which permissions and models will you configure?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Hermes Agent: official product source](https://hermes-agent.nousresearch.com/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/hermes-agent
+
+---
+
+# Mycellios vs Muse
+
+Meta's personal agent for everyday goals.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Muse fits
+
+Meta describes Muse as a personal agent that advances goals and works through web tasks.
+
+Muse runs in a dedicated virtual machine and can be reached through its app or WhatsApp.
+
+You want a personal service built around Meta's managed agent experience.
+
+## What to check before choosing
+
+Is the service available for your account and region, and which data will you connect?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Muse: official product source](https://about.fb.com/news/2026/09/introducing-muse-personal-ai-agent/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/muse
+
+---
+
+# Mycellios vs OpenClaw
+
+An open assistant on your own machines.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where OpenClaw fits
+
+OpenClaw focuses on a personal assistant connected to the chat apps and tools you already use.
+
+Its official distribution runs on your own machine, with your selected models and integrations.
+
+You want to operate and customize a messaging-centered personal assistant.
+
+## What to check before choosing
+
+Who will maintain the installation, integration permissions and model credentials?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [OpenClaw: official product source](https://openclaw.ai/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/openclaw
+
+---
+
+# Mycellios vs Claude Cowork
+
+Delegated work across Claude's files and tools.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Claude Cowork fits
+
+Anthropic's Cowork capabilities work across selected files, tools and browser tasks for review.
+
+The vendor now presents Cowork as part of Claude, with availability depending on the plan and rollout.
+
+You want delegated knowledge work within Claude's product experience.
+
+## What to check before choosing
+
+Which Cowork features are enabled on your plan and in your workspace?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Claude Cowork: official product source](https://claude.com/product/cowork)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/claude-cowork
+
+---
+
+# Mycellios vs ChatGPT dots
+
+Ongoing responsibilities coordinated in ChatGPT.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where ChatGPT dots fits
+
+A dot can follow assigned responsibilities between conversations, coordinate tasks and use relevant memory.
+
+OpenAI documents local tasks on connected computers and tasks in configured cloud environments.
+
+You want ongoing work coordinated through ChatGPT and its connected task environments.
+
+## What to check before choosing
+
+Which work needs a connected computer, and what should trigger an update or approval?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [ChatGPT dots: official product source](https://learn.chatgpt.com/docs/dots/tasks-and-memory)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/chatgpt-dots
+
+---
+
+# Mycellios vs Manus
+
+A service for producing complete task outputs.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Manus fits
+
+Manus offers task workflows for outputs such as research, slides, websites and design.
+
+Its product provides a managed work experience with web, desktop and other access points.
+
+You want to delegate a defined deliverable within Manus's available workflows.
+
+## What to check before choosing
+
+What will the task consume in credits, and which output can you export or maintain?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Manus: official product source](https://manus.im/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/manus
+
+---
+
+# Mycellios vs Devin
+
+A software engineering agent for teams.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Devin fits
+
+Devin specializes in software engineering tasks, repository work, testing and pull requests.
+
+Cognition describes execution in cloud or machine environments with a working browser.
+
+Your primary need is an engineering agent that works toward a reviewable code change.
+
+## What to check before choosing
+
+How will repository access, test environments and code review fit your development process?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Devin: official product source](https://devin.ai/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/devin
+
+---
+
+# Mycellios vs Paperclip
+
+Structure and governance for an agent organization.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Paperclip fits
+
+Paperclip organizes agents around responsibilities, goals, budgets and governance.
+
+Its open-source project is an orchestration application for managing work across agents.
+
+You need organizational controls and accountability across several agent workers.
+
+## What to check before choosing
+
+Which agents do you want to orchestrate, and who owns the budgets and approvals?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Paperclip: official product source](https://github.com/PaperclipAI/paperclip)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/paperclip
+
+---
+
+# Mycellios vs Viktor
+
+An AI coworker in team communication.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Viktor fits
+
+Viktor presents an AI employee that performs work across connected team tools.
+
+The vendor emphasizes Slack and Microsoft Teams alongside its own workspace.
+
+You want a managed coworker embedded in your team's communication and tools.
+
+## What to check before choosing
+
+Which team integrations, data scopes and actions will the coworker be allowed to use?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Viktor: official product source](https://viktor.com/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/viktor
+
+---
+
+# Mycellios vs Instinct
+
+A personal assistant reached by text or call.
+
+Mycellios brings Micos, project context and supported model connections into one workspace. Its optional compute network is a separate contribution workflow.
+
+## Where Instinct fits
+
+Instinct focuses on everyday assistance through conversation and actions on a phone or computer.
+
+Its interface centers on texting or calling the assistant.
+
+You want to reach a personal assistant through the communication habits you already have.
+
+## What to check before choosing
+
+Which accounts should it use, and which actions should require your review?
+
+Use the same small task in each app. Review its output, permissions, hosting needs and model usage costs. Product plans and availability can change; check the official source.
+
+## Links
+
+- [Instinct: official product source](https://www.humaninstinct.com/)
+- [Mycellios models and costs](https://www.mycellios.com/guides/models-and-credits)
+- [All comparisons](https://www.mycellios.com/compare)
+
+Source: https://www.mycellios.com/compare/instinct
+
+---
+
+# Choose your next AI agent
+
+Start with a small, real task and a result you can verify.
+
+Compare model choice, deployment, permissions, total cost and the work you can export.
+
+
+
+## Links
+
+- [Mycellios vs OpenBot](https://www.mycellios.com/compare/openbot)
+- [Mycellios vs Grok Bot](https://www.mycellios.com/compare/grok-bot)
+- [Mycellios vs Hermes Agent](https://www.mycellios.com/compare/hermes-agent)
+- [Mycellios vs Muse](https://www.mycellios.com/compare/muse)
+- [Mycellios vs OpenClaw](https://www.mycellios.com/compare/openclaw)
+- [Mycellios vs Claude Cowork](https://www.mycellios.com/compare/claude-cowork)
+- [Mycellios vs ChatGPT dots](https://www.mycellios.com/compare/chatgpt-dots)
+- [Mycellios vs Manus](https://www.mycellios.com/compare/manus)
+- [Mycellios vs Devin](https://www.mycellios.com/compare/devin)
+- [Mycellios vs Paperclip](https://www.mycellios.com/compare/paperclip)
+- [Mycellios vs Viktor](https://www.mycellios.com/compare/viktor)
+- [Mycellios vs Instinct](https://www.mycellios.com/compare/instinct)
+
+Source: https://www.mycellios.com/compare/best-ai-agent-apps
+
+---
+
+# Mycellios guides
+
+Practical guides to Micos, model providers, AI Credits and contributing compute. Choose a workflow and understand its requirements.
+
+Choose a guide and check the requirements of your connection. Model and tool availability can vary.
+
+
+
+## Links
+
+- [Get started with Mycellios and your first Mico](https://www.mycellios.com/guides/get-started)
+- [Mycellios models, providers and Credits explained](https://www.mycellios.com/guides/models-and-credits)
+- [Contribute compute and earn AI Credits with Mycellios](https://www.mycellios.com/guides/contribute-compute)
+- [Open Mycellios](https://www.mycellios.com/agent)
+- [Download the app](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/guides
+
+---
+
+# Guías de Mycellios
+
+Guías prácticas sobre Micos, proveedores de modelos, Créditos para IA y contribución de potencia. Elige cómo trabajar y conoce sus requisitos.
+
+Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar.
+
+
+
+## Enlaces
+
+- [Cómo empezar con Mycellios y tu primer Mico](https://www.mycellios.com/es/guias/empezar)
+- [Modelos, proveedores y Créditos de Mycellios](https://www.mycellios.com/es/guias/modelos-y-creditos)
+- [Aporta potencia y gana Créditos para IA en Mycellios](https://www.mycellios.com/es/guias/aportar-potencia)
+- [Abrir Mycellios](https://www.mycellios.com/agent)
+- [Descargar la aplicación](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/es/guias
+
+---
+
+# Get started with Mycellios and your first Mico
+
+Open Mycellios in your browser or on desktop, create a Mico and choose a model connection. A practical guide to your first AI task.
+
+Choose a guide and check the requirements of your connection. Model and tool availability can vary.
+
+## Choose where to work
+
+Open Mycellios Agent in your browser, or download the desktop app from the official downloads page. Use the same Mycellios account for your workspace and Credits. Desktop installers are listed by platform and architecture; check availability before downloading.
+
+The browser gives you a workspace without installing an application. Actions on a computer depend on a connected executor and its permissions; opening a browser chat alone does not give an agent control of your computer.
+
+## Give your Mico a clear task
+
+A Mico is your AI agent. Give it a name and explain what you want help with. Start with a small result you can inspect: a draft email, a plan or an explanation of a file. Add relevant context and state what a successful result should look like.
+
+Use separate conversations for separate tasks. You can create a conversation directly, let its first message provide a title and rename it later. Folders help organize Micos without changing their model provider.
+
+## Choose a model and review its work
+
+The Mycellios provider lets eligible accounts use the available catalog with their Credits. You can also configure your own supported provider. Check the model, price and available balance before sending work; a subscription with another company does not automatically include its API usage.
+
+Review files, answers and proposed actions. Tool availability depends on the current connection and permissions. If a task needs access you have not granted, connect the required tool rather than repeatedly resending the same instruction.
+
+## Links
+
+- [Mycellios models, providers and Credits explained](https://www.mycellios.com/guides/models-and-credits)
+- [Contribute compute and earn AI Credits with Mycellios](https://www.mycellios.com/guides/contribute-compute)
+- [Open Mycellios](https://www.mycellios.com/agent)
+- [Download the app](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/guides/get-started
+
+---
+
+# Cómo empezar con Mycellios y tu primer Mico
+
+Abre Mycellios en el navegador o en escritorio, crea un Mico y elige un modelo. Guía práctica para completar tu primera tarea con IA.
+
+Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar.
+
+## Elige dónde trabajar
+
+Abre Mycellios Agent en el navegador o descarga la aplicación de escritorio desde la página oficial. Utiliza la misma cuenta de Mycellios para tu espacio de trabajo y tus Créditos. Los instaladores se muestran por plataforma y arquitectura; comprueba su disponibilidad antes de descargar.
+
+El navegador te permite trabajar sin instalar una aplicación. Las acciones sobre un ordenador dependen de un ejecutor conectado y de sus permisos; abrir un chat en el navegador no da al agente control de tu equipo por sí solo.
+
+## Dale una tarea clara a tu Mico
+
+Un Mico es tu agente de IA. Ponle un nombre y explica en qué quieres que te ayude. Empieza con un resultado pequeño que puedas revisar: un borrador de correo, un plan o la explicación de un archivo. Añade contexto y describe cómo debe ser un buen resultado.
+
+Usa conversaciones distintas para tareas diferentes. Puedes crear una conversación directamente, dejar que el primer mensaje le dé un título y renombrarla después. Las carpetas permiten organizar tus Micos sin cambiar su proveedor de modelos.
+
+## Elige un modelo y revisa su trabajo
+
+El proveedor Mycellios permite a las cuentas habilitadas usar el catálogo disponible con sus Créditos. También puedes configurar tu propio proveedor compatible. Comprueba el modelo, el precio y el saldo antes de enviar una tarea; una suscripción de otra empresa no incluye automáticamente el uso de su API.
+
+Revisa los archivos, las respuestas y las acciones propuestas. Las herramientas disponibles dependen de la conexión y los permisos. Si una tarea necesita un acceso que no has concedido, conecta la herramienta necesaria en lugar de reenviar la misma instrucción repetidamente.
+
+## Enlaces
+
+- [Modelos, proveedores y Créditos de Mycellios](https://www.mycellios.com/es/guias/modelos-y-creditos)
+- [Aporta potencia y gana Créditos para IA en Mycellios](https://www.mycellios.com/es/guias/aportar-potencia)
+- [Abrir Mycellios](https://www.mycellios.com/agent)
+- [Descargar la aplicación](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/es/guias/empezar
+
+---
+
+# Mycellios models, providers and Credits explained
+
+Understand Mycellios Credits, the optional managed provider, your own model connections and the difference between Credits and Spore.
+
+Choose a guide and check the requirements of your connection. Model and tool availability can vary.
+
+## One workspace, your choice of provider
+
+Mycellios is a workspace and an optional model provider. With the Mycellios provider, you spend Credits through the account's available catalog without supplying an upstream API key. Model availability depends on the network, connected services and operator configuration; not every model or media type is always available.
+
+You can instead connect a supported provider with your own account or key. That provider's plan, quota and billing rules apply. Access through a subscription and access through an API can have different charges. Changing a model does not mean moving all computation onto your device.
+
+## How Credits are charged
+
+One Credit corresponds to one US dollar for paid top-ups. The managed-provider pricing policy is the complete upstream cost, including attributable funding and network fees, plus a 4% Mycellios service fee, charged in Credits. Check the current price before use; model input, output and special modalities can be billed differently.
+
+The wallet reserves an approved amount before paid work and settles against verified usage. A reservation is not a second charge. Only a genuinely zero-cost upstream request has zero usage cost; a model labeled free can still have limits or billable extras. Do not retry an uncertain paid request just because its final receipt has not arrived.
+
+Eligible verified new accounts receive 0.20 promotional Credits once. The wallet is the source of truth for your available balance, holds and transactions; a welcome amount is not a recurring grant or a guaranteed balance for every visitor.
+
+## Credits are different from Spore
+
+Credits pay for eligible AI usage inside Mycellios. Approved contribution work can earn Credits after its result is independently verified. Switching on contribution alone does not create earnings, and work availability is not guaranteed.
+
+Spore is the separate proposed token. Token rewards, staking and cash withdrawals must not be inferred from an internal Credit balance. Read the current implementation evidence and published terms before relying on a feature or a financial outcome.
+
+## Links
+
+- [Get started with Mycellios and your first Mico](https://www.mycellios.com/guides/get-started)
+- [Contribute compute and earn AI Credits with Mycellios](https://www.mycellios.com/guides/contribute-compute)
+- [Open Mycellios](https://www.mycellios.com/agent)
+- [Download the app](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/guides/models-and-credits
+
+---
+
+# Modelos, proveedores y Créditos de Mycellios
+
+Entiende los Créditos, el proveedor opcional Mycellios y tus propias conexiones de modelos. Conoce los costes y la diferencia con Spore.
+
+Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar.
+
+## Un espacio, el proveedor que elijas
+
+Mycellios es un espacio de trabajo y un proveedor opcional de modelos. Con el proveedor Mycellios gastas Créditos en el catálogo disponible para tu cuenta, sin introducir una clave del proveedor externo. La disponibilidad depende de la red, los servicios conectados y la configuración del operador; no todos los modelos o tipos de contenido están siempre disponibles.
+
+También puedes conectar un proveedor compatible con tu propia cuenta o clave. Se aplicarán su plan, sus límites y su facturación. Una suscripción y una API pueden tener cobros distintos. Cambiar de modelo no significa que todo el cálculo pase a hacerse en tu dispositivo.
+
+## Cómo se cobran los Créditos
+
+Un Crédito equivale a un dólar estadounidense en las recargas de pago. La política del proveedor gestionado es cobrar el coste completo del proveedor externo, incluidas las comisiones de financiación y red atribuibles, más un 4% de servicio Mycellios, en Créditos. Comprueba el precio antes de usarlo; la entrada, la salida y las modalidades especiales pueden facturarse de forma distinta.
+
+El monedero reserva un importe autorizado antes del trabajo de pago y liquida el consumo verificado. Una reserva no es un segundo cobro. Solo una petición cuyo coste externo sea realmente cero tiene coste de uso cero; un modelo gratuito puede tener límites o extras de pago. No repitas una petición de pago incierta solo porque aún no haya llegado su recibo final.
+
+Las cuentas nuevas verificadas que cumplan los requisitos reciben 0,20 Créditos promocionales una sola vez. El monedero muestra el saldo disponible, las reservas y los movimientos reales; el regalo de bienvenida no es periódico ni garantiza saldo a cualquier visitante.
+
+## Los Créditos no son Spore
+
+Los Créditos sirven para pagar usos de IA habilitados en Mycellios. El trabajo de contribución aprobado puede generar Créditos tras una verificación independiente del resultado. Activar la contribución por sí solo no genera ganancias, y no se garantiza que siempre haya tareas.
+
+Spore es el token propuesto por separado. Un saldo interno de Créditos no implica recompensas en tokens, staking ni retiradas de dinero. Consulta las evidencias de implementación y las condiciones publicadas antes de depender de una función o de un resultado económico.
+
+## Enlaces
+
+- [Cómo empezar con Mycellios y tu primer Mico](https://www.mycellios.com/es/guias/empezar)
+- [Aporta potencia y gana Créditos para IA en Mycellios](https://www.mycellios.com/es/guias/aportar-potencia)
+- [Abrir Mycellios](https://www.mycellios.com/agent)
+- [Descargar la aplicación](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/es/guias/modelos-y-creditos
+
+---
+
+# Contribute compute and earn AI Credits with Mycellios
+
+Learn how to activate and pause browser contribution, check real earnings and use verified-work Credits for eligible AI models in Mycellios.
+
+Choose a guide and check the requirements of your connection. Model and tool availability can vary.
+
+## Start from your account
+
+Open Mycellios Agent and sign in with your Mycellios account so accepted work can be attributed to your wallet. Find Generate AI in the main sidebar and press Play to opt in. You can pause from the same control. Do not use the legacy standalone browser worker as a substitute for an account-bound earnings connection.
+
+Browser contribution uses compatible resources available to the browser. Desktop and native-node participation have their own runtime and pairing requirements. Device support, model downloads, memory and network conditions determine which tasks a node can accept.
+
+## What earns Credits
+
+An approved job must be received, executed and independently verified before earnings are credited. Availability depends on actual funded demand and eligible tasks. An active animation, a benchmark or time spent connected is not proof of billable work.
+
+Use your real wallet balance and transaction history to check earnings. Do not expect a fixed hourly return. Credits earned from verified work can pay for eligible AI usage; electricity, connectivity and hardware remain your responsibility, so free AI does not mean your device has no operating cost.
+
+## Stay in control
+
+Pause contribution when you need your resources or connection. Browsers can throttle or suspend hidden tabs, sleeping devices and background workers. Keep the app's actual state in mind when comparing connected devices with completed jobs.
+
+The public network page shows observed status when data is available. Conceptual network illustrations on the homepage are not live telemetry. Consult the project's evidence record for the distinction between browser work, native execution and multi-host model experiments.
+
+## Links
+
+- [Get started with Mycellios and your first Mico](https://www.mycellios.com/guides/get-started)
+- [Mycellios models, providers and Credits explained](https://www.mycellios.com/guides/models-and-credits)
+- [Open Mycellios](https://www.mycellios.com/agent)
+- [Download the app](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/guides/contribute-compute
+
+---
+
+# Aporta potencia y gana Créditos para IA en Mycellios
+
+Aprende a activar y pausar la contribución desde el navegador, comprobar las ganancias reales y usar Créditos de trabajo verificado para IA.
+
+Elige una guía y comprueba los requisitos de tu conexión. La disponibilidad de modelos y herramientas puede variar.
+
+## Empieza desde tu cuenta
+
+Abre Mycellios Agent e inicia sesión con tu cuenta para vincular el trabajo aceptado a tu monedero. Busca Generar IA en la barra lateral principal y pulsa Play para activarlo. Puedes pausar desde el mismo control. El antiguo worker de navegador independiente no sustituye una conexión de ganancias vinculada a tu cuenta.
+
+La contribución web utiliza los recursos compatibles disponibles en el navegador. La participación desde escritorio o un nodo nativo tiene sus propios requisitos de ejecución y emparejamiento. El dispositivo, las descargas de modelos, la memoria y la conexión determinan qué tareas puede aceptar cada nodo.
+
+## Qué genera Créditos
+
+Una tarea aprobada debe recibirse, ejecutarse y verificarse de forma independiente antes de abonar ganancias. La disponibilidad depende de la demanda financiada y de tareas compatibles. Una animación activa, un benchmark o el tiempo conectado no demuestran trabajo facturable.
+
+Consulta el saldo real y los movimientos del monedero para comprobar las ganancias. No esperes una rentabilidad fija por hora. Los Créditos obtenidos por trabajo verificado pueden pagar usos de IA habilitados; la electricidad, la conexión y el equipo siguen corriendo de tu cuenta, por lo que IA gratis no significa que el dispositivo no tenga costes.
+
+## Mantén el control
+
+Pausa la contribución cuando necesites tus recursos o la conexión. El navegador puede limitar o suspender pestañas ocultas, dispositivos en reposo y procesos en segundo plano. Ten en cuenta el estado real al comparar dispositivos conectados con tareas terminadas.
+
+La página pública de la red muestra datos observados cuando están disponibles. Las ilustraciones conceptuales de la portada no son telemetría en vivo. Consulta las evidencias del proyecto para distinguir el trabajo web, la ejecución nativa y los experimentos de modelos entre varios equipos.
+
+## Enlaces
+
+- [Cómo empezar con Mycellios y tu primer Mico](https://www.mycellios.com/es/guias/empezar)
+- [Modelos, proveedores y Créditos de Mycellios](https://www.mycellios.com/es/guias/modelos-y-creditos)
+- [Abrir Mycellios](https://www.mycellios.com/agent)
+- [Descargar la aplicación](https://www.mycellios.com/downloads/desktop)
+
+Source: https://www.mycellios.com/es/guias/aportar-potencia

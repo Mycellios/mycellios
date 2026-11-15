@@ -7,6 +7,7 @@ import { Maximize2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { ComputersUnavailableHint } from "../../components/ComputersUnavailableHint";
 import { screenIframeSandbox } from "../../lib/computer-screen";
+import { routinesAvailable } from "../../lib/routines-availability";
 import { RoutineListHeader, RoutineListRow } from "../RoutineEditor";
 import { computerLabel, computerPlaceholder, DesktopKindEmptyState } from "./computer-view";
 
@@ -136,7 +137,7 @@ export function ComputerPanel({
         {t`${bot.name}'s screen`}
       </p>}
 
-      <Disclosure summary={t`Routines for this Mico`} summaryClassName="w-full py-2 text-sm text-muted-foreground">
+      {!routinesAvailable() ? <div className="flex items-center justify-between gap-3 py-2 text-sm text-muted-foreground"><span>{t`Routines`}</span><span className="text-xs">{t`Coming soon`}</span></div> : <Disclosure summary={t`Routines for this Mico`} summaryClassName="w-full py-2 text-sm text-muted-foreground">
       <RoutineListHeader onCreate={onCreateRoutine} />
       {routines.map((routine) => (
         <RoutineListRow
@@ -147,7 +148,7 @@ export function ComputerPanel({
           onStop={onStopRun}
         />
       ))}
-      </Disclosure>
+      </Disclosure>}
     </div>
   );
 }

@@ -7999,7 +7999,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
             if (!canPublishDurableProgress()) {
               return finish({
                 ok: true,
-                note: "This update was not posted. The turn is still fresh, or the chat already has enough interim messages for this run. Do not send more progress updates — keep working and put everything in your final reply.",
+                note: "This update was not posted. The turn is still fresh, or the chat already has enough interim messages for this run. Do not send more progress updates — keep working and give a concise final result with any required next action or important blocker.",
               });
             }
             await publishMessage(
@@ -10381,7 +10381,7 @@ export const LIVE_TURN_NARRATION =
   "Before the first tool call, write one short sentence in the user's language saying what you are about to do. Write another sentence only when the plan changes, something fails, or you need the user. Do not narrate every tool call, and do not send a sentence only to say you are still working. Keep chain-of-thought out of the reply; the host shows a short thinking summary.";
 
 export function longWorkProgressGuidance(maxLength = messageUserMaxLength()): string {
-  return `${LIVE_TURN_NARRATION} During long computer tasks or multi-step jobs, keep the user informed with message_user: after roughly a minute of work, explain briefly what you have checked, what you found, and what comes next. Send another short update when a meaningful result or blocker changes the next step. Base updates on observed actions and results, in the user's language; do not invent progress, percentages or completion estimates. Do not interrupt a running tool just to send an update. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Always put the complete final answer in your normal reply, never split across message_user calls, and never assume a message_user update already delivered your content.`;
+  return `${LIVE_TURN_NARRATION} During long computer tasks or multi-step jobs, use message_user only when a material finding, changed plan or blocker is useful to the user. Do not send updates merely because time has passed. Base updates on observed actions and results, in the user's language; do not invent progress, percentages or completion estimates. Do not interrupt a running tool just to send an update. message_user is capped at ${maxLength} characters and will be silently cut off if you exceed it \u2014 never put your final answer, a report, or any long-form deliverable in it. Put a concise, self-contained final answer in your normal reply: the result, any required next action and important limits. Do not repeat the investigation or progress log. Provide a full report only when requested.`;
 }
 
 export const ROUTINE_SILENT_REPLY_GUIDANCE = `This run was scheduled, not asked in chat. Report only what changed since your previous report, in one short paragraph. When nothing material changed — the same blockers, the same commits, the same counts, the same next step — the entire final assistant reply must be exactly ${NO_RESPONSE}: no all-clear, no "nothing new" summary, no repeated baseline, and no meta note that you are staying silent. Do not restate hashes, paths, worktrees or counts that did not change. Do not call message_user unless you have something to report.`;

@@ -1,6 +1,24 @@
 import { expect, it, vi } from "vitest";
 import { contributionAccount } from "./contribution-account.js";
 
+it.each(["pause", "resume"] as const)("keeps %s pending until telemetry follows the applied command", async action => {
+  let observed: { contributionEnabled: boolean; observedAt: string } | null = {
+    contributionEnabled: action === "pause", observedAt: "2026-11-15T08:00:00.000Z",
+  };
+  const completedAt = "2026-11-15T08:00:02.000Z";
+  const transport = vi.fn(async () => Response.json({ data: [{ nodeId: "own-node", status: "active", generation: 7, connected: true,
+    observed, commands: [{ type: action, state: "applied", completedAt }] }] }));
+  const api = contributionAccount("private-session", transport);
+  expect(await api.status("own-node")).toMatchObject({ pending: action, enabled: action === "pause" });
+  observed = null;
+  expect(await api.status("own-node")).toMatchObject({ pending: action, enabled: null });
+  observed = { contributionEnabled: action === "resume", observedAt: "2026-11-15T08:00:03.000Z" };
+  expect(await api.status("own-node")).toMatchObject({ pending: null, enabled: action === "resume" });
+  // A later actual change must not be hidden forever behind an old ACK.
+  observed = { contributionEnabled: action === "pause", observedAt: "2026-11-15T08:00:04.000Z" };
+  expect(await api.status("own-node")).toMatchObject({ pending: null, enabled: action === "pause" });
+});
+
 function fixture() {
   let command: { type: string; state: string } | undefined;
   const transport = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {

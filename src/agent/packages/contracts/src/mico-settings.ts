@@ -8,6 +8,7 @@ export const MicoOverrides = z.object({
   showPlan: z.boolean().optional(),
 }).strict();
 export type MicoOverrides = z.infer<typeof MicoOverrides>;
+export const ResponseStyle = z.enum(["natural", "classic"]);
 export const LocalMemoryReviewPolicy = z.object({
   enabled: z.boolean(), interval: z.union([z.literal(10), z.literal(20), z.literal(40)]),
   dailyLimitMicrounits: z.number().int().min(0).max(100_000),
@@ -18,6 +19,7 @@ export const MicoDefaults = z.object({
   agentNewChat: z.boolean().default(false),
   showPlan: z.boolean().default(false),
   gitCoauthor: z.boolean().default(true),
+  responseStyle: ResponseStyle.optional(),
   memoryReview: LocalMemoryReviewPolicy.optional(),
 }).strict();
 export type MicoDefaults = z.infer<typeof MicoDefaults>;
@@ -40,7 +42,7 @@ export const MicoSettingsState = z.object({
 });
 export type MicoSettingsState = z.infer<typeof MicoSettingsState>;
 export const MicoSettingsUpdate = z.object({ revision: z.number().int().nonnegative() }).and(z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("defaults"), patch: MicoOverrides.extend({ gitCoauthor: z.boolean().optional(), memoryReview: LocalMemoryReviewPolicy.optional() }) }),
+  z.object({ kind: z.literal("defaults"), patch: MicoOverrides.extend({ gitCoauthor: z.boolean().optional(), responseStyle: ResponseStyle.optional(), memoryReview: LocalMemoryReviewPolicy.optional() }) }),
   z.object({ kind: z.literal("bot"), botId: z.string().min(1), key: MicoBehaviorKey, value: z.boolean().nullable() }),
   z.object({ kind: z.literal("all"), key: MicoBehaviorKey, value: z.boolean().nullable() }),
 ]));

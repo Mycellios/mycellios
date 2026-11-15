@@ -1,5 +1,6 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import type { Bot, BotSection } from "@rakazo/contracts";
+import { sidebarFolderTree } from "@rakazo/core";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  OptionSelect,
   RadioGroup,
   RadioGroupItem,
 } from "@rakazo/ui-web";
@@ -102,16 +104,21 @@ export function NewSpaceDialog({
 
 export function NewBotSectionDialog({
   bot,
+  folders = [],
+  initialParentId = null,
   onCancel,
   onConfirm,
 }: {
-  bot: Pick<Bot, "name">;
+  bot?: Pick<Bot, "name">;
+  folders?: BotSection[];
+  initialParentId?: string | null;
   onCancel: () => void;
-  onConfirm: (name: string) => Promise<void>;
+  onConfirm: (name: string, parentId: string | null) => Promise<void>;
 }) {
   const { t } = useLingui();
   const nameId = useId();
   const [name, setName] = useState("");
+  const [parentId, setParentId] = useState(initialParentId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,18 +133,18 @@ export function NewBotSectionDialog({
             if (!trimmed || saving) return;
             setSaving(true);
             setError(null);
-            void onConfirm(trimmed).catch((err: unknown) => {
-              setError(errorText(err, t`Could not create section`));
+            void onConfirm(trimmed, parentId).catch((err: unknown) => {
+              setError(errorText(err, t`Could not create folder`));
               setSaving(false);
             });
           }}
         >
           <DialogHeader>
             <DialogTitle>
-              <Trans>New section</Trans>
+              <Trans>New folder</Trans>
             </DialogTitle>
             <DialogDescription>
-              <Trans>Create a section and move {bot.name} into it.</Trans>
+              {bot ? <Trans>Create a folder and move {bot.name} into it.</Trans> : <Trans>Organize your Micos in one place.</Trans>}
             </DialogDescription>
           </DialogHeader>
           <label htmlFor={nameId} className="block text-[13.5px] text-foreground/75">
@@ -146,10 +153,15 @@ export function NewBotSectionDialog({
               id={nameId}
               maxLength={60}
               value={name}
+              autoFocus
               onChange={(event) => setName(event.target.value)}
               className="mt-2"
             />
           </label>
+          {folders.length ? <label className="block text-[13.5px] text-foreground/75">{t`Location`}
+            <OptionSelect aria-label={t`Location`} className="mt-2 w-full" value={parentId ?? ""} onValueChange={value => setParentId(value || null)}
+              options={[{value:"",label:t`Top level`},...sidebarFolderTree(folders).filter(folder => folder.depth < 2).map(folder => ({value:folder.id,label:folder.path}))]} />
+          </label> : null}
           {error ? <p className="text-[13.5px] text-destructive">{error}</p> : null}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={saving} onClick={onCancel}>
@@ -193,14 +205,14 @@ export function RenameBotSectionDialog({
             setSaving(true);
             setError(null);
             void onConfirm(trimmed).catch((err: unknown) => {
-              setError(errorText(err, t`Could not rename section`));
+              setError(errorText(err, t`Could not rename folder`));
               setSaving(false);
             });
           }}
         >
           <DialogHeader>
             <DialogTitle>
-              <Trans>Rename section</Trans>
+              <Trans>Rename folder</Trans>
             </DialogTitle>
           </DialogHeader>
           <label htmlFor={nameId} className="block text-[13.5px] text-foreground/75">
@@ -419,7 +431,7 @@ export function DeleteItemDialog({
   onConfirm,
 }: {
   item: { name: string };
-  noun: "group" | "routine" | "section" | "space";
+  noun: "group" | "routine" | "section" | "folder" | "space";
   title?: React.ReactNode;
   description?: React.ReactNode;
   onCancel: () => void;
@@ -457,8 +469,8 @@ export function DeleteItemDialog({
                       ? t`Could not delete group`
                       : noun === "space"
                         ? t`Could not delete space`
-                        : noun === "section"
-                          ? t`Could not delete section`
+                        : noun === "section" || noun === "folder"
+                          ? t`Could not delete folder`
                           : t`Could not delete routine`,
                   ),
                 );

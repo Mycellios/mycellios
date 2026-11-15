@@ -10,6 +10,7 @@ import { confirmLanguage, hasConfirmedLanguage } from "../lib/language-entry";
 import { readUiLocalePreference, resolveUiLocale, UI_LOCALES, UI_LOCALE_LABELS } from "../lib/ui-locale";
 import type { UiLocalePreference } from "../lib/ui-locale";
 import { AuthMushroom } from "./AuthMushroom";
+import { desktopBridge } from "../lib/desktop";
 
 export function LanguageEntry({ children }: { children: ReactNode }) {
   const { t } = useLingui();
@@ -28,7 +29,7 @@ export function LanguageEntry({ children }: { children: ReactNode }) {
     } catch { setError(true); }
     finally { setBusy(false); }
   }
-  if (confirmed || eventDemoRoute(appRoute(window.location.pathname)) || eventAgentContext()) return children;
+  if (confirmed || eventDemoRoute(appRoute(window.location.pathname)) || eventAgentContext() || desktopBridge()?.development?.isDevelopment) return children;
   return <main className="grid min-h-dvh place-items-center bg-background px-6 py-10" data-testid="language-entry">
     <form className="w-full max-w-sm space-y-6" onSubmit={event => { event.preventDefault(); void choose(); }}>
       <div className="flex justify-center"><AuthMushroom /></div>

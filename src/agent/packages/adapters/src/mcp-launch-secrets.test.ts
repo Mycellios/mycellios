@@ -82,7 +82,7 @@ describe("MCP launch credentials", () => {
               inputSchema: {
                 type: "object",
                 properties:
-                  phase === "definition" ? { password: { type: "number", default: 1234 } } : {},
+                  (phase === "definition" ? { password: { type: "number", default: 1234 } } : {}) as Record<string, object>,
               },
             },
           ],

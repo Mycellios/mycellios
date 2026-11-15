@@ -1,3 +1,5 @@
+import { startupFetch } from "./startup-fetch";
+
 const key = "mycellios:event-agent-tab";
 export type EventAgentContext = { id: string; spaceId: string; botId: string; endsAt: number };
 /** Only a tab selector, never an authentication or balance credential. */
@@ -14,7 +16,7 @@ export function withEventAgentHeaders(input?: HeadersInit) {
   if (demo) headers.set("x-mycellios-demo-event", demo.id);
   return headers;
 }
-export const eventAgentFetch: typeof fetch = (input, init) => fetch(input, {
+export const eventAgentFetch: typeof fetch = (input, init) => startupFetch(input, {
   ...init, headers: withEventAgentHeaders(init?.headers ?? (input instanceof Request ? input.headers : undefined)),
 });
 export function eventAgentSpace(next?: string | null): string | null {

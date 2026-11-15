@@ -41,6 +41,14 @@ describe("forest bootstrap release safety", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
+  it("uses Agent's current startup asset instead of the legacy line mushroom", () => {
+    expect(html).toContain('src="/brand/agent-loader.svg"');
+    expect(readFileSync("landing/public/brand/agent-loader.svg", "utf8"))
+      .toBe(readFileSync("src/agent/apps/web/public/mycellios/loader.svg", "utf8"));
+    expect(html).not.toContain("mycellios-loader__cap");
+    expect(html).not.toContain("mycellios-cap-grow");
+  });
+
   it.each(["/", "/earn", "/pricing", "/compare/grok-bot", "/changelog", "/spore/rewards", "/downloads/desktop", "/dashboard"])("matches the public paper canvas while %s loads", path => {
     expect(boot(path).loader.dataset.theme).toBe("paper");
   });

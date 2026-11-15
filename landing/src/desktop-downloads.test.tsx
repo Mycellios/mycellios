@@ -39,4 +39,14 @@ describe("Desktop downloads", () => {
       expect(isDesktopDownloadCatalog(invalid)).toBe(false);
     }
   });
+  it("accepts the published checksum query only when it matches the installer", () => {
+    const release = catalog();
+    const original = release.packages[0]!.path;
+    release.packages[0]!.path = `${original}?sha256=${release.packages[0]!.sha256}`;
+    expect(isDesktopDownloadCatalog(release)).toBe(true);
+    for (const query of [`sha256=${"b".repeat(64)}`, "redirect=https://example.com", `sha256=${"a".repeat(64)}&extra=1`, `sha256=${"a".repeat(64)}#fragment`]) {
+      release.packages[0]!.path = `${original}?${query}`;
+      expect(isDesktopDownloadCatalog(release)).toBe(false);
+    }
+  });
 });

@@ -103,6 +103,7 @@ model AiDataConsent {
 
 model User {
   localMemoryReviews LocalMemoryReview[] @relation("ReviewUser")
+  messagePins MessagePin[]
   hostedWebs HostedWeb[]
   hostedWebRevisions HostedWebRevision[]
   hostedWebPins HostedWebPin[]
@@ -367,6 +368,7 @@ model Member {
 
 model Space {
   localMemoryReviews LocalMemoryReview[] @relation("ReviewSpace")
+  messagePins MessagePin[]
   hostedWebs HostedWeb[]
   hostedWebRevisions HostedWebRevision[]
   hostedWebPins HostedWebPin[]
@@ -746,6 +748,9 @@ model BotSection {
   userId    String
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
+  parentId  String?
+  parent    BotSection? @relation("SidebarFolderTree", fields: [parentId, spaceId, userId], references: [id, spaceId, userId], onDelete: NoAction, onUpdate: NoAction)
+  children  BotSection[] @relation("SidebarFolderTree")
   position  Int         @default(0)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -753,6 +758,8 @@ model BotSection {
   groups    ChatGroup[]
 
   @@unique([spaceId, userId, name])
+  @@unique([id, spaceId, userId])
+  @@index([spaceId, userId, parentId])
   @@index([spaceId, userId, position, createdAt])
   @@map("bot_sections")
 }
@@ -821,6 +828,7 @@ model DevelopmentProject {
 model Thread {
   taskMemories MemoryDocument[] @relation("TaskMemory")
   localMemoryReviews LocalMemoryReview[] @relation("ReviewThread")
+  messagePins MessagePin[]
   hostedWebAgent HostedWebAgent?
   inboxTask InboxTask?
   taskBotId String?
@@ -863,7 +871,23 @@ model Thread {
   @@map("threads")
 }
 
+model MessagePin {
+  messageId String
+  threadId String
+  spaceId String
+  userId String
+  pinnedAt DateTime @default(now())
+  message Message @relation(fields:[messageId,threadId],references:[id,threadId],onDelete:Cascade)
+  thread Thread @relation(fields:[threadId,spaceId,userId],references:[id,spaceId,userId],onDelete:Cascade,onUpdate:NoAction)
+  space Space @relation(fields:[spaceId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+  @@id([messageId,userId])
+  @@index([spaceId,userId,threadId,pinnedAt])
+  @@map("message_pins")
+}
+
 model Message {
+  pins MessagePin[]
   id               String    @id @default(cuid())
   threadId         String
   thread           Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -885,6 +909,7 @@ model Message {
   createdAt        DateTime  @default(now())
 
   @@unique([threadId, seq])
+  @@unique([id, threadId])
   @@unique([threadId, clientNonce])
   @@index([threadId, seq])
   @@index([replyToMessageId])

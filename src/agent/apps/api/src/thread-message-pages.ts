@@ -113,7 +113,7 @@ export async function loadAllMessages(
   return pages.reverse().flat();
 }
 
-async function withoutPeerRunMessages<
+export async function withoutPeerRunMessages<
   T extends {
     runId: string | null;
     blocks: Prisma.JsonValue;

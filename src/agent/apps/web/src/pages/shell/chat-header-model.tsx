@@ -12,6 +12,7 @@ import { useSpaceRpc } from "../../lib/space-rpc";
 import { errorText } from "../../lib/user-error";
 import { enableCompatibleModel, savedModelIds } from "../model-settings/enable-compatible-model";
 import { ChatModelPicker } from "./chat-model-picker";
+import { ChatModelCatalog, type ChatModelCatalogSource } from "./chat-model-catalog";
 import { ProviderLogo } from "../../components/ProviderLogo";
 import { MycelliosProvider } from "../model-settings/mycellios-provider";
 
@@ -52,6 +53,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const id = useId();
   const [open, setOpen] = useState(false);
   const [lastProvider, setLastProvider] = useState<string | null>(null);
+  const [exploring, setExploring] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +106,12 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     sources.set(label, { provider: connection.provider });
     return { ...connection, label };
   });
+  // Personal providers retain opt-in discovery. Mycellios continues to use only
+  // the canonical account catalog and its bounded Credit admission.
+  const personalCatalogs: ChatModelCatalogSource[] = namedCredentials
+    .filter(connection => connection.baseUrl && !isMycelliosBaseUrl(connection.baseUrl))
+    .map(connection => ({ label: connection.label, provider: connection.provider, connection, models: [] }));
+  const explorer = personalCatalogs.find(source => source.label === exploring);
   // The account catalog is authoritative for Mycellios, not its saved enabled IDs.
   const connected = connectedModelChoices(namedCredentials.filter(connection => !isMycelliosBaseUrl(connection.baseUrl)), catalog.filter(entry => entry.providerName !== "Mycellios"))
     .concat(mycelliosConnection ? (mycelliosCatalog.data ?? []).map(entry => ({
@@ -159,10 +167,29 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     busy.current = true; setSaving(true); setError(null);
     try {
       await apply();
+      setExploring(null);
       if (close) setOpen(false);
     }
     catch (cause) { setError(errorText(cause)); }
     finally { busy.current = false; setSaving(false); }
+  }
+
+  function pickCatalog(modelId: string, use: boolean) {
+    if (!explorer || !me || !explorer.connection) return;
+    const source = explorer, original = explorer.connection;
+    void save(async () => {
+      const context = { spaceId: me.spaceId };
+      const latest = await rpc.models.credentials(undefined, { context });
+      const connection = latest.find(entry => entry.id === original.id);
+      if (!connection || connection.baseUrl !== original.baseUrl || isMycelliosBaseUrl(connection.baseUrl))
+        throw new Error(t`This connection has changed. Open the catalog again.`);
+      if (use && latest.some(entry => entry.id !== connection.id && entry.provider === connection.provider && savedModelIds(entry).includes(modelId)))
+        throw new Error(t`This model is already enabled on another connection. Use it from that connection.`);
+      const updated = await enableCompatibleModel(rpc, me.spaceId, connection, modelId, t`This connection has reached its enabled model limit.`);
+      await writeSaved(queryClient, queries.models.credentials.queryKey(), () => latest.map(entry => entry.id === updated.id
+        ? { ...entry, modelId: entry.modelId ?? updated.modelId, enabledModelIds: updated.enabledModelIds } : entry));
+      if (use) await onSave({ agentEngine: "pi", modelProvider: source.provider, modelId, thinkingLevel: null });
+    }, use);
   }
 
   function choose(key: string) {
@@ -193,7 +220,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   }
   return (
     <div className={recovery ? "ml-2 inline-flex" : "app-no-drag flex min-w-0 shrink-0 items-center gap-0.5"} data-testid={recovery ? "composer-error-model" : "chat-header-model"}>
-      <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setLastProvider(null); setError(null); } }}>
+      <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setExploring(null); setLastProvider(null); setError(null); } }}>
         <PopoverTrigger type="button" title={label} data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
           ? "inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:text-foreground"
           : "app-no-drag flex h-8 min-w-0 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-normal text-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring @max-[32rem]:size-8 @max-[32rem]:justify-center @max-[32rem]:gap-0 @max-[32rem]:px-0"}>
@@ -218,7 +245,8 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
             </div>
           ) : queryError ? <p role="alert" className="text-xs text-destructive">{errorText(queryError)}</p> :
             <fieldset disabled={saving} className="min-w-0 [&>div]:mt-0 [&>button]:mt-0">
-              <ChatModelPicker
+              {explorer && me ? <ChatModelCatalog source={explorer} userId={me.userId} spaceId={me.spaceId}
+                onBack={() => { setExploring(null); setError(null); }} onPick={pickCatalog} /> : <ChatModelPicker
                 id={`${id}-model`}
                 choices={choices}
                 value={value || defaultKey}
@@ -229,11 +257,14 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 providerIds={Object.fromEntries([...sources].map(([name, source]) => [name, source.provider]))}
                 initialProvider={lastProvider}
                 onProviderChange={setLastProvider}
+                catalogProviders={!recovery ? personalCatalogs.map(source => source.label) : undefined}
+                onExplore={name => { setLastProvider(name); setExploring(name); setError(null); }}
                 providerContent={name => name === "Mycellios" && !mycelliosConnection ? <ul><MycelliosProvider embedded onConnected={async () => {
                   await Promise.all([credentialsQuery.refetch(), catalogQuery.refetch(), queryClient.invalidateQueries({queryKey:queries.me.queryKey()})]);
                 }} /></ul> : null}
+                mycelliosCatalogReady={mycelliosCatalog.isSuccess}
                 modelOrigins={Object.fromEntries((mycelliosCatalog.data ?? []).map(entry => [modelOptionKey(entry.provider, entry.id), entry.mycelliosProcessing === "external" ? "antseed" : "network"]))}
-              />
+              />}
             </fieldset>}
           {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.isFetching ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
           {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.isError ? <p role="alert" className="px-4 py-2 text-xs text-destructive">{t`Could not load the catalog.`} <Button size="sm" variant="ghost" onClick={() => void mycelliosCatalog.refetch()}>{t`Retry`}</Button></p> : null}

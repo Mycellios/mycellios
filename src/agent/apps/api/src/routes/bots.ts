@@ -22,7 +22,7 @@ import {
 } from "@rakazo/adapters";
 import type { Actor, Bot, BotSecretMetadata } from "@rakazo/contracts";
 import { BotSecretAuth, FIRST_MICO_SPAWN_KEY } from "@rakazo/contracts";
-import { ACTIVE_RUN_STATUSES, agentEngineForProviderSelection, displayName } from "@rakazo/core";
+import { ACTIVE_RUN_STATUSES, agentEngineForProviderSelection, displayName, SidebarFolderError } from "@rakazo/core";
 import { Prisma } from "@rakazo/db";
 import {
   BotSectionNameConflictError,
@@ -767,13 +767,19 @@ export function botsRoutes(ctx: RouterContext) {
       list: authed.botSections.list.handler(async ({ context }) =>
         repos.listBotSections(context.actor),
       ),
-      create: authed.botSections.create.handler(async ({ context, input }) =>
-        repos.createBotSection(context.actor, input),
-      ),
+      create: authed.botSections.create.handler(async ({ context, input }) => {
+        try { return await repos.createBotSection(context.actor, input); }
+        catch (error) {
+          if (error instanceof SidebarFolderError) throw new ORPCError("BAD_REQUEST", { message: error.message });
+          if (error instanceof BotSectionNameConflictError) throw new ORPCError("CONFLICT", { message: error.message });
+          throw error;
+        }
+      }),
       update: authed.botSections.update.handler(async ({ context, input }) => {
         try {
           return await repos.updateBotSection(context.actor, input);
         } catch (error) {
+          if (error instanceof SidebarFolderError) throw new ORPCError("BAD_REQUEST", { message: error.message });
           if (error instanceof BotSectionNameConflictError) {
             throw new ORPCError("CONFLICT", { message: error.message });
           }

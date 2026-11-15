@@ -8,6 +8,7 @@ import {
   Download,
   FileVideo,
   Headphones,
+  LoaderCircle,
   Scissors,
   SlidersHorizontal,
   Upload,
@@ -322,23 +323,20 @@ export default function Cadencia({
         </p>
       )}
       {busy && (
-        <div className="cd-progress" role="status">
-          <div>
-            <strong>{busy}</strong>
-            <span>{Math.round(progress * 100)} %</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => operation.current?.abort()}
-            >
-              <X size={14} /> Cancelar
-            </Button>
+        <div className={`cd-progress${state.file ? "" : " cd-progress-initial"}`} role="status">
+          <LoaderCircle className="cd-progress-spinner" size={18} aria-hidden="true" />
+          <div className="cd-progress-copy">
+            <div className="cd-progress-label">
+              <strong>{busy}</strong>
+              {progress > 0 && <span>{Math.round(progress * 100)} %</span>}
+            </div>
+            {progress > 0 && (
+              <progress value={progress} max={1} aria-label="Progreso del procesamiento" />
+            )}
           </div>
-          <progress
-            value={progress}
-            max={1}
-            aria-label="Progreso del procesamiento"
-          />
+          <Button variant="ghost" size="sm" onClick={() => operation.current?.abort()}>
+            Cancelar
+          </Button>
         </div>
       )}
       {!state.file ? (
@@ -388,12 +386,10 @@ export default function Cadencia({
               })
             }
           >
-            Probar con la demo <ArrowRight size={14} />
+            Probar con la demo
           </Button>
           <small>
-            Vídeo o audio · hasta 5 min y 250 MB
-            <br />
-            El archivo se procesa aquí. No se sube a un servidor.
+            Hasta 5 min · 250 MB · Procesado en tu dispositivo
           </small>
         </div>
       ) : (

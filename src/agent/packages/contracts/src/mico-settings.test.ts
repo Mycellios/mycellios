@@ -11,6 +11,12 @@ it("a partial save does not reset unrelated defaults or accept model-supplied po
   expect(MicoSettingsUpdate.safeParse({ revision: 0, kind: "bot", botId: "b", key: "gitCoauthor", value: true }).success).toBe(false);
 });
 
+it("accepts response styles only in owned defaults without changing automation flags", () => {
+  expect(MicoSettingsUpdate.parse({revision: 1, kind: "defaults", patch: {responseStyle: "classic"}})).toMatchObject({patch: {responseStyle: "classic"}});
+  expect(effectiveMicoSettings({responseStyle: "classic", localScripts: true}, {}).responseStyle).toBe("classic");
+  expect(effectiveMicoSettings({responseStyle: "classic", localScripts: true}, {}).localScripts).toBe(true);
+  expect(MicoSettingsUpdate.safeParse({revision: 1, kind: "defaults", patch: {responseStyle: "verbose"}}).success).toBe(false);
+});
 
 it("validates bounded memory-review policy only in owned defaults",()=>{
  for(const dailyLimitMicrounits of [0,1000,10000,50000])expect(MicoSettingsUpdate.safeParse({revision:1,kind:"defaults",patch:{memoryReview:{enabled:true,interval:20,dailyLimitMicrounits}}}).success).toBe(true);

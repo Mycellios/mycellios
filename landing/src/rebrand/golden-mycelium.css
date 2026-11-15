@@ -1,0 +1,32 @@
+.golden-mycelium { position:absolute; inset:0; z-index:2; overflow:hidden; pointer-events:none; contain:strict; }
+.golden-mycelium-canvas, .golden-mycelium-fallback { position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; }
+.golden-mycelium-canvas { opacity:0; }
+.golden-mycelium-fallback { stroke:#d3ad62; opacity:.45; }
+.golden-mycelium[data-renderer="pending"] .golden-mycelium-fallback { visibility:hidden; }
+.golden-mycelium[data-renderer="webgl2"] .golden-mycelium-canvas { opacity:1; }
+.golden-mycelium[data-renderer="webgl2"] .golden-mycelium-fallback { visibility:hidden; }
+/* The original mushroom fabric stays; its ambient signals give this focal sequence room. */
+.agent-product-opening:has(.golden-mycelium[data-renderer="webgl2"]) .agent-network-signals { opacity:.38; }
+@media(prefers-reduced-motion:reduce) { .golden-mycelium-canvas { display:none; } .golden-mycelium-fallback { visibility:visible !important; } }
+
+/* Forest outside, paper inside: light is a material of the opening, not a UI state. */
+.agent-product-opening:has(.golden-mycelium) { background:#14251d; color:#f2f1e8; --ui-foreground:#f2f1e8; }
+.agent-product-opening:has(.golden-mycelium) .marketing-header { color:#e2e7df; }
+.agent-product-opening:has(.golden-mycelium) .marketing-navigation-surface { background:#14251d; color:#e2e7df; --agent-fg:#e2e7df; }
+.agent-product-opening:has(.golden-mycelium) .marketing-brand img { filter:url("/assets/brand/logo-filter.svg#remove-white") brightness(0) invert(1) !important; opacity:.86; }
+.agent-product-opening:has(.golden-mycelium) .marketing-header .marketing-stats { background:#294438; color:#f2f1e8; }
+.agent-product-opening:has(.golden-mycelium) .agent-product-hero > p { color:#b7c5b9; }
+.agent-product-opening:has(.golden-mycelium) .agent-product-actions { --ui-accent:#f0eee1; --ui-accent-hover:#fffdf2; --ui-on-accent:#162c20; --ui-line:#718373; --ui-foreground:#f0eee1; }
+.agent-product-opening:has(.golden-mycelium) .agent-product-browser { background:transparent; color:#e6eadd; border-color:#607465; }
+.agent-product-opening:has(.golden-mycelium) .agent-product-earn :is(p,.agent-product-earn-link) { color:#b7c5b9; }
+.agent-product-opening:has(.golden-mycelium) .agent-product-earn-link > span:nth-child(2) { color:#e0bf79; }
+.agent-product-opening:has(.golden-mycelium) .agent-living-network { mix-blend-mode:multiply; opacity:.65; }
+.agent-product-opening:has(.golden-mycelium) .agent-backdrop-spores { fill:#dfbb70; stroke:#dfbb70; }
+.agent-product-opening:has(.golden-mycelium) .agent-demo-figure > figcaption { color:#a9b8aa; }
+.agent-product-opening:has(.golden-mycelium) .agent-demo-figure > figcaption > :is(span,div) { background:#14251d; }
+.agent-product-opening:has(.golden-mycelium) .agent-demo-figure > figcaption .ui-button { color:#e2d8b8; }
+.agent-product-opening:has(.golden-mycelium) .marketing-mobile-nav { background:#183226; color:#edf1e9; }
+.agent-product-opening:has(.golden-mycelium) .marketing-menu { color:#edf1e9; }
+.agent-product-opening:has(.golden-mycelium) .marketing-header :is(nav > a,.marketing-explore > summary,.marketing-menu):hover { color:#e0bf79; }
+.agent-product-opening:has(.golden-mycelium) :is(.marketing-popover,.agent-download-menu) { color:#16251c; --ui-foreground:#16251c; }
+.mycellios-reference .agent-product-opening:has(.golden-mycelium) + .distributed-earn-scene { margin-top:0; }

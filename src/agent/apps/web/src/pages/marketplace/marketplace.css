@@ -18,6 +18,10 @@
 }
 .rk-market-back {
   margin-inline-start: auto;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
 }
 .rk-market-menu-toggle {
   gap: 4px;
@@ -77,6 +81,31 @@
   overflow-y: auto;
   padding: 30px;
 }
+.rk-market-soon-badge {
+  margin-inline-start: auto;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 400;
+}
+.rk-market-nav nav button:disabled {
+  opacity: 1;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+.rk-market-coming-soon {
+  display: flex;
+  min-height: min(60dvh, 520px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 12px;
+  text-align: center;
+}
+.rk-market-coming-soon > svg { color: var(--muted-foreground); }
+.rk-market-coming-soon h1 { margin: 4px 0 0; font-size: 24px; font-weight: 500; }
+.rk-market-coming-soon p { max-width: 40ch; margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.5; }
+.rk-market-coming-soon .rk-market-coming-soon-status { color: var(--foreground); }
 .rk-market-heading {
   display: flex;
   align-items: flex-start;

@@ -156,7 +156,7 @@ export function modelsRoutes(ctx: RouterContext) {
         return await readBoundedJsonResponse(response,2_000_000,signal);
       }),
       mycelliosMedia: authed.models.mycelliosMedia.handler(async ({context,input})=>{
-        if(process.env.MYCELLIOS_MANAGED_APPS_ENABLED!=="true")throw new ORPCError("PRECONDITION_FAILED",{message:"Estas apps están en preparación. No se ha gastado ningún crédito."});
+        if(process.env.MYCELLIOS_MANAGED_APPS_ENABLED!=="true"&&process.env.MYCELLIOS_MEDIA_STUDIO_ENABLED!=="true")throw new ORPCError("PRECONDITION_FAILED",{message:"Estas apps están en preparación. No se ha gastado ningún crédito."});
         if(input.action!=="models"&&input.expectedUserId!==context.actor.userId)throw new ORPCError("FORBIDDEN",{message:"La cuenta ha cambiado. Vuelve a abrir la app antes de continuar."});
         const owned=await ownedMycellios(context.actor);
         const token=owned?.saved.apiKey ?? (deps.env.mycelliosSso && context.requestHeaders ? await deps.auth.oidcAccessToken(context.requestHeaders,context.actor.userId):null);

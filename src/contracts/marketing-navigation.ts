@@ -8,6 +8,7 @@ export const MARKETING_PRIMARY_LINKS = [
 ] as const;
 
 export const MARKETING_EXPLORE_LINKS = [
+  { id: "guides", label: "Guides", href: "/guides" },
   { id: "api", label: "Build with the API", href: "/#build-api" },
   { id: "compare", label: "Compare agents", href: "/compare" },
   { id: "docs", label: "Documentation", href: "/docs" },
@@ -15,6 +16,13 @@ export const MARKETING_EXPLORE_LINKS = [
   { id: "changelog", label: "Changelog", href: "/changelog" },
   { id: "staking", label: "Staking", href: "/spore" },
   { id: "rewards", label: "Rewards", href: "/spore/rewards" },
+] as const;
+
+export const MARKETING_FOOTER_GROUPS = [
+  { title: "Product", links: [{ label: "Open Mycellios", href: MARKETING_AGENT_URL }, { label: "Download", href: "/downloads/desktop" }, { label: "Credits & pricing", href: "/pricing" }, { label: "Earn AI Credits", href: "/earn" }, { label: "Network status", href: "/network" }] },
+  { title: "Resources", links: [{ label: "Documentation", href: "/docs" }, { label: "Journal", href: "/blog" }, { label: "Changelog", href: "/changelog" }, { label: "Source code", href: SOURCE_URL }, { label: "Implementation status", href: `${SOURCE_URL}/blob/main/docs/STATUS_AND_EVIDENCE.md` }, { label: "For AI assistants", href: "/llms.txt" }] },
+  { title: "Learn", links: [{ label: "Your first Mico", href: "/guides/get-started" }, { label: "Models & providers", href: "/guides/models-and-credits" }, { label: "Contribute compute", href: "/guides/contribute-compute" }, { label: "English guides", href: "/guides" }, { label: "Guías en español", href: "/es/guias" }] },
+  { title: "Compare", links: [{ label: "Mycellios vs OpenBot", href: "/compare/openbot" }, { label: "Mycellios vs OpenClaw", href: "/compare/openclaw" }, { label: "Mycellios vs Hermes Agent", href: "/compare/hermes-agent" }, { label: "Mycellios vs Claude Cowork", href: "/compare/claude-cowork" }, { label: "Choose an AI agent", href: "/compare/best-ai-agent-apps" }, { label: "All comparisons", href: "/compare" }] },
 ] as const;
 
 export const MARKETING_FOOTER_LINKS = [

@@ -4,11 +4,15 @@ import { RootedLanding, ApiSample } from "../rebrand/RootedLanding";
 import { NetworkWeave } from "../rebrand/NetworkWeave";
 import { AssemblageLanding } from "../rebrand/AssemblageLanding";
 import { ReferenceHeader, ReferenceLanding } from "../rebrand/ReferenceLanding";
+import { ContributionEntry } from "../rebrand/ContributionEntry";
+import { DistributedEarnScene } from "../rebrand/DistributedEarnScene";
 
 const meta = { title: "Screens/Landing", component: ReferenceLanding, parameters: { layout: "fullscreen", ownsThemeRoot: true } } satisfies Meta<typeof ReferenceLanding>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Refreshed: Story = {};
+export const Contribution: Story = { render: () => <div className="mycellios-assemblage mycellios-reference"><ContributionEntry /></div> };
+export const DistributedAI: Story = { render: () => <div className="mycellios-assemblage mycellios-reference"><DistributedEarnScene /></div> };
 export const Navigation: Story = { render: () => <div className="mycellios-assemblage mycellios-reference" style={{ minHeight: 320 }}><ReferenceHeader /></div> };
 export const OriginalArtwork: Story = { args: { initialArtwork: "fabric" } };
 export const DiscardedAssemblage: Story = { render: () => <AssemblageLanding /> };

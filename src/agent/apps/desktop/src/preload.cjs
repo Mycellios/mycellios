@@ -1,6 +1,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
+let developmentIdentity;
+try {
+  const arg=process.argv.find(value=>value.startsWith("--mycellios-development="));
+  const value=arg?JSON.parse(decodeURIComponent(arg.slice("--mycellios-development=".length))):null;
+  if(value && typeof value.branch==="string" && value.branch.length<=100 && Number.isInteger(value.hue) && value.hue>=0 && value.hue<360)
+    developmentIdentity={branch:value.branch,hue:value.hue};
+}catch{}
 
 contextBridge.exposeInMainWorld("rakazoDesktop", {
+  development: {isDevelopment: Boolean(developmentIdentity), identity:developmentIdentity, open: botId => ipcRenderer.invoke("desktop.development.open",botId)},
   videoEdit: { request: input => ipcRenderer.invoke("desktop.apps.video-edit", input) },
   appsStudio: { request: input => ipcRenderer.invoke("desktop.apps.studio", input) },
   servers: { list: () => ipcRenderer.invoke("desktop.servers.list"), manage: url => ipcRenderer.invoke("desktop.servers.manage", url), updateIdentity: (url, identity) => ipcRenderer.invoke("desktop.servers.updateIdentity", url, identity) },

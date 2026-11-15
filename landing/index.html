@@ -8,17 +8,17 @@
     <link rel="describedby" href="https://www.mycellios.com/llms.txt" />
     <meta
       name="description"
-      content="Mycellios develops open-source distributed AI inference. Explore model-stage coordination, public network data, browser workers, and current evidence."
+      content="Work with AI agents in one workspace. Connect your models or use Mycellios Credits, and contribute compatible compute to earn Credits for verified work."
     />
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="mycellios" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:url" content="https://www.mycellios.com/" />
-    <meta property="og:title" content="mycellios — The open compute layer for distributed AI" />
+    <meta property="og:title" content="Mycellios — AI agents, your models &amp; shared compute" />
     <meta
       property="og:description"
-      content="Mycellios develops open-source distributed AI inference. Explore model-stage coordination, public network data, browser workers, and current evidence."
+      content="Work with AI agents in one workspace. Connect your models or use Mycellios Credits, and contribute compatible compute to earn Credits for verified work."
     />
     <meta property="og:image" content="https://www.mycellios.com/assets/brand/og-network-v2.png" />
     <meta property="og:image:alt" content="Mycellios — many machines, one shared network" />
@@ -27,10 +27,10 @@
     <meta property="og:image:type" content="image/png" />
     <meta name="twitter:image:alt" content="Mycellios — many machines, one shared network" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="mycellios — The open compute layer for distributed AI" />
+    <meta name="twitter:title" content="Mycellios — AI agents, your models &amp; shared compute" />
     <meta
       name="twitter:description"
-      content="Mycellios develops open-source distributed AI inference. Explore model-stage coordination, public network data, browser workers, and current evidence."
+      content="Work with AI agents in one workspace. Connect your models or use Mycellios Credits, and contribute compatible compute to earn Credits for verified work."
     />
     <meta name="twitter:image" content="https://www.mycellios.com/assets/brand/og-network-v2.png" />
     <link rel="canonical" href="https://www.mycellios.com/" />
@@ -54,24 +54,14 @@
       #mycellios-loader[data-theme="paper"] { background:#faf9f7; color:#203b2b; }
       html[data-forest-loading] { overflow:hidden; scrollbar-gutter:stable; }
       #mycellios-loader[data-mode="forest"] { display:block; background:#17221a; transition:none; }
-      #mycellios-loader[data-mode="forest"] > svg { display:none; }
+      #mycellios-loader[data-mode="forest"] > .mycellios-loader__mark { display:none; }
       #mycellios-loader[data-mode="forest"] picture, #mycellios-loader[data-mode="forest"] img, #mycellios-loader[data-mode="forest"] canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
       #mycellios-loader[data-animated] { background:transparent; }
       #mycellios-loader[data-animated] picture { visibility:hidden; }
       #forest-loader-actions { position:absolute; z-index:1; right:calc(1.25rem + env(safe-area-inset-right)); bottom:calc(1.25rem + env(safe-area-inset-bottom)); padding-top:env(safe-area-inset-top); padding-left:env(safe-area-inset-left); }
-      .mycellios-loader__mark { width:68px; height:68px; overflow:visible; }
-      .mycellios-loader__cap,.mycellios-loader__stem,.mycellios-loader__gills { fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; }
-      .mycellios-loader__cap { stroke-width:1.7; stroke-dasharray:72; animation:mycellios-cap-grow 1.5s cubic-bezier(.2,.75,.2,1) infinite; }
-      .mycellios-loader__stem { stroke:#ad7a48; stroke-width:1.7; stroke-dasharray:30; animation:mycellios-stem-grow 1.5s cubic-bezier(.2,.75,.2,1) infinite; }
-      .mycellios-loader__gills { stroke:currentColor; stroke-width:1; animation:mycellios-gills-breathe 1.5s ease-in-out infinite; }
-      .mycellios-loader__spore { fill:#ad7a48; animation:mycellios-spore-rise 1.8s ease-in-out infinite; }
-      .mycellios-loader__spore:nth-child(2) { animation-delay:-.6s; }
-      .mycellios-loader__spore:nth-child(3) { animation-delay:-1.15s; }
-      @keyframes mycellios-cap-grow { 0% { stroke-dashoffset:72; opacity:.2; } 44%,78% { stroke-dashoffset:0; opacity:1; } 100% { stroke-dashoffset:-72; opacity:.12; } }
-      @keyframes mycellios-stem-grow { 0%,14% { stroke-dashoffset:30; opacity:.15; } 54%,80% { stroke-dashoffset:0; opacity:1; } 100% { stroke-dashoffset:-30; opacity:.12; } }
-      @keyframes mycellios-gills-breathe { 0%,34%,100% { opacity:0; } 58%,82% { opacity:.48; } }
-      @keyframes mycellios-spore-rise { 0%,100% { opacity:.12; } 48% { opacity:.65; } }
-      @media (prefers-reduced-motion:reduce) { #mycellios-loader { transition-duration:80ms; } .mycellios-loader__cap,.mycellios-loader__stem,.mycellios-loader__gills,.mycellios-loader__spore { animation:none; } }
+      .mycellios-loader__mark { display:inline-grid; justify-items:center; gap:14px; font:500 26px/1.5 "Geist Variable",ui-sans-serif,system-ui,sans-serif; letter-spacing:-.025em; }
+      .mycellios-loader__mark img { display:block; width:76px; height:76px; }
+      @media (prefers-reduced-motion:reduce) { #mycellios-loader { transition-duration:80ms; } }
     </style>
     <noscript><style>#mycellios-loader { display:none !important; }</style></noscript>
     <script id="seo-structured-data" type="application/ld+json">
@@ -105,7 +95,7 @@
             "name": "mycellios",
             "applicationCategory": "DeveloperApplication",
             "operatingSystem": "Windows 10/11, macOS, Ubuntu, Debian, Fedora, RHEL",
-            "description": "Open-source software coordinating AI inference across model-stage workers. Multi-host GPU performance and combined-memory execution remain under development.",
+            "description": "An AI agent workspace with supported model connections and an optional distributed compute network. Availability depends on the selected provider, device and permissions.",
             "url": "https://www.mycellios.com/",
             "downloadUrl": "https://www.mycellios.com/downloads",
             "publisher": {
@@ -115,16 +105,11 @@
         ]
       }
     </script>
-    <title>mycellios — The open compute layer for distributed AI</title>
+    <title>Mycellios — AI agents, your models &amp; shared compute</title>
   </head>
   <body>
     <div id="mycellios-loader" role="status" aria-live="polite" aria-label="Loading mycellios">
-      <svg class="mycellios-loader__mark" viewBox="0 0 68 68" aria-hidden="true">
-        <g><circle class="mycellios-loader__spore" cx="18" cy="22" r="1.15" /><circle class="mycellios-loader__spore" cx="49" cy="18" r=".9" /><circle class="mycellios-loader__spore" cx="54" cy="31" r=".7" /></g>
-        <path class="mycellios-loader__cap" pathLength="72" d="M17 35.5C18.8 25.4 25 20 34 20s15.2 5.4 17 15.5c-8.7-2.6-25.3-2.6-34 0Z" />
-        <path class="mycellios-loader__stem" pathLength="30" d="M29.8 35.2c.3 5.8-.8 10.8-3.7 15.5 4.9 2.4 10.9 2.4 15.8 0-2.9-4.7-4-9.7-3.7-15.5" />
-        <path class="mycellios-loader__gills" d="m21.5 34.4 8.9 5.2M46.5 34.4l-8.9 5.2M27 33.5l4.7 6.8m9.3-6.8-4.7 6.8M34 33.2v8" />
-      </svg>
+      <span class="mycellios-loader__mark"><img src="/brand/agent-loader.svg" width="76" height="76" alt="" aria-hidden="true" /><span>Mycellios</span></span>
     </div>
     <div id="root"></div>
     <script id="forest-loader-bootstrap">

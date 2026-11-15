@@ -1,4 +1,5 @@
 export * from "./action-approval.js";
+export * from "./sidebar-folders.js";
 export * from "./run-health.js";
 export * from "./agent-import/index.js";
 export * from "./agent-skill.js";

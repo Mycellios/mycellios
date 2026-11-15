@@ -1,0 +1,20 @@
+.agent-download { position:relative; z-index:5; text-align:left; }
+.agent-download-split { display:inline-flex; align-items:stretch; border-radius:999px; background:#172a20; }
+:root[data-mycellios-design] .mycellios-reference .agent-product-actions .agent-download .agent-download-primary.ui-link { min-height:56px !important; padding:14px 24px !important; border-radius:999px 0 0 999px !important; font-size:15px !important; font-weight:500 !important; }
+:root[data-mycellios-design] .mycellios-reference .agent-product-actions .agent-download .agent-download-toggle.ui-button { min-width:50px; min-height:56px !important; padding:12px !important; border-radius:0 999px 999px 0 !important; position:relative; }
+.agent-download-toggle::before { content:""; position:absolute; left:0; top:16px; bottom:16px; width:1px; background:#faf9f74d; }
+.agent-download-toggle[aria-expanded="true"] > svg { transform:rotate(180deg); }
+.agent-download-menu { position:absolute; top:calc(100% + 12px); left:0; width:300px; max-width:calc(100vw - 40px); max-height:min(440px,40dvh); overflow-y:auto; overscroll-behavior:contain; padding:8px; border-radius:16px; background:#efede7; color:#16221b; box-shadow:0 14px 40px #16221b24; }
+@media(prefers-reduced-motion:no-preference) { .agent-download-menu { animation:agent-download-reveal 180ms cubic-bezier(.165,.84,.44,1) both; } }
+@keyframes agent-download-reveal { from { opacity:0; translate:0 -6px; } to { opacity:1; translate:0 0; } }
+.mycellios-reference .agent-download-menu-title { margin:8px 12px 6px; font-size:12px; color:#59635d; }
+.mycellios-reference .agent-download-menu > a { display:flex; align-items:center; gap:12px; min-height:52px; padding:10px 12px; border-radius:9px; color:#16221b; text-decoration:none !important; font-size:14px; line-height:1.4; }
+.agent-download-menu > a > span { flex:1; }
+.agent-download-menu > a small { display:block; margin-top:2px; font-size:11px; color:#59635d; }
+.mycellios-reference .agent-download-menu > a:hover { background:#faf9f7; }
+.mycellios-reference .agent-download-menu > .agent-download-all { min-height:44px; margin-top:6px; font-size:12px; color:#346b53; }
+@media(max-width:760px) {
+  .agent-product-actions:has(.agent-download) { flex-direction:column; align-items:center; gap:10px; }
+  :root[data-mycellios-design] .mycellios-reference .agent-product-actions .agent-download .agent-download-primary.ui-link { padding-inline:20px !important; font-size:14px !important; }
+  .agent-download-menu { left:50%; transform:translateX(-50%); }
+}

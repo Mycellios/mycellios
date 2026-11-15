@@ -224,7 +224,7 @@ it("keeps the header and recovery model in sync with the current account setting
   const recovery = container!.querySelector<HTMLButtonElement>('[aria-label="Change model"]')!;
   await act(async () => recovery.click());
   expect(document.querySelector('[data-slot="popover-content"] [data-slot="select-trigger"]')?.textContent)
-    .toBe("Use general model · saved-model");
+    .toBe("saved-model");
   expect(pickerProps.onSave).not.toHaveBeenCalled();
 });
 
@@ -262,6 +262,7 @@ it.each([false, true])("enables only the chosen catalog model, using it only whe
   };
   await click("Model");
   expect(probe).not.toHaveBeenCalled();
+  await click("OmniRoute");
   await click("Explore catalog");
   await vi.waitFor(() => expect(document.body.textContent).toContain("new-model"));
   await click("new-model");

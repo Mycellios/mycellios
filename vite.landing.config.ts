@@ -1,3 +1,4 @@
+import { landingSeoAssets } from "./scripts/landing-seo-assets.js";
 import react from "@vitejs/plugin-react";
 import { createRequire } from "node:module";
 import { resolve, sep } from "node:path";
@@ -119,7 +120,7 @@ export default defineConfig({
   define: {
     __MYCELLIOS_BUILD_IDENTITY__: JSON.stringify(landingBuildIdentity),
   },
-  plugins: [react(), preloadHeroRenderer(), marketingNavigationAssets(import.meta.dirname)],
+  plugins: [landingSeoAssets(), react(), preloadHeroRenderer(), marketingNavigationAssets(import.meta.dirname)],
   publicDir: "public",
   server: {
     host: LOCAL_UI_HOST,
@@ -168,5 +169,16 @@ export default defineConfig({
     emptyOutDir: true,
     manifest: true,
     sourcemap: false,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{
+            name: "agent-network-entry",
+            test: /\/rebrand\/(?:ContributionEntry|DistributedEarnScene|distributed-earn-model|AgentDownloadAction|GoldenMycelium)\./,
+            includeDependenciesRecursively: false,
+          }],
+        },
+      },
+    },
   },
 });

@@ -51,8 +51,8 @@ describe("landing SEO contract", () => {
 
   it("uses unique titles and canonical URLs for every route", () => {
     const paths = Object.keys(SEO_PAGES) as SeoPath[];
-    const titles = paths.map((path) => SEO_PAGES[path].title);
-    const canonicals = paths.map((path) => canonicalUrl(SEO_PAGES[path]));
+    const titles = paths.map((path) => SEO_PAGES[path]!.title);
+    const canonicals = paths.map((path) => canonicalUrl(SEO_PAGES[path]!));
 
     expect(new Set(titles).size).toBe(titles.length);
     expect(new Set(canonicals).size).toBe(canonicals.length);
@@ -63,13 +63,13 @@ describe("landing SEO contract", () => {
     expect(LANDING_SEO_PATHS).toContain("/dashboard");
     for (const path of ["/spore", "/spore/rewards"] as const) {
       expect(seoPageForPath(path)).toBe(SEO_PAGES[path]);
-      expect(SEO_PAGES[path].robots).toContain("noindex");
+      expect(SEO_PAGES[path]!.robots).toContain("noindex");
       expect("structuredData" in SEO_PAGES[path]).toBe(false);
       expect(LANDING_SEO_PATHS).toContain(path);
     }
     for (const path of INDEXABLE_SEO_PATHS) {
-      expect(SEO_PAGES[path].robots).toMatch(/^index,/);
-      expect(SEO_PAGES[path].structuredData).toBeDefined();
+      expect(SEO_PAGES[path]!.robots).toMatch(/^index,/);
+      expect(SEO_PAGES[path]!.structuredData).toBeDefined();
     }
   });
 
@@ -77,7 +77,8 @@ describe("landing SEO contract", () => {
     const sitemap = read("landing/public/sitemap.xml");
     const urls = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]);
     const expected = [
-      ...INDEXABLE_SEO_PATHS.map((path) => canonicalUrl(SEO_PAGES[path])),
+      ...INDEXABLE_SEO_PATHS.map((path) => canonicalUrl(SEO_PAGES[path]!)),
+      `${canonicalUrl(SEO_PAGES["/"])}downloads/desktop`,
       `${canonicalUrl(SEO_PAGES["/"])}blog`,
     ];
 
@@ -140,7 +141,7 @@ describe("landing SEO contract", () => {
 
   it("provides specific static content for every indexable page before JavaScript runs", () => {
     for (const path of INDEXABLE_SEO_PATHS) {
-      const page = SEO_PAGES[path];
+      const page = SEO_PAGES[path]!;
       expect(page.staticContent, `${path} static copy`).toBeDefined();
       expect(page.staticContent!.heading.trim()).not.toBe("");
       expect(page.staticContent!.paragraphs.length).toBeGreaterThanOrEqual(2);
@@ -150,7 +151,7 @@ describe("landing SEO contract", () => {
 
   it("does not publish an unverified zero price in application structured data", () => {
     for (const path of ["/", "/downloads", "/browser/"] as const) {
-      expect(JSON.stringify(SEO_PAGES[path].structuredData)).not.toMatch(/"price"\s*:/);
+      expect(JSON.stringify(SEO_PAGES[path]!.structuredData)).not.toMatch(/"price"\s*:/);
     }
   });
 });

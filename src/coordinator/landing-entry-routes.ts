@@ -1,7 +1,8 @@
+import { MARKETING_GUIDE_PATHS } from "../contracts/marketing-guides.js";
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { MARKETING_COMPARISONS, RETIRED_MARKETING_PAGES, STATS_HOST } from "../contracts/marketing-pages.js";
+import { MARKETING_COMPARISONS, MARKETING_INDEXABLE_PATHS, RETIRED_MARKETING_PAGES, STATS_HOST } from "../contracts/marketing-pages.js";
 
 const REPOSITORY_DOCS = "https://github.com/Mycellios/mycellios/blob/main/docs";
 const CANONICAL_LANDING_HOST = "www.mycellios.com";
@@ -20,6 +21,8 @@ const CANONICAL_LANDING_PATHS = new Set([
   "/stats",
   "/downloads",
   "/llms.txt",
+  "/llms-full.txt",
+  ...MARKETING_GUIDE_PATHS,
   "/admin",
   "/dashboard",
   "/account",
@@ -77,11 +80,28 @@ export function registerLandingEntryRoutes(app: FastifyInstance, assetsRoot: str
   } as const;
   for (const [path, documentName] of Object.entries(routeDocuments)) {
     const document = existsSync(resolve(assetsRoot, documentName)) ? documentName : "index.html";
-    app.get(path, async (_request, reply) => reply.sendFile(document));
+    app.get(path, async (request, reply) => {
+      if (["/account", "/admin", "/dashboard", "/spore", "/spore/rewards"].includes(path) || request.url.includes("view=")) reply.header("X-Robots-Tag", "noindex, nofollow, noarchive");
+      return reply.sendFile(document);
+    });
+  }
+  for (const path of MARKETING_GUIDE_PATHS) {
+    const documentName = `${path.slice(1)}/index.html`;
+    app.get(path, async (_request, reply) => existsSync(resolve(assetsRoot, documentName)) ? reply.sendFile(documentName) : reply.code(404).send({ error: "Page not published" }));
+    app.get(`${path}/`, async (request, reply) => reply.redirect(`${path}${request.url.includes("?") ? request.url.slice(request.url.indexOf("?")) : ""}`, 308));
+  }
+  for (const path of MARKETING_INDEXABLE_PATHS) {
+    const markdownPath = path === "/" ? "/index.md" : `${path.replace(/\/+$/, "")}.md`;
+    app.get(markdownPath, async (_request, reply) => {
+      const file = markdownPath.slice(1);
+      if (!existsSync(resolve(assetsRoot, file))) return reply.code(404).send({ error: "Document not published" });
+      return reply.type("text/markdown; charset=utf-8").header("X-Robots-Tag", "noindex, follow").header("Link", `<https://www.mycellios.com${path}>; rel="canonical"`).sendFile(file);
+    });
   }
   for (const [slug] of MARKETING_COMPARISONS) {
     const documentName = `compare/${slug}/index.html`;
-    app.get(`/compare/${slug}`, async (_request, reply) => reply.sendFile(existsSync(resolve(assetsRoot, documentName)) ? documentName : "index.html"));
+    app.get(`/compare/${slug}`, async (_request, reply) => existsSync(resolve(assetsRoot, documentName)) ? reply.sendFile(documentName) : reply.code(404).send({ error: "Page not published" }));
+    app.get(`/compare/${slug}/`, async (_request, reply) => reply.redirect(`/compare/${slug}`, 308));
   }
   for (const [path, destination] of Object.entries(RETIRED_MARKETING_PAGES)) {
     for (const alias of [path, `${path}/`]) app.get(alias, async (request, reply) => {
