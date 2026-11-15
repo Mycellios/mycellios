@@ -7,7 +7,6 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { adaptDesktopLinux } from "./adapt-desktop-linux.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const FEDORA_REQUIRES = Object.freeze([
@@ -158,6 +157,7 @@ export async function buildDesktopRpm({ release, deb, source, outputDirectory, i
   const rpmRelease = release.rpmRelease ?? 1;
   let applicationAdaptation;
   if (rpmRelease === 2) {
+    const { adaptDesktopLinux } = await import("./adapt-desktop-linux.mjs");
     const patched = join(work, "fedora-app.asar");
     applicationAdaptation = await adaptDesktopLinux(join(resources, "app.asar"), patched);
     await copyFile(patched, join(resources, "app.asar"));
