@@ -7,6 +7,10 @@ import { chromium, expect } from "@playwright/test";
 import { createServer } from "vite";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
+// Exercise retained editors in this isolated synthetic fixture. Availability
+// components separately qualify their default Coming soon presentation.
+process.env.VITE_MYCELLIOS_ROUTINES = "true";
+process.env.VITE_MYCELLIOS_WORKFLOWS = "true";
 const root = path.resolve("apps/web");
 const configured = process.argv.find(arg => arg.startsWith("--output="))?.slice(9);
 const output = configured ? path.resolve(configured) : await mkdtemp(path.join(tmpdir(), "mycellios-workspace-ui-"));

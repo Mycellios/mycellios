@@ -83,6 +83,7 @@ describe("desktop preload bridge", () => {
     expect(Object.keys(bridge.development!).sort()).toEqual(["identity", "isDevelopment", "open"]);
     await bridge.development!.open("mico");
     expect(invoke).toHaveBeenCalledWith("desktop.development.open", "mico");
+    invoke.mockClear();
     const request = { id: "page", url: "http://localhost:3000", bounds: {x:600,y:100,width:500,height:500} };
     await bridge.preview!.show(request);
     await bridge.preview!.layout({ id: "page", bounds: null });
