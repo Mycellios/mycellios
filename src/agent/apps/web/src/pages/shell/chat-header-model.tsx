@@ -1,7 +1,6 @@
-import { modelDisplayName } from "../model-settings/model-display-name";
 import { useLingui } from "@lingui/react/macro";
 import type { Bot, Me, ModelCatalogEntry, ModelCredential, ThinkingLevel } from "@rakazo/contracts";
-import { ThinkingLevelSchema, isMycelliosBaseUrl, isOpenAiCompatibleProvider, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
+import { ThinkingLevelSchema, isMycelliosBaseUrl, OPENAI_COMPATIBLE_PROVIDER_ID } from "@rakazo/contracts";
 import { chatModelChoices, connectedModelChoices, credentialForModel, modelOptionKey, parseModelOptionKey, resolveSelectableModelId } from "@rakazo/core";
 import { Button, OptionSelect, Popover, PopoverContent, PopoverTrigger, Spinner, Switch } from "@rakazo/ui-web";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +11,6 @@ import { useSpaceQueries, writeSaved } from "../../lib/query";
 import { useSpaceRpc } from "../../lib/space-rpc";
 import { errorText } from "../../lib/user-error";
 import { enableCompatibleModel, savedModelIds } from "../model-settings/enable-compatible-model";
-import { ChatModelCatalog, type ChatModelCatalogSource } from "./chat-model-catalog";
 import { ChatModelPicker } from "./chat-model-picker";
 import { ProviderLogo } from "../../components/ProviderLogo";
 import { MycelliosProvider } from "../model-settings/mycellios-provider";
@@ -53,8 +51,6 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const { t } = useLingui();
   const id = useId();
   const [open, setOpen] = useState(false);
-  const [editingDefault, setEditingDefault] = useState(false);
-  const [exploring, setExploring] = useState<string | null>(null);
   const [lastProvider, setLastProvider] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
@@ -64,14 +60,26 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const rpc = useSpaceRpc();
   const meQuery = useQuery({ ...queries.me.queryOptions(), enabled: Boolean(initialMe) });
   const me = meQuery.data ?? initialMe;
-  const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), enabled: open });
-  const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), enabled: open });
+  const credentialsQuery = useQuery({ ...queries.models.credentials.queryOptions(), enabled: Boolean(me) });
+  const catalogQuery = useQuery({ ...queries.models.list.queryOptions(), enabled: Boolean(me) });
   const enginesQuery = useQuery(queries.engines.list.queryOptions({ enabled: open }));
   const nativeCatalog = useQuery(queries.engines.codexModels.queryOptions({ enabled: open && (enginesQuery.data ?? []).some(engine => engine.id === "codex" && engine.available) }));
   const nativeModels = nativeCatalog.data ?? [];
   const nativeModel = nativeModels.find(model => bot.nativeConfig?.modelId ? model.id === bot.nativeConfig.modelId : model.isDefault);
   const credentials = credentialsQuery.data ?? EMPTY_CREDENTIALS;
-  const catalog = catalogQuery.data ?? EMPTY_CATALOG;
+  const mycelliosConnection = credentials.find(connection => isMycelliosBaseUrl(connection.baseUrl));
+  const mycelliosCatalog = useQuery({
+    queryKey: ["mycellios-chat-catalog", me?.userId, me?.spaceId, mycelliosConnection?.id],
+    queryFn: ({ signal }) => rpc.models.mycelliosModels(undefined, { context: { spaceId: me!.spaceId }, signal }),
+    enabled: (open || Boolean((bot.modelId ?? me?.defaultModel)?.startsWith("mycellios/"))) && Boolean(me && mycelliosConnection),
+    staleTime: 60_000,
+    retry: false,
+    refetchInterval: query => query.state.data?.length === 0 ? 5_000 : false,
+  });
+  const catalog = [
+    ...(catalogQuery.data ?? EMPTY_CATALOG).filter(entry => entry.providerName !== "Mycellios" && !entry.id.startsWith("mycellios/")),
+    ...(mycelliosCatalog.data ?? []),
+  ];
   const general = generalChatModel(me, catalog);
   const nativeEngine = bot.agentEngine && bot.agentEngine !== "pi" ? bot.agentEngine : null;
   const nativeName = nativeEngine ? NATIVE_PROVIDERS[nativeEngine] : undefined;
@@ -84,37 +92,38 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const entry = provider && model ? selectableCatalogEntry(catalog, provider, model) : undefined;
   const credential = credentialForModel(credentials, provider ?? null, effectiveId ?? null);
   const levels = nativeEngine === "codex" ? (nativeModel?.thinkingLevels ?? []).flatMap(level => { const parsed = ThinkingLevelSchema.safeParse(level); return parsed.success ? [parsed.data] : []; }) : nativeEngine ? [] : (credential?.thinkingLevels ?? entry?.thinkingLevels ?? []).filter(level => level !== "off");
-  const value = nativeEngine ? modelOptionKey(`native-${nativeEngine}`, nativeEngine === "codex" ? bot.nativeConfig?.modelId ?? "default" : "default")
+  const value = nativeEngine ? modelOptionKey(`native-${nativeEngine}`, nativeEngine === "codex" ? bot.nativeConfig?.modelId ?? nativeModel?.id ?? "default" : "default")
     : bot.modelProvider && bot.modelId ? modelOptionKey(bot.modelProvider, resolveSelectableModelId(catalog, bot.modelProvider, bot.modelId)) : "";
-  const inheritLabel = t`Use general model`;
-  const sources = new Map<string, ChatModelCatalogSource>();
-  sources.set("Mycellios", { label: "Mycellios", provider: OPENAI_COMPATIBLE_PROVIDER_ID, models: [] });
+  const sources = new Map<string, { provider: string }>();
+  sources.set("Mycellios", { provider: OPENAI_COMPATIBLE_PROVIDER_ID });
+  const connectionLabels = new Set<string>();
   const namedCredentials = credentials.map(connection => {
     const name = connectionName(connection);
-    const label = sources.has(name) && (name !== "Mycellios" || sources.get(name)?.connection)
-      ? `${name} · ${connection.label}` : name;
-    sources.set(label, { label, provider: connection.provider, connection, models: [] });
+    const label = connectionLabels.has(name) ? `${name} · ${connection.label}` : name;
+    connectionLabels.add(name);
+    sources.set(label, { provider: connection.provider });
     return { ...connection, label };
   });
-  const connected = connectedModelChoices(namedCredentials, catalog).map(choice => {
+  // The account catalog is authoritative for Mycellios, not its saved enabled IDs.
+  const connected = connectedModelChoices(namedCredentials.filter(connection => !isMycelliosBaseUrl(connection.baseUrl)), catalog.filter(entry => entry.providerName !== "Mycellios"))
+    .concat(mycelliosConnection ? (mycelliosCatalog.data ?? []).map(entry => ({
+      key: modelOptionKey(entry.provider, entry.id), provider: entry.provider, modelId: entry.id,
+      label: entry.label, providerLabel: "Mycellios", modelLabel: entry.label, images: entry.images,
+    })) : []).map(choice => {
     const connection = credentialForModel(namedCredentials, choice.provider, choice.modelId)
       ?? namedCredentials.find(entry => entry.provider === choice.provider && entry.label === choice.providerLabel)
       ?? namedCredentials.find(entry => entry.provider === choice.provider);
-    const label = connection?.label ?? choice.providerLabel ?? choice.provider;
-    const source = sources.get(label) ?? { label, provider: choice.provider, models: [] };
-    source.models.push({ id: choice.modelId, label: modelDisplayName(choice.modelId, choice.modelLabel) });
-    sources.set(label, source);
-    return { ...choice, modelLabel: modelDisplayName(choice.modelId, choice.modelLabel), providerLabel: label, label: `${modelDisplayName(choice.modelId, choice.modelLabel)} (${label})` };
+    const label = mycelliosCatalog.data?.some(entry => entry.provider === choice.provider && entry.id === choice.modelId)
+      ? "Mycellios" : connection?.label ?? choice.providerLabel ?? choice.provider;
+    if (!sources.has(label)) sources.set(label, { provider: choice.provider });
+    const name = choice.modelLabel && choice.modelLabel !== choice.modelId ? choice.modelLabel
+      : choice.modelId.startsWith("mycellios/") ? choice.modelId.split("/").at(-1)! : choice.modelId;
+    return { ...choice, providerLabel: label, label: `${name} (${label})`, title: name };
   });
-  const explorer = exploring ? sources.get(exploring) : undefined;
   const defaultKey = general ? modelOptionKey(general.provider, resolveSelectableModelId(catalog, general.provider, general.modelId)) : "";
-  const currentProvider = nativeName ?? connected.find((choice) => choice.key === (value || defaultKey))?.providerLabel
-    ?? entry?.providerName ?? provider;
-  const quickChoices = connected.filter(choice => {
-    const source = sources.get(choice.providerLabel);
-    return isOpenAiCompatibleProvider(choice.provider) || choice.key === value || choice.key === defaultKey ||
-      (source?.connection?.modelId ? choice.modelId === source.connection.modelId : choice.modelId === source?.models[0]?.id);
-  }).sort((left, right) => Number(right.key === (value || defaultKey)) - Number(left.key === (value || defaultKey)));
+  // A saved first-party model identifies Mycellios even before discovery returns.
+  const currentProvider = nativeName ?? (model?.startsWith("mycellios/") || credential && isMycelliosBaseUrl(credential.baseUrl)
+    ? "Mycellios" : connected.find((choice) => choice.key === (value || defaultKey))?.providerLabel ?? entry?.providerName ?? provider);
   // Installed account providers live beside API connections in the same picker.
   // OpenCode/ACP legacy selections stay visible, but new key connections never
   // ask the user to select the implementation that executes their model.
@@ -122,20 +131,25 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     ...(enginesQuery.data ?? []).filter(engine => engine.available && (engine.id === "codex" || engine.id === "claude")).map(engine => engine.id as NativeProvider),
     ...(nativeEngine ? [nativeEngine] : []),
   ])];
-  const nativeChoices = nativeProviders.map(engine => ({
+  const nativeChoices = nativeProviders.filter(engine => engine !== "codex" || !nativeModels.length).map(engine => ({
     key: modelOptionKey(`native-${engine}`, "default"), provider: `native-${engine}`,
     providerLabel: NATIVE_PROVIDERS[engine], label: NATIVE_PROVIDERS[engine] as string, title: t`Use this account`,
   }));
   if (nativeProviders.includes("codex")) nativeChoices.push(...nativeModels.map(model => ({
     key: modelOptionKey("native-codex", model.id), provider: "native-codex", providerLabel: NATIVE_PROVIDERS.codex, label: model.label, title: model.label,
   })));
-  const choices = editingDefault ? connected : [...chatModelChoices(
-    recovery ? connected : quickChoices,
-    value,
-    general ? `${inheritLabel} · ${modelDisplayName(general.modelId, general.label)}` : inheritLabel,
-    general?.entry?.images,
-  ).filter((choice) => !selectedNativeProvider(choice.provider ?? "") && (choice.key || general || !me?.needsModel)), ...nativeChoices];
-  const label = recovery ? t`Change model` : (nativeEngine === "codex" ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? (model ? modelDisplayName(model, entry?.label) : undefined) ?? (me?.needsModel ? t`Choose a model` : t`Model`);
+  const choices = [...chatModelChoices(
+    connected,
+    value || defaultKey,
+    "",
+  ).filter((choice) => choice.key && !selectedNativeProvider(choice.provider ?? "")).map(choice => {
+    const unavailable = Boolean(mycelliosConnection && choice.provider === mycelliosConnection.provider &&
+      (choice.modelId?.startsWith("mycellios/") || savedModelIds(mycelliosConnection).includes(choice.modelId ?? "")) &&
+      !connected.some(entry => entry.key === choice.key));
+    return unavailable ? { ...choice, title: choice.modelId?.startsWith("mycellios/") ? choice.modelId.split("/").at(-1) : choice.modelId,
+      providerLabel: "Mycellios", unavailable: true } : choice;
+  }), ...nativeChoices];
+  const label = recovery ? t`Change model` : (nativeEngine === "codex" ? nativeModel?.label ?? bot.nativeConfig?.modelId ?? nativeName : nativeName) ?? connected.find(choice => choice.key === (value || defaultKey))?.title ?? entry?.label ?? (model?.startsWith("mycellios/") ? model.split("/").at(-1) : model) ?? (me?.needsModel ? t`Choose a model` : t`Model`);
   const headerEffort = ThinkingLevelSchema.safeParse(nativeEngine === "codex" ? bot.nativeConfig?.thinkingLevel ?? nativeModel?.defaultThinkingLevel : nativeEngine ? undefined : bot.thinkingLevel);
   const effortLabel = headerEffort.success && headerEffort.data !== "off" ? thinkingLevelLabel(headerEffort.data) : null;
   const queryError = credentialsQuery.error ?? catalogQuery.error;
@@ -145,65 +159,41 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
     busy.current = true; setSaving(true); setError(null);
     try {
       await apply();
-      setExploring(null);
-      if (close) { setOpen(false); setEditingDefault(false); }
+      if (close) setOpen(false);
     }
     catch (cause) { setError(errorText(cause)); }
     finally { busy.current = false; setSaving(false); }
   }
 
-  function pickCatalog(modelId: string, use: boolean) {
-    if (!explorer || !me) return;
-    const source = explorer;
+  function choose(key: string) {
+    if (choices.some(choice => choice.key === key && "unavailable" in choice && choice.unavailable)) return;
+    const selected = key ? parseModelOptionKey(key) : null;
+    const engine = selected ? selectedNativeProvider(selected.provider) : undefined;
     void save(async () => {
-      if (source.connection && isOpenAiCompatibleProvider(source.provider)) {
-        const context = { spaceId: me.spaceId };
-        const latest = await rpc.models.credentials(undefined, { context });
-        const connection = latest.find(entry => entry.id === source.connection?.id);
-        if (!connection || connection.baseUrl !== source.connection.baseUrl) {
-          throw new Error(t`This connection has changed. Open the catalog again.`);
-        }
-        // A Mico saves provider + model. Do not claim a specific connection when two can serve the same ID.
-        if (use && latest.some(entry => entry.id !== connection.id && entry.provider === connection.provider && savedModelIds(entry).includes(modelId))) {
+      if (selected && mycelliosConnection && selected.provider === mycelliosConnection.provider &&
+        mycelliosCatalog.data?.some(entry => entry.id === selected.modelId) && me) {
+        const latest = await rpc.models.credentials(undefined, { context: { spaceId: me.spaceId } });
+        const connection = latest.find(entry => entry.id === mycelliosConnection.id);
+        if (!connection || connection.baseUrl !== mycelliosConnection.baseUrl) throw new Error(t`This connection has changed. Open the catalog again.`);
+        if (latest.some(entry => entry.id !== connection.id && entry.provider === connection.provider && savedModelIds(entry).includes(selected.modelId))) {
           throw new Error(t`This model is already enabled on another connection. Use it from that connection.`);
         }
-        const updated = await enableCompatibleModel(rpc, me.spaceId, connection, modelId, t`This connection has reached its enabled model limit.`);
-        await writeSaved(queryClient, queries.models.credentials.queryKey(), () =>
-          latest.map(entry => entry.id === updated.id ? {
-            ...entry, modelId: entry.modelId ?? updated.modelId, enabledModelIds: updated.enabledModelIds,
-          } : entry),
-        );
+        const updated = await enableCompatibleModel(rpc, me.spaceId, connection, selected.modelId, t`This connection has reached its enabled model limit.`);
+        await writeSaved(queryClient, queries.models.credentials.queryKey(), () => latest.map(entry => entry.id === updated.id ? { ...entry, enabledModelIds: updated.enabledModelIds } : entry));
       }
-      if (use) await onSave({ agentEngine: "pi", modelProvider: source.provider, modelId, thinkingLevel: null });
-    }, use);
-  }
-
-  function choose(key: string) {
-    const selected = key ? parseModelOptionKey(key) : null;
-    if (editingDefault) {
-      if (!selected || !me) return;
-      void save(async () => {
-        await rpc.models.setRole(
-          { role: "main", primary: selected, expectedUserId: me.userId },
-          { context: { spaceId: me.spaceId } },
-        );
-        await queryClient.invalidateQueries({ queryKey: queries.me.queryKey() });
+      await onSave({
+      agentEngine: engine ?? "pi",
+      nativeConfig: engine === "codex" ? { modelId: selected?.modelId === "default" ? null : selected?.modelId,
+        fastMode: false, thinkingLevel: null } : null,
+      modelProvider: engine ? null : selected?.provider ?? null,
+      modelId: engine ? null : selected?.modelId ?? null,
+      thinkingLevel: null,
       });
-    } else {
-      const engine = selected ? selectedNativeProvider(selected.provider) : undefined;
-      void save(() => onSave({
-        agentEngine: engine ?? "pi",
-        nativeConfig: engine === "codex" ? { modelId: selected?.modelId === "default" ? null : selected?.modelId,
-          fastMode: false, thinkingLevel: null } : null,
-        modelProvider: engine ? null : selected?.provider ?? null,
-        modelId: engine ? null : selected?.modelId ?? null,
-        thinkingLevel: null,
-      }));
-    }
+    });
   }
   return (
     <div className={recovery ? "ml-2 inline-flex" : "app-no-drag flex min-w-0 shrink-0 items-center gap-0.5"} data-testid={recovery ? "composer-error-model" : "chat-header-model"}>
-      <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setEditingDefault(false); setExploring(null); setLastProvider(null); setError(null); } }}>
+      <Popover modal={recovery} open={open} onOpenChange={next => { if (!busy.current) { setOpen(next); setLastProvider(null); setError(null); } }}>
         <PopoverTrigger type="button" title={label} data-mobile-chat-action={inMenu || undefined} aria-label={recovery ? label : t`Model`} className={recovery
           ? "inline-flex items-center gap-1 font-medium underline underline-offset-2 hover:text-foreground"
           : "app-no-drag flex h-8 min-w-0 max-w-64 items-center gap-1.5 rounded-md px-2 text-xs font-normal text-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring @max-[32rem]:size-8 @max-[32rem]:justify-center @max-[32rem]:gap-0 @max-[32rem]:px-0"}>
@@ -219,7 +209,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
         </PopoverTrigger>
         {open ? <PopoverContent align="end" className={recovery
           ? "app-no-drag w-80 max-w-[calc(100vw-24px)] gap-3 p-3"
-          : "app-no-drag w-[410px] max-w-[calc(100vw-24px)] max-h-(--available-height) gap-0 overflow-y-auto p-0"}>
+          : "app-no-drag w-[360px] max-w-[calc(100vw-24px)] max-h-(--available-height) gap-0 overflow-y-auto p-0"}>
           {recovery ? <label htmlFor={`${id}-model`} className="text-xs font-medium">{t`Model`}</label> : null}
           {recovery ? <p className="text-xs text-muted-foreground">{t`This changes the model for this Mico. Your message stays in the chat.`}</p> : null}
           {credentialsQuery.isPending || catalogQuery.isPending ? (
@@ -228,34 +218,27 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
             </div>
           ) : queryError ? <p role="alert" className="text-xs text-destructive">{errorText(queryError)}</p> :
             <fieldset disabled={saving} className="min-w-0 [&>div]:mt-0 [&>button]:mt-0">
-              {explorer && me ? <ChatModelCatalog source={explorer} userId={me.userId} spaceId={me.spaceId}
-                onBack={() => { setExploring(null); setError(null); }} onPick={pickCatalog} /> : <ChatModelPicker
-                key={String(editingDefault)}
+              <ChatModelPicker
                 id={`${id}-model`}
                 choices={choices}
-                value={editingDefault ? defaultKey : value}
+                value={value || defaultKey}
                 defaultKey={nativeEngine === "codex" ? modelOptionKey("native-codex", nativeModels.find(model => model.isDefault)?.id ?? "default") : defaultKey}
-                currentProvider={editingDefault ? undefined : currentProvider}
                 inline={!recovery}
-                onManage={() => { setOpen(false); setEditingDefault(false); onConnections(); }}
+                onManage={() => { setOpen(false); onConnections(); }}
                 onChange={choose}
-                heading={editingDefault ? t`Choose the general model` : undefined}
-                catalogProviders={me ? [...sources.keys()] : undefined}
-                providerContent={name => name === "Mycellios" && !sources.get(name)?.connection ? (
-                  <ul><MycelliosProvider embedded onConnected={async () => {
-                    await Promise.all([
-                      credentialsQuery.refetch(), catalogQuery.refetch(),
-                      queryClient.invalidateQueries({ queryKey: queries.me.queryKey() }),
-                    ]);
-                  }} /></ul>
-                ) : null}
                 providerIds={Object.fromEntries([...sources].map(([name, source]) => [name, source.provider]))}
-                initialProvider={editingDefault ? undefined : lastProvider}
+                initialProvider={lastProvider}
                 onProviderChange={setLastProvider}
-                onExplore={name => { setLastProvider(name); setExploring(name); setError(null); }}
-              />}
+                providerContent={name => name === "Mycellios" && !mycelliosConnection ? <ul><MycelliosProvider embedded onConnected={async () => {
+                  await Promise.all([credentialsQuery.refetch(), catalogQuery.refetch(), queryClient.invalidateQueries({queryKey:queries.me.queryKey()})]);
+                }} /></ul> : null}
+                modelOrigins={Object.fromEntries((mycelliosCatalog.data ?? []).map(entry => [modelOptionKey(entry.provider, entry.id), entry.mycelliosProcessing === "external" ? "antseed" : "network"]))}
+              />
             </fieldset>}
-          {!recovery && !editingDefault && !explorer && (!lastProvider || lastProvider === currentProvider) && levels.length ? <label className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3 text-sm">{t`Effort`}
+          {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.isFetching ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Loading models…`}</p> : null}
+          {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.isError ? <p role="alert" className="px-4 py-2 text-xs text-destructive">{t`Could not load the catalog.`} <Button size="sm" variant="ghost" onClick={() => void mycelliosCatalog.refetch()}>{t`Retry`}</Button></p> : null}
+          {mycelliosConnection && (!lastProvider || lastProvider === "Mycellios") && mycelliosCatalog.data?.length === 0 ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`No Mycellios agent models are available right now. Retrying automatically.`}</p> : null}
+          {!recovery && (!lastProvider || lastProvider === currentProvider) && levels.length ? <label className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border px-4 py-3 text-sm">{t`Effort`}
             <OptionSelect
               aria-label={t`Thinking`}
               className="w-48 min-w-48 shrink-0"
@@ -270,7 +253,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
                 : { modelProvider: bot.modelProvider, modelId: bot.modelId, thinkingLevel: (value || null) as ThinkingLevel | null }), false)}
             />
           </label> : null}
-          {!recovery && !editingDefault && !explorer && (!lastProvider || lastProvider === currentProvider) && nativeEngine === "codex" && nativeModel?.fast ? <label className="flex items-center justify-between gap-3 px-4 pb-3 text-sm">
+          {!recovery && (!lastProvider || lastProvider === currentProvider) && nativeEngine === "codex" && nativeModel?.fast ? <label className="flex items-center justify-between gap-3 px-4 pb-3 text-sm">
             <span title={t`Uses priority processing and may use more quota.`}>{t`Fast`}</span>
             <Switch aria-label={t`Fast`} checked={bot.nativeConfig?.fastMode === true} disabled={saving}
               onCheckedChange={fastMode => void save(() => onSave({ agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, fastMode } }), false)} />
@@ -278,16 +261,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
           {nativeEngine === "codex" && nativeCatalog.error && open ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Could not load this account's models. Fast mode is unavailable until the catalog can be checked.`}</p> : null}
           {saving ? <Spinner aria-label={t`Saving…`} className="mx-auto my-2 text-muted-foreground" /> : null}
           {error ? <p role="alert" className="p-2 text-xs text-destructive">{error}</p> : null}
-          {explorer ? null : recovery || !sources.size ? (
-            <Button variant="ghost" size="sm" onClick={() => { setOpen(false); onConnections(); }}>{t`Manage models`}</Button>
-          ) : me ? (
-            <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
-              {editingDefault ? <span className="text-xs text-muted-foreground">{t`For Micos using the general model`}</span> : null}
-              <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => { setEditingDefault(!editingDefault); setError(null); }}>
-                {editingDefault ? t`Back` : t`Change general model`}
-              </Button>
-            </div>
-          ) : null}
+          {(recovery || !sources.size) ? <Button variant="ghost" size="sm" onClick={() => { setOpen(false); onConnections(); }}>{t`Manage models`}</Button> : null}
         </PopoverContent> : null}
       </Popover>
     </div>

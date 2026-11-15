@@ -9,6 +9,8 @@ export function antseedGatewayFixture() {
     capabilities: {inputs: ["text"], outputs: ["text"], contextWindow: 131072, maxOutputTokens: 8192},
   }]};
   let nonce: string | undefined, pending = false, fail = false, duplicates = false, omitTag = false, authId = "key-fixture";
+  let contract: string | undefined;
+  const models = [model];
   const tag = "gw_" + "12345678-1234-1234-1234-123456789012";
   const row: Record<string, any> = {tag, keyId: authId, model: "deepseek-v4-flash", sellerPeerId: gatewaySeller,
     method: "POST", path: "/v1/chat/completions", finishedAt: Date.now(), status: 200,
@@ -25,7 +27,7 @@ export function antseedGatewayFixture() {
       return Response.json({requests: duplicates ? [...rows, ...rows] : rows, nextBefore: null});
     }
     if (headers.get("authorization") !== "Bearer " + gatewayKey) return new Response(null, {status: 401});
-    if (u.pathname === "/v1/models") return Response.json({data: [model]});
+    if (u.pathname === "/v1/models") return Response.json({data: models}, {headers: contract ? {"x-mycellios-cost-contract": contract} : {}});
     if (u.pathname !== "/v1/chat/completions" || init?.method !== "POST") throw new Error("unexpected fixture request");
     nonce = headers.get("x-antseed-end-user")!;
     if (fail) throw new Error("connection lost after submission");
@@ -40,7 +42,7 @@ export function antseedGatewayFixture() {
     {headers: {...responseHeaders, "content-type": "text/event-stream"}});
     return Response.json({id: "chat-fixture", choices: [{index: 0, message: {role: "assistant", content: "Hi"}, finish_reason: "stop"}], usage}, {headers: responseHeaders});
   });
-  return {model, row, transport, pending: (v: boolean) => {pending = v;}, fail: () => {fail = true;},
+  return {model, models, row, transport, contract: (value: string) => {contract = value;}, pending: (v: boolean) => {pending = v;}, fail: () => {fail = true;},
     duplicates: () => {duplicates = true;}, omitGatewayTag: () => {omitTag = true;}, changeKey: () => {authId = "another-key";},
     inference: () => transport.mock.calls.filter(([u, init]) => new URL(String(u)).pathname === "/v1/chat/completions" && init?.method === "POST")};
 }

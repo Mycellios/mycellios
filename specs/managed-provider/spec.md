@@ -416,3 +416,27 @@ Primary protocol references:
 - https://openrouter.ai/docs/guides/overview/multimodal/video-generation
 - https://raw.githubusercontent.com/OpenRouterTeam/docs/main/batch-quickstart.mdx
 - https://openrouter.ai/docs/guides/community/multimodal-decisions
+
+## Generic bounded AntSeed text (token-bounded-v2)
+
+The existing deepseek-bounded-v1 route remains compatible. V2 requires the
+upstream gateway to advertise its enforced contract, a seller-pinned text-only
+request, explicit tool capability, complete token prices and a finite model
+context/output limit. Additional billable units are not qualified by token prices.
+Round each per-million price UP to six decimals, including cached-input maxima;
+quote and gateway reserve the same exact integer-USDC upper bound using UTF-8
+request bytes, 8192 formatting tokens and 64 tokens per message, plus max output.
+The private mycellios_cost_bounds field never reaches the seller.
+
+The gateway narrows existing routing price policies to these bounds before paid
+admission. A protected operator key cannot use a paid non-bounded route. The
+reservation changes neither per-key budgets nor the Mycellios request/daily/
+lifetime funded envelope. Receipts still require the owned key, unique nonce,
+selected seller/service and complete signed usage. An invoice exceeding the
+accepted maximum remains unresolved; missing/uncertain invoices never authorize
+another paid POST or an inferred refund. Recovery for existing V1 jobs remains.
+
+Qualify the immutable overlay against the exact installed gateway module hashes;
+upstream drift fails the patch. Keep previous images, server-side database backups
+and the original key policy for rollback. Gateway readiness is not permission to
+advertise unqualified models or claim them as native distributed inference.

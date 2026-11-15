@@ -48,7 +48,7 @@ try {
   await providers.getByRole("button", { name: "ChatGPT", exact: true }).click();
   await expect(page.getByRole("option", { name: "ChatGPT", exact: true })).toBeVisible();
   await open("?connected=1");
-  await expect(page.getByRole("option", { name: /fixture-credit-model/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Fixture credit model (Mycellios)", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Use my credits", exact: true })).toHaveCount(0);
   await page.screenshot({ path: path.join(output, "connected-light.png") });
   await page.evaluate(() => { document.documentElement.classList.add("dark"); document.documentElement.dataset.theme = "dark"; });

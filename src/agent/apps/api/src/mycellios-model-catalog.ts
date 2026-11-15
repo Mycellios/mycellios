@@ -61,6 +61,8 @@ export async function readMycelliosChatModels(
   for (const item of body.data) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
+    // Tiny browser demos without tool calls cannot execute a Mico's agent turn.
+    if (row.supports_tools === false) continue;
     const externalText=row.processing==="external"&&row.modality==="text"&&typeof row.id==="string"&&row.id.startsWith("mycellios/managed/");
     if(row.processing==="external"&&row.modality!==undefined&&row.modality!=="text")continue;
     if (
@@ -102,5 +104,7 @@ export async function readMycelliosChatModels(
       ...(options.credentialId ? { credentialIds: [options.credentialId] } : {}),
     });
   }
-  return result;
+  // Real distributed chat capacity precedes external capacity; saved defaults do
+  // not reorder the catalog or make an unavailable route look executable.
+  return result.sort((a, b) => Number(a.mycelliosProcessing === "external") - Number(b.mycelliosProcessing === "external") || a.label.localeCompare(b.label));
 }

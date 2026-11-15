@@ -11,7 +11,15 @@ const object = (v: unknown): Record<string, any> => {
   if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("antseed_gateway_response_invalid");
   return v as Record<string, any>;
 };
-interface Offer { public: ManagedModel; seller: string; provider: string; context: number; output: number }
+interface Offer { public: ManagedModel; seller: string; provider: string; context: number; output: number;
+  service?: string; inputCap?: string; outputCap?: string; inputMillion?: string; outputMillion?: string }
+function priceBound(value: unknown) {
+  if (typeof value !== "string") throw new Error("antseed_price_invalid");
+  const micros = (usdAtoms(value) + 999_999_999_999n) / 1_000_000_000_000n;
+  if (micros > 1_000_000_000_000n) throw new Error("antseed_price_invalid");
+  const decimal = (scale: number) => `${micros / 10n ** BigInt(scale)}.${(micros % 10n ** BigInt(scale)).toString().padStart(scale,"0")}`.replace(/\.?0+$/, "");
+  return { million: decimal(6), token: decimal(12) };
+}
 export interface AntseedGatewayQuote {
   offer: Offer; body: Record<string, unknown> & {max_tokens: number}; maximumUsd: string;
   maximumMicrounits: number; fundingCostBasisPoints: number; expiresAt: number; billingContext: unknown;
@@ -35,11 +43,11 @@ export class ManagedAntseedGateway {
   private discovered: ManagedCatalogDiscovery[] = [];
   constructor(private readonly key: string, base: string, private readonly allowed: readonly string[],
     private readonly funding: number | null = null, private readonly transport: typeof fetch = fetch,
-    contract = "") {
+    private readonly contract = "") {
     const url = new URL(base);
     if ((url.protocol !== "https:" && !(url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)))
       || url.username || url.password || url.search || url.hash || !/^antseed_[A-Za-z0-9_-]{24,200}$/.test(key)
-      || !allowed.length || (allowed.includes("*") && allowed.length !== 1) || contract !== "deepseek-bounded-v1")
+      || !allowed.length || (allowed.includes("*") && allowed.length !== 1) || !["deepseek-bounded-v1", "token-bounded-v2"].includes(contract))
       throw new Error("managed_antseed_gateway_configuration_invalid");
     this.base = url.href.replace(/\/+$/, "");
     if (funding !== null) managedCharge("0", funding);
@@ -89,7 +97,11 @@ export class ManagedAntseedGateway {
   async refresh() {
     const signal = AbortSignal.timeout(12_000);
     await this.receipts("mycellios-preflight-" + randomUUID(), signal);
-    const data = await this.json(await this.request("/v1/models", signal, {headers: {authorization: "Bearer " + this.key}}), signal);
+    const response = await this.request("/v1/models", signal, {headers: {authorization: "Bearer " + this.key}});
+    if (this.contract === "token-bounded-v2" && response.headers.get("x-mycellios-cost-contract") !== this.contract) {
+      await response.body?.cancel(); throw new Error("antseed_cost_contract_unavailable");
+    }
+    const data = await this.json(response, signal);
     if (!Array.isArray(data.data) || data.data.length > 10000) throw new Error("antseed_catalog_invalid");
     const hasLiteralDeepseek = data.data.some(v => v?.id === "deepseek-v4-flash");
     const offers = new Map<string, Offer>(), discovered: ManagedCatalogDiscovery[] = [], seen = new Set<string>();
@@ -113,20 +125,29 @@ export class ManagedAntseedGateway {
           available: false, reason: "cost_contract_not_qualified", provider: "Mycellios", processing: "external", pricing: null};
         discovered.push(entry);
         // This deployment enforces these caps ONLY for the exact text DeepSeek route.
-        if (modelId !== "deepseek-v4-flash" || row.type !== "text" || !Array.isArray(row.peers) || row.peers.length > 1000) continue;
+        const generic = this.contract === "token-bounded-v2";
+        if ((!generic && modelId !== "deepseek-v4-flash") || row.type !== "text" || !Array.isArray(row.peers) || row.peers.length > 1000) continue;
         if (this.funding === null) {entry.reason = "funding_cost_not_configured"; continue;}
         const candidates: (Offer & {quality: number})[] = [];
         for (const rawPeer of row.peers) {
           try {
             const p = object(rawPeer), caps = object(p.capabilities);
-            if (typeof p.peerId !== "string" || !/^[a-f0-9]{40}$/.test(p.peerId) || p.serviceId !== "deepseek-v4-flash"
-              || p.provider !== "openai" || p.type !== "text" || p.unitBillingModels !== undefined
+            if (typeof p.peerId !== "string" || !/^[a-f0-9]{40}$/.test(p.peerId)
+              || (generic ? typeof p.serviceId !== "string" || !/^[A-Za-z0-9._:/-]{1,180}$/.test(p.serviceId) : p.serviceId !== "deepseek-v4-flash")
+              || (generic ? typeof p.provider !== "string" || !/^[A-Za-z0-9._-]{1,100}$/.test(p.provider) : p.provider !== "openai") || p.type !== "text" || p.unitBillingModels !== undefined
+              || (generic && (caps.toolUse !== true || p.allowed === false))
               || !Array.isArray(p.protocols) || !p.protocols.includes("openai-chat-completions")
-              || !Array.isArray(caps.inputs) || caps.inputs.length !== 1 || caps.inputs[0] !== "text"
+              || !Array.isArray(caps.inputs) || (generic ? !caps.inputs.includes("text") : caps.inputs.length !== 1 || caps.inputs[0] !== "text")
               || !Array.isArray(caps.outputs) || caps.outputs.length !== 1 || caps.outputs[0] !== "text"
               || !Number.isSafeInteger(caps.contextWindow) || caps.contextWindow < 16384
               || !Number.isSafeInteger(caps.maxOutputTokens) || caps.maxOutputTokens < 1) continue;
-            for (const [value, maximum] of [[p.inputUsdPerMillion, "0.5"], [p.cachedInputUsdPerMillion ?? p.inputUsdPerMillion, "0.5"], [p.outputUsdPerMillion, "1"]]) {
+            let inputCap = INPUT_CAP, outputCap = OUTPUT_CAP;
+            let inputMillion = "0.5", outputMillion = "1";
+            if (generic) {
+              const input = priceBound(p.inputUsdPerMillion), cached = priceBound(p.cachedInputUsdPerMillion ?? p.inputUsdPerMillion), output = priceBound(p.outputUsdPerMillion);
+              const maximum = usdAtoms(input.million) >= usdAtoms(cached.million) ? input : cached;
+              inputCap = maximum.token; outputCap = output.token; inputMillion = maximum.million; outputMillion = output.million;
+            } else for (const [value, maximum] of [[p.inputUsdPerMillion, "0.5"], [p.cachedInputUsdPerMillion ?? p.inputUsdPerMillion, "0.5"], [p.outputUsdPerMillion, "1"]]) {
               if (typeof value !== "string" || usdAtoms(value) > usdAtoms(maximum)) throw new Error("antseed_price_invalid");
             }
             // Rank only already-qualified offers. Effective reputation includes the
@@ -135,9 +156,10 @@ export class ManagedAntseedGateway {
             const score = p.effectiveReputationScore;
             const quality = typeof score === "number" && Number.isFinite(score) && score >= 0 && score <= 100 ? score : 0;
             candidates.push({quality, seller: p.peerId, provider: p.provider, context: caps.contextWindow, output: Math.min(8192, caps.maxOutputTokens),
+              service: p.serviceId, inputCap, outputCap, inputMillion, outputMillion,
               public: {id: publicId, name: entry.name, owned_by: "mycellios", processing: "external", modality: "text",
                 pricing: {currency: "credits", unit: "token", serviceFeeBasisPoints: 400, fundingCostBasisPoints: this.funding,
-                  input: markedUpUnitPrice(INPUT_CAP, this.funding), output: markedUpUnitPrice(OUTPUT_CAP, this.funding), estimate: "maximum"}}});
+                  input: markedUpUnitPrice(inputCap, this.funding), output: markedUpUnitPrice(outputCap, this.funding), estimate: "maximum"}}});
           } catch { /* Unpriced or unsupported offers cannot spend platform funds. */ }
         }
         candidates.sort((a, b) => b.quality - a.quality || a.seller.localeCompare(b.seller));
@@ -173,18 +195,18 @@ export class ManagedAntseedGateway {
     }))) throw new Error("managed_server_tools_not_allowed");
     const output = request.max_tokens ?? Math.min(256, offer.output);
     if (!Number.isSafeInteger(output) || output < 1 || output > offer.output) throw new Error("managed_request_too_large");
-    const body = {...request, model: offer.seller + "@deepseek-v4-flash", store: false, max_tokens: output,
+    const body = {...request, model: offer.seller + "@" + (offer.service ?? "deepseek-v4-flash"), store: false, max_tokens: output,
       ...(request.stream ? {stream_options: {include_usage: true}} : {})};
     const bytes = Buffer.byteLength(JSON.stringify(body)), inputBound = bytes + 8192 + request.messages.length * 64;
     if (bytes > 131072 || inputBound + output > offer.context) throw new Error("managed_request_too_large");
     // The gateway rounds its own upper bound to USDC micro-units. Cover that ceil as well.
-    const rawUsd = tokenCost(INPUT_CAP, OUTPUT_CAP, inputBound, output);
+    const rawUsd = tokenCost(offer.inputCap ?? INPUT_CAP, offer.outputCap ?? OUTPUT_CAP, inputBound, output);
     const micro = managedCharge(rawUsd, 0).upstreamMicrounits;
     const maximumUsd = tokenCost("0.000001", "0", micro, 0);
-    return {offer, body, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, this.funding).totalMicrounits,
+    return {offer, body: this.contract === "token-bounded-v2" ? {...body, mycellios_cost_bounds: {version: 2, input: offer.inputMillion!, output: offer.outputMillion!}} : body, maximumUsd, maximumMicrounits: managedCharge(maximumUsd, this.funding).totalMicrounits,
       fundingCostBasisPoints: this.funding, expiresAt: this.refreshedAt + TTL,
-      billingContext: {contract: "deepseek-bounded-v1", seller: offer.seller, provider: offer.provider,
-        input: INPUT_CAP, output: OUTPUT_CAP, keyId: this.session?.keyId}};
+      billingContext: {contract: this.contract, seller: offer.seller, provider: offer.provider,
+        input: offer.inputCap ?? INPUT_CAP, output: offer.outputCap ?? OUTPUT_CAP, keyId: this.session?.keyId}};
   }
   async execute(q: AntseedGatewayQuote, chunk?: (v: Record<string, unknown>) => void, submitted?: (job: unknown) => Promise<void>): Promise<ManagedTextResult> {
     if (!submitted || q.expiresAt <= Date.now()) throw new Error("managed_quote_expired");
@@ -230,13 +252,15 @@ export class ManagedAntseedGateway {
     const row = object(matches[0]);
     if (row.keyId !== job.keyId || typeof row.tag !== "string" || !/^gw_[a-f0-9-]{36}$/.test(row.tag)
       || (job.tag !== undefined && row.tag !== job.tag) || row.sellerPeerId !== job.offer.seller
-      || row.model !== "deepseek-v4-flash" || row.method !== "POST" || row.path !== "/v1/chat/completions") throw new Error("antseed_receipt_mismatch");
+      || row.model !== (job.offer.service ?? "deepseek-v4-flash") || row.method !== "POST" || row.path !== "/v1/chat/completions") throw new Error("antseed_receipt_mismatch");
     if (row.costPending || !row.finishedAt || row.status !== 200 || row.spent === null) return null;
     const prompt = job.response.usage.prompt_tokens, output = job.response.usage.completion_tokens;
     const counts = [row.inputTokens, row.cachedInputTokens, row.outputTokens];
     if (!counts.every(n => Number.isSafeInteger(n) && n >= 0) || row.inputTokens + row.cachedInputTokens !== prompt || row.outputTokens !== output) return null;
     if (typeof row.spent !== "string") throw new Error("antseed_receipt_invalid");
     const cost = usdAtoms(row.spent);
+    // Return the authoritative invoice even for an overcharge. ManagedPurchases
+    // must persist its safety stop and retain the hold, not lose that evidence.
     if (cost === 0n && row.servedFree !== true) return null;
     // The gateway's costPending flag alone is insufficient: require the complete signed token coverage above.
     return {response: job.response, receiptId: "antseed-gateway:" + job.keyId + ":" + row.tag,
