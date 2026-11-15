@@ -121,6 +121,9 @@ These rules apply to the complete repository.
   The workflow does not deploy, install dependencies on the live server, apply
   migrations or run paid inference. Promotion still requires the integrated source tree, live
   runtime provenance, compatible dependencies, rollback and health checks.
+  `node scripts/verify-built-landing.mjs` checks the compiled landing and download
+  picker in isolated Chromium at desktop/mobile sizes, with external traffic blocked.
+  Keep this browser startup gate: source-level rendering misses split-chunk cycles.
 
 - Reusable web controls live in `landing/src/ui`. Use the production kit in every
   surface and import the same components in Storybook; do not add parallel demo

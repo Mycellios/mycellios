@@ -5,11 +5,11 @@ import { Button, Link, Text } from "../ui/primitives";
 import "./agent-download-action.css";
 
 export const downloadPlatforms = [
-  { id: "windows-x64", label: "Windows", detail: "Windows 10 / 11 · x64", Icon: Monitor },
-  { id: "macos-arm64", label: "Mac · Apple Silicon", detail: "M1 or later", Icon: Apple },
-  { id: "macos-x64", label: "Mac · Intel", detail: "Intel processor", Icon: Apple },
-  { id: "linux-x64", label: "Linux", detail: "Ubuntu / Debian · DEB", Icon: Terminal },
-  { id: "fedora-x64", label: "Fedora", detail: "Linux · RPM", Icon: Terminal },
+  { id: "windows-x64", label: "Windows", detail: "Windows 10 / 11 · x64" },
+  { id: "macos-arm64", label: "Mac · Apple Silicon", detail: "M1 or later" },
+  { id: "macos-x64", label: "Mac · Intel", detail: "Intel processor" },
+  { id: "linux-x64", label: "Linux", detail: "Ubuntu / Debian · DEB" },
+  { id: "fedora-x64", label: "Fedora", detail: "Linux · RPM" },
 ] as const;
 
 export function suggestedDownload(platform: string) {
@@ -52,7 +52,9 @@ export function AgentDownloadAction() {
     </div>
     {open && <div className="agent-download-menu" id="agent-download-platforms" aria-label="Download Mycellios">
       <Text className="agent-download-menu-title">Get Mycellios</Text>
-      {downloadPlatforms.map(({ id, label, detail, Icon }) => {
+      {downloadPlatforms.map(({ id, label, detail }) => {
+        // Avoid capturing an uninitialised icon from a shared chunk at module load.
+        const Icon = id === "windows-x64" ? Monitor : id.startsWith("macos-") ? Apple : Terminal;
         const pkg = id === "fedora-x64" ? catalog?.fedora : catalog?.packages.find(item => item.id === id);
         return pkg ? <Link key={id} href={pkg.path} download={pkg.fileName} onClick={() => setOpen(false)}><Icon size={18} aria-hidden="true" /><span>{label}<small>{detail}</small></span><ArrowDownToLine size={15} aria-hidden="true" /></Link> : null;
       })}
