@@ -73,6 +73,9 @@ import { useModelOAuthSignIn } from "../lib/use-model-oauth-signin";
 import { errorText } from "../lib/user-error";
 import { CompatibleKeyField } from "./model-settings/compatible-key-field";
 import { OnboardingImport } from "./onboarding-import";
+import { createOnboardingTeam, type OnboardingTeamMember } from "./onboarding/create-onboarding-team";
+import { TeamBuilder } from "./onboarding/TeamBuilder";
+import { TeamCreditsError } from "./onboarding/team-catalog";
 import { InstalledAgentOnboarding } from "./shell/agent-engine-settings";
 
 const CUSTOM_MODEL_OPTION = "__rakazo_custom_model__";
@@ -167,6 +170,9 @@ export function OnboardingPage() {
   const [preflightFailure, setPreflightFailure] = useState<ModelPreflightFailure | null>(null);
   const preflightRevisionRef = useRef(0);
   const [codeCopied, copyOAuthCode] = useCopyText();
+  const [providerSetup, setProviderSetup] = useState(false);
+  const pendingTeamRef = useRef<OnboardingTeamMember[] | null>(null);
+  const finishAfterModelRef = useRef<() => Promise<void>>(async () => undefined);
 
   const {
     oauth,
@@ -181,7 +187,7 @@ export function OnboardingPage() {
     onClearError: () => setError(null),
     onError: setError,
     onFinished: async () => {
-      goTo("bot");
+      await finishAfterModelRef.current();
     },
   });
 
@@ -216,6 +222,43 @@ export function OnboardingPage() {
     const imported = importedBotRef.current;
     navigate(next === "bot" ? (imported ? `/app/${imported.id}` : "/app") : `/onboarding/${next}`, { replace: true });
   }
+
+  async function finishTeam(members: OnboardingTeamMember[]) {
+    const first = await createOnboardingTeam(members, {
+      list: () => rpc.bots.list(),
+      create: (input) => rpc.bots.create(input),
+      lock: withFirstBotLock,
+    });
+    pendingTeamRef.current = null;
+    navigate(`/app/${first.id}`, { replace: true });
+  }
+
+  async function createTeam(members: OnboardingTeamMember[]) {
+    pendingTeamRef.current = members;
+    const me = await rpc.me().catch(() => null);
+    if (me?.needsModel !== false) {
+      try {
+        await rpc.models.connectMycellios();
+      } catch {
+        throw new TeamCreditsError();
+      }
+    }
+    await finishTeam(members);
+  }
+
+  async function finishAfterModel() {
+    const pending = pendingTeamRef.current;
+    if (!pending?.length) {
+      goTo("bot");
+      return;
+    }
+    try {
+      await finishTeam(pending);
+    } catch (err) {
+      setError(errorText(err, t`Could not create the team. Try again.`));
+    }
+  }
+  finishAfterModelRef.current = finishAfterModel;
 
   const providers = useMemo(() => {
     const seen = new Map<string, ModelCatalogEntry>();
@@ -532,7 +575,7 @@ export function OnboardingPage() {
           label: selected?.providerName ?? provider,
         });
       }
-      goTo("bot");
+      await finishAfterModel();
     } catch (err) {
       setError(errorText(err, t`Could not save model`));
     } finally {
@@ -647,8 +690,20 @@ export function OnboardingPage() {
             </p>
           </div>
         ) : null}
-        {step === "model" ? (
+        {step === "model" && !providerSetup ? (
+          <TeamBuilder
+            onCreate={createTeam}
+            onUseProvider={(members) => {
+              pendingTeamRef.current = members;
+              setProviderSetup(true);
+            }}
+          />
+        ) : null}
+        {step === "model" && providerSetup ? (
           <div>
+            <Button variant="ghost" className="mb-4 px-0" onClick={() => setProviderSetup(false)}>
+              {t`Back to your team`}
+            </Button>
             <h1 className="text-[32px] font-medium text-foreground">
               <Trans>Set up your assistant</Trans>
             </h1>
@@ -782,7 +837,7 @@ export function OnboardingPage() {
                     setError(null);
                     try {
                       await rpc.models.connectMycellios();
-                      goTo("bot");
+                      await finishAfterModel();
                     } catch {
                       setError(
                         t`Could not connect your Mycellios credits. Try again later. No credits were spent.`,

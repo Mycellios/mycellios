@@ -402,6 +402,8 @@ export const CreateBotInput = z.object({
   }).optional(),
   /** Idempotency key within a space (unique with spaceId). */
   spawnKey: z.string().trim().min(1).max(120).optional(),
+  /** Team members besides the lead skip the automatic greeting so first-run credits stay available. */
+  skipIntro: z.boolean().optional(),
 });
 export type CreateBotInput = z.infer<typeof CreateBotInput>;
 
