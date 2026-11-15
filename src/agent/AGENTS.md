@@ -38,6 +38,15 @@
 
 # AGENTS.md
 
+- Mycellios Dev launches from the current main chat's tools in Developer mode.
+  `npm run dev:desktop` owns a separate per-source profile, embedded database,
+  dynamic loopback ports and local throwaway account. Never restore the retired
+  real-account renderer proxy or copy normal cookies/provider credentials. Keep
+  native account/Space/current-chat/computer admission, preserved source copies,
+  dependency fingerprints and authenticated process ownership. Renderer edits use
+  Vite HMR; backend/native edits require reopening Dev. Verify desktop-dev-state,
+  project-local-env, development-launcher, preload and OpenMycelliosDev tests.
+
 - `/demo/<event>` is a bounded public guest surface, outside the normal SessionApp
   gate. Keep its coordinator cookie scoped to `/mobile/v1/demo/<event>`; the Dev
   proxy forwards only this cookie and strips all Agent cookies. It never creates

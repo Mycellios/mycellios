@@ -151,6 +151,7 @@ export interface RakazoDesktop {
   };
   development?: {
     isDevelopment?: boolean;
+    identity?: {branch:string;hue:number};
     open?: (botId?: string) => Promise<{ opened: boolean; error?: string }>;
     state?: () => Promise<{ active: boolean }>;
     connect?: (botId: string) => Promise<void>;

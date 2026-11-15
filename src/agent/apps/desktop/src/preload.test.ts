@@ -76,10 +76,12 @@ describe("desktop preload bridge", () => {
     expect(send).toHaveBeenCalledWith("desktop.update.prepared", { nonce: "a".repeat(32), ready: true });
     unsubscribe(); expect(off).toHaveBeenCalledWith("desktop.update.prepare", handler);
   });
-  it("exposes a bounded preview bridge without the Mycellios development launcher", async () => {
+  it("keeps preview bounded alongside the isolated development launcher", async () => {
     const { invoke, on, off, exposeInMainWorld } = runPreload("preload.cjs");
     const bridge = exposeInMainWorld.mock.calls[0]![1] as RakazoDesktop;
-    expect(bridge.development).toBeUndefined();
+    expect(bridge.development?.isDevelopment).toBe(false);
+    expect(bridge.development?.connect).toBeUndefined();
+    expect(bridge.development?.state).toBeUndefined();
     const request = { id: "page", url: "http://localhost:3000", bounds: {x:600,y:100,width:500,height:500} };
     await bridge.preview!.show(request);
     await bridge.preview!.layout({ id: "page", bounds: null });
@@ -107,6 +109,7 @@ describe("desktop preload bridge", () => {
       "badge",
       "companions",
       "computer",
+      "development",
       "localScripts",
       "localVoice",
       "nativeWindowFrame",

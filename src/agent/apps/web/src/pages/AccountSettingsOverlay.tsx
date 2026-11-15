@@ -469,7 +469,7 @@ export function GeneralSettingsPanels({
                 <Trans>Developer mode</Trans>
               </Label>
             }
-            help={{ label: t`Developer mode`, description: t`Shows technical execution logs on this browser. It does not change permissions or enable extra tools.` }}
+            help={{ label: t`Developer mode`, description: t`Shows technical execution logs and the Mycellios Dev launcher on Desktop. Local computer access still requires your permission.` }}
             control={
               <Switch
                 id={developerModeId}
@@ -479,7 +479,7 @@ export function GeneralSettingsPanels({
             }
           >
             <p className="text-xs text-muted-foreground">
-              <Trans>Show execution logs on this browser.</Trans>
+              <Trans>Show execution logs. On Desktop, open Mycellios Dev from the chat tools to edit an isolated copy with live changes.</Trans>
             </p>
           </SettingsRow>
           <SettingsRow

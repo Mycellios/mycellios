@@ -20,8 +20,24 @@ if (mode === 'web') {
 const require = createRequire(import.meta.url);
 const args = mode === 'backend'
   ? ['--import', 'tsx', fileURLToPath(new URL('./project-local-backend.ts', import.meta.url))]
-  : [path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js'), '--host', '127.0.0.1', '--port', '5192', '--strictPort'];
-const child = spawn(process.execPath, args, {cwd: mode === 'web' ? path.join(projectRoot,'apps/web') : projectRoot, env, windowsHide:true,stdio:['ignore','inherit','inherit']});
-for (const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>child.kill(signal));
+  : [path.join(path.dirname(require.resolve('vite/package.json')), 'bin/vite.js'), '--host', '127.0.0.1', '--port', env.WEB_PORT, '--strictPort'];
+const child = spawn(process.execPath, args, {cwd: mode === 'web' ? path.join(projectRoot,'apps/web') : projectRoot, env, windowsHide:true,stdio:env.MYCELLIOS_DEV_STACK&&mode==='backend'?['ignore','inherit','inherit','ipc']:['ignore','inherit','inherit']});
+let stopping=false;
+function stop() {
+  if(stopping)return;stopping=true;
+  if(child.connected)child.send({type:'mycellios-dev-stop'},()=>{});else child.kill('SIGTERM');
+  if(env.MYCELLIOS_DEV_STACK)setTimeout(()=>{
+    if(child.exitCode!==null||child.signalCode!==null)return;
+    if(process.platform==='win32')spawn('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
+    else child.kill('SIGKILL');
+  },4000).unref();
+}
+if(env.MYCELLIOS_DEV_STACK) {
+  const parent=process.ppid;
+  setInterval(()=>{try{process.kill(parent,0);}catch(error){if(error.code==='ESRCH')stop();}},2000).unref();
+  process.on('message',message=>{if(message?.type==='mycellios-dev-stop')stop();});
+  if(process.connected)process.once('disconnect',stop);
+}
+for (const signal of ['SIGINT','SIGTERM']) process.on(signal,stop);
 child.once('error',()=>{process.stderr.write('Local service could not launch\n');process.exit(1);});
 child.once('exit',(code)=>process.exit(code ?? 1));

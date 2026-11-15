@@ -240,6 +240,8 @@ import { WorkspaceRail } from "./shell/workspace-rail";
 import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
 import { ChatHeaderTools, ChatToolsPanel, MobileChatActions } from "./shell/chat-tools-panel";
+import {OpenMycelliosDev} from "../components/OpenMycelliosDev";
+import {DevelopmentIdentity} from "../components/DevelopmentIdentity";
 import { VoiceConversation } from "../components/call/VoiceConversation";
 import { ProviderQuota } from "../components/ProviderQuota";
 import { HelpMenu } from "../components/HelpMenu";
@@ -3881,6 +3883,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const renderToolsExtras = (dismiss: () => void) => {
           const closeTools = () => { dismiss(); };
           return <>
+            {active && !inGroup && !taskScope && !activeProject ? <OpenMycelliosDev key={`dev:${userId}:${shellSpaceId}:${active.id}`} botId={active.id} /> : null}
             {isMobileSidebar ? renderTaskTabs(closeTools) : null}
             {active && !inGroup && !activeProject ? <LocalProject key={JSON.stringify([userId, shellSpaceId, active.id])} botId={active.id} rpc={rpc} inMenu
               onTask={threadId => { closeTools(); projectCollection.refresh(); navigate({ pathname: `/app/${encodeURIComponent(active.id)}`, search: `task=${encodeURIComponent(threadId)}` }); }} /> : null}
@@ -4358,6 +4361,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
               </span>
             </Button>}
             {!isMobileSidebar ? renderTaskTabs() : null}
+            <DevelopmentIdentity />
             <div className="app-no-drag ms-auto flex shrink-0 items-center gap-1">
               {renderHeaderActions()}
             </div>

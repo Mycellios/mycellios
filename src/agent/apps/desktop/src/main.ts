@@ -98,6 +98,8 @@ import { nativePreviewContext, nativeProjectSpace } from "./project-session.js";
 import { installProjectConversations } from "./project-conversations-ipc.js";
 import { assertProjectGrant, attachedRepositoryId } from "./project-grant.js";
 import { isGitProjectRoot } from "./project-workspaces.js";
+import {DevelopmentLauncher, developmentChat} from "./development-launcher.js";
+import {developmentSourceCandidates} from "./development-environment.js";
 import {
   browserWindowOptions,
   developmentIconFile,
@@ -109,13 +111,15 @@ process.setSourceMapsEnabled(true);
 installDesktopEarlyErrorReporting();
 
 const PERFORMANCE_USER_DATA = process.env.RAKAZO_PERFORMANCE_USER_DATA;
+const ISOLATED_DEV = Boolean(PERFORMANCE_USER_DATA && process.env.MYCELLIOS_DEV_STACK);
+if(ISOLATED_DEV)app.setName("Mycellios Dev");
 // An isolated development profile must be recognisable at a glance, so a dev
 // window can never be mistaken for the production app.
 if (PERFORMANCE_USER_DATA) {
   app.on("browser-window-created", (_event, window) => {
     window.on("page-title-updated", (titleEvent, title) => {
       titleEvent.preventDefault();
-      window.setTitle(`${title} · dev`);
+      window.setTitle(ISOLATED_DEV ? `Mycellios Dev · ${process.env.MYCELLIOS_DEV_BRANCH ?? "local"}` : `${title} · dev`);
     });
   });
 }
@@ -450,6 +454,7 @@ function createWindow(url: string, partition: string | null) {
       contextIsolation: true,
       sandbox: true,
       ...(partition === null ? {} : { partition }),
+      ...(ISOLATED_DEV ? {additionalArguments:[`--mycellios-development=${encodeURIComponent(JSON.stringify({branch:(process.env.MYCELLIOS_DEV_BRANCH??"local").slice(0,100),hue:Number(process.env.MYCELLIOS_DEV_HUE) || 0}))}`]} : {}),
     },
   });
   win.on("unresponsive", () =>
@@ -506,12 +511,13 @@ function createWindow(url: string, partition: string | null) {
     popup.webContents.on("will-navigate", (details) => capture(details));
   });
   win.on("close", (event) => {
-    if (!quitting && (keepRunningInBackground || (floatingChats?.liveWindows().length ?? 0) > 0)) {
+    if (!ISOLATED_DEV && !quitting && (keepRunningInBackground || (floatingChats?.liveWindows().length ?? 0) > 0)) {
       event.preventDefault(); win.hide(); return;
     }
     desktopCompanions?.clear();
     if (
       process.platform === "darwin" &&
+      !ISOLATED_DEV &&
       !quitting &&
       process.env.RAKAZO_DISABLE_WARM_WINDOW !== "1"
     ) {
@@ -1133,6 +1139,18 @@ async function openAppOnce(targetUrl: string, switching: boolean) {
     hostComputer?.activate(currentSetup?.mode === "new" && targetUrl === localStack.webUrl());
   }
   const target = await resolveSessionForTarget(targetUrl);
+  // The launcher owns a separate profile and a local throwaway identity. Never
+  // use this path for a remote server or copy the normal application's cookies.
+  if(process.env.MYCELLIOS_DEV_ACCOUNT && PERFORMANCE_USER_DATA && process.env.MYCELLIOS_DEV_STACK) {
+    const local=new URL(targetUrl);
+    if(local.hostname!=="127.0.0.1" || local.protocol!=="http:")throw Error("Dev requires its isolated loopback server.");
+    const account=JSON.parse(await readFile(process.env.MYCELLIOS_DEV_ACCOUNT,"utf8"));
+    const response=await target.value.fetch(`${local.origin}/api/auth/sign-in/email`,{
+      method:"POST",credentials:"include",redirect:"error",headers:{"content-type":"application/json",origin:local.origin},
+      body:JSON.stringify(account),signal:AbortSignal.timeout(10000),
+    });
+    if(!response.ok)throw Error("The isolated development account could not sign in.");
+  }
   target.value.webRequest.onHeadersReceived((details, callback) => {
     const headers = { ...details.responseHeaders };
     for (const name of Object.keys(headers)) if (name.toLowerCase() === "content-security-policy")
@@ -1307,6 +1325,13 @@ function safeOrigin(targetUrl: string) {
 // A second launch on Linux/Windows would rerun host-computer setup, overwrite
 // the saved token and restart the local stack under the running instance.
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if(ISOLATED_DEV)process.on("message",(message)=>{
+  if(message && typeof message==="object" && "type" in message && message.type==="mycellios-dev-stop")app.quit();
+  if(message && typeof message==="object" && "type" in message && message.type==="mycellios-dev-focus") {
+    const window=secondInstanceWindow(setupWindow,mainWindow);if(window)revealSecondInstanceWindow(window);
+  }
+});
+if(ISOLATED_DEV && process.connected)process.once("disconnect",()=>app.quit());
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
@@ -1935,6 +1960,42 @@ app.whenReady().then(async () => {
       throw new Error("The application session changed.");
     return JSON.stringify([base, owner, bot.spaceId]);
   }
+  const developmentLauncher=new DevelopmentLauncher({
+    directory:path.join(userDataDir,"development"),
+    node:path.join(app.getAppPath(),"dist",process.platform==="win32"?"voice-node.exe":"voice-node"),
+    npmCandidates:[path.join(process.resourcesPath,"development-tools/npm"),path.join(process.resourcesPath,"development-tools/npm.asar"),
+      ...(process.env.npm_execpath?[path.resolve(process.env.npm_execpath,"../..")]:[]),path.join(path.dirname(process.execPath),"node_modules/npm")],
+    seeds:()=>developmentSourceCandidates(app.getAppPath(),process.resourcesPath,userDataDir),
+    context:async(event,botId)=>{
+      if(!mainWindow || event.sender!==mainWindow.webContents || event.senderFrame!==event.sender.mainFrame)
+        throw Error("Open Dev from the main app window.");
+      const window=mainWindow,url=window.webContents.getURL();
+      developmentChat(url,botId);
+      const scope=await micoFolderScope(event,botId);
+      const [owner]=await nativePreviewContext(window);
+      const enabled=await window.webContents.executeJavaScript(`localStorage.getItem(${JSON.stringify(`mycellios.developerMode:${owner}`)}) === "on"`);
+      if(!enabled)throw Error("Enable Developer mode in settings first.");
+      const lease=async()=>{
+        if(mainWindow!==window || window.isDestroyed() ||
+          await micoFolderScope(event,botId)!==scope)throw Error("The development chat changed. Open Dev again from this chat.");
+      };
+      const validate=async()=>{await lease();if(window.webContents.getURL()!==url)throw Error("Open Dev from the original chat again.");};
+      return {key:JSON.stringify([scope,botId]),validate,bind:async(root,validateSource)=>{
+        await validate();
+        const existing=hostComputer!.project(botId);
+        if(existing && existing.path!==root)throw Error("This Mico already has a project. Use a Mico without an attached project for Mycellios Dev.");
+        if(isCloudComputerRequest(event))await connectLocalComputer(botId);
+        await validate();
+        const release=hostComputer!.lockProject(botId);
+        try {
+          const folder=await hostComputer!.selectProject(botId,root,{defaultFiles:true,validate:async()=>{await lease();await validateSource();}});
+          attachedFolders.set(botId,{scope,folder});
+        } finally {release();}
+      }};
+    },
+  });
+  ipcMain.handle("desktop.development.open",(event,botId:unknown)=>developmentLauncher.open(event,botId));
+  app.once("before-quit",()=>developmentLauncher.dispose());
   ipcMain.handle("desktop.computer.project", async (event, botId: unknown) => {
     if ((!isManagedComputerRequest(event) && !isCloudComputerRequest(event)) || !hostComputer?.isEnabled() ||
       typeof botId !== "string" || !/^[a-zA-Z0-9_-]{1,256}$/.test(botId))
@@ -2284,6 +2345,7 @@ app.whenReady().then(async () => {
     }
   }
   void accountComputer?.refresh();
+  if(ISOLATED_DEV && mainWindow && !mainWindow.isDestroyed())process.send?.({type:"mycellios-dev-window-ready"});
   if(process.argv.includes("--background")){mainWindow?.hide();setupWindow?.hide();}
 });
 
@@ -2294,8 +2356,8 @@ app.on("window-all-closed", () => {
   if (liveProbeWindows > 0) return;
   // Only an already authorized, live remote transport may outlive its window.
   // Explicit Quit still runs the normal shutdown and stops every transport.
-  if (appBehavior?.state().keepRemoteSessions && accountComputer?.hasConsent() && accountComputer.online()) return;
-  if (process.platform !== "darwin") app.quit();
+  if (!ISOLATED_DEV && appBehavior?.state().keepRemoteSessions && accountComputer?.hasConsent() && accountComputer.online()) return;
+  if (ISOLATED_DEV || process.platform !== "darwin") app.quit();
   else accountComputer?.stop();
 });
 

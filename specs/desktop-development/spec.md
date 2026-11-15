@@ -1,5 +1,8 @@
 # Managed local development environment
 
+The new isolated launcher is specified in [Isolated Mycellios Dev](isolated-dev.md).
+The real-account renderer proxy described below remains retired.
+
 Superseded by [Project browser beside the chat](../project-browser/spec.md).
 The active application no longer exposes the development settings action,
 File menu launcher or Ctrl+Shift+D, and ordinary execution no longer admits a

@@ -6580,6 +6580,21 @@ msgstr "Asignaciones del ejecutor"
 msgid "Developer mode"
 msgstr "Modo desarrollador"
 
+msgid "Open Mycellios Dev"
+msgstr "Abrir Mycellios Dev"
+
+msgid "Preparing Mycellios Dev…"
+msgstr "Preparando Mycellios Dev…"
+
+msgid "Could not open Mycellios Dev. Try again."
+msgstr "No se pudo abrir Mycellios Dev. Inténtalo de nuevo."
+
+msgid "Shows technical execution logs and the Mycellios Dev launcher on Desktop. Local computer access still requires your permission."
+msgstr "Muestra registros técnicos y el acceso a Mycellios Dev en escritorio. El acceso al ordenador sigue requiriendo tu permiso."
+
+msgid "Show execution logs. On Desktop, open Mycellios Dev from the chat tools to edit an isolated copy with live changes."
+msgstr "Muestra los registros de ejecución. En escritorio, abre Mycellios Dev desde las herramientas del chat para editar una copia separada y ver los cambios en vivo."
+
 msgid "Show execution logs on this browser."
 msgstr "Mostrar los registros de ejecución en este navegador."
 

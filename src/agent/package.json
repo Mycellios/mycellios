@@ -9,6 +9,8 @@
     "node": "^22.22.2 || ^24.0.0 || >=26.0.0"
   },
   "scripts": {
+    "dev:desktop": "node scripts/desktop-dev.mjs",
+    "dev:desktop:verify": "node scripts/verify-desktop-dev.mjs",
     "apps:validate": "tsx scripts/apps/validate.ts",
     "dev": "node scripts/dev.mjs",
     "dev:local:backend": "node scripts/project-local.mjs backend",
