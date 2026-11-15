@@ -17,7 +17,7 @@ function command(name: string, args: string[], cwd?: string) {
   return result.stdout;
 }
 
-async function fixture(version = "0.3.9") {
+async function fixture(version = "0.3.9", optional = false) {
   const root = await mkdtemp(join(tmpdir(), "mycellios-fedora-")); temporary.push(root);
   const control = join(root, "control"); const data = join(root, "data");
   await mkdir(control);
@@ -35,6 +35,15 @@ async function fixture(version = "0.3.9") {
     schema: "mycellios-desktop-runtime/1", file: "mycellios-runtime.deb",
     sha256: createHash("sha256").update(runtimeContents).digest("hex"),
   });
+  if (optional) {
+    delete files["opt/Mycellios Desktop/resources/contribution/mycellios-runtime.deb"];
+    const sha256 = createHash("sha256").update(runtimeContents).digest("hex");
+    files["opt/Mycellios Desktop/resources/contribution/runtime.json"] = JSON.stringify({
+      schema: "mycellios-desktop-runtime/2", file: "mycellios-runtime.deb", sha256,
+      bytes: Buffer.byteLength(runtimeContents),
+      url: `https://github.com/Mycellios/mycellios/releases/download/desktop-runtime-${sha256}/mycellios-runtime.deb`,
+    });
+  }
   for (const [path, contents] of Object.entries(files)) {
     await mkdir(dirname(join(data, path)), { recursive: true }); await writeFile(join(data, path), contents);
   }
@@ -68,6 +77,17 @@ describe.skipIf(!packagingAvailable)("Fedora Desktop packaging", () => {
     const input = await fixture("0.3.8");
     await expect(buildDesktopRpm(input)).rejects.toThrow("control_mismatch:Version");
   });
+
+  it("produces an RPM retaining the pinned optional descriptor without bundling the DEB", async () => {
+    const input = await fixture("0.3.9", true);
+    const result = await buildDesktopRpm(input);
+    const files = command("rpm", ["-qpl", result.rpm]);
+    expect(files).toContain("/contribution/runtime.json");
+    expect(files).not.toContain("/contribution/mycellios-runtime.deb");
+    expect(result.provenance).toMatchObject({ runtimeDelivery: "optional-component" });
+    expect(result.provenance.runtimeUrl).toContain(`/desktop-runtime-${result.provenance.runtimeSha256}/`);
+    expect(command("rpm", ["-qp", "--scripts", result.rpm])).not.toMatch(/systemctl.*(?:start|enable)/);
+  }, 30_000);
 
   it("produces an RPM retaining application/runtime bytes, native dependencies and the enrollment helper", async () => {
     const input = await fixture();

@@ -1,3 +1,4 @@
+import {validateRuntimeComponent} from "./publish-runtime-components.mjs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { closeSync, createReadStream, createWriteStream, openSync } from "node:fs";
@@ -6,7 +7,6 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { adaptDesktopLinux } from "./adapt-desktop-linux.mjs";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const FEDORA_REQUIRES = Object.freeze([
@@ -113,6 +113,23 @@ export function renderRpmSpec({ version, root, fileList, rpmRelease = 1 }) {
   ].join("\n");
 }
 
+/** Validate both legacy bundled bytes and the pinned optional component contract. */
+export async function verifyRpmRuntime(resources) {
+  const runtime = JSON.parse(await readFile(join(resources, "contribution/runtime.json"), "utf8"));
+  if (runtime?.schema === "mycellios-desktop-runtime/2") {
+    validateRuntimeComponent(runtime, "deb");
+    try {
+      await lstat(join(resources, "contribution", runtime.file));
+      throw new Error("desktop_rpm_unexpected_bundled_component");
+    } catch (error) { if (error.code !== "ENOENT") throw error; }
+  } else {
+    if (runtime?.schema !== "mycellios-desktop-runtime/1" || runtime.file !== "mycellios-runtime.deb")
+      throw new Error("desktop_rpm_runtime_manifest_mismatch");
+    await verifyPinnedFile(join(resources, "contribution", runtime.file), runtime.sha256);
+  }
+  return runtime;
+}
+
 export async function buildDesktopRpm({ release, deb, source, outputDirectory, installer }) {
   validateRelease(release);
   if (process.platform !== "linux" || process.arch !== "x64") throw new Error("desktop_rpm_requires_linux_x64");
@@ -135,15 +152,12 @@ export async function buildDesktopRpm({ release, deb, source, outputDirectory, i
   run("tar", ["-xzf", data, "-C", root, "--no-same-owner"]);
   await rm(data);
   const resources = join(root, productPath, "resources");
-  const runtime = JSON.parse(await readFile(join(resources, "contribution/runtime.json"), "utf8"));
-  if (runtime.schema !== "mycellios-desktop-runtime/1" || runtime.file !== "mycellios-runtime.deb") {
-    throw new Error("desktop_rpm_runtime_manifest_mismatch");
-  }
-  await verifyPinnedFile(join(resources, "contribution", runtime.file), runtime.sha256);
+  const runtime = await verifyRpmRuntime(resources);
   const applicationSha256 = await sha256(join(resources, "app.asar"));
   const rpmRelease = release.rpmRelease ?? 1;
   let applicationAdaptation;
   if (rpmRelease === 2) {
+    const { adaptDesktopLinux } = await import("./adapt-desktop-linux.mjs");
     const patched = join(work, "fedora-app.asar");
     applicationAdaptation = await adaptDesktopLinux(join(resources, "app.asar"), patched);
     await copyFile(patched, join(resources, "app.asar"));
@@ -169,7 +183,9 @@ export async function buildDesktopRpm({ release, deb, source, outputDirectory, i
     baseline: release.baseline, desktop: release.desktop, source: release.source,
     applicationSha256: await sha256(join(resources, "app.asar")), originalApplicationSha256: applicationSha256,
     ...(applicationAdaptation ? { applicationAdaptation, adapterSha256: await sha256(join(repository, "scripts/adapt-desktop-linux.mjs")) } : {}),
-    runtimeSha256: runtime.sha256, installerSha256: await sha256(installer),
+    runtimeSha256: runtime.sha256,
+    ...(runtime.schema === "mycellios-desktop-runtime/2" ? {runtimeDelivery: "optional-component", runtimeUrl: runtime.url, runtimeBytes: runtime.bytes} : {}),
+    installerSha256: await sha256(installer),
     adaptation: rpmRelease === 2
       ? "Fedora native window controls and indexed icons; all other application files and runtime bytes retained"
       : "Fedora RPM integration and hash-verified runtime extraction without dpkg; application and runtime bytes retained",

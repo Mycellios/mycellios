@@ -103,7 +103,9 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y rpm zstd
+          sudo apt-get install -y rpm rpm2cpio cpio zstd
+          node --test scripts/desktop-rpm-runtime.test.mjs
+          npm exec -- vitest run tests/desktop-rpm.test.ts --maxWorkers=2
           out="$RUNNER_TEMP/desktop-release"
           version="$(node -p 'require("./src/agent/apps/desktop/package.json").version')"
           source="$out/Mycellios-Desktop-$version-source-${RELEASE_REVISION:0:8}.tar.gz"
