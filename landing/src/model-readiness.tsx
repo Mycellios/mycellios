@@ -62,4 +62,3 @@ export function friendlyActivationFailure(message: string): string {
   }
   return message.includes("launch_process_exited:") ? "A model stage stopped during activation. Open capacity and diagnostics for the reported cause." : message.replace(/^Automatic activation failed:\s*/i, "") || "The model runtime stopped before activation completed.";
 }
-
