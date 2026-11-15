@@ -43,3 +43,29 @@ the previous service/config and all installer/certificate identities for rollbac
 Reference flow inspected: https://github.com/nightly-labs/openbot/blob/main/.github/workflows/release.yml
 uses native platform jobs, validation before publication and a serialized release
 queue. Mycellios retains its current unsigned-preview installation policy.
+
+
+## Direct delivery and optional contribution components
+
+Desktop discovers the integrated installer-release/1 receipt directly on the owned
+GitHub release for every supported package kind. It verifies one source identity,
+all five unique platform entries, the requested native receipt and the actual
+release asset digest/size before offering a download. Website mirroring and
+Android signing retain their existing checks but do not gate Desktop discovery.
+Legacy Windows-only releases retain their qualified compatibility reader.
+
+Contribution installers are independent content-addressed release assets. Native
+builders still retrieve and hash-verify the pinned original payloads, but package
+only a descriptor and the existing privileged helpers. The common publisher
+checks and publishes these immutable components before exposing the Desktop
+release. Enrollment alone downloads to a private cache, with a strict byte limit,
+pinned digest, safe redirects and atomic replacement. Status checks never fetch;
+existing enrollment/identity and explicit privileged installation gates remain.
+The essential local server, source and development tools remain bundled: removing
+these requires a separately qualified offline-development contract.
+
+Qualification: offline feed rejection cases, full verified downloads, component
+cache corruption and failed transfer recovery, native packaging resource tests,
+existing contribution enrollment tests and workflow/publisher regression gates.
+Native packages and physical installation must be qualified separately; local
+fixtures alone do not establish a production speed or installation result.

@@ -1,3 +1,4 @@
+import {stageContributionComponent} from './contribution-component.mjs';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, mkdir, writeFile } from 'node:fs/promises';
@@ -12,7 +13,7 @@ export async function writeStandaloneWindowsConfig(desktopRoot, overrides, outpu
   return writeStandaloneInstallerConfig(desktopRoot,overrides,output,'windows-installer-config.json');
 }
 
-export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity }) {
+export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtimeSha256, output, version, development, compact, buildIdentity, separateRuntime=false }) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid Desktop version');
   if (!/^[a-f0-9]{64}$/.test(runtimeSha256)) throw new Error('A pinned runtime hash is required');
   const info = await lstat(runtimeMsi);
@@ -21,8 +22,9 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
   for await (const chunk of createReadStream(runtimeMsi)) hash.update(chunk);
   if (hash.digest('hex') !== runtimeSha256) throw new Error('Runtime payload hash mismatch');
   await mkdir(output, { recursive: true });
-  const manifest = path.join(output, 'runtime.json');
+  let manifest = path.join(output, 'runtime.json');
   await writeFile(manifest, JSON.stringify({ schema: 'mycellios-desktop-runtime/1', file: 'mycellios-runtime.msi', sha256: runtimeSha256 }, null, 2));
+  if(separateRuntime)manifest=await stageContributionComponent({file:runtimeMsi,sha256:runtimeSha256,output,extension:'msi'});
   const agentRoot = path.resolve(desktopRoot, '../..');
   const repository = path.resolve(agentRoot, '../..');
   return {
@@ -47,7 +49,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       { from: path.join(repository, 'LICENSE'), to: 'licenses/Mycellios-GPL-3.0.txt' },
       { from: path.join(agentRoot, 'LICENSE'), to: 'licenses/Agent-upstream-Apache-2.0.txt' },
       { from: path.join(repository, 'THIRD_PARTY.md'), to: 'licenses/THIRD_PARTY.md' },
-      { from: path.resolve(runtimeMsi), to: 'contribution/mycellios-runtime.msi' },
+      ...(!separateRuntime ? [{ from: path.resolve(runtimeMsi), to: 'contribution/mycellios-runtime.msi' }] : []),
       { from: manifest, to: 'contribution/runtime.json' },
       { from: path.join(desktopRoot, 'scripts/install-runtime.ps1'), to: 'contribution/install-runtime.ps1' },
       { from: path.join(desktopRoot, 'scripts/describe-runtime.ps1'), to: 'contribution/describe-runtime.ps1' },

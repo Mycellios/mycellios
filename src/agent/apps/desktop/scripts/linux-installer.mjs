@@ -1,10 +1,11 @@
+import {stageContributionComponent} from './contribution-component.mjs';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { chmod, lstat, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 /** Linux x64 pilot; the same hosted frontend and existing headless service, no second engine. */
-export async function prepareLinuxInstaller({ desktopRoot, runtimeDeb, runtimeSha256, output, version, development }) {
+export async function prepareLinuxInstaller({ desktopRoot, runtimeDeb, runtimeSha256, output, version, development, separateRuntime=false }) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid Desktop version');
   if (!/^[a-f0-9]{64}$/.test(runtimeSha256)) throw new Error('A pinned runtime hash is required');
   const info = await lstat(runtimeDeb);
@@ -13,11 +14,12 @@ export async function prepareLinuxInstaller({ desktopRoot, runtimeDeb, runtimeSh
   for await (const chunk of createReadStream(runtimeDeb)) hash.update(chunk);
   if (hash.digest('hex') !== runtimeSha256) throw new Error('Runtime payload hash mismatch');
   await mkdir(output, { recursive: true });
-  const manifest = path.join(output, 'runtime.json');
+  let manifest = path.join(output, 'runtime.json');
   if (process.platform === 'linux') {
     for (const file of ['install-runtime.sh', 'describe-runtime.sh']) await chmod(path.join(desktopRoot, 'scripts', file), 0o755);
   }
   await writeFile(manifest, JSON.stringify({ schema: 'mycellios-desktop-runtime/1', file: 'mycellios-runtime.deb', sha256: runtimeSha256 }, null, 2));
+  if(separateRuntime)manifest=await stageContributionComponent({file:runtimeDeb,sha256:runtimeSha256,output,extension:'deb'});
   const agentRoot = path.resolve(desktopRoot, '../..');
   const repository = path.resolve(agentRoot, '../..');
   return {
@@ -31,7 +33,7 @@ export async function prepareLinuxInstaller({ desktopRoot, runtimeDeb, runtimeSh
       { from: path.join(desktopRoot, 'local-server'), to: 'local-server', filter: ['**/*', '!node_modules{,/**/*}'] },
       { from: path.join(desktopRoot, 'local-server/node_modules'), to: 'local-server/node_modules', filter: ['**/*', '!**/.bin{,/**/*}'] },
       ...(development ? [{from:development.source,to:'development-source'}, {from:development.npm,to:'development-tools/npm'}] : []),
-      { from: path.resolve(runtimeDeb), to: 'contribution/mycellios-runtime.deb' },
+      ...(!separateRuntime ? [{ from: path.resolve(runtimeDeb), to: 'contribution/mycellios-runtime.deb' }] : []),
       { from: manifest, to: 'contribution/runtime.json' },
       { from: path.join(desktopRoot, 'scripts/install-runtime.sh'), to: 'contribution/install-runtime.sh' },
       { from: path.join(desktopRoot, 'scripts/describe-runtime.sh'), to: 'contribution/describe-runtime.sh' },

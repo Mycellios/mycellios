@@ -98,26 +98,30 @@ jobs:
         run: |
           $runtime=Join-Path $env:RUNNER_TEMP desktop-runtime
           New-Item -ItemType Directory -Force $runtime | Out-Null
-          $previous=Join-Path $runtime previous.exe
-          curl.exe --fail --location --retry 2 --output $previous https://www.mycellios.com/downloads/desktop/releases/0.3.15/Mycellios-Desktop-0.3.15-windows-x64-pilot.exe
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          if((Get-FileHash $previous).Hash.ToLowerInvariant() -ne 'a8ff09b461d69328ee3a287a9a0983983dfd5c4f4d3c59c91600c3558c896482'){throw 'Published runtime source installer changed'}
-          & 'C:/Program Files/7-Zip/7z.exe' e $previous '$PLUGINSDIR\app-64.*' "-o$runtime" -y
-          if($LASTEXITCODE){exit $LASTEXITCODE}
-          $payload=@(Get-ChildItem "$runtime/app-64.*" -File)
-          if($payload.Count -ne 1){throw 'Ambiguous runtime payload'}
-          & 'C:/Program Files/7-Zip/7z.exe' e $payload[0].FullName resources/contribution/mycellios-runtime.msi "-o$runtime" -y
-          if($LASTEXITCODE){exit $LASTEXITCODE}
           $msi=Join-Path $runtime mycellios-runtime.msi
+          $status=& curl.exe --silent --show-error --location --retry 2 --write-out '%{http_code}' --output $msi https://github.com/Mycellios/mycellios/releases/download/desktop-runtime-c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc/mycellios-runtime.msi
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          if($status -eq '404'){
+            $previous=Join-Path $runtime previous.exe
+            curl.exe --fail --location --retry 2 --output $previous https://www.mycellios.com/downloads/desktop/releases/0.3.15/Mycellios-Desktop-0.3.15-windows-x64-pilot.exe
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+            if((Get-FileHash $previous).Hash.ToLowerInvariant() -ne 'a8ff09b461d69328ee3a287a9a0983983dfd5c4f4d3c59c91600c3558c896482'){throw 'Published runtime source installer changed'}
+            & 'C:/Program Files/7-Zip/7z.exe' e $previous '$PLUGINSDIR\app-64.*' "-o$runtime" -y
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+            $payload=@(Get-ChildItem "$runtime/app-64.*" -File)
+            if($payload.Count -ne 1){throw 'Ambiguous runtime payload'}
+            & 'C:/Program Files/7-Zip/7z.exe' e $payload[0].FullName resources/contribution/mycellios-runtime.msi "-o$runtime" -y
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+          } elseif($status -ne '200'){throw 'Pinned runtime component download failed'}
           if((Get-FileHash $msi).Hash.ToLowerInvariant() -ne 'c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc'){throw 'Runtime hash differs from the approved native release'}
           "DESKTOP_RUNTIME_MSI=$msi" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - name: Qualify unsigned manual update recovery
         working-directory: src/agent
         shell: pwsh
         run: |
-          npm exec -- vitest run apps/desktop/src/manual-update.test.ts apps/desktop/src/manual-update-lock.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts --maxWorkers=2
+          npm exec -- vitest run apps/desktop/src/published-integrated-release.test.ts apps/desktop/src/contribution-component.test.ts apps/desktop/src/contribution-runtime.test.ts apps/desktop/src/manual-update.test.ts apps/desktop/src/manual-update-lock.test.ts apps/desktop/src/published-desktop-release.test.ts apps/desktop/src/manual-update-helper.test.ts --maxWorkers=2
           if($LASTEXITCODE){exit $LASTEXITCODE}
-          node --test apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs
+          node --test apps/desktop/scripts/contribution-component.test.mjs apps/desktop/scripts/desktop-release.test.mjs apps/desktop/scripts/windows-installer.test.mjs
           exit $LASTEXITCODE
       - name: Test update and native package boundaries
         if: inputs.expedited != true
@@ -147,7 +151,9 @@ jobs:
         working-directory: src/agent
         shell: pwsh
         run: |
-          node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc --out $env:DESKTOP_RELEASE_OUT
+          $bundle=@()
+          if('${{ github.event_name == 'push' && github.ref_type == 'tag' && vars.MYCELLIOS_LEGACY_WINDOWS_ONLY_RELEASE == 'true' }}' -eq 'true'){$bundle=@('--bundle-runtime')}
+          node apps/desktop/scripts/package-windows.mjs --runtime $env:DESKTOP_RUNTIME_MSI --sha256 c0972d061e9f0cebea428e65536bc7e8c6013135f176a0c530181aa12a6734fc --out $env:DESKTOP_RELEASE_OUT @bundle
           if($LASTEXITCODE){exit $LASTEXITCODE}
           & 'C:/Program Files/7-Zip/7z.exe' t (Join-Path $env:DESKTOP_RELEASE_OUT 'Mycellios-Desktop-${{ steps.identity.outputs.version }}-windows-x64-pilot.exe')
           exit $LASTEXITCODE
@@ -195,6 +201,7 @@ jobs:
         with:
           name: desktop-windows-${{ steps.identity.outputs.revision }}
           path: |
+            ${{ env.DESKTOP_RELEASE_OUT }}/runtime-component/
             ${{ env.DESKTOP_RELEASE_OUT }}/*.exe
             ${{ env.DESKTOP_RELEASE_OUT }}/*.blockmap
             ${{ env.DESKTOP_RELEASE_OUT }}/latest.yml

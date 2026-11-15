@@ -1,3 +1,4 @@
+import {publishRuntimeComponents} from './publish-runtime-components.mjs';
 import fs from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -60,6 +61,7 @@ await fs.writeFile(path.join(out,'SHA256SUMS-all.txt'),artifacts.map(a=>`${a.sha
 // Never publish an earlier checkout over concurrent main changes.
 git('fetch','origin','main:refs/remotes/origin/main','--no-tags');if(git('rev-parse','origin/main')!==revision)throw Error('Main advanced during native qualification');
 const api=async resource=>{const r=await fetch('https://api.github.com/repos/Mycellios/mycellios/'+resource,{redirect:'error',signal:AbortSignal.timeout(15000),headers:{authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json'}});if(r.status===404)return null;if(!r.ok)throw Error('Release API unavailable');return r.json();};
+await publishRuntimeComponents({input,revision,gh,api});
 const previous=await api('releases/tags/'+tag);
 const tagged=await api('git/ref/tags/'+tag);
 if(tagged&&(tagged.object?.type!=='commit'||tagged.object.sha!==revision))throw Error('Tag already names another source; preserve its original identity');

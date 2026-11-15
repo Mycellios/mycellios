@@ -9,7 +9,7 @@ import { FloatingChats } from "./floating-chats.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
 import { DESKTOP_CATALOG_ALL_URL, ManualUpdateController, requireManualUpdateSpace, type ManualPackageKind } from "./manual-update.js";
-import { publishedWindowsRelease } from "./published-desktop-release.js";
+import { publishedDesktopRelease } from "./published-desktop-release.js";
 import { acknowledgeManualUpdate, launchManualUpdate } from "./manual-update-handoff.js";
 import { linuxPackageKind } from "./linux-package.js";
 import { macosPackageKind } from "./macos-package.js";
@@ -189,9 +189,10 @@ const manualDesktopUpdater = catalogPackage !== null && app.isPackaged
     version: app.getVersion(), directory: () => path.join(app.getPath("userData"), "updates", "manual"),
     backgroundDownloads: process.env.RAKAZO_DISABLE_AUTO_UPDATE !== "1",
     autoDownload: () => updatePreferences?.preferences().autoDownload ?? true,
-    ...(catalogPackage === "windows-x64"
-      ? { publishedRelease: () => publishedWindowsRelease(app.getVersion()) }
-      : { packageKind: catalogPackage, catalogUrl: DESKTOP_CATALOG_ALL_URL, installAction: "system-installer" as const }),
+    packageKind: catalogPackage,
+    catalogUrl: DESKTOP_CATALOG_ALL_URL,
+    publishedRelease: () => publishedDesktopRelease(app.getVersion(), catalogPackage),
+    ...(catalogPackage !== "windows-x64" ? { installAction: "system-installer" as const } : {}),
     busy: () => Boolean(hostComputer?.hasActiveWork() || cloudComputer?.busy() || accountComputer?.busy()),
     prepare: prepareRendererUpdate,
     handoff: catalogPackage !== "windows-x64" ? file => openSystemInstaller(file) : async (file, release) => {

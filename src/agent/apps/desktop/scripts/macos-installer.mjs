@@ -1,3 +1,4 @@
+import {stageContributionComponent} from './contribution-component.mjs';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { lstat, mkdir, writeFile } from 'node:fs/promises';
@@ -5,7 +6,7 @@ import path from 'node:path';
 import {compactResourceLayout} from './compact-resource-layout.mjs';
 
 /** Apple Silicon preview: one shared UI and the pinned existing native runtime. */
-export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,output,version,arch='arm64',development,compact}) {
+export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,output,version,arch='arm64',development,compact,separateRuntime=false}) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw Error('Invalid Desktop version');
   if(!['arm64','x64'].includes(arch))throw Error('Unsupported Mac architecture');
   if(arch==='x64'&&(runtimePkg||runtimeSha256))throw Error('Intel Desktop must not bundle an ARM runtime');
@@ -16,9 +17,10 @@ export async function prepareMacInstaller({desktopRoot,runtimePkg,runtimeSha256,
   if (!info.isFile() || info.isSymbolicLink()) throw Error('Runtime payload must be a regular PKG');
   const hash=createHash('sha256');for await(const chunk of createReadStream(runtimePkg))hash.update(chunk);
   if(hash.digest('hex')!==runtimeSha256)throw Error('Runtime payload hash mismatch');
-  await mkdir(output,{recursive:true});const manifest=path.join(output,'runtime.json');
+  await mkdir(output,{recursive:true});let manifest=path.join(output,'runtime.json');
   await writeFile(manifest,JSON.stringify({schema:'mycellios-desktop-runtime/1',file:'mycellios-runtime.pkg',sha256:runtimeSha256},null,2));
-  contribution=[{from:path.resolve(runtimePkg),to:'contribution/mycellios-runtime.pkg'},{from:manifest,to:'contribution/runtime.json'},...['install-runtime-macos.sh','describe-runtime-macos.sh','runtime-public-status.cjs'].map(name=>({from:path.join(desktopRoot,'scripts',name),to:'contribution/'+name}))];
+  if(separateRuntime)manifest=await stageContributionComponent({file:runtimePkg,sha256:runtimeSha256,output,extension:'pkg'});
+  contribution=[...(!separateRuntime?[{from:path.resolve(runtimePkg),to:'contribution/mycellios-runtime.pkg'}]:[]),{from:manifest,to:'contribution/runtime.json'},...['install-runtime-macos.sh','describe-runtime-macos.sh','runtime-public-status.cjs'].map(name=>({from:path.join(desktopRoot,'scripts',name),to:'contribution/'+name}))];
   }
   const agent=path.resolve(desktopRoot,'../..');
   const repository=path.resolve(agent,'../..');
