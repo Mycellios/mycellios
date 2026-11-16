@@ -13071,3 +13071,291 @@ msgstr "Tus Micos comparten un ordenador en este espacio."
 
 msgid "Uses your connected PC and its permissions. It is not an isolated server computer."
 msgstr "Usa tu PC conectado y sus permisos. No es un ordenador aislado del servidor."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Sales"
+msgstr "Ventas"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Find leads, write outreach, and follow up."
+msgstr "Encuentra contactos, escribe el primer mensaje y haz seguimiento."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "SEO"
+msgstr "SEO"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Research queries, edit pages, and check technical issues."
+msgstr "Investiga consultas, edita páginas y revisa problemas técnicos."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Support"
+msgstr "Soporte"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Sort the inbox, draft replies, and keep what the team learned."
+msgstr "Ordena la bandeja, prepara respuestas y guarda lo que el equipo aprendió."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Research"
+msgstr "Investigación"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Gather sources, check them, and write a short brief."
+msgstr "Reúne fuentes, compruébalas y escribe un resumen breve."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Marketing"
+msgstr "Marketing"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Plan a campaign, write the words, and read the results."
+msgstr "Planifica una campaña, escribe los textos y lee los resultados."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Operations"
+msgstr "Operaciones"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Keep work in order, write the steps, and track what is open."
+msgstr "Mantiene el trabajo en orden, escribe los pasos y anota lo que sigue abierto."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Lead Researcher"
+msgstr "Investigador de contactos"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Finds the accounts and facts a message should use."
+msgstr "Encuentra las cuentas y los datos que debe usar un mensaje."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Outreach Writer"
+msgstr "Redactor de contacto"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts the first message for you to review."
+msgstr "Prepara el primer mensaje para que lo revises."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Follow-up"
+msgstr "Seguimiento"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Tracks replies and the next step."
+msgstr "Anota las respuestas y el siguiente paso."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Search Researcher"
+msgstr "Investigador de búsqueda"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Maps the questions people ask and the sources to use."
+msgstr "Ordena las preguntas de la gente y las fuentes que hay que usar."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Content Editor"
+msgstr "Editor de contenido"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts and edits pages from those questions."
+msgstr "Redacta y edita páginas a partir de esas preguntas."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Technical SEO"
+msgstr "SEO técnico"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Checks issues that keep pages from being found."
+msgstr "Revisa lo que impide que encuentren las páginas."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Inbox Triage"
+msgstr "Clasificación de bandeja"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Sorts what needs a reply and what can wait."
+msgstr "Separa lo que necesita respuesta y lo que puede esperar."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Reply Writer"
+msgstr "Redactor de respuestas"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts a clear answer for you to send."
+msgstr "Prepara una respuesta clara para que la envíes."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Knowledge Keeper"
+msgstr "Memoria del equipo"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Records the answer so the next reply can reuse it."
+msgstr "Guarda la respuesta para que la siguiente pueda reutilizarla."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Researcher"
+msgstr "Investigador"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Gathers the sources for the question."
+msgstr "Reúne las fuentes de la pregunta."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Source Checker"
+msgstr "Verificador de fuentes"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Separates what is known from what is still a guess."
+msgstr "Separa lo que se sabe de lo que sigue siendo una hipótesis."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Brief Writer"
+msgstr "Redactor de resúmenes"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Turns that into a short brief."
+msgstr "Lo convierte en un resumen breve."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Campaign Planner"
+msgstr "Planificador de campañas"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Turns a goal into a small plan."
+msgstr "Convierte un objetivo en un plan pequeño."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Copywriter"
+msgstr "Redactor"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts the words for you to review."
+msgstr "Prepara los textos para que los revises."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Analyst"
+msgstr "Analista"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Reads the results and says what changed."
+msgstr "Lee los resultados y dice qué cambió."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Coordinator"
+msgstr "Coordinador"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Keeps the requested work in order."
+msgstr "Mantiene en orden el trabajo pedido."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Process Writer"
+msgstr "Redactor de procesos"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Writes the steps that should repeat."
+msgstr "Escribe los pasos que deben repetirse."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Tracker"
+msgstr "Seguimiento de tareas"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Notes status, blockers, and what is done."
+msgstr "Anota el estado, los bloqueos y lo que ya está hecho."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "What should your team handle?"
+msgstr "¿Qué debe hacer tu equipo?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Describe the work in a sentence or two. You can start on Mycellios credits, and an API key stays optional."
+msgstr "Describe el trabajo en una o dos frases. Puedes empezar con créditos de Mycellios, y la clave de API sigue siendo opcional."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "For example: reply to customer email and find new leads"
+msgstr "Por ejemplo: responder el correo de clientes y encontrar nuevos contactos"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Or start from a role"
+msgstr "O empieza por un rol"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Create and open this team"
+msgstr "Crear y abrir este equipo"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "A few questions so the team fits."
+msgstr "Unas preguntas para que el equipo encaje."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Your team"
+msgstr "Tu equipo"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Use your model or start with Mycellios credits."
+msgstr "Usa tu modelo o empieza con créditos de Mycellios."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Creating your team uses no credits. You choose when to start."
+msgstr "Crear tu equipo no consume créditos. Tú decides cuándo empezar."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Start with one Mico"
+msgstr "Empezar con un solo Mico"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Use your own provider"
+msgstr "Usa tu propio proveedor"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Creating your team…"
+msgstr "Creando tu equipo…"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Mycellios credits are unavailable right now. No credits were spent."
+msgstr "Los créditos de Mycellios no están disponibles ahora. No se ha gastado ningún crédito."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Could not create the team. Try again."
+msgstr "No se pudo crear el equipo. Inténtalo de nuevo."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Who is this for?"
+msgstr "¿Para quién es?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Just me"
+msgstr "Solo para mí"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "A small team"
+msgstr "Un equipo pequeño"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Customers"
+msgstr "Clientes"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "What should they do first?"
+msgstr "¿Qué deben hacer primero?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Research and brief me"
+msgstr "Investigar y resumirme"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Draft work for me to review"
+msgstr "Preparar borradores para que yo los revise"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Run a repeatable process"
+msgstr "Ejecutar un proceso repetible"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Which role is closest?"
+msgstr "¿Qué rol se parece más?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Back to your team"
+msgstr "Volver a tu equipo"

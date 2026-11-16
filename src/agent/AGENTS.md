@@ -1259,6 +1259,13 @@
   First-party onboarding starts with the signed-in Mycellios account and owned
   contribution credits; AntSeed remains an explicit alternative requiring the user's
   own key. Never fall back to another payer or provider when native credit access fails.
+  Empty accounts enter the team builder even when a default model is configured.
+  Explicit role/audience/start choices create bounded templates without model calls.
+  Preserve configured providers and Space-scoped spawn keys on retries; setup
+  profiles use bots.createProfile so creation never starts automatic inference
+  and older servers fail before creating a profile. Keep the
+  single-Mico, native-provider and import paths. Verify team catalog/creation/UI
+  tests and the isolated onboarding browser fixture without live accounts or spend.
   Alternative key-based onboarding discovers models before the user confirms one.
   Keep endpoints and capability limits in advanced setup; preserve key ownership and
   endpoint-bound credentials. The owned local preview uses the public HTTPS gateway,
