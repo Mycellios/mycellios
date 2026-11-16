@@ -20,5 +20,7 @@ describe("desktop package metadata", () => {
     expect(packageJson.build?.beforePack).toBe("./scripts/verify-release.cjs");
     const main = readFileSync(path.resolve(import.meta.dirname,"main.ts"),"utf8");
     expect(main).toContain('app.setPath("userData", path.join(app.getPath("appData"), "Mycellios Agent"))');
+    // Development Electron shortcuts must never claim the installed app identity.
+    expect(main).toMatch(/app\.setAppUserModelId\(app\.isPackaged\s*\? "com\.mycellios\.agent\.desktop" : "com\.mycellios\.agent\.desktop\.dev"\)/);
   });
 });

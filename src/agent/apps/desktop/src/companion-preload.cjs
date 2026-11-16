@@ -1,5 +1,6 @@
 const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("companion", {
+  painted: () => ipcRenderer.send("companion.painted"),
   onState: listener => { ipcRenderer.on("companion.state", (_event, value) => listener(value)); },
   onHover: listener => { ipcRenderer.on("companion.hover", (_event, value) => listener(value === true)); },
   expand: open => { if (typeof open === "boolean") ipcRenderer.send("companion.expand", open); },

@@ -6,6 +6,8 @@ import { DEFAULT_DESKTOP_COMPANIONS, DesktopCompanionPreferencesSchema, DesktopC
   type DesktopCompanionPreferences, type DesktopCompanionSnapshot } from "@rakazo/contracts";
 import { readPrivateFile, writePrivateFile } from "./setup-store.js";
 import { validDesktopIcon } from "./appearance-settings.js";
+import { windowIcon } from "./window-icon.js";
+import { keepCompanionAbove } from "./floating-window.js";
 
 export function companionBounds(area: { x: number; y: number; width: number; height: number }, kind: "dock" | "island", prefs: DesktopCompanionPreferences, count: number, expanded = false) {
   if (kind === "island") {
@@ -51,6 +53,27 @@ export async function installDesktopCompanions(options: {
   }
   const companionWindow = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) =>
     [...windows].find(([, win]) => win.webContents === event.sender && event.senderFrame === event.sender.mainFrame);
+  const populated = new WeakSet<BrowserWindow>();
+  const ready = new WeakSet<BrowserWindow>();
+  const keepAbove = (win: BrowserWindow) => {
+    keepCompanionAbove(win);
+  };
+  const revealReady = (win: BrowserWindow) => {
+    if (!win.isDestroyed() && populated.has(win) && ready.has(win)) {
+      win.showInactive();
+      const owned = [...windows].find(([, candidate]) => candidate === win);
+      if (owned?.[0].startsWith("dock:") && !prefs.dock.autoHide) win.setIgnoreMouseEvents(false);
+      // Windows can clear the native topmost flag during the first show.
+      keepAbove(win);
+    }
+  };
+  // Loading HTML is not evidence that a hidden transparent window has painted.
+  // Only its own sandboxed renderer may acknowledge the first rendered frame.
+  const painted = (event: Electron.IpcMainEvent) => {
+    const owned = companionWindow(event);
+    if (owned && !owned[1].isDestroyed()) { populated.add(owned[1]); revealReady(owned[1]); }
+  };
+  ipcMain.on("companion.painted", painted);
 
   let queue = Promise.resolve();
   const file = path.join(options.profile, "desktop-companions.json");
@@ -84,17 +107,21 @@ export async function installDesktopCompanions(options: {
         if (!win || win.isDestroyed()) {
           win = new BrowserWindow({ ...companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)),
             frame: false, transparent: true, resizable: false, maximizable: false, minimizable: false,
+            icon: windowIcon(import.meta.dirname, path.resolve(import.meta.dirname, ".."), process.platform),
             alwaysOnTop: true, skipTaskbar: true, show: false, focusable: kind !== "island", title: kind === "island" ? "Mycellios · Island" : "Mycellios · Dock",
-            webPreferences: { preload: path.join(import.meta.dirname, "companion-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false } });
-          if (kind === "island") { win.setAlwaysOnTop(true, "status"); win.setHasShadow(false); }
+            webPreferences: { preload: path.join(import.meta.dirname, "companion-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
+          keepAbove(win);
+          if (kind === "island") win.setHasShadow(false);
           windows.set(key, win);
+          const created = win;
+          win.once("ready-to-show", () => { ready.add(created); revealReady(created); });
           win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
           win.webContents.on("will-navigate", event => event.preventDefault());
-          win.webContents.once("did-finish-load", () => { if (!win!.isDestroyed()) { if (kind === "dock") win!.webContents.setZoomFactor(prefs.dock.size / 100); win!.webContents.send("companion.state", { ...payload(kind), expanded: islandExpanded.has(key) }); win!.showInactive(); } });
+          win.webContents.once("did-finish-load", () => { if (!win!.isDestroyed()) { if (kind === "dock") win!.webContents.setZoomFactor(prefs.dock.size / 100); win!.webContents.send("companion.state", { ...payload(kind), expanded: islandExpanded.has(key) }); } });
           win.on("closed", () => { if (windows.get(key) === win) windows.delete(key); });
           void win.loadFile(path.join(import.meta.dirname, "companion.html")).catch(() => { if (!win!.isDestroyed()) win!.destroy(); });
         } else {
-          if (kind === "dock") { win.setAlwaysOnTop(true); win.webContents.setZoomFactor(prefs.dock.size / 100); }
+          if (kind === "dock") { keepAbove(win); win.webContents.setZoomFactor(prefs.dock.size / 100); }
           if (kind === "island") win.setFocusable(islandExpanded.has(key));
           win.setBounds(companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)));
           if (kind === "dock" && !prefs.dock.autoHide) { win.setIgnoreMouseEvents(false); expanded.delete(key); }
@@ -262,6 +289,7 @@ export async function installDesktopCompanions(options: {
       screen.off("display-added", sync); screen.off("display-removed", sync); screen.off("display-metrics-changed", sync);
       ipcMain.removeListener("companion.select", select); ipcMain.removeListener("companion.dock.drag", moveDock);
       ipcMain.removeListener("companion.expand", expandIsland);
+      ipcMain.removeListener("companion.painted", painted);
       ipcMain.removeListener("companion.question.open", openQuestion);
       ipcMain.removeHandler?.("companion.answer"); ipcMain.removeHandler?.("desktop.companions.questionResult"); } };
 }

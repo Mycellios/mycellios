@@ -1,6 +1,14 @@
 const root = document.getElementById("root");
 const surface = document.createElement("div");
 const buttons = new Map();
+let firstFrameScheduled = false;
+function acknowledgePaint() {
+  if (firstFrameScheduled || !window.companion.painted) return;
+  firstFrameScheduled = true;
+  // Hidden Windows overlays may not schedule animation frames until shown.
+  // The host also waits for ready-to-show; acknowledge populated DOM directly.
+  window.companion.painted();
+}
 const grip = document.createElement("button"); grip.type = "button"; grip.className = "dock-grip"; grip.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="4" r="1"/><circle cx="11" cy="4" r="1"/><circle cx="5" cy="8" r="1"/><circle cx="11" cy="8" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="11" cy="12" r="1"/></svg>';
 grip.setAttribute("aria-label", "Move Mico dock"); grip.title = "Move Mico dock";
 let draggingDock = false;
@@ -24,7 +32,7 @@ window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
   document.body.dataset.edge = prefs.dock.edge;
   document.body.dataset.strip = String(prefs.dock.edgeStrip);
   surface.className = "surface " + kind + (kind === "dock" && prefs.dock.edge === "bottom" ? " bottom" : "");
-  if (kind === "island") { grip.remove(); renderIsland({ prefs, snapshot, expanded }); return; }
+  if (kind === "island") { grip.remove(); renderIsland({ prefs, snapshot, expanded }); acknowledgePaint(); return; }
   const agents = kind === "island" ? [...snapshot.agents].sort((a,b) => Number(b.working || b.unread) - Number(a.working || a.unread)).slice(0, 1) : snapshot.agents;
   const ids = new Set(agents.map(agent => agent.id));
   for (const [id, button] of buttons) if (!ids.has(id)) { button.remove(); buttons.delete(id); }
@@ -58,6 +66,7 @@ window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
     if (surface.children[index] !== button) surface.insertBefore(button, surface.children[index] || null);
   });
   if (grip.parentElement !== root) root.append(grip);
+  acknowledgePaint();
 });
 
 // No app preload or tokens: this window has only its bounded companion bridge.

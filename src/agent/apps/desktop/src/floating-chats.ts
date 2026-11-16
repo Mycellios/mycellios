@@ -1,5 +1,6 @@
 import { BrowserWindow, type WebContents } from "electron";
 import path from "node:path";
+import { windowIcon } from "./window-icon.js";
 
 export type FloatingChatTarget = { scope: string; botId: string };
 
@@ -69,6 +70,7 @@ export class FloatingChats {
     }
     if (this.windows.size >= 6) throw new Error("Close a floating chat before opening another");
     const win = new BrowserWindow({
+      icon: windowIcon(import.meta.dirname, path.resolve(import.meta.dirname, ".."), process.platform),
       width: 520, height: 760, minWidth: 380, minHeight: 420,
       title: "Mycellios · Chat", show: false,
       webPreferences: {
