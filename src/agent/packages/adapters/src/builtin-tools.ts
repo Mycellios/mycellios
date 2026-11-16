@@ -1484,6 +1484,16 @@ export const builtinAgentTools: ConnectorTool[] = [
     }, required: ["bot_id", "instruction", "expected_result"] },
   },
   {
+    name: "await_event",
+    description: "Park this authorized request durably and resume it automatically when an owned routine finishes its next run, another owned execution finishes, or a future time arrives. Choose exactly one routine_id, run_id, resume_at. Use an existing webhook/change routine for external events; this tool does not create schedules, grant permissions or keep polling the model. Save a concrete next-step note, then end the turn. Inspect waits with work_status; pause/cancel them with the existing task controls.",
+    inputSchema: { type: "object", properties: {
+      note: { type: "string", minLength: 1, maxLength: 2000 },
+      routine_id: { type: "string" }, run_id: { type: "string" },
+      resume_at: { type: "string", description: "Future ISO timestamp with timezone." },
+      timeout_minutes: { type: "number", minimum: 1, maximum: 43200, description: "Default 1440. Expiry resumes the request with an expired outcome, never a false success." },
+    }, required: ["note"], additionalProperties: false },
+  },
+  {
     name: "work_status",
     readOnly: true,
     description: "Read the current request's durable parent/child task states and result run IDs. Read results before repeating work; do not poll unchanged status.",
