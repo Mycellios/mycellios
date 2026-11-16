@@ -1,4 +1,5 @@
 import {publishRuntimeComponents} from './publish-runtime-components.mjs';
+import {publishInstallerAssets} from './release-publication.mjs';
 import fs from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -62,23 +63,9 @@ await fs.writeFile(path.join(out,'SHA256SUMS-all.txt'),artifacts.map(a=>`${a.sha
 git('fetch','origin','main:refs/remotes/origin/main','--no-tags');if(git('rev-parse','origin/main')!==revision)throw Error('Main advanced during native qualification');
 const api=async resource=>{const r=await fetch('https://api.github.com/repos/Mycellios/mycellios/'+resource,{redirect:'error',signal:AbortSignal.timeout(15000),headers:{authorization:'Bearer '+process.env.GH_TOKEN,accept:'application/vnd.github+json'}});if(r.status===404)return null;if(!r.ok)throw Error('Release API unavailable');return r.json();};
 await publishRuntimeComponents({input,revision,gh,api});
-const previous=await api('releases/tags/'+tag);
-const tagged=await api('git/ref/tags/'+tag);
-if(tagged&&(tagged.object?.type!=='commit'||tagged.object.sha!==revision))throw Error('Tag already names another source; preserve its original identity');
-if(previous&&!tagged)throw Error('Existing release has no verified source tag');
-if(!tagged)gh('api','repos/Mycellios/mycellios/git/refs','-f','ref=refs/tags/'+tag,'-f','sha='+revision);
 await fs.writeFile(path.join(out,'notes.md'),`One qualified source revision for Windows, Linux, Fedora and both Mac architectures: ${revision}.\n\nAndroid build input is signed automatically on the original signing host before it is linked by Mycellios. The download page never links an unsigned APK. Platform runner checks passed; physical device installs are separate. Updates remain owner-approved.\n`);
-if(!previous)gh('release','create',tag,'--verify-tag','--target',revision,'--draft','--prerelease','--latest=false','--title',`Mycellios Desktop ${version}`,'--notes-file',path.join(out,'notes.md'));
 const sums=path.join(out,'SHA256SUMS-all.txt');
 const complete=[...artifacts,{fileName:'SHA256SUMS-all.txt',sha256:await digest(sums),bytes:(await fs.stat(sums)).size}];
-const missing=[];
-for(const a of complete){
- const existing=(previous?.assets??[]).filter(v=>v.name===a.fileName);
- if(existing.length>1||existing[0]&&(existing[0].digest!=='sha256:'+a.sha256||existing[0].size!==a.bytes))throw Error('An existing release asset has different bytes; never replace it');
- if(!existing.length)missing.push(path.join(out,a.fileName));
-}
-if(previous&&!previous.draft&&missing.length)throw Error('A published release is incomplete; preserve its immutable state');
-if(missing.length)gh('release','upload',tag,...missing);
-git('fetch','origin','main:refs/remotes/origin/main','--no-tags');if(git('rev-parse','origin/main')!==revision)throw Error('Main advanced before final publication; draft retained');
-gh('release','edit',tag,'--draft=false','--prerelease','--latest=false');
+await publishInstallerAssets({out,tag,revision,artifacts:complete,notesFile:path.join(out,'notes.md'),gh,api,
+ assertCurrentMain:()=>{git('fetch','origin','main:refs/remotes/origin/main','--no-tags');if(git('rev-parse','origin/main')!==revision)throw Error('Main advanced before final publication; draft retained');}});
 console.log(JSON.stringify({published:true,tag,revision,platforms:platforms.map(p=>p.id),androidSigning:'original-host-required'}));

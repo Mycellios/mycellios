@@ -286,6 +286,9 @@ These rules apply to the complete repository.
   CLI release view and fetch only its validated repository release ID. Verify
   tag, ID, state, asset sizes and digests before publication; preserve existing
   drafts and never clobber assets. Check scripts/publish-runtime-components.test.mjs.
+  Desktop drafts use the same first-party resolver with their own strict tag
+  pattern; require an exact revision target/tagref and verified asset digests
+  before publishing or resuming. Check scripts/publish-installer-release.test.mjs.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   current-source Desktop builds, source provenance, hash-pinned runtime pairing
