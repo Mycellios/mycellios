@@ -1157,6 +1157,21 @@
   failed writes retain confirmed preferences. Completed-result previews expire
   after eight seconds and never replay historical results on scope entry.
   Browser dock controls are an explicit unsaved preview, not an OS overlay.
+  Companion updates change native placement, zoom and focusability only when
+  their values differ. Follow the main window's display identity rather than
+  each intermediate drag bound; qualify movement and display transitions with
+  the companion tests without repositioning the main window.
+  Restore the island reply input's focus during updates only when the native
+  host reports that window focused. Windows can retain document.hasFocus() and
+  activeElement after native blur; neither is sufficient without the host signal.
+  Companions lose native focusability on blur and regain it only through their
+  private preload's trusted pointer gesture or an explicit island-open action.
+  Background DOM replacement must never reactivate a companion window.
+  Windows releases run `apps/desktop/scripts/verify-window-interaction.mjs` in
+  an isolated profile, checking typing during companion updates and native position
+  retention from normal and maximized windows. Its optional `--pointer` mode
+  requires an interactive desktop; CI marks that gesture NOT RUN separately.
+  Retain its qualification receipt and never call a native bounds test a real drag.
   Island scope filters are device-local and keyed by the full account/Space scope.
   New-scope defaults never overwrite explicit choices; switching that default in
   settings freezes known scopes first. Excluded scopes publish no question reads.

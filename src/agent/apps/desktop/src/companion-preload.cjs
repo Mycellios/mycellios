@@ -1,4 +1,9 @@
 const { contextBridge, ipcRenderer } = require("electron");
+// Keep OS activation tied to an actual pointer gesture in this owned surface.
+// Background renderer focus changes have no corresponding native capability.
+document.addEventListener("pointerdown", event => {
+  if (event.isTrusted && event.button === 0) ipcRenderer.send("companion.activate");
+}, true);
 contextBridge.exposeInMainWorld("companion", {
   painted: () => ipcRenderer.send("companion.painted"),
   onState: listener => { ipcRenderer.on("companion.state", (_event, value) => listener(value)); },
