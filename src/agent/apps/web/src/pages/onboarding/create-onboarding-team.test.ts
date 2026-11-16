@@ -72,3 +72,10 @@ it("stops starting new profile writes after leaving setup", async () => {
     .rejects.toMatchObject({ name: "AbortError" });
   expect(create).toHaveBeenCalledTimes(1);
 });
+
+it.each(["codex", "claude"] as const)("keeps every proposed role when the user chooses installed %s", async agentEngine => {
+  const create = vi.fn(async (input: { spawnKey?: string }) => ({ id: input.spawnKey! }));
+  await createOnboardingTeam(members, { list: async () => [], create, agentEngine });
+  expect(create).toHaveBeenCalledTimes(members.length);
+  for (const [input] of create.mock.calls) expect(input).toMatchObject({ agentEngine });
+});

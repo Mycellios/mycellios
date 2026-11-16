@@ -44,6 +44,7 @@ try {
       case "me": return result({ userId: "fixture-owner", spaceId: "fixture-space", needsSignupSurvey: false, needsModel, billingEnabled: false, defaultProvider: needsModel ? null : "fixture-personal", defaultModel: needsModel ? null : "fixture-model" });
       case "models/list": case "models/mycelliosModels": return result([]);
       case "bots/list": return result(bots);
+      case "engines/list": return result([{ id: "codex", name: "Codex", available: true }]);
       case "models/connectMycellios":
         connects++;
         if (!unavailable) { needsModel = false; return result({}); }
@@ -104,6 +105,25 @@ try {
   await expect(page.getByTestId("team-created")).toBeVisible();
   assert.equal(bots.length, 3); assert.equal(new Set(bots.map(bot => bot.spawnKey)).size, 3);
   proof.retryWithoutDuplicates = true;
+  // Installed-account selection after a proposal must retain every role.
+  bots = []; creates = []; needsModel = true;
+  const connectionsBeforeNativeChoice = connects;
+  await open();
+  await page.getByRole("textbox").fill("Review customer requests");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  for (const answer of ["Support", "A small team", "Draft work for me to review"]) {
+    await page.getByRole("button", { name: answer, exact: true }).click();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Use your own provider", exact: true }).click();
+  await page.getByRole("button", { name: "Use my account", exact: true }).click();
+  await page.getByRole("button", { name: "Use an installed agent", exact: true }).click();
+  await page.getByRole("button", { name: "Codex", exact: true }).click();
+  await expect(page.getByTestId("team-created")).toBeVisible();
+  assert.equal(bots.length, 3); assert.equal(connects, connectionsBeforeNativeChoice);
+  assert(creates.every(input => input.agentEngine === "codex" && input.expectedUserId === "fixture-owner"));
+  proof.installedAccountPreservesTeam = true;
+  needsModel = false;
   bots = []; await page.setViewportSize({ width: 390, height: 844 });
   await open("?lang=es");
   await expect(page.getByRole("heading", { name: "¿Qué debe hacer tu equipo?", exact: true })).toBeVisible();

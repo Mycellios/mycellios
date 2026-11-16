@@ -24,6 +24,7 @@ export type OnboardingTeamCreateInput = Pick<
   | "instructions"
   | "notifyOnFinish"
   | "spawnKey"
+  | "agentEngine"
 >;
 
 type ExistingBot = { id: string; spawnKey: string | null };
@@ -63,6 +64,7 @@ export async function createOnboardingTeam(
     create: (input: OnboardingTeamCreateInput) => Promise<{ id: string }>;
     lock?: <T>(run: () => Promise<T>) => Promise<T>;
     signal?: AbortSignal;
+    agentEngine?: CreateBotInput["agentEngine"];
   },
 ): Promise<{ id: string }> {
   if (members.length === 0) throw new Error("Choose at least one Mico");
@@ -85,6 +87,7 @@ export async function createOnboardingTeam(
         instructions: member.instructions,
         notifyOnFinish: true,
         spawnKey,
+        ...(client.agentEngine ? { agentEngine: client.agentEngine } : {}),
       });
       existing.push({ id: created.id, spawnKey });
       if (!firstId) firstId = created.id;

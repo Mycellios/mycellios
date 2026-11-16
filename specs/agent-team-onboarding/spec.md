@@ -20,7 +20,9 @@ their own provider. Existing accounts and Spaces retain their agents and setting
 - The profile-only endpoint requires the expected account and checks it before
   writing. Setup pins the Space client, aborts pending work on leaving and stops
   subsequent profile writes; already committed profiles remain resumable.
-- A native-provider selection and the explicit single-Mico path remain available.
+- An explicitly selected installed account applies to every new proposed role;
+  preserve the separate single-Mico path. Do not connect Mycellios as a hidden
+  replacement for that account. Existing profiles are never overwritten on retry.
 
 ## Qualification
 

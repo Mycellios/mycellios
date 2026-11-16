@@ -1,5 +1,5 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import type { ModelHeaderRow, ThinkingLevel } from "@rakazo/contracts";
+import type { CreateBotInput, ModelHeaderRow, ThinkingLevel } from "@rakazo/contracts";
 import {
   ANTSEED_PROVIDER_ID,
   CLOUDFLARE_AI_GATEWAY_PROVIDER_ID,
@@ -235,12 +235,13 @@ export function OnboardingPage() {
     });
   }
 
-  async function finishTeam(members: OnboardingTeamMember[]) {
+  async function finishTeam(members: OnboardingTeamMember[], agentEngine?: CreateBotInput["agentEngine"]) {
     const owner = setupOwnerRef.current;
     if (!owner) throw new Error("Reload setup before creating profiles");
     const scoped = rpcForSpace(owner.spaceId);
     const { signal } = setupAbortRef.current;
     const first = await createOnboardingTeam(members, {
+      agentEngine,
       list: () => scoped.bots.list(undefined, { signal }),
       create: (input) => scoped.bots.createProfile({ ...input, expectedUserId: owner.userId }, { signal }),
       lock: withFirstBotLock,
@@ -743,6 +744,11 @@ export function OnboardingPage() {
             {connectionPath === "account" ? (
               <InstalledAgentOnboarding
                 onSelect={async (agentEngine) => {
+                  const pending = pendingTeamRef.current;
+                  if (pending?.length) {
+                    await finishTeam(pending, agentEngine);
+                    return;
+                  }
                   navigate("/app", { replace: true, state: { firstMicoEngine: agentEngine } });
                 }}
               />
