@@ -14,7 +14,7 @@ const server = await createServer({ root, envFile: false, configFile: path.join(
   server: { host: "127.0.0.1", port: 0 }, plugins: [{ name: "isolated-computer-qualification", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
       if (req.url?.split("?")[0] !== "/__isolated_computer") return next();
-      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/isolated-computer.tsx"></script></body></html>');
+      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/isolated-computer.tsx"></script></body></html>');
       res.setHeader("content-type", "text/html"); res.end(html);
     });
   } }] });
@@ -66,8 +66,10 @@ try {
   await page.goto(base + "?lang=es");
   await expect(page.getByRole("button", { name: "Solo este Mico", exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  const lightBackground = await page.locator("main").evaluate(element => getComputedStyle(element).backgroundColor);
   await page.screenshot({ path: path.join(output, "computer-isolation-mobile-es.png") });
   await page.evaluate(() => { document.documentElement.classList.add("dark"); document.documentElement.dataset.theme = "dark"; });
+  await expect(page.locator("main")).not.toHaveCSS("background-color", lightBackground);
   await page.screenshot({ path: path.join(output, "computer-isolation-mobile-dark.png") });
   await page.goto(base);
   await page.getByRole("button", { name: "Open synthetic screen", exact: true }).click();
@@ -79,6 +81,6 @@ try {
   await page.screenshot({ path: path.join(output, "computer-isolation-mobile-control.png") });
   assert.deepEqual(errors, []); assert.deepEqual(unexpected, []);
   const proof = { passed: true, actualControls: true, actualComputerOverlay: true, syntheticScreen: true, explicitTakeoverAndRelease: true,
-    blockedRunCannotTakeOver: true, noAutomaticComputeOrConsent: true, externalRequests: 0, paidInferenceCalls: 0, productionAccess: false };
+    blockedRunCannotTakeOver: true, distinctLightAndDarkThemes: true, noAutomaticComputeOrConsent: true, externalRequests: 0, paidInferenceCalls: 0, productionAccess: false };
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2)); console.log(JSON.stringify(proof));
 } finally { await browser?.close(); await server.close(); }
