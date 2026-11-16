@@ -29,6 +29,13 @@ function fixture(kind: "desktop" | "docker" = "docker") {
 }
 
 describe("offline cloud workspaces", () => {
+  it("keeps an assigned isolated computer instead of manufacturing a Desktop/cloud fallback", async () => {
+    const { database, prisma, sandbox, provisionKind } = fixture("desktop");
+    await expect(selectOfflineCloudWorkspace(prisma, sandbox, run,
+      { id: "private-computer", scope: "isolated", kind: "docker" }, lease)).resolves.toBeUndefined();
+    expect(provisionKind).not.toHaveBeenCalled();
+    expect(database.$transaction).not.toHaveBeenCalled();
+  });
   it("pins a separate durable workspace without replacing the Mico's Desktop assignment", async () => {
     const { database, prisma, sandbox } = fixture();
     const computer = await selectOfflineCloudWorkspace(prisma, sandbox, run, desktop, lease);

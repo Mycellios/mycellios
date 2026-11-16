@@ -32,6 +32,7 @@ import {
   computerKindForMode,
   InstructionConflictError,
   IsolationError,
+  parseComputerMode,
   recordComputerRunEnd,
   restoreBotUnderComputerQuota,
   SpaceDeletionInProgressError,
@@ -334,7 +335,7 @@ export function botsRoutes(ctx: RouterContext) {
             notifyOnFinish: source.notifyOnFinish,
             busyMessageMode: source.busyMessageMode,
             color: source.color,
-            computerMode: source.computer?.scope === "dedicated" ? "dedicated" : "team",
+            computerMode: source.computer ? parseComputerMode(source.computer.scope) : "isolated",
             modelProvider: source.modelProvider,
             modelId: source.modelId,
             thinkingLevel: source.thinkingLevel,
@@ -474,7 +475,7 @@ export function botsRoutes(ctx: RouterContext) {
       setComputer: authed.bots.setComputer.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
         if (!bot.computer) throw new IsolationError();
-        const currentMode = bot.computer.scope === "dedicated" ? "dedicated" : "team";
+        const currentMode = parseComputerMode(bot.computer.scope);
         const isolatedKind = deps.sandbox.describe().id;
         // "This PC" is the user's desktop host. A Docker deployment must prove
         // the PC is connected instead of quietly provisioning a container.
@@ -524,7 +525,7 @@ export function botsRoutes(ctx: RouterContext) {
           if (bot.computer.controlBotId === bot.id && hasActiveComputerControl(bot.computer)) {
             throw new ORPCError("BAD_REQUEST", { message: "Release the computer first" });
           }
-          if (bot.computer.scope === "dedicated" && bot.computer.providerRef) {
+          if (bot.computer.scope !== "team" && bot.computer.providerRef) {
             const ctx = computerContext(context.actor, bot.id, "computer.switch");
             const ref = toComputerRef(bot.computer);
             if (bot.computer.state === "running") {

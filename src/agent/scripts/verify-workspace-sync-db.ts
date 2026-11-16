@@ -68,6 +68,23 @@ try {
   await system.user.create({ data: { id: actor.userId, name: "Synthetic owner", email: `${id}@example.invalid` } });
   await system.organization.create({ data: { id, name: "Synthetic", slug: id, createdAt: new Date() } });
   await system.space.create({ data: { id: actor.spaceId, name: "Synthetic", organizationId: id } });
+  // db push omits the CHECK from 0008_team_computers; reproduce it so the new
+  // mode is qualified against a genuine upgrade, not just Prisma's loose String.
+  const scopeSql = database.getPgClient(); await scopeSql.connect();
+  try {
+    await scopeSql.query(`ALTER TABLE computers ADD CONSTRAINT computers_scope_check CHECK (scope IN ('team', 'dedicated'))`);
+    const legacy = await system.computer.create({ data: {
+      ...actor, scope: "team", scopeKey: `legacy-scope:${id}`, homeKey: `legacy-home:${id}`, kind: "none",
+    } });
+    const probe = { ...actor, scope: "isolated", scopeKey: `scope-probe:${id}`, homeKey: `scope-probe:${id}`, kind: "none" };
+    await assert.rejects(system.computer.create({ data: probe }), /computers_scope_check/);
+    await scopeSql.query(await readFile("packages/db/prisma/migrations/20261116070000_isolated_computers/migration.sql", "utf8"));
+    assert.deepEqual(await system.computer.findUniqueOrThrow({ where: { id: legacy.id } }), legacy);
+    const admitted = await system.computer.create({ data: probe });
+    await system.computer.delete({ where: { id: admitted.id } });
+    await assert.rejects(system.computer.create({ data: { ...probe, scope: "invalid" } }), /computers_scope_check/);
+    checks.push("real legacy scope CHECK migration preserves existing rows, admits isolated and rejects unknown scopes");
+  } finally { await scopeSql.end(); }
   const bot = await system.bot.create({ data: { ...actor, name: "Fixture Mico", color: "#10B981", agentEngine: "codex", thread: { create: actor } }, include: { thread: true } });
   const handler = { handler: (fn: unknown) => fn };
   const taskInbox = Object.fromEntries(["followUp", "available", "list", "start", "messages", "read", "send", "markRead", "archive", "stop", "answer"].map(name => [name, handler]));
@@ -195,6 +212,75 @@ try {
     assert.equal(Number((await rls.query("SELECT count(*) AS count FROM task_inbox")).rows[0].count), 0);
   } finally { await rls.end(); }
   checks.push("real PostgreSQL RLS conceals another member's inbox");
+  // Default creation assigns private metadata, never a live provider resource.
+  // Keep this proof on a distinct synthetic member so existing fixtures stay intact.
+  const privateActor = { ...actor, userId: `isolated-${id}` };
+  await system.user.create({ data: { id: privateActor.userId, name: "Synthetic isolated member", email: `isolated-${id}@example.invalid` } });
+  await system.member.create({ data: { id: randomUUID(), userId: privateActor.userId, organizationId: id, role: "member", createdAt: new Date() } });
+  await system.spaceMember.create({ data: { id: randomUUID(), userId: privateActor.userId, organizationId: id, spaceId: actor.spaceId, role: "member", createdAt: new Date() } });
+  const previousProvider = process.env.SANDBOX_PROVIDER;
+  const previousLimit = process.env.SANDBOX_MAX_COMPUTERS_PER_USER;
+  const legacyAssignment = await system.bot.findUniqueOrThrow({ where: { id: bot.id } });
+  try {
+    process.env.SANDBOX_PROVIDER = "fake";
+    process.env.SANDBOX_MAX_COMPUTERS_PER_USER = "2";
+    const privateRepos = createRepos(prisma);
+    const create = (name: string) => runAsTenant(privateActor, () => privateRepos.createBot(privateActor, { name, spawnKey: `isolated-fixture:${name}` }));
+    const firstPrivate = await create("First private Mico");
+    const secondPrivate = await create("Second private Mico");
+    const repeatPrivate = await create("First private Mico");
+    assert.equal(repeatPrivate.id, firstPrivate.id);
+    assert.equal(firstPrivate.computerMode, "isolated");
+    assert.equal(secondPrivate.computerMode, "isolated");
+    const rows = await system.bot.findMany({ where: { userId: privateActor.userId }, include: { computer: true, thread: true }, orderBy: { name: "asc" } });
+    assert.equal(rows.length, 2);
+    assert.notEqual(rows[0]!.computerId, rows[1]!.computerId);
+    assert.notEqual(rows[0]!.computer!.homeKey, rows[1]!.computer!.homeKey);
+    assert(rows.every(row => row.computer!.scope === "isolated" && row.computer!.state === "stopped" && row.computer!.providerRef === null));
+    assert.equal(await system.run.count({ where: { userId: privateActor.userId } }), 0);
+    await assert.rejects(create("Past the limit"), /computer limit/);
+    assert.equal(await system.bot.count({ where: { userId: privateActor.userId } }), 2);
+    await assert.rejects(runAsTenant(actor, () => privateRepos.getBot(actor, firstPrivate.id)));
+    const isolatedProvider = new FakeSandboxProvider();
+    const forbiddenHost = new FakeSandboxProvider();
+    const hostDescription = forbiddenHost.describe();
+    forbiddenHost.describe = () => ({ ...hostDescription, id: "desktop" });
+    let hostCalls = 0;
+    forbiddenHost.provision = async () => { hostCalls++; throw Error("Unexpected Desktop provision"); };
+    const pinnedSandbox = new HostAwareSandbox(isolatedProvider, forbiddenHost, async () => true);
+    const privateDeps = {
+      prisma, sandbox: pinnedSandbox, home: new LocalAgentHomeStore(path.join(directory, "isolated-homes")),
+      jobs: { ...jobs, cancel: async () => undefined, close: async () => undefined }, events: deps.events,
+    };
+    await assert.rejects(runAsTenant(actor, () => provisionComputer(privateDeps, rows[0]!.computerId!, {
+      ...actor, botId: bot.id, operationId: "foreign-boot", traceId: id, signal: AbortSignal.timeout(10_000),
+    })), /not assigned/);
+    assert.equal(isolatedProvider.boxes.size, 0);
+    const refs = [];
+    const privateLeases = [];
+    for (const row of rows) {
+      const ctx = { ...privateActor, botId: row.id, operationId: `boot:${row.id}`, traceId: row.id, signal: AbortSignal.timeout(10_000) };
+      refs.push(await runAsTenant(privateActor, () => provisionComputer(privateDeps, row.computerId!, ctx)));
+      const task = await system.task.create({ data: { ...privateActor, botId: row.id, threadId: row.thread!.id, prompt: "Synthetic lease only", status: "running" } });
+      const active = await system.run.create({ data: { ...privateActor, botId: row.id, threadId: row.thread!.id, taskId: task.id, status: "running", trigger: "user", leaseOwner: "isolated-worker", leaseFence: 1, leaseExpiresAt: new Date(Date.now() + 60_000) } });
+      const input = { computerId: row.computerId!, botId: row.id, runId: active.id, workerId: "isolated-worker", runFence: 1 };
+      await assert.rejects(runAsTenant(privateActor, () => acquireDedicatedScreenLeaseFence(prisma, { ...input, runFence: 0 })));
+      privateLeases.push(await runAsTenant(privateActor, () => acquireDedicatedScreenLeaseFence(prisma, input)));
+    }
+    assert.notEqual(privateLeases[0]!.computerId, privateLeases[1]!.computerId);
+    assert.equal(hostCalls, 0);
+    assert.equal(isolatedProvider.boxes.size, 2);
+    const fileContext = { ...privateActor, operationId: "private-file-proof", traceId: id, signal: AbortSignal.timeout(10_000), isolatedWorkspace: true };
+    await pinnedSandbox.writeFile(refs[0]!, { path: "secret.txt", content: new TextEncoder().encode("First Mico only") }, fileContext);
+    await assert.rejects(pinnedSandbox.readFile(refs[1]!, "secret.txt", fileContext));
+    assert.equal(new TextDecoder().decode(await pinnedSandbox.readFile(refs[0]!, "secret.txt", fileContext)), "First Mico only");
+    assert.deepEqual(await system.bot.findUniqueOrThrow({ where: { id: bot.id } }), legacyAssignment);
+    for (const held of privateLeases) await runAsTenant(privateActor, () => releaseComputerExecutionLease(prisma, held));
+    checks.push("real PostgreSQL default isolated assignment, idempotency, quota, account boundaries, private files, independent screen fences and no Desktop fallback (synthetic provider only)");
+  } finally {
+    if (previousProvider === undefined) delete process.env.SANDBOX_PROVIDER; else process.env.SANDBOX_PROVIDER = previousProvider;
+    if (previousLimit === undefined) delete process.env.SANDBOX_MAX_COMPUTERS_PER_USER; else process.env.SANDBOX_MAX_COMPUTERS_PER_USER = previousLimit;
+  }
   const result = { passed: true, checks, productionAccess: false, modelsCalled: false };
   await writeFile(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));

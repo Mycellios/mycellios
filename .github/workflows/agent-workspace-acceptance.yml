@@ -89,6 +89,8 @@ jobs:
         run: node scripts/verify-workspace-sync-ui.mjs --output=workspace-proof
       - name: Exercise the permanent Mycellios picker without paid inference
         run: node scripts/verify-builtin-provider-ui.mjs --output=builtin-provider-proof
+      - name: Exercise isolated-computer controls without provisioning or inference
+        run: node scripts/verify-isolated-computer-ui.mjs --output=isolated-computer-proof
       - name: Exercise the actual Agent panel, guest authentication and durable messages
         run: npm exec -- tsx scripts/verify-event-demo-agent-ui.ts --output=event-demo-proof
       - name: Exercise the live mycelium presenter with isolated devices
@@ -109,6 +111,7 @@ jobs:
           path: |
             src/agent/workspace-proof
             src/agent/builtin-provider-proof
+            src/agent/isolated-computer-proof
             src/agent/event-demo-proof
             src/agent/event-presenter-proof
             src/agent/chat-flow-proof

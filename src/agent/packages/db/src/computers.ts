@@ -8,7 +8,7 @@ import { withTransactionRetry } from "./transaction-retry.js";
 export type { ComputerMode } from "@rakazo/contracts";
 
 export function parseComputerMode(scope: string): ComputerMode {
-  if (scope === "team" || scope === "dedicated") return scope;
+  if (scope === "team" || scope === "dedicated" || scope === "isolated") return scope;
   throw new Error(`Unknown computer scope: ${scope}`);
 }
 
@@ -18,6 +18,9 @@ export function parseComputerMode(scope: string): ComputerMode {
  * deployment with no computer stays `none` instead of inventing one.
  */
 export function computerKindForMode(mode: ComputerMode, isolatedKind: string): string {
+  // A native host is not a sandbox. Keep the unavailable state explicit when
+  // this installation has no isolated provider, rather than granting PC access.
+  if (mode === "isolated") return isolatedKind === "desktop" ? "none" : isolatedKind;
   if (mode !== "dedicated") return isolatedKind;
   // A Docker deployment only reaches This PC through the user's desktop host.
   // Other providers (self-hosted desktop, tests, managed sandboxes) keep theirs.
@@ -36,6 +39,10 @@ export type ComputerKeyInput = {
 export function computerScopeKey(input: ComputerKeyInput) {
   const owner = `${input.spaceId}:${input.userId}`;
   if (input.mode === "team") return `${input.cloudFallback ? "cloud:" : ""}team:${owner}`;
+  if (input.mode === "isolated") {
+    if (!input.botId) throw new Error("Isolated computers require a bot id");
+    return `${input.cloudFallback ? "cloud:" : ""}isolated:${owner}:${input.botId}`;
+  }
   if (!input.botId) throw new Error("Dedicated computers require a bot id");
   return input.cloudFallback ? `cloud:bot:${owner}:${input.botId}` : `bot:${input.botId}`;
 }
@@ -50,6 +57,10 @@ export function computerHomeKey(input: ComputerKeyInput) {
   if (input.cloudFallback) {
     const digest = createHash("sha256").update(computerScopeKey(input)).digest("hex").slice(0, 32);
     return `cloud-${digest}`;
+  }
+  if (input.mode === "isolated") {
+    const digest = createHash("sha256").update(computerScopeKey(input)).digest("hex").slice(0, 32);
+    return `iso-${digest}`;
   }
   if (input.mode === "team") {
     const digest = createHash("sha256")
@@ -259,8 +270,8 @@ async function ensureComputerRecordWithQuota(
     // transaction; its old or intermediate reference is leaving the live set
     // when this link commits. Exclude this bot's current reference so a
     // transaction that ends with exactly one active computer is not refused
-    // at cap 1 (createBot links the team computer first, then re-links the
-    // bot to the new dedicated one; setBotComputer switches the same way).
+    // at cap 1 when setBotComputer replaces its last live assignment. New
+    // private profiles link only their final Computer in the creation transaction.
     // References from other active bots still count: a team computer another
     // live bot keeps using stays in-use after the re-link.
     const inUse = await countInUseComputersForUser(tx, input.userId, input.cloudFallback ? undefined : input.botId);

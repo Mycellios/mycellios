@@ -1166,6 +1166,17 @@
   transport sends, preserving current instructions and correlated results.
   Keep authorized memory and user-clarification schemas in the initial catalog;
   basic interactions should not require discovering their own core tools.
+- New ordinary Micos use `isolated` server computers with distinct account/Space/
+  Mico home keys. Keep Team sharing and explicit This PC (`dedicated`) unchanged,
+  including the installed-account first-run route. Creation allocates stopped
+  metadata only, under existing quotas. Never move existing assignments by default.
+  Derive the internal isolation pin from the owned Computer; reconnecting Desktop
+  cannot redirect an isolated workspace. Reuse private leases, fencing, approvals,
+  takeover and recovery. A local project requires a supported explicit computer
+  selection, never an implicit PC fallback. Qualify isolated creation/routing with
+  scripts/verify-workspace-sync-db.ts and the actual controls/overlay with
+  scripts/verify-isolated-computer-ui.mjs; fake screen/provider results do not
+  qualify a real container, operating system or multi-host execution.
 - An unavailable sandbox is an explicit `none` computer status, with screen,
   terminal and update access disabled. Keep text chat and thread snapshots usable
   without pretending that a computer was provisioned.

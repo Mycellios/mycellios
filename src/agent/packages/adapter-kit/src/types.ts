@@ -16,6 +16,8 @@ export interface AdapterContext {
   projectSessionId?: string;
   /** Server-selected workspace for this run, including after Desktop reconnects. */
   cloudWorkspace?: { workerId: string; runFence: number };
+  /** Server-derived from the owned Computer scope; never supplied by a client. */
+  isolatedWorkspace?: boolean;
   /** Opaque fence for releasing a graphical screen without tearing down its replacement. */
   screenLeaseId?: string;
   /** Retain a completed run's screen for reuse by this bot. */

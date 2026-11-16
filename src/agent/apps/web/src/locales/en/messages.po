@@ -12794,3 +12794,15 @@ msgstr "New folder inside"
 
 msgid "Delete folder"
 msgstr "Delete folder"
+
+msgid "Just this Mico"
+msgstr "Just this Mico"
+
+msgid "A separate browser and files for this Mico, on the server. Available when an isolated computer provider is configured."
+msgstr "A separate browser and files for this Mico, on the server. Available when an isolated computer provider is configured."
+
+msgid "Your Micos share a computer in this space."
+msgstr "Your Micos share a computer in this space."
+
+msgid "Uses your connected PC and its permissions. It is not an isolated server computer."
+msgstr "Uses your connected PC and its permissions. It is not an isolated server computer."

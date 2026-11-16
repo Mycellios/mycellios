@@ -28,6 +28,30 @@ describe("host-aware sandbox", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  it("keeps an explicitly isolated Mico off Desktop before and after reconnect", async () => {
+    const isolated: SandboxProvider = new FakeSandboxProvider();
+    isolated.isRunning = vi.fn(async () => true);
+    const host = new FakeSandboxProvider();
+    vi.spyOn(host, "describe").mockReturnValue({ ...host.describe(), id: "desktop" });
+    const provisionHost = vi.spyOn(host, "provision").mockRejectedValue(new Error("Local PC must not be used"));
+    let connected = false;
+    const sandbox = new HostAwareSandbox(isolated, host, async () => connected);
+    const pinned = { ...ctx, isolatedWorkspace: true };
+    const first = await sandbox.provision({ botId: "iso-first", homePath: "/unused", providerKind: "fake" }, pinned);
+    await sandbox.writeFile(first, { path: "notes.txt", content: new TextEncoder().encode("first only") }, pinned);
+    connected = true;
+    expect(await sandbox.provisionKind(pinned)).toBe("fake");
+    expect(await sandbox.isRunning(first, pinned)).toBe(true);
+    const resumed = await sandbox.provision({ botId: "iso-first", homePath: "/unused", providerKind: "fake", providerRef: first.providerRef }, pinned);
+    expect(resumed.providerRef).toBe(first.providerRef);
+    const second = await sandbox.provision({ botId: "iso-second", homePath: "/unused", providerKind: "fake" }, pinned);
+    await expect(sandbox.readFile(second, "notes.txt", pinned)).rejects.toThrow("not found");
+    expect(new TextDecoder().decode(await sandbox.readFile(first, "notes.txt", pinned))).toBe("first only");
+    expect(provisionHost).not.toHaveBeenCalled();
+    await expect(sandbox.provision({ botId: "legacy", homePath: "/unused" }, ctx)).rejects.toThrow("Local PC must not be used");
+    expect(provisionHost).toHaveBeenCalledOnce();
+  });
+
   it("never falls back to backend execution when the native connection is missing", async () => {
     const provision = vi.spyOn(DesktopSandboxProvider.prototype, "provision");
     const sandbox = createRunSandbox("docker", {

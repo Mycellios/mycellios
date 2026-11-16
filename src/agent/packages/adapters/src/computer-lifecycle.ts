@@ -166,6 +166,18 @@ export async function provisionComputer(
   const log = getLogger().child({ "computer.id": computerId, "run.id": context.runId });
   let existing = await deps.prisma.computer.findUniqueOrThrow({ where: { id: computerId } });
   const cloudWorkspace = existing.scopeKey?.startsWith("cloud:");
+  context = { ...context, isolatedWorkspace: existing.scope === "isolated" };
+  if (existing.scope === "isolated") {
+    const botId = context.botId;
+    if (existing.spaceId !== context.spaceId || existing.userId !== context.userId || !botId)
+      throw new Error("The isolated computer is not assigned to this Mico");
+    if (!cloudWorkspace && !(await deps.prisma.bot.findFirst({
+      where: { id: botId, computerId, spaceId: context.spaceId, userId: context.userId, archivedAt: null },
+      select: { id: true },
+    }))) throw new Error("The isolated computer is not assigned to this Mico");
+    if (["desktop", "none"].includes(deps.sandbox.describe().id))
+      throw new Error("An isolated computer provider is not available on this installation");
+  }
   if (cloudWorkspace && (!context.cloudWorkspace || !context.runId || !context.botId ||
     existing.spaceId !== context.spaceId || existing.userId !== context.userId)) {
     throw new Error("The server workspace is not assigned to this run");
@@ -566,7 +578,7 @@ export async function acquireDedicatedScreenLeaseFence(
 
     const computer = await tx.$queryRaw<Array<{ id: string; scope: string }>>`
       SELECT id, scope FROM computers WHERE id = ${input.computerId} FOR UPDATE SKIP LOCKED`;
-    if (computer.length !== 1 || computer[0]?.scope !== "dedicated") {
+    if (computer.length !== 1 || !["dedicated", "isolated"].includes(computer[0]?.scope ?? "")) {
       throw new ComputerBusyError();
     }
 

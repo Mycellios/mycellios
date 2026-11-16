@@ -41,10 +41,13 @@ describe("window chrome", () => {
   it("does not paint fake traffic lights in the browser", () => {
     expect(windowChromeKind(undefined)).toBe("spacer");
   });
-  it("defaults a new Desktop bot to this PC instead of a Docker Team Computer", () => {
-    expect(defaultComputerMode(undefined)).toBe("team");
-    expect(defaultComputerMode(desktop("linux"))).toBe("dedicated");
-    expect(defaultComputerMode(desktop("win32"))).toBe("dedicated");
+  it("defaults ordinary new Micos to isolation on web and Desktop", () => {
+    expect(defaultComputerMode(undefined)).toBe("isolated");
+    for (const platform of ["linux", "win32", "darwin"]) expect(defaultComputerMode(desktop(platform))).toBe("isolated");
+  });
+  it("preserves the computer route when the user explicitly selects an installed account", () => {
+    expect(defaultComputerMode(undefined, true)).toBe("team");
+    expect(defaultComputerMode(desktop("win32"), true)).toBe("dedicated");
   });
 
   it("leaves macOS traffic lights to Electron", () => {

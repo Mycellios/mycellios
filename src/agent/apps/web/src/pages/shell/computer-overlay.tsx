@@ -99,7 +99,7 @@ export function ComputerOverlay({
               />
             ) : (
               <span className="truncate text-[15.5px] font-medium text-foreground" dir="auto">
-                {computerLabel(computer?.mode, bot.name)}
+                {computerLabel(computer?.mode ?? bot.computerMode, bot.name)}
               </span>
             )}
             {!recordingSkill && hasControl ? (

@@ -9,6 +9,7 @@ import {
   ensureComputerRecord,
   resolveMaxComputersPerUser,
   restoreBotUnderComputerQuota,
+  parseComputerMode,
 } from "./computers.js";
 
 function fakePrisma(count = 0, existing = false) {
@@ -74,6 +75,7 @@ function fakeSerializingPrisma(initialInUse = 0) {
   }
 
   function botIdFromScopeKey(scopeKey: string): string | null {
+    if (scopeKey.startsWith("isolated:")) return scopeKey.split(":").at(-1)!;
     return scopeKey.startsWith("bot:") ? scopeKey.slice(4) : null;
   }
 
@@ -299,6 +301,41 @@ describe("team computer keys", () => {
     const otherMember = await ensureTeam("user-2");
     expect(secondBot.id).toBe(firstBot.id);
     expect(otherMember.id).not.toBe(firstBot.id);
+  });
+});
+
+describe("isolated Mico computers", () => {
+  const isolated = { ...baseInput, mode: "isolated" as const };
+  it("keeps isolated homes distinct from This PC, Team, other Micos and owners", () => {
+    expect(parseComputerMode("isolated")).toBe("isolated");
+    expect(computerKindForMode("isolated", "docker")).toBe("docker");
+    expect(computerKindForMode("isolated", "desktop")).toBe("none");
+    expect(computerKindForMode("isolated", "none")).toBe("none");
+    const key = computerScopeKey(isolated);
+    const home = computerHomeKey(isolated);
+    expect(home).toMatch(/^iso-[a-f0-9]{32}$/);
+    expect(home.length).toBeLessThanOrEqual(40);
+    for (const other of [
+      { ...isolated, mode: "dedicated" as const },
+      { ...isolated, mode: "team" as const },
+      { ...isolated, botId: "other" },
+      { ...isolated, userId: "other" },
+      { ...isolated, spaceId: "other" },
+    ]) {
+      expect(computerScopeKey(other)).not.toBe(key);
+      expect(computerHomeKey(other)).not.toBe(home);
+    }
+  });
+  it("serializes isolated admission at the same per-user quota without sharing a row", async () => {
+    process.env.SANDBOX_MAX_COMPUTERS_PER_USER = "1";
+    const { prisma } = fakeSerializingPrisma(0);
+    const results = await Promise.allSettled([
+      ensureComputerRecord(prisma, isolated),
+      ensureComputerRecord(prisma, { ...isolated, botId: "other" }),
+    ]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    const failure = results.find(result => result.status === "rejected");
+    expect(failure && failure.status === "rejected" && failure.reason).toBeInstanceOf(ComputerLimitError);
   });
 });
 

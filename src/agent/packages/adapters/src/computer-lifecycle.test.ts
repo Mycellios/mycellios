@@ -37,6 +37,18 @@ const context = {
 } satisfies AdapterContext;
 
 describe("computer provisioning", () => {
+  it.each(["desktop", "none"])("refuses %s as an isolated provider before provisioning", async kind => {
+    const provision = vi.fn();
+    const prisma = {
+      computer: { findUniqueOrThrow: vi.fn(async () => ({ id: "computer", scope: "isolated", spaceId: context.spaceId, userId: context.userId })) },
+      bot: { findFirst: vi.fn(async () => ({ id: context.botId })) },
+    } as unknown as PrismaClient;
+    await expect(provisionComputer({
+      prisma, sandbox: { describe: () => ({ id: kind }), provision } as unknown as SandboxProvider,
+      home: {} as AgentHomeStore, jobs: {} as JobPublisher, events: {} as ThreadEvents,
+    }, "computer", context)).rejects.toThrow("isolated computer provider is not available");
+    expect(provision).not.toHaveBeenCalled();
+  });
   it("stops a provider when archive invalidates its boot claim", async () => {
     const dataDir = await mkdtemp(path.join(tmpdir(), "rakazo-provision-race-"));
     const stop = vi.fn().mockResolvedValue(undefined);
@@ -2173,17 +2185,17 @@ describe("computer execution leases", () => {
     expect(screenLeaseIdForRun(null, "run-1", 0)).toBe("run-1:0");
   });
 
-  it("increments dedicated screen fences and refuses an unowned run", async () => {
+  it.each(["dedicated", "isolated"])("increments %s screen fences and refuses an unowned run", async scope => {
     const queryRaw = vi
       .fn()
       .mockResolvedValueOnce([{ id: "bot-1" }])
-      .mockResolvedValueOnce([{ id: "computer-1", scope: "dedicated" }])
+      .mockResolvedValueOnce([{ id: "computer-1", scope }])
       .mockResolvedValueOnce([{ id: "run-1" }])
       .mockResolvedValueOnce([{ id: "bot-1" }])
-      .mockResolvedValueOnce([{ id: "computer-1", scope: "dedicated" }])
+      .mockResolvedValueOnce([{ id: "computer-1", scope }])
       .mockResolvedValueOnce([{ id: "run-2" }])
       .mockResolvedValueOnce([{ id: "bot-1" }])
-      .mockResolvedValueOnce([{ id: "computer-1", scope: "dedicated" }])
+      .mockResolvedValueOnce([{ id: "computer-1", scope }])
       .mockResolvedValueOnce([]);
     const updateManyAndReturn = vi
       .fn()

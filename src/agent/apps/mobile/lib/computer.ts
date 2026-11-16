@@ -183,7 +183,7 @@ export function controlLabel(computer: ComputerStatus | null, name: string, botI
 }
 
 export function computerLabel(mode: ComputerMode | undefined, name: string) {
-  return mode === "dedicated" ? t("{name}’s computer", { name }) : t("Team Computer");
+  return mode === "team" || !mode ? t("Team Computer") : t("{name}’s computer", { name });
 }
 
 /**

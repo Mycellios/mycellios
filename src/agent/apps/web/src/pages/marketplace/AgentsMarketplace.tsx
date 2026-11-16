@@ -73,7 +73,7 @@ export function AgentsMarketplace({
         title: template.description,
         instructions,
         notifyOnFinish: true,
-        computerMode: "team",
+        computerMode: "isolated",
         spawnKey: `marketplace:${nonce}`,
       });
       nonces.current.delete(key);

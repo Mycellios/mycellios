@@ -3,6 +3,7 @@ import type * as ComputerLifecycleModule from "./computer-lifecycle.js";
 import { replaceComputer } from "./computer-lifecycle.js";
 import {
   performComputerUpdate,
+  computerUpdateView,
   queueComputerUpdate,
   reconcileComputerUpdates,
 } from "./computer-update.js";
@@ -12,6 +13,9 @@ vi.mock("./computer-lifecycle.js", async (original) => ({
   replaceComputer: vi.fn(),
 }));
 const replacement = vi.mocked(replaceComputer);
+it("keeps isolated maintenance separate from This PC", () => {
+  expect(computerUpdateView({ id: "update", botId: "mico", action: "update", status: "queued", stage: "preparing", computer: { scope: "isolated", bots: [{ id: "mico", name: "Writer" }] } })).toMatchObject({ mode: "isolated", botId: "mico" });
+});
 afterEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();

@@ -28,6 +28,15 @@ it("never routes task code to a remote computer as a fallback", async () => {
   ).rejects.toThrow("local PC");
   expect(environment).not.toHaveBeenCalled();
 });
+it("does not probe or grant the connected PC for an isolated local project", async () => {
+  const provisionKind = vi.fn(async () => "desktop");
+  const environment = vi.fn();
+  const isolated = { ...(target as unknown as Record<string, unknown>), bot: { computer: { scope: "isolated", kind: "docker" } } };
+  await expect(admitMicoTaskComputer({ provisionKind, environment } as never, actor, isolated as never))
+    .rejects.toThrow("Select This PC explicitly");
+  expect(provisionKind).not.toHaveBeenCalled();
+  expect(environment).not.toHaveBeenCalled();
+});
 it("checks the exact Mico and task thread while keeping ordinary chats unchanged", async () => {
   const environment = vi.fn(async () => ({ projectSessionId: "task-thread" }));
   await admitMicoTaskComputer(

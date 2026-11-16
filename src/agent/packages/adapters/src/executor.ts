@@ -3829,7 +3829,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: projectLeaseKey ?? run.botId,
           resumeHeldLease,
         });
-        if (!computerLease && (cloudComputer ?? leaseTarget.computer)?.scope === "dedicated") {
+        if (!computerLease && ["dedicated", "isolated"].includes((cloudComputer ?? leaseTarget.computer)?.scope ?? "")) {
           computerLease = await acquireDedicatedScreenLeaseFence(deps.prisma, {
             computerId: assignedComputerId,
             runId,
@@ -4090,12 +4090,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: bot.id,
           runId,
           cloudWorkspace: cloudComputer ? { workerId, runFence: fence } : undefined,
+          isolatedWorkspace: (cloudComputer ?? bot.computer)?.scope === "isolated",
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },
           ...connectedContext(connectedPlugins),
           connectedProviders: connectedComposio.map((row) => row.provider),
         };
+        if (context.isolatedWorkspace && context.projectSessionId) {
+          await failRunBeforeTurn(deps, run, bot.name, { attemptId: attempt.id, workerId, fence },
+            "This local project requires This PC. Select This PC explicitly before continuing; an isolated computer cannot access local project files.");
+          return;
+        }
         const memoryScope = configuredMemory
           ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
@@ -4363,7 +4369,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         const provisionKind = await deps.sandbox.provisionKind?.(context);
         const computerKind = provisionKind ?? storedComputer.kind;
-        const computerAvailable = admittedComputerAvailable(
+        const computerAvailable = !(context.isolatedWorkspace && ["desktop", "none"].includes(deps.sandbox.describe().id)) && admittedComputerAvailable(
           deps.sandbox.describe().id,
           provisionKind,
         );

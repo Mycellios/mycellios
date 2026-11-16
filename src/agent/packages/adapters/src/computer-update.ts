@@ -2,7 +2,7 @@ import type { AdapterContext } from "@rakazo/adapter-kit";
 import { computerControlExpireJobKey } from "@rakazo/adapter-kit";
 import { type ComputerUpdate, ComputerUpdateSchema } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
-import type { Prisma, PrismaClient, ThreadEvents } from "@rakazo/db";
+import { parseComputerMode, type Prisma, type PrismaClient, type ThreadEvents } from "@rakazo/db";
 import { getLogger } from "@rakazo/logging";
 import {
   enqueueTakeoverContinuation,
@@ -43,7 +43,7 @@ export function computerUpdateView(row: {
       ? row.botId
       : (row.computer.bots[0]?.id ?? row.botId),
     name: row.computer.bots.find((bot) => bot.id === row.botId)?.name ?? "",
-    mode: row.computer.scope === "team" ? "team" : "dedicated",
+    mode: parseComputerMode(row.computer.scope),
     status: row.status,
     stage: row.stage,
   });

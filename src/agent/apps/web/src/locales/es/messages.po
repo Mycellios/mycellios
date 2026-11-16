@@ -13059,3 +13059,15 @@ msgstr "Natural"
 
 msgid "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
 msgstr "Natural indica brevemente el primer paso. Clásico va directo al resultado. Ambos responden de forma breve, salvo que pidas más detalle."
+
+msgid "Just this Mico"
+msgstr "Solo este Mico"
+
+msgid "A separate browser and files for this Mico, on the server. Available when an isolated computer provider is configured."
+msgstr "Navegador y archivos separados para este Mico, en el servidor. Disponible si hay un proveedor de ordenadores aislados configurado."
+
+msgid "Your Micos share a computer in this space."
+msgstr "Tus Micos comparten un ordenador en este espacio."
+
+msgid "Uses your connected PC and its permissions. It is not an isolated server computer."
+msgstr "Usa tu PC conectado y sus permisos. No es un ordenador aislado del servidor."

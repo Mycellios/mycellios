@@ -3179,7 +3179,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     const isFirstBot = botsRef.current.length === 0;
     const bot = await rpc.bots.create({
       ...input,
-      computerMode: defaultComputerMode(desktopBridge()),
+      computerMode: defaultComputerMode(desktopBridge(), Boolean(first && firstMicoEngine)),
       notifyOnFinish: true,
       ...(first ? {
         color: input.color ?? MICO_PRIMARY_AVATAR,

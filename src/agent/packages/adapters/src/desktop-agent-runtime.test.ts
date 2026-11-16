@@ -172,6 +172,29 @@ it("continues a pinned cloud turn without probing a reconnected Desktop", async 
   expect(transport).not.toHaveBeenCalled();
 });
 
+it.each([undefined, "pi"] as const)("keeps isolated %s execution on the server without a Desktop dependency", async agentEngine => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn(async function* () { yield { type: "done" as const }; }) };
+  const select = vi.fn(); const transport = vi.fn();
+  const runtime = new DesktopAgentRuntime({ fallback, select, transport });
+  const input = { ...request(), agentEngine, turnCheckpoint: "same-owned-checkpoint" };
+  for await (const _ of runtime.run(input, { ...context, isolatedWorkspace: true })) {}
+  expect(fallback.run).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ model: input.model, turnCheckpoint: "same-owned-checkpoint" }),
+    expect.objectContaining({ isolatedWorkspace: true, userId: context.userId, spaceId: context.spaceId }),
+  );
+  expect(select).not.toHaveBeenCalled(); expect(transport).not.toHaveBeenCalled();
+});
+
+it("keeps an explicitly selected native account from falling back to a paid API model", async () => {
+  const fallback = { describe, abort: vi.fn(), run: vi.fn() };
+  const transport = vi.fn();
+  const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: false, preferred: true }) });
+  await expect(async () => {
+    for await (const _ of runtime.run({ ...request(), agentEngine: "codex" }, { ...context, isolatedWorkspace: true })) {}
+  }).rejects.toThrow("Desktop is offline");
+  expect(fallback.run).not.toHaveBeenCalled(); expect(transport).not.toHaveBeenCalled();
+});
+
 it("distinguishes a lost Desktop transport from a returned provider failure", async () => {
   const fallback = { describe, abort: vi.fn(), run: vi.fn() };
   const providerFailure = '429: {"error":{"code":"quota_exhausted"}}';

@@ -9,6 +9,10 @@ export async function admitMicoTaskComputer(
   target: ThreadTarget,
 ) {
   if (target.kind !== "bot" || !target.projectSessionId) return;
+  if (target.bot.computer?.scope === "isolated")
+    throw new ORPCError("CONFLICT", {
+      message: "This local project requires This PC. Select This PC explicitly before starting its task.",
+    });
   const context = {
     operationId: "mico-task-admission",
     traceId: "mico-task-admission",

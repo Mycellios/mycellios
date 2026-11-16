@@ -3,6 +3,17 @@ import { describe, expect, it } from "vitest";
 import { executionBlocksUserTakeover, toComputerStatus } from "./computer-status.js";
 
 describe("toComputerStatus", () => {
+  it.each(["desktop", "none"])("does not advertise %s as an isolated computer", kind => {
+    expect(toComputerStatus("mico", { kind, scope: "isolated", state: "running", controlHolder: "user", controlBotId: "mico", controlRunId: "stale", homeRevision: "r1" })).toMatchObject({
+      mode: "isolated", kind: "none", state: "stopped", screenAvailable: false, terminalAvailable: false,
+      controlHolder: "none", controlBotId: null, takeoverRequested: false,
+    });
+  });
+  it("retains the isolated mode in a running provider status", () => {
+    expect(toComputerStatus("mico", { kind: "docker", scope: "isolated", state: "running", controlHolder: "none", homeRevision: "r1" })).toMatchObject({
+      mode: "isolated", kind: "docker", screenAvailable: true, terminalAvailable: true,
+    });
+  });
   it("does not advertise a fake computer when none is assigned", () => {
     expect(ComputerStatusSchema.parse(toComputerStatus("bot-1", null))).toMatchObject({
       kind: "none",

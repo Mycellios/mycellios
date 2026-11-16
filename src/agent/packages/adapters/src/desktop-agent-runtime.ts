@@ -134,10 +134,13 @@ export class DesktopAgentRuntime implements AgentRuntime {
     // The approval judge is a server authority, not another Desktop task waiting for
     // a runtime slot held by the very operation it is deciding whether to admit.
     if (request.usageOperationKind === "setup" && !request.tools.length || request.script) { yield* this.options.fallback.run(request, context); return; }
-    if (context.cloudWorkspace) {
+    const isolatedServerRun = context.isolatedWorkspace && (!request.agentEngine || request.agentEngine === "pi");
+    if (context.cloudWorkspace || isolatedServerRun) {
       yield* this.options.fallback.run({
         ...request,
-        instructions: `${request.instructions}\nThis turn uses a server workspace separate from Desktop. For work that requires files only on the PC, explain which files are needed.`,
+        instructions: context.cloudWorkspace
+          ? `${request.instructions}\nThis turn uses a server workspace separate from Desktop. For work that requires files only on the PC, explain which files are needed.`
+          : `${request.instructions}\nThis Mico has selected an isolated server computer. Do not switch to Desktop or claim access to files on the PC.`,
       }, context);
       return;
     }
