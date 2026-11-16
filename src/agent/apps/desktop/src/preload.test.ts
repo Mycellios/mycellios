@@ -11,9 +11,11 @@ function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: u
   const off = (ipc.off as ReturnType<typeof vi.fn>) ?? vi.fn();
   const send = (ipc.send as ReturnType<typeof vi.fn>) ?? vi.fn();
   const exposeInMainWorld = vi.fn();
+  const addEventListener = vi.fn();
   const source = readFileSync(path.join(import.meta.dirname, file), "utf8");
 
   vm.runInNewContext(source, {
+    document: { addEventListener },
     process: { platform: "linux", argv: ["--mycellios-chat-space=space-a"] },
     require(moduleName: string) {
       if (moduleName !== "electron") throw new Error(`Unexpected preload import: ${moduleName}`);
@@ -21,8 +23,17 @@ function runPreload(file: string, ipc: { invoke?: unknown; on?: unknown; off?: u
     },
   });
 
-  return { invoke, on, off, send, exposeInMainWorld };
+  return { invoke, on, off, send, exposeInMainWorld, addEventListener };
 }
+
+it("activates a companion only for a trusted primary pointer gesture without exposing an activation method", () => {
+  const f = runPreload("companion-preload.cjs");
+  const pointer = f.addEventListener.mock.calls.find(([name]) => name === "pointerdown")![1];
+  pointer({ isTrusted: false, button: 0 }); pointer({ isTrusted: true, button: 1 });
+  expect(f.send).not.toHaveBeenCalled();
+  pointer({ isTrusted: true, button: 0 }); expect(f.send).toHaveBeenCalledExactlyOnceWith("companion.activate");
+  expect(f.exposeInMainWorld.mock.calls[0]![1].activate).toBeUndefined();
+});
 
 it("exposes bounded native notification operations and removes click listeners", async () => {
   const f = runPreload("preload.cjs");

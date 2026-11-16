@@ -8,7 +8,7 @@ let bridge: any;
 const prompt = { id: "run:message:0", botId: "bot", runId: "run", messageId: "message", legacy: true,
   questions: [{ id: "q", question: "Where?", options: [{ id: "a", label: "Paris", description: "Museums" }, { id: "b", label: "London" }] }] };
 function state(expanded = true, questions = [prompt], scope = "owner:space") {
-  return { kind: "island", prefs: { dock: { autoHide: false, edge: "right", edgeStrip: true } }, expanded,
+  return { kind: "island", prefs: { dock: { autoHide: false, edge: "right", edgeStrip: true } }, expanded, focused: true,
     snapshot: { scope, theme: "light", questions, agents: [{ id: "bot", name: "Mico", status: "Waiting", color: "#3f9f78" }] } };
 }
 beforeEach(() => {
@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); document.body.replaceChildren(); delete (window as any).companion; });
 
-it.each([false, true])("restores island input focus on updates only while its document is focused (%s)", focused => {
+it.each([{ native: false, document: false }, { native: false, document: true }, { native: true, document: true }])("restores reply focus only with native and document focus (%j)", focused => {
   receive(state());
   const input = document.querySelector<HTMLInputElement>(".island-answer-input")!;
   input.value = "Keep my draft";
@@ -28,11 +28,11 @@ it.each([false, true])("restores island input focus on updates only while its do
   input.focus();
   expect(document.activeElement).toBe(input);
   // A background BrowserWindow retains activeElement even after OS focus leaves.
-  vi.spyOn(document, "hasFocus").mockReturnValue(focused);
+  vi.spyOn(document, "hasFocus").mockReturnValue(focused.document);
   const focus = vi.spyOn(HTMLElement.prototype, "focus");
-  const update = state(); update.snapshot.agents[0]!.status = "Updated in background";
+  const update = state(); update.focused = focused.native; update.snapshot.agents[0]!.status = "Updated in background";
   receive(update);
-  expect(focus).toHaveBeenCalledTimes(focused ? 1 : 0);
+  expect(focus).toHaveBeenCalledTimes(focused.native && focused.document ? 1 : 0);
   expect(document.querySelector<HTMLInputElement>(".island-answer-input")!.value).toBe("Keep my draft");
   expect(bridge.expand).not.toHaveBeenCalled(); expect(bridge.select).not.toHaveBeenCalled();
 });

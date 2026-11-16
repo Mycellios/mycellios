@@ -81,6 +81,16 @@ try {
     main.show();main.focus();
   });
   await page.locator('#draft').focus();
+  await app.evaluate(({BrowserWindow})=>{
+    globalThis.interactionTrace=[];
+    for(const win of BrowserWindow.getAllWindows()) {
+      const record=(event,details)=>{if(globalThis.interactionTrace.length<120)globalThis.interactionTrace.push({window:win.getTitle(),event,details});};
+      for(const event of ['focus','blur'])win.on(event,()=>record(event));
+      for(const method of ['setBounds','setFocusable','setAlwaysOnTop']) {
+        const original=win[method].bind(win);win[method]=(...args)=>{record(method,args);return original(...args);};
+      }
+    }
+  });
   await page.evaluate(() => {window.poll=setInterval(()=>{
     window.snapshot.agents[0].status='Update '+Date.now();void window.fixture.publish(window.snapshot);
   },40);});
@@ -93,12 +103,16 @@ try {
   assert.equal(await page.locator('#draft').inputValue(),'A draft that stays in the main window.');
   const koffi=createRequire(import.meta.url)('koffi');
   const user32=koffi.load('user32.dll');
+  // Keep Win32 hit testing and cursor injection in the same physical coordinate
+  // space on scaled Windows runners and multi-monitor workstations.
+  user32.func('intptr_t __stdcall SetThreadDpiAwarenessContext(intptr_t context)')(-4);
   const Rect=koffi.struct('InteractionRect',{left:'int',top:'int',right:'int',bottom:'int'});
   const Point=koffi.struct('InteractionPoint',{x:'int',y:'int'});
   const rect=user32.func('GetWindowRect','bool',['uintptr_t',koffi.out(koffi.pointer(Rect))]);
   const at=user32.func('WindowFromPoint','uintptr_t',[Point]);
   const cursor=user32.func('bool __stdcall SetCursorPos(int x,int y)');
   const mouse=user32.func('void __stdcall mouse_event(uint32_t flags,uint32_t dx,uint32_t dy,uint32_t data,uintptr_t extra)');
+  const hitTest=user32.func('intptr_t __stdcall SendMessageW(uintptr_t window,uint32_t message,uintptr_t wParam,intptr_t lParam)');
   const handle=BigInt(await app.evaluate(({BrowserWindow})=>{
     const b=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture').getNativeWindowHandle();
     return (b.length===8?b.readBigUInt64LE():BigInt(b.readUInt32LE())).toString();
@@ -114,7 +128,8 @@ try {
     const before={};assert.ok(rect(handle,before));
     const start={x:before.left+150,y:Math.max(10,before.top+18)};
     assert.equal(BigInt(at(start)),handle,'Caption is covered by a different window');
-    assert.ok(cursor(start.x,start.y));mouse(2,0,0,0,0);
+    assert.equal(Number(hitTest(handle,0x84,0,(start.y&0xffff)*65536+(start.x&0xffff))),2,'Pointer must start on the native caption');
+    assert.ok(cursor(start.x,start.y));await pause(75);mouse(2,0,0,0,0);await pause(75);
     try{for(let step=1;step<=12;step++){assert.ok(cursor(start.x+step*9,start.y+step*7));await pause(35);}}
     finally{mouse(4,0,0,0,0);}
     await pause(500);const dropped={};assert.ok(rect(handle,dropped));
@@ -128,6 +143,26 @@ try {
   await writeFile(path.join(output,'window-interaction-qualification.json'),JSON.stringify(receipt,null,2));
   console.log(JSON.stringify(receipt));
 } catch(error) {
-  await writeFile(path.join(output,'window-interaction-qualification.json'),JSON.stringify({passed:false,phase})).catch(()=>{});
+  const native = (()=>{try {
+    const lib=createRequire(import.meta.url)('koffi').load('user32.dll');
+    const foreground=lib.func('uintptr_t __stdcall GetForegroundWindow()')();
+    const pid=[0];lib.func('uint32_t __stdcall GetWindowThreadProcessId(uintptr_t window, _Out_ uint32_t *pid)')(foreground,pid);
+    return {processId:pid[0]};
+  }catch{return null;}})();
+  const observation=app?await Promise.race([app.evaluate(async ({BrowserWindow})=>({trace:globalThis.interactionTrace,
+    windows:await Promise.all(BrowserWindow.getAllWindows().map(async win=>({window:win.getTitle(),focused:win.isFocused(),
+      document:await win.webContents.executeJavaScript('({focused:document.hasFocus(),active:document.activeElement?.className})').catch(()=>null)})))})).catch(()=>null),pause(2000).then(()=>null)]):null;
+  console.error(JSON.stringify({phase,native,observation}));
+  await writeFile(path.join(output,'window-interaction-qualification.json'),JSON.stringify({passed:false,phase,native,observation})).catch(()=>{});
   throw error;
-} finally {await app?.close();await rm(temp,{recursive:true,force:true});}
+} finally {
+  // This process owns only synthetic windows. Exit directly so a failed native
+  // move loop cannot strand the fixture's teardown in a graceful quit wait.
+  if(app) {
+    await Promise.race([app.evaluate(({app})=>app.exit(0)).catch(()=>{}),pause(3000)]);
+    await Promise.race([app.close().catch(()=>{}),pause(3000)]);
+  }
+  assert.equal(path.dirname(path.resolve(temp)),path.resolve(tmpdir()));
+  assert.ok(path.basename(temp).startsWith('mycellios-interaction-proof-'));
+  await rm(temp,{recursive:true,force:true});
+}

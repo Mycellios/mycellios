@@ -1140,8 +1140,12 @@
   their values differ. Follow the main window's display identity rather than
   each intermediate drag bound; qualify movement and display transitions with
   the companion tests without repositioning the main window.
-  Restore the island reply input's focus during updates only when its document
-  still has OS focus; a background window's activeElement is not sufficient.
+  Restore the island reply input's focus during updates only when the native
+  host reports that window focused. Windows can retain document.hasFocus() and
+  activeElement after native blur; neither is sufficient without the host signal.
+  Companions lose native focusability on blur and regain it only through their
+  private preload's trusted pointer gesture or an explicit island-open action.
+  Background DOM replacement must never reactivate a companion window.
   Windows releases run `apps/desktop/scripts/verify-window-interaction.mjs` in
   an isolated profile, checking typing during companion updates and native pointer
   dragging from normal and maximized windows. Retain its qualification receipt.

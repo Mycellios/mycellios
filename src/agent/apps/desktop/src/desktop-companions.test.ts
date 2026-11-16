@@ -114,6 +114,23 @@ async function islandHost() {
   const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
   return { host, requestReply, reveal, window, event };
 }
+it("revokes island activation on blur and restores it only for its owned expanded surface", async () => {
+  const test = await islandHost();
+  try {
+    const activate = mocks.listeners.get("companion.activate")!;
+    activate(test.event); expect(test.window.isFocusable()).toBe(false);
+    mocks.listeners.get("companion.expand")!(test.event, true);
+    expect(test.window.isFocusable()).toBe(true);
+    test.window.emit("blur"); expect(test.window.isFocusable()).toBe(false);
+    call("publish", { ...snapshot, questions: [question] });
+    expect(test.window.isFocusable()).toBe(false);
+    activate({ sender: test.window.webContents, senderFrame: {} }); expect(test.window.isFocusable()).toBe(false);
+    activate(test.event); expect(test.window.isFocusable()).toBe(true);
+    mocks.listeners.get("companion.expand")!(test.event, false);
+    expect(test.window.isFocusable()).toBe(false);
+    activate(test.event); expect(test.window.isFocusable()).toBe(false);
+  } finally { test.host.dispose(); }
+});
 it("answers only from its own island, validates scope/options and resolves through the trusted app", async () => {
   const test = await islandHost(); const reply = mocks.handlers.get("companion.answer")!;
   try {
