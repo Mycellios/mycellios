@@ -32,6 +32,7 @@ try {
     import {installDesktopCompanions} from ${JSON.stringify(path.join(desktop,'src/desktop-companions.ts'))};
     import {browserWindowOptions} from ${JSON.stringify(path.join(desktop,'src/window-options.ts'))};
     app.setPath('userData',${JSON.stringify(path.join(temp,'profile'))});
+    async function qualify() {
     await app.whenReady();
     const main=new BrowserWindow({...browserWindowOptions(process.platform),x:80,y:150,width:800,height:600,
       webPreferences:{preload:${JSON.stringify(preload)},sandbox:true,contextIsolation:true,nodeIntegration:false}});
@@ -40,6 +41,8 @@ try {
     ipcMain.handle('fixture.defaults',()=>DEFAULT_DESKTOP_COMPANIONS);
     app.on('before-quit',()=>host.dispose());
     await main.loadURL('data:text/html,<title>Isolated interaction fixture</title><input id="draft" aria-label="Draft">');
+    }
+    void qualify().catch(error=>{console.error(error);app.exit(1);});
   `;
   await build({stdin:{contents:source,resolveDir:desktop,sourcefile:'interaction-fixture.mjs'},outfile:entry,
     bundle:true,platform:'node',format:'esm',target:'node24',external:['electron'],
