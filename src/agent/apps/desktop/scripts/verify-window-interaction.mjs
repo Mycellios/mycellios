@@ -138,7 +138,9 @@ try {
     assert.equal(BigInt(at(start)),handle,'Caption is covered by a different window');
     assert.equal(Number(hitTest(handle,0x84,0,(start.y&0xffff)*65536+(start.x&0xffff))),2,'Pointer must start on the native caption');
     assert.ok(cursor(start.x,start.y));await pause(75);mouse(2,0,0,0,0);await pause(75);
-    try{for(let step=1;step<=12;step++){assert.ok(cursor(start.x+step*9,start.y+step*7));await pause(35);}}
+    // Repositioning the cursor alone does not supply mouse movement input to
+    // Windows' native caption move loop. Inject actual relative move packets.
+    try{for(let step=1;step<=12;step++){mouse(1,9,7,0,0);await pause(35);}}
     finally{mouse(4,0,0,0,0);}
     await pause(500);const dropped={};assert.ok(rect(handle,dropped));
     assert.ok(Math.abs(dropped.left-before.left)>30||Math.abs(dropped.top-before.top)>30,'Native caption drag did not move the window');
