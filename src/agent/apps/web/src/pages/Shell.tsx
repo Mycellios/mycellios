@@ -3180,7 +3180,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
     const isFirstBot = botsRef.current.length === 0;
     const profile = {
       ...input,
-      computerMode: defaultComputerMode(desktopBridge(), Boolean(first && firstMicoEngine)),
+      computerMode: defaultComputerMode(desktopBridge(), Boolean(first && isFirstBot && firstMicoEngine)),
       notifyOnFinish: true,
       ...(first ? {
         color: input.color ?? MICO_PRIMARY_AVATAR,

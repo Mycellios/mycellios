@@ -1,4 +1,5 @@
 import type { CreateBotInput } from "@rakazo/contracts";
+import { defaultComputerMode, desktopBridge } from "../../lib/desktop";
 import {
   memberInstructions,
   memberSpawnKey,
@@ -25,6 +26,7 @@ export type OnboardingTeamCreateInput = Pick<
   | "notifyOnFinish"
   | "spawnKey"
   | "agentEngine"
+  | "computerMode"
 >;
 
 type ExistingBot = { id: string; spawnKey: string | null };
@@ -68,6 +70,7 @@ export async function createOnboardingTeam(
   },
 ): Promise<{ id: string }> {
   if (members.length === 0) throw new Error("Choose at least one Mico");
+  const computerMode = defaultComputerMode(desktopBridge(), Boolean(client.agentEngine));
   const run = async () => {
     client.signal?.throwIfAborted();
     const existing = [...(await client.list())];
@@ -86,6 +89,7 @@ export async function createOnboardingTeam(
         description: member.description,
         instructions: member.instructions,
         notifyOnFinish: true,
+        computerMode,
         spawnKey,
         ...(client.agentEngine ? { agentEngine: client.agentEngine } : {}),
       });

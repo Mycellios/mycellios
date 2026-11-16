@@ -1,6 +1,14 @@
-import { FIRST_MICO_SPAWN_KEY } from "@rakazo/contracts";
-import { expect, it, vi } from "vitest";
+import { FIRST_MICO_SPAWN_KEY, type RakazoDesktop } from "@rakazo/contracts";
+import { beforeEach, expect, it, vi } from "vitest";
+import { desktopBridge } from "../../lib/desktop";
 import { createOnboardingTeam, type OnboardingTeamMember } from "./create-onboarding-team";
+
+vi.mock("../../lib/desktop", async importOriginal => ({
+  ...await importOriginal<typeof import("../../lib/desktop")>(),
+  desktopBridge: vi.fn(),
+}));
+
+beforeEach(() => vi.mocked(desktopBridge).mockReturnValue(undefined));
 
 const members: OnboardingTeamMember[] = [
   {
@@ -45,6 +53,7 @@ it("resumes interrupted creation without duplicate profiles or automatic inferen
   expect(create.mock.calls[0]?.[0]).toMatchObject({
     name: "Lead Researcher",
     spawnKey: FIRST_MICO_SPAWN_KEY,
+    computerMode: "isolated",
   });
   expect(create.mock.calls[2]?.[0]).toMatchObject({
     spawnKey: "onboarding:team:sales-outreach",
@@ -73,9 +82,34 @@ it("stops starting new profile writes after leaving setup", async () => {
   expect(create).toHaveBeenCalledTimes(1);
 });
 
-it.each(["codex", "claude"] as const)("keeps every proposed role when the user chooses installed %s", async agentEngine => {
+it.each([false, true])("keeps ordinary model/API profiles isolated with Desktop available=%s", async desktop => {
+  vi.mocked(desktopBridge).mockReturnValue(desktop ? {} as RakazoDesktop : undefined);
+  const create = vi.fn(async (input: { spawnKey?: string }) => ({ id: input.spawnKey! }));
+  await createOnboardingTeam(members, { list: async () => [], create });
+  expect(create).toHaveBeenCalledTimes(members.length);
+  for (const [input] of create.mock.calls) {
+    expect(input).toMatchObject({ computerMode: "isolated" });
+    expect(input).not.toHaveProperty("agentEngine");
+  }
+});
+
+it.each([
+  ["codex", false, "team"], ["claude", false, "team"],
+  ["codex", true, "dedicated"], ["claude", true, "dedicated"],
+] as const)("keeps every proposed role for installed %s with Desktop=%s on %s", async (agentEngine, desktop, computerMode) => {
+  vi.mocked(desktopBridge).mockReturnValue(desktop ? {} as RakazoDesktop : undefined);
   const create = vi.fn(async (input: { spawnKey?: string }) => ({ id: input.spawnKey! }));
   await createOnboardingTeam(members, { list: async () => [], create, agentEngine });
   expect(create).toHaveBeenCalledTimes(members.length);
-  for (const [input] of create.mock.calls) expect(input).toMatchObject({ agentEngine });
+  for (const [input] of create.mock.calls) expect(input).toMatchObject({ agentEngine, computerMode });
+});
+
+it("never reassigns an existing profile when a retry chooses an installed account", async () => {
+  vi.mocked(desktopBridge).mockReturnValue({} as RakazoDesktop);
+  const create = vi.fn(async (input: { spawnKey?: string }) => ({ id: input.spawnKey! }));
+  const existing = { id: "bot-lead", spawnKey: FIRST_MICO_SPAWN_KEY, computerMode: "isolated" };
+  await createOnboardingTeam(members, { list: async () => [existing], create, agentEngine: "codex" });
+  expect(create).toHaveBeenCalledTimes(1);
+  expect(create.mock.calls[0]?.[0]).toMatchObject({ spawnKey: "onboarding:team:sales-outreach", computerMode: "dedicated", agentEngine: "codex" });
+  expect(existing.computerMode).toBe("isolated");
 });

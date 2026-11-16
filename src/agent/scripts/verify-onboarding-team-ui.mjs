@@ -80,7 +80,7 @@ try {
   await page.getByRole("button", { name: "Create and open this team", exact: true }).click();
   await expect(page.getByTestId("team-created")).toBeVisible();
   assert.equal(connects, 0); assert.equal(bots.length, 3); assert.equal(normalCreates, 0);
-  assert(creates.every(input => !input.model && !input.agentEngine && input.expectedUserId === "fixture-owner"));
+  assert(creates.every(input => !input.model && !input.agentEngine && input.computerMode === "isolated" && input.expectedUserId === "fixture-owner"));
   proof.defaultProviderPreserved = true; proof.profileOnly = true;
   bots = []; creates = [];
   await open();
@@ -121,7 +121,7 @@ try {
   await page.getByRole("button", { name: "Codex", exact: true }).click();
   await expect(page.getByTestId("team-created")).toBeVisible();
   assert.equal(bots.length, 3); assert.equal(connects, connectionsBeforeNativeChoice);
-  assert(creates.every(input => input.agentEngine === "codex" && input.expectedUserId === "fixture-owner"));
+  assert(creates.every(input => input.agentEngine === "codex" && input.computerMode === "team" && input.expectedUserId === "fixture-owner"));
   proof.installedAccountPreservesTeam = true;
   needsModel = false;
   bots = []; await page.setViewportSize({ width: 390, height: 844 });
