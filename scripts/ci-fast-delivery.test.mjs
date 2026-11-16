@@ -159,3 +159,11 @@ test('conversation follow-up retains an isolated real database and delivery gate
  assert.ok(plan.some(c=>c.args.includes('scripts/verify-task-conversations-route-db.ts')));
  assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-task-conversations-route-db.ts')));
 });
+
+test('event waits qualify the deployed CHECK upgrade and automatic return on a real isolated database',()=>{
+ for (const file of ['src/agent/packages/db/src/event-waits.ts','src/agent/packages/db/src/work-delegation.ts','src/agent/scripts/verify-autonomy-waits-db.ts','src/agent/packages/db/prisma/migrations/20261116150000_event_wait_delegation_state/migration.sql']) {
+  const check=planChecks([file],[]).find(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts'));
+  assert.deepEqual(check?.args,['node_modules/tsx/dist/cli.mjs','scripts/verify-autonomy-waits-db.ts']);
+ }
+ assert.ok(!planChecks(['src/agent/apps/web/src/pages/tasks/tasks.css'],[]).some(c=>c.args.includes('scripts/verify-autonomy-waits-db.ts')));
+});

@@ -234,7 +234,7 @@ export class ManagedAntseedGateway {
     await submitted(job);
     // The signed spend feed may follow the final token frame. Wait briefly using
     // receipt GETs only, under the same execution deadline; never repeat the POST.
-    for (const delay of [0, 100, 200, 400, 800]) {
+    for (const delay of [0, 100, 200, 400, 800, 1600, 3200]) {
       if (delay) await receiptDelay(delay, undefined, {signal});
       const result = await this.recover(job, signal); if (result) return result;
     }

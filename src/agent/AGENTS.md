@@ -47,7 +47,10 @@
   or a bounded future time; external events use the existing routine ingress.
   Reconcile under the same scoped work lock, fence the source run, and return
   failures/expiry without claiming success. Pause/cancel prevent wakeups; no new
-  scheduler, credentials, migration or model polling is involved. Inspect through
+  scheduler, credentials or model polling is involved. Apply the additive
+  `20261116150000_event_wait_delegation_state` migration before enabling waits;
+  it extends the existing delegation-state CHECK without changing older states.
+  Inspect through
   `work_status`; validate with `scripts/verify-autonomy-waits-db.ts` on its fresh
   disposable loopback cluster and the event-waits/work-continuation tests.
 - Fresh routine sessions receive only a bounded, redacted historical handoff from

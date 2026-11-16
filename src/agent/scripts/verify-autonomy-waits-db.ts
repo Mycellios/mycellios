@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chmod, mkdtemp, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -32,6 +32,12 @@ try {
     cwd: process.cwd(), windowsHide: true, env: { ...process.env, DATABASE_URL: url, DATABASE_MIGRATION_URL: url }, maxBuffer: 1024 * 1024,
   });
   database = createDb(url, { encryptContent: false, applicationName: 'synthetic-autonomy-waits' });
+  // Prisma db push omits SQL CHECK constraints. Install the actual deployed
+  // predecessor before qualifying this upgrade, rather than testing a weaker DB.
+  const previousMigration = await readFile('packages/db/prisma/migrations/20261104180000_durable_work_delegation/migration.sql', 'utf8');
+  const previousCheck = previousMigration.match(/ALTER TABLE tasks ADD CONSTRAINT tasks_delegation_state_check CHECK[\s\S]*?;/)?.[0];
+  assert.ok(previousCheck, 'canonical predecessor CHECK must exist');
+  await database.pool.query(previousCheck);
   const prisma = asSystem(database.prisma, 'isolated synthetic autonomy acceptance');
   const suffix = randomUUID();
   const scope = { spaceId: `space-${suffix}`, userId: `user-${suffix}` };
@@ -40,6 +46,25 @@ try {
   await prisma.space.create({ data: { id: scope.spaceId, organizationId: `org-${suffix}`, name: 'Synthetic autonomy' } });
   const bot = await prisma.bot.create({ data: { ...scope, name: 'Synthetic Mico', color: 'green', thread: { create: { ...scope } } }, include: { thread: true } });
   const other = await prisma.bot.create({ data: { ...scope, name: 'Other synthetic Mico', color: 'blue', thread: { create: { ...scope } } }, include: { thread: true } });
+  const originalStates = [null, 'queued', 'running', 'waiting', 'completed', 'failed', 'paused', 'cancelled'] as const;
+  const originalTasks = await Promise.all(originalStates.map(delegationState => prisma.task.create({ data: {
+    ...scope, botId: bot.id, threadId: bot.thread!.id, prompt: 'Synthetic existing delegation state', status: 'completed', delegationState,
+  } })));
+  const invalidState = (delegationState: string) => prisma.task.create({ data: {
+    ...scope, botId: bot.id, threadId: bot.thread!.id, prompt: 'Synthetic CHECK rejection', status: 'completed', delegationState,
+  } });
+  await assert.rejects(invalidState('waiting_event'), /tasks_delegation_state_check/,
+    'the real deployed predecessor rejects event waits before the migration');
+  const migration = await readFile('packages/db/prisma/migrations/20261116150000_event_wait_delegation_state/migration.sql', 'utf8');
+  await database.pool.query(migration);
+  for (const task of originalTasks) assert.deepEqual(await prisma.task.findUniqueOrThrow({ where: { id: task.id } }), task,
+    'migration preserves each preexisting Task row and delegation state');
+  await assert.rejects(invalidState('unknown_state'), /tasks_delegation_state_check/,
+    'the expanded constraint still rejects unknown states');
+  const eventState = await invalidState('waiting_event');
+  assert.equal(eventState.delegationState, 'waiting_event');
+  await prisma.task.deleteMany({ where: { id: { in: [...originalTasks.map(task => task.id), eventState.id] } } });
+  checks.push('real predecessor CHECK rejects waits; actual additive migration preserves all existing states and rejects unknown states');
   const workPlan = { version: 1, steps: [{ id: 'verify', title: 'Verify the observed result', status: 'pending' }], count: 2, nextCount: 0, repairs: 0 };
   async function source(name: string) {
     const task = await prisma.task.create({ data: { ...scope, botId: bot.id, threadId: bot.thread!.id,
