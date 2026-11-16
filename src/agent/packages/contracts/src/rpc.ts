@@ -459,6 +459,8 @@ export const appContract = {
     listArchived: oc.output(z.array(BotSchema)),
     get: oc.input(botId).output(BotSchema),
     create: oc.input(CreateBotInput).output(BotSchema),
+    /** Profile setup never queues a model turn; an old server fails before creation. */
+    createProfile: oc.input(CreateBotInput.extend({ expectedUserId: z.string().min(1).max(256) })).output(BotSchema),
     importPreview: oc.input(AgentImportPreviewInput).output(AgentImportPlanSchema),
     importCreate: oc.input(AgentImportCreateInput).output(BotSchema),
     importInfo: oc.input(botId).output(AgentImportInfoSchema.nullable()),

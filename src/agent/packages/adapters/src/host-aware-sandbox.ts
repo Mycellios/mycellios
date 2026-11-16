@@ -100,7 +100,7 @@ export class HostAwareSandbox implements SandboxProvider {
   }
 
   async provisionKind(context?: AdapterContext) {
-    const provider = !context?.cloudWorkspace && (await this.hostEnabled(context))
+    const provider = !context?.cloudWorkspace && !context?.isolatedWorkspace && (await this.hostEnabled(context))
       ? this.host : this.isolated;
     return provider.describe().id as ComputerRef["kind"];
   }
@@ -114,7 +114,7 @@ export class HostAwareSandbox implements SandboxProvider {
     },
     context: AdapterContext,
   ) {
-    const enabled = !context.cloudWorkspace && (await this.hostEnabled(context));
+    const enabled = !context.cloudWorkspace && !context.isolatedWorkspace && (await this.hostEnabled(context));
     if (request.providerKind === "desktop" && !enabled)
       throw new Error(
         "The selected local computer is disconnected. Reconnect Desktop before continuing this project.",
@@ -131,7 +131,7 @@ export class HostAwareSandbox implements SandboxProvider {
   }
 
   async isRunning(computer: ComputerRef, context: AdapterContext): Promise<boolean> {
-    const provider = !context.cloudWorkspace && (await this.hostEnabled(context))
+    const provider = !context.cloudWorkspace && !context.isolatedWorkspace && (await this.hostEnabled(context))
       ? this.host : this.isolated;
     if (provider.describe().id !== computer.kind) return false;
     return provider.isRunning?.(computer, context) ?? false;

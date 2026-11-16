@@ -122,7 +122,7 @@ export function AgentImportForm({
   const targetBot = target === "existing" ? bots.find((bot) => bot.id === targetBotId) : undefined;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [computerMode, setComputerMode] = useState<ComputerMode>("team");
+  const [computerMode, setComputerMode] = useState<ComputerMode>("isolated");
   const [reply, setReply] = useState("");
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);

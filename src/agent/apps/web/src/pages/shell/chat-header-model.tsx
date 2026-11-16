@@ -53,6 +53,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
   const id = useId();
   const [open, setOpen] = useState(false);
   const [lastProvider, setLastProvider] = useState<string | null>(null);
+  const [pickerRevision, setPickerRevision] = useState(0);
   const [exploring, setExploring] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
@@ -247,6 +248,7 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
             <fieldset disabled={saving} className="min-w-0 [&>div]:mt-0 [&>button]:mt-0">
               {explorer && me ? <ChatModelCatalog source={explorer} userId={me.userId} spaceId={me.spaceId}
                 onBack={() => { setExploring(null); setError(null); }} onPick={pickCatalog} /> : <ChatModelPicker
+                key={pickerRevision}
                 id={`${id}-model`}
                 choices={choices}
                 value={value || defaultKey}
@@ -290,6 +292,13 @@ export function ChatHeaderModel({ bot, me: initialMe, onSave, onConnections, rec
               onCheckedChange={fastMode => void save(() => onSave({ agentEngine: "codex", modelProvider: null, modelId: null, thinkingLevel: null, nativeConfig: { ...bot.nativeConfig, fastMode } }), false)} />
           </label> : null}
           {nativeEngine === "codex" && nativeCatalog.error && open ? <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{t`Could not load this account's models. Fast mode is unavailable until the catalog can be checked.`}</p> : null}
+          {!recovery && me && !queryError && (lastProvider ?? currentProvider) !== "Mycellios" ? <div className="border-t border-border px-4 py-3">
+            <Button variant="ghost" size="sm" disabled={saving} onClick={() => {
+              setLastProvider("Mycellios"); setExploring(null); setError(null);
+              setPickerRevision(revision => revision + 1);
+            }}>{t`Explore models with my credits`}</Button>
+            <p className="mt-1 text-xs text-muted-foreground">{t`Choose a model yourself. Switching keeps this Mico's chat and files.`}</p>
+          </div> : null}
           {saving ? <Spinner aria-label={t`Saving…`} className="mx-auto my-2 text-muted-foreground" /> : null}
           {error ? <p role="alert" className="p-2 text-xs text-destructive">{error}</p> : null}
           {(recovery || !sources.size) ? <Button variant="ghost" size="sm" onClick={() => { setOpen(false); onConnections(); }}>{t`Manage models`}</Button> : null}

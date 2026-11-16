@@ -25,5 +25,5 @@ export function computerPlaceholder(
 }
 
 export function computerLabel(mode: ComputerStatus["mode"] | undefined, botName: string) {
-  return mode === "dedicated" ? t`${botName}’s computer` : t`Team Computer`;
+  return mode === "team" || !mode ? t`Team Computer` : t`${botName}’s computer`;
 }

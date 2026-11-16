@@ -6,9 +6,16 @@ import {
   resolveBotWorkspaceCwd,
   resolveBotWorkspacePath,
   teamBotWorkspaceDirectory,
+  toComputerRef,
 } from "./computer-support.js";
 
 describe("Team Computer bot folders", () => {
+  it("never turns an isolated record into a local PC reference", () => {
+    const isolated = { homeKey: "iso-fixture", scope: "isolated", providerRef: "fixture" };
+    expect(() => toComputerRef({ ...isolated, kind: "desktop" })).toThrow(/isolated computer/);
+    expect(() => toComputerRef({ ...isolated, kind: "none" })).toThrow(/isolated computer/);
+    expect(toComputerRef({ ...isolated, kind: "docker" })).toMatchObject({ kind: "docker" });
+  });
   it("uses an admitted project root without adding the ordinary Team Mico prefix", () => {
     const mode = executionWorkspaceMode("team", "owned-task");
     expect(resolveBotWorkspaceCwd(mode, "mico", undefined)).toBeUndefined();

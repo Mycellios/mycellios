@@ -1,7 +1,7 @@
 import { computerSupportsTerminal, computerSupportsUpdate } from "@rakazo/adapters";
 import type { ComputerStatus } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES, computerScreenSize } from "@rakazo/core";
-import type { PrismaClient } from "@rakazo/db";
+import { parseComputerMode, type PrismaClient } from "@rakazo/db";
 
 /** Mirrors computer.takeover: an execution lease blocks user control unless a takeover is pending. */
 export function executionBlocksUserTakeover(input: {
@@ -63,7 +63,7 @@ export function toComputerStatus(
   } | null,
   busyBotName: string | null = null,
 ): ComputerStatus {
-  const unavailable = !computer || computer.kind === "none";
+  const unavailable = !computer || computer.kind === "none" || (computer.scope === "isolated" && computer.kind === "desktop");
   const state = unavailable
     ? "stopped"
     : computer?.maintenanceId
@@ -78,15 +78,15 @@ export function toComputerStatus(
           ? computer.state
           : "stopped";
   const screen = computerScreenSize(computer?.kind);
-  const kind = (computer?.kind ?? "none") as ComputerStatus["kind"];
+  const kind = (unavailable ? "none" : computer?.kind ?? "none") as ComputerStatus["kind"];
   return {
     botId,
-    mode: computer?.scope === "dedicated" ? "dedicated" : "team",
+    mode: computer ? parseComputerMode(computer.scope) : "team",
     kind,
     state,
-    controlHolder: (computer?.controlHolder ?? "none") as ComputerStatus["controlHolder"],
-    controlBotId: computer?.controlBotId ?? null,
-    takeoverRequested: Boolean(computer?.controlRunId),
+    controlHolder: (unavailable ? "none" : computer?.controlHolder ?? "none") as ComputerStatus["controlHolder"],
+    controlBotId: unavailable ? null : computer?.controlBotId ?? null,
+    takeoverRequested: !unavailable && Boolean(computer?.controlRunId),
     screenAvailable:
       !unavailable && !computer?.maintenanceId && (state === "running" || state === "booting"),
     screenWidth: screen.width,

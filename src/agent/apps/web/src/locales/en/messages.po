@@ -12768,6 +12768,12 @@ msgstr "Mycellios"
 msgid "Response style"
 msgstr "Response style"
 
+msgid "Explore models with my credits"
+msgstr "Explore models with my credits"
+
+msgid "Choose a model yourself. Switching keeps this Mico's chat and files."
+msgstr "Choose a model yourself. Switching keeps this Mico's chat and files."
+
 msgid "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
 msgstr "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
 
@@ -12794,3 +12800,303 @@ msgstr "New folder inside"
 
 msgid "Delete folder"
 msgstr "Delete folder"
+
+msgid "Just this Mico"
+msgstr "Just this Mico"
+
+msgid "A separate browser and files for this Mico, on the server. Available when an isolated computer provider is configured."
+msgstr "A separate browser and files for this Mico, on the server. Available when an isolated computer provider is configured."
+
+msgid "Your Micos share a computer in this space."
+msgstr "Your Micos share a computer in this space."
+
+msgid "Uses your connected PC and its permissions. It is not an isolated server computer."
+msgstr "Uses your connected PC and its permissions. It is not an isolated server computer."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Sales"
+msgstr "Sales"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Find leads, write outreach, and follow up."
+msgstr "Find leads, write outreach, and follow up."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "SEO"
+msgstr "SEO"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Research queries, edit pages, and check technical issues."
+msgstr "Research queries, edit pages, and check technical issues."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Support"
+msgstr "Support"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Sort the inbox, draft replies, and keep what the team learned."
+msgstr "Sort the inbox, draft replies, and keep what the team learned."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Research"
+msgstr "Research"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Gather sources, check them, and write a short brief."
+msgstr "Gather sources, check them, and write a short brief."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Marketing"
+msgstr "Marketing"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Plan a campaign, write the words, and read the results."
+msgstr "Plan a campaign, write the words, and read the results."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Operations"
+msgstr "Operations"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Keep work in order, write the steps, and track what is open."
+msgstr "Keep work in order, write the steps, and track what is open."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Lead Researcher"
+msgstr "Lead Researcher"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Finds the accounts and facts a message should use."
+msgstr "Finds the accounts and facts a message should use."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Outreach Writer"
+msgstr "Outreach Writer"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts the first message for you to review."
+msgstr "Drafts the first message for you to review."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Follow-up"
+msgstr "Follow-up"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Tracks replies and the next step."
+msgstr "Tracks replies and the next step."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Search Researcher"
+msgstr "Search Researcher"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Maps the questions people ask and the sources to use."
+msgstr "Maps the questions people ask and the sources to use."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Content Editor"
+msgstr "Content Editor"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts and edits pages from those questions."
+msgstr "Drafts and edits pages from those questions."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Technical SEO"
+msgstr "Technical SEO"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Checks issues that keep pages from being found."
+msgstr "Checks issues that keep pages from being found."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Inbox Triage"
+msgstr "Inbox Triage"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Sorts what needs a reply and what can wait."
+msgstr "Sorts what needs a reply and what can wait."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Reply Writer"
+msgstr "Reply Writer"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts a clear answer for you to send."
+msgstr "Drafts a clear answer for you to send."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Knowledge Keeper"
+msgstr "Knowledge Keeper"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Records the answer so the next reply can reuse it."
+msgstr "Records the answer so the next reply can reuse it."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Researcher"
+msgstr "Researcher"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Gathers the sources for the question."
+msgstr "Gathers the sources for the question."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Source Checker"
+msgstr "Source Checker"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Separates what is known from what is still a guess."
+msgstr "Separates what is known from what is still a guess."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Brief Writer"
+msgstr "Brief Writer"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Turns that into a short brief."
+msgstr "Turns that into a short brief."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Campaign Planner"
+msgstr "Campaign Planner"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Turns a goal into a small plan."
+msgstr "Turns a goal into a small plan."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Copywriter"
+msgstr "Copywriter"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Drafts the words for you to review."
+msgstr "Drafts the words for you to review."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Analyst"
+msgstr "Analyst"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Reads the results and says what changed."
+msgstr "Reads the results and says what changed."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Coordinator"
+msgstr "Coordinator"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Keeps the requested work in order."
+msgstr "Keeps the requested work in order."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Process Writer"
+msgstr "Process Writer"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Writes the steps that should repeat."
+msgstr "Writes the steps that should repeat."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Tracker"
+msgstr "Tracker"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Notes status, blockers, and what is done."
+msgstr "Notes status, blockers, and what is done."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "What should your team handle?"
+msgstr "What should your team handle?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Describe the work in a sentence or two. You can start on Mycellios credits, and an API key stays optional."
+msgstr "Describe the work in a sentence or two. You can start on Mycellios credits, and an API key stays optional."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "For example: reply to customer email and find new leads"
+msgstr "For example: reply to customer email and find new leads"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Or start from a role"
+msgstr "Or start from a role"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Create and open this team"
+msgstr "Create and open this team"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "A few questions so the team fits."
+msgstr "A few questions so the team fits."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Your team"
+msgstr "Your team"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Use your model or start with Mycellios credits."
+msgstr "Use your model or start with Mycellios credits."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Creating your team uses no credits. You choose when to start."
+msgstr "Creating your team uses no credits. You choose when to start."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Start with one Mico"
+msgstr "Start with one Mico"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Use your own provider"
+msgstr "Use your own provider"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Creating your team…"
+msgstr "Creating your team…"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Mycellios credits are unavailable right now. No credits were spent."
+msgstr "Mycellios credits are unavailable right now. No credits were spent."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Could not create the team. Try again."
+msgstr "Could not create the team. Try again."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Who is this for?"
+msgstr "Who is this for?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Just me"
+msgstr "Just me"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "A small team"
+msgstr "A small team"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Customers"
+msgstr "Customers"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "What should they do first?"
+msgstr "What should they do first?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Research and brief me"
+msgstr "Research and brief me"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Draft work for me to review"
+msgstr "Draft work for me to review"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Run a repeatable process"
+msgstr "Run a repeatable process"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Which role is closest?"
+msgstr "Which role is closest?"
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Back to your team"
+msgstr "Back to your team"

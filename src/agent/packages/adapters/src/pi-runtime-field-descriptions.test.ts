@@ -122,13 +122,15 @@ describe("string enums keep their allowed values in a plain enum", () => {
   it("shows spawn_bot's computer_mode choices and description", () => {
     expect(spawnBot).toBeDefined();
     const computerMode = wire(spawnBot!).properties.computer_mode;
-    expect(computerMode).toMatchObject({ type: "string", enum: ["team", "dedicated"] });
-    expect(computerMode?.description).toMatch(/dedicated \(Private\)/);
+    expect(computerMode).toMatchObject({ type: "string", enum: ["isolated", "team", "dedicated"] });
+    expect(computerMode?.description).toContain("Defaults to isolated");
+    expect(computerMode?.description).toContain("dedicated uses This PC");
   });
 
   it("still validates spawn_bot's computer_mode through Pi", () => {
     for (const args of [
       { name: "Media Manager" },
+      { name: "Media Manager", computer_mode: "isolated" },
       { name: "Media Manager", computer_mode: "team" },
       { name: "Media Manager", computer_mode: "dedicated" },
     ]) {

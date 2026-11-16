@@ -7,7 +7,10 @@ export function toComputerRef(computer: {
   homeKey: string;
   kind: string;
   providerRef: string | null;
+  scope?: string;
 }): ComputerRef {
+  if (computer.scope === "isolated" && ["desktop", "none"].includes(computer.kind))
+    throw new Error("An isolated computer cannot use the local PC or an unavailable provider");
   if (!computer.providerRef) throw new Error("computer provider reference is missing");
   return {
     id: computer.providerRef,

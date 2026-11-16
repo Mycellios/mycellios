@@ -281,6 +281,14 @@ These rules apply to the complete repository.
   times; only exact HTTP 206 ranges qualify. Wrong sizes or bytes remain hard failures.
   `installer-public-health.yml` rechecks an already published integrated revision
   with the current verifier, without rebuilding, signing or promoting installers.
+- Pinned Desktop runtime components remain content-addressed and immutable. If
+  GitHub's release-by-tag API hides a draft, resolve it through the first-party
+  CLI release view and fetch only its validated repository release ID. Verify
+  tag, ID, state, asset sizes and digests before publication; preserve existing
+  drafts and never clobber assets. Check scripts/publish-runtime-components.test.mjs.
+  Desktop drafts use the same first-party resolver with their own strict tag
+  pattern; require an exact revision target/tagref and verified asset digests
+  before publishing or resuming. Check scripts/publish-installer-release.test.mjs.
 - Preserve unrelated worktree changes.
 - Intel and Apple Silicon Desktop packaging lives in `scripts/desktop-macos`. Preserve its
   current-source Desktop builds, source provenance, hash-pinned runtime pairing

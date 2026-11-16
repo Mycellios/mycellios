@@ -257,6 +257,12 @@
   reads must not appear as an empty or disconnected provider directory. Recovery
   preserves open connection fields and scoped caches, reloads the role selector,
   and never connects/disconnects providers or changes the selected model.
+  The chat picker offers explicit exploration of Mycellios credits beside personal
+  providers. Exploration only changes the visible catalog; it must not connect,
+  save a model, replay a run or switch payer. Model selection retains the same
+  Mico, conversation history, memory and computer/files. Qualify the real picker
+  with scripts/verify-builtin-provider-ui.mjs and persistence with
+  scripts/verify-workspace-sync-db.ts; synthetic offers are not live billing proof.
   Sidebar subscription quota reads saved OAuth accounts and the authorized native
   Codex CLI through account/rateLimits/read. Recheck native account/Space grants
   before serving cached quota; forward only sanitized limit metadata, never CLI
@@ -1177,6 +1183,17 @@
   transport sends, preserving current instructions and correlated results.
   Keep authorized memory and user-clarification schemas in the initial catalog;
   basic interactions should not require discovering their own core tools.
+- New ordinary Micos use `isolated` server computers with distinct account/Space/
+  Mico home keys. Keep Team sharing and explicit This PC (`dedicated`) unchanged,
+  including the installed-account first-run route. Creation allocates stopped
+  metadata only, under existing quotas. Never move existing assignments by default.
+  Derive the internal isolation pin from the owned Computer; reconnecting Desktop
+  cannot redirect an isolated workspace. Reuse private leases, fencing, approvals,
+  takeover and recovery. A local project requires a supported explicit computer
+  selection, never an implicit PC fallback. Qualify isolated creation/routing with
+  scripts/verify-workspace-sync-db.ts and the actual controls/overlay with
+  scripts/verify-isolated-computer-ui.mjs; fake screen/provider results do not
+  qualify a real container, operating system or multi-host execution.
 - An unavailable sandbox is an explicit `none` computer status, with screen,
   terminal and update access disabled. Keep text chat and thread snapshots usable
   without pretending that a computer was provisioned.
@@ -1259,6 +1276,13 @@
   First-party onboarding starts with the signed-in Mycellios account and owned
   contribution credits; AntSeed remains an explicit alternative requiring the user's
   own key. Never fall back to another payer or provider when native credit access fails.
+  Empty accounts enter the team builder even when a default model is configured.
+  Explicit role/audience/start choices create bounded templates without model calls.
+  Preserve configured providers and Space-scoped spawn keys on retries; setup
+  profiles use bots.createProfile so creation never starts automatic inference
+  and older servers fail before creating a profile. Keep the
+  single-Mico, native-provider and import paths. Verify team catalog/creation/UI
+  tests and the isolated onboarding browser fixture without live accounts or spend.
   Alternative key-based onboarding discovers models before the user confirms one.
   Keep endpoints and capability limits in advanced setup; preserve key ownership and
   endpoint-bound credentials. The owned local preview uses the public HTTPS gateway,

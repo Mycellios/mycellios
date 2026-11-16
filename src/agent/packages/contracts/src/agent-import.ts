@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { AgentImportStatusSchema } from "./agent-import-setup.js";
-import { BOT_DESCRIPTION_MAX_LENGTH, BOT_NAME_MAX_LENGTH, ComputerModeSchema } from "./domain.js";
+import { BOT_DESCRIPTION_MAX_LENGTH, BOT_NAME_MAX_LENGTH, ComputerModeSchema, DEFAULT_COMPUTER_MODE } from "./domain.js";
 
 export const AGENT_IMPORT_MAX_FILES = 500;
 export const AGENT_IMPORT_MAX_FILE_LENGTH = 100_000;
@@ -249,7 +249,7 @@ export const AgentImportCreateInput = z.strictObject({
   /** The new bot's name; not used when adding to an existing bot. */
   name: z.string().trim().min(1).max(BOT_NAME_MAX_LENGTH).optional(),
   description: z.string().trim().max(BOT_DESCRIPTION_MAX_LENGTH).default(""),
-  computerMode: ComputerModeSchema.default("team"),
+  computerMode: ComputerModeSchema.default(DEFAULT_COMPUTER_MODE),
   selection: AgentImportSelectionSchema,
 });
 export type AgentImportCreateInput = z.infer<typeof AgentImportCreateInput>;

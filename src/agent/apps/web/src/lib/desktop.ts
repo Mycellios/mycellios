@@ -1,4 +1,5 @@
 import type { RakazoDesktop, RakazoDesktopOAuthCallback } from "@rakazo/contracts";
+import { DEFAULT_COMPUTER_MODE, type ComputerMode } from "@rakazo/contracts";
 
 export type { RakazoDesktop, RakazoDesktopOAuthCallback } from "@rakazo/contracts";
 
@@ -13,12 +14,12 @@ export function desktopBridge(): RakazoDesktop | undefined {
 }
 
 /**
- * A new bot on the Desktop app must run on this PC. The hosted default is a
- * Team Computer, which needs Docker; choosing it on a laptop without Docker is
- * why the computer panel fails to start and the executor looks unavailable.
+ * Ordinary new Micos use their own isolated server workspace. An explicitly
+ * chosen installed account keeps the existing native first-run computer route;
+ * isolation must never silently authorize or redirect a local project.
  */
-export function defaultComputerMode(desktop?: RakazoDesktop): "team" | "dedicated" {
-  return desktop ? "dedicated" : "team";
+export function defaultComputerMode(desktop?: RakazoDesktop, installedAccountSelected = false): ComputerMode {
+  return installedAccountSelected ? (desktop ? "dedicated" : "team") : DEFAULT_COMPUTER_MODE;
 }
 
 /**

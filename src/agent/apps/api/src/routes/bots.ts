@@ -20,7 +20,7 @@ import {
   toComputerRef,
   validateBotModelChange,
 } from "@rakazo/adapters";
-import type { Actor, Bot, BotSecretMetadata } from "@rakazo/contracts";
+import type { Actor, Bot, BotSecretMetadata, CreateBotInput } from "@rakazo/contracts";
 import { BotSecretAuth, FIRST_MICO_SPAWN_KEY } from "@rakazo/contracts";
 import { ACTIVE_RUN_STATUSES, agentEngineForProviderSelection, displayName, SidebarFolderError } from "@rakazo/core";
 import { Prisma } from "@rakazo/db";
@@ -32,6 +32,7 @@ import {
   computerKindForMode,
   InstructionConflictError,
   IsolationError,
+  parseComputerMode,
   recordComputerRunEnd,
   restoreBotUnderComputerQuota,
   SpaceDeletionInProgressError,
@@ -252,6 +253,42 @@ async function requireNativeEngine(deps: RouterDeps, actor: Actor, engine: strin
 export function botsRoutes(ctx: RouterContext) {
   const { deps, repos, botModelValidation, removeBot, agentImportServices, groupRepos, authed } =
     ctx;
+  async function createMico(context: { actor: Actor; requestHeaders?: Headers }, input: CreateBotInput, intro: boolean) {
+    const { model, ...profile } = input;
+    if (profile.agentEngine) {
+      if (model) throw new ORPCError("BAD_REQUEST", { message: "Choose a model or an installed agent." });
+      await requireNativeEngine(deps, context.actor, profile.agentEngine);
+    } else {
+      profile.agentEngine = undefined;
+    }
+    if (model) {
+      const result = await validateBotModelChange(botModelValidation(context.actor), {
+        userId: context.actor.userId,
+        spaceId: context.actor.spaceId,
+        provider: model.provider,
+        model: model.modelId,
+        thinkingLevel: model.thinkingLevel,
+      });
+      if (!result.ok) throw new ORPCError("BAD_REQUEST", { message: result.error });
+    }
+    let bot: Bot;
+    try {
+      bot = await repos.createBot(context.actor, {
+        ...profile,
+        modelProvider: model?.provider,
+        modelId: model?.modelId,
+        thinkingLevel: model?.thinkingLevel,
+      });
+    } catch (error) {
+      throw mapSpaceLifecycleError(error);
+    }
+    if (intro) {
+      await enqueueBotIntroRun(deps, context.actor, bot, context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined).catch((error) => {
+        getLogger().error("bot intro run enqueue", error);
+      });
+    }
+    return bot;
+  }
   return {
     bots: {
       list: authed.bots.list.handler(async ({ context }) => repos.listBots(context.actor)),
@@ -263,42 +300,11 @@ export function botsRoutes(ctx: RouterContext) {
         if (!found) throw new IsolationError();
         return found;
       }),
-      create: authed.bots.create.handler(async ({ context, input }) => {
-        const { model, ...profile } = input;
-        if (profile.agentEngine) {
-          if (model) throw new ORPCError("BAD_REQUEST", { message: "Choose a model or an installed agent." });
-          await requireNativeEngine(deps, context.actor, profile.agentEngine);
-        } else {
-          // Saved model connections and the general model use the managed loop.
-          // An installed CLI must be selected as a provider, never inferred from
-          // the presence of a connected PC.
-          profile.agentEngine = undefined;
-        }
-        if (model) {
-          const result = await validateBotModelChange(botModelValidation(context.actor), {
-            userId: context.actor.userId,
-            spaceId: context.actor.spaceId,
-            provider: model.provider,
-            model: model.modelId,
-            thinkingLevel: model.thinkingLevel,
-          });
-          if (!result.ok) throw new ORPCError("BAD_REQUEST", { message: result.error });
-        }
-        let bot: Bot;
-        try {
-          bot = await repos.createBot(context.actor, {
-            ...profile,
-            modelProvider: model?.provider,
-            modelId: model?.modelId,
-            thinkingLevel: model?.thinkingLevel,
-          });
-        } catch (error) {
-          throw mapSpaceLifecycleError(error);
-        }
-        await enqueueBotIntroRun(deps, context.actor, bot, context.requestHeaders?.get("x-mycellios-ui-locale") ?? undefined).catch((error) => {
-          getLogger().error("bot intro run enqueue", error);
-        });
-        return bot;
+      create: authed.bots.create.handler(({ context, input }) => createMico(context, input, true)),
+      createProfile: authed.bots.createProfile.handler(({ context, input }) => {
+        const { expectedUserId, ...profile } = input;
+        if (expectedUserId !== context.actor.userId) throw new ORPCError("FORBIDDEN");
+        return createMico(context, profile, false);
       }),
       importPreview: authed.bots.importPreview.handler(async ({ context, input }) =>
         previewAgentImport(agentImportServices as AgentImportServices, context.actor, input),
@@ -334,7 +340,7 @@ export function botsRoutes(ctx: RouterContext) {
             notifyOnFinish: source.notifyOnFinish,
             busyMessageMode: source.busyMessageMode,
             color: source.color,
-            computerMode: source.computer?.scope === "dedicated" ? "dedicated" : "team",
+            computerMode: source.computer ? parseComputerMode(source.computer.scope) : "isolated",
             modelProvider: source.modelProvider,
             modelId: source.modelId,
             thinkingLevel: source.thinkingLevel,
@@ -474,7 +480,7 @@ export function botsRoutes(ctx: RouterContext) {
       setComputer: authed.bots.setComputer.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
         if (!bot.computer) throw new IsolationError();
-        const currentMode = bot.computer.scope === "dedicated" ? "dedicated" : "team";
+        const currentMode = parseComputerMode(bot.computer.scope);
         const isolatedKind = deps.sandbox.describe().id;
         // "This PC" is the user's desktop host. A Docker deployment must prove
         // the PC is connected instead of quietly provisioning a container.
@@ -524,7 +530,7 @@ export function botsRoutes(ctx: RouterContext) {
           if (bot.computer.controlBotId === bot.id && hasActiveComputerControl(bot.computer)) {
             throw new ORPCError("BAD_REQUEST", { message: "Release the computer first" });
           }
-          if (bot.computer.scope === "dedicated" && bot.computer.providerRef) {
+          if (bot.computer.scope !== "team" && bot.computer.providerRef) {
             const ctx = computerContext(context.actor, bot.id, "computer.switch");
             const ref = toComputerRef(bot.computer);
             if (bot.computer.state === "running") {

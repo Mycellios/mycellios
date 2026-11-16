@@ -51,6 +51,7 @@ import {
 } from "@rakazo/adapter-kit";
 import {
   BOT_INSTRUCTIONS_MAX_LENGTH,
+  ComputerModeSchema,
   canonicalPiProviderId,
   FLEET_TOOL_NAMES,
   isOpenAiCompatibleProvider,
@@ -2576,7 +2577,7 @@ function builtinParameters(tool: ConnectorTool) {
       description: Type.Optional(Type.String()),
       instructions: Type.Optional(Type.String()),
       prompt: Type.Optional(Type.String()),
-      computer_mode: Type.Optional(stringEnum(["team", "dedicated"], {})),
+      computer_mode: Type.Optional(stringEnum(ComputerModeSchema.options, {})),
     });
   }
   if (tool.name === "update_bot") {
