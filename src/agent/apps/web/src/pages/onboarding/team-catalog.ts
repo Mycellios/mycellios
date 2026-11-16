@@ -44,71 +44,11 @@ const ROSTERS: Record<TeamSector, readonly TeamMemberId[]> = {
   operations: ["operations-coordinator", "operations-process", "operations-tracker"],
 };
 
-const KEYWORDS: Record<TeamSector, readonly string[]> = {
-  sales: [
-    "sales",
-    "sale",
-    "venta",
-    "ventas",
-    "leads",
-    "lead",
-    "pipeline",
-    "outreach",
-    "prospect",
-    "crm",
-    "comercial",
-  ],
-  seo: ["seo", "keyword", "keywords", "ranking", "posicionamiento", "search console"],
-  support: [
-    "support",
-    "soporte",
-    "ticket",
-    "tickets",
-    "helpdesk",
-    "inbox",
-    "atencion",
-    "help desk",
-  ],
-  research: ["research", "investig", "fuente", "fuentes", "competitive", "competencia", "brief"],
-  marketing: ["marketing", "campaign", "campana", "anuncio", "anuncios", "social media"],
-  operations: ["operation", "operacion", "proceso", "process", "workflow", "ops"],
-};
-
 export class TeamCreditsError extends Error {
   constructor() {
     super("Mycellios credits are unavailable");
     this.name = "TeamCreditsError";
   }
-}
-
-export function normalizeNeed(value: string): string {
-  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-}
-
-function keywordAt(text: string, keyword: string): number {
-  const pattern = keyword.length > 4 ? keyword : `(?:^|[^a-z0-9])${keyword}(?:$|[^a-z0-9])`;
-  const match = new RegExp(pattern).exec(text);
-  return match ? match.index : -1;
-}
-
-export function inferSector(description: string): TeamSector | null {
-  const text = normalizeNeed(description);
-  if (!text.trim()) return null;
-  let best: { sector: TeamSector; score: number; at: number } | null = null;
-  for (const sector of TEAM_SECTORS) {
-    let score = 0;
-    let at = Number.POSITIVE_INFINITY;
-    for (const keyword of KEYWORDS[sector]) {
-      const index = keywordAt(text, keyword);
-      if (index < 0) continue;
-      score += 1;
-      if (index < at) at = index;
-    }
-    if (score === 0) continue;
-    if (!best || score > best.score || (score === best.score && at < best.at))
-      best = { sector, score, at };
-  }
-  return best?.sector ?? null;
 }
 
 export type TeamAnswers = {
@@ -117,12 +57,13 @@ export type TeamAnswers = {
   start?: TeamStart | null;
 };
 
-export function questionsFor(description: string): Array<"sector" | "audience" | "start"> {
-  return inferSector(description) ? ["audience", "start"] : ["sector", "start"];
+/** Explicit choices keep setup free and avoid guessing intent from keywords. */
+export function questionsFor(): Array<"sector" | "audience" | "start"> {
+  return ["sector", "audience", "start"];
 }
 
-export function proposeTeam(description: string, answers: TeamAnswers = {}) {
-  const sector = answers.sector ?? inferSector(description) ?? "operations";
+export function proposeTeam(answers: TeamAnswers = {}) {
+  const sector = answers.sector ?? "operations";
   return {
     sector,
     members: [...ROSTERS[sector]],

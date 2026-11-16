@@ -23,9 +23,7 @@ export type OnboardingTeamCreateInput = Pick<
   | "description"
   | "instructions"
   | "notifyOnFinish"
-  | "computerMode"
   | "spawnKey"
-  | "skipIntro"
 >;
 
 type ExistingBot = { id: string; spawnKey: string | null };
@@ -39,7 +37,7 @@ export function draftOnboardingTeam(
     start: string;
   },
 ): OnboardingTeamMember[] {
-  const proposed = proposeTeam(description, answers);
+  const proposed = proposeTeam(answers);
   return proposed.members.map((id, index) => {
     const member = copy.member(id);
     return {
@@ -64,13 +62,16 @@ export async function createOnboardingTeam(
     list: () => Promise<ExistingBot[]>;
     create: (input: OnboardingTeamCreateInput) => Promise<{ id: string }>;
     lock?: <T>(run: () => Promise<T>) => Promise<T>;
+    signal?: AbortSignal;
   },
 ): Promise<{ id: string }> {
   if (members.length === 0) throw new Error("Choose at least one Mico");
   const run = async () => {
+    client.signal?.throwIfAborted();
     const existing = [...(await client.list())];
     let firstId = "";
     for (const member of members) {
+      client.signal?.throwIfAborted();
       const spawnKey = memberSpawnKey(member.id, member.lead);
       const found = existing.find((bot) => bot.spawnKey === spawnKey);
       if (found) {
@@ -83,14 +84,13 @@ export async function createOnboardingTeam(
         description: member.description,
         instructions: member.instructions,
         notifyOnFinish: true,
-        computerMode: "team",
         spawnKey,
-        skipIntro: !member.lead,
       });
       existing.push({ id: created.id, spawnKey });
       if (!firstId) firstId = created.id;
     }
     if (!firstId) throw new Error("Choose at least one Mico");
+    client.signal?.throwIfAborted();
     return { id: firstId };
   };
   return client.lock ? client.lock(run) : run();

@@ -68,7 +68,7 @@ import {
   runModelConnectionPreflight,
   unavailableSelectedModel,
 } from "../lib/model-connection-preflight";
-import { rpc } from "../lib/rpc";
+import { rpc, rpcForSpace } from "../lib/rpc";
 import { useModelOAuthSignIn } from "../lib/use-model-oauth-signin";
 import { errorText } from "../lib/user-error";
 import { CompatibleKeyField } from "./model-settings/compatible-key-field";
@@ -121,12 +121,12 @@ export function OnboardingPage() {
   const fieldId = useId();
   // The URL holds the survey and model steps, so /onboarding/survey and /onboarding/model open directly.
   const { step: routeStep } = useParams();
-  const linkedStep = routeStep === "survey" || routeStep === "model" ? routeStep : undefined;
+  const linkedStep = routeStep === "survey" || routeStep === "model" || routeStep === "team" ? routeStep : undefined;
   const [surveyDone, setSurveyDone] = useState(false);
   const step = surveyDone ? "loading" : (linkedStep ?? "loading");
   const [billingEnabled, setBillingEnabled] = useState(false);
   // The step after the survey; null until me loads.
-  const [afterSurvey, setAfterSurvey] = useState<"model" | "bot" | null>(null);
+  const [afterSurvey, setAfterSurvey] = useState<"model" | "team" | "bot" | null>(null);
   const [mycelliosSignIn, setMycelliosSignIn] = useState<boolean | null>(null);
   const [connectingMycellios, setConnectingMycellios] = useState(false);
   const [catalog, setCatalog] = useState<ModelCatalogEntry[]>([]);
@@ -172,6 +172,8 @@ export function OnboardingPage() {
   const [codeCopied, copyOAuthCode] = useCopyText();
   const [providerSetup, setProviderSetup] = useState(false);
   const pendingTeamRef = useRef<OnboardingTeamMember[] | null>(null);
+  const setupOwnerRef = useRef<{ userId: string; spaceId: string } | null>(null);
+  const setupAbortRef = useRef(new AbortController());
   const finishAfterModelRef = useRef<() => Promise<void>>(async () => undefined);
 
   const {
@@ -192,22 +194,29 @@ export function OnboardingPage() {
   });
 
   useEffect(() => {
+    let active = true;
+    setupAbortRef.current = new AbortController();
     void fetchAuthCapabilities()
-      .then((caps) => setMycelliosSignIn(caps.mycelliosAccount === true))
-      .catch(() => setMycelliosSignIn(false));
-    void Promise.all([rpc.me(), rpc.models.list().catch(() => [])])
-      .then(([me, models]) => {
+      .then((caps) => { if (active) setMycelliosSignIn(caps.mycelliosAccount === true); })
+      .catch(() => { if (active) setMycelliosSignIn(false); });
+    void Promise.all([rpc.me(), rpc.models.list().catch(() => []), rpc.bots.list()])
+      .then(([me, models, bots]) => {
+        if (!active) return;
+        setupOwnerRef.current = { userId: me.userId, spaceId: me.spaceId };
         setBillingEnabled(me.billingEnabled);
         setCatalog(models);
-        const next = me.needsModel ? "model" : "bot";
+        const next = bots.length === 0 ? "team" : me.needsModel ? "model" : "bot";
         setAfterSurvey(next);
         if (!linkedStep) goTo(me.needsSignupSurvey ? "survey" : next);
       })
       .catch(() => {
+        if (!active) return;
         setAfterSurvey("bot");
         if (!linkedStep) goTo("bot");
       });
     return () => {
+      active = false;
+      setupAbortRef.current.abort();
       modelProbe.invalidate();
     };
   }, []);
@@ -218,27 +227,38 @@ export function OnboardingPage() {
     goTo(afterSurvey);
   }, [surveyDone, afterSurvey]);
 
-  function goTo(next: "survey" | "model" | "bot") {
+  function goTo(next: "survey" | "model" | "team" | "bot") {
     const imported = importedBotRef.current;
-    navigate(next === "bot" ? (imported ? `/app/${imported.id}` : "/app") : `/onboarding/${next}`, { replace: true });
+    navigate(next === "bot" ? (imported ? `/app/${imported.id}` : "/app") : `/onboarding/${next}`, {
+      replace: true,
+      ...(next === "bot" && !imported ? { state: { manualMicoSetup: true } } : {}),
+    });
   }
 
   async function finishTeam(members: OnboardingTeamMember[]) {
+    const owner = setupOwnerRef.current;
+    if (!owner) throw new Error("Reload setup before creating profiles");
+    const scoped = rpcForSpace(owner.spaceId);
+    const { signal } = setupAbortRef.current;
     const first = await createOnboardingTeam(members, {
-      list: () => rpc.bots.list(),
-      create: (input) => rpc.bots.create(input),
+      list: () => scoped.bots.list(undefined, { signal }),
+      create: (input) => scoped.bots.createProfile({ ...input, expectedUserId: owner.userId }, { signal }),
       lock: withFirstBotLock,
+      signal,
     });
+    if (signal.aborted) return;
     pendingTeamRef.current = null;
     navigate(`/app/${first.id}`, { replace: true });
   }
 
   async function createTeam(members: OnboardingTeamMember[]) {
     pendingTeamRef.current = members;
-    const me = await rpc.me().catch(() => null);
-    if (me?.needsModel !== false) {
+    const me = await rpc.me();
+    const owner = setupOwnerRef.current;
+    if (!owner || owner.userId !== me.userId || owner.spaceId !== me.spaceId) throw new Error("Setup account changed");
+    if (me.needsModel) {
       try {
-        await rpc.models.connectMycellios();
+        await rpcForSpace(owner.spaceId).models.connectMycellios();
       } catch {
         throw new TeamCreditsError();
       }
@@ -690,20 +710,27 @@ export function OnboardingPage() {
             </p>
           </div>
         ) : null}
-        {step === "model" && !providerSetup ? (
+        {step === "team" ? (
           <TeamBuilder
             onCreate={createTeam}
+            onSingleMico={async () => {
+              pendingTeamRef.current = null;
+              const me = await rpc.me();
+              setProviderSetup(true);
+              goTo(me.needsModel ? "model" : "bot");
+            }}
             onUseProvider={(members) => {
               pendingTeamRef.current = members;
               setProviderSetup(true);
+              goTo("model");
             }}
           />
         ) : null}
-        {step === "model" && providerSetup ? (
+        {step === "model" ? (
           <div>
-            <Button variant="ghost" className="mb-4 px-0" onClick={() => setProviderSetup(false)}>
+            {providerSetup ? <Button variant="ghost" className="mb-4 px-0" disabled={savingModel} onClick={() => { cancelOAuthAttempt(); goTo("team"); }}>
               {t`Back to your team`}
-            </Button>
+            </Button> : null}
             <h1 className="text-[32px] font-medium text-foreground">
               <Trans>Set up your assistant</Trans>
             </h1>

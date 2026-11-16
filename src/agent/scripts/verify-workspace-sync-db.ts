@@ -13,6 +13,8 @@ process.env.CONTENT_ENCRYPTION = "off";
 const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun } = await import("@rakazo/db");
 const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js");
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
+const { botsRoutes } = await import("../apps/api/src/routes/bots.js");
+const { CreateBotInput } = await import("@rakazo/contracts");
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");
 const { routineCalendar } = await import("../apps/api/src/routine-calendar.js");
 const { sporeRewards, usageDashboard } = await import("../apps/api/src/usage-dashboard.js");
@@ -195,6 +197,27 @@ try {
     assert.equal(Number((await rls.query("SELECT count(*) AS count FROM task_inbox")).rows[0].count), 0);
   } finally { await rls.end(); }
   checks.push("real PostgreSQL RLS conceals another member's inbox");
+  // Team setup uses a distinct endpoint so an older server cannot ignore a flag
+  // and silently enqueue a model greeting. Exercise its actual route and repos.
+  let modelReads = 0, enqueued = 0;
+  const protectedTables = new Set(["userModelRole", "userModelPreference", "userModelCredential"]);
+  const guarded = new Proxy(prisma, { get(target, property) {
+    if (protectedTables.has(String(property))) { modelReads++; throw Error("No model access during profile setup"); }
+    return Reflect.get(target, property);
+  } });
+  const authed: any = new Proxy({}, { get: () => new Proxy({}, { get: () => handler }) });
+  const profileRoutes = botsRoutes({ deps: { prisma: guarded, env: { agentRuntime: "pi" }, jobs: { enqueue: async () => { enqueued++; } } }, repos: createRepos(guarded), authed } as never).bots as any;
+  const createProfile = (scope = actor, name = "Synthetic lead") => runAsTenant(scope, () => profileRoutes.createProfile({ context: { actor: scope }, input: { ...CreateBotInput.parse({ name, spawnKey: "onboarding:first" }), expectedUserId: actor.userId } }));
+  const beforeRuns = await system.run.count(), beforeUsage = await system.usageRecord.count();
+  const [profile, repeated] = await Promise.all([createProfile(), createProfile()]);
+  assert.equal(profile.id, repeated.id);
+  await system.bot.update({ where: { id: profile.id }, data: { instructions: "Owner-edited instructions" } });
+  assert.equal((await createProfile(actor, "Another requested name")).id, profile.id);
+  assert.equal((await system.bot.findUniqueOrThrow({ where: { id: profile.id } })).instructions, "Owner-edited instructions");
+  await assert.rejects(createProfile({ ...actor, userId: "foreign" }));
+  assert.equal(modelReads, 0); assert.equal(enqueued, 0);
+  assert.equal(await system.run.count(), beforeRuns); assert.equal(await system.usageRecord.count(), beforeUsage);
+  checks.push("profile-only API creates once, preserves edits and account isolation, without model access or queued runs");
   const result = { passed: true, checks, productionAccess: false, modelsCalled: false };
   await writeFile(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));

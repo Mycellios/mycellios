@@ -19,6 +19,7 @@ vi.mock("@rakazo/ui-web", () => ({
     <button {...props} />
   ),
   Textarea: (props: ComponentProps<"textarea">) => <textarea {...props} />,
+  Disclosure: ({ summary, children }: { summary: ReactNode; children: ReactNode }) => <details><summary>{summary}</summary>{children}</details>,
 }));
 
 import { TeamBuilder } from "./TeamBuilder";
@@ -42,7 +43,7 @@ async function render(
   onUseProvider: (members: OnboardingTeamMember[] | null) => void = vi.fn(),
 ) {
   await act(async () => {
-    root.render(<TeamBuilder onCreate={onCreate} onUseProvider={onUseProvider} />);
+    root.render(<TeamBuilder onCreate={onCreate} onUseProvider={onUseProvider} onSingleMico={async () => undefined} />);
   });
   return { onCreate, onUseProvider };
 }
@@ -73,7 +74,7 @@ function fill(value: string) {
   });
 }
 
-it("asks two questions and proposes a sales team from the description", async () => {
+it("uses explicit answers to create a team without classifying free-form text", async () => {
   const onCreate = vi.fn(async (_members: OnboardingTeamMember[]) => undefined);
   await render(onCreate);
   expect(host.querySelector("h1")?.textContent).toBe("What should your team handle?");
@@ -84,6 +85,9 @@ it("asks two questions and proposes a sales team from the description", async ()
   expect(submit.disabled).toBe(true);
   fill("Find new sales leads");
   click("Continue");
+  expect(host.textContent).toContain("Which role is closest?");
+  click("Sales");
+  click("Continue");
   expect(host.textContent).toContain("Who is this for?");
   click("Just me");
   click("Continue");
@@ -93,8 +97,9 @@ it("asks two questions and proposes a sales team from the description", async ()
   expect(host.textContent).toContain("Lead Researcher");
   expect(host.textContent).toContain("Outreach Writer");
   expect(host.textContent).toContain("Follow-up");
-  expect(host.textContent).toContain("Starts on Mycellios credits");
-  await clickAsync("Put it to work");
+  expect(host.textContent).toContain("Use your model or start with Mycellios credits");
+  expect(host.textContent).toContain("Creating your team uses no credits");
+  await clickAsync("Create and open this team");
   expect(onCreate).toHaveBeenCalledTimes(1);
   const members = onCreate.mock.calls[0]![0];
   expect(members.map((member) => member.name)).toEqual([
@@ -112,7 +117,7 @@ it("creates a gallery role in one click and offers a provider when credits are u
   });
   const onUseProvider = vi.fn();
   await render(onCreate, onUseProvider);
-  await clickAsync("Put it to work: SEO");
+  await clickAsync("Create and open this team: SEO");
   expect(onCreate.mock.calls[0]![0].map((member) => member.id)).toEqual([
     "seo-research",
     "seo-editor",
@@ -131,5 +136,5 @@ it("asks which role is closest when the description does not name one", async ()
   expect(host.textContent).toContain("Which role is closest?");
   click("Support");
   click("Continue");
-  expect(host.textContent).toContain("What should they do first?");
+  expect(host.textContent).toContain("Who is this for?");
 });

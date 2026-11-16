@@ -21,7 +21,7 @@ const members: OnboardingTeamMember[] = [
   },
 ];
 
-it("creates the lead once and skips intro runs for the rest of the team", async () => {
+it("resumes interrupted creation without duplicate profiles or automatic inference", async () => {
   const create = vi
     .fn()
     .mockResolvedValueOnce({ id: "bot-lead" })
@@ -45,12 +45,9 @@ it("creates the lead once and skips intro runs for the rest of the team", async 
   expect(create.mock.calls[0]?.[0]).toMatchObject({
     name: "Lead Researcher",
     spawnKey: FIRST_MICO_SPAWN_KEY,
-    skipIntro: false,
-    computerMode: "team",
   });
   expect(create.mock.calls[2]?.[0]).toMatchObject({
     spawnKey: "onboarding:team:sales-outreach",
-    skipIntro: true,
   });
   expect(locks).toBe(2);
 });
@@ -63,4 +60,15 @@ it("reuses an existing lead instead of creating a second first Mico", async () =
   });
   expect(create).toHaveBeenCalledTimes(1);
   expect(create.mock.calls[0]?.[0].spawnKey).toBe("onboarding:team:sales-outreach");
+});
+
+it("stops starting new profile writes after leaving setup", async () => {
+  const controller = new AbortController();
+  const create = vi.fn(async () => {
+    controller.abort();
+    return { id: "already-created" };
+  });
+  await expect(createOnboardingTeam(members, { list: async () => [], create, signal: controller.signal }))
+    .rejects.toMatchObject({ name: "AbortError" });
+  expect(create).toHaveBeenCalledTimes(1);
 });

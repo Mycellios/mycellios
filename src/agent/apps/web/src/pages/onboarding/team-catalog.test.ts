@@ -4,7 +4,6 @@ import { BOT_INSTRUCTIONS_MAX_LENGTH, FIRST_MICO_SPAWN_KEY } from "@rakazo/contr
 import { describe, expect, it } from "vitest";
 import { draftOnboardingTeam } from "./create-onboarding-team";
 import {
-  inferSector,
   memberInstructions,
   proposeTeam,
   questionsFor,
@@ -18,38 +17,23 @@ const copy = {
 };
 
 describe("team catalog", () => {
-  it("infers a sector from English or Spanish and breaks ties by the earliest mention", () => {
-    expect(inferSector("Find new sales leads")).toBe("sales");
-    expect(inferSector("Quiero mejorar las ventas del trimestre")).toBe("sales");
-    expect(inferSector("Revisa el SEO de la tienda")).toBe("seo");
-    expect(inferSector("Clasifica los tickets de soporte")).toBe("support");
-    expect(inferSector("Una investigación con fuentes")).toBe("research");
-    expect(inferSector("Plan de marketing para la campaña")).toBe("marketing");
-    expect(inferSector("Documenta el proceso de operaciones")).toBe("operations");
-    expect(inferSector("sales and seo")).toBe("sales");
-    expect(inferSector("seo and sales")).toBe("seo");
-    expect(inferSector("deseo un equipo")).toBeNull();
-    expect(inferSector("   ")).toBeNull();
-  });
-
-  it("asks for a role only when the description does not name one", () => {
-    expect(questionsFor("reply to support tickets")).toEqual(["audience", "start"]);
-    expect(questionsFor("help me")).toEqual(["sector", "start"]);
+  it("asks structured questions without guessing or calling a model", () => {
+    expect(questionsFor()).toEqual(["sector", "audience", "start"]);
   });
 
   it("proposes the role roster and keeps the user's answers", () => {
-    expect(proposeTeam("need sales help", { audience: "customers", start: "process" })).toEqual({
+    expect(proposeTeam({ sector: "sales", audience: "customers", start: "process" })).toEqual({
       sector: "sales",
       members: ["sales-research", "sales-outreach", "sales-followup"],
       audience: "customers",
       start: "process",
     });
-    expect(proposeTeam("help", { sector: "seo" }).members).toEqual([
+    expect(proposeTeam({ sector: "seo" }).members).toEqual([
       "seo-research",
       "seo-editor",
       "seo-technical",
     ]);
-    expect(proposeTeam("help").sector).toBe("operations");
+    expect(proposeTeam().sector).toBe("operations");
     expect(TEAM_SECTORS).toHaveLength(6);
   });
 
@@ -66,7 +50,7 @@ describe("team catalog", () => {
       "Do not send messages, publish, spend, delete, or expand permissions",
     );
     expect(instructions).toContain("Reply in the user's language.");
-    const draft = draftOnboardingTeam("sales leads", { audience: "me", start: "drafts" }, copy);
+    const draft = draftOnboardingTeam("sales leads", { sector: "sales", audience: "me", start: "drafts" }, copy);
     expect(draft[0]).toMatchObject({ id: "sales-research", lead: true, name: "sales-research" });
     expect(draft[1]?.lead).toBe(false);
     expect(draft[0]?.instructions).toContain("This is for: Just me.");
@@ -101,7 +85,7 @@ describe("team copy catalogs", () => {
       if (!sameInSpanish.has(message)) expect(translated, message).not.toBe(message);
     }
     expect(spanish.get("Back to your team")).toBe("Volver a tu equipo");
-    expect(draftOnboardingTeam("sales", {}, copy)[0]?.id).toBe("sales-research");
+    expect(draftOnboardingTeam("sales", { sector: "sales" }, copy)[0]?.id).toBe("sales-research");
     expect(FIRST_MICO_SPAWN_KEY).toBe("onboarding:first");
   });
 });

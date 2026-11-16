@@ -35,11 +35,17 @@ export async function completeOnboarding(page: Page, testInfo?: TestInfo) {
   await page.waitForURL(/\/(onboarding|app)/, { timeout: 20_000 });
   const integrations = page.getByRole("heading", { name: "Server integrations", exact: true });
   const firstMico = page.getByTestId("first-mico-setup");
+  const team = page.getByTestId("onboarding-team");
   const companion = page.getByRole("combobox", { name: `Message ${productBrand.companionName}`, exact: true });
-  await integrations.or(firstMico).or(companion).waitFor({ timeout: 20_000 });
+  await integrations.or(firstMico).or(companion).or(team).waitFor({ timeout: 20_000 });
   if (await integrations.isVisible().catch(() => false)) {
     if (testInfo) await captureScreenshot(page, testInfo, "02-connect-apps");
     await page.getByRole("button", { name: "Skip", exact: true }).click();
+  }
+  await firstMico.or(companion).or(team).waitFor({ timeout: 20_000 });
+  if (await team.isVisible()) {
+    if (testInfo) await captureScreenshot(page, testInfo, "02-team-builder");
+    await team.getByRole("button", { name: "Start with one Mico", exact: true }).click();
   }
   await firstMico.or(companion).waitFor({ timeout: 20_000 });
   if (await firstMico.isVisible()) {

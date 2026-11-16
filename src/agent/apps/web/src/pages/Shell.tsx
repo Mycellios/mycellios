@@ -411,6 +411,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
   const reviewWorkspace = useReviewWorkspace();
   const { botId, groupId } = useParams();
   const firstMicoEngine = NativeBotEngineSchema.safeParse(useLocation().state?.firstMicoEngine).data;
+  const manualMicoSetup = useLocation().state?.manualMicoSetup === true;
   const [shellSpaceId] = useState(() => initialSpaceId ?? selectedSpaceId());
   const rpc = useSpaceRpc();
   const session = authClient.useSession();
@@ -1651,7 +1652,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           return;
         }
         if (
-          (bootstrap.me.needsSignupSurvey || (bootstrap.me.needsModel && !firstMicoEngine)) &&
+          !manualMicoSetup && !firstMicoEngine &&
           bootstrap.bots.length === 0 &&
           bootstrap.archivedBots.length === 0 &&
           groupList.length === 0 &&
@@ -3177,7 +3178,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
 
   async function createBot(input: CreateBotDialogInput, first = false) {
     const isFirstBot = botsRef.current.length === 0;
-    const bot = await rpc.bots.create({
+    const profile = {
       ...input,
       computerMode: defaultComputerMode(desktopBridge()),
       notifyOnFinish: true,
@@ -3186,7 +3187,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
         spawnKey: FIRST_MICO_SPAWN_KEY,
         agentEngine: firstMicoEngine,
       } : {}),
-    });
+    };
+    if (first && !bootstrapMe?.userId) throw new Error("Reload setup before creating profiles");
+    const bot = first
+      ? await rpc.bots.createProfile({ ...profile, expectedUserId: bootstrapMe!.userId })
+      : await rpc.bots.create(profile);
     // A roster requested before creation may omit this bot and redirect its new chat.
     botsRefreshEpoch.current += 1;
     setBots((current) =>

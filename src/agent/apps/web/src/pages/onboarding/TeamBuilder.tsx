@@ -1,9 +1,8 @@
 import { useLingui } from "@lingui/react/macro";
-import { Button, Textarea } from "@rakazo/ui-web";
+import { Button, Disclosure, Textarea } from "@rakazo/ui-web";
 import { useEffect, useRef, useState } from "react";
 import { draftOnboardingTeam, type OnboardingTeamMember } from "./create-onboarding-team";
 import {
-  inferSector,
   questionsFor,
   TEAM_AUDIENCES,
   TEAM_SECTORS,
@@ -29,9 +28,11 @@ type Phase =
 export function TeamBuilder({
   onCreate,
   onUseProvider,
+  onSingleMico,
 }: {
   onCreate: (members: OnboardingTeamMember[]) => Promise<void>;
   onUseProvider: (members: OnboardingTeamMember[] | null) => void;
+  onSingleMico: () => Promise<void>;
 }) {
   const { t } = useLingui();
   const copy = useTeamCopy();
@@ -74,6 +75,18 @@ export function TeamBuilder({
     }
   }
 
+  async function singleMico() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onSingleMico();
+    } catch {
+      setError("create");
+      setBusy(false);
+    }
+  }
+
   function propose(next: {
     description: string;
     sector: TeamSector;
@@ -88,7 +101,7 @@ export function TeamBuilder({
   }
 
   const proposal = phase.kind === "proposal" ? membersFor(phase) : null;
-  const questions = phase.kind === "question" ? questionsFor(phase.description) : [];
+  const questions = phase.kind === "question" ? questionsFor() : [];
   const question = questions[phase.kind === "question" ? phase.index : 0];
 
   return (
@@ -114,14 +127,15 @@ export function TeamBuilder({
             placeholder={copy.placeholder}
             aria-label={copy.heading}
             rows={4}
+            maxLength={2000}
             className="mt-4"
             disabled={busy}
           />
           <Button type="submit" className="mt-4 w-full" disabled={busy || !description.trim()}>
             {t`Continue`}
           </Button>
-          <h2 className="mt-8 text-sm font-medium text-foreground">{copy.gallery}</h2>
-          <div className="mt-3 grid gap-3">
+          <p className="mt-3 text-sm text-muted-foreground">{copy.setupCost}</p>
+          <Disclosure summary={copy.gallery} className="mt-8" contentClassName="mt-3 grid gap-3">
             {TEAM_SECTORS.map((id) => {
               const item = copy.sectors[id];
               const roster = membersFor({
@@ -158,7 +172,7 @@ export function TeamBuilder({
                 </div>
               );
             })}
-          </div>
+          </Disclosure>
         </form>
       ) : null}
       {phase.kind === "question" && question ? (
@@ -180,14 +194,14 @@ export function TeamBuilder({
             }
             propose({
               description: text,
-              sector: (questions.includes("sector") ? sector : inferSector(text)) ?? "operations",
+              sector: sector ?? "operations",
               audience: audience ?? "me",
               start: start ?? "drafts",
             });
           }}
         >
           <h1 className="text-[32px] font-medium text-foreground">{copy.questionsIntro}</h1>
-          <p className="mt-4 text-muted-foreground">{phase.description}</p>
+          <p className="mt-4 break-words text-muted-foreground">{phase.description}</p>
           <fieldset className="mt-6 grid gap-2">
             <legend className="text-sm font-medium text-foreground">
               {question === "sector"
@@ -272,6 +286,7 @@ export function TeamBuilder({
           <p className="mt-4 text-muted-foreground">
             {copy.sectors[phase.sector].summary} {copy.credits}
           </p>
+          <p className="mt-3 text-sm text-muted-foreground">{copy.setupCost}</p>
           <ul className="mt-4 grid gap-3">
             {proposal.map((member) => (
               <li key={member.id} className="rounded-md border border-border p-3">
@@ -329,15 +344,14 @@ export function TeamBuilder({
         </div>
       ) : null}
       {phase.kind === "describe" ? (
-        <Button
-          type="button"
-          variant="ghost"
-          className="mt-6"
-          disabled={busy}
-          onClick={() => onUseProvider(null)}
-        >
-          {copy.ownProvider}
-        </Button>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button type="button" variant="ghost" disabled={busy} onClick={() => void singleMico()}>
+            {copy.singleMico}
+          </Button>
+          <Button type="button" variant="ghost" disabled={busy} onClick={() => onUseProvider(null)}>
+            {copy.ownProvider}
+          </Button>
+        </div>
       ) : null}
     </div>
   );

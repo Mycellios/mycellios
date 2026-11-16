@@ -13269,20 +13269,28 @@ msgid "Or start from a role"
 msgstr "O empieza por un rol"
 
 #: src/pages/onboarding/team-copy.ts
-msgid "Put it to work"
-msgstr "Ponlo a trabajar"
+msgid "Create and open this team"
+msgstr "Crear y abrir este equipo"
 
 #: src/pages/onboarding/team-copy.ts
-msgid "A couple of questions so the team fits."
-msgstr "Un par de preguntas para que el equipo encaje."
+msgid "A few questions so the team fits."
+msgstr "Unas preguntas para que el equipo encaje."
 
 #: src/pages/onboarding/team-copy.ts
 msgid "Your team"
 msgstr "Tu equipo"
 
 #: src/pages/onboarding/team-copy.ts
-msgid "Starts on Mycellios credits. No API key needed."
-msgstr "Empieza con créditos de Mycellios. No hace falta una clave de API."
+msgid "Use your model or start with Mycellios credits."
+msgstr "Usa tu modelo o empieza con créditos de Mycellios."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Creating your team uses no credits. You choose when to start."
+msgstr "Crear tu equipo no consume créditos. Tú decides cuándo empezar."
+
+#: src/pages/onboarding/team-copy.ts
+msgid "Start with one Mico"
+msgstr "Empezar con un solo Mico"
 
 #: src/pages/onboarding/team-copy.ts
 msgid "Use your own provider"

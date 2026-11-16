@@ -251,8 +251,6 @@ describe("contracts", () => {
     expect(parsed.title).toBe("");
     expect(parsed.notifyOnFinish).toBe(true);
     expect(parsed.avatarFamily).toBeUndefined();
-    expect(parsed.skipIntro).toBeUndefined();
-    expect(CreateBotInput.parse({ name: "Chief", skipIntro: true }).skipIntro).toBe(true);
   });
 
   it("accepts an organic avatar family from 0 to 9 when creating a bot", () => {

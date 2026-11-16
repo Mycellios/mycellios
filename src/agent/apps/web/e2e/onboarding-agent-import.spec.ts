@@ -111,7 +111,6 @@ test("a new user can start from an imported agent instead of Mico", async ({ pag
 test("a new user can create the first Mico without importing", async ({ page }, testInfo) => {
   const model = await controlNeedsModel(page);
   await signup(page, `onboarding-no-import-${Date.now()}@rakazo.test`, "password12", "Plain");
-  await page.getByRole("button", { name: "Use your own provider", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Set up your assistant" })).toBeVisible({
     timeout: 20_000,
   });
