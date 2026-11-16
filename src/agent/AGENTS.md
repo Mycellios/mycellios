@@ -1147,8 +1147,10 @@
   private preload's trusted pointer gesture or an explicit island-open action.
   Background DOM replacement must never reactivate a companion window.
   Windows releases run `apps/desktop/scripts/verify-window-interaction.mjs` in
-  an isolated profile, checking typing during companion updates and native pointer
-  dragging from normal and maximized windows. Retain its qualification receipt.
+  an isolated profile, checking typing during companion updates and native position
+  retention from normal and maximized windows. Its optional `--pointer` mode
+  requires an interactive desktop; CI marks that gesture NOT RUN separately.
+  Retain its qualification receipt and never call a native bounds test a real drag.
   Island scope filters are device-local and keyed by the full account/Space scope.
   New-scope defaults never overwrite explicit choices; switching that default in
   settings freezes known scopes first. Excluded scopes publish no question reads.

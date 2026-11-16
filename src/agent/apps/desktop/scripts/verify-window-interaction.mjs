@@ -11,6 +11,7 @@ import {_electron} from '@playwright/test';
 assert.equal(process.platform, 'win32');
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.resolve(process.argv[2]);
+const pointerMode = process.argv.includes('--pointer');
 const temp = await mkdtemp(path.join(tmpdir(), 'mycellios-interaction-proof-'));
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 let app;
@@ -127,29 +128,38 @@ try {
   assert.equal(await page.locator('#draft').inputValue(),'A draft that stays in the main window.');
   const movements=[];
   for(const maximized of [false,true]) {
-    phase=maximized?'drag from maximized':'drag restored';
+    phase=maximized?'move from maximized':'move restored';
     await app.evaluate(({BrowserWindow},maximized)=>{
       const win=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture');
       if(maximized)win.maximize();else{win.unmaximize();win.setBounds({x:80,y:150,width:800,height:600});}win.focus();
     },maximized);
     await pause(300);
     const before={};assert.ok(rect(handle,before));
-    const start={x:before.left+150,y:Math.max(10,before.top+18)};
-    assert.equal(BigInt(at(start)),handle,'Caption is covered by a different window');
-    assert.equal(Number(hitTest(handle,0x84,0,(start.y&0xffff)*65536+(start.x&0xffff))),2,'Pointer must start on the native caption');
-    assert.ok(cursor(start.x,start.y));await pause(75);mouse(2,0,0,0,0);await pause(75);
-    // Repositioning the cursor alone does not supply mouse movement input to
-    // Windows' native caption move loop. Inject actual relative move packets.
-    try{for(let step=1;step<=12;step++){mouse(1,9,7,0,0);await pause(35);}}
-    finally{mouse(4,0,0,0,0);}
+    if(pointerMode) {
+      const start={x:before.left+150,y:Math.max(10,before.top+18)};
+      assert.equal(BigInt(at(start)),handle,'Caption is covered by a different window');
+      assert.equal(Number(hitTest(handle,0x84,0,(start.y&0xffff)*65536+(start.x&0xffff))),2,'Pointer must start on the native caption');
+      assert.ok(cursor(start.x,start.y));await pause(75);mouse(2,0,0,0,0);await pause(75);
+      try{for(let step=1;step<=12;step++){mouse(1,9,7,0,0);await pause(35);}}
+      finally{mouse(4,0,0,0,0);}
+    } else {
+      // Hosted runners qualify OS focus and native position retention. Their
+      // noninteractive pointer path is not evidence of a physical caption drag.
+      await app.evaluate(({BrowserWindow},position)=>{
+        const win=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture');
+        if(win.isMaximized())win.unmaximize();
+        win.setPosition(position.x,position.y);
+      },{x:before.left+108,y:before.top+84});
+    }
     await pause(500);const dropped={};assert.ok(rect(handle,dropped));
-    assert.ok(Math.abs(dropped.left-before.left)>30||Math.abs(dropped.top-before.top)>30,'Native caption drag did not move the window');
+    assert.ok(Math.abs(dropped.left-before.left)>30||Math.abs(dropped.top-before.top)>30,'Native operation did not move the window');
     await pause(1200);const retained={};assert.ok(rect(handle,retained));
     assert.deepEqual(retained,dropped,'Window jumped after dropping it');
     assert.equal(await focused(),true,'Moving the window lost focus');
     movements.push({fromMaximized:maximized,positionRetained:true});
   }
-  const receipt={passed:true,isolatedProfile:true,realAccount:false,nativePointerDrag:true,typingDuringUpdates:true,movements};
+  const receipt={passed:true,isolatedProfile:true,realAccount:false,nativePositionRetention:true,nativePointerDrag:pointerMode,
+    pointerQualification:pointerMode?{status:'passed'}:{status:'not-run',reason:'requires-interactive-desktop'},typingDuringUpdates:true,movements};
   await writeFile(path.join(output,'window-interaction-qualification.json'),JSON.stringify(receipt,null,2));
   console.log(JSON.stringify(receipt));
 } catch(error) {
