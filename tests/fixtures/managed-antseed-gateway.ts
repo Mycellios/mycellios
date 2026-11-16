@@ -14,7 +14,7 @@ export function antseedGatewayFixture() {
   const tag = "gw_" + "12345678-1234-1234-1234-123456789012";
   const row: Record<string, any> = {tag, keyId: authId, model: "deepseek-v4-flash", sellerPeerId: gatewaySeller,
     method: "POST", path: "/v1/chat/completions", finishedAt: Date.now(), status: 200,
-    inputTokens: 3, cachedInputTokens: 1, outputTokens: 2, spent: "0.000005"};
+    inputTokens: 4, cachedInputTokens: 1, outputTokens: 2, spent: "0.000005"};
   const transport = vi.fn<typeof fetch>(async (url, init) => {
     const u = new URL(String(url)), headers = new Headers(init?.headers);
     if (u.pathname === "/console/api/auth/api-key") {

@@ -256,7 +256,10 @@ export class ManagedAntseedGateway {
     if (row.costPending || !row.finishedAt || row.status !== 200 || row.spent === null) return null;
     const prompt = job.response.usage.prompt_tokens, output = job.response.usage.completion_tokens;
     const counts = [row.inputTokens, row.cachedInputTokens, row.outputTokens];
-    if (!counts.every(n => Number.isSafeInteger(n) && n >= 0) || row.inputTokens + row.cachedInputTokens !== prompt || row.outputTokens !== output) return null;
+    // The gateway normalizes OpenAI prompt_tokens into total inputTokens;
+    // cachedInputTokens is a subset, not an additional billable token count.
+    if (!counts.every(n => Number.isSafeInteger(n) && n >= 0) || row.cachedInputTokens > row.inputTokens
+      || row.inputTokens !== prompt || row.outputTokens !== output) return null;
     if (typeof row.spent !== "string") throw new Error("antseed_receipt_invalid");
     const cost = usdAtoms(row.spent);
     // Return the authoritative invoice even for an overcharge. ManagedPurchases
