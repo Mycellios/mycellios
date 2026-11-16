@@ -2,15 +2,17 @@ import { EventEmitter } from "node:events";
 import { beforeEach, expect, it, vi } from "vitest";
 import { DEFAULT_DESKTOP_COMPANIONS, DesktopCompanionPreferencesSchema, DesktopCompanionSnapshotSchema } from "@rakazo/contracts";
 const mocks = vi.hoisted(() => ({ cursor: { x: 0, y: 0 }, handlers: new Map<string, Function>(), listeners: new Map<string, Function>(), windows: [] as any[],
-  write: vi.fn(async () => undefined), read: vi.fn(async () => null), displays: [{ id: 1, label: "Primary", size: { width: 1920, height: 1080 }, workArea: { x: 0, y: 0, width: 1920, height: 1040 } }] }));
+  matchingDisplay: 1, write: vi.fn(async () => undefined), read: vi.fn(async () => null), displays: [{ id: 1, label: "Primary", size: { width: 1920, height: 1080 }, workArea: { x: 0, y: 0, width: 1920, height: 1040 } }] }));
 vi.mock("./setup-store.js", () => ({ readPrivateFile: mocks.read, writePrivateFile: mocks.write }));
 vi.mock("electron", () => ({
   ipcMain: { handle: (key: string, fn: Function) => mocks.handlers.set(key, fn), on: (key: string, fn: Function) => mocks.listeners.set(key, fn), removeListener: vi.fn() },
-  screen: { getAllDisplays: () => mocks.displays, getPrimaryDisplay: () => mocks.displays[0], getCursorScreenPoint: () => mocks.cursor, getDisplayMatching: () => mocks.displays[0], on: vi.fn(), off: vi.fn() },
+  screen: { getAllDisplays: () => mocks.displays, getPrimaryDisplay: () => mocks.displays[0], getCursorScreenPoint: () => mocks.cursor, getDisplayMatching: () => mocks.displays.find(display => display.id === mocks.matchingDisplay) ?? mocks.displays[0], on: vi.fn(), off: vi.fn() },
   BrowserWindow: class extends EventEmitter {
-    webContents = Object.assign(new EventEmitter(), { send: vi.fn(), setWindowOpenHandler: vi.fn(), setZoomFactor: vi.fn(), mainFrame: {} });
-    destroyed = false; setAlwaysOnTop = vi.fn(); setHasShadow = vi.fn(); setFocusable = vi.fn(); focus = vi.fn(); setBounds = vi.fn(); showInactive = vi.fn(); setIgnoreMouseEvents = vi.fn();
+    zoom = 1;
+    webContents = Object.assign(new EventEmitter(), { send: vi.fn(), setWindowOpenHandler: vi.fn(), getZoomFactor: () => this.zoom, setZoomFactor: vi.fn((zoom: number) => { this.zoom = zoom; }), mainFrame: {} });
+    destroyed = false; setAlwaysOnTop = vi.fn(); setHasShadow = vi.fn(); setFocusable = vi.fn((focusable: boolean) => { this.options.focusable = focusable; }); focus = vi.fn(); setBounds = vi.fn((bounds: any) => { Object.assign(this.options, bounds); }); showInactive = vi.fn(); setIgnoreMouseEvents = vi.fn();
     isFocused() { return false; }
+    isFocusable() { return this.options.focusable; }
     isAlwaysOnTop() { return true; }
     getNativeWindowHandle() { return Buffer.alloc(8); }
     getBounds() { return this.options; }
@@ -24,7 +26,7 @@ import { companionBounds, installDesktopCompanions } from "./desktop-companions"
 const good = { trusted: true };
 const snapshot = { scope: "user:space", theme: "light", agents: [{ id: "bot-a", name: "Mico", color: "#3f9f78", status: "Working", result: "Private preview", working: true, unread: false }] };
 const call = (key: string, value?: unknown, event = good) => mocks.handlers.get(`desktop.companions.${key}`)!(event, value);
-beforeEach(() => { mocks.cursor = { x: 0, y: 0 }; mocks.windows.length = 0; mocks.handlers.clear(); mocks.listeners.clear(); mocks.write.mockClear(); mocks.read.mockResolvedValue(null); });
+beforeEach(() => { mocks.cursor = { x: 0, y: 0 }; mocks.matchingDisplay = 1; mocks.windows.length = 0; mocks.handlers.clear(); mocks.listeners.clear(); mocks.write.mockClear(); mocks.read.mockResolvedValue(null); });
 it("positions dock and island inside offset display work areas", () => {
   const area = { x: -1920, y: -200, width: 1920, height: 1040 };
   const bounds = companionBounds(area, "dock", DEFAULT_DESKTOP_COMPANIONS, 3);
@@ -112,6 +114,23 @@ async function islandHost() {
   const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
   return { host, requestReply, reveal, window, event };
 }
+it("revokes island activation on blur and restores it only for its owned expanded surface", async () => {
+  const test = await islandHost();
+  try {
+    const activate = mocks.listeners.get("companion.activate")!;
+    activate(test.event); expect(test.window.isFocusable()).toBe(false);
+    mocks.listeners.get("companion.expand")!(test.event, true);
+    expect(test.window.isFocusable()).toBe(true);
+    test.window.emit("blur"); expect(test.window.isFocusable()).toBe(false);
+    call("publish", { ...snapshot, questions: [question] });
+    expect(test.window.isFocusable()).toBe(false);
+    activate({ sender: test.window.webContents, senderFrame: {} }); expect(test.window.isFocusable()).toBe(false);
+    activate(test.event); expect(test.window.isFocusable()).toBe(true);
+    mocks.listeners.get("companion.expand")!(test.event, false);
+    expect(test.window.isFocusable()).toBe(false);
+    activate(test.event); expect(test.window.isFocusable()).toBe(false);
+  } finally { test.host.dispose(); }
+});
 it("answers only from its own island, validates scope/options and resolves through the trusted app", async () => {
   const test = await islandHost(); const reply = mocks.handlers.get("companion.answer")!;
   try {
@@ -249,6 +268,49 @@ it("rejects foreign drag events and persists keyboard movement without losing ot
     expect(call("state").dock.offset).toBe(55); drag(event, "end"); await new Promise(resolve => setTimeout(resolve, 0));
     expect(call("state").dock.offset).toBeGreaterThan(55);
   } finally { host.dispose(); }
+});
+
+it("does not reassert native companion placement during main-window movement and still follows display changes", async () => {
+  vi.useFakeTimers();
+  let bounds = { x: 10, y: 10, width: 800, height: 600 };
+  const main = { isDestroyed: () => false, isVisible: () => true, isMinimized: () => false, isFocused: () => true,
+    getBounds: () => bounds, setBounds: vi.fn(), setPosition: vi.fn() };
+  const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal: vi.fn(), mainWindow: () => main as any });
+  try {
+    await call("save", { ...DEFAULT_DESKTOP_COMPANIONS,
+      dock: { ...DEFAULT_DESKTOP_COMPANIONS.dock, shown: true, display: "window" },
+      island: { ...DEFAULT_DESKTOP_COMPANIONS.island, shown: true } });
+    call("publish", snapshot);
+    await vi.advanceTimersByTimeAsync(120);
+    const companions = [...mocks.windows];
+    expect(companions).toHaveLength(2);
+    for (const win of companions) {
+      win.setBounds.mockClear(); win.setAlwaysOnTop.mockClear(); win.setFocusable.mockClear();
+      win.webContents.setZoomFactor.mockClear(); win.webContents.send.mockClear();
+    }
+    // Cover both normal movement and a maximized window returning to normal size.
+    for (const next of [{ x: 100, y: 80, width: 1920, height: 1040 }, { x: 200, y: 120, width: 800, height: 600 }]) {
+      bounds = next;
+      await vi.advanceTimersByTimeAsync(240);
+      call("publish", snapshot);
+    }
+    for (const win of companions) {
+      expect(win.setBounds).not.toHaveBeenCalled(); expect(win.setAlwaysOnTop).not.toHaveBeenCalled();
+      expect(win.setFocusable).not.toHaveBeenCalled(); expect(win.webContents.setZoomFactor).not.toHaveBeenCalled();
+      expect(win.webContents.send).toHaveBeenCalledTimes(2);
+    }
+    mocks.displays.push({ id: 2, label: "Secondary", size: { width: 1920, height: 1080 }, workArea: { x: 1920, y: 0, width: 1920, height: 1040 } });
+    mocks.matchingDisplay = 2;
+    bounds = { ...bounds, x: 2000 };
+    await vi.advanceTimersByTimeAsync(120);
+    const dock = companions.find(win => win.options.title === "Mycellios · Dock");
+    expect(dock.destroyed).toBe(true);
+    expect(mocks.windows.at(-1).options.x).toBeGreaterThanOrEqual(1920);
+    expect(main.setBounds).not.toHaveBeenCalled(); expect(main.setPosition).not.toHaveBeenCalled();
+  } finally {
+    if (mocks.displays.at(-1)?.id === 2) mocks.displays.pop();
+    host.dispose(); vi.useRealTimers();
+  }
 });
 it("shows only newly completed results briefly and never replays old results after a scope change", async () => {
   vi.useFakeTimers(); const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal: vi.fn() });

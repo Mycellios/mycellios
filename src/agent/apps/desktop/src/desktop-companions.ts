@@ -108,24 +108,35 @@ export async function installDesktopCompanions(options: {
           win = new BrowserWindow({ ...companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)),
             frame: false, transparent: true, resizable: false, maximizable: false, minimizable: false,
             icon: windowIcon(import.meta.dirname, path.resolve(import.meta.dirname, ".."), process.platform),
-            alwaysOnTop: true, skipTaskbar: true, show: false, focusable: kind !== "island", title: kind === "island" ? "Mycellios · Island" : "Mycellios · Dock",
+            alwaysOnTop: true, skipTaskbar: true, show: false, focusable: false, title: kind === "island" ? "Mycellios · Island" : "Mycellios · Dock",
             webPreferences: { preload: path.join(import.meta.dirname, "companion-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
           keepAbove(win);
           if (kind === "island") win.setHasShadow(false);
           windows.set(key, win);
           const created = win;
+          // A transparent companion must not reactivate itself when a renderer
+          // removes a previously focused element during a background update.
+          win.on("blur", () => { if (!created.isDestroyed() && created.isFocusable()) created.setFocusable(false); });
           win.once("ready-to-show", () => { ready.add(created); revealReady(created); });
           win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
           win.webContents.on("will-navigate", event => event.preventDefault());
-          win.webContents.once("did-finish-load", () => { if (!win!.isDestroyed()) { if (kind === "dock") win!.webContents.setZoomFactor(prefs.dock.size / 100); win!.webContents.send("companion.state", { ...payload(kind), expanded: islandExpanded.has(key) }); } });
+          win.webContents.once("did-finish-load", () => { if (!win!.isDestroyed()) { if (kind === "dock") win!.webContents.setZoomFactor(prefs.dock.size / 100); win!.webContents.send("companion.state", { ...payload(kind), expanded: islandExpanded.has(key), focused: win!.isFocused() }); } });
           win.on("closed", () => { if (windows.get(key) === win) windows.delete(key); });
           void win.loadFile(path.join(import.meta.dirname, "companion.html")).catch(() => { if (!win!.isDestroyed()) win!.destroy(); });
         } else {
-          if (kind === "dock") { keepAbove(win); win.webContents.setZoomFactor(prefs.dock.size / 100); }
-          if (kind === "island") win.setFocusable(islandExpanded.has(key));
-          win.setBounds(companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)));
+          // Publishing chat state must not repeatedly change native placement or
+          // focusability while the user is dragging the main OS window.
+          if (kind === "dock") {
+            if (!win.isAlwaysOnTop()) keepAbove(win);
+            const zoom = prefs.dock.size / 100;
+            if (win.webContents.getZoomFactor() !== zoom) win.webContents.setZoomFactor(zoom);
+          }
+          if (kind === "island" && !islandExpanded.has(key) && win.isFocusable()) win.setFocusable(false);
+          const bounds = companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key));
+          const current = win.getBounds();
+          if (current.x !== bounds.x || current.y !== bounds.y || current.width !== bounds.width || current.height !== bounds.height) win.setBounds(bounds);
           if (kind === "dock" && !prefs.dock.autoHide) { win.setIgnoreMouseEvents(false); expanded.delete(key); }
-          win.webContents.send("companion.state", { ...data, expanded: islandExpanded.has(key) });
+          win.webContents.send("companion.state", { ...data, expanded: islandExpanded.has(key), focused: win.isFocused() });
         }
       }
     }
@@ -164,9 +175,16 @@ export async function installDesktopCompanions(options: {
     if (!owned?.[0].startsWith("island:") || typeof open !== "boolean") return;
     open ? islandExpanded.add(owned[0]) : islandExpanded.delete(owned[0]);
     sync();
-    if (open) owned[1].focus();
+    if (open) { owned[1].setFocusable(true); owned[1].focus(); }
   };
   ipcMain.on("companion.expand", expandIsland);
+  const activateCompanion = (event: Electron.IpcMainEvent) => {
+    const owned = companionWindow(event);
+    if (!owned || owned[1].isDestroyed() || owned[0].startsWith("island:") && !islandExpanded.has(owned[0])) return;
+    if (!owned[1].isFocusable()) owned[1].setFocusable(true);
+    owned[1].focus();
+  };
+  ipcMain.on("companion.activate", activateCompanion);
   const openQuestion = (event: Electron.IpcMainEvent, id: unknown) => {
     if (!companionWindow(event)?.[0].startsWith("island:") || typeof id !== "string") return;
     const prompt = snapshot.questions?.find(prompt => prompt.id === id && !resolved.has(id));
@@ -265,7 +283,8 @@ export async function installDesktopCompanions(options: {
     if (expired) sync();
     if (prefs.dock.shown && (prefs.dock.layer === "app" || prefs.dock.display === "window" || typeof prefs.dock.display === "number")) {
       const main = options.mainWindow?.();
-      const fingerprint = JSON.stringify(main && !main.isDestroyed() ? [main.getBounds(), main.isVisible(), main.isMinimized(), main.isFocused(), [...windows].some(([key, win]) => key.startsWith("dock:") && !win.isDestroyed() && win.isFocused())] : null);
+      // The dock follows a display, not each intermediate pixel of a native drag.
+      const fingerprint = JSON.stringify(main && !main.isDestroyed() ? [windowDisplay().id, main.isVisible(), main.isMinimized(), main.isFocused(), [...windows].some(([key, win]) => key.startsWith("dock:") && !win.isDestroyed() && win.isFocused())] : null);
       if (fingerprint !== mainFingerprint) { mainFingerprint = fingerprint; sync(); }
     }
     if (!prefs.dock.autoHide || !prefs.dock.shown) return;
@@ -289,6 +308,7 @@ export async function installDesktopCompanions(options: {
       screen.off("display-added", sync); screen.off("display-removed", sync); screen.off("display-metrics-changed", sync);
       ipcMain.removeListener("companion.select", select); ipcMain.removeListener("companion.dock.drag", moveDock);
       ipcMain.removeListener("companion.expand", expandIsland);
+      ipcMain.removeListener("companion.activate", activateCompanion);
       ipcMain.removeListener("companion.painted", painted);
       ipcMain.removeListener("companion.question.open", openQuestion);
       ipcMain.removeHandler?.("companion.answer"); ipcMain.removeHandler?.("desktop.companions.questionResult"); } };

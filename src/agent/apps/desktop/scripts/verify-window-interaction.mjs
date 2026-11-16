@@ -1,0 +1,188 @@
+import assert from 'node:assert/strict';
+import {mkdtemp, mkdir, writeFile, cp, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {createRequire} from 'node:module';
+import {build} from 'esbuild';
+import {_electron} from '@playwright/test';
+
+// Dedicated Windows-runner fixture only. Never attaches to an installed profile.
+assert.equal(process.platform, 'win32');
+const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const output = path.resolve(process.argv[2]);
+const pointerMode = process.argv.includes('--pointer');
+const temp = await mkdtemp(path.join(tmpdir(), 'mycellios-interaction-proof-'));
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+let app;
+let phase = 'prepare';
+try {
+  await mkdir(output, {recursive:true});
+  await mkdir(path.join(temp, 'profile'));
+  for (const name of ['companion.html', 'companion.css', 'companion.js', 'companion-preload.cjs', 'tokens.css', 'assets']) {
+    await cp(path.join(desktop, 'dist', name), path.join(temp, name), {recursive:true});
+  }
+  const preload = path.join(temp, 'fixture.cjs');
+  await writeFile(preload, `const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('fixture',{
+    defaults:()=>ipcRenderer.invoke('fixture.defaults'),save:value=>ipcRenderer.invoke('desktop.companions.save',value),
+    publish:value=>ipcRenderer.invoke('desktop.companions.publish',value)});`);
+  const entry = path.join(temp, 'fixture.mjs');
+  const source = `
+    import {app,BrowserWindow,ipcMain} from 'electron';
+    import {DEFAULT_DESKTOP_COMPANIONS} from '@rakazo/contracts';
+    import {installDesktopCompanions} from ${JSON.stringify(path.join(desktop,'src/desktop-companions.ts'))};
+    import {browserWindowOptions} from ${JSON.stringify(path.join(desktop,'src/window-options.ts'))};
+    app.setPath('userData',${JSON.stringify(path.join(temp,'profile'))});
+    async function qualify() {
+    await app.whenReady();
+    const main=new BrowserWindow({...browserWindowOptions(process.platform),x:80,y:150,width:800,height:600,
+      webPreferences:{preload:${JSON.stringify(preload)},sandbox:true,contextIsolation:true,nodeIntegration:false}});
+    const host=await installDesktopCompanions({profile:app.getPath('userData'),mainWindow:()=>main,
+      allowed:e=>e.sender===main.webContents&&e.senderFrame===main.webContents.mainFrame,reveal:()=>{}});
+    ipcMain.handle('fixture.defaults',()=>DEFAULT_DESKTOP_COMPANIONS);
+    app.on('before-quit',()=>host.dispose());
+    await main.loadURL('data:text/html,<title>Isolated interaction fixture</title><input id="draft" aria-label="Draft">');
+    }
+    void qualify().catch(error=>{console.error(error);app.exit(1);});
+  `;
+  await build({stdin:{contents:source,resolveDir:desktop,sourcefile:'interaction-fixture.mjs'},outfile:entry,
+    bundle:true,platform:'node',format:'esm',target:'node24',external:['electron'],
+    banner:{js:"import {createRequire as fixtureRequire} from 'node:module';const require=fixtureRequire(import.meta.url);"}});
+  phase = 'launch';
+  const env = {...process.env}; delete env.ELECTRON_RUN_AS_NODE;
+  app = await _electron.launch({args:[entry],env,timeout:60_000});
+  const page = await app.firstWindow();
+  await page.waitForSelector('#draft');
+  await page.evaluate(async () => {
+    const prefs=await window.fixture.defaults();
+    await window.fixture.save({...prefs,dock:{...prefs.dock,shown:true,display:'window'},island:{...prefs.island,shown:true}});
+    window.snapshot = {scope:'fixture:space',theme:'light',agents:[{id:'fixture',name:'Fixture',color:'#3f9f78',status:'Waiting',result:'',working:false,unread:false}],
+      questions:[{id:'fixture:question',botId:'fixture',runId:'fixture-run',messageId:'fixture-message',legacy:true,questions:[{id:'question',question:'Fixture?',options:[]}]}]};
+    await window.fixture.publish(window.snapshot);
+  });
+  const koffi=createRequire(import.meta.url)('koffi');
+  const user32=koffi.load('user32.dll');
+  user32.func('intptr_t __stdcall SetThreadDpiAwarenessContext(intptr_t context)')(-4);
+  const Rect=koffi.struct('InteractionRect',{left:'int',top:'int',right:'int',bottom:'int'});
+  const Point=koffi.struct('InteractionPoint',{x:'int',y:'int'});
+  const rect=user32.func('GetWindowRect','bool',['uintptr_t',koffi.out(koffi.pointer(Rect))]);
+  const at=user32.func('WindowFromPoint','uintptr_t',[Point]);
+  const ancestor=user32.func('uintptr_t __stdcall GetAncestor(uintptr_t window,uint32_t flags)');
+  const cursor=user32.func('bool __stdcall SetCursorPos(int x,int y)');
+  const mouse=user32.func('void __stdcall mouse_event(uint32_t flags,uint32_t dx,uint32_t dy,uint32_t data,uintptr_t extra)');
+  const hitTest=user32.func('intptr_t __stdcall SendMessageW(uintptr_t window,uint32_t message,uintptr_t wParam,intptr_t lParam)');
+  const handle=BigInt(await app.evaluate(({BrowserWindow})=>{
+    const b=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture').getNativeWindowHandle();
+    return (b.length===8?b.readBigUInt64LE():BigInt(b.readUInt32LE())).toString();
+  }));
+  const focused = () => app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture').isFocused());
+  phase = 'focus';
+  const deadline = Date.now()+15_000;
+  let island;
+  while (!island && Date.now()<deadline) {
+    island = app.windows().find(p => p.url().endsWith('/companion.html') && p !== page);
+    // Select by the host title because dock and island share their local document.
+    island = await app.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().some(w=>w.getTitle()==='Mycellios · Island')) ? island : undefined;
+    if(!island) await pause(100);
+  }
+  assert.ok(island, 'Island did not open');
+  await app.evaluate(async ({BrowserWindow}) => {
+    const win=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Mycellios · Island');
+    await win.webContents.executeJavaScript('window.companion.expand(true)');
+  });
+  await pause(200);
+  await app.evaluate(async ({BrowserWindow}) => {
+    const win=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Mycellios · Island');
+    win.focus(); await win.webContents.executeJavaScript('document.querySelector("input").focus()');
+    const main=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture');
+    main.show();main.focus();
+  });
+  // Start as a user does: activate this fixture with a real pointer click.
+  // Programmatic show/focus can be denied by Windows' foreground lock.
+  const mainBounds={};assert.ok(rect(handle,mainBounds));
+  const activatePoint={x:mainBounds.left+40,y:mainBounds.top+80};
+  assert.equal(BigInt(ancestor(at(activatePoint),2)),handle,'Activation point is covered by a different window');
+  assert.ok(cursor(activatePoint.x,activatePoint.y));await pause(75);mouse(2,0,0,0,0);await pause(75);mouse(4,0,0,0,0);
+  const focusDeadline=Date.now()+3000;
+  while(!await focused()&&Date.now()<focusDeadline)await pause(50);
+  assert.equal(await focused(),true,'The fixture did not receive initial native focus');
+  await page.locator('#draft').focus();
+  await app.evaluate(({BrowserWindow})=>{
+    globalThis.interactionTrace=[];
+    for(const win of BrowserWindow.getAllWindows()) {
+      const record=(event,details)=>{if(globalThis.interactionTrace.length<120)globalThis.interactionTrace.push({window:win.getTitle(),event,details});};
+      for(const event of ['focus','blur'])win.on(event,()=>record(event));
+      for(const method of ['setBounds','setFocusable','setAlwaysOnTop']) {
+        const original=win[method].bind(win);win[method]=(...args)=>{record(method,args);return original(...args);};
+      }
+    }
+  });
+  await page.evaluate(() => {window.poll=setInterval(()=>{
+    window.snapshot.agents[0].status='Update '+Date.now();void window.fixture.publish(window.snapshot);
+  },40);});
+  for (const text of ['A draft ', 'that stays ', 'in the main window.']) {
+    assert.equal(await focused(),true,'Background activity stole native focus');
+    await page.keyboard.type(text,{delay:25}); await pause(250);
+    assert.equal(await focused(),true,'Typing lost native focus');
+  }
+  assert.equal(await page.locator('#draft').inputValue(),'A draft that stays in the main window.');
+  const movements=[];
+  for(const maximized of [false,true]) {
+    phase=maximized?'move from maximized':'move restored';
+    await app.evaluate(({BrowserWindow},maximized)=>{
+      const win=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture');
+      if(maximized)win.maximize();else{win.unmaximize();win.setBounds({x:80,y:150,width:800,height:600});}win.focus();
+    },maximized);
+    await pause(300);
+    const before={};assert.ok(rect(handle,before));
+    if(pointerMode) {
+      const start={x:before.left+150,y:Math.max(10,before.top+18)};
+      assert.equal(BigInt(at(start)),handle,'Caption is covered by a different window');
+      assert.equal(Number(hitTest(handle,0x84,0,(start.y&0xffff)*65536+(start.x&0xffff))),2,'Pointer must start on the native caption');
+      assert.ok(cursor(start.x,start.y));await pause(75);mouse(2,0,0,0,0);await pause(75);
+      try{for(let step=1;step<=12;step++){mouse(1,9,7,0,0);await pause(35);}}
+      finally{mouse(4,0,0,0,0);}
+    } else {
+      // Hosted runners qualify OS focus and native position retention. Their
+      // noninteractive pointer path is not evidence of a physical caption drag.
+      await app.evaluate(({BrowserWindow},position)=>{
+        const win=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture');
+        if(win.isMaximized())win.unmaximize();
+        win.setPosition(position.x,position.y);
+      },{x:before.left+108,y:before.top+84});
+    }
+    await pause(500);const dropped={};assert.ok(rect(handle,dropped));
+    assert.ok(Math.abs(dropped.left-before.left)>30||Math.abs(dropped.top-before.top)>30,'Native operation did not move the window');
+    await pause(1200);const retained={};assert.ok(rect(handle,retained));
+    assert.deepEqual(retained,dropped,'Window jumped after dropping it');
+    assert.equal(await focused(),true,'Moving the window lost focus');
+    movements.push({fromMaximized:maximized,positionRetained:true});
+  }
+  const receipt={passed:true,isolatedProfile:true,realAccount:false,nativePositionRetention:true,nativePointerDrag:pointerMode,
+    pointerQualification:pointerMode?{status:'passed'}:{status:'not-run',reason:'requires-interactive-desktop'},typingDuringUpdates:true,movements};
+  await writeFile(path.join(output,'window-interaction-qualification.json'),JSON.stringify(receipt,null,2));
+  console.log(JSON.stringify(receipt));
+} catch(error) {
+  const native = (()=>{try {
+    const lib=createRequire(import.meta.url)('koffi').load('user32.dll');
+    const foreground=lib.func('uintptr_t __stdcall GetForegroundWindow()')();
+    const pid=[0];lib.func('uint32_t __stdcall GetWindowThreadProcessId(uintptr_t window, _Out_ uint32_t *pid)')(foreground,pid);
+    return {processId:pid[0]};
+  }catch{return null;}})();
+  const observation=app?await Promise.race([app.evaluate(async ({BrowserWindow})=>({trace:globalThis.interactionTrace,
+    windows:await Promise.all(BrowserWindow.getAllWindows().map(async win=>({window:win.getTitle(),focused:win.isFocused(),
+      document:await win.webContents.executeJavaScript('({focused:document.hasFocus(),active:document.activeElement?.className})').catch(()=>null)})))})).catch(()=>null),pause(2000).then(()=>null)]):null;
+  console.error(JSON.stringify({phase,native,observation}));
+  await writeFile(path.join(output,'window-interaction-qualification.json'),JSON.stringify({passed:false,phase,native,observation})).catch(()=>{});
+  throw error;
+} finally {
+  // This process owns only synthetic windows. Exit directly so a failed native
+  // move loop cannot strand the fixture's teardown in a graceful quit wait.
+  if(app) {
+    await Promise.race([app.evaluate(({app})=>app.exit(0)).catch(()=>{}),pause(3000)]);
+    await Promise.race([app.close().catch(()=>{}),pause(3000)]);
+  }
+  assert.equal(path.dirname(path.resolve(temp)),path.resolve(tmpdir()));
+  assert.ok(path.basename(temp).startsWith('mycellios-interaction-proof-'));
+  await rm(temp,{recursive:true,force:true});
+}
