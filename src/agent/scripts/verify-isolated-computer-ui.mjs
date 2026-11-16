@@ -45,14 +45,14 @@ try {
   await page.getByRole("button", { name: "Shared", exact: true }).click();
   await expect(page.getByText("Your Micos share a computer in this space.", { exact: true })).toBeVisible();
   await isolated.click();
-  await page.screenshot({ path: path.join(output, "computer-isolation-desktop.png") });
+  await page.screenshot({ path: path.join(output, "computer-isolation-desktop.png"), animations: "disabled" });
   await page.getByRole("button", { name: "Open synthetic screen", exact: true }).click();
   await expect(page.getByTitle("Bot screen", { exact: true })).toBeVisible();
   await expect(page.getByTitle("Bot screen", { exact: true })).toHaveCSS("pointer-events", "none");
   await expect(page.getByTitle("Bot screen", { exact: true })).toHaveAttribute("sandbox", "allow-scripts allow-pointer-lock");
   await page.getByRole("button", { name: "Take control", exact: true }).click();
   await expect(page.getByTitle("Bot screen", { exact: true })).toHaveCSS("pointer-events", "auto");
-  await page.screenshot({ path: path.join(output, "computer-isolation-takeover.png") });
+  await page.screenshot({ path: path.join(output, "computer-isolation-takeover.png"), animations: "disabled" });
   await page.getByRole("button", { name: "Release control", exact: true }).click();
   await expect(page.getByTitle("Bot screen", { exact: true })).toHaveCSS("pointer-events", "none");
   assert.deepEqual(await page.evaluate(() => window.__isolatedFixture.calls), ["mode:team", "mode:isolated", "preview", "take-control", "release"]);
@@ -67,10 +67,12 @@ try {
   await expect(page.getByRole("button", { name: "Solo este Mico", exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   const lightBackground = await page.locator("main").evaluate(element => getComputedStyle(element).backgroundColor);
-  await page.screenshot({ path: path.join(output, "computer-isolation-mobile-es.png") });
+  await page.screenshot({ path: path.join(output, "computer-isolation-mobile-es.png"), animations: "disabled" });
   await page.evaluate(() => { document.documentElement.classList.add("dark"); document.documentElement.dataset.theme = "dark"; });
   await expect(page.locator("main")).not.toHaveCSS("background-color", lightBackground);
-  await page.screenshot({ path: path.join(output, "computer-isolation-mobile-dark.png") });
+  const darkForeground = await page.locator("main").evaluate(element => getComputedStyle(element).color);
+  await expect(page.getByRole("button", { name: "Solo este Mico", exact: true })).toHaveCSS("color", darkForeground);
+  await page.screenshot({ path: path.join(output, "computer-isolation-mobile-dark.png"), animations: "disabled" });
   await page.goto(base);
   await page.getByRole("button", { name: "Open synthetic screen", exact: true }).click();
   await page.getByRole("button", { name: "Take control", exact: true }).click();
@@ -78,7 +80,7 @@ try {
   const info = await page.getByTestId("computer-chrome-info").boundingBox();
   const actions = await page.getByTestId("computer-chrome-actions").boundingBox();
   assert(info && actions && info.y + info.height <= actions.y, "mobile computer identity must not overlap its controls");
-  await page.screenshot({ path: path.join(output, "computer-isolation-mobile-control.png") });
+  await page.screenshot({ path: path.join(output, "computer-isolation-mobile-control.png"), animations: "disabled" });
   assert.deepEqual(errors, []); assert.deepEqual(unexpected, []);
   const proof = { passed: true, actualControls: true, actualComputerOverlay: true, syntheticScreen: true, explicitTakeoverAndRelease: true,
     blockedRunCannotTakeOver: true, distinctLightAndDarkThemes: true, noAutomaticComputeOrConsent: true, externalRequests: 0, paidInferenceCalls: 0, productionAccess: false };
