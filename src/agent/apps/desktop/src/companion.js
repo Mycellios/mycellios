@@ -124,7 +124,9 @@ function renderIsland(payload) {
   const signature = JSON.stringify([snapshot.scope, active, agent, expanded, prompts.map(prompt => prompt.id), labels, sending, sendError, questionPages.get(active?.id)]);
   if (signature === islandSignature) return;
   islandSignature = signature;
-  const focused = document.activeElement?.classList.contains("island-answer-input");
+  // activeElement survives an OS-window blur. Restoring it from a background
+  // update must not take keyboard focus away from the main chat or another app.
+  const focused = document.hasFocus() && document.activeElement?.classList.contains("island-answer-input");
   surface.replaceChildren(); surface.className = "surface island";
   surface.dataset.open = String(Boolean(expanded && active));
   if (!agent) return;

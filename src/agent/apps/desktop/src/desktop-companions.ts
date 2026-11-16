@@ -121,9 +121,17 @@ export async function installDesktopCompanions(options: {
           win.on("closed", () => { if (windows.get(key) === win) windows.delete(key); });
           void win.loadFile(path.join(import.meta.dirname, "companion.html")).catch(() => { if (!win!.isDestroyed()) win!.destroy(); });
         } else {
-          if (kind === "dock") { keepAbove(win); win.webContents.setZoomFactor(prefs.dock.size / 100); }
-          if (kind === "island") win.setFocusable(islandExpanded.has(key));
-          win.setBounds(companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)));
+          // Publishing chat state must not repeatedly change native placement or
+          // focusability while the user is dragging the main OS window.
+          if (kind === "dock") {
+            if (!win.isAlwaysOnTop()) keepAbove(win);
+            const zoom = prefs.dock.size / 100;
+            if (win.webContents.getZoomFactor() !== zoom) win.webContents.setZoomFactor(zoom);
+          }
+          if (kind === "island" && win.isFocusable() !== islandExpanded.has(key)) win.setFocusable(islandExpanded.has(key));
+          const bounds = companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key));
+          const current = win.getBounds();
+          if (current.x !== bounds.x || current.y !== bounds.y || current.width !== bounds.width || current.height !== bounds.height) win.setBounds(bounds);
           if (kind === "dock" && !prefs.dock.autoHide) { win.setIgnoreMouseEvents(false); expanded.delete(key); }
           win.webContents.send("companion.state", { ...data, expanded: islandExpanded.has(key) });
         }
@@ -265,7 +273,8 @@ export async function installDesktopCompanions(options: {
     if (expired) sync();
     if (prefs.dock.shown && (prefs.dock.layer === "app" || prefs.dock.display === "window" || typeof prefs.dock.display === "number")) {
       const main = options.mainWindow?.();
-      const fingerprint = JSON.stringify(main && !main.isDestroyed() ? [main.getBounds(), main.isVisible(), main.isMinimized(), main.isFocused(), [...windows].some(([key, win]) => key.startsWith("dock:") && !win.isDestroyed() && win.isFocused())] : null);
+      // The dock follows a display, not each intermediate pixel of a native drag.
+      const fingerprint = JSON.stringify(main && !main.isDestroyed() ? [windowDisplay().id, main.isVisible(), main.isMinimized(), main.isFocused(), [...windows].some(([key, win]) => key.startsWith("dock:") && !win.isDestroyed() && win.isFocused())] : null);
       if (fingerprint !== mainFingerprint) { mainFingerprint = fingerprint; sync(); }
     }
     if (!prefs.dock.autoHide || !prefs.dock.shown) return;

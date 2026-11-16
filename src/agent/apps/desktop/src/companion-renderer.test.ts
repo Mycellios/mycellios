@@ -18,7 +18,24 @@ beforeEach(() => {
   (window as any).companion = bridge;
   new Function(source)();
 });
-afterEach(() => { document.body.replaceChildren(); delete (window as any).companion; });
+afterEach(() => { vi.restoreAllMocks(); document.body.replaceChildren(); delete (window as any).companion; });
+
+it.each([false, true])("restores island input focus on updates only while its document is focused (%s)", focused => {
+  receive(state());
+  const input = document.querySelector<HTMLInputElement>(".island-answer-input")!;
+  input.value = "Keep my draft";
+  input.dispatchEvent(new Event("input"));
+  input.focus();
+  expect(document.activeElement).toBe(input);
+  // A background BrowserWindow retains activeElement even after OS focus leaves.
+  vi.spyOn(document, "hasFocus").mockReturnValue(focused);
+  const focus = vi.spyOn(HTMLElement.prototype, "focus");
+  const update = state(); update.snapshot.agents[0]!.status = "Updated in background";
+  receive(update);
+  expect(focus).toHaveBeenCalledTimes(focused ? 1 : 0);
+  expect(document.querySelector<HTMLInputElement>(".island-answer-input")!.value).toBe("Keep my draft");
+  expect(bridge.expand).not.toHaveBeenCalled(); expect(bridge.select).not.toHaveBeenCalled();
+});
 it("acknowledges populated DOM once without waiting for hidden animation frames", () => {
   bridge.painted = vi.fn(() => expect(document.querySelector('button[aria-label="Mico · Waiting"]')).not.toBeNull());
   receive({ ...state(), kind: "dock" });

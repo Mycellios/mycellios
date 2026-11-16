@@ -128,7 +128,7 @@ jobs:
         working-directory: src/agent
         shell: pwsh
         run: |
-          npm exec -- vitest run apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts --maxWorkers=2
+          npm exec -- vitest run apps/desktop/src/update-resume.test.ts apps/desktop/src/update-resume.integration.test.ts packages/adapters/src/native-command-journal.test.ts packages/adapters/src/desktop-process-tree.test.ts apps/desktop/src/package-metadata.test.ts apps/desktop/src/upgrade-continuity.test.ts apps/desktop/src/local-voice.test.ts apps/desktop/src/preload.test.ts apps/desktop/src/desktop-companions.test.ts apps/desktop/src/companion-renderer.test.ts apps/desktop/src/floating-window.test.ts apps/desktop/src/window-options.test.ts --maxWorkers=2
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node -e "require('electron')"
           if($LASTEXITCODE){exit $LASTEXITCODE}
@@ -141,6 +141,8 @@ jobs:
           npm run build --workspace @rakazo/web -- --desktop
           if($LASTEXITCODE){exit $LASTEXITCODE}
           npm run build --workspace @rakazo/desktop
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          node apps/desktop/scripts/verify-window-interaction.mjs $env:DESKTOP_RELEASE_OUT
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node apps/desktop/scripts/verify-floating-chats.mjs $env:DESKTOP_RELEASE_OUT
           if($LASTEXITCODE){exit $LASTEXITCODE}
@@ -209,6 +211,7 @@ jobs:
             ${{ env.DESKTOP_RELEASE_OUT }}/desktop-release.json
             ${{ env.DESKTOP_RELEASE_OUT }}/packaged-smoke.json
             ${{ env.DESKTOP_RELEASE_OUT }}/floating-chats-qualification.json
+            ${{ env.DESKTOP_RELEASE_OUT }}/window-interaction-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/installer-qualification.json
             ${{ env.DESKTOP_RELEASE_OUT }}/SHA256SUMS.txt
           if-no-files-found: error
