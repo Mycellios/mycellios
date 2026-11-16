@@ -1164,9 +1164,12 @@
   Restore the island reply input's focus during updates only when the native
   host reports that window focused. Windows can retain document.hasFocus() and
   activeElement after native blur; neither is sufficient without the host signal.
-  Companions lose native focusability on blur and regain it only through their
+  On Windows, companions lose native focusability on blur and regain it through their
   private preload's trusted pointer gesture or an explicit island-open action.
   Background DOM replacement must never reactivate a companion window.
+  Keep that dynamic activation gate Windows-only: Linux constructor focusability
+  changes window-manager integration and cannot be reversed through setFocusable.
+  Preserve normal dock focus behavior on Linux and macOS.
   Windows releases run `apps/desktop/scripts/verify-window-interaction.mjs` in
   an isolated profile, checking typing during companion updates and native position
   retention from normal and maximized windows. Its optional `--pointer` mode
