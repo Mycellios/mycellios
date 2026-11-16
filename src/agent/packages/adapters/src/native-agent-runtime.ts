@@ -16,7 +16,7 @@ import type {
   AgentToolResultContent,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
-import { WorkContinuation, withWorkContinuation } from "./work-continuation.js";
+import { WorkContinuation, withWorkContinuation, workContinuationEnabled } from "./work-continuation.js";
 import { nativeAgentProtocolError } from "./native-agent-errors.js";
 import { deliverFinishedShells } from "./shell-command-stream.js";
 import { isToolPauseResult } from "./approval-effect.js";
@@ -356,7 +356,7 @@ export class NativeAgentRuntime implements AgentRuntime {
       ? AbortSignal.any([context.signal, controller.signal])
       : controller.signal;
     const queue = new NativeEventQueue<AgentRuntimeEvent>();
-    const continuity = new WorkContinuation(!request.allowSilentEmpty && !request.script);
+    const continuity = new WorkContinuation(workContinuationEnabled(request));
     request = withWorkContinuation({ ...request, instructions: withConversationStyle(request.instructions ?? "") }, continuity);
     const tools = request.tools.filter((tool) => tool.name !== "run_subagent");
     const binding = hash([engine, request.model.id, request.instructions, tools]);

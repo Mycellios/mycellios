@@ -35,6 +35,7 @@ export const BUILTIN_TOOL_NAMES = [
   "launch_app",
   "request_takeover",
   "ask_user",
+  "await_event",
   "connect_app",
   "message_user",
   "request_secret",

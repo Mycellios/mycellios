@@ -254,6 +254,17 @@ it.each(['codex','claude','acp'] as const)('reports incomplete %s work after a b
  await expect(consume()).rejects.toThrow('WORK_INCOMPLETE');
  expect(test.executeTool).toHaveBeenCalledOnce();
 });
+it.each(['codex','claude','acp'] as const)('continues a silent %s routine without replaying its completed action',async engine=>{
+ const test=await setup(engine,[],workFixture);
+ test.request.allowSilentEmpty=true;test.request.routineId='routine';
+ test.request.saveWorkState=vi.fn(async()=>{});
+ const events:AgentRuntimeEvent[]=[];
+ for await(const event of test.runtime.run(test.request,test.context))events.push(event);
+ expect(test.executeTool).toHaveBeenCalledOnce();
+ expect(test.request.saveWorkState).toHaveBeenCalled();
+ expect(events.filter(event=>event.type==='done')).toHaveLength(1);
+ expect(events.filter(event=>event.type==='text').map(event=>event.text).join('')).toContain('Hecho y verificado.');
+});
 it.each(['codex','claude','acp'] as const)('waits for the actual background result before finishing %s work', async engine=>{
  const test=await setup(engine,[],workFixture);
  let finished=false;

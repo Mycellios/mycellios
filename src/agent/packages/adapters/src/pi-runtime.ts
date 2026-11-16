@@ -1,7 +1,7 @@
 import { askUserQuestionnaire } from "./ask-user-questionnaire.js";
 import { randomUUID } from "node:crypto";
 import { withConversationStyle } from "./conversation-style.js";
-import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation } from "./work-continuation.js";
+import { WORK_PLAN_TOOL, WorkContinuation, withWorkContinuation, workContinuationEnabled } from "./work-continuation.js";
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type {
@@ -351,7 +351,7 @@ export class PiAgentRuntime implements AgentRuntime {
     controller: AbortController,
     context?: Partial<AdapterContext>,
   ): AsyncGenerator<AgentRuntimeEvent, void> {
-    const continuity = new WorkContinuation(!request.allowSilentEmpty && !request.script);
+    const continuity = new WorkContinuation(workContinuationEnabled(request));
     const setupStartedAt = Date.now();
     request = withWorkContinuation(request, continuity);
     const signal = context?.signal
@@ -690,7 +690,7 @@ export class PiAgentRuntime implements AgentRuntime {
             await deliverFinishedShells(
               (text) => {
                 shellResultDelivered = true;
-                try { const content = request.allowSilentEmpty ? text : continuity.afterWait(text); if (content) agent.followUp({
+                try { const content = workContinuationEnabled(request) ? continuity.afterWait(text) : text; if (content) agent.followUp({
                   role: "user",
                   content,
                   timestamp: Date.now(),

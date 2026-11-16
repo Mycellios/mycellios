@@ -38,6 +38,27 @@
 
 # AGENTS.md
 
+- Silent delivery does not disable continuation of durable authorized work in Pi
+  or native runtimes. Keep scripts, ephemeral setup/retrieval/compaction and
+  one-shot internal generations outside that loop. Retain persisted continuation
+  counts, Stop, approvals and ordinary Credit admission on every model call.
+- `await_event` parks a private Mico request as a `waiting_event` child of the
+  existing Task tree. It waits for an owned run, the next owned routine result,
+  or a bounded future time; external events use the existing routine ingress.
+  Reconcile under the same scoped work lock, fence the source run, and return
+  failures/expiry without claiming success. Pause/cancel prevent wakeups; no new
+  scheduler, credentials or model polling is involved. Apply the additive
+  `20261116150000_event_wait_delegation_state` migration before enabling waits;
+  it extends the existing delegation-state CHECK without changing older states.
+  Inspect through
+  `work_status`; validate with `scripts/verify-autonomy-waits-db.ts` on its fresh
+  disposable loopback cluster and the event-waits/work-continuation tests.
+- Fresh routine sessions receive only a bounded, redacted historical handoff from
+  their owned routine thread. Respect its first readable sequence, omit system
+  messages and unrelated chats, and treat history as data rather than approval.
+  Verify routine-context and native/Pi runtime continuation fixtures separately
+  from live-provider inference.
+
 - Native companion windows stay hidden until their own main renderer acknowledges
   the populated first frame. Keep background painting enabled and showInactive;
   never focus another app or broaden the companion bridge to fix visibility.
