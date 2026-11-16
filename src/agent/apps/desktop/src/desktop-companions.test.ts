@@ -290,7 +290,7 @@ it("does not reassert native companion placement during main-window movement and
   let bounds = { x: 10, y: 10, width: 800, height: 600 };
   const main = { isDestroyed: () => false, isVisible: () => true, isMinimized: () => false, isFocused: () => true,
     getBounds: () => bounds, setBounds: vi.fn(), setPosition: vi.fn() };
-  const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal: vi.fn(), mainWindow: () => main as any });
+  const host = await installDesktopCompanions({ platform: "win32", profile: "test", allowed: e => e === good, reveal: vi.fn(), mainWindow: () => main as any });
   try {
     await call("save", { ...DEFAULT_DESKTOP_COMPANIONS,
       dock: { ...DEFAULT_DESKTOP_COMPANIONS.dock, shown: true, display: "window" },
