@@ -44,6 +44,8 @@ jobs:
           npm run build --workspace @rakazo/desktop
           if($LASTEXITCODE){exit $LASTEXITCODE}
           node apps/desktop/scripts/verify-floating-chats.mjs floating-chat-proof
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          node apps/desktop/scripts/verify-window-interaction.mjs floating-chat-proof
           exit $LASTEXITCODE
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

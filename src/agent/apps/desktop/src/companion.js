@@ -21,7 +21,7 @@ grip.onpointercancel = () => { draggingDock = false; window.companion.dragDock?.
 window.companion.onDockSaved?.(ok => { grip.title = ok ? "Move Mico dock" : "Could not save position. Try again."; grip.setAttribute("aria-label", grip.title); });
 root.append(surface);
 window.companion.onHover(shown => { document.body.dataset.expanded = String(shown); });
-window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
+window.companion.onState(({ kind, prefs, snapshot, expanded, focused }) => {
   document.body.dataset.theme = snapshot.theme;
   root.dataset.kind = kind;
   for (const key of ["surface", "foreground", "hover", "muted"]) {
@@ -32,7 +32,7 @@ window.companion.onState(({ kind, prefs, snapshot, expanded }) => {
   document.body.dataset.edge = prefs.dock.edge;
   document.body.dataset.strip = String(prefs.dock.edgeStrip);
   surface.className = "surface " + kind + (kind === "dock" && prefs.dock.edge === "bottom" ? " bottom" : "");
-  if (kind === "island") { grip.remove(); renderIsland({ prefs, snapshot, expanded }); acknowledgePaint(); return; }
+  if (kind === "island") { grip.remove(); renderIsland({ prefs, snapshot, expanded, focused }); acknowledgePaint(); return; }
   const agents = kind === "island" ? [...snapshot.agents].sort((a,b) => Number(b.working || b.unread) - Number(a.working || a.unread)).slice(0, 1) : snapshot.agents;
   const ids = new Set(agents.map(agent => agent.id));
   for (const [id, button] of buttons) if (!ids.has(id)) { button.remove(); buttons.delete(id); }
@@ -124,7 +124,9 @@ function renderIsland(payload) {
   const signature = JSON.stringify([snapshot.scope, active, agent, expanded, prompts.map(prompt => prompt.id), labels, sending, sendError, questionPages.get(active?.id)]);
   if (signature === islandSignature) return;
   islandSignature = signature;
-  const focused = document.activeElement?.classList.contains("island-answer-input");
+  // Electron can retain both activeElement and document.hasFocus() after the OS
+  // window blurs. Only its native host can authorize restoring the reply focus.
+  const focused = payload.focused === true && document.hasFocus() && document.activeElement?.classList.contains("island-answer-input");
   surface.replaceChildren(); surface.className = "surface island";
   surface.dataset.open = String(Boolean(expanded && active));
   if (!agent) return;
