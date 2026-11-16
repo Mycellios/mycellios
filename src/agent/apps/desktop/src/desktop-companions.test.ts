@@ -107,7 +107,7 @@ const question = { id: "run:message:0", botId: "bot-a", runId: "run", messageId:
 const answer = { scope: snapshot.scope, promptId: question.id, nonce: "reply-1", answers: [{ questionId: "q", optionIds: ["a"], text: "" }] };
 async function islandHost() {
   const requestReply = vi.fn(); const reveal = vi.fn();
-  const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal, requestReply });
+  const host = await installDesktopCompanions({ platform: "win32", profile: "test", allowed: e => e === good, reveal, requestReply });
   await call("save", { ...DEFAULT_DESKTOP_COMPANIONS, island: { ...DEFAULT_DESKTOP_COMPANIONS.island, shown: true } });
   call("publish", { ...snapshot, questions: [question] });
   const window = mocks.windows[0]!;
@@ -130,6 +130,21 @@ it("revokes island activation on blur and restores it only for its owned expande
     expect(test.window.isFocusable()).toBe(false);
     activate(test.event); expect(test.window.isFocusable()).toBe(false);
   } finally { test.host.dispose(); }
+});
+
+it.each(["linux", "darwin"] as const)("preserves ordinary dock focus on %s instead of applying the Windows gate", async platform => {
+  const host = await installDesktopCompanions({ platform, profile: "test", allowed: e => e === good, reveal: vi.fn() });
+  try {
+    await call("save", { ...DEFAULT_DESKTOP_COMPANIONS, dock: { ...DEFAULT_DESKTOP_COMPANIONS.dock, shown: true } });
+    call("publish", snapshot);
+    const win = mocks.windows[0];
+    expect(win.options.focusable).toBe(true);
+    win.emit("blur"); call("publish", snapshot);
+    expect(win.setFocusable).not.toHaveBeenCalled();
+    mocks.listeners.get("companion.activate")!({ sender: win.webContents, senderFrame: win.webContents.mainFrame });
+    expect(win.focus).not.toHaveBeenCalled();
+    expect(win.options.focusable).toBe(true);
+  } finally { host.dispose(); }
 });
 it("answers only from its own island, validates scope/options and resolves through the trusted app", async () => {
   const test = await islandHost(); const reply = mocks.handlers.get("companion.answer")!;
