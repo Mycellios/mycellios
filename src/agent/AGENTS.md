@@ -38,6 +38,17 @@
 
 # AGENTS.md
 
+- Native companion windows stay hidden until their own main renderer acknowledges
+  the populated first frame. Keep background painting enabled and showInactive;
+  never focus another app or broaden the companion bridge to fix visibility.
+  Resolve window icons from packaged dist/assets as well as development assets.
+  Development Electron uses a separate Windows AppUserModelId ending in .dev;
+  keep the packaged upgrade identity unchanged to avoid shortcut/icon collisions.
+  On Windows, the existing Koffi fallback may mark only the companion's own HWND
+  topmost, without moving, resizing or activating it. Keep this native call fixed
+  in the main process. Verify floating-window, desktop-companions,
+  companion-renderer, window-icon and floating-chats tests.
+
 - `/demo/<event>` is a bounded public guest surface, outside the normal SessionApp
   gate. Keep its coordinator cookie scoped to `/mobile/v1/demo/<event>`; the Dev
   proxy forwards only this cookie and strips all Agent cookies. It never creates

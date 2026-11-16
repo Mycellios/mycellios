@@ -5,6 +5,7 @@ import { AppBehavior } from "./app-behavior.js";
 import { UpdatePreferences } from "./update-preferences.js";
 import { installedFonts, validDesktopIcon } from "./appearance-settings.js";
 import { installDesktopCompanions } from "./desktop-companions.js";
+import { windowIcon } from "./window-icon.js";
 import { FloatingChats } from "./floating-chats.js";
 import { installAccountComputerBackground } from "./account-computer-background.js";
 import { installAppsStudio } from "./apps-studio-ipc.js";
@@ -102,7 +103,6 @@ import {DevelopmentLauncher, developmentChat} from "./development-launcher.js";
 import {developmentSourceCandidates} from "./development-environment.js";
 import {
   browserWindowOptions,
-  developmentIconFile,
   setupWindowOptions,
   warmWindowTtlMs,
 } from "./window-options.js";
@@ -324,7 +324,7 @@ function openExternalLink(url: string) {
     return;
   }
   // An external page never inherits our preload, native bridge or server cookies.
-  const browser = new BrowserWindow({ width: 1100, height: 780, title: url,
+  const browser = new BrowserWindow({ width: 1100, height: 780, title: url, icon: developmentIcon(),
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: "external-links" } });
   browser.webContents.setWindowOpenHandler(({ url: target }) => {
     const safe = safeExternalUrl(target);
@@ -337,11 +337,9 @@ function openExternalLink(url: string) {
   void browser.loadURL(url).catch(error => reportDesktopError(error, "desktop.externalLink"));
 }
 
-/** Dock/taskbar icon for unpackaged launches; packaged builds get theirs from electron-builder. */
+/** Set window icons too: Windows may otherwise use Electron for secondary windows. */
 function developmentIcon() {
-  if (app.isPackaged) return undefined;
-  const icon = path.join(app.getAppPath(), "assets", developmentIconFile(process.platform));
-  return existsSync(icon) ? icon : undefined;
+  return windowIcon(import.meta.dirname, app.getAppPath(), process.platform);
 }
 
 function sessionPartitionKey(targetUrl: string) {
@@ -1349,7 +1347,8 @@ if (!hasSingleInstanceLock) {
 
 app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
-  if (process.platform === "win32") app.setAppUserModelId("com.mycellios.agent.desktop");
+  if (process.platform === "win32") app.setAppUserModelId(app.isPackaged
+    ? "com.mycellios.agent.desktop" : "com.mycellios.agent.desktop.dev");
   installSessionPermissions(session.defaultSession, permissionTarget);
   const userDataDir = app.getPath("userData");
   await loadBackgroundPreference(userDataDir);

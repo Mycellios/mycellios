@@ -1,5 +1,39 @@
 # Status and evidence
 
+## Windows companion dock local repair, 2026-11-16
+
+Companion windows wait for their populated renderer and native ready-to-show
+before showInactive. Windows retains topmost placement using the existing Koffi
+dependency and a fixed own-window SetWindowPos fallback with no activation,
+movement or resizing. Native windows resolve the packaged dist/assets icon.
+The scoped regression coverage passed 52 unique tests, including renderer
+handshake, native placement and icon paths. Full suites were not run.
+
+A remote packaging job prepared a bounded repair of the installed Windows
+0.3.54 archive, changing only dist/main.js, dist/companion.js and
+dist/companion-preload.cjs. The standard Electron ASAR reader verified all 7,017
+packed files and preservation of the 34 external resources. The installed
+candidate archive SHA256 is
+`c3c1c9076bcdf59baccfe2a2bc967d305c46594813721729f0b5d9b97fd430ec`.
+The original archive and preferences were backed up; the profile was not changed.
+
+Physical Windows verification passed on the real installation: the dock rendered
+the account's agents with the main window minimized; clicking its Mycellios
+agent restored the main window and opened that agent's conversation. The main
+window displayed the Mycellios icon. Evidence and local repair receipts live in
+`outputs/dock-icon-fix-20261116` outside this checkout. This is a local repair,
+not an official release, production deployment or Mac/Linux physical validation.
+
+Follow-up Windows shell verification found a stale Start Menu Electron shortcut
+pointing to a development electron.exe and claiming the packaged AppUserModelId.
+It was moved into a recoverable local backup without changing the current
+installed archive or profile. Development source now uses a separate .dev
+AppUserModelId; the packaged upgrade identity remains unchanged. The two scoped
+package metadata tests passed. A native Windows full-screen capture confirmed
+the actual taskbar displays the Mycellios mark after reopening the installation;
+the cropped evidence is `outputs/dock-icon-fix-20261116/mycellios-taskbar-verified.png`
+outside this checkout. The source prevention change has not been published.
+
 ## Model diagnostics and native transport recovery, 2026-11-15
 
 Models presents the coordinator's requested-model readiness and next step, with

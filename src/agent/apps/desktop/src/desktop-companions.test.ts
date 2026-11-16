@@ -11,6 +11,8 @@ vi.mock("electron", () => ({
     webContents = Object.assign(new EventEmitter(), { send: vi.fn(), setWindowOpenHandler: vi.fn(), setZoomFactor: vi.fn(), mainFrame: {} });
     destroyed = false; setAlwaysOnTop = vi.fn(); setHasShadow = vi.fn(); setFocusable = vi.fn(); focus = vi.fn(); setBounds = vi.fn(); showInactive = vi.fn(); setIgnoreMouseEvents = vi.fn();
     isFocused() { return false; }
+    isAlwaysOnTop() { return true; }
+    getNativeWindowHandle() { return Buffer.alloc(8); }
     getBounds() { return this.options; }
     constructor(public options: any) { super(); mocks.windows.push(this); }
     isDestroyed() { return this.destroyed; }
@@ -30,6 +32,28 @@ it("positions dock and island inside offset display work areas", () => {
   const island = companionBounds(area, "island", DEFAULT_DESKTOP_COMPANIONS, 1);
   expect(island.x).toBe(-1070); expect(island.y).toBe(-198);
   expect(island.width).toBe(220); expect(island.height).toBe(40);
+});
+
+it("shows the dock only after its own main frame paints, without stealing focus", async () => {
+  const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal: vi.fn() });
+  await call("save", { ...DEFAULT_DESKTOP_COMPANIONS, dock: { ...DEFAULT_DESKTOP_COMPANIONS.dock, shown: true } });
+  call("publish", snapshot);
+  const win = mocks.windows[0];
+  expect(win.options.webPreferences.backgroundThrottling).toBe(false);
+  expect(win.setAlwaysOnTop).toHaveBeenCalledWith(...(process.platform === "darwin" ? [true, "status"] : [true]));
+  expect(win.showInactive).not.toHaveBeenCalled();
+  const painted = mocks.listeners.get("companion.painted")!;
+  painted({ sender: {}, senderFrame: null });
+  painted({ sender: win.webContents, senderFrame: {} });
+  expect(win.showInactive).not.toHaveBeenCalled();
+  painted({ sender: win.webContents, senderFrame: win.webContents.mainFrame });
+  expect(win.showInactive).not.toHaveBeenCalled();
+  win.emit("ready-to-show");
+  expect(win.showInactive).toHaveBeenCalledOnce();
+  expect(win.setIgnoreMouseEvents).toHaveBeenCalledWith(false);
+  expect(win.setAlwaysOnTop.mock.invocationCallOrder.at(-1)).toBeGreaterThan(win.showInactive.mock.invocationCallOrder.at(-1)!);
+  expect(win.focus).not.toHaveBeenCalled();
+  host.dispose();
 });
 it("requires a trusted main frame, validates payloads and never exposes native capabilities to an external page", async () => {
   const host = await installDesktopCompanions({ profile: "test", allowed: e => e === good, reveal: vi.fn() });

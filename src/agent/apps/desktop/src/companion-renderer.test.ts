@@ -19,6 +19,13 @@ beforeEach(() => {
   new Function(source)();
 });
 afterEach(() => { document.body.replaceChildren(); delete (window as any).companion; });
+it("acknowledges populated DOM once without waiting for hidden animation frames", () => {
+  bridge.painted = vi.fn(() => expect(document.querySelector('button[aria-label="Mico · Waiting"]')).not.toBeNull());
+  receive({ ...state(), kind: "dock" });
+  expect(bridge.painted).toHaveBeenCalledOnce();
+  receive({ ...state(), kind: "dock" });
+  expect(bridge.painted).toHaveBeenCalledOnce();
+});
 it("opens from the Questions pill and renders real labels and descriptions", () => {
   receive(state(false)); expect(document.querySelector(".island-pill")?.getAttribute("aria-label")).toBe("Mico · Preguntas");
   expect(document.querySelector(".island-name")).toBeNull();
