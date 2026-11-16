@@ -54,7 +54,7 @@ import {
   SandboxRateLimitError,
   TransientModelError,
 } from "@rakazo/adapter-kit";
-import type { ComputerCommand, MessageBlock, ModelRoleChoice, RunStatus } from "@rakazo/contracts";
+import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, RunStatus } from "@rakazo/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
   BotSecretName,
@@ -62,6 +62,7 @@ import {
   CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE,
   CLOUDFLARE_WORKERS_AI_PROVIDER_ID,
   COMPUTER_COMMAND_OUTPUT_MAX_CHARS,
+  ComputerModeSchema,
   cloudflareModelConfigMessage,
   disabledBuiltinToolSet,
   FLEET_TOOL_NAMES,
@@ -7841,15 +7842,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "spawn_bot") {
             const computerModeArg = args.computer_mode;
-            let computerMode: "team" | "dedicated" | undefined;
+            let computerMode: ComputerMode | undefined;
             if (computerModeArg != null && computerModeArg !== "") {
-              const value = String(computerModeArg);
-              if (value !== "team" && value !== "dedicated") {
+              const parsed = ComputerModeSchema.safeParse(computerModeArg);
+              if (!parsed.success) {
                 return finish({
-                  error: 'computer_mode must be "team" or "dedicated".',
+                  error: 'computer_mode must be "isolated", "team" or "dedicated".',
                 });
               }
-              computerMode = value;
+              computerMode = parsed.data;
             }
             const spawned = await spawnBot(deps, {
               spawnedBy: {

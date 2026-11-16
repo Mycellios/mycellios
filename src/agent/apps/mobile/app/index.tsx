@@ -1,6 +1,6 @@
 import { MenuView } from "@expo/ui/community/menu";
 import type { RunActivityRow, SpaceBot, SpaceGroup } from "@rakazo/contracts";
-import { normalizeCreateBotProfile } from "@rakazo/contracts";
+import { DEFAULT_COMPUTER_MODE, normalizeCreateBotProfile } from "@rakazo/contracts";
 import { accountDisplay, isRetryableError, isRunWaitingOnUser, isRunWorking } from "@rakazo/core";
 import { botColors, fontWeight, typeScale } from "@rakazo/ui-tokens";
 import type { Href } from "expo-router";
@@ -830,7 +830,7 @@ function Home({ embedded, onSelectSpace }: InboxPaneProps & { embedded: boolean 
       const bot = await rpc<MobileBot>("bots/create", {
         ...normalizeCreateBotProfile({ name: "New Bot", title: "", description: "" }),
         notifyOnFinish: true,
-        computerMode: "team",
+        computerMode: DEFAULT_COMPUTER_MODE,
       });
       void refreshBots().catch(() => undefined);
       allowFocusPrompt(bot.id);

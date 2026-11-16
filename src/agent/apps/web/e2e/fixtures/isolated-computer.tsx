@@ -40,7 +40,7 @@ function Fixture() {
     </section>
     {open ? <ComputerOverlay bot={bot} computer={computer} computerViewport={null}
       recordingSkill={null} teachBusy={false} hasControl={control} composerRunning={blocked}
-      sending={false} booting={false} runStatus={blocked ? "waiting_approval" : undefined}
+      sending={false} booting={false} runStatus={blocked ? params.get("blocked") === "approval" ? "waiting_input" : "running" : undefined}
       sendError={null} embeddedScreenUrl="/novnc/isolated-fixture" screenFrameRef={noop}
       computerScreenError={null} computerBooting={null} onStopTeaching={noop} onStopRun={noop}
       onRelease={async () => { calls.push("release"); setControl(false); }}

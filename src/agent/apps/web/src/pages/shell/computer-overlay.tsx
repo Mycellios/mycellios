@@ -85,9 +85,9 @@ export function ComputerOverlay({
       >
         <div
           data-testid="computer-chrome"
-          className="app-no-drag flex items-center justify-between gap-4 border-b border-sidebar-border px-[18px] py-3.5"
+          className="app-no-drag flex flex-wrap items-center justify-between gap-4 border-b border-sidebar-border px-[18px] py-3.5"
         >
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div data-testid="computer-chrome-info" className="flex min-w-0 flex-1 items-center gap-3 max-sm:basis-full">
             <BotAvatar color={bot.color} identity={bot.id} size={28} status={bot.status} />
             {recordingSkill ? (
               <TeachRecordingChrome
@@ -114,7 +114,7 @@ export function ComputerOverlay({
               )
             ) : null}
           </div>
-          <div className="flex items-center gap-3">
+          <div data-testid="computer-chrome-actions" className="flex items-center gap-3 max-sm:w-full max-sm:flex-wrap max-sm:justify-end">
             {composerRunning ? (
               <Button
                 type="button"

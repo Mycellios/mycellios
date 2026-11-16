@@ -62,11 +62,13 @@ Full suites, paid provider allocation/inference, production changes and physical
 Desktop/multi-host qualification remain outside this request. Record actual
 container/browser-runtime evidence separately from fixture results.
 
-The scoped Isolated Mico computers workflow builds the existing sandbox image
+The scoped Isolated Mico computers workflow builds the existing sandbox and supervisor images
 on a disposable Linux runner and runs the existing replay CLI with
 `--isolated --output=isolated-docker-proof`. This offline-only mode creates two
-owned containers with internal networks and real browser screens, checks private
+owned computers with internal networks and a separate trusted supervisor, checks private
 files/processes/mounts and Desktop reconnect routing, and cleans up only its own
-resources. Its PNGs/receipt are separate from synthetic UI screenshots. Paid
+resources. Docker access stays only on the supervisor. Viewer HTTP, the real VNC
+handshake and decoded PNG dimensions qualify the screen transport. Its PNGs/receipt
+are separate from synthetic UI screenshots. Paid
 capture flags are rejected before credential or Docker setup. No cloud resources
 or LLM calls are used by this qualification.

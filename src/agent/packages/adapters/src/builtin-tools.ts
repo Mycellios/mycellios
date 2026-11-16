@@ -4,6 +4,7 @@ import { hostedAppTools } from "./hosted-app-tools.js";
 import {
   BOT_DESCRIPTION_MAX_LENGTH,
   BOT_INSTRUCTIONS_MAX_LENGTH,
+  ComputerModeSchema,
   BotSecretName,
   botSecretDestinationSchema,
   FLEET_TOOL_NAMES,
@@ -1300,9 +1301,9 @@ export const builtinAgentTools: ConnectorTool[] = [
         },
         computer_mode: {
           type: "string",
-          enum: ["team", "dedicated"],
+          enum: ComputerModeSchema.options,
           description:
-            "Optional. team shares one screen with other Team bots; dedicated (Private) gets its own. Defaults to team.",
+            "Optional. isolated gives this Mico its own server computer; team shares a computer with your Micos in this space; dedicated uses This PC with existing permissions. Defaults to isolated. Creating a profile does not boot a computer.",
         },
       },
       required: ["name"],

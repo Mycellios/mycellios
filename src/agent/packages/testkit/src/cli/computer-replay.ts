@@ -14,9 +14,11 @@ async function main() {
   const live = process.argv.includes("--live");
   const isolated = process.argv.includes("--isolated");
   const outputArg = process.argv.slice(2).find(arg => arg.startsWith("--output="));
+  const supervisorImageArg = process.argv.slice(2).find(arg => arg.startsWith("--supervisor-image="));
   if (isolated && (live || recordArg)) throw new Error("--isolated is offline only; --live and --record are forbidden");
   if (outputArg && (!isolated || outputArg === "--output=")) throw new Error("--output=<directory> requires --isolated");
   if (isolated && subnetArg) throw new Error("--isolated creates two private networks; a single --subnet is not supported");
+  if (supervisorImageArg && (!isolated || supervisorImageArg === "--supervisor-image=")) throw new Error("--supervisor-image=<image> requires --isolated");
   if (Boolean(recordArg) !== live || recordArg === "--record=") {
     throw new Error("A paid recording requires both --live and --record=<new-fixture.json>");
   }
@@ -28,11 +30,12 @@ async function main() {
         !arg.startsWith("--subnet=") &&
         !arg.startsWith("--record=") &&
         !arg.startsWith("--output=") &&
+        !arg.startsWith("--supervisor-image=") &&
         arg !== "--live" && arg !== "--isolated",
     );
   if (unknown.length)
     throw new Error(
-      "Usage: computer-replay.ts [--image=rakazo/computer:local] [--subnet=unused-private-CIDR] [--live --record=new-fixture.json] | --isolated [--image=...] [--output=directory]",
+      "Usage: computer-replay.ts [--image=rakazo/computer:local] [--subnet=unused-private-CIDR] [--live --record=new-fixture.json] | --isolated [--image=...] [--supervisor-image=...] [--output=directory]",
     );
   const image = imageArg?.slice("--image=".length) || "rakazo/computer:local";
   let captureKey: string | undefined;
@@ -42,6 +45,8 @@ async function main() {
     if (!captureKey) throw new Error("OPENROUTER_API_KEY is required for a live recording");
   }
   execFileSync("docker", ["image", "inspect", image], { stdio: "ignore" });
+  const supervisorImage = supervisorImageArg?.slice("--supervisor-image=".length) ?? "mycellios/supervisor:isolated-test";
+  if (isolated) execFileSync("docker", ["image", "inspect", supervisorImage], { stdio: "ignore" });
   const directory = await mkdtemp(path.join(tmpdir(), "rakazo-computer-replay-"));
   // Retain only local process/Docker discovery settings. In particular, do not
   // inherit provider, telemetry, proxy credentials, or the maintainer's data dir.
@@ -74,6 +79,7 @@ async function main() {
       // The fixture creates owned --internal networks itself. Do not probe or
       // change host firewall policy; Docker's internal network blocks egress.
       SANDBOX_COMPUTER_EGRESS: "open",
+      ISOLATED_COMPUTERS_SUPERVISOR_IMAGE: supervisorImage,
       ISOLATED_COMPUTERS_OUTPUT: outputArg ? path.resolve(outputArg.slice("--output=".length)) : path.join(directory, "proof"),
     } : {}),
     ...(subnetArg ? { COMPUTER_REPLAY_SUBNET: subnetArg.slice("--subnet=".length) } : {}),

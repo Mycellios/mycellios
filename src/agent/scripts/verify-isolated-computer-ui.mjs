@@ -14,7 +14,7 @@ const server = await createServer({ root, envFile: false, configFile: path.join(
   server: { host: "127.0.0.1", port: 0 }, plugins: [{ name: "isolated-computer-qualification", configureServer(server) {
     server.middlewares.use(async (req, res, next) => {
       if (req.url?.split("?")[0] !== "/__isolated_computer") return next();
-      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/isolated-computer.tsx"></script></body></html>');
+      const html = await server.transformIndexHtml(req.url, '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module" src="/e2e/fixtures/isolated-computer.tsx"></script></body></html>');
       res.setHeader("content-type", "text/html"); res.end(html);
     });
   } }] });
@@ -33,7 +33,7 @@ try {
     if (/\/(?:api\/)?rpc\//.test(url.pathname) || /^\/(?:api|mobile|v1)\//.test(url.pathname)) {
       unexpected.push(url.pathname); return route.abort();
     }
-    if (url.pathname === "/novnc/isolated-fixture") return route.fulfill({ contentType: "text/html", body: '<!doctype html><title>Synthetic isolated screen</title><body style="background:#1e2421;color:#fff;font:16px system-ui;padding:32px">Synthetic screen for Ada — no real computer</body>' });
+    if (url.pathname === "/novnc/isolated-fixture") return route.fulfill({ contentType: "text/html; charset=utf-8", body: '<!doctype html><meta charset="utf-8"><title>Synthetic isolated screen</title><body style="background:#1e2421;color:#fff;font:16px system-ui;padding:32px">Synthetic screen for Ada — no real computer</body>' });
     return route.continue();
   });
   const base = origin + "/__isolated_computer";
@@ -56,10 +56,12 @@ try {
   await page.getByRole("button", { name: "Release control", exact: true }).click();
   await expect(page.getByTitle("Bot screen", { exact: true })).toHaveCSS("pointer-events", "none");
   assert.deepEqual(await page.evaluate(() => window.__isolatedFixture.calls), ["mode:team", "mode:isolated", "preview", "take-control", "release"]);
-  await page.goto(base + "?blocked=1");
-  await page.getByRole("button", { name: "Open synthetic screen", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Take control", exact: true })).toHaveCount(0);
-  assert.deepEqual(await page.evaluate(() => window.__isolatedFixture.calls), ["preview"]);
+  for (const blocked of ["1", "approval"]) {
+    await page.goto(base + `?blocked=${blocked}`);
+    await page.getByRole("button", { name: "Open synthetic screen", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Take control", exact: true })).toHaveCount(0);
+    assert.deepEqual(await page.evaluate(() => window.__isolatedFixture.calls), ["preview"]);
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + "?lang=es");
   await expect(page.getByRole("button", { name: "Solo este Mico", exact: true })).toBeVisible();
@@ -67,6 +69,14 @@ try {
   await page.screenshot({ path: path.join(output, "computer-isolation-mobile-es.png") });
   await page.evaluate(() => { document.documentElement.classList.add("dark"); document.documentElement.dataset.theme = "dark"; });
   await page.screenshot({ path: path.join(output, "computer-isolation-mobile-dark.png") });
+  await page.goto(base);
+  await page.getByRole("button", { name: "Open synthetic screen", exact: true }).click();
+  await page.getByRole("button", { name: "Take control", exact: true }).click();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  const info = await page.getByTestId("computer-chrome-info").boundingBox();
+  const actions = await page.getByTestId("computer-chrome-actions").boundingBox();
+  assert(info && actions && info.y + info.height <= actions.y, "mobile computer identity must not overlap its controls");
+  await page.screenshot({ path: path.join(output, "computer-isolation-mobile-control.png") });
   assert.deepEqual(errors, []); assert.deepEqual(unexpected, []);
   const proof = { passed: true, actualControls: true, actualComputerOverlay: true, syntheticScreen: true, explicitTakeoverAndRelease: true,
     blockedRunCannotTakeOver: true, noAutomaticComputeOrConsent: true, externalRequests: 0, paidInferenceCalls: 0, productionAccess: false };

@@ -14,6 +14,7 @@ on:
       - "src/agent/packages/testkit/src/isolated-computers.docker.test.ts"
       - "src/agent/packages/testkit/src/cli/computer-replay.ts"
       - "src/agent/infra/sandboxes/computer/**"
+      - "src/agent/infra/sandboxes/supervisor/**"
   workflow_dispatch:
 
 permissions:
@@ -44,6 +45,9 @@ jobs:
       - run: npm run db:generate
       - name: Build the existing computer image on this disposable runner
         run: docker build --build-arg TARGETARCH=amd64 -t rakazo/computer:local infra/sandboxes/computer
+      - name: Build the existing supervisor for private-network screen routing
+        working-directory: .
+        run: docker build -f src/agent/infra/sandboxes/supervisor/Dockerfile -t mycellios/supervisor:isolated-test .
       - name: Verify two real desktops with no model or provider credentials
         run: node --import tsx packages/testkit/src/cli/computer-replay.ts --isolated --output=isolated-docker-proof
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

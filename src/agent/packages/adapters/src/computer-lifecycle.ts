@@ -166,7 +166,8 @@ export async function provisionComputer(
   const log = getLogger().child({ "computer.id": computerId, "run.id": context.runId });
   let existing = await deps.prisma.computer.findUniqueOrThrow({ where: { id: computerId } });
   const cloudWorkspace = existing.scopeKey?.startsWith("cloud:");
-  context = { ...context, isolatedWorkspace: existing.scope === "isolated" };
+  const { isolatedWorkspace: _providedIsolation, ...ownedContext } = context;
+  context = existing.scope === "isolated" ? { ...ownedContext, isolatedWorkspace: true } : ownedContext;
   if (existing.scope === "isolated") {
     const botId = context.botId;
     if (existing.spaceId !== context.spaceId || existing.userId !== context.userId || !botId)

@@ -113,9 +113,10 @@ describe("computer provisioning", () => {
             dataDir,
           },
           "computer-1",
-          context,
+          { ...context, isolatedWorkspace: true },
         ),
       ).rejects.toThrow("Computer is busy");
+      expect(vi.mocked(sandbox.provision).mock.calls[0]?.[1]).toEqual(context);
       expect(releaseScreen).toHaveBeenCalledOnce();
       expect(stop).toHaveBeenCalledOnce();
       expect(prisma.computer.updateMany).toHaveBeenNthCalledWith(
