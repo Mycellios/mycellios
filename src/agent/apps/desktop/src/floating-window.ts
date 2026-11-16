@@ -1,10 +1,7 @@
 import { createRequire } from "node:module";
+import type { BrowserWindow } from "electron";
 
-type FloatingWindow = {
-  setAlwaysOnTop: (flag: boolean, level?: string) => void;
-  isAlwaysOnTop: () => boolean;
-  getNativeWindowHandle: () => Buffer;
-};
+type FloatingWindow = Pick<BrowserWindow, "setAlwaysOnTop" | "isAlwaysOnTop" | "getNativeWindowHandle">;
 type Placement = (handle: bigint | number, insertAfter: number, x: number, y: number, width: number, height: number, flags: number) => number;
 let placement: Placement | undefined;
 
