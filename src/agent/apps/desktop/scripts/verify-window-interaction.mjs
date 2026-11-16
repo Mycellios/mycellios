@@ -59,6 +59,22 @@ try {
       questions:[{id:'fixture:question',botId:'fixture',runId:'fixture-run',messageId:'fixture-message',legacy:true,questions:[{id:'question',question:'Fixture?',options:[]}]}]};
     await window.fixture.publish(window.snapshot);
   });
+  const koffi=createRequire(import.meta.url)('koffi');
+  const user32=koffi.load('user32.dll');
+  user32.func('intptr_t __stdcall SetThreadDpiAwarenessContext(intptr_t context)')(-4);
+  const Rect=koffi.struct('InteractionRect',{left:'int',top:'int',right:'int',bottom:'int'});
+  const Point=koffi.struct('InteractionPoint',{x:'int',y:'int'});
+  const rect=user32.func('GetWindowRect','bool',['uintptr_t',koffi.out(koffi.pointer(Rect))]);
+  const at=user32.func('WindowFromPoint','uintptr_t',[Point]);
+  const ancestor=user32.func('uintptr_t __stdcall GetAncestor(uintptr_t window,uint32_t flags)');
+  const cursor=user32.func('bool __stdcall SetCursorPos(int x,int y)');
+  const mouse=user32.func('void __stdcall mouse_event(uint32_t flags,uint32_t dx,uint32_t dy,uint32_t data,uintptr_t extra)');
+  const hitTest=user32.func('intptr_t __stdcall SendMessageW(uintptr_t window,uint32_t message,uintptr_t wParam,intptr_t lParam)');
+  const handle=BigInt(await app.evaluate(({BrowserWindow})=>{
+    const b=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture').getNativeWindowHandle();
+    return (b.length===8?b.readBigUInt64LE():BigInt(b.readUInt32LE())).toString();
+  }));
+  const focused = () => app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture').isFocused());
   phase = 'focus';
   const deadline = Date.now()+15_000;
   let island;
@@ -80,6 +96,15 @@ try {
     const main=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture');
     main.show();main.focus();
   });
+  // Start as a user does: activate this fixture with a real pointer click.
+  // Programmatic show/focus can be denied by Windows' foreground lock.
+  const mainBounds={};assert.ok(rect(handle,mainBounds));
+  const activatePoint={x:mainBounds.left+40,y:mainBounds.top+80};
+  assert.equal(BigInt(ancestor(at(activatePoint),2)),handle,'Activation point is covered by a different window');
+  assert.ok(cursor(activatePoint.x,activatePoint.y));await pause(75);mouse(2,0,0,0,0);await pause(75);mouse(4,0,0,0,0);
+  const focusDeadline=Date.now()+3000;
+  while(!await focused()&&Date.now()<focusDeadline)await pause(50);
+  assert.equal(await focused(),true,'The fixture did not receive initial native focus');
   await page.locator('#draft').focus();
   await app.evaluate(({BrowserWindow})=>{
     globalThis.interactionTrace=[];
@@ -94,29 +119,12 @@ try {
   await page.evaluate(() => {window.poll=setInterval(()=>{
     window.snapshot.agents[0].status='Update '+Date.now();void window.fixture.publish(window.snapshot);
   },40);});
-  const focused = () => app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture').isFocused());
   for (const text of ['A draft ', 'that stays ', 'in the main window.']) {
     assert.equal(await focused(),true,'Background activity stole native focus');
     await page.keyboard.type(text,{delay:25}); await pause(250);
     assert.equal(await focused(),true,'Typing lost native focus');
   }
   assert.equal(await page.locator('#draft').inputValue(),'A draft that stays in the main window.');
-  const koffi=createRequire(import.meta.url)('koffi');
-  const user32=koffi.load('user32.dll');
-  // Keep Win32 hit testing and cursor injection in the same physical coordinate
-  // space on scaled Windows runners and multi-monitor workstations.
-  user32.func('intptr_t __stdcall SetThreadDpiAwarenessContext(intptr_t context)')(-4);
-  const Rect=koffi.struct('InteractionRect',{left:'int',top:'int',right:'int',bottom:'int'});
-  const Point=koffi.struct('InteractionPoint',{x:'int',y:'int'});
-  const rect=user32.func('GetWindowRect','bool',['uintptr_t',koffi.out(koffi.pointer(Rect))]);
-  const at=user32.func('WindowFromPoint','uintptr_t',[Point]);
-  const cursor=user32.func('bool __stdcall SetCursorPos(int x,int y)');
-  const mouse=user32.func('void __stdcall mouse_event(uint32_t flags,uint32_t dx,uint32_t dy,uint32_t data,uintptr_t extra)');
-  const hitTest=user32.func('intptr_t __stdcall SendMessageW(uintptr_t window,uint32_t message,uintptr_t wParam,intptr_t lParam)');
-  const handle=BigInt(await app.evaluate(({BrowserWindow})=>{
-    const b=BrowserWindow.getAllWindows().find(w=>w.getTitle()==='Isolated interaction fixture').getNativeWindowHandle();
-    return (b.length===8?b.readBigUInt64LE():BigInt(b.readUInt32LE())).toString();
-  }));
   const movements=[];
   for(const maximized of [false,true]) {
     phase=maximized?'drag from maximized':'drag restored';
