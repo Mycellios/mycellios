@@ -199,6 +199,8 @@ try {
   checks.push("real PostgreSQL RLS conceals another member's inbox");
   // Team setup uses a distinct endpoint so an older server cannot ignore a flag
   // and silently enqueue a model greeting. Exercise its actual route and repos.
+  await system.member.create({ data: { id: randomUUID(), userId: actor.userId, organizationId: id, role: "owner", createdAt: new Date() } });
+  await system.spaceMember.create({ data: { id: randomUUID(), userId: actor.userId, organizationId: id, spaceId: actor.spaceId, role: "owner", createdAt: new Date() } });
   let modelReads = 0, enqueued = 0;
   const protectedTables = new Set(["userModelRole", "userModelPreference", "userModelCredential"]);
   const guarded = new Proxy(prisma, { get(target, property) {
