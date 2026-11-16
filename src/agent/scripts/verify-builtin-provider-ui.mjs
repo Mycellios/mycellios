@@ -62,6 +62,7 @@ try {
     await page.goto(base + `?personal=1${connected ? "&connected=1" : ""}`);
     await page.getByRole("button", { name: "Model", exact: true }).click();
     await expect(page.getByRole("option", { name: "Fixture personal model (OpenCode Go)", exact: true })).toBeVisible();
+    await page.screenshot({ path: path.join(output, `personal-provider-${connected ? "connected" : "unconnected"}.png`) });
     await page.getByRole("button", { name: "Explore models with my credits", exact: true }).click();
     await expect(page.getByRole("button", { name: "Explore models with my credits", exact: true })).toHaveCount(0);
     if (connected) await expect(page.getByRole("option", { name: "Fixture credit model (Mycellios)", exact: true })).toBeVisible();
@@ -74,7 +75,13 @@ try {
   await expect(page.getByRole("button", { name: "Use my credits", exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.screenshot({ path: path.join(output, "unconfigured-narrow.png") });
+  await page.goto(base + "?personal=1&connected=1");
+  await page.getByRole("button", { name: "Model", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Explore models with my credits", exact: true })).toBeVisible();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: path.join(output, "personal-provider-narrow.png") });
+  assert.equal(await page.evaluate(() => window.fixtureModelSaves), 0);
   assert.deepEqual(errors, []); assert.deepEqual(unexpectedRpc, []); assert.deepEqual(externalRequests, []);
-  const proof = { verified: true, realComponents: true, syntheticAccount: true, nativeProviderPreserved: true, builtinAlwaysVisible: true, creditExplorationDoesNotSaveOrConnect: true, paidInference: false, liveIdentityOrWallet: false, screenshots: 6 };
+  const proof = { verified: true, realComponents: true, syntheticAccount: true, nativeProviderPreserved: true, builtinAlwaysVisible: true, creditExplorationDoesNotSaveOrConnect: true, paidInference: false, liveIdentityOrWallet: false, screenshots: 9 };
   await writeFile(path.join(output, "qualification.json"), JSON.stringify(proof, null, 2)); console.log(JSON.stringify(proof));
 } finally { await browser?.close(); await server.close(); }
