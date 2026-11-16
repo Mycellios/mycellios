@@ -246,6 +246,12 @@
   reads must not appear as an empty or disconnected provider directory. Recovery
   preserves open connection fields and scoped caches, reloads the role selector,
   and never connects/disconnects providers or changes the selected model.
+  The chat picker offers explicit exploration of Mycellios credits beside personal
+  providers. Exploration only changes the visible catalog; it must not connect,
+  save a model, replay a run or switch payer. Model selection retains the same
+  Mico, conversation history, memory and computer/files. Qualify the real picker
+  with scripts/verify-builtin-provider-ui.mjs and persistence with
+  scripts/verify-workspace-sync-db.ts; synthetic offers are not live billing proof.
   Sidebar subscription quota reads saved OAuth accounts and the authorized native
   Codex CLI through account/rateLimits/read. Recheck native account/Space grants
   before serving cached quota; forward only sanitized limit metadata, never CLI

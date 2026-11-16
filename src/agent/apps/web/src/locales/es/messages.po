@@ -13054,6 +13054,12 @@ msgstr "Puedes fijar hasta 100 mensajes por conversación."
 msgid "Response style"
 msgstr "Estilo de respuesta"
 
+msgid "Explore models with my credits"
+msgstr "Explorar modelos con mis créditos"
+
+msgid "Choose a model yourself. Switching keeps this Mico's chat and files."
+msgstr "Tú eliges el modelo. Al cambiar se conservan el chat y los archivos de este Mico."
+
 msgid "Natural"
 msgstr "Natural"
 

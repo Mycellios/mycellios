@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,8 +10,9 @@ import EmbeddedPostgres from "embedded-postgres";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun } = await import("@rakazo/db");
+const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun, Prisma } = await import("@rakazo/db");
 const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js");
+const { commitBotUpdate } = await import("../packages/db/src/bot-update.js");
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");
 const { routineCalendar } = await import("../apps/api/src/routine-calendar.js");
@@ -154,6 +155,41 @@ try {
   await assert.rejects(call("send", { id: first.id, text: "Refuse archived", clientNonce: randomUUID() }));
   await call("archive", { id: first.id, archived: false });
   checks.push("existing task tabs see inbox conversations; archive refuses active or archived sends");
+  // The same persistence path used by bots.update must leave conversations,
+  // memory and the computer's files intact when an owner selects another model.
+  await system.memoryDocument.create({ data: {
+    ...actor, botId: bot.id, scope: "bot", path: "notes.md", content: "Owner-approved fixture notes", userControlled: true,
+  } });
+  const homeDirectory = new LocalAgentHomeStore(path.join(directory, "homes")).pathFor(bot.id);
+  await mkdir(homeDirectory, { recursive: true });
+  const homeFile = path.join(homeDirectory, "continuity.txt");
+  await writeFile(homeFile, "Original workspace file", "utf8");
+  const continuity = async () => ({
+    threads: await system.thread.findMany({ where: { OR: [{ botId: bot.id }, { taskBotId: bot.id }] }, orderBy: { id: "asc" } }),
+    messages: await system.message.findMany({ where: { thread: { OR: [{ botId: bot.id }, { taskBotId: bot.id }] } }, orderBy: { id: "asc" } }),
+    memory: await system.memoryDocument.findMany({ where: { botId: bot.id }, orderBy: { id: "asc" } }),
+    computer: await system.computer.findUniqueOrThrow({ where: { id: local.id } }),
+    file: await readFile(homeFile, "utf8"),
+    usage: await system.usageRecord.count(),
+    runs: await system.run.findMany({ where: { botId: bot.id }, orderBy: { id: "asc" } }),
+  });
+  const beforeProviderChange = await continuity();
+  const originalProfile = await system.bot.findUniqueOrThrow({ where: { id: bot.id } });
+  for (const [modelProvider, modelId] of [["fixture-managed", "credit-model"], ["fixture-personal", "own-model"]]) {
+    await runAsTenant(actor, () => commitBotUpdate({
+      prisma, notify: async () => { throw Error("Model selection must not notify a new task"); },
+      ...actor, threadId: bot.thread!.id, botId: bot.id, emitBotUpdated: false,
+      data: { modelProvider, modelId, agentEngine: "pi", nativeConfig: Prisma.JsonNull, thinkingLevel: null },
+    }));
+    const updated = await system.bot.findUniqueOrThrow({ where: { id: bot.id } });
+    assert.equal(updated.modelProvider, modelProvider);
+    assert.equal(updated.modelId, modelId);
+    const { modelProvider: _oldProvider, modelId: _oldModel, agentEngine: _oldEngine, nativeConfig: _oldConfig, thinkingLevel: _oldEffort, updatedAt: _oldUpdated, ...oldIdentity } = originalProfile;
+    const { modelProvider: _provider, modelId: _model, agentEngine: _engine, nativeConfig: _config, thinkingLevel: _effort, updatedAt: _updated, ...newIdentity } = updated;
+    assert.deepEqual(newIdentity, oldIdentity);
+    assert.deepEqual(await continuity(), beforeProviderChange);
+  }
+  checks.push("real PostgreSQL model persistence preserves Mico identity, task histories, memory, computer, files and usage without replay");
   await assert.rejects(call("read", { id: first.id }, { ...actor, userId: "foreign" }));
   await assert.rejects(call("read", { id: first.id }, { ...actor, spaceId: "foreign" }));
   const range = { from: new Date(Date.now() - 86400000).toISOString(), to: new Date(Date.now() + 86400000).toISOString(), timeZone: "Europe/Madrid" };

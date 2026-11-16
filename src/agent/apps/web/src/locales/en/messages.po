@@ -12768,6 +12768,12 @@ msgstr "Mycellios"
 msgid "Response style"
 msgstr "Response style"
 
+msgid "Explore models with my credits"
+msgstr "Explore models with my credits"
+
+msgid "Choose a model yourself. Switching keeps this Mico's chat and files."
+msgstr "Choose a model yourself. Switching keeps this Mico's chat and files."
+
 msgid "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
 msgstr "Natural shares a brief first step. Classic goes straight to the result. Both keep replies short unless you ask for detail."
 
