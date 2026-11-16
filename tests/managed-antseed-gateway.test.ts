@@ -147,6 +147,20 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     await expect(a.execute(a.quote(input), undefined, async j => {saved = structuredClone(j);})).rejects.toThrow("connection lost");
     expect(await a.recover(saved)).toBeNull(); expect(f.inference()).toHaveLength(1);
   });
+  it("recovers receipt settlement after the old 1.5 second window using only additional GETs", async () => {
+    const f = antseedGatewayFixture(); f.pending(true); let reads = 0;
+    const transport: typeof fetch = async (url, init) => {
+      const response = await f.transport(url, init);
+      if (String(url).includes('/console/api/requests?q=mycellios-') && !String(url).includes('preflight') && ++reads === 5)
+        f.pending(false);
+      return response;
+    };
+    const a = new ManagedAntseedGateway(gatewayKey, 'http://127.0.0.1:8379', ['*'], 100, transport, 'deepseek-bounded-v1');
+    await a.refresh();
+    expect((await a.execute(a.quote({ ...input, stream: true }), undefined, async () => {})).usd).toBe('0.000005');
+    expect(reads).toBe(6);
+    expect(f.inference()).toHaveLength(1);
+  });
   it.each([0, 1, 4])("accepts cached tokens as a subset of the complete input count (%s cached)", async cached => {
     const f = antseedGatewayFixture(), a = create(f); await a.refresh(); f.row.cachedInputTokens = cached;
     const result = await a.execute(a.quote(input), undefined, async () => {});
