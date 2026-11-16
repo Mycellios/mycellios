@@ -147,7 +147,22 @@ describe("managed AntSeed gateway billing boundary (no paid upstream)", () => {
     await expect(a.execute(a.quote(input), undefined, async j => {saved = structuredClone(j);})).rejects.toThrow("connection lost");
     expect(await a.recover(saved)).toBeNull(); expect(f.inference()).toHaveLength(1);
   });
-  it.each([{inputTokens: 1}, {cachedInputTokens: 0}, {outputTokens: 1}, {spent: null}, {finishedAt: null}, {status: 502}])(
+  it.each([0, 1, 4])("accepts cached tokens as a subset of the complete input count (%s cached)", async cached => {
+    const f = antseedGatewayFixture(), a = create(f); await a.refresh(); f.row.cachedInputTokens = cached;
+    const result = await a.execute(a.quote(input), undefined, async () => {});
+    expect(result).toMatchObject({inputTokens: 4, outputTokens: 2, usd: "0.000005"});
+    expect(f.inference()).toHaveLength(1);
+  });
+  it("recovers a saved cache-hit response by receipt reads without repeating inference", async () => {
+    const f = antseedGatewayFixture(), a = create(f); await a.refresh(); let saved: any;
+    await a.execute(a.quote(input), undefined, async j => {saved = structuredClone(j);});
+    Object.assign(saved.response.usage, {prompt_tokens: 5197, completion_tokens: 48, total_tokens: 5245});
+    Object.assign(f.row, {inputTokens: 5197, cachedInputTokens: 4864, outputTokens: 48, spent: "0.000244"});
+    expect(await a.recover(saved)).toMatchObject({inputTokens: 5197, outputTokens: 48, usd: "0.000244"});
+    expect(f.inference()).toHaveLength(1);
+  });
+  it.each([{inputTokens: 1}, {inputTokens: 3}, {cachedInputTokens: 5}, {cachedInputTokens: -1},
+    {cachedInputTokens: 0.5}, {cachedInputTokens: "1"}, {outputTokens: 1}, {spent: null}, {finishedAt: null}, {status: 502}])(
     "does not settle partial or unavailable receipt %j", async patch => {
       const f = antseedGatewayFixture(), a = create(f); await a.refresh(); Object.assign(f.row, patch);
       await expect(a.execute(a.quote(input), undefined, async () => {})).rejects.toThrow("receipt_pending");

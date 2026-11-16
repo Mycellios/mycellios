@@ -124,7 +124,7 @@ describe.skipIf(!url)("managed purchases on isolated PostgreSQL", () => {
     await expect(make().reconcile("bob",key)).rejects.toThrow("receipt_missing");
     f.pending(false);f.row.inputTokens=1;
     expect(await make().reconcile("alice",key)).toMatchObject({status:"pending_reconciliation"});
-    f.row.inputTokens=3;
+    f.row.inputTokens=4;
     expect(await make().reconcile("alice",key)).toMatchObject({status:"completed",response:{mycellios:{creditsMicrounits:6}}});
     expect(f.inference()).toHaveLength(1);expect(await wallet.reserved("alice")).toBe(0);
   });
