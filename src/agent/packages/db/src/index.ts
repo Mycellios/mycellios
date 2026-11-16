@@ -1,4 +1,5 @@
 export * from "./event-demo-session.js";
+export * from "./event-waits.js";
 export * from "./approval-settings.js";
 export * from "./routine-thread.js";
 export * from "./routine-delivery.js";
