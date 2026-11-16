@@ -7,6 +7,7 @@ const fakeAgentState = vi.hoisted(() => ({
   mode: "dispatch" as
     | "dispatch"
     | "work-continuation"
+    | "silent-work-continuation"
     | "empty"
     | "two-boundaries"
     | "silent-continuation"
@@ -88,7 +89,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
     async prompt(prompt: string, images?: unknown[]) {
       fakeAgentState.promptInputs.push(prompt);
       fakeAgentState.promptImages.push(images ?? []);
-      if (fakeAgentState.mode === "work-continuation") {
+      if (fakeAgentState.mode === "work-continuation" || fakeAgentState.mode === "silent-work-continuation") {
         const plan = this.tools.find(tool => tool.name === "update_work_plan")!;
         const work = this.tools.find(tool => tool.name !== "update_work_plan")!;
         await plan.execute('plan-1', {steps:[{id:'verify',title:'Verify change',status:'running'}]});
@@ -96,7 +97,7 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
         const turn = (text:string) => ({message:{role:'assistant',content:[{type:'text',text}],stopReason:'stop'},toolResults:[],context:{},newMessages:[]}) as unknown as Parameters<FinishTurn>[0];
         await this.finishTurn?.(turn('Voy a comprobar el resultado.'));
         await plan.execute('plan-2', {steps:[{id:'verify',title:'Verify change',status:'done'}]});
-        const final = turn('Hecho y verificado.');
+        const final = turn(fakeAgentState.mode === 'silent-work-continuation' ? '' : 'Hecho y verificado.');
         await this.finishTurn?.(final);
         this.state.messages.push(final.message);
         this.emit({type:'message_end',message:final.message});
@@ -2382,4 +2383,15 @@ it('continues Pi work through its completed-turn hook without repeating its tool
  expect(executeTool).toHaveBeenCalledOnce();
  expect(fakeAgentState.followUpMessages).toHaveLength(1);
  expect(JSON.stringify(fakeAgentState.followUpMessages)).toContain('Pending steps: Verify change');
+});
+
+it('continues a silent Pi routine and then completes without synthetic user-facing text',async()=>{
+ fakeAgentState.mode='silent-work-continuation';fakeAgentState.followUpMessages=[];
+ const executeTool=vi.fn(async()=>({ok:true}));const saveWorkState=vi.fn(async()=>{});
+ const runtime=new PiAgentRuntime();const events:unknown[]=[];
+ for await(const event of runtime.run({botId:'b',threadId:'t',runId:'pi-silent-work',routineId:'routine',prompt:'Finish the authorized review silently',instructions:'Authorized scope',history:[],tools:[destinationTool],model:{provider:'test',id:'dispatch-test-model'},allowSilentEmpty:true,executeTool,saveWorkState},{spaceId:'w',userId:'u',signal:AbortSignal.timeout(5000)}))events.push(event);
+ expect(executeTool).toHaveBeenCalledOnce();expect(fakeAgentState.followUpMessages).toHaveLength(1);
+ expect(JSON.stringify(fakeAgentState.followUpMessages)).toContain('Pending steps: Verify change');
+ expect(saveWorkState).toHaveBeenCalled();expect(events.at(-1)).toEqual({type:'done'});
+ expect(events).not.toContainEqual(expect.objectContaining({type:'text'}));
 });

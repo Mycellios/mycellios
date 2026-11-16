@@ -4,6 +4,7 @@ import { cancelRunsInTransaction } from "./cancel-runs.js";
 import { appendEventInTransaction } from "./events.js";
 import { IsolationError } from "./scope.js";
 import { withTransactionRetry } from "./transaction-retry.js";
+import { eventWaitState } from "./event-waits.js";
 
 export async function controlWorkTree(prisma: PrismaClient, actorInput: {spaceId:string;userId:string}, input: {
   taskId:string; expectedRevision:number; action:"pause"|"resume"|"cancel"|"reassign"; botId?:string;
@@ -50,6 +51,7 @@ export async function controlWorkTree(prisma: PrismaClient, actorInput: {spaceId
     ]}}))throw new Error('The previous owned processes are still stopping; inspect again shortly');
     let destination: {botId:string;threadId:string}|undefined;
     if(input.action==='reassign'){
+      if(tasks.some(task=>eventWaitState(task.workPlan)))throw new Error('Cancel this event wait before transferring its owning Mico');
       const bot=await tx.bot.findFirst({where:{id:input.botId,...actor,archivedAt:null},include:{thread:true}});
       if(!bot?.thread)throw new IsolationError();
       const thread=await tx.thread.findFirst({where:{id:selected.threadId,...actor},include:{group:{include:{members:true}}}});
@@ -63,7 +65,8 @@ export async function controlWorkTree(prisma: PrismaClient, actorInput: {spaceId
     for(const task of tasks){
       if(task.delegationState!=='paused')continue;
       const pending=tasks.some(child=>child.parentTaskId===task.id&&!['completed','cancelled'].includes(child.delegationState??''));
-      await tx.task.update({where:{id:task.id},data:{paused:false,delegationState:pending?'waiting':'queued',
+      const eventWait = eventWaitState(task.workPlan);
+      await tx.task.update({where:{id:task.id},data:{paused:false,delegationState:eventWait?'waiting_event':pending?'waiting':'queued',
         status:'queued',delegatedRunId:null,returnRunId:null,assignmentVersion:{increment:1},delegationRevision:{increment:1},
         ...(task.id===selected.id?destination:{}),
         prompt:`${task.prompt}\n\nRecovery of interrupted work: inspect command_status and existing effects before any new write. Do not repeat completed or uncertain actions. This resume does not expand permissions.`}});

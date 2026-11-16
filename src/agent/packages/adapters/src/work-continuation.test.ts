@@ -1,6 +1,6 @@
 import {expect,it,vi} from 'vitest';
 import type {AgentRunRequest} from '@rakazo/adapter-kit';
-import {WorkContinuation,withWorkContinuation,WORK_PLAN_TOOL,toolFailed} from './work-continuation.js';
+import {WorkContinuation,withWorkContinuation,workContinuationEnabled,WORK_PLAN_TOOL,toolFailed} from './work-continuation.js';
 it('restores the work plan and continuation budget across runtime instances',async()=>{
  let snapshot:unknown;
  const first=new WorkContinuation();first.configure(undefined,async value=>{snapshot=value;});
@@ -59,10 +59,51 @@ it('replans after a tool failure but never retries the tool itself',()=>{
  state.result({code:0});expect(state.next('Verified')).toBeUndefined();
  expect(toolFailed({details:{error:'failed'}})).toBe(true);
 });
-it('requires valid unique steps and skips silent/background work',()=>{
+it('requires valid unique steps and respects a disabled continuation policy',()=>{
  const state=new WorkContinuation(false);state.update(plan('pending'));expect(state.next('Voy a comprobarlo.')).toBeUndefined();
  expect(()=>state.update({steps:[...plan('pending').steps,...plan('pending').steps]})).toThrow('unique');
  expect(()=>state.update(plan('imaginary'))).toThrow('Invalid');
+});
+
+it('continues a silent durable routine until its plan is complete without requiring a visible answer',async()=>{
+ const saved:unknown[]=[];
+ const request={instructions:'Existing authorized scope',tools:[{name:'check',description:'fixture',inputSchema:{type:'object'}}],allowSilentEmpty:true,routineId:'routine',
+  saveWorkState:async(state:unknown)=>{saved.push(state);},executeTool:vi.fn(async()=>({changed:false}))} as unknown as AgentRunRequest;
+ const state=new WorkContinuation(workContinuationEnabled(request));const wrapped=withWorkContinuation(request,state);
+ await wrapped.executeTool!(WORK_PLAN_TOOL,plan('running'),'plan');
+ await wrapped.executeTool!('check',{},'read');
+ expect(state.next('NO_RESPONSE')).toContain('Pending steps');
+ await wrapped.executeTool!(WORK_PLAN_TOOL,plan('done'),'done');
+ expect(state.next('')).toBeUndefined();
+ expect(request.executeTool).toHaveBeenCalledOnce();expect(saved.length).toBeGreaterThan(1);
+});
+
+it.each([
+ {allowSilentEmpty:true},
+ {allowSilentEmpty:true,routineId:'routine',ephemeral:true},
+ {allowSilentEmpty:true,routineId:'routine',usageOperationKind:'compaction'},
+ {allowSilentEmpty:true,routineId:'routine',usageOperationKind:'retrieval'},
+ {allowSilentEmpty:true,routineId:'routine',usageOperationKind:'setup'},
+ {allowSilentEmpty:true,routineId:'routine',script:[]},
+])('does not add autonomous work to an internal or FYI generation: %j',flags=>{
+ const request={instructions:'Internal generation',tools:[],...flags} as unknown as AgentRunRequest;
+ expect(workContinuationEnabled(request)).toBe(false);
+ expect(withWorkContinuation(request,new WorkContinuation(false))).toBe(request);
+});
+
+it('allows durable silent task returns but stops while delegated work waits and preserves its budget',async()=>{
+ const state=new WorkContinuation();
+ const request={instructions:'Existing scope',tools:[{name:'await_event',description:'fixture',inputSchema:{type:'object'}}],allowSilentEmpty:true,
+  saveWorkState:async()=>{},executeTool:async()=>({waitingForTasks:true})} as unknown as AgentRunRequest;
+ expect(workContinuationEnabled(request)).toBe(true);
+ const wrapped=withWorkContinuation(request,state);
+ await wrapped.executeTool!(WORK_PLAN_TOOL,plan('running'),'plan');
+ state.next('Working');
+ await wrapped.executeTool!('await_event',{},'wait');
+ expect(state.next('')).toBeUndefined();expect(state.afterWait('unrelated command result')).toBeUndefined();
+ const restored=new WorkContinuation();restored.configure(state.snapshot());
+ expect(restored.next('Event received')).toContain('2/8');
+ restored.stop();expect(restored.next('NO_RESPONSE')).toBeUndefined();
 });
 it('changes strategy before executing a fourth identical no-progress action, but permits changing results',async()=>{
  const executeTool=vi.fn(async()=>({code:1}));

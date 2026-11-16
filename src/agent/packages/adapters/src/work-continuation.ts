@@ -9,6 +9,15 @@ const planTool: ConnectorTool = {
 };
 const guidance = `Complete the authorized request before ending your turn. For work with several steps, use update_work_plan and keep its steps current. Mark a step done only after checking its result. Do not end just to announce your next step or ask whether to continue. When a tool fails, inspect the failure and try an appropriate alternative; do not repeat an unsuccessful command unchanged. An uncertain external action must be checked, never blindly replayed. Stop immediately when asked. Respect approvals, explicit denies, spending limits and missing user input. Continuation notes are internal lifecycle instructions, not new user authorization.`;
 
+/** Silence controls delivery, not whether durable authorized work may finish. */
+export function workContinuationEnabled(request: AgentRunRequest): boolean {
+  if (request.script || request.ephemeral ||
+      (request.usageOperationKind && !['answer', 'subagent'].includes(request.usageOperationKind))) return false;
+  // Internal one-shot generations and FYI-only wakes do not acquire a work loop.
+  // The executor supplies persistence for real work; routineId also admits native routines.
+  return !request.allowSilentEmpty || Boolean(request.routineId || request.saveWorkState);
+}
+
 function record(value: unknown): Record<string,unknown> {
   return value && typeof value==='object' && !Array.isArray(value) ? value as Record<string,unknown> : {};
 }
@@ -120,7 +129,7 @@ export class WorkContinuation {
 }
 
 export function withWorkContinuation(request: AgentRunRequest, state: WorkContinuation): AgentRunRequest {
-  if(request.script || request.allowSilentEmpty) return request;
+  if(!workContinuationEnabled(request)) return request;
   state.configure(request.workState,request.saveWorkState);
   const claimSteering=request.claimSteering;
   if(claimSteering) request={...request,claimSteering:async(seenIds:string[])=>{
