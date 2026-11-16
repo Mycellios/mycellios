@@ -27,6 +27,7 @@ export function companionBounds(area: { x: number; y: number; width: number; hei
 
 /** Owned, sandboxed OS windows. Only the app main frame publishes their scoped data. */
 export async function installDesktopCompanions(options: {
+  platform?: NodeJS.Platform;
   mainWindow?: () => BrowserWindow | null;
   profile: string; allowed: (event: Electron.IpcMainInvokeEvent) => boolean;
   reveal: (target: { scope: string; botId: string; respond?: boolean }) => void;
@@ -34,6 +35,7 @@ export async function installDesktopCompanions(options: {
   openChat?: (target: { scope: string; botId: string }) => Promise<void>;
   scopeChanged?: (scope: string) => void;
 }) {
+  const nativeFocusGate = (options.platform ?? process.platform) === "win32";
   let prefs = structuredClone(DEFAULT_DESKTOP_COMPANIONS);
   let snapshot: DesktopCompanionSnapshot = { scope: "", theme: "light", agents: [] };
   const windows = new Map<string, BrowserWindow>();
@@ -108,7 +110,7 @@ export async function installDesktopCompanions(options: {
           win = new BrowserWindow({ ...companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key)),
             frame: false, transparent: true, resizable: false, maximizable: false, minimizable: false,
             icon: windowIcon(import.meta.dirname, path.resolve(import.meta.dirname, ".."), process.platform),
-            alwaysOnTop: true, skipTaskbar: true, show: false, focusable: false, title: kind === "island" ? "Mycellios · Island" : "Mycellios · Dock",
+            alwaysOnTop: true, skipTaskbar: true, show: false, focusable: !nativeFocusGate && kind !== "island", title: kind === "island" ? "Mycellios · Island" : "Mycellios · Dock",
             webPreferences: { preload: path.join(import.meta.dirname, "companion-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
           keepAbove(win);
           if (kind === "island") win.setHasShadow(false);
@@ -116,7 +118,7 @@ export async function installDesktopCompanions(options: {
           const created = win;
           // A transparent companion must not reactivate itself when a renderer
           // removes a previously focused element during a background update.
-          win.on("blur", () => { if (!created.isDestroyed() && created.isFocusable()) created.setFocusable(false); });
+          if (nativeFocusGate) win.on("blur", () => { if (!created.isDestroyed() && created.isFocusable()) created.setFocusable(false); });
           win.once("ready-to-show", () => { ready.add(created); revealReady(created); });
           win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
           win.webContents.on("will-navigate", event => event.preventDefault());
@@ -131,7 +133,10 @@ export async function installDesktopCompanions(options: {
             const zoom = prefs.dock.size / 100;
             if (win.webContents.getZoomFactor() !== zoom) win.webContents.setZoomFactor(zoom);
           }
-          if (kind === "island" && !islandExpanded.has(key) && win.isFocusable()) win.setFocusable(false);
+          if (kind === "island") {
+            if (!nativeFocusGate) win.setFocusable(islandExpanded.has(key));
+            else if (!islandExpanded.has(key) && win.isFocusable()) win.setFocusable(false);
+          }
           const bounds = companionBounds(display.workArea, kind, layout, data.snapshot.agents.length, islandExpanded.has(key));
           const current = win.getBounds();
           if (current.x !== bounds.x || current.y !== bounds.y || current.width !== bounds.width || current.height !== bounds.height) win.setBounds(bounds);
@@ -175,10 +180,11 @@ export async function installDesktopCompanions(options: {
     if (!owned?.[0].startsWith("island:") || typeof open !== "boolean") return;
     open ? islandExpanded.add(owned[0]) : islandExpanded.delete(owned[0]);
     sync();
-    if (open) { owned[1].setFocusable(true); owned[1].focus(); }
+    if (open) { if (nativeFocusGate) owned[1].setFocusable(true); owned[1].focus(); }
   };
   ipcMain.on("companion.expand", expandIsland);
   const activateCompanion = (event: Electron.IpcMainEvent) => {
+    if (!nativeFocusGate) return;
     const owned = companionWindow(event);
     if (!owned || owned[1].isDestroyed() || owned[0].startsWith("island:") && !islandExpanded.has(owned[0])) return;
     if (!owned[1].isFocusable()) owned[1].setFocusable(true);
