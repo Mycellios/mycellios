@@ -1,6 +1,7 @@
 import { createBotFolderRepos } from "./bot-folders.js";
 import type { Actor, Bot, BotSection, MessageBlock, SpaceBot } from "@rakazo/contracts";
 import {
+  DEFAULT_COMPUTER_MODE,
   canonicalPiProviderId,
   InstructionVersionSchema,
   initialBotMemory,
@@ -462,12 +463,13 @@ export function createRepos(
           const avatar = input.color === undefined && input.avatarFamily === undefined
             ? chooseMicoAvatar(existing)
             : chooseBotAvatar(existing, input.color, { family: input.avatarFamily });
-          const teamComputer = await ensureComputerRecord(tx, {
+          const computerMode = input.computerMode ?? DEFAULT_COMPUTER_MODE;
+          const teamComputer = computerMode === "team" ? await ensureComputerRecord(tx, {
             mode: "team",
             spaceId: actor.spaceId,
             userId: actor.userId,
             kind,
-          });
+          }) : null;
           const created = await tx.bot.create({
             data: {
               id: avatar.id,
@@ -483,7 +485,7 @@ export function createRepos(
               color: avatar.color,
               position: (positions._max.position ?? -1) + 1,
               parentBotId: input.parentBotId ?? null,
-              computerId: teamComputer.id,
+              computerId: teamComputer?.id ?? null,
               spawnKey: input.spawnKey,
               agentEngine,
               modelProvider,
@@ -506,14 +508,14 @@ export function createRepos(
               markUnread: false,
             });
           }
-          if (input.computerMode === "dedicated") {
+          if (computerMode !== "team") {
             const dedicated = await ensureComputerRecord(tx, {
-              mode: "dedicated",
+              mode: computerMode,
               spaceId: actor.spaceId,
               userId: actor.userId,
               botId: created.id,
               // "This PC" means the desktop host; it must never become Docker.
-              kind: computerKindForMode("dedicated", kind),
+              kind: computerKindForMode(computerMode, computerMode === "isolated" ? envKind : kind),
             });
             await tx.bot.update({ where: { id: created.id }, data: { computerId: dedicated.id } });
           }

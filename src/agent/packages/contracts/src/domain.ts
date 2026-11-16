@@ -22,7 +22,8 @@ import { RoutineWatchSchema, RoutineWatchStateSchema } from "./routine-watch.js"
 import { RunTriggerSchema } from "./runs.js";
 import { SettingsScopeSchema } from "./settings-scope.js";
 
-export const ComputerModeSchema = z.enum(["team", "dedicated"]);
+export const ComputerModeSchema = z.enum(["isolated", "team", "dedicated"]);
+export const DEFAULT_COMPUTER_MODE = "isolated" as const;
 export type ComputerMode = z.infer<typeof ComputerModeSchema>;
 
 export const MemoryScopeSchema = z.enum(["isolated", "shared"]);
@@ -393,7 +394,7 @@ export const CreateBotInput = z.object({
   color: BotAvatarValueSchema.optional(),
   /** Organic body family (0-9) to draw the new bot with; the server picks an id that hashes to it. */
   avatarFamily: z.number().int().min(0).max(9).optional(),
-  computerMode: ComputerModeSchema.default("team"),
+  computerMode: ComputerModeSchema.default(DEFAULT_COMPUTER_MODE),
   agentEngine: NativeBotEngineSchema.optional(),
   model: z.object({
     provider: z.string().trim().min(1).max(80),

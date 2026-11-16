@@ -83,7 +83,7 @@ export function ComputerModePicker({
   desktopAvailable?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 gap-2 @min-[24rem]:grid-cols-3">
       {BOT_COMPUTER_MODES.map((mode) => (
         <Toggle
           key={mode}
@@ -93,13 +93,26 @@ export function ComputerModePicker({
           onPressedChange={(pressed) => {
             if (pressed) onChange(mode);
           }}
-          className="capitalize aria-pressed:border-foreground/40 aria-pressed:text-foreground"
+          className="aria-pressed:border-foreground/40 aria-pressed:text-foreground"
         >
-          {mode === "team" ? <Trans>Cloud/Team</Trans> : <Trans>This PC</Trans>}
+          {mode === "isolated" ? <Trans>Just this Mico</Trans> : mode === "team" ? <Trans>Shared</Trans> : <Trans>This PC</Trans>}
         </Toggle>
       ))}
     </div>
   );
+}
+
+export function ComputerModeDescription({ mode }: { mode: ComputerMode }) {
+  return <>
+    <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+      {mode === "isolated" ? <Trans>A separate browser and files for this Mico, on the server. Available when an isolated computer provider is configured.</Trans>
+        : mode === "team" ? <Trans>Your Micos share a computer in this space.</Trans>
+        : <Trans>Uses your connected PC and its permissions. It is not an isolated server computer.</Trans>}
+    </p>
+    {mode === "dedicated" ? <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+      <Trans>If this PC is offline, the turn stops. It never moves to the cloud without your permission.</Trans>
+    </p> : null}
+  </>;
 }
 
 export function BotSettings({
@@ -552,7 +565,7 @@ export function BotSettings({
     permissions: t`Permissions`,
     advanced: t`Advanced`,
   };
-  const computerLabel = computerMode === "team" ? t`Cloud/Team` : t`This PC`;
+  const computerLabel = computerMode === "isolated" ? t`Just this Mico` : computerMode === "team" ? t`Shared` : t`This PC`;
 
   return (
     <div data-testid="bot-settings">
@@ -767,18 +780,7 @@ export function BotSettings({
               {computerBusy ? t`Connecting…` : t`Use this PC`}
             </Button>
           ) : null}
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            <Trans>
-              Cloud/Team runs on a shared computer on the server and does not see files on your PC.
-              This PC runs on your desktop with your folders, shell and tools.
-            </Trans>
-          </p>
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            <Trans>
-              If this PC is offline, the turn stops. It never moves to the cloud without your
-              permission.
-            </Trans>
-          </p>
+          <ComputerModeDescription mode={computerMode} />
 
             <div className="mt-4 text-sm text-foreground">
               <Trans>Memory scope</Trans>

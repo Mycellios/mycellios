@@ -30,8 +30,8 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 vi.mock("./chat-model-catalog", () => ({ ChatModelCatalog: () => null }));
-vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, value, onChange }: { choices: (ChatModelChoice & { unavailable?: boolean })[]; value: string; onChange: (key: string) => void }) =>
-  <div>{choices.map(choice => <button key={choice.key} data-choice={choice.key} data-selected={choice.key === value} disabled={choice.unavailable} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
+vi.mock("./chat-model-picker", () => ({ ChatModelPicker: ({ choices, value, onChange, initialProvider }: { choices: (ChatModelChoice & { unavailable?: boolean })[]; value: string; onChange: (key: string) => void; initialProvider?: string | null }) =>
+  <div data-picker-provider={initialProvider}>{choices.map(choice => <button key={choice.key} data-choice={choice.key} data-selected={choice.key === value} disabled={choice.unavailable} onClick={() => onChange(choice.key)}>{choice.label}</button>)}</div>,
 }));
 vi.mock("@rakazo/ui-web", () => ({
   Popover: ({ children, onOpenChange }: { children: ReactNode; onOpenChange: (open: boolean) => void }) => <div><button data-open onClick={() => onOpenChange(true)}>Open</button>{children}</div>,
@@ -65,6 +65,16 @@ it("shows the installed provider instead of the unrelated general model", async 
   expect(container.querySelector("[data-trigger]")?.textContent).toBe("ChatGPT");
   expect(container.querySelector('[aria-label="Thinking"]')).toBeNull();
   expect(container.querySelector('[data-choice="native-opencode::default"]')).toBeNull();
+});
+it.each(["pi", "codex"] as const)("explores credits without saving or connecting from %s", async engine => {
+  await render(engine);
+  const explore = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Explore models with my credits");
+  expect(explore).toBeDefined();
+  await act(async () => explore!.click());
+  expect(container.querySelector("[data-picker-provider]")?.getAttribute("data-picker-provider")).toBe("Mycellios");
+  expect(container.textContent).not.toContain("Explore models with my credits");
+  expect(save).not.toHaveBeenCalled();
+  expect(connect).not.toHaveBeenCalled();
 });
 it("changes executor and saved model together when leaving a native provider", async () => {
   await render();

@@ -106,7 +106,7 @@ vi.mock("../KnowledgeSection", () => ({
 import { InstructionSettings } from "../../components/InstructionSettings";
 import { spaceQueries } from "../../lib/query";
 import { rpc } from "../../lib/rpc";
-import { BotSettings } from "./bot-panel";
+import { BotSettings, ComputerModePicker, ComputerModeDescription } from "./bot-panel";
 
 const longInstructions = "I".repeat(4_000);
 
@@ -184,6 +184,21 @@ async function render(
 async function openSettingsPage(page: string) {
   await act(async () => container.querySelector<HTMLButtonElement>(`[data-settings-page="${page}"]`)!.click());
 }
+
+it("keeps server isolation selectable without granting this PC access", async () => {
+  await act(async () => root.render(<>
+    <ComputerModePicker value="isolated" desktopAvailable={false} onChange={vi.fn()} />
+    <ComputerModeDescription mode="isolated" />
+  </>));
+  const buttons = [...container.querySelectorAll("button")];
+  expect(buttons.map(button => button.textContent)).toEqual(["Just this Mico", "Shared", "This PC"]);
+  expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
+  expect(buttons[0]?.disabled).toBe(false);
+  expect(buttons[2]?.disabled).toBe(true);
+  expect(container.textContent).toContain("Available when an isolated computer provider is configured.");
+  expect(container.textContent).not.toContain("If this PC is offline");
+  expect(onSave).not.toHaveBeenCalled();
+});
 
 async function expandAdvanced() {
   await openSettingsPage("advanced");

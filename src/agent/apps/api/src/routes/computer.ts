@@ -826,7 +826,9 @@ async function computerStatus(
     botId,
     botName: bot.name,
   });
-  return toComputerStatus(botId, bot.computer, busyBotName);
+  const computer = bot.computer?.scope === "isolated" && ["desktop", "none"].includes(deps.sandbox.describe().id)
+    ? { ...bot.computer, kind: "none" } : bot.computer;
+  return toComputerStatus(botId, computer, busyBotName);
 }
 
 /** Hand the user's screen control for this bot back, continuing any run waiting on it. */

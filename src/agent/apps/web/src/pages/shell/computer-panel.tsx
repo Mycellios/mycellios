@@ -105,7 +105,7 @@ export function ComputerPanel({
                 computerPlaceholder(
                   computer?.state,
                   booting,
-                  computerLabel(computer?.mode, bot.name),
+                  computerLabel(computer?.mode ?? bot.computerMode, bot.name),
                 ))
               ))}
           </div>

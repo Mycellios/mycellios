@@ -54,7 +54,7 @@ import {
   SandboxRateLimitError,
   TransientModelError,
 } from "@rakazo/adapter-kit";
-import type { ComputerCommand, MessageBlock, ModelRoleChoice, RunStatus } from "@rakazo/contracts";
+import type { ComputerCommand, ComputerMode, MessageBlock, ModelRoleChoice, RunStatus } from "@rakazo/contracts";
 import {
   ATTACHMENT_MAX_BYTES,
   BotSecretName,
@@ -62,6 +62,7 @@ import {
   CLOUDFLARE_AI_GATEWAY_CONFIG_MESSAGE,
   CLOUDFLARE_WORKERS_AI_PROVIDER_ID,
   COMPUTER_COMMAND_OUTPUT_MAX_CHARS,
+  ComputerModeSchema,
   cloudflareModelConfigMessage,
   disabledBuiltinToolSet,
   FLEET_TOOL_NAMES,
@@ -3829,7 +3830,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: projectLeaseKey ?? run.botId,
           resumeHeldLease,
         });
-        if (!computerLease && (cloudComputer ?? leaseTarget.computer)?.scope === "dedicated") {
+        if (!computerLease && ["dedicated", "isolated"].includes((cloudComputer ?? leaseTarget.computer)?.scope ?? "")) {
           computerLease = await acquireDedicatedScreenLeaseFence(deps.prisma, {
             computerId: assignedComputerId,
             runId,
@@ -4090,12 +4091,18 @@ export function createRunExecutor(deps: ExecutorDeps) {
           botId: bot.id,
           runId,
           cloudWorkspace: cloudComputer ? { workerId, runFence: fence } : undefined,
+          isolatedWorkspace: (cloudComputer ?? bot.computer)?.scope === "isolated",
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
           onComputerUpdate: (dispatched = true) => { desktopUpdateRequested = true; desktopUpdateDispatched ||= dispatched; },
           ...connectedContext(connectedPlugins),
           connectedProviders: connectedComposio.map((row) => row.provider),
         };
+        if (context.isolatedWorkspace && context.projectSessionId) {
+          await failRunBeforeTurn(deps, run, bot.name, { attemptId: attempt.id, workerId, fence },
+            "This local project requires This PC. Select This PC explicitly before continuing; an isolated computer cannot access local project files.");
+          return;
+        }
         const memoryScope = configuredMemory
           ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
@@ -4363,7 +4370,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         const provisionKind = await deps.sandbox.provisionKind?.(context);
         const computerKind = provisionKind ?? storedComputer.kind;
-        const computerAvailable = admittedComputerAvailable(
+        const computerAvailable = !(context.isolatedWorkspace && ["desktop", "none"].includes(deps.sandbox.describe().id)) && admittedComputerAvailable(
           deps.sandbox.describe().id,
           provisionKind,
         );
@@ -7835,15 +7842,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
           if (name === "spawn_bot") {
             const computerModeArg = args.computer_mode;
-            let computerMode: "team" | "dedicated" | undefined;
+            let computerMode: ComputerMode | undefined;
             if (computerModeArg != null && computerModeArg !== "") {
-              const value = String(computerModeArg);
-              if (value !== "team" && value !== "dedicated") {
+              const parsed = ComputerModeSchema.safeParse(computerModeArg);
+              if (!parsed.success) {
                 return finish({
-                  error: 'computer_mode must be "team" or "dedicated".',
+                  error: 'computer_mode must be "isolated", "team" or "dedicated".',
                 });
               }
-              computerMode = value;
+              computerMode = parsed.data;
             }
             const spawned = await spawnBot(deps, {
               spawnedBy: {

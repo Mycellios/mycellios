@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,9 +10,12 @@ import EmbeddedPostgres from "embedded-postgres";
 
 process.env.RAKAZO_PROJECT_LOCAL = "1";
 process.env.CONTENT_ENCRYPTION = "off";
-const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun } = await import("@rakazo/db");
+const { createDb, asSystem, runAsTenant, createThreadEvents, createRepos, claimMicoRun, Prisma } = await import("@rakazo/db");
 const { taskInboxRoutes } = await import("../apps/api/src/routes/task-inbox.js");
+const { commitBotUpdate } = await import("../packages/db/src/bot-update.js");
 const { developmentRoutes } = await import("../apps/api/src/routes/development.js");
+const { botsRoutes } = await import("../apps/api/src/routes/bots.js");
+const { CreateBotInput } = await import("@rakazo/contracts");
 const { resolveThreadTarget } = await import("../apps/api/src/thread-target.js");
 const { routineCalendar } = await import("../apps/api/src/routine-calendar.js");
 const { sporeRewards, usageDashboard } = await import("../apps/api/src/usage-dashboard.js");
@@ -68,6 +71,23 @@ try {
   await system.user.create({ data: { id: actor.userId, name: "Synthetic owner", email: `${id}@example.invalid` } });
   await system.organization.create({ data: { id, name: "Synthetic", slug: id, createdAt: new Date() } });
   await system.space.create({ data: { id: actor.spaceId, name: "Synthetic", organizationId: id } });
+  // db push omits the CHECK from 0008_team_computers; reproduce it so the new
+  // mode is qualified against a genuine upgrade, not just Prisma's loose String.
+  const scopeSql = database.getPgClient(); await scopeSql.connect();
+  try {
+    await scopeSql.query(`ALTER TABLE computers ADD CONSTRAINT computers_scope_check CHECK (scope IN ('team', 'dedicated'))`);
+    const legacy = await system.computer.create({ data: {
+      ...actor, scope: "team", scopeKey: `legacy-scope:${id}`, homeKey: `legacy-home:${id}`, kind: "none",
+    } });
+    const probe = { ...actor, scope: "isolated", scopeKey: `scope-probe:${id}`, homeKey: `scope-probe:${id}`, kind: "none" };
+    await assert.rejects(system.computer.create({ data: probe }), /computers_scope_check/);
+    await scopeSql.query(await readFile("packages/db/prisma/migrations/20261116070000_isolated_computers/migration.sql", "utf8"));
+    assert.deepEqual(await system.computer.findUniqueOrThrow({ where: { id: legacy.id } }), legacy);
+    const admitted = await system.computer.create({ data: probe });
+    await system.computer.delete({ where: { id: admitted.id } });
+    await assert.rejects(system.computer.create({ data: { ...probe, scope: "invalid" } }), /computers_scope_check/);
+    checks.push("real legacy scope CHECK migration preserves existing rows, admits isolated and rejects unknown scopes");
+  } finally { await scopeSql.end(); }
   const bot = await system.bot.create({ data: { ...actor, name: "Fixture Mico", color: "#10B981", agentEngine: "codex", thread: { create: actor } }, include: { thread: true } });
   const handler = { handler: (fn: unknown) => fn };
   const taskInbox = Object.fromEntries(["followUp", "available", "list", "start", "messages", "read", "send", "markRead", "archive", "stop", "answer"].map(name => [name, handler]));
@@ -154,6 +174,41 @@ try {
   await assert.rejects(call("send", { id: first.id, text: "Refuse archived", clientNonce: randomUUID() }));
   await call("archive", { id: first.id, archived: false });
   checks.push("existing task tabs see inbox conversations; archive refuses active or archived sends");
+  // The same persistence path used by bots.update must leave conversations,
+  // memory and the computer's files intact when an owner selects another model.
+  await system.memoryDocument.create({ data: {
+    ...actor, botId: bot.id, scope: "bot", path: "notes.md", content: "Owner-approved fixture notes", userControlled: true,
+  } });
+  const homeDirectory = new LocalAgentHomeStore(path.join(directory, "homes")).pathFor(bot.id);
+  await mkdir(homeDirectory, { recursive: true });
+  const homeFile = path.join(homeDirectory, "continuity.txt");
+  await writeFile(homeFile, "Original workspace file", "utf8");
+  const continuity = async () => ({
+    threads: await system.thread.findMany({ where: { OR: [{ botId: bot.id }, { taskBotId: bot.id }] }, orderBy: { id: "asc" } }),
+    messages: await system.message.findMany({ where: { thread: { OR: [{ botId: bot.id }, { taskBotId: bot.id }] } }, orderBy: { id: "asc" } }),
+    memory: await system.memoryDocument.findMany({ where: { botId: bot.id }, orderBy: { id: "asc" } }),
+    computer: await system.computer.findUniqueOrThrow({ where: { id: local.id } }),
+    file: await readFile(homeFile, "utf8"),
+    usage: await system.usageRecord.count(),
+    runs: await system.run.findMany({ where: { botId: bot.id }, orderBy: { id: "asc" } }),
+  });
+  const beforeProviderChange = await continuity();
+  const originalProfile = await system.bot.findUniqueOrThrow({ where: { id: bot.id } });
+  for (const [modelProvider, modelId] of [["fixture-managed", "credit-model"], ["fixture-personal", "own-model"]]) {
+    await runAsTenant(actor, () => commitBotUpdate({
+      prisma, notify: async () => { throw Error("Model selection must not notify a new task"); },
+      ...actor, threadId: bot.thread!.id, botId: bot.id, emitBotUpdated: false,
+      data: { modelProvider, modelId, agentEngine: "pi", nativeConfig: Prisma.JsonNull, thinkingLevel: null },
+    }));
+    const updated = await system.bot.findUniqueOrThrow({ where: { id: bot.id } });
+    assert.equal(updated.modelProvider, modelProvider);
+    assert.equal(updated.modelId, modelId);
+    const { modelProvider: _oldProvider, modelId: _oldModel, agentEngine: _oldEngine, nativeConfig: _oldConfig, thinkingLevel: _oldEffort, updatedAt: _oldUpdated, ...oldIdentity } = originalProfile;
+    const { modelProvider: _provider, modelId: _model, agentEngine: _engine, nativeConfig: _config, thinkingLevel: _effort, updatedAt: _updated, ...newIdentity } = updated;
+    assert.deepEqual(newIdentity, oldIdentity);
+    assert.deepEqual(await continuity(), beforeProviderChange);
+  }
+  checks.push("real PostgreSQL model persistence preserves Mico identity, task histories, memory, computer, files and usage without replay");
   await assert.rejects(call("read", { id: first.id }, { ...actor, userId: "foreign" }));
   await assert.rejects(call("read", { id: first.id }, { ...actor, spaceId: "foreign" }));
   const range = { from: new Date(Date.now() - 86400000).toISOString(), to: new Date(Date.now() + 86400000).toISOString(), timeZone: "Europe/Madrid" };
@@ -195,6 +250,99 @@ try {
     assert.equal(Number((await rls.query("SELECT count(*) AS count FROM task_inbox")).rows[0].count), 0);
   } finally { await rls.end(); }
   checks.push("real PostgreSQL RLS conceals another member's inbox");
+  // Default creation assigns private metadata, never a live provider resource.
+  // Keep this proof on a distinct synthetic member so existing fixtures stay intact.
+  const privateActor = { ...actor, userId: `isolated-${id}` };
+  await system.user.create({ data: { id: privateActor.userId, name: "Synthetic isolated member", email: `isolated-${id}@example.invalid` } });
+  await system.member.create({ data: { id: randomUUID(), userId: privateActor.userId, organizationId: id, role: "member", createdAt: new Date() } });
+  await system.spaceMember.create({ data: { id: randomUUID(), userId: privateActor.userId, organizationId: id, spaceId: actor.spaceId, role: "member", createdAt: new Date() } });
+  const previousProvider = process.env.SANDBOX_PROVIDER;
+  const previousLimit = process.env.SANDBOX_MAX_COMPUTERS_PER_USER;
+  const legacyAssignment = await system.bot.findUniqueOrThrow({ where: { id: bot.id } });
+  try {
+    process.env.SANDBOX_PROVIDER = "fake";
+    process.env.SANDBOX_MAX_COMPUTERS_PER_USER = "2";
+    const privateRepos = createRepos(prisma);
+    const create = (name: string) => runAsTenant(privateActor, () => privateRepos.createBot(privateActor, { name, spawnKey: `isolated-fixture:${name}` }));
+    const firstPrivate = await create("First private Mico");
+    const secondPrivate = await create("Second private Mico");
+    const repeatPrivate = await create("First private Mico");
+    assert.equal(repeatPrivate.id, firstPrivate.id);
+    assert.equal(firstPrivate.computerMode, "isolated");
+    assert.equal(secondPrivate.computerMode, "isolated");
+    const rows = await system.bot.findMany({ where: { userId: privateActor.userId }, include: { computer: true, thread: true }, orderBy: { name: "asc" } });
+    assert.equal(rows.length, 2);
+    assert.notEqual(rows[0]!.computerId, rows[1]!.computerId);
+    assert.notEqual(rows[0]!.computer!.homeKey, rows[1]!.computer!.homeKey);
+    assert(rows.every(row => row.computer!.scope === "isolated" && row.computer!.state === "stopped" && row.computer!.providerRef === null));
+    assert.equal(await system.run.count({ where: { userId: privateActor.userId } }), 0);
+    await assert.rejects(create("Past the limit"), /computer limit/);
+    assert.equal(await system.bot.count({ where: { userId: privateActor.userId } }), 2);
+    await assert.rejects(runAsTenant(actor, () => privateRepos.getBot(actor, firstPrivate.id)));
+    const isolatedProvider = new FakeSandboxProvider();
+    const forbiddenHost = new FakeSandboxProvider();
+    const hostDescription = forbiddenHost.describe();
+    forbiddenHost.describe = () => ({ ...hostDescription, id: "desktop" });
+    let hostCalls = 0;
+    forbiddenHost.provision = async () => { hostCalls++; throw Error("Unexpected Desktop provision"); };
+    const pinnedSandbox = new HostAwareSandbox(isolatedProvider, forbiddenHost, async () => true);
+    const privateDeps = {
+      prisma, sandbox: pinnedSandbox, home: new LocalAgentHomeStore(path.join(directory, "isolated-homes")),
+      jobs: { ...jobs, cancel: async () => undefined, close: async () => undefined }, events: deps.events,
+    };
+    await assert.rejects(runAsTenant(actor, () => provisionComputer(privateDeps, rows[0]!.computerId!, {
+      ...actor, botId: bot.id, operationId: "foreign-boot", traceId: id, signal: AbortSignal.timeout(10_000),
+    })), /not assigned/);
+    assert.equal(isolatedProvider.boxes.size, 0);
+    const refs = [];
+    const privateLeases = [];
+    for (const row of rows) {
+      const ctx = { ...privateActor, botId: row.id, operationId: `boot:${row.id}`, traceId: row.id, signal: AbortSignal.timeout(10_000) };
+      refs.push(await runAsTenant(privateActor, () => provisionComputer(privateDeps, row.computerId!, ctx)));
+      const task = await system.task.create({ data: { ...privateActor, botId: row.id, threadId: row.thread!.id, prompt: "Synthetic lease only", status: "running" } });
+      const active = await system.run.create({ data: { ...privateActor, botId: row.id, threadId: row.thread!.id, taskId: task.id, status: "running", trigger: "user", leaseOwner: "isolated-worker", leaseFence: 1, leaseExpiresAt: new Date(Date.now() + 60_000) } });
+      const input = { computerId: row.computerId!, botId: row.id, runId: active.id, workerId: "isolated-worker", runFence: 1 };
+      await assert.rejects(runAsTenant(privateActor, () => acquireDedicatedScreenLeaseFence(prisma, { ...input, runFence: 0 })));
+      privateLeases.push(await runAsTenant(privateActor, () => acquireDedicatedScreenLeaseFence(prisma, input)));
+    }
+    assert.notEqual(privateLeases[0]!.computerId, privateLeases[1]!.computerId);
+    assert.equal(hostCalls, 0);
+    assert.equal(isolatedProvider.boxes.size, 2);
+    const fileContext = { ...privateActor, operationId: "private-file-proof", traceId: id, signal: AbortSignal.timeout(10_000), isolatedWorkspace: true };
+    await pinnedSandbox.writeFile(refs[0]!, { path: "secret.txt", content: new TextEncoder().encode("First Mico only") }, fileContext);
+    await assert.rejects(pinnedSandbox.readFile(refs[1]!, "secret.txt", fileContext));
+    assert.equal(new TextDecoder().decode(await pinnedSandbox.readFile(refs[0]!, "secret.txt", fileContext)), "First Mico only");
+    assert.deepEqual(await system.bot.findUniqueOrThrow({ where: { id: bot.id } }), legacyAssignment);
+    for (const held of privateLeases) await runAsTenant(privateActor, () => releaseComputerExecutionLease(prisma, held));
+    checks.push("real PostgreSQL default isolated assignment, idempotency, quota, account boundaries, private files, independent screen fences and no Desktop fallback (synthetic provider only)");
+  } finally {
+    if (previousProvider === undefined) delete process.env.SANDBOX_PROVIDER; else process.env.SANDBOX_PROVIDER = previousProvider;
+    if (previousLimit === undefined) delete process.env.SANDBOX_MAX_COMPUTERS_PER_USER; else process.env.SANDBOX_MAX_COMPUTERS_PER_USER = previousLimit;
+  }
+
+  // Team setup uses a distinct endpoint so an older server cannot ignore a flag
+  // and silently enqueue a model greeting. Exercise its actual route and repos.
+  await system.member.create({ data: { id: randomUUID(), userId: actor.userId, organizationId: id, role: "owner", createdAt: new Date() } });
+  await system.spaceMember.create({ data: { id: randomUUID(), userId: actor.userId, organizationId: id, spaceId: actor.spaceId, role: "owner", createdAt: new Date() } });
+  let modelReads = 0, enqueued = 0;
+  const protectedTables = new Set(["userModelRole", "userModelPreference", "userModelCredential"]);
+  const guarded = new Proxy(prisma, { get(target, property) {
+    if (protectedTables.has(String(property))) { modelReads++; throw Error("No model access during profile setup"); }
+    return Reflect.get(target, property);
+  } });
+  const authed: any = new Proxy({}, { get: () => new Proxy({}, { get: () => handler }) });
+  const profileRoutes = botsRoutes({ deps: { prisma: guarded, env: { agentRuntime: "pi" }, jobs: { enqueue: async () => { enqueued++; } } }, repos: createRepos(guarded), authed } as never).bots as any;
+  const createProfile = (scope = actor, name = "Synthetic lead") => runAsTenant(scope, () => profileRoutes.createProfile({ context: { actor: scope }, input: { ...CreateBotInput.parse({ name, spawnKey: "onboarding:first" }), expectedUserId: actor.userId } }));
+  const beforeRuns = await system.run.count(), beforeUsage = await system.usageRecord.count();
+  const [profile, repeated] = await Promise.all([createProfile(), createProfile()]);
+  assert.equal(profile.id, repeated.id);
+  await system.bot.update({ where: { id: profile.id }, data: { instructions: "Owner-edited instructions" } });
+  assert.equal((await createProfile(actor, "Another requested name")).id, profile.id);
+  assert.equal((await system.bot.findUniqueOrThrow({ where: { id: profile.id } })).instructions, "Owner-edited instructions");
+  await assert.rejects(createProfile({ ...actor, userId: "foreign" }));
+  assert.equal(modelReads, 0); assert.equal(enqueued, 0);
+  assert.equal(await system.run.count(), beforeRuns); assert.equal(await system.usageRecord.count(), beforeUsage);
+  checks.push("profile-only API creates once, preserves edits and account isolation, without model access or queued runs");
   const result = { passed: true, checks, productionAccess: false, modelsCalled: false };
   await writeFile(path.join(directory, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));

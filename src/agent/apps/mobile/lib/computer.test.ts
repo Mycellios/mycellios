@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ComputerStatus } from "./computer.js";
 import {
+  computerLabel,
   controlLabel,
   embeddableScreenUrl,
   fromScreenPage,
@@ -15,6 +16,11 @@ import {
   screenRenewReadAt,
   screenStreamKey,
 } from "./computer.js";
+
+it("labels an isolated server computer as belonging to its Mico", () => {
+  expect(computerLabel("isolated", "Ada")).toBe("Ada’s computer");
+  expect(computerLabel("team", "Ada")).toBe("Team Computer");
+});
 
 function computer(overrides: Partial<ComputerStatus> = {}): ComputerStatus {
   return {
