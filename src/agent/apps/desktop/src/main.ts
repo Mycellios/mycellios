@@ -72,6 +72,7 @@ import {
   isRendererAssetMiss,
   resolvePackagedRenderer,
 } from "./renderer-assets.js";
+import { forwardDocument, isDocumentRequest } from "./renderer-navigation.js";
 import { revealSecondInstanceWindow, secondInstanceWindow } from "./second-instance.js";
 import { installSessionPermissions } from "./session-permissions.js";
 import {
@@ -689,7 +690,11 @@ async function installBundledRenderer(
 
   await targetSession.protocol.handle(webUrl.protocol.slice(0, -1), async (request) => {
     const forward = () => {
-      return targetSession.fetch(request, forwardedRendererRequestInit(request, webUrl.origin));
+      const init = forwardedRendererRequestInit(request, webUrl.origin);
+      // Page loads must reach the window as real redirects (see renderer-navigation.ts).
+      if (isDocumentRequest(request))
+        return forwardDocument(request, targetSession, new Headers(init.headers ?? request.headers), net.request);
+      return targetSession.fetch(request, init);
     };
     // Self-hosted servers keep their own UI; official API/auth traffic stays on the network.
     if (!localRoot && !firstParty && currentSetup?.mode !== "new") {
