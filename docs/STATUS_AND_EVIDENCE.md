@@ -311,6 +311,22 @@ Enrollment uses official device login. It does not implement Grok Bot's
 [OAuth Apps onboarding](https://tailscale.com/blog/oauth-apps-ga), which requires
 a separately registered Mycellios OAuth App, or its app-specific posture policy.
 
+## Desktop execution diagnostics — source candidate
+
+The Agent source retains bounded reason codes, run/callback phase, native stage
+and operation UUID through Desktop interruptions. The existing uncertain-result
+retry guard still applies. The native journal records operation/lifecycle metadata
+in two rotating files, keeps a session heartbeat marker and offers an explicit
+Help / Copy diagnostics action. Chat error Details can copy a safe run diagnostic.
+No conversation, command, credential, URL, raw error body or crash dump is included.
+This adds no external telemetry transport. See
+`specs/desktop-diagnostics/spec.md` for boundaries and qualification.
+
+Offline tests cover broker/stream causes, mocked native relay delivery, rotation,
+stalled-disk fallback, privacy, clipboard success/denial and replay fencing.
+Physical suspension/crash behavior, installed Desktop activation and production
+deployment require separate qualification.
+
 ## Desktop-owned Mico execution candidate - 2026-11-07
 
 The local candidate adds account-scoped Desktop execution of the existing Mico

@@ -1,4 +1,4 @@
-import { COMPUTER_RATE_LIMIT_ERROR } from "@rakazo/contracts";
+import { COMPUTER_RATE_LIMIT_ERROR, desktopDiagnosticRunId, parseDesktopDiagnostic } from "@rakazo/contracts";
 import { stuckWorkStatusMessages } from "./stuck-work.js";
 
 export const MISSING_TOOL_FINAL_RESPONSE_ERROR =
@@ -202,8 +202,20 @@ const UNCERTAIN_DESKTOP_RUN = new Set([
 export function isUncertainDesktopRun(details: string | null | undefined): boolean {
   if (!details) return false;
   const fallback = parseModelFallbackFailure(details.trim());
-  return UNCERTAIN_DESKTOP_RUN.has((fallback?.primaryError ?? details).trim()) ||
-    (fallback?.backups.some(backup => UNCERTAIN_DESKTOP_RUN.has(backup.reason.trim())) ?? false);
+  const uncertain = (text: string) => UNCERTAIN_DESKTOP_RUN.has(text.trim()) || !!parseDesktopDiagnostic(text.trim());
+  return uncertain(fallback?.primaryError ?? details) ||
+    (fallback?.backups.some(backup => uncertain(backup.reason)) ?? false);
+}
+
+/** A support copy contains correlation and fixed categories, never provider text or prompts. */
+export function desktopRunDiagnosticText(details: string, runId: string | null): string | undefined {
+  if (!isUncertainDesktopRun(details)) return;
+  const diagnostic = parseDesktopDiagnostic(details.trim());
+  return JSON.stringify({schema:"mycellios-run-diagnostics/1",
+    runId:desktopDiagnosticRunId(runId) ?? null,
+    code:diagnostic?.code ?? "unknown_legacy_interruption",
+    phase:diagnostic?.phase ?? null,stage:diagnostic?.stage ?? null,
+    operationId:diagnostic?.operationId ?? null,outcome:"unconfirmed"},null,2);
 }
 
 /**
@@ -259,7 +271,7 @@ export function normalizeRunError(
       kind: "maintenance",
     };
   }
-  if (UNCERTAIN_DESKTOP_RUN.has(trimmed)) {
+  if (UNCERTAIN_DESKTOP_RUN.has(trimmed) || parseDesktopDiagnostic(trimmed)) {
     return {
       summary: translate("Desktop could not confirm the result. Review what it already did before continuing."),
       details,

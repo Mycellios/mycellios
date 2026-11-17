@@ -25,7 +25,8 @@ import { nativeEnvironment } from "@rakazo/adapters/native-agent-process";
 import type { DesktopMicoFolder, DesktopReachability, DesktopSetup } from "@rakazo/contracts";
 import { videoStudioEnabled } from "@rakazo/contracts";
 import type { Session } from "electron";
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, net, Notification, powerMonitor, powerSaveBlocker, session, shell, utilityProcess } from "electron";
+import { startDesktopDiagnostics, recordDesktopDiagnostic, desktopDiagnosticsText, desktopExceptionFields, type DesktopDiagnostics } from "./diagnostics.js";
 import type { AppDocumentState } from "./app-document-state.js";
 import { APP_DOCUMENT_STATE_SCRIPT } from "./app-document-state.js";
 import { createAppOpener } from "./app-opener.js";
@@ -1005,6 +1006,11 @@ function installApplicationMenu() {
           viewMenu,
           { role: "windowMenu" },
         ];
+  template.push({label:"Help",submenu:[{label:"Copy diagnostics",click:()=>{
+    void desktopDiagnosticsText().then(text=>clipboard.writeText(text)).catch(()=>{
+      dialog.showErrorBox("Mycellios", "Could not copy diagnostics. Try again.");
+    });
+  }}]});
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
@@ -1351,6 +1357,12 @@ app.whenReady().then(async () => {
     ? "com.mycellios.agent.desktop" : "com.mycellios.agent.desktop.dev");
   installSessionPermissions(session.defaultSession, permissionTarget);
   const userDataDir = app.getPath("userData");
+  desktopDiagnostics = startDesktopDiagnostics(userDataDir, app.getVersion(), process.platform);
+  process.on("uncaughtExceptionMonitor", error => recordDesktopDiagnostic("main_failure", desktopExceptionFields(error)));
+  app.on("render-process-gone", (_event, _contents, details) => recordDesktopDiagnostic("renderer_exit", {reason:details.reason,exitCode:details.exitCode}));
+  app.on("child-process-gone", (_event, details) => recordDesktopDiagnostic("child_exit", {reason:details.reason,exitCode:details.exitCode}));
+  powerMonitor.on("suspend", () => recordDesktopDiagnostic("suspend"));
+  powerMonitor.on("resume", () => recordDesktopDiagnostic("resume"));
   await loadBackgroundPreference(userDataDir);
   serverDirectory = new ServerDirectory({
     read: () => readPrivateFile(path.join(userDataDir, "servers.json"), 65536),
@@ -2366,6 +2378,9 @@ app.on("window-all-closed", () => {
 });
 
 let localShutdownComplete = false;
+let desktopDiagnostics: DesktopDiagnostics | undefined;
+let diagnosticsShutdown: Promise<void> | undefined;
+let diagnosticsClosed = false;
 app.on("before-quit", (event) => {
   if (localStack instanceof LocalNativeStackController && !localShutdownComplete) {
     event.preventDefault();
@@ -2386,5 +2401,12 @@ app.on("before-quit", (event) => {
   hostComputer?.activate(false);
   void hostComputer?.close();
   localStack?.abort();
+});
+app.on("will-quit", event => {
+  if (desktopDiagnostics && !diagnosticsClosed) {
+    event.preventDefault();
+    diagnosticsShutdown ??= Promise.race([desktopDiagnostics.close(),new Promise<void>(resolve=>setTimeout(resolve,1_000))])
+      .catch(()=>undefined).then(()=>{diagnosticsClosed=true;app.quit();});
+  }
 });
 

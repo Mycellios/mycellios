@@ -119,7 +119,7 @@ it("does not publish a completion if the Desktop stream loses its terminal frame
   const events: AgentRuntimeEvent[] = [];
   await expect(async () => {
     for await (const event of runtime.run(request(), context)) events.push(event);
-  }).rejects.toThrow("disconnected");
+  }).rejects.toThrow("stream_incomplete");
   expect(events).toEqual([]);
   expect(transport).toHaveBeenCalledTimes(1);
   expect(fallback.run).not.toHaveBeenCalled();
@@ -152,7 +152,7 @@ it("never replays or falls back after dispatch or a truncated native stream", as
   const fallback = { describe, abort: vi.fn(), run: vi.fn() };
   const transport = vi.fn(async () => new Response('{"value":{"kind":"event","value":{"kind":"object","value":[["type","text"],["text","partial"]]}}}\n'));
   const runtime = new DesktopAgentRuntime({ fallback, transport, select: async () => ({ available: true, preferred: true }) });
-  await expect(async () => { for await (const _ of runtime.run(request(), context)) {} }).rejects.toThrow("disconnected");
+  await expect(async () => { for await (const _ of runtime.run(request(), context)) {} }).rejects.toThrow("stream_incomplete");
   expect(transport).toHaveBeenCalledTimes(1); expect(fallback.run).not.toHaveBeenCalled();
 });
 
@@ -219,7 +219,7 @@ it("preserves binary input and opaque marker-looking objects without interpretin
 });
 
 it("requires native completion rather than treating EOF or abort as success", async () => {
-  await expect(async () => { for await (const _ of desktopAgentFrames(new Response(""), context.signal)) {} }).rejects.toThrow("disconnected");
+  await expect(async () => { for await (const _ of desktopAgentFrames(new Response(""), context.signal)) {} }).rejects.toThrow("stream_incomplete");
   const controller = new AbortController(); controller.abort();
   await expect(async () => { for await (const _ of desktopAgentFrames(new Response(""), controller.signal)) {} }).rejects.toThrow();
 });

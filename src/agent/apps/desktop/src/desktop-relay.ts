@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { recordDesktopDiagnostic, desktopExceptionFields } from "./diagnostics.js";
+import type { DesktopFailureCode } from "@rakazo/contracts";
 import type { UpdateResumeBinding } from "./update-resume.js";
 import type {
   DesktopExecutorOperation,
@@ -61,6 +63,8 @@ export class DesktopRelayClient {
       redirect: "error",
       signal: signal ?? AbortSignal.timeout(10_000),
     });
+    if (!response.ok) recordDesktopDiagnostic("relay_http_failure",{httpStatus:response.status,stage:action === "result" ? "result_ack" : "poll",
+      code:response.status === 401 || response.status === 403 ? "access_revoked" : response.status === 429 ? "desktop_busy" : "relay_stream_failure"});
     if (response.status === 401 || response.status === 403) {
       this.stop();
       this.options.revoked();
@@ -163,6 +167,7 @@ export class DesktopRelayClient {
       [...this.grants].map(([botId, grant]) => ({ ...binding, generation: grant.generation, botId }));
   }
   async beginUpdate() {
+    recordDesktopDiagnostic("update_started", {active:this.active.size});
     this.updating = true;
     await Promise.all([...this.updateNotices.values()].map(notice => notice()));
   }
@@ -171,6 +176,7 @@ export class DesktopRelayClient {
     return this.active.size > 0;
   }
   stop() {
+    if (!this.stopped) recordDesktopDiagnostic("relay_stopped", {active:this.active.size});
     this.pollController?.abort();
     ++this.intent;
     this.stopped = true;
@@ -217,6 +223,7 @@ export class DesktopRelayClient {
         for(const raw of state.bindings){const b=parseDesktopBinding(raw);if(b.deviceId!==this.deviceId)continue;grants.set(b.botId,{generation:b.generation});}
         this.grants=grants;
       }
+      if (!this.lastContact || (this.options.now ?? Date.now)() - this.lastContact >= 40_000) recordDesktopDiagnostic("relay_connected");
       this.lastContact = (this.options.now ?? Date.now)();
       for (const [id, controller] of this.active) {
         const action = missingOperationAction(id, state.active, this.settled);
@@ -227,6 +234,7 @@ export class DesktopRelayClient {
       }
       for (const id of state.active)
         if (!previousActive.has(id) && !this.active.has(id) && !state.operations.some((op) => op.id === id)) {
+          recordDesktopDiagnostic("delivery_lost", {operationId:id,code:"delivery_lost",stage:"poll"});
           // A lost poll is an uncertain delivery, never a reason to replay an effectful command.
           try {
             await this.post("result", {
@@ -257,11 +265,14 @@ export class DesktopRelayClient {
         )
           continue;
         const controller = new AbortController();
+        recordDesktopDiagnostic("operation_received", {operationId:operation.id,runId:"runId" in input.data ? input.data.runId : undefined,method:input.data.method});
         this.active.set(operation.id, controller);
         void this.execute(operation, controller).finally(() => { this.active.delete(operation.id); this.settled.delete(operation.id); });
       }
-    } catch {
+    } catch (error) {
+      if (!this.stopped && !pollController.signal.aborted) recordDesktopDiagnostic("relay_poll_failed", {stage:"poll",...desktopExceptionFields(error)});
       if ((this.options.now ?? Date.now)() - this.lastContact > 40_000) {
+        if (this.active.size) recordDesktopDiagnostic("relay_expired", {active:this.active.size,code:"desktop_disconnected",stage:"poll"});
         // Stop uncertain commands, but retain the approved binding while the
         // network is unavailable. A fresh authenticated poll must precede work.
         // Explicit 401/403 or an identity change still revokes everything.
@@ -276,6 +287,12 @@ export class DesktopRelayClient {
   }
   private async execute(operation: DesktopExecutorOperation, controller: AbortController) {
     let seq = 0, closed = false;
+    const started = (this.options.now ?? Date.now)();
+    let stage: "native_request" | "native_stream" | "result_ack" = "native_request";
+    let failureCode: DesktopFailureCode = "native_transport_interrupted";
+    let httpStatus: number | undefined;
+    const request = operation.request as {runId?:unknown;method?:unknown};
+    const correlation = {operationId:operation.id,runId:request.runId,method:request.method};
     let delivery = Promise.resolve();
     const send = (data: Uint8Array, done: boolean): Promise<void> => {
       const next = delivery.then(async () => {
@@ -287,12 +304,13 @@ export class DesktopRelayClient {
           try { await this.post("result", body, AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)])); break; }
           catch (error) {
             if (done) this.settled.delete(operation.id);
-            if (attempt >= attempts || controller.signal.aborted || this.stopped) throw error;
+            if (attempt >= attempts || controller.signal.aborted || this.stopped) {stage="result_ack";throw error;}
           }
         }
         seq++;
         closed = done;
         if (done) this.settled.add(operation.id);
+        if (done) recordDesktopDiagnostic("operation_confirmed", {...correlation,lastSequence:seq-1,elapsedMs:(this.options.now ?? Date.now)()-started});
       });
       delivery = next;
       return next;
@@ -314,8 +332,9 @@ export class DesktopRelayClient {
     this.updateNotices.set(operation.id, interrupt);
     try {
       if (this.updating) { await interrupt(false); return; }
+      recordDesktopDiagnostic("operation_native_started", {...correlation,stage});
       const body = JSON.stringify(operation.request);
-      if (Buffer.byteLength(body) > HOST_COMPUTER_MAX_BYTES) throw new Error("Request too large");
+      if (Buffer.byteLength(body) > HOST_COMPUTER_MAX_BYTES) { failureCode="desktop_request_too_large";throw new Error("Request too large"); }
       const response = await fetch(`${this.options.localUrl}/computer`, {
         method: "POST",
         headers: {
@@ -327,19 +346,21 @@ export class DesktopRelayClient {
         signal: controller.signal,
       });
       if (response.headers.get("x-mycellios-desktop-error") === "desktop_updating") { await interrupt(false); return; }
-      if (!response.ok || !response.body) throw new Error("Local computer unavailable");
+      httpStatus=response.status;
+      if (!response.ok || !response.body) {failureCode="native_host_failure";throw new Error("Local computer unavailable");}
+      stage = "native_stream";
       const reader = response.body.getReader();
       let pending: Buffer = Buffer.alloc(0);
       try {
         for (;;) {
           const { value, done } = await reader.read();
           if (done) {
-            if (pending.byteLength) throw Error("Incomplete native frame");
+            if (pending.byteLength) {failureCode="stream_incomplete";throw Error("Incomplete native frame");}
             await forward(new Uint8Array(), true);
             break;
           }
           pending = Buffer.concat([pending, value]);
-          if (pending.byteLength > HOST_COMPUTER_MAX_BYTES) throw Error("Native frame exceeds its limit");
+          if (pending.byteLength > HOST_COMPUTER_MAX_BYTES) {failureCode="invalid_frame";throw Error("Native frame exceeds its limit");}
           const end = pending.lastIndexOf(10);
           if (end >= 0) {
             await forward(pending.subarray(0, end + 1), false);
@@ -350,7 +371,8 @@ export class DesktopRelayClient {
         await reader.cancel().catch(() => undefined);
         reader.releaseLock();
       }
-    } catch {
+    } catch (error) {
+      recordDesktopDiagnostic("operation_failed", {...correlation,stage,code:failureCode,httpStatus,lastSequence:seq-1,elapsedMs:(this.options.now ?? Date.now)()-started,...desktopExceptionFields(error)});
       controller.abort();
       if (!this.stopped && !closed) {
         try {
@@ -361,6 +383,9 @@ export class DesktopRelayClient {
             data: Buffer.from(
               JSON.stringify({
                 error: "Desktop operation interrupted. Check results before retrying.",
+                code: failureCode,
+                stage,
+                operationId: operation.id,
               }) + "\n",
             ).toString("base64"),
             done: true,

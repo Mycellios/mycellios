@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { AdapterContext } from "@rakazo/adapter-kit";
 import { getLogger } from "@rakazo/logging";
+import { desktopLegacyFailureCode } from "@rakazo/contracts";
 import type { DesktopExecutorBinding, DesktopExecutorOwner, DesktopExecutorPoll } from "../../../../contracts/desktop-executor.js";
 import { HOST_COMPUTER_MAX_BYTES, hostComputerDeadlineMs, hostComputerRequest, type HostComputerRequest } from "./host-computer-protocol.js";
 
@@ -263,7 +264,7 @@ export class DesktopRelayBroker {
     }, { highWaterMark: MAX_STREAM_BUFFER, size: chunk => chunk.byteLength });
     context.signal.addEventListener("abort", abort, { once: true });
     if (context.signal.aborted) abort();
-    return new Response(body, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" } });
+    return new Response(body, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store", "x-mycellios-desktop-operation": id } });
   }
   result(owner: DesktopExecutorOwner, deviceId: string, id: string, seq: number, data: string, done: boolean) {
     const op = this.operations.get(id);
@@ -297,7 +298,7 @@ export class DesktopRelayBroker {
     this.logFailure(op, message);
     op.closed = true; op.dispose(); this.operations.delete(op.id);
     this.wake(op.binding, op.binding.deviceId);
-    try { op.controller.enqueue(new TextEncoder().encode(JSON.stringify({ error: message }) + "\n")); op.controller.close(); } catch { /* consumer already gone */ }
+    try { op.controller.enqueue(new TextEncoder().encode(JSON.stringify({ error: message, code: desktopLegacyFailureCode(message), operationId: op.id, dispatched: op.claimed }) + "\n")); op.controller.close(); } catch { /* consumer already gone */ }
   }
   private logFailure(op: Operation, reason: string) {
     getLogger().warn("desktop.relay.operation_failed", {

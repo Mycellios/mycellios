@@ -1543,6 +1543,17 @@
   active. Preserve owner/generation fencing, queued cancellation and distinct
   queue-pressure/disconnection errors without automatic command replay.
 
+- Desktop diagnostics reuse the relay and native lifecycle hooks. Keep fixed
+  failure codes, phase/stage and operation UUIDs through the transport and safe
+  persisted run-error suffix; diagnosed interruptions retain the uncertain-result
+  retry fence. `apps/desktop/src/diagnostics.ts` stores metadata only in two bounded
+  local files, with bounded pending writes and an unclean-session marker. Never
+  record request/response bodies, commands, URLs, credentials or raw exception text.
+  Native Help / Copy diagnostics and chat error Details / Copy diagnostics are
+  explicit local copies, not uploads. Preserve partial-copy fallback when disk
+  stalls and keep diagnostic failures independent of execution. Verify the focused
+  desktop-diagnostics, desktop-agent-stream, native relay, retry and composer tests.
+
 - Never ask honors the account owner's standing approval choice for resumed and
   unattended work. Keep explicit action blocks, account/Space ownership, native
   computer consent and credential scope enforced. Outside content remains data,
