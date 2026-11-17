@@ -1771,7 +1771,11 @@
   maintenance permissions intact when switching views.
 
 - Native CLIs and connected API models share stable conversation-style defaults; explicit
-  user/Mico formatting and silent routine rules take precedence. Do not shorten output
+  user/Mico formatting and silent routine rules take precedence.
+  Refresh exact historical host style blocks and keep one selected style at the end
+  of each run's instructions, including resumed chats; preserve owner text and spacing.
+  Status replies summarize result/blocker/next action, not teammate reports or logs.
+  Do not shorten output
   with post-processing or reduce model effort to simulate speed. Text progress publishes
   immediately first, then coalesces at 80 ms, with final/tool-boundary flushes retained.
   Long replies use the same disclosure for plain text and mixed blocks. Keep streamed
