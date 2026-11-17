@@ -1,4 +1,5 @@
-import { shellCommandTimeoutMs } from "./shell-command-budget.js";
+import { planShellSearch } from "./shell-command-budget.js";
+import { dockerAdaptiveSearchCommand } from "./docker-search-budget.js";
 import { eventDemoSessionActive } from "@rakazo/db";
 import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
@@ -6481,6 +6482,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
               bot.id,
               args.cwd ? String(args.cwd) : undefined,
             );
+            const search = planShellSearch(command, typeof args.timeout_ms === "number" ? args.timeout_ms : undefined, {
+              cwd, home: hostEnvironment?.home ?? (computerKind === "desktop" ? undefined : "/home/rakazo"), projectPath: hostEnvironment?.projectPath,
+            });
+            if (search.refusal) return finish({ error: search.refusal, started: false });
             // Loaded per command so a command variable added, replaced, or removed mid-run
             // applies to the next command. Registered for redaction before anything runs.
             const commandEnvironment = await shellCommandEnvironment({
@@ -6546,6 +6551,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   ? await deps.sandbox.environment?.(computer, context)
                   : undefined);
               desktopCommand = shellEnvironment?.durableCommands === true;
+              const dockerProgress = computer.kind === "docker" ? search.progress : undefined;
+              const executedCommand = dockerProgress ? dockerAdaptiveSearchCommand(command, search.timeoutMs, dockerProgress) : command;
               commandStartedAt = Date.now();
               pendingCommands.add(commandId);
               const observed = await observeShellCommand(
@@ -6564,7 +6571,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                           storedComputer.id,
                           runId,
                           randomUUID(),
-                          command,
+                          executedCommand,
                         ],
                     cwd,
                     env:
@@ -6574,7 +6581,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     unsetEnv: commandEnvironment.unsetEnv,
                     commandId: shellEnvironment?.durableCommands ? commandId : undefined,
                     executionId,
-                    timeoutMs: shellCommandTimeoutMs(command, typeof args.timeout_ms === "number" ? args.timeout_ms : undefined),
+                    timeoutMs: dockerProgress ? dockerProgress.maxMs + 1000 : search.timeoutMs,
+                    ...(shellEnvironment && search.progress ? { searchProgress: search.progress } : {}),
                   },
                   context,
                 ),

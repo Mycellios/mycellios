@@ -445,7 +445,7 @@ export const builtinAgentTools: ConnectorTool[] = [
   {
     name: "shell",
     description:
-      "Run a command inside this bot's computer. cwd defaults to the bot's folder on a Team Computer and the workspace root on a Private Computer. Search the known project first with rg and bounded paths; exclude dependencies, caches and .git. Do not scan the whole home to locate a project. Read-only search pipelines stop after at most 45 seconds; after a timeout narrow the directory or pattern instead of repeating the same scan. Durable delivery does not extend the command deadline. Output can arrive while the command is still running; tell the user any one-time code or sign-in URL in that output.",
+      "Run a command inside this bot's computer. cwd defaults to the bot's folder on a Team Computer and the workspace root on a Private Computer. Search the known project first with rg and bounded paths; exclude dependencies, caches and .git. Do not scan the whole home to locate a project. Searches start with a 45-second budget. A scoped project search can continue for up to three minutes while new result locations arrive; banners, repeated hits and stderr do not extend it. Whole-home, drive-root and parent-tree scans must be narrowed before execution. After a timeout narrow the directory or pattern instead of repeating the same scan. Use rg -n with explicit paths for useful progress. Durable delivery does not extend the command deadline. Output can arrive while the command is still running; tell the user any one-time code or sign-in URL in that output.",
     inputSchema: {
       type: "object",
       properties: {

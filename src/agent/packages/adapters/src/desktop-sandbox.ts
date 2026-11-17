@@ -31,6 +31,7 @@ import type {
   WorkspaceDirectoryRequest,
 } from "@rakazo/adapter-kit";
 import { boundedSandboxCommandTimeoutMs } from "@rakazo/core";
+import { SearchProgressClock } from "./search-progress.js";
 import {
   applyPlaceholderAction,
   boundedComputerActions,
@@ -965,14 +966,22 @@ async function* streamLocalCommand(
     finish(code, message);
   };
   const abort = () => terminate("command aborted", 130);
-  const timeout = setTimeout(
-    () => terminate(`command timed out after ${timeoutMs} ms`, 124),
-    timeoutMs,
-  );
-  timeout.unref?.();
+  const progress = request.searchProgress
+    ? new SearchProgressClock(Math.min(timeoutMs, 45_000), request.searchProgress.maxMs, request.searchProgress.roots)
+    : undefined;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const armDeadline = () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => terminate(progress
+      ? "Search stopped at its idle or maximum budget. Narrow the project path or pattern before continuing; partial results do not prove absence."
+      : `command timed out after ${timeoutMs} ms`, 124), Math.max(0, progress ? progress.deadline - Date.now() : timeoutMs));
+    timeout.unref?.();
+  };
+  armDeadline();
   signal.addEventListener("abort", abort, { once: true });
   child.stdout?.on("data", (chunk: Buffer) => {
     if (settled) return;
+    if (progress?.output(chunk)) armDeadline();
     push({ type: "stdout", data: chunk.toString("utf8") });
   });
   child.stderr?.on("data", (chunk: Buffer) => {
