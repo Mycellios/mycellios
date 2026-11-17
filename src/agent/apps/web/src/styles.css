@@ -288,15 +288,23 @@ html[data-theme-sweep]::view-transition-new(rk-theme-spore) {
 }
 @media (min-width: 768px) {
   .rk-workspace-rail {
-    display: flex; flex-direction: column; flex-shrink: 0; width: 52px;
+    display: flex; flex-direction: column; flex-shrink: 0; width: var(--rk-rail-width, 52px);
     background: var(--muted); border-inline-end: 1px solid var(--border);
   }
-  [data-workspace-chrome="compact"] [data-slot="sidebar-container"] { inset-inline-start: 52px; }
+  [data-workspace-chrome="compact"] [data-slot="sidebar-container"] { inset-inline-start: var(--rk-rail-width, 52px); }
+  /* macOS draws its window buttons over the top of the rail (MAC_WINDOW_BUTTON_INSET in
+     apps/desktop/src/window-options.ts), so the rail is wide enough to hold them, as in OpenBot. */
+  [data-window-buttons="darwin"] { --rk-rail-width: 72px; }
+}
+/* Below 768px the rail is hidden, so a top row that starts at the window edge clears the macOS
+   window buttons itself (12px inset + 59px group + 7px). */
+@media (max-width: 767px) {
+  [data-window-buttons="darwin"] .rk-window-buttons-clear { padding-inline-start: 78px; }
 }
 @media (min-width: 1100px) {
   .rk-chat-tools-panel {
     display: flex; flex-direction: column; flex-shrink: 0;
-    width: clamp(220px, calc(100vw - var(--sidebar-width) - 52px - 424px), 380px);
+    width: clamp(220px, calc(100vw - var(--sidebar-width) - var(--rk-rail-width, 52px) - 424px), 380px);
     border-inline-start: 1px solid var(--border); background: var(--background);
   }
 }

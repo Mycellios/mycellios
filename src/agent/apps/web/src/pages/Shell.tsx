@@ -139,7 +139,7 @@ import { readActivityMode, writeActivityMode } from "../lib/activity-mode";
 import { appPath } from "../lib/app-path";
 import type { ArtifactTarget } from "../lib/artifact-open";
 import { localProjectLink, ReviewWorkspaceProvider, useReviewWorkspace } from "../lib/review-workspace";
-import { connectThisComputer, defaultComputerMode, desktopBridge, desktopDragClass } from "../lib/desktop";
+import { connectThisComputer, defaultComputerMode, desktopBridge, desktopDragClass, desktopHidesTitleBar } from "../lib/desktop";
 import { notificationTarget } from "../pwa/notification-target";
 import { ReviewWorkspacePanel } from "../components/ReviewWorkspacePanel";
 import { SidebarProjects } from "../components/SidebarProjects";
@@ -4109,6 +4109,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
       data-floating-chat={floatingChat || undefined}
       data-workspace-chrome="compact"
       data-task-desktop={Boolean(desktopBridge())}
+      data-window-buttons={desktopHidesTitleBar() ? "darwin" : undefined}
       data-testid="shell-root"
       data-ready={shellReady}
       className={`${marketplaceView ? "rk-task-shell rk-market-shell" : usageView ? "rk-task-shell rk-usage-shell" : scheduleView ? "rk-task-shell rk-schedule-shell" : taskView ? "rk-task-shell" : ""} relative flex h-full min-h-0 min-w-0 overflow-hidden bg-background text-foreground/90 [&[data-resizing-sidebar]_*[data-slot=sidebar-gap]]:transition-none [&[data-resizing-sidebar]_*[data-slot=sidebar-container]]:transition-none`}

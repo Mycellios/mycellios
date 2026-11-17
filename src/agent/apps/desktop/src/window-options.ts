@@ -9,6 +9,14 @@ export function warmWindowTtlMs(value: string | undefined) {
     : DEFAULT_WARM_WINDOW_TTL_MS;
 }
 
+/**
+ * The macOS window buttons are drawn over the page, so their position is a layout value. macOS
+ * spaces the three 13px buttons 23px apart, so the group is 59px wide: x 12 keeps it inside the
+ * 72px page rail (`--rk-rail-width` on macOS), and y 19 puts its centre line on the centre of the
+ * 51px top row, (51 - 13) / 2. Change these with that rail and row.
+ */
+export const MAC_WINDOW_BUTTON_INSET = { x: 12, y: 19 } as const;
+
 function windowChrome(platform: NodeJS.Platform) {
   const mac = platform === "darwin";
   return {
@@ -19,10 +27,10 @@ function windowChrome(platform: NodeJS.Platform) {
     show: true,
     autoHideMenuBar: true,
     // Windows and Linux use the standard OS title bar, above the page.
-    // macOS keeps inset traffic lights over the page.
+    // macOS hides it and draws the window buttons over the page, as OpenBot does.
     frame: true,
-    titleBarStyle: mac ? ("hiddenInset" as const) : undefined,
-    trafficLightPosition: mac ? { x: 16, y: 16 } : undefined,
+    titleBarStyle: mac ? ("hidden" as const) : undefined,
+    trafficLightPosition: mac ? MAC_WINDOW_BUTTON_INSET : undefined,
   };
 }
 

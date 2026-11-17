@@ -191,12 +191,12 @@ export function MicoTaskTabs({ botId, taskThreadId, rpc, onSelect, scope, inMenu
       }} />;
   }
 
-  return <nav ref={nav} aria-label={t`Conversations`} className={inMenu ? "min-w-0" : "app-no-drag flex min-w-0 flex-1 items-center gap-1 md:ms-1 md:border-s md:border-border md:ps-3"}>
+  return <nav ref={nav} aria-label={t`Conversations`} className={inMenu ? "min-w-0" : "flex min-w-0 flex-1 items-center gap-1 md:ms-1 md:border-s md:border-border md:ps-3"}>
     {!inMenu ? <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
       {displayedTabs.map(tab => (
         <ContextMenu key={tab.threadId}>
         <ContextMenuTrigger render={<div />} data-active={tab.threadId === taskThreadId ? "" : undefined}
-          className="group/task-tab relative flex h-7 min-w-0 max-w-64 flex-1 items-center overflow-hidden rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[active]:bg-muted data-[active]:text-foreground">
+          className="app-no-drag group/task-tab relative flex h-7 min-w-0 max-w-64 flex-1 items-center overflow-hidden rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground data-[active]:bg-muted data-[active]:text-foreground">
           {renameTarget?.threadId === tab.threadId && !threadPickerOpen ? titleEditor() : <Button ref={tab.threadId === taskThreadId ? activeTab : undefined} size="sm" variant="ghost"
             className="h-full min-w-0 flex-1 shrink justify-start gap-1.5 overflow-hidden bg-transparent px-2 font-normal hover:bg-transparent"
             aria-current={tab.threadId === taskThreadId ? "page" : undefined} title={tab.title || t`New conversation`}
