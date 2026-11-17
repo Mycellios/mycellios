@@ -155,10 +155,12 @@ function countContextImages(context: { messages?: unknown[] }): number {
   return count;
 }
 
+// Independent fixtures must not share the runtime's per-chat compaction breaker.
+let fixtureThread = 0;
 function request(fallbackModels: AgentRunRequest["model"][] = []): AgentRunRequest {
   return {
     botId: "bot",
-    threadId: "thread",
+    threadId: `fixture-thread-${++fixtureThread}`,
     runId: "run",
     prompt: "Write the requested result",
     instructions: "Use tools when useful.",
