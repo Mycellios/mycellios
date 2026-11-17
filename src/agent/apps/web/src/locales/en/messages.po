@@ -13103,3 +13103,15 @@ msgstr "Back to your team"
 
 msgid "Copy diagnostics"
 msgstr "Copy diagnostics"
+
+msgid "Copy debug link"
+msgstr "Copy debug link"
+
+msgid "Debug link copied"
+msgstr "Debug link copied"
+
+msgid "Could not copy the link. Try again."
+msgstr "Could not copy the link. Try again."
+
+msgid "Retry copy"
+msgstr "Retry copy"

@@ -247,6 +247,7 @@ import { useChatHistory } from "./shell/use-chat-history";
 import { ChatHeaderModel, type ChatModelPatch } from "./shell/chat-header-model";
 import { ChatHeaderTools, ChatToolsPanel, MobileChatActions } from "./shell/chat-tools-panel";
 import {OpenMycelliosDev} from "../components/OpenMycelliosDev";
+import { DeveloperContextLink } from "../components/DeveloperContextLink";
 import {DevelopmentIdentity} from "../components/DevelopmentIdentity";
 import { VoiceConversation } from "../components/call/VoiceConversation";
 import { ProviderQuota } from "../components/ProviderQuota";
@@ -4405,6 +4406,11 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
                 </span>
               </span>
             </Button>}
+            {active && !inGroup ? <DeveloperContextLink
+              key={`debug-link:${userId}:${currentSpaceId}:${active.id}:${activeSnapshot?.threadId}`}
+              botId={active.id} spaceId={currentSpaceId} threadId={activeSnapshot?.threadId}
+              taskThreadId={taskScope?.taskThreadId} runId={activeSnapshot?.run?.id}
+            /> : null}
             {!isMobileSidebar ? renderTaskTabs() : null}
             <DevelopmentIdentity />
             <div className="app-no-drag ms-auto flex shrink-0 items-center gap-1">
