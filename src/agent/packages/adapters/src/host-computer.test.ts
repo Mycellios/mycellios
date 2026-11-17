@@ -534,6 +534,13 @@ it.each([1, 5 * 60_000, 15 * 60_000, 60 * 60_000])(
   },
 );
 
+it("keeps native transport open throughout an adaptive search without changing its initial deadline", () => {
+  expect(hostComputerDeadlineMs({ method: "execute", botId: "bot", command: {
+    argv: ["rg", "-n", "pattern", "src"], timeoutMs: 45_000,
+    searchProgress: { maxMs: 180_000, roots: ["src"] },
+  } })).toBe(210_000);
+});
+
 it.each([
   [429, undefined, "queue is full"],
   [413, undefined, "too large"],

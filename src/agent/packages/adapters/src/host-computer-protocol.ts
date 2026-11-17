@@ -19,6 +19,7 @@ const command = z.object({
   env: z.record(z.string(), z.string()).optional(),
   unsetEnv: z.array(z.string()).optional(),
   timeoutMs: z.number().int().positive().optional(),
+  searchProgress: z.object({ maxMs: z.number().int().positive().max(180_000), roots: z.array(z.string().min(1).max(4096)).min(1).max(8) }).optional(),
 });
 const directories = z.discriminatedUnion("action", [
   z.object({ action: z.literal("ensure"), paths: z.array(z.string().max(4096)).max(256) }),
@@ -85,6 +86,6 @@ export type HostComputerFrame<T> =
 export function hostComputerDeadlineMs(request: HostComputerRequest) {
   if (request.method === "agentRun") return 24 * 60 * 60_000;
   return request.method === "execute"
-    ? boundedSandboxCommandTimeoutMs(request.command.timeoutMs) + 30_000
+    ? Math.max(boundedSandboxCommandTimeoutMs(request.command.timeoutMs), request.command.searchProgress?.maxMs ?? 0) + 30_000
     : 10 * 60_000;
 }

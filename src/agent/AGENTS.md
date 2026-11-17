@@ -1810,7 +1810,13 @@
 
 - Durable native command receipts preserve identity, not an implicit one-hour timeout.
   Shell defaults retain the configured bounded budget. Recognized read-only search
-  pipelines use at most 45 seconds; a timeout returns failure to the same turn.
+  pipelines start at 45 seconds. Identified project scopes may extend only on new
+  result locations, with 45 seconds idle and 180 seconds total at most. Whole-home,
+  drive-root and parent-tree searches are refused before execution. Native hosts
+  enforce the owned process deadline; Docker uses an image-owned Python watchdog
+  inside the existing run marker. Older native hosts safely keep the initial limit.
+  A timeout returns failure to the same turn.
   Narrow paths before another search, never replay an uncertain command automatically.
   Preserve explicit build/install deadlines, command journals and Credit admission.
-  Verify shell-command-budget, shell-command-stream and native-command-recovery tests.
+  Verify shell-command-budget, search-progress, adaptive-search-runtime,
+  shell-command-stream and native-command-recovery tests.

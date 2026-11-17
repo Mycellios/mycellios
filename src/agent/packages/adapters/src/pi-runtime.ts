@@ -453,7 +453,10 @@ export class PiAgentRuntime implements AgentRuntime {
             ? request.instructions || fallbackPrompt
             : restored?.systemPrompt ?? (request.allowSilentEmpty || request.script
               ? fallbackPrompt : withLiveTurnNarration(fallbackPrompt));
-        const withTone = withConversationStyle(baseSystemPrompt);
+        // Internal summaries already have explicit instructions and a tightly
+        // measured input budget. User-facing style must not consume that reserve.
+        const withTone = request.usageOperationKind === "compaction"
+          ? baseSystemPrompt : withConversationStyle(baseSystemPrompt);
         const systemPrompt =
           toolDefs.some((tool) => tool.name === "edit_file") && !withTone.includes("File changes:")
             ? `${withTone}\n\n${FILE_EDIT_GUIDANCE}`

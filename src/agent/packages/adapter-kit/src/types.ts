@@ -113,8 +113,10 @@ export interface CommandRequest {
   /** Remove these variables after all environment overlays, including inherited values. */
   unsetEnv?: string[];
   pty?: boolean;
-  /** Maximum wall-clock runtime before the command and its descendants are terminated. */
+  /** Runtime budget; also the idle budget when searchProgress is present. */
   timeoutMs?: number;
+  /** Optional bounded search extension, driven only by new result locations. */
+  searchProgress?: { maxMs: number; roots: string[] };
 }
 
 export type ProcessEvent =
