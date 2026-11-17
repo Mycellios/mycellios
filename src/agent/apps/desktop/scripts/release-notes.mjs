@@ -6,6 +6,7 @@ import path from "node:path";
 
 /** The groups a release section may have, in the order a release writes them. */
 export const RELEASE_GROUPS = [
+  "Breaking changes",
   "Security",
   "Added",
   "Changed",
@@ -175,17 +176,20 @@ function collectGroups(body, groups) {
   return stray;
 }
 
+/** A change that existing installations cannot take without manual work, or that drops support. */
+const MAJOR_GROUP = "Breaking changes";
 /** Groups that hold only corrections. A release with nothing else is a patch. */
 const PATCH_GROUPS = ["Fixed", "Security"];
 
 /**
  * The increment that the automatic release picks for `bodies` (the Unreleased section and the
- * fragments): undefined when nothing waits, patch when every item is a fix or a security fix,
- * minor otherwise. A major version is never automatic.
+ * fragments): undefined when nothing waits, major when any item is a breaking change, patch when
+ * every item is a fix or a security fix, minor otherwise.
  */
 export function chooseIncrement(bodies) {
   const groups = [...assembleSection(bodies).matchAll(/^### (.+)$/gm)].map((match) => match[1]);
   if (groups.length === 0) return undefined;
+  if (groups.includes(MAJOR_GROUP)) return "major";
   return groups.every((group) => PATCH_GROUPS.includes(group)) ? "patch" : "minor";
 }
 

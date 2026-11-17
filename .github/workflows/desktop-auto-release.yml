@@ -1,9 +1,9 @@
 name: Desktop auto release
 
 # Once a day, when release notes wait in src/agent/changelog.d or under Unreleased, choose the
-# next Desktop version (patch when every item is Fixed or Security, minor otherwise, never
-# major), land it on main through a pull request and start the installer release. Nobody picks
-# the version by hand. docs/DEVELOPMENT.md#desktop-release-notes
+# next Desktop version (major for any Breaking changes item, patch when every item is Fixed
+# or Security, minor otherwise), land it on main through a pull request and start the
+# installer release. Nobody picks the version by hand. docs/DEVELOPMENT.md#desktop-release-notes
 on:
   schedule:
     - cron: "0 5 * * *"

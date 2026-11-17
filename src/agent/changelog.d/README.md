@@ -18,3 +18,8 @@ The daily `desktop-auto-release` workflow (or `npm run release:patch`, `release:
 version section of `CHANGELOG.md`, in the order that the pull requests merged, and deletes the files.
 The `changelog` workflow checks each file. A pull request with no change that a user or self-hoster
 can see gets the `no-changelog` label.
+
+The groups decide the next version: an item under `### Breaking changes` makes it a major
+version, notes only under `### Fixed` or `### Security` make it a patch, anything else a minor
+version. Use `### Breaking changes` only when an existing installation cannot take the release
+without manual work, or when support for a platform, protocol or older server is dropped.

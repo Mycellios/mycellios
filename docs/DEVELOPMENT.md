@@ -901,9 +901,9 @@ change the same lines. The version bump moves the items of every file into
 `## [Unreleased]` go first.
 
 - Put each change that a user or self-hoster can see in one of these groups:
-  `### Security`, `### Added`, `### Changed`, `### Deprecated`, `### Removed`,
-  `### Fixed`, `### Self-host upgrade notes`, `### Messaging upgrade notes`. The
-  release writes them in that order.
+  `### Breaking changes`, `### Security`, `### Added`, `### Changed`,
+  `### Deprecated`, `### Removed`, `### Fixed`, `### Self-host upgrade notes`,
+  `### Messaging upgrade notes`. The release writes them in that order.
 - Write one `- ` item for each change, for a user and not for a developer. Say
   what changed. For a fix, say what happened before.
 - Leave out refactors, tests, CI and internal tooling. Such a pull request gets
@@ -913,10 +913,12 @@ Nobody chooses the version by hand. Every day at 05:00 UTC, and on a manual
 run, `.github/workflows/desktop-auto-release.yml` releases the notes that wait
 in `changelog.d` and under `## [Unreleased]`:
 
+- **major** when any waiting item is under `### Breaking changes`: an existing
+  installation cannot take the release without manual work (data it cannot
+  read, a required new setting, signing in again), or support for a platform,
+  protocol or older server is dropped. From 0.x the first one is 1.0.0;
 - **patch** when every waiting item is under `### Fixed` or `### Security`;
-- **minor** when any item is under another group (a feature, a change, a
-  removal or upgrade notes);
-- **major** never automatically; it stays a deliberate `npm run release:major`;
+- **minor** otherwise (a feature, a change, a removal or upgrade notes);
 - nothing when no notes wait.
 
 It runs `node apps/desktop/scripts/prepare-release.mjs auto` in `src/agent`, which

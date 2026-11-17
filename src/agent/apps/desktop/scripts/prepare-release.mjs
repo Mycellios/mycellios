@@ -3,8 +3,8 @@
 //   node apps/desktop/scripts/prepare-release.mjs auto   (desktop-auto-release.yml, every day)
 //   npm run release:patch | release:minor | release:major   (from src/agent, by hand)
 //
-// `auto` picks patch when every waiting item is under Fixed or Security, minor otherwise, and
-// does nothing when no notes wait. The new section holds the items still written under
+// `auto` picks major when any waiting item is under Breaking changes, patch when every item is
+// under Fixed or Security, minor otherwise, and does nothing when no notes wait. The new section holds the items still written under
 // Unreleased, then each changelog.d fragment in the order that its pull request merged. The
 // fragments are deleted once the section holds them. Preparation only: merging the version
 // change to main is what publishes the installers.

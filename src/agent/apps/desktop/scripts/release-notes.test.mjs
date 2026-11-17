@@ -133,12 +133,16 @@ test("prepare changes nothing when there are no notes", async () => {
   }
 });
 
-test("the automatic release picks patch only for fixes, minor otherwise, and nothing when empty", () => {
+test("the automatic release picks major for breaking changes, patch for fixes only, minor otherwise", () => {
   assert.equal(chooseIncrement(["", "\n"]), undefined);
   assert.equal(chooseIncrement(["### Fixed\n\n- A fix.", "### Security\n\n- A patch."]), "patch");
   assert.equal(chooseIncrement(["### Fixed\n\n- A fix.", "### Added\n\n- A feature."]), "minor");
   assert.equal(chooseIncrement(["### Changed\n"]), undefined);
   assert.equal(chooseIncrement(["### Self-host upgrade notes\n\n- Set X."]), "minor");
+  assert.equal(
+    chooseIncrement(["### Fixed\n\n- A fix.", "### Breaking changes\n\n- Sign in again."]),
+    "major",
+  );
 });
 
 test("auto releases a fix-only patch and does nothing when no notes wait", async () => {
