@@ -1807,6 +1807,9 @@
   download links in update settings, not stacked beneath the sidebar action.
   Preserve native draft/call/work guards and explicit install consent; waiting
   for those guards must not cover the chat with a full-screen update dialog.
+  As in OpenBot, an explicit Restart uses the checkpointed forceInstall when
+  native supports it; never park the row on a local-tasks wait. Only unsaved
+  drafts/calls and the automatic grace period offer Later.
 
 - Durable native command receipts preserve identity, not an implicit one-hour timeout.
   Shell defaults retain the configured bounded budget. Recognized read-only search

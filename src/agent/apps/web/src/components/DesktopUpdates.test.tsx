@@ -103,12 +103,30 @@ it("retries a staged installer after a handoff failure instead of only checking 
   expect(gate()).toBeNull();
   expect(host.querySelector("main")?.textContent).toBe("Chat draft");
 });
-it("waits for unsaved work and preserves explicit checkpointed restart of native tasks", async () => {
+it("offers the checkpointed restart instead of parking the sidebar on local tasks", async () => {
   fixture.safe = false;
   fixture.state = { ...fixture.state, installPending: true, supportsForceRestart: true, restartMode: "whenIdle", waitingFor: "local_work" };
   await render(); expect(gate()).toBeNull();
-  expect([...host.querySelectorAll("button")].find(b => b.textContent === "Later")?.disabled).toBe(false);
+  const notice = host.querySelector("aside.myc-update-notice")!;
+  expect(notice.textContent).not.toContain("Update waiting");
+  expect([...notice.querySelectorAll("button")].find(b => b.textContent === "Later")).toBeUndefined();
   fixture.safe = true; await refresh();
+  await act(async () => notice.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.click());
+  expect(bridge.forceInstall).toHaveBeenCalledOnce(); expect(bridge.install).not.toHaveBeenCalled();
+  expect(notice.textContent).toContain("Saving work and restarting…");
+  expect(notice.querySelector("button")?.disabled).toBe(true);
+});
+it("restarts at once from the sidebar when native can checkpoint local work", async () => {
+  fixture.state = { ...fixture.state, supportsForceRestart: true };
+  await render();
+  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.click());
+  expect(bridge.forceInstall).toHaveBeenCalledOnce(); expect(bridge.install).not.toHaveBeenCalled();
+  expect(host.textContent).not.toContain("Update waiting");
+  expect(host.textContent).toContain("Saving work and restarting…");
+  expect(gate()).toBeNull(); expect(host.querySelector("main")?.textContent).toBe("Chat draft");
+});
+it("keeps the explicit Restart now in update settings", async () => {
+  fixture.state = { ...fixture.state, installPending: true, supportsForceRestart: true, restartMode: "whenIdle", waitingFor: "local_work" };
   await act(async () => root.render(<DesktopUpdatesProvider><DesktopUpdateSection /></DesktopUpdatesProvider>));
   await act(async () => [...host.querySelectorAll("button")].find(b => b.textContent === "Restart now")!.click());
   expect(bridge.forceInstall).toHaveBeenCalledOnce();
@@ -129,9 +147,9 @@ it("hands a package-manager update to the system installer instead of announcing
   expect(bridge.install).toHaveBeenCalledOnce();
 });
 
-it("shows an accepted idle restart and cancels its native controller", async () => {
+it("shows an accepted idle restart and cancels its native controller without a forced restart", async () => {
   bridge.install.mockImplementationOnce(async () => (fixture.state = { ...fixture.state,
-    relaunchPending: true, relaunchWaitingFor: "local_work", supportsForceRestart: true }));
+    relaunchPending: true, relaunchWaitingFor: "local_work" }));
   await render();
   await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Install update"]')!.click());
   expect(host.textContent).toContain("Update waiting");

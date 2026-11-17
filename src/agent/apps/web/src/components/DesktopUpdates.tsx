@@ -79,7 +79,7 @@ function useDesktopUpdates() {
     if ((action === "install" || action === "forceInstall") && desktopUpdateHasCall()) endDesktopUpdateCall();
     if (action === "check") setConfirmedCheck(null);
     try {
-      if (action === "install" && canRestartDesktop()) await playUpdateMycelium(document.activeElement);
+      if ((action === "install" || action === "forceInstall") && canRestartDesktop()) await playUpdateMycelium(document.activeElement);
       const method = action === "cancelInstall" && state?.relaunchPending ? "cancelRestart" : action;
       const result = await bridge[method]?.();
       if (!result) throw new Error("Update action is unavailable");
@@ -140,8 +140,11 @@ export function useSidebarUpdate() {
     state: updates?.state ?? null,
     callActive: updates?.callActive ?? false,
     error: updates?.message ?? null,
+    forceAvailable: updates?.forceAvailable ?? false,
+    // Like OpenBot, Restart restarts now: native checkpoints owned local work and
+    // only in-memory drafts or a call still hold it back.
     install: () => {
-      void updates?.act(updates.state?.installPending && updates.forceAvailable ? "forceInstall" : "install");
+      void updates?.act(updates.forceAvailable ? "forceInstall" : "install");
     },
     download: () => { void updates?.act("download"); },
     check: () => { void updates?.act("check"); },
@@ -174,10 +177,18 @@ export function DesktopSidebarUpdate() {
   const failed = state.phase === "error" || Boolean(update.error);
   const percent = typeof state.percent === "number" && Number.isFinite(state.percent)
     ? Math.max(0, Math.min(100, Math.round(state.percent))) : null;
-  const waiting = Boolean(state.installPending || state.automaticRestartAt);
+  const pending = Boolean(state.installPending || state.automaticRestartAt);
+  const restarting = state.installPending === true && state.restartMode === "now" && state.waitingFor !== "unsaved_work";
+  // A restart waiting only for local tasks is not a state to park the user in: offer the same
+  // checkpointed Restart instead of a waiting label. Unsaved drafts/calls and the automatic grace
+  // period stay postponable, since restarting through them would lose work or surprise the user.
+  const waitingOnTasks = pending && !restarting && !state.automaticRestartAt &&
+    state.waitingFor !== "unsaved_work" && update.forceAvailable;
+  const waiting = pending && !restarting && !waitingOnTasks;
   const handedOff = state.handoffComplete === true;
   const label = failed && !handedOff ? update.error ?? t`Update needs attention`
     : handedOff ? update.error ?? t`Update ready to install`
+    : restarting ? t`Saving work and restarting…`
     : state.automaticRestartAt ? t`Updating shortly`
     : waiting ? state.waitingFor === "unsaved_work" ? t`Save changes or finish the call to restart.` : t`Update waiting`
     : ready ? t`Update ready to install` : t`New update available`;
@@ -190,8 +201,8 @@ export function DesktopSidebarUpdate() {
     : t`Download`;
   return <UpdateNotice actionRef={actionRef} label={label} actionLabel={actionLabel}
     ready={ready} failed={failed && !handedOff} deferred={waiting}
-    busy={waiting ? update.cancelBusy : update.busy || downloading}
-    disabled={waiting ? update.cancelBusy : update.busy || downloading || handedOff}
+    busy={waiting ? update.cancelBusy : restarting || update.busy || downloading}
+    disabled={waiting ? update.cancelBusy : restarting || update.busy || downloading || handedOff}
     progress={downloading ? percent : undefined} progressLabel={t`Download progress`}
     action={action} onAction={waiting ? update.cancel : ready ? update.install : failed ? update.check : update.download}
   />;
@@ -216,7 +227,7 @@ export function DesktopUpdateSection() {
         <Button
           variant="outline"
           disabled={busy || (state.installPending && (!forceAvailable || state.restartMode === "now")) || downloading || state.phase === "checking"}
-          onClick={() => void act(state.installPending && forceAvailable ? "forceInstall" : ready ? "install" : "check")}
+          onClick={() => void act(ready && forceAvailable ? "forceInstall" : ready ? "install" : "check")}
         >
           {state.installAction === "system-installer" && ready && updates.callActive ? <Trans>End call to update</Trans>
             : state.installAction === "system-installer" && ready ? <Trans>Open installer</Trans>
