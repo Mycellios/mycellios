@@ -26,7 +26,7 @@ it("identifies callback drain expiry after the engine ends, without replaying it
   const started=vi.fn();
   const runtime:AgentRuntime={describe,abort:vi.fn(),async *run(input){started();void input.onCheckpoint!(()=>"fixture checkpoint","call").catch(()=>undefined);}};
   const host=new DesktopAgentHost(runtime),peer=new DesktopAgentRpc(()=>{});
-  const stream=host.run("session",peer.encode({...request(),onCheckpoint:async()=>{}}),"bot","run",context());
+  const stream=host.run("session",peer.encode({...request(),onCheckpoint:async()=>{}}),"bot","run",context())[Symbol.asyncIterator]();
   try {
     expect((await stream.next()).value?.kind).toBe("rpc");
     await vi.waitFor(()=>expect(timeout).toHaveBeenCalledWith(30_000));
@@ -37,17 +37,17 @@ it("identifies callback drain expiry after the engine ends, without replaying it
     expect(parseDesktopDiagnostic((peer.decode(frame.value) as Error).message)).toEqual({code:"callback_drain_timeout",phase:"callback",stage:"callback_drain"});
     expect((await stream.next()).done).toBe(true);expect(started).toHaveBeenCalledOnce();
     expect(host.hasSession("session","bot","run")).toBe(false);
-  } finally {await stream.return();peer.close();}
+  } finally {await stream.return?.();peer.close();}
 });
 
 it("does not misclassify an explicit Stop as callback timeout or retry the turn",async()=>{
   const controller=new AbortController();
   const runtime:AgentRuntime={describe,abort:vi.fn(),async *run(input){void input.onCheckpoint!(()=>"fixture checkpoint","call").catch(()=>undefined);}};
   const host=new DesktopAgentHost(runtime),peer=new DesktopAgentRpc(()=>{});
-  const stream=host.run("session",peer.encode({...request(),onCheckpoint:async()=>{}}),"bot","run",context(controller.signal));
+  const stream=host.run("session",peer.encode({...request(),onCheckpoint:async()=>{}}),"bot","run",context(controller.signal))[Symbol.asyncIterator]();
   try {
     expect((await stream.next()).value?.kind).toBe("rpc");controller.abort();
     expect((await stream.next()).done).toBe(true);
     expect(host.hasSession("session","bot","run")).toBe(false);
-  } finally {await stream.return();peer.close();}
+  } finally {await stream.return?.();peer.close();}
 });

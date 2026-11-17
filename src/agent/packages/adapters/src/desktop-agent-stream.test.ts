@@ -21,7 +21,7 @@ it.each([
   const response = new Response(JSON.stringify({ error }) + "\n", {
     headers: { "x-mycellios-desktop-operation": id },
   });
-  const failure = await collect(response).catch((e) => e as Error);
+  const failure = await collect(response).then(() => { throw new Error("Expected the stream to reject"); }, (e: unknown) => { if (!(e instanceof Error)) throw e; return e; });
   expect(parseDesktopDiagnostic(failure.message)).toEqual({
     code: desktopLegacyFailureCode(error),
     phase: "callback",
@@ -42,7 +42,7 @@ it("retains the native stage without trusting an error's text or forged operatio
       }) + "\n",
       { headers: { "x-mycellios-desktop-operation": id } },
     ),
-  ).catch((e) => e as Error);
+  ).then(() => { throw new Error("Expected the stream to reject"); }, (e: unknown) => { if (!(e instanceof Error)) throw e; return e; });
   expect(parseDesktopDiagnostic(failure.message)).toMatchObject({
     code: "native_transport_interrupted",
     stage: "result_ack",
@@ -61,7 +61,7 @@ it("requires a terminal frame and differentiates truncation from malformed frame
     ["null\n", "invalid_frame"],
     ['{"done":true}\n{"value":1}\n', "invalid_frame"],
   ] as const) {
-    const error = await collect(new Response(data)).catch((e) => e as Error);
+    const error = await collect(new Response(data)).then(() => { throw new Error("Expected the stream to reject"); }, (e: unknown) => { if (!(e instanceof Error)) throw e; return e; });
     expect(parseDesktopDiagnostic(error.message)?.code).toBe(code);
   }
   await expect(collect(new Response('{"value":1}\n{"done":true}\n'))).resolves.toEqual([1]);
@@ -77,7 +77,7 @@ it("preserves aborted and updating semantics without inferring success or replay
 it("records a rejected dispatch separately from an already started run", async () => {
   const error = await collect(
     new Response(null, { status: 429, headers: { "x-mycellios-desktop-error": "desktop_busy" } }),
-  ).catch((e) => e as Error);
+  ).then(() => { throw new Error("Expected the stream to reject"); }, (e: unknown) => { if (!(e instanceof Error)) throw e; return e; });
   expect(parseDesktopDiagnostic(error.message)).toEqual({
     code: "desktop_busy",
     phase: "callback",
@@ -85,7 +85,7 @@ it("records a rejected dispatch separately from an already started run", async (
   });
 });
 it("does not invent a disconnection when an upstream rejection has no known cause",async()=>{
-  const error=await collect(new Response("private response",{status:503})).catch(e=>e as Error);
+  const error=await collect(new Response("private response",{status:503})).then(() => { throw new Error("Expected the stream to reject"); }, (e: unknown) => { if (!(e instanceof Error)) throw e; return e; });
   expect(parseDesktopDiagnostic(error.message)).toEqual({code:"relay_stream_failure",phase:"callback",stage:"dispatch"});
   expect(error.message).not.toContain("private response");
 });
