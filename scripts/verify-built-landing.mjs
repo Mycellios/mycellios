@@ -38,7 +38,7 @@ try{
     assert.equal(await page.locator('.distributed-earn-node').count(),49);
     await page.getByRole('button',{name:'Choose a download platform',exact:true}).click();
     const menu=page.locator('#agent-download-platforms');await menu.waitFor();
-    for(const [name,id] of [['Windows','windows-x64'],['Mac · Apple Silicon','macos-arm64'],['Mac · Intel','macos-x64'],['Linux','linux-x64'],['Fedora','fedora-x64']]){
+    for(const [name,id] of [['Windows','windows-x64'],['Mac · M1 or newer','macos-arm64'],['Mac · Intel','macos-x64'],['Linux','linux-x64'],['Fedora','fedora-x64']]){
       const link=menu.getByRole('link',{name:new RegExp('^'+name)});
       assert.equal(await link.count(),1,name);assert.equal(await link.locator('svg').count(),2,name);
       assert.equal(await link.getAttribute('href'),`/downloads/desktop/latest/${id}`,'An already open page must resolve the newest verified installer');
