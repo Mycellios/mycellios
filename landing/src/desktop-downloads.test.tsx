@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { isDesktopDownloadCatalog } from "../../src/contracts/desktop-downloads";
-import { DesktopDownloads } from "./DesktopDownloads";
+import { DesktopDownloads, detectInstaller } from "./DesktopDownloads";
 
 const catalog = () => ({
   schema: "mycellios-desktop-downloads/1", version: "0.3.9", runtimeVersion: "0.2.95",
@@ -18,6 +18,20 @@ describe("Desktop downloads", () => {
     const html=renderToStaticMarkup(<DesktopDownloads />);
     expect(html).toContain('Download for Mac (Intel)');expect(html).toContain('Download for Mac (Apple Silicon)');expect(html).toContain('macOS 13 or later');
     expect(html).not.toContain('Intel Macs are not supported');
+  });
+  it("recommends the visitor's installer without jargon-only Mac choices", async () => {
+    const nav = (userAgent: string, extra: Record<string, unknown> = {}) => ({ userAgent, platform: "", maxTouchPoints: 0, ...extra }) as unknown as Navigator;
+    const mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)";
+    expect(await detectInstaller(nav("Mozilla/5.0 (Windows NT 10.0; Win64; x64)"))).toBe("windows-x64");
+    expect(await detectInstaller(nav(mac, { userAgentData: { platform: "macOS", getHighEntropyValues: async () => ({ architecture: "arm" }) } }))).toBe("macos-arm64");
+    expect(await detectInstaller(nav(mac, { userAgentData: { platform: "macOS", getHighEntropyValues: async () => ({ architecture: "x86" }) } }))).toBe("macos-x64");
+    expect(await detectInstaller(nav(mac, { platform: "MacIntel" }))).toBe("macos-arm64");
+    expect(await detectInstaller(nav(mac, { platform: "MacIntel", maxTouchPoints: 5 }))).toBe("");
+    expect(await detectInstaller(nav("Mozilla/5.0 (Linux; Android 14)"))).toBe("");
+    expect(await detectInstaller(nav("Mozilla/5.0 (X11; Fedora; Linux x86_64)"))).toBe("fedora-x64");
+    const html = renderToStaticMarkup(<DesktopDownloads />);
+    expect(html).toContain(">M1 or newer<"); expect(html).toContain("About This Mac");
+    expect(html).not.toMatch(/<details[^>]* open/);
   });
   it("waits for the release catalog before offering the Fedora download", () => {
     const html = renderToStaticMarkup(<DesktopDownloads />);

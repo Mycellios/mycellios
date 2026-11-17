@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Apple, ArrowDownToLine, ChevronDown, Monitor, Smartphone, Terminal } from "lucide-react";
 import { desktopLatestDownloadPath, isDesktopDownloadCatalog, type DesktopDownloadCatalog } from "../../../src/contracts/desktop-downloads";
 import { Button, Link, Text } from "../ui/primitives";
+import { detectInstaller, type InstallerId } from "../detect-installer";
 import "./agent-download-action.css";
 
 export const downloadPlatforms = [
   { id: "windows-x64", label: "Windows", detail: "Windows 10 / 11 · x64" },
-  { id: "macos-arm64", label: "Mac · Apple Silicon", detail: "M1 or later" },
-  { id: "macos-x64", label: "Mac · Intel", detail: "Intel processor" },
+  { id: "macos-arm64", label: "Mac · M1 or newer", detail: "Most Macs from 2021 on" },
+  { id: "macos-x64", label: "Mac · Intel", detail: "Macs from 2020 and earlier" },
   { id: "linux-x64", label: "Linux", detail: "Ubuntu / Debian · DEB" },
   { id: "fedora-x64", label: "Fedora", detail: "Linux · RPM" },
 ] as const;
@@ -15,7 +16,7 @@ export const downloadPlatforms = [
 export function suggestedDownload(platform: string) {
   if (/android|iphone|ipad/i.test(platform)) return { id: undefined, label: undefined };
   if (/win/i.test(platform)) return { id: "windows-x64", label: "Windows" };
-  // A browser cannot reliably identify the Mac's CPU. Let the user choose it.
+  // The user agent alone cannot identify the Mac's CPU; detectInstaller adds hints.
   if (/mac/i.test(platform)) return { id: undefined, label: "Mac" };
   if (/linux/i.test(platform) && !/android/i.test(platform)) return { id: "linux-x64", label: "Linux" };
   return { id: undefined, label: undefined };
@@ -24,10 +25,12 @@ export function suggestedDownload(platform: string) {
 export function AgentDownloadAction() {
   const [catalog, setCatalog] = useState<DesktopDownloadCatalog | null>(null);
   const [suggested, setSuggested] = useState<ReturnType<typeof suggestedDownload>>({ id: undefined, label: undefined });
+  const [installer, setInstaller] = useState<InstallerId | "">("");
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null), toggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     setSuggested(suggestedDownload(navigator.userAgent));
+    void detectInstaller().then(id => setInstaller(id)).catch(() => {});
     let active = true;
     const controller = new AbortController();
     void fetch("/public/v1/desktop-downloads?include=macos-all", { cache: "no-store", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]) })
@@ -42,15 +45,21 @@ export function AgentDownloadAction() {
     document.addEventListener("pointerdown", outside); document.addEventListener("keydown", escape);
     return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape); };
   }, [open]);
-  const preferred = catalog?.packages.find(pkg => pkg.id === suggested.id);
+  // One click downloads this computer's installer, as on other desktop apps. On a
+  // Mac the other CPU stays one link away, because Safari cannot report Intel.
+  const preferredId = installer || suggested.id;
+  const preferred = preferredId === "fedora-x64" ? catalog?.fedora : catalog?.packages.find(pkg => pkg.id === preferredId);
+  const otherMac = preferred?.id === "macos-arm64" ? catalog?.packages.find(pkg => pkg.id === "macos-x64") : preferred?.id === "macos-x64" ? catalog?.packages.find(pkg => pkg.id === "macos-arm64") : undefined;
+  const buttonLabel = preferred?.id.startsWith("macos-") || suggested.label === "Mac" ? "macOS" : suggested.label;
   return <div className="agent-download" ref={root}>
     <div className="agent-download-split">
       <Link variant="primary" size="xl" className="agent-download-primary" href={preferred ? desktopLatestDownloadPath(preferred.id) : "/downloads/desktop"}>
-        <ArrowDownToLine size={19} aria-hidden="true" />Download{suggested.label ? ` for ${suggested.label}` : " Mycellios"}
+        <ArrowDownToLine size={19} aria-hidden="true" />Download{buttonLabel ? ` for ${buttonLabel}` : " Mycellios"}
       </Link>
       <Button ref={toggle} variant="primary" size="xl" className="agent-download-toggle" aria-label="Choose a download platform" aria-expanded={open} aria-controls="agent-download-platforms" onClick={() => setOpen(value => !value)}><ChevronDown size={17} aria-hidden="true" /></Button>
     </div>
-    {open && <div className="agent-download-menu" id="agent-download-platforms" aria-label="Download Mycellios">
+    {otherMac && !open ? <Link className="agent-download-alternative" href={desktopLatestDownloadPath(otherMac.id)}>{otherMac.id === "macos-x64" ? "Mac with Intel? Get the Intel version" : "Mac with M1 or newer? Get that version"}</Link> : null}
+    {open &&<div className="agent-download-menu" id="agent-download-platforms" aria-label="Download Mycellios">
       <Text className="agent-download-menu-title">Get Mycellios</Text>
       {downloadPlatforms.map(({ id, label, detail }) => {
         // Avoid capturing an uninitialised icon from a shared chunk at module load.
