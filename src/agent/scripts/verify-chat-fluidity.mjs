@@ -143,6 +143,27 @@ try {
     await expect.poll(() => chat.evaluate(el => el.scrollTop)).toBe(500);
     proof.scenarios.push(`${name}: no overflow; pending feedback; follow-tail respects history`);
   }
+  await page.setViewportSize({width:1280,height:900});
+  await page.context().grantPermissions(["clipboard-read","clipboard-write"],{origin:new URL(base).origin});
+  await open("?diagnostic");
+  const diagnostic = page.getByTestId("composer-error");
+  await expect(diagnostic).toContainText("Desktop could not confirm the result");
+  await page.locator("textarea").fill("Keep this unsent draft");
+  await diagnostic.locator("summary").click();
+  await expect(page.getByTestId("composer-error-retry")).toHaveCount(0);
+  await diagnostic.getByRole("button",{name:"Copy diagnostics",exact:true}).click();
+  await expect(diagnostic.getByRole("button",{name:"Copied",exact:true})).toBeVisible();
+  const copied=JSON.parse(await page.evaluate(()=>navigator.clipboard.readText()));
+  assert.equal(copied.schema,"mycellios-run-diagnostics/1");
+  assert.equal(copied.runId,"cm00000000000000000000002");
+  assert.equal(copied.operationId,"12345678-1234-4321-8765-123456789abc");
+  assert.equal(copied.code,"desktop_disconnected");
+  assert.equal(copied.outcome,"unconfirmed");
+  assert.equal(JSON.stringify(copied).includes("Keep this unsent draft"),false);
+  await expect(page.locator("textarea")).toHaveValue("Keep this unsent draft");
+  assert.equal(await page.evaluate(()=>window.__chatFlow.metrics().sends),0);
+  await page.screenshot({path:path.join(output,"desktop-interruption-diagnostics.png"),animations:"disabled"});
+  proof.scenarios.push("safe diagnostic copied from the real composer without sending, retrying or clearing its draft");
   assert.deepEqual(errors, []);
   assert.deepEqual(consoleErrors, []);
   proof.passed = true;
