@@ -13368,3 +13368,15 @@ msgstr "Volver a tu equipo"
 
 msgid "Copy diagnostics"
 msgstr "Copiar diagnóstico"
+
+msgid "Copy debug link"
+msgstr "Copiar enlace de depuración"
+
+msgid "Debug link copied"
+msgstr "Enlace de depuración copiado"
+
+msgid "Could not copy the link. Try again."
+msgstr "No se ha podido copiar el enlace. Inténtalo de nuevo."
+
+msgid "Retry copy"
+msgstr "Reintentar copia"

@@ -1554,6 +1554,12 @@
   stalls and keep diagnostic failures independent of execution. Verify the focused
   desktop-diagnostics, desktop-agent-stream, native relay, retry and composer tests.
 
+- Developer mode exposes a Copy link action beside the current Mico. Build its
+  URL from the deployment origin/base and owned bot, Space, conversation and run
+  IDs; reuse noticeSpace/task routing, never copy arbitrary query/fragment data
+  or issue a public sharing capability. Keep it hidden outside developer mode,
+  preserve authentication and verify developer-context-link and its copy control.
+
 - Never ask honors the account owner's standing approval choice for resumed and
   unattended work. Keep explicit action blocks, account/Space ownership, native
   computer consent and credential scope enforced. Outside content remains data,
