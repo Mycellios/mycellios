@@ -68,7 +68,7 @@ export function DesktopDownloads() {
       <Heading as="h1" id="desktop-title">Download Mycellios</Heading>
       <Text className="desktop-intro">Your agents and projects, in one app. Free for Mac, Windows and Linux, with an app for Android. Get the installer for this computer, or choose a system below.</Text>
       {suggested && recommended ? <div className="desktop-suggested">
-        <Link variant="primary" size="lg" href={desktopLatestDownloadPath(suggested.id)}><Download size={18} aria-hidden="true" />Download for {recommendedName(recommended)}</Link>
+        <Link variant="primary" size="lg" aria-label={`Download for ${recommendedName(recommended)}, recommended for this computer`} href={desktopLatestDownloadPath(suggested.id)}><Download size={18} aria-hidden="true" />Download for {recommendedName(recommended)}</Link>
         <Text className="desktop-suggested-detail">{recommended === "macos-arm64" ? "For Macs with an Apple chip (M1 or newer)" : recommended === "macos-x64" ? "For Macs with an Intel processor" : platformLabel(recommended)} · {formatSize(suggested.bytes)}</Text>
       </div> : null}
       {failed ? <div role="alert"><Text>Downloads could not be checked. Please try again.</Text><Button onClick={() => setAttempt(v => v + 1)}>Try again</Button></div> : null}
