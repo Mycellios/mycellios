@@ -26,7 +26,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useState } from "react";
-import { RELEASE_NOTES } from "../lib/release-notes";
+import { LATEST_RELEASE } from "../lib/release-notes";
 
 /** Shared by the desktop rail and mobile sidebar; no second release feed. */
 export function HelpMenu({
@@ -113,7 +113,7 @@ export function HelpMenu({
               <span className={copy}>
                 {t`What's new`}
                 <span className={detail}>
-                  {t`Release notes`} · {RELEASE_NOTES.version}
+                  {t`Release notes`} · {LATEST_RELEASE.version}
                 </span>
               </span>
             </DropdownMenuItem>

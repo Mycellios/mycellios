@@ -5,3 +5,9 @@
 export function t(strings: TemplateStringsArray, ...values: unknown[]): string {
   return String.raw(strings, ...values);
 }
+
+/** A lazily translated message: tests read its English text. */
+export function msg(strings: TemplateStringsArray, ...values: unknown[]): { id: string; message: string } {
+  const message = String.raw(strings, ...values);
+  return { id: message, message };
+}

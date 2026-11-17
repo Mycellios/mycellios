@@ -3,11 +3,11 @@ import {act,StrictMode,useState,type ReactNode} from 'react';
 import {createRoot} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 const mock=vi.hoisted(()=>({show:true,call:false,recording:'idle',ack:vi.fn()}));
-vi.mock('@lingui/react/macro',()=>({useLingui:()=>({i18n:{locale:'en'}}),Trans:({children}:{children:ReactNode})=>children}));
-vi.mock('../lib/client-build',()=>({CLIENT_BUILD:'20261102090000'}));
+vi.mock('@lingui/react/macro',()=>({useLingui:()=>({i18n:{locale:'en',_:(d:{message:string})=>d.message},t:(s:TemplateStringsArray,...v:unknown[])=>String.raw(s,...v)}),Trans:({children}:{children:ReactNode})=>children}));
+vi.mock('../lib/client-build',()=>({CLIENT_BUILD:'20261117180000'}));
 vi.mock('../lib/call-session',()=>({getSnapshot:()=>mock.call}));
 vi.mock('../lib/dictation',()=>({dictation:{get state(){return {status:mock.recording};}}}));
-vi.mock('../lib/release-notes',()=>({RELEASE_NOTES:{version:'2026.11.02',date:'2026-11-02'},observeRelease:()=>({previousBuild:'20261101164621',show:mock.show}),acknowledgeRelease:mock.ack,browserStorage:()=>null}));
+vi.mock('../lib/release-notes',async(original)=>{const actual=await original<typeof import('../lib/release-notes')>();return {...actual,observeRelease:()=>({previousBuild:actual.RELEASES[3]!.minimumBuild,releases:actual.RELEASES.slice(0,3),show:mock.show}),acknowledgeRelease:mock.ack,browserStorage:()=>null};});
 import {ReleaseNotes} from './ReleaseNotes';
 let host:HTMLDivElement;let root:ReturnType<typeof createRoot>;
 beforeEach(()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);vi.useFakeTimers();mock.show=true;mock.call=false;mock.recording='idle';mock.ack.mockClear();host=document.createElement('div');document.body.append(host);root=createRoot(host);});
@@ -34,4 +34,11 @@ it('does not reopen a manually acknowledged notice when a delayed call ends',asy
  mock.call=true;await mount();await act(async()=>host.querySelector('button')!.click());
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Got it')!.click());
  mock.call=false;await act(async()=>vi.advanceTimersByTime(3000));expect(document.querySelector('[role=dialog]')).toBeNull();
+});
+it('summarizes skipped versions like an update and links the full changelog',async()=>{
+ await mount();const dialog=document.querySelector('[data-testid=release-notes-dialog]')!;
+ expect(dialog.textContent).toContain('Updated from 0.3.58 to 0.3.61');
+ expect([...dialog.querySelectorAll('[data-release-group]')].map(n=>n.getAttribute('data-release-group'))).toEqual(['added','changed','fixed']);
+ expect(dialog.textContent).toContain('Searches adapt their time to the task.');
+ expect(dialog.querySelector('a[href="https://www.mycellios.com/changelog"]')).not.toBeNull();
 });
