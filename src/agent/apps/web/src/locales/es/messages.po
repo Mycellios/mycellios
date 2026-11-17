@@ -13380,3 +13380,11 @@ msgstr "No se ha podido copiar el enlace. Inténtalo de nuevo."
 
 msgid "Retry copy"
 msgstr "Reintentar copia"
+
+#: src/pages/Auth.tsx
+msgid "By continuing, you accept the <0>Terms of Service</0> and confirm you have read the <1>Privacy Policy</1>."
+msgstr "Al continuar, aceptas las <0>Condiciones del servicio</0> y confirmas que has leído la <1>Política de privacidad</1>."
+
+#: src/pages/Auth.tsx
+msgid "Create your account and get {SPORE_WELCOME_REWARD} Spore and 0.20 Credits."
+msgstr "Crea tu cuenta y recibe {SPORE_WELCOME_REWARD} Spore y 0,20 créditos."

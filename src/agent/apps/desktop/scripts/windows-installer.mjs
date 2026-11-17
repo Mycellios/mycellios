@@ -73,7 +73,7 @@ export async function prepareWindowsInstaller({ desktopRoot, runtimeMsi, runtime
       // Retain the standalone installer blockmap separately after packaging.
       ...(compact ? { differentialPackage: false } : {}), oneClick: false,
       allowToChangeInstallationDirectory: false, allowElevation: false, runAfterFinish: true,
-      perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios Desktop' },
+      perMachine: false, deleteAppDataOnUninstall: false, createDesktopShortcut: true, createStartMenuShortcut: true, shortcutName: 'Mycellios', uninstallDisplayName: 'Mycellios' },
     // This only writes standard updater metadata/block maps at build time.
     // The unsigned preview still installs through an explicit user action.
     publish: [{ provider: 'generic', url: 'https://www.mycellios.com/downloads/desktop/updates/windows' }],

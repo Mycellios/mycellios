@@ -97,7 +97,7 @@ function Fixture() {
     return <LanguageEntry><p>Language saved</p></LanguageEntry>;
   if (p.get("surface") === "auth")
     return (
-      <AuthFrame title="Sign in to Mycellios" onSubmit={(e) => e.preventDefault()}>
+      <AuthFrame title="Sign in" onSubmit={(e) => e.preventDefault()}>
         <Button className="w-full">Continue with Mycellios</Button>
       </AuthFrame>
     );

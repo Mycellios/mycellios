@@ -43,3 +43,14 @@ it("stops its own stack if the chat changes while the app opens",async()=>{
 it("normal app shutdown stops only the child it owns",async()=>{
   const app=launcher();await app.open(event,"mico");app.dispose();expect(child.send.mock.calls[0]?.[0]).toEqual({type:"mycellios-dev-stop"});
 });
+it("runs an owner-chosen checkout in place, like a worktree dev command",async()=>{
+  const checkout={root:path.resolve("fixture/checkout"),workspace:path.resolve("fixture/checkout/src/agent"),validate:mocks.sourceValidate};
+  const result=await new DevelopmentLauncher({directory:path.resolve("fixture/dev"),node:path.resolve("fixture/node"),npmCandidates:[],seeds:async()=>[],checkout:async()=>checkout,context:mocks.context}).open(event,"mico");
+  expect(result.opened).toBe(true);
+  expect(mocks.ensure).not.toHaveBeenCalled();
+  expect(mocks.bind).toHaveBeenCalledWith(checkout.root,mocks.sourceValidate);
+  const [,args,options]=mocks.spawn.mock.calls[0]!;
+  expect(args).toEqual([path.join(checkout.workspace,"scripts/desktop-dev.mjs")]);
+  expect(options.cwd).toBe(checkout.workspace);
+  expect(options.env.MYCELLIOS_DEV_HOME).toBeUndefined();
+});

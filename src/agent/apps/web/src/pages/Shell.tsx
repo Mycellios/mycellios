@@ -4241,7 +4241,7 @@ function SpaceShell({ taskScope, spaceId: initialSpaceId }: { taskScope?: TaskTh
           setCreateBotOpen={setCreateBotOpen}
           onCreateProject={() => { setBotsSidebarCollapsedPref(false); setQuery(""); if (activityMode) toggleActivityMode(); setCreatingProject(true); }}
         />
-        <div className={`rk-scroll flex min-h-0 flex-1 flex-col overflow-y-auto ${isMobileSidebar ? "gap-3 px-4 pb-4" : "scroll-fade-y scroll-fade-12 gap-0.5 px-2.5 pb-2.5"}`}>
+        <div className={`rk-scroll flex min-h-0 flex-1 flex-col overflow-y-auto ${isMobileSidebar ? "gap-1 px-3 pb-4" : "scroll-fade-y scroll-fade-12 gap-0.5 px-2.5 pb-2.5"}`}>
           {showSpaceSearch && !miniSidebar ? (
             <SpaceSearchResults
               hits={searchHits}
