@@ -13365,3 +13365,6 @@ msgstr "¿Qué rol se parece más?"
 #: src/pages/onboarding/team-copy.ts
 msgid "Back to your team"
 msgstr "Volver a tu equipo"
+
+msgid "Copy diagnostics"
+msgstr "Copiar diagnóstico"

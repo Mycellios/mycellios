@@ -13100,3 +13100,6 @@ msgstr "Which role is closest?"
 #: src/pages/onboarding/team-copy.ts
 msgid "Back to your team"
 msgstr "Back to your team"
+
+msgid "Copy diagnostics"
+msgstr "Copy diagnostics"

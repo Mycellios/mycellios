@@ -1,6 +1,7 @@
 import type { AdapterContext, AgentRunRequest, AgentRuntime } from "@rakazo/adapter-kit";
 import { getLogger } from "@rakazo/logging";
 import { NativeEventQueue } from "./native-agent-process.js";
+import { desktopDiagnosticMessage } from "@rakazo/contracts";
 import { DesktopAgentRpc } from "./desktop-agent-rpc.js";
 import type { AgentRpcMessage, AgentWire } from "./desktop-agent-rpc.js";
 
@@ -53,7 +54,10 @@ export class DesktopAgentHost {
           try {
             await rpc.drainOutgoing(AbortSignal.any([signal, AbortSignal.timeout(30_000)]));
           } catch {
-            if (!signal.aborted) throw Error("Desktop execution interrupted; check existing results before retrying");
+            if (!signal.aborted) {
+              getLogger().warn("desktop.agent.callback_drain_timeout", { "run.id": runId });
+              throw Error(desktopDiagnosticMessage({code:"callback_drain_timeout", phase:"callback", stage:"callback_drain"}));
+            }
           }
         }
       }

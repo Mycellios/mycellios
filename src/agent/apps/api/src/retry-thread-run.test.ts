@@ -3,6 +3,7 @@ import type { Actor } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import type { ThreadTarget } from "./thread-target.js";
 import { retryThreadRun } from "./retry-thread-run.js";
+import { desktopDiagnosticMessage } from "@rakazo/contracts";
 
 const actor = { userId: "owner", spaceId: "space" } as Actor;
 const target = { kind: "bot", botId: "bot", threadId: "thread" } as ThreadTarget;
@@ -40,6 +41,7 @@ describe("retry original failed turn", () => {
     { status: "completed" }, { status: "cancelled" }, { sourceMessageId: null },
     { _count: { effects: 1 } }, { firstResponseAt: new Date() },
     { error: "Desktop execution interrupted; check existing results before retrying" },
+    { error: desktopDiagnosticMessage({code:"response_disconnected",phase:"run",stage:"native_stream",operationId:"12345678-1234-4321-8765-123456789abc"}) },
   ])("refuses unsafe or terminal replay: %j", async (state) => {
     const { prisma, tx } = fixture(state);
     await expect(retryThreadRun(prisma, actor, target, "run")).rejects.toMatchObject({ code: "CONFLICT" });

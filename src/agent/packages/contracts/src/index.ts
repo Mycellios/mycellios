@@ -68,3 +68,4 @@ export * from "./video-edit.js";
 export * from "./referrals.js";
 export * from "./hosted-webs.js";
 export * from "./mico-settings.js";
+export * from "./desktop-diagnostics.js";

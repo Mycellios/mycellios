@@ -1,9 +1,10 @@
 import { i18n } from "@lingui/core";
 import { useLingui } from "@lingui/react/macro";
-import { MISSING_MODEL_RUN_ERROR, isModelRequiredSendError, normalizeRunError } from "@rakazo/core";
+import { MISSING_MODEL_RUN_ERROR, desktopRunDiagnosticText, isModelRequiredSendError, normalizeRunError } from "@rakazo/core";
+import { Button } from "@rakazo/ui-web/components/ui/button";
 import { X } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { translateRunError } from "../../lib/run-error";
 
 export function ComposerError({
@@ -37,6 +38,8 @@ export function ComposerError({
 }) {
   const { t } = useLingui();
   const runErrorRef = useRef<HTMLDivElement>(null);
+  const [copyState,setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  useEffect(()=>setCopyState("idle"),[runError,runErrorId]);
   const presentedRunErrorIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!runError || !runErrorId) return;
@@ -76,6 +79,7 @@ export function ComposerError({
     : null;
   const recovery = sendError ? undefined : normalizedRunError?.recovery;
   const interrupted = normalizedRunError?.kind === "interrupted";
+  const diagnostic = !sendError && runError ? desktopRunDiagnosticText(runError,runErrorId) : undefined;
   // A deploy interruption is not a model problem: keep the message neutral and
   // do not offer a model change; the turn can be retried as-is.
   const maintenance = normalizedRunError?.kind === "maintenance";
@@ -148,6 +152,13 @@ export function ComposerError({
             <pre className="mt-2 whitespace-pre-wrap break-words text-xs">
               {normalizedRunError?.details}
             </pre>
+            {diagnostic ? <>
+              <Button type="button" variant="ghost" size="sm" className="mt-1" onClick={()=>{
+                void (async()=>{try {await navigator.clipboard.writeText(diagnostic);setCopyState("copied");} catch {setCopyState("failed");}})();
+              }}>{copyState === "copied" ? t`Copied` : t`Copy diagnostics`}</Button>
+              <span role="status" className="block text-xs">{copyState === "failed" ? t`Could not copy details. Select the execution ID instead.` : null}</span>
+              <span className="block select-all text-xs">{runErrorId}</span>
+            </> : null}
           </details>
         ) : null}
       </div>

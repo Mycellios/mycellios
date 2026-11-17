@@ -1,5 +1,6 @@
 import { I18nProvider } from "@lingui/react";
 import type { ProductEvent, ThreadSnapshot } from "@rakazo/contracts";
+import { desktopDiagnosticMessage } from "@rakazo/contracts";
 import { Profiler, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createFramePublisher } from "../../src/lib/frame-publisher";
@@ -13,6 +14,7 @@ import { FixtureTranscript, threadEvent } from "./thread-fixture";
 import "../../src/styles.css";
 
 const immediate = new URLSearchParams(location.search).has("immediate");
+const diagnostic = new URLSearchParams(location.search).has("diagnostic");
 const noop = () => {};
 const client = { threads: { queue: async () => [] } } as unknown as RpcClient;
 const initial: ThreadSnapshot = {
@@ -156,8 +158,9 @@ function ChatFixture() {
         sendError={sendError}
         onOpenModels={noop}
         onOpenConnections={noop}
-        runError={null}
-        runErrorId={null}
+        runError={diagnostic ? desktopDiagnosticMessage({code:"desktop_disconnected",phase:"run",stage:"native_stream",operationId:"12345678-1234-4321-8765-123456789abc"}) : null}
+        runErrorId={diagnostic ? "cm00000000000000000000002" : null}
+        onRetryError={() => { metrics.current.sends++; }}
         onRunErrorPresented={noop}
         onDismissError={noop}
         sending={sending}
