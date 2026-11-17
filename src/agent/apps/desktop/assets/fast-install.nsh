@@ -60,6 +60,9 @@
     SetErrorLevel 2
     Abort
   ${EndIf}
+  ; Shortcuts are now named "Mycellios"; remove the ones older versions created.
+  Delete "$DESKTOP\Mycellios Desktop.lnk"
+  Delete "$SMPROGRAMS\Mycellios Desktop.lnk"
 !macroend
 
 !macro MycelliosCheckUninstall

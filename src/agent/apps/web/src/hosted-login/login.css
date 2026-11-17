@@ -23,47 +23,65 @@ body {
   font-family: inherit;
 }
 .oauth-consent section {
-  width: min(100%, 390px);
+  width: min(100%, 360px);
   min-width: 0;
 }
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
+}
+.login-mark-tile {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: color-mix(in srgb, #3f9f78 18%, var(--background));
 }
 .login-mark {
   display: block;
-  flex: none;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
 }
 .login-brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
   color: var(--foreground);
   font-family: inherit;
   font-size: 30px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.2;
   text-decoration: none;
   letter-spacing: -0.025em;
 }
 .oauth-consent h1 {
-  margin: 24px 0 0;
-  font-size: 24px;
-  font-weight: 500;
+  margin: 32px 0 0;
+  font-size: 22px;
+  font-weight: 600;
   line-height: 1.25;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
-.oauth-consent form,
+.oauth-consent form {
+  display: grid;
+  gap: 12px;
+}
 .oauth-consent label {
   display: grid;
-  gap: 10px;
 }
-.oauth-consent label {
-  margin-bottom: 12px;
-  font-size: 14px;
+/* Fields keep accessible names; the placeholder carries the visible hint. */
+.login-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.oauth-consent input::placeholder {
+  color: var(--muted-foreground);
 }
 .oauth-consent input,
 .oauth-consent button,
@@ -73,7 +91,7 @@ body {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   font: inherit;
 }
 .oauth-consent input {

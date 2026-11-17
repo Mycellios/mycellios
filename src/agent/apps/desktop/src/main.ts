@@ -102,6 +102,7 @@ import { installProjectConversations } from "./project-conversations-ipc.js";
 import { assertProjectGrant, attachedRepositoryId } from "./project-grant.js";
 import { isGitProjectRoot } from "./project-workspaces.js";
 import {DevelopmentLauncher, developmentChat} from "./development-launcher.js";
+import { developmentCheckout } from "./development-checkout.js";
 import {developmentSourceCandidates} from "./development-environment.js";
 import {
   browserWindowOptions,
@@ -1987,6 +1988,7 @@ app.whenReady().then(async () => {
     npmCandidates:[path.join(process.resourcesPath,"development-tools/npm"),path.join(process.resourcesPath,"development-tools/npm.asar"),
       ...(process.env.npm_execpath?[path.resolve(process.env.npm_execpath,"../..")]:[]),path.join(path.dirname(process.execPath),"node_modules/npm")],
     seeds:()=>developmentSourceCandidates(app.getAppPath(),process.resourcesPath,userDataDir),
+    checkout:()=>developmentCheckout(userDataDir),
     context:async(event,botId)=>{
       if(!mainWindow || event.sender!==mainWindow.webContents || event.senderFrame!==event.sender.mainFrame)
         throw Error("Open Dev from the main app window.");

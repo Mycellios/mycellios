@@ -23,6 +23,8 @@ export class DevelopmentLauncher {
     node:string;
     npmCandidates:string[];
     seeds():Promise<string[]>;
+    /** An owner-chosen git checkout that runs in place; null keeps the bundled copy. */
+    checkout?():Promise<{root:string;workspace:string;validate():Promise<void>}|null>;
     context(event:IpcMainInvokeEvent,botId:string):Promise<{key:string;validate():Promise<void>;bind(root:string,validateSource:()=>Promise<void>):Promise<void>}>;
   }) {}
   dispose() {for(const child of this.children)if(child.connected)child.send({type:"mycellios-dev-stop"},()=>{});}
@@ -36,8 +38,8 @@ export class DevelopmentLauncher {
   }
   private async launch(context:{key:string;validate():Promise<void>;bind(root:string,validateSource:()=>Promise<void>):Promise<void>}) {
     const directory=path.join(this.options.directory,createHash("sha256").update(context.key).digest("hex"));
-    const copy=new DevelopmentCopy(directory,this.options.seeds,async()=>{});
-    const source=await copy.ensure();
+    const checkout=await this.options.checkout?.() ?? null;
+    const source=checkout ?? await new DevelopmentCopy(directory,this.options.seeds,async()=>{}).ensure();
     await context.validate();
     const npm=path.join(directory,"npm");
     // Electron can unpack npm.asar here; standalone Node cannot read asar paths.
@@ -76,7 +78,10 @@ export class DevelopmentLauncher {
     const child=spawn(node,[path.join(source.workspace,"scripts/desktop-dev.mjs")],{
       cwd:source.workspace,windowsHide:true,stdio:["ignore","pipe","pipe","ipc"],
       env:{...Object.fromEntries(Object.entries(process.env).filter(([key])=>/^(PATH|PATHEXT|SYSTEMROOT|SYSTEMDRIVE|WINDIR|COMSPEC|TEMP|TMP|TMPDIR|HOME|USER|USERNAME|USERPROFILE|HOMEDRIVE|HOMEPATH|APPDATA|LOCALAPPDATA|PROGRAMDATA|PROGRAMFILES(?:\(X86\))?|LANG|LANGUAGE|TZ|NUMBER_OF_PROCESSORS|PROCESSOR_ARCHITECTURE|LC_.*)$/i.test(key))),
-        PATH:bin+path.delimiter+(process.env.PATH??""),MYCELLIOS_DEV_HOME:path.join(directory,"profiles"),MYCELLIOS_DEV_NPM_CLI:path.join(npm,"bin/npm-cli.js"),MYCELLIOS_DEV_PARENT_PID:String(process.pid)},
+        PATH:bin+path.delimiter+(process.env.PATH??""),
+        // A checkout shares the profile `npm run dev:desktop` uses there, so both reach the same instance.
+        ...(checkout?{}:{MYCELLIOS_DEV_HOME:path.join(directory,"profiles")}),
+        MYCELLIOS_DEV_NPM_CLI:path.join(npm,"bin/npm-cli.js"),MYCELLIOS_DEV_PARENT_PID:String(process.pid)},
     });
     this.children.add(child);child.once("exit",()=>this.children.delete(child));
     let diagnostics="",buffer="";

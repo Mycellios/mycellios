@@ -167,7 +167,7 @@ export function SidebarRoster({
                   group.title && hasSpaceActions
                     ? "grid"
                     : `flex items-center${group.title ? "" : " justify-end"}`
-                } sticky top-0 z-10 pb-0.5 ${section ? folderDepth > 0 ? "pt-0" : "pt-2" : "pt-3"} rounded-lg ${rosterDropKey === headerDropKey ? "bg-sidebar-accent" : "bg-sidebar"}`}
+                } sticky top-0 z-10 pb-0.5 ${section ? folderDepth > 0 ? "pt-0" : "pt-2" : "pt-3"} ${mobile ? "" : "rounded-lg"} ${rosterDropKey === headerDropKey ? "bg-sidebar-accent" : mobile ? "bg-background" : "bg-sidebar"}`}
                 onDragOver={(event) => {
                   if (!headerDropTarget || !rosterDropAction(headerDropTarget, false)) return;
                   event.preventDefault();
@@ -191,7 +191,7 @@ export function SidebarRoster({
                       render={
                         group.emptySpaceId ? <button type="button" /> : <CollapsibleTrigger />
                       }
-                      className={`flex min-w-0 items-center gap-2 rounded-lg px-2.5 ${mobile ? "min-h-11 justify-start text-sm font-medium text-muted-foreground" : `justify-between py-1 text-xs ${section ? "font-medium text-foreground" : "font-normal text-muted-foreground"}`} ${hasSpaceActions ? "col-start-1 row-start-1 w-full" : "flex-1"}`}
+                      className={`flex min-w-0 items-center gap-2 rounded-lg px-2.5 ${mobile ? "min-h-10 justify-start text-[13px] font-semibold tracking-tight text-muted-foreground" : `justify-between py-1 text-xs ${section ? "font-medium text-foreground" : "font-normal text-muted-foreground"}`} ${hasSpaceActions ? "col-start-1 row-start-1 w-full" : "flex-1"}`}
                       onClick={() => {
                         if (group.emptySpaceId) {
                           openSpaceChat(group.emptySpaceId, "/onboarding");
@@ -448,7 +448,7 @@ export function SidebarRoster({
                         ? "mx-auto size-12 justify-center rounded-xl"
                         : compact
                           ? "w-full min-h-11 gap-2 rounded-xl px-2.5 py-1.5"
-                          : mobile ? "w-full min-h-[68px] gap-3 rounded-xl px-2.5 py-2"
+                          : mobile ? "w-full min-h-[62px] gap-3 rounded-2xl px-2 py-1.5"
                           : "w-full min-h-[66px] gap-3 rounded-xl px-2.5 py-[7px]"
                     } text-start ${
                       item.kind === "bot" && sidebarChatOrder === "manual" ? "cursor-grab active:cursor-grabbing" : ""

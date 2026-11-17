@@ -14,3 +14,8 @@ export function AuthMushroom({ variant = "mushroom" }: { variant?: "mycelium" | 
     </div>
   );
 }
+
+/** The same mascot without its circular backdrop, for a framed brand tile. */
+export function AuthMushroomMark({ size = 48 }: { size?: number }) {
+  return <BotAvatar color={MICO_PRIMARY_AVATAR} identity="brand-mushroom" size={size} />;
+}

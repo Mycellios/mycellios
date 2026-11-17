@@ -30,7 +30,7 @@ for (const viewport of [
       );
       await page.screenshot({ path: testInfo.outputPath("mycellios-welcome.png"), fullPage: true });
       await page.getByRole("link", { name: "Sign in", exact: true }).click();
-      await expect(page.getByRole("heading", { name: "Sign in to Mycellios" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );

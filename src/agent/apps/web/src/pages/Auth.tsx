@@ -9,7 +9,7 @@ import {
 import { Button, Input, InputOTP, InputOTPGroup, InputOTPSlot, Label } from "@rakazo/ui-web";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { AuthMushroom } from "../components/AuthMushroom";
+import { AuthMushroomMark } from "../components/AuthMushroom";
 import { BrandLaunch } from "../components/BrandLaunch";
 import { PasskeySignIn } from "../components/PasskeySignIn";
 import { appPath } from "../lib/app-path";
@@ -23,6 +23,9 @@ import { authErrorText, credentialIssueText } from "../lib/user-error";
 type AuthMode = "in" | "up" | "forgot";
 
 const fieldClass = "mt-2 h-12 rounded-xl px-4 text-base md:text-base";
+// Public legal pages. Both must exist on www.mycellios.com before release.
+const TERMS_URL = "https://www.mycellios.com/terms";
+const PRIVACY_URL = "https://www.mycellios.com/privacy";
 const CODE_LENGTH = 6;
 export const submitClass = "mt-3 h-12 w-full rounded-xl text-base";
 
@@ -57,9 +60,9 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
     sent || codeStep ? (
       <Trans>Check your email</Trans>
     ) : mode === "in" ? (
-      <Trans>Sign in to Mycellios</Trans>
+      <Trans>Sign in</Trans>
     ) : mode === "up" ? (
-      <Trans>Create your Mycellios account</Trans>
+      <Trans>Create account</Trans>
     ) : (
       <Trans>Reset your password</Trans>
     );
@@ -268,7 +271,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
         <>
           {mode === "up" && !codeStep && reset?.passwordAuth ? (
             <p className="mb-4 text-center text-sm text-muted-foreground">
-              <Trans>Create your account and get {SPORE_WELCOME_REWARD} trial Spore with no monetary value.</Trans>
+              <Trans>Create your account and get {SPORE_WELCOME_REWARD} Spore and 0.20 Credits.</Trans>
             </p>
           ) : null}
           {capabilityError ? (
@@ -304,7 +307,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
             <>
               {mode === "up" && !codeStep ? (
                 <div className="mb-4 w-full">
-                  <Label htmlFor="name" className="text-muted-foreground">
+                  <Label htmlFor="name" className="sr-only">
                     <Trans>Name</Trans>
                   </Label>
                   <Input
@@ -344,7 +347,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                 </div>
               ) : (
                 <div className="w-full">
-                  <Label htmlFor="email" className="text-muted-foreground">
+                  <Label htmlFor="email" className="sr-only">
                     <Trans>Email</Trans>
                   </Label>
                   <Input
@@ -362,7 +365,7 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
               )}
               {mode !== "forgot" && !codeStep ? (
                 <div className="mt-4 w-full">
-                  <Label htmlFor={passwordFieldId} className="text-muted-foreground">
+                  <Label htmlFor={passwordFieldId} className="sr-only">
                     <Trans>Password</Trans>
                   </Label>
                   <Input
@@ -465,6 +468,21 @@ export function AuthPage({ mode }: { mode: AuthMode }) {
                   )}
                 </p>
               )}
+              {mode !== "forgot" && !codeStep ? (
+                <p className="mt-6 max-w-[320px] text-center text-xs leading-relaxed text-muted-foreground">
+                  <Trans>
+                    By continuing, you accept the{" "}
+                    <a href={TERMS_URL} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">
+                      Terms of Service
+                    </a>{" "}
+                    and confirm you have read the{" "}
+                    <a href={PRIVACY_URL} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">
+                      Privacy Policy
+                    </a>
+                    .
+                  </Trans>
+                </p>
+              ) : null}
             </>
           ) : null}
         </>
@@ -568,9 +586,14 @@ export function AuthFrame({
 }) {
   return (
     <div className="flex min-h-full items-center justify-center bg-background px-6 py-16 text-foreground">
-      <form onSubmit={onSubmit} className="flex w-full min-w-0 max-w-[460px] flex-col items-center">
-        <AuthMushroom />
-        <h1 aria-live="polite" className="mb-9 mt-7 w-full break-words text-center text-3xl font-medium tracking-tight text-balance sm:text-4xl">
+      <form onSubmit={onSubmit} className="flex w-full min-w-0 max-w-[380px] flex-col items-center">
+        <div className="flex items-center gap-4">
+          <div className="flex size-[72px] items-center justify-center rounded-[20px] bg-[#3f9f78]/15" aria-hidden="true">
+            <AuthMushroomMark />
+          </div>
+          <span className="text-3xl font-semibold tracking-tight">Mycellios</span>
+        </div>
+        <h1 aria-live="polite" className="mb-7 mt-8 w-full break-words text-center text-[22px] font-semibold tracking-tight text-balance">
           {title}
         </h1>
         {children}
