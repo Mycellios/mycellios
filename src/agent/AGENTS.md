@@ -1807,3 +1807,10 @@
   download links in update settings, not stacked beneath the sidebar action.
   Preserve native draft/call/work guards and explicit install consent; waiting
   for those guards must not cover the chat with a full-screen update dialog.
+
+- Durable native command receipts preserve identity, not an implicit one-hour timeout.
+  Shell defaults retain the configured bounded budget. Recognized read-only search
+  pipelines use at most 45 seconds; a timeout returns failure to the same turn.
+  Narrow paths before another search, never replay an uncertain command automatically.
+  Preserve explicit build/install deadlines, command journals and Credit admission.
+  Verify shell-command-budget, shell-command-stream and native-command-recovery tests.
