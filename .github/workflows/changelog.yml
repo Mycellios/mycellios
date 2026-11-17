@@ -1,0 +1,74 @@
+name: Changelog
+
+# Each pull request that changes src/agent writes its release notes in its own
+# src/agent/changelog.d file, so two pull requests never change the same lines.
+# `npm run release:*` in src/agent moves the files into src/agent/CHANGELOG.md.
+# The label events run the check again when no-changelog is added or removed.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: changelog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  notes:
+    name: Release notes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        shell: bash
+        working-directory: src/agent
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # The merge commit and its first parent, the base branch.
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+
+      - name: Test the release scripts
+        run: node --test apps/desktop/scripts/release-notes.test.mjs apps/desktop/scripts/prepare-desktop-version.test.mjs
+
+      # A change to CHANGELOG.md itself also passes: a release pull request.
+      # Not `grep -q`: it stops at the first match, and with a long file list the
+      # grep before it then fails with a broken pipe, which pipefail reports.
+      - name: Require release notes
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          changed="$(git diff --name-only --diff-filter=ACMRD HEAD^1 HEAD -- .)"
+          if [[ -z "$changed" ]]; then
+            echo "No change under src/agent."
+            exit 0
+          fi
+          if ! git diff --name-only --diff-filter=ACMR HEAD^1 HEAD -- . |
+            grep -vFx src/agent/changelog.d/README.md |
+            grep -E '^src/agent/(changelog\.d/.+\.md|CHANGELOG\.md)$' >/dev/null; then
+            echo "::error::Write the release notes in src/agent/changelog.d/${BRANCH//\//-}.md (see docs/DEVELOPMENT.md#desktop-release-notes). Add the no-changelog label when no user sees a change."
+            exit 1
+          fi
+
+      - name: Check changelog fragments
+        run: |
+          find changelog.d -name '*.md' ! -path changelog.d/README.md -print0 |
+            xargs -0 -r node apps/desktop/scripts/check-release-notes.mjs --fragments
+
+      # A version bump publishes on merge, so its section must be ready first.
+      - name: Check the release section
+        run: |
+          before="$(git show HEAD^1:src/agent/apps/desktop/package.json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')"
+          after="$(node -p 'require("./apps/desktop/package.json").version')"
+          if [[ "$before" != "$after" ]]; then
+            node apps/desktop/scripts/check-release-notes.mjs
+          fi
