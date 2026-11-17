@@ -7,6 +7,16 @@ export interface OAuthAuthorization {
   scope: string;
 }
 
+/** The authority refused the request; 401/403 mean this browser's session is no longer valid. */
+export class OAuthConsentError extends Error {
+  constructor(readonly status: number) {
+    super("This authorization is unavailable or has expired.");
+  }
+  get sessionRejected() {
+    return this.status === 401 || this.status === 403;
+  }
+}
+
 export function authorizationId(search: string): string {
   const values = new URLSearchParams(search).getAll("authorization_id");
   const id = values[0] ?? "";
@@ -51,7 +61,7 @@ async function consentRequest(
       ...(action ? { body: JSON.stringify({ action }) } : {}),
     },
   );
-  if (!response.ok) throw new Error("This authorization is unavailable or has expired.");
+  if (!response.ok) throw new OAuthConsentError(response.status);
   const reader = response.body?.getReader();
   if (!reader) throw new Error("Invalid authorization response.");
   const chunks: Uint8Array[] = [];

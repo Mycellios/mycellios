@@ -7,7 +7,9 @@ import { launchText } from "./launch-copy";
 import type { AuthSession, PublicAuthConfig } from "./auth";
 import {
   AuthServiceError,
+  clearAuthSession,
   EmailConfirmationRequired,
+  isDefinitiveAuthFailure,
   loadAuthConfig,
   restoreAuthSession,
   signIn,
@@ -22,7 +24,14 @@ import {
   loadFirstPartyClients,
 } from "./first-party";
 import type { OAuthAuthorization } from "./oauth-consent";
-import { authorizationId, decideOAuthAuthorization, getOAuthAuthorization } from "./oauth-consent";
+import {
+  authorizationId,
+  decideOAuthAuthorization,
+  getOAuthAuthorization,
+  OAuthConsentError,
+} from "./oauth-consent";
+
+const sessionRejected = (error: unknown) => error instanceof OAuthConsentError && error.sessionRejected;
 
 export function OAuthConsent() {
   const [config, setConfig] = useState<PublicAuthConfig | null>(null);
@@ -66,10 +75,38 @@ export function OAuthConsent() {
     if (!config || !session || !clients) return;
     let active = true;
     void (async () => {
-      const s = await validAuthSession(config, session);
       const authority = { ...config, url: location.origin };
-      const d = await getOAuthAuthorization(authority, s, authorizationId(location.search));
+      const id = authorizationId(location.search);
+      let s = await validAuthSession(config, session);
+      let d: Awaited<ReturnType<typeof getOAuthAuthorization>> | null;
+      try {
+        d = await getOAuthAuthorization(authority, s, id);
+      } catch (error) {
+        if (!sessionRejected(error)) throw error;
+        // A locally unexpired session can still be revoked by the authority
+        // (for example after signing out elsewhere). Renew it once; if that is
+        // refused too, forget it and show sign-in instead of looping here.
+        d = null;
+        try {
+          s = await validAuthSession(config, s, true);
+          d = await getOAuthAuthorization(authority, s, id);
+        } catch (retry) {
+          // Network errors keep the session and the retry screen.
+          if (!sessionRejected(retry) && !isDefinitiveAuthFailure(retry)) throw retry;
+        }
+      }
       if (!active) return;
+      if (!d) {
+        clearAuthSession();
+        setSession(null);
+        setError(
+          text(
+            "Your session has ended. Sign in to continue.",
+            "Tu sesión ha terminado. Inicia sesión para continuar.",
+          ),
+        );
+        return;
+      }
       if ("redirectUrl" in d) {
         if (!isFirstPartyReturn(d.redirectUrl, clients)) throw new Error();
         location.replace(d.redirectUrl);

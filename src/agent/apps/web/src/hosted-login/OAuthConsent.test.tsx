@@ -12,7 +12,7 @@ import {
   validAuthSession,
 } from "./auth";
 import { OAuthConsent } from "./OAuthConsent";
-import { getOAuthAuthorization } from "./oauth-consent";
+import { getOAuthAuthorization, OAuthConsentError } from "./oauth-consent";
 
 vi.mock("./auth", async (original) => ({
   ...(await original<typeof import("./auth")>()),
@@ -243,4 +243,55 @@ it("keeps a failed sign-in load on the same transition with retry", async () => 
   const retry = [...host.querySelectorAll("button")].find((button) => button.textContent === "Retry");
   await act(async () => retry!.click());
   expect(loadAuthConfig).toHaveBeenCalledTimes(2);
+});
+
+const pending = {
+  authorization_id: "fixture-authorization-12345",
+  client: { id: "external-client", name: "Client" },
+  redirect_uri: "https://client.example.test/callback",
+  scope: "openid email",
+};
+
+it("forgets a revoked saved session and offers sign-in with any account instead of looping", async () => {
+  localStorage.setItem("mycellios.auth.session", JSON.stringify(session));
+  vi.mocked(restoreAuthSession).mockResolvedValue(session);
+  vi.mocked(getOAuthAuthorization).mockRejectedValue(new OAuthConsentError(403));
+  await render();
+  expect(validAuthSession).toHaveBeenCalledWith(config, session, true);
+  expect(getOAuthAuthorization).toHaveBeenCalledTimes(2);
+  expect(localStorage.getItem("mycellios.auth.session")).toBeNull();
+  expect(host.querySelector("[role='alert']")?.textContent).toBe("Your session has ended. Sign in to continue.");
+  expect(host.querySelector('[name="email"]')).not.toBeNull();
+  expect(host.querySelector('a[href="/agent/sign-in"]')).toBeNull();
+  vi.mocked(getOAuthAuthorization).mockResolvedValue(pending);
+  await submit();
+  expect(signIn).toHaveBeenCalled();
+  expect(host.querySelector("h1")?.textContent).toBe("Authorize access");
+});
+
+it("continues the same authorization when renewing the saved session succeeds", async () => {
+  const renewed = { ...session, accessToken: "renewed-access" };
+  vi.mocked(restoreAuthSession).mockResolvedValue(session);
+  vi.mocked(validAuthSession).mockImplementation(async (_c, s, force) => (force ? renewed : s));
+  vi.mocked(getOAuthAuthorization).mockRejectedValueOnce(new OAuthConsentError(401)).mockResolvedValueOnce(pending);
+  await render();
+  expect(vi.mocked(getOAuthAuthorization).mock.calls[1]?.[1]).toBe(renewed);
+  expect(host.querySelector("h1")?.textContent).toBe("Authorize access");
+});
+
+it("keeps the saved session when the authority cannot be reached", async () => {
+  localStorage.setItem("mycellios.auth.session", JSON.stringify(session));
+  vi.mocked(restoreAuthSession).mockResolvedValue(session);
+  vi.mocked(getOAuthAuthorization).mockRejectedValueOnce(new OAuthConsentError(401)).mockRejectedValueOnce(new TypeError("fetch failed"));
+  await act(async () => root.render(<OAuthConsent />));
+  expect(localStorage.getItem("mycellios.auth.session")).not.toBeNull();
+  expect(host.textContent).toContain("This sign-in request has expired.");
+});
+
+it("still restarts an expired authorization from the agent", async () => {
+  vi.mocked(restoreAuthSession).mockResolvedValue(session);
+  vi.mocked(getOAuthAuthorization).mockRejectedValue(new OAuthConsentError(404));
+  await act(async () => root.render(<OAuthConsent />));
+  expect(getOAuthAuthorization).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('a[href="/agent/sign-in"]')?.textContent).toBe("Sign in again");
 });
