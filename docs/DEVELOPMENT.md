@@ -864,9 +864,10 @@ Do not update an installed app by copying an arbitrary working tree or replacing
 only its frontend. The Windows package contains the frontend, native host and
 local server from the same recorded source, plus the pinned contribution runtime.
 
-From `src/agent`, prepare a new version with
-`node apps/desktop/scripts/prepare-desktop-version.mjs patch`, review and commit
-the Desktop package and lockfile changes. This command publishes nothing.
+New versions are prepared automatically from the waiting release notes (see
+[Desktop release notes](#desktop-release-notes)). By hand, `npm run release:minor`
+(or `release:patch`, `release:major`) from `src/agent` prepares the Desktop
+package, lockfile, `CHANGELOG.md` and `changelog.d` changes and publishes nothing.
 The `Desktop Windows release package` workflow builds `codex/desktop-release-*`
 branches or an explicitly selected manual ref. Its real builds, native boundary
 tests, installer archive check and isolated packaged startup produce one qualified
@@ -889,6 +890,49 @@ installs the staged package and reopens the same profile. There is no unattended
 installation of unsigned previews. The signed electron-updater channel remains
 separately opt-in and must be qualified with the owner's signing credentials.
 
+### Desktop release notes
+
+`src/agent/CHANGELOG.md` holds the Desktop and Agent release notes. Each pull
+request that changes `src/agent` writes its notes in its own file,
+`src/agent/changelog.d/<branch>.md` with `-` for `/`, so two pull requests never
+change the same lines. The version bump moves the items of every file into
+`CHANGELOG.md`, in the order that the pull requests merged, under
+`## [X.Y.Z] - YYYY-MM-DD`, and deletes the files. Items still under
+`## [Unreleased]` go first.
+
+- Put each change that a user or self-hoster can see in one of these groups:
+  `### Breaking changes`, `### Security`, `### Added`, `### Changed`,
+  `### Deprecated`, `### Removed`, `### Fixed`, `### Self-host upgrade notes`,
+  `### Messaging upgrade notes`. The release writes them in that order.
+- Write one `- ` item for each change, for a user and not for a developer. Say
+  what changed. For a fix, say what happened before.
+- Leave out refactors, tests, CI and internal tooling. Such a pull request gets
+  the `no-changelog` label instead of a file.
+
+Nobody chooses the version by hand. Every day at 05:00 UTC, and on a manual
+run, `.github/workflows/desktop-auto-release.yml` releases the notes that wait
+in `changelog.d` and under `## [Unreleased]`:
+
+- **major** when any waiting item is under `### Breaking changes`: an existing
+  installation cannot take the release without manual work (data it cannot
+  read, a required new setting, signing in again), or support for a platform,
+  protocol or older server is dropped. From 0.x the first one is 1.0.0;
+- **patch** when every waiting item is under `### Fixed` or `### Security`;
+- **minor** otherwise (a feature, a change, a removal or upgrade notes);
+- nothing when no notes wait.
+
+It runs `node apps/desktop/scripts/prepare-release.mjs auto` in `src/agent`, which
+checks the new section before it writes anything, then sets the version in
+`apps/desktop/package.json` and `package-lock.json`, writes the section and deletes
+the fragments. It stops and changes nothing when a note is malformed. The
+workflow merges that change to `main` through a `Release Desktop X.Y.Z` pull
+request and starts `installer-release.yml`. `npm run release:patch`, `release:minor`
+and `release:major` do the same preparation by hand when one is needed.
+
+The `changelog` workflow fails a pull request that changes `src/agent` without a
+`changelog.d` file or a `CHANGELOG.md` change, unless it has the `no-changelog`
+label. It checks each fragment, and the full section when the pull request
+changes the Desktop version.
 
 ### Direct Desktop delivery and optional contribution installers
 
