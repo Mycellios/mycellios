@@ -873,8 +873,11 @@
   `titleBarStyle` or `titleBarOverlay`. Caption controls sit in that bar above
   the page. Do not install a host caption strip, a transparent overlay, or page
   padding and drag regions that reserve space for those controls.
-  macOS keeps `titleBarStyle: "hiddenInset"` and traffic lights over the page,
-  with drag regions only on that platform. The legacy nativeWindowFrame
+  macOS uses `titleBarStyle: "hidden"` with the traffic lights over the page at
+  MAC_WINDOW_BUTTON_INSET, inside the 72px macOS page rail and centred on the
+  51px top row, as in OpenBot; drag regions exist only on that platform. Each
+  top row drags the window as a whole: mark only its controls no-drag, never a
+  wrapper that spans the row. The legacy nativeWindowFrame
   capability means controls are host-owned; hide duplicate in-page controls only
   when the bridge advertises it. Older frameless builds retain their page controls.
   Sign-in proceeds without an intermediate login launcher or popup. Keep the persistent

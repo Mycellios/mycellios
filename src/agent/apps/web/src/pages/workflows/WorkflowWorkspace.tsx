@@ -21,7 +21,7 @@ import {
   Square,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { desktopDragClass, desktopHidesTitleBar } from "../../lib/desktop";
+import { desktopDragClass } from "../../lib/desktop";
 import type { RpcClient } from "../../lib/rpc";
 import { selectedSpaceLabel, spaceLabel } from "../../lib/space-label";
 import { useWorkflows } from "./use-workflows";
@@ -82,8 +82,7 @@ export function WorkflowWorkspace({
     >
       <header
         data-testid="conversation-header"
-        className={`${desktopDragClass()} rk-workflow-header flex h-[51px] min-w-0 shrink-0 items-center gap-2 border-b border-border px-3`}
-        style={desktopHidesTitleBar() ? { paddingInlineStart: 48 } : undefined}
+        className={`${desktopDragClass()} rk-workflow-header rk-window-buttons-clear flex h-[51px] min-w-0 shrink-0 items-center gap-2 border-b border-border px-3`}
       >
         <div className="app-no-drag hidden w-60 shrink-0 md:block">
           <DropdownMenu>

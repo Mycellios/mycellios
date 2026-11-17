@@ -11,8 +11,8 @@ describe("desktop window chrome", () => {
   it("uses native traffic lights on macOS", () => {
     const opts = browserWindowOptions("darwin");
     expect(opts.frame).toBe(true);
-    expect(opts.titleBarStyle).toBe("hiddenInset");
-    expect(opts.trafficLightPosition).toEqual({ x: 16, y: 16 });
+    expect(opts.titleBarStyle).toBe("hidden");
+    expect(opts.trafficLightPosition).toEqual({ x: 12, y: 19 });
   });
 
   it("uses the standard native title bar on Windows and Linux", () => {
