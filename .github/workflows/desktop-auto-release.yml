@@ -1,0 +1,78 @@
+name: Desktop auto release
+
+# Once a day, when release notes wait in src/agent/changelog.d or under Unreleased, choose the
+# next Desktop version (patch when every item is Fixed or Security, minor otherwise, never
+# major), land it on main through a pull request and start the installer release. Nobody picks
+# the version by hand. docs/DEVELOPMENT.md#desktop-release-notes
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: desktop-auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release waiting notes
+    if: github.repository == 'Mycellios/mycellios'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Push the release branch, open and merge its pull request, start installer-release.yml.
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          # The fragments are ordered by the commit that added each one.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24.22.2
+
+      - name: Prepare the version
+        id: prepare
+        working-directory: src/agent
+        run: node apps/desktop/scripts/prepare-release.mjs auto
+
+      - name: Merge the version to main
+        if: steps.prepare.outputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ steps.prepare.outputs.version }}
+          INCREMENT: ${{ steps.prepare.outputs.increment }}
+        run: |
+          set -euo pipefail
+          branch="release/desktop-$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A src/agent/CHANGELOG.md src/agent/changelog.d src/agent/apps/desktop/package.json src/agent/package-lock.json
+          git commit -m "Release Desktop $VERSION"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --label no-changelog \
+            --title "Release Desktop $VERSION" \
+            --body "Automatic $INCREMENT release of the notes waiting in \`src/agent/changelog.d\` and under Unreleased. See docs/DEVELOPMENT.md#desktop-release-notes."
+          # GitHub computes mergeability after the pull request opens.
+          for attempt in 1 2 3 4 5 6; do
+            if gh pr merge "$branch" --squash --delete-branch; then exit 0; fi
+            sleep 10
+          done
+          echo "::error::Could not merge the release pull request for $VERSION." >&2
+          exit 1
+
+      # A merge made with this token starts no push workflows, so start the release here. Its
+      # admission builds the current main revision only when this version is not published yet.
+      - name: Start the installer release
+        if: steps.prepare.outputs.version != ''
+        run: gh workflow run installer-release.yml --ref main

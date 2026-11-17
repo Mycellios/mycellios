@@ -175,6 +175,29 @@ function collectGroups(body, groups) {
   return stray;
 }
 
+/** Groups that hold only corrections. A release with nothing else is a patch. */
+const PATCH_GROUPS = ["Fixed", "Security"];
+
+/**
+ * The increment that the automatic release picks for `bodies` (the Unreleased section and the
+ * fragments): undefined when nothing waits, patch when every item is a fix or a security fix,
+ * minor otherwise. A major version is never automatic.
+ */
+export function chooseIncrement(bodies) {
+  const groups = [...assembleSection(bodies).matchAll(/^### (.+)$/gm)].map((match) => match[1]);
+  if (groups.length === 0) return undefined;
+  return groups.every((group) => PATCH_GROUPS.includes(group)) ? "patch" : "minor";
+}
+
+/** The text under `## [Unreleased]`, up to the next version. */
+export function unreleasedBody(changelog) {
+  const lines = changelog.split("\n");
+  const start = lines.findIndex((line) => line.startsWith(`## [${UNRELEASED}]`));
+  if (start === -1) throw new Error(`${CHANGELOG} has no "## [${UNRELEASED}]" section.`);
+  const end = lines.findIndex((line, index) => index > start && line.startsWith("## "));
+  return lines.slice(start + 1, end === -1 ? undefined : end).join("\n");
+}
+
 /** `version` with `increment` (major, minor or patch) added and the lower parts reset. */
 export function bumpVersion(version, increment) {
   const match = SEMVER.exec(version);

@@ -8,6 +8,7 @@ import { prepareRelease } from "./prepare-release.mjs";
 import {
   assembleSection,
   bumpVersion,
+  chooseIncrement,
   fragmentProblems,
   releasedChangelog,
   releaseNotesProblems,
@@ -127,6 +128,34 @@ test("prepare changes nothing when there are no notes", async () => {
     );
     assert.equal(json(dir, "apps/desktop/package.json").version, "0.3.61");
     assert.equal(json(dir, "package-lock.json").packages["apps/desktop"].version, "0.3.61");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the automatic release picks patch only for fixes, minor otherwise, and nothing when empty", () => {
+  assert.equal(chooseIncrement(["", "\n"]), undefined);
+  assert.equal(chooseIncrement(["### Fixed\n\n- A fix.", "### Security\n\n- A patch."]), "patch");
+  assert.equal(chooseIncrement(["### Fixed\n\n- A fix.", "### Added\n\n- A feature."]), "minor");
+  assert.equal(chooseIncrement(["### Changed\n"]), undefined);
+  assert.equal(chooseIncrement(["### Self-host upgrade notes\n\n- Set X."]), "minor");
+});
+
+test("auto releases a fix-only patch and does nothing when no notes wait", async () => {
+  const dir = repo({
+    "apps/desktop/package.json": '{\n  "version": "0.3.61"\n}\n',
+    "package-lock.json": LOCK("0.3.61"),
+    "CHANGELOG.md":
+      "# Changelog\n\n## [Unreleased]\n\n## [0.3.61] - 2026-11-16\n\n### Added\n\n- Old.\n",
+    "changelog.d/README.md": "# Unreleased notes\n",
+    "changelog.d/fix.md": "### Fixed\n\n- A fix.\n",
+  });
+  try {
+    const release = await prepareRelease({ increment: "auto", cwd: dir, date: "2026-11-17" });
+    assert.deepEqual([release.version, release.increment], ["0.3.62", "patch"]);
+    assert.equal(json(dir, "package-lock.json").packages["apps/desktop"].version, "0.3.62");
+    assert.equal(await prepareRelease({ increment: "auto", cwd: dir }), undefined);
+    assert.equal(json(dir, "apps/desktop/package.json").version, "0.3.62");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

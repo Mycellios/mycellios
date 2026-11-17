@@ -251,8 +251,9 @@ These rules apply to the complete repository.
   Windows, Linux, both native Mac architectures and Android from that revision.
   A Desktop version bump owns the release. Pull requests that change src/agent
   write user-facing notes in src/agent/changelog.d/<branch>.md (or carry the
-  no-changelog label); `npm run release:minor` in src/agent bumps the version
-  and moves those notes into its CHANGELOG.md (docs/DEVELOPMENT.md#desktop-release-notes).
+  no-changelog label). desktop-auto-release.yml chooses the version from those
+  notes every day (patch for fixes only, minor otherwise) and moves them into
+  src/agent/CHANGELOG.md; never bump it by hand (docs/DEVELOPMENT.md#desktop-release-notes).
   Android's versionCode is derived by
   `installer-version.mjs`. Native receipts, immutable assets and current-main
   comparison precede publication. `deploy/installers/publisher.py` promotes the

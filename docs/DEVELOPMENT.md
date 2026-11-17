@@ -864,10 +864,10 @@ Do not update an installed app by copying an arbitrary working tree or replacing
 only its frontend. The Windows package contains the frontend, native host and
 local server from the same recorded source, plus the pinned contribution runtime.
 
-From `src/agent`, prepare a new version with `npm run release:minor` (or
-`release:patch`, `release:major`; see [Desktop release notes](#desktop-release-notes)),
-review and commit the Desktop package, lockfile, `CHANGELOG.md` and `changelog.d`
-changes. This command publishes nothing.
+New versions are prepared automatically from the waiting release notes (see
+[Desktop release notes](#desktop-release-notes)). By hand, `npm run release:minor`
+(or `release:patch`, `release:major`) from `src/agent` prepares the Desktop
+package, lockfile, `CHANGELOG.md` and `changelog.d` changes and publishes nothing.
 The `Desktop Windows release package` workflow builds `codex/desktop-release-*`
 branches or an explicitly selected manual ref. Its real builds, native boundary
 tests, installer archive check and isolated packaged startup produce one qualified
@@ -909,19 +909,25 @@ change the same lines. The version bump moves the items of every file into
 - Leave out refactors, tests, CI and internal tooling. Such a pull request gets
   the `no-changelog` label instead of a file.
 
-Choose the version bump:
+Nobody chooses the version by hand. Every day at 05:00 UTC, and on a manual
+run, `.github/workflows/desktop-auto-release.yml` releases the notes that wait
+in `changelog.d` and under `## [Unreleased]`:
 
-- **minor** for each regular release: everything merged since the previous
-  version, features and fixes alike. This is the default.
-- **patch** only for an urgent fix on top of the latest published release.
-- **major** for a change that existing installations cannot upgrade through
-  without manual work. Not used yet.
+- **patch** when every waiting item is under `### Fixed` or `### Security`;
+- **minor** when any item is under another group (a feature, a change, a
+  removal or upgrade notes);
+- **major** never automatically; it stays a deliberate `npm run release:major`;
+- nothing when no notes wait.
 
-`npm run release:minor` (or `release:patch`, `release:major`) from `src/agent`
+It runs `node apps/desktop/scripts/prepare-release.mjs auto` in `src/agent`, which
 checks the new section before it writes anything, then sets the version in
 `apps/desktop/package.json` and `package-lock.json`, writes the section and deletes
 the fragments. It stops and changes nothing when a note is malformed. The
-`changelog` workflow fails a pull request that changes `src/agent` without a
+workflow merges that change to `main` through a `Release Desktop X.Y.Z` pull
+request and starts `installer-release.yml`. `npm run release:patch`, `release:minor`
+and `release:major` do the same preparation by hand when one is needed.
+
+The `changelog` workflow fails a pull request that changes `src/agent` without a
 `changelog.d` file or a `CHANGELOG.md` change, unless it has the `no-changelog`
 label. It checks each fragment, and the full section when the pull request
 changes the Desktop version.

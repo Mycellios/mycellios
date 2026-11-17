@@ -14,7 +14,7 @@ file can have more than one group:
   characters.
 ```
 
-`npm run release:patch`, `release:minor` and `release:major` move the items of every file into the new
-version section of `CHANGELOG.md`, in the order that the pull requests merged, and delete the files.
+The daily `desktop-auto-release` workflow (or `npm run release:patch`, `release:minor`, `release:major` by hand) moves the items of every file into the new
+version section of `CHANGELOG.md`, in the order that the pull requests merged, and deletes the files.
 The `changelog` workflow checks each file. A pull request with no change that a user or self-hoster
 can see gets the `no-changelog` label.
