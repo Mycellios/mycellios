@@ -1,3 +1,4 @@
+import { shellCommandTimeoutMs } from "./shell-command-budget.js";
 import { eventDemoSessionActive } from "@rakazo/db";
 import { scheduleLocalMemoryReview } from "./local-memory-review.js";
 import { NATIVE_PROJECT_INSTRUCTIONS } from "@rakazo/core/native-project-instructions";
@@ -117,7 +118,6 @@ import {
   redactSecrets,
   renderBotDirectory,
   resolveActionApprovalForTools,
-  sandboxCommandTimeoutMs,
   siteAlwaysAllowed,
   TAKEOVER_COMPUTER_PENDING_STATE,
   toolRequiresApproval,
@@ -6574,8 +6574,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                     unsetEnv: commandEnvironment.unsetEnv,
                     commandId: shellEnvironment?.durableCommands ? commandId : undefined,
                     executionId,
-                    timeoutMs: typeof args.timeout_ms === "number" && Number.isSafeInteger(args.timeout_ms) && args.timeout_ms >= 1000 && args.timeout_ms <= 3600000
-                      ? args.timeout_ms : shellEnvironment?.durableCommands ? 60 * 60_000 : sandboxCommandTimeoutMs(),
+                    timeoutMs: shellCommandTimeoutMs(command, typeof args.timeout_ms === "number" ? args.timeout_ms : undefined),
                   },
                   context,
                 ),
