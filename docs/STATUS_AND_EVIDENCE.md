@@ -2542,3 +2542,21 @@ remain manual-install releases; ad-hoc Mac integrity is not notarization.
   and hash-verified locally with its Internet zone evidence retained, but not
   executed. The installed owner profile remained at 0.3.46; Windows UI automation
   returned Access denied, so that real upgrade and restart remain unverified.
+
+## Concise conversational replies — 2026-11-17 (not deployed)
+
+Reviewed OpenBot's current `src/backend/agent/developer-instructions.ts`: result
+first, brief default, internal coordination kept out of ordinary user replies.
+Mycellios already had short-answer guidance but left a recognized style block
+buried in the instruction body. The shared native/Pi preparation now refreshes
+exact known historical host blocks and places one selected current style last,
+without rewriting owner instructions or choosing a new model. Ordinary status
+replies ask for result, blocker and necessary next action. Teammate reports and
+corrections are summarized rather than echoed; explicitly requested deliverables,
+approvals, costs and important failures remain intact. No text truncation or
+post-generation rewrite was added.
+
+Remote validation passed: 10 style/Mico preference tests, 37 native/append-only
+runtime tests and incremental adapter types. These are synthetic regressions;
+no real DeepSeek/OpenBot output comparison or paid model call was run. Full
+suites and deployment were not run. Existing referral changes remain preserved.
